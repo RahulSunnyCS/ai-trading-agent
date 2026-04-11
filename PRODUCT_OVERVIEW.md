@@ -124,6 +124,27 @@ S/R levels are defined objectively (not subjectively) — pivot points, previous
 
 ---
 
+## Strategy Ideas — Honest Evaluation
+
+As the system evolves beyond time-based entries, several ideas have been considered. This is an honest assessment of each:
+
+| Idea | Good? | Practical Now? | Honest Take |
+|------|-------|---------------|-------------|
+| **ATM straddle peak** | Yes | Yes | The core. Prove this first before adding anything else. |
+| **50/100 pt move → add new straddle** | Conceptually interesting | No | Too undefined as a standalone signal. Without a portfolio-level delta/gamma framework, adding straddles at fixed point intervals creates compounding directional risk. Viable only as part of the position management (Adjuster) framework — not as an independent entry signal. |
+| **S/R → directional straddle or buy** | Yes, real edge | Phase 2 | Most valuable addition. Options at well-defined S/R levels have genuine edge — short straddle for range-bound expectation, directional buy for bounce/break. Requires a proper S/R detection engine with objective level definitions and strength scoring. |
+
+### Notes on the "50/100 pt" Idea Specifically
+
+This idea is valid **only when reframed correctly**. As an independent entry trigger ("every time index moves 100 points, open a new straddle") it is dangerous because:
+- The trigger point is arbitrary without backtesting
+- In a trending day, it results in multiple straddles all losing simultaneously
+- There is no natural exit or position-size discipline
+
+The **correct framing** is as the Adjuster management style: a position that already exists gets one leg rolled when the index moves ~70 points. This keeps gross exposure flat, reduces net delta, and has defined rules. Same intuition, much safer implementation.
+
+---
+
 ## How Decisions Are Made
 
 Every signal passes through a **5-stage filter** before a personality acts:
