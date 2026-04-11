@@ -61,119 +61,26 @@ Strategy 1 accounts for ~80% of trades. All strategies have defined stop-loss an
 
 ## Trading Personalities
 
-Personalities are not risk levels — they are **hypotheses**. Each one is a controlled test subject running in parallel, designed to answer a specific research question. After enough samples, the data tells you which hypothesis holds.
+The system runs **10 personalities in parallel** across two groups:
 
-Every personality is defined by two independent variables:
-- **Entry style** — when and why to enter a position
-- **Management style** — what to do once in, when the market moves against you
+**Reference personalities (7)** are controlled experiments. Each one isolates a single variable — entry signal quality, entry frequency, or position management style — so that comparisons are clean. Clockwork is the permanent benchmark that nothing ever changes. The other six have their strategy identity locked (entry type + management style never changes) but their tuning parameters evolve slowly based on evidence.
 
-### The 2D Design Matrix
+**Learning personalities (3)** simulate human traders with different adaptation speeds. All three start from identical Clockwork parameters (fixed time entry, hold management) and evolve from there — Conservative Learner very slowly, Medium Learner moderately, Aggressive Learner quickly. After months of trading, their parameter divergence is itself the research output.
 
-```
-                    HOLD          ROLL (Adjuster)    CUT + RE-ENTER (Reducer)
-                 ┌────────────┬──────────────────┬──────────────────────────┐
-Time-based       │ Clockwork  │        —          │            —             │
-High-conf signal │ Precision  │    Adjuster       │         Reducer          │
-Low-conf signal  │  Scanner   │     Blitz         │            —             │
-S/R-anchored     │     —      │        —          │         Levelhead*       │
-                 └────────────┴──────────────────┴──────────────────────────┘
-                                                          * Phase 2 only
-```
+| # | Name | Group | Tests |
+|---|------|-------|-------|
+| 1 | **Clockwork** | Reference | Permanent benchmark — fixed time entry, frozen forever |
+| 2 | **Precision** | Reference | High-confidence signal entry vs time-based |
+| 3 | **Scanner** | Reference | Entry frequency vs selectivity |
+| 4 | **Adjuster** | Reference | Rolling management vs holding |
+| 5 | **Reducer** | Reference | Cut+re-enter management vs holding and rolling |
+| 6 | **Blitz** | Reference | Max frequency + active management vs selective + passive |
+| 7 | **Levelhead** | Reference | S/R-anchored entry vs momentum exhaustion *(Phase 2)* |
+| 8 | **Conservative Learner** | Learning | Slow adaptation — 30 samples before any change |
+| 9 | **Medium Learner** | Learning | Moderate adaptation — 15 samples before changes |
+| 10 | **Aggressive Learner** | Learning | Fast adaptation — acts on as few as 5 samples |
 
-Blank cells are intentional — not every combination needs testing. The filled cells isolate one variable at a time.
-
----
-
-### Phase 1 Personalities (run from day one)
-
-#### 1. Clockwork
-> *"Does any signal-based approach outperform a fixed clock?"*
-
-The permanent benchmark. Enters at a **fixed time every day** (9:17 AM), holds to stop-loss or EOD. No signal filtering, no management adjustments — ever.
-
-- Entry: Fixed 9:17 AM, every qualifying day
-- Management: Hold to SL / TSL / EOD
-- Parameters: **Frozen. Never evolved. Never changed.**
-- Purpose: If every other personality can't beat Clockwork consistently, signal-based approaches have no edge
-
-#### 2. Precision
-> *"Does high-quality signal entry beat time-based entry — with no other changes?"*
-
-Enters only on **high-confidence momentum exhaustion signals (70%+)**. Holds through the position exactly like Clockwork — no adjustments. The only variable changed from Clockwork is the entry trigger.
-
-- Entry: Momentum exhaustion signal, probability ≥ 70%
-- Management: Hold to SL / TSL / EOD
-- Max trades/day: 2
-- Purpose: Isolates the value of entry signal quality vs time-based entry
-
-#### 3. Scanner
-> *"Does taking more signals (lower bar) beat being selective — if management is the same?"*
-
-Enters on **any qualifying signal** including low-confidence momentum exhaustion and scheduled fallback entries (50%+). Same hold management as Precision — the only variable is entry threshold.
-
-- Entry: Any momentum exhaustion or scheduled fallback signal, probability ≥ 50%
-- Management: Hold to SL / TSL / EOD
-- Max trades/day: 5
-- Purpose: Isolates entry frequency vs entry quality — compared directly against Precision
-
-#### 4. Adjuster
-> *"Does active delta neutralization (rolling) add value over just holding a good entry?"*
-
-Same high-confidence entry as Precision. When the index moves ~70 points adversely, rolls **one leg** to the new ATM strike — reducing net delta without adding gross exposure. Compared directly against Precision (same entry, different management).
-
-- Entry: Momentum exhaustion signal, probability ≥ 70%
-- Management: Roll one leg to new ATM on ~70pt adverse move; max 4 open legs total
-- Max trades/day: 2 initial entries (rolling not counted as new trades)
-- Purpose: Isolates whether rolling adds value vs holding, given the same entry quality
-
-#### 5. Reducer
-> *"Does cutting size on an adverse move and re-entering at better IV beat holding through?"*
-
-Same high-confidence entry as Precision. When the index moves ~70 points adversely, closes one position entirely, then waits for the next momentum exhaustion or VIX spike signal to re-enter at the new ATM. Compared directly against Precision and Adjuster.
-
-- Entry: Momentum exhaustion signal, probability ≥ 70%
-- Management: Close one position on ~70pt adverse move; re-enter on next exhaustion signal
-- Max trades/day: 2 initial entries + 2 re-entries
-- Purpose: Isolates whether cut-and-re-enter beats hold-through or roll, given the same entry quality
-
-#### 6. Blitz
-> *"Does maximum frequency + active management beat selective + passive?"*
-
-Low entry threshold (like Scanner) combined with the rolling management style (like Adjuster). This is the "do everything, do it often" hypothesis — the opposite end of the spectrum from Precision.
-
-- Entry: Any qualifying signal, probability ≥ 50%
-- Management: Roll one leg to new ATM on ~70pt adverse move; max 4 open legs total
-- Max trades/day: 5
-- Purpose: Tests whether volume + activity beats selectivity + patience
-
----
-
-### Phase 2 Personality (added after Phase 1 baseline is proven)
-
-#### 7. Levelhead
-> *"Does entering at objective support/resistance levels add independent edge?"*
-
-Enters only when the index is at a well-defined, objectively identified S/R level (previous week high/low, monthly pivot, volume POC). Uses the Reducer management style — cuts one leg on adverse move, re-enters on next signal.
-
-- Entry: Index within 20 points of a qualified S/R level (strength score ≥ threshold)
-- Management: Reducer style (cut + re-enter)
-- Max trades/day: 2
-- Purpose: Tests whether S/R-anchored entries produce better outcomes than momentum exhaustion entries
-- Prerequisite: S/R detection engine with strength scoring must be built and validated first
-
----
-
-### What Each Personality Is Testing — Summary
-
-| Personality | vs Baseline | Variable Being Tested |
-|-------------|------------|----------------------|
-| **Clockwork** | — | Permanent benchmark |
-| **Precision** | vs Clockwork | Signal quality entry over time-based entry |
-| **Scanner** | vs Precision | Entry frequency (low bar) vs entry selectivity (high bar) |
-| **Adjuster** | vs Precision | Rolling management vs hold management |
-| **Reducer** | vs Precision & Adjuster | Cut+re-enter management vs hold vs roll |
-| **Blitz** | vs Precision & Scanner | High frequency + active vs selective + passive |
-| **Levelhead** | vs Precision | S/R entry signal vs momentum exhaustion signal |
+For full personality detail, starting parameters, what can evolve, comparison baselines, and a concrete 5-day evolution example, see **[PERSONALITIES.md](./PERSONALITIES.md)**.
 
 ---
 
