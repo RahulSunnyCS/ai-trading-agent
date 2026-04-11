@@ -345,32 +345,118 @@ Regardless of management style, the following are non-negotiable:
 
 ## How the System Learns & Evolves
 
-At the end of each trading day, the system runs a **retrospection batch** that analyzes:
+At the end of each trading day, a retrospection batch runs and analyzes every personality. The output is not just "who won today" — it's **why**, under **which regime**, and **what should change**.
 
-- Win rates, P&L, and drawdowns per personality
-- Best entry offsets (0, 5, 10, 15 min after signal)
-- Win rate by hour, day of week, and VIX range
-- **Management style performance by regime** — which style (Adjuster/Reducer/Holder) won on ranging vs trending days
-- **Signal type performance** — which entry signal produced better outcomes
-- Parameter suggestions for next day
+Every result is tagged with the day's market regime before any comparison is made:
 
-Every result is tagged with the day's **market regime** (ranging, trending, volatile-reverting, event day) so comparisons across styles are meaningful — not just raw P&L averages across all market conditions.
+| Regime Tag | Definition |
+|-----------|-----------|
+| `RANGING` | Index within ±0.5% of open, VIX stable |
+| `TRENDING_STRONG` | Index moves 1%+ directionally |
+| `VOLATILE_REVERTING` | Large intraday swings but mean-reverting |
+| `EVENT_DAY` | RBI, budget, F&O expiry morning, macro news |
+
+---
+
+### What Retrospection Computes Per Personality
+
+For every personality, the batch produces five outputs:
+
+1. **Daily metrics** — trades taken, win rate, P&L, max drawdown, Sharpe
+2. **Beat-Clockwork delta** — how much this personality made vs Clockwork on the same day (the only comparison that matters)
+3. **Entry quality** — for signal-based personalities: were stated probabilities calibrated? Did 70%+ signals actually win 70%+ of the time?
+4. **Management effectiveness** — for Adjuster/Reducer/Blitz: did the roll or cut improve outcomes compared to what a hold would have produced in the same situation?
+5. **Parameter suggestions** — regime-tagged recommendations for what to change
+
+---
+
+### What Can and Cannot Change — Per Personality
+
+Each personality has a **fixed identity** (entry type + management style) that never changes, and **tunable parameters** around that identity that the retrospection engine can suggest evolving.
+
+| Personality | Fixed Forever | Can Evolve |
+|-------------|--------------|-----------|
+| **Clockwork** | Everything — entry time, management, all params | **Nothing. Ever.** |
+| **Precision** | Entry type (momentum exhaustion), management (Hold) | Probability threshold, max trades/day, VIX range |
+| **Scanner** | Entry type (any signal), management (Hold) | Probability threshold, max trades/day |
+| **Adjuster** | Entry type (momentum exhaustion), management (Roll) | Probability threshold, roll trigger distance, max open legs |
+| **Reducer** | Entry type (momentum exhaustion), management (Cut+Re-enter) | Probability threshold, cut trigger distance, re-entry signal threshold |
+| **Blitz** | Entry type (any signal), management (Roll) | Entry threshold, roll trigger distance, max legs |
+| **Levelhead** | Entry type (S/R-anchored), management (Reducer) | S/R proximity window, strength score threshold |
+
+The management style is the personality's identity. If Precision starts rolling, it has become Adjuster — that defeats the experiment.
+
+---
+
+### The Clockwork Rule
+
+Clockwork is the **permanent control group**. It answers one question every day:
+
+> *"Is the market beatable today, and by how much?"*
+
+```
+All personalities beat Clockwork   → signal-based approaches adding value
+No personality beats Clockwork     → the edge may not exist in this regime
+Some beat Clockwork in some regime → regime-specific edge confirmed
+```
+
+Clockwork's retrospection output is read-only — no suggestions, no changes, no evolution. It is the anchor against which all other personalities are measured at every point in time.
+
+---
+
+### Sample Retrospection Output (Illustrative)
+
+**Ranging day. All personalities ran on the same Nifty signals.**
+
+```
+CLOCKWORK     Trades: 1 | P&L: +₹1,840 | Regime: RANGING
+              → No changes. Baseline logged.
+
+PRECISION     Trades: 2 | P&L: +₹2,950 | Beat Clockwork: +₹1,110
+              Signal calibration: 72%, 78% signals → both won ✓
+              → No parameter change suggested.
+
+ADJUSTER      Trades: 2 | P&L: +₹2,200 | Beat Clockwork: +₹360
+              Roll triggered at 23070 → market reversed 45 min later
+              Roll cost ₹750 in spread. Would have recovered without rolling.
+              → Suggestion: on RANGING days, increase roll trigger from 70pt to 90pt
+                (queued — needs 10 more RANGING day samples before applying)
+
+REDUCER       Trades: 2 | P&L: +₹1,400 | Lost to Clockwork: -₹440
+              Cut triggered → market reversed → re-entry missed recovery window
+              → Suggestion: consider RANGING regime gate for Reducer
+                (queued — needs 15 more samples to confirm pattern)
+
+SCANNER       Trades: 4 | P&L: +₹3,100 | Beat Clockwork: +₹1,260
+              High frequency helped on ranging day (multiple small wins)
+              → No change suggested.
+
+BLITZ         Trades: 4 | P&L: +₹1,950 | Beat Clockwork: +₹110
+              Rolls added cost on a ranging day vs Scanner (same entries, no rolls)
+              → Suggestion: on RANGING days, Blitz underperforms Scanner.
+                Track: does Blitz outperform Scanner on TRENDING days? (hypothesis)
+```
+
+---
+
+### Comparison Integrity Rule
+
+Precision, Adjuster, and Reducer share the same entry style (high-confidence momentum exhaustion). For their management comparison to be valid, their entry thresholds must stay close. If they drift apart, the comparison becomes "who has a better threshold" rather than "who has a better management style."
+
+**Enforcement:** If the probability threshold gap between any of these three exceeds 8 percentage points, the retrospection engine flags it and pauses further evolution on the outlier until alignment is restored.
+
+---
 
 ### Evolution Phases
 
 | Phase | Method | When |
 |-------|--------|------|
-| **Phase 1** | Rule-based adjustments | MVP (now) |
-| **Phase 2** | Bayesian optimization | After stable baseline |
-| **Phase 3** | Genetic algorithms | After 3+ months data |
-| **Phase 4** | Reinforcement learning | Future |
+| **Phase 1** | Rule-based adjustments | From the start |
+| **Phase 2** | Bayesian optimization | After 3+ months stable data per personality |
+| **Phase 3** | Genetic algorithms | After regime-personality mapping is established |
+| **Phase 4** | Reinforcement learning | Only if earlier phases show clear learnable patterns |
 
-**Example rule-based evolution:**
-- Win rate < 40% → increase probability threshold by 5%
-- Max drawdown > ₹20K → reduce daily trade limit by 1
-- High result variance → enable profit gate
-
-All parameter changes are logged with version history so evolution is fully traceable.
+All parameter changes are logged with: date, old value, new value, triggering metrics, regime context, and whether human approval was required. Evolution is fully auditable.
 
 ---
 

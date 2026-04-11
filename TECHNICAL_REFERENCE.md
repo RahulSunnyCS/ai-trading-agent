@@ -377,16 +377,25 @@ Version-controlled parameter sets for each personality.
 ```sql
 CREATE TABLE personality_configs (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name                TEXT NOT NULL,          -- conservative | balanced | aggressive
+  name                TEXT NOT NULL,          -- clockwork | precision | scanner | adjuster | reducer | blitz | levelhead
   version             INTEGER NOT NULL,
   is_active           BOOLEAN DEFAULT TRUE,
+  is_frozen           BOOLEAN DEFAULT FALSE,  -- TRUE for Clockwork — blocks all evolution rules
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  -- Core parameters
+  -- Identity (fixed — changing these invalidates the experiment)
+  entry_type          TEXT NOT NULL,          -- FIXED_TIME | MOMENTUM_EXHAUSTION | ANY_SIGNAL | SR_ANCHORED
+  management_style    TEXT NOT NULL,          -- HOLD | ROLL | CUT_REENTER
+  phase               INTEGER NOT NULL,       -- 1 = runs from day 1, 2 = Phase 2 only
+  -- Core tunable parameters
   min_probability     NUMERIC(4,3) NOT NULL,
   max_daily_trades    INTEGER NOT NULL,
   max_daily_loss      NUMERIC(10,2) NOT NULL,
   entry_delay_secs    INTEGER NOT NULL,
   position_multiplier NUMERIC(4,2) NOT NULL DEFAULT 1.0,
+  -- Management parameters (used by ROLL and CUT_REENTER styles)
+  adjustment_trigger_points INTEGER,          -- index points before roll/cut fires
+  max_open_legs             INTEGER,          -- hard cap on total open legs
+  reentry_min_probability   NUMERIC(4,3),     -- min signal quality to re-enter
   -- VIX constraints
   min_vix             NUMERIC(5,2) DEFAULT 0,
   max_vix             NUMERIC(5,2) DEFAULT 100,
@@ -410,39 +419,72 @@ CREATE TABLE personality_configs (
 ```
 
 #### `retrospection_results`
-Daily EOD analysis output.
+Daily EOD analysis output. One row per personality per day.
 
 ```sql
 CREATE TABLE retrospection_results (
-  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  analysis_date       DATE NOT NULL,
-  personality_id      UUID REFERENCES personality_configs(id),
-  run_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  analysis_date         DATE NOT NULL,
+  personality_id        UUID REFERENCES personality_configs(id),
+  run_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- Regime context (critical for all comparisons)
+  market_regime         TEXT NOT NULL,   -- RANGING | TRENDING_STRONG | VOLATILE_REVERTING | EVENT_DAY
+  vix_open              NUMERIC(6,2),
+  index_move_pct        NUMERIC(6,4),    -- % move from open to close
   -- Aggregate metrics
-  total_trades        INTEGER,
-  winning_trades      INTEGER,
-  losing_trades       INTEGER,
-  win_rate            NUMERIC(5,4),
-  total_pnl           NUMERIC(12,2),
-  avg_pnl_per_trade   NUMERIC(10,2),
-  max_drawdown        NUMERIC(12,2),
-  sharpe_ratio        NUMERIC(8,4),
-  -- Timing insights (JSONB for flexibility)
-  insights            JSONB,
-  -- Suggested parameter changes
-  suggested_changes   JSONB,
-  applied             BOOLEAN DEFAULT FALSE,
-  applied_at          TIMESTAMPTZ
+  total_trades          INTEGER,
+  winning_trades        INTEGER,
+  losing_trades         INTEGER,
+  win_rate              NUMERIC(5,4),
+  total_pnl             NUMERIC(12,2),
+  avg_pnl_per_trade     NUMERIC(10,2),
+  max_drawdown          NUMERIC(12,2),
+  sharpe_ratio          NUMERIC(8,4),
+  -- Clockwork comparison (filled for all non-Clockwork personalities)
+  clockwork_pnl_today   NUMERIC(12,2),  -- what Clockwork made on the same day
+  beat_clockwork_by     NUMERIC(12,2),  -- positive = beat, negative = lost to
+  -- Signal calibration (filled for signal-based personalities)
+  signals_received      INTEGER,
+  signals_acted_on      INTEGER,
+  signal_brier_score    NUMERIC(6,4),   -- lower = better calibrated
+  -- Management effectiveness (filled for Adjuster, Reducer, Blitz)
+  adjustments_made      INTEGER,
+  mgmt_pnl_delta        NUMERIC(12,2),  -- P&L vs estimated hold baseline
+  mgmt_verdict          TEXT,           -- HELPED | HURT | NEUTRAL
+  -- Comparison integrity check
+  threshold_drift_flag  BOOLEAN DEFAULT FALSE,  -- true if entry threshold diverged from peers
+  evolution_paused      BOOLEAN DEFAULT FALSE,
+  -- Insights and suggestions
+  insights              JSONB,
+  suggested_changes     JSONB,
+  applied               BOOLEAN DEFAULT FALSE,
+  applied_at            TIMESTAMPTZ
 );
+
+CREATE UNIQUE INDEX ON retrospection_results (analysis_date, personality_id);
+CREATE INDEX ON retrospection_results (market_regime, personality_id);
 ```
 
 **`insights` JSONB structure:**
 ```json
 {
+  "regime": "RANGING",
+  "beat_clockwork_pnl": 1110.0,
+  "beat_clockwork_pct": 60.3,
   "best_entry_offsets": [{ "offset_min": 5, "win_rate": 0.68 }],
   "win_rate_by_hour":   { "09": 0.55, "10": 0.61 },
   "vix_sweet_spots":    [{ "min": 12, "max": 16, "win_rate": 0.72 }],
-  "strategy_breakdown": [{ "strategy_id": 1, "trades": 8, "win_rate": 0.625 }]
+  "strategy_breakdown": [{ "strategy_id": 1, "trades": 8, "win_rate": 0.625 }],
+  "signal_calibration": {
+    "signals_at_70_plus": 2,
+    "actual_win_rate_at_70_plus": 1.0,
+    "brier_score": 0.12
+  },
+  "management_effectiveness": {
+    "adjustments_made": 1,
+    "pnl_delta_vs_hold_baseline": -750.0,
+    "verdict": "roll_hurt_on_ranging_day"
+  }
 }
 ```
 
@@ -476,13 +518,58 @@ GROUP BY bucket, underlying, expiry;
 
 ## Evolution Engine
 
+### Core Constraint: What Can Never Change
+
+Before any evolution rule runs, the engine checks two hard locks:
+
+```typescript
+const FROZEN_PERSONALITIES = ['clockwork'];  // never touched by any rule
+
+const FROZEN_ATTRIBUTES = [
+  'entry_type',        // FIXED_TIME | MOMENTUM_EXHAUSTION | ANY_SIGNAL | SR_ANCHORED
+  'management_style',  // HOLD | ROLL | CUT_REENTER
+];
+// These define the personality's identity. Changing them creates a different experiment.
+```
+
+If a rule targets a frozen personality or a frozen attribute, the rule is rejected with a `FROZEN_VIOLATION` error — not silently skipped, so it's visible in logs.
+
+---
+
+### Comparison Integrity Enforcement
+
+Precision, Adjuster, and Reducer all use the same entry style (momentum exhaustion). Their `min_probability` thresholds must stay within 8 percentage points of each other for the management comparison to be valid.
+
+```typescript
+function checkComparisonIntegrity(configs: PersonalityConfig[]): IntegrityResult {
+  const group = configs.filter(p =>
+    p.entry_type === 'MOMENTUM_EXHAUSTION' && p.name !== 'clockwork'
+  );
+  const thresholds = group.map(p => p.min_probability);
+  const drift = Math.max(...thresholds) - Math.min(...thresholds);
+
+  if (drift > 0.08) {
+    const outlier = group.find(p => p.min_probability === Math.max(...thresholds));
+    return { valid: false, pause_evolution_for: outlier.id, drift };
+  }
+  return { valid: true };
+}
+```
+
+This runs before any evolution rule is applied. If integrity is violated, the outlier's evolution is paused until alignment is restored.
+
+---
+
 ### Phase 1: Rule-Based Evolution
 
-Pre-defined rules trigger parameter adjustments when performance thresholds are crossed.
+Pre-defined rules trigger parameter adjustments when performance thresholds are crossed. Rules are **regime-aware** — a rule triggered on a RANGING day may not apply on a TRENDING day.
 
 ```typescript
 type EvolutionRule = {
   id: string;
+  applicable_to: string[];          // personality names this rule applies to
+  regime_filter?: RegimeTag[];      // only trigger in these regimes (null = all)
+  min_sample_size: number;          // minimum trades before rule can fire
   condition: (metrics: PerformanceMetrics) => boolean;
   adjustment: (config: PersonalityConfig) => Partial<PersonalityConfig>;
   cooldown_days: number;
@@ -491,22 +578,31 @@ type EvolutionRule = {
 };
 ```
 
-**Built-in rules:**
+**Entry tuning rules** (apply to all non-Clockwork personalities):
 
-| Rule | Condition | Adjustment |
-|------|-----------|------------|
-| `low_win_rate` | win_rate < 0.40 | increase `min_probability` by 0.05 |
-| `high_win_rate` | win_rate > 0.65 + good sample | decrease `min_probability` by 0.03 |
-| `excessive_drawdown` | max_drawdown > ₹20K | reduce `max_daily_trades` by 1 |
-| `severe_drawdown` | max_drawdown > ₹25K | enable profit gate |
-| `whipsaw_detection` | avg_hold < 10min AND win_rate < 0.45 | increase `entry_delay_secs` by 60 |
-| `high_variance` | pnl_stddev > ₹3K | enable `require_profit_gate` |
-| `vix_losses` | loss_rate_when_vix_gt20 > 0.60 | reduce `max_vix` by 3 |
+| Rule | Min Samples | Condition | Adjustment |
+|------|------------|-----------|------------|
+| `low_win_rate` | 30 | win_rate < 0.40 | increase `min_probability` by 0.05 |
+| `high_win_rate` | 30 | win_rate > 0.65 | decrease `min_probability` by 0.03 |
+| `excessive_drawdown` | 20 | max_drawdown > ₹20K | reduce `max_daily_trades` by 1 |
+| `severe_drawdown` | 10 | max_drawdown > ₹25K | reduce `max_daily_trades` by 2 + requires_approval |
+| `vix_losses` | 20 | loss_rate when VIX > 20 > 60% | reduce `max_vix` by 3 |
+
+**Management tuning rules** (Adjuster, Reducer, Blitz only):
+
+| Rule | Min Samples | Regime Filter | Condition | Adjustment |
+|------|------------|--------------|-----------|------------|
+| `roll_hurts_ranging` | 10 RANGING days | RANGING | roll_pnl_delta_vs_hold < -₹500 avg | increase `roll_trigger_points` by 20 |
+| `roll_hurts_trending` | 10 TRENDING days | TRENDING | roll_pnl_delta_vs_hold < -₹500 avg | increase `roll_trigger_points` by 30 |
+| `cut_too_early_ranging` | 10 RANGING days | RANGING | cut_pnl_delta_vs_hold < -₹400 avg | increase `cut_trigger_points` by 20 |
+| `reentry_missing_moves` | 10 any | any | re_entry_pnl < 0 on avg | increase re-entry signal threshold by 0.05 |
+| `whipsaw_detection` | 15 | any | avg_hold < 10min AND win_rate < 0.45 | increase `entry_delay_secs` by 60 |
 
 All rules have:
-- **Cooldown period** — prevents thrashing (minimum days between applications)
-- **Max applications** — caps cumulative drift
-- **Approval gate** — high-impact rules can require human confirmation
+- **Minimum sample size** — rules cannot fire on thin data
+- **Cooldown period** — minimum days between applications (prevents thrashing)
+- **Max applications** — caps cumulative drift on any single parameter
+- **Approval gate** — high-impact rules flag for human confirmation before applying
 
 ### Phase 2: Bayesian Optimization (Planned)
 
