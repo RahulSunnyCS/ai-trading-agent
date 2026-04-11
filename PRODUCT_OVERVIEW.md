@@ -2,7 +2,11 @@
 
 ## What Is This?
 
-The **AI Trading Agent** is a paper-trading research platform designed to find the optimal entry timing for weekly index options strategies on Indian markets (NSE/BSE). It runs multiple parallel "trading personalities" simultaneously, tracks their performance, and evolves their parameters automatically — the goal is to discover, through systematic experimentation, the entry timing and risk configuration that consistently performs best.
+The **AI Trading Agent** is a paper-trading research platform for weekly index options strategies on Indian markets (NSE/BSE). It runs multiple parallel "trading personalities" simultaneously across two dimensions — **how to enter** and **how to manage** positions — tracks their performance, and evolves parameters automatically.
+
+The core philosophy is to move away from **time-based, fixed rules** toward **signal-based, adaptive strategies** where every decision (entry timing, position sizing, adjustment, exit) is driven by market data and validated through systematic experimentation.
+
+The goal is to discover, through controlled parallel testing, which combination of entry signals and position management styles consistently performs best — and under which market conditions.
 
 ---
 
@@ -20,8 +24,9 @@ Most traders fall into the first two categories. This system aims to **systemati
 
 - Detecting when a straddle has peaked using momentum exhaustion signals
 - Running multiple personalities with different entry timings in parallel
-- Statistically identifying which timing windows actually produce better outcomes
-- Continuously refining parameters based on what actually worked
+- Testing multiple position management styles simultaneously (roll vs cut vs hold)
+- Statistically identifying which combination of entry + management produces better outcomes
+- Continuously refining parameters based on what actually worked — tagged by market regime
 
 ---
 
@@ -91,7 +96,9 @@ All three personalities receive the same signals simultaneously — the differen
 
 ## How Entry Signals Are Generated
 
-The core signal is **Momentum Exhaustion Detection**:
+The system supports multiple signal types. They are layered in phases — each new signal type added only after the previous one is proven.
+
+### Signal Type 1: Momentum Exhaustion (Core)
 
 1. From market open, the system tracks the straddle value (ATM CE + PE combined premium)
 2. It measures the **rate of change** and **acceleration** of straddle expansion
@@ -101,9 +108,19 @@ The core signal is **Momentum Exhaustion Detection**:
    - Time of day
    - Day of week
 
-**Fallback signals** are also supported:
+**Fallback signals** within this type:
 - **Scheduled entry**: Fixed time triggers (9:17 AM, 9:24 AM) when no momentum signal fires
 - **Pullback entry**: Entry after a 2% pullback from a detected peak
+
+### Signal Type 2: Support/Resistance Level Entry (Phase 2)
+
+When the index approaches a well-defined, objective S/R level (e.g., previous week's high/low, monthly pivot), a signal is generated:
+- **Short straddle at S/R**: Expecting range-bound behaviour around the level; time decay works in favour
+- **Directional buy at S/R**: Expecting a sharp bounce or break; asymmetric payoff
+
+S/R levels are defined objectively (not subjectively) — pivot points, previous week high/low, volume POC — and carry a "strength score" based on how many times the level has been tested.
+
+> **Why not build this first?** S/R detection requires significant infrastructure and the quality of the level definition determines everything. It is sequenced after the core signal type is validated.
 
 ---
 
@@ -123,6 +140,105 @@ A trade only executes if it passes all applicable stages.
 
 ---
 
+## Position Management: The Second Dimension
+
+Entry timing is only half the problem. Once a short straddle is open, **how you manage it as the market moves** determines a large part of the outcome. This is the second dimension the system tests in parallel.
+
+### The Problem: Delta Accumulation
+
+A short straddle is delta-neutral at entry. As the index moves, delta accumulates:
+
+```
+Short straddle @ 23000, index moves to 23070:
+  → Short 23000 CE is now losing (deeper ITM)
+  → Short 23000 PE is winning (further OTM)
+  → Net position: short delta (directional risk building)
+```
+
+Three philosophies exist for handling this. The system runs all three simultaneously and lets data decide which wins.
+
+---
+
+### The Three Management Styles
+
+#### The Adjuster
+> "Stay in the trade, neutralize delta by rolling"
+
+When the index moves ~70 points against the position, the Adjuster rolls one leg to the new ATM strike:
+
+```
+3× short straddle @ 23000, index hits 23070
+→ Buy back one 23000 CE
+→ Sell one 23100 CE (new ATM-ish)
+→ Now: 2× at 23000 + 1× rolled to 23100
+→ Net delta reduced, gross exposure unchanged
+```
+
+- Stays invested at all times — theta keeps collecting on all legs
+- Best in: ranging markets where delta eventually reverses
+- Worst in: strong trending days where you keep rolling into a move
+
+#### The Reducer
+> "Cut size on adverse move, re-enter at better prices"
+
+When the index moves ~70 points against the position, the Reducer closes one of the short straddles entirely — reducing exposure — then waits for VIX to spike or price acceleration to peak before re-entering a new straddle at the new ATM.
+
+```
+3× short straddle @ 23000, index hits 23070
+→ Close one 23000 straddle (take the loss, reduce exposure)
+→ Wait for VIX spike or momentum exhaustion signal
+→ Re-enter 1× short straddle @ 23070–23100 at elevated IV
+```
+
+- Reduces loss exposure on adverse move
+- Re-enters at higher IV — potentially better premium
+- Best in: trending days (cuts a losing leg before it gets worse, re-enters at better price)
+- Worst in: ranging days (exited too early, re-entered at higher cost, lost theta)
+
+#### The Holder
+> "Trust theta, hold conviction through the move"
+
+The Holder makes no adjustment. The position is held until the original stop-loss, trailing stop-loss, or end of day — no rolling, no cutting.
+
+```
+3× short straddle @ 23000, index hits 23070
+→ No action. Monitor. Let theta work.
+→ If market reverts, all three positions recover.
+→ If market continues, all three positions keep losing.
+```
+
+- Zero transaction costs — no bid-ask drag from adjustments
+- Best in: ranging markets with strong mean reversion
+- **Warning:** This is the highest-variance and highest-risk style in trending markets. "Holder" does not mean safe — it means maximum exposure. A strongly trending day without adjustment can result in the largest losses of all three styles.
+
+---
+
+### How the Styles Perform by Regime
+
+The winner is **not universal** — it is regime-dependent. This is why regime tagging in the retrospection engine is critical:
+
+| Market Regime | Adjuster | Reducer | Holder |
+|---------------|----------|---------|--------|
+| Ranging (most common) | Wins — delta neutral, full theta | Loses — exited too early | Wins — theta recovers |
+| Trending strong | Bleeds — keeps rolling into move | Wins — cut and re-entered | Blows up — full exposure |
+| Volatile + reverting | Wins — adjustments help | Neutral | Neutral |
+| Event day spike | Bleeds — multiple losing legs | Wins — reduced size early | Largest loss |
+
+The retrospection engine labels every trading day with its regime. Comparisons are only meaningful within the same regime bucket.
+
+---
+
+### Hard Risk Rules (All Styles)
+
+Regardless of management style, the following are non-negotiable:
+
+- **Maximum open legs**: 4 legs total across all straddles (hard cap, no exceptions)
+- **Portfolio-level stop**: If total portfolio P&L drops below ₹X, close all positions immediately — no more rolls or re-entries that day
+- **Event day gate**: No new positions or rolls on RBI policy days, budget days, or F&O expiry morning until after the event
+- **Margin buffer**: At least 30% free margin required before any roll or new position is added
+
+---
+
 ## How the System Learns & Evolves
 
 At the end of each trading day, the system runs a **retrospection batch** that analyzes:
@@ -130,7 +246,11 @@ At the end of each trading day, the system runs a **retrospection batch** that a
 - Win rates, P&L, and drawdowns per personality
 - Best entry offsets (0, 5, 10, 15 min after signal)
 - Win rate by hour, day of week, and VIX range
+- **Management style performance by regime** — which style (Adjuster/Reducer/Holder) won on ranging vs trending days
+- **Signal type performance** — which entry signal produced better outcomes
 - Parameter suggestions for next day
+
+Every result is tagged with the day's **market regime** (ranging, trending, volatile-reverting, event day) so comparisons across styles are meaningful — not just raw P&L averages across all market conditions.
 
 ### Evolution Phases
 
@@ -185,32 +305,63 @@ All three personalities trade the same underlying, so their drawdowns may be cor
 ### 4. Probability Calibration
 The confidence scores (e.g., "75% probability") are estimates based on rules and historical patterns — not rigorously calibrated probability distributions. Treat them as relative rankings, not absolute likelihoods.
 
+### 5. Rolling Into a Trend (Adjuster-specific)
+The Adjuster style's biggest risk: on a strongly trending day, rolling one leg at every 70-point move means you accumulate losses across multiple rolling points without ever reversing. Each roll adds transaction cost and the aggregate loss can be the largest of all three styles.
+
+### 6. Gamma Compounding With Multiple Legs
+Holding 3 short straddles at different strikes is not 3× the risk — it behaves worse on large moves because all legs are simultaneously deep ITM. The hard cap of 4 total legs exists specifically to prevent this from compounding.
+
+### 7. Complexity Budget vs Statistical Significance
+The system now tests across two dimensions: entry signal type × management style. Each combination needs 30+ trades for meaningful data. With 2–3 signals per day, some combinations will take months to produce statistically significant results. Running all combinations simultaneously from day one is tempting but produces noise, not signal.
+
 ---
 
 ## Implementation Roadmap
 
-### Phase 1 — MVP
-- One signal type (momentum exhaustion)
-- Two personalities (Conservative + Balanced)
-- One index (Nifty)
-- Daily retrospection + weekly review
-- Rule-based evolution
+The system is built in focused phases — each phase answers one research question before the next is layered on. This prevents the "too many variables" problem where you can't tell what's working.
 
-### Phase 2 — Expansion
-- Add Aggressive personality
-- Add Strategies 2 & 3
-- Bayesian parameter optimization
-- Multi-index support (BankNifty, Sensex)
+### Phase 1 — Prove Entry Timing
+**Research question: Does momentum exhaustion signal produce better entries than fixed time?**
 
-### Phase 3 — Optimization
+- One signal type: momentum exhaustion
+- Two entry personalities: Sniper + Professional
+- One management style: Holder (baseline — no adjustment complexity)
+- One index: Nifty
+- Daily retrospection with regime tagging
+- Rule-based evolution only
+
+*Exit criteria: 50+ samples, signal accuracy > 55% vs random, statistically significant.*
+
+### Phase 2 — Prove Management Style
+**Research question: Which position management style wins, and in which regime?**
+
+- Same signal and entry personalities from Phase 1
+- Add all three management styles in parallel: Adjuster, Reducer, Holder
+- Portfolio-level Greeks tracking (delta, gamma monitoring required before this phase)
+- Hard risk rules enforced: 4-leg cap, portfolio stop, margin buffer
+- Retrospection compares styles within each regime bucket
+
+*Exit criteria: 30+ samples per style per regime, statistically significant regime-style mapping.*
+
+### Phase 3 — Expand Signal Types
+**Research question: Do S/R-based signals add independent edge beyond momentum exhaustion?**
+
+- Add S/R signal type (objective levels: pivot, previous week high/low)
+- Run alongside momentum exhaustion as separate signal source
+- Multi-index support: BankNifty, Sensex
+- Bayesian parameter optimization for personality configs
+
+### Phase 4 — Full System Optimization
+- Add Aggressive entry personality
+- Add Strategies 2 & 3 (directional ATM short, momentum buy)
 - Genetic algorithms for personality discovery
-- Microstructure-aware simulation (realistic slippage)
-- Regime-switching logic
-
-### Phase 4 — Advanced
-- Reinforcement learning (if warranted by data)
+- Microstructure-aware simulation (dynamic slippage model)
 - Cross-personality portfolio-level risk constraints
-- Options Greeks hedging framework
+
+### Phase 5 — Advanced (If Warranted)
+- Reinforcement learning for management decisions (only if Phases 1–3 show clear patterns)
+- Options Greeks hedging framework (delta/gamma hedging)
+- Live trading readiness assessment
 
 ---
 
