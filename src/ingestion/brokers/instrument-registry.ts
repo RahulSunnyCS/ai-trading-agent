@@ -36,6 +36,14 @@ const EXCHANGE: Record<Underlying, 'NSE' | 'BSE'> = {
   SENSEX:    'BSE',
 };
 
+// Fyers uses 'NIFTYBANK' in option symbols, not 'BANKNIFTY' (our internal name).
+// All other underlyings match directly.
+const FYERS_SEGMENT: Record<Underlying, string> = {
+  NIFTY:     'NIFTY',
+  BANKNIFTY: 'NIFTYBANK',
+  SENSEX:    'SENSEX',
+};
+
 // ── Month code builder ─────────────────────────────────────────────────────────
 // Fyers weekly option uses single character for month:
 // Jan-Sep → '1'-'9', Oct → 'O', Nov → 'N', Dec → 'D'
@@ -61,10 +69,15 @@ export function buildWeeklySymbol(
   optionType: OptionType
 ): string {
   const yy      = String(expiry.getFullYear()).slice(2);
-  const m       = weeklyMonthCode(expiry.getMonth() + 1);
-  const dd      = String(expiry.getDate()).padStart(2, '0');
+  const month   = expiry.getMonth() + 1;
+  const m       = weeklyMonthCode(month);
+  // Oct/Nov/Dec use letter codes — day is 2-digit zero-padded.
+  // Jan-Sep use digit codes — Fyers stores only the last digit of the day.
+  // All Thursdays/Fridays in a month have unique last digits, so this is unambiguous.
+  const dd      = month >= 10 ? String(expiry.getDate()).padStart(2, '0') : String(expiry.getDate() % 10);
   const exch    = EXCHANGE[underlying];
-  return `${exch}:${underlying}${yy}${m}${dd}${strike}${optionType}`;
+  const seg     = FYERS_SEGMENT[underlying];
+  return `${exch}:${seg}${yy}${m}${dd}${strike}${optionType}`;
 }
 
 /**
@@ -81,7 +94,8 @@ export function buildMonthlySymbol(
   const mon     = MONTH_ABBR[expiry.getMonth()];
   const year4   = expiry.getFullYear();
   const exch    = EXCHANGE[underlying];
-  return `${exch}:${underlying}${yy}${mon}${year4}${strike}${optionType}`;
+  const seg     = FYERS_SEGMENT[underlying];
+  return `${exch}:${seg}${yy}${mon}${year4}${strike}${optionType}`;
 }
 
 /**
@@ -172,7 +186,10 @@ export function parseFyersSymbol(symbol: string): (ParsedSymbol & { isIndex: boo
   }
 
   // Option symbols: NSE:NIFTY255824000CE or NSE:NIFTY25MAY2524000CE
-  const weeklyRe  = /^(NSE|BSE):(NIFTY|NIFTYBANK|SENSEX)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)$/;
+  // Day is 1-2 digits for Jan-Sep (digit month codes) and always 2 digits for Oct-Dec.
+  // Strike is always 5 digits for current index ranges. Fixed \d{5} lets the regex engine
+  // backtrack correctly when a single-digit day precedes a 5-digit strike.
+  const weeklyRe  = /^(NSE|BSE):(NIFTY|NIFTYBANK|SENSEX)(\d{2})([1-9OND])(\d{1,2})(\d{5})(CE|PE)$/;
   const monthlyRe = /^(NSE|BSE):(NIFTY|NIFTYBANK|SENSEX)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d{4})(\d+)(CE|PE)$/;
 
   let match = symbol.match(weeklyRe);

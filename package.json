@@ -7,7 +7,9 @@
     "start": "bun run src/index.ts",
     "migrate": "bun run src/db/migrate.ts",
     "sim": "bun run src/index.ts --simulate",
-    "test": "bun test"
+    "test": "bun test",
+    "test:unit": "bun test --testPathPattern='(?<!integration)\\.test\\.ts$'",
+    "test:integration": "bun test --testPathPattern='\\.integration\\.test\\.ts$'"
   },
   "dependencies": {
     "fastify": "^4.28.1",

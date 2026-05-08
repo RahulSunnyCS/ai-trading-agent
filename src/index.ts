@@ -14,19 +14,13 @@ import {
   getAtmStrike,
 } from './ingestion/straddle-calc';
 import type { BrokerTick } from './ingestion/brokers/types';
+import { isMarketHours } from './utils/market-hours';
 import type { Underlying } from './db/schema';
 
 const SIMULATE        = process.env.SIMULATE === 'true' || process.argv.includes('--simulate');
 const UNDERLYING      = (process.env.SIM_UNDERLYING ?? 'NIFTY') as Underlying;
 const SNAPSHOT_MS     = 15_000;  // straddle snapshot every 15 seconds
 const TICK_CONSUME_MS = 500;     // drain tick stream into price cache twice per second
-
-// NSE market hours: 09:15 – 15:30 IST (UTC+5:30)
-function isMarketHours(): boolean {
-  const istOffset  = 5.5 * 60;
-  const istMinutes = (new Date().getUTCHours() * 60 + new Date().getUTCMinutes() + istOffset) % (24 * 60);
-  return istMinutes >= 9 * 60 + 15 && istMinutes <= 15 * 60 + 30;
-}
 
 // ── Shutdown handler ───────────────────────────────────────────────────────────
 let fyersFeed:  FyersFeed | null = null;
