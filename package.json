@@ -1,0 +1,28 @@
+{
+  "name": "ai-trading-agent",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "migrate": "bun run src/db/migrate.ts",
+    "sim": "bun run src/index.ts --simulate",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "fastify": "^4.28.1",
+    "@fastify/websocket": "^11.0.1",
+    "pg": "^8.13.1",
+    "ioredis": "^5.4.1",
+    "bullmq": "^5.13.2",
+    "ws": "^8.18.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "@types/ws": "^8.5.12",
+    "@types/bun": "latest",
+    "typescript": "^5.5.4"
+  }
+}
