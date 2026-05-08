@@ -2,41 +2,39 @@ import 'dotenv/config';
 import { runMigrations } from './db/migrate';
 import { closePool } from './db/client';
 import { getRedis, closeRedis } from './redis/client';
-import { NseWebSocketFeed, type InstrumentInfo } from './ingestion/nse-websocket';
-import { VixFeed, fetchVixFromNse } from './ingestion/vix-feed';
+import { FyersFeed } from './ingestion/brokers/fyers';
+import { currentExpiry, FYERS_INDEX_SYMBOLS } from './ingestion/brokers/instrument-registry';
+import { setVix } from './ingestion/vix-feed';
 import { MarketDataSimulator } from './ingestion/market-data-sim';
 import {
   computeAndSaveSnapshot,
   consumeTickStream,
+  updatePrice,
   resetDayState,
   getAtmStrike,
 } from './ingestion/straddle-calc';
+import type { BrokerTick } from './ingestion/brokers/types';
 import type { Underlying } from './db/schema';
 
 const SIMULATE        = process.env.SIMULATE === 'true' || process.argv.includes('--simulate');
 const UNDERLYING      = (process.env.SIM_UNDERLYING ?? 'NIFTY') as Underlying;
 const SNAPSHOT_MS     = 15_000;  // straddle snapshot every 15 seconds
-const TICK_CONSUME_MS = 500;     // drain tick stream twice per second
+const TICK_CONSUME_MS = 500;     // drain tick stream into price cache twice per second
 
-// ── Market hours (IST = UTC+5:30) ─────────────────────────────────────────────
-// NSE market: 09:15 – 15:30 IST
+// NSE market hours: 09:15 – 15:30 IST (UTC+5:30)
 function isMarketHours(): boolean {
-  const now = new Date();
-  // Convert UTC to IST offset
-  const istOffset = 5.5 * 60; // minutes
-  const istMinutes = (now.getUTCHours() * 60 + now.getUTCMinutes() + istOffset) % (24 * 60);
+  const istOffset  = 5.5 * 60;
+  const istMinutes = (new Date().getUTCHours() * 60 + new Date().getUTCMinutes() + istOffset) % (24 * 60);
   return istMinutes >= 9 * 60 + 15 && istMinutes <= 15 * 60 + 30;
 }
 
 // ── Shutdown handler ───────────────────────────────────────────────────────────
-let wssFeed:    NseWebSocketFeed | null = null;
-let vixFeed:    VixFeed | null = null;
+let fyersFeed:  FyersFeed | null = null;
 let simulator:  MarketDataSimulator | null = null;
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`\n[main] Received ${signal}. Shutting down...`);
-  wssFeed?.stop();
-  vixFeed?.stop();
+  fyersFeed?.disconnect();
   simulator?.stop();
   await closeRedis();
   await closePool();
@@ -48,128 +46,195 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 async function main(): Promise<void> {
-  console.log(`[main] AI Trading Agent — Sprint 1: Data Ingestion`);
+  console.log('[main] AI Trading Agent — Data Ingestion (Broker: Fyers)');
   console.log(`[main] Mode: ${SIMULATE ? 'SIMULATION' : 'LIVE'}`);
 
-  // 1. Run DB migrations
   await runMigrations();
 
-  // 2. Verify Redis
   await getRedis().ping();
   console.log('[main] Redis ready');
 
-  // 3. Start market data source
   if (SIMULATE) {
     await startSimulation();
   } else {
     await startLiveFeed();
   }
 
-  console.log('[main] Ingestion pipeline running. Press Ctrl+C to stop.');
+  console.log('[main] Ingestion pipeline running. Ctrl+C to stop.');
+}
+
+// ── Live feed — Fyers ──────────────────────────────────────────────────────────
+async function startLiveFeed(): Promise<void> {
+  const appId       = process.env.FYERS_APP_ID;
+  const accessToken = process.env.FYERS_ACCESS_TOKEN;
+
+  if (!appId || !accessToken) {
+    throw new Error(
+      'Missing FYERS_APP_ID or FYERS_ACCESS_TOKEN. ' +
+      'Set SIMULATE=true to run without credentials.'
+    );
+  }
+
+  const expiry = currentExpiry(UNDERLYING);
+
+  fyersFeed = new FyersFeed({ appId, accessToken });
+
+  // Route every tick into: price cache + VIX cache + straddle snapshots
+  fyersFeed.onTick((tick: BrokerTick) => {
+    routeTick(tick);
+  });
+
+  fyersFeed.onConnect(() => {
+    // Subscribe to index spot + VIX first
+    fyersFeed!.subscribeIndexes([UNDERLYING]);
+
+    // Subscribe to ATM ±2 strikes for current weekly expiry
+    const spot    = 24_000; // initial estimate; will self-correct after first spot tick
+    const atm     = getAtmStrike(spot, UNDERLYING);
+    const strikes = [atm - 200, atm - 100, atm, atm + 100, atm + 200];
+
+    fyersFeed!.subscribe(
+      strikes.flatMap((strike) => [
+        { underlying: UNDERLYING, expiry, strike, optionType: 'CE' as const },
+        { underlying: UNDERLYING, expiry, strike, optionType: 'PE' as const },
+      ])
+    );
+  });
+
+  fyersFeed.onError((err) => console.error('[fyers] Error:', err.message));
+
+  await fyersFeed.connect();
+
+  // Drain tick stream into price cache every 500ms
+  setInterval(() => void consumeTickStream(), TICK_CONSUME_MS);
+
+  // Compute and persist straddle snapshot every 15s during market hours
+  let lastAtm = 0;
+  setInterval(async () => {
+    if (!isMarketHours()) return;
+
+    const spotTick = getPrice(FYERS_INDEX_SYMBOLS[UNDERLYING]);
+    if (!spotTick) return; // no spot price yet
+
+    const spot   = spotTick.ltp;
+    const vix    = getVixFromCache();
+    const newAtm = getAtmStrike(spot, UNDERLYING);
+
+    // Re-subscribe if ATM moved by one strike interval
+    if (newAtm !== lastAtm && lastAtm !== 0) {
+      resubscribeAtm(newAtm, lastAtm, expiry);
+    }
+    lastAtm = newAtm;
+
+    try {
+      await computeAndSaveSnapshot(UNDERLYING, expiry, spot, vix);
+      console.log(`[live] Snapshot — ${UNDERLYING} spot:${spot.toFixed(0)} ATM:${newAtm} VIX:${vix?.toFixed(1) ?? 'n/a'}`);
+    } catch (err) {
+      console.error('[live] Snapshot error:', err instanceof Error ? err.message : err);
+    }
+  }, SNAPSHOT_MS);
+
+  scheduleDailyReset();
 }
 
 // ── Simulation mode ────────────────────────────────────────────────────────────
 async function startSimulation(): Promise<void> {
   const tickIntervalMs = parseInt(process.env.SIM_TICK_INTERVAL_MS ?? '1000', 10);
 
-  simulator = new MarketDataSimulator({
-    underlying:     UNDERLYING,
-    startSpot:      24_000,
-    startVix:       14.5,
-    tickIntervalMs,
-  });
+  simulator = new MarketDataSimulator({ underlying: UNDERLYING, startSpot: 24_000, startVix: 14.5, tickIntervalMs });
   simulator.start();
 
-  // Drain tick stream into price cache
   setInterval(() => void consumeTickStream(), TICK_CONSUME_MS);
 
-  // Every 15s: compute straddle snapshot using simulated prices
   setInterval(async () => {
     const spot   = simulator!.getSpot();
     const vix    = simulator!.getVix();
     const expiry = simulator!.getExpiry();
-
     try {
       await computeAndSaveSnapshot(UNDERLYING, expiry, spot, vix);
-      const atm = getAtmStrike(spot, UNDERLYING);
-      console.log(
-        `[sim] Snapshot — ${UNDERLYING} spot:${spot.toFixed(0)} ATM:${atm} ` +
-        `VIX:${vix.toFixed(1)}`
-      );
+      console.log(`[sim] Snapshot — ${UNDERLYING} spot:${spot.toFixed(0)} ATM:${getAtmStrike(spot, UNDERLYING)} VIX:${vix.toFixed(1)}`);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[sim] Snapshot error:', msg);
+      console.error('[sim] Snapshot error:', err instanceof Error ? err.message : err);
     }
   }, SNAPSHOT_MS);
 
-  // Reset day state at midnight IST
   scheduleDailyReset();
 }
 
-// ── Live feed mode ─────────────────────────────────────────────────────────────
-async function startLiveFeed(): Promise<void> {
-  const wsUrl      = process.env.NSE_WEBSOCKET_URL;
-  const apiKey     = process.env.NSE_API_KEY;
-  const accessToken = process.env.NSE_ACCESS_TOKEN;
+// ── Tick routing (live mode) ───────────────────────────────────────────────────
+// Cache for spot prices from index ticks (keyed by Fyers index symbol)
+const spotCache = new Map<string, { ltp: number; time: Date }>();
+let cachedVix: number | null = null;
 
-  if (!wsUrl || !apiKey || !accessToken) {
-    throw new Error(
-      'Missing required env vars: NSE_WEBSOCKET_URL, NSE_API_KEY, NSE_ACCESS_TOKEN. ' +
-      'Set SIMULATE=true to run without broker credentials.'
-    );
+function routeTick(tick: BrokerTick): void {
+  const symbol = tick.symbol;
+
+  // VIX tick
+  if (symbol === 'NSE:INDIAVIX-INDEX') {
+    cachedVix = tick.ltp;
+    setVix(tick.ltp);
+    return;
   }
 
-  // Instrument map — populate this with your broker's instrument tokens.
-  // Example shows Nifty spot + weekly ATM ±2 strikes.
-  // In production, this is loaded from the broker's instrument CSV.
-  const instruments = new Map<number, InstrumentInfo>([
-    // Nifty spot (instrument token varies by broker)
-    // [256265, { symbol: 'NIFTY', underlying: 'NIFTY' }],
-    // Add weekly option tokens here after loading instrument CSV
-  ]);
-
-  if (instruments.size === 0) {
-    console.warn(
-      '[main] WARNING: No instruments configured in instrument map. ' +
-      'Populate src/index.ts instruments with your broker\'s instrument tokens.'
-    );
+  // Index spot tick
+  const indexSymbols = Object.values(FYERS_INDEX_SYMBOLS) as string[];
+  if (indexSymbols.includes(symbol)) {
+    spotCache.set(symbol, { ltp: tick.ltp, time: tick.timestamp });
+    return;
   }
 
-  wssFeed = new NseWebSocketFeed({ url: wsUrl, apiKey, accessToken, instruments });
-  wssFeed.start();
+  // Option tick → update straddle-calc price cache
+  updatePrice(symbol, tick.ltp, tick.timestamp);
+}
 
-  // Drain tick stream
-  setInterval(() => void consumeTickStream(), TICK_CONSUME_MS);
+function getPrice(fyersIndexSymbol: string): { ltp: number; time: Date } | undefined {
+  return spotCache.get(fyersIndexSymbol);
+}
 
-  // VIX feed (poll NSE every 60s as fallback)
-  vixFeed = new VixFeed(fetchVixFromNse, 60_000);
-  vixFeed.start();
+function getVixFromCache(): number | null {
+  return cachedVix;
+}
 
-  // Straddle snapshots every 15s during market hours
-  // Requires: spot price from index tick, expiry from current week's contracts
-  // TODO: wire spot from index tick → computeAndSaveSnapshot
-  setInterval(async () => {
-    if (!isMarketHours()) return;
-    // Spot price needs to come from the index instrument tick
-    // Add snapshot logic here once instrument tokens are configured
-  }, SNAPSHOT_MS);
+// Re-subscribe to new ATM strikes when spot moves enough
+function resubscribeAtm(newAtm: number, oldAtm: number, expiry: Date): void {
+  if (!fyersFeed) return;
 
-  scheduleDailyReset();
+  const INTERVAL = newAtm > oldAtm ? 50 : -50; // direction of movement
+  const toUnsub  = [oldAtm - 200, oldAtm - 100, oldAtm, oldAtm + 100, oldAtm + 200]
+    .filter((s) => ![newAtm - 200, newAtm - 100, newAtm, newAtm + 100, newAtm + 200].includes(s));
+  const toSub    = [newAtm - 200, newAtm - 100, newAtm, newAtm + 100, newAtm + 200]
+    .filter((s) => ![oldAtm - 200, oldAtm - 100, oldAtm, oldAtm + 100, oldAtm + 200].includes(s));
+
+  if (toUnsub.length > 0) {
+    fyersFeed.unsubscribe(toUnsub.flatMap((s) => [
+      { underlying: UNDERLYING, expiry, strike: s, optionType: 'CE' as const },
+      { underlying: UNDERLYING, expiry, strike: s, optionType: 'PE' as const },
+    ]));
+  }
+  if (toSub.length > 0) {
+    fyersFeed.subscribe(toSub.flatMap((s) => [
+      { underlying: UNDERLYING, expiry, strike: s, optionType: 'CE' as const },
+      { underlying: UNDERLYING, expiry, strike: s, optionType: 'PE' as const },
+    ]));
+  }
+
+  void INTERVAL; // suppress unused warning — kept for clarity
+  console.log(`[live] ATM shifted ${oldAtm} → ${newAtm}: unsub ${toUnsub.join(',')}, sub ${toSub.join(',')}`);
 }
 
 // ── Daily reset at midnight IST ────────────────────────────────────────────────
 function scheduleDailyReset(): void {
-  const now       = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const istNow    = new Date(now.getTime() + istOffset);
-  const midnight  = new Date(istNow);
+  const istOffset       = 5.5 * 60 * 60 * 1000;
+  const istNow          = new Date(Date.now() + istOffset);
+  const midnight        = new Date(istNow);
   midnight.setHours(0, 0, 0, 0);
   midnight.setDate(midnight.getDate() + 1);
   const msUntilMidnight = midnight.getTime() - istNow.getTime();
 
   setTimeout(() => {
     resetDayState();
-    // Reschedule for the next day
+    spotCache.clear();
+    cachedVix = null;
     scheduleDailyReset();
   }, msUntilMidnight);
 }

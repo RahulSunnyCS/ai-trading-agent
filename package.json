@@ -12,6 +12,7 @@
   "dependencies": {
     "fastify": "^4.28.1",
     "@fastify/websocket": "^11.0.1",
+    "fyers-api-v3": "^1.8.0",
     "pg": "^8.13.1",
     "ioredis": "^5.4.1",
     "bullmq": "^5.13.2",
