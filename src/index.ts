@@ -16,7 +16,9 @@ import {
 import type { BrokerTick } from './ingestion/brokers/types';
 import { isMarketHours } from './utils/market-hours';
 import type { Underlying } from './db/schema';
+import { startApiServer, stopApiServer } from './api/server';
 
+const API_PORT = parseInt(process.env.API_PORT ?? '3001', 10);
 const SIMULATE        = process.env.SIMULATE === 'true' || process.argv.includes('--simulate');
 const UNDERLYING      = (process.env.SIM_UNDERLYING ?? 'NIFTY') as Underlying;
 const SNAPSHOT_MS     = 15_000;  // straddle snapshot every 15 seconds
@@ -30,6 +32,7 @@ async function shutdown(signal: string): Promise<void> {
   console.log(`\n[main] Received ${signal}. Shutting down...`);
   fyersFeed?.disconnect();
   simulator?.stop();
+  await stopApiServer();
   await closeRedis();
   await closePool();
   process.exit(0);
@@ -47,6 +50,8 @@ async function main(): Promise<void> {
 
   await getRedis().ping();
   console.log('[main] Redis ready');
+
+  await startApiServer(API_PORT);
 
   if (SIMULATE) {
     await startSimulation();
