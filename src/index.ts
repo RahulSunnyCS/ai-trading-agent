@@ -3,7 +3,7 @@ import { runMigrations } from './db/migrate';
 import { closePool } from './db/client';
 import { getRedis, closeRedis } from './redis/client';
 import { FyersFeed } from './ingestion/brokers/fyers';
-import { currentExpiry, FYERS_INDEX_SYMBOLS } from './ingestion/brokers/instrument-registry';
+import { currentExpiry, FYERS_INDEX_SYMBOLS, buildFyersSymbol } from './ingestion/brokers/instrument-registry';
 import { setVix } from './ingestion/vix-feed';
 import { MarketDataSimulator } from './ingestion/market-data-sim';
 import {
@@ -12,10 +12,13 @@ import {
   updatePrice,
   resetDayState,
   getAtmStrike,
+  buildOptionSymbol,
+  getPrice as getOptionPrice,
 } from './ingestion/straddle-calc';
 import type { BrokerTick } from './ingestion/brokers/types';
 import { isMarketHours } from './utils/market-hours';
 import type { Underlying } from './db/schema';
+import { startTradingLoop, stopTradingLoop } from './trading/trading-loop';
 
 const SIMULATE        = process.env.SIMULATE === 'true' || process.argv.includes('--simulate');
 const UNDERLYING      = (process.env.SIM_UNDERLYING ?? 'NIFTY') as Underlying;
@@ -28,6 +31,7 @@ let simulator:  MarketDataSimulator | null = null;
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`\n[main] Received ${signal}. Shutting down...`);
+  stopTradingLoop();
   fyersFeed?.disconnect();
   simulator?.stop();
   await closeRedis();
@@ -128,6 +132,7 @@ async function startLiveFeed(): Promise<void> {
     }
   }, SNAPSHOT_MS);
 
+  startTradingLoop(UNDERLYING, currentPrices, getVixFromCache);
   scheduleDailyReset();
 }
 
@@ -150,8 +155,23 @@ async function startSimulation(): Promise<void> {
     } catch (err) {
       console.error('[sim] Snapshot error:', err instanceof Error ? err.message : err);
     }
+
+    // Sync currentPrices with Fyers-format keys so the trading loop can look up option prices
+    const atmStrike = getAtmStrike(spot, UNDERLYING);
+    for (const delta of [-200, -100, 0, 100, 200]) {
+      const strike = atmStrike + delta;
+      for (const optionType of ['CE', 'PE'] as const) {
+        const simKey   = buildOptionSymbol(UNDERLYING, simulator!.getExpiry(), strike, optionType);
+        const fyersKey = buildFyersSymbol({ underlying: UNDERLYING, expiry: simulator!.getExpiry(), strike, optionType });
+        const cached   = getOptionPrice(simKey);
+        if (cached) currentPrices.set(fyersKey, cached.ltp);
+      }
+    }
+    // Index spot
+    currentPrices.set(FYERS_INDEX_SYMBOLS[UNDERLYING], spot);
   }, SNAPSHOT_MS);
 
+  startTradingLoop(UNDERLYING, currentPrices, () => simulator!.getVix());
   scheduleDailyReset();
 }
 
@@ -159,6 +179,9 @@ async function startSimulation(): Promise<void> {
 // Cache for spot prices from index ticks (keyed by Fyers index symbol)
 const spotCache = new Map<string, { ltp: number; time: Date }>();
 let cachedVix: number | null = null;
+
+// Shared price map passed to trading loop — keyed by Fyers symbol
+const currentPrices = new Map<string, number>();
 
 function routeTick(tick: BrokerTick): void {
   const symbol = tick.symbol;
@@ -174,11 +197,13 @@ function routeTick(tick: BrokerTick): void {
   const indexSymbols = Object.values(FYERS_INDEX_SYMBOLS) as string[];
   if (indexSymbols.includes(symbol)) {
     spotCache.set(symbol, { ltp: tick.ltp, time: tick.timestamp });
+    currentPrices.set(symbol, tick.ltp);
     return;
   }
 
-  // Option tick → update straddle-calc price cache
+  // Option tick → update straddle-calc price cache and shared prices map
   updatePrice(symbol, tick.ltp, tick.timestamp);
+  currentPrices.set(symbol, tick.ltp);
 }
 
 function getPrice(fyersIndexSymbol: string): { ltp: number; time: Date } | undefined {
