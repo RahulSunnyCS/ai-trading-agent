@@ -12,7 +12,7 @@
 import type { FastifyInstance } from "fastify";
 import type { Redis } from "ioredis";
 import type { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildServer } from "../../api/server.js";
 import { FixedClock } from "../../utils/clock.js";
 
@@ -471,6 +471,12 @@ describe("GET /paper-trades", () => {
 
   afterAll(async () => {
     await server.close();
+  });
+
+  // Reset call history before each test so that mock.calls[0] always refers
+  // to the call made in the current test, not an earlier one.
+  beforeEach(() => {
+    (db.query as ReturnType<typeof vi.fn>).mockClear();
   });
 
   it("returns HTTP 400 for invalid date format", async () => {
