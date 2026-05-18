@@ -114,7 +114,32 @@ the working slice.
 
 ---
 
-## Milestone 3 — EOD Retrospection + Rule-Based Evolution (Phase 1)
+## Milestone 3 — Fyers Historical Data, Replay & Backtesting
+
+Unlock data-driven validation: pull Fyers historical data, reconstruct
+straddles for past dates, replay them through the **real** pipeline, and
+run full backtests over the personality engine. Sequenced after M2 so
+there is a signal + personality engine to replay against. Consolidates
+the old `T-51` backtesting task (re-homed here with broader scope).
+
+> **Forward dependency note:** per-regime backtest reporting (T-58)
+> needs the regime tagging engine (**T-33**, Milestone 4). If
+> regime-bucketed backtests are wanted before M4, pull T-33 forward and
+> implement it alongside this milestone — the rest of M3 does not
+> depend on it.
+
+| Task | Title | Depends on | Acceptance (summary) |
+|---|---|---|---|
+| **T-54** | Fyers historical REST client | T-09 | `brokers/fyers-historical.ts` — Fyers history REST API (candles/quotes), reuses Fyers auth + `fyers-api-v3` shim. Date-range chunking, pagination, rate-limit backoff, typed responses. |
+| **T-55** | Historical backfill store + writer | T-05,T-54 | Idempotent backfill into `market_ticks` / `option_ticks` hypertables (time-filtered, dedupe on conflict). Resumable; tracks backfilled ranges. |
+| **T-56** | Historical straddle reconstruction | T-13,T-55 | Rebuild `straddle_snapshots` (value, ROC, acceleration) from historical option candles for any past date range — live snapshots do not exist for the past. |
+| **T-57** | Deterministic replay harness | T-12,T-56 | `HistoricalFeed` implementing `BrokerFeed` + a virtual clock. Replays a historical window through the real pipeline at configurable speed; deterministic given the same data. |
+| **T-51** | Backtest runner *(re-homed from old M5)* | T-27,T-57 | Run all active personalities over a historical window via the replay harness. Train/test split + reserved **holdout** period that optimisation must not touch. |
+| **T-58** | Backtest reporting + statistical validation | T-51,T-33 | Per-regime Sharpe / drawdown, signal accuracy, per-personality results. Two-sample t-test / Mann-Whitney U (p < 0.05). Holdout-respecting; emits an experiment-card-style report. |
+
+---
+
+## Milestone 4 — EOD Retrospection + Rule-Based Evolution (Phase 1)
 
 | Task | Title | Depends on | Acceptance (summary) |
 |---|---|---|---|
@@ -131,7 +156,7 @@ the working slice.
 
 ---
 
-## Milestone 4 — Phase 2: S/R Signals, Multi-Index, Bayesian (later)
+## Milestone 5 — Phase 2: S/R Signals, Multi-Index, Bayesian (later)
 
 | Task | Title | Depends on | Acceptance (summary) |
 |---|---|---|---|
@@ -142,7 +167,7 @@ the working slice.
 
 ---
 
-## Milestone 5 — Phase 3/4 + Production Readiness (later, data-gated)
+## Milestone 6 — Phase 3/4 + Production Readiness (later, data-gated)
 
 | Task | Title | Depends on | Acceptance (summary) |
 |---|---|---|---|
@@ -150,7 +175,6 @@ the working slice.
 | **T-48** | Genetic-algorithm evolution | T-46 | Population/fitness/crossover/mutation over configs. |
 | **T-49** | Dynamic slippage model | T-17 | Microstructure-aware `f(roc, spread, volume, oi)` + tail stress tests. Replaces optimistic static assumption. |
 | **T-50** | Portfolio Greeks + circuit breaker | T-31 | Aggregate delta/gamma; pause all personalities past exposure cap. |
-| **T-51** | Backtesting harness | T-22,T-40 | ≥6 months historical, train/test split, holdout; per-regime Sharpe/drawdown report. |
 | **T-52** | Probability recalibration | T-37 | Isotonic / Platt scaling + reliability diagrams. |
 | **T-53** | Prod hardening | T-09 | Fyers daily token auto-refresh, Railway/Fly.io deploy, secrets hygiene audit. |
 
@@ -169,6 +193,11 @@ the working slice.
   (unit + integration; E2E for dashboard tasks) — not split into
   separate roadmap tasks. Acceptance criteria above are the test
   contract.
+- **Task-ID stability:** `T-XX` IDs are permanent identifiers, not a
+  sequence. Numeric order need not match milestone order — e.g. `T-51`
+  was re-homed from the old M5 into Milestone 3 with broader scope, ID
+  unchanged so references stay stable. New work appends new IDs rather
+  than renumbering.
 - **Gates:** each milestone end is a natural Human Gate. Milestone 1
   is the first "is this real and working?" checkpoint.
 - **Next step:** on approval, decompose **Milestone 0 + Milestone 1**

@@ -41,7 +41,15 @@ At-a-glance mirror of `ROADMAP.md`. Status: all tasks **not started**
 - [ ] T-31 Hard portfolio risk rules
 - [ ] T-32 Personality CRUD + performance API
 
-## Milestone 3 — EOD Retrospection + Rule-Based Evolution (Phase 1)
+## Milestone 3 — Fyers Historical Data, Replay & Backtesting
+- [ ] T-54 Fyers historical REST client (candles/quotes, chunking, rate limits)
+- [ ] T-55 Historical backfill store + writer (idempotent, resumable)
+- [ ] T-56 Historical straddle reconstruction (rebuild snapshots for past dates)
+- [ ] T-57 Deterministic replay harness (HistoricalFeed + virtual clock)
+- [ ] T-51 Backtest runner — train/test split + holdout (re-homed from old M5)
+- [ ] T-58 Backtest reporting + statistical validation (needs T-33; see ROADMAP note)
+
+## Milestone 4 — EOD Retrospection + Rule-Based Evolution (Phase 1)
 - [ ] T-33 Regime tagging engine
 - [ ] T-34 BullMQ EOD job scaffold
 - [ ] T-35 Daily metrics computation
@@ -53,17 +61,16 @@ At-a-glance mirror of `ROADMAP.md`. Status: all tasks **not started**
 - [ ] T-41 Retrospection + evolution API + audit log
 - [ ] T-42 Dashboard retrospection view
 
-## Milestone 4 — Phase 2 (later)
+## Milestone 5 — Phase 2 (later)
 - [ ] T-43 S/R detection engine
 - [ ] T-44 Levelhead personality
 - [ ] T-45 Multi-index expansion (BankNifty, Sensex)
 - [ ] T-46 Bayesian optimization
 
-## Milestone 5 — Phase 3/4 + Production (later, data-gated)
+## Milestone 6 — Phase 3/4 + Production (later, data-gated)
 - [ ] T-47 Strategies 2 & 3
 - [ ] T-48 Genetic-algorithm evolution
 - [ ] T-49 Dynamic slippage model
 - [ ] T-50 Portfolio Greeks + circuit breaker
-- [ ] T-51 Backtesting harness
 - [ ] T-52 Probability recalibration
 - [ ] T-53 Prod hardening (Fyers token refresh, deploy, secrets)
