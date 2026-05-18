@@ -52,33 +52,48 @@ cleanly.
 
 ---
 
-## Milestone 0.5 — Testing & CI Foundation
+## Milestone 0.5 — Testing & CI Foundation (lean — research-tool scoped)
 
-The confidence layer for AI-written code. Built **before** heavy
-implementation so every later task plugs into an existing gate. The
-principle: since the AI writes both code and its tests, a green suite is
-only trustworthy with (a) an automated merge gate and (b) independent
-oracles the AI cannot satisfy with shallow tests (golden replay,
-property tests, mutation testing). The pipeline's Phase 5 still writes
-per-task specs — this milestone is the infra those specs run on.
+This is a solo research tool: the failure mode is **silent wrong
+numbers and non-reproducible findings**, not multi-user regressions or
+scale. So test the strategy/money math and run-to-run reproducibility
+hard; skip team/scale ceremony. Built before heavy implementation so
+later tasks plug into an existing gate. The pipeline's Phase 5 still
+writes per-task specs — this milestone is the infra they run on.
+
+### Essential — correctness & reproducibility, not ceremony
 
 | Task | Title | Depends on | Acceptance (summary) |
 |---|---|---|---|
-| **T-59** | CI pipeline (GitHub Actions) | T-01 | On every push/PR: `tsc --noEmit` strict → lint → unit → integration (with services) → e2e → coverage. Red blocks merge. The actual safety mechanism — everything else is optional without it. |
-| **T-60** | Lint/format + pre-commit | T-01 | Biome (or ESLint+Prettier) config; `lefthook` pre-commit running typecheck + lint + changed-unit subset. Enforced in CI (T-59). |
-| **T-61** | Vitest config + coverage + property testing | T-01 | Vitest set up; `fast-check` wired for property-based money/trigger tests; coverage with **ratcheted thresholds on core money/trigger/evolution modules** (not a vanity global %). |
-| **T-62** | Injectable `Clock` abstraction | T-01 | `Clock` interface with real / fixed / virtual implementations. All time-sensitive code (entry/exit windows, EOD, day-of-week, cooldowns) takes `Clock` — never `Date.now()` directly. Consumed by T-15/T-16 and the T-57 replay harness. |
-| **T-63** | Dockerized integration harness | T-02,T-03 | Ephemeral TimescaleDB+Redis per run (testcontainers / compose). Migration apply-from-scratch **+ idempotency** test, seed/fixture factories, teardown. |
-| **T-64** | Playwright E2E config + deterministic boot harness | T-01 | `playwright.config.ts`, `test:e2e` script, harness booting API+frontend+seeded DB+Redis against a **deterministic feed (fixed seed) + fixed Clock**. Tag taxonomy `@critical`/`@functional`/`@non-blocker` (consumed by the pipeline Automation Gate). Specs themselves written per-task (T-20, T-42). |
-| **T-65** | BrokerFeed conformance harness + WS fixture tooling | T-01 | Shared conformance test pack skeleton + recorded-WebSocket fixture recorder/player so every adapter (sim/Fyers/Angel/historical) is verified credential-free. Conformance assertions plug in when `BrokerFeed` lands (T-07). |
+| **T-59** | Lean CI (GitHub Actions) | T-01 | On push/PR: `tsc --noEmit` strict → lint → unit. Integration on a nightly/manual job, not every push. Red blocks merge. ~1h to stand up; grows later, not gold-plated now. |
+| **T-60** | Lint/format + pre-commit | T-01 | Biome (or ESLint+Prettier) + `lefthook` pre-commit (typecheck + lint + changed-unit). Near-zero-effort hygiene. |
+| **T-61** | Vitest + targeted property tests | T-01 | Vitest; `fast-check` on the money/trigger/evolution math (P&L, SL/TSL/target, clamping, peak detection, rule conditions). Coverage **tracked, not gated** — no ratcheted threshold. |
+| **T-62** | Injectable `Clock` | T-01 | real / fixed / virtual. All time-sensitive code takes `Clock`, never `Date.now()`. Prerequisite for testable time-logic **and** reproducible M3 replay. Cheap, day-one. |
+| **T-63** | Minimal integration harness | T-02,T-03 | Ephemeral TimescaleDB+Redis; migration apply-from-scratch **+ idempotency**, the one signal→personality→trade flow, fixture factories. Deliberately not a sprawling suite. |
 
-> **Cross-cutting (not M0.5 tasks — land where their dependency lands):**
-> **Golden replay fixtures** — frozen historical input → checked-in
-> expected trade ledger; added with T-57/T-58 in M3 (strongest
-> regression anchor). **Mutation testing** (`Stryker`, scoped to
-> money/trigger/evolution) — added in M3, run nightly in CI, not
-> per-commit. **Runtime invariant assertions** (max 4 legs, Clockwork
-> frozen, 8pp drift) — authored with T-31/T-39/T-40, reused in tests.
+### Cross-cutting research-integrity oracle (lands in M3)
+
+> **Deterministic golden replay** — frozen historical input → checked-in
+> expected trade ledger. For a research tool this is not just regression
+> safety, it is a **reproducibility requirement**: a finding you cannot
+> reproduce run-to-run is not a finding. Added with T-57/T-58 — highest
+> ROI test in the whole project, cheap once replay exists. Runtime
+> invariant assertions (max 4 legs, Clockwork frozen, 8pp drift) are
+> authored with T-31/T-39/T-40 and reused here.
+
+### Deferred — add only when the project earns it (intentionally not now)
+
+- **Playwright E2E** — dashboard is read-only and personal. When M1
+  lands, add **2–3 smoke specs only** (page loads, trades table
+  populates) via a minimal `playwright.config.ts`. A full tagged suite
+  + boot harness is overhead until there are users. *(was T-64)*
+- **BrokerFeed conformance pack** — premature until 2+ real adapters
+  diverge; revisit when Angel One / historical adapters land. *(was T-65)*
+- **Mutation testing (Stryker)** — slow, fiddly, pays off only on a
+  hardened core with a team. Likely skip solo; reconsider post-M3 if a
+  module becomes load-bearing.
+- **Ratcheted coverage gates** — chasing a number is itself overhead
+  solo. Track coverage, never gate on it.
 
 ---
 
@@ -219,12 +234,13 @@ the old `T-51` backtesting task (re-homed here with broader scope).
 - **Parallelism:** within a milestone, tasks with no `depends on` edge
   can be implemented in parallel by separate agents (no shared file
   writes — e.g. T-08/T-09/T-10/T-11 are independent broker files).
-- **Testing model:** Milestone 0.5 builds the *infra and gate* (CI,
-  Vitest/coverage, Clock, integration + Playwright harness, conformance
-  pack). The pipeline's Phase 5 then writes the *per-task specs*
-  (unit + integration; E2E for dashboard tasks) that run on that infra.
-  Golden replay + mutation testing are independent oracles added in M3.
-  Acceptance criteria above are the per-task test contract.
+- **Testing model (research-tool scoped):** M0.5 builds only the
+  essential gate + correctness infra (lean CI, Vitest + targeted
+  property tests, Clock, minimal integration harness). Deterministic
+  golden replay in M3 is the reproducibility oracle. E2E /
+  conformance / mutation / coverage-gates are explicitly deferred until
+  the project earns them. Phase 5 writes per-task specs onto this
+  infra; acceptance criteria above are the per-task contract.
 - **Task-ID stability:** `T-XX` IDs are permanent identifiers, not a
   sequence. Numeric order need not match milestone order — e.g. `T-51`
   was re-homed from the old M5 into Milestone 3 with broader scope, ID

@@ -11,15 +11,16 @@ At-a-glance mirror of `ROADMAP.md`. Status: all tasks **not started**
 - [ ] T-05 Core schema migration 001 (hypertables + tables + straddle_1min + schema.ts)
 - [ ] T-06 Seed migration 002 — single Clockwork-style personality (MVP)
 
-## Milestone 0.5 — Testing & CI Foundation
-- [ ] T-59 CI pipeline (typecheck → lint → unit → integration → e2e → coverage; blocks merge)
+## Milestone 0.5 — Testing & CI Foundation (lean — research-tool scoped)
+Essential — correctness & reproducibility:
+- [ ] T-59 Lean CI (typecheck → lint → unit on push; integration nightly; blocks merge)
 - [ ] T-60 Lint/format + lefthook pre-commit
-- [ ] T-61 Vitest + coverage (ratcheted on money/trigger/evolution) + fast-check
+- [ ] T-61 Vitest + targeted fast-check on money/trigger/evolution (coverage tracked, not gated)
 - [ ] T-62 Injectable Clock (real/fixed/virtual) — consumed by T-15/T-16/T-57
-- [ ] T-63 Dockerized integration harness (ephemeral TimescaleDB+Redis, migration idempotency)
-- [ ] T-64 Playwright E2E config + deterministic boot harness (fixed seed + fixed Clock)
-- [ ] T-65 BrokerFeed conformance harness + WS fixture tooling
-- [ ] (M3) Golden replay fixtures + Stryker mutation testing — see ROADMAP cross-cutting note
+- [ ] T-63 Minimal integration harness (TimescaleDB+Redis, migration idempotency, one signal→trade flow)
+Cross-cutting (M3):
+- [ ] (M3) Deterministic golden replay — reproducibility oracle; with T-57/T-58
+Deferred (not now — see ROADMAP): 2–3 Playwright smoke specs after M1 · BrokerFeed conformance (2+ adapters) · Stryker · coverage gates
 
 ## Milestone 1 — Live Paper-Trading Slice + Dashboard ⭐
 - [ ] T-07 BrokerFeed interface + tick types
