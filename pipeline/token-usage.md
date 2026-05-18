@@ -35,3 +35,8 @@
 | Phase 4 | Security Audit | security-auditor | sonnet | max | ~131k |
 | Phase 4 | Performance Review | performance-reviewer | sonnet | high | ~82k |
 | Phase 4 | Architecture Review | architecture-reviewer | sonnet | high | ~149k |
+| Phase 4 | Phase 4 fix cycle (7 conditions) | implementor | sonnet | high | ~10k |
+| Phase 5 | Unit tests (trigger-engine, straddle-calc, entry-engine, instrument-registry) | test-writer | sonnet | medium | ~113k |
+| Phase 5 | Integration tests (API routes) | test-writer | sonnet | medium | ~82k |
+| Phase 5 | Docs update + progress | docs-writer | sonnet | medium | ~83k |
+| Phase 6 | Test execution + smoke fix | orchestrator | sonnet | low | ~5k |

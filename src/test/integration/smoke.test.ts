@@ -152,17 +152,19 @@ beforeAll(async () => {
 // ---------------------------------------------------------------------------
 
 afterAll(async () => {
-  // Stop components in reverse dependency order.
-  entryEngine.stop();
-  await positionMonitor.stop();
-  calc.stop();
-  vixFeed.stop();
-  await server.close();
-  await testDb.end();
+  // Guard: if beforeAll failed (e.g. Docker not running), components are undefined.
+  // Calling stop() on undefined produces a misleading secondary error that masks
+  // the real failure; these guards make the test output point to the root cause.
+  if (entryEngine) entryEngine.stop();
+  if (positionMonitor) await positionMonitor.stop();
+  if (calc) calc.stop();
+  if (vixFeed) vixFeed.stop();
+  if (server) await server.close();
+  if (testDb) await testDb.end();
   // Do NOT call closeRedis() here — that shuts down the shared module-level
   // singleton which may be used by other test files in the same Vitest worker.
   // Flushing is sufficient for isolation; the singleton persists across test files.
-  await (redis as Redis).flushdb();
+  if (redis) await (redis as Redis).flushdb();
 }, 15_000);
 
 // ---------------------------------------------------------------------------
