@@ -4,10 +4,7 @@
   "assigned_to": "implementor",
   "risk_flags": ["secrets-hygiene"],
   "scope": {
-    "files_to_create": [
-      "src/ingestion/brokers/fyers.ts",
-      "src/types/fyers-api-v3.d.ts"
-    ],
+    "files_to_create": ["src/ingestion/brokers/fyers.ts", "src/types/fyers-api-v3.d.ts"],
     "files_to_modify": ["package.json"],
     "files_forbidden": ["src/ingestion/brokers/angelone.ts", "src/ingestion/market-data-sim.ts"]
   },

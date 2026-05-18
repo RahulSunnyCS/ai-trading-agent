@@ -6,7 +6,11 @@
   "scope": {
     "files_to_create": ["src/ingestion/brokers/types.ts"],
     "files_to_modify": [],
-    "files_forbidden": ["src/ingestion/brokers/fyers.ts", "src/ingestion/brokers/angelone.ts", "src/ingestion/market-data-sim.ts"]
+    "files_forbidden": [
+      "src/ingestion/brokers/fyers.ts",
+      "src/ingestion/brokers/angelone.ts",
+      "src/ingestion/market-data-sim.ts"
+    ]
   },
   "acceptance_criteria": [
     "src/ingestion/brokers/types.ts exports interface BrokerTick { time: number; symbol: string; underlying: string; ltp: number; bid: number; ask: number; volume: number; oi: number; optionType?: 'CE' | 'PE'; strike?: number; expiry?: string; isIndex: boolean; }",

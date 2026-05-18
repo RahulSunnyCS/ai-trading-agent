@@ -12,7 +12,10 @@
       "src/utils/pnl.ts"
     ],
     "files_to_modify": ["package.json"],
-    "files_forbidden": ["src/trading/trigger-engine.ts", "src/ingestion/brokers/instrument-registry.ts"]
+    "files_forbidden": [
+      "src/trading/trigger-engine.ts",
+      "src/ingestion/brokers/instrument-registry.ts"
+    ]
   },
   "acceptance_criteria": [
     "vitest.config.ts defines two projects: 'unit' (include: src/**/*.test.ts, exclude: src/test/integration/**) and 'integration' (include: src/test/integration/**); sets globals: true, environment: 'node'",

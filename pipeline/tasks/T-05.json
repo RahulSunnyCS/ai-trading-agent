@@ -4,12 +4,13 @@
   "assigned_to": "implementor",
   "risk_flags": [],
   "scope": {
-    "files_to_create": [
-      "src/db/migrations/001_core_schema.sql",
-      "src/db/schema.ts"
-    ],
+    "files_to_create": ["src/db/migrations/001_core_schema.sql", "src/db/schema.ts"],
     "files_to_modify": [],
-    "files_forbidden": ["src/db/migrations/002_seed_clockwork.sql", "src/db/client.ts", "src/db/migrate.ts"]
+    "files_forbidden": [
+      "src/db/migrations/002_seed_clockwork.sql",
+      "src/db/client.ts",
+      "src/db/migrate.ts"
+    ]
   },
   "acceptance_criteria": [
     "001_core_schema.sql creates hypertable market_ticks (time TIMESTAMPTZ NOT NULL, symbol TEXT NOT NULL, underlying TEXT NOT NULL, expiry DATE, strike INTEGER, option_type CHAR(2), ltp NUMERIC(10,2), bid NUMERIC(10,2), ask NUMERIC(10,2), volume BIGINT, oi BIGINT) — calls SELECT create_hypertable('market_ticks','time')",

@@ -4,10 +4,7 @@
   "assigned_to": "implementor",
   "risk_flags": [],
   "scope": {
-    "files_to_create": [
-      "src/utils/clock.ts",
-      "src/utils/__tests__/clock.test.ts"
-    ],
+    "files_to_create": ["src/utils/clock.ts", "src/utils/__tests__/clock.test.ts"],
     "files_to_modify": [],
     "files_forbidden": []
   },

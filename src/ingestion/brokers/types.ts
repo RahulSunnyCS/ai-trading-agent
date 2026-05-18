@@ -32,7 +32,7 @@ export interface BrokerTick {
   /** Open interest (contracts). */
   oi: number;
   /** 'CE' or 'PE'; undefined for index/VIX ticks. */
-  optionType?: 'CE' | 'PE';
+  optionType?: "CE" | "PE";
   /** Strike price in points; undefined for index/VIX ticks. */
   strike?: number;
   /**
@@ -68,24 +68,24 @@ export interface BrokerFeed {
   /** Gracefully close the connection. */
   disconnect(): Promise<void>;
   /** Register a handler for incoming tick data. */
-  on(event: 'tick', handler: (tick: BrokerTick) => void): this;
+  on(event: "tick", handler: (tick: BrokerTick) => void): this;
   /** Register a handler for feed-level errors. */
-  on(event: 'error', handler: (err: Error) => void): this;
+  on(event: "error", handler: (err: Error) => void): this;
   /**
    * Register a handler for disconnection events.
    * reason is a human-readable string; use DisconnectReason constants
    * for programmatic branching.
    */
-  on(event: 'disconnect', handler: (reason: string) => void): this;
+  on(event: "disconnect", handler: (reason: string) => void): this;
   /** Register a handler for reconnection attempts (receives attempt count). */
-  on(event: 'reconnecting', handler: (attempt: number) => void): this;
+  on(event: "reconnecting", handler: (attempt: number) => void): this;
 }
 
 /**
  * Identifies which broker adapter is active.
  * Used by the factory / selection logic in src/index.ts.
  */
-export type BrokerName = 'fyers' | 'angelone' | 'simulator';
+export type BrokerName = "fyers" | "angelone" | "simulator";
 
 /**
  * Structured disconnect reason codes.
@@ -96,9 +96,9 @@ export type BrokerName = 'fyers' | 'angelone' | 'simulator';
  */
 export enum DisconnectReason {
   /** Token expired or credentials rejected by the broker. */
-  AUTH_FAILURE = 'AUTH_FAILURE',
+  AUTH_FAILURE = "AUTH_FAILURE",
   /** Network blip or broker-side transient failure — reconnect is appropriate. */
-  TRANSIENT = 'TRANSIENT',
+  TRANSIENT = "TRANSIENT",
   /** disconnect() was called intentionally — do not reconnect. */
-  MANUAL = 'MANUAL',
+  MANUAL = "MANUAL",
 }

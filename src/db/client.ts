@@ -1,4 +1,4 @@
-import pg, { type QueryResultRow } from 'pg';
+import pg, { type QueryResultRow } from "pg";
 
 // Configure pg to return NUMERIC (OID 1700) columns as strings instead of JS
 // floats. This is critical for financial data: a value like 21847.50 would
@@ -12,7 +12,7 @@ pg.types.setTypeParser(1700, (val) => val);
 // pg defaults (max 10 connections). If the env var is missing, pg will throw
 // at first query — this is acceptable since there is no meaningful fallback.
 export const pool = new pg.Pool({
-  connectionString: process.env['DATABASE_URL'],
+  connectionString: process.env.DATABASE_URL,
 });
 
 /**
@@ -27,7 +27,10 @@ export const pool = new pg.Pool({
  * compiles without error. In practice every DB row type is a plain object so
  * this constraint is always satisfied by callers.
  */
-export async function query<T extends QueryResultRow>(sql: string, params?: unknown[]): Promise<T[]> {
+export async function query<T extends QueryResultRow>(
+  sql: string,
+  params?: unknown[],
+): Promise<T[]> {
   const result = await pool.query<T>(sql, params);
   return result.rows;
 }
@@ -37,7 +40,10 @@ export async function query<T extends QueryResultRow>(sql: string, params?: unkn
  * is empty. Use this for lookups by primary key or unique constraint where you
  * know at most one row can match.
  */
-export async function queryOne<T extends QueryResultRow>(sql: string, params?: unknown[]): Promise<T | null> {
+export async function queryOne<T extends QueryResultRow>(
+  sql: string,
+  params?: unknown[],
+): Promise<T | null> {
   const result = await pool.query<T>(sql, params);
   // result.rows[0] can be undefined when the set is empty; we normalise to null
   // to give callers a consistent sentinel rather than forcing them to check for
@@ -54,21 +60,19 @@ export async function queryOne<T extends QueryResultRow>(sql: string, params?: u
  * secondary error but still rethrow the original — losing the original error
  * would make debugging impossible.
  */
-export async function withTransaction<T>(
-  fn: (client: pg.PoolClient) => Promise<T>,
-): Promise<T> {
+export async function withTransaction<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
     const result = await fn(client);
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     return result;
   } catch (err) {
     try {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
     } catch (rollbackErr) {
       // Log the secondary failure but do not mask the original error
-      console.error('ROLLBACK failed after transaction error:', rollbackErr);
+      console.error("ROLLBACK failed after transaction error:", rollbackErr);
     }
     throw err;
   } finally {

@@ -6,7 +6,11 @@
   "scope": {
     "files_to_create": ["src/test/integration/smoke.test.ts"],
     "files_to_modify": ["src/index.ts", "README.md"],
-    "files_forbidden": ["src/trading/trigger-engine.ts", "src/trading/paper-trade-executor.ts", "src/trading/position-monitor.ts"]
+    "files_forbidden": [
+      "src/trading/trigger-engine.ts",
+      "src/trading/paper-trade-executor.ts",
+      "src/trading/position-monitor.ts"
+    ]
   },
   "acceptance_criteria": [
     "src/index.ts wires the full pipeline: creates Pool + Redis client; creates VirtualClock (in SIMULATE mode) or RealClock; creates MarketDataSimulator or Fyers/Angel One adapter via broker-factory; creates StraddleCalculator, VixFeed, EntryEngine, PaperTradeExecutor, PositionMonitor; starts broker → starts StraddleCalculator → starts PositionMonitor → starts EntryEngine → starts Fastify server; handles SIGTERM gracefully (stop all, close DB, close Redis)",

@@ -4,13 +4,12 @@
   "assigned_to": "implementor",
   "risk_flags": [],
   "scope": {
-    "files_to_create": [
-      "src/db/client.ts",
-      "src/db/migrate.ts",
-      "src/db/migrations/.gitkeep"
-    ],
+    "files_to_create": ["src/db/client.ts", "src/db/migrate.ts", "src/db/migrations/.gitkeep"],
     "files_to_modify": [],
-    "files_forbidden": ["src/db/migrations/001_core_schema.sql", "src/db/migrations/002_seed_clockwork.sql"]
+    "files_forbidden": [
+      "src/db/migrations/001_core_schema.sql",
+      "src/db/migrations/002_seed_clockwork.sql"
+    ]
   },
   "acceptance_criteria": [
     "src/db/client.ts exports: a Pool instance (pg) created from DATABASE_URL env var; a typed query helper query<T>(sql, params?) returning Promise<T[]>; a queryOne<T>(sql, params?) returning Promise<T | null>; a withTransaction<T>(fn) helper that wraps a callback in BEGIN/COMMIT/ROLLBACK",

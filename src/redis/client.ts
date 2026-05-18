@@ -1,13 +1,13 @@
-import Redis from 'ioredis';
+import Redis from "ioredis";
 
 // Singleton Redis client — created once at module load time.
 // REDIS_URL defaults to localhost so simulation mode works without extra config.
-export const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
+export const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
 
 // Stream name constants — centralised here so callers never hard-code strings.
-export const STREAM_TICKS = 'market.ticks';
-export const STREAM_STRADDLE = 'straddle.values';
-export const STREAM_SIGNALS = 'signals.generated';
+export const STREAM_TICKS = "market.ticks";
+export const STREAM_STRADDLE = "straddle.values";
+export const STREAM_SIGNALS = "signals.generated";
 
 // Shutdown flag checked by every active streamConsume loop.
 // A single boolean is sufficient because Node.js/Bun is single-threaded;
@@ -22,7 +22,7 @@ let shuttingDown = false;
  */
 export async function streamPublish(
   stream: string,
-  fields: Record<string, string>
+  fields: Record<string, string>,
 ): Promise<string> {
   // Flatten the object into a flat [k, v, k, v, ...] array for ioredis.
   // ioredis accepts (key, id, ...fieldValues) as variadic args.
@@ -31,7 +31,7 @@ export async function streamPublish(
     flatFields.push(k, v);
   }
   // The '*' ID lets Redis assign a monotonically increasing timestamp-based ID.
-  const id = await redis.xadd(stream, '*', ...flatFields);
+  const id = await redis.xadd(stream, "*", ...flatFields);
   // Redis guarantees xadd with '*' always returns an ID string, never null.
   // Casting is safe here; null would only occur with MAXLEN trimming conditions
   // that we are not using.
@@ -49,11 +49,11 @@ async function ensureGroup(stream: string, group: string): Promise<void> {
     // historical messages before group creation are not replayed.
     // MKSTREAM creates the stream key if it does not yet exist,
     // avoiding a race condition between stream creation and group creation.
-    await redis.xgroup('CREATE', stream, group, '$', 'MKSTREAM');
+    await redis.xgroup("CREATE", stream, group, "$", "MKSTREAM");
   } catch (err: unknown) {
     // ioredis surfaces Redis errors as Error objects whose message starts
     // with the Redis error prefix, e.g. "BUSYGROUP Consumer Group ...".
-    if (err instanceof Error && err.message.startsWith('BUSYGROUP')) {
+    if (err instanceof Error && err.message.startsWith("BUSYGROUP")) {
       // Group already exists — this is expected on every restart after the first.
       return;
     }
@@ -70,7 +70,7 @@ async function ensureGroup(stream: string, group: string): Promise<void> {
  * We only read from one stream at a time so we take index 0.
  */
 function parseXreadgroupResponse(
-  raw: unknown
+  raw: unknown,
 ): Array<{ id: string; fields: Record<string, string> }> {
   if (!raw || !Array.isArray(raw) || raw.length === 0) {
     return [];
@@ -116,7 +116,7 @@ export function streamConsume(
   group: string,
   consumer: string,
   handler: (id: string, fields: Record<string, string>) => Promise<void>,
-  opts?: { blockMs?: number; count?: number }
+  opts?: { blockMs?: number; count?: number },
 ): void {
   const blockMs = opts?.blockMs ?? 2000;
   const count = opts?.count ?? 10;
@@ -132,16 +132,16 @@ export function streamConsume(
         // '>' is the special ID meaning "messages not yet delivered to this group".
         // BLOCK causes the server to wait up to blockMs before returning empty.
         raw = await redis.xreadgroup(
-          'GROUP',
+          "GROUP",
           group,
           consumer,
-          'COUNT',
+          "COUNT",
           count,
-          'BLOCK',
+          "BLOCK",
           blockMs,
-          'STREAMS',
+          "STREAMS",
           stream,
-          '>'
+          ">",
         );
       } catch (err: unknown) {
         if (shuttingDown) break;
@@ -186,22 +186,24 @@ export function streamConsume(
 export async function recoverPending(
   stream: string,
   group: string,
-  consumer: string
+  consumer: string,
 ): Promise<string[]> {
   // XAUTOCLAIM syntax: XAUTOCLAIM key group consumer min-idle-time start [COUNT count]
   // ioredis exposes this as redis.xautoclaim(key, group, consumer, minIdleTime, start, ...)
   // The response is [nextStartId, [[id, fields], ...], [deletedIds]] in Redis 7.
-  const result = await (redis as unknown as {
-    xautoclaim: (
-      key: string,
-      group: string,
-      consumer: string,
-      minIdleTime: number,
-      start: string,
-      countKeyword: string,
-      count: number
-    ) => Promise<[string, Array<[string, string[]]>, string[]]>;
-  }).xautoclaim(stream, group, consumer, 60000, '0-0', 'COUNT', 100);
+  const result = await (
+    redis as unknown as {
+      xautoclaim: (
+        key: string,
+        group: string,
+        consumer: string,
+        minIdleTime: number,
+        start: string,
+        countKeyword: string,
+        count: number,
+      ) => Promise<[string, Array<[string, string[]]>, string[]]>;
+    }
+  ).xautoclaim(stream, group, consumer, 60000, "0-0", "COUNT", 100);
 
   // result[1] is the array of reclaimed [id, fields] pairs.
   const claimed = result[1] ?? [];

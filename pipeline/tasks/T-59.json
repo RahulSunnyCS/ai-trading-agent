@@ -4,10 +4,7 @@
   "assigned_to": "implementor",
   "risk_flags": ["secrets-hygiene"],
   "scope": {
-    "files_to_create": [
-      ".github/workflows/ci.yml",
-      ".github/workflows/integration.yml"
-    ],
+    "files_to_create": [".github/workflows/ci.yml", ".github/workflows/integration.yml"],
     "files_to_modify": [],
     "files_forbidden": ["package.json", "biome.json", "lefthook.yml"]
   },

@@ -13,10 +13,14 @@
     "test:integration": "vitest run --project integration",
     "test:watch": "vitest --project unit",
     "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "bullmq": "^5.0.0",
+    "date-fns-tz": "^3.2.0",
+    "decimal.js": "^10.6.0",
     "fastify": "^4.28.0",
     "ioredis": "^5.3.0",
     "pg": "^8.11.0"
@@ -25,11 +29,10 @@
     "@biomejs/biome": "^1.9.0",
     "@types/bun": "latest",
     "@types/pg": "^8.11.0",
+    "@vitest/coverage-v8": "^4.1.6",
+    "fast-check": "^4.8.0",
+    "lefthook": "^2.1.6",
     "vitest": "^2.0.0"
   },
-  "trustedDependencies": [
-    "@biomejs/biome",
-    "esbuild",
-    "msgpackr-extract"
-  ]
+  "trustedDependencies": ["@biomejs/biome", "esbuild", "msgpackr-extract"]
 }

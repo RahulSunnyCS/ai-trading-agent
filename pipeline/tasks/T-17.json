@@ -4,10 +4,7 @@
   "assigned_to": "implementor",
   "risk_flags": [],
   "scope": {
-    "files_to_create": [
-      "src/trading/paper-trade-executor.ts",
-      "src/trading/quantiply-stub.ts"
-    ],
+    "files_to_create": ["src/trading/paper-trade-executor.ts", "src/trading/quantiply-stub.ts"],
     "files_to_modify": [],
     "files_forbidden": ["src/trading/trigger-engine.ts", "src/trading/entry-engine.ts"]
   },

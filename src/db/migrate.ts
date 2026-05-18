@@ -1,6 +1,6 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import pg from 'pg';
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
+import pg from "pg";
 
 // ---------------------------------------------------------------------------
 // Connection with retry
@@ -43,7 +43,7 @@ async function connectWithRetry(connectionString: string): Promise<pg.PoolClient
     }
   }
 
-  console.error('Migration: could not connect to PostgreSQL after 3 retries.');
+  console.error("Migration: could not connect to PostgreSQL after 3 retries.");
   throw lastError;
 }
 
@@ -69,9 +69,9 @@ async function connectWithRetry(connectionString: string): Promise<pg.PoolClient
  *   less surprising than a mid-migration DDL error.
  */
 export async function runMigrations(): Promise<void> {
-  const connectionString = process.env['DATABASE_URL'];
+  const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    console.error('ERROR: DATABASE_URL environment variable is not set.');
+    console.error("ERROR: DATABASE_URL environment variable is not set.");
     process.exit(1);
   }
 
@@ -91,13 +91,13 @@ export async function runMigrations(): Promise<void> {
 
     if (tsdbResult.rows.length === 0) {
       console.error(
-        'ERROR: TimescaleDB extension not found. ' +
+        "ERROR: TimescaleDB extension not found. " +
           "Use image timescale/timescaledb:latest-pg16, not postgres:16-alpine.",
       );
       process.exit(1);
     }
 
-    const tsdbVersion = tsdbResult.rows[0]?.installed_version ?? '(unknown)';
+    const tsdbVersion = tsdbResult.rows[0]?.installed_version ?? "(unknown)";
     console.log(`Migration: TimescaleDB ${tsdbVersion} detected.`);
 
     // ------------------------------------------------------------------
@@ -115,7 +115,7 @@ export async function runMigrations(): Promise<void> {
     // 3. Load already-applied filenames into a Set for O(1) lookup
     // ------------------------------------------------------------------
     const appliedResult = await client.query<{ filename: string }>(
-      'SELECT filename FROM schema_migrations ORDER BY filename',
+      "SELECT filename FROM schema_migrations ORDER BY filename",
     );
     const applied = new Set(appliedResult.rows.map((r) => r.filename));
 
@@ -124,22 +124,22 @@ export async function runMigrations(): Promise<void> {
     // ------------------------------------------------------------------
     // Resolve relative to the repository root (process.cwd()) so this works
     // whether invoked via `bun run migrate` from root or directly.
-    const migrationsDir = join(process.cwd(), 'src', 'db', 'migrations');
+    const migrationsDir = join(process.cwd(), "src", "db", "migrations");
     let files: string[];
     try {
       files = await readdir(migrationsDir);
     } catch {
-      console.log('Migration: migrations directory not found or empty — nothing to apply.');
+      console.log("Migration: migrations directory not found or empty — nothing to apply.");
       return;
     }
 
     // Filter to .sql files only (ignore .gitkeep and other artefacts) and sort
     // ascending. Lexicographic order matches numeric order when filenames use
     // zero-padded numbers (001_, 002_, …).
-    const sqlFiles = files.filter((f) => f.endsWith('.sql')).sort();
+    const sqlFiles = files.filter((f) => f.endsWith(".sql")).sort();
 
     if (sqlFiles.length === 0) {
-      console.log('Migration: no SQL files found in migrations/ — nothing to apply.');
+      console.log("Migration: no SQL files found in migrations/ — nothing to apply.");
       return;
     }
 
@@ -154,22 +154,19 @@ export async function runMigrations(): Promise<void> {
 
       console.log(`Migration: applying ${filename}…`);
       const filePath = join(migrationsDir, filename);
-      const sql = await readFile(filePath, 'utf8');
+      const sql = await readFile(filePath, "utf8");
 
       // Each migration runs in its own transaction so that a failure in
       // migration N+1 does not roll back the DDL from migration N (TimescaleDB
       // hypertable creation is not transactional in all versions anyway).
-      await client.query('BEGIN');
+      await client.query("BEGIN");
       try {
         await client.query(sql);
-        await client.query(
-          'INSERT INTO schema_migrations (filename) VALUES ($1)',
-          [filename],
-        );
-        await client.query('COMMIT');
+        await client.query("INSERT INTO schema_migrations (filename) VALUES ($1)", [filename]);
+        await client.query("COMMIT");
         console.log(`Migration: ${filename} applied successfully.`);
       } catch (err) {
-        await client.query('ROLLBACK').catch(() => {
+        await client.query("ROLLBACK").catch(() => {
           // Ignore ROLLBACK failures — the connection may be in an error state
         });
         console.error(`Migration: failed on ${filename}:`, err);
@@ -177,7 +174,7 @@ export async function runMigrations(): Promise<void> {
       }
     }
 
-    console.log('Migration: all migrations applied successfully.');
+    console.log("Migration: all migrations applied successfully.");
   } finally {
     // Release the client and close the one-off pool regardless of success or
     // failure, so the process can exit cleanly without hanging on open sockets.
@@ -194,7 +191,7 @@ export async function runMigrations(): Promise<void> {
 // be imported in tests without triggering a migration run.
 if (import.meta.main) {
   runMigrations().catch((err) => {
-    console.error('Migration runner failed:', err);
+    console.error("Migration runner failed:", err);
     process.exit(1);
   });
 }

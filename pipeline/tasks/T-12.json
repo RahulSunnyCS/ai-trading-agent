@@ -6,7 +6,12 @@
   "scope": {
     "files_to_create": ["src/ingestion/broker-factory.ts"],
     "files_to_modify": [],
-    "files_forbidden": ["src/index.ts", "src/ingestion/brokers/fyers.ts", "src/ingestion/brokers/angelone.ts", "src/ingestion/market-data-sim.ts"]
+    "files_forbidden": [
+      "src/index.ts",
+      "src/ingestion/brokers/fyers.ts",
+      "src/ingestion/brokers/angelone.ts",
+      "src/ingestion/market-data-sim.ts"
+    ]
   },
   "acceptance_criteria": [
     "src/ingestion/broker-factory.ts exports createBroker(clock: Clock): BrokerFeed",

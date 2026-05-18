@@ -6,7 +6,11 @@
   "scope": {
     "files_to_create": ["src/trading/trigger-engine.ts"],
     "files_to_modify": [],
-    "files_forbidden": ["src/trading/entry-engine.ts", "src/trading/paper-trade-executor.ts", "src/trading/position-monitor.ts"]
+    "files_forbidden": [
+      "src/trading/entry-engine.ts",
+      "src/trading/paper-trade-executor.ts",
+      "src/trading/position-monitor.ts"
+    ]
   },
   "acceptance_criteria": [
     "src/trading/trigger-engine.ts exports pure function evaluateTriggers(position: OpenPosition, currentStraddleValue: string, clock: Clock, config: TriggerConfig): ExitDecision | null",
