@@ -1,0 +1,19 @@
+{
+  "risk_level": "MEDIUM",
+  "triggers": [
+    "Financial logic — P&L calculations, position sizing, hard-stop and trailing-stop arithmetic must be exact",
+    "External broker API credentials — Fyers and Angel One secrets in .env require hygiene guards",
+    "Broker WebSocket data ingestion — malformed external data must not crash the process",
+    "TimescaleDB financial time-series integrity — hypertable write patterns and time-range filter discipline"
+  ],
+  "mandatory_agents": ["security-auditor", "performance-reviewer", "architecture-reviewer"],
+  "tags": ["backend", "infra", "frontend", "product"],
+  "lane": "feature-full",
+  "sprint_count": 3,
+  "human_gates": 3,
+  "scope_notes": {
+    "pricing_reviewer": "NOT APPLICABLE — no billing, no tiers, no Stripe (business.md)",
+    "auth_risk_flag": "NOT APPLICABLE — no user authentication, no sessions, no PII (business.md)",
+    "security_focus": "Secrets management (Fyers/Angel One credentials, .env hygiene) and safe broker WebSocket handling"
+  }
+}
