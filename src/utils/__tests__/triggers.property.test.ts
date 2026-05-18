@@ -1,6 +1,13 @@
 import Decimal from "decimal.js";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import type { OpenPosition } from "../../db/schema.js";
+import {
+  evaluateTriggers,
+  loadTriggerConfig,
+  updateTrailingStop,
+} from "../../trading/trigger-engine.js";
+import { FixedClock } from "../../utils/clock.js";
 
 /**
  * Property tests for stop-loss, trailing stop, profit target, and daily loss cap
@@ -328,5 +335,251 @@ describe("Daily loss cap accumulation", () => {
     expect(isDailyLossCapBreached(losses, "9.99")).toBe(true);
     // ₹10.00 against a ₹10.00 cap → not breached (gt, not gte)
     expect(isDailyLossCapBreached(losses, "10.00")).toBe(false);
+  });
+});
+
+// ─── evaluateTriggers (imported from trigger-engine) ─────────────────────────
+
+/**
+ * Minimal OpenPosition factory. Only the fields trigger-engine reads are
+ * populated; other fields are not part of OpenPosition (see src/db/schema.ts).
+ */
+function makePosition(overrides?: Partial<OpenPosition>): OpenPosition {
+  return {
+    id: "test-id",
+    entryStraddleValue: "200",
+    lowestStraddleValueSeen: "200",
+    todayNetPnl: "0",
+    entryTimeMs: Date.now(),
+    ...overrides,
+  };
+}
+
+/** A config that should never fire for safe values. */
+const safeConfig = {
+  hardSlPct: 0.3, // 30%
+  trailingSlPct: 0.15, // 15%
+  profitTargetPct: 0.3, // 30%
+  eodExitTime: "15:25",
+  exitCutoffTime: "15:30",
+  maxDailyLoss: "10000",
+};
+
+/**
+ * IST 10:00 on 2026-05-18. In UTC that is 04:30 on the same day.
+ * Date.UTC(2026, 4, 18, 4, 30, 0) = 1747538200000... let's compute precisely.
+ */
+const IST_1000_MAY18_2026 = new Date("2026-05-18T04:30:00.000Z").getTime();
+const IST_1525_MAY18_2026 = new Date("2026-05-18T09:55:00.000Z").getTime(); // 15:25 IST
+
+describe("evaluateTriggers — happy path and individual triggers", () => {
+  it("returns shouldExit:false when all values are safe", () => {
+    const clock = new FixedClock(IST_1000_MAY18_2026);
+    const pos = makePosition();
+    // current=180 is below hard SL threshold (200*1.3=260), above profit target (200*0.7=140),
+    // and below entry so TSL check applies but 180 < 200*1.15=230 so no TSL fire.
+    const result = evaluateTriggers(pos, "180", clock, safeConfig);
+    expect(result.shouldExit).toBe(false);
+  });
+
+  it("SL fires at exactly entry × (1 + hardSlPct)", () => {
+    const clock = new FixedClock(IST_1000_MAY18_2026);
+    const pos = makePosition({ entryStraddleValue: "200" });
+    // threshold = 200 * 1.30 = 260.00
+    const atThreshold = evaluateTriggers(pos, "260", clock, safeConfig);
+    expect(atThreshold).toEqual({ shouldExit: true, reason: "SL" });
+
+    const justBelow = evaluateTriggers(pos, "259.99", clock, safeConfig);
+    expect(justBelow.shouldExit).toBe(false);
+  });
+
+  it("TSL fires when current >= lowestSeen × (1 + trailingSlPct) AND current < entry", () => {
+    const clock = new FixedClock(IST_1000_MAY18_2026);
+    // entry=200, lowestSeen=160 → trailThreshold = 160 * 1.15 = 184
+    // current=184 is < entry(200) → TSL fires
+    const pos = makePosition({
+      entryStraddleValue: "200",
+      lowestStraddleValueSeen: "160",
+    });
+    const result = evaluateTriggers(pos, "184", clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: "TSL" });
+  });
+
+  it("TSL does NOT fire when current >= entry (not in profit territory)", () => {
+    const clock = new FixedClock(IST_1000_MAY18_2026);
+    // entry=200, lowestSeen=160, trailThreshold=184
+    // current=200 satisfies current>=trailThreshold but current>=entry → no TSL
+    const pos = makePosition({
+      entryStraddleValue: "200",
+      lowestStraddleValueSeen: "160",
+    });
+    // current=200 equals entry → should NOT fire TSL (guard: current < entry)
+    // But hard SL fires at 260, so at exactly 200 we expect no exit.
+    const result = evaluateTriggers(pos, "200", clock, safeConfig);
+    expect(result.shouldExit).toBe(false);
+  });
+
+  it("TARGET fires when current <= entry × (1 - profitTargetPct)", () => {
+    const clock = new FixedClock(IST_1000_MAY18_2026);
+    // profitTarget threshold = 200 * (1 - 0.30) = 140.00
+    const pos = makePosition({ entryStraddleValue: "200" });
+    const atTarget = evaluateTriggers(pos, "140", clock, safeConfig);
+    expect(atTarget).toEqual({ shouldExit: true, reason: "TARGET" });
+
+    const justAbove = evaluateTriggers(pos, "140.01", clock, safeConfig);
+    expect(justAbove.shouldExit).toBe(false);
+  });
+
+  it("EOD fires when current IST time >= eodExitTime", () => {
+    // FixedClock set to 15:25 IST — exactly at eodExitTime '15:25'
+    const clock = new FixedClock(IST_1525_MAY18_2026);
+    const pos = makePosition();
+    const result = evaluateTriggers(pos, "180", clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: "EOD" });
+  });
+
+  it("DAILY_LOSS fires when todayNetPnl <= -maxDailyLoss", () => {
+    const clock = new FixedClock(IST_1000_MAY18_2026);
+    // maxDailyLoss = '10000' → fires when pnl <= -10000
+    const posAtLimit = makePosition({ todayNetPnl: "-10000" });
+    const result = evaluateTriggers(posAtLimit, "180", clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: "DAILY_LOSS" });
+
+    // One cent above the limit — should NOT fire daily loss
+    const posJustAbove = makePosition({ todayNetPnl: "-9999.99" });
+    const noFire = evaluateTriggers(posJustAbove, "180", clock, safeConfig);
+    expect(noFire.shouldExit).toBe(false);
+  });
+
+  it("SL wins over DAILY_LOSS when both would fire", () => {
+    const clock = new FixedClock(IST_1000_MAY18_2026);
+    // Both triggers active: SL (current=260 >= 260) and DAILY_LOSS (pnl=-10000)
+    const pos = makePosition({ todayNetPnl: "-10000" });
+    const result = evaluateTriggers(pos, "260", clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: "SL" });
+  });
+
+  it("DAILY_LOSS wins over EOD when both would fire", () => {
+    // Set clock to 15:25 IST (EOD fires) and pnl at daily limit (DAILY_LOSS fires)
+    const clock = new FixedClock(IST_1525_MAY18_2026);
+    const pos = makePosition({ todayNetPnl: "-10000" });
+    const result = evaluateTriggers(pos, "180", clock, safeConfig);
+    // Priority: SL > DAILY_LOSS > EOD — DAILY_LOSS is at priority 2, EOD at 3
+    expect(result).toEqual({ shouldExit: true, reason: "DAILY_LOSS" });
+  });
+
+  it("EOD wins over TSL when both would fire", () => {
+    // Clock at 15:25 IST; position in profit with TSL also tripping
+    const clock = new FixedClock(IST_1525_MAY18_2026);
+    // entry=200, lowest=160, trailThreshold=184 → current=184 trips TSL
+    // EOD also fires at 15:25
+    const pos = makePosition({
+      entryStraddleValue: "200",
+      lowestStraddleValueSeen: "160",
+    });
+    const result = evaluateTriggers(pos, "184", clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: "EOD" });
+  });
+
+  it("TSL wins over TARGET when both would fire", () => {
+    const clock = new FixedClock(IST_1000_MAY18_2026);
+    // entry=200, lowest=90, trailThreshold=90*1.15=103.5
+    // profitTarget=200*0.70=140
+    // current=103 satisfies TSL (103>=103.5? no — let's use lowest=80: 80*1.15=92)
+    // entry=200, lowest=80 → trailThreshold=80*1.15=92
+    // profitTarget=200*0.70=140
+    // At current=90: TSL check: 90>=92? NO. Let's pick: lowest=80, trailThreshold=92
+    // At current=92: TSL fires (92>=92 AND 92<200). profitTarget at 140, 92<140 → TARGET also fires.
+    // TSL wins (lower priority number means higher priority: TSL=5, TARGET=6)
+    const pos = makePosition({
+      entryStraddleValue: "200",
+      lowestStraddleValueSeen: "80",
+    });
+    const result = evaluateTriggers(pos, "92", clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: "TSL" });
+  });
+});
+
+describe("updateTrailingStop", () => {
+  it("returns the current value when current < lowestStraddleValueSeen", () => {
+    const pos = makePosition({ lowestStraddleValueSeen: "200" });
+    const result = updateTrailingStop(pos, "150");
+    expect(result).toBe("150");
+  });
+
+  it("returns lowestStraddleValueSeen when current > lowest (keeps the minimum)", () => {
+    const pos = makePosition({ lowestStraddleValueSeen: "150" });
+    const result = updateTrailingStop(pos, "180");
+    expect(result).toBe("150");
+  });
+
+  it("returns the same value when current equals lowestStraddleValueSeen", () => {
+    const pos = makePosition({ lowestStraddleValueSeen: "200" });
+    const result = updateTrailingStop(pos, "200");
+    // Both are equal, min returns either — result should equal "200"
+    expect(result).toBe("200");
+  });
+
+  it("result is always min(current, lowestSeen) property", () => {
+    fc.assert(
+      fc.property(
+        fc.float({ min: 50, max: 500, noNaN: true }),
+        fc.float({ min: 50, max: 500, noNaN: true }),
+        (lowest, current) => {
+          const pos = makePosition({ lowestStraddleValueSeen: lowest.toFixed(2) });
+          const result = updateTrailingStop(pos, current.toFixed(2));
+          const expected = Decimal.min(
+            new Decimal(lowest.toFixed(2)),
+            new Decimal(current.toFixed(2)),
+          ).toString();
+          return result === expected;
+        },
+      ),
+    );
+  });
+});
+
+describe("loadTriggerConfig", () => {
+  it("returns defaults when no env vars are set", () => {
+    // Save and clear env vars that might have been set
+    const saved = {
+      HARD_SL_PCT: process.env.HARD_SL_PCT,
+      TRAILING_SL_PCT: process.env.TRAILING_SL_PCT,
+      PROFIT_TARGET_PCT: process.env.PROFIT_TARGET_PCT,
+      EOD_EXIT_TIME: process.env.EOD_EXIT_TIME,
+      EXIT_CUTOFF_TIME: process.env.EXIT_CUTOFF_TIME,
+      MAX_DAILY_LOSS: process.env.MAX_DAILY_LOSS,
+    };
+    for (const key of Object.keys(saved)) {
+      delete process.env[key];
+    }
+
+    const config = loadTriggerConfig();
+    expect(config.hardSlPct).toBe(0.3);
+    expect(config.trailingSlPct).toBe(0.15);
+    expect(config.profitTargetPct).toBe(0.3);
+    expect(config.eodExitTime).toBe("15:25");
+    expect(config.exitCutoffTime).toBe("15:30");
+    expect(config.maxDailyLoss).toBe("10000");
+
+    // Restore
+    for (const [key, val] of Object.entries(saved)) {
+      if (val !== undefined) process.env[key] = val;
+    }
+  });
+
+  it("reads overridden values from env vars", () => {
+    process.env.HARD_SL_PCT = "0.5";
+    process.env.EOD_EXIT_TIME = "15:20";
+    process.env.MAX_DAILY_LOSS = "5000";
+
+    const config = loadTriggerConfig();
+    expect(config.hardSlPct).toBe(0.5);
+    expect(config.eodExitTime).toBe("15:20");
+    expect(config.maxDailyLoss).toBe("5000");
+
+    process.env.HARD_SL_PCT = undefined;
+    process.env.EOD_EXIT_TIME = undefined;
+    process.env.MAX_DAILY_LOSS = undefined;
   });
 });
