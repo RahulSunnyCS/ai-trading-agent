@@ -52,6 +52,36 @@ cleanly.
 
 ---
 
+## Milestone 0.5 — Testing & CI Foundation
+
+The confidence layer for AI-written code. Built **before** heavy
+implementation so every later task plugs into an existing gate. The
+principle: since the AI writes both code and its tests, a green suite is
+only trustworthy with (a) an automated merge gate and (b) independent
+oracles the AI cannot satisfy with shallow tests (golden replay,
+property tests, mutation testing). The pipeline's Phase 5 still writes
+per-task specs — this milestone is the infra those specs run on.
+
+| Task | Title | Depends on | Acceptance (summary) |
+|---|---|---|---|
+| **T-59** | CI pipeline (GitHub Actions) | T-01 | On every push/PR: `tsc --noEmit` strict → lint → unit → integration (with services) → e2e → coverage. Red blocks merge. The actual safety mechanism — everything else is optional without it. |
+| **T-60** | Lint/format + pre-commit | T-01 | Biome (or ESLint+Prettier) config; `lefthook` pre-commit running typecheck + lint + changed-unit subset. Enforced in CI (T-59). |
+| **T-61** | Vitest config + coverage + property testing | T-01 | Vitest set up; `fast-check` wired for property-based money/trigger tests; coverage with **ratcheted thresholds on core money/trigger/evolution modules** (not a vanity global %). |
+| **T-62** | Injectable `Clock` abstraction | T-01 | `Clock` interface with real / fixed / virtual implementations. All time-sensitive code (entry/exit windows, EOD, day-of-week, cooldowns) takes `Clock` — never `Date.now()` directly. Consumed by T-15/T-16 and the T-57 replay harness. |
+| **T-63** | Dockerized integration harness | T-02,T-03 | Ephemeral TimescaleDB+Redis per run (testcontainers / compose). Migration apply-from-scratch **+ idempotency** test, seed/fixture factories, teardown. |
+| **T-64** | Playwright E2E config + deterministic boot harness | T-01 | `playwright.config.ts`, `test:e2e` script, harness booting API+frontend+seeded DB+Redis against a **deterministic feed (fixed seed) + fixed Clock**. Tag taxonomy `@critical`/`@functional`/`@non-blocker` (consumed by the pipeline Automation Gate). Specs themselves written per-task (T-20, T-42). |
+| **T-65** | BrokerFeed conformance harness + WS fixture tooling | T-01 | Shared conformance test pack skeleton + recorded-WebSocket fixture recorder/player so every adapter (sim/Fyers/Angel/historical) is verified credential-free. Conformance assertions plug in when `BrokerFeed` lands (T-07). |
+
+> **Cross-cutting (not M0.5 tasks — land where their dependency lands):**
+> **Golden replay fixtures** — frozen historical input → checked-in
+> expected trade ledger; added with T-57/T-58 in M3 (strongest
+> regression anchor). **Mutation testing** (`Stryker`, scoped to
+> money/trigger/evolution) — added in M3, run nightly in CI, not
+> per-commit. **Runtime invariant assertions** (max 4 legs, Clockwork
+> frozen, 8pp drift) — authored with T-31/T-39/T-40, reused in tests.
+
+---
+
 ## Milestone 1 — Live Paper-Trading Vertical Slice + Dashboard ⭐ FIRST RUNNABLE
 
 The owner's priority. One fixed-time straddle strategy, live Fyers data
@@ -189,10 +219,12 @@ the old `T-51` backtesting task (re-homed here with broader scope).
 - **Parallelism:** within a milestone, tasks with no `depends on` edge
   can be implemented in parallel by separate agents (no shared file
   writes — e.g. T-08/T-09/T-10/T-11 are independent broker files).
-- **Testing** is handled by the pipeline's Phase 5 per task
-  (unit + integration; E2E for dashboard tasks) — not split into
-  separate roadmap tasks. Acceptance criteria above are the test
-  contract.
+- **Testing model:** Milestone 0.5 builds the *infra and gate* (CI,
+  Vitest/coverage, Clock, integration + Playwright harness, conformance
+  pack). The pipeline's Phase 5 then writes the *per-task specs*
+  (unit + integration; E2E for dashboard tasks) that run on that infra.
+  Golden replay + mutation testing are independent oracles added in M3.
+  Acceptance criteria above are the per-task test contract.
 - **Task-ID stability:** `T-XX` IDs are permanent identifiers, not a
   sequence. Numeric order need not match milestone order — e.g. `T-51`
   was re-homed from the old M5 into Milestone 3 with broader scope, ID
@@ -200,6 +232,7 @@ the old `T-51` backtesting task (re-homed here with broader scope).
   than renumbering.
 - **Gates:** each milestone end is a natural Human Gate. Milestone 1
   is the first "is this real and working?" checkpoint.
-- **Next step:** on approval, decompose **Milestone 0 + Milestone 1**
-  into formal `pipeline/tasks/T-XX.json` contracts and begin
-  implementation; later milestones stay as this roadmap until reached.
+- **Next step:** on approval, decompose **Milestone 0 + Milestone 0.5
+  + Milestone 1** into formal `pipeline/tasks/T-XX.json` contracts and
+  begin implementation; later milestones stay as this roadmap until
+  reached.

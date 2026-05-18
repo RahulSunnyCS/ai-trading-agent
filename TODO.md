@@ -11,6 +11,16 @@ At-a-glance mirror of `ROADMAP.md`. Status: all tasks **not started**
 - [ ] T-05 Core schema migration 001 (hypertables + tables + straddle_1min + schema.ts)
 - [ ] T-06 Seed migration 002 — single Clockwork-style personality (MVP)
 
+## Milestone 0.5 — Testing & CI Foundation
+- [ ] T-59 CI pipeline (typecheck → lint → unit → integration → e2e → coverage; blocks merge)
+- [ ] T-60 Lint/format + lefthook pre-commit
+- [ ] T-61 Vitest + coverage (ratcheted on money/trigger/evolution) + fast-check
+- [ ] T-62 Injectable Clock (real/fixed/virtual) — consumed by T-15/T-16/T-57
+- [ ] T-63 Dockerized integration harness (ephemeral TimescaleDB+Redis, migration idempotency)
+- [ ] T-64 Playwright E2E config + deterministic boot harness (fixed seed + fixed Clock)
+- [ ] T-65 BrokerFeed conformance harness + WS fixture tooling
+- [ ] (M3) Golden replay fixtures + Stryker mutation testing — see ROADMAP cross-cutting note
+
 ## Milestone 1 — Live Paper-Trading Slice + Dashboard ⭐
 - [ ] T-07 BrokerFeed interface + tick types
 - [ ] T-08 Random-walk simulator (credential-free dev)
