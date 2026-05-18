@@ -1,0 +1,44 @@
+# Docker Compose — development infrastructure for ai-trading-agent
+# Provides TimescaleDB (PostgreSQL 16) and Redis 7 with healthchecks.
+#
+# Usage:
+#   docker compose up -d          # start in background
+#   docker compose ps             # verify both services show (healthy)
+#   docker compose down           # stop (data volumes preserved)
+#   docker compose down -v        # stop + delete volumes (full reset)
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    ports:
+      - "5432:5432"
+    volumes:
+      - trading_pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: trading
+      POSTGRES_USER: trading
+      # Dev-only default. Override via POSTGRES_PASSWORD env var in production.
+      POSTGRES_PASSWORD: trading
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - trading_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Named volumes ensure data persists across container restarts.
+# Use `docker compose down -v` to destroy them for a clean slate.
+volumes:
+  trading_pgdata:
+  trading_redis_data:
