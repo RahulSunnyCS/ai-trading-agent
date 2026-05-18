@@ -166,11 +166,12 @@ describe("Trailing stop-loss ratchet", () => {
       fc.property(
         fc.array(fc.float({ min: 50, max: 300, noNaN: true }), { minLength: 2, maxLength: 50 }),
         (values) => {
-          let lowest = values[0].toFixed(2);
+          const [first, ...rest] = values;
+          let lowest = (first as number).toFixed(2);
           let prevLowest = lowest;
           let monotonic = true;
 
-          for (const v of values.slice(1)) {
+          for (const v of rest) {
             lowest = updateLowest(lowest, v.toFixed(2));
             // lowestObserved must never increase
             if (new Decimal(lowest).gt(new Decimal(prevLowest))) {
@@ -221,7 +222,7 @@ describe("Trailing stop-loss ratchet", () => {
     const slPct = "15";
     const sequence = ["200.00", "185.00", "170.00", "155.00"]; // always falling
 
-    let prevThreshold = trailSlThreshold(sequence[0], slPct);
+    let prevThreshold = trailSlThreshold(sequence[0] ?? "200.00", slPct);
     let allTighter = true;
 
     for (const v of sequence.slice(1)) {
