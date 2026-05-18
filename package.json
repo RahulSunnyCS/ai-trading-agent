@@ -1,0 +1,35 @@
+{
+  "name": "ai-trading-agent",
+  "version": "0.1.0",
+  "description": "Paper-trading research platform for weekly index options strategies on Indian markets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "sim": "SIMULATE=true bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "migrate": "bun run src/db/migrate.ts",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:watch": "vitest --project unit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
+  },
+  "dependencies": {
+    "bullmq": "^5.0.0",
+    "fastify": "^4.28.0",
+    "ioredis": "^5.3.0",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/bun": "latest",
+    "@types/pg": "^8.11.0",
+    "vitest": "^2.0.0"
+  },
+  "trustedDependencies": [
+    "@biomejs/biome",
+    "esbuild",
+    "msgpackr-extract"
+  ]
+}

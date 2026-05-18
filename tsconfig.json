@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    // Target modern JS — Bun supports ES2022 natively
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    // bundler resolution works with Bun's module system (no .js extension required)
+    "moduleResolution": "bundler",
+    // Strict mode: required by project conventions
+    "strict": true,
+    // No emit — Bun runs TypeScript natively; tsc is type-check only
+    "noEmit": true,
+    // Additional strict checks beyond the strict flag
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    // Path alias: import from "@/..." resolves to "src/..."
+    // This lets us write `import { query } from "@/db/client"` throughout the codebase
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    // Allow Bun's non-standard globals (Bun, $, etc.)
+    "types": ["bun-types"],
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    // Source maps for readable stack traces in Bun
+    "sourceMap": true,
+    "declaration": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "coverage"]
+}

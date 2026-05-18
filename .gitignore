@@ -1,7 +1,29 @@
-node_modules/
-dist/
+# Environment files — never commit real credentials
 .env
-*.env.local
-*.log
-.DS_Store
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Bun binary lockfile (OLD format — bun.lock text format IS committed)
+# The text-format bun.lock must be committed so the repo is reproducible.
+# bun.lockb is the old binary format from older Bun versions — excluded.
 bun.lockb
+
+# Logs
+*.log
+npm-debug.log*
+bun-debug.log*
+
+# macOS metadata
+.DS_Store
+
+# Test coverage output
+coverage/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
