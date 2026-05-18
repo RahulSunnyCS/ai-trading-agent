@@ -42,6 +42,7 @@ export interface EntryIntent {
   straddleValue: string;
   atmStrike: number;
   underlying: "NIFTY";
+  spot: string;
   vixAtEntry: string | null;
   entryTimeMs: number;
 }
@@ -282,6 +283,7 @@ export class EntryEngine {
     const straddleValue = fields.straddleValue ?? fields.straddle_value ?? "";
     const rawAtmStrike = fields.atmStrike ?? fields.atm_strike ?? "0";
     const atmStrike = Number.parseInt(rawAtmStrike, 10);
+    const spot = fields.spot ?? "0";
 
     // straddleValue must be a non-empty numeric string — if the snapshot is
     // malformed we log and skip rather than emitting a bad intent.
@@ -295,6 +297,7 @@ export class EntryEngine {
       atmStrike,
       // Phase 1 only supports NIFTY. BankNifty/Sensex are Phase 2.
       underlying: "NIFTY",
+      spot,
       // vixAtEntry is null when VIX data is unavailable, matching the DB
       // column's nullable constraint (paper_trades.vix_at_entry).
       vixAtEntry: vixValue !== null ? String(vixValue) : null,
