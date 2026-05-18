@@ -27,3 +27,9 @@
 | Phase 3 | T-12: Straddle calculator + broker factory | implementor | sonnet | high | ~75k |
 | Phase 3 | T-16: Trigger/exit engine (pure function) | implementor | sonnet | high | ~41k |
 | Phase 3 | T-13: Entry engine — signal generation | implementor | sonnet | high | ~20k |
+| Phase 3 | T-17: Paper trade executor + Quantiply stub | implementor | sonnet | high | ~15k |
+| Phase 3 | T-18: Position monitor — trailing stop, triggers, watchdog | implementor | sonnet | high | ~20k |
+| Phase 3 | T-19: Dashboard + paper-trades API + WebSocket | implementor | sonnet | high | ~55k |
+| Phase 3 | T-20: React dashboard shell | implementor | sonnet | high | ~65k |
+| Phase 3 | T-21: End-to-end wire-up + smoke test + README | implementor | sonnet | high | ~105k |
+| Phase 4 | Security Audit | security-auditor | sonnet | max | ~131k |
