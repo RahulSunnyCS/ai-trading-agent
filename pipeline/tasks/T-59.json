@@ -1,0 +1,27 @@
+{
+  "task_id": "T-59",
+  "title": "Lean GitHub Actions CI",
+  "assigned_to": "implementor",
+  "risk_flags": ["secrets-hygiene"],
+  "scope": {
+    "files_to_create": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/integration.yml"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": ["package.json", "biome.json", "lefthook.yml"]
+  },
+  "acceptance_criteria": [
+    "ci.yml triggers on: push (all branches) and pull_request (all branches)",
+    "ci.yml uses oven-sh/setup-bun@v2 action with explicit bun-version: '1.x' pinned (use the latest 1.x stable at time of implementation)",
+    "ci.yml steps in order: checkout → setup-bun → bun install --frozen-lockfile → bun run --bun tsc --noEmit → bun run lint (biome check) → bun test:unit",
+    "ci.yml includes a lockfile integrity step after bun install: run 'git diff --exit-code bun.lock' and fail if bun.lock was modified (catches stale lockfile)",
+    "ci.yml fails the entire workflow (not just a step) if any step fails — no continue-on-error",
+    "integration.yml triggers on: workflow_dispatch (manual) and schedule (cron: '0 2 * * 1-5' — nightly weekdays at 2 AM UTC)",
+    "integration.yml spins up TimescaleDB and Redis using services: (Docker service containers), then runs bun test:integration",
+    "integration.yml services: postgres with image timescale/timescaledb:latest-pg16, env POSTGRES_DB/USER/PASSWORD, health check; redis with image redis:7-alpine, health check",
+    "No secrets or credentials appear in any workflow file — DATABASE_URL and REDIS_URL for integration tests use service container defaults (localhost:5432, localhost:6379)"
+  ],
+  "dependencies": ["T-01"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

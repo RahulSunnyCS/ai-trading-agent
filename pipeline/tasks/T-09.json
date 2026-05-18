@@ -1,0 +1,30 @@
+{
+  "task_id": "T-09",
+  "title": "Fyers WebSocket adapter (primary live source)",
+  "assigned_to": "implementor",
+  "risk_flags": ["secrets-hygiene"],
+  "scope": {
+    "files_to_create": [
+      "src/ingestion/brokers/fyers.ts",
+      "src/types/fyers-api-v3.d.ts"
+    ],
+    "files_to_modify": ["package.json"],
+    "files_forbidden": ["src/ingestion/brokers/angelone.ts", "src/ingestion/market-data-sim.ts"]
+  },
+  "acceptance_criteria": [
+    "FIRST: verify Bun-compat spike — add a comment at the top of fyers.ts documenting the outcome of: (1) import 'fyers-api-v3' in a test script under Bun; (2) confirm WebSocket connects to Fyers sandbox or that the SDK's WS client initialises without error. If incompatibility is found, document the workaround used.",
+    "package.json adds dependency: fyers-api-v3",
+    "src/types/fyers-api-v3.d.ts declares module 'fyers-api-v3' covering: fyersDataSocket class with constructor({ symbol, accessToken, appId, onmessage, onerror, onclose }), .connect(), .subscribe(symbols: string[]), .unsubscribe(symbols: string[]), .disconnect(). Also covers fyersModel (or equivalent auth class) if used",
+    "src/ingestion/brokers/fyers.ts exports class FyersBrokerFeed implements BrokerFeed",
+    "Constructor takes { appId: string, accessToken: string } — reads from FYERS_APP_ID and FYERS_ACCESS_TOKEN env vars if not provided",
+    "connect(): initialises the fyersDataSocket, wires onmessage/onerror/onclose handlers, calls .connect()",
+    "CRITICAL — disconnect type detection: on close/error, inspect the error/reason: if it contains 'invalid token', 'unauthorized', 'authentication', or HTTP 401 → classify as DisconnectReason.AUTH_FAILURE; emit 'disconnect' with reason AUTH_FAILURE; log ERROR: 'Fyers auth failure — access token may be expired. Regenerate before next market open.' Do NOT retry on AUTH_FAILURE.",
+    "CRITICAL — transient reconnect: for any other disconnect → emit 'reconnecting' event with attempt number; reconnect with exponential backoff (2s, 4s, 8s, 16s, 32s… capped at 60s); add ±25% jitter; NO maximum retry count for transient disconnects — keep retrying indefinitely until connect() succeeds or disconnect() is called manually",
+    "subscribe(symbols): calls the underlying SDK subscribe with the symbol list; re-subscribes after reconnect",
+    "Each incoming tick mapped to BrokerTick format; raw message parsed defensively (try/catch around JSON.parse with logging on error)",
+    "FYERS_ACCESS_TOKEN and FYERS_APP_ID are NEVER logged, even at DEBUG level — log only the first 4 chars + '...' if needed for debugging",
+    "All exports are named exports"
+  ],
+  "dependencies": ["T-07", "T-04"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

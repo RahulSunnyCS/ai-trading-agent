@@ -1,0 +1,26 @@
+{
+  "task_id": "T-10",
+  "title": "Angel One (SmartAPI) WebSocket adapter — full implementation",
+  "assigned_to": "implementor",
+  "risk_flags": ["secrets-hygiene"],
+  "scope": {
+    "files_to_create": ["src/ingestion/brokers/angelone.ts"],
+    "files_to_modify": ["package.json"],
+    "files_forbidden": ["src/ingestion/brokers/fyers.ts", "src/ingestion/market-data-sim.ts"]
+  },
+  "acceptance_criteria": [
+    "FIRST: verify Bun-compat spike — add a comment at top of angelone.ts documenting the outcome of importing the SmartAPI WebSocket package under Bun. Document any compatibility shim required.",
+    "package.json adds dependency: smartapi-javascript-sdk (or the current SmartAPI official npm package — verify the correct package name from the Angel One SmartAPI docs at the time of implementation)",
+    "src/ingestion/brokers/angelone.ts exports class AngelOneBrokerFeed implements BrokerFeed",
+    "Constructor takes { apiKey: string, clientCode: string, clientPin: string, totpSecret: string } — reads from ANGEL_API_KEY, ANGEL_CLIENT_CODE, ANGEL_CLIENT_PIN, ANGEL_TOTP_SECRET env vars if not provided. TOTP generated using a standard TOTP library (add otplib or similar dependency).",
+    "connect(): authenticates via SmartAPI REST login (POST to Angel One auth endpoint with apiKey + clientCode + clientPin + totp); stores the jwtToken and feedToken; initialises SmartAPI WebSocket (SmartAPIWebSocket or equivalent class) using feedToken; connects",
+    "subscribe(symbols): Angel One uses token-based subscriptions (not symbol strings); implement symbol-to-token mapping for NIFTY index + ATM CE/PE + INDIAVIX. Document in a comment that the token mapping may need updating as expiry changes weekly.",
+    "Tick mapping: Angel One WebSocket frames use a different format than Fyers — map incoming frame fields to BrokerTick (ltp, bid/ask if available, volume, oi, symbol, underlying, isIndex, optionType, strike)",
+    "CRITICAL — same disconnect classification as T-09: AUTH_FAILURE (token expired/invalid → log actionable message, do NOT retry) vs TRANSIENT (network → reconnect indefinitely with capped exponential backoff + jitter)",
+    "On AUTH_FAILURE: log ERROR: 'Angel One auth failure — check ANGEL_API_KEY, ANGEL_CLIENT_CODE, ANGEL_CLIENT_PIN, ANGEL_TOTP_SECRET. TOTP may have expired.'",
+    "Credentials (apiKey, clientCode, clientPin, jwtToken, feedToken) NEVER logged, even at DEBUG level — log only first 4 chars + '...' if needed",
+    "All exports are named exports"
+  ],
+  "dependencies": ["T-07", "T-04"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

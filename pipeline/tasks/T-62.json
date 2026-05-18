@@ -1,0 +1,29 @@
+{
+  "task_id": "T-62",
+  "title": "Injectable Clock abstraction",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/utils/clock.ts",
+      "src/utils/__tests__/clock.test.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": []
+  },
+  "acceptance_criteria": [
+    "src/utils/clock.ts exports interface Clock { now(): number; today(): string; toISTDate(ms: number): string; toISTTime(ms: number): string; }",
+    "today() returns the current date as 'YYYY-MM-DD' in Asia/Kolkata timezone using date-fns-tz (import { formatInTimeZone } from 'date-fns-tz')",
+    "toISTDate(ms) returns 'YYYY-MM-DD' for the given epoch ms in Asia/Kolkata timezone",
+    "toISTTime(ms) returns 'HH:mm:ss' for the given epoch ms in Asia/Kolkata timezone",
+    "Exports class RealClock implements Clock: now() returns Date.now(); today/toISTDate/toISTTime use date-fns-tz with 'Asia/Kolkata'",
+    "Exports class FixedClock implements Clock: constructor takes a fixed epoch ms or ISO string; now() always returns that fixed timestamp; today/toISTDate/toISTTime compute from the fixed timestamp",
+    "Exports class VirtualClock implements Clock: starts at a given epoch ms; advance(ms: number): void increments the internal timestamp; now() returns current internal timestamp; supports tick(intervalMs, callback) which registers a callback to be called each time advance() crosses an interval boundary — allowing deterministic timer simulation",
+    "package.json adds dependency: date-fns-tz",
+    "clock.test.ts tests: FixedClock.today() at Unix epoch 1748425800000 (2026-05-28 03:00:00 UTC = 2026-05-28 08:30:00 IST) returns '2026-05-28'; at epoch just before midnight IST (2026-05-27 18:29:59 UTC = 2026-05-27 23:59:59 IST) returns '2026-05-27'; at epoch just after midnight IST (2026-05-27 18:30:00 UTC = 2026-05-28 00:00:00 IST) returns '2026-05-28'",
+    "VirtualClock.tick() callback fires exactly when advance() crosses the registered interval, not before; multiple callbacks can be registered at different intervals",
+    "All exports are named exports; Date.now() and new Date() are used only inside clock.ts and nowhere else in the codebase"
+  ],
+  "dependencies": ["T-01"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

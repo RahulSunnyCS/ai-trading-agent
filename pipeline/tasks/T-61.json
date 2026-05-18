@@ -1,0 +1,30 @@
+{
+  "task_id": "T-61",
+  "title": "Vitest + targeted property tests",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "vitest.config.ts",
+      "src/utils/__tests__/pnl.property.test.ts",
+      "src/utils/__tests__/triggers.property.test.ts",
+      "src/utils/__tests__/atm-strike.property.test.ts",
+      "src/utils/pnl.ts"
+    ],
+    "files_to_modify": ["package.json"],
+    "files_forbidden": ["src/trading/trigger-engine.ts", "src/ingestion/brokers/instrument-registry.ts"]
+  },
+  "acceptance_criteria": [
+    "vitest.config.ts defines two projects: 'unit' (include: src/**/*.test.ts, exclude: src/test/integration/**) and 'integration' (include: src/test/integration/**); sets globals: true, environment: 'node'",
+    "package.json scripts updated: test:unit uses 'vitest run --project unit', test:integration uses 'vitest run --project integration', test:watch uses 'vitest --project unit'",
+    "package.json adds devDependencies: vitest, @vitest/coverage-v8, fast-check, decimal.js",
+    "src/utils/pnl.ts exports: calculatePnl(entryStraddleValue: string, exitStraddleValue: string, lots: number, lotSize: number): { grossPnl: string, isProfit: boolean } — uses decimal.js; position is SHORT so profit = entry > exit",
+    "pnl.property.test.ts: CRITICAL test — property test using fast-check: for any entry=100, exit=130 → grossPnl is negative (loss); for entry=100, exit=70 → grossPnl is positive (profit). Also tests: pnl of 100 × ₹0.10 increments = exactly ₹10.00 (no float drift vs decimal.js oracle); accumulation of 1000 random decimal P&L values matches decimal.js sum",
+    "triggers.property.test.ts: property tests for hard SL math (fires at exactly entry*(1+sl_pct), not at entry*(1+sl_pct-ε)), trailing SL ratchet (TSL only moves down, never up; fires at correct threshold), profit target math, daily loss cap accumulation — all using decimal.js as oracle",
+    "atm-strike.property.test.ts: property tests for getAtmStrike (imported stub/placeholder that will be implemented in T-11): NIFTY strikes always multiples of 50; BankNifty always multiples of 100; Sensex always multiples of 100; result is the nearest valid strike to spot price",
+    "Coverage tracked (HTML report output to coverage/) but no threshold gate — vitest --coverage generates the report",
+    "All property tests pass on first run with bun test:unit"
+  ],
+  "dependencies": ["T-01"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

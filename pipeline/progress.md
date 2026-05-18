@@ -11,7 +11,7 @@ recommendation_rounds_used: 0
 | Phase 0 — Triage | ✅ COMPLETE | MEDIUM risk, feature-full lane, 3 sprints, tags: backend/infra/frontend/product |
 | Phase 1 — Planning | ✅ COMPLETE | 3 Red Team sprints, QA Planner, Translator — score 9/10 |
 | Human Gate 1 | ⏳ PENDING | Plan Report presented — awaiting user approval |
-| Phase 2 — Decomposition | — | |
+| Phase 2 — Decomposition | ✅ COMPLETE | 21 task contracts written; TODO.md regenerated; T-10 upgraded to full Angel One impl |
 | Phase 3 — Implementation | — | |
 | Phase 4 — Review | — | |
 | Human Gate 2 | — | |

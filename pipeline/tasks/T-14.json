@@ -1,0 +1,22 @@
+{
+  "task_id": "T-14",
+  "title": "VIX feed (light)",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": ["src/ingestion/vix-feed.ts"],
+    "files_to_modify": [],
+    "files_forbidden": []
+  },
+  "acceptance_criteria": [
+    "src/ingestion/vix-feed.ts exports class VixFeed",
+    "Constructor takes a BrokerFeed instance; listens for ticks from the broker where symbol matches 'NSE:INDIAVIX-INDEX' (Fyers) or equivalent Angel One VIX symbol",
+    "Maintains lastVix: number | null = null; updates on each VIX tick",
+    "Exports getCurrentVix(): number | null — returns lastVix; null if no VIX tick received yet",
+    "NSE public API polling is NOT implemented in M1 — that is deferred to M2. A comment documents this: 'NSE-API polling deferred to M2. Currently captures VIX from broker tick only.'",
+    "No crash if VIX tick is missing — null is a valid return value; callers must handle null",
+    "All exports are named exports"
+  ],
+  "dependencies": ["T-04"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

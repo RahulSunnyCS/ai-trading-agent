@@ -1,0 +1,39 @@
+{
+  "task_id": "T-20",
+  "title": "React dashboard shell",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "frontend/package.json",
+      "frontend/vite.config.ts",
+      "frontend/tsconfig.json",
+      "frontend/index.html",
+      "frontend/src/main.tsx",
+      "frontend/src/App.tsx",
+      "frontend/src/store/trading.ts",
+      "frontend/src/components/StraddleChart.tsx",
+      "frontend/src/components/TradesTable.tsx",
+      "frontend/src/components/PnlDisplay.tsx",
+      "frontend/src/hooks/useWebSocket.ts",
+      "frontend/tailwind.config.ts",
+      "frontend/postcss.config.js"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": ["src/api/server.ts", "src/api/websocket.ts"]
+  },
+  "acceptance_criteria": [
+    "frontend/package.json: separate Bun/npm project (can use npm in the frontend since it's a separate workspace from the backend — or Bun, document the choice); dependencies: react@18, react-dom@18, zustand, lightweight-charts, @tanstack/react-query; devDependencies: vite, @vitejs/plugin-react, typescript, tailwindcss, postcss, autoprefixer, @types/react, @types/react-dom",
+    "vite.config.ts: server.proxy routes /api and /ws to http://localhost:3000 (Fastify backend) so the Vite dev server and API work together without CORS issues in dev",
+    "frontend/src/store/trading.ts: Zustand store with state: straddleHistory (array of {time, value, roc}), openTrades (array of PaperTrade), todayPnl (Decimal string), wsStatus ('connecting'|'connected'|'disconnected'). Actions: addStraddleTick, setTrades, updatePnl, setWsStatus",
+    "frontend/src/hooks/useWebSocket.ts: connects to ws://localhost:3000/ws/ticks (proxied via Vite); on message: parses JSON, dispatches to Zustand store; reconnects with 3s delay on disconnect; updates wsStatus",
+    "frontend/src/components/StraddleChart.tsx: Lightweight Charts line chart showing straddle_value over time; updates in real-time from Zustand store; shows last 100 data points",
+    "frontend/src/components/TradesTable.tsx: table of today's trades from GET /dashboard/summary; columns: entry time, ATM strike, entry value, current P&L, status, exit reason; polled every 10s via react-query",
+    "frontend/src/components/PnlDisplay.tsx: displays total running P&L for today; green if positive, red if negative",
+    "frontend/src/App.tsx: assembles StraddleChart + PnlDisplay + TradesTable + WS status indicator; read-only, no user actions",
+    "vite build (run from frontend/ directory) completes without TypeScript errors or build errors",
+    "frontend is deliberately a separate package from the backend — no shared TypeScript files between frontend/ and src/"
+  ],
+  "dependencies": ["T-19"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

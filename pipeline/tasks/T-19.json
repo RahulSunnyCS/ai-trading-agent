@@ -1,0 +1,28 @@
+{
+  "task_id": "T-19",
+  "title": "Fastify server + MVP REST + WebSocket",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/api/server.ts",
+      "src/api/routes/dashboard.ts",
+      "src/api/routes/paper-trades.ts",
+      "src/api/websocket.ts"
+    ],
+    "files_to_modify": ["package.json"],
+    "files_forbidden": ["src/index.ts", "src/trading/position-monitor.ts"]
+  },
+  "acceptance_criteria": [
+    "package.json adds dependencies: fastify, @fastify/websocket, @fastify/cors",
+    "src/api/server.ts exports buildServer({ db: Pool, redis: Redis }): FastifyInstance — creates a Fastify instance with logger enabled; registers @fastify/cors (allow all origins in dev — CORS_ORIGIN env var); registers @fastify/websocket; registers dashboard and paper-trades route plugins; returns the instance without starting it (start is done by caller)",
+    "src/api/routes/dashboard.ts: GET /dashboard/live — queries straddle_snapshots for the latest row WHERE time > NOW() - INTERVAL '1 minute' (always time-filtered); returns { straddleValue, roc, acceleration, atmStrike, underlying, timestamp }; GET /dashboard/summary — queries paper_trades WHERE DATE(entry_time AT TIME ZONE 'Asia/Kolkata') = today; returns array of { id, status, entryStraddleValue, currentPnl, exitReason }",
+    "src/api/routes/paper-trades.ts: GET /paper-trades — accepts query params ?date (YYYY-MM-DD, defaults to today IST) and ?status ('open'|'closed'|'all'); queries paper_trades with date filter always using AT TIME ZONE 'Asia/Kolkata'; returns paginated array of PaperTrade rows",
+    "src/api/websocket.ts: WS /ws/ticks — subscribes to STREAM_STRADDLE via Redis XREAD (not XREADGROUP — this is a broadcast, not a consumer group); broadcasts each straddle snapshot as JSON to all connected WebSocket clients; handles client disconnect gracefully; logs WARN if no clients connected (not an error)",
+    "All routes use Fastify JSON Schema validation for both request params and response shape",
+    "Graceful shutdown: server.close() drains existing connections; exported closeServer() unsubscribes from Redis and closes the Fastify server",
+    "All exports are named exports"
+  ],
+  "dependencies": ["T-17"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

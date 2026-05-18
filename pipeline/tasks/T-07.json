@@ -1,0 +1,20 @@
+{
+  "task_id": "T-07",
+  "title": "BrokerFeed interface + tick types",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": ["src/ingestion/brokers/types.ts"],
+    "files_to_modify": [],
+    "files_forbidden": ["src/ingestion/brokers/fyers.ts", "src/ingestion/brokers/angelone.ts", "src/ingestion/market-data-sim.ts"]
+  },
+  "acceptance_criteria": [
+    "src/ingestion/brokers/types.ts exports interface BrokerTick { time: number; symbol: string; underlying: string; ltp: number; bid: number; ask: number; volume: number; oi: number; optionType?: 'CE' | 'PE'; strike?: number; expiry?: string; isIndex: boolean; }",
+    "Exports interface BrokerFeed { connect(): Promise<void>; subscribe(symbols: string[]): Promise<void>; disconnect(): Promise<void>; on(event: 'tick', handler: (tick: BrokerTick) => void): this; on(event: 'error', handler: (err: Error) => void): this; on(event: 'disconnect', handler: (reason: string) => void): this; on(event: 'reconnecting', handler: (attempt: number) => void): this; }",
+    "Exports type BrokerName = 'fyers' | 'angelone' | 'simulator'",
+    "Exports enum DisconnectReason { AUTH_FAILURE = 'AUTH_FAILURE', TRANSIENT = 'TRANSIENT', MANUAL = 'MANUAL' }",
+    "All exports are named exports; file contains no implementation logic — only type/interface definitions"
+  ],
+  "dependencies": ["T-01"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

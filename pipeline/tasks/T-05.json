@@ -1,0 +1,27 @@
+{
+  "task_id": "T-05",
+  "title": "Core schema migration 001",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/db/migrations/001_core_schema.sql",
+      "src/db/schema.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": ["src/db/migrations/002_seed_clockwork.sql", "src/db/client.ts", "src/db/migrate.ts"]
+  },
+  "acceptance_criteria": [
+    "001_core_schema.sql creates hypertable market_ticks (time TIMESTAMPTZ NOT NULL, symbol TEXT NOT NULL, underlying TEXT NOT NULL, expiry DATE, strike INTEGER, option_type CHAR(2), ltp NUMERIC(10,2), bid NUMERIC(10,2), ask NUMERIC(10,2), volume BIGINT, oi BIGINT) — calls SELECT create_hypertable('market_ticks','time')",
+    "Creates hypertable straddle_snapshots (time TIMESTAMPTZ NOT NULL, underlying TEXT NOT NULL, expiry DATE NOT NULL, atm_strike INTEGER NOT NULL, ce_ltp NUMERIC(10,2), pe_ltp NUMERIC(10,2), straddle_value NUMERIC(10,2), straddle_change_pct NUMERIC(8,4), roc NUMERIC(10,6), acceleration NUMERIC(10,6), vix NUMERIC(6,2)) — calls SELECT create_hypertable('straddle_snapshots','time'); adds compression policy: ALTER TABLE straddle_snapshots SET (timescaledb.compress, timescaledb.compress_segmentby='underlying,expiry'); SELECT add_compression_policy('straddle_snapshots', INTERVAL '7 days')",
+    "Creates hypertable option_ticks (time TIMESTAMPTZ NOT NULL, symbol TEXT NOT NULL, underlying TEXT NOT NULL, expiry DATE NOT NULL, strike INTEGER NOT NULL, option_type CHAR(2) NOT NULL, open NUMERIC(10,2), high NUMERIC(10,2), low NUMERIC(10,2), close NUMERIC(10,2), volume BIGINT, oi BIGINT, price_ema8 NUMERIC(10,4), price_ema20 NUMERIC(10,4), exhaustion_score NUMERIC(6,4))",
+    "Creates standard tables: straddle_signals, paper_trades, personality_configs, retrospection_results, external_signals — exact column definitions match TECHNICAL_REFERENCE.md schema section verbatim",
+    "Creates continuous aggregate: CREATE MATERIALIZED VIEW straddle_1min WITH (timescaledb.continuous) AS SELECT time_bucket('1 minute', time) AS bucket, underlying, expiry, first(straddle_value, time) AS open, max(straddle_value) AS high, min(straddle_value) AS low, last(straddle_value, time) AS close FROM straddle_snapshots GROUP BY bucket, underlying, expiry",
+    "Canary validation block at end of migration (in a DO $$ block): asserts that market_ticks is a hypertable (query pg_extension for timescaledb + timescaledb_information.hypertables), asserts straddle_1min exists as a continuous aggregate, asserts compression policy exists for straddle_snapshots — raises EXCEPTION with descriptive message if any assertion fails",
+    "Note in SQL comments: add_compression_policy and CAGG creation are NOT transactional in TimescaleDB — if these fail after the tables are created, the migration is partially applied; the canary block detects this",
+    "src/db/schema.ts exports TypeScript interfaces matching every table: MarketTick, StraddleSnapshot, OptionTick, StraddleSignal, PaperTrade, PersonalityConfig, RetrospectionResult, ExternalSignal. All NUMERIC columns typed as string (matching pg type parser config from T-03)",
+    "All exports are named exports"
+  ],
+  "dependencies": ["T-03"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

@@ -1,0 +1,21 @@
+{
+  "task_id": "T-12",
+  "title": "Broker selection wiring",
+  "assigned_to": "implementor",
+  "risk_flags": ["secrets-hygiene"],
+  "scope": {
+    "files_to_create": ["src/ingestion/broker-factory.ts"],
+    "files_to_modify": [],
+    "files_forbidden": ["src/index.ts", "src/ingestion/brokers/fyers.ts", "src/ingestion/brokers/angelone.ts", "src/ingestion/market-data-sim.ts"]
+  },
+  "acceptance_criteria": [
+    "src/ingestion/broker-factory.ts exports createBroker(clock: Clock): BrokerFeed",
+    "Selection logic: if SIMULATE=true → return new MarketDataSimulator({ clock }); else if BROKER='angelone' → return new AngelOneBrokerFeed({ ... from env }); else default → return new FyersBrokerFeed({ ... from env })",
+    "Exports createBrokerWithFallback(clock: Clock): BrokerFeed — wraps the primary broker (Fyers by default) with fallback logic: on AUTH_FAILURE from primary, if BROKER_FALLBACK='angelone' is set → log WARN 'Primary broker auth failed, switching to Angel One fallback' → return AngelOneBrokerFeed; if BROKER_FALLBACK not set → re-throw the auth error",
+    "Validates required env vars at startup and throws a descriptive error if missing (e.g., 'FYERS_ACCESS_TOKEN is required when SIMULATE is not true')",
+    "FYERS_ACCESS_TOKEN, ANGEL_API_KEY etc are read from process.env inside the factory — never hardcoded, never default-valued to anything real",
+    "All exports are named exports"
+  ],
+  "dependencies": ["T-08", "T-09", "T-10"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

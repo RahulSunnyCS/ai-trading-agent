@@ -1,0 +1,25 @@
+{
+  "task_id": "T-60",
+  "title": "Biome lint/format + lefthook pre-commit",
+  "assigned_to": "implementor",
+  "risk_flags": ["secrets-hygiene"],
+  "scope": {
+    "files_to_create": [
+      "biome.json",
+      "lefthook.yml"
+    ],
+    "files_to_modify": ["package.json"],
+    "files_forbidden": [".github/workflows/ci.yml"]
+  },
+  "acceptance_criteria": [
+    "biome.json configures Biome as both formatter and linter: formatter enabled (indentStyle: space, indentWidth: 2, lineWidth: 100); linter enabled with recommended rules; organizeImports enabled",
+    "biome.json adds a custom lint rule to ban Date.now() and new Date() calls outside src/utils/clock.ts — use noRestrictedGlobals or equivalent Biome rule; if Biome does not support this natively, add a comment explaining the limitation and note that the ban is enforced via code review",
+    "package.json adds scripts: lint ('biome check .'), lint:fix ('biome check --write .'), format ('biome format --write .')",
+    "package.json adds devDependencies: @biomejs/biome, lefthook",
+    "lefthook.yml defines pre-commit hook with three steps: (1) biome-check: run 'biome check --no-errors-on-unmatched {staged_files}' on staged .ts/.tsx files; (2) env-guard: run a shell command that exits 1 if any staged file matches '.env' or '.env.*' (excluding .env.example); (3) env-example-scan: run a shell command that greps .env.example for patterns matching real token values (length > 20 chars, alphanumeric with dashes/underscores — common API key shape); exit 1 with message 'Possible real credential in .env.example — replace with placeholder' if found",
+    "lefthook install runs without errors (can be invoked via bun run prepare script or manually)",
+    "Running biome check . on the initial codebase (T-01 scaffold) passes with zero errors"
+  ],
+  "dependencies": ["T-01"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

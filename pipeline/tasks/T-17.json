@@ -1,0 +1,27 @@
+{
+  "task_id": "T-17",
+  "title": "Paper trade execution + P&L",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/trading/paper-trade-executor.ts",
+      "src/trading/quantiply-stub.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": ["src/trading/trigger-engine.ts", "src/trading/entry-engine.ts"]
+  },
+  "acceptance_criteria": [
+    "src/trading/paper-trade-executor.ts exports class PaperTradeExecutor",
+    "Constructor takes { db: Pool, quantiply: QuantiplyClient }",
+    "Exports async openTrade(intent: EntryIntent, lotSize?: number): Promise<string> (returns paper_trades.id) — inserts a row into paper_trades with status='open', captures entry_ce_strike, entry_pe_strike, entry_ce_price (from intent straddleValue/2 as placeholder — actual CE/PE split populated if tick data available), lots=1, straddle_at_entry=intent.straddleValue, vix_at_entry=intent.vixAtEntry, spot_at_entry from intent, lowestStraddleValueSeen initialized to intent.straddleValue",
+    "Exports async closeTrade(tradeId: string, exitStraddleValue: string, exitReason: string, clock: Clock): Promise<void> — updates the paper_trades row: exit_time=clock.now(), exit_ce_price and exit_pe_price, exit_reason, status='closed', computes using decimal.js: gross_pnl = (Decimal(straddle_at_entry) - Decimal(exitStraddleValue)).mul(lots).mul(lotSize), net_pnl = gross_pnl (no fee model in MVP), updates max_drawdown (running min of gross_pnl during the trade's life — maintained in position monitor T-18)",
+    "CRITICAL: all P&L arithmetic uses decimal.js — no JavaScript number arithmetic on monetary values",
+    "Exports interface QuantiplyClient { recordTrade(trade: PaperTrade): Promise<void> } and class QuantiplyStub implements QuantiplyClient — stub is a no-op that logs INFO 'Quantiply stub: recordTrade called (no-op in MVP)'",
+    "QuantiplyStub lives in src/trading/quantiply-stub.ts and satisfies the same interface signature as the real integration would",
+    "Exports getOpenTrades(db: Pool, tradingDate: string): Promise<OpenPosition[]> — queries paper_trades WHERE status='open' AND DATE(entry_time AT TIME ZONE 'Asia/Kolkata') = tradingDate; always includes this time filter",
+    "All exports are named exports"
+  ],
+  "dependencies": ["T-05", "T-15"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

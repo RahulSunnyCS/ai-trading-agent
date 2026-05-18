@@ -6,3 +6,4 @@
 | Phase 1 | Planning + Red Team (3 sprints) | orchestrator + red-team | opus | max | ~60k |
 | Phase 1 | QA Planner | qa-planner | sonnet | medium | ~8k |
 | Phase 1 | Translator (Gate 1) | translator | haiku | medium | ~4k |
+| Phase 2 | Decomposition (21 task contracts) | orchestrator | opus | high | ~20k |
