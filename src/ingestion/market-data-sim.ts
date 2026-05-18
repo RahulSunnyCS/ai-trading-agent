@@ -15,31 +15,15 @@
  * All time operations must go through the injected Clock instance.
  */
 
-import type { Clock } from "../utils/clock.js";
+import type { ClockWithTick } from "../utils/clock.js";
 import type { BrokerFeed, BrokerTick } from "./brokers/types.js";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * The Clock interface does not include tick() — that method exists only on
- * VirtualClock and on RealClock's tick-loop variant. We need a structural
- * supertype that requires only now() (from Clock) plus the optional tick()
- * so callers can pass either a VirtualClock or a RealClock that exposes tick.
- *
- * Using an intersection type rather than extending Clock keeps this file
- * from coupling to a concrete class and avoids modifying the shared Clock
- * interface for simulator-specific concerns.
- */
-export type SimulatorClock = Clock & {
-  /**
-   * Registers a callback to fire each time intervalMs elapses.
-   * VirtualClock fires it on advance(); RealClock implementations use
-   * their own real-timer mechanism.
-   */
-  tick(intervalMs: number, callback: () => void): void;
-};
+/** Alias kept for backward compatibility — use ClockWithTick from utils/clock.ts. */
+export type SimulatorClock = ClockWithTick;
 
 /** Constructor options for MarketDataSimulator. */
 export interface SimulatorOptions {

@@ -44,22 +44,13 @@
 import type { Redis } from "ioredis";
 import type { Pool } from "pg";
 import { STREAM_STRADDLE, recoverPending, streamConsume } from "../redis/client.js";
-import type { Clock } from "../utils/clock.js";
+import type { ClockWithTick } from "../utils/clock.js";
 import type { EntryIntent } from "./entry-engine.js";
 import type { EntryEngine } from "./entry-engine.js";
 import type { PaperTradeExecutor } from "./paper-trade-executor.js";
 import { getOpenTrades } from "./paper-trade-executor.js";
 import { evaluateTriggers, updateTrailingStop } from "./trigger-engine.js";
 import type { TriggerConfig } from "./trigger-engine.js";
-
-// ---------------------------------------------------------------------------
-// ClockWithTick — same intersection pattern as straddle-calc.ts / vix-feed.ts.
-// The base Clock interface does not include tick() because RealClock does not
-// implement it. Any concrete clock passed to PositionMonitor must support it.
-// ---------------------------------------------------------------------------
-type ClockWithTick = Clock & {
-  tick(intervalMs: number, callback: () => void): void;
-};
 
 // ---------------------------------------------------------------------------
 // Constructor options

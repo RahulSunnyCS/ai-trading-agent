@@ -37,12 +37,13 @@ export function useWebSocket(): void {
       ws.onmessage = (event: MessageEvent<string>) => {
         if (unmountedRef.current) return;
         try {
-          const msg = JSON.parse(event.data) as Record<string, unknown>;
-          if (typeof msg.straddle_value !== "undefined") {
+          const msg = JSON.parse(event.data) as { id: string; fields: Record<string, string> };
+          const fields = msg.fields;
+          if (fields?.straddleValue !== undefined) {
             addStraddleTick({
               time: Date.now(),
-              value: Number.parseFloat(String(msg.straddle_value)),
-              roc: msg.roc != null ? Number.parseFloat(String(msg.roc)) : null,
+              value: Number.parseFloat(fields.straddleValue),
+              roc: fields.roc != null ? Number.parseFloat(fields.roc) : null,
             });
           }
         } catch (err) {

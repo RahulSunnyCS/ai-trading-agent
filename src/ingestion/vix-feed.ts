@@ -17,32 +17,14 @@
  * All time operations must go through the injected Clock instance.
  */
 
-import type { Clock } from "../utils/clock.js";
+import type { ClockWithTick } from "../utils/clock.js";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * The base Clock interface does not include tick() — that method exists only
- * on VirtualClock (test) and on any RealClock-equivalent that adds tick loop
- * support. We define a structural supertype that requires only the Clock
- * interface PLUS the optional tick() so callers can pass either a VirtualClock
- * or a RealClock with tick scheduling.
- *
- * This mirrors the SimulatorClock pattern in market-data-sim.ts exactly —
- * using an intersection type rather than extending Clock keeps this file
- * from coupling to a concrete class and avoids modifying the shared Clock
- * interface for VixFeed-specific concerns.
- */
-export type VixClock = Clock & {
-  /**
-   * Registers a callback to fire each time intervalMs elapses.
-   * VirtualClock fires it on advance(); production RealClock implementations
-   * use their own real-timer mechanism.
-   */
-  tick(intervalMs: number, callback: () => void): void;
-};
+/** Alias kept for backward compatibility — use ClockWithTick from utils/clock.ts. */
+export type VixClock = ClockWithTick;
 
 /** Constructor options for VixFeed. */
 export interface VixFeedOptions {

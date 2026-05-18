@@ -96,7 +96,7 @@ async function main(): Promise<void> {
   // vixFeed and entryEngine are independent; positionMonitor depends on entryEngine.
   // server.listen is last so the HTTP surface is not available until the pipeline
   // is fully wired and ready to serve data.
-  broker.connect();
+  await broker.connect();
   calc.start(broker);
   vixFeed.start();
   await positionMonitor.start();
@@ -141,6 +141,19 @@ async function main(): Promise<void> {
   // Register both SIGTERM (Docker / Railway / Fly.io) and SIGINT (Ctrl-C in dev).
   // Using 'once' semantics via `process.on` is sufficient because process.exit(0)
   // in the handler prevents the process from receiving a second signal.
+  // Catch unhandled promise rejections and uncaught exceptions — any escape from
+  // the hot-path catch blocks (stream handlers, VIX polling) must not silently
+  // terminate the process while positions remain open.
+  process.on("unhandledRejection", (reason: unknown) => {
+    console.error("[index] Unhandled rejection — initiating graceful shutdown:", reason);
+    shutdown().catch(() => process.exit(1));
+  });
+
+  process.on("uncaughtException", (err: Error) => {
+    console.error("[index] Uncaught exception — initiating graceful shutdown:", err);
+    shutdown().catch(() => process.exit(1));
+  });
+
   process.on("SIGTERM", () => {
     shutdown().catch((err) => {
       console.error("[index] Error during shutdown:", err);

@@ -17,22 +17,11 @@
  * All exports are named exports (no default export) per project conventions.
  */
 
-import type { Clock } from "../../utils/clock.js";
+import type { Clock, ClockWithTick } from "../../utils/clock.js";
 import { MarketDataSimulator } from "../market-data-sim.js";
 import { AngelOneBroker } from "./angelone.js";
 import { FyersBroker } from "./fyers.js";
 import type { BrokerFeed } from "./types.js";
-
-// ---------------------------------------------------------------------------
-// SimulatorClock alias
-//
-// MarketDataSimulator requires a Clock that also exposes tick(), which is the
-// VirtualClock / RealClock extension for interval callbacks. We use the same
-// structural intersection pattern as straddle-calc.ts and market-data-sim.ts.
-// ---------------------------------------------------------------------------
-type ClockWithTick = Clock & {
-  tick(intervalMs: number, callback: () => void): void;
-};
 
 // ---------------------------------------------------------------------------
 // createBroker

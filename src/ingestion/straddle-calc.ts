@@ -18,18 +18,9 @@
 import type { Redis } from "ioredis";
 import type { Pool } from "pg";
 import { STREAM_STRADDLE } from "../redis/client.js";
-import type { Clock } from "../utils/clock.js";
+import type { ClockWithTick } from "../utils/clock.js";
 import { getAtmStrike } from "./brokers/instrument-registry.js";
 import type { BrokerFeed, BrokerTick } from "./brokers/types.js";
-
-// ---------------------------------------------------------------------------
-// SimulatorClock alias — Clock must also expose tick() for interval callbacks.
-// We use a structural intersection so no concrete class needs to be imported.
-// This mirrors the pattern used in market-data-sim.ts.
-// ---------------------------------------------------------------------------
-type ClockWithTick = Clock & {
-  tick(intervalMs: number, callback: () => void): void;
-};
 
 // ---------------------------------------------------------------------------
 // StraddleCalculatorConfig
@@ -233,7 +224,7 @@ export class StraddleCalculator {
     // Using .catch() on each step independently so a Redis failure does not
     // prevent the DB write from being attempted.
     this._redis
-      .xadd(STREAM_STRADDLE, "*", ...flatFields)
+      .xadd(STREAM_STRADDLE, "MAXLEN", "~", "10000", "*", ...flatFields)
       .catch((err: unknown) => {
         console.error("[StraddleCalculator] Redis publish error:", err);
       })

@@ -89,7 +89,11 @@ export const tradesRoutes: FastifyPluginAsync<TradesRoutesOptions> = async (
     },
     async (_request, _reply) => {
       const result = await opts.db.query<Record<string, unknown>>(
-        "SELECT * FROM paper_trades WHERE status = 'open'",
+        `SELECT * FROM paper_trades
+         WHERE status = 'open'
+           AND entry_time > NOW() - INTERVAL '7 days'
+         ORDER BY entry_time DESC
+         LIMIT 100`,
       );
       return result.rows;
     },

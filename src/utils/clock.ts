@@ -75,6 +75,18 @@ export class FixedClock implements Clock {
 }
 
 /**
+ * Intersection type for clocks that support interval callbacks.
+ * Used by StraddleCalculator, VixFeed, MarketDataSimulator, PositionMonitor,
+ * and broker-factory — all of which need the real Clock interface plus the
+ * ability to register interval callbacks driven by VirtualClock.advance() in tests.
+ *
+ * Exported here so it is defined exactly once; all modules import from this file.
+ */
+export type ClockWithTick = Clock & {
+  tick(intervalMs: number, callback: () => void): void;
+};
+
+/**
  * Represents a single registered tick callback.
  * We store the intervalMs and the timestamp at which it was last "fired" so we
  * can detect boundary crossings independently for each callback.
