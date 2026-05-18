@@ -93,6 +93,10 @@ const QUERY_STRING_SCHEMA = {
  *
  * Pagination cap: max 100 rows per page. This prevents full-hypertable-scan
  * style queries even on large date ranges. Callers paginate by incrementing ?page.
+ *
+ * GET /paper-trades — paginated trade query with optional date and status filters.
+ *                     date filter uses IST timezone (Asia/Kolkata) for correct day boundaries.
+ *                     max 100 rows per page.
  */
 export const paperTradesRoutes: FastifyPluginAsync<PaperTradesRoutesOptions> = async (
   fastify: FastifyInstance,

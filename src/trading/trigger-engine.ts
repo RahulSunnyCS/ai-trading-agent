@@ -139,6 +139,9 @@ export function evaluateTriggers(
   //
   // trailingThreshold = lowestStraddleValueSeen * (1 + trailingSlPct)
   // Guard: current < entry ensures we only trail when profitable (short straddle).
+  // TSL only applies when current < entry (we are in profit territory on a short straddle).
+  // Without this guard, TSL would fire incorrectly when the position is at a loss —
+  // which would cause premature exits that the hard SL should handle instead.
   const trailingThreshold = lowest.mul(new Decimal(1).add(config.trailingSlPct));
   if (current.gte(trailingThreshold) && current.lt(entry)) {
     return { shouldExit: true, reason: "TSL" };

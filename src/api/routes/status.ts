@@ -23,6 +23,10 @@ export const statusRoutes: FastifyPluginAsync<StatusRoutesOptions> = async (
   fastify: FastifyInstance,
   opts: StatusRoutesOptions,
 ): Promise<void> => {
+  /**
+   * GET /health — liveness probe for Docker / Railway / Fly.io health checks.
+   * Returns { status: "ok", time: epochMs } — the time field confirms the clock is working.
+   */
   fastify.get(
     "/health",
     {

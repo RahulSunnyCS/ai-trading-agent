@@ -60,6 +60,10 @@ const SUMMARY_ITEM_SCHEMA = {
  *
  * Routes are read-only (GET only). They surface live straddle data and
  * today's trade summary for the React dashboard.
+ *
+ * GET /dashboard/live  — latest straddle snapshot within the past minute.
+ *                        404 when the feed is stale (useful for the dashboard to detect feed-down).
+ * GET /dashboard/summary — today's paper_trades (IST date). Polled by the React dashboard every 10s.
  */
 export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async (
   fastify: FastifyInstance,
