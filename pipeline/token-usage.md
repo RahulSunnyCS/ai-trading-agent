@@ -34,3 +34,4 @@
 | Phase 3 | T-21: End-to-end wire-up + smoke test + README | implementor | sonnet | high | ~105k |
 | Phase 4 | Security Audit | security-auditor | sonnet | max | ~131k |
 | Phase 4 | Performance Review | performance-reviewer | sonnet | high | ~82k |
+| Phase 4 | Architecture Review | architecture-reviewer | sonnet | high | ~149k |
