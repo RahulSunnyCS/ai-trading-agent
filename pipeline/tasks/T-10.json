@@ -1,0 +1,25 @@
+{
+  "task_id": "T-10",
+  "title": "Evolution approval panel",
+  "assigned_to": "implementor",
+  "risk_flags": ["public-facing-api"],
+  "scope": {
+    "files_to_create": [
+      "frontend/src/components/EvolutionPanel.tsx"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": []
+  },
+  "acceptance_criteria": [
+    "EvolutionPanel.tsx fetches pending evolution approvals via TanStack Query (getPendingEvolutions()); 60s refetch interval",
+    "Each pending approval card shows: personality name, parameter name, current value, proposed value, rationale text, regime context, requested_at (IST)",
+    "Approve button calls approveEvolution(id) via Axios POST; on success invalidates the pending-evolutions and personalities queries (cache refresh); shows loading state during request",
+    "Reject button opens a minimal reason input (optional text) then calls rejectEvolution(id, reason); same cache invalidation",
+    "If approve returns 409 (already processed), show a friendly 'Already applied' message — not an error toast",
+    "If approve returns 400 (frozen personality or disallowed parameter), show 'Cannot apply: [server error message]'",
+    "Shows 'No pending approvals' placeholder when queue is empty",
+    "TypeScript strict mode"
+  ],
+  "dependencies": ["T-06"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

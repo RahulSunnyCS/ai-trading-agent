@@ -1,0 +1,37 @@
+{
+  "task_id": "T-05",
+  "title": "React + Vite frontend scaffold with dev proxy",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "frontend/package.json",
+      "frontend/vite.config.ts",
+      "frontend/tsconfig.json",
+      "frontend/tailwind.config.ts",
+      "frontend/postcss.config.js",
+      "frontend/index.html",
+      "frontend/src/main.tsx",
+      "frontend/src/App.tsx",
+      "frontend/src/index.css"
+    ],
+    "files_to_modify": [
+      "package.json"
+    ],
+    "files_forbidden": [
+      "src/index.ts",
+      "src/trading/evolution-rules.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "frontend/package.json includes: vite, @vitejs/plugin-react, react, react-dom, @types/react, @types/react-dom, typescript, tailwindcss, @tanstack/react-query, zustand, axios, lightweight-charts",
+    "frontend/vite.config.ts dev server proxy: { '/api': { target: 'http://127.0.0.1:3000', changeOrigin: false }, '/ws': { target: 'ws://127.0.0.1:3000', ws: true, changeOrigin: false } }",
+    "Root package.json adds scripts: 'frontend:dev': 'cd frontend && bun run dev', 'frontend:build': 'cd frontend && bun run build', 'frontend:preview': 'cd frontend && bun run preview'",
+    "Tailwind CSS v3 configured with content paths: ['./index.html', './src/**/*.{ts,tsx}']",
+    "frontend/src/App.tsx renders a placeholder div with text 'AI Trading Agent Dashboard' — verifying the build pipeline works",
+    "Running 'bun run frontend:build' from repo root produces frontend/dist/ with index.html",
+    "TypeScript strict mode in frontend/tsconfig.json"
+  ],
+  "dependencies": [],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

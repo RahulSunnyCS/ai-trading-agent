@@ -1,0 +1,37 @@
+{
+  "task_id": "T-02",
+  "title": "evolution-guard module, evolution_approvals migration, personalities + evolution REST API",
+  "assigned_to": "implementor",
+  "risk_flags": ["public-facing-api"],
+  "scope": {
+    "files_to_create": [
+      "src/trading/evolution-guard.ts",
+      "src/api/routes/personalities.ts",
+      "src/api/routes/evolution.ts",
+      "src/db/migrations/003_evolution_approvals.sql"
+    ],
+    "files_to_modify": [
+      "src/trading/evolution-rules.ts",
+      "src/api/server.ts"
+    ],
+    "files_forbidden": [
+      "src/db/migrations/001_initial_schema.sql",
+      "src/db/migrations/002_seed_personalities.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "evolution-guard.ts exports MUTABLE_PARAMETERS readonly string array: ['min_probability','max_daily_trades','max_daily_loss','entry_delay_secs','adjustment_trigger_points','max_open_legs','reentry_min_probability','min_vix','max_vix','require_profit_gate','profit_gate_amount','profit_gate_days','reentry_delay_mins']",
+    "evolution-guard.ts exports assertEvolutionAllowed(personality: PersonalityConfig, parameter: string): void — throws FrozenPersonalityError if is_frozen, throws Error if parameter not in MUTABLE_PARAMETERS",
+    "EXISTING auto-apply path applyEvolutionRules() in evolution-rules.ts is REWRITTEN to: (a) call assertEvolutionAllowed() per proposal, (b) use MUTABLE_PARAMETERS allowlist for column name (no raw ${parameter} string interpolation), (c) wrap UPDATE personality_configs + UPDATE retrospection_results.applied in a single withTransaction()",
+    "Migration 003 creates evolution_approvals table with CHECK constraint on parameter column matching MUTABLE_PARAMETERS list; includes retrospection_result_id UUID REFERENCES retrospection_results(id)",
+    "GET /api/personalities returns array of all active PersonalityConfig rows from DB",
+    "GET /api/personalities/:id returns single personality or 404",
+    "GET /api/evolution/pending returns pending evolution_approvals rows joined with personality name",
+    "POST /api/evolution/:id/approve runs 7-step withTransaction: (1) SELECT...FOR UPDATE, (2) 409 if status != 'pending', (3) assertEvolutionAllowed (frozen + parameter allowlist), (4) comparison-integrity DB check (min_probability drift across Precision/Adjuster/Reducer must be <= 8pp), (5) UPDATE personality_configs SET validated_col = proposed_value, (6) UPDATE evolution_approvals SET status='applied', reviewed_at=NOW(), (7) UPDATE retrospection_results SET applied=TRUE, applied_at=NOW(); returns 200 on success",
+    "POST /api/evolution/:id/reject: withTransaction flips status='rejected' with optional body.reason; returns 200",
+    "Clockwork (is_frozen=true) cannot be approved — assertEvolutionAllowed throws and approve returns 400",
+    "TypeScript strict mode throughout; all DB queries parameterized"
+  ],
+  "dependencies": ["T-01"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

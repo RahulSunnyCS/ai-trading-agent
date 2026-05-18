@@ -1,0 +1,35 @@
+{
+  "task_id": "T-01",
+  "title": "Fastify server bootstrap, lifecycle, and origin-guard middleware",
+  "assigned_to": "implementor",
+  "risk_flags": ["public-facing-api"],
+  "scope": {
+    "files_to_create": [
+      "src/api/server.ts",
+      "src/api/index.ts",
+      "src/api/middleware/origin-guard.ts"
+    ],
+    "files_to_modify": [
+      "src/index.ts",
+      "package.json",
+      "bun.lock"
+    ],
+    "files_forbidden": [
+      "src/trading/evolution-rules.ts",
+      "src/db/schema.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "Fastify server listens on 127.0.0.1:3000 (NOT 0.0.0.0)",
+    "GET /health returns 200 OK with JSON { status: 'ok' }",
+    "GET /api/status returns { mode: 'live'|'sim', underlying, uptimeMs }",
+    "@fastify/websocket and @fastify/static plugins registered (bun add @fastify/static added to package.json + bun.lock updated)",
+    "origin-guard.ts onRequest hook rejects requests with Origin or Host header not in allowlist: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000']; returns 403 for disallowed origins",
+    "startApiServer() exported from src/api/index.ts; called from main() in src/index.ts after runMigrations()",
+    "Fastify app reference stored at module level for shutdown",
+    "shutdown() in src/index.ts updated to: stopTradingLoop() → connectionManager.closeAll() → Promise.race([app.close(), timeout(5000)]) → closeRedis() → closePool() → process.exit(0)",
+    "TypeScript strict mode — no any, no ts-ignore"
+  ],
+  "dependencies": [],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

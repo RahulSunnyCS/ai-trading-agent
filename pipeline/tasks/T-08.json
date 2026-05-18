@@ -1,0 +1,25 @@
+{
+  "task_id": "T-08",
+  "title": "Live straddle chart with REST history seed and WebSocket delta updates",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "frontend/src/components/StraddleChart.tsx"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": []
+  },
+  "acceptance_criteria": [
+    "StraddleChart.tsx uses Lightweight Charts (createChart + LineSeries or AreaSeries)",
+    "On mount: calls getStraddleHistory({ underlying, limit: 200 }) to seed historical data points before any WS data arrives — chart is not blank on first paint",
+    "WS snapshot messages (from Zustand store straddleHistory or direct useWebSocket) are appended to the chart series in real-time",
+    "Signal events from WS are rendered as vertical marker lines on the chart: HIGH = green marker, MEDIUM = orange marker, LOW = grey marker; marker shows confidence tier and atm_strike in label",
+    "Chart updates are incremental (series.update()) not full-redraws",
+    "Chart auto-resizes when container dimensions change",
+    "No memory leak — chart instance destroyed on component unmount",
+    "TypeScript strict mode"
+  ],
+  "dependencies": ["T-06"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

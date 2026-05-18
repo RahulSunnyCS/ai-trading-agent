@@ -1,0 +1,14 @@
+{
+  "risk_level": "HIGH",
+  "triggers": [
+    "Exposes public-facing Fastify HTTP API (input validation and injection risks apply)",
+    "Financial data served via API (trades, P&L, evolution approvals)",
+    "Evolution approval API can mutate live personality parameters",
+    "WebSocket streaming surface with connection lifecycle complexity"
+  ],
+  "mandatory_agents": ["security-auditor", "performance-reviewer", "architecture-reviewer"],
+  "tags": ["backend", "frontend"],
+  "lane": "feature-full",
+  "sprint_count": 3,
+  "human_gates": 3
+}

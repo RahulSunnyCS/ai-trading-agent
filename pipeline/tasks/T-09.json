@@ -1,0 +1,23 @@
+{
+  "task_id": "T-09",
+  "title": "Trade log and signal feed panels",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "frontend/src/components/TradeLog.tsx",
+      "frontend/src/components/SignalFeed.tsx"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": []
+  },
+  "acceptance_criteria": [
+    "TradeLog.tsx: renders open and closed trades from TanStack Query (getTrades with status and date filters); filter controls: status dropdown (all/open/closed), personality dropdown (all + each name), date picker; columns: personality, entry time (IST), ATM strike, entry straddle value, exit straddle value (if closed), net P&L ₹, exit reason; 30s refetch; max 100 rows displayed",
+    "TradeLog updates instantly when trade_open or trade_close WS message arrives (invalidates TanStack Query cache for trades)",
+    "SignalFeed.tsx: renders last 20 signals from Zustand recentSignals (WS-fed); each card shows: signal time (IST), ATM strike, probability, confidence tier badge (HIGH=green, MEDIUM=amber, LOW=grey), expansion_pct",
+    "SignalFeed also shows a 'No signals today' placeholder when empty",
+    "TypeScript strict mode"
+  ],
+  "dependencies": ["T-06"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

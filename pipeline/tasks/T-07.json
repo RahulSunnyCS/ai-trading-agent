@@ -1,0 +1,28 @@
+{
+  "task_id": "T-07",
+  "title": "Dashboard layout and 10-personality comparison grid (primary view)",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "frontend/src/layouts/DashboardLayout.tsx",
+      "frontend/src/components/Header.tsx",
+      "frontend/src/components/PersonalitiesGrid.tsx",
+      "frontend/src/pages/DashboardPage.tsx"
+    ],
+    "files_to_modify": [
+      "frontend/src/App.tsx"
+    ],
+    "files_forbidden": []
+  },
+  "acceptance_criteria": [
+    "Header.tsx shows: system mode badge (green LIVE / blue SIM), underlying symbol, IST clock updating every second, WebSocket connection status indicator (green dot = connected, yellow = reconnecting, red = disconnected)",
+    "PersonalitiesGrid.tsx is the PRIMARY view — renders a table/grid with one row per personality: name, regime tag (colour-coded by regime type), open position (ATM strike or '—' if none), day P&L in ₹ (red if negative, green if positive), beats-Clockwork delta in ₹, win rate %; Clockwork row visually highlighted as benchmark row",
+    "PersonalitiesGrid data comes from TanStack Query (useQuery on getPersonalities()) with 30s refetch interval",
+    "DashboardPage.tsx grid layout: PersonalitiesGrid occupies full top section; below it are three panels: StraddleChart (left), SignalFeed (centre), EvolutionPanel (right)",
+    "DashboardLayout.tsx wraps Header + DashboardPage in a responsive Tailwind flex column; min-height 100vh",
+    "TypeScript strict mode"
+  ],
+  "dependencies": ["T-06"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

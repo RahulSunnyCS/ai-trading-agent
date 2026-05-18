@@ -1,0 +1,28 @@
+{
+  "task_id": "T-06",
+  "title": "Typed API client, WebSocket hook, and Zustand store",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "frontend/src/lib/api.ts",
+      "frontend/src/lib/ws.ts",
+      "frontend/src/store/trading.ts",
+      "frontend/src/types/api.ts"
+    ],
+    "files_to_modify": [
+      "frontend/src/App.tsx"
+    ],
+    "files_forbidden": []
+  },
+  "acceptance_criteria": [
+    "frontend/src/types/api.ts defines TypeScript interfaces for all API response shapes: PersonalityConfig, PaperTrade, StraddleSignal, StraddleSnapshot, RetrospectionResult, EvolutionApproval, WsMessage (union type)",
+    "frontend/src/lib/api.ts exports typed async functions: getPersonalities(), getPersonality(id), getTrades(params), getTradeById(id), getSignals(params), getStraddleLatest(), getStraddleHistory(params), getRetrospection(params), getPendingEvolutions(), approveEvolution(id), rejectEvolution(id, reason?); all use Axios base client pointing to /api (relative URL, works through Vite proxy in dev and same-origin in prod)",
+    "frontend/src/lib/ws.ts exports useWebSocket() hook that: derives WS URL from window.location (ws:// or wss:// + host + /ws/stream), connects on mount, reconnects with exponential backoff (1s, 2s, 4s, 8s, 16s, 30s cap), exposes { lastMessage, connectionStatus: 'connecting'|'connected'|'disconnected' }",
+    "frontend/src/store/trading.ts Zustand store with: personalities: PersonalityConfig[], recentSignals: StraddleSignal[] (last 20), straddleHistory: StraddleSnapshot[], openTrades: PaperTrade[], systemStatus: { mode: string, underlying: string, connected: boolean }; WS messages update the appropriate slice: snapshot → straddleHistory.push(), signal → recentSignals.unshift().slice(0,20), trade_open → openTrades.push(), trade_close → openTrades filter out closed",
+    "App.tsx wraps with QueryClientProvider and initialises the WS hook",
+    "TypeScript strict mode, no any"
+  ],
+  "dependencies": ["T-05"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

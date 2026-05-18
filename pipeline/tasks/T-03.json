@@ -1,0 +1,36 @@
+{
+  "task_id": "T-03",
+  "title": "Trades, signals, straddle, and retrospection REST API routes",
+  "assigned_to": "implementor",
+  "risk_flags": ["public-facing-api"],
+  "scope": {
+    "files_to_create": [
+      "src/api/routes/trades.ts",
+      "src/api/routes/signals.ts",
+      "src/api/routes/straddle.ts",
+      "src/api/routes/retrospection.ts"
+    ],
+    "files_to_modify": [
+      "src/api/server.ts",
+      "src/utils/market-hours.ts"
+    ],
+    "files_forbidden": [
+      "src/db/migrations/001_initial_schema.sql",
+      "src/trading/evolution-rules.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "src/utils/market-hours.ts adds: toIstDate(utcDate: Date): string (returns YYYY-MM-DD in IST UTC+5:30) and istDayRange(isoDate: string): { from: Date; to: Date } (returns UTC Date objects for IST midnight boundaries of that date)",
+    "GET /api/trades Zod schema: { status?: z.enum(['open','closed','stopped']), personality_id?: z.string().uuid(), date?: z.string() validated as YYYY-MM-DD, limit: z.coerce.number().int().min(1).max(500).default(100) }; date param parsed via istDayRange() for query bounds",
+    "GET /api/trades/:id returns single trade or 404",
+    "GET /api/signals Zod schema: { underlying?: z.enum(['NIFTY','BANKNIFTY','SENSEX']), limit: z.coerce.number().int().min(1).max(200).default(50), date?: YYYY-MM-DD, min_probability?: z.coerce.number().min(0).max(1) }",
+    "GET /api/straddle/latest returns most recent straddle_snapshots row per underlying",
+    "GET /api/straddle/history Zod schema: { underlying: z.enum(['NIFTY','BANKNIFTY','SENSEX']), expiry?: z.string(), from?: IST datetime, to?: IST datetime, limit: z.coerce.number().int().min(1).max(500).default(200) }",
+    "GET /api/retrospection Zod schema: { date?: YYYY-MM-DD, personality_id?: uuid }; returns all results for date if no personality_id",
+    "Invalid Zod schema → 400 with descriptive error message (not a 500)",
+    "All DB queries use parameterized values — no string interpolation of user input",
+    "TypeScript strict mode"
+  ],
+  "dependencies": ["T-01"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

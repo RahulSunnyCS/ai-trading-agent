@@ -1,0 +1,38 @@
+{
+  "task_id": "T-04",
+  "title": "WebSocket connection manager and priority broadcaster",
+  "assigned_to": "implementor",
+  "risk_flags": ["public-facing-api"],
+  "scope": {
+    "files_to_create": [
+      "src/api/ws/connection-manager.ts",
+      "src/api/ws/broadcaster.ts",
+      "src/api/ws/types.ts"
+    ],
+    "files_to_modify": [
+      "src/index.ts",
+      "src/trading/trade-executor.ts",
+      "src/trading/trade-manager.ts",
+      "src/api/server.ts"
+    ],
+    "files_forbidden": [
+      "src/trading/evolution-rules.ts",
+      "src/trading/signal-detector.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "types.ts defines WsMessage union: { type: 'snapshot'|'signal'|'trade_open'|'trade_close'|'system'; payload: object }",
+    "connection-manager.ts: maintains Set<WebSocket> of active connections; max 20 cap; on new connection attempt above cap — evict oldest IDLE socket (last message timestamp > 60s ago) or if none idle return WS close frame 1013 Try Again Later; 30s ping interval with pong tracking (dead socket removed if no pong within 10s)",
+    "broadcaster.ts: broadcastSnapshot(payload), broadcastSignal(payload), broadcastTrade(type: 'trade_open'|'trade_close', payload) — all are void (fire-and-forget); per-socket try/catch; CRITICAL messages (signal, trade_open, trade_close) are never dropped; SNAPSHOT messages are only sent if the socket's pending snapshot count is < 20 (oldest dropped otherwise); broadcast NEVER awaits or blocks",
+    "WS endpoint ws://localhost:3000/ws/stream registered on Fastify via @fastify/websocket",
+    "src/index.ts live snapshot interval: after await computeAndSaveSnapshot() resolves, calls broadcastSnapshot() with snapshot data — NON-BLOCKING",
+    "src/index.ts sim snapshot interval: after await computeAndSaveSnapshot() resolves, calls broadcastSnapshot() with snapshot data — NON-BLOCKING; BOTH call sites are wired (not just live)",
+    "trade-executor.ts openTrade(): calls broadcastTrade('trade_open', tradeData) fire-and-forget after INSERT",
+    "trade-executor.ts executeSignalEntry(): calls broadcastSignal(signalData) fire-and-forget",
+    "trade-manager.ts closeTrade(): calls broadcastTrade('trade_close', tradeData) fire-and-forget after UPDATE",
+    "Snapshot interval re-entrancy: broadcaster.broadcastSnapshot() does not await; the interval callback never blocks even if DB is slow",
+    "TypeScript strict mode"
+  ],
+  "dependencies": ["T-01"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}
