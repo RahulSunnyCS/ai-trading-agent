@@ -126,22 +126,30 @@ describe("Hard stop-loss trigger math", () => {
   });
 
   it("threshold scales linearly with entry price (property)", () => {
-    // Doubling entry → doubles threshold (linear scale invariance)
+    // Doubling entry → doubles threshold (linear scale invariance).
+    //
+    // We compute the doubled entry via Decimal (not float arithmetic) to avoid
+    // double-rounding artifacts: `(float * 2).toFixed(2)` can differ from
+    // `Decimal(float.toFixed(2)).mul(2).toFixed(2)` when the original float is
+    // not exactly representable. By deriving doubleEntryStr from the already-
+    // rounded Decimal we guarantee the two input strings are exactly 2× each
+    // other, making the linearity assertion watertight.
     fc.assert(
       fc.property(
         fc.float({ min: 50, max: 200, noNaN: true }),
         fc.float({ min: 5, max: 80, noNaN: true }),
         (entry, slPct) => {
           const entryStr = entry.toFixed(2);
-          const doubleEntryStr = (entry * 2).toFixed(2);
+          // Derive the doubled entry from the Decimal representation of entryStr
+          // so there is no secondary rounding artefact from native float * 2.
+          const doubleEntryStr = new Decimal(entryStr).mul(2).toFixed(2);
           const slPctStr = slPct.toFixed(4);
 
           const t1 = hardSlThreshold(entryStr, slPctStr);
           const t2 = hardSlThreshold(doubleEntryStr, slPctStr);
 
-          // t2 should equal 2 × t1 (within 2dp rounding tolerance)
-          const expected = t1.mul(2).toFixed(2);
-          return t2.toFixed(2) === expected;
+          // t2 must equal exactly 2 × t1 (true linear scale invariance)
+          return t2.toFixed(2) === t1.mul(2).toFixed(2);
         },
       ),
     );
@@ -284,9 +292,16 @@ describe("Daily loss cap accumulation", () => {
 
   it("accumulation of many small losses matches decimal.js oracle (property)", () => {
     // Guards against float drift: 100 losses of ₹0.10 must equal exactly ₹10.00
+    //
+    // fc.float requires min/max to be 32-bit floats (Math.fround values).
+    // 0.01 is not a 32-bit float so we use Math.fround(0.01) as the minimum.
+    // This is cosmetic — the generated values still exercise small-decimal math.
     fc.assert(
       fc.property(
-        fc.array(fc.float({ min: 0.01, max: 1000, noNaN: true }), { minLength: 1, maxLength: 50 }),
+        fc.array(fc.float({ min: Math.fround(0.01), max: 1000, noNaN: true }), {
+          minLength: 1,
+          maxLength: 50,
+        }),
         fc.float({ min: 1, max: 100000, noNaN: true }),
         (losses, cap) => {
           const lossStrs = losses.map((l) => l.toFixed(2));
