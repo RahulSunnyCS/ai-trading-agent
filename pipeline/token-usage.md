@@ -23,3 +23,7 @@
 | Phase 3 | T-10: Angel One SmartAPI adapter | implementor | sonnet | high | ~20k |
 | Phase 3 | T-14: VIX feed — NSE polling | implementor | sonnet | high | ~12k |
 | Phase 3 | T-63: Integration test harness | implementor | sonnet | high | ~12k |
+| Phase 3 | T-06: Fastify server skeleton + /ws/ticks | implementor | sonnet | high | ~61k |
+| Phase 3 | T-12: Straddle calculator + broker factory | implementor | sonnet | high | ~75k |
+| Phase 3 | T-16: Trigger/exit engine (pure function) | implementor | sonnet | high | ~41k |
+| Phase 3 | T-13: Entry engine — signal generation | implementor | sonnet | high | ~20k |

@@ -1,7 +1,7 @@
 # Pipeline Progress
 
 ## Current State
-Phase: 3 — Implementation (Wave 3 in progress)
+Phase: 3 — Implementation (Wave 4/5 in progress)
 Gate: Human Gate 1 — APPROVED
 recommendation_rounds_used: 0
 
@@ -12,7 +12,7 @@ recommendation_rounds_used: 0
 | Phase 1 — Planning | ✅ COMPLETE | 3 Red Team sprints, QA Planner, Translator — score 9/10 |
 | Human Gate 1 | ✅ APPROVED | User approved with scope change: T-10 Angel One upgraded to full implementation |
 | Phase 2 — Decomposition | ✅ COMPLETE | 21 task contracts written; TODO.md regenerated; T-10 upgraded to full Angel One impl |
-| Phase 3 — Implementation | 🔄 IN PROGRESS | Wave 1 ✅ (T-01,T-02,T-03,T-04,T-07); Wave 2 ✅ (T-11,T-60,T-61,T-62,T-59); Wave 3 🔄 (T-05,T-08,T-09,T-10,T-14,T-63) |
+| Phase 3 — Implementation | 🔄 IN PROGRESS | Wave 1–4 ✅ (T-01–T-12,T-14,T-16,T-59–T-63); Wave 5 🔄 (T-13 running; T-15,T-17,T-18,T-19,T-20,T-21 pending) |
 | Phase 4 — Review | — | |
 | Human Gate 2 | — | |
 | Phase 5 — Tests | — | |
