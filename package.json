@@ -20,6 +20,7 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
+    "@fastify/websocket": "^11.2.0",
     "bullmq": "^5.0.0",
     "date-fns-tz": "^3.2.0",
     "decimal.js": "^10.6.0",
