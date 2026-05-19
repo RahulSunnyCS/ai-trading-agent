@@ -1,0 +1,7 @@
+pre-commit:
+  parallel: false
+  commands:
+    typecheck:
+      run: bun run typecheck
+    lint:
+      run: bun run lint
