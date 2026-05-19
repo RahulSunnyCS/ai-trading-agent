@@ -1,0 +1,21 @@
+{
+  "risk_level": "HIGH",
+  "triggers": [
+    "Introduces payment and billing logic (UPI via Razorpay subscription API)",
+    "Handles live financial transactions and subscription state — bypass = revenue loss",
+    "Exposes public-facing webhook endpoint for Razorpay payment callbacks",
+    "Geolocation-based regional pricing creates an access-control attack surface (VPN spoofing)",
+    "Anti-spoofing logic correctness is business-critical — a bug here directly loses money",
+    "Subscription state stored in DB — must be tamper-proof"
+  ],
+  "mandatory_agents": ["security-auditor", "performance-reviewer", "architecture-reviewer"],
+  "tags": ["pricing", "backend", "product"],
+  "lane": "feature-full",
+  "sprint_count": 3,
+  "human_gates": 3,
+  "notes": {
+    "pricing_reviewer_override": "business.md scope-down said pricing-reviewer NOT APPLICABLE because there was no billing. This task IS the billing introduction — scope-down is superseded for this run. pricing-reviewer runs in Phase 1 constraint round and Phase 4 review.",
+    "auth_flag": "NOT APPLICABLE — confirmed per business.md, no user auth/sessions",
+    "pii_flag": "PARTIAL — Razorpay stores cardholder/UPI data on their side; we store subscription_id and plan_id only. No raw payment instrument stored on our side."
+  }
+}
