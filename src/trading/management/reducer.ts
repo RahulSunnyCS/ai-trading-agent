@@ -21,6 +21,9 @@
  *     therefore always returns false — no explicit nightly cleanup is required.
  *   - PersonalityRouter / PositionMonitor can call resetReentryState() at EOD
  *     for an explicit reset (belt-and-suspenders).
+ *   - reentry_min_probability (e.g., 0.65 vs standard 0.70) is a softer threshold
+ *     post-CUT to prevent the strategy from sitting idle after a sharp loss — it lets
+ *     the Reducer get back into a fresh setup at a lower bar.
  *
  * Why not store state in Redis?
  *   The volume of state is tiny (at most 10 keys — one per Reducer personality),
@@ -73,6 +76,10 @@ interface ReentryState {
  * Intentionally module-level (not instance-level) so PositionMonitor can use
  * a singleton ReducerManager instance without each instance having its own
  * isolated state copy. The static helper methods access this map directly.
+ *
+ * Why not Redis? State is transient (one day), tiny volume (≤10 personalities),
+ * and safe to lose on restart (next signal uses standard threshold instead).
+ * Redis would add infrastructure coupling without meaningfulness.
  */
 const reentryEligible = new Map<string, ReentryState>();
 

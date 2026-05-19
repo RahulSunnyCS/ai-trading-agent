@@ -1,19 +1,19 @@
 # Pipeline Progress — Milestone 2: Momentum Signals + Multi-Personality Engine
 
-## Current Phase: Phase 3 — Implementation (Batch 4 in progress)
+## Current Phase: Phase 5 — Test Generation (in progress)
 
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 0 — Triage | ✅ Complete | MEDIUM risk, feature-full lane, 3 sprints |
 | Phase 1 — Planning | ✅ Complete | Score 8.4/10; 3 Red Team sprints; QA checklist ready |
 | Phase 2 — Decomposition | ✅ Complete | 12 tasks (T-22 through T-32 + T-65) |
-| Phase 3 — Implementation | 🔄 In Progress | 9/12 tasks done; T-24, T-28 running; T-29, T-30, T-31 pending |
-| Phase 4 — Specialist Review | ⏳ Pending | |
-| Phase 5 — Test Generation | ⏳ Pending | |
+| Phase 3 — Implementation | ✅ Complete | 12/12 tasks done |
+| Phase 4 — Specialist Review | ✅ Complete | CONDITIONAL PASS (3 findings resolved, 2 accepted) |
+| Phase 5 — Test Generation | 🔄 In Progress | Unit, integration, docs, E2E bootstrap in progress |
 | Phase 6 — Test Execution | ⏳ Pending | |
 | Phase 7 — Final Review | ⏳ Pending | |
 
-## Task Status
+## Task Status (Phase 3 Implementation)
 
 | Task | Title | Status |
 |------|-------|--------|
@@ -24,11 +24,11 @@
 | T-23 | Probability scorer (8-factor incl OI change) | ✅ Done |
 | T-22 | Peak detection engine + OI tracking | ✅ Done |
 | T-27 | Personality router | ✅ Done |
-| T-24 | Scheduled signal emitter (SCHEDULED + PULLBACK) | 🔄 Running |
-| T-28 | Holder management + PositionMonitor refactor | 🔄 Running |
-| T-29 | Adjuster management (roll logic) | ⏳ Awaits T-28 |
-| T-30 | Reducer management (cut + re-entry) | ⏳ Awaits T-28 |
-| T-31 | Portfolio risk rules | ⏳ Awaits T-28, T-29, T-30 |
+| T-24 | Scheduled signal emitter (SCHEDULED + PULLBACK) | ✅ Done |
+| T-28 | Holder management + PositionMonitor refactor | ✅ Done |
+| T-29 | Adjuster management (roll logic) | ✅ Done |
+| T-30 | Reducer management (cut + re-entry) | ✅ Done |
+| T-31 | Portfolio risk rules | ✅ Done |
 
 ## Risk Manifest
 

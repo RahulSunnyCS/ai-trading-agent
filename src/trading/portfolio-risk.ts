@@ -37,7 +37,8 @@ export interface RiskCheckResult {
 // ---------------------------------------------------------------------------
 // Advisory lock key — project constant, documented here as the single source
 // of truth. Key 42 = "portfolio-leg-cap". All code that needs to take this
-// lock must import the constant rather than hard-coding the integer.
+// lock must import the constant rather than hard-coding the integer. Key 42 is
+// unique within the project scope (no other advisory locks needed currently).
 // ---------------------------------------------------------------------------
 const ADVISORY_LOCK_KEY = 42;
 

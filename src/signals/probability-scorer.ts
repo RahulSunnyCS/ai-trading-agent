@@ -272,7 +272,8 @@ function adjustGold(changePct: number | null): number {
  *
  * null is a silent fail — OI data is optional. If unavailable, we do not
  * penalise or boost the score. The "null = neutral" policy prevents unavailable
- * data from inadvertently biasing strategy selection.
+ * data from inadvertently biasing strategy selection. This is particularly useful
+ * in SIMULATE mode where OI tracking may not be available.
  */
 function adjustOiChange(oiChangePct: number | null): number {
   if (oiChangePct === null) return 0;
@@ -367,6 +368,8 @@ export function scoreProbability(input: ScoringInput): ScoringResult {
   // ------------------------------------------------------------------
   // SCHEDULED: fixed probability, no adjustments
   // ------------------------------------------------------------------
+  // SCHEDULED signals are time-triggered (not signal-quality-driven), so macro
+  // context adjustments do not apply — the entry decision has already been made.
   if (signalType === 'SCHEDULED') {
     return {
       rawProbability: 0.60,

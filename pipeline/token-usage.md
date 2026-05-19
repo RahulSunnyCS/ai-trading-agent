@@ -16,4 +16,14 @@
 | Phase 3 | T-22: Peak detection engine + OI tracking | implementor | sonnet | high | ~109k |
 | Phase 3 | T-27: Personality router | implementor | sonnet | high | ~108k |
 | Phase 3 | T-24: Scheduled signal emitter | implementor | sonnet | high | ~15k |
-| Phase 3 | T-28: Holder management + PositionMonitor | implementor | sonnet | high | ~15k |
+| Phase 3 | T-28: Holder management + PositionMonitor | implementor | sonnet | high | ~25k |
+| Phase 3 | T-29: Adjuster management (roll logic) | implementor | sonnet | high | ~20k |
+| Phase 3 | T-30: Reducer management (cut + re-entry) | implementor | sonnet | high | ~18k |
+| Phase 3 | T-31: Portfolio risk rules | implementor | sonnet | high | ~15k |
+| Phase 4 | Security Auditor review | security-auditor | opus | max | ~40k |
+| Phase 4 | Performance Reviewer | performance-reviewer | sonnet | high | ~20k |
+| Phase 4 | Architecture Reviewer | architecture-reviewer | sonnet | high | ~20k |
+| Phase 4 | Synthesis & Gate 2 Translator | translator | haiku | medium | ~12k |
+| Phase 5 | Test Writer (unit + integration) | test-writer | sonnet | medium | ~30k |
+| Phase 5 | Docs Writer | docs-writer | haiku | low | ~8k |
+| Phase 5 | E2E Test Writer | e2e-test-writer | sonnet | medium | ~22k |
