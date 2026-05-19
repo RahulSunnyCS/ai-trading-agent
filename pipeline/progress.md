@@ -12,7 +12,7 @@
 | Phase | Status | Notes |
 |---|---|---|
 | Phase 0 Triage | ✅ COMPLETE | risk_level=HIGH, lane=feature-full, sprint_count=3 |
-| Phase 1 Planning | 🔄 IN PROGRESS | Red Team Sprint 1/3 running |
+| Phase 1 Planning | ✅ COMPLETE | Red Team 3/3 sprints done; 25 revisions accepted; QA checklist generated; Translator done |
 | Phase 2 Decomposition | ⏳ PENDING | Awaiting Gate 1 approval |
 | Phase 3 Implementation | ⏳ PENDING | |
 | Phase 4 Review | ⏳ PENDING | |
