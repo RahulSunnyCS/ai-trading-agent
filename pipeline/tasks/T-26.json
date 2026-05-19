@@ -1,0 +1,33 @@
+{
+  "task_id": "T-26",
+  "title": "5-stage personality decision filter",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/signals/personality-filter.ts",
+      "src/signals/__tests__/personality-filter.test.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/index.ts",
+      "src/trading/entry-engine.ts",
+      "src/db/migrations/001_core_schema.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "Export a pure function runPersonalityFilter(signal, personality, dailyState, currentVix, clock) that returns {passed: true} or {passed: false, stage: 1|2|3|4|5, reason: string}",
+    "Stage 1 — Hard filters (pure, synchronous): (a) signal.signal_type matches personality's accepted signal types (Clockwork/Learners accept 'SCHEDULED'; momentum personalities accept 'MOMENTUM_EXHAUSTION'|'PULLBACK'; Scanner/Blitz also accept 'SCHEDULED' as fallback); (b) signal time is within trading hours (ENTRY_START_TIME..ENTRY_CUTOFF_TIME from env); (c) today's date is not in blocked_dates",
+    "Stage 2 — State checks (uses pre-fetched DailyState): (a) dailyState.tradeCount < personality.params.max_daily_trades (or Infinity if not set); (b) dailyState.netPnl > -personality.params.max_daily_loss; (c) dailyState.openPositions < (personality.params.max_open_legs ?? 2) / 2 (i.e. open straddle count check)",
+    "Stage 3 — Context checks (uses currentVix): (a) if personality.params.vix_max is set, currentVix must be <= vix_max; (b) regime check is SKIPPED in Phase 1 (no regime tagging yet — documented as deferred to T-33 in M4)",
+    "Stage 4 — Signal quality (pure): signal.adjusted_probability >= (personality.params.min_probability ?? 0) — passes for Clockwork/Learners (min_probability not set, defaults to 0, so always passes)",
+    "Stage 5 — Profit gate (optional, uses pre-fetched DailyState): if personality.params.require_profit_gate is true, pass only if dailyState.netPnl < personality.params.profit_gate_amount (default: gate disabled/null means always pass)",
+    "DailyState interface exported: { tradeCount: number; netPnl: string; openPositions: number }",
+    "fetchDailyState(db, personalityId, todayIST) exported: single DB query that fetches trade count, sum of net_pnl, and count of open positions for a given personality+date — used by T-27 PersonalityRouter to pre-fetch before calling runPersonalityFilter",
+    "Unit tests cover each stage independently: stage 1 blocks on wrong signal_type, wrong time, blocked date; stage 2 blocks on too many trades, daily loss hit, too many open positions; stage 3 blocks on VIX ceiling; stage 4 blocks on low probability; stage 5 blocks when profit gate active and already profitable",
+    "Every stage is independently testable by passing controlled inputs — no async in the core filter function itself",
+    "checkComparisonIntegrity(configs: PersonalityConfig[]) function exported: checks that Precision, Adjuster, Reducer min_probability values are within 8 percentage points of each other; returns {valid: boolean, offender?: string, message?: string}"
+  ],
+  "dependencies": ["T-25"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

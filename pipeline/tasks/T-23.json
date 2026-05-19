@@ -1,0 +1,34 @@
+{
+  "task_id": "T-23",
+  "title": "Probability scoring — pure functions for VIX + time-of-day + day-of-week adjustments",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/signals/probability-scorer.ts",
+      "src/signals/__tests__/probability-scorer.test.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/index.ts",
+      "src/db/migrations/001_core_schema.sql",
+      "src/db/migrations/002_paper_trades_indexes.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "scoreProbability(input: ScoringInput) → ScoringResult exported as a pure function with no I/O",
+    "ScoringInput type: { rawExhaustionScore: number; signalType: 'MOMENTUM_EXHAUSTION'|'SCHEDULED'|'PULLBACK'; currentVix: number|null; signalTimeMs: number; clock: Clock }",
+    "ScoringResult type: { rawProbability: number; adjustedProbability: number; confidenceTier: 'HIGH'|'MEDIUM'|'LOW' }",
+    "rawProbability = baseProbability derived from rawExhaustionScore: exhaustionScore * 0.40 + 0.35 (linear mapping: score 0→prob 0.35, score 1→prob 0.75)",
+    "VIX adjustment: if currentVix is null, no adjustment (do not penalise unavailable data); if vix <= 15: +0.02; if vix > 15: -(vix-15) * 0.005 capped at -0.10",
+    "Time-of-day adjustment: 09:20–09:45 IST → +0.05 (early session premium decay phase); 14:00–15:00 IST → -0.05 (low-volume afternoon); else 0",
+    "Day-of-week adjustment: Monday → -0.03 (gap risk); Friday → -0.03 (expiry week fear); else 0",
+    "adjustedProbability = clamp(rawProbability + vixAdj + timeAdj + dowAdj, 0.0, 1.0)",
+    "SCHEDULED signals are assigned a fixed adjustedProbability = 0.60 (above Scanner's 0.50 threshold but below Precision's 0.70 — correct by design for filter routing). rawProbability = 0.60, no adjustments applied",
+    "PULLBACK signals use the same adjustment formula as MOMENTUM_EXHAUSTION but start with baseProbability = 0.60 regardless of rawExhaustionScore",
+    "confidenceTier: 'HIGH' if adjustedProbability >= 0.70; 'MEDIUM' if >= 0.50; 'LOW' otherwise",
+    "Unit tests cover: probability clamping at 0 and 1; each adjustment direction is correct (high VIX lowers, early session raises, Monday/Friday lower); SCHEDULED always returns 0.60 regardless of other inputs; PULLBACK uses base 0.60 with adjustments applied"
+  ],
+  "dependencies": [],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

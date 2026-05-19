@@ -1,0 +1,32 @@
+{
+  "task_id": "T-29",
+  "title": "Adjuster management — roll one leg on adverse move",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/trading/management/adjuster.ts",
+      "src/trading/management/__tests__/adjuster.test.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/index.ts",
+      "src/db/migrations/001_core_schema.sql",
+      "src/db/migrations/002_paper_trades_indexes.sql",
+      "src/db/migrations/003_personality_signals_schema.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "AdjusterManager implements ManagementHandler interface from T-28",
+    "Roll trigger: |current_spot - spot_at_entry| >= personality.params.roll_trigger_points (default 70 points). Checked on each PositionMonitor tick",
+    "Roll is modeled as a CLOSE+OPEN cycle (NOT a leg-level operation for M2): close the current straddle with exit_reason='ROLL', open a new straddle at the new current ATM strike at the current straddle_value. Both DB operations run in a single transaction using one captured snapshot timestamp — no P&L gap between close and reopen",
+    "parent_trade_id on the new paper_trades row is set to the closed row's id, linking the roll chain",
+    "Cumulative P&L of a rolled position chain = sum of net_pnl across all paper_trades rows WHERE id=original_id OR parent_trade_id=original_id (recursive, max 4 hops)",
+    "max_open_legs enforcement: count open straddles for this personality (paper_trades WHERE personality_id=x AND status='open') before rolling; if count >= max_open_legs/2 (default 4/2=2), do NOT open the new leg (log warning, treat position as Holder-style instead)",
+    "After a roll, the original SL/TSL/TARGET logic applies to the new position from its new entry straddle_value",
+    "SL/TSL/TARGET/EOD exits still work on rolled positions identically to Holder — AdjusterManager delegates to the same evaluateTriggers() function for these",
+    "Unit tests: roll fires at exactly roll_trigger_points; parent_trade_id linkage is set; max_open_legs cap prevents third roll; transaction atomicity (mock DB that fails on second write — first write must be rolled back)"
+  ],
+  "dependencies": ["T-28"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

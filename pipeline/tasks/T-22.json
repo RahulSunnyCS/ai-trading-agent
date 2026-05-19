@@ -1,0 +1,39 @@
+{
+  "task_id": "T-22",
+  "title": "Peak detection engine + probability scoring",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/signals/peak-detection-engine.ts",
+      "src/signals/__tests__/peak-detection-engine.test.ts"
+    ],
+    "files_to_modify": [
+      "src/db/schema.ts"
+    ],
+    "files_forbidden": [
+      "src/index.ts",
+      "src/trading/entry-engine.ts",
+      "src/db/migrations/001_core_schema.sql",
+      "src/db/migrations/002_paper_trades_indexes.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "PeakDetectionEngine class subscribes to straddle.values Redis stream using consumer group 'peak-detection'/'primary'",
+    "On each snapshot, computes: expansion_pct = (straddle_value - open_straddle_value) / open_straddle_value × 100 where open_straddle_value = first snapshot after 9:15 AM",
+    "Computes ROC = (straddle[t] - straddle[t-1]) / straddle[t-1] and acceleration = roc[t] - roc[t-1]",
+    "Maintains EMA(8min, 20min) windows over the snapshot history",
+    "Detects exhaustion when: expansion_pct >= SIGNAL_MIN_EXPANSION_PCT (env, default 10%), acceleration < SIGNAL_ACCELERATION_THRESHOLD (env, default -0.5), ROC has declined for >= SIGNAL_ROC_DECLINE_CANDLES (env, default 3) consecutive snapshots, SIGNAL_CONFIRMATION_CANDLES (env, default 2) confirming bars seen",
+    "Computes raw_exhaustion_score (unclamped float) as a weighted combination of expansion_pct, depth of ROC decline, and acceleration magnitude",
+    "Applies ProbabilityScorer: base_probability=0.55, VIX adjustment (VIX>18 → -0.05 per point over 18, capped at -0.15), time-of-day adjustment (09:20-09:45 IST → +0.05, 14:00-15:00 → -0.05), day-of-week adjustment (Monday → -0.03, Friday → -0.03)",
+    "Stores both raw_exhaustion_score (unclamped) and adjusted_probability = clamp(raw_score_mapped + adjustments, 0, 1) in straddle_signals",
+    "Assigns confidence_tier: 'HIGH' if adjusted_probability >= 0.70, 'MEDIUM' if >= 0.50, 'LOW' otherwise",
+    "Signal deduplication: no new MOMENTUM_EXHAUSTION signal published within 300 seconds of the previous one (per underlying)",
+    "Writes to straddle_signals table (must exist from migration 003 — task T-25 runs first)",
+    "Publishes to Redis signals.generated stream as: {signal_type:'MOMENTUM_EXHAUSTION', signal_id, underlying, atm_strike, spot, straddle_value, vix, adjusted_probability, confidence_tier, signal_time}",
+    "Unit tests: given straddle snapshot sequences with known expansion/ROC/acceleration values, exhaustion_score must be computed correctly; probability adjustments are bounded and clamp correctly; dedup window prevents double-firing",
+    "PeakDetectionConfig interface exported with all thresholds as configurable fields (loaded from env vars)"
+  ],
+  "dependencies": ["T-25", "T-23"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

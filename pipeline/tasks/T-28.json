@@ -1,0 +1,32 @@
+{
+  "task_id": "T-28",
+  "title": "Holder management — formalize hold-to-SL/TSL/EOD",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/trading/management/holder.ts",
+      "src/trading/management/__tests__/holder.test.ts"
+    ],
+    "files_to_modify": [
+      "src/trading/position-monitor.ts"
+    ],
+    "files_forbidden": [
+      "src/index.ts",
+      "src/db/migrations/001_core_schema.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "Create src/trading/management/ directory with HolderManager class",
+    "HolderManager.openPosition(tradeIntent, executor, clock) opens a paper trade via PaperTradeExecutor with personality_id set to tradeIntent.personalityId",
+    "HolderManager.evaluatePosition(position, currentStraddleValue, clock, triggerConfig) uses the existing evaluateTriggers() from trigger-engine.ts — no duplicate logic",
+    "HolderManager.closePosition(position, currentStraddleValue, exitReason, executor) closes via PaperTradeExecutor",
+    "ManagementHandler interface exported: { openPosition, evaluatePosition, closePosition } — Adjuster (T-29) and Reducer (T-30) implement this same interface",
+    "PositionMonitor refactored: becomes personality-aware. On each straddle.values snapshot, for each open position: (a) loads the position's personality config (cached from startup), (b) dispatches to the correct ManagementHandler based on personality.management_style, (c) calls evaluatePosition — if shouldExit, calls closePosition",
+    "PositionMonitor no longer implicitly assumes a single Clockwork personality — it handles all open positions regardless of personality",
+    "Startup re-adoption covered: PersonalityRouter.start() (T-27) passes open positions to management handlers; PositionMonitor's existing position loading still works because it queries all open paper_trades",
+    "Unit tests: HolderManager.evaluatePosition correctly wraps evaluateTriggers; SL/TSL/TARGET/EOD/DAILY_LOSS all close via closePosition; openPosition writes paper_trades row with correct personality_id"
+  ],
+  "dependencies": ["T-27"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

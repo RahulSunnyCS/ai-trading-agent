@@ -1,0 +1,30 @@
+{
+  "task_id": "T-32",
+  "title": "Personality CRUD + performance API",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/api/routes/personalities.ts",
+      "src/test/integration/personalities-api.integration.test.ts"
+    ],
+    "files_to_modify": [
+      "src/api/server.ts"
+    ],
+    "files_forbidden": [
+      "src/index.ts",
+      "src/db/migrations/001_core_schema.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "GET /personalities — returns all personality_configs rows (id, name, display_name, group_type, entry_type, management_style, is_frozen, is_active, phase, params, updated_at). Excludes is_active=FALSE personalities from default response unless ?include_inactive=true query param",
+    "GET /personalities/:id — returns single personality or 404",
+    "PUT /personalities/:id — updates personality params. Request body: { params: Record<string, unknown> }. Validation: (a) if is_frozen=TRUE → return 403 with {error: 'FROZEN_VIOLATION', message: 'Clockwork parameters are immutable'}; (b) validate each param key against allowed ranges documented in PERSONALITIES.md (min_probability: 0.40–0.90, max_daily_trades: 1–15, entry_delay_secs: 0–600, max_daily_loss: 2000–25000, roll_trigger_points: 20–150, cut_trigger_points: 20–150); (c) for Precision/Adjuster/Reducer, run checkComparisonIntegrity() (imported from T-26) — if the proposed change would cause >8pp drift, return 409 with {error: 'COMPARISON_INTEGRITY_VIOLATION', offender, message}; (d) on success, UPDATE personality_configs SET params=$1, updated_at=NOW() WHERE id=$2, record audit log",
+    "Audit log: INSERT INTO personality_audit_log (personality_id, changed_by, old_params, new_params, changed_at) — Migration 004 must create this table. Changed_by = 'api' (no auth in this tool)",
+    "GET /personalities/:id/performance — returns: { personalityId, trades: [{id, entry_time, exit_time, net_pnl, exit_reason, signal_type, parent_trade_id}], summary: {total_trades, win_rate, total_pnl, avg_pnl, max_drawdown} } for today (default) or ?date=YYYY-MM-DD. Filters: WHERE personality_id=$1 AND entry_time >= today AND personality_id IS NOT NULL (excludes pre-M2 legacy rows with NULL personality_id)",
+    "All routes are registered in src/api/server.ts via personalityRoutes plugin with { db } dependency",
+    "Integration test: GET /personalities returns 10 rows (9 active + Levelhead); PUT /personalities/clockwork-id with param change returns 403 FROZEN_VIOLATION; PUT /personalities/precision-id with valid param returns 200 and updated_at changes; GET /personalities/:id/performance returns empty summary when no trades today"
+  ],
+  "dependencies": ["T-25"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

@@ -1,0 +1,31 @@
+{
+  "task_id": "T-31",
+  "title": "Hard portfolio risk rules — max legs, portfolio stop, event-day gate, margin buffer",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/trading/portfolio-risk.ts",
+      "src/trading/__tests__/portfolio-risk.test.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/index.ts",
+      "src/db/migrations/001_core_schema.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "portfolioRiskCheck(db, tradeIntent, clock) async function: returns {allowed: true} or {allowed: false, reason: string}",
+    "Rule 1 — Max 4 open legs: SELECT COUNT(*) FROM paper_trades WHERE status='open' with a transaction-level advisory lock (pg_try_advisory_xact_lock(42)) to prevent race conditions. If count >= 4 (i.e., 2 open straddles), reject. The advisory lock key 42 is documented as a project constant for 'portfolio-leg-cap'. Returns {allowed: false, reason: 'MAX_LEGS_EXCEEDED'}",
+    "Rule 2 — Portfolio daily stop: SELECT SUM(net_pnl) FROM paper_trades WHERE entry_time >= today_IST_start. If sum <= -PORTFOLIO_DAILY_STOP (env, default '20000'), reject all new opens. Returns {allowed: false, reason: 'PORTFOLIO_DAILY_STOP'}",
+    "Rule 3 — Event-day gate: if today's date is in BLOCKED_DATES env var (JSON array) OR today matches a known NSE F&O expiry morning pattern (Thursday before 11 AM IST), reject. Returns {allowed: false, reason: 'EVENT_DAY_BLOCKED'}",
+    "Rule 4 — VIX staleness gate: if last VIX timestamp > VIX_STALE_MS (env, default 300000) milliseconds ago, reject. Returns {allowed: false, reason: 'VIX_STALE'}. PersonalityRouter passes currentVixAge as parameter",
+    "Rule 5 — 30% margin buffer: if open positions consume > 70% of MARGIN_CAPITAL (env, default '100000'), reject. Compute as: open_straddle_count * estimated_margin_per_lot (straddle_value * lots * lot_size * MARGIN_RATE, default 20%). Returns {allowed: false, reason: 'MARGIN_BUFFER_EXCEEDED'}",
+    "Rules are checked in this order: Event-day → VIX stale → Portfolio stop → Max legs (most expensive DB call last)",
+    "Integration test: open 4 positions via DB insert (status='open'), then attempt portfolioRiskCheck → must return MAX_LEGS_EXCEEDED",
+    "Concurrency test: run 10 concurrent portfolioRiskCheck calls when 3 positions are open → at most 1 should succeed (advisory lock serializes them)",
+    "All portfolio risk violations are logged at WARN level with the reason and the personality attempting to open"
+  ],
+  "dependencies": ["T-28"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}
