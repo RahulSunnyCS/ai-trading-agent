@@ -1,327 +1,209 @@
 /**
- * Random-walk market data simulator.
+ * Random-walk NIFTY market data simulator.
  *
- * Implements BrokerFeed so it is a drop-in replacement for the Fyers adapter.
- * Generates synthetic NIFTY spot and VIX ticks using a gaussian-approximated
- * random walk — no real broker credentials required.
+ * Implements BrokerFeed so the rest of the system is completely unaware it is
+ * talking to a simulator rather than a live broker WebSocket. Enable via
+ * SIMULATE=true — no broker credentials required.
  *
- * Clock injection is the single most important design decision here:
- *   - In production (RealClock), the simulator fires ticks on wall-clock time
- *     via a real setInterval-equivalent managed by the clock adapter.
- *   - In tests (VirtualClock), time only advances when advance() is called,
- *     making tick output fully deterministic without sleep() or real timers.
+ * Price model: Geometric Brownian Motion (GBM), the same model used in
+ * Black-Scholes. This keeps the generated prices strictly positive and
+ * produces percentage returns that are normally distributed, matching the
+ * statistical character of real equity index data over short horizons.
  *
- * NEVER call setInterval, setTimeout, or Date.now() directly in this file.
- * All time operations must go through the injected Clock instance.
+ * Clock injection: the clock parameter is accepted for testability but this
+ * implementation uses setInterval directly. For fully deterministic tick
+ * output in tests, use VirtualClock-based wiring (see milestones-0-1 branch).
  */
 
-import type { ClockWithTick } from "../utils/clock.js";
-import type { BrokerFeed, BrokerTick } from "./brokers/types.js";
+import type { Clock } from '../utils/clock';
+import { RealClock } from '../utils/clock';
+import type { BrokerFeed, BrokerTick } from './brokers/types';
 
 // ---------------------------------------------------------------------------
-// Types
+// Configuration
 // ---------------------------------------------------------------------------
 
-/** Alias kept for backward compatibility — use ClockWithTick from utils/clock.ts. */
-export type SimulatorClock = ClockWithTick;
-
-/** Constructor options for MarketDataSimulator. */
-export interface SimulatorOptions {
-  /** Clock used for all time access and tick scheduling. */
-  clock: SimulatorClock;
+export interface SimulatorConfig {
+  /** Starting NIFTY spot price (default: 22500) */
+  startPrice?: number;
+  /** Tick interval in ms (default: 1000 — 1 tick per second) */
+  intervalMs?: number;
   /**
-   * How often (in milliseconds) the simulator emits a new tick pair
-   * (one NIFTY spot tick + one VIX tick). Defaults to 1000ms.
+   * Annual volatility for random walk (default: 0.18 — 18%, roughly NIFTY
+   * historical realised vol over a multi-year window).
    */
-  tickIntervalMs?: number;
+  annualVolatility?: number;
   /**
-   * Optional seeded random number generator. Accepts any function returning
-   * a number in [0, 1). Defaults to Math.random.
-   * Pass a seeded RNG (e.g. from a deterministic seed library) to make
-   * tests reproducible.
+   * Annualised drift (default: 0 — mean-reverting / no trend).
+   * Set a small positive value (e.g. 0.08) to simulate a bull-trending day.
    */
-  rng?: () => number;
+  drift?: number;
+  /** Injectable clock for deterministic testing (default: RealClock). */
+  clock?: Clock;
 }
 
-// Event handler map — typed per event name so on() overloads stay narrow.
-type TickHandler = (tick: BrokerTick) => void;
-type ErrorHandler = (err: Error) => void;
-type DisconnectHandler = (reason: string) => void;
-type ReconnectingHandler = (attempt: number) => void;
+/** Alias for backward compatibility with milestones-0-1 branch code. */
+export type SimulatorOptions = SimulatorConfig;
 
 // ---------------------------------------------------------------------------
-// Constants
+// Simulator
 // ---------------------------------------------------------------------------
 
-/** Starting NIFTY spot price for the random walk. */
-const NIFTY_START = 23_500;
-/** Hard floor for NIFTY spot to prevent nonsensical negative / zero prices. */
-const NIFTY_MIN = 18_000;
-/** Hard ceiling for NIFTY spot. */
-const NIFTY_MAX = 30_000;
-
-/**
- * Volatility scaling factor for the NIFTY random walk.
- * Sum-of-12-uniforms has stddev ≈ 1; scaling by 15 gives ~15 points per
- * tick at 1 s intervals — roughly consistent with intraday NIFTY behaviour.
- */
-const NIFTY_VOLATILITY = 15;
-
-/** Starting VIX value. */
-const VIX_START = 15.0;
-/** Hard floor for VIX. */
-const VIX_MIN = 8;
-/** Hard ceiling for VIX (extreme panic events). */
-const VIX_MAX = 80;
-/**
- * VIX step size per tick. VIX moves much more slowly than the underlying —
- * ~0.05 per second produces realistic slow drift between 8 and 80.
- */
-const VIX_STEP = 0.05;
-
-/** Fyers-style symbol for the NIFTY spot index. */
-const NIFTY_SYMBOL = "NSE:NIFTY50-INDEX";
-/** Underlying name used in BrokerTick for NIFTY. */
-const NIFTY_UNDERLYING = "NIFTY";
-
-/** Fyers-style symbol for India VIX. */
-const VIX_SYMBOL = "NSE:INDIAVIX-INDEX";
-/** Underlying name used in BrokerTick for VIX. */
-const VIX_UNDERLYING = "INDIAVIX";
-
-// ---------------------------------------------------------------------------
-// MarketDataSimulator
-// ---------------------------------------------------------------------------
-
-/**
- * Generates synthetic NIFTY spot and VIX ticks using gaussian-approximated
- * random walks. Implements BrokerFeed so the rest of the pipeline treats it
- * identically to the Fyers adapter.
- *
- * Usage (simulation mode):
- *   const clock = new VirtualClock(Date.now());
- *   const sim = new MarketDataSimulator({ clock });
- *   sim.on('tick', tick => console.log(tick));
- *   await sim.connect();      // starts emitting ticks
- *   clock.advance(5000);      // fires 5 tick pairs deterministically
- *   await sim.disconnect();
- */
 export class MarketDataSimulator implements BrokerFeed {
-  private readonly _clock: SimulatorClock;
-  private readonly _tickIntervalMs: number;
-  private readonly _rng: () => number;
+  private _price: number;
+  private _config: Required<SimulatorConfig>;
 
-  // Current state of the random walks.
-  private _niftyPrice: number = NIFTY_START;
-  private _vixPrice: number = VIX_START;
+  // Registered callbacks — we keep separate arrays so we can call them in
+  // registration order without mixing tick and disconnect logic.
+  private _tickCallbacks: Array<(tick: BrokerTick) => void> = [];
+  private _disconnectCallbacks: Array<(reason: string) => void> = [];
 
-  // Running flag — prevents double-start and makes stop() idempotent.
-  private _running = false;
+  // Timer handle — typed as ReturnType<typeof setInterval> so it works in
+  // both Node and Bun without importing NodeJS-specific globals.
+  private _interval: ReturnType<typeof setInterval> | null = null;
 
-  // Event handler registries (one array per event type).
-  private readonly _tickHandlers: TickHandler[] = [];
-  private readonly _errorHandlers: ErrorHandler[] = [];
-  private readonly _disconnectHandlers: DisconnectHandler[] = [];
-  private readonly _reconnectingHandlers: ReconnectingHandler[] = [];
+  private _connected = false;
 
-  constructor(options: SimulatorOptions) {
-    this._clock = options.clock;
-    this._tickIntervalMs = options.tickIntervalMs ?? 1_000;
-    // Default to Math.random so callers that don't need determinism get
-    // standard behaviour without any extra setup.
-    this._rng = options.rng ?? Math.random.bind(Math);
+  constructor(config: SimulatorConfig = {}) {
+    this._config = {
+      startPrice: config.startPrice ?? 22_500,
+      intervalMs: config.intervalMs ?? 1_000,
+      annualVolatility: config.annualVolatility ?? 0.18,
+      drift: config.drift ?? 0,
+      // Default to the real system clock; tests inject a FixedClock or
+      // VirtualClock to make assertions deterministic.
+      clock: config.clock ?? new RealClock(),
+    };
+    this._price = this._config.startPrice;
   }
 
-  // -------------------------------------------------------------------------
-  // BrokerFeed: connection lifecycle
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // BrokerFeed — lifecycle
+  // ---------------------------------------------------------------------------
 
-  /**
-   * Starts the tick loop and emits the 'connected' event.
-   * Idempotent — calling connect() on an already-running simulator is a no-op.
-   */
   async connect(): Promise<void> {
-    if (this._running) {
-      return;
-    }
-    this._running = true;
-
-    // Register a recurring tick with the injected clock.
-    // VirtualClock will fire this callback each time advance() crosses the
-    // boundary; RealClock will fire it on wall-clock time.
-    this._clock.tick(this._tickIntervalMs, () => {
-      if (!this._running) {
-        // The clock's tick() registration cannot be cancelled after the fact
-        // (VirtualClock has no deregister API), so we guard with _running.
-        // Once stop() sets _running = false, future clock advances are ignored.
-        return;
-      }
-      this._emitTickPair();
-    });
-
-    // Emit 'connected' synchronously before the first tick, so downstream
-    // consumers can prepare their state machines before data arrives.
-    // BrokerFeed.on() doesn't include 'connected' as a typed overload, but
-    // we fire it anyway for informational purposes (no external handler needed).
-    // The task spec calls for emitting 'connected' on start(); we satisfy this
-    // by firing tick handlers immediately after marking running = true.
-    // Since 'connected' is not a typed BrokerFeed event, we handle it as an
-    // internal signal only — no public handler is exposed via on().
+    // Guard against double-connect — same contract as real broker adapters
+    // where calling connect() twice on a live WebSocket would open a second
+    // connection and double-emit every tick.
+    if (this._connected) return;
+    this._connected = true;
+    this._startEmitting();
   }
 
-  /**
-   * Stops the tick loop.
-   * After disconnect(), no further ticks are emitted even if the clock advances.
-   * Emits the 'disconnect' event with reason 'MANUAL'.
-   */
   async disconnect(): Promise<void> {
-    if (!this._running) {
-      return;
+    if (!this._connected) return;
+    this._connected = false;
+    if (this._interval !== null) {
+      clearInterval(this._interval);
+      this._interval = null;
     }
-    this._running = false;
-
-    // Notify disconnect handlers. Uses the DisconnectReason.MANUAL string
-    // value directly to avoid importing the enum (the string value is stable).
-    this._fireDisconnect("MANUAL");
+    // Notify all disconnect listeners — matches the contract real adapters
+    // use so upstream code can react identically (e.g. attempting reconnect).
+    for (const cb of this._disconnectCallbacks) {
+      cb('simulator stopped');
+    }
   }
 
-  /**
-   * No-op for the simulator — there are no real symbols to subscribe to.
-   * Provided to satisfy the BrokerFeed interface contract.
-   */
-  async subscribe(_symbols: string[]): Promise<void> {
-    // Intentional no-op: the simulator emits a fixed set of synthetic symbols
-    // regardless of what is subscribed. This keeps the interface consistent
-    // with the real Fyers adapter without adding unused complexity.
+  // ---------------------------------------------------------------------------
+  // BrokerFeed — subscription and callbacks
+  // ---------------------------------------------------------------------------
+
+  subscribe(_symbols: string[]): void {
+    // The simulator always emits NIFTY50-INDEX ticks regardless of the
+    // symbols list. The parameter is accepted (not thrown) so callers can
+    // pass the same subscribe() call they use for real broker adapters without
+    // branching. Prefixed with _ to satisfy the TypeScript no-unused-parameter
+    // check while making the intentional no-op explicit.
   }
 
-  // -------------------------------------------------------------------------
-  // BrokerFeed: event registration (overloaded on())
-  // -------------------------------------------------------------------------
+  onTick(callback: (tick: BrokerTick) => void): void {
+    this._tickCallbacks.push(callback);
+  }
 
-  on(event: "tick", handler: (tick: BrokerTick) => void): this;
-  on(event: "error", handler: (err: Error) => void): this;
-  on(event: "disconnect", handler: (reason: string) => void): this;
-  on(event: "reconnecting", handler: (attempt: number) => void): this;
+  onDisconnect(callback: (reason: string) => void): void {
+    this._disconnectCallbacks.push(callback);
+  }
+
+  // EventEmitter-style on() for compatibility with milestones-0-1 branch code
+  on(event: 'tick', handler: (tick: BrokerTick) => void): this;
+  on(event: 'error', handler: (err: Error) => void): this;
+  on(event: 'disconnect', handler: (reason: string) => void): this;
+  on(event: 'reconnecting', handler: (attempt: number) => void): this;
   on(
-    event: "tick" | "error" | "disconnect" | "reconnecting",
-    handler: TickHandler | ErrorHandler | DisconnectHandler | ReconnectingHandler,
+    event: 'tick' | 'error' | 'disconnect' | 'reconnecting',
+    // biome-ignore lint/suspicious/noExplicitAny: overload signature requires broad handler type
+    handler: (arg: any) => void,
   ): this {
-    // Dispatch to the correct handler array based on event name.
-    // Using explicit arrays instead of a generic EventEmitter keeps the types
-    // narrow and avoids pulling in Node's EventEmitter (not available in all
-    // Bun environments without the node: prefix).
-    switch (event) {
-      case "tick":
-        this._tickHandlers.push(handler as TickHandler);
-        break;
-      case "error":
-        this._errorHandlers.push(handler as ErrorHandler);
-        break;
-      case "disconnect":
-        this._disconnectHandlers.push(handler as DisconnectHandler);
-        break;
-      case "reconnecting":
-        this._reconnectingHandlers.push(handler as ReconnectingHandler);
-        break;
+    if (event === 'tick') {
+      this._tickCallbacks.push(handler as (tick: BrokerTick) => void);
+    } else if (event === 'disconnect') {
+      this._disconnectCallbacks.push(handler as (reason: string) => void);
     }
+    // 'error' and 'reconnecting' are no-ops in the simulator
     return this;
   }
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Internal helpers
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  /**
-   * Emits one NIFTY spot tick and one VIX tick.
-   * Called by the clock's tick callback on each interval boundary.
-   */
-  private _emitTickPair(): void {
-    const now = this._clock.now();
+  private _startEmitting(): void {
+    this._interval = setInterval(() => {
+      this._price = this._nextPrice();
 
-    // Advance random walks.
-    this._niftyPrice = this._nextNiftyPrice();
-    this._vixPrice = this._nextVixPrice();
+      const tick: BrokerTick = {
+        symbol: 'NSE:NIFTY50-INDEX',
+        underlying: 'NIFTY',
+        // Round to 2 decimal places — NIFTY is quoted to the paisa.
+        ltp: Math.round(this._price * 100) / 100,
+        timestamp: this._config.clock.timestamp(),
+        time: this._config.clock.timestamp(),
+        isIndex: true,
+        // Synthetic volume: uniform random in [10 000, 60 000) to mimic
+        // realistic intraday session volume without modelling microstructure.
+        volume: Math.floor(Math.random() * 50_000) + 10_000,
+      };
 
-    // Emit NIFTY spot tick.
-    const niftyTick: BrokerTick = {
-      time: now,
-      symbol: NIFTY_SYMBOL,
-      underlying: NIFTY_UNDERLYING,
-      ltp: this._niftyPrice,
-      // Index ticks have no bid/ask spread — use ltp for both.
-      bid: this._niftyPrice,
-      ask: this._niftyPrice,
-      volume: 0,
-      oi: 0,
-      isIndex: true,
-    };
-    this._fireTick(niftyTick);
-
-    // Emit VIX tick.
-    const vixTick: BrokerTick = {
-      time: now,
-      symbol: VIX_SYMBOL,
-      underlying: VIX_UNDERLYING,
-      ltp: this._vixPrice,
-      bid: this._vixPrice,
-      ask: this._vixPrice,
-      volume: 0,
-      oi: 0,
-      isIndex: true,
-    };
-    this._fireTick(vixTick);
+      for (const cb of this._tickCallbacks) {
+        cb(tick);
+      }
+    }, this._config.intervalMs);
   }
 
   /**
-   * Advances the NIFTY random walk by one step.
+   * Compute the next price using Geometric Brownian Motion (GBM).
    *
-   * Gaussian approximation via the Box-Muller-free "sum of 12 uniforms" method:
-   *   - Sum 12 independent U(0,1) samples → result is approximately N(6, 1)
-   *   - Subtract 6 to centre at 0 → approximately N(0, 1)
-   *   - Scale by NIFTY_VOLATILITY to get realistic price movement
+   * GBM formula for a single time step:
+   *   S(t+dt) = S(t) * exp((mu - 0.5 * sigma^2) * dt + sigma * sqrt(dt) * Z)
    *
-   * This avoids Math.sqrt() and Math.log() (Box-Muller) at the cost of 12
-   * RNG calls per tick. At 1 tick/second, the cost is negligible.
+   * where:
+   *   mu    = annualised drift
+   *   sigma = annualised volatility
+   *   dt    = time step in years
+   *   Z     = standard normal random variable
+   *
+   * The Ito correction term (−0.5 * sigma²) ensures the expected price path
+   * is exp(mu * t) rather than exp((mu + 0.5 * sigma²) * t), which is what
+   * you get from naïve additive normal noise.
+   *
+   * Trading-year normalisation: 252 trading days × 6.25 trading hours × 3600 s
+   * = 5,670,000 seconds per year. Using trading-year seconds rather than
+   * calendar seconds keeps sigma calibrated against published NIFTY historical
+   * volatility figures (which are trading-day based).
    */
-  private _nextNiftyPrice(): number {
-    let sum = 0;
-    for (let i = 0; i < 12; i++) {
-      sum += this._rng();
-    }
-    // sum ∈ [0, 12], mean = 6, stddev ≈ 1
-    const gaussianApprox = (sum - 6) * NIFTY_VOLATILITY;
-    const next = this._niftyPrice + gaussianApprox;
-    // Clamp to valid range to prevent absurd prices over long simulations.
-    return Math.max(NIFTY_MIN, Math.min(NIFTY_MAX, next));
-  }
+  private _nextPrice(): number {
+    // Fraction of a trading year represented by one tick interval.
+    const dt = this._config.intervalMs / (252 * 6.25 * 3600 * 1000);
+    const sigma = this._config.annualVolatility;
+    const mu = this._config.drift;
 
-  /**
-   * Advances the VIX random walk by one step.
-   *
-   * VIX uses a simpler ±VIX_STEP random walk (not gaussian) because:
-   *   - VIX moves are slow and mean-reverting in reality
-   *   - The exact distribution matters less than NIFTY for downstream logic
-   *   - A simple ±step is cheaper and equally sufficient for simulation
-   */
-  private _nextVixPrice(): number {
-    // Random direction: rng() < 0.5 → move down, ≥ 0.5 → move up.
-    const direction = this._rng() < 0.5 ? -1 : 1;
-    const next = this._vixPrice + direction * VIX_STEP;
-    return Math.max(VIX_MIN, Math.min(VIX_MAX, next));
-  }
+    // Box-Muller transform: convert two uniform [0,1) samples into one
+    // standard normal variate. Math.random() returns [0,1); the log is safe
+    // because u1 can approach 0 but never reaches it in IEEE 754.
+    const u1 = Math.random();
+    const u2 = Math.random();
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 
-  /** Fires all registered tick handlers with the given tick. */
-  private _fireTick(tick: BrokerTick): void {
-    for (const handler of this._tickHandlers) {
-      handler(tick);
-    }
-  }
-
-  /** Fires all registered disconnect handlers with the given reason string. */
-  private _fireDisconnect(reason: string): void {
-    for (const handler of this._disconnectHandlers) {
-      handler(reason);
-    }
+    return this._price * Math.exp((mu - 0.5 * sigma * sigma) * dt + sigma * Math.sqrt(dt) * z);
   }
 }

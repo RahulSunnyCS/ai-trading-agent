@@ -8,11 +8,15 @@ import pg, { type QueryResultRow } from "pg";
 // arithmetic when they need precision math.
 pg.types.setTypeParser(1700, (val) => val);
 
-// Create the pool from DATABASE_URL. Pool settings are intentionally left at
-// pg defaults (max 10 connections). If the env var is missing, pg will throw
-// at first query — this is acceptable since there is no meaningful fallback.
+// Create the pool from DATABASE_URL. Pool max is set to 20 to support the
+// combined load from the trading pipeline and the Fastify server.
+// If the env var is missing, pg will throw at first query — this is acceptable
+// since there is no meaningful fallback.
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
 });
 
 /**
@@ -81,3 +85,9 @@ export async function withTransaction<T>(fn: (client: pg.PoolClient) => Promise<
     client.release();
   }
 }
+
+/**
+ * Alias for withTransaction — provided so callers from the payment branch
+ * that imported `transaction` continue to compile without changes.
+ */
+export const transaction = withTransaction;

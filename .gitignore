@@ -30,3 +30,10 @@ coverage/
 
 # Biome standalone binary (platform-specific — never commit; install via scripts/install-biome.sh)
 tools/biome*
+
+# Vite build cache
+.vite/
+
+# Playwright test results
+playwright-report/
+test-results/

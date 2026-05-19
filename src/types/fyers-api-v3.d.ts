@@ -14,6 +14,12 @@
  *     methods and events listed below.
  *   - The SDK is CommonJS — import via createRequire or the defensive
  *     pattern used in fyers.ts.
+ *
+ * NOTE: The payment branch declared fyersDataSocket as a class with a
+ * constructor. The actual SDK uses a factory pattern (getInstance), not a
+ * constructor. The class declaration below is kept as an additional export
+ * shape for compatibility with any import that references the class form,
+ * but production code should use the factory interface.
  */
 
 declare module "fyers-api-v3" {
@@ -142,6 +148,9 @@ declare module "fyers-api-v3" {
    *   - fyersCombinedToken: "APPID:AccessToken" format
    *   - logPath: directory path for SDK-internal log files (pass '' to suppress)
    *   - enableLogging: whether the SDK writes its own log files
+   *
+   * The class form below is also exported for compatibility with import styles
+   * from the payment branch that reference fyersDataSocket as a class.
    */
   interface FyersDataSocketFactory {
     getInstance(
@@ -151,12 +160,31 @@ declare module "fyers-api-v3" {
     ): FyersDataSocketInstance;
   }
 
+  /**
+   * Class-style declaration for compatibility with the payment branch's import
+   * convention (import { fyersDataSocket } then `new fyersDataSocket(...)`).
+   * The real SDK uses getInstance(), but this shape allows TypeScript to accept
+   * both usage patterns without errors.
+   */
+  class fyersDataSocket {
+    constructor(config: { access_token: string; client_id: string });
+    on(event: string, callback: (data: unknown) => void): void;
+    subscribe(symbols: string[]): void;
+    unsubscribe(symbols: string[]): void;
+    connect(): void;
+    close(): void;
+
+    // Factory method also accessible on the class (matches real SDK shape)
+    static getInstance(
+      fyersCombinedToken: string,
+      logPath?: string,
+      enableLogging?: boolean,
+    ): FyersDataSocketInstance;
+  }
+
   /** fyersModel: REST API client (not used in this codebase — declared for completeness). */
   // biome-ignore lint/suspicious/noExplicitAny: Untyped Fyers SDK export — no better type available
   const fyersModel: any;
-
-  /** fyersDataSocket: Market data WebSocket factory. */
-  const fyersDataSocket: FyersDataSocketFactory;
 
   /** fyersOrderSocket: Order update WebSocket (not used in this codebase). */
   // biome-ignore lint/suspicious/noExplicitAny: Untyped Fyers SDK export — no better type available

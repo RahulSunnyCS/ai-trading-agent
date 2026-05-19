@@ -5,6 +5,12 @@ pre-commit:
       glob: "*.{ts,tsx}"
       run: "[ -f ./tools/biome ] && ./tools/biome check --no-errors-on-unmatched {staged_files} || true"
 
+    typecheck:
+      run: bun run typecheck
+
+    lint:
+      run: "[ -f ./tools/biome ] && ./tools/biome check . || bun run lint"
+
     env-guard:
       # Refuse to commit any .env file (except .env.example) to prevent
       # accidental credential exposure. Runs against all staged files.
@@ -21,16 +27,21 @@ pre-commit:
 
     env-example-scan:
       glob: ".env.example"
-      # Scan .env.example for strings that look like real credentials:
-      # ≥25 chars, alphanumeric+dash+underscore, AND containing at least one
-      # letter AND one digit. Pure separator lines (---) and variable names
-      # (EVOLUTION_REQUIRE_APPROVAL) are excluded by the letter+digit requirement.
+      # Scan .env.example VALUES (right side of '=') for strings that look
+      # like real credentials: ≥25 chars, alphanumeric+dash+underscore, AND
+      # containing at least one letter AND one digit.
+      # Only the value portion (after '=') is scanned so that long variable
+      # names like RAZORPAY_CREDITS_PACK_50_PRICE_PAISE do not false-positive.
+      # Comment lines (#) and blank lines are skipped by the grep -v.
       run: |
         if git diff --cached --name-only | grep -q '\.env\.example'; then
-          if grep -oE '[A-Za-z0-9_-]{25,}' .env.example \
+          if grep -v '^#' .env.example \
+              | grep '=' \
+              | sed 's/^[^=]*=//' \
+              | grep -oE '[A-Za-z0-9_-]{25,}' \
               | grep -E '[A-Za-z]' \
               | grep -qE '[0-9]'; then
-            echo "WARNING: .env.example may contain a real credential (alphanumeric string ≥25 chars found)."
+            echo "WARNING: .env.example may contain a real credential (alphanumeric string ≥25 chars found in a value field)."
             echo "Replace any real tokens with placeholder text before committing."
             exit 1
           fi

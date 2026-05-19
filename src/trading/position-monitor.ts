@@ -1,469 +1,366 @@
 /**
- * PositionMonitor — subscribes to the straddle.values Redis stream and manages
- * open short-straddle positions in real time.
+ * Position Monitor Loop
  *
- * Responsibilities on each stream snapshot:
- *   1. Load today's open positions from the database.
- *   2. Update the trailing stop watermark for each position.
- *   3. Persist the updated lowestStraddleValueSeen to the DB.
- *   4. Evaluate all exit triggers (SL, TSL, TARGET, EOD, EXIT_WINDOW, DAILY_LOSS).
- *   5. Close any position whose trigger fires via PaperTradeExecutor.
- *   6. ACK the Redis message only after all processing is complete.
- *
- * Stale-data watchdog (fired every watchdogIntervalMs = 5000 ms via clock.tick):
- *   - Warns when the straddle feed has not updated within staleThresholdMs.
- *   - Evaluates time-based exits (EOD, EXIT_WINDOW) using the last known value
- *     so positions are not left dangling if the feed is interrupted near EOD.
- *
- * Entry bridge (optional):
- *   - If an EntryEngine is provided, the monitor registers an 'entry' handler
- *     that calls executor.openTrade() and emits a 'trade-opened' event.
+ * Subscribes to the `straddle.values` Redis stream and, on each new snapshot,
+ * evaluates all open positions for exit conditions.  This is the runtime loop
+ * that connects straddle calculator output to the exit engine.
  *
  * Design decisions:
- *   - Uses the ClockWithTick intersection type (same pattern as straddle-calc.ts
- *     and vix-feed.ts) instead of extending the Clock interface — this lets
- *     VirtualClock drive the watchdog in tests without touching clock.ts.
- *   - The watchdog uses clock.tick() not setInterval() so the same VirtualClock
- *     can control both stale detection and the advance of simulated time in tests.
- *   - ACK happens AFTER all DB writes complete so a partial failure (e.g. DB
- *     write succeeds but close fails) leaves the message unACKed and recoverable.
- *   - The in-flight-handler fence (this._inFlight) lets stop() wait for the
- *     current snapshot handler to finish before tearing down, preventing
- *     half-written DB state on shutdown.
- *   - todayNetPnl placeholder: getOpenTrades() returns '0' for todayNetPnl
- *     because it does not know the current straddle value at query time. We do
- *     not attempt to compute a "real" running P&L here because the trigger engine
- *     only uses todayNetPnl for the DAILY_LOSS check, which is an account-level
- *     cumulative figure that would require summing closed-trade P&L plus the
- *     current mark-to-market. For MVP Phase 1, '0' disables the DAILY_LOSS
- *     trigger (the condition is `todayNetPnl <= -maxDailyLoss`; 0 never fires
- *     unless maxDailyLoss is 0). This is an accepted limitation documented in
- *     the P1 risk manifest.
+ * - Uses the same non-blocking XREAD pattern as straddle-calc.ts: no BLOCK
+ *   argument so the `running` flag is checked on every iteration for clean
+ *   shutdown.
+ * - In-memory watermark map (tradeId → min straddle value) is lazily
+ *   initialised: the first observed straddle value becomes the baseline, not
+ *   the entry value.  This prevents stale entry values from distorting the
+ *   trailing-stop calculation when the monitor starts mid-session.
+ * - Each PaperTradeRecord has a `personalityId` field but position evaluation
+ *   is personality-agnostic here — the monitor closes any open trade that
+ *   meets an exit condition, regardless of which personality opened it.
+ * - Malformed JSON in the stream is silently skipped (logged as a warning) so
+ *   a single bad entry does not halt evaluation of subsequent entries.
  */
 
-import type { Redis } from "ioredis";
-import type { Pool } from "pg";
-import { STREAM_STRADDLE, recoverPending, streamConsume } from "../redis/client.js";
-import type { ClockWithTick } from "../utils/clock.js";
-import type { EntryIntent } from "./entry-engine.js";
-import type { EntryEngine } from "./entry-engine.js";
-import type { PaperTradeExecutor } from "./paper-trade-executor.js";
-import { getOpenTrades } from "./paper-trade-executor.js";
-import { evaluateTriggers, updateTrailingStop } from "./trigger-engine.js";
-import type { TriggerConfig } from "./trigger-engine.js";
+import type { Redis } from 'ioredis';
+import type { Pool } from 'pg';
+
+import type { StraddleSnapshot } from '../ingestion/straddle-calc';
+import { type Clock, RealClock } from '../utils/clock';
+import { exitTrade, getOpenTrades } from './paper-trade';
+import { type Position, evaluateExit, updateHighWatermark } from './trigger-exit';
 
 // ---------------------------------------------------------------------------
-// Constructor options
+// Public types
 // ---------------------------------------------------------------------------
 
-export interface PositionMonitorOptions {
-  clock: ClockWithTick;
-  db: Pool;
-  redis: Redis;
-  executor: PaperTradeExecutor;
-  triggerConfig: TriggerConfig;
-  /**
-   * How long (ms) the straddle feed must be silent before the watchdog logs a
-   * WARN and evaluates time-based exits. Defaults to 30 000 ms (30 seconds).
-   */
-  staleThresholdMs?: number;
-  /**
-   * Optional entry engine. When provided, the monitor bridges entry signals to
-   * the executor (openTrade) and emits 'trade-opened' events.
-   */
-  entryEngine?: EntryEngine;
+export interface PositionMonitorConfig {
+  clock?: Clock;
+  /** Default stop-loss as a fraction of entry value (default: 0.20 = 20%). */
+  defaultStopLossPct?: number;
+  /** Default trailing-stop as a fraction of running minimum (default: 0.15 = 15%). */
+  defaultTrailingStopPct?: number;
+  /** Default profit-target as a fraction of entry value (default: 0.30 = 30%). */
+  defaultTargetPct?: number;
+  /** HH:MM in IST for forced end-of-day exit (default: '15:15'). */
+  defaultEodExitIST?: string;
+}
+
+export interface PositionMonitor {
+  start(): Promise<void>;
+  stop(): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
-// Event handler types
+// Internal: resolved config with every field present
 // ---------------------------------------------------------------------------
 
-type PositionMonitorEvents = {
-  /** Emitted after a new paper trade is successfully opened via the entry bridge. */
-  "trade-opened": (tradeId: string, intent: EntryIntent) => void;
-};
+interface ResolvedConfig {
+  clock: Clock;
+  defaultStopLossPct: number;
+  defaultTrailingStopPct: number;
+  defaultTargetPct: number;
+  defaultEodExitIST: string;
+}
 
 // ---------------------------------------------------------------------------
-// PositionMonitor
+// Internal helpers
 // ---------------------------------------------------------------------------
 
-export class PositionMonitor {
-  private readonly _clock: ClockWithTick;
-  private readonly _db: Pool;
-  private readonly _redis: Redis;
-  private readonly _executor: PaperTradeExecutor;
-  private readonly _triggerConfig: TriggerConfig;
-  private readonly _staleThresholdMs: number;
+/**
+ * Build a Position snapshot from a PaperTradeRecord and the current observed
+ * straddle value.
+ *
+ * The config defaults supply thresholds that are not yet persisted per-trade.
+ * Phase 2 will switch to per-trade thresholds stored in the DB.
+ */
+function buildPosition(
+  entryStraddleValue: number,
+  entryTimestampMs: number,
+  currentValue: number,
+  watermark: number,
+  config: ResolvedConfig,
+): Position {
+  return {
+    entryStraddleValue,
+    currentStraddleValue: currentValue,
+    entryTimestamp: entryTimestampMs,
+    stopLossPct: config.defaultStopLossPct,
+    trailingStopPct: config.defaultTrailingStopPct,
+    targetPct: config.defaultTargetPct,
+    highWatermark: watermark,
+    eodExitIST: config.defaultEodExitIST,
+  };
+}
 
-  /** Consumer name used for XREADGROUP. Unique per process so multiple instances
-   *  can run in parallel without competing for the same pending-message claims.
-   *  Using the PID is a simple uniqueness strategy for a single-server MVP. */
-  private readonly _consumerName: string;
-
-  /** Shutdown flag set by stop(). The stream handler checks this to skip
-   *  processing after a graceful shutdown has been requested. */
-  private _stopped = false;
-
-  /** The last epoch-ms at which a real straddle snapshot arrived via the stream.
-   *  Initialised to clock.now() at construction so the watchdog does not
-   *  immediately fire before the first message arrives. */
-  private _lastTickTimestamp: number;
-
-  /** The most recent straddle value from the stream, for watchdog use when
-   *  the feed is stale and we need to evaluate EOD/EXIT_WINDOW exits. */
-  private _lastKnownStraddleValue: string | null = null;
-
-  /** A promise representing the currently running snapshot handler, or null
-   *  when idle. stop() awaits this to ensure graceful completion. */
-  private _inFlight: Promise<void> | null = null;
-
-  /** Lightweight hand-rolled event registry (same pattern as EntryEngine). */
-  private readonly _handlers: Map<
-    keyof PositionMonitorEvents,
-    Array<PositionMonitorEvents[keyof PositionMonitorEvents]>
-  > = new Map();
-
-  // ---------------------------------------------------------------------------
-  // Constructor
-  // ---------------------------------------------------------------------------
-
-  constructor(opts: PositionMonitorOptions) {
-    this._clock = opts.clock;
-    this._db = opts.db;
-    this._redis = opts.redis;
-    this._executor = opts.executor;
-    this._triggerConfig = opts.triggerConfig;
-    this._staleThresholdMs = opts.staleThresholdMs ?? 30_000;
-
-    // Initialise lastTickTimestamp so the watchdog does not fire at t=0.
-    this._lastTickTimestamp = this._clock.now();
-
-    // Consumer name is unique per PID to allow multiple monitor instances
-    // (e.g. in tests or future multi-process setups) without competing for
-    // the same pending-message ownership in Redis.
-    this._consumerName = `position-monitor-${process.pid}`;
-
-    // Register the watchdog with the clock's tick mechanism.
-    // The watchdog interval is fixed at 5 000 ms (5 seconds) as per the spec.
-    const watchdogIntervalMs = 5_000;
-    this._clock.tick(watchdogIntervalMs, () => {
-      // Skip watchdog work after stop() has been called — avoids a race where
-      // the clock fires one more tick after graceful shutdown begins.
-      if (this._stopped) return;
-      this._runWatchdog();
-    });
-
-    // If an entry engine is provided, wire up the entry → openTrade bridge.
-    if (opts.entryEngine) {
-      opts.entryEngine.on("entry", (intent: EntryIntent) => {
-        if (this._stopped) return;
-        // Fire-and-forget: errors are caught inside the handler so the entry
-        // engine's event emit cannot throw back to the caller.
-        this._handleEntryIntent(intent).catch((err: unknown) => {
-          console.error("[position-monitor] Entry bridge handler error:", err);
-        });
-      });
+/**
+ * Parse and validate a raw JSON string from the `straddle.values` stream.
+ *
+ * Returns null and logs a warning for any malformed or type-incorrect input so
+ * a single bad entry does not break the evaluation loop.
+ */
+function parseSnapshot(raw: string): StraddleSnapshot | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !('straddleValue' in parsed) ||
+      !('timestamp' in parsed) ||
+      !('underlying' in parsed)
+    ) {
+      console.warn('[position-monitor] malformed snapshot (missing required fields):', raw);
+      return null;
     }
-  }
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
+    const obj = parsed as Record<string, unknown>;
+
+    // Narrow the fields we actually use; other StraddleSnapshot fields are
+    // present in the JSON but we only need straddleValue + timestamp here.
+    if (typeof obj.straddleValue !== 'number' || typeof obj.timestamp !== 'number') {
+      console.warn('[position-monitor] malformed snapshot (wrong field types):', raw);
+      return null;
+    }
+
+    // Cast to StraddleSnapshot — the remaining fields (cePrice, pePrice, etc.)
+    // are trusted from the straddle-calc publisher which owns this schema.
+    return parsed as StraddleSnapshot;
+  } catch {
+    console.warn('[position-monitor] failed to parse snapshot JSON:', raw);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a PositionMonitor that polls the `straddle.values` stream and
+ * evaluates all open positions on each new snapshot.
+ *
+ * The returned object has no side effects until `start()` is called.
+ */
+export function createPositionMonitor(
+  redisClient: Redis,
+  db: Pool,
+  config?: PositionMonitorConfig,
+): PositionMonitor {
+  // Resolve config with defaults so downstream code never deals with undefined.
+  const resolved: ResolvedConfig = {
+    clock: config?.clock ?? new RealClock(),
+    defaultStopLossPct: config?.defaultStopLossPct ?? 0.2,
+    defaultTrailingStopPct: config?.defaultTrailingStopPct ?? 0.15,
+    defaultTargetPct: config?.defaultTargetPct ?? 0.3,
+    defaultEodExitIST: config?.defaultEodExitIST ?? '15:15',
+  };
+
+  // In-memory high watermark map: tradeId → lowest straddle value seen.
+  // Using tradeId (string) as the key because trade IDs are UUIDs from
+  // PostgreSQL — globally unique and compared by value equality.
+  const watermarks = new Map<string, number>();
+
+  // XREAD cursor for `straddle.values`.
+  // Starting at '0' replays from the beginning of the current stream so the
+  // monitor catches any snapshots published before it started.  The practical
+  // effect is at most a few seconds of history — this is intentional: we want
+  // to initialise watermarks from real recent market data rather than a stale
+  // entry value that may be hours old.
+  let lastId = '0';
+
+  // Running flag — set to false by stop() to terminate the poll loop cleanly.
+  let running = false;
+
+  // -------------------------------------------------------------------------
+  // Core evaluation logic (called on every new snapshot)
+  // -------------------------------------------------------------------------
 
   /**
-   * Recover stale pending messages from a previous consumer, then start the
-   * live stream consumption loop.
+   * Load all open trades and evaluate each against the current snapshot.
    *
-   * recoverPending() runs BEFORE streamConsume() so that messages that were
-   * delivered to a previous process instance but never ACKed are reclaimed by
-   * this consumer and reprocessed. This satisfies the "replay idempotency"
-   * requirement: we check inside the snapshot handler whether positions are
-   * already closed before doing any work.
-   */
-  async start(): Promise<void> {
-    this._stopped = false;
-
-    // Reclaim any pending messages from prior consumers (crash recovery).
-    // We log how many were recovered but do not replay their payloads here —
-    // streamConsume's XREADGROUP will deliver them in-order as pending messages
-    // become visible to the new consumer after XAUTOCLAIM transfers ownership.
-    const recovered = await recoverPending(STREAM_STRADDLE, "position-monitor", this._consumerName);
-    if (recovered.length > 0) {
-      console.info(
-        `[position-monitor] Recovered ${recovered.length} pending message(s) from prior consumer`,
-      );
-    }
-
-    // Start the live consumption loop. The handler wraps each snapshot in an
-    // async IIFE stored in this._inFlight so stop() can await graceful finish.
-    streamConsume(
-      STREAM_STRADDLE,
-      "position-monitor",
-      this._consumerName,
-      async (id: string, fields: Record<string, string>) => {
-        if (this._stopped) return;
-
-        // Serialise handlers: wait for the previous one to finish before
-        // starting the next. This avoids parallel DB writes that could
-        // create race conditions when multiple snapshots arrive in a burst.
-        const handlerPromise = (this._inFlight ?? Promise.resolve()).then(() =>
-          this._handleSnapshot(fields),
-        );
-        this._inFlight = handlerPromise;
-
-        // Await the handler so streamConsume only ACKs after completion.
-        // (streamConsume ACKs the message after this async handler resolves.)
-        await handlerPromise;
-      },
-    );
-  }
-
-  /**
-   * Graceful shutdown: signal the loop to stop and wait for any in-flight
-   * snapshot handler to complete before returning.
-   */
-  async stop(): Promise<void> {
-    this._stopped = true;
-    // Wait for the last snapshot handler to complete so we do not leave
-    // partial DB writes when the process shuts down.
-    if (this._inFlight) {
-      await this._inFlight;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Event registration (fluent, mirroring EntryEngine.on())
-  // ---------------------------------------------------------------------------
-
-  on(event: "trade-opened", handler: (tradeId: string, intent: EntryIntent) => void): this {
-    const existing = this._handlers.get(event) ?? [];
-    existing.push(handler);
-    this._handlers.set(event, existing);
-    return this;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Core: snapshot handler
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Process one straddle snapshot message from the Redis stream.
+   * Exits are applied immediately (DB write via exitTrade).  The watermark
+   * map is updated or cleaned up after each trade is processed.
    *
-   * Steps:
-   *   a. Idempotency check — skip if no open positions exist (all already closed).
-   *   b. Update lastTickTimestamp and lastKnownStraddleValue for watchdog.
-   *   c. For each open position: update trailing stop, persist to DB, evaluate
-   *      triggers, close if triggered.
+   * We call getOpenTrades on every snapshot tick rather than caching the list
+   * because trades may be opened by other parts of the system between ticks.
+   * At 15-second snapshot intervals this DB read is negligible.
    */
-  private async _handleSnapshot(fields: Record<string, string>): Promise<void> {
-    // Accept both camelCase and snake_case field names — straddle-calc may
-    // publish under either convention depending on the code version.
-    const straddleValue = fields.straddleValue ?? fields.straddle_value ?? "";
+  async function evaluateSnapshot(snapshot: StraddleSnapshot): Promise<void> {
+    const currentValue = snapshot.straddleValue;
 
-    if (straddleValue === "") {
-      console.warn("[position-monitor] Received snapshot with missing straddleValue — skipping");
+    let openTrades: Awaited<ReturnType<typeof getOpenTrades>>;
+    try {
+      openTrades = await getOpenTrades(db);
+    } catch (err) {
+      console.error('[position-monitor] failed to load open trades:', err);
       return;
     }
 
-    // --- Step a: Idempotency / replay guard ---
-    // Load today's open positions. If all are already closed (empty list), ACK
-    // immediately and do nothing. This handles replayed messages from crash
-    // recovery: once a position is closed, reprocessing the same snapshot is
-    // a no-op. The ACK happens in streamConsume after this function returns.
-    const today = this._clock.today();
-    const openPositions = await getOpenTrades(this._db, today);
+    for (const trade of openTrades) {
+      const tradeId = trade.id;
+      const entryValue = Number(trade.entryStraddleValue);
 
-    if (openPositions.length === 0) {
-      // No open positions — nothing to do. ACK is issued by streamConsume.
-      return;
-    }
+      // Lazily initialise the watermark to the first observed straddle value.
+      // Using the current market value (not entryStraddleValue) because the
+      // monitor may start mid-session after the trade has already moved from
+      // its entry value.  A stale entry value would immediately fire a trailing
+      // stop if the market has already moved against us.
+      const existingWatermark = watermarks.get(tradeId);
+      const watermark = existingWatermark ?? currentValue;
+      if (existingWatermark === undefined) {
+        watermarks.set(tradeId, watermark);
+      }
 
-    // --- Step b: Update in-memory state for watchdog ---
-    this._lastTickTimestamp = this._clock.now();
-    this._lastKnownStraddleValue = straddleValue;
-
-    // --- Step c: Per-position trailing stop + trigger evaluation ---
-    for (const position of openPositions) {
-      // Compute the new trailing stop watermark (pure, no async).
-      const newLowest = updateTrailingStop(position, straddleValue);
-
-      // Persist the updated watermark to DB immediately so a crash between
-      // this write and the trigger evaluation cannot lose the trailing stop
-      // data. We use a parameterised query (not string interpolation) to
-      // prevent SQL injection, even though lowestStraddleValueSeen comes from
-      // the Decimal library (never user input) — defence in depth.
-      await this._db.query(
-        "UPDATE paper_trades SET lowest_straddle_value_seen = $1 WHERE id = $2",
-        [newLowest, position.id],
+      const position = buildPosition(
+        entryValue,
+        trade.entryTimestamp.getTime(),
+        currentValue,
+        watermark,
+        resolved,
       );
 
-      // Rebuild the position with the updated lowestStraddleValueSeen for the
-      // trigger evaluation. We must use the freshly computed value, not the
-      // stale one from the DB query (which may already be one snapshot old).
-      const updatedPosition = {
-        ...position,
-        lowestStraddleValueSeen: newLowest,
-      };
-
-      // Evaluate all exit triggers (pure function — no I/O).
-      const decision = evaluateTriggers(
-        updatedPosition,
-        straddleValue,
-        this._clock,
-        this._triggerConfig,
-      );
+      const decision = evaluateExit(position, resolved.clock);
 
       if (decision.shouldExit) {
-        // Delegate the actual close to the executor, which writes the DB row
-        // and notifies Quantiply. Errors from closeTrade propagate up and
-        // prevent the ACK (message stays pending for recovery).
-        await this._executor.closeTrade(position.id, straddleValue, decision.reason, this._clock);
+        // Remove from watermark map before the async DB write so that if
+        // another concurrent snapshot arrives for the same tradeId before the
+        // write completes, it will re-initialise the watermark rather than
+        // evaluating exit on a trade that is already being closed.
+        watermarks.delete(tradeId);
 
-        console.info(
-          `[position-monitor] Closed trade ${position.id} — reason: ${decision.reason} ` +
-            `@ straddleValue=${straddleValue}`,
-        );
+        try {
+          await exitTrade(db, {
+            tradeId,
+            exitStraddleValue: currentValue,
+            exitTimestamp: snapshot.timestamp,
+            exitReason: decision.reason,
+          });
+          console.info(`[position-monitor] exited trade ${tradeId} — reason: ${decision.reason}`);
+        } catch (err) {
+          console.error(`[position-monitor] failed to exit trade ${tradeId}:`, err);
+          // Re-insert the watermark so the next tick re-evaluates this trade
+          // rather than silently leaving it open with no watermark entry.
+          watermarks.set(tradeId, watermark);
+        }
+      } else {
+        // Update the high watermark (running minimum) for the next tick.
+        const updated = updateHighWatermark(currentValue, watermark);
+        watermarks.set(tradeId, updated);
       }
     }
 
-    // ACK is issued by streamConsume after this handler resolves without throwing.
+    // Clean up watermark entries for trades that have already been closed
+    // externally (e.g. manually from the API) — they will not appear in
+    // openTrades but may still have a stale entry in the map.
+    const openIds = new Set(openTrades.map((t) => t.id));
+    for (const [id] of watermarks) {
+      if (!openIds.has(id)) {
+        watermarks.delete(id);
+      }
+    }
   }
 
-  // ---------------------------------------------------------------------------
-  // Watchdog
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Poll loop
+  // -------------------------------------------------------------------------
 
   /**
-   * Called every watchdogIntervalMs (5 s) by clock.tick().
+   * Non-blocking XREAD poll loop for `straddle.values`.
    *
-   * If the straddle feed has been silent for longer than staleThresholdMs:
-   *   1. Log a WARN with how long it has been stale.
-   *   2. Evaluate time-based exits (EOD, EXIT_WINDOW) for every open position
-   *      using the last known straddle value, and close any that trigger.
-   *
-   * Using the last known straddle value for time-based exits is acceptable
-   * because EOD / EXIT_WINDOW exits are driven entirely by the clock, not by
-   * price — the exact straddle value used for the P&L calculation will be the
-   * last market price, which is the best we can do without a live feed.
+   * Same pattern as straddle-calc.ts: XREAD without BLOCK so the `running`
+   * flag is checked on every iteration and stop() terminates cleanly without
+   * waiting for a blocking call to time out.
    */
-  private _runWatchdog(): void {
-    const nowMs = this._clock.now();
-    const staleDurationMs = nowMs - this._lastTickTimestamp;
+  async function pollLoop(): Promise<void> {
+    while (running) {
+      try {
+        // XREAD COUNT 100 STREAMS straddle.values <lastId>
+        const results = await redisClient.xread('COUNT', 100, 'STREAMS', 'straddle.values', lastId);
 
-    if (staleDurationMs <= this._staleThresholdMs) {
-      // Feed is healthy — nothing to do.
-      return;
-    }
+        if (!results || results.length === 0) {
+          // No new snapshots — sleep briefly to avoid a tight CPU spin.
+          await sleep(100);
+          continue;
+        }
 
-    const staleSecs = Math.floor(staleDurationMs / 1000);
-    console.warn(`[position-monitor] Straddle feed stale for ${staleSecs}s`);
+        // results shape: [ [ 'streamName', [ [ 'id', ['field', 'value', ...] ] ] ] ]
+        const streamResult = results[0];
+        if (!streamResult) {
+          await sleep(100);
+          continue;
+        }
 
-    // Only evaluate time-based exits if we have a last known price.
-    // We cannot compute P&L without any straddle value.
-    if (this._lastKnownStraddleValue === null) {
-      return;
-    }
+        // Cast to the known ioredis XREAD shape.
+        const entries = streamResult[1] as [string, string[]][];
 
-    const lastKnownValue = this._lastKnownStraddleValue;
+        for (const entry of entries) {
+          const entryId = entry[0];
+          const rawFields = entry[1];
+          if (!entryId || !rawFields) continue;
 
-    // Load open positions and evaluate time-based exits.
-    // The watchdog runs in a sync context (clock.tick callback), so we use
-    // a fire-and-forget pattern with explicit error handling.
-    const today = this._clock.today();
+          // Advance cursor so processed messages are never re-read.
+          lastId = entryId;
 
-    getOpenTrades(this._db, today)
-      .then(async (positions) => {
-        for (const position of positions) {
-          const decision = evaluateTriggers(
-            position,
-            lastKnownValue,
-            this._clock,
-            this._triggerConfig,
-          );
-
-          // Only act on time-based exits in the watchdog.
-          // Price-based exits (SL, TSL, TARGET, DAILY_LOSS) should only fire on
-          // real tick data — using a stale price for price-based exits could
-          // trigger a false exit if the straddle moved significantly while the
-          // feed was down. EOD and EXIT_WINDOW are purely clock-driven and safe
-          // to evaluate with any non-null straddle value.
-          if (
-            decision.shouldExit &&
-            (decision.reason === "EOD" || decision.reason === "EXIT_WINDOW")
-          ) {
-            try {
-              await this._executor.closeTrade(
-                position.id,
-                lastKnownValue,
-                decision.reason,
-                this._clock,
-              );
-              console.info(
-                `[position-monitor] Watchdog closed trade ${position.id} — reason: ${decision.reason}`,
-              );
-            } catch (err: unknown) {
-              console.error(
-                `[position-monitor] Watchdog: closeTrade failed for trade ${position.id}:`,
-                err,
-              );
+          // Extract the `data` field containing the serialised StraddleSnapshot.
+          let rawData: string | undefined;
+          for (let i = 0; i + 1 < rawFields.length; i += 2) {
+            if (rawFields[i] === 'data') {
+              rawData = rawFields[i + 1];
+              break;
             }
           }
+
+          if (rawData === undefined) {
+            console.warn('[position-monitor] stream entry missing `data` field, id:', entryId);
+            continue;
+          }
+
+          const snapshot = parseSnapshot(rawData);
+          if (snapshot !== null) {
+            // evaluateSnapshot is async; we await it to ensure ordering:
+            // each snapshot is fully processed before we move to the next.
+            // This prevents two snapshots from racing to close the same trade.
+            await evaluateSnapshot(snapshot);
+          }
         }
-      })
-      .catch((err: unknown) => {
-        console.error("[position-monitor] Watchdog: getOpenTrades failed:", err);
-      });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Entry bridge
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Handles an EntryIntent from the EntryEngine.
-   *
-   * Calls executor.openTrade() to create the DB record and Quantiply notification,
-   * then emits 'trade-opened' on this monitor so downstream subscribers (e.g. a
-   * UI websocket relay) are notified.
-   *
-   * Errors from openTrade() are logged but not rethrown: a failed trade open
-   * should not crash the monitor loop or prevent the entry engine from
-   * continuing to evaluate subsequent signals.
-   */
-  private async _handleEntryIntent(intent: EntryIntent): Promise<void> {
-    let tradeId: string;
-    try {
-      tradeId = await this._executor.openTrade(intent);
-    } catch (err: unknown) {
-      console.error("[position-monitor] Entry bridge: openTrade failed:", err);
-      return;
-    }
-
-    console.info(
-      `[position-monitor] Opened trade ${tradeId} via entry bridge ` +
-        `— straddleValue=${intent.straddleValue} atmStrike=${intent.atmStrike}`,
-    );
-
-    this._emit("trade-opened", tradeId, intent);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Internal: emit
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Invoke all registered handlers for the given event.
-   * Errors in individual handlers are caught and logged so one bad handler
-   * does not prevent others from receiving the event (consistent with EntryEngine).
-   */
-  private _emit(event: "trade-opened", tradeId: string, intent: EntryIntent): void {
-    const handlers = this._handlers.get(event) ?? [];
-    for (const handler of handlers) {
-      try {
-        (handler as PositionMonitorEvents["trade-opened"])(tradeId, intent);
-      } catch (err: unknown) {
-        console.error(`[position-monitor] Error in '${event}' handler:`, err);
+      } catch (err) {
+        // Log but continue — transient Redis errors should not crash the loop.
+        console.error('[position-monitor] error in poll loop:', err);
+        await sleep(100);
       }
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Public API
+  // -------------------------------------------------------------------------
+
+  return {
+    async start(): Promise<void> {
+      if (running) return;
+      running = true;
+      // Run the poll loop concurrently; do not await here so start() returns
+      // immediately and the caller is not blocked.
+      void pollLoop();
+    },
+
+    async stop(): Promise<void> {
+      running = false;
+      // The poll loop checks `running` at the top of each iteration and exits
+      // naturally.  No forced termination is needed because XREAD is called
+      // without BLOCK, so the next iteration check will see running=false.
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Internal sleep helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Promise-based sleep.  Used in the poll loop to avoid a tight CPU spin when
+ * no new messages are available in the Redis stream.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

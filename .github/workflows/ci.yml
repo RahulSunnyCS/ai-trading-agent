@@ -1,12 +1,17 @@
 name: CI
+
 on:
   push:
     branches: ['**']
   pull_request:
     branches: ['**']
+  schedule:
+    - cron: '0 2 * * *'   # nightly at 02:00 UTC
+  workflow_dispatch:        # allow manual trigger
 
 jobs:
   ci:
+    name: Typecheck · Lint · Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,3 +46,49 @@ jobs:
 
       - name: Unit tests
         run: bun run test:unit
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    # Only run on schedule (nightly) or when manually triggered — not on every
+    # push/PR because the integration suite requires TimescaleDB + Redis and
+    # takes significantly longer than the unit suite.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    services:
+      postgres:
+        # Must use the TimescaleDB image — plain postgres:16 does not have the
+        # TimescaleDB extension and migrations will fail on hypertable creation.
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_trading_agent_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_trading_agent_test
+      REDIS_URL: redis://localhost:6379
+      # SIMULATE=true so the integration tests do not attempt to connect to
+      # Fyers WebSocket or require broker credentials in CI.
+      SIMULATE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+      - run: bun install --frozen-lockfile
+      - run: bun run migrate
+      - run: bun run test:integration

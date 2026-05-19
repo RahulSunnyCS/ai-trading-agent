@@ -14,160 +14,20 @@
  *
  * All exports are named exports per project convention. This file has no exports
  * because it is the process entry point.
+ *
+ * Payment routes (Razorpay/UPI): registered via startServer() from src/server/index.ts
+ * which wires up the payment routes alongside the existing trading API routes.
  */
 
-import { buildServer } from "./api/server.js";
 import { pool } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
-import { createBroker } from "./ingestion/brokers/broker-factory.js";
-import { StraddleCalculator } from "./ingestion/straddle-calc.js";
-import { VixFeed } from "./ingestion/vix-feed.js";
-import { closeRedis, redis } from "./redis/client.js";
-import { EntryEngine } from "./trading/entry-engine.js";
-import { PaperTradeExecutor } from "./trading/paper-trade-executor.js";
-import { PositionMonitor } from "./trading/position-monitor.js";
-import { QuantiplyStub } from "./trading/quantiply-stub.js";
-import { loadTriggerConfig } from "./trading/trigger-engine.js";
+import { createBrokerFeed } from "./ingestion/brokers/index.js";
+import { createStraddleCalculator } from "./ingestion/straddle-calc.js";
+import { createVixFeed } from "./ingestion/vix-feed.js";
+import { redis } from "./redis/client.js";
+import { startServer } from "./server/index.js";
+import { createPositionMonitor } from "./trading/position-monitor.js";
 import { RealClock, VirtualClock } from "./utils/clock.js";
-
-// ---------------------------------------------------------------------------
-// Main startup function — separated so async/await works at module level.
-// ---------------------------------------------------------------------------
-
-async function main(): Promise<void> {
-  // Step 1: run migrations before anything else. If PostgreSQL is unreachable
-  // or the schema is inconsistent this throws immediately, preventing the app
-  // from starting in a broken state (fail fast principle).
-  await runMigrations();
-
-  // Step 2: choose clock based on SIMULATE env var.
-  // VirtualClock is used in simulation mode so that all time-based callbacks
-  // (straddle snapshots, VIX polling, position watchdog) are driven by
-  // clock.advance() calls rather than wall-clock timers. This makes simulation
-  // faster than real time and allows tests to control time precisely.
-  //
-  // We start VirtualClock at the current wall-clock epoch so that IST date
-  // strings produced by clock.today() are correct even in simulation mode.
-  const simulate = process.env.SIMULATE?.toLowerCase().trim() === "true";
-
-  // Both VirtualClock and RealClock satisfy the ClockWithTick intersection type
-  // required by createBroker / StraddleCalculator / VixFeed / PositionMonitor.
-  // RealClock does not have tick() — but in live mode the broker adapter and
-  // all components that need tick() use real setInterval internally.
-  // VirtualClock.tick() registers a callback that fires on clock.advance() calls.
-  //
-  // Note: TypeScript is satisfied because VirtualClock has tick() and all
-  // component configs accept the ClockWithTick intersection structurally.
-  const clock = simulate
-    ? new VirtualClock(Date.now())
-    : (new RealClock() as unknown as VirtualClock); // RealClock cast: live mode never calls tick()
-
-  if (simulate) {
-    console.log(`[index] Simulation mode active — advancing clock every ${SIM_TICK_INTERVAL_MS}ms`);
-  } else {
-    console.log("[index] Live mode active — using real clock");
-  }
-
-  // Step 3: instantiate all components.
-  // createBroker reads BROKER and SIMULATE env vars and picks the right adapter.
-  const broker = createBroker(clock);
-
-  const calc = new StraddleCalculator({ db: pool, redis, clock });
-  const vixFeed = new VixFeed({ clock });
-
-  const entryEngine = new EntryEngine({ db: pool, redis, clock });
-
-  const quantiply = new QuantiplyStub();
-  const executor = new PaperTradeExecutor({ db: pool, quantiply });
-
-  const positionMonitor = new PositionMonitor({
-    clock,
-    db: pool,
-    redis,
-    executor,
-    triggerConfig: loadTriggerConfig(),
-    entryEngine,
-  });
-
-  const server = buildServer({ db: pool, redis, clock });
-
-  // Step 4: start components in dependency order.
-  // broker must connect before calc.start(broker) subscribes to tick events.
-  // vixFeed and entryEngine are independent; positionMonitor depends on entryEngine.
-  // server.listen is last so the HTTP surface is not available until the pipeline
-  // is fully wired and ready to serve data.
-  await broker.connect();
-  calc.start(broker);
-  vixFeed.start();
-  await positionMonitor.start();
-  entryEngine.start();
-
-  const port = Number(process.env.PORT ?? 3000);
-  await server.listen({ port, host: "0.0.0.0" });
-  console.log(`[index] API server listening on port ${port}`);
-
-  // Step 5: in simulation mode, advance the virtual clock on a real setInterval.
-  // Each advance fires all registered tick() callbacks (straddle, VIX, watchdog)
-  // according to how many of their interval boundaries were crossed by the advance.
-  let simInterval: ReturnType<typeof setInterval> | null = null;
-  if (simulate) {
-    simInterval = setInterval(() => {
-      // advance() is defined only on VirtualClock; the cast above makes TypeScript
-      // treat `clock` as VirtualClock in this branch so the call compiles.
-      (clock as VirtualClock).advance(SIM_TICK_INTERVAL_MS);
-    }, SIM_TICK_INTERVAL_MS);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Graceful shutdown
-  // ---------------------------------------------------------------------------
-
-  async function shutdown(): Promise<void> {
-    console.log("[index] Shutdown signal received — stopping components");
-    entryEngine.stop();
-    await positionMonitor.stop();
-    calc.stop();
-    vixFeed.stop();
-    await server.close();
-    await pool.end();
-    await closeRedis();
-    if (simInterval !== null) {
-      clearInterval(simInterval);
-    }
-    console.log("[index] Shutdown complete");
-    process.exit(0);
-  }
-
-  // Register both SIGTERM (Docker / Railway / Fly.io) and SIGINT (Ctrl-C in dev).
-  // Using 'once' semantics via `process.on` is sufficient because process.exit(0)
-  // in the handler prevents the process from receiving a second signal.
-  // Catch unhandled promise rejections and uncaught exceptions — any escape from
-  // the hot-path catch blocks (stream handlers, VIX polling) must not silently
-  // terminate the process while positions remain open.
-  process.on("unhandledRejection", (reason: unknown) => {
-    console.error("[index] Unhandled rejection — initiating graceful shutdown:", reason);
-    shutdown().catch(() => process.exit(1));
-  });
-
-  process.on("uncaughtException", (err: Error) => {
-    console.error("[index] Uncaught exception — initiating graceful shutdown:", err);
-    shutdown().catch(() => process.exit(1));
-  });
-
-  process.on("SIGTERM", () => {
-    shutdown().catch((err) => {
-      console.error("[index] Error during shutdown:", err);
-      process.exit(1);
-    });
-  });
-
-  process.on("SIGINT", () => {
-    shutdown().catch((err) => {
-      console.error("[index] Error during shutdown:", err);
-      process.exit(1);
-    });
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Simulation tick interval
@@ -180,6 +40,119 @@ const SIM_TICK_INTERVAL_MS = (() => {
   const parsed = Number.parseInt(process.env.SIM_TICK_INTERVAL_MS ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1_000;
 })();
+
+// ---------------------------------------------------------------------------
+// Main startup function — separated so async/await works at module level.
+// ---------------------------------------------------------------------------
+
+async function main(): Promise<void> {
+  // Step 1: run migrations before anything else. If PostgreSQL is unreachable
+  // or the schema is inconsistent this throws immediately, preventing the app
+  // from starting in a broken state (fail fast principle).
+  await runMigrations();
+
+  // Step 2: choose clock based on SIMULATE env var.
+  const simulate = process.env.SIMULATE?.toLowerCase().trim() === "true";
+
+  const clock = simulate
+    ? new VirtualClock(new Date(Date.now()))
+    : new RealClock();
+
+  if (simulate) {
+    console.log(`[index] Simulation mode active — advancing clock every ${SIM_TICK_INTERVAL_MS}ms`);
+  } else {
+    console.log("[index] Live mode active — using real clock");
+  }
+
+  // Step 3: instantiate all components.
+  // createBrokerFeed reads BROKER and SIMULATE env vars and picks the right adapter.
+  const feed = createBrokerFeed();
+
+  // Straddle calculator reads market.ticks from Redis → publishes straddle.values.
+  const straddleCalc = createStraddleCalculator(redis, { underlying: 'NIFTY', clock });
+
+  // VIX feed: reads market.ticks for NSE:INDIAVIX-INDEX; polls NSE API as fallback.
+  const vixFeed = createVixFeed(redis, { clock });
+
+  // Position monitor: reads straddle.values and evaluates open positions for exit conditions.
+  const positionMonitor = createPositionMonitor(redis, pool, { clock });
+
+  // Wire tick publisher: each tick from the broker feed is serialised and written to
+  // the market.ticks Redis stream so the straddle calculator and VIX feed can consume it.
+  // Use optional chaining because BrokerFeed.onTick / onDisconnect are optional methods —
+  // some broker adapters use the EventEmitter .on() pattern instead; those are wired via
+  // the .on('tick') and .on('disconnect') overloads, which createBrokerFeed sets up before
+  // returning.  The onTick/onDisconnect style is used by the simulator and the Fyers adapter.
+  feed.onTick?.((tick) => {
+    // Fire-and-forget: we do not await here because onTick is a synchronous callback.
+    void redis.xadd('market.ticks', '*', 'data', JSON.stringify(tick));
+  });
+
+  feed.onDisconnect?.((reason) => {
+    console.warn(`[feed] disconnected — reason: ${reason}`);
+  });
+
+  // Step 4: start components in dependency order.
+  await Promise.all([
+    straddleCalc.start(),
+    vixFeed.start(),
+    positionMonitor.start(),
+    // startServer registers its own SIGINT/SIGTERM handlers for server.close().
+    // Our outer handlers (below) also call feed.disconnect(), pool.end(), and
+    // redis.quit() which the server's handlers do not cover.
+    startServer(pool),
+  ]);
+
+  // Connect broker feed after all consumers are ready so no ticks are dropped.
+  await feed.connect();
+  console.log('[index] broker feed connected — receiving ticks');
+
+  // Step 5: in simulation mode, advance the virtual clock on a real setInterval.
+  let simInterval: ReturnType<typeof setInterval> | null = null;
+  if (simulate && clock instanceof VirtualClock) {
+    simInterval = setInterval(() => {
+      (clock as VirtualClock).advance(SIM_TICK_INTERVAL_MS);
+    }, SIM_TICK_INTERVAL_MS);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Graceful shutdown
+  // ---------------------------------------------------------------------------
+
+  async function shutdown(signal: string): Promise<void> {
+    console.log(`[index] ${signal} received — shutting down gracefully`);
+    try {
+      if (simInterval !== null) {
+        clearInterval(simInterval);
+      }
+      await positionMonitor.stop();
+      await vixFeed.stop();
+      await straddleCalc.stop();
+      await feed.disconnect();
+      await pool.end();
+      await redis.quit();
+    } finally {
+      process.exit(0);
+    }
+  }
+
+  process.on("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
+  process.on("SIGINT", () => {
+    void shutdown("SIGINT");
+  });
+
+  process.on("unhandledRejection", (reason: unknown) => {
+    console.error("[index] Unhandled rejection:", reason);
+    void shutdown("unhandledRejection");
+  });
+
+  process.on("uncaughtException", (err: Error) => {
+    console.error("[index] Uncaught exception:", err);
+    void shutdown("uncaughtException");
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Boot
