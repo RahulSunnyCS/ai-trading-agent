@@ -170,3 +170,35 @@ export interface Straddle1Min {
   avg_roc: number | null; // nullable because roc itself is nullable
   avg_vix: number | null; // nullable because vix is not always available
 }
+
+// ---------------------------------------------------------------------------
+// Payment / access-control interfaces (T-64)
+// ---------------------------------------------------------------------------
+
+export type GrantType = 'monthly_pass' | 'credits_pack';
+export type GrantStatus = 'pending' | 'paid' | 'active' | 'expired';
+
+export interface AccessGrant {
+  id: string;
+  razorpay_order_id: string;
+  razorpay_payment_id: string | null;
+  grant_type: GrantType;
+  days_granted: number;
+  expires_at: Date | null;
+  status: GrantStatus;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreditTransaction {
+  id: string;
+  razorpay_order_id: string;
+  credits_delta: number;
+  feature: string | null;
+  created_at: Date;
+}
+
+export interface ProcessedWebhookEvent {
+  razorpay_event_id: string;
+  processed_at: Date;
+}
