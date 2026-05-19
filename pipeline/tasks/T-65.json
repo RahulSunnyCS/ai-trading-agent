@@ -1,0 +1,24 @@
+{
+  "task_id": "T-65",
+  "title": "Razorpay service module — Orders API, signature verify, credit consumption",
+  "assigned_to": "implementor",
+  "risk_flags": ["pricing", "backend"],
+  "scope": {
+    "files_to_create": ["src/payment/razorpay.ts"],
+    "files_to_modify": [],
+    "files_forbidden": ["src/db/", "src/ingestion/", "src/trading/", "src/index.ts"]
+  },
+  "acceptance_criteria": [
+    "File exports a named function 'initRazorpay()' that reads RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET from env; throws a descriptive error if called when PAYMENT_ENABLED is false or keys are missing; never called at module load time (lazy init pattern)",
+    "Exports 'createOrder(params: { amountPaise: number; currency: string; receipt: string; notes?: Record<string,string> }): Promise<{ orderId: string; amount: number; currency: string }>'. Uses Razorpay REST API (fetch or razorpay npm package). Returns typed result.",
+    "Exports 'verifyPaymentSignature(orderId: string, paymentId: string, signature: string): boolean'. Computes HMAC-SHA256 of '${orderId}|${paymentId}' using RAZORPAY_KEY_SECRET. Returns boolean, never throws on bad input.",
+    "Exports 'verifyWebhookSignature(rawBody: Buffer, headerSignature: string): boolean'. Computes HMAC-SHA256 of rawBody using RAZORPAY_WEBHOOK_SECRET. CRITICAL: rawBody must be a Buffer — function must not accept string to prevent accidental re-serialization. Returns boolean, never throws.",
+    "Exports 'consumeCredit(db: Pool, feature: string, amount?: number): Promise<{ success: boolean; remainingBalance: number }>'. Atomically: reads current SUM(credits_delta) from credit_transactions, checks balance >= amount (default 1), if sufficient inserts a row with credits_delta = -(amount), returns success=true and new balance. If insufficient, returns success=false with current balance. Uses a DB transaction to prevent race conditions.",
+    "Exports 'getCreditBalance(db: Pool): Promise<number>'. Returns current SUM(credits_delta) or 0 if no rows.",
+    "All exports are named (no default export)",
+    "TypeScript strict mode — no 'any' types",
+    "No secrets are logged or included in error messages"
+  ],
+  "dependencies": ["T-01", "T-64"],
+  "output_format": "src/payment/razorpay.ts plus plain-English explanation of the HMAC raw-body requirement and why consumeCredit uses a DB transaction"
+}

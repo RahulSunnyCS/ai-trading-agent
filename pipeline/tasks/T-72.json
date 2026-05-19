@@ -1,0 +1,21 @@
+{
+  "task_id": "T-72",
+  "title": "Update business.md Pipeline Scope — governance for commercial pivot",
+  "assigned_to": "implementor",
+  "risk_flags": ["pricing"],
+  "scope": {
+    "files_to_create": [],
+    "files_to_modify": [".claude/project/business.md"],
+    "files_forbidden": ["CLAUDE.md", "src/", "pipeline/"]
+  },
+  "acceptance_criteria": [
+    "The 'Pipeline Scope' section in .claude/project/business.md no longer contains 'pricing-reviewer: NOT APPLICABLE'",
+    "The section now states 'pricing-reviewer: APPLICABLE — billing and payment logic now present (Razorpay UPI, access grants, credit tokens)'",
+    "The section now states 'auth risk flag: NOT APPLICABLE — single-instance tool, no user sessions or accounts; Razorpay holds PCI/PII scope for payment instruments'",
+    "A 'PCI / PII boundary' note is added: 'Razorpay stores all card/UPI credentials; we store only razorpay_order_id, razorpay_payment_id, grant_type, and credit_transactions. No raw payment instrument is ever written to our database.'",
+    "The 'Payment / Billing' section is updated to reflect Razorpay is now integrated (India-only, UPI + Razorpay Orders API, no mandate)",
+    "No other sections of business.md are changed — scope is strictly the Pipeline Scope block and the Payment/Billing block"
+  ],
+  "dependencies": [],
+  "output_format": "edited file plus a one-paragraph plain-English explanation of every change made and why"
+}

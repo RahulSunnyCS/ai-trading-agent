@@ -1,0 +1,23 @@
+{
+  "task_id": "T-71",
+  "title": "Update .env.example with all payment-related environment variables",
+  "assigned_to": "implementor",
+  "risk_flags": ["pricing"],
+  "scope": {
+    "files_to_create": [],
+    "files_to_modify": [".env.example"],
+    "files_forbidden": [
+      "src/", "pipeline/", ".env",
+      ".claude/project/business.md"
+    ]
+  },
+  "acceptance_criteria": [
+    "A clearly labelled '# Payment (Razorpay — India UPI)' section is added to .env.example",
+    "Section contains all of these variables with inline comments: RAZORPAY_KEY_ID (comment: 'Razorpay Key ID — SAFE to expose to frontend / Checkout widget'), RAZORPAY_KEY_SECRET (comment: 'Razorpay Key Secret — SERVER-ONLY, never expose to frontend or logs'), RAZORPAY_WEBHOOK_SECRET (comment: 'Razorpay Webhook Signing Secret — SERVER-ONLY'), RAZORPAY_MONTHLY_PASS_PRICE_PAISE (comment: 'Monthly access pass price in Indian paise. e.g. 99900 = ₹999'), RAZORPAY_CREDITS_PACK_50_PRICE_PAISE (comment: '50-credit pack price in paise. e.g. 49900 = ₹499'), RAZORPAY_CREDITS_PACK_200_PRICE_PAISE (comment: '200-credit pack price in paise. e.g. 149900 = ₹1499'), GEOLOCATION_API_URL (comment: 'Geolocation endpoint. Default: https://ip-api.com/json — free tier, 45 req/min. Self-hosted MaxMind proxy can be substituted.')",
+    "A note is added above the section: '# Set RAZORPAY_KEY_ID to enable payment mode. Omit it (or leave blank) for free/open access (dev mode).'",
+    "All pre-existing variables in .env.example are preserved unchanged.",
+    "No actual key values are present — all values are empty (VAR=) or example placeholders (VAR=rzp_test_XXXX)"
+  ],
+  "dependencies": ["T-65"],
+  "output_format": "the .env.example diff only, plus a note confirming no secrets are present in the committed file"
+}

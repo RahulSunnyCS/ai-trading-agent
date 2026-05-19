@@ -1,7 +1,11 @@
 # TODO — AI Trading Agent
 
-At-a-glance mirror of `ROADMAP.md`. Status: all tasks **not started**
-(greenfield repo — only docs exist). ⭐ = first runnable milestone.
+At-a-glance mirror of `ROADMAP.md` + formally contracted pipeline tasks.
+⭐ = first runnable milestone. 🔒 = task contract written (pipeline/tasks/T-XX.json).
+
+**Build status:** 0 / 73 tasks complete. Greenfield — only docs exist.
+
+---
 
 ## Milestone 0 — Scaffolding & Infrastructure
 - [ ] T-01 Bun project init (package.json, tsconfig strict, .env.example, dirs)
@@ -85,3 +89,17 @@ Deferred (not now — see ROADMAP): 2–3 Playwright smoke specs after M1 · Bro
 - [ ] T-50 Portfolio Greeks + circuit breaker
 - [ ] T-52 Probability recalibration
 - [ ] T-53 Prod hardening (Fyers token refresh, deploy, secrets)
+
+## Milestone 7 — Payment & Access Gateway 🔒 (blocked on M1; can start T-72 now)
+Credits = feature tokens (1 credit consumed per feature call, e.g. backtest run).
+No mandate / no autopay — all payments are one-time Razorpay Orders.
+Silent fail: omit RAZORPAY_KEY_ID → free/open access, no payment screens.
+
+- [ ] T-72 🔒 Update business.md Pipeline Scope (governance — re-enable pricing-reviewer, document PCI boundary)
+- [ ] T-64 🔒 DB migrations: access_grants + credit_transactions + processed_webhook_events (depends: T-03, T-05)
+- [ ] T-65 🔒 Razorpay service module: createOrder, verifyPaymentSig, verifyWebhookSig (raw bytes), consumeCredit (depends: T-01, T-64)
+- [ ] T-66 🔒 Geolocation service: ip-api.com, injectable, graceful fail → show both options (depends: T-01)
+- [ ] T-67 🔒 Payment API routes: /plans /create-order /webhook /access-status /credit-balance (depends: T-19, T-64, T-65, T-66)
+- [ ] T-68 🔒 Access gate middleware + PAYMENT_ENABLED silent-fail (depends: T-19, T-64)
+- [ ] T-69 🔒 React pricing page: region-aware, Razorpay Checkout widget, post-payment polling (depends: T-20, T-67)
+- [ ] T-71 🔒 Update .env.example with all RAZORPAY_* + GEOLOCATION_API_URL vars (depends: T-65)

@@ -1,0 +1,24 @@
+{
+  "task_id": "T-68",
+  "title": "Access gate middleware — PAYMENT_ENABLED silent-fail, 402 on no active grant",
+  "assigned_to": "implementor",
+  "risk_flags": ["pricing", "backend"],
+  "scope": {
+    "files_to_create": ["src/payment/access-gate.ts"],
+    "files_to_modify": ["src/server.ts"],
+    "files_forbidden": ["src/db/", "src/ingestion/", "src/trading/", "src/index.ts", "src/payment/routes.ts"]
+  },
+  "acceptance_criteria": [
+    "Exports 'createAccessGate(db: Pool): preHandlerHookHandler'. Returns a Fastify preHandler hook.",
+    "If PAYMENT_ENABLED is false (i.e. process.env.RAZORPAY_KEY_ID is absent or empty): hook calls done() immediately with no DB query — full pass-through.",
+    "If PAYMENT_ENABLED is true: queries access_grants for a row with status='active' AND (expires_at IS NULL OR expires_at > NOW() - INTERVAL '3 days'). If found: calls done(). If not found: calls done(new PaymentRequiredError()) which Fastify serialises to HTTP 402 with body {\"error\":\"subscription_required\",\"redirectTo\":\"/pricing\"}.",
+    "The hook is registered on all /api/* routes EXCEPT /api/payment/* — this exclusion is enforced by the route prefix pattern, not by a blocklist inside the hook itself.",
+    "A custom error class 'PaymentRequiredError extends Error' is defined in this file with a statusCode = 402 property that Fastify's setErrorHandler reads.",
+    "The gate never queries DB more than once per request — no N+1 risk.",
+    "Clock used in the 3-day grace comparison is DB NOW() — not app-level Date.now() — so there is one authoritative clock source.",
+    "A comment explains the 3-day grace: 'Gives a paying user time to renew after expiry without immediately losing access. Grace period is inclusive: NOW() - 3 days means a subscription expired 2 days ago is still active.'",
+    "src/server.ts is modified only to register the access gate — no other changes."
+  ],
+  "dependencies": ["T-19", "T-64"],
+  "output_format": "src/payment/access-gate.ts plus minimal server.ts diff, plus plain-English note on why DB NOW() is used instead of app-side Date"
+}
