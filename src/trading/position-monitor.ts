@@ -64,6 +64,8 @@ import type { EntryIntent } from "./entry-engine.js";
 import type { EntryEngine } from "./entry-engine.js";
 import type { ManagementHandler } from "./management/holder.js";
 import { HolderManager } from "./management/holder.js";
+import { AdjusterManager } from "./management/adjuster.js";
+import { ReducerManager } from "./management/reducer.js";
 import type { PaperTradeExecutor } from "./paper-trade-executor.js";
 import { getOpenTrades } from "./paper-trade-executor.js";
 import { updateTrailingStop } from "./trigger-engine.js";
@@ -168,6 +170,8 @@ export class PositionMonitor {
    * so a single instance handles all positions of that style simultaneously.
    */
   private readonly _holderManager: HolderManager = new HolderManager();
+  private readonly _adjusterManager: AdjusterManager = new AdjusterManager();
+  private readonly _reducerManager: ReducerManager = new ReducerManager();
 
   // ---------------------------------------------------------------------------
   // Constructor
@@ -384,17 +388,10 @@ export class PositionMonitor {
         return this._holderManager;
 
       case "roll":
-        // TODO(T-29): replace with AdjusterManager once it is implemented.
-        // Using HolderManager here means rolled trades are held-to-trigger
-        // instead of being rolled at the roll trigger point — this is safe but
-        // suboptimal until T-29 lands.
-        return this._holderManager;
+        return this._adjusterManager;
 
       case "cut_reenter":
-        // TODO(T-30): replace with ReducerManager once it is implemented.
-        // Using HolderManager here means cut-and-reenter trades are held-to-trigger
-        // instead of being cut and re-entered — safe but suboptimal until T-30 lands.
-        return this._holderManager;
+        return this._reducerManager;
     }
   }
 

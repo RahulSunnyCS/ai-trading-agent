@@ -60,6 +60,7 @@ import {
   fetchDailyState,
   runPersonalityFilter,
 } from "./personality-filter.js";
+import { portfolioRiskCheck } from "../trading/portfolio-risk.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -120,6 +121,13 @@ export class PersonalityRouter {
   private readonly _redis: Redis;
   private readonly _clock: Clock;
 
+  /**
+   * Singleton PaperTradeExecutor instance. Moved to constructor level to avoid
+   * instantiating a new executor (and QuantiplyStub) on every signal that opens a
+   * trade — one instance is reused for the lifetime of the router.
+   */
+  private readonly _executor: PaperTradeExecutor;
+
   /** Shutdown flag — checked in the read loop to exit cleanly. */
   private _stopped = false;
 
@@ -143,6 +151,10 @@ export class PersonalityRouter {
     this._redis = redis;
     this._clock = clock;
     this._lastVixTimestampMs = clock.now();
+
+    // Instantiate once at construction so trade opens reuse a single executor
+    // and QuantiplyStub rather than creating a new instance per signal.
+    this._executor = new PaperTradeExecutor({ db: this._db, quantiply: new QuantiplyStub() });
 
     // Parse VIX_STALE_MS env var. Fall back to 300,000 ms (5 minutes) if
     // absent or not a valid positive integer. A zero/negative value would
@@ -498,6 +510,23 @@ export class PersonalityRouter {
   private async _openTradeForPersonality(intent: TradeIntent): Promise<void> {
     const { personalityId, signal, personality } = intent;
 
+    // Portfolio-level hard risk check (event-day, VIX stale, daily stop, margin, max legs).
+    // vixAgeMs is derived from _lastVixTimestampMs which tracks when we last saw a live VIX tick.
+    const vixAgeMs = this._clock.now() - this._lastVixTimestampMs;
+    const riskResult = await portfolioRiskCheck(this._db, {
+      personalityId: personalityId,
+      underlying: signal.underlying,
+      atmStrike: signal.atm_strike,
+      straddleValue: Number(signal.straddle_value),
+    }, this._clock, vixAgeMs);
+
+    if (!riskResult.allowed) {
+      console.warn(
+        `[personality-router] portfolioRiskCheck blocked trade for ${personality.name}: ${riskResult.reason}`
+      );
+      return;
+    }
+
     // Build an EntryIntent from the signal — the shape required by openTrade().
     // The EntryIntent.underlying type is narrowed to 'NIFTY' in entry-engine.ts;
     // we preserve this for Phase 1 and will widen it in Phase 2 when BankNifty
@@ -514,11 +543,8 @@ export class PersonalityRouter {
       entryTimeMs: signal.signal_time,
     };
 
-    // PaperTradeExecutor requires a QuantiplyClient; we use QuantiplyStub here
-    // because the router does not receive a Quantiply client in its constructor.
-    // Accepting a QuantiplyClient in the constructor is a Phase 2 concern (when
-    // live Quantiply integration is configured).
-    const executor = new PaperTradeExecutor({ db: this._db, quantiply: new QuantiplyStub() });
+    // Reuse the singleton executor instantiated in the constructor.
+    const executor = this._executor;
 
     let tradeId: string;
     try {
@@ -632,8 +658,14 @@ export class PersonalityRouter {
       return null;
     }
 
-    const signal_time = Number.parseInt(fields["signal_time"] ?? "", 10);
-    if (!Number.isFinite(signal_time)) {
+    const rawSignalTime = fields["signal_time"] ?? "";
+    // PeakDetectionEngine publishes an ISO-8601 string; ScheduledSignalEmitter may
+    // publish epoch ms as a string. Handle both.
+    // Number("2026-05-19T09:30:00.000Z") → NaN; Number("1716123000000") → valid epoch.
+    const signal_time_ms = Number.isNaN(Number(rawSignalTime))
+      ? new Date(rawSignalTime).getTime()
+      : Number(rawSignalTime);
+    if (!Number.isFinite(signal_time_ms)) {
       console.warn("[personality-router] Signal missing/invalid signal_time — skipping");
       return null;
     }
@@ -648,7 +680,7 @@ export class PersonalityRouter {
       vix,
       adjusted_probability,
       confidence_tier,
-      signal_time,
+      signal_time: signal_time_ms,
     };
   }
 }
