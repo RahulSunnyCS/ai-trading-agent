@@ -12,3 +12,8 @@
 | Phase 3 | T-65: GlobalMacroFeed | implementor | sonnet | high | ~15k |
 | Phase 3 | T-26: 5-stage personality filter | implementor | sonnet | high | ~15k |
 | Phase 3 | T-32: Personality CRUD + performance API | implementor | sonnet | high | ~18k |
+| Phase 3 | T-23: Probability scorer (8-factor incl OI) | implementor | sonnet | high | ~55k |
+| Phase 3 | T-22: Peak detection engine + OI tracking | implementor | sonnet | high | ~109k |
+| Phase 3 | T-27: Personality router | implementor | sonnet | high | ~108k |
+| Phase 3 | T-24: Scheduled signal emitter | implementor | sonnet | high | ~15k |
+| Phase 3 | T-28: Holder management + PositionMonitor | implementor | sonnet | high | ~15k |
