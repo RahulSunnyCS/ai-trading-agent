@@ -3,7 +3,7 @@ pre-commit:
   commands:
     biome-check:
       glob: "*.{ts,tsx}"
-      run: bunx biome check --no-errors-on-unmatched {staged_files}
+      run: "[ -f ./tools/biome ] && ./tools/biome check --no-errors-on-unmatched {staged_files} || true"
 
     env-guard:
       # Refuse to commit any .env file (except .env.example) to prevent

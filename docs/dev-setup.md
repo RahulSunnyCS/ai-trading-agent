@@ -206,6 +206,45 @@ Vite proxies `/api` and `/ws` to the Fastify backend at `localhost:3000`.
 
 ---
 
+## Corporate / restricted network (JFrog proxy)
+
+If your organisation routes all npm traffic through a JFrog Artifactory proxy and
+`@biomejs/biome` is not cached there, `bun install` will fail with an error like:
+
+```
+error: GET https://<proxy>/artifactory/api/npm/.../biome-1.9.4.tgz
+```
+
+Biome is NOT in `devDependencies` for this reason — it is installed as a standalone
+binary instead.
+
+**One-time setup (run after cloning):**
+
+```bash
+bash scripts/install-biome.sh   # downloads ./tools/biome from GitHub Releases
+```
+
+`bun run lint` and the pre-commit hook both check for `./tools/biome` first; they
+skip gracefully if it is absent (you can still develop, lint just won't run locally).
+
+**If GitHub Releases is also blocked:** download the binary on a machine with internet
+access from `https://github.com/biomejs/biome/releases/tag/cli/v1.9.4`, place it at
+`./tools/biome`, then `chmod +x ./tools/biome`.
+
+**Permanent fix:** ask your JFrog admin to add these packages to the virtual npm repo
+as proxied from `https://registry.npmjs.org`:
+- `@biomejs/biome`
+- `@biomejs/cli-linux-x64`
+- `@biomejs/cli-linux-arm64`
+- `@biomejs/cli-darwin-arm64`
+- `@biomejs/cli-darwin-x64`
+- `@biomejs/cli-win32-x64`
+
+Once they are available, run `bun install` and restore `@biomejs/biome` to
+`devDependencies`; the standalone-binary path can then be removed.
+
+---
+
 ## Common problems
 
 | Symptom | Likely cause | Fix |
@@ -217,3 +256,4 @@ Vite proxies `/api` and `/ws` to the Fastify backend at `localhost:3000`.
 | `rediss://` connection refused | Using Upstash TLS URL against a local Redis | Local Redis uses `redis://` (no `s`); Upstash uses `rediss://` |
 | `FYERS_ACCESS_TOKEN` errors in live mode | Token expires daily | Regenerate before 09:00 IST each market morning |
 | Port 5432 or 6379 already in use | Conflicting local service | Change the Docker Compose port mapping or stop the local service |
+| `bun install` fails fetching `@biomejs/biome` | Corporate npm proxy doesn't have the package | Run `bash scripts/install-biome.sh` — see Corporate / restricted network section above |

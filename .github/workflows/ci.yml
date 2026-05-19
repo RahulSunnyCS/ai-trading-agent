@@ -30,8 +30,14 @@ jobs:
       - name: TypeScript typecheck
         run: bun run --bun tsc --noEmit
 
+      # Download Biome binary from GitHub Releases (avoids the JFrog npm proxy
+      # which does not have @biomejs/biome cached). GitHub Releases is reachable
+      # from standard GitHub Actions runners without proxy configuration.
+      - name: Install Biome
+        run: bash scripts/install-biome.sh
+
       - name: Biome lint
-        run: bun run lint
+        run: ./tools/biome check .
 
       - name: Unit tests
         run: bun run test:unit

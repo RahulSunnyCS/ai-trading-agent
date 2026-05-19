@@ -27,3 +27,6 @@ coverage/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Biome standalone binary (platform-specific — never commit; install via scripts/install-biome.sh)
+tools/biome*
