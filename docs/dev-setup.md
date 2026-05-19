@@ -69,10 +69,12 @@ echo "shared_preload_libraries = 'timescaledb'" >> /opt/homebrew/var/postgresql@
 
 brew services restart postgresql@16
 
-# Create the database and user
+# Create the database and user — run each line separately, do NOT paste as a block.
+# Using -c flags avoids the \c meta-command paste-parsing bug.
 psql postgres -c "CREATE USER trading WITH PASSWORD 'trading';"
 psql postgres -c "CREATE DATABASE trading OWNER trading;"
-psql trading -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+psql trading  -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+psql postgres -c "GRANT ALL PRIVILEGES ON DATABASE trading TO trading;"
 ```
 
 **Ubuntu / Debian**
@@ -95,7 +97,8 @@ sudo systemctl restart postgresql
 
 sudo -u postgres psql -c "CREATE USER trading WITH PASSWORD 'trading';"
 sudo -u postgres psql -c "CREATE DATABASE trading OWNER trading;"
-sudo -u postgres psql trading -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+sudo -u postgres psql trading  -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+sudo -u postgres psql postgres -c "GRANT ALL PRIVILEGES ON DATABASE trading TO trading;"
 ```
 
 **Windows**
@@ -208,6 +211,7 @@ Vite proxies `/api` and `/ws` to the Fastify backend at `localhost:3000`.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `CREATE EXTENSION timescaledb` fails | TimescaleDB not installed, or not in `shared_preload_libraries` | Re-run `timescaledb-tune` and restart PostgreSQL |
+| `invalid integer value "IF" for connection option "port"` | Pasted a multi-line psql block containing `\c`; psql parsed the next line as `\c` arguments | Use `psql <dbname> -c "..."` one command at a time instead of pasting a block with `\c` inside |
 | `bun run migrate` hangs | PostgreSQL not running, or wrong `DATABASE_URL` | Check the service is up; verify the URL in `.env` |
 | `SIMULATE=true bun run sim` exits immediately | Redis not running, or wrong `REDIS_URL` | Check Redis; `redis-cli ping` should return `PONG` |
 | `rediss://` connection refused | Using Upstash TLS URL against a local Redis | Local Redis uses `redis://` (no `s`); Upstash uses `rediss://` |
