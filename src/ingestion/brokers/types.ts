@@ -7,98 +7,77 @@
  */
 
 /**
- * A single market data tick emitted by any broker adapter.
- *
- * optionType, strike, and expiry are optional because the same interface
- * covers both option ticks and index-spot / VIX ticks (which have no
- * option-specific fields). Callers must check isIndex and optionType
- * before accessing those fields.
+ * Canonical market tick emitted by any broker adapter.
+ * All numeric fields are in the broker's native units (INR for Indian markets).
  */
 export interface BrokerTick {
-  /** Wall-clock timestamp in epoch milliseconds. */
-  time: number;
-  /** Full Fyers-style symbol, e.g. 'NSE:NIFTY24O17023000CE'. */
-  symbol: string;
-  /** Underlying instrument name: 'NIFTY' | 'BANKNIFTY' | 'SENSEX'. */
-  underlying: string;
-  /** Last traded price. */
-  ltp: number;
-  /** Best bid price. */
-  bid: number;
-  /** Best ask price. */
-  ask: number;
-  /** Traded volume for the session. */
-  volume: number;
-  /** Open interest (contracts). */
-  oi: number;
-  /** 'CE' or 'PE'; undefined for index/VIX ticks. */
-  optionType?: "CE" | "PE";
-  /** Strike price in points; undefined for index/VIX ticks. */
-  strike?: number;
-  /**
-   * Expiry date in 'YYYY-MM-DD' format; undefined for index/VIX ticks.
-   * ISO format is used (not Fyers symbol notation) so comparisons are
-   * calendar-safe across month-code encoding quirks.
-   */
-  expiry?: string;
-  /** true for index spot ticks (NIFTY spot, VIX) — false for option ticks. */
-  isIndex: boolean;
+  symbol: string; // Fyers symbol format: 'NSE:NIFTY50-INDEX', 'NSE:NIFTY25JUN24500CE'
+  ltp: number; // Last traded price
+  timestamp: number; // Unix ms (epoch milliseconds)
+  volume?: number; // Total traded volume for the session (optional — not all feeds provide it)
+  oi?: number; // Open interest (options only)
+  bid?: number; // Best bid price
+  ask?: number; // Best ask price
 }
 
 /**
- * Common interface every broker adapter must implement.
- *
- * The overloaded on() signatures mirror the Node.js EventEmitter pattern
- * but are declared explicitly here so TypeScript enforces the exact event
- * names and payload types at each call site — rather than accepting
- * arbitrary strings with `any` handlers.
- *
- * Returning `this` from on() allows fluent chaining:
- *   feed.on('tick', handleTick).on('error', handleError)
+ * Implemented by every broker adapter (Fyers, AngelOne, simulator).
+ * The trading engine only knows about BrokerFeed — never about a specific broker class.
  */
 export interface BrokerFeed {
-  /** Open the WebSocket / streaming connection to the broker. */
+  /**
+   * Start the feed. Resolves when the connection is established and
+   * the feed is ready to emit ticks. Rejects on unrecoverable error.
+   */
   connect(): Promise<void>;
+
   /**
-   * Subscribe to market data for the given list of broker-format symbols
-   * (e.g. ['NSE:NIFTY24O17023000CE', 'NSE:NIFTY-INDEX']).
-   * May be called after connect() — or re-called to add symbols.
+   * Subscribe to tick updates for the given symbols.
+   * May be called after connect() or before — implementations buffer as needed.
+   * @param symbols Array of Fyers-format symbol strings
    */
-  subscribe(symbols: string[]): Promise<void>;
-  /** Gracefully close the connection. */
+  subscribe(symbols: string[]): void;
+
+  /**
+   * Register a callback invoked for every tick received.
+   * Multiple callbacks may be registered; all are called in registration order.
+   */
+  onTick(callback: (tick: BrokerTick) => void): void;
+
+  /**
+   * Register a callback invoked when the feed disconnects (intentional or error).
+   * Implementations should call this before attempting reconnect.
+   */
+  onDisconnect(callback: (reason: string) => void): void;
+
+  /**
+   * Gracefully stop the feed. Resolves when the underlying connection is closed.
+   */
   disconnect(): Promise<void>;
-  /** Register a handler for incoming tick data. */
-  on(event: "tick", handler: (tick: BrokerTick) => void): this;
-  /** Register a handler for feed-level errors. */
-  on(event: "error", handler: (err: Error) => void): this;
-  /**
-   * Register a handler for disconnection events.
-   * reason is a human-readable string; use DisconnectReason constants
-   * for programmatic branching.
-   */
-  on(event: "disconnect", handler: (reason: string) => void): this;
-  /** Register a handler for reconnection attempts (receives attempt count). */
-  on(event: "reconnecting", handler: (attempt: number) => void): this;
 }
+
+/**
+ * Symbol format helpers — Fyers uses a specific encoding for options.
+ * NSE weekly options: NSE:NIFTY{YY}{M}{DD}{STRIKE}{TYPE}
+ * where months Oct-Dec use single letters: O, N, D
+ * Examples:
+ *   NSE:NIFTY24J2524500CE  — NIFTY Jan 25 2024 24500 Call
+ *   NSE:NIFTY24O1024500PE  — NIFTY Oct 10 2024 24500 Put
+ */
+export const MONTH_CODES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'O', 'N', 'D'] as const;
+export type MonthCode = (typeof MONTH_CODES)[number];
+
+/** Underlying symbols for the three supported indices */
+export const UNDERLYING_SYMBOLS = {
+  NIFTY: 'NSE:NIFTY50-INDEX',
+  BANKNIFTY: 'NSE:NIFTYBANK-INDEX',
+  SENSEX: 'BSE:SENSEX-INDEX',
+} as const;
+
+export type Underlying = keyof typeof UNDERLYING_SYMBOLS;
 
 /**
  * Identifies which broker adapter is active.
- * Used by the factory / selection logic in src/index.ts.
+ * Used by the factory / selection logic.
  */
-export type BrokerName = "fyers" | "angelone" | "simulator";
-
-/**
- * Structured disconnect reason codes.
- *
- * String enum values (not numeric) are used so log output is self-describing
- * without a lookup table — important for fast debugging of silent
- * Fyers token-expiry disconnects.
- */
-export enum DisconnectReason {
-  /** Token expired or credentials rejected by the broker. */
-  AUTH_FAILURE = "AUTH_FAILURE",
-  /** Network blip or broker-side transient failure — reconnect is appropriate. */
-  TRANSIENT = "TRANSIENT",
-  /** disconnect() was called intentionally — do not reconnect. */
-  MANUAL = "MANUAL",
-}
+export type BrokerName = 'fyers' | 'angelone' | 'simulator';

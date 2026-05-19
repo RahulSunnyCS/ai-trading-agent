@@ -1,5 +1,5 @@
 /**
- * TypeScript interfaces for every database table in migration 001.
+ * TypeScript interfaces for every database table in the AI Trading Agent schema.
  *
  * IMPORTANT — NUMERIC columns are typed as `string`, not `number`.
  *
@@ -15,124 +15,208 @@
  * returns column names in lowercase by default, so the SQL column names use
  * snake_case and callers alias or map as needed when the column name differs
  * from camelCase.
+ *
+ * Additional interfaces from the payment/access-control system (migration 003+)
+ * are also declared here.
+ *
+ * No ORM imports. No default exports (project convention).
  */
 
 // ---------------------------------------------------------------------------
-// paper_trades
+// Hypertable interfaces
 // ---------------------------------------------------------------------------
 
-/**
- * One simulated straddle paper trade opened by a personality.
- *
- * Nullable columns (entry/exit legs, context data) use `string | null` rather
- * than optional `?` to make it explicit that these fields always come back from
- * the database — they are simply NULL-valued, not absent from the row object.
- *
- * status is narrowed to the literal union to match the CHECK constraint in the
- * migration rather than being typed as plain `string`.
- *
- * Milestone 2 columns (personalityId, parentTradeId, signalId):
- * These three columns were added in migration 004. All rows created before
- * Milestone 2 (i.e. all Sprint 1 paper trades) will have NULL for these fields.
- * NULL means "trade was created before the personality engine existed" — it is
- * not a data error. Callers must treat NULL as "pre-M2 trade" and not assume
- * a missing personality association is a bug.
- */
-export interface PaperTrade {
-  id: string;
-  entryTime: Date;
-  exitTime: Date | null;
-  entryCeStrike: string | null;
-  entryPeStrike: string | null;
-  entryCePrice: string | null;
-  entryPePrice: string | null;
-  exitCePrice: string | null;
-  exitPePrice: string | null;
-  lots: number;
-  lotSize: number;
-  straddleAtEntry: string;
-  lowestStraddleValueSeen: string;
-  vixAtEntry: string | null;
-  spotAtEntry: string | null;
-  exitReason: string | null;
-  grossPnl: string | null;
-  netPnl: string | null;
-  maxDrawdown: string | null;
-  status: "open" | "closed";
-  notes: string | null;
-  // Milestone 2 fields — NULL for all pre-M2 (Sprint 1) rows
-  personalityId: string | null;
-  parentTradeId: string | null; // non-null only for rolled legs (Adjuster)
-  signalId: string | null;      // null for Clockwork fixed-time entries and pre-M2 rows
+export interface MarketTick {
+  id: number;
+  symbol: string;
+  time: Date;
+  ltp: number;
+  volume: number | null;
+  oi: number | null;
+  bid: number | null;
+  ask: number | null;
+  source: string;
 }
 
-// ---------------------------------------------------------------------------
-// market_ticks
-// ---------------------------------------------------------------------------
-
-/**
- * One raw tick from the broker WebSocket or simulator.
- *
- * volume and oi are nullable because the Fyers WebSocket does not always
- * include them in every tick message.
- *
- * time is typed as Date because pg automatically parses TIMESTAMPTZ columns
- * to JS Date objects (unlike NUMERIC, there is no custom type parser needed).
- */
-export interface MarketTick {
+export interface StraddleSnapshot {
+  id: number;
   time: Date;
   symbol: string;
-  lastPrice: string;
-  volume: bigint | null;
-  oi: bigint | null;
+  expiry: Date;
+  strike: number;
+  call_ltp: number;
+  put_ltp: number;
+  straddle_value: number;
+  roc: number | null;
+  roc_acceleration: number | null;
+  vix: number | null;
 }
 
-// ---------------------------------------------------------------------------
-// straddle_snapshots
-// ---------------------------------------------------------------------------
-
-/**
- * One 15-second ATM straddle snapshot produced by straddle-calc.ts.
- *
- * vix is nullable: the VIX poller may not have a value at startup before the
- * NSE API responds.
- *
- * roc and acceleration were added in migration 003. They are nullable because
- * the first few snapshots do not have enough history to compute a meaningful
- * rate-of-change or second derivative value.
- */
-export interface StraddleSnapshot {
+export interface OptionTick {
+  id: number;
   time: Date;
-  underlying: string;
-  spot: string;
-  atmStrike: string;
-  cePrice: string;
-  pePrice: string;
-  straddleValue: string;
-  vix: string | null;
-  roc: string | null;          // rate-of-change of straddle value; null until history exists
-  acceleration: string | null; // second derivative of straddle value; null until history exists
+  symbol: string;
+  ltp: number;
+  volume: number | null;
+  oi: number | null;
+  delta: number | null;
+  iv: number | null;
 }
 
 // ---------------------------------------------------------------------------
-// personality_configs
+// Regular table interfaces
+// ---------------------------------------------------------------------------
+
+/** Valid values for StraddleSignal.signal_type */
+export type SignalType = 'MOMENTUM_EXHAUSTION' | 'SCHEDULED' | 'PULLBACK';
+
+/** Valid values for StraddleSignal.direction and trade direction fields */
+export type TradeDirection = 'LONG' | 'SHORT';
+
+/** Valid values for StraddleSignal.status */
+export type SignalStatus = 'pending' | 'consumed' | 'expired';
+
+export interface StraddleSignal {
+  id: string;
+  time: Date;
+  symbol: string;
+  signal_type: SignalType;
+  direction: TradeDirection | null;
+  probability: number | null;
+  peak_roc: number | null;
+  peak_acceleration: number | null;
+  vix_at_signal: number | null;
+  status: SignalStatus;
+  created_at: Date;
+}
+
+/** Valid values for PersonalityConfig.management_style */
+export type ManagementStyle = 'HOLD' | 'ADJUST' | 'REDUCE';
+
+export interface PersonalityConfig {
+  id: string;
+  name: string;
+  description: string | null;
+  phase: number;
+  is_frozen: boolean;
+  entry_type: string;
+  management_style: ManagementStyle;
+  min_probability: number;
+  sl_pct: number;
+  target_pct: number;
+  tsl_trigger_pct: number | null;
+  max_daily_loss_pct: number;
+  entry_window_start: string; // TIME column — pg returns "HH:MM:SS"
+  entry_window_end: string;
+  exit_time: string;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** Valid values for exit_reason and market_regime across paper_trades / retrospection */
+export type ExitReason = 'SL' | 'TSL' | 'TARGET' | 'EOD' | 'TIME' | 'DAILY_LOSS_CAP' | 'MANUAL';
+
+export type MarketRegime = 'RANGING' | 'TRENDING_STRONG' | 'VOLATILE_REVERTING' | 'EVENT_DAY';
+
+/** Valid values for PaperTrade.status */
+export type TradeStatus = 'open' | 'closed';
+
+export interface PaperTrade {
+  id: string;
+  personality_id: string;
+  signal_id: string | null;
+  symbol: string;
+  expiry: Date;
+  strike: number;
+  entry_type: string;
+  entry_time: Date;
+  entry_straddle_value: number;
+  exit_time: Date | null;
+  exit_straddle_value: number | null;
+  exit_reason: ExitReason | null;
+  pnl_pct: number | null;
+  pnl_abs: number | null;
+  status: TradeStatus;
+  market_regime: MarketRegime | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Public interface for paper trade records as consumed by the trading engine.
+ *
+ * Column name mapping from the DB schema:
+ *   symbol              → underlying
+ *   expiry              → expiryDate (ISO 'YYYY-MM-DD' string)
+ *   strike              → atmStrike
+ *   entry_time          → entryTimestamp
+ *   pnl_abs             → pnl
+ *
+ * The DB schema uses short column names for query efficiency; this interface
+ * uses descriptive names for readability in business logic.
+ */
+export interface PaperTradeRecord {
+  id: string;
+  underlying: string;
+  /** ISO date string 'YYYY-MM-DD'. */
+  expiryDate: string;
+  atmStrike: number;
+  entryStraddleValue: number;
+  exitStraddleValue: number | null;
+  entryTimestamp: Date;
+  exitTimestamp: Date | null;
+  exitReason: string | null;
+  /** Short-straddle absolute P&L: entryStraddleValue - exitStraddleValue. Null until closed. */
+  pnl: number | null;
+  status: 'open' | 'closed';
+  entryType: string;
+  personalityId: string | null;
+}
+
+export interface RetrospectionResult {
+  id: string;
+  personality_id: string;
+  trade_date: Date;
+  market_regime: MarketRegime;
+  total_trades: number;
+  winning_trades: number;
+  total_pnl_pct: number | null;
+  beat_clockwork_delta: number | null;
+  signal_brier_score: number | null;
+  management_effectiveness: number | null;
+  proposed_adjustments: unknown | null; // JSONB — shape varies by rule type
+  adjustments_applied: boolean;
+  created_at: Date;
+}
+
+// ---------------------------------------------------------------------------
+// Continuous aggregate interface
+// ---------------------------------------------------------------------------
+
+/** One row of the straddle_1min continuous aggregate view. */
+export interface Straddle1Min {
+  bucket: Date; // time_bucket('1 minute', time)
+  symbol: string;
+  expiry: Date;
+  strike: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  avg_roc: number | null; // nullable because roc itself is nullable
+  avg_vix: number | null; // nullable because vix is not always available
+}
+
+// ---------------------------------------------------------------------------
+// M2 legacy interfaces (camelCase, used by position-monitor and other M2 code)
 // ---------------------------------------------------------------------------
 
 /**
- * One trading personality and its full configuration.
- *
- * params is typed as Record<string, unknown> rather than a narrow interface
- * because each personality has a different params schema (e.g. Adjuster has
- * roll_trigger_points, Precision has entry_delay_secs). Callers that need
- * strongly-typed params should cast after a personality-name guard.
- *
- * is_frozen marks the Clockwork benchmark: the evolution engine must throw
- * FROZEN_VIOLATION (never silently skip) if asked to modify a frozen personality.
- *
- * phase gates personalities behind major feature milestones. A personality with
- * phase = 2 must not be activated until the Phase 2 engine is deployed.
+ * One trading personality — camelCase version used by M2 trading engine code.
+ * Maps to the same personality_configs table as PersonalityConfig above.
  */
-export interface PersonalityConfig {
+export interface PersonalityConfigM2 {
   id: string;
   name: string;
   displayName: string;
@@ -147,19 +231,8 @@ export interface PersonalityConfig {
   updatedAt: Date;
 }
 
-// ---------------------------------------------------------------------------
-// personality_audit_log
-// ---------------------------------------------------------------------------
-
 /**
  * One immutable audit record capturing a parameter change on a personality.
- *
- * Both oldParams and newParams are stored as full JSONB blobs so any change can
- * be reviewed or rolled back without querying external systems. reason is nullable
- * because automated evolution-engine changes may not carry a human-readable reason.
- *
- * changedBy defaults to 'api' for REST-triggered changes and should be set to
- * 'evolution_engine' for automated retrospection-driven changes.
  */
 export interface PersonalityAuditLog {
   id: string;
@@ -171,32 +244,10 @@ export interface PersonalityAuditLog {
   reason: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// straddle_signals
-// ---------------------------------------------------------------------------
-
 /**
- * One signal event produced by the peak detection engine.
- *
- * adjustedProbability is the final score after VIX and time-of-day context
- * adjustments have been applied. rawExhaustionScore is the pre-adjustment value.
- * Both are NUMERIC in the DB and therefore typed as string here (see file header).
- *
- * confidenceTier is a pre-computed categorical bucket derived from
- * adjustedProbability so the personality filter stages can use simple equality
- * checks rather than numeric threshold comparisons.
- *
- * Algorithm-specific columns (expansionPct, rocDeclineCandles, accelerationValue)
- * are nullable: SCHEDULED signals are not produced by the peak detection algorithm
- * and will have NULL for all of these.
- *
- * adjustmentBreakdown is a free-text explanation of how the VIX and time-of-day
- * multipliers shifted the raw score, stored for retrospection analysis.
- *
- * This table is a TimescaleDB hypertable — all queries must include a time-range
- * filter (WHERE time > ...) to avoid full hypertable scans.
+ * One signal event produced by the peak detection engine (M2 camelCase version).
  */
-export interface StraddleSignal {
+export interface StraddleSignalM2 {
   id: string;
   time: Date;
   underlying: string;
@@ -205,33 +256,18 @@ export interface StraddleSignal {
   spot: string;
   straddleValue: string;
   vix: string | null;
-  rawExhaustionScore: string | null;  // null for SCHEDULED signals
+  rawExhaustionScore: string | null;
   adjustedProbability: string;
   confidenceTier: "HIGH" | "MEDIUM" | "LOW";
-  expansionPct: string | null;        // null for SCHEDULED signals
-  rocDeclineCandles: number | null;   // INTEGER column, not NUMERIC — stays as number
-  accelerationValue: string | null;   // null for SCHEDULED signals
+  expansionPct: string | null;
+  rocDeclineCandles: number | null;
+  accelerationValue: string | null;
   adjustmentBreakdown: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// OpenPosition (runtime shape — not a DB table)
-// ---------------------------------------------------------------------------
-
 /**
- * The in-memory shape consumed by the trigger engine (T-16) to evaluate
+ * The in-memory shape consumed by the trigger engine to evaluate
  * whether an open position should be closed, rolled, or held.
- *
- * This is derived from `paper_trades` rows where status = 'open'. It carries
- * only the fields the trigger engine needs — the full `PaperTrade` row is not
- * required at decision time.
- *
- * entryTimeMs is epoch milliseconds (Date.getTime()) rather than a Date object
- * because the trigger engine compares it to Date.now() for time-in-trade
- * calculations, and arithmetic on numbers is simpler than Date subtraction.
- *
- * todayNetPnl is a running P&L string computed by the trigger engine from the
- * current straddle value versus straddleAtEntry, not stored directly in the DB.
  */
 export interface OpenPosition {
   id: string;
@@ -239,4 +275,36 @@ export interface OpenPosition {
   lowestStraddleValueSeen: string;
   entryTimeMs: number;
   todayNetPnl: string;
+}
+
+// ---------------------------------------------------------------------------
+// Payment / access-control interfaces (migration 003+)
+// ---------------------------------------------------------------------------
+
+export type GrantType = 'monthly_pass' | 'credits_pack';
+export type GrantStatus = 'pending' | 'paid' | 'active' | 'expired';
+
+export interface AccessGrant {
+  id: string;
+  razorpay_order_id: string;
+  razorpay_payment_id: string | null;
+  grant_type: GrantType;
+  days_granted: number;
+  expires_at: Date | null;
+  status: GrantStatus;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CreditTransaction {
+  id: string;
+  razorpay_order_id: string;
+  credits_delta: number;
+  feature: string | null;
+  created_at: Date;
+}
+
+export interface ProcessedWebhookEvent {
+  razorpay_event_id: string;
+  processed_at: Date;
 }

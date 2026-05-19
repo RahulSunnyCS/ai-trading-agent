@@ -1,347 +1,389 @@
 /**
- * Unit tests for StraddleCalculator (src/ingestion/straddle-calc.ts).
+ * Unit tests for straddle-calc.ts
  *
- * All external dependencies (Redis, PostgreSQL, broker feed) are mocked.
- * Time is controlled via VirtualClock so snapshots are triggered
- * deterministically without real timers.
+ * Tests cover:
+ *   1. ATM strike rounding for NIFTY (50pt intervals) and BANKNIFTY (100pt intervals)
+ *   2. ROC = 0 when fewer than 2 snapshots in buffer
+ *   3. ROC calculation correctness
+ *   4. Acceleration = 0 when fewer than 3 snapshots
+ *   5. Acceleration = current ROC minus previous ROC
+ *   6. Snapshot skipped (no xadd) when CE or PE price is missing
+ *   7. Published snapshot has correct straddleValue = cePrice + pePrice
+ *
+ * Redis is fully mocked — no live Redis connection is required.
+ * Timers are faked via vitest so snapshot intervals can be driven deterministically.
  */
 
-import type { Redis } from "ioredis";
-import type { Pool } from "pg";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { VirtualClock } from "../../utils/clock.js";
-import type { BrokerFeed, BrokerTick } from "../brokers/types.js";
-import { StraddleCalculator } from "../straddle-calc.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { FixedClock } from '../../utils/clock';
+import { getAtmStrike } from '../brokers/instrument-registry';
+import { computeAcceleration, computeRoc, createStraddleCalculator } from '../straddle-calc';
+import type { StraddleSnapshot } from '../straddle-calc';
 
 // ---------------------------------------------------------------------------
-// Mocks
+// 1. ATM Strike rounding (pure function — no mocking needed)
 // ---------------------------------------------------------------------------
 
-// Mock the STREAM_STRADDLE import used internally by StraddleCalculator.
-// The value itself is not under test; we only care about xadd call arguments.
-vi.mock("../../redis/client.js", () => ({
-  STREAM_STRADDLE: "straddle.values",
-  streamPublish: vi.fn(),
-}));
+describe('getAtmStrike', () => {
+  it('rounds NIFTY prices to the nearest 50-point interval', () => {
+    // Midpoint rounds up (Math.round semantics)
+    expect(getAtmStrike('NIFTY', 22437)).toBe(22450);
+    // Below midpoint rounds down
+    expect(getAtmStrike('NIFTY', 22424)).toBe(22400);
+    // Exact strike is unchanged
+    expect(getAtmStrike('NIFTY', 22400)).toBe(22400);
+    // At midpoint (22425) rounds up to 22450 per Math.round
+    expect(getAtmStrike('NIFTY', 22425)).toBe(22450);
+  });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeMockRedis(): { redis: Redis; xadd: ReturnType<typeof vi.fn> } {
-  const xadd = vi.fn().mockResolvedValue("1-0");
-  const redis = { xadd } as unknown as Redis;
-  return { redis, xadd };
-}
-
-function makeMockDb(): { db: Pool; query: ReturnType<typeof vi.fn> } {
-  const query = vi.fn().mockResolvedValue({ rows: [], rowCount: 0 });
-  const db = { query } as unknown as Pool;
-  return { db, query };
-}
-
-function makeMockBroker(): { broker: BrokerFeed; fireTick: (tick: BrokerTick) => void } {
-  let tickHandler: ((tick: BrokerTick) => void) | undefined;
-
-  const broker = {
-    connect: vi.fn().mockResolvedValue(undefined),
-    subscribe: vi.fn().mockResolvedValue(undefined),
-    disconnect: vi.fn().mockResolvedValue(undefined),
-    on: vi.fn((event: string, handler: unknown) => {
-      if (event === "tick") {
-        tickHandler = handler as (tick: BrokerTick) => void;
-      }
-      return broker;
-    }),
-  } as unknown as BrokerFeed;
-
-  const fireTick = (tick: BrokerTick) => {
-    if (tickHandler) {
-      tickHandler(tick);
-    }
-  };
-
-  return { broker, fireTick };
-}
-
-function makeNiftyTick(ltp: number): BrokerTick {
-  return {
-    time: Date.now(),
-    symbol: "NSE:NIFTY-INDEX",
-    underlying: "NIFTY",
-    ltp,
-    bid: ltp - 1,
-    ask: ltp + 1,
-    volume: 0,
-    oi: 0,
-    isIndex: true,
-  };
-}
-
-function makeVixTick(ltp: number): BrokerTick {
-  return {
-    time: Date.now(),
-    symbol: "NSE:INDIAVIX-INDEX",
-    underlying: "INDIAVIX",
-    ltp,
-    bid: ltp - 0.1,
-    ask: ltp + 0.1,
-    volume: 0,
-    oi: 0,
-    isIndex: true,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe("StraddleCalculator — no publish before first tick", () => {
-  it("does not call xadd when no tick has arrived yet, even after the interval elapses", async () => {
-    const { redis, xadd } = makeMockRedis();
-    const { db } = makeMockDb();
-    const clock = new VirtualClock(0);
-    const { broker } = makeMockBroker();
-
-    const calc = new StraddleCalculator({ db, redis, clock });
-
-    // Use a 1000ms interval so that advancing by 15_000 definitely crosses it.
-    process.env.STRADDLE_INTERVAL_MS = "1000";
-    calc.start(broker);
-
-    // Advance clock by 15 seconds — crosses the 1-second interval 15 times.
-    // No NIFTY tick has arrived, so _lastSpot is null and no publish should occur.
-    clock.advance(15_000);
-
-    // Allow any microtasks/promises to flush
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(xadd).not.toHaveBeenCalled();
-
-    calc.stop();
-    Reflect.deleteProperty(process.env, "STRADDLE_INTERVAL_MS");
+  it('rounds BANKNIFTY prices to the nearest 100-point interval', () => {
+    // Midpoint rounds up
+    expect(getAtmStrike('BANKNIFTY', 47351)).toBe(47400);
+    // Below midpoint rounds down
+    expect(getAtmStrike('BANKNIFTY', 47349)).toBe(47300);
+    // Exact strike is unchanged
+    expect(getAtmStrike('BANKNIFTY', 47400)).toBe(47400);
+    // At midpoint (47350) rounds up to 47400 per Math.round
+    expect(getAtmStrike('BANKNIFTY', 47350)).toBe(47400);
   });
 });
 
-describe("StraddleCalculator — publishes after NIFTY tick arrives", () => {
+// ---------------------------------------------------------------------------
+// 2 & 3. ROC computation (pure function)
+// ---------------------------------------------------------------------------
+
+describe('computeRoc', () => {
+  it('returns 0 when the buffer is empty', () => {
+    expect(computeRoc([])).toBe(0);
+  });
+
+  it('returns 0 when the buffer has only 1 entry (need at least 2)', () => {
+    expect(computeRoc([100])).toBe(0);
+  });
+
+  it('computes ROC correctly: (current - prev) / prev * 100', () => {
+    // From 100 to 110: (110 - 100) / 100 * 100 = 10%
+    expect(computeRoc([100, 110])).toBeCloseTo(10, 8);
+    // From 200 to 190: (190 - 200) / 200 * 100 = -5%
+    expect(computeRoc([200, 190])).toBeCloseTo(-5, 8);
+    // Only the last two entries matter even if buffer is longer
+    expect(computeRoc([50, 60, 100, 110])).toBeCloseTo(10, 8);
+  });
+
+  it('returns 0 when the previous value is 0 (avoids divide-by-zero)', () => {
+    expect(computeRoc([0, 100])).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4 & 5. Acceleration computation (pure function)
+// ---------------------------------------------------------------------------
+
+describe('computeAcceleration', () => {
+  it('returns 0 when the buffer has fewer than 3 entries', () => {
+    expect(computeAcceleration([])).toBe(0);
+    expect(computeAcceleration([100])).toBe(0);
+    expect(computeAcceleration([100, 110])).toBe(0);
+  });
+
+  it('computes acceleration as roc_current - roc_prev', () => {
+    // buffer = [a, b, c]
+    // roc_prev = (b - a) / a * 100
+    // roc_curr = (c - b) / b * 100
+    // acceleration = roc_curr - roc_prev
+    const a = 100;
+    const b = 110;
+    const c = 121;
+    const rocPrev = ((b - a) / a) * 100; // 10%
+    const rocCurr = ((c - b) / b) * 100; // 10%
+    const expected = rocCurr - rocPrev; // 0% (constant growth rate)
+    expect(computeAcceleration([a, b, c])).toBeCloseTo(expected, 8);
+  });
+
+  it('returns positive acceleration when growth rate is increasing', () => {
+    // a=100, b=105 (5% ROC), c=115.5 (10% ROC) → acceleration = +5
+    const a = 100;
+    const b = 105;
+    const c = 115.5;
+    const rocPrev = ((b - a) / a) * 100; // 5%
+    const rocCurr = ((c - b) / b) * 100; // ~10%
+    const expected = rocCurr - rocPrev;
+    expect(computeAcceleration([a, b, c])).toBeCloseTo(expected, 6);
+  });
+
+  it('uses only the last 3 entries from a longer buffer', () => {
+    // The first entry (50) should be ignored; only [100, 110, 121] matter
+    const a = 100;
+    const b = 110;
+    const c = 121;
+    const rocPrev = ((b - a) / a) * 100;
+    const rocCurr = ((c - b) / b) * 100;
+    const expected = rocCurr - rocPrev;
+    expect(computeAcceleration([50, a, b, c])).toBeCloseTo(expected, 8);
+  });
+
+  it('returns 0 when a (3rd-from-last) entry is 0 (divide-by-zero guard)', () => {
+    expect(computeAcceleration([0, 100, 110])).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helper: build a minimal fake Redis that records xadd calls
+// ---------------------------------------------------------------------------
+
+/**
+ * Shapes the XREAD return value the way ioredis actually returns it:
+ *   [ [ 'streamName', [ [ 'id', ['field', 'value', ...] ] ] ] ]
+ *
+ * Returns null (no new messages) when entries is empty.
+ *
+ * ioredis XREAD return type:
+ *   Array<[key: string, items: Array<[id: string, fields: string[]]>]>
+ * So the outer array has one element per requested stream, and each element
+ * is a 2-tuple of [streamName, messages].
+ */
+function makeXreadResult(
+  streamName: string,
+  entries: Array<{ id: string; data: string }>,
+): [string, [string, string[]][]][] | null {
+  if (entries.length === 0) return null;
+  const msgs: [string, string[]][] = entries.map(({ id, data }) => [id, ['data', data]]);
+  // One stream entry: [ [streamName, messages] ]
+  return [[streamName, msgs]];
+}
+
+/** Minimal Redis fake — only the methods touched by straddle-calc are implemented. */
+interface FakeRedis {
+  xread: ReturnType<typeof vi.fn>;
+  xadd: ReturnType<typeof vi.fn>;
+}
+
+function makeFakeRedis(): FakeRedis {
+  return {
+    // Default: return null (no new messages). Tests override this per-call.
+    xread: vi.fn().mockResolvedValue(null),
+    // Default: succeed silently.
+    xadd: vi.fn().mockResolvedValue('ok'),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 6. Snapshot skipped when CE or PE price is missing
+// ---------------------------------------------------------------------------
+
+describe('createStraddleCalculator — snapshot skipping', () => {
   beforeEach(() => {
-    process.env.STRADDLE_INTERVAL_MS = "1000";
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(process.env, "STRADDLE_INTERVAL_MS");
+    vi.useRealTimers();
   });
 
-  it("calls xadd once after a NIFTY tick is fired and the interval elapses", async () => {
-    const { redis, xadd } = makeMockRedis();
-    const { db } = makeMockDb();
-    const clock = new VirtualClock(0);
-    const { broker, fireTick } = makeMockBroker();
+  it('does not call xadd when only the underlying price is known (CE and PE missing)', async () => {
+    const redis = makeFakeRedis();
 
-    const calc = new StraddleCalculator({ db, redis, clock });
-    calc.start(broker);
+    // A Thursday in IST (2024-01-25 is a Thursday). We pick noon IST (06:30 UTC).
+    // This avoids the 15:30 cut-off so getCurrentExpiry returns this Thursday.
+    const fixedDate = new Date('2024-01-25T06:30:00Z');
+    const clock = new FixedClock(fixedDate);
 
-    // Fire a NIFTY spot tick
-    fireTick(makeNiftyTick(22000));
-
-    // Advance past the snapshot interval
-    clock.advance(1500);
-
-    // Allow async chains to settle
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(xadd).toHaveBeenCalledOnce();
-
-    calc.stop();
-  });
-
-  it("published fields include straddleValue, atmStrike, spot, and underlying", async () => {
-    const { redis, xadd } = makeMockRedis();
-    const { db } = makeMockDb();
-    const clock = new VirtualClock(0);
-    const { broker, fireTick } = makeMockBroker();
-
-    const calc = new StraddleCalculator({ db, redis, clock });
-    calc.start(broker);
-
-    fireTick(makeNiftyTick(22000));
-    clock.advance(1500);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(xadd).toHaveBeenCalledOnce();
-
-    // xadd is called with: (STREAM, "MAXLEN", "~", "10000", "*", ...flatFields)
-    const callArgs = xadd.mock.calls[0] as unknown[];
-    // flatFields start at index 5 and are [k, v, k, v, ...]
-    const flatFields = callArgs.slice(5) as string[];
-
-    const fields: Record<string, string> = {};
-    for (let i = 0; i < flatFields.length - 1; i += 2) {
-      fields[flatFields[i] as string] = flatFields[i + 1] as string;
-    }
-
-    expect(fields).toHaveProperty("straddleValue");
-    expect(fields).toHaveProperty("atmStrike");
-    expect(fields).toHaveProperty("spot", "22000");
-    expect(fields).toHaveProperty("underlying", "NIFTY");
-
-    calc.stop();
-  });
-
-  it("atmStrike is the nearest 50-point multiple of the NIFTY spot", async () => {
-    const { redis, xadd } = makeMockRedis();
-    const { db } = makeMockDb();
-    const clock = new VirtualClock(0);
-    const { broker, fireTick } = makeMockBroker();
-
-    const calc = new StraddleCalculator({ db, redis, clock });
-    calc.start(broker);
-
-    // spot=22137 → ATM = 22150 (nearest 50)
-    fireTick(makeNiftyTick(22137));
-    clock.advance(1500);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    const flatFields = (xadd.mock.calls[0] as unknown[]).slice(5) as string[];
-    const fields: Record<string, string> = {};
-    for (let i = 0; i < flatFields.length - 1; i += 2) {
-      fields[flatFields[i] as string] = flatFields[i + 1] as string;
-    }
-
-    expect(fields.atmStrike).toBe("22150");
-
-    calc.stop();
-  });
-
-  it("VIX tick updates the vix field in the published payload", async () => {
-    const { redis, xadd } = makeMockRedis();
-    const { db } = makeMockDb();
-    const clock = new VirtualClock(0);
-    const { broker, fireTick } = makeMockBroker();
-
-    const calc = new StraddleCalculator({ db, redis, clock });
-    calc.start(broker);
-
-    // Fire VIX tick first, then NIFTY spot tick
-    fireTick(makeVixTick(14.5));
-    fireTick(makeNiftyTick(22000));
-
-    clock.advance(1500);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    const flatFields = (xadd.mock.calls[0] as unknown[]).slice(5) as string[];
-    const fields: Record<string, string> = {};
-    for (let i = 0; i < flatFields.length - 1; i += 2) {
-      fields[flatFields[i] as string] = flatFields[i + 1] as string;
-    }
-
-    expect(fields.vix).toBe("14.5");
-
-    calc.stop();
-  });
-
-  it("without a VIX tick, the vix field is published as the string 'null'", async () => {
-    const { redis, xadd } = makeMockRedis();
-    const { db } = makeMockDb();
-    const clock = new VirtualClock(0);
-    const { broker, fireTick } = makeMockBroker();
-
-    const calc = new StraddleCalculator({ db, redis, clock });
-    calc.start(broker);
-
-    fireTick(makeNiftyTick(22000));
-    clock.advance(1500);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    const flatFields = (xadd.mock.calls[0] as unknown[]).slice(5) as string[];
-    const fields: Record<string, string> = {};
-    for (let i = 0; i < flatFields.length - 1; i += 2) {
-      fields[flatFields[i] as string] = flatFields[i + 1] as string;
-    }
-
-    expect(fields.vix).toBe("null");
-
-    calc.stop();
-  });
-});
-
-describe("StraddleCalculator — stop() prevents further publishes", () => {
-  it("does not call xadd after stop() even when the interval elapses again", async () => {
-    process.env.STRADDLE_INTERVAL_MS = "1000";
-
-    const { redis, xadd } = makeMockRedis();
-    const { db } = makeMockDb();
-    const clock = new VirtualClock(0);
-    const { broker, fireTick } = makeMockBroker();
-
-    const calc = new StraddleCalculator({ db, redis, clock });
-    calc.start(broker);
-
-    // Fire a tick so _lastSpot is set
-    fireTick(makeNiftyTick(22000));
-
-    // Advance to trigger one snapshot
-    clock.advance(1500);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    // Should have published once
-    expect(xadd).toHaveBeenCalledOnce();
-
-    // Stop the calculator, then advance the clock further
-    calc.stop();
-    xadd.mockClear();
-
-    clock.advance(3000);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    // No further publishes should occur after stop()
-    expect(xadd).not.toHaveBeenCalled();
-
-    Reflect.deleteProperty(process.env, "STRADDLE_INTERVAL_MS");
-  });
-});
-
-describe("StraddleCalculator — non-NIFTY index ticks are ignored", () => {
-  it("BANKNIFTY tick does not set the spot and no snapshot is published", async () => {
-    process.env.STRADDLE_INTERVAL_MS = "1000";
-
-    const { redis, xadd } = makeMockRedis();
-    const { db } = makeMockDb();
-    const clock = new VirtualClock(0);
-    const { broker, fireTick } = makeMockBroker();
-
-    const calc = new StraddleCalculator({ db, redis, clock });
-    calc.start(broker);
-
-    // Fire a BANKNIFTY tick (should be ignored, only NIFTY drives snapshots)
-    fireTick({
-      time: Date.now(),
-      symbol: "NSE:BANKNIFTY-INDEX",
-      underlying: "BANKNIFTY",
-      ltp: 49000,
-      bid: 48999,
-      ask: 49001,
-      volume: 0,
-      oi: 0,
-      isIndex: true,
+    // Provide only the underlying NIFTY index price — no CE or PE ticks.
+    // NIFTY spot at 22400 → ATM = 22400 (exact multiple of 50)
+    const underlyingTick = JSON.stringify({
+      symbol: 'NSE:NIFTY50-INDEX',
+      ltp: 22400,
+      timestamp: fixedDate.getTime(),
     });
 
-    clock.advance(1500);
-    await Promise.resolve();
-    await Promise.resolve();
+    // First XREAD call returns the underlying tick; subsequent calls return null.
+    redis.xread
+      .mockResolvedValueOnce(makeXreadResult('market.ticks', [{ id: '1-1', data: underlyingTick }]))
+      .mockResolvedValue(null);
 
-    // No NIFTY tick has arrived — no publish
-    expect(xadd).not.toHaveBeenCalled();
+    // Cast to Redis — the fake implements every method we actually call.
+    const calculator = createStraddleCalculator(redis as unknown as import('ioredis').Redis, {
+      underlying: 'NIFTY',
+      snapshotIntervalMs: 15_000,
+      clock,
+    });
 
-    calc.stop();
-    Reflect.deleteProperty(process.env, "STRADDLE_INTERVAL_MS");
+    await calculator.start();
+
+    // Let the poll loop process the tick (it runs async, one microtask turn).
+    // Flush microtasks so the async poll loop can process the XREAD result.
+    // We yield several times because each await in the loop is one turn.
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+
+    // Advance fake clock by one interval to fire the setInterval callback.
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    // The snapshot should have been skipped because CE/PE prices are missing.
+    expect(redis.xadd).not.toHaveBeenCalled();
+
+    await calculator.stop();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Published snapshot has correct straddleValue = cePrice + pePrice
+// ---------------------------------------------------------------------------
+
+describe('createStraddleCalculator — snapshot publication', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('publishes a snapshot with straddleValue = cePrice + pePrice when all prices are known', async () => {
+    const redis = makeFakeRedis();
+
+    // Thursday noon IST — expiry is same-day Thursday (before 15:30 cut-off).
+    const fixedDate = new Date('2024-01-25T06:30:00Z');
+    const clock = new FixedClock(fixedDate);
+
+    // NIFTY spot = 22400 → ATM = 22400
+    // Expiry 2024-01-25 → Fyers code: yy=24, month=1, dd=25 → '24125'
+    // CE symbol: NSE:NIFTY2412522400CE
+    // PE symbol: NSE:NIFTY2412522400PE
+    const cePrice = 150;
+    const pePrice = 145;
+
+    const ticks = [
+      {
+        id: '1-1',
+        data: JSON.stringify({
+          symbol: 'NSE:NIFTY50-INDEX',
+          ltp: 22400,
+          timestamp: fixedDate.getTime(),
+        }),
+      },
+      {
+        id: '1-2',
+        data: JSON.stringify({
+          symbol: 'NSE:NIFTY2412522400CE',
+          ltp: cePrice,
+          timestamp: fixedDate.getTime(),
+        }),
+      },
+      {
+        id: '1-3',
+        data: JSON.stringify({
+          symbol: 'NSE:NIFTY2412522400PE',
+          ltp: pePrice,
+          timestamp: fixedDate.getTime(),
+        }),
+      },
+    ];
+
+    // First XREAD returns all three ticks; subsequent calls return null.
+    redis.xread
+      .mockResolvedValueOnce(makeXreadResult('market.ticks', ticks))
+      .mockResolvedValue(null);
+
+    const calculator = createStraddleCalculator(redis as unknown as import('ioredis').Redis, {
+      underlying: 'NIFTY',
+      snapshotIntervalMs: 15_000,
+      clock,
+    });
+
+    await calculator.start();
+
+    // Process tick data and drive snapshot timer.
+    // Flush microtasks so the async poll loop can process the XREAD result.
+    // We yield several times because each await in the loop is one turn.
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    // xadd must have been called exactly once.
+    expect(redis.xadd).toHaveBeenCalledTimes(1);
+
+    // Extract and parse the published snapshot.
+    const xaddArgs: unknown[] = redis.xadd.mock.calls[0] as unknown[];
+    // xadd('straddle.values', '*', 'data', <json>)
+    expect(xaddArgs[0]).toBe('straddle.values');
+    expect(xaddArgs[1]).toBe('*');
+    expect(xaddArgs[2]).toBe('data');
+
+    const snapshot = JSON.parse(xaddArgs[3] as string) as StraddleSnapshot;
+
+    expect(snapshot.straddleValue).toBe(cePrice + pePrice);
+    expect(snapshot.cePrice).toBe(cePrice);
+    expect(snapshot.pePrice).toBe(pePrice);
+    expect(snapshot.underlying).toBe('NIFTY');
+    expect(snapshot.atmStrike).toBe(22400);
+    expect(snapshot.snapshotCount).toBe(1);
+    // First snapshot — buffer has only 1 entry, so ROC and acceleration are 0.
+    expect(snapshot.roc).toBe(0);
+    expect(snapshot.acceleration).toBe(0);
+
+    await calculator.stop();
+  });
+
+  it('sets getLatestSnapshot() after a successful snapshot', async () => {
+    const redis = makeFakeRedis();
+
+    const fixedDate = new Date('2024-01-25T06:30:00Z');
+    const clock = new FixedClock(fixedDate);
+
+    const ticks = [
+      {
+        id: '2-1',
+        data: JSON.stringify({
+          symbol: 'NSE:NIFTY50-INDEX',
+          ltp: 22400,
+          timestamp: fixedDate.getTime(),
+        }),
+      },
+      {
+        id: '2-2',
+        data: JSON.stringify({
+          symbol: 'NSE:NIFTY2412522400CE',
+          ltp: 200,
+          timestamp: fixedDate.getTime(),
+        }),
+      },
+      {
+        id: '2-3',
+        data: JSON.stringify({
+          symbol: 'NSE:NIFTY2412522400PE',
+          ltp: 180,
+          timestamp: fixedDate.getTime(),
+        }),
+      },
+    ];
+
+    redis.xread
+      .mockResolvedValueOnce(makeXreadResult('market.ticks', ticks))
+      .mockResolvedValue(null);
+
+    const calculator = createStraddleCalculator(redis as unknown as import('ioredis').Redis, {
+      underlying: 'NIFTY',
+      snapshotIntervalMs: 15_000,
+      clock,
+    });
+
+    await calculator.start();
+    // Flush microtasks so the async poll loop can process the XREAD result.
+    // We yield several times because each await in the loop is one turn.
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    const latest = calculator.getLatestSnapshot();
+    expect(latest).not.toBeNull();
+    expect(latest?.straddleValue).toBe(380); // 200 + 180
+    expect(latest?.snapshotCount).toBe(1);
+
+    await calculator.stop();
   });
 });

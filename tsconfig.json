@@ -2,25 +2,29 @@
   "compilerOptions": {
     // Target modern JS — Bun supports ES2022 natively
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM"],
     "module": "ESNext",
     // bundler resolution works with Bun's module system (no .js extension required)
     "moduleResolution": "bundler",
     // Strict mode: required by project conventions
     "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
     // No emit — Bun runs TypeScript natively; tsc is type-check only
     "noEmit": true,
     // Additional strict checks beyond the strict flag
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true,
+    // JSX support for React frontend (payment pages, dashboard)
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
     // Path alias: import from "@/..." resolves to "src/..."
-    // This lets us write `import { query } from "@/db/client"` throughout the codebase
     "paths": {
       "@/*": ["./src/*"]
     },
     // Allow Bun's non-standard globals (Bun, $, etc.)
-    "types": ["bun-types"],
+    "types": ["bun-types", "node"],
     "skipLibCheck": true,
     "resolveJsonModule": true,
     // Source maps for readable stack traces in Bun

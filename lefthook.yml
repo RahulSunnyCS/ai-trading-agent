@@ -5,6 +5,12 @@ pre-commit:
       glob: "*.{ts,tsx}"
       run: "[ -f ./tools/biome ] && ./tools/biome check --no-errors-on-unmatched {staged_files} || true"
 
+    typecheck:
+      run: bun run --bun tsc --noEmit
+
+    lint:
+      run: "[ -f ./tools/biome ] && ./tools/biome check . || true"
+
     env-guard:
       # Refuse to commit any .env file (except .env.example) to prevent
       # accidental credential exposure. Runs against all staged files.

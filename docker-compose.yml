@@ -1,6 +1,11 @@
 # Docker Compose — development infrastructure for ai-trading-agent
 # Provides TimescaleDB (PostgreSQL 16) and Redis 7 with healthchecks.
 #
+# timescale/timescaledb:latest-pg16 is used instead of plain postgres:16-alpine because
+# the TimescaleDB extension (required for hypertables and continuous aggregates) is NOT
+# bundled in the official PostgreSQL image. The migration runner will fail with
+# "extension timescaledb does not exist" if a vanilla postgres image is used here.
+#
 # Usage:
 #   docker compose up -d          # start in background
 #   docker compose ps             # verify both services show (healthy)
@@ -24,6 +29,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -31,11 +37,15 @@ services:
       - "6379:6379"
     volumes:
       - trading_redis_data:/data
+    # AOF persistence ensures Redis data survives container restarts.
+    # BullMQ relies on Redis Streams (Redis 7+); redis:7-alpine satisfies that requirement.
+    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
 # Named volumes ensure data persists across container restarts.
 # Use `docker compose down -v` to destroy them for a clean slate.

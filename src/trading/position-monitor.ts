@@ -57,7 +57,7 @@
 
 import type { Redis } from "ioredis";
 import type { Pool } from "pg";
-import type { OpenPosition, PersonalityConfig } from "../db/schema.js";
+import type { OpenPosition, PersonalityConfig as PersonalityConfigSnake, PersonalityConfigM2 as PersonalityConfig } from "../db/schema.js";
 import { STREAM_STRADDLE, recoverPending, streamConsume } from "../redis/client.js";
 import type { ClockWithTick } from "../utils/clock.js";
 import type { EntryIntent } from "./entry-engine.js";
@@ -392,6 +392,11 @@ export class PositionMonitor {
 
       case "cut_reenter":
         return this._reducerManager;
+
+      default:
+        // Exhaustive check — should never reach here given the union type.
+        // Fall back to HolderManager so unknown future styles don't crash.
+        return this._holderManager;
     }
   }
 
@@ -487,10 +492,11 @@ export class PositionMonitor {
         this._clock,
         this._triggerConfig,
         this._db,
-        // Pass a synthetic default PersonalityConfig when personality is null
-        // (pre-M2 trade). The HolderManager ignores the personality parameter
-        // so passing a minimal object avoids a null check in the interface.
-        personality ?? this._defaultPersonality(),
+        // Cast PersonalityConfigM2 (camelCase, used by position-monitor) to
+        // PersonalityConfig (snake_case, expected by management handlers).
+        // Both map to the same personality_configs DB row — the difference is
+        // only the property naming convention used by each module.
+        (personality ?? this._defaultPersonality()) as unknown as PersonalityConfigSnake,
       );
 
       if (decision.shouldExit && decision.exitReason !== undefined) {
@@ -629,7 +635,8 @@ export class PositionMonitor {
             this._clock,
             this._triggerConfig,
             this._db,
-            personality ?? this._defaultPersonality(),
+            // Same camelCase→snake_case cast as in _handleSnapshot above.
+            (personality ?? this._defaultPersonality()) as unknown as PersonalityConfigSnake,
           );
 
           // Only act on time-based exits in the watchdog.
@@ -754,4 +761,283 @@ export class PositionMonitor {
       updatedAt: new Date(0),
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Factory (main-branch implementation — preserved for main-branch callers)
+// ---------------------------------------------------------------------------
+
+import type { StraddleSnapshot } from '../ingestion/straddle-calc';
+import { type Clock, RealClock } from '../utils/clock';
+import { exitTrade, getOpenTrades } from './paper-trade';
+import { type Position, evaluateExit, updateHighWatermark } from './trigger-exit';
+
+export interface PositionMonitorConfig {
+  clock?: Clock;
+  /** Default stop-loss as a fraction of entry value (default: 0.20 = 20%). */
+  defaultStopLossPct?: number;
+  /** Default trailing-stop as a fraction of running minimum (default: 0.15 = 15%). */
+  defaultTrailingStopPct?: number;
+  /** Default profit-target as a fraction of entry value (default: 0.30 = 30%). */
+  defaultTargetPct?: number;
+  /** HH:MM in IST for forced end-of-day exit (default: '15:15'). */
+  defaultEodExitIST?: string;
+}
+
+export interface PositionMonitorInterface {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Internal: resolved config with every field present
+// ---------------------------------------------------------------------------
+
+interface ResolvedConfig {
+  clock: Clock;
+  defaultStopLossPct: number;
+  defaultTrailingStopPct: number;
+  defaultTargetPct: number;
+  defaultEodExitIST: string;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a Position snapshot from a PaperTradeRecord and the current observed
+ * straddle value.
+ *
+ * The config defaults supply thresholds that are not yet persisted per-trade.
+ * Phase 2 will switch to per-trade thresholds stored in the DB.
+ */
+function buildPosition(
+  entryStraddleValue: number,
+  entryTimestampMs: number,
+  currentValue: number,
+  watermark: number,
+  config: ResolvedConfig,
+): Position {
+  return {
+    entryStraddleValue,
+    currentStraddleValue: currentValue,
+    entryTimestamp: entryTimestampMs,
+    stopLossPct: config.defaultStopLossPct,
+    trailingStopPct: config.defaultTrailingStopPct,
+    targetPct: config.defaultTargetPct,
+    highWatermark: watermark,
+    eodExitIST: config.defaultEodExitIST,
+  };
+}
+
+/**
+ * Parse and validate a raw JSON string from the `straddle.values` stream.
+ *
+ * Returns null and logs a warning for any malformed or type-incorrect input so
+ * a single bad entry does not break the evaluation loop.
+ */
+function parseSnapshot(raw: string): StraddleSnapshot | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !('straddleValue' in parsed) ||
+      !('timestamp' in parsed) ||
+      !('underlying' in parsed)
+    ) {
+      console.warn('[position-monitor] malformed snapshot (missing required fields):', raw);
+      return null;
+    }
+
+    const obj = parsed as Record<string, unknown>;
+
+    if (typeof obj.straddleValue !== 'number' || typeof obj.timestamp !== 'number') {
+      console.warn('[position-monitor] malformed snapshot (wrong field types):', raw);
+      return null;
+    }
+
+    return parsed as StraddleSnapshot;
+  } catch {
+    console.warn('[position-monitor] failed to parse snapshot JSON:', raw);
+    return null;
+  }
+}
+
+/**
+ * Create a PositionMonitor that polls the `straddle.values` stream and
+ * evaluates all open positions on each new snapshot.
+ *
+ * The returned object has no side effects until `start()` is called.
+ *
+ * This is the main-branch factory implementation. The M2 class-based
+ * PositionMonitor above is used when full M2 dependencies are available
+ * (PaperTradeExecutor, TriggerConfig, ClockWithTick).
+ */
+export function createPositionMonitor(
+  redisClient: Redis,
+  db: Pool,
+  config?: PositionMonitorConfig,
+): PositionMonitorInterface {
+  // Resolve config with defaults so downstream code never deals with undefined.
+  const resolved: ResolvedConfig = {
+    clock: config?.clock ?? new RealClock(),
+    defaultStopLossPct: config?.defaultStopLossPct ?? 0.2,
+    defaultTrailingStopPct: config?.defaultTrailingStopPct ?? 0.15,
+    defaultTargetPct: config?.defaultTargetPct ?? 0.3,
+    defaultEodExitIST: config?.defaultEodExitIST ?? '15:15',
+  };
+
+  // In-memory high watermark map: tradeId → lowest straddle value seen.
+  const watermarks = new Map<string | number, number>();
+
+  // XREAD cursor for `straddle.values`.
+  // Starting at '0' replays from the beginning of the current stream so the
+  // monitor catches any snapshots published before it started.
+  let lastId = '0';
+
+  // Running flag — set to false by stop() to terminate the poll loop cleanly.
+  let running = false;
+
+  // -------------------------------------------------------------------------
+  // Core evaluation logic (called on every new snapshot)
+  // -------------------------------------------------------------------------
+
+  async function evaluateSnapshot(snapshot: StraddleSnapshot): Promise<void> {
+    const currentValue = snapshot.straddleValue;
+
+    let openTrades: Awaited<ReturnType<typeof getOpenTrades>>;
+    try {
+      openTrades = await getOpenTrades(db);
+    } catch (err) {
+      console.error('[position-monitor] failed to load open trades:', err);
+      return;
+    }
+
+    for (const trade of openTrades) {
+      const tradeId = trade.id;
+      const entryValue = Number(trade.entryStraddleValue);
+
+      const existingWatermark = watermarks.get(tradeId);
+      const watermark = existingWatermark ?? currentValue;
+      if (existingWatermark === undefined) {
+        watermarks.set(tradeId, watermark);
+      }
+
+      const position = buildPosition(
+        entryValue,
+        trade.entryTimestamp.getTime(),
+        currentValue,
+        watermark,
+        resolved,
+      );
+
+      const decision = evaluateExit(position, resolved.clock);
+
+      if (decision.shouldExit) {
+        watermarks.delete(tradeId);
+
+        try {
+          await exitTrade(db, {
+            tradeId,
+            exitStraddleValue: currentValue,
+            exitTimestamp: snapshot.timestamp,
+            exitReason: decision.reason,
+          });
+          console.info(`[position-monitor] exited trade ${String(tradeId)} — reason: ${decision.reason}`);
+        } catch (err) {
+          console.error(`[position-monitor] failed to exit trade ${String(tradeId)}:`, err);
+          watermarks.set(tradeId, watermark);
+        }
+      } else {
+        const updated = updateHighWatermark(currentValue, watermark);
+        watermarks.set(tradeId, updated);
+      }
+    }
+
+    // Clean up watermark entries for trades that have already been closed externally.
+    const openIds = new Set(openTrades.map((t) => t.id));
+    for (const [id] of watermarks) {
+      if (!openIds.has(id as string)) {
+        watermarks.delete(id);
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Poll loop
+  // -------------------------------------------------------------------------
+
+  async function pollLoop(): Promise<void> {
+    while (running) {
+      try {
+        const results = await redisClient.xread('COUNT', 100, 'STREAMS', 'straddle.values', lastId);
+
+        if (!results || results.length === 0) {
+          await sleep(100);
+          continue;
+        }
+
+        const streamResult = results[0];
+        if (!streamResult) {
+          await sleep(100);
+          continue;
+        }
+
+        const entries = streamResult[1] as [string, string[]][];
+
+        for (const entry of entries) {
+          const entryId = entry[0];
+          const rawFields = entry[1];
+          if (!entryId || !rawFields) continue;
+
+          lastId = entryId;
+
+          let rawData: string | undefined;
+          for (let i = 0; i + 1 < rawFields.length; i += 2) {
+            if (rawFields[i] === 'data') {
+              rawData = rawFields[i + 1];
+              break;
+            }
+          }
+
+          if (rawData === undefined) {
+            console.warn('[position-monitor] stream entry missing `data` field, id:', entryId);
+            continue;
+          }
+
+          const snapshot = parseSnapshot(rawData);
+          if (snapshot !== null) {
+            await evaluateSnapshot(snapshot);
+          }
+        }
+      } catch (err) {
+        console.error('[position-monitor] error in poll loop:', err);
+        await sleep(100);
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Public API
+  // -------------------------------------------------------------------------
+
+  return {
+    async start(): Promise<void> {
+      if (running) return;
+      running = true;
+      void pollLoop();
+    },
+
+    async stop(): Promise<void> {
+      running = false;
+    },
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

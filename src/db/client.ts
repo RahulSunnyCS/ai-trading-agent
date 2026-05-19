@@ -13,6 +13,9 @@ pg.types.setTypeParser(1700, (val) => val);
 // at first query — this is acceptable since there is no meaningful fallback.
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
 });
 
 /**
@@ -59,6 +62,9 @@ export async function queryOne<T extends QueryResultRow>(
  * ROLLBACK is always attempted in the catch block; if it also fails we log the
  * secondary error but still rethrow the original — losing the original error
  * would make debugging impossible.
+ *
+ * Also exported as `transaction` (alias) for callers from main branch that use
+ * that name.
  */
 export async function withTransaction<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
@@ -81,3 +87,6 @@ export async function withTransaction<T>(fn: (client: pg.PoolClient) => Promise<
     client.release();
   }
 }
+
+// Alias for callers that import `transaction` (used by payment/main branch code)
+export const transaction = withTransaction;

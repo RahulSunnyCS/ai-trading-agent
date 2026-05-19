@@ -1,281 +1,79 @@
 /**
- * VixFeed — NSE public API polling fallback for India VIX.
+ * VIX Feed
  *
- * The primary VIX source is the broker WebSocket tick for
- * 'NSE:INDIAVIX-INDEX'. This module provides a polling fallback that
- * queries the NSE public API directly. It fills gaps when the broker feed
- * is stale or disconnected (e.g. pre-market, post-market, or during
- * connection interruptions).
+ * Provides India VIX values from two sources:
+ *   - Primary:  Fyers tick feed — listens to the `market.ticks` Redis Stream
+ *               for ticks with symbol `NSE:INDIAVIX-INDEX` and publishes them
+ *               immediately.
+ *   - Fallback: NSE public API polling — every `pollIntervalMs` ms it hits the
+ *               NSE allIndices endpoint. It only publishes from the poll when
+ *               no tick-sourced VIX was received in the last 5 minutes, to
+ *               avoid flooding the stream with duplicate data.
  *
- * Caller contract:
- *   - latestVix may be up to pollIntervalMs stale at any point in time.
- *   - latestVix is null until the first successful poll completes.
- *   - Callers must handle null — VIX is best-effort; trading continues
- *     without it.
- *
- * NEVER call setInterval, setTimeout, or Date.now() directly in this file.
- * All time operations must go through the injected Clock instance.
+ * Design decisions:
+ * - Non-blocking XREAD loop (no BLOCK) matches the straddle-calc pattern so the
+ *   `running` flag is checked on every iteration, enabling a clean shutdown.
+ * - A small sleep prevents a tight CPU spin on empty polls.
+ * - `fetch` is Bun-native; an AbortController gives each NSE call a 5-second
+ *   deadline.
+ * - Using `||` (not `??`) for the NSE_VIX_URL fallback so that an explicitly
+ *   exported empty-string env var also falls back to the constant default.
  */
 
-import type { ClockWithTick } from "../utils/clock.js";
+import type { Redis } from 'ioredis';
+
+import type { Clock } from '../utils/clock';
+import { RealClock } from '../utils/clock';
 
 // ---------------------------------------------------------------------------
-// Types
+// VIX symbol on Fyers tick feed
 // ---------------------------------------------------------------------------
 
-/** Alias kept for backward compatibility — use ClockWithTick from utils/clock.ts. */
-export type VixClock = ClockWithTick;
+/** The Fyers symbol for India VIX on the market.ticks stream. */
+const VIX_TICK_SYMBOL = 'NSE:INDIAVIX-INDEX';
 
-/** Constructor options for VixFeed. */
-export interface VixFeedOptions {
-  /** Clock used for all time access and tick scheduling. */
-  clock: VixClock;
-  /**
-   * How often (in milliseconds) to poll the NSE public API.
-   * Defaults to 60_000ms (1 minute) — NSE VIX moves slowly enough that
-   * 1-minute resolution is sufficient for signal probability adjustments.
-   */
+/** How long (ms) a tick-based VIX reading suppresses the poll fallback. */
+const TICK_FRESHNESS_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Timeout for each NSE API fetch call. */
+const NSE_FETCH_TIMEOUT_MS = 5_000;
+
+/** Default poll interval (1 minute). */
+const DEFAULT_POLL_INTERVAL_MS = 60_000;
+
+// ---------------------------------------------------------------------------
+// Public interfaces
+// ---------------------------------------------------------------------------
+
+export interface VixReading {
+  vix: number;
+  timestamp: number; // Unix ms
+  source: 'tick' | 'poll';
+}
+
+export interface VixFeedConfig {
   pollIntervalMs?: number;
+  pollUrl?: string;
+  clock?: Clock;
 }
 
-/**
- * Shape of one entry in the NSE allIndices API response array.
- * We only declare the fields we use to avoid coupling to undocumented fields
- * that NSE may add or rename without notice.
- */
+export interface VixFeed {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  getLatestVix(): VixReading | null;
+}
+
+// ---------------------------------------------------------------------------
+// Internal NSE API response types
+// ---------------------------------------------------------------------------
+
 interface NseIndexEntry {
-  indexSymbol: string;
-  last: string; // NSE returns the value as a string, not a number
+  index: string;
+  last: number;
 }
 
-/** Shape of the NSE allIndices API response envelope. */
-interface NseAllIndicesResponse {
+interface NseApiResponse {
   data: NseIndexEntry[];
-}
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/**
- * NSE public API endpoint for all indices, including India VIX.
- * This endpoint is unauthenticated but requires a User-Agent header and
- * is rate-limited by NSE. One request per minute is well within limits.
- */
-const NSE_ALL_INDICES_URL = "https://www.nseindia.com/api/allIndices";
-
-/**
- * The indexSymbol value for India VIX in the NSE API response.
- * Used for exact-match lookup in the returned array.
- */
-const INDIA_VIX_SYMBOL = "INDIA VIX";
-
-/**
- * HTTP headers required by the NSE public API.
- * NSE blocks requests without a browser-like User-Agent (returns 401/403).
- * Including Accept: application/json is good practice even though NSE
- * always returns JSON from this endpoint.
- */
-// Using Record<string, string> rather than HeadersInit because HeadersInit is
-// a browser DOM type that is not guaranteed to be in scope under Bun's strict
-// TypeScript config. Record<string, string> is equally correct for a plain
-// header object passed to fetch().
-const NSE_HEADERS: Record<string, string> = {
-  "User-Agent": "Mozilla/5.0",
-  Accept: "application/json",
-};
-
-// ---------------------------------------------------------------------------
-// VixFeed
-// ---------------------------------------------------------------------------
-
-/**
- * Polls the NSE public API for the India VIX value at a configurable interval.
- *
- * Usage (production):
- *   const clock = new RealClockWithTick(); // or any Clock & { tick() }
- *   const feed = new VixFeed({ clock });
- *   feed.start();
- *   // later:
- *   const vix = feed.getVix(); // string | null
- *   feed.stop();
- *
- * Usage (testing with VirtualClock):
- *   const clock = new VirtualClock(Date.now());
- *   const feed = new VixFeed({ clock, pollIntervalMs: 1000 });
- *   feed.start();
- *   clock.advance(1000); // triggers one poll (against a mocked fetch)
- */
-export class VixFeed {
-  private readonly _clock: VixClock;
-  private readonly _pollIntervalMs: number;
-
-  /**
-   * The most recently received India VIX value from the NSE API.
-   * Null until the first successful poll, or after a parse/network failure
-   * clears it (we preserve the last good value on failure — see _poll()).
-   */
-  private _latestVix: string | null = null;
-
-  /**
-   * Running flag — prevents double-start and allows stop() to suppress
-   * callbacks after the polling loop is cancelled.
-   *
-   * VirtualClock has no tick deregistration API, so the same guard-flag
-   * pattern used in MarketDataSimulator is used here: the callback checks
-   * _running before doing any work, meaning clock.advance() after stop()
-   * will fire the callback but it will exit immediately.
-   */
-  private _running = false;
-
-  constructor(options: VixFeedOptions) {
-    this._clock = options.clock;
-    // Default to 1 minute — India VIX moves slowly; 1-minute granularity
-    // is sufficient for probability score adjustments and does not hammer NSE.
-    this._pollIntervalMs = options.pollIntervalMs ?? 60_000;
-  }
-
-  // -------------------------------------------------------------------------
-  // Public API
-  // -------------------------------------------------------------------------
-
-  /**
-   * Starts the VIX polling loop.
-   * Idempotent — calling start() on an already-running feed is a no-op.
-   */
-  start(): void {
-    if (this._running) {
-      return;
-    }
-    this._running = true;
-
-    // Register a recurring tick with the injected clock.
-    // The clock fires the callback each time pollIntervalMs elapses.
-    // We do NOT fire an immediate poll here on purpose: the first poll fires
-    // after one interval, giving the caller time to set up consumers before
-    // data arrives — mirroring the MarketDataSimulator pattern.
-    this._clock.tick(this._pollIntervalMs, () => {
-      // Guard: if stop() was called after this tick was registered, ignore
-      // the callback. VirtualClock cannot deregister ticks, so this flag is
-      // the only cancellation mechanism available.
-      if (!this._running) {
-        return;
-      }
-      // _poll() returns a Promise but we intentionally do not await it here.
-      // The tick callback is synchronous; we fire-and-forget the async HTTP
-      // request. Errors are caught inside _poll() and logged as warnings —
-      // they never propagate to the clock's tick mechanism.
-      void this._poll();
-    });
-  }
-
-  /**
-   * Stops the VIX polling loop.
-   * After stop(), no further polls are performed even if the clock advances.
-   * The last known VIX value is preserved in latestVix.
-   * Idempotent — safe to call multiple times.
-   */
-  stop(): void {
-    this._running = false;
-  }
-
-  /**
-   * Returns the most recently received India VIX value, or null if no
-   * successful poll has completed yet (or if the feed has never been started).
-   *
-   * The returned value is a string — NSE returns VIX as a string (e.g. "14.75")
-   * and we preserve it as-is to avoid precision loss from float parsing.
-   * Callers that need numeric comparison should parse with parseFloat().
-   */
-  getVix(): string | null {
-    return this._latestVix;
-  }
-
-  // -------------------------------------------------------------------------
-  // Internal helpers
-  // -------------------------------------------------------------------------
-
-  /**
-   * Performs a single HTTP GET to the NSE allIndices endpoint, parses the
-   * response, and updates latestVix.
-   *
-   * Error handling policy:
-   *   - Any HTTP error (4xx, 5xx, network failure) → log warning, preserve
-   *     last known VIX value, return without throwing.
-   *   - Any parse error (malformed JSON, missing field) → same: log warning,
-   *     preserve last known value, return without throwing.
-   *
-   * VIX is best-effort: the trading loop must never depend on VIX being
-   * non-null. A stale or null VIX falls back to the baseline probability
-   * adjustment (no VIX modifier applied).
-   *
-   * We preserve the last good value on failure rather than resetting to null
-   * so that a single network blip doesn't cause probability scores to
-   * momentarily lose their VIX modifier — a stale value is more useful than
-   * null when the failure is transient.
-   */
-  private async _poll(): Promise<void> {
-    let response: Response;
-    try {
-      response = await fetch(NSE_ALL_INDICES_URL, {
-        headers: NSE_HEADERS,
-      });
-    } catch (err) {
-      // Network error (DNS failure, connection refused, timeout, etc.)
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`VIX poll failed: ${message}`);
-      return;
-    }
-
-    if (!response.ok) {
-      // HTTP error — NSE sometimes returns 401/403 when cookies are missing.
-      // Log and return; preserve last known value.
-      console.warn(`VIX poll failed: HTTP ${response.status} ${response.statusText}`);
-      return;
-    }
-
-    let json: unknown;
-    try {
-      json = await response.json();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`VIX poll failed: JSON parse error — ${message}`);
-      return;
-    }
-
-    // Validate top-level shape. We cannot trust external API responses to be
-    // well-formed, so we narrow the type defensively before accessing fields.
-    if (
-      typeof json !== "object" ||
-      json === null ||
-      !("data" in json) ||
-      !Array.isArray((json as { data: unknown }).data)
-    ) {
-      console.warn("VIX poll failed: unexpected response shape (missing data array)");
-      return;
-    }
-
-    const body = json as NseAllIndicesResponse;
-
-    // Find the India VIX entry in the array by exact symbol match.
-    const vixEntry = body.data.find(
-      (entry) =>
-        typeof entry === "object" && entry !== null && entry.indexSymbol === INDIA_VIX_SYMBOL,
-    );
-
-    if (vixEntry === undefined) {
-      console.warn(`VIX poll failed: '${INDIA_VIX_SYMBOL}' not found in response`);
-      return;
-    }
-
-    if (typeof vixEntry.last !== "string" || vixEntry.last.trim() === "") {
-      console.warn(`VIX poll failed: 'last' field is missing or empty for '${INDIA_VIX_SYMBOL}'`);
-      return;
-    }
-
-    // Successful poll — update the stored value.
-    this._latestVix = vixEntry.last;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -283,11 +81,309 @@ export class VixFeed {
 // ---------------------------------------------------------------------------
 
 /**
- * Convenience factory for creating a VixFeed instance.
- * Equivalent to `new VixFeed(opts)` — provided as a named export to satisfy
- * the acceptance criterion for a static factory pattern without requiring
- * a static class method (which would complicate testing via constructor mocks).
+ * Create a VixFeed bound to the provided Redis client and optional config.
+ *
+ * No side effects until `start()` is called.
  */
-export function createVixFeed(opts: VixFeedOptions): VixFeed {
-  return new VixFeed(opts);
+export function createVixFeed(redisClient: Redis, config?: VixFeedConfig): VixFeed {
+  const clock: Clock = config?.clock ?? new RealClock();
+
+  // Use || (not ??) so an empty string also falls back to the constant default.
+  // process.env dot notation required by Biome; bracket notation is disallowed.
+  const pollUrl =
+    config?.pollUrl || process.env.NSE_VIX_URL || 'https://www.nseindia.com/api/allIndices';
+
+  const pollIntervalMs = config?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+
+  // Control flags.
+  let running = false;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  // Last XREAD cursor — '$' means "only new messages from now on".
+  let lastId = '$';
+
+  // The most recently received VIX reading (either source).
+  let latestVix: VixReading | null = null;
+
+  // Timestamp (Unix ms) of the last VIX reading sourced from a tick.
+  // Used to gate the NSE poll fallback: if we received a tick recently we skip
+  // the poll publish to avoid duplicating data on the stream.
+  let lastTickVixTimestamp: number | null = null;
+
+  // ---------------------------------------------------------------------------
+  // Tick parsing
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Parse a raw JSON `data` field from a market.ticks stream entry.
+   * Returns null and logs a warning on malformed or incomplete input.
+   * Uses `unknown` then narrows — never `any`.
+   */
+  function parseTickJson(raw: string): { symbol: string; ltp: number; timestamp: number } | null {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      console.warn('[vix-feed] malformed JSON in tick, skipping:', raw);
+      return null;
+    }
+
+    if (typeof parsed !== 'object' || parsed === null) {
+      console.warn('[vix-feed] tick is not an object, skipping:', raw);
+      return null;
+    }
+
+    // Narrow to a record so we can check individual field types safely.
+    const obj = parsed as Record<string, unknown>;
+
+    if (
+      typeof obj.symbol !== 'string' ||
+      typeof obj.ltp !== 'number' ||
+      typeof obj.timestamp !== 'number'
+    ) {
+      console.warn(
+        '[vix-feed] tick missing required fields (symbol/ltp/timestamp), skipping:',
+        raw,
+      );
+      return null;
+    }
+
+    return { symbol: obj.symbol, ltp: obj.ltp, timestamp: obj.timestamp };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Publish helper
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Publish a VixReading to the `market.vix` Redis stream and update latestVix.
+   */
+  async function publishVix(reading: VixReading): Promise<void> {
+    latestVix = reading;
+    try {
+      await redisClient.xadd('market.vix', '*', 'data', JSON.stringify(reading));
+    } catch (err) {
+      console.error('[vix-feed] failed to publish VIX reading to Redis:', err);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tick reader loop
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Non-blocking XREAD loop that watches `market.ticks` for VIX ticks.
+   *
+   * Runs until `running` is set to false by `stop()`.  Errors are caught and
+   * logged; the loop resumes after a brief pause so transient Redis hiccups do
+   * not crash the feed.
+   */
+  async function tickReaderLoop(): Promise<void> {
+    while (running) {
+      try {
+        // Non-blocking XREAD — no BLOCK option so we check `running` each iteration.
+        const results = await redisClient.xread('COUNT', 100, 'STREAMS', 'market.ticks', lastId);
+
+        if (!results || results.length === 0) {
+          await sleep(100);
+          continue;
+        }
+
+        // results shape: [ [ streamName, [ [id, [field, value, ...]], ... ] ] ]
+        const streamResult = results[0];
+        if (!streamResult) {
+          await sleep(100);
+          continue;
+        }
+
+        // Cast to the known ioredis XREAD shape.
+        const entries = streamResult[1] as [string, string[]][];
+
+        for (const entry of entries) {
+          const id = entry[0];
+          const rawFields = entry[1];
+          if (!id || !rawFields) continue;
+
+          // Advance cursor so we never re-read already-processed messages.
+          lastId = id;
+
+          // Extract the `data` field (linear field-value pairs).
+          let rawData: string | undefined;
+          for (let i = 0; i + 1 < rawFields.length; i += 2) {
+            if (rawFields[i] === 'data') {
+              rawData = rawFields[i + 1];
+              break;
+            }
+          }
+
+          if (rawData === undefined) {
+            console.warn('[vix-feed] stream entry missing `data` field, id:', id);
+            continue;
+          }
+
+          const tick = parseTickJson(rawData);
+          if (tick === null) continue;
+
+          // Only care about the VIX symbol.
+          if (tick.symbol !== VIX_TICK_SYMBOL) continue;
+
+          const now = clock.timestamp();
+          const reading: VixReading = {
+            vix: tick.ltp,
+            timestamp: now,
+            source: 'tick',
+          };
+
+          lastTickVixTimestamp = now;
+          await publishVix(reading);
+        }
+      } catch (err) {
+        // Log and resume — transient Redis errors must not crash the loop.
+        console.error('[vix-feed] error in tick reader loop:', err);
+        await sleep(100);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // NSE API poll fallback
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Validate that the parsed NSE API response has the expected shape.
+   * Returns a typed NseApiResponse or null when the shape doesn't match.
+   *
+   * Separate from parsing so malformed but valid JSON is handled distinctly.
+   */
+  function parseNseResponse(body: unknown): NseApiResponse | null {
+    if (typeof body !== 'object' || body === null) return null;
+    const obj = body as Record<string, unknown>;
+    if (!Array.isArray(obj.data)) return null;
+
+    // Validate every element has `index` (string) and `last` (number).
+    // We do a best-effort cast; elements that don't match are filtered out
+    // downstream when we search for INDIA VIX.
+    return { data: obj.data as NseIndexEntry[] };
+  }
+
+  /**
+   * Poll the NSE API once.  Publishes to `market.vix` only when no tick-based
+   * VIX was received in the last TICK_FRESHNESS_MS, preventing duplicate noise.
+   *
+   * Errors are caught and logged — this function must never throw.
+   */
+  async function pollNse(): Promise<void> {
+    // If a fresh tick-based VIX arrived recently, skip the poll publish.
+    const now = clock.timestamp();
+    if (lastTickVixTimestamp !== null && now - lastTickVixTimestamp < TICK_FRESHNESS_MS) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, NSE_FETCH_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(pollUrl, {
+        signal: controller.signal,
+        headers: {
+          // NSE requires a Referer header to avoid bot-detection rejections.
+          // Without it the request often returns a 403 or redirect.
+          Referer: 'https://www.nseindia.com',
+          'User-Agent': 'Mozilla/5.0 (compatible; ai-trading-agent)',
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.warn(`[vix-feed] NSE API returned HTTP ${response.status}, skipping poll`);
+        return;
+      }
+
+      const body: unknown = await response.json();
+      const parsed = parseNseResponse(body);
+
+      if (parsed === null) {
+        console.warn('[vix-feed] NSE API response has unexpected shape, skipping poll');
+        return;
+      }
+
+      // Find the INDIA VIX entry in the data array.
+      const vixEntry = parsed.data.find(
+        (entry) => typeof entry.index === 'string' && entry.index === 'INDIA VIX',
+      );
+
+      if (vixEntry === undefined) {
+        console.warn('[vix-feed] NSE API response does not contain INDIA VIX entry, skipping poll');
+        return;
+      }
+
+      // Validate `last` is a finite number before publishing.
+      if (typeof vixEntry.last !== 'number' || !Number.isFinite(vixEntry.last)) {
+        console.warn('[vix-feed] NSE VIX entry has invalid `last` value:', vixEntry.last);
+        return;
+      }
+
+      const reading: VixReading = {
+        vix: vixEntry.last,
+        timestamp: clock.timestamp(),
+        source: 'poll',
+      };
+
+      await publishVix(reading);
+    } catch (err) {
+      // Covers AbortError (timeout) and network failures.
+      console.warn('[vix-feed] NSE API fetch failed, skipping poll:', err);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
+  return {
+    async start(): Promise<void> {
+      if (running) return;
+      running = true;
+
+      // Begin the tick reader loop (non-blocking — runs concurrently).
+      void tickReaderLoop();
+
+      // Schedule periodic NSE API polling.
+      pollTimer = setInterval(() => {
+        void pollNse();
+      }, pollIntervalMs);
+    },
+
+    async stop(): Promise<void> {
+      running = false;
+
+      if (pollTimer !== null) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      // The tick reader loop exits naturally on the next `while (running)` check.
+    },
+
+    getLatestVix(): VixReading | null {
+      return latestVix;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Internal sleep helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Promise-based sleep used in the tick reader loop to avoid a tight CPU spin
+ * when no new messages are present in the Redis stream.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

@@ -14,6 +14,11 @@ dist/
 # bun.lockb is the old binary format from older Bun versions — excluded.
 bun.lockb
 
+# Bun lock file (text format — keep this if switching to bun.lock text mode)
+bun.lock
+.vite/
+*.tsbuildinfo
+
 # Logs
 *.log
 npm-debug.log*
@@ -28,9 +33,6 @@ coverage/
 # Playwright test artifacts
 test-results/
 playwright-report/
-
-# TypeScript incremental build cache
-*.tsbuildinfo
 
 # Biome standalone binary (platform-specific — never commit; install via scripts/install-biome.sh)
 tools/biome*
