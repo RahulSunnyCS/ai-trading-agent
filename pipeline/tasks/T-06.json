@@ -1,0 +1,56 @@
+{
+  "task_id": "T-06",
+  "title": "Seed migration 002 — single Clockwork personality (MVP)",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/db/migrations/002_seed_clockwork.sql"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/db/migrations/001_core_schema.sql",
+      "src/db/schema.ts",
+      "src/db/client.ts",
+      "src/db/migrate.ts",
+      "TODO.md",
+      "pipeline/"
+    ]
+  },
+  "acceptance_criteria": [
+    "002_seed_clockwork.sql is idempotent — running bun run migrate twice produces no duplicate row error",
+    "Inserts exactly one row into personality_configs with name='Clockwork' and is_frozen=TRUE",
+    "Clockwork row uses INSERT ... ON CONFLICT (name) DO NOTHING for idempotency",
+    "Clockwork parameters match the benchmark specification in context below",
+    "management_style='HOLD' for Clockwork (it never adjusts or cuts — it is the frozen control)",
+    "phase=1 and is_active=TRUE",
+    "bun run migrate applies both migrations cleanly from a fresh schema_migrations state (i.e. after docker compose down -v && docker compose up -d)"
+  ],
+  "dependencies": ["T-05"],
+  "context": {
+    "clockwork_params": {
+      "name": "Clockwork",
+      "description": "Frozen benchmark personality. Never evolves. All other personalities are compared against it.",
+      "phase": 1,
+      "is_frozen": true,
+      "entry_type": "MOMENTUM_EXHAUSTION",
+      "management_style": "HOLD",
+      "min_probability": 0.55,
+      "sl_pct": 0.15,
+      "target_pct": 0.25,
+      "tsl_trigger_pct": null,
+      "max_daily_loss_pct": 0.03,
+      "entry_window_start": "09:20",
+      "entry_window_end": "14:30",
+      "exit_time": "15:15",
+      "is_active": true
+    },
+    "important_notes": [
+      "Use INSERT INTO personality_configs (...) VALUES (...) ON CONFLICT (name) DO NOTHING — this is the idempotency mechanism",
+      "The full 10-personality seed (Precision, Adjuster, Reducer, Levelhead, etc.) is deferred to T-25 (M2). Only Clockwork is needed for M0.",
+      "Do not add any other seed data — this migration is Clockwork-only",
+      "tsl_trigger_pct should be NULL for Clockwork (HOLD style — no trailing stop trigger)"
+    ]
+  },
+  "output_format": "SQL seed file, plus plain English explanation of why each parameter value was chosen"
+}

@@ -1,0 +1,58 @@
+{
+  "task_id": "T-05",
+  "title": "Core schema migration 001 — hypertables, tables, straddle_1min, schema.ts",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/db/migrations/001_core_schema.sql",
+      "src/db/schema.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/db/client.ts",
+      "src/db/migrate.ts",
+      "TODO.md",
+      "pipeline/"
+    ]
+  },
+  "acceptance_criteria": [
+    "001_core_schema.sql is idempotent — running bun run migrate twice produces no error",
+    "market_ticks, straddle_snapshots, option_ticks are TimescaleDB hypertables partitioned on the 'time' column",
+    "straddle_1min is a TimescaleDB continuous aggregate over straddle_snapshots with 1-minute bucket",
+    "All tables include created_at TIMESTAMPTZ NOT NULL DEFAULT NOW() (plus updated_at where mutable)",
+    "personality_configs includes is_frozen BOOLEAN NOT NULL DEFAULT FALSE",
+    "retrospection_results includes market_regime TEXT NOT NULL CHECK IN ('RANGING','TRENDING_STRONG','VOLATILE_REVERTING','EVENT_DAY')",
+    "schema.ts exports a TypeScript interface for every table (named after the table in PascalCase: MarketTick, StraddleSnapshot, etc.)",
+    "schema.ts interfaces use exact column names as property names",
+    "bun run typecheck exits 0 with the new schema.ts",
+    "bun run lint exits 0 with the new schema.ts"
+  ],
+  "dependencies": ["T-03"],
+  "context": {
+    "hypertables": [
+      "market_ticks — raw broker tick data: id BIGSERIAL PK, symbol TEXT NOT NULL, time TIMESTAMPTZ NOT NULL, ltp NUMERIC(12,2) NOT NULL, volume BIGINT, oi BIGINT, bid NUMERIC(12,2), ask NUMERIC(12,2), source TEXT NOT NULL DEFAULT 'fyers'",
+      "straddle_snapshots — 15s ATM straddle calculator output: id BIGSERIAL PK, time TIMESTAMPTZ NOT NULL, symbol TEXT NOT NULL (e.g. 'NIFTY'), expiry DATE NOT NULL, strike NUMERIC(10,2) NOT NULL, call_ltp NUMERIC(12,2) NOT NULL, put_ltp NUMERIC(12,2) NOT NULL, straddle_value NUMERIC(12,2) NOT NULL, roc NUMERIC(8,4), roc_acceleration NUMERIC(8,4), vix NUMERIC(6,2)",
+      "option_ticks — individual option leg ticks: id BIGSERIAL PK, time TIMESTAMPTZ NOT NULL, symbol TEXT NOT NULL (full Fyers option symbol), ltp NUMERIC(12,2) NOT NULL, volume BIGINT, oi BIGINT, delta NUMERIC(6,4), iv NUMERIC(6,4)"
+    ],
+    "regular_tables": [
+      "straddle_signals — detected signals: id UUID PK DEFAULT gen_random_uuid(), time TIMESTAMPTZ NOT NULL DEFAULT NOW(), symbol TEXT NOT NULL, signal_type TEXT NOT NULL CHECK ('MOMENTUM_EXHAUSTION','SCHEDULED','PULLBACK'), direction TEXT CHECK ('LONG','SHORT'), probability NUMERIC(5,4), peak_roc NUMERIC(8,4), peak_acceleration NUMERIC(8,4), vix_at_signal NUMERIC(6,2), status TEXT NOT NULL DEFAULT 'pending' CHECK ('pending','consumed','expired'), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+      "personality_configs — the 10 trading personalities + Clockwork benchmark: id UUID PK DEFAULT gen_random_uuid(), name TEXT NOT NULL UNIQUE, description TEXT, phase INTEGER NOT NULL DEFAULT 1, is_frozen BOOLEAN NOT NULL DEFAULT FALSE, entry_type TEXT NOT NULL DEFAULT 'MOMENTUM_EXHAUSTION', management_style TEXT NOT NULL CHECK ('HOLD','ADJUST','REDUCE'), min_probability NUMERIC(5,4) NOT NULL DEFAULT 0.55, sl_pct NUMERIC(6,4) NOT NULL DEFAULT 0.15, target_pct NUMERIC(6,4) NOT NULL DEFAULT 0.25, tsl_trigger_pct NUMERIC(6,4), max_daily_loss_pct NUMERIC(6,4) NOT NULL DEFAULT 0.03, entry_window_start TIME NOT NULL DEFAULT '09:20', entry_window_end TIME NOT NULL DEFAULT '14:30', exit_time TIME NOT NULL DEFAULT '15:15', is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+      "paper_trades — individual paper trade records: id UUID PK DEFAULT gen_random_uuid(), personality_id UUID NOT NULL REFERENCES personality_configs(id), signal_id UUID REFERENCES straddle_signals(id), symbol TEXT NOT NULL, expiry DATE NOT NULL, strike NUMERIC(10,2) NOT NULL, entry_type TEXT NOT NULL, entry_time TIMESTAMPTZ NOT NULL, entry_straddle_value NUMERIC(12,2) NOT NULL, exit_time TIMESTAMPTZ, exit_straddle_value NUMERIC(12,2), exit_reason TEXT CHECK ('SL','TSL','TARGET','EOD','TIME','DAILY_LOSS_CAP','MANUAL'), pnl_pct NUMERIC(8,4), pnl_abs NUMERIC(12,2), status TEXT NOT NULL DEFAULT 'open' CHECK ('open','closed'), market_regime TEXT CHECK ('RANGING','TRENDING_STRONG','VOLATILE_REVERTING','EVENT_DAY'), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+      "retrospection_results — EOD per-personality analytics: id UUID PK DEFAULT gen_random_uuid(), personality_id UUID NOT NULL REFERENCES personality_configs(id), trade_date DATE NOT NULL, market_regime TEXT NOT NULL CHECK ('RANGING','TRENDING_STRONG','VOLATILE_REVERTING','EVENT_DAY'), total_trades INTEGER NOT NULL DEFAULT 0, winning_trades INTEGER NOT NULL DEFAULT 0, total_pnl_pct NUMERIC(8,4), beat_clockwork_delta NUMERIC(8,4), signal_brier_score NUMERIC(6,4), management_effectiveness NUMERIC(6,4), proposed_adjustments JSONB, adjustments_applied BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(personality_id, trade_date)"
+    ],
+    "continuous_aggregate": "straddle_1min — CREATE MATERIALIZED VIEW straddle_1min WITH (timescaledb.continuous) AS SELECT time_bucket('1 minute', time) AS bucket, symbol, expiry, strike, first(straddle_value, time) AS open, max(straddle_value) AS high, min(straddle_value) AS low, last(straddle_value, time) AS close, avg(roc) AS avg_roc, avg(vix) AS avg_vix FROM straddle_snapshots GROUP BY bucket, symbol, expiry, strike; with policy: add_continuous_aggregate_policy for 1-minute refresh",
+    "important_notes": [
+      "Use CREATE TABLE IF NOT EXISTS and CREATE INDEX IF NOT EXISTS throughout — migration must be idempotent",
+      "create_hypertable calls should use IF NOT EXISTS variant: SELECT create_hypertable('table', 'time', if_not_exists => TRUE)",
+      "TimescaleDB continuous aggregate: use IF NOT EXISTS in CREATE MATERIALIZED VIEW ... WITH (timescaledb.continuous)",
+      "Add index on personality_configs(name) and personality_configs(is_frozen) for fast Clockwork lookups",
+      "Add index on paper_trades(personality_id, status) for position monitor queries",
+      "Add index on straddle_signals(status, time) for signal router",
+      "schema.ts: use Date for TIMESTAMPTZ columns (pg driver parses them), string for TEXT, number for NUMERIC/BIGINT/INTEGER, boolean for BOOLEAN",
+      "Do NOT use ORM — raw SQL only. No Drizzle, Prisma, or Knex imports",
+      "Use gen_random_uuid() not uuid_generate_v4() — requires pgcrypto extension; gen_random_uuid() is built-in to Postgres 13+"
+    ]
+  },
+  "output_format": "SQL migration file + TypeScript schema types file, plus plain English explanation of every non-obvious decision"
+}

@@ -14,7 +14,7 @@
 | Phase 0 Triage | ✅ COMPLETE | risk_level=HIGH, lane=feature-full, sprint_count=3 |
 | Phase 1 Planning | ✅ COMPLETE | Red Team 3/3 sprints done; 25 revisions accepted; QA checklist generated; Translator done |
 | Phase 2 Decomposition | ✅ COMPLETE | 8 task contracts written (T-64, T-65, T-66, T-67, T-68, T-69, T-71, T-72); TODO.md regenerated |
-| Phase 3 Implementation | ⏳ PENDING | |
+| Phase 3 Implementation | 🔄 IN PROGRESS | T-72✅ T-01✅ T-02✅ T-03✅ T-04✅ T-05⏳ T-06⏳ |
 | Phase 4 Review | ⏳ PENDING | |
 | Phase 5 Tests | ⏳ PENDING | |
 | Phase 6 Fix Loop | ⏳ PENDING | |
