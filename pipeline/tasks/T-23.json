@@ -1,6 +1,6 @@
 {
   "task_id": "T-23",
-  "title": "Probability scoring — India VIX + global macro context (US VIX, S&P 500, DAX, crude oil, gold) + time/day adjustments",
+  "title": "Probability scoring — India VIX + global macro context + OI change + time/day adjustments (8-factor model)",
   "assigned_to": "implementor",
   "risk_flags": [],
   "scope": {
@@ -17,7 +17,7 @@
   },
   "acceptance_criteria": [
     "scoreProbability(input: ScoringInput) → ScoringResult exported as a pure function with no I/O. All context is passed in as parameters — no Redis reads inside this function.",
-    "ScoringInput type: { rawExhaustionScore: number; signalType: 'MOMENTUM_EXHAUSTION'|'SCHEDULED'|'PULLBACK'; indiaVix: number|null; macro: MacroContext; signalTimeMs: number; clock: Clock } — MacroContext imported from src/ingestion/global-macro-feed.ts (T-65)",
+    "ScoringInput type: { rawExhaustionScore: number; signalType: 'MOMENTUM_EXHAUSTION'|'SCHEDULED'|'PULLBACK'; indiaVix: number|null; macro: MacroContext; oiChangePct: number|null; signalTimeMs: number; clock: Clock } — MacroContext imported from src/ingestion/global-macro-feed.ts (T-65). oiChangePct is the percentage change in total straddle OI (call OI + put OI) from 9:15 AM open to the signal time; null when data is unavailable (silent fail).",
     "ScoringResult type: { rawProbability: number; adjustedProbability: number; confidenceTier: 'HIGH'|'MEDIUM'|'LOW'; adjustmentBreakdown: Record<string, number> } — breakdown is for logging/debugging signal quality",
     "rawProbability = baseProbability mapped from rawExhaustionScore: exhaustionScore * 0.40 + 0.35 (score 0→prob 0.35, score 1→prob 0.75)",
 
@@ -29,17 +29,19 @@
     "Crude oil adjustment (macro.crude_oil.change_pct): null → 0; |change_pct| > 3% → -0.05 (high crude volatility creates uncertainty for India as oil importer, regardless of direction); |change_pct| 1.5–3% → -0.02; |change_pct| < 1.5% → 0. Use absolute value — both spike and crash are destabilising.",
     "Gold adjustment (macro.gold.change_pct): null → 0; gold up > 2% → -0.05 (strong safe-haven demand signals global risk-off); up 1–2% → -0.03; gold down or flat → 0. Gold decline is neutral (not positive) — falling gold in risk-on environments is already captured by S&P 500 positive adjustment.",
 
+    "OI change adjustment (oiChangePct): null → 0 (data unavailable — silent fail, no adjustment). OI here is the total straddle OI (ATM call OI + ATM put OI). Rising OI while straddle value is falling confirms genuine premium decay (option writers are increasing positions); falling OI suggests unwinding which is less reliable. Thresholds: oiChangePct > 5% → +0.04 (strong OI buildup confirms exhaustion); 2%–5% → +0.02; -2% to +2% → 0 (flat OI, neutral); -2% to -5% → -0.02 (mild unwinding); < -5% → -0.04 (strong unwinding, signal is less reliable).",
+
     "Time-of-day adjustment: 09:20–09:45 IST → +0.05 (early session premium decay phase); 14:00–15:00 IST → -0.04 (low liquidity, wide spreads); else 0",
     "Day-of-week adjustment: Monday → -0.03 (weekend gap risk); Friday → -0.03 (expiry week, lower confidence in exhaustion); else 0",
 
-    "adjustedProbability = clamp(rawProbability + indiaVixAdj + usVixAdj + sp500Adj + daxAdj + crudeOilAdj + goldAdj + timeAdj + dowAdj, 0.0, 1.0)",
-    "adjustmentBreakdown in ScoringResult records each named adjustment value (e.g. {india_vix: -0.03, us_vix: -0.04, sp500: 0, dax: -0.02, crude_oil: -0.02, gold: 0, time_of_day: +0.05, day_of_week: -0.03}) for signal quality logging",
+    "adjustedProbability = clamp(rawProbability + indiaVixAdj + usVixAdj + sp500Adj + daxAdj + crudeOilAdj + goldAdj + oiChangeAdj + timeAdj + dowAdj, 0.0, 1.0)",
+    "adjustmentBreakdown in ScoringResult records each named adjustment value (e.g. {india_vix: -0.03, us_vix: -0.04, sp500: 0, dax: -0.02, crude_oil: -0.02, gold: 0, oi_change: +0.04, time_of_day: +0.05, day_of_week: -0.03}) for signal quality logging. All 9 keys must always be present even when the adjustment is 0.",
 
     "SCHEDULED signals: fixed adjustedProbability = 0.60, rawProbability = 0.60, no macro adjustments applied. Rationale: Clockwork's fixed-time entry is not a quality signal — it is a decision to enter regardless of conditions. Applying macro penalties would prevent Clockwork from ever trading on bad global days, which defeats its purpose as a naive benchmark.",
     "PULLBACK signals: same adjustment formula as MOMENTUM_EXHAUSTION but baseProbability = 0.60 (slightly lower confidence than a fresh exhaustion signal since it is a secondary detection)",
     "confidenceTier: 'HIGH' if adjustedProbability >= 0.70; 'MEDIUM' if >= 0.50; 'LOW' otherwise",
 
-    "Unit tests cover: clamp to [0,1] on extreme inputs; each individual adjustment correct direction and magnitude; SCHEDULED always 0.60 regardless of inputs; all-null MacroContext produces same result as zero macro adjustments; PULLBACK uses 0.60 base; adjustmentBreakdown keys all present even when adjustment is 0"
+    "Unit tests cover: clamp to [0,1] on extreme inputs; each individual adjustment correct direction and magnitude; SCHEDULED always 0.60 regardless of inputs; all-null MacroContext produces same result as zero macro adjustments; PULLBACK uses 0.60 base; adjustmentBreakdown keys all 9 present even when adjustment is 0; OI change null → 0 adjustment; OI > 5% → +0.04; OI < -5% → -0.04"
   ],
   "dependencies": ["T-65"],
   "output_format": "code plus plain English explanation of every non-obvious decision"
