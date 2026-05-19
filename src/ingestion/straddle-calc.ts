@@ -69,6 +69,26 @@ export class StraddleCalculator {
   /** Whether the calculator is actively running. */
   private _running = false;
 
+  // --------------------------------------------------------------------------
+  // OI tracking fields
+  //
+  // These fields track the call and put open interest for the ATM straddle so
+  // that PeakDetectionEngine can read the OI change from Redis as a context
+  // signal. In SIMULATE mode, no option ticks arrive so all four remain null —
+  // downstream code handles null gracefully (OI adjustment treated as 0).
+  // --------------------------------------------------------------------------
+
+  /** Call-side OI at the 9:15–9:30 AM open window (locked once on first snapshot). */
+  private _openCallOi: number | null = null;
+  /** Put-side OI at the 9:15–9:30 AM open window (locked once on first snapshot). */
+  private _openPutOi: number | null = null;
+  /** Most recent call OI received from an option tick. */
+  private _lastCallOi: number | null = null;
+  /** Most recent put OI received from an option tick. */
+  private _lastPutOi: number | null = null;
+  /** Epoch-ms at which the open OI was locked. Used to prevent re-locking. */
+  private _oiOpenLockedMs: number | null = null;
+
   constructor(config: StraddleCalculatorConfig) {
     this._db = config.db;
     this._redis = config.redis;
@@ -148,7 +168,25 @@ export class StraddleCalculator {
         this._lastVix = tick.ltp;
       }
     }
-    // Option ticks are ignored in MVP — CE/PE prices remain '0'.
+
+    // Track option OI when option ticks arrive (live Fyers mode only).
+    // In SIMULATE mode the simulator emits only index ticks (isIndex=true),
+    // so these fields remain null — the downstream OI change key is simply
+    // never written to Redis and PeakDetectionEngine gets null (0 adjustment).
+    //
+    // We do not filter by ATM strike here because we don't know the current
+    // ATM strike inside _handleTick without a spot price. Instead we track
+    // whichever CE and PE OI arrives most recently and let _publishSnapshot
+    // overwrite per interval — the 15-second snapshot cadence means we use
+    // the OI of the most recently ticked option (almost always the ATM option
+    // in active markets, since ATM sees the highest tick frequency).
+    if (!tick.isIndex && tick.optionType !== undefined) {
+      if (tick.optionType === "CE") {
+        this._lastCallOi = tick.oi;
+      } else if (tick.optionType === "PE") {
+        this._lastPutOi = tick.oi;
+      }
+    }
   }
 
   /**
@@ -175,6 +213,17 @@ export class StraddleCalculator {
 
     // getAtmStrike rounds to the nearest 50-point interval for NIFTY.
     const atmStrike = getAtmStrike("NIFTY", spot);
+
+    // ------------------------------------------------------------------
+    // OI tracking: lock open OI once during 9:15–9:30 AM IST and then
+    // compute the percentage change for PeakDetectionEngine to read.
+    //
+    // Why UTC arithmetic instead of toLocaleString?
+    // IST = UTC+5:30 (no DST). Adding 330 minutes and reading getUTCHours/
+    // getUTCMinutes is ~5x faster than toLocaleString with a timezone and
+    // avoids locale-specific formatting edge cases in the Bun runtime.
+    // ------------------------------------------------------------------
+    this._updateOiTracking(now);
 
     // Build the Redis stream payload. All numeric values are stringified because
     // Redis Streams only store string field values. The consumer must parse them.
@@ -236,6 +285,64 @@ export class StraddleCalculator {
       .catch((err: unknown) => {
         console.error("[StraddleCalculator] DB write error:", err);
       });
+  }
+
+  /**
+   * Locks the open OI at the first snapshot during the 9:15–9:30 AM IST window
+   * and then writes the current OI change percentage to Redis.
+   *
+   * This is a private helper called from _publishSnapshot so that the OI logic
+   * does not clutter the main snapshot publication path.
+   *
+   * The Redis write is fire-and-forget (.catch(() => {})) because OI is
+   * supplemental data — a Redis write failure must never prevent snapshot
+   * publication or crash the process. The key expires after 900 seconds (15
+   * minutes) which is long enough to survive any Redis hiccup during a trading
+   * session but prevents stale OI data from persisting across sessions.
+   */
+  private _updateOiTracking(now: number): void {
+    // IST = UTC + 5h30m = UTC + 330 minutes. No DST in IST, so the offset is fixed.
+    const IST_OFFSET_MS = 330 * 60 * 1000;
+    const istDate = new Date(now + IST_OFFSET_MS);
+    const istHour = istDate.getUTCHours();
+    const istMin = istDate.getUTCMinutes();
+    // 9:15–9:30 AM IST is the opening window for ATM straddle OI.
+    const isOpenWindow = istHour === 9 && istMin >= 15 && istMin <= 30;
+
+    // Lock the open OI exactly once: on the first snapshot that arrives during
+    // the open window with both CE and PE OI values available.
+    if (
+      isOpenWindow &&
+      this._oiOpenLockedMs === null &&
+      this._lastCallOi !== null &&
+      this._lastPutOi !== null
+    ) {
+      this._openCallOi = this._lastCallOi;
+      this._openPutOi = this._lastPutOi;
+      this._oiOpenLockedMs = now;
+    }
+
+    // Publish OI change to Redis only when we have a valid baseline and current values.
+    if (
+      this._openCallOi !== null &&
+      this._openPutOi !== null &&
+      this._lastCallOi !== null &&
+      this._lastPutOi !== null &&
+      this._openCallOi + this._openPutOi > 0 // Guard against divide-by-zero
+    ) {
+      const currentOi = this._lastCallOi + this._lastPutOi;
+      const openOi = this._openCallOi + this._openPutOi;
+      const oiChangePct = ((currentOi - openOi) / openOi) * 100;
+
+      // Fire-and-forget: OI is supplemental. A Redis write failure here must
+      // not crash the snapshot loop or bubble up to the caller.
+      this._redis
+        .set("straddle_oi_change:NIFTY", String(oiChangePct), "EX", 900)
+        .catch(() => {
+          // Intentionally silent — errors are not logged to avoid noise on
+          // transient Redis blips. The next snapshot will retry.
+        });
+    }
   }
 
   /**
