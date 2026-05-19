@@ -49,14 +49,17 @@ export function isPaymentEnabled(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Lazy Razorpay client
+// Lazy Razorpay client (singleton — created once, reused across requests)
 // ---------------------------------------------------------------------------
 
+let _razorpayClient: Razorpay | null = null;
+
 /**
- * Initialise and return a Razorpay SDK instance.
+ * Initialise (once) and return the Razorpay SDK singleton.
  *
- * Called lazily by every function that needs the SDK. Throwing here (rather than
- * at module load) means a cold import of this file never fails in dev mode.
+ * Called lazily — cold import of this file never fails in dev mode where
+ * RAZORPAY_KEY_ID is absent. The instance is cached after first construction
+ * so SDK internals (connection keep-alives, etc.) are not recreated per request.
  */
 export function initRazorpay(): Razorpay {
   const keyId = process.env.RAZORPAY_KEY_ID;
@@ -74,7 +77,11 @@ export function initRazorpay(): Razorpay {
     throw new Error('Razorpay secret not configured: RAZORPAY_KEY_SECRET is missing.');
   }
 
-  return new Razorpay({ key_id: keyId, key_secret: keySecret });
+  if (_razorpayClient === null) {
+    _razorpayClient = new Razorpay({ key_id: keyId, key_secret: keySecret });
+  }
+
+  return _razorpayClient;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,15 +203,15 @@ export function verifyWebhookSignature(rawBody: Buffer, headerSignature: string)
 // ---------------------------------------------------------------------------
 
 /**
- * Return the current total credit balance: SUM(credits_delta) across all rows.
- * Returns 0 when the table has no rows (COALESCE handled in SQL).
+ * Return the current total credit balance via the `credit_balance` view.
+ * Using the view as the single source of truth means the aggregate logic
+ * lives in one place — if the view is updated (e.g. to a materialized view),
+ * this function picks up the change automatically.
  */
 export async function getCreditBalance(db: Pool): Promise<number> {
-  const result = await db.query<{ balance: string }>(
-    'SELECT COALESCE(SUM(credits_delta), 0) AS balance FROM credit_transactions',
-  );
+  const result = await db.query<{ balance: string }>('SELECT balance FROM credit_balance');
 
-  // pg returns NUMERIC aggregates as strings — parse explicitly.
+  // pg returns NUMERIC as a string — parse explicitly.
   const row = result.rows[0];
   return row !== undefined ? Number.parseFloat(row.balance) : 0;
 }
@@ -218,9 +225,14 @@ export async function getCreditBalance(db: Pool): Promise<number> {
  *
  * Atomicity design:
  * - All reads and writes happen inside a single PostgreSQL transaction.
- * - `FOR UPDATE` on the balance sub-query serialises concurrent consumers at
- *   the row level — the second concurrent request blocks until the first commits,
- *   so it sees the post-deduction balance rather than the stale pre-deduction value.
+ * - `pg_advisory_xact_lock(key)` serialises concurrent consumers for the lifetime
+ *   of the transaction — the second concurrent request blocks at the lock acquisition
+ *   step until the first commits and releases it automatically. This avoids the
+ *   TOCTOU race without requiring `FOR UPDATE` on aggregate queries (which PostgreSQL
+ *   rejects: "FOR UPDATE is not allowed with aggregate functions").
+ * - Advisory lock key 7241964 is an arbitrary stable constant — unique to this
+ *   operation within this application. Any non-zero integer works; the constant
+ *   just avoids magic-number confusion.
  * - If the balance is insufficient, the transaction is rolled back and the caller
  *   receives `success: false` with the current balance.
  *
@@ -233,18 +245,25 @@ export async function consumeCredit(
   feature: string,
   amount = 1,
 ): Promise<{ success: boolean; remainingBalance: number }> {
+  // Validate amount before touching the DB — catches NaN, negatives, and non-integers.
+  // A negative amount would mint credits; NaN bypasses the balance check entirely.
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isInteger(amount)) {
+    throw new Error(`consumeCredit: amount must be a positive integer, got ${amount}`);
+  }
+
   const client = await db.connect();
 
   try {
     await client.query('BEGIN');
 
-    // Lock and read the current balance within this transaction.
-    // `FOR UPDATE` on credit_transactions prevents a concurrent transaction from
-    // inserting a new row until this one commits, serialising balance checks.
+    // Acquire an application-level advisory lock that is automatically released
+    // when this transaction ends. Serialises all concurrent consumeCredit calls
+    // so only one reads + inserts at a time, preventing the TOCTOU race.
+    await client.query('SELECT pg_advisory_xact_lock(7241964)');
+
+    // Read the current balance within the locked transaction.
     const balanceResult = await client.query<{ balance: string }>(
-      `SELECT COALESCE(SUM(credits_delta), 0) AS balance
-       FROM credit_transactions
-       FOR UPDATE`,
+      'SELECT COALESCE(SUM(credits_delta), 0) AS balance FROM credit_transactions',
     );
 
     const balanceRow = balanceResult.rows[0];
