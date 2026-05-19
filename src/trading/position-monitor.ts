@@ -3,12 +3,21 @@
  * open short-straddle positions in real time.
  *
  * Responsibilities on each stream snapshot:
- *   1. Load today's open positions from the database.
+ *   1. Load today's open positions from the database (all personalities).
  *   2. Update the trailing stop watermark for each position.
  *   3. Persist the updated lowestStraddleValueSeen to the DB.
- *   4. Evaluate all exit triggers (SL, TSL, TARGET, EOD, EXIT_WINDOW, DAILY_LOSS).
- *   5. Close any position whose trigger fires via PaperTradeExecutor.
+ *   4. Evaluate all exit triggers (SL, TSL, TARGET, EOD, EXIT_WINDOW, DAILY_LOSS)
+ *      via the correct ManagementHandler for each position's personality.
+ *   5. Close any position whose trigger fires via the handler's closePosition().
  *   6. ACK the Redis message only after all processing is complete.
+ *
+ * Multi-personality dispatch (added in T-28):
+ *   Each open position is dispatched to the ManagementHandler matching the
+ *   personality's management_style ('hold' → HolderManager, 'roll' → Adjuster,
+ *   'cut_reenter' → Reducer). Personality configs are loaded at startup and
+ *   cached for the lifetime of the monitor so every snapshot avoids N+1 DB
+ *   queries. Positions with personality_id IS NULL (pre-M2 trades) default to
+ *   HolderManager.
  *
  * Stale-data watchdog (fired every watchdogIntervalMs = 5000 ms via clock.tick):
  *   - Warns when the straddle feed has not updated within staleThresholdMs.
@@ -39,18 +48,41 @@
  *     trigger (the condition is `todayNetPnl <= -maxDailyLoss`; 0 never fires
  *     unless maxDailyLoss is 0). This is an accepted limitation documented in
  *     the P1 risk manifest.
+ *   - Personality config cache: loaded once via _loadPersonalityConfigs() at
+ *     start() time. This cache is never invalidated during a session; a restart
+ *     is required to pick up personality config changes. This is acceptable for
+ *     Phase 1 — personality configs change rarely (via evolution engine, which
+ *     only runs EOD) and a daily restart is the normal operational cadence.
  */
 
 import type { Redis } from "ioredis";
 import type { Pool } from "pg";
+import type { OpenPosition, PersonalityConfig } from "../db/schema.js";
 import { STREAM_STRADDLE, recoverPending, streamConsume } from "../redis/client.js";
 import type { ClockWithTick } from "../utils/clock.js";
 import type { EntryIntent } from "./entry-engine.js";
 import type { EntryEngine } from "./entry-engine.js";
+import type { ManagementHandler } from "./management/holder.js";
+import { HolderManager } from "./management/holder.js";
 import type { PaperTradeExecutor } from "./paper-trade-executor.js";
 import { getOpenTrades } from "./paper-trade-executor.js";
-import { evaluateTriggers, updateTrailingStop } from "./trigger-engine.js";
+import { updateTrailingStop } from "./trigger-engine.js";
 import type { TriggerConfig } from "./trigger-engine.js";
+
+// ---------------------------------------------------------------------------
+// Local type: open position extended with personality_id
+// ---------------------------------------------------------------------------
+
+/**
+ * Extends the shared OpenPosition with the personality_id column from
+ * paper_trades. We use a local intersection type rather than modifying
+ * the shared OpenPosition interface because other callers of OpenPosition
+ * (e.g. trigger-engine.ts) do not need personality_id and we want to keep
+ * that interface minimal.
+ */
+type OpenPositionWithPersonality = OpenPosition & {
+  personalityId: string | null;
+};
 
 // ---------------------------------------------------------------------------
 // Constructor options
@@ -123,6 +155,20 @@ export class PositionMonitor {
     Array<PositionMonitorEvents[keyof PositionMonitorEvents]>
   > = new Map();
 
+  /**
+   * Personality config cache keyed by personality_configs.id (UUID string).
+   * Loaded once at start() time and never invalidated mid-session.
+   * A Map is used instead of a plain object so UUID string keys have O(1) lookup
+   * without prototype-chain interference.
+   */
+  private _personalityCache: Map<string, PersonalityConfig> = new Map();
+
+  /**
+   * Singleton ManagementHandler instances. One per style — they are stateless
+   * so a single instance handles all positions of that style simultaneously.
+   */
+  private readonly _holderManager: HolderManager = new HolderManager();
+
   // ---------------------------------------------------------------------------
   // Constructor
   // ---------------------------------------------------------------------------
@@ -171,17 +217,27 @@ export class PositionMonitor {
   // ---------------------------------------------------------------------------
 
   /**
-   * Recover stale pending messages from a previous consumer, then start the
-   * live stream consumption loop.
+   * Recover stale pending messages from a previous consumer, load personality
+   * configs into the cache, then start the live stream consumption loop.
    *
    * recoverPending() runs BEFORE streamConsume() so that messages that were
    * delivered to a previous process instance but never ACKed are reclaimed by
    * this consumer and reprocessed. This satisfies the "replay idempotency"
    * requirement: we check inside the snapshot handler whether positions are
    * already closed before doing any work.
+   *
+   * _loadPersonalityConfigs() runs before the stream loop starts so the cache
+   * is ready before the first snapshot arrives. Failure to load configs is
+   * treated as a fatal startup error — if we cannot read personality configs we
+   * cannot dispatch correctly, so we must not silently start in a broken state.
    */
   async start(): Promise<void> {
     this._stopped = false;
+
+    // Load personality configs into cache before processing begins.
+    // Any DB error here propagates to the caller (src/index.ts) which will
+    // log and exit — better than starting up with a broken config cache.
+    await this._loadPersonalityConfigs();
 
     // Reclaim any pending messages from prior consumers (crash recovery).
     // We log how many were recovered but do not replay their payloads here —
@@ -243,6 +299,106 @@ export class PositionMonitor {
   }
 
   // ---------------------------------------------------------------------------
+  // Personality config cache
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Loads all active personality configs from the DB and stores them in the
+   * cache keyed by id. This replaces any previous cache contents — it is safe
+   * to call this at startup even if it was called before.
+   *
+   * We load ALL personalities (not just active ones) so that positions opened
+   * by a personality that was later deactivated can still be managed correctly
+   * (we must be able to dispatch to their handler to close them at EOD).
+   */
+  private async _loadPersonalityConfigs(): Promise<void> {
+    const result = await this._db.query<{
+      id: string;
+      name: string;
+      display_name: string;
+      group_type: string;
+      entry_type: string;
+      management_style: string;
+      is_frozen: boolean;
+      is_active: boolean;
+      phase: number;
+      params: Record<string, unknown>;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `SELECT id, name, display_name, group_type, entry_type, management_style,
+              is_frozen, is_active, phase, params, created_at, updated_at
+       FROM personality_configs`,
+    );
+
+    this._personalityCache.clear();
+    for (const row of result.rows) {
+      // Map snake_case DB columns to the camelCase TypeScript interface.
+      const config: PersonalityConfig = {
+        id: row.id,
+        name: row.name,
+        displayName: row.display_name,
+        groupType: row.group_type as PersonalityConfig["groupType"],
+        entryType: row.entry_type as PersonalityConfig["entryType"],
+        managementStyle: row.management_style as PersonalityConfig["managementStyle"],
+        isFrozen: row.is_frozen,
+        isActive: row.is_active,
+        phase: row.phase,
+        params: row.params,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+      this._personalityCache.set(row.id, config);
+    }
+
+    console.info(
+      `[position-monitor] Loaded ${this._personalityCache.size} personality config(s) into cache`,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Handler dispatch
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns the correct ManagementHandler for a given personality config, or
+   * HolderManager as the default when no personality is associated (pre-M2 trade).
+   *
+   * 'roll'        → AdjusterManager (T-29): not yet implemented; uses HolderManager
+   *                 as a temporary stand-in so pre-M2 positions can still be managed.
+   * 'cut_reenter' → ReducerManager (T-30): not yet implemented; uses HolderManager
+   *                 as a temporary stand-in.
+   *
+   * The TODO comments below are the handoff points for T-29 and T-30 — when those
+   * tasks are implemented, replace the HolderManager fallback with the correct import.
+   */
+  private _resolveHandler(personality: PersonalityConfig | null): ManagementHandler {
+    if (personality === null) {
+      // No personality associated (pre-M2 trade created before the personality
+      // engine existed). Default to the simplest handler — hold until a trigger.
+      return this._holderManager;
+    }
+
+    switch (personality.managementStyle) {
+      case "hold":
+        return this._holderManager;
+
+      case "roll":
+        // TODO(T-29): replace with AdjusterManager once it is implemented.
+        // Using HolderManager here means rolled trades are held-to-trigger
+        // instead of being rolled at the roll trigger point — this is safe but
+        // suboptimal until T-29 lands.
+        return this._holderManager;
+
+      case "cut_reenter":
+        // TODO(T-30): replace with ReducerManager once it is implemented.
+        // Using HolderManager here means cut-and-reenter trades are held-to-trigger
+        // instead of being cut and re-entered — safe but suboptimal until T-30 lands.
+        return this._holderManager;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Core: snapshot handler
   // ---------------------------------------------------------------------------
 
@@ -252,18 +408,22 @@ export class PositionMonitor {
    * Steps:
    *   a. Idempotency check — skip if no open positions exist (all already closed).
    *   b. Update lastTickTimestamp and lastKnownStraddleValue for watchdog.
-   *   c. For each open position: update trailing stop, persist to DB, evaluate
-   *      triggers, close if triggered.
+   *   c. For each open position: update trailing stop, persist to DB, resolve the
+   *      correct ManagementHandler based on personality, evaluate triggers, and
+   *      close if triggered.
    */
   private async _handleSnapshot(fields: Record<string, string>): Promise<void> {
     // Accept both camelCase and snake_case field names — straddle-calc may
     // publish under either convention depending on the code version.
     const straddleValue = fields.straddleValue ?? fields.straddle_value ?? "";
+    const currentSpot = Number.parseFloat(fields.spot ?? "0");
 
     if (straddleValue === "") {
       console.warn("[position-monitor] Received snapshot with missing straddleValue — skipping");
       return;
     }
+
+    const currentStraddleNumber = Number.parseFloat(straddleValue);
 
     // --- Step a: Idempotency / replay guard ---
     // Load today's open positions. If all are already closed (empty list), ACK
@@ -271,7 +431,7 @@ export class PositionMonitor {
     // recovery: once a position is closed, reprocessing the same snapshot is
     // a no-op. The ACK happens in streamConsume after this function returns.
     const today = this._clock.today();
-    const openPositions = await getOpenTrades(this._db, today);
+    const openPositions = await this._getOpenPositionsWithPersonality(today);
 
     if (openPositions.length === 0) {
       // No open positions — nothing to do. ACK is issued by streamConsume.
@@ -300,33 +460,112 @@ export class PositionMonitor {
       // Rebuild the position with the updated lowestStraddleValueSeen for the
       // trigger evaluation. We must use the freshly computed value, not the
       // stale one from the DB query (which may already be one snapshot old).
-      const updatedPosition = {
+      const updatedPosition: OpenPositionWithPersonality = {
         ...position,
         lowestStraddleValueSeen: newLowest,
       };
 
-      // Evaluate all exit triggers (pure function — no I/O).
-      const decision = evaluateTriggers(
+      // Resolve the correct personality config (null for pre-M2 trades).
+      const personality =
+        updatedPosition.personalityId !== null
+          ? (this._personalityCache.get(updatedPosition.personalityId) ?? null)
+          : null;
+
+      // If a personalityId is set but we couldn't find it in the cache, that
+      // means a personality was created after this monitor started. Log a warning
+      // and fall back to HolderManager rather than skipping the position entirely.
+      if (updatedPosition.personalityId !== null && personality === null) {
+        console.warn(
+          `[position-monitor] Unknown personality_id ${updatedPosition.personalityId} for trade ${updatedPosition.id} — falling back to HolderManager`,
+        );
+      }
+
+      // Resolve the handler and evaluate the exit decision.
+      const handler = this._resolveHandler(personality);
+
+      const decision = await handler.evaluatePosition(
         updatedPosition,
-        straddleValue,
+        currentStraddleNumber,
+        currentSpot,
         this._clock,
         this._triggerConfig,
+        this._db,
+        // Pass a synthetic default PersonalityConfig when personality is null
+        // (pre-M2 trade). The HolderManager ignores the personality parameter
+        // so passing a minimal object avoids a null check in the interface.
+        personality ?? this._defaultPersonality(),
       );
 
-      if (decision.shouldExit) {
-        // Delegate the actual close to the executor, which writes the DB row
-        // and notifies Quantiply. Errors from closeTrade propagate up and
-        // prevent the ACK (message stays pending for recovery).
-        await this._executor.closeTrade(position.id, straddleValue, decision.reason, this._clock);
+      if (decision.shouldExit && decision.exitReason !== undefined) {
+        // Delegate the actual close to the handler's closePosition(), which
+        // writes the DB row and notifies Quantiply via the executor. Errors
+        // propagate up and prevent the ACK (message stays pending for recovery).
+        await handler.closePosition(
+          updatedPosition,
+          currentStraddleNumber,
+          decision.exitReason,
+          this._db,
+          this._clock,
+          this._executor,
+        );
 
         console.info(
-          `[position-monitor] Closed trade ${position.id} — reason: ${decision.reason} ` +
+          `[position-monitor] Closed trade ${updatedPosition.id} — reason: ${decision.exitReason} ` +
             `@ straddleValue=${straddleValue}`,
         );
       }
     }
 
     // ACK is issued by streamConsume after this handler resolves without throwing.
+  }
+
+  // ---------------------------------------------------------------------------
+  // Query: open positions with personality_id
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Queries today's open positions, also fetching the personality_id from the
+   * paper_trades row so the monitor can dispatch to the correct handler.
+   *
+   * This is a local query rather than a modification to getOpenTrades() because
+   * the shared getOpenTrades() is used by other callers (entry engine, API) that
+   * do not need personality_id and should not be coupled to this concern.
+   *
+   * The time-zone cast (AT TIME ZONE 'Asia/Kolkata') mirrors the logic in
+   * getOpenTrades() — see paper-trade-executor.ts for the full rationale.
+   * A time-range filter is always included (acceptance criterion 9 equivalent)
+   * to avoid full-table scans on paper_trades as the dataset grows.
+   */
+  private async _getOpenPositionsWithPersonality(
+    tradingDate: string,
+  ): Promise<OpenPositionWithPersonality[]> {
+    const result = await this._db.query<{
+      id: string;
+      straddle_at_entry: string;
+      lowest_straddle_value_seen: string;
+      entry_time: Date;
+      personality_id: string | null;
+    }>(
+      `SELECT
+         id,
+         straddle_at_entry,
+         lowest_straddle_value_seen,
+         entry_time,
+         personality_id
+       FROM paper_trades
+       WHERE status = 'open'
+         AND DATE(entry_time AT TIME ZONE 'Asia/Kolkata') = $1`,
+      [tradingDate],
+    );
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      entryStraddleValue: row.straddle_at_entry,
+      lowestStraddleValueSeen: row.lowest_straddle_value_seen,
+      entryTimeMs: row.entry_time.getTime(),
+      todayNetPnl: "0",
+      personalityId: row.personality_id,
+    }));
   }
 
   // ---------------------------------------------------------------------------
@@ -345,6 +584,10 @@ export class PositionMonitor {
    * because EOD / EXIT_WINDOW exits are driven entirely by the clock, not by
    * price — the exact straddle value used for the P&L calculation will be the
    * last market price, which is the best we can do without a live feed.
+   *
+   * The watchdog dispatches through the handler system for consistency, but
+   * only acts on time-based exits (EOD, EXIT_WINDOW) — price-based exits
+   * should only fire on real tick data (see the filter below).
    */
   private _runWatchdog(): void {
     const nowMs = this._clock.now();
@@ -365,20 +608,31 @@ export class PositionMonitor {
     }
 
     const lastKnownValue = this._lastKnownStraddleValue;
+    const lastKnownNumber = Number.parseFloat(lastKnownValue);
 
     // Load open positions and evaluate time-based exits.
     // The watchdog runs in a sync context (clock.tick callback), so we use
     // a fire-and-forget pattern with explicit error handling.
     const today = this._clock.today();
 
-    getOpenTrades(this._db, today)
+    this._getOpenPositionsWithPersonality(today)
       .then(async (positions) => {
         for (const position of positions) {
-          const decision = evaluateTriggers(
+          const personality =
+            position.personalityId !== null
+              ? (this._personalityCache.get(position.personalityId) ?? null)
+              : null;
+
+          const handler = this._resolveHandler(personality);
+
+          const decision = await handler.evaluatePosition(
             position,
-            lastKnownValue,
+            lastKnownNumber,
+            0, // spot is unknown in watchdog context — only time-based exits fire
             this._clock,
             this._triggerConfig,
+            this._db,
+            personality ?? this._defaultPersonality(),
           );
 
           // Only act on time-based exits in the watchdog.
@@ -389,21 +643,24 @@ export class PositionMonitor {
           // to evaluate with any non-null straddle value.
           if (
             decision.shouldExit &&
-            (decision.reason === "EOD" || decision.reason === "EXIT_WINDOW")
+            decision.exitReason !== undefined &&
+            (decision.exitReason === "EOD" || decision.exitReason === "EXIT_WINDOW")
           ) {
             try {
-              await this._executor.closeTrade(
-                position.id,
-                lastKnownValue,
-                decision.reason,
+              await handler.closePosition(
+                position,
+                lastKnownNumber,
+                decision.exitReason,
+                this._db,
                 this._clock,
+                this._executor,
               );
               console.info(
-                `[position-monitor] Watchdog closed trade ${position.id} — reason: ${decision.reason}`,
+                `[position-monitor] Watchdog closed trade ${position.id} — reason: ${decision.exitReason}`,
               );
             } catch (err: unknown) {
               console.error(
-                `[position-monitor] Watchdog: closeTrade failed for trade ${position.id}:`,
+                `[position-monitor] Watchdog: closePosition failed for trade ${position.id}:`,
                 err,
               );
             }
@@ -411,7 +668,7 @@ export class PositionMonitor {
         }
       })
       .catch((err: unknown) => {
-        console.error("[position-monitor] Watchdog: getOpenTrades failed:", err);
+        console.error("[position-monitor] Watchdog: _getOpenPositionsWithPersonality failed:", err);
       });
   }
 
@@ -465,5 +722,39 @@ export class PositionMonitor {
         console.error(`[position-monitor] Error in '${event}' handler:`, err);
       }
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal: default personality for pre-M2 trades
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns a synthetic PersonalityConfig used when a trade has no personality_id
+   * (pre-M2 trades created before the personality engine was deployed).
+   *
+   * HolderManager ignores the personality argument entirely (it has no
+   * personality-specific params), so the exact values here do not matter.
+   * We use management_style 'hold' to make the intent explicit and to ensure
+   * that if the personality object is ever inspected in a log, its values
+   * are self-documenting.
+   *
+   * This is NOT inserted into the DB — it is a transient in-memory default used
+   * solely to satisfy the ManagementHandler interface's non-null requirement.
+   */
+  private _defaultPersonality(): PersonalityConfig {
+    return {
+      id: "00000000-0000-0000-0000-000000000000",
+      name: "pre-m2-default",
+      displayName: "Pre-M2 Default (Hold)",
+      groupType: "reference",
+      entryType: "fixed_time",
+      managementStyle: "hold",
+      isFrozen: false,
+      isActive: false,
+      phase: 1,
+      params: {},
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    };
   }
 }
