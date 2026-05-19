@@ -259,6 +259,7 @@ export async function consumeCredit(
     // Acquire an application-level advisory lock that is automatically released
     // when this transaction ends. Serialises all concurrent consumeCredit calls
     // so only one reads + inserts at a time, preventing the TOCTOU race.
+    // Lock key 7241964 is arbitrary but stable — any non-zero integer works.
     await client.query('SELECT pg_advisory_xact_lock(7241964)');
 
     // Read the current balance within the locked transaction.
