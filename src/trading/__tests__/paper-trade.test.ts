@@ -12,7 +12,7 @@
  *   - NUMERIC columns come back as strings.
  *   - TIMESTAMPTZ comes back as Date.
  *   - DATE comes back as Date (midnight UTC).
- *   - SERIAL id comes back as number.
+ *   - id is a UUID (string) — the paper_trades table uses gen_random_uuid().
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -46,11 +46,11 @@ function makeMockPool(queryFn: (sql: string, params?: unknown[]) => unknown): im
  * Build a realistic raw DB row for a paper trade.
  *
  * NUMERIC columns are strings (as pg returns them). Timestamps are Dates.
- * The `id` for this helper is 1 (a SERIAL integer).
+ * The `id` is a UUID string — the paper_trades table uses gen_random_uuid().
  */
 function makeRawRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    id: 1,
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     symbol: 'NIFTY',
     // pg returns DATE as a Date object at midnight UTC.
     expiry: new Date('2026-05-22T00:00:00Z'),
@@ -80,24 +80,24 @@ const SAMPLE_ENTRY: PaperTradeEntry = {
 };
 
 // ---------------------------------------------------------------------------
-// 1. enterTrade — inserts and returns a numeric id
+// 1. enterTrade — inserts and returns a UUID string id
 // ---------------------------------------------------------------------------
 
 describe('enterTrade', () => {
-  it('inserts a trade and returns the numeric id from RETURNING id', async () => {
-    const pool = makeMockPool(() => ({ rows: [{ id: 42 }] }));
+  it('inserts a trade and returns the UUID string id from RETURNING id', async () => {
+    const pool = makeMockPool(() => ({ rows: [{ id: 'uuid-42' }] }));
 
     const id = await enterTrade(pool, SAMPLE_ENTRY);
 
-    expect(id).toBe(42);
-    expect(id).toBeTypeOf('number');
+    expect(id).toBe('uuid-42');
+    expect(id).toBeTypeOf('string');
   });
 
   it('calls db.query with the underlying, expiryDate, atmStrike, entryStraddleValue, entryTimestamp, entryType', async () => {
     const capturedArgs: unknown[][] = [];
     const pool = makeMockPool((_sql: string, params?: unknown[]) => {
       capturedArgs.push(params ?? []);
-      return { rows: [{ id: 7 }] };
+      return { rows: [{ id: 'uuid-7' }] };
     });
 
     await enterTrade(pool, SAMPLE_ENTRY);
@@ -124,16 +124,19 @@ describe('enterTrade', () => {
     const capturedArgs: unknown[][] = [];
     const pool = makeMockPool((_sql: string, params?: unknown[]) => {
       capturedArgs.push(params ?? []);
-      return { rows: [{ id: 3 }] };
+      return { rows: [{ id: 'uuid-trade-3' }] };
     });
-    const entryWithPersonality: PaperTradeEntry = { ...SAMPLE_ENTRY, personalityId: 5 };
+    const entryWithPersonality: PaperTradeEntry = {
+      ...SAMPLE_ENTRY,
+      personalityId: 'uuid-personality-5',
+    };
 
     const id = await enterTrade(pool, entryWithPersonality);
 
-    expect(id).toBe(3);
+    expect(id).toBe('uuid-trade-3');
     const params = capturedArgs[0] ?? [];
-    // personalityId 5 must be in the params list.
-    expect(params).toContain(5);
+    // personalityId must be in the params list.
+    expect(params).toContain('uuid-personality-5');
   });
 });
 
@@ -154,7 +157,7 @@ describe('exitTrade', () => {
 
     const pool = makeMockPool(() => ({ rows: [rawRow] }));
     const exit: PaperTradeExit = {
-      tradeId: 1,
+      tradeId: 'uuid-trade-1',
       exitStraddleValue: 200,
       exitTimestamp: Date.UTC(2026, 4, 19, 9, 30, 0),
       exitReason: 'TARGET',
@@ -178,7 +181,7 @@ describe('exitTrade', () => {
 
     const pool = makeMockPool(() => ({ rows: [rawRow] }));
     const exit: PaperTradeExit = {
-      tradeId: 1,
+      tradeId: 'uuid-trade-1',
       exitStraddleValue: 400,
       exitTimestamp: Date.UTC(2026, 4, 19, 7, 45, 0),
       exitReason: 'SL',
@@ -200,7 +203,7 @@ describe('exitTrade', () => {
 
     const pool = makeMockPool(() => ({ rows: [rawRow] }));
     const exit: PaperTradeExit = {
-      tradeId: 1,
+      tradeId: 'uuid-trade-1',
       exitStraddleValue: 200,
       exitTimestamp: Date.UTC(2026, 4, 19, 9, 45, 0),
       exitReason: 'EOD',
@@ -216,13 +219,13 @@ describe('exitTrade', () => {
     // An empty rows array means no trade was found with the given id.
     const pool = makeMockPool(() => ({ rows: [] }));
     const exit: PaperTradeExit = {
-      tradeId: 9999,
+      tradeId: 'uuid-trade-9999',
       exitStraddleValue: 200,
       exitTimestamp: Date.now(),
       exitReason: 'EOD',
     };
 
-    await expect(exitTrade(pool, exit)).rejects.toThrow(/no trade found with id 9999/);
+    await expect(exitTrade(pool, exit)).rejects.toThrow(/no trade found with id uuid-trade-9999/);
   });
 
   it('maps expiry DATE to a YYYY-MM-DD string', async () => {
@@ -236,7 +239,7 @@ describe('exitTrade', () => {
 
     const pool = makeMockPool(() => ({ rows: [rawRow] }));
     const exit: PaperTradeExit = {
-      tradeId: 1,
+      tradeId: 'uuid-trade-1',
       exitStraddleValue: 180,
       exitTimestamp: Date.now(),
       exitReason: 'TARGET',

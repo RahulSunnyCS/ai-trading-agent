@@ -41,12 +41,12 @@ export interface PaperTradeEntry {
   /** Signal type — 'SCHEDULED' | 'MOMENTUM_EXHAUSTION'. */
   entryType: string;
   /** FK to personality_configs.id (optional for MVP — null means unattributed). */
-  personalityId?: number;
+  personalityId?: string;
 }
 
 export interface PaperTradeExit {
-  /** The id returned by enterTrade(). */
-  tradeId: number;
+  /** The UUID returned by enterTrade(). */
+  tradeId: string;
   /** Current straddle value at exit (CE + PE). */
   exitStraddleValue: number;
   /** Exit moment as Unix milliseconds. */
@@ -56,7 +56,7 @@ export interface PaperTradeExit {
 }
 
 export interface PaperTradeRecord {
-  id: number;
+  id: string;
   underlying: string;
   expiryDate: string;
   atmStrike: number;
@@ -69,7 +69,7 @@ export interface PaperTradeRecord {
   pnl: number | null;
   status: 'open' | 'closed';
   entryType: string;
-  personalityId: number | null;
+  personalityId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,12 +79,11 @@ export interface PaperTradeRecord {
 /**
  * Raw row shape returned by pg from the paper_trades table.
  *
- * All NUMERIC columns come back as strings. id is SERIAL → number (pg parses
- * integer types natively). Timestamps come back as Date (pg auto-parses
- * TIMESTAMPTZ). DATE columns also come back as Date.
+ * All NUMERIC columns come back as strings. id is a UUID string. Timestamps
+ * come back as Date (pg auto-parses TIMESTAMPTZ). DATE columns also as Date.
  */
 interface RawTradeRow {
-  id: number;
+  id: string;
   // The DB schema uses 'symbol' for the underlying name.
   symbol: string;
   // The DB schema uses 'expiry' for the expiry date (DATE → pg returns Date).
@@ -116,16 +115,7 @@ interface RawTradeRow {
  * of aliasing noise and isolates the mapping to one place.
  */
 function mapRow(row: RawTradeRow): PaperTradeRecord {
-  // personality_id in the DB is a UUID string. The interface uses number|null.
-  // For MVP we cannot convert a UUID to a meaningful integer, so null is
-  // returned whenever the value is not already a parseable integer string.
-  // This preserves the interface contract without breaking the FK relationship.
-  const rawPersonalityId = row.personality_id;
-  let personalityId: number | null = null;
-  if (rawPersonalityId !== null) {
-    const parsed = Number.parseInt(rawPersonalityId, 10);
-    personalityId = Number.isFinite(parsed) ? parsed : null;
-  }
+  const personalityId: string | null = row.personality_id;
 
   // pg returns DATE columns as Date objects using midnight UTC. Convert to
   // ISO date string (YYYY-MM-DD) by reading the UTC date components.
@@ -175,7 +165,7 @@ function mapRow(row: RawTradeRow): PaperTradeRecord {
  * recorded before personalities are wired up. The FK constraint in the DB
  * still enforces referential integrity when a value is supplied.
  */
-export async function enterTrade(db: Pool, entry: PaperTradeEntry): Promise<number> {
+export async function enterTrade(db: Pool, entry: PaperTradeEntry): Promise<string> {
   const sql = `
     INSERT INTO paper_trades
       (symbol, expiry, strike, entry_straddle_value, entry_time,
@@ -200,10 +190,10 @@ export async function enterTrade(db: Pool, entry: PaperTradeEntry): Promise<numb
     RETURNING id
   `;
 
-  let result: QueryResult<{ id: number }>;
+  let result: QueryResult<{ id: string }>;
 
   if (entry.personalityId !== undefined) {
-    result = await db.query<{ id: number }>(sqlWithPersonality, [
+    result = await db.query<{ id: string }>(sqlWithPersonality, [
       entry.underlying,
       entry.expiryDate,
       entry.atmStrike,
@@ -217,7 +207,7 @@ export async function enterTrade(db: Pool, entry: PaperTradeEntry): Promise<numb
     // The current schema has personality_id as NOT NULL FK, so in practice
     // callers should always supply one in production. The else-branch
     // supports test scenarios where the FK is relaxed.
-    result = await db.query<{ id: number }>(sql, [
+    result = await db.query<{ id: string }>(sql, [
       entry.underlying,
       entry.expiryDate,
       entry.atmStrike,

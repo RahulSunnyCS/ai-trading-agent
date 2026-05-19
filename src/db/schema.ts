@@ -151,7 +151,7 @@ export interface PaperTrade {
  * uses descriptive names for readability in business logic.
  */
 export interface PaperTradeRecord {
-  id: number;
+  id: string;
   underlying: string;
   /** ISO date string 'YYYY-MM-DD'. */
   expiryDate: string;
@@ -165,7 +165,7 @@ export interface PaperTradeRecord {
   pnl: number | null;
   status: 'open' | 'closed';
   entryType: string;
-  personalityId: number | null;
+  personalityId: string | null;
 }
 
 export interface RetrospectionResult {
