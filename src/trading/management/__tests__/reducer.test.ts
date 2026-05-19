@@ -20,7 +20,7 @@
 
 import type { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenPosition, PersonalityConfig } from "../../../db/schema.js";
+import type { OpenPosition, PersonalityConfigM2 as PersonalityConfig } from "../../../db/schema.js";
 import { FixedClock } from "../../../utils/clock.js";
 import type { PaperTradeExecutor } from "../../paper-trade-executor.js";
 import type { TriggerConfig } from "../../trigger-engine.js";

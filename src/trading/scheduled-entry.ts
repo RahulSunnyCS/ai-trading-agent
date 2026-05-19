@@ -70,7 +70,7 @@ function parseHHMMToMinutes(hhMM: string): number {
  * configuration on the host and produces identical results in every locale.
  */
 function getISTMinutes(clock: Clock): number {
-  const istMs = clock.timestamp() + IST_OFFSET_MS;
+  const istMs = (clock.timestamp?.() ?? clock.now()) + IST_OFFSET_MS;
   const d = new Date(istMs);
   return d.getUTCHours() * 60 + d.getUTCMinutes();
 }

@@ -274,7 +274,7 @@ export function createStraddleCalculator(
 
     const snapshot: StraddleSnapshot = {
       underlying,
-      timestamp: clock.timestamp(),
+      timestamp: clock.timestamp?.() ?? clock.now(),
       atmStrike,
       cePrice,
       pePrice,

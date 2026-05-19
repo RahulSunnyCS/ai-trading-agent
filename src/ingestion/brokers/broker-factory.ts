@@ -162,5 +162,5 @@ function _createSimulator(clock: ClockWithTick): MarketDataSimulator {
     `[BrokerFactory] Instantiating MarketDataSimulator (tick interval: ${tickIntervalMs} ms)`,
   );
 
-  return new MarketDataSimulator({ clock, tickIntervalMs });
+  return new MarketDataSimulator({ clock, intervalMs: tickIntervalMs });
 }

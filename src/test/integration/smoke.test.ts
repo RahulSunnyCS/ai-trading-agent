@@ -31,8 +31,8 @@ import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildServer } from "../../api/server.js";
 import { createBroker } from "../../ingestion/brokers/broker-factory.js";
-import { StraddleCalculator } from "../../ingestion/straddle-calc.js";
-import { VixFeed } from "../../ingestion/vix-feed.js";
+import { type StraddleCalculator, createStraddleCalculator } from "../../ingestion/straddle-calc.js";
+import { type VixFeed, createVixFeed } from "../../ingestion/vix-feed.js";
 // We intentionally use the module-level redis singleton for stream consumption,
 // so all stream publish/consume goes through the same Redis connection.
 import { redis } from "../../redis/client.js";
@@ -113,11 +113,11 @@ beforeAll(async () => {
   // StraddleCalculator uses the module-level redis singleton for publishing so
   // that the straddle.values stream is visible to the module-level streamConsume
   // calls in EntryEngine and PositionMonitor.
-  calc = new StraddleCalculator({ db: testDb, redis: redis as Redis, clock });
+  calc = createStraddleCalculator(redis as Redis, { underlying: 'NIFTY', clock });
 
   // VixFeed is network-dependent (NSE API). In simulation mode it will fail
   // to fetch VIX but that is acceptable — vixAtEntry will be null on trades.
-  vixFeed = new VixFeed({ clock });
+  vixFeed = createVixFeed(redis as Redis, { clock });
 
   entryEngine = new EntryEngine({ db: testDb, redis: redis as Redis, clock });
 
@@ -136,8 +136,11 @@ beforeAll(async () => {
   });
 
   // ---- Start components ----
+  broker.onTick((tick) => {
+    void (redis as Redis).xadd('market.ticks', '*', 'data', JSON.stringify(tick));
+  });
   broker.connect();
-  calc.start(broker);
+  calc.start();
   vixFeed.start();
   await positionMonitor.start();
   entryEngine.start();

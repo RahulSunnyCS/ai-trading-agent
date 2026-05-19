@@ -6,7 +6,7 @@
  * via FixedClock for deterministic gate evaluation.
  */
 
-import type { Pool } from "ioredis";
+import type { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EntryEngine, type EntryIntent } from "../../trading/entry-engine.js";
 import { FixedClock } from "../../utils/clock.js";

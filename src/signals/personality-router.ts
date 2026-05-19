@@ -54,7 +54,7 @@ import { STREAM_SIGNALS } from "../redis/client.js";
 import type { Clock } from "../utils/clock.js";
 import { PaperTradeExecutor } from "../trading/paper-trade-executor.js";
 import { QuantiplyStub } from "../trading/quantiply-stub.js";
-import type { PersonalityConfig } from "../db/schema.js";
+import type { PersonalityConfigM2 as PersonalityConfig } from "../db/schema.js";
 import {
   type StraddleSignalInput,
   fetchDailyState,

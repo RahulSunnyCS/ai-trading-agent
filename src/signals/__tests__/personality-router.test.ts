@@ -20,7 +20,7 @@
 import type { Redis } from "ioredis";
 import type { Pool, QueryResult } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PersonalityConfig } from "../../db/schema.js";
+import type { PersonalityConfigM2 as PersonalityConfig } from "../../db/schema.js";
 import { FixedClock } from "../../utils/clock.js";
 import { PersonalityRouter, type IncomingSignal } from "../personality-router.js";
 

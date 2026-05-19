@@ -25,7 +25,7 @@
  */
 
 import type { Pool } from "pg";
-import type { OpenPosition, PersonalityConfig } from "../../db/schema.js";
+import type { OpenPosition, PersonalityConfigM2 as PersonalityConfig } from "../../db/schema.js";
 import type { Clock } from "../../utils/clock.js";
 import type { PaperTradeExecutor } from "../paper-trade-executor.js";
 import { evaluateTriggers } from "../trigger-engine.js";

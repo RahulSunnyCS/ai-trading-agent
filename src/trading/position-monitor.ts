@@ -492,11 +492,7 @@ export class PositionMonitor {
         this._clock,
         this._triggerConfig,
         this._db,
-        // Cast PersonalityConfigM2 (camelCase, used by position-monitor) to
-        // PersonalityConfig (snake_case, expected by management handlers).
-        // Both map to the same personality_configs DB row — the difference is
-        // only the property naming convention used by each module.
-        (personality ?? this._defaultPersonality()) as unknown as PersonalityConfigSnake,
+        personality ?? this._defaultPersonality(),
       );
 
       if (decision.shouldExit && decision.exitReason !== undefined) {
@@ -635,8 +631,7 @@ export class PositionMonitor {
             this._clock,
             this._triggerConfig,
             this._db,
-            // Same camelCase→snake_case cast as in _handleSnapshot above.
-            (personality ?? this._defaultPersonality()) as unknown as PersonalityConfigSnake,
+            personality ?? this._defaultPersonality(),
           );
 
           // Only act on time-based exits in the watchdog.
@@ -769,7 +764,7 @@ export class PositionMonitor {
 
 import type { StraddleSnapshot } from '../ingestion/straddle-calc';
 import { type Clock, RealClock } from '../utils/clock';
-import { exitTrade, getOpenTrades } from './paper-trade';
+import { exitTrade, getOpenTrades as getOpenTradesFactory } from './paper-trade';
 import { type Position, evaluateExit, updateHighWatermark } from './trigger-exit';
 
 export interface PositionMonitorConfig {
@@ -907,9 +902,9 @@ export function createPositionMonitor(
   async function evaluateSnapshot(snapshot: StraddleSnapshot): Promise<void> {
     const currentValue = snapshot.straddleValue;
 
-    let openTrades: Awaited<ReturnType<typeof getOpenTrades>>;
+    let openTrades: Awaited<ReturnType<typeof getOpenTradesFactory>>;
     try {
-      openTrades = await getOpenTrades(db);
+      openTrades = await getOpenTradesFactory(db);
     } catch (err) {
       console.error('[position-monitor] failed to load open trades:', err);
       return;

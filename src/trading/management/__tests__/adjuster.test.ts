@@ -21,7 +21,7 @@
 
 import type { Pool, PoolClient } from "pg";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenPosition, PersonalityConfig } from "../../../db/schema.js";
+import type { OpenPosition, PersonalityConfigM2 as PersonalityConfig } from "../../../db/schema.js";
 import { FixedClock } from "../../../utils/clock.js";
 import { AdjusterManager } from "../adjuster.js";
 

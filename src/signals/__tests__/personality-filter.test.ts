@@ -11,7 +11,7 @@
 
 import type { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PersonalityConfig } from "../../db/schema.js";
+import type { PersonalityConfigM2 as PersonalityConfig } from "../../db/schema.js";
 import {
   type DailyState,
   type StraddleSignalInput,

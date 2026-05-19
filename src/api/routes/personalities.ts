@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import type { Pool } from "pg";
-import type { PersonalityConfig } from "../../db/schema.js";
+import type { PersonalityConfigM2 as PersonalityConfig } from "../../db/schema.js";
 
 /**
  * Options injected when this plugin is registered.

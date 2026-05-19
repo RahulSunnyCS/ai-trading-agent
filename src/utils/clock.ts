@@ -64,8 +64,8 @@ export interface Clock {
    * should call `new Date(clock.now())` or use `clock.timestamp()`.
    */
   now(): number;
-  /** Returns milliseconds since epoch (equivalent to Date.now()). Alias for now(). */
-  timestamp(): number;
+  /** Returns milliseconds since epoch. Optional alias for now() — prefer now(). */
+  timestamp?(): number;
   /**
    * Returns the current IST date as a 'YYYY-MM-DD' string.
    * Added for M2 compatibility — M2 code calls clock.today() for date-keyed
@@ -332,7 +332,7 @@ export const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
  * Used by entry/exit window logic in the trading engine.
  */
 export function toISTTimeString(clock: Clock): string {
-  const istMs = clock.timestamp() + IST_OFFSET_MS;
+  const istMs = (clock.timestamp?.() ?? clock.now()) + IST_OFFSET_MS;
   const d = new Date(istMs);
   const h = String(d.getUTCHours()).padStart(2, '0');
   const m = String(d.getUTCMinutes()).padStart(2, '0');

@@ -18,6 +18,9 @@ export interface BrokerTick {
   oi?: number; // Open interest (options only)
   bid?: number; // Best bid price
   ask?: number; // Best ask price
+  time?: number; // Broker-assigned wall-clock time (ms); used by Fyers/AngelOne adapters
+  underlying?: string; // Underlying index symbol (derived by broker adapters)
+  isIndex?: boolean; // True for index spot ticks (no option chain fields)
 }
 
 /**
@@ -55,6 +58,15 @@ export interface BrokerFeed {
    */
   disconnect(): Promise<void>;
 }
+
+/** Reason codes for a broker feed disconnect — used by fyers.ts and angelone.ts adapters. */
+export const DisconnectReason = {
+  MANUAL: 'intentional',
+  AUTH_FAILURE: 'error',
+  TRANSIENT: 'reconnect',
+} as const;
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export type DisconnectReason = string;
 
 /**
  * Symbol format helpers — Fyers uses a specific encoding for options.
