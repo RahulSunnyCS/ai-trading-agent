@@ -48,6 +48,15 @@ export function isPaymentEnabled(): boolean {
   return Boolean(process.env.RAZORPAY_KEY_ID);
 }
 
+/**
+ * True when the configured Razorpay key is a test key (prefix `rzp_test_`).
+ * Razorpay test keys never move real money — safe to show UI warnings.
+ * Returns false when payment mode is disabled (no key configured).
+ */
+export function isTestMode(): boolean {
+  return process.env.RAZORPAY_KEY_ID?.startsWith('rzp_test_') ?? false;
+}
+
 // ---------------------------------------------------------------------------
 // Lazy Razorpay client (singleton — created once, reused across requests)
 // ---------------------------------------------------------------------------

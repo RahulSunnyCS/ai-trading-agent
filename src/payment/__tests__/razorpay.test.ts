@@ -85,6 +85,34 @@ describe('isPaymentEnabled()', () => {
 });
 
 // ---------------------------------------------------------------------------
+// isTestMode
+// ---------------------------------------------------------------------------
+
+describe('isTestMode()', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return true for a rzp_test_ prefixed key', async () => {
+    vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_test_abc123');
+    const { isTestMode } = await import('../razorpay.ts');
+    expect(isTestMode()).toBe(true);
+  });
+
+  it('should return false for a rzp_live_ prefixed key', async () => {
+    vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_live_abc123');
+    const { isTestMode } = await import('../razorpay.ts');
+    expect(isTestMode()).toBe(false);
+  });
+
+  it('should return false when RAZORPAY_KEY_ID is not set', async () => {
+    vi.stubEnv('RAZORPAY_KEY_ID', '');
+    const { isTestMode } = await import('../razorpay.ts');
+    expect(isTestMode()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // initRazorpay
 // ---------------------------------------------------------------------------
 
