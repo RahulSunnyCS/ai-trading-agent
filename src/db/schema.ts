@@ -137,6 +137,37 @@ export interface PaperTrade {
   updated_at: Date;
 }
 
+/**
+ * Public interface for paper trade records as consumed by the trading engine.
+ *
+ * Column name mapping from the DB schema:
+ *   symbol              → underlying
+ *   expiry              → expiryDate (ISO 'YYYY-MM-DD' string)
+ *   strike              → atmStrike
+ *   entry_time          → entryTimestamp
+ *   pnl_abs             → pnl
+ *
+ * The DB schema uses short column names for query efficiency; this interface
+ * uses descriptive names for readability in business logic.
+ */
+export interface PaperTradeRecord {
+  id: number;
+  underlying: string;
+  /** ISO date string 'YYYY-MM-DD'. */
+  expiryDate: string;
+  atmStrike: number;
+  entryStraddleValue: number;
+  exitStraddleValue: number | null;
+  entryTimestamp: Date;
+  exitTimestamp: Date | null;
+  exitReason: string | null;
+  /** Short-straddle absolute P&L: entryStraddleValue - exitStraddleValue. Null until closed. */
+  pnl: number | null;
+  status: 'open' | 'closed';
+  entryType: string;
+  personalityId: number | null;
+}
+
 export interface RetrospectionResult {
   id: string;
   personality_id: string;
