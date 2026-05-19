@@ -3,15 +3,15 @@
 At-a-glance mirror of `ROADMAP.md` + formally contracted pipeline tasks.
 ⭐ = first runnable milestone. 🔒 = task contract written (pipeline/tasks/T-XX.json).
 
-**Build status:** 0 / 73 tasks complete. Greenfield — only docs exist.
+**Build status:** 5 / 73 tasks complete (T-01, T-02, T-03, T-04, T-72 done). M0 in progress.
 
 ---
 
 ## Milestone 0 — Scaffolding & Infrastructure
-- [ ] T-01 Bun project init (package.json, tsconfig strict, .env.example, dirs)
-- [ ] T-02 Docker Compose (TimescaleDB pg16 + Redis 7, healthchecks)
-- [ ] T-03 Postgres client + idempotent migration runner
-- [ ] T-04 Redis client + stream helpers (market.ticks / straddle.values / signals.generated)
+- [x] T-01 Bun project init (package.json, tsconfig strict, .env.example, dirs)
+- [x] T-02 Docker Compose (TimescaleDB pg16 + Redis 7, healthchecks)
+- [x] T-03 Postgres client + idempotent migration runner
+- [x] T-04 Redis client + stream helpers (market.ticks / straddle.values / signals.generated)
 - [ ] T-05 Core schema migration 001 (hypertables + tables + straddle_1min + schema.ts)
 - [ ] T-06 Seed migration 002 — single Clockwork-style personality (MVP)
 
@@ -95,7 +95,7 @@ Credits = feature tokens (1 credit consumed per feature call, e.g. backtest run)
 No mandate / no autopay — all payments are one-time Razorpay Orders.
 Silent fail: omit RAZORPAY_KEY_ID → free/open access, no payment screens.
 
-- [ ] T-72 🔒 Update business.md Pipeline Scope (governance — re-enable pricing-reviewer, document PCI boundary)
+- [x] T-72 🔒 Update business.md Pipeline Scope (governance — re-enable pricing-reviewer, document PCI boundary)
 - [ ] T-64 🔒 DB migrations: access_grants + credit_transactions + processed_webhook_events (depends: T-03, T-05)
 - [ ] T-65 🔒 Razorpay service module: createOrder, verifyPaymentSig, verifyWebhookSig (raw bytes), consumeCredit (depends: T-01, T-64)
 - [ ] T-66 🔒 Geolocation service: ip-api.com, injectable, graceful fail → show both options (depends: T-01)
