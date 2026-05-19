@@ -449,34 +449,40 @@ export async function getMacroContext(redis: Redis): Promise<MacroContext> {
     gold: null,
   };
 
-  for (const inst of INSTRUMENTS) {
-    try {
-      const raw = await redis.get(`macro:${inst.key}`);
-      if (raw === null) {
-        // Key not present in Redis (never set or TTL expired) — null is valid.
-        continue;
+  // Fetch all five Redis keys in parallel. Each promise writes to a different
+  // key on the shared context object — no write races because each iteration
+  // targets a unique inst.key field. Promise.all is used (not allSettled)
+  // because each callback already catches its own errors and never rejects.
+  await Promise.all(
+    INSTRUMENTS.map(async (inst) => {
+      try {
+        const raw = await redis.get(`macro:${inst.key}`);
+        if (raw === null) {
+          // Key not present in Redis (never set or TTL expired) — null is valid.
+          return;
+        }
+
+        const parsed = JSON.parse(raw) as MacroDataPoint;
+
+        // Basic shape check to guard against corrupted Redis values.
+        if (
+          typeof parsed.value !== "number" ||
+          typeof parsed.change_pct !== "number" ||
+          typeof parsed.timestamp !== "number"
+        ) {
+          console.warn(
+            `[GlobalMacroFeed] getMacroContext: invalid shape for macro:${inst.key} — skipping`,
+          );
+          return;
+        }
+
+        context[inst.key] = parsed;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[GlobalMacroFeed] getMacroContext failed for ${inst.key}: ${msg}`);
       }
-
-      const parsed = JSON.parse(raw) as MacroDataPoint;
-
-      // Basic shape check to guard against corrupted Redis values.
-      if (
-        typeof parsed.value !== "number" ||
-        typeof parsed.change_pct !== "number" ||
-        typeof parsed.timestamp !== "number"
-      ) {
-        console.warn(
-          `[GlobalMacroFeed] getMacroContext: invalid shape for macro:${inst.key} — skipping`,
-        );
-        continue;
-      }
-
-      context[inst.key] = parsed;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[GlobalMacroFeed] getMacroContext failed for ${inst.key}: ${msg}`);
-    }
-  }
+    }),
+  );
 
   return context;
 }
