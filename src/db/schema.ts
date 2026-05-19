@@ -1,167 +1,125 @@
-// TypeScript types matching the database schema.
-// These are plain data types — no ORM, no magic.
+/**
+ * TypeScript interfaces for every database table in migration 001.
+ *
+ * IMPORTANT — NUMERIC columns are typed as `string`, not `number`.
+ *
+ * Reason: the pg client is configured with `pg.types.setTypeParser(1700, val => val)`
+ * in src/db/client.ts. OID 1700 is the PostgreSQL NUMERIC type. This parser
+ * returns the raw wire-format string instead of coercing it to a JS float.
+ * Typing these columns as `number` would be a lie: callers receive a string at
+ * runtime and must use string arithmetic or a decimal library (e.g. `decimal.js`)
+ * for any precision math. Using `number` would silently introduce floating-point
+ * rounding errors in P&L calculations, which are unacceptable in a trading context.
+ *
+ * All column names are camelCase to match TypeScript conventions. The pg driver
+ * returns column names in lowercase by default, so the SQL column names use
+ * snake_case and callers alias or map as needed when the column name differs
+ * from camelCase.
+ */
 
-export type Underlying = 'NIFTY' | 'BANKNIFTY' | 'SENSEX';
-export type OptionType = 'CE' | 'PE';
-export type SignalType = 'MOMENTUM_EXHAUSTION' | 'SCHEDULED' | 'PULLBACK';
-export type MarketRegime = 'RANGING' | 'TRENDING_STRONG' | 'VOLATILE_REVERTING' | 'EVENT_DAY';
-export type TradeStatus = 'open' | 'closed' | 'stopped';
-export type ExitReason = 'TARGET' | 'SL' | 'TSL' | 'EOD' | 'MANUAL';
-export type EntryType = 'FIXED_TIME' | 'MOMENTUM_EXHAUSTION' | 'ANY_SIGNAL' | 'SR_ANCHORED';
-export type ManagementStyle = 'HOLD' | 'ROLL' | 'CUT_REENTER';
-export type ConfidenceTier = 'LOW' | 'MEDIUM' | 'HIGH';
-export type MgmtVerdict = 'HELPED' | 'HURT' | 'NEUTRAL';
+// ---------------------------------------------------------------------------
+// paper_trades
+// ---------------------------------------------------------------------------
 
+/**
+ * One simulated straddle paper trade opened by a personality.
+ *
+ * Nullable columns (entry/exit legs, context data) use `string | null` rather
+ * than optional `?` to make it explicit that these fields always come back from
+ * the database — they are simply NULL-valued, not absent from the row object.
+ *
+ * status is narrowed to the literal union to match the CHECK constraint in the
+ * migration rather than being typed as plain `string`.
+ */
+export interface PaperTrade {
+  id: string;
+  entryTime: Date;
+  exitTime: Date | null;
+  entryCeStrike: string | null;
+  entryPeStrike: string | null;
+  entryCePrice: string | null;
+  entryPePrice: string | null;
+  exitCePrice: string | null;
+  exitPePrice: string | null;
+  lots: number;
+  lotSize: number;
+  straddleAtEntry: string;
+  lowestStraddleValueSeen: string;
+  vixAtEntry: string | null;
+  spotAtEntry: string | null;
+  exitReason: string | null;
+  grossPnl: string | null;
+  netPnl: string | null;
+  maxDrawdown: string | null;
+  status: "open" | "closed";
+  notes: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// market_ticks
+// ---------------------------------------------------------------------------
+
+/**
+ * One raw tick from the broker WebSocket or simulator.
+ *
+ * volume and oi are nullable because the Fyers WebSocket does not always
+ * include them in every tick message.
+ *
+ * time is typed as Date because pg automatically parses TIMESTAMPTZ columns
+ * to JS Date objects (unlike NUMERIC, there is no custom type parser needed).
+ */
 export interface MarketTick {
   time: Date;
   symbol: string;
-  underlying: Underlying;
-  expiry?: Date;
-  strike?: number;
-  option_type?: OptionType;
-  ltp: number;
-  bid?: number;
-  ask?: number;
-  volume?: number;
-  oi?: number;
+  lastPrice: string;
+  volume: bigint | null;
+  oi: bigint | null;
 }
 
+// ---------------------------------------------------------------------------
+// straddle_snapshots
+// ---------------------------------------------------------------------------
+
+/**
+ * One 15-second ATM straddle snapshot produced by straddle-calc.ts.
+ *
+ * vix is nullable: the VIX poller may not have a value at startup before the
+ * NSE API responds.
+ */
 export interface StraddleSnapshot {
   time: Date;
-  underlying: Underlying;
-  expiry: Date;
-  atm_strike: number;
-  ce_ltp?: number;
-  pe_ltp?: number;
-  straddle_value?: number;
-  straddle_change_pct?: number;
-  roc?: number;
-  acceleration?: number;
-  vix?: number;
+  underlying: string;
+  spot: string;
+  atmStrike: string;
+  cePrice: string;
+  pePrice: string;
+  straddleValue: string;
+  vix: string | null;
 }
 
-export interface StraddleSignal {
-  id: string;
-  created_at: Date;
-  underlying: Underlying;
-  expiry: Date;
-  signal_time: Date;
-  signal_type: SignalType;
-  atm_strike: number;
-  straddle_value?: number;
-  expansion_pct?: number;
-  probability?: number;
-  confidence_tier?: ConfidenceTier;
-  trigger_layer?: string;
-  status: string;
-  actual_peak_value?: number;
-  actual_peak_time?: Date;
-  signal_to_peak_gap_pct?: number;
-}
+// ---------------------------------------------------------------------------
+// OpenPosition (runtime shape — not a DB table)
+// ---------------------------------------------------------------------------
 
-export interface ExternalSignal {
+/**
+ * The in-memory shape consumed by the trigger engine (T-16) to evaluate
+ * whether an open position should be closed, rolled, or held.
+ *
+ * This is derived from `paper_trades` rows where status = 'open'. It carries
+ * only the fields the trigger engine needs — the full `PaperTrade` row is not
+ * required at decision time.
+ *
+ * entryTimeMs is epoch milliseconds (Date.getTime()) rather than a Date object
+ * because the trigger engine compares it to Date.now() for time-in-trade
+ * calculations, and arithmetic on numbers is simpler than Date subtraction.
+ *
+ * todayNetPnl is a running P&L string computed by the trigger engine from the
+ * current straddle value versus straddleAtEntry, not stored directly in the DB.
+ */
+export interface OpenPosition {
   id: string;
-  recorded_at: Date;
-  signal_date: Date;
-  signal_type: 'FII_DII' | 'GLOBAL_CUES' | 'SENTIMENT' | 'CALENDAR' | 'VIX';
-  source?: string;
-  data: Record<string, unknown>;
-  relevance?: number;
-}
-
-export interface PersonalityConfig {
-  id: string;
-  name: string;
-  version: number;
-  is_active: boolean;
-  is_frozen: boolean;
-  created_at: Date;
-  entry_type: EntryType;
-  management_style: ManagementStyle;
-  phase: number;
-  min_probability?: number;
-  max_daily_trades: number;
-  max_daily_loss: number;
-  entry_delay_secs: number;
-  position_multiplier: number;
-  adjustment_trigger_points?: number;
-  max_open_legs?: number;
-  reentry_min_probability?: number;
-  min_vix: number;
-  max_vix: number;
-  require_profit_gate: boolean;
-  profit_gate_amount?: number;
-  profit_gate_days?: number;
-  allow_reentry: boolean;
-  reentry_delay_mins?: number;
-  allowed_regimes?: MarketRegime[];
-  allowed_strategies?: number[];
-  cached_win_rate?: number;
-  cached_sharpe?: number;
-  cached_total_trades?: number;
-  cache_updated_at?: Date;
-  evolved_from?: string;
-  evolution_reason?: string;
-}
-
-export interface PaperTrade {
-  id: string;
-  personality_id?: string;
-  signal_id?: string;
-  strategy_id: number;
-  underlying: Underlying;
-  expiry: Date;
-  entry_time: Date;
-  exit_time?: Date;
-  status: TradeStatus;
-  exit_reason?: ExitReason;
-  entry_ce_strike?: number;
-  entry_ce_price?: number;
-  exit_ce_price?: number;
-  entry_pe_strike?: number;
-  entry_pe_price?: number;
-  exit_pe_price?: number;
-  lots: number;
-  position_multiplier: number;
-  gross_pnl?: number;
-  net_pnl?: number;
-  max_drawdown?: number;
-  max_favorable_excursion?: number;
-  vix_at_entry?: number;
-  spot_at_entry?: number;
-  straddle_at_entry?: number;
-  market_regime?: MarketRegime;
-  has_event_flag: boolean;
-}
-
-export interface RetrospectionResult {
-  id: string;
-  analysis_date: Date;
-  personality_id: string;
-  run_at: Date;
-  market_regime: MarketRegime;
-  vix_open?: number;
-  index_move_pct?: number;
-  total_trades?: number;
-  winning_trades?: number;
-  losing_trades?: number;
-  win_rate?: number;
-  total_pnl?: number;
-  avg_pnl_per_trade?: number;
-  max_drawdown?: number;
-  sharpe_ratio?: number;
-  clockwork_pnl_today?: number;
-  beat_clockwork_by?: number;
-  signals_received?: number;
-  signals_acted_on?: number;
-  signal_brier_score?: number;
-  adjustments_made?: number;
-  mgmt_pnl_delta?: number;
-  mgmt_verdict?: MgmtVerdict;
-  threshold_drift_flag: boolean;
-  evolution_paused: boolean;
-  insights?: Record<string, unknown>;
-  suggested_changes?: Record<string, unknown>;
-  applied: boolean;
-  applied_at?: Date;
+  entryStraddleValue: string;
+  lowestStraddleValueSeen: string;
+  entryTimeMs: number;
+  todayNetPnl: string;
 }

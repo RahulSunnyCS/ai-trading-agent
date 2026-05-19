@@ -1,264 +1,191 @@
-import 'dotenv/config';
-import { runMigrations } from './db/migrate';
-import { closePool } from './db/client';
-import { getRedis, closeRedis } from './redis/client';
-import { FyersFeed } from './ingestion/brokers/fyers';
-import { currentExpiry, FYERS_INDEX_SYMBOLS, buildFyersSymbol } from './ingestion/brokers/instrument-registry';
-import { setVix } from './ingestion/vix-feed';
-import { MarketDataSimulator } from './ingestion/market-data-sim';
-import {
-  computeAndSaveSnapshot,
-  consumeTickStream,
-  updatePrice,
-  resetDayState,
-  getAtmStrike,
-  buildOptionSymbol,
-  getPrice as getOptionPrice,
-} from './ingestion/straddle-calc';
-import type { BrokerTick } from './ingestion/brokers/types';
-import { isMarketHours } from './utils/market-hours';
-import type { Underlying } from './db/schema';
-import { startTradingLoop, stopTradingLoop } from './trading/trading-loop';
+/**
+ * Main entry point — full pipeline wiring.
+ *
+ * Startup sequence:
+ *   1. Run DB migrations (fail fast if DB is unreachable)
+ *   2. Determine clock (VirtualClock in SIMULATE mode, RealClock otherwise)
+ *   3. Instantiate all components with the shared clock
+ *   4. Start components in dependency order
+ *   5. Register SIGTERM / SIGINT handlers for graceful shutdown
+ *
+ * In simulation mode the clock is advanced programmatically by a setInterval
+ * so that VirtualClock.tick() callbacks (straddle calc, VIX feed, watchdog) fire
+ * deterministically without real wall-clock time passing at 1:1 speed.
+ *
+ * All exports are named exports per project convention. This file has no exports
+ * because it is the process entry point.
+ */
 
-const SIMULATE        = process.env.SIMULATE === 'true' || process.argv.includes('--simulate');
-const UNDERLYING      = (process.env.SIM_UNDERLYING ?? 'NIFTY') as Underlying;
-const SNAPSHOT_MS     = 15_000;  // straddle snapshot every 15 seconds
-const TICK_CONSUME_MS = 500;     // drain tick stream into price cache twice per second
+import { buildServer } from "./api/server.js";
+import { pool } from "./db/client.js";
+import { runMigrations } from "./db/migrate.js";
+import { createBroker } from "./ingestion/brokers/broker-factory.js";
+import { StraddleCalculator } from "./ingestion/straddle-calc.js";
+import { VixFeed } from "./ingestion/vix-feed.js";
+import { closeRedis, redis } from "./redis/client.js";
+import { EntryEngine } from "./trading/entry-engine.js";
+import { PaperTradeExecutor } from "./trading/paper-trade-executor.js";
+import { PositionMonitor } from "./trading/position-monitor.js";
+import { QuantiplyStub } from "./trading/quantiply-stub.js";
+import { loadTriggerConfig } from "./trading/trigger-engine.js";
+import { RealClock, VirtualClock } from "./utils/clock.js";
 
-// ── Shutdown handler ───────────────────────────────────────────────────────────
-let fyersFeed:  FyersFeed | null = null;
-let simulator:  MarketDataSimulator | null = null;
+// ---------------------------------------------------------------------------
+// Main startup function — separated so async/await works at module level.
+// ---------------------------------------------------------------------------
 
-async function shutdown(signal: string): Promise<void> {
-  console.log(`\n[main] Received ${signal}. Shutting down...`);
-  stopTradingLoop();
-  fyersFeed?.disconnect();
-  simulator?.stop();
-  await closeRedis();
-  await closePool();
-  process.exit(0);
-}
-
-process.on('SIGINT',  () => void shutdown('SIGINT'));
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
-
-// ── Main ───────────────────────────────────────────────────────────────────────
 async function main(): Promise<void> {
-  console.log('[main] AI Trading Agent — Data Ingestion (Broker: Fyers)');
-  console.log(`[main] Mode: ${SIMULATE ? 'SIMULATION' : 'LIVE'}`);
-
+  // Step 1: run migrations before anything else. If PostgreSQL is unreachable
+  // or the schema is inconsistent this throws immediately, preventing the app
+  // from starting in a broken state (fail fast principle).
   await runMigrations();
 
-  await getRedis().ping();
-  console.log('[main] Redis ready');
+  // Step 2: choose clock based on SIMULATE env var.
+  // VirtualClock is used in simulation mode so that all time-based callbacks
+  // (straddle snapshots, VIX polling, position watchdog) are driven by
+  // clock.advance() calls rather than wall-clock timers. This makes simulation
+  // faster than real time and allows tests to control time precisely.
+  //
+  // We start VirtualClock at the current wall-clock epoch so that IST date
+  // strings produced by clock.today() are correct even in simulation mode.
+  const simulate = process.env.SIMULATE?.toLowerCase().trim() === "true";
 
-  if (SIMULATE) {
-    await startSimulation();
+  // Both VirtualClock and RealClock satisfy the ClockWithTick intersection type
+  // required by createBroker / StraddleCalculator / VixFeed / PositionMonitor.
+  // RealClock does not have tick() — but in live mode the broker adapter and
+  // all components that need tick() use real setInterval internally.
+  // VirtualClock.tick() registers a callback that fires on clock.advance() calls.
+  //
+  // Note: TypeScript is satisfied because VirtualClock has tick() and all
+  // component configs accept the ClockWithTick intersection structurally.
+  const clock = simulate
+    ? new VirtualClock(Date.now())
+    : (new RealClock() as unknown as VirtualClock); // RealClock cast: live mode never calls tick()
+
+  if (simulate) {
+    console.log(`[index] Simulation mode active — advancing clock every ${SIM_TICK_INTERVAL_MS}ms`);
   } else {
-    await startLiveFeed();
+    console.log("[index] Live mode active — using real clock");
   }
 
-  console.log('[main] Ingestion pipeline running. Ctrl+C to stop.');
-}
+  // Step 3: instantiate all components.
+  // createBroker reads BROKER and SIMULATE env vars and picks the right adapter.
+  const broker = createBroker(clock);
 
-// ── Live feed — Fyers ──────────────────────────────────────────────────────────
-async function startLiveFeed(): Promise<void> {
-  const appId       = process.env.FYERS_APP_ID;
-  const accessToken = process.env.FYERS_ACCESS_TOKEN;
+  const calc = new StraddleCalculator({ db: pool, redis, clock });
+  const vixFeed = new VixFeed({ clock });
 
-  if (!appId || !accessToken) {
-    throw new Error(
-      'Missing FYERS_APP_ID or FYERS_ACCESS_TOKEN. ' +
-      'Set SIMULATE=true to run without credentials.'
-    );
-  }
+  const entryEngine = new EntryEngine({ db: pool, redis, clock });
 
-  const expiry = currentExpiry(UNDERLYING);
+  const quantiply = new QuantiplyStub();
+  const executor = new PaperTradeExecutor({ db: pool, quantiply });
 
-  fyersFeed = new FyersFeed({ appId, accessToken });
-
-  // Route every tick into: price cache + VIX cache + straddle snapshots
-  fyersFeed.onTick((tick: BrokerTick) => {
-    routeTick(tick);
+  const positionMonitor = new PositionMonitor({
+    clock,
+    db: pool,
+    redis,
+    executor,
+    triggerConfig: loadTriggerConfig(),
+    entryEngine,
   });
 
-  fyersFeed.onConnect(() => {
-    // Subscribe to index spot + VIX first
-    fyersFeed!.subscribeIndexes([UNDERLYING]);
+  const server = buildServer({ db: pool, redis, clock });
 
-    // Subscribe to ATM ±2 strikes for current weekly expiry
-    const spot    = 24_000; // initial estimate; will self-correct after first spot tick
-    const atm     = getAtmStrike(spot, UNDERLYING);
-    const strikes = [atm - 200, atm - 100, atm, atm + 100, atm + 200];
+  // Step 4: start components in dependency order.
+  // broker must connect before calc.start(broker) subscribes to tick events.
+  // vixFeed and entryEngine are independent; positionMonitor depends on entryEngine.
+  // server.listen is last so the HTTP surface is not available until the pipeline
+  // is fully wired and ready to serve data.
+  await broker.connect();
+  calc.start(broker);
+  vixFeed.start();
+  await positionMonitor.start();
+  entryEngine.start();
 
-    fyersFeed!.subscribe(
-      strikes.flatMap((strike) => [
-        { underlying: UNDERLYING, expiry, strike, optionType: 'CE' as const },
-        { underlying: UNDERLYING, expiry, strike, optionType: 'PE' as const },
-      ])
-    );
+  const port = Number(process.env.PORT ?? 3000);
+  await server.listen({ port, host: "0.0.0.0" });
+  console.log(`[index] API server listening on port ${port}`);
+
+  // Step 5: in simulation mode, advance the virtual clock on a real setInterval.
+  // Each advance fires all registered tick() callbacks (straddle, VIX, watchdog)
+  // according to how many of their interval boundaries were crossed by the advance.
+  let simInterval: ReturnType<typeof setInterval> | null = null;
+  if (simulate) {
+    simInterval = setInterval(() => {
+      // advance() is defined only on VirtualClock; the cast above makes TypeScript
+      // treat `clock` as VirtualClock in this branch so the call compiles.
+      (clock as VirtualClock).advance(SIM_TICK_INTERVAL_MS);
+    }, SIM_TICK_INTERVAL_MS);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Graceful shutdown
+  // ---------------------------------------------------------------------------
+
+  async function shutdown(): Promise<void> {
+    console.log("[index] Shutdown signal received — stopping components");
+    entryEngine.stop();
+    await positionMonitor.stop();
+    calc.stop();
+    vixFeed.stop();
+    await server.close();
+    await pool.end();
+    await closeRedis();
+    if (simInterval !== null) {
+      clearInterval(simInterval);
+    }
+    console.log("[index] Shutdown complete");
+    process.exit(0);
+  }
+
+  // Register both SIGTERM (Docker / Railway / Fly.io) and SIGINT (Ctrl-C in dev).
+  // Using 'once' semantics via `process.on` is sufficient because process.exit(0)
+  // in the handler prevents the process from receiving a second signal.
+  // Catch unhandled promise rejections and uncaught exceptions — any escape from
+  // the hot-path catch blocks (stream handlers, VIX polling) must not silently
+  // terminate the process while positions remain open.
+  process.on("unhandledRejection", (reason: unknown) => {
+    console.error("[index] Unhandled rejection — initiating graceful shutdown:", reason);
+    shutdown().catch(() => process.exit(1));
   });
 
-  fyersFeed.onError((err) => console.error('[fyers] Error:', err.message));
+  process.on("uncaughtException", (err: Error) => {
+    console.error("[index] Uncaught exception — initiating graceful shutdown:", err);
+    shutdown().catch(() => process.exit(1));
+  });
 
-  await fyersFeed.connect();
+  process.on("SIGTERM", () => {
+    shutdown().catch((err) => {
+      console.error("[index] Error during shutdown:", err);
+      process.exit(1);
+    });
+  });
 
-  // Drain tick stream into price cache every 500ms
-  setInterval(() => void consumeTickStream(), TICK_CONSUME_MS);
-
-  // Compute and persist straddle snapshot every 15s during market hours
-  let lastAtm = 0;
-  setInterval(async () => {
-    if (!isMarketHours()) return;
-
-    const spotTick = getPrice(FYERS_INDEX_SYMBOLS[UNDERLYING]);
-    if (!spotTick) return; // no spot price yet
-
-    const spot   = spotTick.ltp;
-    const vix    = getVixFromCache();
-    const newAtm = getAtmStrike(spot, UNDERLYING);
-
-    // Re-subscribe if ATM moved by one strike interval
-    if (newAtm !== lastAtm && lastAtm !== 0) {
-      resubscribeAtm(newAtm, lastAtm, expiry);
-    }
-    lastAtm = newAtm;
-
-    try {
-      await computeAndSaveSnapshot(UNDERLYING, expiry, spot, vix);
-      console.log(`[live] Snapshot — ${UNDERLYING} spot:${spot.toFixed(0)} ATM:${newAtm} VIX:${vix?.toFixed(1) ?? 'n/a'}`);
-    } catch (err) {
-      console.error('[live] Snapshot error:', err instanceof Error ? err.message : err);
-    }
-  }, SNAPSHOT_MS);
-
-  startTradingLoop(UNDERLYING, currentPrices, getVixFromCache);
-  scheduleDailyReset();
+  process.on("SIGINT", () => {
+    shutdown().catch((err) => {
+      console.error("[index] Error during shutdown:", err);
+      process.exit(1);
+    });
+  });
 }
 
-// ── Simulation mode ────────────────────────────────────────────────────────────
-async function startSimulation(): Promise<void> {
-  const tickIntervalMs = parseInt(process.env.SIM_TICK_INTERVAL_MS ?? '1000', 10);
+// ---------------------------------------------------------------------------
+// Simulation tick interval
+// ---------------------------------------------------------------------------
 
-  simulator = new MarketDataSimulator({ underlying: UNDERLYING, startSpot: 24_000, startVix: 14.5, tickIntervalMs });
-  simulator.start();
+// How many ms of virtual time to advance per real tick in simulation mode.
+// Read at startup so operators can tune simulation speed via env var without
+// code changes. Default 1000 ms of virtual time per 1000 ms of real time (1:1).
+const SIM_TICK_INTERVAL_MS = (() => {
+  const parsed = Number.parseInt(process.env.SIM_TICK_INTERVAL_MS ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1_000;
+})();
 
-  setInterval(() => void consumeTickStream(), TICK_CONSUME_MS);
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
 
-  setInterval(async () => {
-    const spot   = simulator!.getSpot();
-    const vix    = simulator!.getVix();
-    const expiry = simulator!.getExpiry();
-    try {
-      await computeAndSaveSnapshot(UNDERLYING, expiry, spot, vix);
-      console.log(`[sim] Snapshot — ${UNDERLYING} spot:${spot.toFixed(0)} ATM:${getAtmStrike(spot, UNDERLYING)} VIX:${vix.toFixed(1)}`);
-    } catch (err) {
-      console.error('[sim] Snapshot error:', err instanceof Error ? err.message : err);
-    }
-
-    // Sync currentPrices with Fyers-format keys so the trading loop can look up option prices
-    const atmStrike = getAtmStrike(spot, UNDERLYING);
-    for (const delta of [-200, -100, 0, 100, 200]) {
-      const strike = atmStrike + delta;
-      for (const optionType of ['CE', 'PE'] as const) {
-        const simKey   = buildOptionSymbol(UNDERLYING, simulator!.getExpiry(), strike, optionType);
-        const fyersKey = buildFyersSymbol({ underlying: UNDERLYING, expiry: simulator!.getExpiry(), strike, optionType });
-        const cached   = getOptionPrice(simKey);
-        if (cached) currentPrices.set(fyersKey, cached.ltp);
-      }
-    }
-    // Index spot
-    currentPrices.set(FYERS_INDEX_SYMBOLS[UNDERLYING], spot);
-  }, SNAPSHOT_MS);
-
-  startTradingLoop(UNDERLYING, currentPrices, () => simulator!.getVix());
-  scheduleDailyReset();
-}
-
-// ── Tick routing (live mode) ───────────────────────────────────────────────────
-// Cache for spot prices from index ticks (keyed by Fyers index symbol)
-const spotCache = new Map<string, { ltp: number; time: Date }>();
-let cachedVix: number | null = null;
-
-// Shared price map passed to trading loop — keyed by Fyers symbol
-const currentPrices = new Map<string, number>();
-
-function routeTick(tick: BrokerTick): void {
-  const symbol = tick.symbol;
-
-  // VIX tick
-  if (symbol === 'NSE:INDIAVIX-INDEX') {
-    cachedVix = tick.ltp;
-    setVix(tick.ltp);
-    return;
-  }
-
-  // Index spot tick
-  const indexSymbols = Object.values(FYERS_INDEX_SYMBOLS) as string[];
-  if (indexSymbols.includes(symbol)) {
-    spotCache.set(symbol, { ltp: tick.ltp, time: tick.timestamp });
-    currentPrices.set(symbol, tick.ltp);
-    return;
-  }
-
-  // Option tick → update straddle-calc price cache and shared prices map
-  updatePrice(symbol, tick.ltp, tick.timestamp);
-  currentPrices.set(symbol, tick.ltp);
-}
-
-function getPrice(fyersIndexSymbol: string): { ltp: number; time: Date } | undefined {
-  return spotCache.get(fyersIndexSymbol);
-}
-
-function getVixFromCache(): number | null {
-  return cachedVix;
-}
-
-// Re-subscribe to new ATM strikes when spot moves enough
-function resubscribeAtm(newAtm: number, oldAtm: number, expiry: Date): void {
-  if (!fyersFeed) return;
-
-  const INTERVAL = newAtm > oldAtm ? 50 : -50; // direction of movement
-  const toUnsub  = [oldAtm - 200, oldAtm - 100, oldAtm, oldAtm + 100, oldAtm + 200]
-    .filter((s) => ![newAtm - 200, newAtm - 100, newAtm, newAtm + 100, newAtm + 200].includes(s));
-  const toSub    = [newAtm - 200, newAtm - 100, newAtm, newAtm + 100, newAtm + 200]
-    .filter((s) => ![oldAtm - 200, oldAtm - 100, oldAtm, oldAtm + 100, oldAtm + 200].includes(s));
-
-  if (toUnsub.length > 0) {
-    fyersFeed.unsubscribe(toUnsub.flatMap((s) => [
-      { underlying: UNDERLYING, expiry, strike: s, optionType: 'CE' as const },
-      { underlying: UNDERLYING, expiry, strike: s, optionType: 'PE' as const },
-    ]));
-  }
-  if (toSub.length > 0) {
-    fyersFeed.subscribe(toSub.flatMap((s) => [
-      { underlying: UNDERLYING, expiry, strike: s, optionType: 'CE' as const },
-      { underlying: UNDERLYING, expiry, strike: s, optionType: 'PE' as const },
-    ]));
-  }
-
-  void INTERVAL; // suppress unused warning — kept for clarity
-  console.log(`[live] ATM shifted ${oldAtm} → ${newAtm}: unsub ${toUnsub.join(',')}, sub ${toSub.join(',')}`);
-}
-
-// ── Daily reset at midnight IST ────────────────────────────────────────────────
-function scheduleDailyReset(): void {
-  const istOffset       = 5.5 * 60 * 60 * 1000;
-  const istNow          = new Date(Date.now() + istOffset);
-  const midnight        = new Date(istNow);
-  midnight.setHours(0, 0, 0, 0);
-  midnight.setDate(midnight.getDate() + 1);
-  const msUntilMidnight = midnight.getTime() - istNow.getTime();
-
-  setTimeout(() => {
-    resetDayState();
-    spotCache.clear();
-    cachedVix = null;
-    scheduleDailyReset();
-  }, msUntilMidnight);
-}
-
-void main().catch((err) => {
-  console.error('[main] Fatal error:', err);
+main().catch((err) => {
+  console.error("[index] Fatal startup error:", err);
   process.exit(1);
 });

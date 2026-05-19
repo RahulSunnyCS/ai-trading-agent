@@ -1,217 +1,245 @@
-// Fyers instrument symbol builder for NSE/BSE index options.
-//
-// Fyers symbol format reference:
-//   Equity:         NSE:SBIN-EQ
-//   Index (spot):   NSE:NIFTY-INDEX    BSE:SENSEX-INDEX
-//   VIX:            NSE:INDIAVIX-INDEX
-//   Monthly option: NSE:NIFTY25MAY2524000CE
-//   Weekly option:  NSE:NIFTY255824000CE
-//                        ^^ ^^ ^^
-//                        YY  M DD   (M is single digit for Jan-Sep, O/N/D for Oct-Dec)
-//
-// The weekly format uses: {YY}{M_single}{DD}
-//   Jan=1, Feb=2, ..., Sep=9, Oct=O, Nov=N, Dec=D
-//
-// This string-based approach is why Fyers was chosen over Angel One:
-//   - No scripmaster download required
-//   - New weekly contracts (listed every Thursday) are addressed by constructing
-//     the symbol string — no token lookup, no file parsing, no cron job
+/**
+ * Instrument Registry
+ *
+ * Central source-of-truth for:
+ *   - ATM strike rounding per underlying
+ *   - Fyers symbol construction (weekly options)
+ *   - Angel One token placeholder
+ *   - Weekly expiry date calculation (Thursday for NIFTY/BANKNIFTY, Friday for SENSEX)
+ *   - VIX symbol constant
+ *
+ * All exports are named exports (no default export) per project conventions.
+ */
 
-import type { Underlying, OptionType } from '../../db/schema';
-import type { Instrument } from './types';
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-// ── Index spot and VIX symbols ─────────────────────────────────────────────────
+export type Underlying = "NIFTY" | "BANKNIFTY" | "SENSEX";
 
-export const FYERS_INDEX_SYMBOLS = {
-  NIFTY:     'NSE:NIFTY-INDEX',
-  BANKNIFTY: 'NSE:NIFTYBANK-INDEX',
-  SENSEX:    'BSE:SENSEX-INDEX',
-  VIX:       'NSE:INDIAVIX-INDEX',
-} as const;
+// ─── ATM Strike Intervals ────────────────────────────────────────────────────
 
-// Exchange prefix per underlying
-const EXCHANGE: Record<Underlying, 'NSE' | 'BSE'> = {
-  NIFTY:     'NSE',
-  BANKNIFTY: 'NSE',
-  SENSEX:    'BSE',
+/**
+ * NSE-standard strike intervals by underlying.
+ * NIFTY: 50pt, BankNifty: 100pt, Sensex: 100pt.
+ * Using a const map rather than a switch so the compiler enforces exhaustiveness
+ * if Underlying is ever extended.
+ */
+const ATM_STRIKE_INTERVALS: Record<Underlying, number> = {
+  NIFTY: 50,
+  BANKNIFTY: 100,
+  SENSEX: 100,
 };
 
-// Fyers uses 'NIFTYBANK' in option symbols, not 'BANKNIFTY' (our internal name).
-// All other underlyings match directly.
-const FYERS_SEGMENT: Record<Underlying, string> = {
-  NIFTY:     'NIFTY',
-  BANKNIFTY: 'NIFTYBANK',
-  SENSEX:    'SENSEX',
-};
-
-// ── Month code builder ─────────────────────────────────────────────────────────
-// Fyers weekly option uses single character for month:
-// Jan-Sep → '1'-'9', Oct → 'O', Nov → 'N', Dec → 'D'
-
-function weeklyMonthCode(month: number): string {
-  if (month < 10) return String(month);
-  return ['O', 'N', 'D'][month - 10]!;
+/**
+ * Round a spot price to the nearest ATM strike for the given underlying.
+ *
+ * Uses standard "round half up" (Math.round), which is the convention
+ * on NSE — a spot exactly halfway between two strikes rounds to the higher one.
+ *
+ * @example getAtmStrike('NIFTY', 23024) → 23000
+ * @example getAtmStrike('NIFTY', 23025) → 23050  (half-up: 23025/50 = 460.5 → rounds to 461 → 23050)
+ * @example getAtmStrike('BANKNIFTY', 49150) → 49200
+ */
+export function getAtmStrike(underlying: Underlying, spot: number): number {
+  const interval = ATM_STRIKE_INTERVALS[underlying];
+  return Math.round(spot / interval) * interval;
 }
 
-// 3-letter month abbreviation for monthly option symbols
-const MONTH_ABBR = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+// ─── Fyers Symbol Builder ─────────────────────────────────────────────────────
 
-// ── Symbol builders ────────────────────────────────────────────────────────────
+/**
+ * Fyers month encoding for weekly-option symbols.
+ *
+ * Fyers uses single-character month codes where Jan–Sep are digits '1'–'9'
+ * and Oct/Nov/Dec are letters 'O', 'N', 'D' to keep the symbol compact and
+ * unambiguous (no two-digit month number collides with a day number).
+ *
+ * This encoding is critical for October (index 9 → 'O') because without it
+ * the symbol parser cannot distinguish month from day digits.
+ */
+const FYERS_MONTH_CODES: Record<number, string> = {
+  0: "1", // January
+  1: "2", // February
+  2: "3", // March
+  3: "4", // April
+  4: "5", // May
+  5: "6", // June
+  6: "7", // July
+  7: "8", // August
+  8: "9", // September
+  9: "O", // October  — letter, not digit
+  10: "N", // November — letter, not digit
+  11: "D", // December — letter, not digit
+};
+
+/**
+ * Fyers exchange prefix by underlying.
+ * SENSEX is BSE-listed; NIFTY and BANKNIFTY are NSE.
+ */
+const FYERS_EXCHANGE_PREFIX: Record<Underlying, string> = {
+  NIFTY: "NSE",
+  BANKNIFTY: "NSE",
+  SENSEX: "BSE",
+};
+
+/**
+ * Fyers underlying name as it appears in the symbol string.
+ * BankNifty contracts use 'BANKNIFTY' without space.
+ */
+const FYERS_SYMBOL_NAME: Record<Underlying, string> = {
+  NIFTY: "NIFTY",
+  BANKNIFTY: "BANKNIFTY",
+  SENSEX: "SENSEX",
+};
 
 /**
  * Build a Fyers weekly option symbol.
- * Example: NIFTY, May 8 2025, 24000 CE → "NSE:NIFTY255824000CE"
+ *
+ * Format: {EXCHANGE}:{UNDERLYING}{YY}{M}{DD}{STRIKE}{TYPE}
+ *
+ * Where:
+ *   YY  = 2-digit year (2025 → '25')
+ *   M   = single-char month code (see FYERS_MONTH_CODES)
+ *   DD  = zero-padded 2-digit day (5 → '05')
+ *   STRIKE = integer with no decimal point (23000 not 23000.0)
+ *   TYPE   = 'CE' or 'PE'
+ *
+ * @example
+ *   buildFyersSymbol({ underlying: 'NIFTY', expiry: new Date('2025-10-16'), strike: 23000, optionType: 'CE' })
+ *   → 'NSE:NIFTY25O1623000CE'
+ *
+ * Notes:
+ * - `expiry` is treated as a wall-clock date in the local (IST) timezone of
+ *   the running process. The caller must ensure the Date object represents the
+ *   correct expiry calendar date in IST.
+ * - Strike is converted with Math.trunc to strip any floating-point residue
+ *   before stringification, ensuring no decimal point appears in the symbol.
  */
-export function buildWeeklySymbol(
-  underlying: Underlying,
-  expiry: Date,
-  strike: number,
-  optionType: OptionType
-): string {
-  const yy      = String(expiry.getFullYear()).slice(2);
-  const month   = expiry.getMonth() + 1;
-  const m       = weeklyMonthCode(month);
-  // Oct/Nov/Dec use letter codes — day is 2-digit zero-padded.
-  // Jan-Sep use digit codes — Fyers stores only the last digit of the day.
-  // All Thursdays/Fridays in a month have unique last digits, so this is unambiguous.
-  const dd      = month >= 10 ? String(expiry.getDate()).padStart(2, '0') : String(expiry.getDate() % 10);
-  const exch    = EXCHANGE[underlying];
-  const seg     = FYERS_SEGMENT[underlying];
-  return `${exch}:${seg}${yy}${m}${dd}${strike}${optionType}`;
-}
-
-/**
- * Build a Fyers monthly option symbol.
- * Example: NIFTY, May 2025, 24000 CE → "NSE:NIFTY25MAY2524000CE"
- */
-export function buildMonthlySymbol(
-  underlying: Underlying,
-  expiry: Date,
-  strike: number,
-  optionType: OptionType
-): string {
-  const yy      = String(expiry.getFullYear()).slice(2);
-  const mon     = MONTH_ABBR[expiry.getMonth()];
-  const year4   = expiry.getFullYear();
-  const exch    = EXCHANGE[underlying];
-  const seg     = FYERS_SEGMENT[underlying];
-  return `${exch}:${seg}${yy}${mon}${year4}${strike}${optionType}`;
-}
-
-/**
- * Main entry point used by the broker adapter.
- * NSE weekly options (Nifty, BankNifty) expire on Thursday.
- * BSE Sensex weekly options expire on Friday.
- * The last Thursday of the month is the monthly expiry — use monthly format for that.
- */
-export function buildFyersSymbol(instrument: Instrument): string {
-  const { underlying, expiry, strike, optionType } = instrument;
-  return isMonthlyExpiry(expiry)
-    ? buildMonthlySymbol(underlying, expiry, strike, optionType)
-    : buildWeeklySymbol(underlying, expiry, strike, optionType);
-}
-
-/**
- * Returns true if this expiry is the monthly (last Thursday of the month).
- * NSE monthly expiry = last Thursday of the month.
- */
-export function isMonthlyExpiry(expiry: Date): boolean {
-  const nextWeek = new Date(expiry);
-  nextWeek.setDate(expiry.getDate() + 7);
-  // If adding 7 days crosses into next month → this is the last Thursday
-  return nextWeek.getMonth() !== expiry.getMonth();
-}
-
-// ── Expiry helpers ─────────────────────────────────────────────────────────────
-
-/**
- * Returns the next Thursday from a given date (or today if it's Thursday).
- * NSE weekly option expiry day.
- */
-export function nextThursday(from: Date = new Date()): Date {
-  const d = new Date(from);
-  d.setHours(15, 30, 0, 0);
-  const day = d.getDay(); // 0=Sun, 4=Thu
-  const daysAhead = day <= 4 ? 4 - day : 11 - day;
-  d.setDate(d.getDate() + daysAhead);
-  return d;
-}
-
-/**
- * Returns the next Friday from a given date.
- * BSE Sensex weekly option expiry day.
- */
-export function nextFriday(from: Date = new Date()): Date {
-  const d = new Date(from);
-  d.setHours(15, 30, 0, 0);
-  const day = d.getDay();
-  const daysAhead = day <= 5 ? 5 - day : 12 - day;
-  d.setDate(d.getDate() + daysAhead);
-  return d;
-}
-
-/**
- * Returns the current weekly expiry for a given underlying.
- */
-export function currentExpiry(underlying: Underlying): Date {
-  return underlying === 'SENSEX' ? nextFriday() : nextThursday();
-}
-
-// ── Reverse parser (for incoming tick routing) ─────────────────────────────────
-
-interface ParsedSymbol {
+export function buildFyersSymbol(opts: {
   underlying: Underlying;
-  expiry:     Date;
-  strike:     number;
-  optionType: OptionType;
+  expiry: Date;
+  strike: number;
+  optionType: "CE" | "PE";
+}): string {
+  const { underlying, expiry, strike, optionType } = opts;
+
+  const yy = String(expiry.getFullYear()).slice(-2); // '25' from 2025
+  const monthCode = FYERS_MONTH_CODES[expiry.getMonth()]; // '1'..'9' | 'O'|'N'|'D'
+  const dd = String(expiry.getDate()).padStart(2, "0"); // zero-pad day
+  const strikeStr = String(Math.trunc(strike)); // no decimal point
+
+  const exchange = FYERS_EXCHANGE_PREFIX[underlying];
+  const symbolName = FYERS_SYMBOL_NAME[underlying];
+
+  return `${exchange}:${symbolName}${yy}${monthCode}${dd}${strikeStr}${optionType}`;
 }
 
-const INDEX_SYMBOLS_REVERSE: Record<string, Underlying> = {
-  'NSE:NIFTY-INDEX':    'NIFTY',
-  'NSE:NIFTYBANK-INDEX':'BANKNIFTY',
-  'BSE:SENSEX-INDEX':   'SENSEX',
+// ─── Angel One Token Placeholder ─────────────────────────────────────────────
+
+/**
+ * Build a placeholder Angel One instrument identifier.
+ *
+ * IMPORTANT LIMITATION:
+ * Angel One uses numeric instrument tokens (not string symbols) for order
+ * placement and WebSocket subscriptions. These tokens are assigned by Angel
+ * One and change with each contract series — they are NOT derivable from the
+ * option parameters alone. To resolve a real token, the caller must look up
+ * the live instrument master file published by Angel One (available via their
+ * Market Data API as a daily CSV/JSON download).
+ *
+ * At Milestone 1, Angel One integration is not yet live, so we return a
+ * deterministic human-readable placeholder that encodes all the relevant
+ * dimensions. This format is used only for logging, diagnostics, and tests —
+ * it must NEVER be passed to the Angel One API.
+ *
+ * Placeholder format: AO:{UNDERLYING}:{STRIKE}:{OPTIONTYPE}:{YYYYMMDD}
+ * Example: AO:NIFTY:23000:CE:20251016
+ *
+ * When live Angel One integration is implemented, replace this function body
+ * with a lookup against the downloaded instrument master (keyed by underlying,
+ * expiry, strike, and optionType) and cache the result in Redis to avoid
+ * repeated file I/O during market hours.
+ */
+export function buildAngelOneToken(opts: {
+  underlying: Underlying;
+  expiry: Date;
+  strike: number;
+  optionType: "CE" | "PE";
+}): string {
+  const { underlying, expiry, strike, optionType } = opts;
+
+  const yyyy = expiry.getFullYear();
+  // Pad month and day to 2 digits so the date segment is always 8 characters
+  const mm = String(expiry.getMonth() + 1).padStart(2, "0");
+  const dd = String(expiry.getDate()).padStart(2, "0");
+  const strikeStr = String(Math.trunc(strike));
+
+  return `AO:${underlying}:${strikeStr}:${optionType}:${yyyy}${mm}${dd}`;
+}
+
+// ─── Weekly Expiry Calculator ─────────────────────────────────────────────────
+
+/**
+ * Target expiry weekdays per underlying.
+ * JS getDay(): 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat.
+ *
+ * NIFTY and BANKNIFTY expire on Thursday (4).
+ * SENSEX expires on Friday (5) — BSE weekly contract expiry.
+ */
+const EXPIRY_WEEKDAY: Record<Underlying, number> = {
+  NIFTY: 4, // Thursday
+  BANKNIFTY: 4, // Thursday
+  SENSEX: 5, // Friday
 };
 
 /**
- * Parse a Fyers symbol string back into structured fields.
- * Returns null for index/VIX symbols (not option instruments).
+ * Return the nearest upcoming weekly expiry date for the given underlying.
+ *
+ * Rules:
+ * - If `referenceDate` falls ON the expiry weekday, that date is returned
+ *   (the current-day-is-expiry case is included, not skipped).
+ * - Otherwise, advance forward until the next matching weekday.
+ *
+ * The returned Date's time components are set to midnight (00:00:00.000) on
+ * the expiry day. The caller should not rely on the time portion.
+ *
+ * @param underlying - Which index to compute expiry for
+ * @param referenceDate - Defaults to today (new Date()) if omitted
+ *
+ * @example
+ *   // If today is Wednesday 2025-10-15, NIFTY expires Thursday 2025-10-16
+ *   getCurrentWeeklyExpiry('NIFTY') → Date(2025-10-16)
+ *
+ *   // If today IS Thursday 2025-10-16, NIFTY expiry is the same day
+ *   getCurrentWeeklyExpiry('NIFTY', new Date('2025-10-16')) → Date(2025-10-16)
  */
-export function parseFyersSymbol(symbol: string): (ParsedSymbol & { isIndex: boolean; isVix: boolean }) | null {
-  // Index symbols
-  if (symbol in INDEX_SYMBOLS_REVERSE) {
-    return null;
-  }
-  if (symbol === 'NSE:INDIAVIX-INDEX') {
-    return null;
-  }
+export function getCurrentWeeklyExpiry(underlying: Underlying, referenceDate?: Date): Date {
+  const targetWeekday = EXPIRY_WEEKDAY[underlying];
 
-  // Option symbols: NSE:NIFTY255824000CE or NSE:NIFTY25MAY2524000CE
-  // Day is 1-2 digits for Jan-Sep (digit month codes) and always 2 digits for Oct-Dec.
-  // Strike is always 5 digits for current index ranges. Fixed \d{5} lets the regex engine
-  // backtrack correctly when a single-digit day precedes a 5-digit strike.
-  const weeklyRe  = /^(NSE|BSE):(NIFTY|NIFTYBANK|SENSEX)(\d{2})([1-9OND])(\d{1,2})(\d{5})(CE|PE)$/;
-  const monthlyRe = /^(NSE|BSE):(NIFTY|NIFTYBANK|SENSEX)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d{4})(\d+)(CE|PE)$/;
+  // Clone to avoid mutating the caller's Date object.
+  // Strip time components so arithmetic is purely day-based.
+  const ref = referenceDate ? new Date(referenceDate) : new Date();
+  ref.setHours(0, 0, 0, 0);
 
-  let match = symbol.match(weeklyRe);
-  if (match) {
-    const [, , sym, yy, mCode, dd, strikeStr, opt] = match;
-    const underlying = sym === 'NIFTYBANK' ? 'BANKNIFTY' : sym as Underlying;
-    const monthIdx   = '123456789OND'.indexOf(mCode);
-    const expiry     = new Date(2000 + Number(yy), monthIdx, Number(dd), 15, 30, 0, 0);
-    return { underlying, expiry, strike: Number(strikeStr), optionType: opt as OptionType, isIndex: false, isVix: false };
-  }
+  const currentWeekday = ref.getDay();
 
-  match = symbol.match(monthlyRe);
-  if (match) {
-    const [, , sym, , mon, year, strikeStr, opt] = match;
-    const underlying = sym === 'NIFTYBANK' ? 'BANKNIFTY' : sym as Underlying;
-    const monthIdx   = MONTH_ABBR.indexOf(mon);
-    const expiry     = new Date(Number(year), monthIdx, 1, 15, 30, 0, 0);
-    // Find last Thursday of month
-    expiry.setMonth(expiry.getMonth() + 1, 0); // last day of month
-    while (expiry.getDay() !== 4) expiry.setDate(expiry.getDate() - 1);
-    return { underlying, expiry, strike: Number(strikeStr), optionType: opt as OptionType, isIndex: false, isVix: false };
-  }
+  // Calculate how many days ahead the target weekday is.
+  // If daysAhead === 0, today IS expiry day — return today per spec.
+  const daysAhead = (targetWeekday - currentWeekday + 7) % 7;
 
-  return null;
+  const expiry = new Date(ref);
+  expiry.setDate(ref.getDate() + daysAhead);
+
+  return expiry;
+}
+
+// ─── VIX Symbol ──────────────────────────────────────────────────────────────
+
+/**
+ * Fyers symbol for India VIX.
+ * Returns the constant string used to subscribe to VIX via Fyers WebSocket.
+ * Extracted as a function (rather than a bare constant) so callers always
+ * import from a single registry rather than hardcoding the symbol string.
+ */
+export function getVixSymbol(): string {
+  return "NSE:INDIAVIX-INDEX";
 }

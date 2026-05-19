@@ -1,242 +1,159 @@
-import { describe, it, expect } from 'bun:test';
-import {
-  buildWeeklySymbol,
-  buildMonthlySymbol,
-  buildFyersSymbol,
-  isMonthlyExpiry,
-  nextThursday,
-  nextFriday,
-  parseFyersSymbol,
-} from '../instrument-registry';
+/**
+ * Unit tests for instrument-registry.ts
+ *
+ * Tests ATM strike rounding (getAtmStrike) with concrete values and property
+ * invariants. The property tests overlap in spirit with the ones in
+ * src/utils/__tests__/atm-strike.property.test.ts but are focused on the
+ * specific concrete examples listed in the task specification plus a few
+ * edge cases.
+ *
+ * No network, DB, or Redis access — getAtmStrike is a pure function.
+ */
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+import fc from "fast-check";
+import { describe, expect, it } from "vitest";
+import { type Underlying, getAtmStrike } from "../instrument-registry.js";
 
-function date(year: number, month: number, day: number): Date {
-  // month is 1-based for readability
-  return new Date(year, month - 1, day, 15, 30, 0, 0);
-}
+// ─── NIFTY concrete cases (50-point intervals) ───────────────────────────────
 
-// ── buildWeeklySymbol ──────────────────────────────────────────────────────────
-
-describe('buildWeeklySymbol', () => {
-  it('NIFTY May 8 2025 CE 24000 → NSE:NIFTY255824000CE', () => {
-    expect(buildWeeklySymbol('NIFTY', date(2025, 5, 8), 24000, 'CE')).toBe('NSE:NIFTY255824000CE');
+describe("getAtmStrike — NIFTY (50pt intervals)", () => {
+  it("rounds 22137 up to 22150 (nearest 50 above)", () => {
+    // 22137 / 50 = 442.74 → Math.round = 443 → 443 * 50 = 22150
+    expect(getAtmStrike("NIFTY", 22137)).toBe(22150);
   });
 
-  it('NIFTY May 29 2025 CE 24000 → NSE:NIFTY255924000CE', () => {
-    expect(buildWeeklySymbol('NIFTY', date(2025, 5, 29), 24000, 'CE')).toBe('NSE:NIFTY255924000CE');
+  it("keeps 22100 unchanged (already on boundary)", () => {
+    // 22100 / 50 = 442 exactly → 442 * 50 = 22100
+    expect(getAtmStrike("NIFTY", 22100)).toBe(22100);
   });
 
-  it('BANKNIFTY May 8 2025 CE 52000 → NSE:NIFTYBANK255852000CE (uses NIFTYBANK not BANKNIFTY)', () => {
-    expect(buildWeeklySymbol('BANKNIFTY', date(2025, 5, 8), 52000, 'CE')).toBe('NSE:NIFTYBANK255852000CE');
+  it("rounds 22124 down to 22100 (< 25 from lower bound)", () => {
+    // 22124 / 50 = 442.48 → Math.round = 442 → 22100
+    expect(getAtmStrike("NIFTY", 22124)).toBe(22100);
   });
 
-  it('SENSEX May 9 2025 PE 80000 → BSE:SENSEX255980000PE', () => {
-    expect(buildWeeklySymbol('SENSEX', date(2025, 5, 9), 80000, 'PE')).toBe('BSE:SENSEX255980000PE');
+  it("rounds 22125 up to 22150 (exactly halfway rounds up per Math.round)", () => {
+    // 22125 / 50 = 442.5 → Math.round = 443 → 22150
+    expect(getAtmStrike("NIFTY", 22125)).toBe(22150);
   });
 
-  it('October expiry uses month code O', () => {
-    expect(buildWeeklySymbol('NIFTY', date(2025, 10, 2), 25000, 'CE')).toBe('NSE:NIFTY25O0225000CE');
+  it("rounds 22000 (exact multiple) to 22000", () => {
+    expect(getAtmStrike("NIFTY", 22000)).toBe(22000);
   });
 
-  it('November expiry uses month code N', () => {
-    expect(buildWeeklySymbol('NIFTY', date(2025, 11, 6), 25000, 'CE')).toBe('NSE:NIFTY25N0625000CE');
+  it("rounds 22074 down to 22050", () => {
+    // 22074 / 50 = 441.48 → Math.round = 441 → 22050
+    expect(getAtmStrike("NIFTY", 22074)).toBe(22050);
   });
 
-  it('December expiry uses month code D', () => {
-    expect(buildWeeklySymbol('NIFTY', date(2025, 12, 4), 25000, 'CE')).toBe('NSE:NIFTY25D0425000CE');
-  });
-
-  it('single-digit day is zero-padded', () => {
-    const sym = buildWeeklySymbol('NIFTY', date(2025, 5, 8), 24000, 'CE');
-    // "08" not "8"
-    expect(sym).toContain('2558');
+  it("rounds 22076 up to 22100", () => {
+    // 22076 / 50 = 441.52 → Math.round = 442 → 22100
+    expect(getAtmStrike("NIFTY", 22076)).toBe(22100);
   });
 });
 
-// ── buildMonthlySymbol ─────────────────────────────────────────────────────────
+// ─── BANKNIFTY concrete cases (100-point intervals) ──────────────────────────
 
-describe('buildMonthlySymbol', () => {
-  it('NIFTY May 29 2025 CE 24000 → NSE:NIFTY25MAY202524000CE', () => {
-    expect(buildMonthlySymbol('NIFTY', date(2025, 5, 29), 24000, 'CE')).toBe('NSE:NIFTY25MAY202524000CE');
+describe("getAtmStrike — BANKNIFTY (100pt intervals)", () => {
+  it("rounds 48150 up to 48200", () => {
+    // 48150 / 100 = 481.5 → Math.round = 482 → 48200
+    expect(getAtmStrike("BANKNIFTY", 48150)).toBe(48200);
   });
 
-  it('December uses DEC abbreviation not D', () => {
-    const sym = buildMonthlySymbol('NIFTY', date(2025, 12, 25), 25000, 'PE');
-    expect(sym).toContain('DEC');
-    expect(sym).not.toMatch(/25D\d/);
+  it("keeps 48200 unchanged (already on boundary)", () => {
+    expect(getAtmStrike("BANKNIFTY", 48200)).toBe(48200);
   });
 
-  it('year in symbol is 4-digit', () => {
-    const sym = buildMonthlySymbol('NIFTY', date(2025, 5, 29), 24000, 'CE');
-    expect(sym).toContain('2025');
+  it("rounds 48749 down to 48700", () => {
+    // 48749 / 100 = 487.49 → Math.round = 487 → 48700
+    expect(getAtmStrike("BANKNIFTY", 48749)).toBe(48700);
   });
 
-  it('BANKNIFTY monthly uses NIFTYBANK segment', () => {
-    const sym = buildMonthlySymbol('BANKNIFTY', date(2025, 5, 29), 52000, 'CE');
-    expect(sym).toMatch(/^NSE:NIFTYBANK/);
-  });
-});
-
-// ── isMonthlyExpiry ────────────────────────────────────────────────────────────
-
-describe('isMonthlyExpiry', () => {
-  it('May 29 2025 (last Thursday of May) → true', () => {
-    expect(isMonthlyExpiry(date(2025, 5, 29))).toBe(true);
-  });
-
-  it('May 8 2025 (not last Thursday) → false', () => {
-    expect(isMonthlyExpiry(date(2025, 5, 8))).toBe(false);
-  });
-
-  it('May 22 2025 (second-to-last Thursday) → false', () => {
-    expect(isMonthlyExpiry(date(2025, 5, 22))).toBe(false);
-  });
-
-  it('January 30 2025 (last Thursday of Jan) → true', () => {
-    expect(isMonthlyExpiry(date(2025, 1, 30))).toBe(true);
+  it("rounds 48750 up to 48800 (half-up rule)", () => {
+    // 48750 / 100 = 487.5 → Math.round = 488 → 48800
+    expect(getAtmStrike("BANKNIFTY", 48750)).toBe(48800);
   });
 });
 
-// ── nextThursday ───────────────────────────────────────────────────────────────
+// ─── SENSEX concrete cases (100-point intervals) ─────────────────────────────
 
-describe('nextThursday', () => {
-  it('Wednesday May 7 → Thursday May 8', () => {
-    const result = nextThursday(new Date(2025, 4, 7)); // May 7
-    expect(result.getDate()).toBe(8);
-    expect(result.getMonth()).toBe(4); // May
+describe("getAtmStrike — SENSEX (100pt intervals)", () => {
+  it("rounds 81050 up to 81100 (half-up rule)", () => {
+    // 81050 / 100 = 810.5 → Math.round = 811 → 81100
+    expect(getAtmStrike("SENSEX", 81050)).toBe(81100);
   });
 
-  it('Thursday May 8 → same day May 8 (not +7)', () => {
-    const result = nextThursday(new Date(2025, 4, 8)); // May 8
-    expect(result.getDate()).toBe(8);
+  it("keeps 81100 unchanged (already on boundary)", () => {
+    expect(getAtmStrike("SENSEX", 81100)).toBe(81100);
   });
 
-  it('Friday May 9 → next Thursday May 15', () => {
-    const result = nextThursday(new Date(2025, 4, 9)); // May 9
-    expect(result.getDate()).toBe(15);
-  });
-
-  it('Sunday May 11 → Thursday May 15', () => {
-    const result = nextThursday(new Date(2025, 4, 11)); // May 11
-    expect(result.getDate()).toBe(15);
-  });
-
-  it('result time is 15:30:00', () => {
-    const result = nextThursday(new Date(2025, 4, 7));
-    expect(result.getHours()).toBe(15);
-    expect(result.getMinutes()).toBe(30);
-    expect(result.getSeconds()).toBe(0);
+  it("rounds 81049 down to 81000", () => {
+    // 81049 / 100 = 810.49 → Math.round = 810 → 81000
+    expect(getAtmStrike("SENSEX", 81049)).toBe(81000);
   });
 });
 
-// ── nextFriday ─────────────────────────────────────────────────────────────────
+// ─── Property: result is always a multiple of the interval ───────────────────
 
-describe('nextFriday', () => {
-  it('Thursday May 8 → Friday May 9', () => {
-    const result = nextFriday(new Date(2025, 4, 8)); // May 8
-    expect(result.getDate()).toBe(9);
+describe("getAtmStrike — property: result is a multiple of the interval", () => {
+  const intervals: Record<Underlying, number> = {
+    NIFTY: 50,
+    BANKNIFTY: 100,
+    SENSEX: 100,
+  };
+
+  it("NIFTY result is always divisible by 50", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 15000, max: 30000 }), (spot) => {
+        return getAtmStrike("NIFTY", spot) % intervals.NIFTY === 0;
+      }),
+    );
   });
 
-  it('Friday May 9 → same day May 9 (not +7)', () => {
-    const result = nextFriday(new Date(2025, 4, 9)); // May 9
-    expect(result.getDate()).toBe(9);
+  it("BANKNIFTY result is always divisible by 100", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 40000, max: 60000 }), (spot) => {
+        return getAtmStrike("BANKNIFTY", spot) % intervals.BANKNIFTY === 0;
+      }),
+    );
   });
 
-  it('Saturday May 10 → next Friday May 16', () => {
-    const result = nextFriday(new Date(2025, 4, 10)); // May 10
-    expect(result.getDate()).toBe(16);
-  });
-
-  it('result time is 15:30:00', () => {
-    const result = nextFriday(new Date(2025, 4, 8));
-    expect(result.getHours()).toBe(15);
-    expect(result.getMinutes()).toBe(30);
-  });
-});
-
-// ── parseFyersSymbol ───────────────────────────────────────────────────────────
-
-describe('parseFyersSymbol', () => {
-  it('parses weekly NIFTY CE symbol', () => {
-    const r = parseFyersSymbol('NSE:NIFTY255824000CE');
-    expect(r).not.toBeNull();
-    expect(r?.underlying).toBe('NIFTY');
-    expect(r?.strike).toBe(24000);
-    expect(r?.optionType).toBe('CE');
-    expect(r?.expiry.getFullYear()).toBe(2025);
-    expect(r?.expiry.getMonth()).toBe(4); // May = 4
-    expect(r?.expiry.getDate()).toBe(8);
-  });
-
-  it('parses weekly BANKNIFTY symbol (NIFTYBANK segment → BANKNIFTY underlying)', () => {
-    const r = parseFyersSymbol('NSE:NIFTYBANK255852000CE');
-    expect(r?.underlying).toBe('BANKNIFTY');
-    expect(r?.strike).toBe(52000);
-  });
-
-  it('parses October weekly symbol (O month code)', () => {
-    const r = parseFyersSymbol('NSE:NIFTY25O0225000CE');
-    expect(r?.expiry.getMonth()).toBe(9); // October = 9
-    expect(r?.expiry.getDate()).toBe(2);
-  });
-
-  it('returns null for index symbol NSE:NIFTY-INDEX', () => {
-    expect(parseFyersSymbol('NSE:NIFTY-INDEX')).toBeNull();
-  });
-
-  it('returns null for NSE:INDIAVIX-INDEX', () => {
-    expect(parseFyersSymbol('NSE:INDIAVIX-INDEX')).toBeNull();
-  });
-
-  it('returns null for BSE:SENSEX-INDEX', () => {
-    expect(parseFyersSymbol('BSE:SENSEX-INDEX')).toBeNull();
+  it("SENSEX result is always divisible by 100", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 60000, max: 90000 }), (spot) => {
+        return getAtmStrike("SENSEX", spot) % intervals.SENSEX === 0;
+      }),
+    );
   });
 });
 
-// ── Round-trip tests ───────────────────────────────────────────────────────────
+// ─── Property: |result - spot| <= interval / 2 ───────────────────────────────
 
-describe('round-trip: buildWeeklySymbol → parseFyersSymbol', () => {
-  it('NIFTY round-trip preserves underlying, strike, optionType, expiry', () => {
-    const expiry = date(2025, 5, 8);
-    const sym    = buildWeeklySymbol('NIFTY', expiry, 24000, 'CE');
-    const parsed = parseFyersSymbol(sym);
-    expect(parsed?.underlying).toBe('NIFTY');
-    expect(parsed?.strike).toBe(24000);
-    expect(parsed?.optionType).toBe('CE');
-    expect(parsed?.expiry.getDate()).toBe(8);
-    expect(parsed?.expiry.getMonth()).toBe(4);
+describe("getAtmStrike — property: rounds by at most half the interval", () => {
+  it("NIFTY: |result - spot| <= 25", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 15000, max: 30000 }), (spot) => {
+        const strike = getAtmStrike("NIFTY", spot);
+        return Math.abs(strike - spot) <= 25;
+      }),
+    );
   });
 
-  it('BANKNIFTY round-trip (key test: NIFTYBANK segment must survive parse)', () => {
-    const expiry = date(2025, 5, 8);
-    const sym    = buildWeeklySymbol('BANKNIFTY', expiry, 52000, 'PE');
-    const parsed = parseFyersSymbol(sym);
-    expect(parsed?.underlying).toBe('BANKNIFTY');
-    expect(parsed?.strike).toBe(52000);
-    expect(parsed?.optionType).toBe('PE');
+  it("BANKNIFTY: |result - spot| <= 50", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 40000, max: 60000 }), (spot) => {
+        const strike = getAtmStrike("BANKNIFTY", spot);
+        return Math.abs(strike - spot) <= 50;
+      }),
+    );
   });
 
-  it('SENSEX round-trip', () => {
-    const expiry = date(2025, 5, 9);
-    const sym    = buildWeeklySymbol('SENSEX', expiry, 80000, 'PE');
-    const parsed = parseFyersSymbol(sym);
-    expect(parsed?.underlying).toBe('SENSEX');
-    expect(parsed?.strike).toBe(80000);
-  });
-});
-
-// ── buildFyersSymbol dispatch ──────────────────────────────────────────────────
-
-describe('buildFyersSymbol', () => {
-  it('uses weekly format for non-monthly expiry', () => {
-    const sym = buildFyersSymbol({ underlying: 'NIFTY', expiry: date(2025, 5, 8), strike: 24000, optionType: 'CE' });
-    // Weekly format: no month abbreviation, just digit month code
-    expect(sym).toBe('NSE:NIFTY255824000CE');
-  });
-
-  it('uses monthly format for last Thursday of the month', () => {
-    const sym = buildFyersSymbol({ underlying: 'NIFTY', expiry: date(2025, 5, 29), strike: 24000, optionType: 'CE' });
-    expect(sym).toContain('MAY');
+  it("SENSEX: |result - spot| <= 50", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 60000, max: 90000 }), (spot) => {
+        const strike = getAtmStrike("SENSEX", spot);
+        return Math.abs(strike - spot) <= 50;
+      }),
+    );
   });
 });
