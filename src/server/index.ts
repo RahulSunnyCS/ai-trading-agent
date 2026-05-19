@@ -27,6 +27,8 @@ import Fastify from 'fastify';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
 
+import { paymentRoutes } from './routes/payment';
+
 // ---------------------------------------------------------------------------
 // Fastify module augmentation — makes server.db typed as Pool
 // ---------------------------------------------------------------------------
@@ -66,8 +68,19 @@ function buildPool(): Pool {
  *
  * Does NOT call server.listen() — callers (tests, startServer) are responsible
  * for that.
+ *
+ * @param opts    Standard Fastify server options (logger, etc.).
+ * @param externalPool  When provided, the server uses this pool instead of
+ *   creating its own. This allows the main entry point (src/index.ts) to share
+ *   one pool between the server and the position monitor, avoiding two separate
+ *   connection pools competing for the same PostgreSQL connections. When absent,
+ *   buildServer() creates its own pool (used in tests and standalone server
+ *   runs where pool sharing is not required).
  */
-export async function buildServer(opts?: FastifyServerOptions): Promise<FastifyInstance> {
+export async function buildServer(
+  opts?: FastifyServerOptions,
+  externalPool?: Pool,
+): Promise<FastifyInstance> {
   const server = Fastify({
     logger: opts?.logger ?? true,
     ...opts,
@@ -87,13 +100,21 @@ export async function buildServer(opts?: FastifyServerOptions): Promise<FastifyI
 
   // Decorate early so all route handlers can access server.db.
   // Tests replace this with a mock Pool before injecting requests.
-  const pool = buildPool();
+  //
+  // If an external pool is supplied (e.g. from the main entry point), use it
+  // directly.  We do NOT close an external pool on server close because the
+  // caller that owns the pool is responsible for its lifecycle.
+  const pool = externalPool ?? buildPool();
+  const ownsPool = externalPool === undefined;
   server.decorate('db', pool);
 
-  // Close the pool when the Fastify instance closes (graceful shutdown).
-  server.addHook('onClose', async () => {
-    await pool.end();
-  });
+  // Close the pool on server close ONLY when we created it.  If an external
+  // pool was injected, the caller owns it and will close it during shutdown.
+  if (ownsPool) {
+    server.addHook('onClose', async () => {
+      await pool.end();
+    });
+  }
 
   // ── Routes ────────────────────────────────────────────────────────────────
 
@@ -168,6 +189,14 @@ export async function buildServer(opts?: FastifyServerOptions): Promise<FastifyI
     });
   });
 
+  // ── Payment routes ────────────────────────────────────────────────────────
+
+  // Register the payment plugin last so it can access server.db (decorated
+  // above) and all other plugins that its handlers depend on.  The plugin is
+  // wrapped in fastify-plugin (see payment.ts) so it runs in the parent scope
+  // and can access all decorators without re-declaration.
+  await server.register(paymentRoutes);
+
   return server;
 }
 
@@ -178,9 +207,12 @@ export async function buildServer(opts?: FastifyServerOptions): Promise<FastifyI
 /**
  * Build the server and bind to PORT (default 3000) on 0.0.0.0.
  * Registers SIGINT/SIGTERM handlers for graceful shutdown.
+ *
+ * @param externalPool  Optional shared pool — forwarded to buildServer().
+ *   See buildServer() doc for the ownership semantics.
  */
-export async function startServer(): Promise<void> {
-  const server = await buildServer();
+export async function startServer(externalPool?: Pool): Promise<void> {
+  const server = await buildServer(undefined, externalPool);
 
   // Read port from env using dot notation (Biome useLiteralKeys requirement).
   const rawPort = process.env.PORT ?? '3000';

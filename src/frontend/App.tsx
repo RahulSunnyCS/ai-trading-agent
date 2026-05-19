@@ -3,12 +3,13 @@ import { useState } from 'react';
 import { LiveView } from './components/LiveView';
 import { PaymentTestModeBanner } from './components/PaymentTestModeBanner';
 import { PnlView } from './components/PnlView';
+import { PricingPage } from './components/PricingPage';
 import { TradesView } from './components/TradesView';
 
 /**
- * The three dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
+ * The four dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
  */
-type Tab = 'live' | 'pnl' | 'trades';
+type Tab = 'live' | 'pnl' | 'pricing' | 'trades';
 
 /**
  * Returns a human-readable label for each tab.
@@ -17,6 +18,7 @@ type Tab = 'live' | 'pnl' | 'trades';
 function tabLabel(tab: Tab): string {
   if (tab === 'pnl') return 'P&L';
   // Capitalise first letter; remaining tabs are single words so slice(1) is safe.
+  // 'pricing' → "Pricing", 'live' → "Live", 'trades' → "Trades"
   return tab.charAt(0).toUpperCase() + tab.slice(1);
 }
 
@@ -36,7 +38,7 @@ export function App() {
       </header>
 
       <nav className="flex gap-1 border-b border-gray-800 px-6">
-        {(['live', 'trades', 'pnl'] as Tab[]).map((tab) => (
+        {(['live', 'trades', 'pnl', 'pricing'] as Tab[]).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -56,6 +58,7 @@ export function App() {
         {activeTab === 'live' && <LiveView />}
         {activeTab === 'trades' && <TradesView />}
         {activeTab === 'pnl' && <PnlView />}
+        {activeTab === 'pricing' && <PricingPage />}
       </main>
     </div>
   );
