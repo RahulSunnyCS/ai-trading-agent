@@ -51,7 +51,8 @@ export async function getClientCountry(
     return cached.result;
   }
 
-  const baseUrl = process.env.GEOLOCATION_API_URL ?? 'https://ip-api.com/json';
+  // Use || not ?? so an empty-string env var falls back to the default correctly.
+  const baseUrl = process.env.GEOLOCATION_API_URL || 'https://ip-api.com/json';
   const url = `${baseUrl}/${safeIp}?fields=status,country,countryCode`;
 
   // Abort the request after 5 seconds to avoid blocking the response
