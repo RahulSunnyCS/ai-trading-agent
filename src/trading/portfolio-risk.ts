@@ -89,7 +89,15 @@ export async function portfolioRiskCheck(
   //      invalidates the momentum-exhaustion signal assumptions.
   // -------------------------------------------------------------------------
 
-  const blockedDates: string[] = JSON.parse(process.env.BLOCKED_DATES ?? "[]");
+  // Guard against a malformed BLOCKED_DATES env var (e.g. a typo in the value).
+  // An invalid JSON string must not crash the risk check — we treat it as an
+  // empty list and log a warning so the operator can investigate.
+  let blockedDates: string[] = [];
+  try {
+    blockedDates = JSON.parse(process.env.BLOCKED_DATES ?? "[]") as string[];
+  } catch {
+    console.warn("[portfolioRiskCheck] BLOCKED_DATES env var is not valid JSON — treating as empty list");
+  }
   const nowMs = clock.now();
   const todayIST = getISTDateStr(nowMs);
 
@@ -144,10 +152,29 @@ export async function portfolioRiskCheck(
   // -------------------------------------------------------------------------
 
   const portfolioDailyStop = Number(process.env.PORTFOLIO_DAILY_STOP ?? "20000");
+
+  // Compute IST midnight as a UTC timestamp so we can use a range predicate
+  // on the indexed entry_time column. The original cast
+  //   (NOW() AT TIME ZONE 'Asia/Kolkata')::date::timestamptz
+  // does not produce an IST midnight boundary — ::date strips the timezone and
+  // ::timestamptz reinterprets it in the PostgreSQL session timezone (usually UTC),
+  // which is wrong. Computing the range in TypeScript is clearer and keeps the
+  // query index-friendly (no function wrapping entry_time).
+  const istMidnightMs = (() => {
+    const nowMs = clock.now();
+    const istDate = new Date(nowMs + 330 * 60 * 1000); // shift to IST (UTC+5:30)
+    // Zero out the time components in IST by treating the shifted date as UTC
+    istDate.setUTCHours(0, 0, 0, 0);
+    return istDate.getTime() - 330 * 60 * 1000; // convert back to UTC
+  })();
+  const istMidnightISO = new Date(istMidnightMs).toISOString();
+  const istTomorrowISO = new Date(istMidnightMs + 24 * 60 * 60 * 1000).toISOString();
+
   const pnlResult = await db.query<{ total_pnl: string }>(
     `SELECT COALESCE(SUM(net_pnl), 0) AS total_pnl
      FROM paper_trades
-     WHERE entry_time >= (NOW() AT TIME ZONE 'Asia/Kolkata')::date::timestamptz`,
+     WHERE entry_time >= $1 AND entry_time < $2`,
+    [istMidnightISO, istTomorrowISO],
   );
   const totalPnl = Number(pnlResult.rows[0]?.total_pnl ?? 0);
   if (totalPnl <= -portfolioDailyStop) {

@@ -100,6 +100,25 @@ export interface TradeIntent {
 }
 
 // ---------------------------------------------------------------------------
+// Internal: DB row shape for personality_configs SELECT *
+// ---------------------------------------------------------------------------
+
+interface DbPersonalityRow {
+  id: string;
+  name: string;
+  display_name: string;
+  group_type: "reference" | "learning";
+  entry_type: "fixed_time" | "momentum_exhaustion" | "any_signal" | "sr_anchored";
+  management_style: "hold" | "roll" | "cut_reenter";
+  is_frozen: boolean;
+  is_active: boolean;
+  phase: number;
+  params: Record<string, unknown>;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// ---------------------------------------------------------------------------
 // Internal: DB row shape returned by the open-trades reconciliation query
 // ---------------------------------------------------------------------------
 
@@ -137,6 +156,23 @@ export class PersonalityRouter {
    * opens. Read from VIX_STALE_MS env var; defaults to 300,000 ms (5 minutes).
    */
   private readonly _vixStaleMs: number;
+
+  // ---------------------------------------------------------------------------
+  // Personality config cache
+  //
+  // The personality_configs table is a tiny, rarely-changing 10-row table.
+  // Querying it on every signal (~1,500/day) is safe but unnecessary. A 60-second
+  // TTL cache means config changes (via the CRUD API) are reflected within one
+  // minute — fast enough for operations, and negligible staleness risk since
+  // personality parameters are only changed deliberately by the operator.
+  //
+  // The cache is keyed by expiry timestamp (not by invalidation events) so no
+  // additional coordination is needed when the CRUD API mutates rows.
+  // ---------------------------------------------------------------------------
+
+  private _personalityCache: PersonalityConfig[] | null = null;
+  private _personalityCacheExpiresMs = 0;
+  private readonly _personalityCacheTtlMs = 60_000; // 60 seconds
 
   constructor(db: Pool, redis: Redis, clock: Clock) {
     this._db = db;
@@ -253,6 +289,49 @@ export class PersonalityRouter {
         );
       }
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Personality config cache loader
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns the active personality configs, using a 60-second in-memory cache.
+   *
+   * Cache hit: returns the cached list immediately (no DB round-trip).
+   * Cache miss: queries personality_configs, maps rows to PersonalityConfig,
+   *   stores the result, and sets the expiry timestamp.
+   *
+   * The mapping from DB snake_case to camelCase is inlined here (not a
+   * standalone helper) because it is only needed by this single call site.
+   */
+  private async _loadActivePersonalities(): Promise<PersonalityConfig[]> {
+    const nowMs = this._clock.now();
+    if (this._personalityCache !== null && nowMs < this._personalityCacheExpiresMs) {
+      return this._personalityCache;
+    }
+
+    const result = await this._db.query<DbPersonalityRow>(
+      `SELECT * FROM personality_configs WHERE is_active = TRUE AND phase <= 1 ORDER BY created_at`,
+    );
+
+    this._personalityCache = result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      displayName: row.display_name,
+      groupType: row.group_type,
+      entryType: row.entry_type,
+      managementStyle: row.management_style,
+      isFrozen: row.is_frozen,
+      isActive: row.is_active,
+      phase: row.phase,
+      params: row.params,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+    this._personalityCacheExpiresMs = nowMs + this._personalityCacheTtlMs;
+
+    return this._personalityCache;
   }
 
   // ---------------------------------------------------------------------------
@@ -373,37 +452,8 @@ export class PersonalityRouter {
     }
 
     // --- Step 5: Load active personalities (phase <= 1 for Phase 1 scope) ---
-    const personalityRows = await this._db.query<{
-      id: string;
-      name: string;
-      display_name: string;
-      group_type: "reference" | "learning";
-      entry_type: "fixed_time" | "momentum_exhaustion" | "any_signal" | "sr_anchored";
-      management_style: "hold" | "roll" | "cut_reenter";
-      is_frozen: boolean;
-      is_active: boolean;
-      phase: number;
-      params: Record<string, unknown>;
-      created_at: Date;
-      updated_at: Date;
-    }>(
-      `SELECT * FROM personality_configs WHERE is_active = TRUE AND phase <= 1`,
-    );
-
-    const personalities: PersonalityConfig[] = personalityRows.rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      displayName: row.display_name,
-      groupType: row.group_type,
-      entryType: row.entry_type,
-      managementStyle: row.management_style,
-      isFrozen: row.is_frozen,
-      isActive: row.is_active,
-      phase: row.phase,
-      params: row.params,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
+    // Uses the 60-second in-memory cache to avoid a DB round-trip on every signal.
+    const personalities = await this._loadActivePersonalities();
 
     if (personalities.length === 0) {
       console.info("[personality-router] No active personalities found — nothing to route");
