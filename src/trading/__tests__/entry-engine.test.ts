@@ -133,7 +133,7 @@ describe("EntryEngine — time gate", () => {
     expect(emitted).toHaveLength(0);
   });
 
-  it("passes the time gate and proceeds to open-position check at 10:00 IST", async () => {
+  it("passes the time gate and emits an entry at 10:00 IST", async () => {
     const { getHandler } = captureStreamHandler();
     const clock = new FixedClock(IST_1000_MAY18);
     const engine = new EntryEngine({ db: mockDb, redis: mockRedis, clock });
@@ -145,9 +145,9 @@ describe("EntryEngine — time gate", () => {
 
     await handler?.("msg-1", validFields);
 
-    // query IS called when the time gate passes
-    expect(query).toHaveBeenCalledOnce();
-    // And the entry is emitted (no open positions, all other gates pass)
+    // The global open-position DB query was removed in M2; no query is issued here.
+    expect(query).not.toHaveBeenCalled();
+    // Entry is emitted — all remaining gates (time, blocked-date, VIX, cooldown) pass.
     expect(emitted).toHaveLength(1);
   });
 });
@@ -195,13 +195,15 @@ describe("EntryEngine — blocked date gate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Open position gate tests
+// Open position gate (removed in M2)
 // ---------------------------------------------------------------------------
 
-describe("EntryEngine — open position gate", () => {
-  it("blocks entry when an existing open position is found in paper_trades", async () => {
-    vi.mocked(query).mockResolvedValue([{ id: "existing-trade-id" }]);
+describe("EntryEngine — open position gate removed in M2", () => {
+  // The global open-position gate was removed in M2. Each personality now manages
+  // its own position cap in Stage 2 of the personality filter chain. The entry
+  // engine no longer queries paper_trades for open positions.
 
+  it("emits an entry even when open positions exist — global gate was removed in M2", async () => {
     const { getHandler } = captureStreamHandler();
     const clock = new FixedClock(IST_1000_MAY18);
     const engine = new EntryEngine({ db: mockDb, redis: mockRedis, clock });
@@ -213,23 +215,9 @@ describe("EntryEngine — open position gate", () => {
 
     await handler?.("msg-1", validFields);
 
-    expect(emitted).toHaveLength(0);
-  });
-
-  it("allows entry when no open positions exist", async () => {
-    vi.mocked(query).mockResolvedValue([]);
-
-    const { getHandler } = captureStreamHandler();
-    const clock = new FixedClock(IST_1000_MAY18);
-    const engine = new EntryEngine({ db: mockDb, redis: mockRedis, clock });
-    engine.start();
-
-    const handler = getHandler();
-    const emitted: EntryIntent[] = [];
-    engine.on("entry", (intent) => emitted.push(intent));
-
-    await handler?.("msg-1", validFields);
-
+    // No DB query issued: per-personality position checking happens in the
+    // personality filter (Stage 2), not here.
+    expect(query).not.toHaveBeenCalled();
     expect(emitted).toHaveLength(1);
   });
 });

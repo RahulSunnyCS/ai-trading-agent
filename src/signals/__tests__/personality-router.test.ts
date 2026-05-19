@@ -56,9 +56,16 @@ vi.mock("../../trading/paper-trade-executor.js", () => ({
   })),
 }));
 
+// Mock portfolioRiskCheck so the router tests are not coupled to the risk
+// module's DB query sequence. The risk module has its own dedicated test suite.
+vi.mock("../../trading/portfolio-risk.js", () => ({
+  portfolioRiskCheck: vi.fn().mockResolvedValue({ allowed: true }),
+}));
+
 // Import the mocked modules so we can control their behaviour per test.
 import { fetchDailyState, runPersonalityFilter } from "../personality-filter.js";
 import { PaperTradeExecutor } from "../../trading/paper-trade-executor.js";
+import { portfolioRiskCheck } from "../../trading/portfolio-risk.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -218,8 +225,12 @@ function makeMockRedis(xreadgroupResponses: unknown[]): Redis {
 
 describe("PersonalityRouter", () => {
   // Reset all mocks between tests to avoid cross-test contamination.
+  // After resetting, restore the portfolioRiskCheck default (vi.resetAllMocks clears
+  // all implementations, so without this the risk check would return undefined and
+  // crash _openTradeForPersonality before openTrade is reached).
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(portfolioRiskCheck).mockResolvedValue({ allowed: true });
   });
 
   afterEach(() => {
@@ -250,13 +261,14 @@ describe("PersonalityRouter", () => {
     const redis = makeMockRedis(xreadgroupResponses);
     const clock = new FixedClock(IST_1030_MAY19);
 
-    const router = new PersonalityRouter(db, redis, clock);
-
-    // Create a mock executor so we can verify openTrade calls.
+    // Set up the executor mock BEFORE constructing the router: the executor is
+    // created in the constructor (P2 fix), so the mock must be in place first.
     const mockOpenTrade = vi.fn().mockResolvedValue("trade-uuid");
     vi.mocked(PaperTradeExecutor).mockImplementation(() => ({
       openTrade: mockOpenTrade,
     }) as unknown as InstanceType<typeof PaperTradeExecutor>);
+
+    const router = new PersonalityRouter(db, redis, clock);
 
     await router.start();
 
@@ -334,12 +346,13 @@ describe("PersonalityRouter", () => {
     const redis = makeMockRedis(xreadgroupResponses);
     const clock = new FixedClock(IST_1030_MAY19);
 
-    const router = new PersonalityRouter(db, redis, clock);
-
+    // Set up the executor mock BEFORE constructing the router.
     const mockOpenTrade = vi.fn().mockResolvedValue("trade-uuid");
     vi.mocked(PaperTradeExecutor).mockImplementation(() => ({
       openTrade: mockOpenTrade,
     }) as unknown as InstanceType<typeof PaperTradeExecutor>);
+
+    const router = new PersonalityRouter(db, redis, clock);
 
     await router.start();
     await new Promise<void>((resolve) => setTimeout(resolve, 50));
@@ -427,12 +440,13 @@ describe("PersonalityRouter", () => {
     const clock = new FixedClock(IST_1030_MAY19);
     process.env["VIX_STALE_MS"] = "99999999"; // effectively disabled for this test
 
-    const router = new PersonalityRouter(db, redis, clock);
-
+    // Set up the executor mock BEFORE constructing the router.
     const mockOpenTrade = vi.fn().mockResolvedValue("trade-uuid");
     vi.mocked(PaperTradeExecutor).mockImplementation(() => ({
       openTrade: mockOpenTrade,
     }) as unknown as InstanceType<typeof PaperTradeExecutor>);
+
+    const router = new PersonalityRouter(db, redis, clock);
 
     await router.start();
     await new Promise<void>((resolve) => setTimeout(resolve, 50));

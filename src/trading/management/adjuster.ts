@@ -156,7 +156,9 @@ export class AdjusterManager implements ManagementHandler {
 
       // max_open_legs is the total leg limit. We cap at max_open_legs / 2 because
       // each roll opens one new leg while closing the previous one, so the net count
-      // is bounded at ceil(max_open_legs / 2) at any given moment.
+      // is bounded at ceil(max_open_legs / 2) at any given moment. Preventing the roll
+      // when the cap is reached guards against unbounded leg accumulation if spot
+      // oscillates around the roll trigger (would roll once per tick).
       const maxOpenLegs = (personality.params.max_open_legs as number) ?? 4;
 
       if (openLegs >= maxOpenLegs / 2) {
@@ -242,7 +244,9 @@ export class AdjusterManager implements ManagementHandler {
       return;
     }
 
-    // ROLL: close + reopen in one transaction.
+    // ROLL: close + reopen in one transaction (atomic all-or-nothing).
+    // If a process crashes between the UPDATE and INSERT, a restart will find the
+    // original position still open and can retry or escalate — no half-rolled states.
     const client = await db.connect();
     try {
       await client.query("BEGIN");
@@ -350,7 +354,7 @@ export class AdjusterManager implements ManagementHandler {
         [
           parent.personality_id,        // $1  personality_id — inherit from parent
           parent.signal_id,             // $2  signal_id — inherit from parent roll chain
-          position.id,                  // $3  parent_trade_id — links this to the closed leg
+          position.id,                  // $3  parent_trade_id — links closed to new row; enables roll-chain traversal for P&L aggregation
           parent.entry_ce_strike,       // $4  entry_ce_strike = entry_pe_strike (ATM straddle)
           entryHalf,                    // $5  entry_ce_price = entry_pe_price (50/50 split)
           parent.lots,                  // $6  lots — copied from parent
