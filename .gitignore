@@ -30,3 +30,6 @@ coverage/
 
 # Biome standalone binary (platform-specific — never commit; install via scripts/install-biome.sh)
 tools/biome*
+
+# Claude Code agent worktrees (temporary isolated git worktrees used during parallel implementation)
+.claude/worktrees/
