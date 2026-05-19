@@ -3,7 +3,7 @@
 At-a-glance mirror of `ROADMAP.md` + formally contracted pipeline tasks.
 ⭐ = first runnable milestone. 🔒 = task contract written (pipeline/tasks/T-XX.json).
 
-**Build status:** 5 / 73 tasks complete (T-01, T-02, T-03, T-04, T-72 done). M0 in progress.
+**Build status:** 7 / 73 tasks complete (T-01–T-06, T-72 done). M0 ✅ complete. M7 payment tasks in progress.
 
 ---
 
@@ -12,8 +12,8 @@ At-a-glance mirror of `ROADMAP.md` + formally contracted pipeline tasks.
 - [x] T-02 Docker Compose (TimescaleDB pg16 + Redis 7, healthchecks)
 - [x] T-03 Postgres client + idempotent migration runner
 - [x] T-04 Redis client + stream helpers (market.ticks / straddle.values / signals.generated)
-- [ ] T-05 Core schema migration 001 (hypertables + tables + straddle_1min + schema.ts)
-- [ ] T-06 Seed migration 002 — single Clockwork-style personality (MVP)
+- [x] T-05 Core schema migration 001 (hypertables + tables + straddle_1min + schema.ts)
+- [x] T-06 Seed migration 002 — single Clockwork-style personality (MVP)
 
 ## Milestone 0.5 — Testing & CI Foundation (lean — research-tool scoped)
 Essential — correctness & reproducibility:
