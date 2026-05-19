@@ -24,6 +24,6 @@
 
 | Gate | Status |
 |---|---|
-| Gate 1 (Plan) | ⏳ PENDING — presenting after Phase 1 completes |
+| Gate 1 (Plan) | 🔄 RE-PRESENTING — user decisions folded; awaiting final confirmation |
 | Gate 2 (Review) | ⏳ PENDING |
 | Gate 3 (Final) | ⏳ PENDING |
