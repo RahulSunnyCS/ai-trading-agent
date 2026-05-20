@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Trading Agent — Dashboard Mockup</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  body { background: #0b0f17; color: #e5e7eb; font-family: ui-sans-serif, system-ui, sans-serif; }
+  .card { background: #111827; border: 1px solid #1f2937; border-radius: 0.75rem; }
+  .pos { color: #34d399; } .neg { color: #f87171; } .mut { color: #9ca3af; }
+  .pill { font-size: 10px; padding: 2px 6px; border-radius: 9999px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .glow-green { box-shadow: 0 0 8px #10b981; }
+  .glow-red   { box-shadow: 0 0 8px #ef4444; }
+  table th { font-weight: 500; color: #9ca3af; text-align: left; padding: 6px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;}
+  table td { padding: 8px; border-top: 1px solid #1f2937; font-size: 13px; }
+  .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #1f2937; color: #d1d5db; }
+  .regime-RANGING            { background:#1e3a8a; color:#bfdbfe; }
+  .regime-TRENDING_STRONG    { background:#065f46; color:#a7f3d0; }
+  .regime-VOLATILE_REVERTING { background:#7c2d12; color:#fed7aa; }
+  .regime-EVENT_DAY          { background:#7f1d1d; color:#fecaca; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Top bar -->
+<header class="flex items-center justify-between px-6 py-3 border-b border-gray-800 bg-[#0d1320] sticky top-0 z-10">
+  <div class="flex items-center gap-3">
+    <div class="text-lg font-semibold">AI Trading Agent</div>
+    <span class="pill bg-emerald-900 text-emerald-300">● LIVE</span>
+    <span class="pill bg-gray-800 text-gray-300">SIMULATE=false</span>
+    <span class="pill regime-TRENDING_STRONG">REGIME: TRENDING_STRONG</span>
+  </div>
+  <div class="flex items-center gap-4 text-sm">
+    <div><span class="mut">NIFTY</span> <span id="nifty" class="font-mono">24,812.40</span> <span id="niftyChg" class="pos font-mono">+0.42%</span></div>
+    <div><span class="mut">VIX</span> <span class="font-mono">13.84</span></div>
+    <div><span class="mut">IST</span> <span id="clock" class="font-mono">14:23:11</span></div>
+    <div><span class="mut">Fyers token</span> <span class="pos">●</span> valid (exp 23:59 IST)</div>
+  </div>
+</header>
+
+<main class="grid grid-cols-12 gap-4 p-4">
+
+  <!-- Straddle / momentum chart -->
+  <section class="card col-span-8 p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <div class="text-xs mut">ATM Straddle — NIFTY 24800 (Weekly 22-May)</div>
+        <div class="text-2xl font-mono">₹ <span id="straddleVal">328.55</span>
+          <span id="straddleChg" class="text-sm neg">−4.20 (−1.26%)</span>
+        </div>
+      </div>
+      <div class="flex gap-4 text-xs">
+        <div><span class="mut">ROC (15s)</span> <span class="neg font-mono">−0.62%</span></div>
+        <div><span class="mut">Acceleration</span> <span class="neg font-mono">−0.18</span></div>
+        <div><span class="mut">EMA(9/21)</span> <span class="neg font-mono">cross-down</span></div>
+        <div><span class="mut">Peak conf.</span> <span class="pos font-mono">0.78</span></div>
+      </div>
+    </div>
+    <div id="chart" style="height: 320px;"></div>
+    <div class="flex gap-2 mt-2 text-xs">
+      <span class="tag">15s snapshots</span>
+      <span class="tag">peak markers</span>
+      <span class="tag">EMA 9 / 21</span>
+      <span class="tag">VIX overlay</span>
+    </div>
+  </section>
+
+  <!-- Active signals -->
+  <section class="card col-span-4 p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-sm font-semibold">Active Signals</div>
+      <span class="pill bg-gray-800 text-gray-300">3 live</span>
+    </div>
+    <ul class="space-y-2">
+      <li class="border border-gray-800 rounded-md p-2">
+        <div class="flex justify-between">
+          <div class="text-sm">MOMENTUM_EXHAUSTION <span class="tag">SELL straddle</span></div>
+          <div class="text-xs pos font-mono">p=0.74</div>
+        </div>
+        <div class="text-xs mut mt-1">NIFTY 24800 CE+PE · 14:22:48 · VIX-adj +0.04</div>
+        <div class="flex gap-1 mt-2 flex-wrap">
+          <span class="pill bg-emerald-900 text-emerald-300">Clockwork ✓</span>
+          <span class="pill bg-emerald-900 text-emerald-300">Precision ✓</span>
+          <span class="pill bg-emerald-900 text-emerald-300">Adjuster ✓</span>
+          <span class="pill bg-rose-900 text-rose-300">Reducer ✗ profit-gate</span>
+          <span class="pill bg-gray-800 text-gray-300">Patient ⏸ state</span>
+        </div>
+      </li>
+      <li class="border border-gray-800 rounded-md p-2">
+        <div class="flex justify-between">
+          <div class="text-sm">SCHEDULED_FALLBACK <span class="tag">SELL straddle</span></div>
+          <div class="text-xs mut font-mono">p=0.58</div>
+        </div>
+        <div class="text-xs mut mt-1">NIFTY 24800 · 14:15:00 · fired by 4/10</div>
+      </li>
+      <li class="border border-gray-800 rounded-md p-2 opacity-60">
+        <div class="flex justify-between">
+          <div class="text-sm">MOMENTUM_EXHAUSTION <span class="tag">expired</span></div>
+          <div class="text-xs mut font-mono">p=0.63</div>
+        </div>
+        <div class="text-xs mut mt-1">13:48:30 · no fills</div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 10 personalities -->
+  <section class="card col-span-12 p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-sm font-semibold">10 Personalities — Today</div>
+      <div class="text-xs mut">P&amp;L vs frozen Clockwork benchmark · regime: TRENDING_STRONG</div>
+    </div>
+    <table class="w-full">
+      <thead>
+        <tr><th>#</th><th>Personality</th><th>State</th><th>Trades</th><th>Open</th><th>Realised ₹</th><th>Unrealised ₹</th><th>Net ₹</th><th>Δ vs Clockwork</th><th>Brier</th><th>Mgmt</th></tr>
+      </thead>
+      <tbody id="persoBody"></tbody>
+    </table>
+  </section>
+
+  <!-- Open paper trades -->
+  <section class="card col-span-7 p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-sm font-semibold">Open Paper Trades</div>
+      <span class="pill bg-gray-800 text-gray-300">5 open</span>
+    </div>
+    <table class="w-full">
+      <thead>
+        <tr><th>Personality</th><th>Strike</th><th>Entry</th><th>LTP</th><th>MTM ₹</th><th>Mgmt</th><th>Age</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Clockwork</td><td>24800 CE+PE</td><td class="font-mono">332.75</td><td class="font-mono">328.55</td><td class="pos font-mono">+2,100</td><td><span class="tag">Hold</span></td><td>00:18</td></tr>
+        <tr><td>Precision</td><td>24800 CE+PE</td><td class="font-mono">331.10</td><td class="font-mono">328.55</td><td class="pos font-mono">+1,275</td><td><span class="tag">Hold</span></td><td>00:16</td></tr>
+        <tr><td>Adjuster</td><td>24750 CE+PE</td><td class="font-mono">340.20</td><td class="font-mono">335.80</td><td class="pos font-mono">+2,200</td><td><span class="tag">Roll</span></td><td>00:42</td></tr>
+        <tr><td>Reducer</td><td>24800 CE+PE</td><td class="font-mono">329.40</td><td class="font-mono">328.55</td><td class="pos font-mono">+425</td><td><span class="tag">Cut + Re-enter</span></td><td>00:09</td></tr>
+        <tr><td>Aggressor</td><td>24850 CE+PE</td><td class="font-mono">324.10</td><td class="font-mono">326.90</td><td class="neg font-mono">−1,400</td><td><span class="tag">Hold</span></td><td>00:31</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- EOD retrospection -->
+  <section class="card col-span-5 p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-sm font-semibold">EOD Retrospection (yesterday)</div>
+      <span class="pill bg-gray-800 text-gray-300">21-May · RANGING</span>
+    </div>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <div class="border border-gray-800 rounded-md p-3">
+        <div class="mut text-xs">Beat Clockwork</div>
+        <div class="text-xl font-mono pos">6 / 9</div>
+        <div class="text-xs mut">Precision +₹4.2k · Adjuster +₹6.8k</div>
+      </div>
+      <div class="border border-gray-800 rounded-md p-3">
+        <div class="mut text-xs">Avg Brier (lower = better)</div>
+        <div class="text-xl font-mono">0.214</div>
+        <div class="text-xs mut">best: Precision 0.181</div>
+      </div>
+      <div class="border border-gray-800 rounded-md p-3">
+        <div class="mut text-xs">Mgmt effectiveness</div>
+        <div class="text-xl font-mono">Roll +12% vs Hold</div>
+        <div class="text-xs mut">Cut+Re-enter −3% vs Hold</div>
+      </div>
+      <div class="border border-gray-800 rounded-md p-3">
+        <div class="mut text-xs">Suggestions queued</div>
+        <div class="text-xl font-mono">3</div>
+        <div class="text-xs mut">awaiting approval</div>
+      </div>
+    </div>
+    <div class="mt-3">
+      <div class="text-xs mut mb-1">Pending parameter suggestions</div>
+      <ul class="space-y-1 text-xs">
+        <li class="flex justify-between border border-gray-800 rounded p-2">
+          <span>Aggressor · <span class="font-mono">min_probability</span> 0.55 → 0.58</span>
+          <span class="flex gap-1"><span class="pill bg-emerald-900 text-emerald-300">Approve</span><span class="pill bg-rose-900 text-rose-300">Reject</span></span>
+        </li>
+        <li class="flex justify-between border border-gray-800 rounded p-2">
+          <span>Patient · <span class="font-mono">cooldown_s</span> 180 → 240</span>
+          <span class="flex gap-1"><span class="pill bg-emerald-900 text-emerald-300">Approve</span><span class="pill bg-rose-900 text-rose-300">Reject</span></span>
+        </li>
+        <li class="flex justify-between border border-gray-800 rounded p-2">
+          <span>Reducer · profit-gate ₹1500 → ₹1200</span>
+          <span class="flex gap-1"><span class="pill bg-emerald-900 text-emerald-300">Approve</span><span class="pill bg-rose-900 text-rose-300">Reject</span></span>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- System health -->
+  <section class="card col-span-12 p-3">
+    <div class="flex flex-wrap items-center gap-6 text-xs">
+      <div><span class="dot bg-emerald-500"></span> Fyers WS · 1,284 ticks/min</div>
+      <div><span class="dot bg-emerald-500"></span> Redis streams · lag 12ms</div>
+      <div><span class="dot bg-emerald-500"></span> Postgres / TimescaleDB · 4 hypertables healthy</div>
+      <div><span class="dot bg-emerald-500"></span> BullMQ · next EOD job 15:35 IST</div>
+      <div><span class="dot bg-amber-500"></span> Quantiply API · p99 312ms (degraded)</div>
+      <div class="ml-auto mut">v0.4.2 · uptime 03:14:22</div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// Clock
+setInterval(() => {
+  const d = new Date();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('en-GB');
+}, 1000);
+
+// Personalities table
+const personalities = [
+  ['Clockwork',  'frozen',   12, 1,  8420,  2100, 10520,   '—',         0.221, 'Hold'],
+  ['Precision',  'in-trade', 14, 1, 10200,  1275, 11475, '+955',        0.181, 'Hold'],
+  ['Adjuster',   'in-trade', 11, 1,  9100,  2200, 11300, '+780',        0.205, 'Roll'],
+  ['Reducer',    'in-trade', 18, 1,  7400,   425,  7825, '−2,695',      0.244, 'Cut+RE'],
+  ['Aggressor',  'in-trade', 22, 1,  6300, -1400,  4900, '−5,620',      0.298, 'Hold'],
+  ['Patient',    'waiting',   6, 0, 11200,     0, 11200, '+680',        0.190, 'Hold'],
+  ['Contrarian', 'waiting',   8, 0,  9800,     0,  9800, '−720',        0.231, 'Hold'],
+  ['Scalper',    'cooldown', 27, 0,  5400,     0,  5400, '−5,120',      0.276, 'Cut+RE'],
+  ['Trend',      'waiting',  10, 0, 12100,     0, 12100, '+1,580',      0.198, 'Roll'],
+  ['Mean-Rev',   'in-trade', 13, 0,  8900,     0,  8900, '−1,620',      0.252, 'Hold'],
+];
+const tbody = document.getElementById('persoBody');
+personalities.forEach((p, i) => {
+  const net = p[7];
+  const netCls = net >= 0 ? 'pos' : 'neg';
+  const delta = p[8];
+  const dCls = delta === '—' ? 'mut' : (delta.startsWith('+') ? 'pos' : 'neg');
+  const stateColor = { 'in-trade':'bg-emerald-900 text-emerald-300', 'waiting':'bg-gray-800 text-gray-300', 'cooldown':'bg-amber-900 text-amber-300', 'frozen':'bg-blue-900 text-blue-300' }[p[1]];
+  tbody.insertAdjacentHTML('beforeend', `
+    <tr>
+      <td class="mut">${i+1}</td>
+      <td>${p[0]} ${p[0]==='Clockwork' ? '<span class="pill bg-blue-900 text-blue-300">benchmark</span>':''}</td>
+      <td><span class="pill ${stateColor}">${p[1]}</span></td>
+      <td class="font-mono">${p[2]}</td>
+      <td class="font-mono">${p[3]}</td>
+      <td class="font-mono">${p[4].toLocaleString()}</td>
+      <td class="font-mono ${p[5]>=0?'pos':'neg'}">${p[5]>=0?'+':''}${p[5].toLocaleString()}</td>
+      <td class="font-mono ${netCls}">${net>=0?'+':''}${net.toLocaleString()}</td>
+      <td class="font-mono ${dCls}">${delta}</td>
+      <td class="font-mono">${p[9]}</td>
+      <td><span class="tag">${p[10]}</span></td>
+    </tr>`);
+});
+
+// Lightweight chart
+const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+  layout: { background: { color: '#111827' }, textColor: '#9ca3af' },
+  grid:   { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+  timeScale: { timeVisible: true, secondsVisible: false },
+  rightPriceScale: { borderColor: '#1f2937' },
+});
+const series = chart.addAreaSeries({
+  lineColor: '#60a5fa', topColor: 'rgba(96,165,250,0.35)', bottomColor: 'rgba(96,165,250,0.0)',
+});
+const ema = chart.addLineSeries({ color: '#f59e0b', lineWidth: 1 });
+// Synthetic straddle path
+const base = Date.UTC(2026, 4, 22, 9, 15) / 1000;
+let v = 345, data = [], emaData = [], e = 345;
+for (let i = 0; i < 180; i++) {
+  v += (Math.random() - 0.52) * 1.4;
+  e = e * 0.9 + v * 0.1;
+  const t = base + i * 60;
+  data.push({ time: t, value: +v.toFixed(2) });
+  emaData.push({ time: t, value: +e.toFixed(2) });
+}
+series.setData(data);
+ema.setData(emaData);
+// Peak markers
+series.setMarkers([
+  { time: base + 40*60, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: 'Peak SELL' },
+  { time: base + 95*60, position: 'aboveBar', color: '#ef4444', shape: 'arrowDown', text: 'Peak SELL' },
+  { time: base + 150*60, position: 'belowBar', color: '#10b981', shape: 'arrowUp', text: 'Exit' },
+]);
+</script>
+
+</body>
+</html>
