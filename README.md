@@ -2,6 +2,16 @@
 
 Paper-trading research platform for weekly index options strategies on Indian markets (NSE/BSE).
 
+## The Approach
+
+Most trading research suffers from a fundamental flaw: you tune a single strategy until it looks good, then discover it was curve-fitted to the regime you happened to study. This platform attacks that problem differently — by running **10 competing trading personalities in parallel**, each with its own risk tolerance, entry thresholds, and trade management style, all trading the same signals at the same time on paper.
+
+The idea is simple: instead of asking "is this strategy good?", we ask "which personality survives across regimes, and why?". Every personality sees the same momentum-exhaustion signals generated from NSE/BSE ATM straddle data. Each one independently decides whether to act — filtering the signal through five stages (hard risk limits → position state → market context → signal quality → optional profit gate). The result is a controlled experiment: identical market exposure, divergent decision logic, measurable outcomes.
+
+A frozen **Clockwork** personality acts as the immutable benchmark. Its parameters never change. Every other personality is measured against it — not against the market, not against itself from last week, but against a stable reference. This makes regime-to-regime comparison honest: if Clockwork bleeds in a trending market and Precision thrives, that's signal, not noise.
+
+At end-of-day, a retrospection engine tags each day's results by market regime (`RANGING`, `TRENDING_STRONG`, `VOLATILE_REVERTING`, `EVENT_DAY`) and computes per-personality metrics: Beat-Clockwork delta, signal calibration score, management effectiveness. Rule-based parameter evolution then proposes adjustments — with human approval gates — so the personalities adapt to evidence rather than intuition.
+
 ## Quick Start
 
 ### Prerequisites
