@@ -1,4 +1,5 @@
-# AI Trading Agent
+# AI Trading Agent (In Progress)
+
 
 Paper-trading research platform for weekly index options strategies on Indian markets (NSE/BSE).
 
