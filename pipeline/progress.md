@@ -3,7 +3,13 @@
 **Task:** Create relevant frontend changes for the current workflow (wire dashboard tabs to the running backend).
 **Branch:** claude/sweet-wright-ORLM0
 **Lane:** feature-fast | **Risk:** LOW | **Sprints:** 1 | **Effort:** medium (default)
-**Recommendation rounds used:** 0
+**Recommendation rounds used:** 1 (R2 accepted)
+
+## Resolved decisions
+- Live straddle value: use continuous polling (auto-updates when backend goes live) — user confirmed.
+- R2 accepted: delete the stale top-level `frontend/` tree (verified unreferenced; frontend-only, safe).
+- R2 server-consolidation portion: DEFERRED — it is a backend refactor that conflicts with the
+  strictly-frontend-only constraint and touches payment routes. Surfaced as a decision at Gate 1.
 
 ## User constraints (locked at clarification)
 - Scope: surface "whatever is completed in the backend, only needing a frontend change."
