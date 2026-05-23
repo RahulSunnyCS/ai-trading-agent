@@ -1,0 +1,35 @@
+{
+  "task_id": "T-03",
+  "title": "P&L tab — realized P&L aggregates (closed-only, IST) + cumulative chart",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/frontend/lib/pnl.ts",
+      "src/frontend/lib/__tests__/pnl.test.ts"
+    ],
+    "files_to_modify": ["src/frontend/components/PnlView.tsx"],
+    "files_forbidden": [
+      "src/server/**",
+      "src/api/**",
+      "frontend/**",
+      "src/frontend/components/LiveView.tsx",
+      "src/frontend/components/TradesView.tsx",
+      "src/frontend/hooks/useLiveTicks.ts",
+      "src/frontend/hooks/usePaperTrades.ts",
+      "src/frontend/lib/api.ts",
+      "src/frontend/lib/format.ts",
+      "src/frontend/App.tsx"
+    ]
+  },
+  "acceptance_criteria": [
+    "pnl.ts exports PURE functions that take PaperTrade[] and compute: total realized net P&L over status==='closed' trades ONLY, today's realized P&L (closed trades whose exit date is IST-today), win rate (winners / closed count, guarding divide-by-zero -> 0), open count, closed count, and a cumulative-P&L series ordered by exit_time for closed trades. All money math uses T-04 null-safe coercion; null/missing values are skipped, never summed as 0-from-NaN.",
+    "PnlView consumes the SHARED usePaperTrades hook from T-02 (does not refetch). It renders the aggregates labeled honestly — the total is 'Realized P&L (closed trades)', open positions shown as a separate count, never an invented unrealized number.",
+    "Cumulative-P&L rendered with Lightweight Charts; chart handles 0, 1, and many points without crashing.",
+    "Distinct empty state (no closed trades yet) and error state (propagated from usePaperTrades) — error must not render as flat 0.00 / 0% as if it were a real no-activity day.",
+    "Vitest tests in pnl.test.ts cover: closed-only filtering, null P&L exclusion, divide-by-zero win rate, IST today-boundary selection, and cumulative series ordering.",
+    "Named exports only; TypeScript strict passes."
+  ],
+  "dependencies": ["T-04", "T-02"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

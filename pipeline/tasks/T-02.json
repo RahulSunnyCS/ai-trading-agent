@@ -1,0 +1,30 @@
+{
+  "task_id": "T-02",
+  "title": "Trades tab — poll /api/trades, render trades table with safe money parsing",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": ["src/frontend/hooks/usePaperTrades.ts"],
+    "files_to_modify": ["src/frontend/components/TradesView.tsx"],
+    "files_forbidden": [
+      "src/server/**",
+      "src/api/**",
+      "frontend/**",
+      "src/frontend/components/LiveView.tsx",
+      "src/frontend/components/PnlView.tsx",
+      "src/frontend/hooks/useLiveTicks.ts",
+      "src/frontend/lib/**",
+      "src/frontend/App.tsx"
+    ]
+  },
+  "acceptance_criteria": [
+    "usePaperTrades polls GET /api/trades on a ~10s interval via the T-04 api helper, using AbortController and clearing the timer + aborting in-flight requests on unmount; no overlapping requests (do not start a new poll while one is in flight).",
+    "It normalizes the running envelope: {data: PaperTrade[]} -> trades; {data: [], message} -> empty list; HTTP/network error -> a distinct error state (NOT silently treated as 'no trades').",
+    "It returns { trades, loading, error } and is reused by T-03 (single source of truth for trade data) — do not duplicate the fetch in PnlView.",
+    "TradesView renders a table: entry time formatted in IST (T-04 helper), open/closed status badge, straddle-at-entry, gross and net P&L colored by sign (green positive / red negative / neutral zero) using T-04 null-safe coercion + formatter, and exit reason. Open trades with null P&L render as '—', never as 0.",
+    "Distinct empty state ('no trades yet') and error state ('couldn't load trades — retrying') — the two must be visually and semantically different.",
+    "Named exports only; TypeScript strict passes."
+  ],
+  "dependencies": ["T-04"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

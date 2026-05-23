@@ -2,19 +2,23 @@
 
 > Mirror of `pipeline/tasks/T-XX.json`. Orchestrator-written, read-only for agents.
 > Lane: feature-fast · Risk: LOW · Strictly frontend-only (no backend edits).
+> Gate 1: APPROVED (option A — server consolidation deferred to a separate backend task).
 
-## Status: Planning — awaiting Human Gate 1
+## Status: Decomposed — awaiting confirmation to implement (Phase 2 → Phase 3)
 
-High-level task list (decomposed into contracts after Gate 1 approval):
+| Task | Title | Depends on | Files |
+|---|---|---|---|
+| T-04 | Shared scaffolding (api helper, IST/number format, types) + tests | — | create: lib/api.ts, lib/format.ts, types/trading.ts, lib/__tests__/format.test.ts |
+| T-01 | Live tab: WebSocket feed + polled straddle value | T-04 | create: hooks/useLiveTicks.ts · modify: components/LiveView.tsx |
+| T-02 | Trades tab: poll /api/trades, trades table | T-04 | create: hooks/usePaperTrades.ts · modify: components/TradesView.tsx |
+| T-03 | P&L tab: realized aggregates + cumulative chart | T-04, T-02 | create: lib/pnl.ts, lib/__tests__/pnl.test.ts · modify: components/PnlView.tsx |
+| T-05 | Delete stale top-level frontend/ tree (R2) | — | delete: frontend/ |
 
-- [ ] **T-01 — LiveView**: WebSocket to running `/ws/ticks`, connection-status pill, live NIFTY index number, honestly-labeled synthetic sparkline, one-shot `/api/straddle/latest` fetch with "feed not yet connected" notice. New hook `useLiveTicks.ts`.
-- [ ] **T-02 — TradesView**: poll `/api/trades`, normalize `{data}` envelope + empty case, null-safe NUMERIC parsing, trades table with IST times, status badge, sign-colored P&L, empty/error states. New hook `usePaperTrades.ts`.
-- [ ] **T-03 — PnlView**: reuse `usePaperTrades`, compute realized P&L (closed trades only), today's P&L (IST), win rate, open/closed counts, cumulative-P&L line chart; empty/error states.
-- [ ] **T-04 — Shared scaffolding**: fetch helper, IST/number-format utils, shared types in `src/frontend/types/`; Vitest unit tests for the pure parse/aggregate functions and a mock-WebSocket test for the hook.
-- [ ] **T-05 — Delete stale frontend (R2)**: remove the unreferenced top-level `frontend/` tree (verified: no config or import references it). Frontend-only deletion.
+### Implementation ordering (no shared file writes between parallel tasks)
+1. **T-04** first (others import its lib/types — read-only consumers).
+2. **T-01**, **T-02**, **T-05** in parallel after T-04 (T-05 has no dep, can start anytime).
+3. **T-03** after T-02 (reuses usePaperTrades as the single trade-data source).
 
-### Decision pending at Gate 1
-- R2 server consolidation: it is a BACKEND refactor (running `src/server/index.ts` also hosts payment/Fyers routes; the complete `src/api/server.ts` is the orphaned one). Conflicts with frontend-only constraint → propose deferring to a separate backend task.
-
-### Out of scope this task
-- No UI for personalities / retrospection / signals (no backend API exists for them).
+### Deferred / out of scope
+- Server consolidation (mounting the complete `src/api` server, relocating payment routes) — separate BACKEND task, per Gate 1 decision A.
+- No UI for personalities / retrospection / signals (no backend API exists yet).

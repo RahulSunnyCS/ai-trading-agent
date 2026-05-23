@@ -1,0 +1,28 @@
+{
+  "task_id": "T-05",
+  "title": "Delete the stale, unreferenced top-level frontend/ duplicate tree (R2)",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [],
+    "files_to_modify": [],
+    "files_to_delete": ["frontend/ (entire top-level directory, git rm -r)"],
+    "files_forbidden": [
+      "src/**",
+      "index.html",
+      "vite.config.ts",
+      "tsconfig.json",
+      "tailwind.config.ts",
+      "package.json",
+      "bun.lock"
+    ]
+  },
+  "acceptance_criteria": [
+    "The entire top-level frontend/ directory is removed via git rm -r (it is tracked but referenced by no config or import — verified: root index.html/tsconfig/tailwind/vite all target src/frontend).",
+    "Before deleting, re-grep the repo to CONFIRM zero references to the top-level frontend/ tree (imports, configs, scripts, playwright/e2e). If ANY live reference is found, STOP and report rather than delete.",
+    "Canonical src/frontend/ is untouched. `bun run typecheck` and the build still resolve (no dangling references introduced).",
+    "No file outside the top-level frontend/ directory is modified."
+  ],
+  "dependencies": [],
+  "output_format": "code plus plain English explanation; explicit confirmation that the pre-delete reference grep came back clean"
+}
