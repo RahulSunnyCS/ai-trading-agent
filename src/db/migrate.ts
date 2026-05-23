@@ -86,7 +86,7 @@ export async function runMigrations(): Promise<void> {
     // This must run before CREATE TABLE because the migration files will
     // attempt to create hypertables, which require the extension.
     const tsdbResult = await client.query<{ installed_version: string }>(
-      `SELECT installed_version FROM pg_extension WHERE extname = 'timescaledb'`,
+      `SELECT extversion AS installed_version FROM pg_extension WHERE extname = 'timescaledb'`,
     );
 
     if (tsdbResult.rows.length === 0) {

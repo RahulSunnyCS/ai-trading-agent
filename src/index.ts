@@ -22,6 +22,7 @@
 import { pool } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 import { createBrokerFeed } from "./ingestion/brokers/index.js";
+import { loadStoredToken } from "./server/services/fyers-auth.js";
 import { createStraddleCalculator } from "./ingestion/straddle-calc.js";
 import { createVixFeed } from "./ingestion/vix-feed.js";
 import { redis } from "./redis/client.js";
@@ -65,6 +66,35 @@ async function main(): Promise<void> {
   }
 
   // Step 3: instantiate all components.
+  // If BROKER=fyers and FYERS_ACCESS_TOKEN is not in the env, try the DB —
+  // the dashboard OAuth flow writes tokens to broker_tokens. This lets the
+  // operator "Login with Fyers" instead of pasting a daily token into .env.
+  if (
+    (process.env.BROKER ?? "").toLowerCase().trim() === "fyers" &&
+    !process.env.FYERS_ACCESS_TOKEN
+  ) {
+    try {
+      const stored = await loadStoredToken(pool);
+      if (stored && stored.expiresAt.getTime() > Date.now()) {
+        process.env.FYERS_ACCESS_TOKEN = stored.accessToken;
+        if (!process.env.FYERS_APP_ID) process.env.FYERS_APP_ID = stored.appId;
+        console.log(
+          `[index] Loaded Fyers token from DB — expires ${stored.expiresAt.toISOString()}`,
+        );
+      } else if (stored) {
+        console.warn(
+          `[index] Stored Fyers token expired at ${stored.expiresAt.toISOString()} — open the dashboard and re-login.`,
+        );
+      } else {
+        console.warn(
+          "[index] BROKER=fyers but no token in env or DB — open the dashboard and click 'Login with Fyers'.",
+        );
+      }
+    } catch (err) {
+      console.warn("[index] Failed to load Fyers token from DB:", err);
+    }
+  }
+
   // createBrokerFeed reads BROKER and SIMULATE env vars and picks the right adapter.
   const feed = createBrokerFeed();
 

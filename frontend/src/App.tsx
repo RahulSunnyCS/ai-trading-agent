@@ -1,3 +1,4 @@
+import FyersLogin from "./components/FyersLogin";
 import PnlDisplay from "./components/PnlDisplay";
 import StraddleChart from "./components/StraddleChart";
 import TradesTable from "./components/TradesTable";
@@ -13,6 +14,9 @@ export function App(): JSX.Element {
           AI Trading Agent — Paper Trading Dashboard
         </h1>
       </header>
+      <div className="mb-6">
+        <FyersLogin />
+      </div>
       <div className="mb-6">
         <PnlDisplay />
       </div>

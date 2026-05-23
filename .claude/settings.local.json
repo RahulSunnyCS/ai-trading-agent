@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun --version)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Read(//Applications/**)",
+      "Read(//Applications/Docker.app/Contents/Resources/bin/**)",
+      "Bash(/usr/local/bin/docker --version)",
+      "Read(//Users/rahul/**)",
+      "Read(//opt/homebrew/bin/**)",
+      "Bash(PGPASSWORD=trading psql -h localhost -p 5432 -U trading -d trading -c 'SELECT 1 AS ok;')",
+      "Bash(timeout 60 bun run migrate)",
+      "Bash(bun run *)",
+      "Bash(lsof -nP -iTCP:5432 -sTCP:LISTEN)",
+      "Read(//opt/homebrew/var/**)",
+      "Bash(brew services *)",
+      "Bash(yarn sim *)",
+      "Bash(docker exec *)"
+    ]
+  }
+}

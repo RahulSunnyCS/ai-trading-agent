@@ -28,6 +28,7 @@ import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
 
 import { paymentRoutes } from './routes/payment';
+import { fyersAuthRoutes } from './routes/fyers-auth.js';
 
 // ---------------------------------------------------------------------------
 // Fastify module augmentation — makes server.db typed as Pool
@@ -196,6 +197,7 @@ export async function buildServer(
   // wrapped in fastify-plugin (see payment.ts) so it runs in the parent scope
   // and can access all decorators without re-declaration.
   await server.register(paymentRoutes);
+  await server.register(fyersAuthRoutes);
 
   return server;
 }
