@@ -12,9 +12,10 @@
 
 ## Phase status
 - [x] Phase 0 — Triage (risk_manifest.json written)
-- [~] Phase 1 — Planning done; Red Team sprint 1 = "Acceptable" (fixes folded in); QA Planner running → Human Gate 1
+- [~] Phase 1 — Planning + Red Team sprint 1 ("Acceptable") + QA Planner DONE → awaiting Human Gate 1
   - Internal score ~8.5/10 (>8 → no extra sprint, per feature-fast = 1 sprint)
   - Red Team fixes accepted: running WS shape; realized-only P&L; synthetic labeling on chart; one-shot straddle fetch; StrictMode-safe + backoff reconnect; null-safe NUMERIC coercion; IST-explicit dates.
+  - QA checklist: 16 Critical / 17 Functional / 9 Non-blocker (42 total). File: pipeline/qa-checklist.md
 - [ ] Phase 2 — Decomposition
 - [ ] Phase 3 — Implementation
 - [ ] Phase 4 — Architecture review (LOW → architecture only) → Human Gate 2
