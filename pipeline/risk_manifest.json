@@ -1,0 +1,23 @@
+{
+  "milestone": "M3 — Fyers Historical Data, Replay & Backtesting",
+  "tasks_in_scope": ["T-54", "T-55", "T-56", "T-57", "T-51", "T-58"],
+  "risk_level": "HIGH",
+  "triggers": [
+    "Financial / research-integrity logic: backtest P&L, train/test/holdout discipline, and statistical-significance testing produce numbers that inform real trading decisions — a wrong backtest is financially harmful downstream",
+    "External broker API integration: Fyers historical REST client reuses live broker credentials (token in broker_tokens) and performs authenticated outbound calls",
+    "New public-facing API surface likely: a backtest-trigger endpoint on the unauthenticated single-instance Fastify server is resource-intensive (expensive, long-running) and a DoS / resource-exhaustion vector",
+    "Writes to TimescaleDB hypertables (market_ticks / option_ticks / straddle_snapshots) — idempotency and time-range discipline are correctness-critical"
+  ],
+  "risk_flags": ["public-facing-api", "financial-logic"],
+  "mandatory_agents": ["security-auditor", "performance-reviewer", "architecture-reviewer"],
+  "tags": ["backend", "infra"],
+  "lane": "feature-full",
+  "sprint_count": 3,
+  "human_gates": 3,
+  "notes": [
+    "auth risk flag NOT APPLICABLE per .claude/project/business.md (single-instance tool, no per-user accounts).",
+    "pricing tag NOT set — M3 touches no payment/billing code; pricing-reviewer does not run.",
+    "Forward dependencies: T-51 needs T-27 (personality router, M2 — NOT built); T-58 per-regime needs T-33 (regime tagging, M4 — NOT built). Surfaced as Gate-1 decisions.",
+    "Lane fail-safe applied: HIGH risk + financial-logic + public-facing-api risk flags => feature-full, security-auditor mandatory at Opus/max."
+  ]
+}
