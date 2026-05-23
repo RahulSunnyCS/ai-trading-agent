@@ -4,7 +4,7 @@
 - **Risk level:** HIGH (financial-logic + public-facing-api risk flags)
 - **Sprint count:** 3
 - **Effort:** Planning/Red Team at max; default per CLAUDE.md table otherwise.
-- **recommendation_rounds_used:** 0
+- **recommendation_rounds_used:** 1 (R1 pull T-33 forward + R2 golden-oracle CI check accepted at Gate 1; re-planning)
 
 ## Phase Status
 

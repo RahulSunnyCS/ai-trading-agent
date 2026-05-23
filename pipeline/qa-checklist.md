@@ -431,8 +431,60 @@ Auth/PII escalated: no (auth flag NOT APPLICABLE per .claude/project/business.md
 
 ---
 
+## T-33 — Regime Tagging (pulled forward into M3a)
+
+<!-- R2 CONFIRMATION — T-57 golden-oracle scenario (existing critical): "The golden-replay oracle: the frozen fixture replays to a structurally identical trade ledger 100 times in succession" already covers the frozen-fixture assertion. R2 confirms that CI MUST replay against the FROZEN checked-in fixture, not a fixture regenerated from the synthetic generator each run. No new scenario is added for R2 — the T-57 scenario is confirmed as the authoritative CI gate for this. Regenerating the fixture per run would test generator round-trip, not replay determinism, and reseeding/library drift would flake CI. -->
+
+🔴 Regime classification is strictly point-in-time — a look-ahead audit test asserts that the regime label for any given day uses only data available up to a fixed cutoff (prior close or intraday-up-to-decision-time), never that day's close or any future day's data
+  Scenario    : Construct a synthetic historical dataset where the index makes a sharp move on day D+1 that would, if visible, shift day D's regime classification; run the regime tagger with a fixed cutoff at prior-day close; assert the label assigned to day D
+  Pass if     : The regime label for day D is identical whether or not D+1 data is present in the database; the classifier reads no candle with a timestamp after the declared cutoff for day D
+  Fail if     : The regime label for day D changes when D+1 data is added; any candle with timestamp > cutoff(D) is read during classification of day D; the test detects any future-data access (mirror of the T-56 look-ahead audit)
+  Automatable : yes
+  @critical
+
+🔴 Regime classification is deterministic under the replay oracle — the same inputs produce the same label across all 100 replay iterations with no wall-clock dependency and no full-series statistics
+  Scenario    : Load the frozen golden fixture; run the regime tagger 100 times consecutively driven by VirtualClock-fed inputs (the same inputs used in the T-57 100x gate); collect the regime label for every day across all 100 runs; compare
+  Pass if     : Every run produces identical regime labels for every day; no label differs across runs; no code path in the classifier reads wall-clock time (System.now, Date.now, new Date()) or computes statistics over the full series rather than the point-in-time window
+  Fail if     : Any single run produces a different label from the first run for any day; any wall-clock or full-series statistic is detected in the classifier code path; the classifier output flakes under concurrent or sequential replay
+  Automatable : yes
+  @critical
+
+🟡 EVENT_DAY regime is sourced from a checked-in dated calendar table of known RBI policy days, budget days, and F&O expiry mornings — not the live operator-supplied BLOCKED_DATES env var — so historical labels are reproducible and env-independent
+  Scenario    : Run the regime tagger with BLOCKED_DATES env var set to a date that is NOT in the checked-in calendar table; observe the regime label for that date; then remove BLOCKED_DATES and re-run
+  Pass if     : The regime label for that date is identical in both runs (either EVENT_DAY if it is in the calendar table, or the appropriate non-event regime); BLOCKED_DATES has no effect on historical regime classification
+  Fail if     : The regime label changes between runs because BLOCKED_DATES is present or absent; the classifier sources EVENT_DAY from the env var rather than the calendar table; historical labels differ between two operators with different BLOCKED_DATES settings
+  Automatable : yes
+  @functional
+
+🟡 Regime precedence follows the documented hierarchy EVENT_DAY > VOLATILE_REVERTING > TRENDING_STRONG > RANGING with deterministic tie-breaks at boundaries
+  Scenario    : Construct synthetic inputs for a day that qualifies for two regimes simultaneously (e.g. high volatility on an F&O expiry morning, and a day where ROC patterns would classify as TRENDING_STRONG); run the classifier; inspect the assigned label and any tie-break log
+  Pass if     : The label assigned matches the higher-precedence regime in the documented hierarchy; the same inputs always produce the same label; a tie-break log entry is emitted when precedence resolves a conflict
+  Fail if     : A lower-precedence regime overrides a higher-precedence one; the same boundary inputs produce different labels across runs; no tie-break is recorded when precedence is invoked
+  Automatable : yes
+  @functional
+
+🟡 Degraded days (gap-marked or low-resolution per T-55 tags) are emitted as UNCLASSIFIED with a regime_confidence value, and T-58 excludes UNCLASSIFIED days from its per-regime buckets rather than mislabeling them
+  Scenario    : Provide a date range that includes at least one gap-marked day and one low-resolution day (as tagged in backfill_ranges per T-55); run the regime tagger; inspect the output rows; then run a T-58 report over the same range
+  Pass if     : Gap-marked and low-resolution days carry regime label UNCLASSIFIED and a non-null regime_confidence field; the T-58 report's per-regime bucket counts exclude those days entirely; no UNCLASSIFIED day contributes to any regime's Sharpe, drawdown, or win-rate calculation
+  Fail if     : Any gap-marked or low-resolution day receives a non-UNCLASSIFIED label; any UNCLASSIFIED day appears in a T-58 regime bucket; regime_confidence is null or absent on any degraded day
+  Automatable : yes
+  @functional
+
+---
+
+## T-58 Refinement — Regime-aware but sample-gated statistical validation [M3b — GATED BEHIND M2 and T-33]
+
+🟡 [M3b] Below the hard min-sample-per-bucket gate, the report emits raw trade counts and an INSUFFICIENT_SAMPLE marker and suppresses Sharpe ratio and Benjamini-Hochberg correction; BH and deflated Sharpe activate only when the sample size is above the gate threshold across all personality-regime combinations, not at the 2-personality launch state
+  Scenario    : Configure a backtest result set where at least one personality-regime bucket (e.g. EVENT_DAY for the single momentum personality) has fewer trades than the configured minimum-sample threshold; request the regime-aware statistical report; then repeat with a result set above threshold for all buckets
+  Pass if     : Below-threshold buckets report raw trade count and INSUFFICIENT_SAMPLE, with Sharpe, BH p-value, and deflated Sharpe absent or explicitly null; above-threshold buckets emit all statistical fields; no BH correction is computed when the comparison family is trivial (personality count x regime count below the activation threshold); the threshold value is a named constant, not a magic number
+  Fail if     : A Sharpe ratio or BH-corrected p-value is emitted for any below-gate bucket; INSUFFICIENT_SAMPLE is absent from any below-gate output; BH correction fires at the 2-personality launch state where it is not yet meaningful; the gate threshold is hard-coded inline without a named constant
+  Automatable : yes
+  @functional
+
+---
+
 TIER SUMMARY
-🔴 Critical    : 27 — all must pass at Automation Gate for Gate 2 to pass
-🟡 Functional  : 17 — failures -> CONDITIONAL PASS at Gate 2
+🔴 Critical    : 29 — all must pass at Automation Gate for Gate 2 to pass
+🟡 Functional  : 21 — failures -> CONDITIONAL PASS at Gate 2
 🟢 Non-blocker : 9 — logged only, no gate impact
-Automatable    : 30 yes / 11 partial / 12 no
+Automatable    : 36 yes / 11 partial / 12 no

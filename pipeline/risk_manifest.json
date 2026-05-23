@@ -1,6 +1,6 @@
 {
   "milestone": "M3 — Fyers Historical Data, Replay & Backtesting",
-  "tasks_in_scope": ["T-54", "T-55", "T-56", "T-57", "T-51", "T-58"],
+  "tasks_in_scope": ["T-54", "T-55", "T-56", "T-57", "T-33", "T-51", "T-58"],
   "risk_level": "HIGH",
   "triggers": [
     "Financial / research-integrity logic: backtest P&L, train/test/holdout discipline, and statistical-significance testing produce numbers that inform real trading decisions — a wrong backtest is financially harmful downstream",

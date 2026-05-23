@@ -44,6 +44,20 @@
 - Deferred to land WITH T-33 (regime tagging, M4): Benjamini-Hochberg multiple-comparisons correction, deflated Sharpe ratio, per-regime buckets — built only when multiple comparisons actually exist.
 - Holdout-respecting. Emits an experiment-card report (JSON + human-readable).
 
+## T-33 — Regime tagging (PULLED FORWARD into M3a via R1) (`src/trading/regime-tagging.ts` + migration)
+- Classifies each past trading day as RANGING | TRENDING_STRONG | VOLATILE_REVERTING | EVENT_DAY over reconstructed historical data (straddle_snapshots + index candles). Writes a `market_regime` tag per day.
+- Depends only on T-13 (built) + T-54–T-56 output; parallelizes AFTER T-56 and does NOT gate the replay foundation (T-57). T-58's inferential stats must NOT ride onto M3a's critical path.
+- **Causal / point-in-time (Critical, look-ahead audit required):** regime for day D uses data only up to a fixed cutoff (prior close / intraday up-to-decision-time) — NEVER D's close or any future day. Same look-ahead audit discipline as T-56. Without this, regime buckets are circular and silently invalidate T-58.
+- **Deterministic:** runs purely off VirtualClock-fed inputs (no wall-clock, no full-series statistics) so it passes the 100×-identical replay gate. Documented tie-breaks; precedence EVENT_DAY > VOLATILE_REVERTING > TRENDING_STRONG > RANGING.
+- **EVENT_DAY from a checked-in dated calendar table** (RBI policy / budget / F&O expiry mornings) — NOT the live operator-supplied `BLOCKED_DATES` env var, so historical labels are reproducible and env-independent.
+- **Fidelity-aware:** reads T-55 resolution/gap tags; emits `regime_confidence` and tags degraded (gap-marked / low-resolution) days `UNCLASSIFIED`. T-58 excludes UNCLASSIFIED from buckets rather than mislabeling.
+
+## R2 — Golden-replay oracle as a permanent CI check (frozen fixture)
+- The golden fixture is FROZEN and CHECKED IN (not regenerated from the synthetic generator each run — a regenerated fixture tests the generator round-trip, not replay determinism, and reseeding/lib drift would cause flaky CI). CI replays against the frozen artifact and asserts the structurally-compared ledger is identical. The synthetic generator is used only to author the fixture once.
+
+## T-58 refinement (regime-aware but sample-gated)
+- With T-33 present, T-58 buckets per regime AND applies Benjamini-Hochberg correction + deflated Sharpe across personality×regime — BUT only above a hard **min-sample-per-bucket gate**. Below threshold (e.g. EVENT_DAY with ~3 trades): report raw counts + `INSUFFICIENT_SAMPLE`, suppress Sharpe/BH. BH/deflated-Sharpe activate only when the comparison family is non-trivial (i.e. not at the 2-personality launch state).
+
 ## Gate-1 decisions for the human
 1. M3a/M3b split — approve building T-54–T-57 now and gating T-51/T-58 behind M2? (Red Team strongly converged on yes.)
 2. T-58 per-regime stats — confirm deferral to T-33, ship aggregate-labeled stats first? (Or pull T-33 forward.)

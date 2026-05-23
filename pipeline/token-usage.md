@@ -8,3 +8,5 @@
 | Phase 1 | Red Team Sprint 3 | red-team | opus | max | ~49k |
 | Phase 1 | QA Planner | qa-planner | sonnet | medium | ~10k |
 | Phase 1 | Plan Translation | translator | haiku | medium | ~6k |
+| Phase 1 | Red Team Re-plan Delta (R1+R2) | red-team | opus | max | ~44k |
+| Phase 1 | QA Checklist Delta (T-33) | qa-planner | sonnet | medium | ~9k |
