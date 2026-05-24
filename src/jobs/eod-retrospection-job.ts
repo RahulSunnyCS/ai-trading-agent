@@ -164,7 +164,7 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
       // -----------------------------------------------------------------------
       const regimeResult = await pool.query<{ regime: string }>(
         `SELECT regime FROM daily_regime_tags
-          WHERE tag_date = $1
+          WHERE trade_date = $1
           ORDER BY id DESC
           LIMIT 1`,
         [tradeDateISO],
