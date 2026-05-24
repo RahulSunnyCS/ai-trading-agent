@@ -1,7 +1,7 @@
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone } from 'date-fns-tz';
 
 // IST = UTC+5:30. All date/time strings returned by this module are in this timezone.
-const IST = "Asia/Kolkata";
+const IST = 'Asia/Kolkata';
 
 /**
  * IST is UTC+5:30 — a fixed offset with no daylight-saving transitions.
@@ -51,15 +51,15 @@ export class RealClock implements Clock {
   }
 
   today(): string {
-    return formatInTimeZone(new Date(), IST, "yyyy-MM-dd");
+    return formatInTimeZone(new Date(), IST, 'yyyy-MM-dd');
   }
 
   toISTDate(ms: number): string {
-    return formatInTimeZone(new Date(ms), IST, "yyyy-MM-dd");
+    return formatInTimeZone(new Date(ms), IST, 'yyyy-MM-dd');
   }
 
   toISTTime(ms: number): string {
-    return formatInTimeZone(new Date(ms), IST, "HH:mm:ss");
+    return formatInTimeZone(new Date(ms), IST, 'HH:mm:ss');
   }
 }
 
@@ -78,7 +78,7 @@ export class FixedClock implements Clock {
     // where FixedClock was constructed with `new FixedClock(new Date(...))`.
     if (epochMsOrIso instanceof Date) {
       this._fixed = epochMsOrIso.getTime();
-    } else if (typeof epochMsOrIso === "string") {
+    } else if (typeof epochMsOrIso === 'string') {
       this._fixed = new Date(epochMsOrIso).getTime();
     } else {
       this._fixed = epochMsOrIso;
@@ -94,15 +94,15 @@ export class FixedClock implements Clock {
   }
 
   today(): string {
-    return formatInTimeZone(new Date(this._fixed), IST, "yyyy-MM-dd");
+    return formatInTimeZone(new Date(this._fixed), IST, 'yyyy-MM-dd');
   }
 
   toISTDate(ms: number): string {
-    return formatInTimeZone(new Date(ms), IST, "yyyy-MM-dd");
+    return formatInTimeZone(new Date(ms), IST, 'yyyy-MM-dd');
   }
 
   toISTTime(ms: number): string {
-    return formatInTimeZone(new Date(ms), IST, "HH:mm:ss");
+    return formatInTimeZone(new Date(ms), IST, 'HH:mm:ss');
   }
 }
 
@@ -160,9 +160,7 @@ export class VirtualClock implements Clock {
   constructor(startEpochMsOrDate: number | Date, rate = 0) {
     // Accept both number (milestones-0-1) and Date (payment branch) for the start value.
     this._current =
-      startEpochMsOrDate instanceof Date
-        ? startEpochMsOrDate.getTime()
-        : startEpochMsOrDate;
+      startEpochMsOrDate instanceof Date ? startEpochMsOrDate.getTime() : startEpochMsOrDate;
     this._rate = rate;
     this._startWallMs = Date.now();
   }
@@ -182,15 +180,15 @@ export class VirtualClock implements Clock {
   }
 
   today(): string {
-    return formatInTimeZone(new Date(this.now()), IST, "yyyy-MM-dd");
+    return formatInTimeZone(new Date(this.now()), IST, 'yyyy-MM-dd');
   }
 
   toISTDate(ms: number): string {
-    return formatInTimeZone(new Date(ms), IST, "yyyy-MM-dd");
+    return formatInTimeZone(new Date(ms), IST, 'yyyy-MM-dd');
   }
 
   toISTTime(ms: number): string {
-    return formatInTimeZone(new Date(ms), IST, "HH:mm:ss");
+    return formatInTimeZone(new Date(ms), IST, 'HH:mm:ss');
   }
 
   /**
@@ -306,8 +304,8 @@ export function createClock(options?: {
 export function toISTTimeString(clock: Clock): string {
   const istMs = clock.timestamp() + IST_OFFSET_MS;
   const d = new Date(istMs);
-  const h = String(d.getUTCHours()).padStart(2, "0");
-  const m = String(d.getUTCMinutes()).padStart(2, "0");
+  const h = String(d.getUTCHours()).padStart(2, '0');
+  const m = String(d.getUTCMinutes()).padStart(2, '0');
   return `${h}:${m}`;
 }
 

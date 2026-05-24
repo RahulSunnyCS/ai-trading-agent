@@ -32,11 +32,7 @@
 
 import type { Pool } from 'pg';
 
-import {
-  buildOptionSymbol,
-  getAtmStrike,
-  getCurrentExpiry,
-} from '../brokers/instrument-registry';
+import { buildOptionSymbol, getAtmStrike, getCurrentExpiry } from '../brokers/instrument-registry';
 import type { Underlying } from '../brokers/types';
 import { UNDERLYING_SYMBOLS } from '../brokers/types';
 import {
@@ -166,9 +162,7 @@ export class MissingLegError extends Error {
 
   constructor(missingSymbol: string, stepTime: Date) {
     super(
-      `[ReconstructStraddle] Missing leg candle at ${stepTime.toISOString()}: ` +
-        `no option_ticks row at-or-before this timestamp for symbol ${missingSymbol}. ` +
-        `Never interpolated or zero-filled — this is a data gap.`,
+      `[ReconstructStraddle] Missing leg candle at ${stepTime.toISOString()}: no option_ticks row at-or-before this timestamp for symbol ${missingSymbol}. Never interpolated or zero-filled — this is a data gap.`,
     );
     this.name = 'MissingLegError';
     this.missingSymbol = missingSymbol;
@@ -230,7 +224,7 @@ async function queryLegAtOrBefore(
   // Precision loss is acceptable: straddle values are INR amounts where
   // sub-paisa precision is not meaningful.
   return {
-    ltp: parseFloat(row.ltp),
+    ltp: Number.parseFloat(row.ltp),
     resolution: row.resolution,
   };
 }
@@ -267,7 +261,7 @@ async function queryIndexPriceAtOrBefore(
   const row = result.rows[0];
   if (!row) return null;
 
-  return parseFloat(row.ltp);
+  return Number.parseFloat(row.ltp);
 }
 
 /**
@@ -307,15 +301,17 @@ async function writeSnapshot(pool: Pool, snap: ReconstructedSnapshot): Promise<v
     [
       snap.time.toISOString(),
       snap.symbol,
-      snap.expiry.toISOString().slice(0, 10), // DATE column — truncate to date
+      snap.expiry
+        .toISOString()
+        .slice(0, 10), // DATE column — truncate to date
       snap.strike,
       snap.call_ltp,
       snap.put_ltp,
       snap.straddle_value,
-      snap.roc,              // null for first two steps
+      snap.roc, // null for first two steps
       snap.roc_acceleration, // null for first two steps
-      snap.vix,              // always null for historical data
-      snap.resolution,       // resolution tag from option_ticks (e.g. '1', '5', 'D')
+      snap.vix, // always null for historical data
+      snap.resolution, // resolution tag from option_ticks (e.g. '1', '5', 'D')
     ],
   );
 }
@@ -341,11 +337,21 @@ function getExpiryAtStep(underlying: Underlying, stepTime: Date): Date {
   // the historical step timestamp. getCurrentExpiry() only uses timestamp(),
   // so the other methods are never called.
   const clock = {
-    now(): number { return stepTime.getTime(); },
-    timestamp(): number { return stepTime.getTime(); },
-    today(): string { return stepTime.toISOString().slice(0, 10); },
-    toISTDate(_ms: number): string { return stepTime.toISOString().slice(0, 10); },
-    toISTTime(_ms: number): string { return stepTime.toISOString().slice(11, 19); },
+    now(): number {
+      return stepTime.getTime();
+    },
+    timestamp(): number {
+      return stepTime.getTime();
+    },
+    today(): string {
+      return stepTime.toISOString().slice(0, 10);
+    },
+    toISTDate(_ms: number): string {
+      return stepTime.toISOString().slice(0, 10);
+    },
+    toISTTime(_ms: number): string {
+      return stepTime.toISOString().slice(11, 19);
+    },
   };
   return getCurrentExpiry(underlying, clock);
 }
@@ -378,20 +384,13 @@ export async function reconstructStraddle(
   pool: Pool,
   options: ReconstructOptions,
 ): Promise<ReconstructResult> {
-  const {
-    underlying,
-    from,
-    to,
-    cadenceMs = 15_000,
-    rocWindowSize = 5,
-    persist = true,
-  } = options;
+  const { underlying, from, to, cadenceMs = 15_000, rocWindowSize = 5, persist = true } = options;
 
   // Validate inputs before touching the DB.
-  if (!(from instanceof Date) || isNaN(from.getTime())) {
+  if (!(from instanceof Date) || Number.isNaN(from.getTime())) {
     throw new Error('[ReconstructStraddle] from must be a valid Date');
   }
-  if (!(to instanceof Date) || isNaN(to.getTime())) {
+  if (!(to instanceof Date) || Number.isNaN(to.getTime())) {
     throw new Error('[ReconstructStraddle] to must be a valid Date');
   }
   if (from > to) {

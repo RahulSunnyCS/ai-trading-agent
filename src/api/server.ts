@@ -1,14 +1,14 @@
-import fastifyCors from "@fastify/cors";
-import fastifyWebsocket from "@fastify/websocket";
-import Fastify, { type FastifyInstance } from "fastify";
-import type { Redis } from "ioredis";
-import type { Pool } from "pg";
-import type { Clock } from "../utils/clock.js";
-import { dashboardRoutes } from "./routes/dashboard.js";
-import { paperTradesRoutes } from "./routes/paper-trades.js";
-import { statusRoutes } from "./routes/status.js";
-import { tradesRoutes } from "./routes/trades.js";
-import { registerWebSocket } from "./websocket.js";
+import fastifyCors from '@fastify/cors';
+import fastifyWebsocket from '@fastify/websocket';
+import Fastify, { type FastifyInstance } from 'fastify';
+import type { Redis } from 'ioredis';
+import type { Pool } from 'pg';
+import type { Clock } from '../utils/clock.js';
+import { dashboardRoutes } from './routes/dashboard.js';
+import { paperTradesRoutes } from './routes/paper-trades.js';
+import { statusRoutes } from './routes/status.js';
+import { tradesRoutes } from './routes/trades.js';
+import { registerWebSocket } from './websocket.js';
 
 /**
  * Options consumed by buildServer. All three are injected so the server is
@@ -55,7 +55,7 @@ export function buildServer(opts: BuildServerOpts): FastifyInstance {
   // to protect. Per project context, this is a single-operator research tool
   // with no public-facing users, so '*' is an acceptable default.
   server.register(fastifyCors, {
-    origin: process.env.CORS_ORIGIN ?? "*",
+    origin: process.env.CORS_ORIGIN ?? '*',
   });
 
   // ---------------------------------------------------------------------------

@@ -33,10 +33,10 @@
 
 import type { Redis } from 'ioredis';
 
+import type { PositionMonitor } from '../../trading/position-monitor';
+import type { VirtualClock } from '../../utils/clock';
 import type { BrokerTick } from '../brokers/types';
 import type { StraddleCalculator } from '../straddle-calc';
-import type { PositionMonitor } from '../../trading/position-monitor';
-import { VirtualClock } from '../../utils/clock';
 import type { HistoricalFeed } from './historical-feed';
 
 // ---------------------------------------------------------------------------

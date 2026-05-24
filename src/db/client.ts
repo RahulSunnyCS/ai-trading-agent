@@ -1,4 +1,4 @@
-import pg, { type QueryResultRow } from "pg";
+import pg, { type QueryResultRow } from 'pg';
 
 // Configure pg to return NUMERIC (OID 1700) columns as strings instead of JS
 // floats. This is critical for financial data: a value like 21847.50 would
@@ -67,16 +67,16 @@ export async function queryOne<T extends QueryResultRow>(
 export async function withTransaction<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
     const result = await fn(client);
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return result;
   } catch (err) {
     try {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK');
     } catch (rollbackErr) {
       // Log the secondary failure but do not mask the original error
-      console.error("ROLLBACK failed after transaction error:", rollbackErr);
+      console.error('ROLLBACK failed after transaction error:', rollbackErr);
     }
     throw err;
   } finally {

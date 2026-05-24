@@ -1,13 +1,13 @@
-import Decimal from "decimal.js";
-import fc from "fast-check";
-import { describe, expect, it } from "vitest";
-import type { OpenPosition } from "../../db/schema.js";
+import Decimal from 'decimal.js';
+import fc from 'fast-check';
+import { describe, expect, it } from 'vitest';
+import type { OpenPosition } from '../../db/schema.js';
 import {
   evaluateTriggers,
   loadTriggerConfig,
   updateTrailingStop,
-} from "../../trading/trigger-engine.js";
-import { FixedClock } from "../../utils/clock.js";
+} from '../../trading/trigger-engine.js';
+import { FixedClock } from '../../utils/clock.js';
 
 /**
  * Property tests for stop-loss, trailing stop, profit target, and daily loss cap
@@ -101,21 +101,21 @@ function isDailyLossCapBreached(losses: string[], capAmount: string): boolean {
 
 // ─── Hard Stop-Loss Tests ─────────────────────────────────────────────────────
 
-describe("Hard stop-loss trigger math", () => {
-  it("fires at EXACTLY entry × (1 + slPct), not just above it", () => {
+describe('Hard stop-loss trigger math', () => {
+  it('fires at EXACTLY entry × (1 + slPct), not just above it', () => {
     // entry=200, SL=50% → threshold=300.00
     // Current value = 300.00 must fire; 299.99 must NOT fire
-    expect(isHardSlFired("200", "50", "300.00")).toBe(true);
-    expect(isHardSlFired("200", "50", "299.99")).toBe(false);
+    expect(isHardSlFired('200', '50', '300.00')).toBe(true);
+    expect(isHardSlFired('200', '50', '299.99')).toBe(false);
   });
 
-  it("fires when current value is strictly above threshold", () => {
-    expect(isHardSlFired("100", "20", "121.00")).toBe(true); // 120 is threshold, 121 > 120
-    expect(isHardSlFired("100", "20", "120.00")).toBe(true); // exactly at threshold = fires
-    expect(isHardSlFired("100", "20", "119.99")).toBe(false); // just below = does not fire
+  it('fires when current value is strictly above threshold', () => {
+    expect(isHardSlFired('100', '20', '121.00')).toBe(true); // 120 is threshold, 121 > 120
+    expect(isHardSlFired('100', '20', '120.00')).toBe(true); // exactly at threshold = fires
+    expect(isHardSlFired('100', '20', '119.99')).toBe(false); // just below = does not fire
   });
 
-  it("threshold is computed without float drift (property)", () => {
+  it('threshold is computed without float drift (property)', () => {
     fc.assert(
       fc.property(
         fc.float({ min: 50, max: 500, noNaN: true }),
@@ -132,7 +132,7 @@ describe("Hard stop-loss trigger math", () => {
     );
   });
 
-  it("threshold scales linearly with entry price (property)", () => {
+  it('threshold scales linearly with entry price (property)', () => {
     // Doubling entry → doubles threshold (linear scale invariance).
     //
     // We compute the doubled entry via Decimal (not float arithmetic) to avoid
@@ -165,8 +165,8 @@ describe("Hard stop-loss trigger math", () => {
 
 // ─── Trailing Stop-Loss Tests ─────────────────────────────────────────────────
 
-describe("Trailing stop-loss ratchet", () => {
-  it("lowestObserved never increases — ratchet only moves down", () => {
+describe('Trailing stop-loss ratchet', () => {
+  it('lowestObserved never increases — ratchet only moves down', () => {
     // Simulate a sequence of straddle values; lowestObserved must be monotonically
     // non-increasing regardless of the order values arrive.
     fc.assert(
@@ -194,20 +194,20 @@ describe("Trailing stop-loss ratchet", () => {
     );
   });
 
-  it("TSL fires at correct threshold from lowest observed", () => {
+  it('TSL fires at correct threshold from lowest observed', () => {
     // entry=200, value drops to 160 (new low), SL=20%
     // TSL threshold = 160 × 1.20 = 192.00
     // Value rises back to 192 → fires; 191.99 → does not fire
-    const slPct = "20";
-    const lowestObserved = "160.00";
+    const slPct = '20';
+    const lowestObserved = '160.00';
     const threshold = trailSlThreshold(lowestObserved, slPct);
 
-    expect(threshold.toFixed(2)).toBe("192.00");
-    expect(new Decimal("192.00").gte(threshold)).toBe(true); // fires
-    expect(new Decimal("191.99").gte(threshold)).toBe(false); // does not fire
+    expect(threshold.toFixed(2)).toBe('192.00');
+    expect(new Decimal('192.00').gte(threshold)).toBe(true); // fires
+    expect(new Decimal('191.99').gte(threshold)).toBe(false); // does not fire
   });
 
-  it("TSL threshold is always above lowestObserved (property)", () => {
+  it('TSL threshold is always above lowestObserved (property)', () => {
     fc.assert(
       fc.property(
         fc.float({ min: 50, max: 500, noNaN: true }),
@@ -223,13 +223,13 @@ describe("Trailing stop-loss ratchet", () => {
     );
   });
 
-  it("TSL with falling market: threshold only tightens (lower), never relaxes", () => {
+  it('TSL with falling market: threshold only tightens (lower), never relaxes', () => {
     // Simulate consecutive new lows; each new low must produce a LOWER TSL threshold
     // than the previous one (the TSL tightens as the market falls in our favour).
-    const slPct = "15";
-    const sequence = ["200.00", "185.00", "170.00", "155.00"]; // always falling
+    const slPct = '15';
+    const sequence = ['200.00', '185.00', '170.00', '155.00']; // always falling
 
-    let prevThreshold = trailSlThreshold(sequence[0] ?? "200.00", slPct);
+    let prevThreshold = trailSlThreshold(sequence[0] ?? '200.00', slPct);
     let allTighter = true;
 
     for (const v of sequence.slice(1)) {
@@ -247,15 +247,15 @@ describe("Trailing stop-loss ratchet", () => {
 
 // ─── Profit Target Tests ──────────────────────────────────────────────────────
 
-describe("Profit target trigger math", () => {
-  it("fires when straddle value falls to exactly targetPct below entry", () => {
+describe('Profit target trigger math', () => {
+  it('fires when straddle value falls to exactly targetPct below entry', () => {
     // entry=200, target=30% → fires at 200 × 0.70 = 140.00
-    expect(isProfitTargetHit("200", "30", "140.00")).toBe(true);
-    expect(isProfitTargetHit("200", "30", "140.01")).toBe(false); // one tick above target
-    expect(isProfitTargetHit("200", "30", "139.99")).toBe(true); // below target also fires
+    expect(isProfitTargetHit('200', '30', '140.00')).toBe(true);
+    expect(isProfitTargetHit('200', '30', '140.01')).toBe(false); // one tick above target
+    expect(isProfitTargetHit('200', '30', '139.99')).toBe(true); // below target also fires
   });
 
-  it("profit target is always below entry (property)", () => {
+  it('profit target is always below entry (property)', () => {
     fc.assert(
       fc.property(
         fc.float({ min: 50, max: 500, noNaN: true }),
@@ -271,34 +271,34 @@ describe("Profit target trigger math", () => {
     );
   });
 
-  it("50% target on entry=300 fires at 150.00 (no float drift)", () => {
-    const target = profitTargetThreshold("300", "50");
-    expect(target.toFixed(2)).toBe("150.00");
+  it('50% target on entry=300 fires at 150.00 (no float drift)', () => {
+    const target = profitTargetThreshold('300', '50');
+    expect(target.toFixed(2)).toBe('150.00');
     // Verify exact boundary
-    expect(isProfitTargetHit("300", "50", "150.00")).toBe(true);
-    expect(isProfitTargetHit("300", "50", "150.01")).toBe(false);
+    expect(isProfitTargetHit('300', '50', '150.00')).toBe(true);
+    expect(isProfitTargetHit('300', '50', '150.01')).toBe(false);
   });
 });
 
 // ─── Daily Loss Cap Accumulation Tests ───────────────────────────────────────
 
-describe("Daily loss cap accumulation", () => {
-  it("cap not breached when total losses are below cap", () => {
+describe('Daily loss cap accumulation', () => {
+  it('cap not breached when total losses are below cap', () => {
     // Three losses: 500 + 300 + 100 = 900 → cap = 1000 → not breached
-    expect(isDailyLossCapBreached(["500", "300", "100"], "1000")).toBe(false);
+    expect(isDailyLossCapBreached(['500', '300', '100'], '1000')).toBe(false);
   });
 
-  it("cap is breached when total losses exceed cap", () => {
+  it('cap is breached when total losses exceed cap', () => {
     // 500 + 300 + 250 = 1050 → cap = 1000 → breached
-    expect(isDailyLossCapBreached(["500", "300", "250"], "1000")).toBe(true);
+    expect(isDailyLossCapBreached(['500', '300', '250'], '1000')).toBe(true);
   });
 
-  it("cap is NOT breached at exactly the cap amount", () => {
+  it('cap is NOT breached at exactly the cap amount', () => {
     // 500 + 500 = 1000 → cap = 1000 → gt(1000) is false → not breached
-    expect(isDailyLossCapBreached(["500", "500"], "1000")).toBe(false);
+    expect(isDailyLossCapBreached(['500', '500'], '1000')).toBe(false);
   });
 
-  it("accumulation of many small losses matches decimal.js oracle (property)", () => {
+  it('accumulation of many small losses matches decimal.js oracle (property)', () => {
     // Guards against float drift: 100 losses of ₹0.10 must equal exactly ₹10.00
     //
     // fc.float requires min/max to be 32-bit floats (Math.fround values).
@@ -326,15 +326,15 @@ describe("Daily loss cap accumulation", () => {
     );
   });
 
-  it("100 losses of ₹0.10 = exactly ₹10.00 (no float drift)", () => {
-    const losses = Array.from({ length: 100 }, () => "0.10");
+  it('100 losses of ₹0.10 = exactly ₹10.00 (no float drift)', () => {
+    const losses = Array.from({ length: 100 }, () => '0.10');
     const total = losses.reduce((acc, l) => acc.plus(new Decimal(l)), new Decimal(0));
-    expect(total.toFixed(2)).toBe("10.00");
+    expect(total.toFixed(2)).toBe('10.00');
 
     // ₹10.00 against a ₹9.99 cap → breached
-    expect(isDailyLossCapBreached(losses, "9.99")).toBe(true);
+    expect(isDailyLossCapBreached(losses, '9.99')).toBe(true);
     // ₹10.00 against a ₹10.00 cap → not breached (gt, not gte)
-    expect(isDailyLossCapBreached(losses, "10.00")).toBe(false);
+    expect(isDailyLossCapBreached(losses, '10.00')).toBe(false);
   });
 });
 
@@ -346,10 +346,10 @@ describe("Daily loss cap accumulation", () => {
  */
 function makePosition(overrides?: Partial<OpenPosition>): OpenPosition {
   return {
-    id: "test-id",
-    entryStraddleValue: "200",
-    lowestStraddleValueSeen: "200",
-    todayNetPnl: "0",
+    id: 'test-id',
+    entryStraddleValue: '200',
+    lowestStraddleValueSeen: '200',
+    todayNetPnl: '0',
     entryTimeMs: Date.now(),
     ...overrides,
   };
@@ -360,128 +360,128 @@ const safeConfig = {
   hardSlPct: 0.3, // 30%
   trailingSlPct: 0.15, // 15%
   profitTargetPct: 0.3, // 30%
-  eodExitTime: "15:25",
-  exitCutoffTime: "15:30",
-  maxDailyLoss: "10000",
+  eodExitTime: '15:25',
+  exitCutoffTime: '15:30',
+  maxDailyLoss: '10000',
 };
 
 /**
  * IST 10:00 on 2026-05-18. In UTC that is 04:30 on the same day.
  * Date.UTC(2026, 4, 18, 4, 30, 0) = 1747538200000... let's compute precisely.
  */
-const IST_1000_MAY18_2026 = new Date("2026-05-18T04:30:00.000Z").getTime();
-const IST_1525_MAY18_2026 = new Date("2026-05-18T09:55:00.000Z").getTime(); // 15:25 IST
+const IST_1000_MAY18_2026 = new Date('2026-05-18T04:30:00.000Z').getTime();
+const IST_1525_MAY18_2026 = new Date('2026-05-18T09:55:00.000Z').getTime(); // 15:25 IST
 
-describe("evaluateTriggers — happy path and individual triggers", () => {
-  it("returns shouldExit:false when all values are safe", () => {
+describe('evaluateTriggers — happy path and individual triggers', () => {
+  it('returns shouldExit:false when all values are safe', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
     const pos = makePosition();
     // current=180 is below hard SL threshold (200*1.3=260), above profit target (200*0.7=140),
     // and below entry so TSL check applies but 180 < 200*1.15=230 so no TSL fire.
-    const result = evaluateTriggers(pos, "180", clock, safeConfig);
+    const result = evaluateTriggers(pos, '180', clock, safeConfig);
     expect(result.shouldExit).toBe(false);
   });
 
-  it("SL fires at exactly entry × (1 + hardSlPct)", () => {
+  it('SL fires at exactly entry × (1 + hardSlPct)', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
-    const pos = makePosition({ entryStraddleValue: "200" });
+    const pos = makePosition({ entryStraddleValue: '200' });
     // threshold = 200 * 1.30 = 260.00
-    const atThreshold = evaluateTriggers(pos, "260", clock, safeConfig);
-    expect(atThreshold).toEqual({ shouldExit: true, reason: "SL" });
+    const atThreshold = evaluateTriggers(pos, '260', clock, safeConfig);
+    expect(atThreshold).toEqual({ shouldExit: true, reason: 'SL' });
 
-    const justBelow = evaluateTriggers(pos, "259.99", clock, safeConfig);
+    const justBelow = evaluateTriggers(pos, '259.99', clock, safeConfig);
     expect(justBelow.shouldExit).toBe(false);
   });
 
-  it("TSL fires when current >= lowestSeen × (1 + trailingSlPct) AND current < entry", () => {
+  it('TSL fires when current >= lowestSeen × (1 + trailingSlPct) AND current < entry', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
     // entry=200, lowestSeen=160 → trailThreshold = 160 * 1.15 = 184
     // current=184 is < entry(200) → TSL fires
     const pos = makePosition({
-      entryStraddleValue: "200",
-      lowestStraddleValueSeen: "160",
+      entryStraddleValue: '200',
+      lowestStraddleValueSeen: '160',
     });
-    const result = evaluateTriggers(pos, "184", clock, safeConfig);
-    expect(result).toEqual({ shouldExit: true, reason: "TSL" });
+    const result = evaluateTriggers(pos, '184', clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: 'TSL' });
   });
 
-  it("TSL does NOT fire when current >= entry (not in profit territory)", () => {
+  it('TSL does NOT fire when current >= entry (not in profit territory)', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
     // entry=200, lowestSeen=160, trailThreshold=184
     // current=200 satisfies current>=trailThreshold but current>=entry → no TSL
     const pos = makePosition({
-      entryStraddleValue: "200",
-      lowestStraddleValueSeen: "160",
+      entryStraddleValue: '200',
+      lowestStraddleValueSeen: '160',
     });
     // current=200 equals entry → should NOT fire TSL (guard: current < entry)
     // But hard SL fires at 260, so at exactly 200 we expect no exit.
-    const result = evaluateTriggers(pos, "200", clock, safeConfig);
+    const result = evaluateTriggers(pos, '200', clock, safeConfig);
     expect(result.shouldExit).toBe(false);
   });
 
-  it("TARGET fires when current <= entry × (1 - profitTargetPct)", () => {
+  it('TARGET fires when current <= entry × (1 - profitTargetPct)', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
     // profitTarget threshold = 200 * (1 - 0.30) = 140.00
-    const pos = makePosition({ entryStraddleValue: "200" });
-    const atTarget = evaluateTriggers(pos, "140", clock, safeConfig);
-    expect(atTarget).toEqual({ shouldExit: true, reason: "TARGET" });
+    const pos = makePosition({ entryStraddleValue: '200' });
+    const atTarget = evaluateTriggers(pos, '140', clock, safeConfig);
+    expect(atTarget).toEqual({ shouldExit: true, reason: 'TARGET' });
 
-    const justAbove = evaluateTriggers(pos, "140.01", clock, safeConfig);
+    const justAbove = evaluateTriggers(pos, '140.01', clock, safeConfig);
     expect(justAbove.shouldExit).toBe(false);
   });
 
-  it("EOD fires when current IST time >= eodExitTime", () => {
+  it('EOD fires when current IST time >= eodExitTime', () => {
     // FixedClock set to 15:25 IST — exactly at eodExitTime '15:25'
     const clock = new FixedClock(IST_1525_MAY18_2026);
     const pos = makePosition();
-    const result = evaluateTriggers(pos, "180", clock, safeConfig);
-    expect(result).toEqual({ shouldExit: true, reason: "EOD" });
+    const result = evaluateTriggers(pos, '180', clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: 'EOD' });
   });
 
-  it("DAILY_LOSS fires when todayNetPnl <= -maxDailyLoss", () => {
+  it('DAILY_LOSS fires when todayNetPnl <= -maxDailyLoss', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
     // maxDailyLoss = '10000' → fires when pnl <= -10000
-    const posAtLimit = makePosition({ todayNetPnl: "-10000" });
-    const result = evaluateTriggers(posAtLimit, "180", clock, safeConfig);
-    expect(result).toEqual({ shouldExit: true, reason: "DAILY_LOSS" });
+    const posAtLimit = makePosition({ todayNetPnl: '-10000' });
+    const result = evaluateTriggers(posAtLimit, '180', clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: 'DAILY_LOSS' });
 
     // One cent above the limit — should NOT fire daily loss
-    const posJustAbove = makePosition({ todayNetPnl: "-9999.99" });
-    const noFire = evaluateTriggers(posJustAbove, "180", clock, safeConfig);
+    const posJustAbove = makePosition({ todayNetPnl: '-9999.99' });
+    const noFire = evaluateTriggers(posJustAbove, '180', clock, safeConfig);
     expect(noFire.shouldExit).toBe(false);
   });
 
-  it("SL wins over DAILY_LOSS when both would fire", () => {
+  it('SL wins over DAILY_LOSS when both would fire', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
     // Both triggers active: SL (current=260 >= 260) and DAILY_LOSS (pnl=-10000)
-    const pos = makePosition({ todayNetPnl: "-10000" });
-    const result = evaluateTriggers(pos, "260", clock, safeConfig);
-    expect(result).toEqual({ shouldExit: true, reason: "SL" });
+    const pos = makePosition({ todayNetPnl: '-10000' });
+    const result = evaluateTriggers(pos, '260', clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: 'SL' });
   });
 
-  it("DAILY_LOSS wins over EOD when both would fire", () => {
+  it('DAILY_LOSS wins over EOD when both would fire', () => {
     // Set clock to 15:25 IST (EOD fires) and pnl at daily limit (DAILY_LOSS fires)
     const clock = new FixedClock(IST_1525_MAY18_2026);
-    const pos = makePosition({ todayNetPnl: "-10000" });
-    const result = evaluateTriggers(pos, "180", clock, safeConfig);
+    const pos = makePosition({ todayNetPnl: '-10000' });
+    const result = evaluateTriggers(pos, '180', clock, safeConfig);
     // Priority: SL > DAILY_LOSS > EOD — DAILY_LOSS is at priority 2, EOD at 3
-    expect(result).toEqual({ shouldExit: true, reason: "DAILY_LOSS" });
+    expect(result).toEqual({ shouldExit: true, reason: 'DAILY_LOSS' });
   });
 
-  it("EOD wins over TSL when both would fire", () => {
+  it('EOD wins over TSL when both would fire', () => {
     // Clock at 15:25 IST; position in profit with TSL also tripping
     const clock = new FixedClock(IST_1525_MAY18_2026);
     // entry=200, lowest=160, trailThreshold=184 → current=184 trips TSL
     // EOD also fires at 15:25
     const pos = makePosition({
-      entryStraddleValue: "200",
-      lowestStraddleValueSeen: "160",
+      entryStraddleValue: '200',
+      lowestStraddleValueSeen: '160',
     });
-    const result = evaluateTriggers(pos, "184", clock, safeConfig);
-    expect(result).toEqual({ shouldExit: true, reason: "EOD" });
+    const result = evaluateTriggers(pos, '184', clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: 'EOD' });
   });
 
-  it("TSL wins over TARGET when both would fire", () => {
+  it('TSL wins over TARGET when both would fire', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
     // entry=200, lowest=90, trailThreshold=90*1.15=103.5
     // profitTarget=200*0.70=140
@@ -492,35 +492,35 @@ describe("evaluateTriggers — happy path and individual triggers", () => {
     // At current=92: TSL fires (92>=92 AND 92<200). profitTarget at 140, 92<140 → TARGET also fires.
     // TSL wins (lower priority number means higher priority: TSL=5, TARGET=6)
     const pos = makePosition({
-      entryStraddleValue: "200",
-      lowestStraddleValueSeen: "80",
+      entryStraddleValue: '200',
+      lowestStraddleValueSeen: '80',
     });
-    const result = evaluateTriggers(pos, "92", clock, safeConfig);
-    expect(result).toEqual({ shouldExit: true, reason: "TSL" });
+    const result = evaluateTriggers(pos, '92', clock, safeConfig);
+    expect(result).toEqual({ shouldExit: true, reason: 'TSL' });
   });
 });
 
-describe("updateTrailingStop", () => {
-  it("returns the current value when current < lowestStraddleValueSeen", () => {
-    const pos = makePosition({ lowestStraddleValueSeen: "200" });
-    const result = updateTrailingStop(pos, "150");
-    expect(result).toBe("150");
+describe('updateTrailingStop', () => {
+  it('returns the current value when current < lowestStraddleValueSeen', () => {
+    const pos = makePosition({ lowestStraddleValueSeen: '200' });
+    const result = updateTrailingStop(pos, '150');
+    expect(result).toBe('150');
   });
 
-  it("returns lowestStraddleValueSeen when current > lowest (keeps the minimum)", () => {
-    const pos = makePosition({ lowestStraddleValueSeen: "150" });
-    const result = updateTrailingStop(pos, "180");
-    expect(result).toBe("150");
+  it('returns lowestStraddleValueSeen when current > lowest (keeps the minimum)', () => {
+    const pos = makePosition({ lowestStraddleValueSeen: '150' });
+    const result = updateTrailingStop(pos, '180');
+    expect(result).toBe('150');
   });
 
-  it("returns the same value when current equals lowestStraddleValueSeen", () => {
-    const pos = makePosition({ lowestStraddleValueSeen: "200" });
-    const result = updateTrailingStop(pos, "200");
+  it('returns the same value when current equals lowestStraddleValueSeen', () => {
+    const pos = makePosition({ lowestStraddleValueSeen: '200' });
+    const result = updateTrailingStop(pos, '200');
     // Both are equal, min returns either — result should equal "200"
-    expect(result).toBe("200");
+    expect(result).toBe('200');
   });
 
-  it("result is always min(current, lowestSeen) property", () => {
+  it('result is always min(current, lowestSeen) property', () => {
     fc.assert(
       fc.property(
         fc.float({ min: 50, max: 500, noNaN: true }),
@@ -539,8 +539,8 @@ describe("updateTrailingStop", () => {
   });
 });
 
-describe("loadTriggerConfig", () => {
-  it("returns defaults when no env vars are set", () => {
+describe('loadTriggerConfig', () => {
+  it('returns defaults when no env vars are set', () => {
     // Save and clear env vars that might have been set
     const saved = {
       HARD_SL_PCT: process.env.HARD_SL_PCT,
@@ -558,9 +558,9 @@ describe("loadTriggerConfig", () => {
     expect(config.hardSlPct).toBe(0.3);
     expect(config.trailingSlPct).toBe(0.15);
     expect(config.profitTargetPct).toBe(0.3);
-    expect(config.eodExitTime).toBe("15:25");
-    expect(config.exitCutoffTime).toBe("15:30");
-    expect(config.maxDailyLoss).toBe("10000");
+    expect(config.eodExitTime).toBe('15:25');
+    expect(config.exitCutoffTime).toBe('15:30');
+    expect(config.maxDailyLoss).toBe('10000');
 
     // Restore
     for (const [key, val] of Object.entries(saved)) {
@@ -568,15 +568,15 @@ describe("loadTriggerConfig", () => {
     }
   });
 
-  it("reads overridden values from env vars", () => {
-    process.env.HARD_SL_PCT = "0.5";
-    process.env.EOD_EXIT_TIME = "15:20";
-    process.env.MAX_DAILY_LOSS = "5000";
+  it('reads overridden values from env vars', () => {
+    process.env.HARD_SL_PCT = '0.5';
+    process.env.EOD_EXIT_TIME = '15:20';
+    process.env.MAX_DAILY_LOSS = '5000';
 
     const config = loadTriggerConfig();
     expect(config.hardSlPct).toBe(0.5);
-    expect(config.eodExitTime).toBe("15:20");
-    expect(config.maxDailyLoss).toBe("5000");
+    expect(config.eodExitTime).toBe('15:20');
+    expect(config.maxDailyLoss).toBe('5000');
 
     process.env.HARD_SL_PCT = undefined;
     process.env.EOD_EXIT_TIME = undefined;

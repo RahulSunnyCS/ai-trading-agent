@@ -27,8 +27,8 @@ import Fastify from 'fastify';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
 
-import { paymentRoutes } from './routes/payment';
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
+import { paymentRoutes } from './routes/payment';
 
 // ---------------------------------------------------------------------------
 // Fastify module augmentation — makes server.db typed as Pool

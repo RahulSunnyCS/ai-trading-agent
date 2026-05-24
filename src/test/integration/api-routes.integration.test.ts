@@ -9,12 +9,12 @@
  * shapes, AJV query-string validation, and correct DB query invocation.
  */
 
-import type { FastifyInstance } from "fastify";
-import type { Redis } from "ioredis";
-import type { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildServer } from "../../api/server.js";
-import { FixedClock } from "../../utils/clock.js";
+import type { FastifyInstance } from 'fastify';
+import type { Redis } from 'ioredis';
+import type { Pool } from 'pg';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { buildServer } from '../../api/server.js';
+import { FixedClock } from '../../utils/clock.js';
 
 // ---------------------------------------------------------------------------
 // Mock factories
@@ -51,13 +51,13 @@ function mockRedis(): Redis {
 
 // Fixed clock frozen at 09:30 IST on 2026-01-15 — used by all tests that need a
 // deterministic "today" value (dashboard/summary, paper-trades default date).
-const TEST_CLOCK = new FixedClock("2026-01-15T09:30:00+05:30");
+const TEST_CLOCK = new FixedClock('2026-01-15T09:30:00+05:30');
 
 // ---------------------------------------------------------------------------
 // GET /health
 // ---------------------------------------------------------------------------
 
-describe("GET /health", () => {
+describe('GET /health', () => {
   let server: FastifyInstance;
 
   beforeAll(async () => {
@@ -69,17 +69,17 @@ describe("GET /health", () => {
     await server.close();
   });
 
-  it("returns HTTP 200 with status ok", async () => {
-    const response = await server.inject({ method: "GET", url: "/health" });
+  it('returns HTTP 200 with status ok', async () => {
+    const response = await server.inject({ method: 'GET', url: '/health' });
     expect(response.statusCode).toBe(200);
     const body = response.json<{ status: string; time: number }>();
-    expect(body.status).toBe("ok");
+    expect(body.status).toBe('ok');
   });
 
-  it("response contains a time field that is a number", async () => {
-    const response = await server.inject({ method: "GET", url: "/health" });
+  it('response contains a time field that is a number', async () => {
+    const response = await server.inject({ method: 'GET', url: '/health' });
     const body = response.json<{ status: string; time: number }>();
-    expect(typeof body.time).toBe("number");
+    expect(typeof body.time).toBe('number');
     // The FixedClock value must be the epoch-ms of 2026-01-15T09:30:00+05:30.
     expect(body.time).toBe(TEST_CLOCK.now());
   });
@@ -89,7 +89,7 @@ describe("GET /health", () => {
 // GET /api/trades
 // ---------------------------------------------------------------------------
 
-describe("GET /api/trades", () => {
+describe('GET /api/trades', () => {
   let server: FastifyInstance;
   let db: Pool;
 
@@ -103,19 +103,19 @@ describe("GET /api/trades", () => {
     await server.close();
   });
 
-  it("returns HTTP 200 with empty array when no open trades exist", async () => {
+  it('returns HTTP 200 with empty array when no open trades exist', async () => {
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
-    const response = await server.inject({ method: "GET", url: "/api/trades" });
+    const response = await server.inject({ method: 'GET', url: '/api/trades' });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual([]);
   });
 
-  it("returns HTTP 200 with trade objects when trades exist", async () => {
+  it('returns HTTP 200 with trade objects when trades exist', async () => {
     const tradeRows = [
       {
-        id: "trade-001",
-        entry_time: "2026-01-15T04:00:00.000Z",
+        id: 'trade-001',
+        entry_time: '2026-01-15T04:00:00.000Z',
         exit_time: null,
         entry_ce_strike: null,
         entry_pe_strike: null,
@@ -125,20 +125,20 @@ describe("GET /api/trades", () => {
         exit_pe_price: null,
         lots: 1,
         lot_size: 50,
-        straddle_at_entry: "200.00",
-        lowest_straddle_value_seen: "195.00",
+        straddle_at_entry: '200.00',
+        lowest_straddle_value_seen: '195.00',
         vix_at_entry: null,
         spot_at_entry: null,
         exit_reason: null,
         gross_pnl: null,
         net_pnl: null,
         max_drawdown: null,
-        status: "open",
+        status: 'open',
         notes: null,
       },
       {
-        id: "trade-002",
-        entry_time: "2026-01-15T05:00:00.000Z",
+        id: 'trade-002',
+        entry_time: '2026-01-15T05:00:00.000Z',
         exit_time: null,
         entry_ce_strike: null,
         entry_pe_strike: null,
@@ -148,15 +148,15 @@ describe("GET /api/trades", () => {
         exit_pe_price: null,
         lots: 2,
         lot_size: 50,
-        straddle_at_entry: "210.00",
-        lowest_straddle_value_seen: "205.00",
+        straddle_at_entry: '210.00',
+        lowest_straddle_value_seen: '205.00',
         vix_at_entry: null,
         spot_at_entry: null,
         exit_reason: null,
         gross_pnl: null,
         net_pnl: null,
         max_drawdown: null,
-        status: "open",
+        status: 'open',
         notes: null,
       },
     ];
@@ -166,18 +166,18 @@ describe("GET /api/trades", () => {
       rowCount: tradeRows.length,
     });
 
-    const response = await server.inject({ method: "GET", url: "/api/trades" });
+    const response = await server.inject({ method: 'GET', url: '/api/trades' });
     expect(response.statusCode).toBe(200);
 
     const body = response.json<typeof tradeRows>();
     expect(body).toHaveLength(2);
-    expect(body[0]?.id).toBe("trade-001");
+    expect(body[0]?.id).toBe('trade-001');
     expect(body[0]?.lots).toBe(1);
     expect(body[0]?.lot_size).toBe(50);
-    expect(body[0]?.straddle_at_entry).toBe("200.00");
-    expect(body[0]?.lowest_straddle_value_seen).toBe("195.00");
-    expect(body[0]?.status).toBe("open");
-    expect(body[1]?.id).toBe("trade-002");
+    expect(body[0]?.straddle_at_entry).toBe('200.00');
+    expect(body[0]?.lowest_straddle_value_seen).toBe('195.00');
+    expect(body[0]?.status).toBe('open');
+    expect(body[1]?.id).toBe('trade-002');
   });
 });
 
@@ -185,7 +185,7 @@ describe("GET /api/trades", () => {
 // GET /api/trades/history
 // ---------------------------------------------------------------------------
 
-describe("GET /api/trades/history", () => {
+describe('GET /api/trades/history', () => {
   let server: FastifyInstance;
   let db: Pool;
 
@@ -199,20 +199,20 @@ describe("GET /api/trades/history", () => {
     await server.close();
   });
 
-  it("returns HTTP 200 with empty array when no closed trades exist", async () => {
+  it('returns HTTP 200 with empty array when no closed trades exist', async () => {
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
-    const response = await server.inject({ method: "GET", url: "/api/trades/history" });
+    const response = await server.inject({ method: 'GET', url: '/api/trades/history' });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual([]);
   });
 
-  it("returns HTTP 200 with up to 100 closed trades", async () => {
+  it('returns HTTP 200 with up to 100 closed trades', async () => {
     const closedRows = [
       {
-        id: "trade-100",
-        entry_time: "2026-01-15T04:00:00.000Z",
-        exit_time: "2026-01-15T07:00:00.000Z",
+        id: 'trade-100',
+        entry_time: '2026-01-15T04:00:00.000Z',
+        exit_time: '2026-01-15T07:00:00.000Z',
         entry_ce_strike: null,
         entry_pe_strike: null,
         entry_ce_price: null,
@@ -221,21 +221,21 @@ describe("GET /api/trades/history", () => {
         exit_pe_price: null,
         lots: 1,
         lot_size: 50,
-        straddle_at_entry: "200.00",
-        lowest_straddle_value_seen: "185.00",
-        vix_at_entry: "14.50",
-        spot_at_entry: "22000.00",
-        exit_reason: "EOD",
-        gross_pnl: "750.00",
-        net_pnl: "700.00",
-        max_drawdown: "-50.00",
-        status: "closed",
+        straddle_at_entry: '200.00',
+        lowest_straddle_value_seen: '185.00',
+        vix_at_entry: '14.50',
+        spot_at_entry: '22000.00',
+        exit_reason: 'EOD',
+        gross_pnl: '750.00',
+        net_pnl: '700.00',
+        max_drawdown: '-50.00',
+        status: 'closed',
         notes: null,
       },
       {
-        id: "trade-101",
-        entry_time: "2026-01-15T05:30:00.000Z",
-        exit_time: "2026-01-15T08:00:00.000Z",
+        id: 'trade-101',
+        entry_time: '2026-01-15T05:30:00.000Z',
+        exit_time: '2026-01-15T08:00:00.000Z',
         entry_ce_strike: null,
         entry_pe_strike: null,
         entry_ce_price: null,
@@ -244,21 +244,21 @@ describe("GET /api/trades/history", () => {
         exit_pe_price: null,
         lots: 2,
         lot_size: 50,
-        straddle_at_entry: "220.00",
-        lowest_straddle_value_seen: "200.00",
-        vix_at_entry: "15.00",
-        spot_at_entry: "22100.00",
-        exit_reason: "STOP_LOSS",
-        gross_pnl: "1000.00",
-        net_pnl: "950.00",
-        max_drawdown: "-100.00",
-        status: "closed",
+        straddle_at_entry: '220.00',
+        lowest_straddle_value_seen: '200.00',
+        vix_at_entry: '15.00',
+        spot_at_entry: '22100.00',
+        exit_reason: 'STOP_LOSS',
+        gross_pnl: '1000.00',
+        net_pnl: '950.00',
+        max_drawdown: '-100.00',
+        status: 'closed',
         notes: null,
       },
       {
-        id: "trade-102",
-        entry_time: "2026-01-14T04:00:00.000Z",
-        exit_time: "2026-01-14T07:00:00.000Z",
+        id: 'trade-102',
+        entry_time: '2026-01-14T04:00:00.000Z',
+        exit_time: '2026-01-14T07:00:00.000Z',
         entry_ce_strike: null,
         entry_pe_strike: null,
         entry_ce_price: null,
@@ -267,15 +267,15 @@ describe("GET /api/trades/history", () => {
         exit_pe_price: null,
         lots: 1,
         lot_size: 50,
-        straddle_at_entry: "190.00",
-        lowest_straddle_value_seen: "175.00",
+        straddle_at_entry: '190.00',
+        lowest_straddle_value_seen: '175.00',
         vix_at_entry: null,
         spot_at_entry: null,
-        exit_reason: "EOD",
-        gross_pnl: "375.00",
-        net_pnl: "350.00",
+        exit_reason: 'EOD',
+        gross_pnl: '375.00',
+        net_pnl: '350.00',
         max_drawdown: null,
-        status: "closed",
+        status: 'closed',
         notes: null,
       },
     ];
@@ -285,18 +285,18 @@ describe("GET /api/trades/history", () => {
       rowCount: closedRows.length,
     });
 
-    const response = await server.inject({ method: "GET", url: "/api/trades/history" });
+    const response = await server.inject({ method: 'GET', url: '/api/trades/history' });
     expect(response.statusCode).toBe(200);
 
     const body = response.json<typeof closedRows>();
     expect(body).toHaveLength(3);
     // All returned rows must have status 'closed' (from mock data)
     for (const row of body) {
-      expect(row.status).toBe("closed");
+      expect(row.status).toBe('closed');
     }
-    expect(body[0]?.id).toBe("trade-100");
-    expect(body[0]?.exit_reason).toBe("EOD");
-    expect(body[0]?.gross_pnl).toBe("750.00");
+    expect(body[0]?.id).toBe('trade-100');
+    expect(body[0]?.exit_reason).toBe('EOD');
+    expect(body[0]?.gross_pnl).toBe('750.00');
   });
 });
 
@@ -304,7 +304,7 @@ describe("GET /api/trades/history", () => {
 // GET /dashboard/live
 // ---------------------------------------------------------------------------
 
-describe("GET /dashboard/live", () => {
+describe('GET /dashboard/live', () => {
   let server: FastifyInstance;
   let db: Pool;
 
@@ -318,30 +318,30 @@ describe("GET /dashboard/live", () => {
     await server.close();
   });
 
-  it("returns HTTP 404 when no recent snapshot exists", async () => {
+  it('returns HTTP 404 when no recent snapshot exists', async () => {
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
-    const response = await server.inject({ method: "GET", url: "/dashboard/live" });
+    const response = await server.inject({ method: 'GET', url: '/dashboard/live' });
     expect(response.statusCode).toBe(404);
     const body = response.json<{ message: string }>();
     expect(body.message).toMatch(/no straddle snapshot/i);
   });
 
-  it("returns HTTP 200 with snapshot data when a recent snapshot exists", async () => {
-    const snapshotTime = new Date("2026-01-15T04:00:00.000Z");
+  it('returns HTTP 200 with snapshot data when a recent snapshot exists', async () => {
+    const snapshotTime = new Date('2026-01-15T04:00:00.000Z');
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       rows: [
         {
-          straddle_value: "200",
-          atm_strike: "22000",
-          underlying: "NIFTY",
+          straddle_value: '200',
+          atm_strike: '22000',
+          underlying: 'NIFTY',
           time: snapshotTime,
         },
       ],
       rowCount: 1,
     });
 
-    const response = await server.inject({ method: "GET", url: "/dashboard/live" });
+    const response = await server.inject({ method: 'GET', url: '/dashboard/live' });
     expect(response.statusCode).toBe(200);
 
     const body = response.json<{
@@ -353,27 +353,27 @@ describe("GET /dashboard/live", () => {
       timestamp: string;
     }>();
 
-    expect(body.straddleValue).toBe("200");
-    expect(body.atmStrike).toBe("22000");
-    expect(body.underlying).toBe("NIFTY");
+    expect(body.straddleValue).toBe('200');
+    expect(body.atmStrike).toBe('22000');
+    expect(body.underlying).toBe('NIFTY');
     expect(body.timestamp).toBe(snapshotTime.toISOString());
   });
 
-  it("response shape includes roc and acceleration fields (both null until migration)", async () => {
-    const snapshotTime = new Date("2026-01-15T04:00:00.000Z");
+  it('response shape includes roc and acceleration fields (both null until migration)', async () => {
+    const snapshotTime = new Date('2026-01-15T04:00:00.000Z');
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       rows: [
         {
-          straddle_value: "200",
-          atm_strike: "22000",
-          underlying: "NIFTY",
+          straddle_value: '200',
+          atm_strike: '22000',
+          underlying: 'NIFTY',
           time: snapshotTime,
         },
       ],
       rowCount: 1,
     });
 
-    const response = await server.inject({ method: "GET", url: "/dashboard/live" });
+    const response = await server.inject({ method: 'GET', url: '/dashboard/live' });
     expect(response.statusCode).toBe(200);
 
     const body = response.json<{
@@ -395,7 +395,7 @@ describe("GET /dashboard/live", () => {
 // GET /dashboard/summary
 // ---------------------------------------------------------------------------
 
-describe("GET /dashboard/summary", () => {
+describe('GET /dashboard/summary', () => {
   let server: FastifyInstance;
   let db: Pool;
 
@@ -409,29 +409,29 @@ describe("GET /dashboard/summary", () => {
     await server.close();
   });
 
-  it("returns HTTP 200 with empty array when no trades today", async () => {
+  it('returns HTTP 200 with empty array when no trades today', async () => {
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
-    const response = await server.inject({ method: "GET", url: "/dashboard/summary" });
+    const response = await server.inject({ method: 'GET', url: '/dashboard/summary' });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual([]);
   });
 
-  it("returns HTTP 200 with trade summaries for today", async () => {
+  it('returns HTTP 200 with trade summaries for today', async () => {
     const summaryRows = [
       {
-        id: "trade-001",
-        status: "open",
-        straddle_at_entry: "200.00",
+        id: 'trade-001',
+        status: 'open',
+        straddle_at_entry: '200.00',
         gross_pnl: null,
         exit_reason: null,
       },
       {
-        id: "trade-002",
-        status: "closed",
-        straddle_at_entry: "210.00",
-        gross_pnl: "500.00",
-        exit_reason: "EOD",
+        id: 'trade-002',
+        status: 'closed',
+        straddle_at_entry: '210.00',
+        gross_pnl: '500.00',
+        exit_reason: 'EOD',
       },
     ];
 
@@ -440,18 +440,18 @@ describe("GET /dashboard/summary", () => {
       rowCount: summaryRows.length,
     });
 
-    const response = await server.inject({ method: "GET", url: "/dashboard/summary" });
+    const response = await server.inject({ method: 'GET', url: '/dashboard/summary' });
     expect(response.statusCode).toBe(200);
 
     const body = response.json<typeof summaryRows>();
     expect(body).toHaveLength(2);
-    expect(body[0]?.id).toBe("trade-001");
-    expect(body[0]?.status).toBe("open");
-    expect(body[0]?.straddle_at_entry).toBe("200.00");
+    expect(body[0]?.id).toBe('trade-001');
+    expect(body[0]?.status).toBe('open');
+    expect(body[0]?.straddle_at_entry).toBe('200.00');
     expect(body[0]?.gross_pnl).toBeNull();
-    expect(body[1]?.id).toBe("trade-002");
-    expect(body[1]?.gross_pnl).toBe("500.00");
-    expect(body[1]?.exit_reason).toBe("EOD");
+    expect(body[1]?.id).toBe('trade-002');
+    expect(body[1]?.gross_pnl).toBe('500.00');
+    expect(body[1]?.exit_reason).toBe('EOD');
   });
 });
 
@@ -459,7 +459,7 @@ describe("GET /dashboard/summary", () => {
 // GET /paper-trades
 // ---------------------------------------------------------------------------
 
-describe("GET /paper-trades", () => {
+describe('GET /paper-trades', () => {
   let server: FastifyInstance;
   let db: Pool;
 
@@ -479,38 +479,38 @@ describe("GET /paper-trades", () => {
     (db.query as ReturnType<typeof vi.fn>).mockClear();
   });
 
-  it("returns HTTP 400 for invalid date format", async () => {
+  it('returns HTTP 400 for invalid date format', async () => {
     const response = await server.inject({
-      method: "GET",
-      url: "/paper-trades?date=not-a-date",
+      method: 'GET',
+      url: '/paper-trades?date=not-a-date',
     });
     expect(response.statusCode).toBe(400);
   });
 
-  it("returns HTTP 400 for invalid status value", async () => {
+  it('returns HTTP 400 for invalid status value', async () => {
     const response = await server.inject({
-      method: "GET",
-      url: "/paper-trades?status=invalid",
+      method: 'GET',
+      url: '/paper-trades?status=invalid',
     });
     expect(response.statusCode).toBe(400);
   });
 
-  it("returns HTTP 200 with empty array for valid params when no trades match", async () => {
+  it('returns HTTP 200 with empty array for valid params when no trades match', async () => {
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
     const response = await server.inject({
-      method: "GET",
-      url: "/paper-trades?date=2026-01-15&status=open",
+      method: 'GET',
+      url: '/paper-trades?date=2026-01-15&status=open',
     });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual([]);
   });
 
-  it("returns HTTP 200 with trade list when DB has matching data", async () => {
+  it('returns HTTP 200 with trade list when DB has matching data', async () => {
     const tradeRows = [
       {
-        id: "trade-001",
-        entry_time: "2026-01-15T04:00:00.000Z",
+        id: 'trade-001',
+        entry_time: '2026-01-15T04:00:00.000Z',
         exit_time: null,
         entry_ce_strike: null,
         entry_pe_strike: null,
@@ -520,15 +520,15 @@ describe("GET /paper-trades", () => {
         exit_pe_price: null,
         lots: 1,
         lot_size: 50,
-        straddle_at_entry: "200.00",
-        lowest_straddle_value_seen: "195.00",
+        straddle_at_entry: '200.00',
+        lowest_straddle_value_seen: '195.00',
         vix_at_entry: null,
         spot_at_entry: null,
         exit_reason: null,
         gross_pnl: null,
         net_pnl: null,
         max_drawdown: null,
-        status: "open",
+        status: 'open',
         notes: null,
       },
     ];
@@ -539,23 +539,23 @@ describe("GET /paper-trades", () => {
     });
 
     const response = await server.inject({
-      method: "GET",
-      url: "/paper-trades?date=2026-01-15&status=open",
+      method: 'GET',
+      url: '/paper-trades?date=2026-01-15&status=open',
     });
     expect(response.statusCode).toBe(200);
 
     const body = response.json<typeof tradeRows>();
     expect(body).toHaveLength(1);
-    expect(body[0]?.id).toBe("trade-001");
-    expect(body[0]?.status).toBe("open");
+    expect(body[0]?.id).toBe('trade-001');
+    expect(body[0]?.status).toBe('open');
   });
 
-  it("uses page=2 to compute the correct SQL OFFSET (100)", async () => {
+  it('uses page=2 to compute the correct SQL OFFSET (100)', async () => {
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
     const response = await server.inject({
-      method: "GET",
-      url: "/paper-trades?date=2026-01-15&page=2",
+      method: 'GET',
+      url: '/paper-trades?date=2026-01-15&page=2',
     });
     expect(response.statusCode).toBe(200);
 
@@ -571,12 +571,12 @@ describe("GET /paper-trades", () => {
     expect(params[params.length - 2]).toBe(100); // pageSize cap
   });
 
-  it("status=all omits the status filter from the SQL params", async () => {
+  it('status=all omits the status filter from the SQL params', async () => {
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
     const response = await server.inject({
-      method: "GET",
-      url: "/paper-trades?date=2026-01-15&status=all",
+      method: 'GET',
+      url: '/paper-trades?date=2026-01-15&status=all',
     });
     expect(response.statusCode).toBe(200);
 
@@ -587,15 +587,15 @@ describe("GET /paper-trades", () => {
     const params = queryCall[1];
     // When status=all: params = [date, pageSize, offset] → length 3, no status string
     expect(params).toHaveLength(3);
-    expect(params[0]).toBe("2026-01-15");
+    expect(params[0]).toBe('2026-01-15');
   });
 
-  it("status=closed includes the status value in the SQL params", async () => {
+  it('status=closed includes the status value in the SQL params', async () => {
     (db.query as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
     const response = await server.inject({
-      method: "GET",
-      url: "/paper-trades?date=2026-01-15&status=closed",
+      method: 'GET',
+      url: '/paper-trades?date=2026-01-15&status=closed',
     });
     expect(response.statusCode).toBe(200);
 
@@ -606,6 +606,6 @@ describe("GET /paper-trades", () => {
     const params = queryCall[1];
     // When status=closed: params = [date, status, pageSize, offset] → length 4
     expect(params).toHaveLength(4);
-    expect(params[1]).toBe("closed");
+    expect(params[1]).toBe('closed');
   });
 });

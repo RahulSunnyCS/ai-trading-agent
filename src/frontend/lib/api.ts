@@ -24,9 +24,7 @@
  *   if (!result.ok) { console.error(result.error); return; }
  *   // result.data is now narrowed to MyType here
  */
-export type ApiResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string; status?: number };
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
 // ---------------------------------------------------------------------------
 // Core helper

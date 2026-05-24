@@ -23,7 +23,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { apiGet } from '../lib/api.js';
-import { type ApiEnvelope, type PaperTrade } from '../types/trading.js';
+import type { ApiEnvelope, PaperTrade } from '../types/trading.js';
 
 // ---------------------------------------------------------------------------
 // Return type — exported so consumers can annotate state variables if needed.

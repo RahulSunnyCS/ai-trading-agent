@@ -117,7 +117,7 @@ describe('computeAcceleration', () => {
     const c = 121;
     const rocPrev = ((b - a) / a) * 100; // 10%
     const rocCurr = ((c - b) / b) * 100; // 10%
-    const expected = rocCurr - rocPrev;   // 0% — constant growth rate
+    const expected = rocCurr - rocPrev; // 0% — constant growth rate
     expect(computeAcceleration([a, b, c])).toBeCloseTo(expected, 8);
   });
 

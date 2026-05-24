@@ -1,6 +1,6 @@
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import type { Pool } from "pg";
-import type { Clock } from "../../utils/clock.js";
+import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import type { Pool } from 'pg';
+import type { Clock } from '../../utils/clock.js';
 
 /**
  * Options injected when this plugin is registered.
@@ -25,16 +25,16 @@ export interface DashboardRoutesOptions {
 // returns as strings (see schema.ts header for the NUMERIC string-type rationale).
 // We declare them as "string" here to match the wire format.
 const LIVE_RESPONSE_SCHEMA = {
-  type: "object",
+  type: 'object',
   properties: {
-    straddleValue: { type: "string" },
-    roc: { type: ["number", "null"] },
-    acceleration: { type: ["number", "null"] },
-    atmStrike: { type: "string" },
-    underlying: { type: "string" },
-    timestamp: { type: "string" },
+    straddleValue: { type: 'string' },
+    roc: { type: ['number', 'null'] },
+    acceleration: { type: ['number', 'null'] },
+    atmStrike: { type: 'string' },
+    underlying: { type: 'string' },
+    timestamp: { type: 'string' },
   },
-  required: ["straddleValue", "atmStrike", "underlying", "timestamp"],
+  required: ['straddleValue', 'atmStrike', 'underlying', 'timestamp'],
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -44,15 +44,15 @@ const LIVE_RESPONSE_SCHEMA = {
 // gross_pnl is NUMERIC → string; straddle_at_entry similarly.
 // exit_reason can be null for open trades included in the summary.
 const SUMMARY_ITEM_SCHEMA = {
-  type: "object",
+  type: 'object',
   properties: {
-    id: { type: "string" },
-    status: { type: "string", enum: ["open", "closed"] },
-    straddle_at_entry: { type: "string" },
-    gross_pnl: { type: ["string", "null"] },
-    exit_reason: { type: ["string", "null"] },
+    id: { type: 'string' },
+    status: { type: 'string', enum: ['open', 'closed'] },
+    straddle_at_entry: { type: 'string' },
+    gross_pnl: { type: ['string', 'null'] },
+    exit_reason: { type: ['string', 'null'] },
   },
-  required: ["id", "status", "straddle_at_entry"],
+  required: ['id', 'status', 'straddle_at_entry'],
 } as const;
 
 /**
@@ -87,17 +87,17 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
   // closed, data feed down) so the dashboard can show a "no recent data"
   // state rather than stale numbers.
   fastify.get(
-    "/dashboard/live",
+    '/dashboard/live',
     {
       schema: {
         response: {
           200: LIVE_RESPONSE_SCHEMA,
           404: {
-            type: "object",
+            type: 'object',
             properties: {
-              message: { type: "string" },
+              message: { type: 'string' },
             },
-            required: ["message"],
+            required: ['message'],
           },
         },
       },
@@ -121,7 +121,7 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
         // inactive" state. This is not a server error; we use reply.code()
         // and return the body rather than throwing, which keeps Fastify's
         // schema serialiser active for the 404 shape.
-        return reply.code(404).send({ message: "No straddle snapshot in the last minute" });
+        return reply.code(404).send({ message: 'No straddle snapshot in the last minute' });
       }
 
       const row = result.rows[0] as {
@@ -161,12 +161,12 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
   // parameterised query (not string interpolation) prevents SQL injection
   // even though the value comes from a controlled source — safe defaults rule.
   fastify.get(
-    "/dashboard/summary",
+    '/dashboard/summary',
     {
       schema: {
         response: {
           200: {
-            type: "array",
+            type: 'array',
             items: SUMMARY_ITEM_SCHEMA,
           },
         },
@@ -177,7 +177,7 @@ export const dashboardRoutes: FastifyPluginAsync<DashboardRoutesOptions> = async
 
       const result = await opts.db.query<{
         id: string;
-        status: "open" | "closed";
+        status: 'open' | 'closed';
         straddle_at_entry: string;
         gross_pnl: string | null;
         exit_reason: string | null;

@@ -24,8 +24,8 @@ import type { Redis } from 'ioredis';
 import type { Clock } from '../utils/clock';
 import { RealClock } from '../utils/clock';
 import { buildOptionSymbol, getAtmStrike, getCurrentExpiry } from './brokers/instrument-registry';
-import { computeAcceleration, computeRoc } from './straddle-math';
 import type { BrokerTick, Underlying } from './brokers/types';
+import { computeAcceleration, computeRoc } from './straddle-math';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -360,7 +360,12 @@ export function createStraddleCalculator(
     // Publish to Redis stream `straddle.values` and return the assigned stream ID.
     // The returned ID is used by the replay drain barrier in position-monitor.
     try {
-      const streamId = await redisClient.xadd('straddle.values', '*', 'data', JSON.stringify(snapshot));
+      const streamId = await redisClient.xadd(
+        'straddle.values',
+        '*',
+        'data',
+        JSON.stringify(snapshot),
+      );
       // ioredis xadd with '*' always returns a non-null string per Redis spec.
       // Guard anyway so the return type is correct at runtime.
       return streamId ?? null;

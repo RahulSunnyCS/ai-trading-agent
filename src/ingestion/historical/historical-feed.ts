@@ -181,10 +181,10 @@ export function createHistoricalFeed(pool: Pool, config: HistoricalFeedConfig): 
   const { underlying, from, to } = config;
 
   // Validate inputs before any DB access.
-  if (!(from instanceof Date) || isNaN(from.getTime())) {
+  if (!(from instanceof Date) || Number.isNaN(from.getTime())) {
     throw new Error('[HistoricalFeed] config.from must be a valid Date');
   }
-  if (!(to instanceof Date) || isNaN(to.getTime())) {
+  if (!(to instanceof Date) || Number.isNaN(to.getTime())) {
     throw new Error('[HistoricalFeed] config.to must be a valid Date');
   }
   if (from > to) {
@@ -193,7 +193,7 @@ export function createHistoricalFeed(pool: Pool, config: HistoricalFeedConfig): 
     );
   }
 
-  const indexSymbol = UNDERLYING_SYMBOLS[underlying];
+  const _indexSymbol = UNDERLYING_SYMBOLS[underlying];
 
   // Registered tick callbacks (BrokerFeed.onTick style).
   const tickCallbacks: Array<(tick: BrokerTick) => void> = [];
@@ -231,7 +231,7 @@ export function createHistoricalFeed(pool: Pool, config: HistoricalFeedConfig): 
     return result.rows.map((row): HistoricalTick => {
       const tick: HistoricalTick = {
         symbol: row.symbol,
-        ltp: parseFloat(row.ltp),
+        ltp: Number.parseFloat(row.ltp),
         timestamp: row.time.getTime(),
         time: row.time.getTime(),
         source: row.source,
@@ -239,10 +239,10 @@ export function createHistoricalFeed(pool: Pool, config: HistoricalFeedConfig): 
       };
       // exactOptionalPropertyTypes: only set optional fields when the value exists.
       // Assigning undefined to an optional field is forbidden in strict mode.
-      if (row.volume !== null) tick.volume = parseFloat(row.volume);
-      if (row.oi !== null) tick.oi = parseFloat(row.oi);
-      if (row.bid !== null) tick.bid = parseFloat(row.bid);
-      if (row.ask !== null) tick.ask = parseFloat(row.ask);
+      if (row.volume !== null) tick.volume = Number.parseFloat(row.volume);
+      if (row.oi !== null) tick.oi = Number.parseFloat(row.oi);
+      if (row.bid !== null) tick.bid = Number.parseFloat(row.bid);
+      if (row.ask !== null) tick.ask = Number.parseFloat(row.ask);
       return tick;
     });
   }
@@ -270,15 +270,15 @@ export function createHistoricalFeed(pool: Pool, config: HistoricalFeedConfig): 
     return result.rows.map((row): HistoricalTick => {
       const tick: HistoricalTick = {
         symbol: row.symbol,
-        ltp: parseFloat(row.ltp),
+        ltp: Number.parseFloat(row.ltp),
         timestamp: row.time.getTime(),
         time: row.time.getTime(),
         source: row.source,
         resolution: row.resolution,
       };
       // exactOptionalPropertyTypes: only set optional fields when the value exists.
-      if (row.volume !== null) tick.volume = parseFloat(row.volume);
-      if (row.oi !== null) tick.oi = parseFloat(row.oi);
+      if (row.volume !== null) tick.volume = Number.parseFloat(row.volume);
+      if (row.oi !== null) tick.oi = Number.parseFloat(row.oi);
       return tick;
     });
   }

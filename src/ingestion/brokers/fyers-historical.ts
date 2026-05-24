@@ -39,16 +39,16 @@
  *   M  (monthly)   : 365 days per request
  */
 
-import type { Pool } from "pg";
-import { loadStoredToken } from "../../server/services/fyers-auth.js";
+import type { Pool } from 'pg';
+import { loadStoredToken } from '../../server/services/fyers-auth.js';
 
 // ---------------------------------------------------------------------------
 // Fixed host — never allow caller-supplied URLs (SSRF guard)
 // ---------------------------------------------------------------------------
 
 /** The only host this client will ever contact. */
-const FYERS_HISTORY_HOST = "https://api-t1.fyers.in";
-const FYERS_HISTORY_PATH = "/api/v3/data/history";
+const FYERS_HISTORY_HOST = 'https://api-t1.fyers.in';
+const FYERS_HISTORY_PATH = '/api/v3/data/history';
 const FYERS_HISTORY_URL = `${FYERS_HISTORY_HOST}${FYERS_HISTORY_PATH}`;
 
 /**
@@ -61,9 +61,9 @@ const FYERS_HISTORY_URL = `${FYERS_HISTORY_HOST}${FYERS_HISTORY_PATH}`;
  * consumers re-evaluated.
  */
 const ADJUSTED_DATA_ASSUMPTION =
-  "Prices are split/bonus-adjusted (Fyers v3 default). " +
-  "Unadjusted prices require cont_adjustment=0 in the request. " +
-  "Assumption: adjusted data is returned.";
+  'Prices are split/bonus-adjusted (Fyers v3 default). ' +
+  'Unadjusted prices require cont_adjustment=0 in the request. ' +
+  'Assumption: adjusted data is returned.';
 
 // ---------------------------------------------------------------------------
 // Resolution type
@@ -78,20 +78,20 @@ const ADJUSTED_DATA_ASSUMPTION =
  * Add more as they are verified against live Fyers docs.
  */
 export type FyersResolution =
-  | "1"   // 1-minute
-  | "2"   // 2-minute
-  | "3"   // 3-minute
-  | "5"   // 5-minute
-  | "10"  // 10-minute
-  | "15"  // 15-minute
-  | "20"  // 20-minute
-  | "30"  // 30-minute
-  | "60"  // 1-hour
-  | "120" // 2-hour
-  | "240" // 4-hour
-  | "D"   // daily
-  | "W"   // weekly
-  | "M";  // monthly
+  | '1' // 1-minute
+  | '2' // 2-minute
+  | '3' // 3-minute
+  | '5' // 5-minute
+  | '10' // 10-minute
+  | '15' // 15-minute
+  | '20' // 20-minute
+  | '30' // 30-minute
+  | '60' // 1-hour
+  | '120' // 2-hour
+  | '240' // 4-hour
+  | 'D' // daily
+  | 'W' // weekly
+  | 'M'; // monthly
 
 /**
  * Maximum date-range days per Fyers history request, keyed by resolution.
@@ -104,20 +104,20 @@ export type FyersResolution =
  * data). Using a larger cap risks HTTP 400 from Fyers.
  */
 export const RESOLUTION_DAY_CAPS: Readonly<Record<FyersResolution, number>> = {
-  "1":   30,  // 1-minute: 30 days max per request
-  "2":   30,  // 2-minute: same cap as 1-minute (intraday)
-  "3":   30,  // 3-minute
-  "5":   60,  // 5-minute: Fyers allows up to 60 days
-  "10":  60,  // 10-minute
-  "15":  60,  // 15-minute
-  "20":  60,  // 20-minute
-  "30":  60,  // 30-minute
-  "60":  60,  // 1-hour
-  "120": 100, // 2-hour
-  "240": 100, // 4-hour
-  "D":  365,  // daily: 1 year per request
-  "W":  365,  // weekly
-  "M":  365,  // monthly
+  '1': 30, // 1-minute: 30 days max per request
+  '2': 30, // 2-minute: same cap as 1-minute (intraday)
+  '3': 30, // 3-minute
+  '5': 60, // 5-minute: Fyers allows up to 60 days
+  '10': 60, // 10-minute
+  '15': 60, // 15-minute
+  '20': 60, // 20-minute
+  '30': 60, // 30-minute
+  '60': 60, // 1-hour
+  '120': 100, // 2-hour
+  '240': 100, // 4-hour
+  D: 365, // daily: 1 year per request
+  W: 365, // weekly
+  M: 365, // monthly
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -266,10 +266,10 @@ export interface FetchHistoricalOptions {
 export class FyersNoCredentialsError extends Error {
   constructor() {
     super(
-      "Fyers credentials missing: set FYERS_ACCESS_TOKEN + FYERS_APP_ID env vars, " +
-        "or store a token via the OAuth flow (broker_tokens table).",
+      'Fyers credentials missing: set FYERS_ACCESS_TOKEN + FYERS_APP_ID env vars, ' +
+        'or store a token via the OAuth flow (broker_tokens table).',
     );
-    this.name = "FyersNoCredentialsError";
+    this.name = 'FyersNoCredentialsError';
   }
 }
 
@@ -279,10 +279,9 @@ export class FyersNoCredentialsError extends Error {
 export class FyersRateLimitError extends Error {
   constructor(public readonly attemptsExhausted: number) {
     super(
-      `Fyers history API rate limit hit — exhausted ${attemptsExhausted} retry attempts. ` +
-        "Back off and retry later.",
+      `Fyers history API rate limit hit — exhausted ${attemptsExhausted} retry attempts. Back off and retry later.`,
     );
-    this.name = "FyersRateLimitError";
+    this.name = 'FyersRateLimitError';
   }
 }
 
@@ -305,17 +304,15 @@ export class FyersAuthError extends Error {
    */
   readonly lastSuccessfulCutoff: Date | null;
 
-  constructor(
-    message: string,
-    lastSuccessfulCutoff: Date | null,
-  ) {
+  constructor(message: string, lastSuccessfulCutoff: Date | null) {
     super(
-      `Fyers auth failure mid-fetch: ${message}. ` +
-        (lastSuccessfulCutoff
+      `Fyers auth failure mid-fetch: ${message}. ${
+        lastSuccessfulCutoff
           ? `Last successful candle at ${lastSuccessfulCutoff.toISOString()} — resume from this point.`
-          : "No candles were fetched before failure — restart from the beginning of the range."),
+          : 'No candles were fetched before failure — restart from the beginning of the range.'
+      }`,
     );
-    this.name = "FyersAuthError";
+    this.name = 'FyersAuthError';
     this.lastSuccessfulCutoff = lastSuccessfulCutoff;
   }
 }
@@ -329,7 +326,7 @@ export class FyersAuthError extends Error {
  * candles is an array of [epochSeconds, open, high, low, close, volume] tuples.
  */
 interface FyersHistorySuccessResponse {
-  s: "ok";
+  s: 'ok';
   /** Array of OHLCV tuples: [epochSec, open, high, low, close, volume] */
   candles: number[][];
 }
@@ -338,7 +335,7 @@ interface FyersHistorySuccessResponse {
  * Shape of a Fyers history error response.
  */
 interface FyersHistoryErrorResponse {
-  s: "error" | string;
+  s: 'error' | string;
   message?: string;
   code?: number;
 }
@@ -373,14 +370,14 @@ interface ResolvedCredentials {
  * written to any log output.
  */
 async function resolveCredentials(db: Pool | null): Promise<ResolvedCredentials> {
-  const envAccessToken = process.env["FYERS_ACCESS_TOKEN"];
-  const envAppId = process.env["FYERS_APP_ID"];
+  const envAccessToken = process.env.FYERS_ACCESS_TOKEN;
+  const envAppId = process.env.FYERS_APP_ID;
 
   if (envAccessToken && envAppId) {
     return {
       appId: envAppId,
       accessToken: envAccessToken,
-      refreshToken: process.env["FYERS_REFRESH_TOKEN"] ?? null,
+      refreshToken: process.env.FYERS_REFRESH_TOKEN ?? null,
     };
   }
 
@@ -496,7 +493,7 @@ async function fetchChunk(
     resolution,
     // date_format=1 tells Fyers to interpret range_from/range_to as epoch seconds
     // and to return candle timestamps as epoch seconds.
-    date_format: "1",
+    date_format: '1',
     range_from: String(Math.floor(chunk.from.getTime() / 1000)),
     range_to: String(Math.floor(chunk.to.getTime() / 1000)),
     // cont_adjustment is intentionally omitted — we accept the Fyers default of
@@ -513,11 +510,11 @@ async function fetchChunk(
     let res: Response;
     try {
       res = await fetchFn(url, {
-        method: "GET",
+        method: 'GET',
         headers: {
           // Never log this header value in full — it contains the access token.
           Authorization: authHeader,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
       });
     } catch (networkErr) {
@@ -552,15 +549,13 @@ async function fetchChunk(
 
     // Any other non-2xx: unrecoverable for this request
     if (!res.ok) {
-      let body = "";
+      let body = '';
       try {
         body = await res.text();
       } catch {
         // swallow — we already have the status code
       }
-      throw new Error(
-        `Fyers history request failed: HTTP ${res.status} — ${body.slice(0, 200)}`,
-      );
+      throw new Error(`Fyers history request failed: HTTP ${res.status} — ${body.slice(0, 200)}`);
     }
 
     // Parse the response body
@@ -568,31 +563,31 @@ async function fetchChunk(
     try {
       body = (await res.json()) as FyersHistoryResponse;
     } catch {
-      throw new Error("Fyers history response was not valid JSON");
+      throw new Error('Fyers history response was not valid JSON');
     }
 
     // Fyers-level auth error: s !== "ok" with an auth-related payload.
     // Fyers sometimes returns HTTP 200 with s="error" and a message indicating
     // token expiry — we treat this as an auth failure to match the WS adapter.
-    if (body.s !== "ok") {
+    if (body.s !== 'ok') {
       const errBody = body as FyersHistoryErrorResponse;
       const msg = errBody.message ?? `s=${body.s}`;
       const isAuthError =
         errBody.code === 16 || // Fyers token-expiry code (observed in SDK samples)
-        msg.toLowerCase().includes("token") ||
-        msg.toLowerCase().includes("auth") ||
-        msg.toLowerCase().includes("unauthorized") ||
-        msg.toLowerCase().includes("session");
+        msg.toLowerCase().includes('token') ||
+        msg.toLowerCase().includes('auth') ||
+        msg.toLowerCase().includes('unauthorized') ||
+        msg.toLowerCase().includes('session');
 
       if (isAuthError) {
         throw new FyersAuthError(
-          `Fyers API auth error: ${msg} (code=${errBody.code ?? "n/a"})`,
+          `Fyers API auth error: ${msg} (code=${errBody.code ?? 'n/a'})`,
           lastSuccessfulCutoff,
         );
       }
 
       // Non-auth Fyers error (e.g. invalid symbol)
-      throw new Error(`Fyers history API error: ${msg} (code=${errBody.code ?? "n/a"})`);
+      throw new Error(`Fyers history API error: ${msg} (code=${errBody.code ?? 'n/a'})`);
     }
 
     // Successfully received candles — parse and return.
@@ -601,7 +596,7 @@ async function fetchChunk(
   }
 
   // Should be unreachable — the loop either returns or throws.
-  throw new Error("[FyersHistorical] Exhausted retry loop unexpectedly");
+  throw new Error('[FyersHistorical] Exhausted retry loop unexpectedly');
 }
 
 // ---------------------------------------------------------------------------
@@ -634,13 +629,22 @@ function parseCandles(raw: number[][]): FyersCandle[] {
     // Validate that all fields are finite numbers before trusting them.
     // Fyers occasionally sends null for volume on illiquid instruments.
     const [epochSec, open, high, low, close, volume] = tuple as [
-      number, number, number, number, number, number
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
     ];
 
-    if (!isFinite(epochSec) || !isFinite(open) || !isFinite(high) || !isFinite(low) || !isFinite(close)) {
-      console.warn(
-        `[FyersHistorical] Candle at index ${i} has non-finite price field — skipping.`,
-      );
+    if (
+      !Number.isFinite(epochSec) ||
+      !Number.isFinite(open) ||
+      !Number.isFinite(high) ||
+      !Number.isFinite(low) ||
+      !Number.isFinite(close)
+    ) {
+      console.warn(`[FyersHistorical] Candle at index ${i} has non-finite price field — skipping.`);
       continue;
     }
 
@@ -655,7 +659,7 @@ function parseCandles(raw: number[][]): FyersCandle[] {
       // We do NOT zero-fill price data (open/high/low/close), only volume.
       // Note: isFinite(null) returns true (null coerces to 0), so we use an
       // explicit null/undefined check before falling back to isFinite.
-      volume: volume != null && isFinite(volume) ? volume : 0,
+      volume: volume != null && Number.isFinite(volume) ? volume : 0,
     });
   }
 
@@ -677,18 +681,15 @@ function parseCandles(raw: number[][]): FyersCandle[] {
  * chunk (e.g. one holiday within a 30-day window) are NOT detected here —
  * Fyers silently omits closed-market days, and we do not fabricate them.
  */
-function detectGap(
-  chunk: DateChunk,
-  candlesInChunk: FyersCandle[],
-): FyersCandleGap | null {
+function detectGap(chunk: DateChunk, candlesInChunk: FyersCandle[]): FyersCandleGap | null {
   if (candlesInChunk.length === 0) {
     return {
       from: chunk.from,
       to: chunk.to,
       reason:
-        "No candles returned by Fyers for this date range. Possible causes: " +
-        "market holiday(s), exchange halt, instrument not yet listed, or " +
-        "option strike not available for this period.",
+        'No candles returned by Fyers for this date range. Possible causes: ' +
+        'market holiday(s), exchange halt, instrument not yet listed, or ' +
+        'option strike not available for this period.',
     };
   }
   return null;
@@ -733,7 +734,14 @@ export async function fetchHistoricalCandles(
   db: Pool | null,
   options: FetchHistoricalOptions,
 ): Promise<FyersHistoricalResult> {
-  const { symbol, resolution, from, to, fetchFn = (fetch as FetchFn), sleepFn = defaultSleep } = options;
+  const {
+    symbol,
+    resolution,
+    from,
+    to,
+    fetchFn = fetch as FetchFn,
+    sleepFn = defaultSleep,
+  } = options;
 
   // Validate the date range before making any network calls.
   if (from > to) {

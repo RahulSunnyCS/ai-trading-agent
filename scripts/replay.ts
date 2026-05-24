@@ -35,16 +35,16 @@
  *     prevent credential leakage in process lists.
  */
 
-import pg from 'pg';
 import Redis from 'ioredis';
+import pg from 'pg';
 
 import { runMigrations } from '../src/db/migrate.js';
-import { VirtualClock } from '../src/utils/clock.js';
-import { createStraddleCalculator } from '../src/ingestion/straddle-calc.js';
-import { createPositionMonitor } from '../src/trading/position-monitor.js';
+import type { Underlying } from '../src/ingestion/brokers/types.js';
 import { createHistoricalFeed } from '../src/ingestion/historical/historical-feed.js';
 import { createReplayDriver } from '../src/ingestion/historical/replay-driver.js';
-import type { Underlying } from '../src/ingestion/brokers/types.js';
+import { createStraddleCalculator } from '../src/ingestion/straddle-calc.js';
+import { createPositionMonitor } from '../src/trading/position-monitor.js';
+import { VirtualClock } from '../src/utils/clock.js';
 
 // ---------------------------------------------------------------------------
 // Argument parsing
@@ -79,22 +79,36 @@ function parseArgs(argv: string[]): {
     switch (arg) {
       case '--from': {
         const val = args[++i];
-        if (!val) { console.error('--from requires a value'); process.exit(1); }
+        if (!val) {
+          console.error('--from requires a value');
+          process.exit(1);
+        }
         from = new Date(val);
-        if (isNaN(from.getTime())) { console.error(`Invalid --from value: ${val}`); process.exit(1); }
+        if (Number.isNaN(from.getTime())) {
+          console.error(`Invalid --from value: ${val}`);
+          process.exit(1);
+        }
         break;
       }
       case '--to': {
         const val = args[++i];
-        if (!val) { console.error('--to requires a value'); process.exit(1); }
+        if (!val) {
+          console.error('--to requires a value');
+          process.exit(1);
+        }
         to = new Date(val);
-        if (isNaN(to.getTime())) { console.error(`Invalid --to value: ${val}`); process.exit(1); }
+        if (Number.isNaN(to.getTime())) {
+          console.error(`Invalid --to value: ${val}`);
+          process.exit(1);
+        }
         break;
       }
       case '--underlying': {
         const val = args[++i] as Underlying;
         if (!val || !['NIFTY', 'BANKNIFTY', 'SENSEX'].includes(val)) {
-          console.error(`Invalid --underlying value: ${val ?? '(missing)'}. Must be NIFTY | BANKNIFTY | SENSEX`);
+          console.error(
+            `Invalid --underlying value: ${val ?? '(missing)'}. Must be NIFTY | BANKNIFTY | SENSEX`,
+          );
           process.exit(1);
         }
         underlying = val;
@@ -102,8 +116,8 @@ function parseArgs(argv: string[]): {
       }
       case '--speed': {
         const val = args[++i];
-        const parsed = parseFloat(val ?? '');
-        if (!isFinite(parsed) || parsed <= 0) {
+        const parsed = Number.parseFloat(val ?? '');
+        if (!Number.isFinite(parsed) || parsed <= 0) {
           console.error(`Invalid --speed value: ${val ?? '(missing)'}. Must be a positive number.`);
           process.exit(1);
         }
@@ -144,14 +158,18 @@ async function main(): Promise<void> {
   const opts = parseArgs(process.argv);
 
   if (opts.regenerateFixture) {
-    console.log('[replay] --regenerate-fixture: regenerating golden fixture (developer mode, NOT CI)');
+    console.log(
+      '[replay] --regenerate-fixture: regenerating golden fixture (developer mode, NOT CI)',
+    );
     await regenerateGoldenFixture();
     return;
   }
 
   if (!opts.from || !opts.to) {
     console.error('[replay] --from and --to are required. Example:');
-    console.error('  bun run replay --from 2024-01-25T03:45:00Z --to 2024-01-25T10:00:00Z --underlying NIFTY');
+    console.error(
+      '  bun run replay --from 2024-01-25T03:45:00Z --to 2024-01-25T10:00:00Z --underlying NIFTY',
+    );
     process.exit(1);
   }
 
@@ -193,7 +211,9 @@ async function main(): Promise<void> {
   console.log(`[replay]   Speed      : ${opts.speed}x`);
   console.log(`[replay]   Verbose    : ${opts.verbose}`);
   if (opts.againstLive || replayConfirmLive) {
-    console.log('[replay]   LIVE MODE  : --against-live acknowledged — PositionMonitor may close real trades');
+    console.log(
+      '[replay]   LIVE MODE  : --against-live acknowledged — PositionMonitor may close real trades',
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -273,18 +293,11 @@ async function main(): Promise<void> {
   });
 
   // Create and run the replay driver.
-  const driver = createReplayDriver(
-    feed,
-    redisClient,
-    straddleCalc,
-    positionMonitor,
-    clock,
-    {
-      snapshotIntervalMs: SNAPSHOT_INTERVAL_MS,
-      speedMultiplier: opts.speed,
-      verboseTicks: opts.verbose,
-    },
-  );
+  const driver = createReplayDriver(feed, redisClient, straddleCalc, positionMonitor, clock, {
+    snapshotIntervalMs: SNAPSHOT_INTERVAL_MS,
+    speedMultiplier: opts.speed,
+    verboseTicks: opts.verbose,
+  });
 
   console.log('[replay] Starting replay driver...');
   const summary = await driver.run();
@@ -297,9 +310,13 @@ async function main(): Promise<void> {
   console.log(`[replay]   Ticks emitted          : ${summary.ticksEmitted}`);
   console.log(`[replay]   Snapshot steps total   : ${summary.snapshotStepsAttempted}`);
   console.log(`[replay]   Snapshots published    : ${summary.snapshotStepsPublished}`);
-  console.log(`[replay]   Virtual time spanned   : ${(summary.virtualMs / 1000 / 60).toFixed(1)} min`);
+  console.log(
+    `[replay]   Virtual time spanned   : ${(summary.virtualMs / 1000 / 60).toFixed(1)} min`,
+  );
   console.log(`[replay]   Wall-clock elapsed     : ${(summary.wallClockMs / 1000).toFixed(2)} s`);
-  console.log(`[replay]   Effective speed        : ${(summary.virtualMs / summary.wallClockMs).toFixed(1)}x`);
+  console.log(
+    `[replay]   Effective speed        : ${(summary.virtualMs / summary.wallClockMs).toFixed(1)}x`,
+  );
 
   // ---------------------------------------------------------------------------
   // Graceful shutdown
@@ -332,21 +349,126 @@ async function regenerateGoldenFixture(): Promise<void> {
 
   // Synthetic ticks — same as the fixture but generated programmatically.
   const syntheticTicks = [
-    { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: START, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY2412522400CE', ltp: 150, timestamp: START, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY2412522400PE', ltp: 145, timestamp: START, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: START + 15000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY2412522400CE', ltp: 155, timestamp: START + 15000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY2412522400PE', ltp: 148, timestamp: START + 15000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: START + 30000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY2412522400CE', ltp: 160, timestamp: START + 30000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY2412522400PE', ltp: 152, timestamp: START + 30000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: START + 45000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY2412522400CE', ltp: 165, timestamp: START + 45000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY2412522400PE', ltp: 155, timestamp: START + 45000, source: 'fyers-historical', resolution: '1', gapMarker: false },
-    { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: START + 180000, source: 'fyers-historical', resolution: '1', gapMarker: true },
-    { symbol: 'NSE:NIFTY2412522400CE', ltp: 168, timestamp: START + 180000, source: 'fyers-historical', resolution: '1', gapMarker: true },
-    { symbol: 'NSE:NIFTY2412522400PE', ltp: 157, timestamp: START + 180000, source: 'fyers-historical', resolution: '1', gapMarker: false },
+    {
+      symbol: 'NSE:NIFTY50-INDEX',
+      ltp: 22400,
+      timestamp: START,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400CE',
+      ltp: 150,
+      timestamp: START,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400PE',
+      ltp: 145,
+      timestamp: START,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY50-INDEX',
+      ltp: 22400,
+      timestamp: START + 15000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400CE',
+      ltp: 155,
+      timestamp: START + 15000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400PE',
+      ltp: 148,
+      timestamp: START + 15000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY50-INDEX',
+      ltp: 22400,
+      timestamp: START + 30000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400CE',
+      ltp: 160,
+      timestamp: START + 30000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400PE',
+      ltp: 152,
+      timestamp: START + 30000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY50-INDEX',
+      ltp: 22400,
+      timestamp: START + 45000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400CE',
+      ltp: 165,
+      timestamp: START + 45000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400PE',
+      ltp: 155,
+      timestamp: START + 45000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
+    {
+      symbol: 'NSE:NIFTY50-INDEX',
+      ltp: 22400,
+      timestamp: START + 180000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: true,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400CE',
+      ltp: 168,
+      timestamp: START + 180000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: true,
+    },
+    {
+      symbol: 'NSE:NIFTY2412522400PE',
+      ltp: 157,
+      timestamp: START + 180000,
+      source: 'fyers-historical',
+      resolution: '1',
+      gapMarker: false,
+    },
   ];
 
   // Simulate the replay algorithm to compute expected ledger.
@@ -393,8 +515,8 @@ async function regenerateGoldenFixture(): Promise<void> {
     const index = priceMap.get('NSE:NIFTY50-INDEX');
     if (index !== undefined) {
       const atmStrike = Math.round(index / 50) * 50;
-      const ce = priceMap.get(`NSE:NIFTY${24}${1}${25}${atmStrike}CE`);
-      const pe = priceMap.get(`NSE:NIFTY${24}${1}${25}${atmStrike}PE`);
+      const _ce = priceMap.get(`NSE:NIFTY${24}${1}${25}${atmStrike}CE`);
+      const _pe = priceMap.get(`NSE:NIFTY${24}${1}${25}${atmStrike}PE`);
       const ceSymbol = 'NSE:NIFTY2412522400CE';
       const peSymbol = 'NSE:NIFTY2412522400PE';
       const cePrice = priceMap.get(ceSymbol);
@@ -439,7 +561,8 @@ async function regenerateGoldenFixture(): Promise<void> {
       snapshotIntervalMs: INTERVAL,
       _frozen: true,
       _version: 1,
-      _comment: 'FROZEN — do not edit without re-running scripts/replay.ts --regenerate-fixture. See README.md.',
+      _comment:
+        'FROZEN — do not edit without re-running scripts/replay.ts --regenerate-fixture. See README.md.',
     },
     ticks: syntheticTicks,
     expectedSnapshotLedger,

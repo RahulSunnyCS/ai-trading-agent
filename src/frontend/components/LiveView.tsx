@@ -15,9 +15,9 @@
  * stores epoch *milliseconds*, so we divide by 1000 before handing to the chart.
  */
 
-import { useEffect, useRef, useState } from 'react';
 import { createChart } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
+import { useEffect, useRef, useState } from 'react';
 
 import { useLiveTicks } from '../hooks/useLiveTicks.js';
 import { apiGet, unwrapData } from '../lib/api.js';
@@ -61,11 +61,11 @@ const STRADDLE_POLL_MS = 10_000;
  */
 const CHART_LAYOUT = {
   background: { color: 'transparent' },
-  textColor: '#9ca3af',       // Tailwind gray-400
+  textColor: '#9ca3af', // Tailwind gray-400
 } as const;
 
-const CHART_GRID_COLOR = '#1f2937';   // Tailwind gray-800
-const SERIES_LINE_COLOR = '#3b82f6';  // Tailwind blue-500
+const CHART_GRID_COLOR = '#1f2937'; // Tailwind gray-800
+const SERIES_LINE_COLOR = '#3b82f6'; // Tailwind blue-500
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -100,14 +100,13 @@ function ConnectionPill({ status }: { status: 'connecting' | 'connected' | 'disc
   const { dot, text, label } = map[status];
 
   return (
-    <span
+    <output
       className={`inline-flex items-center gap-1.5 rounded-full bg-gray-800 px-2.5 py-1 text-xs font-medium ring-1 ring-gray-700 ${text}`}
-      role="status"
       aria-label={`WebSocket status: ${label}`}
     >
       <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
       {label}
-    </span>
+    </output>
   );
 }
 
@@ -167,7 +166,9 @@ function StraddleSection() {
 
     // Fire immediately on mount, then on the interval.
     void poll();
-    const timerId = setInterval(() => { void poll(); }, STRADDLE_POLL_MS);
+    const timerId = setInterval(() => {
+      void poll();
+    }, STRADDLE_POLL_MS);
 
     return () => {
       controller.abort();
@@ -203,8 +204,8 @@ function StraddleSection() {
           <div>
             <p className="text-sm text-gray-400">Straddle feed not yet connected</p>
             <p className="mt-0.5 text-xs text-gray-600">
-              The straddle calculator has not connected yet. This will update
-              automatically once the feed is live — no refresh needed.
+              The straddle calculator has not connected yet. This will update automatically once the
+              feed is live — no refresh needed.
             </p>
           </div>
         </div>
@@ -230,9 +231,7 @@ function StraddleSection() {
 
       {/* Subtle fetch-error indicator — shown alongside data (never instead of it) */}
       {fetchError !== null && (
-        <p className="mt-2 text-xs text-amber-600">
-          Poll error: {fetchError}
-        </p>
+        <p className="mt-2 text-xs text-amber-600">Poll error: {fetchError}</p>
       )}
     </div>
   );
@@ -379,8 +378,7 @@ export function LiveView() {
 
   // Convert epoch ms timestamp to ISO string for formatIstDateTime.
   // formatIstDateTime expects an ISO-8601 string, not epoch ms directly.
-  const lastUpdateIso =
-    latestTimestamp !== null ? new Date(latestTimestamp).toISOString() : null;
+  const lastUpdateIso = latestTimestamp !== null ? new Date(latestTimestamp).toISOString() : null;
 
   return (
     <div className="space-y-4">

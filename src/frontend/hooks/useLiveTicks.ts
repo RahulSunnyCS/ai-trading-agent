@@ -10,7 +10,7 @@
  * so teardown never arms a new reconnect cycle.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TickMessage } from '../types/trading.js';
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ const MAX_DELAY_MS = 30_000;
  * @param attempt  0-based attempt index (0 = first retry after disconnect).
  */
 function backoffMs(attempt: number): number {
-  const exponential = BASE_DELAY_MS * Math.pow(2, attempt);
+  const exponential = BASE_DELAY_MS * 2 ** attempt;
   const capped = Math.min(exponential, MAX_DELAY_MS);
   // Add up to ±20% random jitter of the capped value.
   const jitter = capped * 0.2 * Math.random();
@@ -163,10 +163,11 @@ export function useLiveTicks(): UseLiveTicksResult {
       // We use a functional setState so the closure always sees the latest
       // array — avoids stale capture if the hook re-runs.
       setTicks((prev) => {
-        const next: TickPoint[] = prev.length >= BUFFER_CAP
-          // Slice from index 1 drops the oldest entry.
-          ? [...prev.slice(1), { time: timestamp, ltp }]
-          : [...prev, { time: timestamp, ltp }];
+        const next: TickPoint[] =
+          prev.length >= BUFFER_CAP
+            ? // Slice from index 1 drops the oldest entry.
+              [...prev.slice(1), { time: timestamp, ltp }]
+            : [...prev, { time: timestamp, ltp }];
         return next;
       });
     };

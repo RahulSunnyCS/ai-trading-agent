@@ -27,13 +27,13 @@
  *   accidentally return yesterday's trades as "today's open positions".
  */
 
-import Decimal from "decimal.js";
-import type { Pool } from "pg";
-import type { OpenPosition } from "../db/schema.js";
-import type { Clock } from "../utils/clock.js";
-import { calculatePnl } from "../utils/pnl.js";
-import type { EntryIntent } from "./entry-engine.js";
-import type { QuantiplyClient } from "./quantiply-stub.js";
+import Decimal from 'decimal.js';
+import type { Pool } from 'pg';
+import type { OpenPosition } from '../db/schema.js';
+import type { Clock } from '../utils/clock.js';
+import { calculatePnl } from '../utils/pnl.js';
+import type { EntryIntent } from './entry-engine.js';
+import type { QuantiplyClient } from './quantiply-stub.js';
 
 // Re-export the interface so callers can import it from here if they prefer
 // without a separate import from quantiply-stub.ts.
@@ -106,7 +106,7 @@ export class PaperTradeExecutor {
     // succeeds; a missing row here would indicate a driver bug, not normal flow.
     const id = result.rows[0]?.id;
     if (!id) {
-      throw new Error("[paper-trade-executor] INSERT into paper_trades returned no id");
+      throw new Error('[paper-trade-executor] INSERT into paper_trades returned no id');
     }
 
     // Notify Quantiply asynchronously. Errors are caught here so a Quantiply
@@ -121,7 +121,7 @@ export class PaperTradeExecutor {
       await this._quantiply.recordTrade(tradeRecord);
     } catch (err: unknown) {
       // Log but do not rethrow — Quantiply failure is non-fatal for the trading loop.
-      console.error("[paper-trade-executor] Quantiply recordTrade failed (non-fatal):", err);
+      console.error('[paper-trade-executor] Quantiply recordTrade failed (non-fatal):', err);
     }
 
     return id;
@@ -265,6 +265,6 @@ export async function getOpenTrades(db: Pool, tradingDate: string): Promise<Open
     // todayNetPnl is a placeholder: the trigger engine overwrites this with the
     // live calculated value before calling evaluateTriggers(). '0' is correct
     // here because at query time we do not know the current straddle value.
-    todayNetPnl: "0",
+    todayNetPnl: '0',
   }));
 }

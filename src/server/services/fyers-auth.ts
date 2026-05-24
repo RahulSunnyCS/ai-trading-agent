@@ -12,11 +12,11 @@
  * is not set in the env.
  */
 
-import { createHash } from "node:crypto";
-import type { Pool } from "pg";
+import { createHash } from 'node:crypto';
+import type { Pool } from 'pg';
 
-const FYERS_AUTH_URL = "https://api-t1.fyers.in/api/v3/generate-authcode";
-const FYERS_TOKEN_URL = "https://api-t1.fyers.in/api/v3/validate-authcode";
+const FYERS_AUTH_URL = 'https://api-t1.fyers.in/api/v3/generate-authcode';
+const FYERS_TOKEN_URL = 'https://api-t1.fyers.in/api/v3/validate-authcode';
 
 export interface FyersOAuthConfig {
   appId: string;
@@ -36,7 +36,7 @@ export function loadFyersOAuthConfig(): FyersOAuthConfig | null {
   const secretKey = process.env.FYERS_APP_SECRET;
   const redirectUri =
     process.env.FYERS_REDIRECT_URI ??
-    `http://localhost:${process.env.PORT ?? "3000"}/api/auth/fyers/callback`;
+    `http://localhost:${process.env.PORT ?? '3000'}/api/auth/fyers/callback`;
 
   if (!appId || !secretKey) return null;
   return { appId, secretKey, redirectUri };
@@ -46,7 +46,7 @@ export function buildAuthUrl(cfg: FyersOAuthConfig, state: string): string {
   const params = new URLSearchParams({
     client_id: cfg.appId,
     redirect_uri: cfg.redirectUri,
-    response_type: "code",
+    response_type: 'code',
     state,
   });
   return `${FYERS_AUTH_URL}?${params.toString()}`;
@@ -65,20 +65,20 @@ export async function exchangeAuthCode(
   cfg: FyersOAuthConfig,
   authCode: string,
 ): Promise<StoredToken> {
-  const appIdHash = createHash("sha256").update(`${cfg.appId}:${cfg.secretKey}`).digest("hex");
+  const appIdHash = createHash('sha256').update(`${cfg.appId}:${cfg.secretKey}`).digest('hex');
 
   const res = await fetch(FYERS_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      grant_type: "authorization_code",
+      grant_type: 'authorization_code',
       appIdHash,
       code: authCode,
     }),
   });
 
   const body = (await res.json()) as ValidateAuthCodeResponse;
-  if (body.s !== "ok" || !body.access_token) {
+  if (body.s !== 'ok' || !body.access_token) {
     throw new Error(`Fyers token exchange failed: ${body.message ?? JSON.stringify(body)}`);
   }
 

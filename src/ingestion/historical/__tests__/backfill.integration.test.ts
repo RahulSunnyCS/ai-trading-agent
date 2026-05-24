@@ -48,15 +48,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Pool } from 'pg';
 import { createTestDb } from '../../../test/integration/helpers.js';
-import {
-  runBackfill,
-  BackfillResumeError,
-} from '../backfill.js';
-import {
-  FyersAuthError,
-  type FyersCandle,
-  type FetchFn,
-} from '../../brokers/fyers-historical.js';
+import { type FetchFn, FyersAuthError, type FyersCandle } from '../../brokers/fyers-historical.js';
+import { BackfillResumeError, runBackfill } from '../backfill.js';
 
 // ---------------------------------------------------------------------------
 // Skip guard — skip the entire suite when DATABASE_URL is absent (Docker down)
@@ -112,10 +105,7 @@ function mockSuccessFetchFn(candles: FyersCandle[]): FetchFn {
  * Used to trigger BackfillResumeError in the interruption/resume tests.
  */
 function mockAuthFailFetchFn(): FetchFn {
-  return () =>
-    Promise.resolve(
-      new Response('Unauthorized', { status: 401 }),
-    );
+  return () => Promise.resolve(new Response('Unauthorized', { status: 401 }));
 }
 
 /** No-op sleep to avoid real delays in test runs. */
@@ -261,10 +251,7 @@ describe.skipIf(SKIP)('backfill integration — partial unique index and resume'
   it('partial unique index prevents duplicates for option_ticks as well as market_ticks', async () => {
     // Use a CE option symbol to exercise the option_ticks write path.
     const ceSymbol = 'NSE:NIFTY25MAY24000CE';
-    const candles = [
-      makeCandle('2024-01-02', 150),
-      makeCandle('2024-01-03', 155),
-    ];
+    const candles = [makeCandle('2024-01-02', 150), makeCandle('2024-01-03', 155)];
 
     const from = new Date('2024-01-02T00:00:00.000Z');
     const to = new Date('2024-01-03T00:00:00.000Z');
@@ -334,8 +321,8 @@ describe.skipIf(SKIP)('backfill integration — partial unique index and resume'
     // Both rows (live + historical) must coexist.
     const liveAfter = await countMarketTicksRows(db, symbol, from, to, 'fyers');
     const histAfter = await countMarketTicksRows(db, symbol, from, to, 'fyers-historical');
-    expect(liveAfter).toBe(1);  // live row untouched
-    expect(histAfter).toBe(1);  // historical row added
+    expect(liveAfter).toBe(1); // live row untouched
+    expect(histAfter).toBe(1); // historical row added
   });
 
   it('partial index is disjoint — simulator rows (source=simulator) are unaffected by backfill idempotency', async () => {
@@ -399,7 +386,7 @@ describe.skipIf(SKIP)('backfill integration — partial unique index and resume'
     }
 
     expect(resumeError).toBeDefined();
-    const rangeId = resumeError!.rangeId;
+    const rangeId = resumeError?.rangeId;
 
     // backfill_ranges row must show status='partial' with checkpoint_ts=null
     // (the 401 fired before any candle was successfully fetched).
@@ -504,7 +491,7 @@ describe.skipIf(SKIP)('backfill integration — partial unique index and resume'
     // ON CONFLICT DO NOTHING must absorb the first candle and only write the second.
     const allCandles = [
       makeCandle(checkpointDate, 21800), // already in DB
-      makeCandle('2024-01-03', 21900),   // new
+      makeCandle('2024-01-03', 21900), // new
     ];
 
     const result = await runBackfill(db, {
@@ -636,7 +623,7 @@ describe.skipIf(SKIP)('backfill integration — partial unique index and resume'
 
     // The DB row must not be 'complete'.
     const rangeRow = await db.query<{ status: string }>(
-      `SELECT status FROM backfill_ranges WHERE id = $1`,
+      'SELECT status FROM backfill_ranges WHERE id = $1',
       [result.rangeId],
     );
     expect(rangeRow.rows[0]?.status).toBe('gapped');
@@ -647,10 +634,7 @@ describe.skipIf(SKIP)('backfill integration — partial unique index and resume'
     const symbol = 'NSE:NIFTY50-INDEX';
     const from = new Date('2024-01-02T00:00:00.000Z');
     const to = new Date('2024-01-03T00:00:00.000Z');
-    const candles = [
-      makeCandle('2024-01-02', 21800),
-      makeCandle('2024-01-03', 21900),
-    ];
+    const candles = [makeCandle('2024-01-02', 21800), makeCandle('2024-01-03', 21900)];
 
     const result1 = await runBackfill(db, {
       symbol,

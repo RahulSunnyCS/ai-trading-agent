@@ -28,16 +28,16 @@
  *     (SSRF guard is in fyers-historical.ts).
  */
 
-import type { Pool, PoolClient } from "pg";
+import type { Pool, PoolClient } from 'pg';
+import type { BackfillRange, BackfillRangeStatus } from '../../db/schema.js';
 import {
-  FyersAuthError,
-  fetchHistoricalCandles,
   type FetchFn,
+  FyersAuthError,
   type FyersCandle,
   type FyersCandleGap,
   type FyersResolution,
-} from "../brokers/fyers-historical.js";
-import type { BackfillRange, BackfillRangeStatus } from "../../db/schema.js";
+  fetchHistoricalCandles,
+} from '../brokers/fyers-historical.js';
 
 // ---------------------------------------------------------------------------
 // Public option types
@@ -111,15 +111,11 @@ export class BackfillResumeError extends Error {
   readonly rangeId: number;
 
   constructor(checkpointTs: Date | null, rangeId: number, cause: FyersAuthError) {
-    const checkpoint = checkpointTs?.toISOString() ?? "none (no candles written)";
+    const checkpoint = checkpointTs?.toISOString() ?? 'none (no candles written)';
     super(
-      `[BackfillResumeError] Fyers auth failure interrupted the backfill. ` +
-        `Checkpoint saved at backfill_ranges id=${rangeId}, ` +
-        `checkpoint_ts=${checkpoint}. ` +
-        `Re-run with the same options after refreshing credentials to resume. ` +
-        `Original error: ${cause.message}`,
+      `[BackfillResumeError] Fyers auth failure interrupted the backfill. Checkpoint saved at backfill_ranges id=${rangeId}, checkpoint_ts=${checkpoint}. Re-run with the same options after refreshing credentials to resume. Original error: ${cause.message}`,
     );
-    this.name = "BackfillResumeError";
+    this.name = 'BackfillResumeError';
     this.checkpointTs = checkpoint;
     this.rangeId = rangeId;
     this.cause = cause;
@@ -131,7 +127,7 @@ export class BackfillResumeError extends Error {
 // ---------------------------------------------------------------------------
 
 /** Which hypertable to write historical candles into. */
-export type SymbolTable = "market_ticks" | "option_ticks";
+export type SymbolTable = 'market_ticks' | 'option_ticks';
 
 /**
  * Determine whether a Fyers symbol routes to market_ticks (index) or
@@ -147,14 +143,14 @@ export type SymbolTable = "market_ticks" | "option_ticks";
  * is resilient and sufficient for routing.
  */
 export function resolveSymbolTable(symbol: string): SymbolTable {
-  if (symbol.endsWith("-INDEX")) return "market_ticks";
-  if (symbol.endsWith("CE") || symbol.endsWith("PE")) return "option_ticks";
+  if (symbol.endsWith('-INDEX')) return 'market_ticks';
+  if (symbol.endsWith('CE') || symbol.endsWith('PE')) return 'option_ticks';
 
   // Unrecognised pattern — default to market_ticks and warn.
   console.warn(
     `[BackfillWriter] Unrecognised symbol format '${symbol}' — defaulting to market_ticks.`,
   );
-  return "market_ticks";
+  return 'market_ticks';
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +227,7 @@ export function reconcileCalendarGaps(
   // Day-level reconciliation is meaningful only for intraday and daily candles.
   // Weekly / monthly candles intentionally cover multiple days — a "missing day"
   // within a weekly candle period is not a gap.
-  const skipDayReconciliation = resolution === "W" || resolution === "M";
+  const skipDayReconciliation = resolution === 'W' || resolution === 'M';
 
   if (!skipDayReconciliation) {
     const covered = extractTradingDates(candles);
@@ -244,9 +240,9 @@ export function reconcileCalendarGaps(
           from: dayDate,
           to: dayDate,
           reason:
-            "Possible NSE holiday or exchange halt (unverified) — " +
-            "no candle data returned by Fyers for this trading day. " +
-            "Verify against the NSE holiday calendar.",
+            'Possible NSE holiday or exchange halt (unverified) — ' +
+            'no candle data returned by Fyers for this trading day. ' +
+            'Verify against the NSE holiday calendar.',
         });
       }
     }
@@ -311,7 +307,7 @@ async function insertRangeRow(
   );
   const row = result.rows[0];
   if (!row) {
-    throw new Error("[BackfillWriter] INSERT backfill_ranges returned no id.");
+    throw new Error('[BackfillWriter] INSERT backfill_ranges returned no id.');
   }
   return row.id;
 }
@@ -376,7 +372,7 @@ async function finaliseRange(
   rowsWrittenThisRun: number,
   gaps: BackfillGapSummary[],
 ): Promise<BackfillRangeStatus> {
-  const status: BackfillRangeStatus = gaps.length > 0 ? "gapped" : "complete";
+  const status: BackfillRangeStatus = gaps.length > 0 ? 'gapped' : 'complete';
 
   // Serialise gap records to JSON text for storage.
   const gapsJsonStr =
@@ -455,16 +451,16 @@ async function writeMarketTicks(
     params.push(
       symbol,
       candle.timestamp.toISOString(),
-      candle.close,         // ltp = candle close (standard OHLCV synthesis)
+      candle.close, // ltp = candle close (standard OHLCV synthesis)
       candle.volume,
-      "fyers-historical",   // source — matches the partial-unique index predicate
+      'fyers-historical', // source — matches the partial-unique index predicate
       resolution,
     );
   }
 
   const sql = `
     INSERT INTO market_ticks (symbol, time, ltp, volume, source, resolution)
-    VALUES ${placeholders.join(", ")}
+    VALUES ${placeholders.join(', ')}
     ON CONFLICT DO NOTHING
   `;
 
@@ -501,14 +497,14 @@ async function writeOptionTicks(
       symbol,
       candle.close,
       candle.volume,
-      "fyers-historical",
+      'fyers-historical',
       resolution,
     );
   }
 
   const sql = `
     INSERT INTO option_ticks (time, symbol, ltp, volume, source, resolution)
-    VALUES ${placeholders.join(", ")}
+    VALUES ${placeholders.join(', ')}
     ON CONFLICT DO NOTHING
   `;
 
@@ -582,12 +578,12 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
       previousRowsWritten = existing.rows_written ?? 0;
 
       // Short-circuit: range already fully processed.
-      if (existing.status === "complete" || existing.status === "gapped") {
+      if (existing.status === 'complete' || existing.status === 'gapped') {
         releaseClient();
         const storedGaps = parseStoredGaps(existing.gaps_json);
         return {
           status: existing.status,
-          rowsWritten: 0,  // zero new rows written in this invocation
+          rowsWritten: 0, // zero new rows written in this invocation
           totalRowsWritten: previousRowsWritten,
           gaps: storedGaps,
           rangeId,
@@ -595,7 +591,7 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
       }
 
       // Partial run: resume from checkpoint.
-      if (existing.status === "partial" && existing.checkpoint_ts) {
+      if (existing.status === 'partial' && existing.checkpoint_ts) {
         // checkpoint_ts is the timestamp of the last successfully written candle.
         // We use it as the new from date. Fyers rounds to UTC midnight internally,
         // so chunks that overlap the checkpoint boundary will be handled by
@@ -646,7 +642,7 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
           await checkpointRange(client, resolvedRangeId, checkpointTs, 0);
         } catch (dbErr) {
           // Log but don't mask the original FyersAuthError.
-          console.error("[BackfillWriter] Failed to write checkpoint on FyersAuthError:", dbErr);
+          console.error('[BackfillWriter] Failed to write checkpoint on FyersAuthError:', dbErr);
         }
         releaseClient();
         throw new BackfillResumeError(checkpointTs, resolvedRangeId, err);
@@ -656,7 +652,7 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
       try {
         await markRangeError(client, resolvedRangeId, 0);
       } catch (dbErr) {
-        console.error("[BackfillWriter] Failed to mark range as error:", dbErr);
+        console.error('[BackfillWriter] Failed to mark range as error:', dbErr);
       }
       releaseClient();
       throw err;
@@ -668,7 +664,7 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
     try {
       const batches = chunkArray(candles, BATCH_SIZE);
       for (const batch of batches) {
-        if (targetTable === "market_ticks") {
+        if (targetTable === 'market_ticks') {
           rowsWrittenThisRun += await writeMarketTicks(client, symbol, resolution, batch);
         } else {
           rowsWrittenThisRun += await writeOptionTicks(client, symbol, resolution, batch);
@@ -681,7 +677,7 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
       try {
         await checkpointRange(client, resolvedRangeId, checkpointTs, rowsWrittenThisRun);
       } catch (dbErr) {
-        console.error("[BackfillWriter] Failed to checkpoint on write error:", dbErr);
+        console.error('[BackfillWriter] Failed to checkpoint on write error:', dbErr);
       }
       releaseClient();
       throw err;
@@ -698,8 +694,7 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
 
     if (calendarGaps.length > 0) {
       console.warn(
-        `[BackfillWriter] ${calendarGaps.length} gap(s) detected for ${symbol} ${resolution}. ` +
-          "Range will be marked 'gapped'. Review gaps_json in backfill_ranges.",
+        `[BackfillWriter] ${calendarGaps.length} gap(s) detected for ${symbol} ${resolution}. Range will be marked 'gapped'. Review gaps_json in backfill_ranges.`,
       );
     }
 
@@ -753,7 +748,7 @@ function parseStoredGaps(gapsJson: string | null): BackfillGapSummary[] {
       reason: g.reason,
     }));
   } catch {
-    console.warn("[BackfillWriter] Could not parse gaps_json — treating as no gaps.");
+    console.warn('[BackfillWriter] Could not parse gaps_json — treating as no gaps.');
     return [];
   }
 }

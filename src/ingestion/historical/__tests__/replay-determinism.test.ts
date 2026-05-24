@@ -38,20 +38,17 @@ import { join } from 'node:path';
 import Decimal from 'decimal.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { createPositionMonitor } from '../../../trading/position-monitor';
 import { VirtualClock } from '../../../utils/clock';
 import { createStraddleCalculator } from '../../straddle-calc';
 import type { StraddleSnapshot } from '../../straddle-calc';
-import { createPositionMonitor } from '../../../trading/position-monitor';
-import type { GoldenFixture, FixtureTick } from '../historical-feed';
+import type { FixtureTick, GoldenFixture } from '../historical-feed';
 
 // ---------------------------------------------------------------------------
 // Load the frozen fixture once (it never changes between runs in CI)
 // ---------------------------------------------------------------------------
 
-const FIXTURE_PATH = join(
-  import.meta.dirname,
-  'fixtures/golden/fixture.json',
-);
+const FIXTURE_PATH = join(import.meta.dirname, 'fixtures/golden/fixture.json');
 
 function loadFixture(): GoldenFixture {
   const raw = readFileSync(FIXTURE_PATH, 'utf-8');
@@ -295,19 +292,16 @@ async function runReplay(
   //   - startId='0' (FORBID '$' — replay assertion)
   //   - No setInterval cadence used in replay (snapshotStep() drives cadence)
   //   - The fake Redis for xread/xadd
-  const straddleCalc = createStraddleCalculator(
-    fakeRedis as unknown as import('ioredis').Redis,
-    {
-      underlying: metadata.underlying,
-      snapshotIntervalMs,
-      clock,
-      startId: '0',    // REPLAY REQUIREMENT: never '$'
-      noInterval: true, // REPLAY REQUIREMENT: snapshotStep() drives cadence; prevent
-                        // setInterval from firing extra void snapshots when fake
-                        // timers advance in flushPollLoop(), which would corrupt
-                        // the deterministic snapshot count.
-    },
-  );
+  const straddleCalc = createStraddleCalculator(fakeRedis as unknown as import('ioredis').Redis, {
+    underlying: metadata.underlying,
+    snapshotIntervalMs,
+    clock,
+    startId: '0', // REPLAY REQUIREMENT: never '$'
+    noInterval: true, // REPLAY REQUIREMENT: snapshotStep() drives cadence; prevent
+    // setInterval from firing extra void snapshots when fake
+    // timers advance in flushPollLoop(), which would corrupt
+    // the deterministic snapshot count.
+  });
 
   // Create PositionMonitor with a fake DB (no real DB needed — we just need
   // the poll loop running to exercise processedThrough()).
@@ -506,17 +500,23 @@ describe('C. processedThrough() drain barrier — named, concrete, not a sleep',
   it('resolves immediately when lastId is already past the target', async () => {
     // Build a monitor whose poll loop has already advanced past "1-0".
     const entries: [string, string[]][] = [
-      ['1-0', ['data', JSON.stringify({
-        underlying: 'NIFTY',
-        timestamp: 1706154300000,
-        atmStrike: 22400,
-        cePrice: 150,
-        pePrice: 145,
-        straddleValue: 295,
-        roc: 0,
-        acceleration: 0,
-        snapshotCount: 1,
-      })]],
+      [
+        '1-0',
+        [
+          'data',
+          JSON.stringify({
+            underlying: 'NIFTY',
+            timestamp: 1706154300000,
+            atmStrike: 22400,
+            cePrice: 150,
+            pePrice: 145,
+            straddleValue: 295,
+            roc: 0,
+            acceleration: 0,
+            snapshotCount: 1,
+          }),
+        ],
+      ],
     ];
 
     let callCount = 0;
@@ -534,10 +534,7 @@ describe('C. processedThrough() drain barrier — named, concrete, not a sleep',
       query: async () => ({ rows: [] }),
     } as unknown as import('pg').Pool;
 
-    const monitor = createPositionMonitor(
-      fakeRedis as unknown as import('ioredis').Redis,
-      fakeDb,
-    );
+    const monitor = createPositionMonitor(fakeRedis as unknown as import('ioredis').Redis, fakeDb);
 
     await monitor.start();
 
@@ -579,7 +576,9 @@ describe('C. processedThrough() drain barrier — named, concrete, not a sleep',
 
     // Deferred: resolve this to make xread return the entry.
     let releaseEntry!: () => void;
-    const entryReady = new Promise<void>((r) => { releaseEntry = r; });
+    const entryReady = new Promise<void>((r) => {
+      releaseEntry = r;
+    });
 
     let callCount = 0;
     const fakeRedis = {
@@ -602,10 +601,7 @@ describe('C. processedThrough() drain barrier — named, concrete, not a sleep',
       query: async () => ({ rows: [] }),
     } as unknown as import('pg').Pool;
 
-    const monitor = createPositionMonitor(
-      fakeRedis as unknown as import('ioredis').Redis,
-      fakeDb,
-    );
+    const monitor = createPositionMonitor(fakeRedis as unknown as import('ioredis').Redis, fakeDb);
 
     await monitor.start();
 
@@ -614,7 +610,9 @@ describe('C. processedThrough() drain barrier — named, concrete, not a sleep',
 
     // The barrier should NOT be resolved yet.
     let barrierDone = false;
-    const barrierPromise = monitor.processedThrough('2-0').then(() => { barrierDone = true; });
+    const barrierPromise = monitor.processedThrough('2-0').then(() => {
+      barrierDone = true;
+    });
 
     // Assert it has not resolved yet.
     await new Promise<void>((r) => setTimeout(r, 20));
@@ -660,10 +658,12 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
     const xaddCalls: string[] = [];
     const fakeRedis = {
       xread: vi.fn().mockResolvedValue(null),
-      xadd: vi.fn(async (_stream: string, _idArg: string, _field: string, data: string): Promise<string> => {
-        xaddCalls.push(data);
-        return '999-0';
-      }),
+      xadd: vi.fn(
+        async (_stream: string, _idArg: string, _field: string, data: string): Promise<string> => {
+          xaddCalls.push(data);
+          return '999-0';
+        },
+      ),
     };
 
     // Pre-seed the price map by having the calculator read from a stream
@@ -679,14 +679,17 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
       { symbol: 'NSE:NIFTY2412522400PE', ltp: 145, timestamp: fixedDate.getTime() },
     ];
 
-    fakeRedis.xread.mockResolvedValueOnce(
-      [['market.ticks', ticks.map((t, i) => [`tick-${i}-0`, ['data', JSON.stringify(t)]])]]
-    ).mockResolvedValue(null);
+    fakeRedis.xread
+      .mockResolvedValueOnce([
+        ['market.ticks', ticks.map((t, i) => [`tick-${i}-0`, ['data', JSON.stringify(t)]])],
+      ])
+      .mockResolvedValue(null);
 
-    const calculator = createStraddleCalculator(
-      fakeRedis as unknown as import('ioredis').Redis,
-      { underlying: 'NIFTY', snapshotIntervalMs: 15_000, clock },
-    );
+    const calculator = createStraddleCalculator(fakeRedis as unknown as import('ioredis').Redis, {
+      underlying: 'NIFTY',
+      snapshotIntervalMs: 15_000,
+      clock,
+    });
 
     await calculator.start();
 
@@ -718,10 +721,12 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
     const xaddCalls: string[] = [];
     const fakeRedis = {
       xread: vi.fn().mockResolvedValue(null),
-      xadd: vi.fn(async (_stream: string, _idArg: string, _field: string, data: string): Promise<string> => {
-        xaddCalls.push(data);
-        return '1000-0';
-      }),
+      xadd: vi.fn(
+        async (_stream: string, _idArg: string, _field: string, data: string): Promise<string> => {
+          xaddCalls.push(data);
+          return '1000-0';
+        },
+      ),
     };
 
     const fixedDate = new Date('2024-01-25T06:30:00Z');
@@ -735,15 +740,19 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
       { symbol: 'NSE:NIFTY2412522400PE', ltp: 145, timestamp: fixedDate.getTime() },
     ];
 
-    fakeRedis.xread.mockResolvedValueOnce(
-      [['market.ticks', ticks.map((t, i) => [`tick-${i}-0`, ['data', JSON.stringify(t)]])]]
-    ).mockResolvedValue(null);
+    fakeRedis.xread
+      .mockResolvedValueOnce([
+        ['market.ticks', ticks.map((t, i) => [`tick-${i}-0`, ['data', JSON.stringify(t)]])],
+      ])
+      .mockResolvedValue(null);
 
     // Use startId='0' for replay — the critical '$'-prevention check.
-    const calculator = createStraddleCalculator(
-      fakeRedis as unknown as import('ioredis').Redis,
-      { underlying: 'NIFTY', snapshotIntervalMs: 15_000, clock, startId: '0' },
-    );
+    const calculator = createStraddleCalculator(fakeRedis as unknown as import('ioredis').Redis, {
+      underlying: 'NIFTY',
+      snapshotIntervalMs: 15_000,
+      clock,
+      startId: '0',
+    });
 
     await calculator.start();
 
@@ -779,35 +788,32 @@ describe('E. $ cursor forbidden in replay path', () => {
     const fakeRedis = makeInMemoryRedis();
 
     // Directly calling xread with '$' must throw — this is the enforcement mechanism.
-    await expect(
-      fakeRedis.xread('COUNT', 100, 'STREAMS', 'market.ticks', '$'),
-    ).rejects.toThrow('REPLAY PATH VIOLATION');
+    await expect(fakeRedis.xread('COUNT', 100, 'STREAMS', 'market.ticks', '$')).rejects.toThrow(
+      'REPLAY PATH VIOLATION',
+    );
   });
 
   it('StraddleCalculator with startId="0" never calls xread with $', async () => {
     // This test asserts that when startId='0', the xread calls never use '$'.
     const xreadCursors: string[] = [];
     const fakeRedis = {
-      xread: vi.fn(async (
-        _count: string,
-        _n: number,
-        _streams: string,
-        _stream: string,
-        cursor: string,
-      ) => {
-        xreadCursors.push(cursor);
-        return null;
-      }),
+      xread: vi.fn(
+        async (_count: string, _n: number, _streams: string, _stream: string, cursor: string) => {
+          xreadCursors.push(cursor);
+          return null;
+        },
+      ),
       xadd: vi.fn().mockResolvedValue('1-0'),
     };
 
     const { FixedClock } = await import('../../../utils/clock');
     const clock = new FixedClock(new Date('2024-01-25T06:30:00Z'));
 
-    const calculator = createStraddleCalculator(
-      fakeRedis as unknown as import('ioredis').Redis,
-      { underlying: 'NIFTY', clock, startId: '0' },
-    );
+    const calculator = createStraddleCalculator(fakeRedis as unknown as import('ioredis').Redis, {
+      underlying: 'NIFTY',
+      clock,
+      startId: '0',
+    });
 
     await calculator.start();
     // Let the poll loop run a few iterations.

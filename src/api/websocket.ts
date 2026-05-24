@@ -1,6 +1,6 @@
-import type { FastifyInstance } from "fastify";
-import type { Redis } from "ioredis";
-import { STREAM_STRADDLE } from "../redis/client.js";
+import type { FastifyInstance } from 'fastify';
+import type { Redis } from 'ioredis';
+import { STREAM_STRADDLE } from '../redis/client.js';
 
 /**
  * Registers the WebSocket endpoint /ws/ticks on the given Fastify instance.
@@ -26,7 +26,7 @@ import { STREAM_STRADDLE } from "../redis/client.js";
  */
 export function registerWebSocket(server: FastifyInstance, redis: Redis): void {
   server.register(async (wsServer) => {
-    wsServer.get("/ws/ticks", { websocket: true }, (socket, _request) => {
+    wsServer.get('/ws/ticks', { websocket: true }, (socket, _request) => {
       // -----------------------------------------------------------------------
       // Dedicated Redis connection per WebSocket client
       // -----------------------------------------------------------------------
@@ -48,7 +48,7 @@ export function registerWebSocket(server: FastifyInstance, redis: Redis): void {
       // clients do not receive a backlog of historical snapshots. We advance
       // the cursor to the last-seen message ID after each successful read so
       // subsequent XREAD calls pick up only newer messages.
-      let cursor = "$";
+      let cursor = '$';
 
       // -----------------------------------------------------------------------
       // XREAD broadcast loop
@@ -61,12 +61,12 @@ export function registerWebSocket(server: FastifyInstance, redis: Redis): void {
             // Blocks up to 2 000 ms waiting for new messages. COUNT 10 bounds
             // the work per iteration; at a 15-second snapshot interval we will
             // rarely see more than 1 message per iteration.
-            raw = await sub.xread("COUNT", 10, "BLOCK", 2000, "STREAMS", STREAM_STRADDLE, cursor);
+            raw = await sub.xread('COUNT', 10, 'BLOCK', 2000, 'STREAMS', STREAM_STRADDLE, cursor);
           } catch (err: unknown) {
             // If active is false the socket closed while we were mid-block —
             // this is an expected race, not an error worth logging.
             if (!active) break;
-            server.log.error({ err }, "[ws/ticks] xread error");
+            server.log.error({ err }, '[ws/ticks] xread error');
             // Brief back-off before retry to avoid a tight loop on transient
             // Redis errors (e.g. network blip, restart).
             await new Promise<void>((resolve) => setTimeout(resolve, 500));
@@ -82,7 +82,7 @@ export function registerWebSocket(server: FastifyInstance, redis: Redis): void {
             // connected on a tick. Here we always have a client (we're inside
             // the connection handler), so we log at debug level to avoid
             // flooding logs on normal idle ticks.
-            server.log.debug("[ws/ticks] xread timeout — no messages this window");
+            server.log.debug('[ws/ticks] xread timeout — no messages this window');
             continue;
           }
 
@@ -123,7 +123,7 @@ export function registerWebSocket(server: FastifyInstance, redis: Redis): void {
           // them as errors.
           if (clientsNotified === 0) {
             server.log.warn(
-              "[ws/ticks] tick received but socket not ready (readyState %d) — message dropped",
+              '[ws/ticks] tick received but socket not ready (readyState %d) — message dropped',
               socket.readyState,
             );
           }
@@ -134,7 +134,7 @@ export function registerWebSocket(server: FastifyInstance, redis: Redis): void {
       // Errors that escape broadcastLoop (e.g. duplicate() fails) are caught
       // here and cause a clean socket close rather than an unhandled rejection.
       broadcastLoop().catch((err: unknown) => {
-        server.log.error({ err }, "[ws/ticks] broadcastLoop fatal error");
+        server.log.error({ err }, '[ws/ticks] broadcastLoop fatal error');
         if (socket.readyState === 1) socket.close();
       });
 
@@ -153,7 +153,7 @@ export function registerWebSocket(server: FastifyInstance, redis: Redis): void {
       //     a) the sub client is dedicated to this socket and not shared;
       //     b) we set active = false first, so the loop will not retry;
       //     c) any in-flight XREAD will throw, be caught, and exit via !active.
-      socket.on("close", () => {
+      socket.on('close', () => {
         active = false;
         sub.disconnect();
       });

@@ -24,20 +24,20 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { FixedClock } from '../../utils/clock.js';
 import {
   CLASSIFICATION_CUTOFF_IST,
+  type ClassifyDayOptions,
   EXPECTED_SNAPSHOTS_PER_DAY,
   GAP_FRACTION_THRESHOLD,
+  type IndexSample,
+  type SnapshotInput,
   TRENDING_CONSISTENCY_THRESHOLD,
   TRENDING_NET_MOVE_THRESHOLD,
   VOLATILE_ACCELERATION_THRESHOLD,
   VOLATILE_SIGN_CHANGE_THRESHOLD,
-  type ClassifyDayOptions,
-  type IndexSample,
-  type SnapshotInput,
   classifyDay,
 } from '../regime-tagging.js';
-import { FixedClock } from '../../utils/clock.js';
 
 // ---------------------------------------------------------------------------
 // Test-clock factory
@@ -108,7 +108,7 @@ function makeOptions(overrides: Partial<ClassifyDayOptions> = {}): ClassifyDayOp
 
 // UTC times for 2024-01-25 at key IST hours
 const T_0915 = '2024-01-25T03:45:00.000Z'; // 09:15 IST — market open
-const T_1000 = '2024-01-25T04:30:00.000Z'; // 10:00 IST
+const _T_1000 = '2024-01-25T04:30:00.000Z'; // 10:00 IST
 const T_1200 = '2024-01-25T06:30:00.000Z'; // 12:00 IST
 const T_1400 = '2024-01-25T08:30:00.000Z'; // 14:00 IST
 const T_1430 = '2024-01-25T09:00:00.000Z'; // 14:30 IST — exactly at cutoff
@@ -148,7 +148,8 @@ function makeVolatileSnapshots(n: number, startUtc: string): SnapshotInput[] {
     // Alternating large ROC — every step reverses direction
     roc: i % 2 === 0 ? 1.0 : -1.0,
     // High acceleration — rapid changes in ROC
-    roc_acceleration: i % 2 === 0 ? VOLATILE_ACCELERATION_THRESHOLD * 2 : -(VOLATILE_ACCELERATION_THRESHOLD * 2),
+    roc_acceleration:
+      i % 2 === 0 ? VOLATILE_ACCELERATION_THRESHOLD * 2 : -(VOLATILE_ACCELERATION_THRESHOLD * 2),
   }));
 }
 
@@ -177,10 +178,12 @@ function makeTrendingSnapshots(n: number, startUtc: string): SnapshotInput[] {
 
 describe('classifyDay — EVENT_DAY', () => {
   it('returns EVENT_DAY with confidence=1.0 when date is in event calendar', () => {
-    const result = classifyDay(makeOptions({
-      tradeDate: '2024-01-25',
-      eventCalendarDates: new Set(['2024-01-25']),
-    }));
+    const result = classifyDay(
+      makeOptions({
+        tradeDate: '2024-01-25',
+        eventCalendarDates: new Set(['2024-01-25']),
+      }),
+    );
 
     expect(result.regime).toBe('EVENT_DAY');
     expect(result.regimeConfidence).toBe(1.0);
@@ -188,10 +191,12 @@ describe('classifyDay — EVENT_DAY', () => {
   });
 
   it('does NOT return EVENT_DAY when date is NOT in event calendar', () => {
-    const result = classifyDay(makeOptions({
-      tradeDate: '2024-01-25',
-      eventCalendarDates: new Set(['2024-01-24']), // different date
-    }));
+    const result = classifyDay(
+      makeOptions({
+        tradeDate: '2024-01-25',
+        eventCalendarDates: new Set(['2024-01-24']), // different date
+      }),
+    );
 
     expect(result.regime).not.toBe('EVENT_DAY');
     expect(result.diagnostics.isEventDay).toBe(false);
@@ -217,7 +222,9 @@ describe('classifyDay — VOLATILE_REVERTING', () => {
     const snaps = makeVolatileSnapshots(minRequired, T_0915);
 
     const result = classifyDay(makeOptions({ snapshots: snaps }));
-    expect(result.diagnostics.meanAbsAcceleration).toBeGreaterThanOrEqual(VOLATILE_ACCELERATION_THRESHOLD);
+    expect(result.diagnostics.meanAbsAcceleration).toBeGreaterThanOrEqual(
+      VOLATILE_ACCELERATION_THRESHOLD,
+    );
   });
 
   it('diagnostics.rocSignChangeFraction exceeds threshold for VOLATILE_REVERTING day', () => {
@@ -225,7 +232,9 @@ describe('classifyDay — VOLATILE_REVERTING', () => {
     const snaps = makeVolatileSnapshots(minRequired, T_0915);
 
     const result = classifyDay(makeOptions({ snapshots: snaps }));
-    expect(result.diagnostics.rocSignChangeFraction).toBeGreaterThanOrEqual(VOLATILE_SIGN_CHANGE_THRESHOLD);
+    expect(result.diagnostics.rocSignChangeFraction).toBeGreaterThanOrEqual(
+      VOLATILE_SIGN_CHANGE_THRESHOLD,
+    );
   });
 });
 
@@ -242,10 +251,12 @@ describe('classifyDay — TRENDING_STRONG', () => {
       idx(T_1400, 21780), // afternoon — 1.0% down total
     ];
 
-    const result = classifyDay(makeOptions({
-      snapshots: snaps,
-      indexSamples: indexData,
-    }));
+    const result = classifyDay(
+      makeOptions({
+        snapshots: snaps,
+        indexSamples: indexData,
+      }),
+    );
 
     expect(result.regime).toBe('TRENDING_STRONG');
     expect(result.regimeConfidence).toBeGreaterThan(0);
@@ -254,14 +265,13 @@ describe('classifyDay — TRENDING_STRONG', () => {
   it('diagnostics.netIndexMoveFraction exceeds threshold for TRENDING day', () => {
     const minRequired = Math.ceil(EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD));
     const snaps = makeTrendingSnapshots(minRequired, T_0915);
-    const indexData = [
-      idx(T_0915, 22000),
-      idx(T_1400, 21780),
-    ];
+    const indexData = [idx(T_0915, 22000), idx(T_1400, 21780)];
 
     const result = classifyDay(makeOptions({ snapshots: snaps, indexSamples: indexData }));
     expect(result.diagnostics.netIndexMoveFraction).not.toBeNull();
-    expect(Math.abs(result.diagnostics.netIndexMoveFraction!)).toBeGreaterThanOrEqual(TRENDING_NET_MOVE_THRESHOLD);
+    expect(Math.abs(result.diagnostics.netIndexMoveFraction!)).toBeGreaterThanOrEqual(
+      TRENDING_NET_MOVE_THRESHOLD,
+    );
   });
 });
 
@@ -276,10 +286,12 @@ describe('classifyDay — RANGING', () => {
       idx(T_1400, 22005), // 0.023% move — well below TRENDING_NET_MOVE_THRESHOLD
     ];
 
-    const result = classifyDay(makeOptions({
-      snapshots: snaps,
-      indexSamples: indexData,
-    }));
+    const result = classifyDay(
+      makeOptions({
+        snapshots: snaps,
+        indexSamples: indexData,
+      }),
+    );
 
     expect(result.regime).toBe('RANGING');
     expect(result.regimeConfidence).toBeGreaterThan(0);
@@ -323,11 +335,13 @@ describe('LOOK-AHEAD AUDIT', () => {
     const dayDSnapshots = makeRangingSnapshots(minRequired, T_0915);
 
     // Run 1: only day D data
-    const run1 = classifyDay(makeOptions({
-      tradeDate: '2024-01-25',
-      snapshots: dayDSnapshots,
-      indexSamples: [idx(T_0915, 22000), idx(T_1400, 22005)],
-    }));
+    const run1 = classifyDay(
+      makeOptions({
+        tradeDate: '2024-01-25',
+        snapshots: dayDSnapshots,
+        indexSamples: [idx(T_0915, 22000), idx(T_1400, 22005)],
+      }),
+    );
 
     // Run 2: same day D data PLUS extreme next-day snapshots
     // Next-day snapshots have drastic values that would change the label if consumed.
@@ -339,17 +353,22 @@ describe('LOOK-AHEAD AUDIT', () => {
     }));
     const allSnapshots = [...dayDSnapshots, ...nextDaySnapshots];
 
-    const run2 = classifyDay(makeOptions({
-      tradeDate: '2024-01-25',
-      snapshots: allSnapshots,
-      indexSamples: [idx(T_0915, 22000), idx(T_1400, 22005)],
-    }));
+    const run2 = classifyDay(
+      makeOptions({
+        tradeDate: '2024-01-25',
+        snapshots: allSnapshots,
+        indexSamples: [idx(T_0915, 22000), idx(T_1400, 22005)],
+      }),
+    );
 
     // Day D's label must be identical regardless of next-day data presence
     expect(run2.regime).toBe(run1.regime);
     expect(run2.regimeConfidence).toBeCloseTo(run1.regimeConfidence, 4);
     expect(run2.diagnostics.snapshotCount).toBe(run1.diagnostics.snapshotCount);
-    expect(run2.diagnostics.meanAbsAcceleration).toBeCloseTo(run1.diagnostics.meanAbsAcceleration, 6);
+    expect(run2.diagnostics.meanAbsAcceleration).toBeCloseTo(
+      run1.diagnostics.meanAbsAcceleration,
+      6,
+    );
   });
 
   it('mutating future-day index samples does not change day D label', () => {
@@ -363,16 +382,19 @@ describe('LOOK-AHEAD AUDIT', () => {
     // Run 2: same day D data + extreme next-day index samples
     const nextDayIndex = [
       idx(T_NEXT_1000, 99999), // extreme price on next day
-      idx('2024-01-26T08:30:00.000Z', 1),     // another next-day sample
+      idx('2024-01-26T08:30:00.000Z', 1), // another next-day sample
     ];
-    const run2 = classifyDay(makeOptions({
-      snapshots: snaps,
-      indexSamples: [...dayDIndex, ...nextDayIndex],
-    }));
+    const run2 = classifyDay(
+      makeOptions({
+        snapshots: snaps,
+        indexSamples: [...dayDIndex, ...nextDayIndex],
+      }),
+    );
 
     expect(run2.regime).toBe(run1.regime);
     expect(run2.diagnostics.netIndexMoveFraction).toBeCloseTo(
-      run1.diagnostics.netIndexMoveFraction ?? 0, 6,
+      run1.diagnostics.netIndexMoveFraction ?? 0,
+      6,
     );
   });
 
@@ -394,9 +416,11 @@ describe('LOOK-AHEAD AUDIT', () => {
     const run1 = classifyDay(makeOptions({ snapshots: preCutoffSnaps }));
 
     // Run 2: pre-cutoff + post-cutoff (extreme values that would change label)
-    const run2 = classifyDay(makeOptions({
-      snapshots: [...preCutoffSnaps, ...postCutoffSnaps],
-    }));
+    const run2 = classifyDay(
+      makeOptions({
+        snapshots: [...preCutoffSnaps, ...postCutoffSnaps],
+      }),
+    );
 
     // Labels must match — post-cutoff snaps were excluded
     expect(run2.regime).toBe(run1.regime);
@@ -438,7 +462,9 @@ describe('DETERMINISM', () => {
       expect(repeat.regime).toBe(first.regime);
       expect(repeat.regimeConfidence).toBe(first.regimeConfidence);
       expect(repeat.diagnostics.meanAbsAcceleration).toBe(first.diagnostics.meanAbsAcceleration);
-      expect(repeat.diagnostics.rocSignChangeFraction).toBe(first.diagnostics.rocSignChangeFraction);
+      expect(repeat.diagnostics.rocSignChangeFraction).toBe(
+        first.diagnostics.rocSignChangeFraction,
+      );
       expect(repeat.diagnostics.snapshotCount).toBe(first.diagnostics.snapshotCount);
     }
   });
@@ -446,7 +472,10 @@ describe('DETERMINISM', () => {
   it('RANGING day produces identical results on 100 repeated calls', () => {
     const minRequired = Math.ceil(EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD));
     const snaps = makeRangingSnapshots(minRequired, T_0915);
-    const opts = makeOptions({ snapshots: snaps, indexSamples: [idx(T_0915, 22000), idx(T_1400, 22005)] });
+    const opts = makeOptions({
+      snapshots: snaps,
+      indexSamples: [idx(T_0915, 22000), idx(T_1400, 22005)],
+    });
 
     const first = classifyDay(opts);
     for (let i = 1; i < 100; i++) {
@@ -479,10 +508,12 @@ describe('EVENT_DAY PRECEDENCE', () => {
     expect(withoutEvent.regime).toBe('VOLATILE_REVERTING');
 
     // With event calendar: must be EVENT_DAY
-    const withEvent = classifyDay(makeOptions({
-      snapshots: volatileSnaps,
-      eventCalendarDates: new Set(['2024-01-25']),
-    }));
+    const withEvent = classifyDay(
+      makeOptions({
+        snapshots: volatileSnaps,
+        eventCalendarDates: new Set(['2024-01-25']),
+      }),
+    );
     expect(withEvent.regime).toBe('EVENT_DAY');
     expect(withEvent.regimeConfidence).toBe(1.0);
   });
@@ -493,15 +524,19 @@ describe('EVENT_DAY PRECEDENCE', () => {
     const indexData = [idx(T_0915, 22000), idx(T_1400, 21780)];
 
     // Without event calendar: should be TRENDING_STRONG
-    const withoutEvent = classifyDay(makeOptions({ snapshots: trendingSnaps, indexSamples: indexData }));
+    const withoutEvent = classifyDay(
+      makeOptions({ snapshots: trendingSnaps, indexSamples: indexData }),
+    );
     expect(withoutEvent.regime).toBe('TRENDING_STRONG');
 
     // With event calendar: must be EVENT_DAY
-    const withEvent = classifyDay(makeOptions({
-      snapshots: trendingSnaps,
-      indexSamples: indexData,
-      eventCalendarDates: new Set(['2024-01-25']),
-    }));
+    const withEvent = classifyDay(
+      makeOptions({
+        snapshots: trendingSnaps,
+        indexSamples: indexData,
+        eventCalendarDates: new Set(['2024-01-25']),
+      }),
+    );
     expect(withEvent.regime).toBe('EVENT_DAY');
   });
 
@@ -509,26 +544,32 @@ describe('EVENT_DAY PRECEDENCE', () => {
     const minRequired = Math.ceil(EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD));
     const rangingSnaps = makeRangingSnapshots(minRequired, T_0915);
 
-    const withEvent = classifyDay(makeOptions({
-      snapshots: rangingSnaps,
-      eventCalendarDates: new Set(['2024-01-25']),
-    }));
+    const withEvent = classifyDay(
+      makeOptions({
+        snapshots: rangingSnaps,
+        eventCalendarDates: new Set(['2024-01-25']),
+      }),
+    );
     expect(withEvent.regime).toBe('EVENT_DAY');
   });
 
   it('EVENT_DAY confidence is always exactly 1.0', () => {
     // Verify this holds regardless of snapshot state
-    const noCoverage = classifyDay(makeOptions({
-      snapshots: [],
-      eventCalendarDates: new Set(['2024-01-25']),
-    }));
+    const noCoverage = classifyDay(
+      makeOptions({
+        snapshots: [],
+        eventCalendarDates: new Set(['2024-01-25']),
+      }),
+    );
     expect(noCoverage.regimeConfidence).toBe(1.0);
 
     const minRequired = Math.ceil(EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD));
-    const withSnaps = classifyDay(makeOptions({
-      snapshots: makeVolatileSnapshots(minRequired, T_0915),
-      eventCalendarDates: new Set(['2024-01-25']),
-    }));
+    const withSnaps = classifyDay(
+      makeOptions({
+        snapshots: makeVolatileSnapshots(minRequired, T_0915),
+        eventCalendarDates: new Set(['2024-01-25']),
+      }),
+    );
     expect(withSnaps.regimeConfidence).toBe(1.0);
   });
 
@@ -541,16 +582,19 @@ describe('EVENT_DAY PRECEDENCE', () => {
       time: new Date(new Date(T_0915).getTime() + i * 15_000),
       // Alternating ROC (satisfies VOLATILE sign-change + acceleration)
       roc: i % 2 === 0 ? 1.0 : -1.0,
-      roc_acceleration: i % 2 === 0 ? VOLATILE_ACCELERATION_THRESHOLD * 3 : -(VOLATILE_ACCELERATION_THRESHOLD * 3),
+      roc_acceleration:
+        i % 2 === 0 ? VOLATILE_ACCELERATION_THRESHOLD * 3 : -(VOLATILE_ACCELERATION_THRESHOLD * 3),
     }));
 
     // Index data showing a clear trend to also trigger TRENDING_STRONG
     const indexData = [idx(T_0915, 22000), idx(T_1400, 21780)];
 
-    const result = classifyDay(makeOptions({
-      snapshots: mixedSnaps,
-      indexSamples: indexData,
-    }));
+    const result = classifyDay(
+      makeOptions({
+        snapshots: mixedSnaps,
+        indexSamples: indexData,
+      }),
+    );
 
     // VOLATILE_REVERTING must win
     expect(result.regime).toBe('VOLATILE_REVERTING');
@@ -567,10 +611,12 @@ describe('UNCLASSIFIED — degraded input', () => {
     // Even with full, high-quality data — gapped flag forces UNCLASSIFIED
     const goodSnaps = makeVolatileSnapshots(minRequired, T_0915);
 
-    const result = classifyDay(makeOptions({
-      snapshots: goodSnaps,
-      isBackfillGapped: true,
-    }));
+    const result = classifyDay(
+      makeOptions({
+        snapshots: goodSnaps,
+        isBackfillGapped: true,
+      }),
+    );
 
     expect(result.regime).toBe('UNCLASSIFIED');
     expect(result.diagnostics.isBackfillGapped).toBe(true);
@@ -578,7 +624,8 @@ describe('UNCLASSIFIED — degraded input', () => {
 
   it('returns UNCLASSIFIED when snapshot count is below minimum (sparse data gate)', () => {
     // Need fewer than (1 - GAP_FRACTION_THRESHOLD) * EXPECTED_SNAPSHOTS_PER_DAY
-    const insufficientCount = Math.floor(EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD)) - 1;
+    const insufficientCount =
+      Math.floor(EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD)) - 1;
     const sparseSnaps = makeRangingSnapshots(insufficientCount, T_0915);
 
     const result = classifyDay(makeOptions({ snapshots: sparseSnaps }));
@@ -596,7 +643,9 @@ describe('UNCLASSIFIED — degraded input', () => {
 
   it('UNCLASSIFIED regimeConfidence equals the data-completeness fraction', () => {
     // Half the required snapshots
-    const halfRequired = Math.floor(EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD) / 2);
+    const halfRequired = Math.floor(
+      (EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD)) / 2,
+    );
     const sparseSnaps = makeRangingSnapshots(halfRequired, T_0915);
 
     const result = classifyDay(makeOptions({ snapshots: sparseSnaps }));
@@ -612,11 +661,13 @@ describe('UNCLASSIFIED — degraded input', () => {
   it('isBackfillGapped=true with EVENT_DAY: EVENT_DAY still wins (calendar lookup is pre-gap-check)', () => {
     // EVENT_DAY is checked FIRST in the precedence chain, before the UNCLASSIFIED gate.
     // A gapped event day should still be EVENT_DAY.
-    const result = classifyDay(makeOptions({
-      snapshots: [],
-      eventCalendarDates: new Set(['2024-01-25']),
-      isBackfillGapped: true,
-    }));
+    const result = classifyDay(
+      makeOptions({
+        snapshots: [],
+        eventCalendarDates: new Set(['2024-01-25']),
+        isBackfillGapped: true,
+      }),
+    );
 
     expect(result.regime).toBe('EVENT_DAY');
     expect(result.regimeConfidence).toBe(1.0);
@@ -700,35 +751,45 @@ describe('Edge cases', () => {
     // Use extreme values to test the clamping
     const minRequired = Math.ceil(EXPECTED_SNAPSHOTS_PER_DAY * (1 - GAP_FRACTION_THRESHOLD));
 
-    const test1 = classifyDay(makeOptions({ snapshots: makeVolatileSnapshots(minRequired, T_0915) }));
+    const test1 = classifyDay(
+      makeOptions({ snapshots: makeVolatileSnapshots(minRequired, T_0915) }),
+    );
     expect(test1.regimeConfidence).toBeGreaterThanOrEqual(0);
     expect(test1.regimeConfidence).toBeLessThanOrEqual(1);
 
-    const test2 = classifyDay(makeOptions({ snapshots: makeRangingSnapshots(minRequired, T_0915) }));
+    const test2 = classifyDay(
+      makeOptions({ snapshots: makeRangingSnapshots(minRequired, T_0915) }),
+    );
     expect(test2.regimeConfidence).toBeGreaterThanOrEqual(0);
     expect(test2.regimeConfidence).toBeLessThanOrEqual(1);
   });
 
   it('returns correct tradeDate and symbol in result', () => {
-    const result = classifyDay(makeOptions({
-      tradeDate: '2024-03-15',
-      symbol: 'BANKNIFTY',
-    }));
+    const result = classifyDay(
+      makeOptions({
+        tradeDate: '2024-03-15',
+        symbol: 'BANKNIFTY',
+      }),
+    );
     expect(result.tradeDate).toBe('2024-03-15');
     expect(result.symbol).toBe('BANKNIFTY');
   });
 
   it('UNCLASSIFIED day has diagnostics.isBackfillGapped set correctly', () => {
-    const gappedResult = classifyDay(makeOptions({
-      snapshots: [],
-      isBackfillGapped: true,
-    }));
+    const gappedResult = classifyDay(
+      makeOptions({
+        snapshots: [],
+        isBackfillGapped: true,
+      }),
+    );
     expect(gappedResult.diagnostics.isBackfillGapped).toBe(true);
 
-    const sparseResult = classifyDay(makeOptions({
-      snapshots: [],
-      isBackfillGapped: false,
-    }));
+    const sparseResult = classifyDay(
+      makeOptions({
+        snapshots: [],
+        isBackfillGapped: false,
+      }),
+    );
     expect(sparseResult.diagnostics.isBackfillGapped).toBe(false);
   });
 });
@@ -754,15 +815,19 @@ describe('TRENDING_STRONG threshold boundary conditions', () => {
       roc_acceleration: 0.01,
     }));
 
-    const result = classifyDay(makeOptions({
-      snapshots: inconsistentSnaps,
-      indexSamples: indexData,
-    }));
+    const result = classifyDay(
+      makeOptions({
+        snapshots: inconsistentSnaps,
+        indexSamples: indexData,
+      }),
+    );
 
     // Consistency is 25% — below TRENDING_CONSISTENCY_THRESHOLD (0.55)
     // Should NOT be TRENDING_STRONG. But might be RANGING (low accel, low sign-change).
     // (Note: high sign-change rate could make it VOLATILE, but accel is low here)
     expect(result.regime).not.toBe('TRENDING_STRONG');
-    expect(result.diagnostics.trendConsistencyFraction).toBeLessThan(TRENDING_CONSISTENCY_THRESHOLD);
+    expect(result.diagnostics.trendConsistencyFraction).toBeLessThan(
+      TRENDING_CONSISTENCY_THRESHOLD,
+    );
   });
 });

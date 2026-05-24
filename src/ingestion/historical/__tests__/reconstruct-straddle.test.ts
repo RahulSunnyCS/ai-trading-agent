@@ -30,14 +30,14 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { computeAcceleration, computeRoc } from '../../straddle-math';
 import {
   MissingLegError,
-  type ReconstructedSnapshot,
   type ReconstructResult,
+  type ReconstructedSnapshot,
   reconstructStraddle,
 } from '../reconstruct-straddle';
 import type { ReconstructOptions } from '../reconstruct-straddle';
-import { computeAcceleration, computeRoc } from '../../straddle-math';
 
 // ---------------------------------------------------------------------------
 // Mock Pool helpers
@@ -234,7 +234,7 @@ describe('LOOK-AHEAD AUDIT', () => {
       ltps: typeof originalLtps,
       collector: ReconstructedSnapshot[],
     ): Promise<void> {
-      const capturingPool = makeMockPool(makeHandler(ltps)) as unknown as import('pg').Pool;
+      const _capturingPool = makeMockPool(makeHandler(ltps)) as unknown as import('pg').Pool;
       // We need to intercept the write call. Since persist=false, the reconstructor
       // does not call pool.query for INSERT. So we can capture via a wrapper that
       // intercepts the result object.
@@ -341,9 +341,7 @@ describe('LOOK-AHEAD AUDIT', () => {
     // Group bounds by which step they belong to (match by upper bound value)
     for (const { symbol: _s, upperBound } of queriedBounds) {
       // The upper bound must equal one of our step times — no future times permitted
-      const isOneOfOurSteps = stepTimes.some(
-        (st) => st.getTime() === upperBound.getTime(),
-      );
+      const isOneOfOurSteps = stepTimes.some((st) => st.getTime() === upperBound.getTime());
       expect(isOneOfOurSteps).toBe(true);
     }
   });
@@ -520,7 +518,7 @@ describe('RESOLUTION PROPAGATION', () => {
     }) as unknown as import('pg').Pool;
 
     const insertedResolutions: string[] = [];
-    const interceptingPool: MockPool = {
+    const _interceptingPool: MockPool = {
       query: async (sql: string, params: unknown[]) => {
         if (sql.includes('INSERT INTO straddle_snapshots')) {
           // resolution is NOT written to straddle_snapshots — it is on the snapshot object
@@ -536,8 +534,8 @@ describe('RESOLUTION PROPAGATION', () => {
     // reconstructor in dry-run mode and verify the resolution in the return
     // values. Since reconstructStraddle doesn't expose per-snapshot data in
     // its result, we verify via a write-intercepting pool.
-    const snapshots: ReconstructedSnapshot[] = [];
-    const capturePool: MockPool = {
+    const _snapshots: ReconstructedSnapshot[] = [];
+    const _capturePool: MockPool = {
       query: async (sql: string, params: unknown[]) => {
         if (sql.includes('INSERT INTO straddle_snapshots')) {
           // We can't directly capture the snapshot object from the INSERT params
@@ -593,7 +591,7 @@ describe('RESOLUTION PROPAGATION', () => {
     // is NOT stored in the DB (only in the ReconstructedSnapshot object), we
     // test via a slightly different approach: verify that the snapshot returned
     // has the right resolution by using a write-interception pool.
-    const resCapture: ReconstructedSnapshot[] = [];
+    const _resCapture: ReconstructedSnapshot[] = [];
     const fullPool: MockPool = {
       query: async (sql: string, params: unknown[]) => {
         if (sql.includes('INSERT INTO straddle_snapshots')) {
@@ -671,9 +669,7 @@ describe('HAPPY-PATH RECONSTRUCTION', () => {
 
         const symbol = params[0] as string;
         const upperBound = new Date(params[2] as string);
-        const stepIndex = Math.round(
-          (upperBound.getTime() - BASE_TIME.getTime()) / 15_000,
-        );
+        const stepIndex = Math.round((upperBound.getTime() - BASE_TIME.getTime()) / 15_000);
         const step = steps[stepIndex];
         if (!step) return { rows: [] };
 
@@ -729,9 +725,7 @@ describe('HAPPY-PATH RECONSTRUCTION', () => {
 
         const symbol = params[0] as string;
         const upperBound = new Date(params[2] as string);
-        const stepIndex = Math.round(
-          (upperBound.getTime() - BASE_TIME.getTime()) / 15_000,
-        );
+        const stepIndex = Math.round((upperBound.getTime() - BASE_TIME.getTime()) / 15_000);
         const pair = ltpPairs[stepIndex];
         if (!pair) return { rows: [] };
 
@@ -859,7 +853,7 @@ describe('DRY-RUN (persist=false)', () => {
     const insertCalls: string[] = [];
 
     const pool: MockPool = {
-      query: async (sql: string, params: unknown[]) => {
+      query: async (sql: string, _params: unknown[]) => {
         if (sql.includes('INSERT')) {
           insertCalls.push(sql);
           return { rows: [] };
@@ -910,4 +904,3 @@ describe('MISSING INDEX PRICE', () => {
     expect(result.gaps[0]?.missingSymbol).toBe('NSE:NIFTY50-INDEX');
   });
 });
-

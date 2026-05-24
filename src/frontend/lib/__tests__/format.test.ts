@@ -6,8 +6,8 @@
  * typically run in UTC; developer machines may be in any timezone).
  */
 
-import { describe, it, expect } from 'vitest';
-import { toNumberOrNull, formatPnl, formatIstDateTime, istToday } from '../format.js';
+import { describe, expect, it } from 'vitest';
+import { formatIstDateTime, formatPnl, istToday, toNumberOrNull } from '../format.js';
 
 // ---------------------------------------------------------------------------
 // toNumberOrNull
@@ -57,7 +57,7 @@ describe('toNumberOrNull', () => {
 
   it('returns null for the number NaN', () => {
     // NaN is a valid JS number type value but semantically absent — must return null
-    expect(toNumberOrNull(NaN)).toBeNull();
+    expect(toNumberOrNull(Number.NaN)).toBeNull();
   });
 });
 

@@ -10,43 +10,44 @@
  * table and returns a small HTML page that closes itself.
  */
 
-import { randomBytes } from "node:crypto";
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import { randomBytes } from 'node:crypto';
+import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import {
   buildAuthUrl,
   exchangeAuthCode,
   loadFyersOAuthConfig,
   loadStoredToken,
   saveToken,
-} from "../services/fyers-auth.js";
+} from '../services/fyers-auth.js';
 
 export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
-  server.get("/api/auth/fyers/login", async (_request, reply) => {
+  server.get('/api/auth/fyers/login', async (_request, reply) => {
     const cfg = loadFyersOAuthConfig();
     if (!cfg) {
-      return reply
-        .code(503)
-        .send({ error: "fyers_oauth_not_configured", message: "Set FYERS_APP_ID and FYERS_APP_SECRET in the server environment." });
+      return reply.code(503).send({
+        error: 'fyers_oauth_not_configured',
+        message: 'Set FYERS_APP_ID and FYERS_APP_SECRET in the server environment.',
+      });
     }
-    const state = randomBytes(16).toString("hex");
+    const state = randomBytes(16).toString('hex');
     return reply.send({ url: buildAuthUrl(cfg, state), state });
   });
 
-  server.get("/api/auth/fyers/callback", async (request, reply) => {
+  server.get('/api/auth/fyers/callback', async (request, reply) => {
     const cfg = loadFyersOAuthConfig();
     if (!cfg) {
-      return reply.code(503).send({ error: "fyers_oauth_not_configured" });
+      return reply.code(503).send({ error: 'fyers_oauth_not_configured' });
     }
     const query = request.query as Record<string, string | undefined>;
     const authCode = query.auth_code ?? query.code;
     if (!authCode) {
-      return reply.code(400).send({ error: "missing_auth_code", details: query });
+      return reply.code(400).send({ error: 'missing_auth_code', details: query });
     }
 
     try {
       const token = await exchangeAuthCode(cfg, authCode);
       await saveToken(server.db, token);
-      reply.header("Content-Type", "text/html; charset=utf-8");
+      reply.header('Content-Type', 'text/html; charset=utf-8');
       return reply.send(`<!doctype html>
 <html><body style="font-family:system-ui;background:#0f172a;color:#e2e8f0;padding:2rem">
 <h2>Fyers connected ✓</h2>
@@ -56,12 +57,12 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
 </body></html>`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      request.log.error({ err }, "[fyers-auth] token exchange failed");
-      return reply.code(502).send({ error: "token_exchange_failed", message });
+      request.log.error({ err }, '[fyers-auth] token exchange failed');
+      return reply.code(502).send({ error: 'token_exchange_failed', message });
     }
   });
 
-  server.get("/api/auth/fyers/status", async (_request, reply) => {
+  server.get('/api/auth/fyers/status', async (_request, reply) => {
     const cfg = loadFyersOAuthConfig();
     if (!cfg) {
       return reply.send({ configured: false, connected: false });

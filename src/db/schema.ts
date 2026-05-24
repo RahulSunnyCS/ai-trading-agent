@@ -102,12 +102,12 @@ export interface OptionTick {
 
 /** Valid values for BackfillRange.status */
 export type BackfillRangeStatus =
-  | 'pending'   // Queued but not yet started
-  | 'running'   // Currently executing (stale detection: check updated_at + timeout)
-  | 'partial'   // Interrupted (FyersAuthError); resume from checkpoint_ts
-  | 'complete'  // All candles written; NO calendar gaps detected
-  | 'gapped'    // All candles written but calendar gaps were found; see gaps_json
-  | 'error';    // Non-resumable failure
+  | 'pending' // Queued but not yet started
+  | 'running' // Currently executing (stale detection: check updated_at + timeout)
+  | 'partial' // Interrupted (FyersAuthError); resume from checkpoint_ts
+  | 'complete' // All candles written; NO calendar gaps detected
+  | 'gapped' // All candles written but calendar gaps were found; see gaps_json
+  | 'error'; // Non-resumable failure
 
 /**
  * One row in the backfill_ranges table.

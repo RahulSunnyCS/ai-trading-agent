@@ -13,9 +13,9 @@
  *  5. Cumulative series: ordering by exit_time ascending, null exclusions
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import type { PaperTrade } from '../../types/trading.js';
 import { computePnlSummary } from '../pnl.js';
-import { type PaperTrade } from '../../types/trading.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,7 +54,12 @@ const TODAY_IST = '2026-05-20';
 describe('computePnlSummary — closed-only filtering', () => {
   it('counts open trades in openCount but excludes them from P&L', () => {
     const trades: PaperTrade[] = [
-      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00', exit_time: '2026-05-20T10:00:00.000Z' }),
+      makeTrade({
+        id: 'c1',
+        status: 'closed',
+        net_pnl: '100.00',
+        exit_time: '2026-05-20T10:00:00.000Z',
+      }),
       makeTrade({ id: 'o1', status: 'open', net_pnl: '999.00', exit_time: null }),
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
@@ -129,8 +134,8 @@ describe('computePnlSummary — null net_pnl exclusion', () => {
     // 0/2 = 0.  But a null should not count as a loser either.
     // A winner is defined as net_pnl > 0 — null has no sign, so skip entirely.
     const trades: PaperTrade[] = [
-      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00' }),  // winner
-      makeTrade({ id: 'c2', status: 'closed', net_pnl: null }),       // skip
+      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00' }), // winner
+      makeTrade({ id: 'c2', status: 'closed', net_pnl: null }), // skip
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
     // 1 winner out of 2 closed trades = 0.5
@@ -141,7 +146,7 @@ describe('computePnlSummary — null net_pnl exclusion', () => {
     const trades: PaperTrade[] = [
       makeTrade({ id: 'c1', status: 'closed', net_pnl: '300.00' }),
       makeTrade({ id: 'c2', status: 'closed', net_pnl: '-100.00' }),
-      makeTrade({ id: 'c3', status: 'closed', net_pnl: null }),   // skipped
+      makeTrade({ id: 'c3', status: 'closed', net_pnl: null }), // skipped
       makeTrade({ id: 'c4', status: 'closed', net_pnl: '50.00' }),
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
@@ -188,10 +193,10 @@ describe('computePnlSummary — win rate', () => {
 
   it('computes a fractional win rate correctly', () => {
     const trades: PaperTrade[] = [
-      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00' }),  // win
-      makeTrade({ id: 'c2', status: 'closed', net_pnl: '-50.00' }),  // loss
-      makeTrade({ id: 'c3', status: 'closed', net_pnl: '25.00' }),   // win
-      makeTrade({ id: 'c4', status: 'closed', net_pnl: '-10.00' }),  // loss
+      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00' }), // win
+      makeTrade({ id: 'c2', status: 'closed', net_pnl: '-50.00' }), // loss
+      makeTrade({ id: 'c3', status: 'closed', net_pnl: '25.00' }), // win
+      makeTrade({ id: 'c4', status: 'closed', net_pnl: '-10.00' }), // loss
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
     // 2 wins / 4 closed = 0.5
@@ -343,65 +348,115 @@ describe('computePnlSummary — cumulative series', () => {
 
   it('returns a single-point series for one closed trade', () => {
     const trades: PaperTrade[] = [
-      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00', exit_time: '2026-05-20T09:15:00.000Z' }),
+      makeTrade({
+        id: 'c1',
+        status: 'closed',
+        net_pnl: '100.00',
+        exit_time: '2026-05-20T09:15:00.000Z',
+      }),
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
     expect(summary.cumulativeSeries).toHaveLength(1);
-    expect(summary.cumulativeSeries[0]!.value).toBe(100);
+    expect(summary.cumulativeSeries[0]?.value).toBe(100);
     // time should be the IST date string
-    expect(summary.cumulativeSeries[0]!.time).toBe('2026-05-20');
+    expect(summary.cumulativeSeries[0]?.time).toBe('2026-05-20');
   });
 
   it('orders the series by exit_time ascending (not insertion order)', () => {
     // Insert in reverse order to prove sorting is applied.
     const trades: PaperTrade[] = [
-      makeTrade({ id: 'c2', status: 'closed', net_pnl: '50.00', exit_time: '2026-05-20T11:00:00.000Z' }),
-      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00', exit_time: '2026-05-20T09:00:00.000Z' }),
+      makeTrade({
+        id: 'c2',
+        status: 'closed',
+        net_pnl: '50.00',
+        exit_time: '2026-05-20T11:00:00.000Z',
+      }),
+      makeTrade({
+        id: 'c1',
+        status: 'closed',
+        net_pnl: '100.00',
+        exit_time: '2026-05-20T09:00:00.000Z',
+      }),
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
     // c1 exits at 09:00, c2 at 11:00 — series must be c1 first.
     expect(summary.cumulativeSeries).toHaveLength(2);
     // First point: just c1's P&L = 100
-    expect(summary.cumulativeSeries[0]!.value).toBeCloseTo(100, 5);
+    expect(summary.cumulativeSeries[0]?.value).toBeCloseTo(100, 5);
     // Second point: c1 + c2 = 150
-    expect(summary.cumulativeSeries[1]!.value).toBeCloseTo(150, 5);
+    expect(summary.cumulativeSeries[1]?.value).toBeCloseTo(150, 5);
   });
 
   it('excludes trades with null net_pnl from the series', () => {
     const trades: PaperTrade[] = [
-      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00', exit_time: '2026-05-20T09:00:00.000Z' }),
-      makeTrade({ id: 'c2', status: 'closed', net_pnl: null,     exit_time: '2026-05-20T10:00:00.000Z' }),
-      makeTrade({ id: 'c3', status: 'closed', net_pnl: '50.00',  exit_time: '2026-05-20T11:00:00.000Z' }),
+      makeTrade({
+        id: 'c1',
+        status: 'closed',
+        net_pnl: '100.00',
+        exit_time: '2026-05-20T09:00:00.000Z',
+      }),
+      makeTrade({
+        id: 'c2',
+        status: 'closed',
+        net_pnl: null,
+        exit_time: '2026-05-20T10:00:00.000Z',
+      }),
+      makeTrade({
+        id: 'c3',
+        status: 'closed',
+        net_pnl: '50.00',
+        exit_time: '2026-05-20T11:00:00.000Z',
+      }),
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
     // c2 has null net_pnl — excluded from the series entirely (not plotted as 0).
     expect(summary.cumulativeSeries).toHaveLength(2);
-    expect(summary.cumulativeSeries[0]!.value).toBeCloseTo(100, 5);
-    expect(summary.cumulativeSeries[1]!.value).toBeCloseTo(150, 5);
+    expect(summary.cumulativeSeries[0]?.value).toBeCloseTo(100, 5);
+    expect(summary.cumulativeSeries[1]?.value).toBeCloseTo(150, 5);
   });
 
   it('excludes trades with null exit_time from the series', () => {
     // A closed trade with null exit_time is a data integrity anomaly; skip it.
     const trades: PaperTrade[] = [
-      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00', exit_time: '2026-05-20T09:00:00.000Z' }),
+      makeTrade({
+        id: 'c1',
+        status: 'closed',
+        net_pnl: '100.00',
+        exit_time: '2026-05-20T09:00:00.000Z',
+      }),
       makeTrade({ id: 'c2', status: 'closed', net_pnl: '200.00', exit_time: null }),
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
     expect(summary.cumulativeSeries).toHaveLength(1);
-    expect(summary.cumulativeSeries[0]!.value).toBeCloseTo(100, 5);
+    expect(summary.cumulativeSeries[0]?.value).toBeCloseTo(100, 5);
   });
 
   it('builds the running sum correctly across multiple trades', () => {
     const trades: PaperTrade[] = [
-      makeTrade({ id: 'c1', status: 'closed', net_pnl: '100.00', exit_time: '2026-05-18T09:00:00.000Z' }),
-      makeTrade({ id: 'c2', status: 'closed', net_pnl: '-40.00', exit_time: '2026-05-19T09:00:00.000Z' }),
-      makeTrade({ id: 'c3', status: 'closed', net_pnl: '60.00',  exit_time: '2026-05-20T09:00:00.000Z' }),
+      makeTrade({
+        id: 'c1',
+        status: 'closed',
+        net_pnl: '100.00',
+        exit_time: '2026-05-18T09:00:00.000Z',
+      }),
+      makeTrade({
+        id: 'c2',
+        status: 'closed',
+        net_pnl: '-40.00',
+        exit_time: '2026-05-19T09:00:00.000Z',
+      }),
+      makeTrade({
+        id: 'c3',
+        status: 'closed',
+        net_pnl: '60.00',
+        exit_time: '2026-05-20T09:00:00.000Z',
+      }),
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
     expect(summary.cumulativeSeries).toHaveLength(3);
-    expect(summary.cumulativeSeries[0]!.value).toBeCloseTo(100, 5);   // 100
-    expect(summary.cumulativeSeries[1]!.value).toBeCloseTo(60, 5);    // 100 - 40
-    expect(summary.cumulativeSeries[2]!.value).toBeCloseTo(120, 5);   // 100 - 40 + 60
+    expect(summary.cumulativeSeries[0]?.value).toBeCloseTo(100, 5); // 100
+    expect(summary.cumulativeSeries[1]?.value).toBeCloseTo(60, 5); // 100 - 40
+    expect(summary.cumulativeSeries[2]?.value).toBeCloseTo(120, 5); // 100 - 40 + 60
   });
 
   it('uses the IST date (not UTC date) for the series time field', () => {
@@ -418,6 +473,6 @@ describe('computePnlSummary — cumulative series', () => {
     const summary = computePnlSummary(trades, TODAY_IST);
     expect(summary.cumulativeSeries).toHaveLength(1);
     // Must be the IST date 2026-05-20, not the UTC date 2026-05-19.
-    expect(summary.cumulativeSeries[0]!.time).toBe('2026-05-20');
+    expect(summary.cumulativeSeries[0]?.time).toBe('2026-05-20');
   });
 });

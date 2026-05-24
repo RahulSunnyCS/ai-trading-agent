@@ -108,16 +108,13 @@ const FIXED_DATE = new Date('2024-01-25T06:30:00Z'); // Thursday noon IST
 
 function makeCalculator(redis: ReturnType<typeof makeInMemoryRedis>) {
   const clock = new FixedClock(FIXED_DATE);
-  return createStraddleCalculator(
-    redis as unknown as import('ioredis').Redis,
-    {
-      underlying: 'NIFTY',
-      snapshotIntervalMs: 15_000,
-      clock,
-      startId: '0',
-      noInterval: true,
-    },
-  );
+  return createStraddleCalculator(redis as unknown as import('ioredis').Redis, {
+    underlying: 'NIFTY',
+    snapshotIntervalMs: 15_000,
+    clock,
+    startId: '0',
+    noInterval: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +179,9 @@ describe('A. ticksConsumed — fast path (cursor already past target)', () => {
 
     // ticksConsumed(id1) must resolve immediately because lastId > id1.
     let resolved = false;
-    const barrier = calculator.ticksConsumed(id1).then(() => { resolved = true; });
+    const barrier = calculator.ticksConsumed(id1).then(() => {
+      resolved = true;
+    });
     for (let i = 0; i < 10; i++) await Promise.resolve();
 
     expect(resolved).toBe(true);
@@ -214,8 +213,12 @@ describe('B. ticksConsumed — slow path (poll loop not yet at target)', () => {
     await flushPollLoop();
 
     // Publish a tick AFTER start — the poll loop has not yet seen it.
-    const publishedId = await redis.xadd('market.ticks', '*', 'data',
-      makeTick('NSE:NIFTY50-INDEX', 22400));
+    const publishedId = await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      makeTick('NSE:NIFTY50-INDEX', 22400),
+    );
 
     // Install the barrier BEFORE the poll loop processes it.
     let barrierDone = false;
@@ -247,16 +250,25 @@ describe('B. ticksConsumed — slow path (poll loop not yet at target)', () => {
     await calculator.start();
     await flushPollLoop(); // flush empty iteration
 
-    const id1 = await redis.xadd('market.ticks', '*', 'data',
-      makeTick('NSE:NIFTY50-INDEX', 22400));
-    const id2 = await redis.xadd('market.ticks', '*', 'data',
-      makeTick('NSE:NIFTY2412522400CE', 150));
-    const id3 = await redis.xadd('market.ticks', '*', 'data',
-      makeTick('NSE:NIFTY2412522400PE', 145));
+    const id1 = await redis.xadd('market.ticks', '*', 'data', makeTick('NSE:NIFTY50-INDEX', 22400));
+    const id2 = await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      makeTick('NSE:NIFTY2412522400CE', 150),
+    );
+    const id3 = await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      makeTick('NSE:NIFTY2412522400PE', 145),
+    );
 
     // We target id3 — the barrier should resolve only after all 3 are consumed.
     let barrierDone = false;
-    const barrier = calculator.ticksConsumed(id3).then(() => { barrierDone = true; });
+    const barrier = calculator.ticksConsumed(id3).then(() => {
+      barrierDone = true;
+    });
 
     // Not yet consumed
     for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -275,7 +287,8 @@ describe('B. ticksConsumed — slow path (poll loop not yet at target)', () => {
     // All 3 prices are present, so snapshotStep should return a stream ID.
     expect(snap).not.toBeNull();
 
-    void id1; void id2; // silence unused-var lint
+    void id1;
+    void id2; // silence unused-var lint
   });
 });
 
@@ -305,9 +318,14 @@ describe('C. ticksConsumed — drain on stop (fix C4 regression)', () => {
 
     let barrierDone = false;
     let barrierError: unknown = null;
-    const barrier = calculator.ticksConsumed(neverPublishedId)
-      .then(() => { barrierDone = true; })
-      .catch((err: unknown) => { barrierError = err; });
+    const barrier = calculator
+      .ticksConsumed(neverPublishedId)
+      .then(() => {
+        barrierDone = true;
+      })
+      .catch((err: unknown) => {
+        barrierError = err;
+      });
 
     // Confirm barrier is not yet resolved
     for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -338,9 +356,15 @@ describe('C. ticksConsumed — drain on stop (fix C4 regression)', () => {
     const never3 = '66666666-0';
 
     const resolved: string[] = [];
-    const b1 = calculator.ticksConsumed(never1).then(() => { resolved.push('b1'); });
-    const b2 = calculator.ticksConsumed(never2).then(() => { resolved.push('b2'); });
-    const b3 = calculator.ticksConsumed(never3).then(() => { resolved.push('b3'); });
+    const b1 = calculator.ticksConsumed(never1).then(() => {
+      resolved.push('b1');
+    });
+    const b2 = calculator.ticksConsumed(never2).then(() => {
+      resolved.push('b2');
+    });
+    const b3 = calculator.ticksConsumed(never3).then(() => {
+      resolved.push('b3');
+    });
 
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(resolved).toHaveLength(0);
@@ -375,7 +399,9 @@ describe('C. ticksConsumed — drain on stop (fix C4 regression)', () => {
     // Fast path check: '' >= '0' is false; '0' >= '0' is true.
     // Actually after start() lastId = '0', so ticksConsumed('0') is fast path.
     let done = false;
-    await calculator.ticksConsumed('0').then(() => { done = true; });
+    await calculator.ticksConsumed('0').then(() => {
+      done = true;
+    });
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(done).toBe(true);
   });
@@ -401,10 +427,13 @@ describe('D. ticksConsumed — multiple barriers on different IDs', () => {
     await flushPollLoop();
 
     // Publish 2 ticks sequentially (to get 2 distinct IDs).
-    const id1 = await redis.xadd('market.ticks', '*', 'data',
-      makeTick('NSE:NIFTY50-INDEX', 22400));
-    const id2 = await redis.xadd('market.ticks', '*', 'data',
-      makeTick('NSE:NIFTY2412522400CE', 150));
+    const id1 = await redis.xadd('market.ticks', '*', 'data', makeTick('NSE:NIFTY50-INDEX', 22400));
+    const id2 = await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      makeTick('NSE:NIFTY2412522400CE', 150),
+    );
 
     const resolved1Order: number[] = [];
     const resolved2Order: number[] = [];
@@ -456,14 +485,24 @@ describe('E. ticksConsumed — multiple callers on the same target ID', () => {
     await calculator.start();
     await flushPollLoop();
 
-    const publishedId = await redis.xadd('market.ticks', '*', 'data',
-      makeTick('NSE:NIFTY50-INDEX', 22400));
+    const publishedId = await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      makeTick('NSE:NIFTY50-INDEX', 22400),
+    );
 
     // Three concurrent callers all waiting on the same ID.
     const resolved: number[] = [];
-    const b1 = calculator.ticksConsumed(publishedId).then(() => { resolved.push(1); });
-    const b2 = calculator.ticksConsumed(publishedId).then(() => { resolved.push(2); });
-    const b3 = calculator.ticksConsumed(publishedId).then(() => { resolved.push(3); });
+    const b1 = calculator.ticksConsumed(publishedId).then(() => {
+      resolved.push(1);
+    });
+    const b2 = calculator.ticksConsumed(publishedId).then(() => {
+      resolved.push(2);
+    });
+    const b3 = calculator.ticksConsumed(publishedId).then(() => {
+      resolved.push(3);
+    });
 
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(resolved).toHaveLength(0);
@@ -518,8 +557,12 @@ describe('F. Zero-padded stream ID — lexicographic = numeric ordering', () => 
     // Publish 10 ticks to advance counter past the 9→10 boundary.
     const ids: string[] = [];
     for (let i = 0; i < 10; i++) {
-      const id = await redis.xadd('market.ticks', '*', 'data',
-        makeTick('NSE:NIFTY50-INDEX', 22400 + i));
+      const id = await redis.xadd(
+        'market.ticks',
+        '*',
+        'data',
+        makeTick('NSE:NIFTY50-INDEX', 22400 + i),
+      );
       ids.push(id);
     }
 
@@ -528,7 +571,9 @@ describe('F. Zero-padded stream ID — lexicographic = numeric ordering', () => 
 
     // ticksConsumed for the 10th ID must work correctly.
     let resolved = false;
-    const barrier = calculator.ticksConsumed(ids[9]!).then(() => { resolved = true; });
+    const barrier = calculator.ticksConsumed(ids[9]!).then(() => {
+      resolved = true;
+    });
 
     for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(resolved).toBe(false);

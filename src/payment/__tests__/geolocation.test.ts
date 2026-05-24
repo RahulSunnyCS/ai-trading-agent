@@ -166,7 +166,6 @@ describe('getClientCountry()', () => {
     // process.env.X = undefined coerces to the string "undefined" in Node.js.
     // We must use delete to achieve genuine key absence, which triggers the ?? fallback.
     const original = process.env.GEOLOCATION_API_URL;
-    // biome-ignore lint/performance/noDelete: delete is required to make process.env.X genuinely absent
     delete process.env.GEOLOCATION_API_URL;
 
     try {

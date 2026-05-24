@@ -1,6 +1,6 @@
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import type { Pool } from "pg";
-import type { Clock } from "../../utils/clock.js";
+import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import type { Pool } from 'pg';
+import type { Clock } from '../../utils/clock.js';
 
 /**
  * Options injected when this plugin is registered.
@@ -17,38 +17,38 @@ export interface PaperTradesRoutesOptions {
 // NUMERIC columns come back as strings from the pg driver (see schema.ts rationale).
 // Nullable columns use the array form ["string", "null"] — standard JSON Schema.
 const PAPER_TRADE_ITEM_SCHEMA = {
-  type: "object",
+  type: 'object',
   properties: {
-    id: { type: "string" },
-    entry_time: { type: "string" },
-    exit_time: { type: ["string", "null"] },
-    entry_ce_strike: { type: ["string", "null"] },
-    entry_pe_strike: { type: ["string", "null"] },
-    entry_ce_price: { type: ["string", "null"] },
-    entry_pe_price: { type: ["string", "null"] },
-    exit_ce_price: { type: ["string", "null"] },
-    exit_pe_price: { type: ["string", "null"] },
-    lots: { type: "number" },
-    lot_size: { type: "number" },
-    straddle_at_entry: { type: "string" },
-    lowest_straddle_value_seen: { type: "string" },
-    vix_at_entry: { type: ["string", "null"] },
-    spot_at_entry: { type: ["string", "null"] },
-    exit_reason: { type: ["string", "null"] },
-    gross_pnl: { type: ["string", "null"] },
-    net_pnl: { type: ["string", "null"] },
-    max_drawdown: { type: ["string", "null"] },
-    status: { type: "string", enum: ["open", "closed"] },
-    notes: { type: ["string", "null"] },
+    id: { type: 'string' },
+    entry_time: { type: 'string' },
+    exit_time: { type: ['string', 'null'] },
+    entry_ce_strike: { type: ['string', 'null'] },
+    entry_pe_strike: { type: ['string', 'null'] },
+    entry_ce_price: { type: ['string', 'null'] },
+    entry_pe_price: { type: ['string', 'null'] },
+    exit_ce_price: { type: ['string', 'null'] },
+    exit_pe_price: { type: ['string', 'null'] },
+    lots: { type: 'number' },
+    lot_size: { type: 'number' },
+    straddle_at_entry: { type: 'string' },
+    lowest_straddle_value_seen: { type: 'string' },
+    vix_at_entry: { type: ['string', 'null'] },
+    spot_at_entry: { type: ['string', 'null'] },
+    exit_reason: { type: ['string', 'null'] },
+    gross_pnl: { type: ['string', 'null'] },
+    net_pnl: { type: ['string', 'null'] },
+    max_drawdown: { type: ['string', 'null'] },
+    status: { type: 'string', enum: ['open', 'closed'] },
+    notes: { type: ['string', 'null'] },
   },
   required: [
-    "id",
-    "entry_time",
-    "lots",
-    "lot_size",
-    "straddle_at_entry",
-    "lowest_straddle_value_seen",
-    "status",
+    'id',
+    'entry_time',
+    'lots',
+    'lot_size',
+    'straddle_at_entry',
+    'lowest_straddle_value_seen',
+    'status',
   ],
 } as const;
 
@@ -61,22 +61,22 @@ const PAPER_TRADE_ITEM_SCHEMA = {
 // date is YYYY-MM-DD — AJV enforces the format via the pattern property.
 // status defaults to 'all' when omitted.
 const QUERY_STRING_SCHEMA = {
-  type: "object",
+  type: 'object',
   properties: {
     date: {
-      type: "string",
+      type: 'string',
       // Strict date pattern prevents SQL injection through the date parameter.
       // Even though it is used in a parameterised query ($1), validating the
       // format at the HTTP layer gives a clear 400 with a useful error message
       // rather than a pg parse error with a confusing stack trace.
-      pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+      pattern: '^\\d{4}-\\d{2}-\\d{2}$',
     },
     status: {
-      type: "string",
-      enum: ["open", "closed", "all"],
+      type: 'string',
+      enum: ['open', 'closed', 'all'],
     },
     page: {
-      type: "integer",
+      type: 'integer',
       minimum: 1,
       default: 1,
     },
@@ -115,13 +115,13 @@ export const paperTradesRoutes: FastifyPluginAsync<PaperTradesRoutesOptions> = a
   // which is already validated by AJV, because parameterised queries are the
   // safe default (General Rule 4 equivalent for DB access).
   fastify.get(
-    "/paper-trades",
+    '/paper-trades',
     {
       schema: {
         querystring: QUERY_STRING_SCHEMA,
         response: {
           200: {
-            type: "array",
+            type: 'array',
             items: PAPER_TRADE_ITEM_SCHEMA,
           },
         },
@@ -137,7 +137,7 @@ export const paperTradesRoutes: FastifyPluginAsync<PaperTradesRoutesOptions> = a
 
       const date = query.date ?? opts.clock.today();
       // 'all' → no status filter; 'open'/'closed' → equality filter.
-      const status = query.status ?? "all";
+      const status = query.status ?? 'all';
       // page is 1-based; convert to 0-based offset for SQL.
       const page = (query.page ?? 1) as number;
       const pageSize = 100; // max rows per page — prevents hypertable full scans
@@ -151,8 +151,8 @@ export const paperTradesRoutes: FastifyPluginAsync<PaperTradesRoutesOptions> = a
       // building a string with interpolated user values — even though AJV validates
       // the status enum, keeping all WHERE values parameterised is the safe default.
       const params: (string | number)[] = [date];
-      let statusClause = "";
-      if (status !== "all") {
+      let statusClause = '';
+      if (status !== 'all') {
         params.push(status);
         statusClause = `AND status = $${params.length}`;
       }

@@ -27,17 +27,22 @@
  *   - All DB reads after runBackfill() are time-range bounded (hypertable discipline).
  */
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { Pool } from "pg";
+import type { Pool } from 'pg';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
-import { createTestDb, cleanTestDb } from "../../../test/integration/helpers.js";
-import { runBackfill, BackfillResumeError, resolveSymbolTable, reconcileCalendarGaps } from "../backfill.js";
+import { cleanTestDb, createTestDb } from '../../../test/integration/helpers.js';
 import {
+  type FetchFn,
   FyersAuthError,
   type FyersCandle,
   type FyersHistoricalResult,
-  type FetchFn,
-} from "../../brokers/fyers-historical.js";
+} from '../../brokers/fyers-historical.js';
+import {
+  BackfillResumeError,
+  reconcileCalendarGaps,
+  resolveSymbolTable,
+  runBackfill,
+} from '../backfill.js';
 
 // ---------------------------------------------------------------------------
 // Skip guard — skip the entire suite when DATABASE_URL is absent (no Docker)
@@ -91,13 +96,13 @@ function mockFetchFn(candles: FyersCandle[]): FetchFn {
     c.volume,
   ]);
 
-  const responseBody = JSON.stringify({ s: "ok", candles: rawCandles });
+  const responseBody = JSON.stringify({ s: 'ok', candles: rawCandles });
 
   return () =>
     Promise.resolve(
       new Response(responseBody, {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
       }),
     );
 }
@@ -109,7 +114,7 @@ const noopSleep = () => Promise.resolve();
 // Suite
 // ---------------------------------------------------------------------------
 
-describe.skipIf(SKIP)("backfill writer integration", () => {
+describe.skipIf(SKIP)('backfill writer integration', () => {
   let db: Pool;
 
   // ── Setup ──────────────────────────────────────────────────────────────────
@@ -139,35 +144,35 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
   // tests, we provide dummy env vars. The actual fetchFn mock never hits the
   // network, so the values don't matter.
   beforeAll(() => {
-    process.env.FYERS_ACCESS_TOKEN = "test-token-for-backfill-tests";
-    process.env.FYERS_APP_ID = "TEST12345678-100";
+    process.env.FYERS_ACCESS_TOKEN = 'test-token-for-backfill-tests';
+    process.env.FYERS_APP_ID = 'TEST12345678-100';
   });
 
   afterAll(() => {
     // Remove only if we set them — don't leak to other test files.
-    if (process.env.FYERS_ACCESS_TOKEN === "test-token-for-backfill-tests") {
+    if (process.env.FYERS_ACCESS_TOKEN === 'test-token-for-backfill-tests') {
       process.env.FYERS_ACCESS_TOKEN = undefined;
     }
-    if (process.env.FYERS_APP_ID === "TEST12345678-100") {
+    if (process.env.FYERS_APP_ID === 'TEST12345678-100') {
       process.env.FYERS_APP_ID = undefined;
     }
   });
 
   // ── Test 1: Idempotent re-run ───────────────────────────────────────────────
 
-  it("idempotent re-run writes zero duplicate rows", async () => {
+  it('idempotent re-run writes zero duplicate rows', async () => {
     // Two weekdays in the same week — no weekend gaps, so calendar reconciliation
     // should find no missing days and mark the range 'complete'.
     const candles = [
-      makeCandle("2024-01-02", 21800), // Tuesday
-      makeCandle("2024-01-03", 21900), // Wednesday
+      makeCandle('2024-01-02', 21800), // Tuesday
+      makeCandle('2024-01-03', 21900), // Wednesday
     ];
 
     const options = {
-      symbol: "NSE:NIFTY50-INDEX",
-      resolution: "D" as const,
-      from: new Date("2024-01-02T00:00:00.000Z"),
-      to: new Date("2024-01-03T00:00:00.000Z"),
+      symbol: 'NSE:NIFTY50-INDEX',
+      resolution: 'D' as const,
+      from: new Date('2024-01-02T00:00:00.000Z'),
+      to: new Date('2024-01-03T00:00:00.000Z'),
       fetchFn: mockFetchFn(candles),
       sleepFn: noopSleep,
     };
@@ -182,18 +187,14 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
          AND time >= $2
          AND time <= $3
          AND source = 'fyers-historical'`,
-      [
-        "NSE:NIFTY50-INDEX",
-        "2024-01-02T00:00:00.000Z",
-        "2024-01-04T00:00:00.000Z",
-      ],
+      ['NSE:NIFTY50-INDEX', '2024-01-02T00:00:00.000Z', '2024-01-04T00:00:00.000Z'],
     );
     const countAfterFirst = Number(rows1.rows[0]?.count ?? 0);
 
     // Status should be 'complete' for two consecutive weekdays.
     // (If the test DB contains NSE holidays on these dates, it may be 'gapped' —
     // but 2024-01-02 and 2024-01-03 are both normal NSE trading days.)
-    expect(["complete", "gapped"]).toContain(result1.status);
+    expect(['complete', 'gapped']).toContain(result1.status);
     expect(result1.rowsWritten).toBe(candles.length);
 
     // Second run — must write ZERO new rows (idempotency).
@@ -205,7 +206,7 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
     // rowsWritten in the second call should be 0 because status was 'complete'
     // or 'gapped' — the writer short-circuits immediately without a fetch.
     expect(result2.rowsWritten).toBe(0);
-    expect(["complete", "gapped"]).toContain(result2.status);
+    expect(['complete', 'gapped']).toContain(result2.status);
 
     // Total row count in the DB must not have changed.
     const rows2 = await db.query<{ count: string }>(
@@ -214,11 +215,7 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
          AND time >= $2
          AND time <= $3
          AND source = 'fyers-historical'`,
-      [
-        "NSE:NIFTY50-INDEX",
-        "2024-01-02T00:00:00.000Z",
-        "2024-01-04T00:00:00.000Z",
-      ],
+      ['NSE:NIFTY50-INDEX', '2024-01-02T00:00:00.000Z', '2024-01-04T00:00:00.000Z'],
     );
     const countAfterSecond = Number(rows2.rows[0]?.count ?? 0);
     expect(countAfterSecond).toBe(countAfterFirst);
@@ -226,7 +223,7 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
 
   // ── Test 2: Interrupted run resumes from checkpoint ────────────────────────
 
-  it("interrupted run resumes from checkpoint without re-writing completed data", async () => {
+  it('interrupted run resumes from checkpoint without re-writing completed data', async () => {
     // Simulate a fetch that succeeds for one candle, then fails with FyersAuthError.
     // We do this by providing a fetchFn that returns a response for the first chunk
     // but throws FyersAuthError on the second.
@@ -255,20 +252,20 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
     // Then on the resume run, the fetchFn returns the full candle set.
 
     const candles = [
-      makeCandle("2024-01-02", 21800),
-      makeCandle("2024-01-03", 21900),
-      makeCandle("2024-01-04", 22000), // Thursday
+      makeCandle('2024-01-02', 21800),
+      makeCandle('2024-01-03', 21900),
+      makeCandle('2024-01-04', 22000), // Thursday
     ];
 
-    const symbol = "NSE:NIFTY50-INDEX";
-    const resolution = "D" as const;
-    const from = new Date("2024-01-02T00:00:00.000Z");
-    const to = new Date("2024-01-04T00:00:00.000Z");
+    const symbol = 'NSE:NIFTY50-INDEX';
+    const resolution = 'D' as const;
+    const from = new Date('2024-01-02T00:00:00.000Z');
+    const to = new Date('2024-01-04T00:00:00.000Z');
 
     // First run: fetchFn returns 401 → fetchHistoricalCandles throws FyersAuthError
     // with lastSuccessfulCutoff = null (no candles fetched before failure).
     const authFailFetchFn: FetchFn = () =>
-      Promise.resolve(new Response("Unauthorized", { status: 401 }));
+      Promise.resolve(new Response('Unauthorized', { status: 401 }));
 
     const options1 = { symbol, resolution, from, to, fetchFn: authFailFetchFn, sleepFn: noopSleep };
 
@@ -284,14 +281,14 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
 
     // The BackfillResumeError must have been thrown.
     expect(resumeError).toBeDefined();
-    expect(resumeError!.rangeId).toBeGreaterThan(0);
+    expect(resumeError?.rangeId).toBeGreaterThan(0);
 
     // backfill_ranges must show status = 'partial'.
     const partialRow = await db.query<{ status: string; checkpoint_ts: Date | null }>(
-      `SELECT status, checkpoint_ts FROM backfill_ranges WHERE id = $1`,
-      [resumeError!.rangeId],
+      'SELECT status, checkpoint_ts FROM backfill_ranges WHERE id = $1',
+      [resumeError?.rangeId],
     );
-    expect(partialRow.rows[0]?.status).toBe("partial");
+    expect(partialRow.rows[0]?.status).toBe('partial');
     // lastSuccessfulCutoff was null (no candles fetched before the 401),
     // so checkpoint_ts must be null.
     expect(partialRow.rows[0]?.checkpoint_ts).toBeNull();
@@ -300,11 +297,18 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
     // The resume sees status='partial' with checkpoint_ts=null, so it restarts
     // from the original from date (not a mid-range cutoff). ON CONFLICT DO NOTHING
     // handles any overlap.
-    const options2 = { symbol, resolution, from, to, fetchFn: mockFetchFn(candles), sleepFn: noopSleep };
+    const options2 = {
+      symbol,
+      resolution,
+      from,
+      to,
+      fetchFn: mockFetchFn(candles),
+      sleepFn: noopSleep,
+    };
     const result2 = await runBackfill(db, options2);
 
     // After the resume, the range should be 'complete' or 'gapped' (not 'partial').
-    expect(["complete", "gapped"]).toContain(result2.status);
+    expect(['complete', 'gapped']).toContain(result2.status);
     expect(result2.rowsWritten).toBe(candles.length);
 
     // DB should now have all 3 candles (time-range bounded query).
@@ -314,34 +318,41 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
          AND time >= $2
          AND time <= $3
          AND source = 'fyers-historical'`,
-      [symbol, from.toISOString(), new Date("2024-01-05T00:00:00.000Z").toISOString()],
+      [symbol, from.toISOString(), new Date('2024-01-05T00:00:00.000Z').toISOString()],
     );
     expect(Number(rows.rows[0]?.count ?? 0)).toBe(candles.length);
 
     // Running again with the same options is now idempotent (status is complete/gapped).
-    const options3 = { symbol, resolution, from, to, fetchFn: mockFetchFn(candles), sleepFn: noopSleep };
+    const options3 = {
+      symbol,
+      resolution,
+      from,
+      to,
+      fetchFn: mockFetchFn(candles),
+      sleepFn: noopSleep,
+    };
     const result3 = await runBackfill(db, options3);
     expect(result3.rowsWritten).toBe(0); // short-circuit, no re-write
   });
 
   // ── Test 3: Calendar gap is recorded, not hidden ───────────────────────────
 
-  it("calendar gap is recorded in backfill_ranges and status is gapped not complete", async () => {
+  it('calendar gap is recorded in backfill_ranges and status is gapped not complete', async () => {
     // Provide candles for Monday and Wednesday only — Tuesday is missing.
     // The calendar reconciler should detect Tuesday (2024-01-02 is a Tuesday;
     // let us use a week where the gap is clear):
     //   Mon 2024-01-08, Tue 2024-01-09 (missing), Wed 2024-01-10
     // The reconciler generates expected days {Mon, Tue, Wed} and finds Tue missing.
     const candlesWithGap = [
-      makeCandle("2024-01-08", 21700), // Monday
+      makeCandle('2024-01-08', 21700), // Monday
       // 2024-01-09 Tuesday — intentionally missing (simulates a Fyers data gap)
-      makeCandle("2024-01-10", 21800), // Wednesday
+      makeCandle('2024-01-10', 21800), // Wednesday
     ];
 
-    const symbol = "NSE:NIFTY50-INDEX";
-    const resolution = "D" as const;
-    const from = new Date("2024-01-08T00:00:00.000Z");
-    const to = new Date("2024-01-10T00:00:00.000Z");
+    const symbol = 'NSE:NIFTY50-INDEX';
+    const resolution = 'D' as const;
+    const from = new Date('2024-01-08T00:00:00.000Z');
+    const to = new Date('2024-01-10T00:00:00.000Z');
 
     const options = {
       symbol,
@@ -355,13 +366,11 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
     const result = await runBackfill(db, options);
 
     // Status MUST be 'gapped' (not 'complete') because Tuesday is missing.
-    expect(result.status).toBe("gapped");
+    expect(result.status).toBe('gapped');
     expect(result.gaps.length).toBeGreaterThan(0);
 
     // The returned gaps must include an entry covering 2024-01-09 (Tuesday).
-    const tuesdayGap = result.gaps.find(
-      (g) => g.from.toISOString().startsWith("2024-01-09"),
-    );
+    const tuesdayGap = result.gaps.find((g) => g.from.toISOString().startsWith('2024-01-09'));
     expect(tuesdayGap).toBeDefined();
 
     // DB row must have gaps_detected > 0 and gaps_json populated.
@@ -369,21 +378,24 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
       status: string;
       gaps_detected: number;
       gaps_json: string | null;
-    }>(
-      `SELECT status, gaps_detected, gaps_json FROM backfill_ranges WHERE id = $1`,
-      [result.rangeId],
-    );
+    }>('SELECT status, gaps_detected, gaps_json FROM backfill_ranges WHERE id = $1', [
+      result.rangeId,
+    ]);
 
     const row = rangeRow.rows[0];
     expect(row).toBeDefined();
-    expect(row?.status).toBe("gapped");
+    expect(row?.status).toBe('gapped');
     expect(Number(row?.gaps_detected ?? 0)).toBeGreaterThan(0);
     expect(row?.gaps_json).not.toBeNull();
 
     // Verify gaps_json is valid JSON containing the Tuesday entry.
-    const parsedGaps = JSON.parse(row!.gaps_json!) as Array<{ from: string; to: string; reason: string }>;
+    const parsedGaps = JSON.parse(row?.gaps_json!) as Array<{
+      from: string;
+      to: string;
+      reason: string;
+    }>;
     expect(Array.isArray(parsedGaps)).toBe(true);
-    const tuesdayInJson = parsedGaps.some((g) => g.from.startsWith("2024-01-09"));
+    const tuesdayInJson = parsedGaps.some((g) => g.from.startsWith('2024-01-09'));
     expect(tuesdayInJson).toBe(true);
 
     // Two candle rows must still be written (the gap doesn't block writes).
@@ -393,7 +405,7 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
          AND time >= $2
          AND time <= $3
          AND source = 'fyers-historical'`,
-      [symbol, from.toISOString(), new Date("2024-01-11T00:00:00.000Z").toISOString()],
+      [symbol, from.toISOString(), new Date('2024-01-11T00:00:00.000Z').toISOString()],
     );
     expect(Number(rows.rows[0]?.count ?? 0)).toBe(candlesWithGap.length);
   });
@@ -405,125 +417,202 @@ describe.skipIf(SKIP)("backfill writer integration", () => {
 // These cover pure functions that don't need the database. They run in the
 // unit test project and do NOT require Docker services.
 
-describe("resolveSymbolTable (unit)", () => {
-  it("routes -INDEX symbols to market_ticks", () => {
-    expect(resolveSymbolTable("NSE:NIFTY50-INDEX")).toBe("market_ticks");
-    expect(resolveSymbolTable("NSE:NIFTYBANK-INDEX")).toBe("market_ticks");
-    expect(resolveSymbolTable("NSE:INDIAVIX-INDEX")).toBe("market_ticks");
+describe('resolveSymbolTable (unit)', () => {
+  it('routes -INDEX symbols to market_ticks', () => {
+    expect(resolveSymbolTable('NSE:NIFTY50-INDEX')).toBe('market_ticks');
+    expect(resolveSymbolTable('NSE:NIFTYBANK-INDEX')).toBe('market_ticks');
+    expect(resolveSymbolTable('NSE:INDIAVIX-INDEX')).toBe('market_ticks');
   });
 
-  it("routes CE/PE symbols to option_ticks", () => {
-    expect(resolveSymbolTable("NSE:NIFTY25MAY24000CE")).toBe("option_ticks");
-    expect(resolveSymbolTable("NSE:NIFTY25MAY24000PE")).toBe("option_ticks");
-    expect(resolveSymbolTable("NSE:BANKNIFTY25MAY47000CE")).toBe("option_ticks");
+  it('routes CE/PE symbols to option_ticks', () => {
+    expect(resolveSymbolTable('NSE:NIFTY25MAY24000CE')).toBe('option_ticks');
+    expect(resolveSymbolTable('NSE:NIFTY25MAY24000PE')).toBe('option_ticks');
+    expect(resolveSymbolTable('NSE:BANKNIFTY25MAY47000CE')).toBe('option_ticks');
   });
 
-  it("defaults unrecognised symbols to market_ticks", () => {
-    expect(resolveSymbolTable("UNKNOWN:SYMBOL")).toBe("market_ticks");
+  it('defaults unrecognised symbols to market_ticks', () => {
+    expect(resolveSymbolTable('UNKNOWN:SYMBOL')).toBe('market_ticks');
   });
 });
 
-describe("reconcileCalendarGaps (unit)", () => {
-  it("returns no gaps when all expected trading days are covered", () => {
+describe('reconcileCalendarGaps (unit)', () => {
+  it('returns no gaps when all expected trading days are covered', () => {
     // Mon–Fri covered → no gaps expected.
     const candles: FyersCandle[] = [
-      { timestamp: new Date("2024-01-08T04:30:00.000Z"), open: 100, high: 110, low: 90, close: 105, volume: 1000 },
-      { timestamp: new Date("2024-01-09T04:30:00.000Z"), open: 105, high: 115, low: 95, close: 110, volume: 1000 },
-      { timestamp: new Date("2024-01-10T04:30:00.000Z"), open: 110, high: 120, low: 100, close: 115, volume: 1000 },
+      {
+        timestamp: new Date('2024-01-08T04:30:00.000Z'),
+        open: 100,
+        high: 110,
+        low: 90,
+        close: 105,
+        volume: 1000,
+      },
+      {
+        timestamp: new Date('2024-01-09T04:30:00.000Z'),
+        open: 105,
+        high: 115,
+        low: 95,
+        close: 110,
+        volume: 1000,
+      },
+      {
+        timestamp: new Date('2024-01-10T04:30:00.000Z'),
+        open: 110,
+        high: 120,
+        low: 100,
+        close: 115,
+        volume: 1000,
+      },
     ];
 
     const gaps = reconcileCalendarGaps(
       candles,
       [],
-      new Date("2024-01-08T00:00:00.000Z"),
-      new Date("2024-01-10T00:00:00.000Z"),
-      "D",
+      new Date('2024-01-08T00:00:00.000Z'),
+      new Date('2024-01-10T00:00:00.000Z'),
+      'D',
     );
 
     expect(gaps.length).toBe(0);
   });
 
-  it("records missing trading days as gaps", () => {
+  it('records missing trading days as gaps', () => {
     // Mon and Wed present, Tue missing.
     const candles: FyersCandle[] = [
-      { timestamp: new Date("2024-01-08T04:30:00.000Z"), open: 100, high: 110, low: 90, close: 105, volume: 1000 },
-      { timestamp: new Date("2024-01-10T04:30:00.000Z"), open: 110, high: 120, low: 100, close: 115, volume: 1000 },
+      {
+        timestamp: new Date('2024-01-08T04:30:00.000Z'),
+        open: 100,
+        high: 110,
+        low: 90,
+        close: 105,
+        volume: 1000,
+      },
+      {
+        timestamp: new Date('2024-01-10T04:30:00.000Z'),
+        open: 110,
+        high: 120,
+        low: 100,
+        close: 115,
+        volume: 1000,
+      },
     ];
 
     const gaps = reconcileCalendarGaps(
       candles,
       [],
-      new Date("2024-01-08T00:00:00.000Z"),
-      new Date("2024-01-10T00:00:00.000Z"),
-      "D",
+      new Date('2024-01-08T00:00:00.000Z'),
+      new Date('2024-01-10T00:00:00.000Z'),
+      'D',
     );
 
     expect(gaps.length).toBe(1);
-    expect(gaps[0]!.from.toISOString().startsWith("2024-01-09")).toBe(true);
+    expect(gaps[0]?.from.toISOString().startsWith('2024-01-09')).toBe(true);
   });
 
-  it("skips weekend days when generating expected trading days", () => {
+  it('skips weekend days when generating expected trading days', () => {
     // Range spans Mon–Sun: only Mon–Fri are expected trading days.
     // Provide Mon–Fri candles → no gaps.
     const candles: FyersCandle[] = [
-      { timestamp: new Date("2024-01-08T04:30:00.000Z"), open: 100, high: 110, low: 90, close: 105, volume: 1000 },
-      { timestamp: new Date("2024-01-09T04:30:00.000Z"), open: 105, high: 115, low: 95, close: 110, volume: 1000 },
-      { timestamp: new Date("2024-01-10T04:30:00.000Z"), open: 110, high: 120, low: 100, close: 115, volume: 1000 },
-      { timestamp: new Date("2024-01-11T04:30:00.000Z"), open: 115, high: 125, low: 105, close: 120, volume: 1000 },
-      { timestamp: new Date("2024-01-12T04:30:00.000Z"), open: 120, high: 130, low: 110, close: 125, volume: 1000 },
+      {
+        timestamp: new Date('2024-01-08T04:30:00.000Z'),
+        open: 100,
+        high: 110,
+        low: 90,
+        close: 105,
+        volume: 1000,
+      },
+      {
+        timestamp: new Date('2024-01-09T04:30:00.000Z'),
+        open: 105,
+        high: 115,
+        low: 95,
+        close: 110,
+        volume: 1000,
+      },
+      {
+        timestamp: new Date('2024-01-10T04:30:00.000Z'),
+        open: 110,
+        high: 120,
+        low: 100,
+        close: 115,
+        volume: 1000,
+      },
+      {
+        timestamp: new Date('2024-01-11T04:30:00.000Z'),
+        open: 115,
+        high: 125,
+        low: 105,
+        close: 120,
+        volume: 1000,
+      },
+      {
+        timestamp: new Date('2024-01-12T04:30:00.000Z'),
+        open: 120,
+        high: 130,
+        low: 110,
+        close: 125,
+        volume: 1000,
+      },
     ];
 
     const gaps = reconcileCalendarGaps(
       candles,
       [],
-      new Date("2024-01-08T00:00:00.000Z"),
-      new Date("2024-01-14T00:00:00.000Z"), // ends Sunday
-      "D",
+      new Date('2024-01-08T00:00:00.000Z'),
+      new Date('2024-01-14T00:00:00.000Z'), // ends Sunday
+      'D',
     );
 
     // Sat and Sun are not in the expected set, so no gaps.
     expect(gaps.length).toBe(0);
   });
 
-  it("skips day-level reconciliation for weekly resolution", () => {
+  it('skips day-level reconciliation for weekly resolution', () => {
     // Weekly candles: only one candle for the entire week — no day-level gaps expected.
     const candles: FyersCandle[] = [
-      { timestamp: new Date("2024-01-08T04:30:00.000Z"), open: 100, high: 110, low: 90, close: 105, volume: 5000 },
+      {
+        timestamp: new Date('2024-01-08T04:30:00.000Z'),
+        open: 100,
+        high: 110,
+        low: 90,
+        close: 105,
+        volume: 5000,
+      },
     ];
 
     const gaps = reconcileCalendarGaps(
       candles,
       [],
-      new Date("2024-01-08T00:00:00.000Z"),
-      new Date("2024-01-12T00:00:00.000Z"),
-      "W",
+      new Date('2024-01-08T00:00:00.000Z'),
+      new Date('2024-01-12T00:00:00.000Z'),
+      'W',
     );
 
     // W resolution skips day-level reconciliation — expect 0 gaps.
     expect(gaps.length).toBe(0);
   });
 
-  it("merges Fyers-reported chunk gaps into the result", () => {
+  it('merges Fyers-reported chunk gaps into the result', () => {
     const fyersGaps = [
       {
-        from: new Date("2024-01-08T00:00:00.000Z"),
-        to: new Date("2024-01-08T00:00:00.000Z"),
-        reason: "No candles returned by Fyers for this date range.",
+        from: new Date('2024-01-08T00:00:00.000Z'),
+        to: new Date('2024-01-08T00:00:00.000Z'),
+        reason: 'No candles returned by Fyers for this date range.',
       },
     ];
 
     const gaps = reconcileCalendarGaps(
       [],
       fyersGaps,
-      new Date("2024-01-08T00:00:00.000Z"),
-      new Date("2024-01-08T00:00:00.000Z"),
-      "D",
+      new Date('2024-01-08T00:00:00.000Z'),
+      new Date('2024-01-08T00:00:00.000Z'),
+      'D',
     );
 
     // One day missing + one Fyers-reported gap = 2 gap entries
     // (the day-level reconciler also finds Mon 2024-01-08 missing).
     expect(gaps.length).toBeGreaterThan(0);
-    const fyersEntry = gaps.find((g) => g.reason.includes("Fyers API returned no candles"));
+    const fyersEntry = gaps.find((g) => g.reason.includes('Fyers API returned no candles'));
     expect(fyersEntry).toBeDefined();
   });
 });

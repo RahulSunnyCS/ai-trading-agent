@@ -25,24 +25,24 @@
  * Run with: bun run test:integration
  */
 
-import type { FastifyInstance } from "fastify";
-import type { Redis } from "ioredis";
-import type { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildServer } from "../../api/server.js";
-import { createBroker } from "../../ingestion/brokers/broker-factory.js";
-import { StraddleCalculator } from "../../ingestion/straddle-calc.js";
-import { VixFeed } from "../../ingestion/vix-feed.js";
+import type { FastifyInstance } from 'fastify';
+import type { Redis } from 'ioredis';
+import type { Pool } from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { buildServer } from '../../api/server.js';
+import { createBroker } from '../../ingestion/brokers/broker-factory.js';
+import { StraddleCalculator } from '../../ingestion/straddle-calc.js';
+import { VixFeed } from '../../ingestion/vix-feed.js';
 // We intentionally use the module-level redis singleton for stream consumption,
 // so all stream publish/consume goes through the same Redis connection.
-import { redis } from "../../redis/client.js";
-import { EntryEngine } from "../../trading/entry-engine.js";
-import { PaperTradeExecutor } from "../../trading/paper-trade-executor.js";
-import { PositionMonitor } from "../../trading/position-monitor.js";
-import { QuantiplyStub } from "../../trading/quantiply-stub.js";
-import { loadTriggerConfig } from "../../trading/trigger-engine.js";
-import { VirtualClock } from "../../utils/clock.js";
-import { cleanTestDb, createTestDb } from "./helpers.js";
+import { redis } from '../../redis/client.js';
+import { EntryEngine } from '../../trading/entry-engine.js';
+import { PaperTradeExecutor } from '../../trading/paper-trade-executor.js';
+import { PositionMonitor } from '../../trading/position-monitor.js';
+import { QuantiplyStub } from '../../trading/quantiply-stub.js';
+import { loadTriggerConfig } from '../../trading/trigger-engine.js';
+import { VirtualClock } from '../../utils/clock.js';
+import { cleanTestDb, createTestDb } from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,7 +67,7 @@ async function waitFor(check: () => Promise<boolean>, timeoutMs = 5000): Promise
 // ---------------------------------------------------------------------------
 
 // 09:14 IST on 2026-01-15 = 03:44 UTC on 2026-01-15
-const START_EPOCH_MS = new Date("2026-01-15T03:44:00.000Z").getTime();
+const START_EPOCH_MS = new Date('2026-01-15T03:44:00.000Z').getTime();
 
 let testDb: Pool;
 let clock: VirtualClock;
@@ -86,9 +86,9 @@ beforeAll(async () => {
   // ---- Environment ----
   // Set entry window wide enough that the test can trigger entries.
   // 09:00–15:30 IST covers the simulated times we use.
-  process.env.ENTRY_START_TIME = "09:00";
-  process.env.ENTRY_CUTOFF_TIME = "15:30";
-  process.env.SIMULATE = "true";
+  process.env.ENTRY_START_TIME = '09:00';
+  process.env.ENTRY_CUTOFF_TIME = '15:30';
+  process.env.SIMULATE = 'true';
 
   // ---- Database ----
   // createTestDb() runs migrations against the test database so the schema is current.
@@ -144,7 +144,7 @@ beforeAll(async () => {
 
   // Start server on a random port (port 0) so CI never has a port conflict.
   server = buildServer({ db: testDb, redis: redis as Redis, clock });
-  await server.listen({ port: 0, host: "127.0.0.1" });
+  await server.listen({ port: 0, host: '127.0.0.1' });
 }, 30_000); // 30s timeout for Docker service connections
 
 // ---------------------------------------------------------------------------
@@ -171,15 +171,15 @@ afterAll(async () => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("full pipeline smoke test", () => {
-  it("pipeline starts without error", () => {
+describe('full pipeline smoke test', () => {
+  it('pipeline starts without error', () => {
     // The Fastify server must be listening. server.server is the underlying
     // Node/Bun http.Server; its .listening property is true once listen() has
     // resolved. This is the fastest possible canary that the setup succeeded.
     expect(server.server.listening).toBe(true);
   });
 
-  it("straddle snapshot published after advancing clock to 09:17 IST", async () => {
+  it('straddle snapshot published after advancing clock to 09:17 IST', async () => {
     // Advance the clock by 3 minutes (180 000ms).
     // The straddle snapshot interval is 15 000ms, so this crosses 12 interval
     // boundaries and should trigger 12 snapshot publishes — at least one DB
@@ -189,18 +189,18 @@ describe("full pipeline smoke test", () => {
 
     await waitFor(async () => {
       const result = await testDb.query<{ count: string }>(
-        "SELECT COUNT(*) AS count FROM straddle_snapshots",
+        'SELECT COUNT(*) AS count FROM straddle_snapshots',
       );
       return Number(result.rows[0]?.count ?? 0) > 0;
     }, 5_000);
 
     const result = await testDb.query<{ count: string }>(
-      "SELECT COUNT(*) AS count FROM straddle_snapshots",
+      'SELECT COUNT(*) AS count FROM straddle_snapshots',
     );
     expect(Number(result.rows[0]?.count ?? 0)).toBeGreaterThan(0);
   });
 
-  it("entry signal produced and paper trade opened between 09:14 and 09:17 IST", async () => {
+  it('entry signal produced and paper trade opened between 09:14 and 09:17 IST', async () => {
     // The entry engine listens on the straddle.values stream and emits an
     // EntryIntent when all gates pass (time window, no open position, etc.).
     // The position monitor bridges EntryIntent → openTrade().
@@ -208,23 +208,23 @@ describe("full pipeline smoke test", () => {
     // one paper_trade row (either open or closed if the watchdog already ran).
     await waitFor(async () => {
       const result = await testDb.query<{ count: string }>(
-        "SELECT COUNT(*) AS count FROM paper_trades",
+        'SELECT COUNT(*) AS count FROM paper_trades',
       );
       return Number(result.rows[0]?.count ?? 0) > 0;
     }, 5_000);
 
     const result = await testDb.query<{ id: string; status: string }>(
-      "SELECT id, status FROM paper_trades LIMIT 1",
+      'SELECT id, status FROM paper_trades LIMIT 1',
     );
     expect(result.rows.length).toBeGreaterThan(0);
     // Status is 'open' or 'closed' — both are valid at this stage.
-    expect(["open", "closed"]).toContain(result.rows[0]?.status);
+    expect(['open', 'closed']).toContain(result.rows[0]?.status);
   });
 
-  it("EOD exit closes all open positions at 15:25 IST", async () => {
+  it('EOD exit closes all open positions at 15:25 IST', async () => {
     // 15:25 IST = 09:55 UTC on the same date.
     // The target epoch in ms:
-    const eodEpochMs = new Date("2026-01-15T09:55:00.000Z").getTime();
+    const eodEpochMs = new Date('2026-01-15T09:55:00.000Z').getTime();
     // How much to advance: eodEpochMs minus current clock position.
     // Current clock is at START_EPOCH_MS + 180_000 = 03:47 UTC.
     const currentMs = START_EPOCH_MS + 180_000;
@@ -272,7 +272,7 @@ describe("full pipeline smoke test", () => {
     }
   });
 
-  it("WebSocket broadcasts straddle ticks", async () => {
+  it('WebSocket broadcasts straddle ticks', async () => {
     // The straddle.values stream has data from previous tests (we advanced to 15:25).
     // Open a WebSocket connection and wait for at least one message.
     //
@@ -281,15 +281,15 @@ describe("full pipeline smoke test", () => {
     clock.advance(15_000); // one more straddle interval
 
     const address = server.server.address();
-    if (!address || typeof address === "string") {
-      throw new Error("Unexpected server address format");
+    if (!address || typeof address === 'string') {
+      throw new Error('Unexpected server address format');
     }
     const wsUrl = `ws://127.0.0.1:${address.port}/ws/ticks`;
 
     const message = await new Promise<string>((resolve, reject) => {
       // Bun's test environment provides a global WebSocket. Node.js environments
       // without it fall back to the 'ws' package via dynamic import.
-      if (typeof WebSocket !== "undefined") {
+      if (typeof WebSocket !== 'undefined') {
         const native = new WebSocket(wsUrl);
         native.onmessage = (event: MessageEvent) => {
           resolve(event.data as string);
@@ -303,7 +303,7 @@ describe("full pipeline smoke test", () => {
         // a global WebSocket (older Node.js versions, some CI runtimes).
         // @ts-expect-error — 'ws' has no @types/ws in this project; the Bun runtime
         // takes the branch above, so this fallback only runs in Node-only CI.
-        import("ws")
+        import('ws')
           .then((mod: unknown) => {
             // Resolve constructor from either ESM default export or CJS module object.
             const modObj = mod as Record<string, unknown>;
@@ -314,9 +314,9 @@ describe("full pipeline smoke test", () => {
               close(): void;
             };
             const wsClient = new WsCtor(wsUrl);
-            wsClient.on("message", (data: unknown) => {
+            wsClient.on('message', (data: unknown) => {
               const str =
-                typeof data === "string"
+                typeof data === 'string'
                   ? data
                   : Buffer.isBuffer(data)
                     ? data.toString()
@@ -324,7 +324,7 @@ describe("full pipeline smoke test", () => {
               resolve(str);
               wsClient.close();
             });
-            wsClient.on("error", (err: unknown) =>
+            wsClient.on('error', (err: unknown) =>
               reject(err instanceof Error ? err : new Error(String(err))),
             );
           })
@@ -335,7 +335,7 @@ describe("full pipeline smoke test", () => {
     // The WebSocket payload is JSON: { id: string; fields: Record<string, string> }
     // fields should contain straddleValue (the field name published by straddle-calc.ts).
     const parsed = JSON.parse(message) as { id: string; fields: Record<string, string> };
-    expect(parsed).toHaveProperty("fields");
-    expect(parsed.fields).toHaveProperty("straddleValue");
+    expect(parsed).toHaveProperty('fields');
+    expect(parsed.fields).toHaveProperty('straddleValue');
   });
 });

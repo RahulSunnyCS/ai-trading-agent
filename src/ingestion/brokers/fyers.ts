@@ -25,8 +25,8 @@
 // property wrapping the real exports, OR the exports may be directly at the top
 // level. We use a runtime coalesce so either layout works without TypeScript
 // fighting us on the type (which correctly has no .default — that's the point).
-import * as fyersMod from "fyers-api-v3";
-import type { FyersDataSocketFactory } from "fyers-api-v3";
+import * as fyersMod from 'fyers-api-v3';
+import type { FyersDataSocketFactory } from 'fyers-api-v3';
 
 // Safely extract fyersDataSocket regardless of whether Bun wraps it in .default.
 // The `as any` on fyersMod is required because TypeScript's type for fyersMod
@@ -37,11 +37,11 @@ const modAny = fyersMod as any;
 const fyersDataSocket: FyersDataSocketFactory = (modAny.default?.fyersDataSocket ??
   modAny.fyersDataSocket) as FyersDataSocketFactory;
 
-import { EventEmitter } from "node:events";
-import type { FyersDataSocketInstance, FyersSocketError, FyersTick } from "fyers-api-v3";
-import type { Clock } from "../../utils/clock.js";
-import type { BrokerFeed, BrokerTick } from "./types.js";
-import { DisconnectReason } from "./types.js";
+import { EventEmitter } from 'node:events';
+import type { FyersDataSocketInstance, FyersSocketError, FyersTick } from 'fyers-api-v3';
+import type { Clock } from '../../utils/clock.js';
+import type { BrokerFeed, BrokerTick } from './types.js';
+import { DisconnectReason } from './types.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ import { DisconnectReason } from "./types.js";
  * INDIAVIX-INDEX is the India VIX (used for probability weighting).
  * Both are read-only subscription symbols — no order placement involved.
  */
-const DEFAULT_SYMBOLS = ["NSE:NIFTY50-INDEX", "NSE:INDIAVIX-INDEX"] as const;
+const DEFAULT_SYMBOLS = ['NSE:NIFTY50-INDEX', 'NSE:INDIAVIX-INDEX'] as const;
 
 /**
  * Backoff configuration for transient reconnect retries.
@@ -117,11 +117,11 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
     super();
 
     // Validate inputs eagerly — fail fast on obvious misconfiguration.
-    if (!config.appId || config.appId.trim() === "") {
-      throw new Error("FyersBroker: appId is required");
+    if (!config.appId || config.appId.trim() === '') {
+      throw new Error('FyersBroker: appId is required');
     }
-    if (!config.accessToken || config.accessToken.trim() === "") {
-      throw new Error("FyersBroker: accessToken is required");
+    if (!config.accessToken || config.accessToken.trim() === '') {
+      throw new Error('FyersBroker: accessToken is required');
     }
 
     this._appId = config.appId;
@@ -181,7 +181,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
       this._reconnectTimer = null;
     }
 
-    this.emit("disconnect", DisconnectReason.MANUAL);
+    this.emit('disconnect', DisconnectReason.MANUAL);
   }
 
   // ─── EventEmitter overloads (BrokerFeed interface) ─────────────────────
@@ -196,10 +196,10 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
    * satisfy TypeScript's overload-compatibility check: each overload signature
    * must be assignable to the implementation signature.
    */
-  override on(event: "tick", handler: (tick: BrokerTick) => void): this;
-  override on(event: "error", handler: (err: Error) => void): this;
-  override on(event: "disconnect", handler: (reason: string) => void): this;
-  override on(event: "reconnecting", handler: (attempt: number) => void): this;
+  override on(event: 'tick', handler: (tick: BrokerTick) => void): this;
+  override on(event: 'error', handler: (err: Error) => void): this;
+  override on(event: 'disconnect', handler: (reason: string) => void): this;
+  override on(event: 'reconnecting', handler: (attempt: number) => void): this;
   override on(event: string, handler: (...args: unknown[]) => void): this;
   // biome-ignore lint/suspicious/noExplicitAny: EventEmitter base signature requires any[] — using unknown[] on overrides but impl must match base
   override on(event: string, handler: (...args: any[]) => void): this {
@@ -232,7 +232,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
     // also reconnect would cause duplicate subscriptions and unpredictable state.
     const socket = fyersDataSocket.getInstance(
       combinedToken,
-      "", // no SDK log files
+      '', // no SDK log files
       false, // SDK logging disabled
     );
 
@@ -242,10 +242,10 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
     this._socket = socket;
 
     // Wire up all event handlers before calling connect() so no events are missed.
-    socket.on("connect", () => this._handleConnect());
-    socket.on("message", (tick: FyersTick) => this._handleTick(tick));
-    socket.on("error", (err: FyersSocketError) => this._handleError(err));
-    socket.on("close", () => this._handleClose());
+    socket.on('connect', () => this._handleConnect());
+    socket.on('message', (tick: FyersTick) => this._handleTick(tick));
+    socket.on('error', (err: FyersSocketError) => this._handleError(err));
+    socket.on('close', () => this._handleClose());
 
     socket.connect();
   }
@@ -279,7 +279,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
    * attempt, so reconnects are transparent to callers).
    */
   private _handleConnect(): void {
-    console.log("[FyersBroker] Socket connected — subscribing to symbols");
+    console.log('[FyersBroker] Socket connected — subscribing to symbols');
 
     // Reset backoff on successful connection.
     this._backoffMs = INITIAL_BACKOFF_MS;
@@ -330,7 +330,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
       isIndex: this._isIndexSymbol(tick.symbol),
     };
 
-    this.emit("tick", brokerTick);
+    this.emit('tick', brokerTick);
   }
 
   /**
@@ -342,7 +342,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
    */
   private _handleError(err: FyersSocketError): void {
     const code = err.code;
-    const message = err.message ?? "unknown error";
+    const message = err.message ?? 'unknown error';
 
     if (code === 1) {
       // Auth failure — the token is expired or invalid. Retrying is pointless.
@@ -352,7 +352,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
       );
 
       this._teardownSocket();
-      this.emit("disconnect", DisconnectReason.AUTH_FAILURE);
+      this.emit('disconnect', DisconnectReason.AUTH_FAILURE);
       // Do not schedule a reconnect.
       return;
     }
@@ -360,7 +360,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
     // For all other error codes, treat as transient. Log and let the "close"
     // event trigger the reconnect (Fyers closes the socket after an error).
     console.warn(`[FyersBroker] Socket error (code=${code}): ${message} — will attempt reconnect`);
-    this.emit("error", new Error(`Fyers socket error code=${code}: ${message}`));
+    this.emit('error', new Error(`Fyers socket error code=${code}: ${message}`));
   }
 
   /**
@@ -380,9 +380,9 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
       return;
     }
 
-    console.warn("[FyersBroker] Socket closed unexpectedly — scheduling reconnect");
+    console.warn('[FyersBroker] Socket closed unexpectedly — scheduling reconnect');
     this._teardownSocket();
-    this.emit("disconnect", DisconnectReason.TRANSIENT);
+    this.emit('disconnect', DisconnectReason.TRANSIENT);
     this._scheduleReconnect();
   }
 
@@ -416,7 +416,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
         `(base backoff=${this._backoffMs}ms)`,
     );
 
-    this.emit("reconnecting", this._reconnectAttempt);
+    this.emit('reconnecting', this._reconnectAttempt);
 
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
@@ -450,14 +450,14 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
    */
   private _deriveUnderlying(symbol: string): string {
     // Strip the exchange prefix (e.g. 'NSE:' or 'BSE:').
-    const withoutExchange = symbol.includes(":") ? (symbol.split(":")[1] ?? symbol) : symbol;
+    const withoutExchange = symbol.includes(':') ? (symbol.split(':')[1] ?? symbol) : symbol;
 
     // For index symbols ending in '-INDEX', extract the meaningful part.
-    if (withoutExchange.endsWith("-INDEX")) {
-      const name = withoutExchange.replace("-INDEX", "");
+    if (withoutExchange.endsWith('-INDEX')) {
+      const name = withoutExchange.replace('-INDEX', '');
       // Map known index variants to their canonical underlying name.
-      if (name === "NIFTY50") return "NIFTY";
-      if (name === "INDIAVIX") return "INDIAVIX";
+      if (name === 'NIFTY50') return 'NIFTY';
+      if (name === 'INDIAVIX') return 'INDIAVIX';
       return name;
     }
 
@@ -471,6 +471,6 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
    * Returns true if the symbol is an index-spot or VIX tick (no option fields).
    */
   private _isIndexSymbol(symbol: string): boolean {
-    return symbol.includes("-INDEX");
+    return symbol.includes('-INDEX');
   }
 }

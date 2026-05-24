@@ -19,16 +19,16 @@
  * which wires up the payment routes alongside the existing trading API routes.
  */
 
-import { pool } from "./db/client.js";
-import { runMigrations } from "./db/migrate.js";
-import { createBrokerFeed } from "./ingestion/brokers/index.js";
-import { loadStoredToken } from "./server/services/fyers-auth.js";
-import { createStraddleCalculator } from "./ingestion/straddle-calc.js";
-import { createVixFeed } from "./ingestion/vix-feed.js";
-import { redis } from "./redis/client.js";
-import { startServer } from "./server/index.js";
-import { createPositionMonitor } from "./trading/position-monitor.js";
-import { RealClock, VirtualClock } from "./utils/clock.js";
+import { pool } from './db/client.js';
+import { runMigrations } from './db/migrate.js';
+import { createBrokerFeed } from './ingestion/brokers/index.js';
+import { createStraddleCalculator } from './ingestion/straddle-calc.js';
+import { createVixFeed } from './ingestion/vix-feed.js';
+import { redis } from './redis/client.js';
+import { startServer } from './server/index.js';
+import { loadStoredToken } from './server/services/fyers-auth.js';
+import { createPositionMonitor } from './trading/position-monitor.js';
+import { RealClock, VirtualClock } from './utils/clock.js';
 
 // ---------------------------------------------------------------------------
 // Simulation tick interval
@@ -38,7 +38,7 @@ import { RealClock, VirtualClock } from "./utils/clock.js";
 // Read at startup so operators can tune simulation speed via env var without
 // code changes. Default 1000 ms of virtual time per 1000 ms of real time (1:1).
 const SIM_TICK_INTERVAL_MS = (() => {
-  const parsed = Number.parseInt(process.env.SIM_TICK_INTERVAL_MS ?? "", 10);
+  const parsed = Number.parseInt(process.env.SIM_TICK_INTERVAL_MS ?? '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1_000;
 })();
 
@@ -53,16 +53,14 @@ async function main(): Promise<void> {
   await runMigrations();
 
   // Step 2: choose clock based on SIMULATE env var.
-  const simulate = process.env.SIMULATE?.toLowerCase().trim() === "true";
+  const simulate = process.env.SIMULATE?.toLowerCase().trim() === 'true';
 
-  const clock = simulate
-    ? new VirtualClock(new Date(Date.now()))
-    : new RealClock();
+  const clock = simulate ? new VirtualClock(new Date(Date.now())) : new RealClock();
 
   if (simulate) {
     console.log(`[index] Simulation mode active — advancing clock every ${SIM_TICK_INTERVAL_MS}ms`);
   } else {
-    console.log("[index] Live mode active — using real clock");
+    console.log('[index] Live mode active — using real clock');
   }
 
   // Step 3: instantiate all components.
@@ -70,7 +68,7 @@ async function main(): Promise<void> {
   // the dashboard OAuth flow writes tokens to broker_tokens. This lets the
   // operator "Login with Fyers" instead of pasting a daily token into .env.
   if (
-    (process.env.BROKER ?? "").toLowerCase().trim() === "fyers" &&
+    (process.env.BROKER ?? '').toLowerCase().trim() === 'fyers' &&
     !process.env.FYERS_ACCESS_TOKEN
   ) {
     try {
@@ -91,7 +89,7 @@ async function main(): Promise<void> {
         );
       }
     } catch (err) {
-      console.warn("[index] Failed to load Fyers token from DB:", err);
+      console.warn('[index] Failed to load Fyers token from DB:', err);
     }
   }
 
@@ -166,21 +164,21 @@ async function main(): Promise<void> {
     }
   }
 
-  process.on("SIGTERM", () => {
-    void shutdown("SIGTERM");
+  process.on('SIGTERM', () => {
+    void shutdown('SIGTERM');
   });
-  process.on("SIGINT", () => {
-    void shutdown("SIGINT");
-  });
-
-  process.on("unhandledRejection", (reason: unknown) => {
-    console.error("[index] Unhandled rejection:", reason);
-    void shutdown("unhandledRejection");
+  process.on('SIGINT', () => {
+    void shutdown('SIGINT');
   });
 
-  process.on("uncaughtException", (err: Error) => {
-    console.error("[index] Uncaught exception:", err);
-    void shutdown("uncaughtException");
+  process.on('unhandledRejection', (reason: unknown) => {
+    console.error('[index] Unhandled rejection:', reason);
+    void shutdown('unhandledRejection');
+  });
+
+  process.on('uncaughtException', (err: Error) => {
+    console.error('[index] Uncaught exception:', err);
+    void shutdown('uncaughtException');
   });
 }
 
@@ -189,6 +187,6 @@ async function main(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 main().catch((err) => {
-  console.error("[index] Fatal startup error:", err);
+  console.error('[index] Fatal startup error:', err);
   process.exit(1);
 });

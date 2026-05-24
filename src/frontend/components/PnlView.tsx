@@ -22,13 +22,13 @@
  *    visually distinguish "real zero-activity day" from "fetch failed").
  */
 
-import { useEffect, useMemo, useRef } from 'react';
 import { createChart } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
+import { useEffect, useMemo, useRef } from 'react';
 
 import { usePaperTrades } from '../hooks/usePaperTrades.js';
 import { formatPnl } from '../lib/format.js';
-import { computePnlSummary, type PnlSeriesPoint } from '../lib/pnl.js';
+import { type PnlSeriesPoint, computePnlSummary } from '../lib/pnl.js';
 
 // ---------------------------------------------------------------------------
 // Sub-components — state-specific renders
@@ -40,13 +40,10 @@ import { computePnlSummary, type PnlSeriesPoint } from '../lib/pnl.js';
  */
 function LoadingState() {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: role="status" live region for loading state; <output> would alter block layout.
     <div className="space-y-3 pt-4" role="status" aria-label="Loading P&L data">
-      {[...Array(4)].map((_, i) => (
-        <div
-          key={i}
-          className="h-10 animate-pulse rounded bg-gray-800"
-          aria-hidden="true"
-        />
+      {Array.from({ length: 4 }, (_, i) => `pnl-skeleton-${i}`).map((key) => (
+        <div key={key} className="h-10 animate-pulse rounded bg-gray-800" aria-hidden="true" />
       ))}
     </div>
   );
@@ -205,14 +202,14 @@ function CumulativeChart({ series }: CumulativeChartProps) {
       height: 200,
       layout: {
         background: { color: '#111827' }, // bg-gray-900 equivalent
-        textColor: '#9ca3af',             // text-gray-400 equivalent
+        textColor: '#9ca3af', // text-gray-400 equivalent
       },
       grid: {
-        vertLines: { color: '#1f2937' },  // gray-800 — subtle grid
+        vertLines: { color: '#1f2937' }, // gray-800 — subtle grid
         horzLines: { color: '#1f2937' },
       },
       rightPriceScale: {
-        borderColor: '#374151',           // gray-700
+        borderColor: '#374151', // gray-700
       },
       timeScale: {
         borderColor: '#374151',
@@ -224,7 +221,7 @@ function CumulativeChart({ series }: CumulativeChartProps) {
     // Add the line series. We colour it green for profit — the value label
     // makes the sign clear when the running total goes negative.
     const lineSeries = chart.addLineSeries({
-      color: '#4ade80',        // green-400 — visible on dark background
+      color: '#4ade80', // green-400 — visible on dark background
       lineWidth: 2,
       priceLineVisible: true,
       lastValueVisible: true,
@@ -360,16 +357,10 @@ export function PnlView() {
             />
 
             {/* Win rate as a percentage */}
-            <StatCard
-              label="Win Rate"
-              value={`${(summary.winRate * 100).toFixed(1)}%`}
-            />
+            <StatCard label="Win Rate" value={`${(summary.winRate * 100).toFixed(1)}%`} />
 
             {/* Closed count */}
-            <StatCard
-              label="Closed Trades"
-              value={String(summary.closedCount)}
-            />
+            <StatCard label="Closed Trades" value={String(summary.closedCount)} />
 
             {/* Open count — explicitly separate to avoid implying unrealized P&L.
                 We show this even when 0 so the grid is stable. */}

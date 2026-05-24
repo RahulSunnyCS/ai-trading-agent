@@ -249,9 +249,7 @@ export function getCurrentWeeklyExpiry(underlying: Underlying, referenceDate?: D
   // When a referenceDate is supplied, build a minimal Clock shim that satisfies
   // the full Clock interface.  now() returns epoch ms (our Clock convention);
   // today/toISTDate/toISTTime are unused by getCurrentExpiry but must be present.
-  const clock: Clock = referenceDate
-    ? new FixedReferenceClock(referenceDate)
-    : new RealClock();
+  const clock: Clock = referenceDate ? new FixedReferenceClock(referenceDate) : new RealClock();
   return getCurrentExpiry(underlying, clock);
 }
 
@@ -265,8 +263,12 @@ class FixedReferenceClock implements Clock {
   constructor(date: Date) {
     this._ms = date.getTime();
   }
-  now(): number { return this._ms; }
-  timestamp(): number { return this._ms; }
+  now(): number {
+    return this._ms;
+  }
+  timestamp(): number {
+    return this._ms;
+  }
   today(): string {
     // ISO date portion in IST — approximate via UTC+5:30 offset arithmetic
     const ist = new Date(this._ms + 5.5 * 60 * 60 * 1000);

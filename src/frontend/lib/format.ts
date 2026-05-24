@@ -26,7 +26,7 @@
  */
 export function toNumberOrNull(v: string | number | null | undefined): number | null {
   if (v === null || v === undefined || v === '') return null;
-  const n = typeof v === 'number' ? v : parseFloat(v);
+  const n = typeof v === 'number' ? v : Number.parseFloat(v);
   if (Number.isNaN(n)) return null;
   return n;
 }
@@ -94,10 +94,7 @@ const _dateParts = new Intl.DateTimeFormat('en-IN', {
  * Extract named Intl parts from a DateTimeFormat instance.
  * Returns an object keyed by `Intl.DateTimeFormatPartTypes`.
  */
-function extractParts(
-  formatter: Intl.DateTimeFormat,
-  date: Date,
-): Record<string, string> {
+function extractParts(formatter: Intl.DateTimeFormat, date: Date): Record<string, string> {
   const result: Record<string, string> = {};
   for (const part of formatter.formatToParts(date)) {
     if (part.type !== 'literal') {
@@ -149,8 +146,8 @@ export function istToday(now?: Date): string {
   const parts = extractParts(_dateParts, date);
   // en-IN formatToParts gives day/month/year; reassemble as YYYY-MM-DD.
   // The `year`, `month`, `day` keys are guaranteed by the options we passed.
-  const year = parts['year'] ?? '';
-  const month = parts['month'] ?? '';
-  const day = parts['day'] ?? '';
+  const year = parts.year ?? '';
+  const month = parts.month ?? '';
+  const day = parts.day ?? '';
   return `${year}-${month}-${day}`;
 }

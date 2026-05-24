@@ -1,5 +1,5 @@
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import type { Pool } from "pg";
+import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import type { Pool } from 'pg';
 
 /**
  * Options passed in when this plugin is registered.
@@ -18,38 +18,38 @@ export interface TradesRoutesOptions {
 // NUMERIC columns are serialised as strings (matches pg type-parser behaviour).
 // nullable fields use `type: ["string", "null"]` — standard JSON Schema syntax.
 const PAPER_TRADE_SCHEMA = {
-  type: "object",
+  type: 'object',
   properties: {
-    id: { type: "string" },
-    entry_time: { type: "string" },
-    exit_time: { type: ["string", "null"] },
-    entry_ce_strike: { type: ["string", "null"] },
-    entry_pe_strike: { type: ["string", "null"] },
-    entry_ce_price: { type: ["string", "null"] },
-    entry_pe_price: { type: ["string", "null"] },
-    exit_ce_price: { type: ["string", "null"] },
-    exit_pe_price: { type: ["string", "null"] },
-    lots: { type: "number" },
-    lot_size: { type: "number" },
-    straddle_at_entry: { type: "string" },
-    lowest_straddle_value_seen: { type: "string" },
-    vix_at_entry: { type: ["string", "null"] },
-    spot_at_entry: { type: ["string", "null"] },
-    exit_reason: { type: ["string", "null"] },
-    gross_pnl: { type: ["string", "null"] },
-    net_pnl: { type: ["string", "null"] },
-    max_drawdown: { type: ["string", "null"] },
-    status: { type: "string", enum: ["open", "closed"] },
-    notes: { type: ["string", "null"] },
+    id: { type: 'string' },
+    entry_time: { type: 'string' },
+    exit_time: { type: ['string', 'null'] },
+    entry_ce_strike: { type: ['string', 'null'] },
+    entry_pe_strike: { type: ['string', 'null'] },
+    entry_ce_price: { type: ['string', 'null'] },
+    entry_pe_price: { type: ['string', 'null'] },
+    exit_ce_price: { type: ['string', 'null'] },
+    exit_pe_price: { type: ['string', 'null'] },
+    lots: { type: 'number' },
+    lot_size: { type: 'number' },
+    straddle_at_entry: { type: 'string' },
+    lowest_straddle_value_seen: { type: 'string' },
+    vix_at_entry: { type: ['string', 'null'] },
+    spot_at_entry: { type: ['string', 'null'] },
+    exit_reason: { type: ['string', 'null'] },
+    gross_pnl: { type: ['string', 'null'] },
+    net_pnl: { type: ['string', 'null'] },
+    max_drawdown: { type: ['string', 'null'] },
+    status: { type: 'string', enum: ['open', 'closed'] },
+    notes: { type: ['string', 'null'] },
   },
   required: [
-    "id",
-    "entry_time",
-    "lots",
-    "lot_size",
-    "straddle_at_entry",
-    "lowest_straddle_value_seen",
-    "status",
+    'id',
+    'entry_time',
+    'lots',
+    'lot_size',
+    'straddle_at_entry',
+    'lowest_straddle_value_seen',
+    'status',
   ],
 } as const;
 
@@ -76,12 +76,12 @@ export const tradesRoutes: FastifyPluginAsync<TradesRoutesOptions> = async (
 ): Promise<void> => {
   // GET /api/trades — all currently open paper trades
   fastify.get(
-    "/api/trades",
+    '/api/trades',
     {
       schema: {
         response: {
           200: {
-            type: "array",
+            type: 'array',
             items: PAPER_TRADE_SCHEMA,
           },
         },
@@ -104,12 +104,12 @@ export const tradesRoutes: FastifyPluginAsync<TradesRoutesOptions> = async (
   // the query planner scans the most-recent chunks first and stops at LIMIT 100
   // without touching older partitions.
   fastify.get(
-    "/api/trades/history",
+    '/api/trades/history',
     {
       schema: {
         response: {
           200: {
-            type: "array",
+            type: 'array',
             items: PAPER_TRADE_SCHEMA,
           },
         },

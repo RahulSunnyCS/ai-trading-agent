@@ -60,8 +60,5 @@
     "vite": "^5.4.0",
     "vitest": "^2.0.0"
   },
-  "trustedDependencies": [
-    "esbuild",
-    "msgpackr-extract"
-  ]
+  "trustedDependencies": ["esbuild", "msgpackr-extract"]
 }

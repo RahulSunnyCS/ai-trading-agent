@@ -38,15 +38,19 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Redis } from 'ioredis';
-import { createTestRedis, cleanTestRedis } from '../../../test/integration/helpers.js';
+import { cleanTestRedis, createTestRedis } from '../../../test/integration/helpers.js';
+import type { PositionMonitor } from '../../../trading/position-monitor.js';
+import { VirtualClock } from '../../../utils/clock.js';
+import {
+  buildOptionSymbol,
+  getAtmStrike,
+  getCurrentExpiry,
+} from '../../brokers/instrument-registry.js';
+import type { BrokerTick } from '../../brokers/types.js';
 import { createStraddleCalculator } from '../../straddle-calc.js';
 import type { StraddleCalculator } from '../../straddle-calc.js';
-import { createReplayDriver } from '../replay-driver.js';
-import { VirtualClock } from '../../../utils/clock.js';
-import { buildOptionSymbol, getAtmStrike, getCurrentExpiry } from '../../brokers/instrument-registry.js';
 import type { HistoricalFeed } from '../historical-feed.js';
-import type { PositionMonitor } from '../../../trading/position-monitor.js';
-import type { BrokerTick } from '../../brokers/types.js';
+import { createReplayDriver } from '../replay-driver.js';
 
 // ---------------------------------------------------------------------------
 // Skip guard — skip the entire suite when REDIS_URL is absent (Docker down)
@@ -121,7 +125,9 @@ function buildMinimalFeed(clock: VirtualClock, tickCount = 1): HistoricalFeed {
     async connect(): Promise<void> {},
     subscribe(_symbols: string[]): void {},
     async disconnect(): Promise<void> {},
-    onTick(cb: (tick: BrokerTick) => void): void { callbacks.push(cb); },
+    onTick(cb: (tick: BrokerTick) => void): void {
+      callbacks.push(cb);
+    },
     onDisconnect(_cb: (reason: string) => void): void {},
 
     async load(): Promise<number> {
@@ -240,12 +246,17 @@ describe.skipIf(SKIP)('replay-driver real-Redis integration', () => {
     // will consume this tick and advance lastId past the target.
     // Then ticksConsumed(target) should resolve immediately (fast path).
 
-    const entryId = await redis.xadd('market.ticks', '*', 'data', JSON.stringify({
-      symbol: 'NSE:NIFTY50-INDEX',
-      ltp: NIFTY_SPOT,
-      timestamp: REPLAY_START_MS,
-      time: REPLAY_START_MS,
-    }));
+    const entryId = await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      JSON.stringify({
+        symbol: 'NSE:NIFTY50-INDEX',
+        ltp: NIFTY_SPOT,
+        timestamp: REPLAY_START_MS,
+        time: REPLAY_START_MS,
+      }),
+    );
 
     expect(typeof entryId).toBe('string');
     expect(entryId).not.toBeNull();
@@ -355,9 +366,14 @@ describe.skipIf(SKIP)('replay-driver real-Redis integration', () => {
       async connect(): Promise<void> {},
       subscribe(_symbols: string[]): void {},
       async disconnect(): Promise<void> {},
-      onTick(cb: (tick: BrokerTick) => void): void { callbacks.push(cb); },
+      onTick(cb: (tick: BrokerTick) => void): void {
+        callbacks.push(cb);
+      },
       onDisconnect(_cb: (reason: string) => void): void {},
-      async load(): Promise<number> { loaded = true; return ticks.length; },
+      async load(): Promise<number> {
+        loaded = true;
+        return ticks.length;
+      },
       emitUpTo(virtualNowMs: number): number {
         if (!loaded) throw new Error('[test feed] call load() before emitUpTo()');
         let emitted = 0;
@@ -370,7 +386,9 @@ describe.skipIf(SKIP)('replay-driver real-Redis integration', () => {
         }
         return emitted;
       },
-      done(): boolean { return loaded && emitIndex >= ticks.length; },
+      done(): boolean {
+        return loaded && emitIndex >= ticks.length;
+      },
     };
 
     const straddleCalc = createStraddleCalculator(redis, {
@@ -427,9 +445,24 @@ describe.skipIf(SKIP)('replay-driver real-Redis integration', () => {
 
     // Publish all three required ticks and capture the last ID.
     const ts = REPLAY_START_MS;
-    await redis.xadd('market.ticks', '*', 'data', JSON.stringify({ symbol: 'NSE:NIFTY50-INDEX', ltp: NIFTY_SPOT, timestamp: ts, time: ts }));
-    await redis.xadd('market.ticks', '*', 'data', JSON.stringify({ symbol: ceSymbol, ltp: CE_PRICE, timestamp: ts, time: ts }));
-    const lastId = await redis.xadd('market.ticks', '*', 'data', JSON.stringify({ symbol: peSymbol, ltp: PE_PRICE, timestamp: ts, time: ts }));
+    await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      JSON.stringify({ symbol: 'NSE:NIFTY50-INDEX', ltp: NIFTY_SPOT, timestamp: ts, time: ts }),
+    );
+    await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      JSON.stringify({ symbol: ceSymbol, ltp: CE_PRICE, timestamp: ts, time: ts }),
+    );
+    const lastId = await redis.xadd(
+      'market.ticks',
+      '*',
+      'data',
+      JSON.stringify({ symbol: peSymbol, ltp: PE_PRICE, timestamp: ts, time: ts }),
+    );
 
     expect(lastId).not.toBeNull();
 

@@ -18,7 +18,7 @@ import type { ReactNode } from 'react';
 
 import { usePaperTrades } from '../hooks/usePaperTrades.js';
 import { formatIstDateTime, formatPnl, toNumberOrNull } from '../lib/format.js';
-import { type PaperTrade } from '../types/trading.js';
+import type { PaperTrade } from '../types/trading.js';
 
 // ---------------------------------------------------------------------------
 // Sub-components / helpers
@@ -93,13 +93,10 @@ function StraddleCell({ raw }: { raw: string | null }) {
  */
 function LoadingState() {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: role="status" live region for loading state; <output> would alter block layout.
     <div className="space-y-2 pt-4" role="status" aria-label="Loading trades">
-      {[...Array(3)].map((_, i) => (
-        <div
-          key={i}
-          className="h-10 animate-pulse rounded bg-gray-800"
-          aria-hidden="true"
-        />
+      {Array.from({ length: 3 }, (_, i) => `trades-skeleton-${i}`).map((key) => (
+        <div key={key} className="h-10 animate-pulse rounded bg-gray-800" aria-hidden="true" />
       ))}
     </div>
   );

@@ -42,7 +42,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Pool } from 'pg';
-import { createTestDb, cleanTestDb } from '../../../test/integration/helpers.js';
+import { cleanTestDb, createTestDb } from '../../../test/integration/helpers.js';
 import { reconstructStraddle } from '../reconstruct-straddle.js';
 
 // ---------------------------------------------------------------------------
@@ -108,8 +108,12 @@ async function insertMarketTicks(db: Pool): Promise<void> {
             ($4, $5, $6, 'fyers-historical', '1')
      ON CONFLICT DO NOTHING`,
     [
-      STEP_T0.toISOString(), INDEX_SYMBOL, NIFTY_SPOT,
-      STEP_T1.toISOString(), INDEX_SYMBOL, NIFTY_SPOT + 10, // slightly different at T1
+      STEP_T0.toISOString(),
+      INDEX_SYMBOL,
+      NIFTY_SPOT,
+      STEP_T1.toISOString(),
+      INDEX_SYMBOL,
+      NIFTY_SPOT + 10, // slightly different at T1
     ],
   );
 }
@@ -128,10 +132,18 @@ async function insertOptionTicks(db: Pool): Promise<void> {
        ($10, $11, $12, 'fyers-historical', '1')
      ON CONFLICT DO NOTHING`,
     [
-      STEP_T0.toISOString(), CE_SYMBOL, CE_PRICE_T0,
-      STEP_T0.toISOString(), PE_SYMBOL, PE_PRICE_T0,
-      STEP_T1.toISOString(), CE_SYMBOL, CE_PRICE_T1,
-      STEP_T1.toISOString(), PE_SYMBOL, PE_PRICE_T1,
+      STEP_T0.toISOString(),
+      CE_SYMBOL,
+      CE_PRICE_T0,
+      STEP_T0.toISOString(),
+      PE_SYMBOL,
+      PE_PRICE_T0,
+      STEP_T1.toISOString(),
+      CE_SYMBOL,
+      CE_PRICE_T1,
+      STEP_T1.toISOString(),
+      PE_SYMBOL,
+      PE_PRICE_T1,
     ],
   );
 }
@@ -155,13 +167,15 @@ async function countSnapshotRows(db: Pool): Promise<number> {
 /**
  * Fetch all straddle_snapshots rows in the test range, ordered by time.
  */
-async function fetchSnapshotRows(db: Pool): Promise<Array<{
-  time: Date;
-  symbol: string;
-  resolution: string | null;
-  strike: number;
-  straddle_value: string;
-}>> {
+async function fetchSnapshotRows(db: Pool): Promise<
+  Array<{
+    time: Date;
+    symbol: string;
+    resolution: string | null;
+    strike: number;
+    straddle_value: string;
+  }>
+> {
   const result = await db.query<{
     time: Date;
     symbol: string;
@@ -206,9 +220,7 @@ describe.skipIf(SKIP)('reconstruct-straddle idempotency integration', () => {
     // Also truncate the input tables we write in setup.
     // market_ticks and option_ticks are covered by cleanTestDb (via CASCADE
     // on straddle_snapshots → same TRUNCATE statement). Confirm:
-    await db.query(
-      `TRUNCATE market_ticks, option_ticks, backfill_ranges RESTART IDENTITY CASCADE`,
-    );
+    await db.query('TRUNCATE market_ticks, option_ticks, backfill_ranges RESTART IDENTITY CASCADE');
   });
 
   // ── C1: No duplicate rows on re-run ────────────────────────────────────────
@@ -296,9 +308,15 @@ describe.skipIf(SKIP)('reconstruct-straddle idempotency integration', () => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `;
     const params = [
-      STEP_T0.toISOString(), 'NIFTY', EXPIRY_DATE, ATM_STRIKE,
-      CE_PRICE_T0, PE_PRICE_T0, CE_PRICE_T0 + PE_PRICE_T0,
-      null, '1',
+      STEP_T0.toISOString(),
+      'NIFTY',
+      EXPIRY_DATE,
+      ATM_STRIKE,
+      CE_PRICE_T0,
+      PE_PRICE_T0,
+      CE_PRICE_T0 + PE_PRICE_T0,
+      null,
+      '1',
     ];
 
     // First insert succeeds.
@@ -320,9 +338,15 @@ describe.skipIf(SKIP)('reconstruct-straddle idempotency integration', () => {
     // not over-constrain.
 
     const baseParams = (strike: number, cePrice: number, pePrice: number) => [
-      STEP_T0.toISOString(), 'NIFTY', EXPIRY_DATE, strike,
-      cePrice, pePrice, cePrice + pePrice,
-      null, '1',
+      STEP_T0.toISOString(),
+      'NIFTY',
+      EXPIRY_DATE,
+      strike,
+      cePrice,
+      pePrice,
+      cePrice + pePrice,
+      null,
+      '1',
     ];
 
     const insertSql = `
@@ -356,10 +380,16 @@ describe.skipIf(SKIP)('reconstruct-straddle idempotency integration', () => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     `;
     await db.query(liveSql, [
-      STEP_T0.toISOString(), 'NIFTY', EXPIRY_DATE, ATM_STRIKE,
+      STEP_T0.toISOString(),
+      'NIFTY',
+      EXPIRY_DATE,
+      ATM_STRIKE,
       // Use different prices to detect if reconstruction overwrote the live row.
-      999, 999, 1998,
-      null, null, // no resolution for a live snapshot (not historical)
+      999,
+      999,
+      1998,
+      null,
+      null, // no resolution for a live snapshot (not historical)
     ]);
 
     // Seed input tables for reconstruction.
@@ -391,7 +421,7 @@ describe.skipIf(SKIP)('reconstruct-straddle idempotency integration', () => {
     expect(rows).toHaveLength(1);
     // The live row's straddle_value (1998) must be preserved, not overwritten
     // by the reconstructed value (CE_PRICE_T0 + PE_PRICE_T0 = 300).
-    expect(parseFloat(rows[0]!.straddle_value)).toBeCloseTo(1998, 2);
+    expect(Number.parseFloat(rows[0]?.straddle_value ?? 'NaN')).toBeCloseTo(1998, 2);
   });
 
   // ── C1: Multiple reconstruction runs do not grow the table unboundedly ──────

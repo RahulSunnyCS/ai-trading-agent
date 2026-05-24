@@ -27,5 +27,17 @@
   },
   "files": {
     "ignore": ["node_modules", "dist", "coverage", "bun.lock", "*.sql"]
-  }
+  },
+  "overrides": [
+    {
+      "include": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts", "e2e/**"],
+      "linter": {
+        "rules": {
+          "style": { "noNonNullAssertion": "off" },
+          "suspicious": { "noImplicitAnyLet": "off" },
+          "performance": { "noDelete": "off" }
+        }
+      }
+    }
+  ]
 }

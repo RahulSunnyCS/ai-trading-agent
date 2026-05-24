@@ -1,4 +1,4 @@
-import Decimal from "decimal.js";
+import Decimal from 'decimal.js';
 
 /**
  * Calculate gross P&L for a SHORT straddle position.

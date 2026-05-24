@@ -25,16 +25,16 @@ export default defineConfig({
   // Each test sets up its own state via route interception, so parallel
   // file-level execution is safe.
   fullyParallel: true,
-  forbidOnly: !!process.env['CI'],
+  forbidOnly: !!process.env.CI,
 
   // No automatic retries — a flaky test should be fixed, not silently retried.
-  retries: process.env['CI'] ? 1 : 0,
+  retries: process.env.CI ? 1 : 0,
 
   reporter: 'list',
 
   use: {
     // The Vite dev server for the React SPA.
-    baseURL: process.env['BASE_URL'] ?? 'http://localhost:5173',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
 
     // Capture a trace on the first retry — useful for post-mortem debugging in
     // CI without recording on every passing run.

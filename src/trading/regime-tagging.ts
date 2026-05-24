@@ -362,7 +362,15 @@ function toISTDateString(utcDate: Date): string {
  * @returns The regime label and confidence for this day.
  */
 export function classifyDay(options: ClassifyDayOptions): DailyRegimeResult {
-  const { tradeDate, symbol, snapshots, indexSamples, eventCalendarDates, isBackfillGapped, clock: _clock } = options;
+  const {
+    tradeDate,
+    symbol,
+    snapshots,
+    indexSamples,
+    eventCalendarDates,
+    isBackfillGapped,
+    clock: _clock,
+  } = options;
 
   // ── Step 1: EVENT_DAY check (highest precedence) ─────────────────────────
   //
@@ -421,7 +429,7 @@ export function classifyDay(options: ClassifyDayOptions): DailyRegimeResult {
   // callers can prioritize re-backfilling the most-gapped days first.
   const actualSnapshotCount = filteredSnapshots.length;
   const dataCompleteness = Math.min(1.0, actualSnapshotCount / EXPECTED_SNAPSHOTS_PER_DAY);
-  const isDataSparse = dataCompleteness < (1 - GAP_FRACTION_THRESHOLD);
+  const isDataSparse = dataCompleteness < 1 - GAP_FRACTION_THRESHOLD;
 
   if (isBackfillGapped || isDataSparse) {
     return {
@@ -482,26 +490,35 @@ export function classifyDay(options: ClassifyDayOptions): DailyRegimeResult {
     regime = 'VOLATILE_REVERTING';
     // Confidence = fraction of windows that contributed to the volatile signal.
     // We weight by both acceleration and sign-change evidence.
-    const accelScore = Math.min(1.0, metrics.meanAbsAcceleration / (VOLATILE_ACCELERATION_THRESHOLD * 2));
+    const accelScore = Math.min(
+      1.0,
+      metrics.meanAbsAcceleration / (VOLATILE_ACCELERATION_THRESHOLD * 2),
+    );
     const signScore = Math.min(1.0, metrics.rocSignChangeFraction / VOLATILE_SIGN_CHANGE_THRESHOLD);
     regimeConfidence = (accelScore + signScore) / 2;
   } else if (isTrending) {
     regime = 'TRENDING_STRONG';
     // Confidence = how strongly the net move and consistency exceeded the thresholds.
-    const moveScore = metrics.netIndexMoveFraction !== null
-      ? Math.min(1.0, Math.abs(metrics.netIndexMoveFraction) / (TRENDING_NET_MOVE_THRESHOLD * 2))
-      : 0;
-    const consistencyScore = Math.min(1.0, metrics.trendConsistencyFraction / TRENDING_CONSISTENCY_THRESHOLD);
+    const moveScore =
+      metrics.netIndexMoveFraction !== null
+        ? Math.min(1.0, Math.abs(metrics.netIndexMoveFraction) / (TRENDING_NET_MOVE_THRESHOLD * 2))
+        : 0;
+    const consistencyScore = Math.min(
+      1.0,
+      metrics.trendConsistencyFraction / TRENDING_CONSISTENCY_THRESHOLD,
+    );
     regimeConfidence = (moveScore + consistencyScore) / 2;
   } else {
     // Default: RANGING — low directional move, low volatility.
     regime = 'RANGING';
     // Confidence for RANGING is the inverse of how close we came to the other thresholds.
     // A day far from all thresholds is a high-confidence RANGING day.
-    const accelMargin = 1 - Math.min(1.0, metrics.meanAbsAcceleration / VOLATILE_ACCELERATION_THRESHOLD);
-    const moveMargin = metrics.netIndexMoveFraction !== null
-      ? 1 - Math.min(1.0, Math.abs(metrics.netIndexMoveFraction) / TRENDING_NET_MOVE_THRESHOLD)
-      : 1.0;
+    const accelMargin =
+      1 - Math.min(1.0, metrics.meanAbsAcceleration / VOLATILE_ACCELERATION_THRESHOLD);
+    const moveMargin =
+      metrics.netIndexMoveFraction !== null
+        ? 1 - Math.min(1.0, Math.abs(metrics.netIndexMoveFraction) / TRENDING_NET_MOVE_THRESHOLD)
+        : 1.0;
     regimeConfidence = (accelMargin + moveMargin) / 2;
   }
 
@@ -555,9 +572,9 @@ function computeMetrics(
   // has a high range.
   let netIndexMoveFraction: number | null = null;
   if (indexSamples.length >= 2) {
-    const firstPrice = indexSamples[0]!.price;
-    const lastPrice = indexSamples[indexSamples.length - 1]!.price;
-    if (firstPrice > 0) {
+    const firstPrice = indexSamples[0]?.price;
+    const lastPrice = indexSamples[indexSamples.length - 1]?.price;
+    if (firstPrice !== undefined && lastPrice !== undefined && firstPrice > 0) {
       netIndexMoveFraction = (lastPrice - firstPrice) / firstPrice;
     }
   }
@@ -578,9 +595,7 @@ function computeMetrics(
   // up), straddle premium should be decreasing (ROC < 0) consistently —
   // straddle premium compresses in trending markets. If net move is negative,
   // straddle ROC should be positive (expansion due to downside move).
-  const rocValues = snapshots
-    .map((s) => s.roc)
-    .filter((r): r is number => r !== null);
+  const rocValues = snapshots.map((s) => s.roc).filter((r): r is number => r !== null);
 
   let trendConsistencyFraction = 0;
 
@@ -589,7 +604,7 @@ function computeMetrics(
     // If index moved up (net > 0) → straddle ROC expected < 0.
     // If index moved down (net < 0) → straddle ROC expected > 0.
     // At zero net move, consistency is not meaningful → fraction stays 0.
-    const expectedRocSign = netIndexMoveFraction > 0 ? -1 : (netIndexMoveFraction < 0 ? 1 : 0);
+    const expectedRocSign = netIndexMoveFraction > 0 ? -1 : netIndexMoveFraction < 0 ? 1 : 0;
     if (expectedRocSign !== 0) {
       const consistentCount = rocValues.filter((r) => Math.sign(r) === expectedRocSign).length;
       trendConsistencyFraction = consistentCount / rocValues.length;
@@ -627,10 +642,10 @@ function computeMetrics(
     let signChanges = 0;
     let comparablePairs = 0;
     for (let i = 1; i < rocValues.length; i++) {
-      const prev = rocValues[i - 1]!;
-      const curr = rocValues[i]!;
+      const prev = rocValues[i - 1];
+      const curr = rocValues[i];
       // Skip zero-valued ROC — no clear direction
-      if (prev === 0 || curr === 0) continue;
+      if (prev === undefined || curr === undefined || prev === 0 || curr === 0) continue;
       comparablePairs++;
       if (Math.sign(prev) !== Math.sign(curr)) {
         signChanges++;
@@ -676,9 +691,9 @@ export async function writeRegimeTag(pool: Pool, result: DailyRegimeResult): Pro
        regime_confidence  = EXCLUDED.regime_confidence,
        classified_at      = NOW()`,
     [
-      result.tradeDate,       // DATE — ISO string 'YYYY-MM-DD'
-      result.symbol,          // TEXT
-      result.regime,          // TEXT (CHECK constraint in DB)
+      result.tradeDate, // DATE — ISO string 'YYYY-MM-DD'
+      result.symbol, // TEXT
+      result.regime, // TEXT (CHECK constraint in DB)
       result.regimeConfidence.toFixed(4), // NUMERIC(5,4)
     ],
   );
@@ -774,8 +789,9 @@ export async function loadSnapshotsForDay(
     // NUMERIC columns come back as strings from pg; parseFloat is safe here
     // because we only use these values for threshold comparisons, not precise
     // financial arithmetic.
-    roc: row.roc !== null ? parseFloat(row.roc) : null,
-    roc_acceleration: row.roc_acceleration !== null ? parseFloat(row.roc_acceleration) : null,
+    roc: row.roc !== null ? Number.parseFloat(row.roc) : null,
+    roc_acceleration:
+      row.roc_acceleration !== null ? Number.parseFloat(row.roc_acceleration) : null,
   }));
 }
 
@@ -819,7 +835,7 @@ export async function loadIndexSamplesForDay(
 
   return result.rows.map((row) => ({
     time: row.bucket,
-    price: parseFloat(row.price),
+    price: Number.parseFloat(row.price),
   }));
 }
 
@@ -855,7 +871,7 @@ export async function isBackfillGappedForDay(
     [symbol, dayStart.toISOString(), dayEnd.toISOString()],
   );
 
-  const count = parseInt(result.rows[0]?.count ?? '0', 10);
+  const count = Number.parseInt(result.rows[0]?.count ?? '0', 10);
   return count > 0;
 }
 
