@@ -14,18 +14,36 @@
 
 ## Target Users
 
-This is a personal / small-team **research tool** for quant-oriented options traders who want data-driven evidence on Indian weekly index strategies (Nifty, BankNifty, Sensex) before going live. It is not a commercial product and has no external end-users.
+Originally a personal / small-team **research tool**; now a **commercial SaaS product** with India-only subscription billing (see `business.md` for billing details). Primary users are quant-oriented options traders who want data-driven evidence on Indian weekly index strategies (Nifty, BankNifty, Sensex). Access is gated by Razorpay UPI payment.
 
 ## Secondary Surfaces
 
-- Fastify REST API (port 3000) — signal management, personality CRUD, paper-trade queries, retrospection triggers, live dashboard data
+- Fastify REST API (port 3000) — signal management, personality CRUD, paper-trade queries, retrospection triggers, live dashboard data, payment/order endpoints
 - WebSocket endpoint (`/ws/ticks`) — live tick stream for the React frontend
+- Payment routes — `POST /payment/create-order`, `POST /payment/webhook`, `GET /payment/balance`; access-gate middleware for subscription + credit checks
 - Docker Compose — development infrastructure (TimescaleDB + Redis)
 - Simulation mode (`SIMULATE=true`) — fully self-contained, no broker credentials needed
 
 ## Implementation Phases
 
-- **Phase 1 (current):** Sprint 1 = data ingestion pipeline (DB, Redis, straddle calc, Fyers adapter, simulator); Sprint 2 = paper trading, personalities, retrospection skeleton
-- **Phase 2:** S/R signal detection engine, Levelhead personality, BankNifty/Sensex expansion
+- **Phase 1 (complete):**
+  - M0/M0.5: Bun scaffolding, Docker infra, DB/Redis clients, Vitest + CI, injectable Clock
+  - M1: Live/sim paper-trade loop, Fyers/Angel One/simulator brokers, straddle pipeline, trigger engine, Fastify API, React dashboard
+  - M2: Peak detection, probability scoring, 10-personality engine, 5-stage filter, Holder/Adjuster/Reducer management, portfolio risk rules, Personalities dashboard tab
+  - M3a: Fyers historical REST client, idempotent backfill, straddle reconstruction, deterministic replay harness, regime tagging (T-33)
+  - M7: Razorpay UPI payment system — order creation, HMAC webhook verification, credit consumption, geolocation, access-gate middleware, pricing page
+  - **M3 gaps remaining:** backtest runner (T-51) and per-regime statistical reporting (T-58) deferred
+  - **M4 gaps remaining:** BullMQ EOD job and full retrospection + evolution engine (T-34–T-38, T-40–T-42) not started
+- **Phase 2:** S/R signal detection engine, Levelhead personality, BankNifty/Sensex expansion, Bayesian optimisation
 - **Phase 3:** Strategies 2 & 3, genetic algorithms, microstructure-aware slippage
 - **Phase 4:** Reinforcement learning, live trading readiness assessment
+
+## Project File Maintenance
+
+Update the relevant `.claude/project/` file in the same commit as the code change that affects it. Specifically:
+
+- **`overview.md` (this file):** Update when a milestone or epic completes — revise the Implementation Phases section to mark it done and note any remaining gaps. Also update Target Users or Secondary Surfaces if the product surface changes.
+- **`business.md`:** Update when billing tiers, payment processors, compliance obligations, or Pipeline Scope notes change.
+- **`technical.md`:** Update when the tech stack, essential commands, repository structure, key patterns/conventions, or environment variables change.
+
+One fact lives in exactly one file. Never duplicate across the three files.
