@@ -9,7 +9,8 @@
 
 - [x] Phase 0 — Triage (risk_manifest.json written)
 - [x] Phase 1 — Planning + Red Team (3 sprints, 8.75/10) + QA Planner → **Gate 1 APPROVED**
-- [x] Phase 2 — Decomposition (6 contracts: T-43-A/B/C, T-44, T-45, T-46) — awaiting go-ahead for Phase 3
+- [x] Phase 2 — Decomposition (6 contracts: T-43-A/B/C, T-44, T-45, T-46)
+- [~] Phase 3 — Implementation (Wave 1: T-43-A + T-46 in progress)
 
 ## Gate 1 Decisions (locked)
 - **D1 — Bayesian optimizer:** Option B — guarded deterministic 1-D search (golden-section over [0.30,0.90]); full GP deferred to multi-param milestone.

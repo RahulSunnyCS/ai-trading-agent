@@ -9,3 +9,6 @@
 | Phase 1 | Planning + synthesis | orchestrator | opus | max | ~30k |
 | Phase 1 | QA Planner | qa-planner | sonnet | medium | ~43k |
 | Phase 1 | Translator (Plan Report) | translator | haiku | medium | ~12k |
+| Phase 2 | Decomposition (6 contracts) | orchestrator | opus | high | ~20k |
+| Phase 3 | T-43-A: schema & migrations | implementor | sonnet | high | ~14k |
+| Phase 3 | T-46: deterministic optimizer | implementor | sonnet | high | ~18k |
