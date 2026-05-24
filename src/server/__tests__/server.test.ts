@@ -39,6 +39,18 @@ vi.mock('pg', () => {
   return { Pool: MockPool };
 });
 
+// The T-41 server wiring imports the EOD job and retrospection routes, which
+// pull in db/client.ts (calls pg.types.setTypeParser at module load) and
+// bullmq (attempts Redis connection). Stub both modules so these server tests
+// remain focused on the original route set without infrastructure side-effects.
+vi.mock('../../jobs/eod-retrospection-job.js', () => ({
+  createEodRetrospectionQueue: vi.fn(() => ({ add: vi.fn(), close: vi.fn() })),
+  createEodRetrospectionWorker: vi.fn(() => ({ close: vi.fn() })),
+}));
+vi.mock('../../api/routes/retrospection.js', () => ({
+  retrospectionRoutes: async () => { /* noop plugin stub */ },
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

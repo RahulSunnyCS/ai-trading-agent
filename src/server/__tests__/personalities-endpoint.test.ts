@@ -34,6 +34,13 @@ vi.mock('pg', () => {
   }));
   return { Pool: MockPool };
 });
+vi.mock('../../jobs/eod-retrospection-job.js', () => ({
+  createEodRetrospectionQueue: vi.fn(() => ({ add: vi.fn(), close: vi.fn() })),
+  createEodRetrospectionWorker: vi.fn(() => ({ close: vi.fn() })),
+}));
+vi.mock('../../api/routes/retrospection.js', () => ({
+  retrospectionRoutes: async () => { /* noop plugin stub */ },
+}));
 
 // ---------------------------------------------------------------------------
 // Fixtures
