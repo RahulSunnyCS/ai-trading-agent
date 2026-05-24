@@ -19,6 +19,9 @@ Longer, code-grounded explainers for individual topics live in
 - [The Tick → Trade Pipeline](./tech/tick-to-trade-pipeline.md) — one market
   tick walked end to end through all four layers, from broker feed to paper
   trade.
+- [Pipeline Internals — A Detailed Reference](./tech/pipeline-internals.md) —
+  the deep companion to the walkthrough: per-component data structures,
+  algorithms, the concurrency/ACK model, and failure handling.
 
 ## Language & Runtime
 
