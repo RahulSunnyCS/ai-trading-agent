@@ -79,6 +79,36 @@ export interface PaperTrade {
 }
 
 // ---------------------------------------------------------------------------
+// Personalities (GET /api/personalities)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single personality row returned by GET /api/personalities.
+ *
+ * Field naming is snake_case, matching the raw PostgreSQL column names sent
+ * directly by the server (the personalities endpoint does NOT camelCase-map
+ * like the M2 plugin does — the live server returns the DB row as-is inside
+ * the { data } envelope).
+ *
+ * `params` is a JSONB column — pg returns it as an already-parsed object.
+ * `created_at` and `updated_at` are ISO-8601 strings after JSON serialisation.
+ */
+export interface Personality {
+  id: string;
+  name: string;
+  display_name: string;
+  group_type: string; // 'reference' | 'learning'
+  entry_type: string; // 'fixed_time' | 'momentum_exhaustion' | 'any_signal' | 'sr_anchored'
+  management_style: string; // 'hold' | 'roll' | 'cut_reenter'
+  is_frozen: boolean;
+  is_active: boolean;
+  phase: number;
+  params: Record<string, unknown>;
+  created_at: string; // ISO-8601 timestamp
+  updated_at: string; // ISO-8601 timestamp
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket tick messages
 // ---------------------------------------------------------------------------
 

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { BackfillView } from './components/BackfillView';
 import { LiveView } from './components/LiveView';
 import { PaymentTestModeBanner } from './components/PaymentTestModeBanner';
+import { PersonalitiesView } from './components/PersonalitiesView';
 import { PnlView } from './components/PnlView';
 import { PricingPage } from './components/PricingPage';
 import { RegimeView } from './components/RegimeView';
@@ -10,10 +11,19 @@ import { ReplayView } from './components/ReplayView';
 import { TradesView } from './components/TradesView';
 
 /**
- * The seven dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
+ * The eight dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
  * 'regime', 'backfill' and 'replay' are the Milestone-3 additions.
+ * 'personalities' is the Milestone-2 personalities engine surface.
  */
-type Tab = 'live' | 'pnl' | 'pricing' | 'trades' | 'regime' | 'backfill' | 'replay';
+type Tab =
+  | 'live'
+  | 'pnl'
+  | 'pricing'
+  | 'trades'
+  | 'personalities'
+  | 'regime'
+  | 'backfill'
+  | 'replay';
 
 /**
  * Returns a human-readable label for each tab.
@@ -25,6 +35,7 @@ function tabLabel(tab: Tab): string {
   if (tab === 'regime') return 'Regimes';
   if (tab === 'backfill') return 'Backfill';
   if (tab === 'replay') return 'Replay';
+  if (tab === 'personalities') return 'Personalities';
   // Capitalise first letter; remaining tabs are single words so slice(1) is safe.
   // 'pricing' → "Pricing", 'live' → "Live", 'trades' → "Trades"
   return tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -46,27 +57,37 @@ export function App() {
       </header>
 
       <nav className="flex gap-1 border-b border-gray-800 px-6">
-        {(['live', 'trades', 'pnl', 'pricing', 'regime', 'backfill', 'replay'] as Tab[]).map(
-          (tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-3 text-sm font-medium capitalize transition-colors ${
-                activeTab === tab
-                  ? 'border-b-2 border-blue-500 text-blue-400'
-                  : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              {tabLabel(tab)}
-            </button>
-          ),
-        )}
+        {(
+          [
+            'live',
+            'trades',
+            'personalities',
+            'pnl',
+            'pricing',
+            'regime',
+            'backfill',
+            'replay',
+          ] as Tab[]
+        ).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-3 text-sm font-medium capitalize transition-colors ${
+              activeTab === tab
+                ? 'border-b-2 border-blue-500 text-blue-400'
+                : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            {tabLabel(tab)}
+          </button>
+        ))}
       </nav>
 
       <main className="p-6">
         {activeTab === 'live' && <LiveView />}
         {activeTab === 'trades' && <TradesView />}
+        {activeTab === 'personalities' && <PersonalitiesView />}
         {activeTab === 'pnl' && <PnlView />}
         {activeTab === 'pricing' && <PricingPage />}
         {activeTab === 'regime' && <RegimeView />}

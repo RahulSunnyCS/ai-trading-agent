@@ -231,6 +231,54 @@ export async function buildServer(
     }
   });
 
+  // GET /api/personalities — personality configs from personality_configs table.
+  //
+  // Query params (optional):
+  //   include_inactive — when 'true', return all 10 personalities regardless of
+  //                      active state; otherwise return only is_active = TRUE rows.
+  //
+  // The route uses parameterised SQL only ($1 placeholder). `params` is a JSONB
+  // column — pg returns it already parsed as a JS object; no JSON.parse needed.
+  // On DB error (table missing, connection down) we return a graceful empty
+  // response so the dashboard renders the empty state instead of a 500.
+  server.get('/api/personalities', async (request, reply) => {
+    const query = request.query as Record<string, string | undefined>;
+    // Only activate the "all rows" path when include_inactive is explicitly
+    // the string 'true'. Any other value (absent, 'false') returns active-only.
+    const includeInactive = query.include_inactive === 'true';
+
+    try {
+      // We branch on includeInactive rather than building a dynamic WHERE clause
+      // so the SQL remains fully literal — no string interpolation at all.
+      let result: { rows: unknown[] };
+      if (includeInactive) {
+        result = await server.db.query(
+          `SELECT id, name, display_name, group_type, entry_type,
+                  management_style, is_frozen, is_active, phase, params,
+                  created_at, updated_at
+           FROM personality_configs
+           ORDER BY created_at ASC`,
+        );
+      } else {
+        result = await server.db.query(
+          `SELECT id, name, display_name, group_type, entry_type,
+                  management_style, is_frozen, is_active, phase, params,
+                  created_at, updated_at
+           FROM personality_configs
+           WHERE is_active = $1
+           ORDER BY created_at ASC`,
+          [true],
+        );
+      }
+
+      return reply.send({ data: result.rows });
+    } catch {
+      // Table does not exist yet or DB is unavailable — return graceful empty
+      // response so the frontend renders the empty state, not a 500.
+      return reply.send({ data: [], message: 'no personalities yet' });
+    }
+  });
+
   // GET /api/backfill — backfill job ranges from backfill_ranges table.
   //
   // Query params (optional):
