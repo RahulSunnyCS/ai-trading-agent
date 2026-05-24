@@ -249,6 +249,10 @@ async function main(): Promise<void> {
     snapshotIntervalMs: SNAPSHOT_INTERVAL_MS,
     clock,
     startId: '0', // REPLAY: never '$'
+    // REPLAY: no wall-clock setInterval — snapshotStep() drives cadence. Without
+    // this, start() would fire extra wall-clock snapshots for any replay longer
+    // than one interval (~15s), breaking the deterministic replay guarantee.
+    noInterval: true,
   });
 
   // PositionMonitor in replay mode:
@@ -281,16 +285,11 @@ async function main(): Promise<void> {
   await straddleCalc.start();
   await positionMonitor.start();
 
-  // Wire the feed's onTick to publish to market.ticks (same as live pipeline).
-  // In the replay driver, tick emission is controlled by emitUpTo() not onTick.
-  // We wire onTick here for the ReplayDriver to use internally.
-  feed.onTick((tick) => {
-    // The ReplayDriver emits ticks via feed.emitUpTo() which calls these callbacks.
-    // Each tick is written to market.ticks — same as src/index.ts's onTick handler.
-    // The driver awaits all xadd promises before snapshotStep() fires.
-    // (This void is inside the driver's xaddPromises collection; see replay-driver.ts)
-    void redisClient.xadd('market.ticks', '*', 'data', JSON.stringify(tick));
-  });
+  // NOTE: tick publishing to market.ticks is owned by the ReplayDriver, which
+  // registers its own feed.onTick handler and awaits every xadd (zero floating
+  // promises) before each snapshotStep(). We must NOT register a second onTick
+  // publisher here — doing so would publish every tick twice and float the
+  // promise, corrupting the deterministic replay.
 
   // Create and run the replay driver.
   const driver = createReplayDriver(feed, redisClient, straddleCalc, positionMonitor, clock, {
