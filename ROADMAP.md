@@ -37,30 +37,30 @@ this file.
 
 ## Delivery Status
 
-Legend: ✅ complete · 🚧 partial · ⬜ not started. Status reflects the
-`claude/hopeful-lovelace-Kaqsz` branch after the Milestone 2 merge.
+Legend: ✅ complete · 🚧 partial · ⬜ not started. Status as of 2026-05-24
+(`claude/eloquent-babbage-RwHSq` branch).
 
 | Milestone | Status | Notes |
 |---|---|---|
 | **M0 — Scaffolding** | ✅ | T-01–T-06 complete. Bun project, Docker infra, DB/Redis clients, core schema + seed. |
 | **M0.5 — Testing & CI** | ✅ | T-59–T-63 complete. Lean CI, Biome + lefthook, Vitest + property tests, injectable Clock, integration harness. |
 | **M1 — Vertical slice + dashboard** | ✅ | T-07–T-21 complete. Live/sim trade loop, brokers (Fyers/Angel/sim), straddle pipeline, trigger engine, position monitor, Fastify API, React dashboard. |
-| **M2 — Signals + multi-personality** | ✅ | T-22–T-32 complete (merged from `claude/complete-milestone-2-bFvPs`). Peak detection, probability scoring, fallback signals, 10-personality seed, 5-stage filter, router, Holder/Adjuster/Reducer management, portfolio risk rules, personality CRUD + performance API. |
-| **M3 — Historical data, replay & backtesting** | 🚧 | T-54–T-57 complete (M3a: Fyers historical client, idempotent backfill, straddle reconstruction, deterministic replay harness). **T-51 (backtest runner) and T-58 (backtest reporting) deferred** — replay is currently exposed in the dashboard as a read-only Replay tab + CLI (`bun run replay`), not yet a server-driven backtest endpoint. |
-| **M4 — Retrospection + evolution** | 🚧 | **T-33 (regime tagging) complete** (pulled forward with M3a; surfaced as the Regimes dashboard tab). T-34–T-42 not started. T-39 (comparison-integrity check) landed with M2. |
+| **M2 — Signals + multi-personality** | ✅ | T-22–T-32 complete. Peak detection, probability scoring, fallback signals, 10-personality seed, 5-stage filter, router, Holder/Adjuster/Reducer management, portfolio risk rules, personality CRUD + performance API. Personalities dashboard tab wired. |
+| **M3 — Historical data, replay & backtesting** | 🚧 | T-54–T-57 + T-33 complete (M3a: Fyers historical client, idempotent backfill, straddle reconstruction, deterministic replay harness, regime tagging). **T-51 (backtest runner) and T-58 (backtest reporting) deferred** — replay exposed as read-only Replay tab + CLI (`bun run replay`), not yet a server-driven backtest endpoint. |
+| **M4 — Retrospection + evolution** | 🚧 | T-33 (regime tagging, pulled forward with M3a) and T-39 (comparison-integrity check, landed with M2) complete. T-34–T-38, T-40–T-42 not started. |
+| **M7 — UPI India Payment & Access Gateway** | ✅ | T-64–T-69, T-71, T-72 complete. Razorpay Orders API (monthly pass + credits pack), dual HMAC webhook verification, credit consumption with advisory-lock atomicity, geolocation for UPI display, access-gate middleware, Fastify payment routes, React pricing page. See `docs/epics/upi-india-payment.md`. |
 | **M5 — Phase 2 (S/R, multi-index, Bayesian)** | ⬜ | Not started. |
 | **M6 — Phase 3/4 + prod readiness** | ⬜ | Not started. |
 
-**Dashboard tabs live:** Live, Trades, P&L, Pricing, Regimes (T-33), Backfill
-(T-55), Replay (read-only, T-57).
+**Dashboard tabs live:** Live, Trades, P&L, Pricing (T-69 payment/UPI), Regimes
+(T-33), Backfill (T-55), Replay (read-only, T-57), Personalities (T-32).
 
 **Known gaps / next up:**
-- **Personalities dashboard view** — M2's personality CRUD + performance API
-  (T-32) has no dashboard tab yet, and its routes live in the unregistered
-  `src/api/` tree (the live server is `src/server/index.ts`). Wiring a live
-  read-only Personalities view is the immediate frontend follow-up.
 - **T-51 / T-58** — server-driven backtest runner + per-regime statistical
   reporting remain the main M3 backend gap.
+- **Payment `.env.example` placeholder** — `RAZORPAY_KEY_ID` ships with a
+  non-blank placeholder value; operators must blank it to disable payment mode
+  in dev (accepted Medium risk M-1 from the payment security audit).
 - Integration + E2E suites require Docker (TimescaleDB + Redis); they run in CI,
   not in the credential-free container.
 
