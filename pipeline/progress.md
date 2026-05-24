@@ -8,8 +8,14 @@
 ## Phase State
 
 - [x] Phase 0 — Triage (risk_manifest.json written)
-- [ ] Phase 1 — Planning + Red Team (3 sprints) + QA Planner → Human Gate 1
-- [ ] Phase 2 — Decomposition
+- [x] Phase 1 — Planning + Red Team (3 sprints, 8.75/10) + QA Planner → **Gate 1 APPROVED**
+- [x] Phase 2 — Decomposition (6 contracts: T-43-A/B/C, T-44, T-45, T-46) — awaiting go-ahead for Phase 3
+
+## Gate 1 Decisions (locked)
+- **D1 — Bayesian optimizer:** Option B — guarded deterministic 1-D search (golden-section over [0.30,0.90]); full GP deferred to multi-param milestone.
+- **D2 — Multi-index risk caps:** Option A — per-index caps (each index an independent book); global circuit-breaker deferred to M6 (T-50).
+- **Optional recommendations:** none accepted (recommendation_rounds_used stays 0).
+- Rebased onto origin/main @ c1b5b48 before decomposition.
 - [ ] Phase 3 — Implementation
 - [ ] Phase 4 — Specialist Review → Human Gate 2
 - [ ] Phase 5 — Test Generation

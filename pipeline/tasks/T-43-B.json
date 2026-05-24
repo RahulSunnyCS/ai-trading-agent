@@ -1,0 +1,32 @@
+{
+  "task_id": "T-43-B",
+  "title": "S/R level computation + session-start freshness guard",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/signals/sr-levels.ts",
+      "src/signals/__tests__/sr-levels.test.ts"
+    ],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/db/schema.ts",
+      "src/db/migrations/**",
+      "src/signals/sr-detection-engine.ts",
+      "src/signals/personality-filter.ts",
+      "src/signals/personality-router.ts",
+      "src/index.ts",
+      "src/ingestion/brokers/instrument-registry.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "Pure, unit-testable functions to compute objective S/R levels for a given underlying + as-of date from TimescaleDB hypertable history (time-filtered queries only — never a full hypertable scan): previous-week High/Low, monthly classic pivot ((H+L+C)/3) with R1/S1/R2/S2, and Volume Point of Control (POC).",
+    "POC degrades gracefully when volume is NULL/absent: it is omitted (not faked), and the function reports which level types contributed so callers can set poc_used downstream.",
+    "Each level carries a strength score combining proximity, confluence (count of nearby levels within a band), and a volume weight (neutral weight when volume is null — R-I consistency).",
+    "Session-start freshness/coverage guard (R-D): a function asserts historical coverage per underlying meets an expected-bars threshold for the lookback window; below threshold it THROWS (throw-don't-skip, mirroring FROZEN_VIOLATION) so the caller disables S/R for that index that day rather than silently emitting against stale/zero levels.",
+    "Property/unit tests with fast-check on the pivot math, prev-week H/L windowing (IST week boundaries), POC bucketing, the null-volume degrade path, and the coverage-guard throw path.",
+    "tsc --noEmit clean; named exports only; takes an injectable Clock (never Date.now())."
+  ],
+  "dependencies": ["T-43-A"],
+  "output_format": "code plus plain English explanation of every non-obvious decision (esp. POC bucketing, IST week/month boundary handling, and the strength-score weighting)"
+}

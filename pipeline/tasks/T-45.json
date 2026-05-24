@@ -1,0 +1,36 @@
+{
+  "task_id": "T-45",
+  "title": "Multi-index expansion — BankNifty + Sensex (instrument correctness, per-index pipeline, per-index portfolio stop)",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [],
+    "files_to_modify": [
+      "src/ingestion/brokers/instrument-registry.ts",
+      "src/index.ts",
+      "src/trading/portfolio-risk.ts"
+    ],
+    "files_forbidden": [
+      "src/db/schema.ts",
+      "src/db/migrations/**",
+      "src/signals/personality-filter.ts",
+      "src/signals/personality-router.ts",
+      "src/signals/sr-levels.ts",
+      "src/signals/sr-detection-engine.ts",
+      "src/retrospection/**",
+      "src/jobs/**"
+    ]
+  },
+  "acceptance_criteria": [
+    "instrument-registry: buildOptionSymbol uses a per-underlying exchange prefix (BSE: for SENSEX, NSE: for NIFTY/BANKNIFTY) instead of the hardcoded NSE: prefix.",
+    "instrument-registry: getCurrentExpiry reads the per-underlying expiry from the index_expiry_calendar table (migration 013) instead of the hardcoded Thursday weekday formula. Honors holiday-shifted rows.",
+    "Calendar-freshness assert (R-K): HARD-FAIL (throw) if the calendar has no future expiry for an active underlying (expired/past-max-date calendar); emit a SEPARATE, independently-evaluated refill-reminder log if the max seeded expiry is within N days. Future-date assert and refill threshold are distinct checks.",
+    "Startup symbol-resolution assert per active index (R-A/R-L): the computed ATM straddle symbol must resolve to a real tradable instrument — in LIVE mode validate against the freshly-fetched broker instrument master; in SIM mode validate against a dated sim-only fixture. On failure: log loudly and DISABLE that index for the session (do not crash the whole process).",
+    "src/index.ts: INDICES env (comma-separated, default 'NIFTY') selects active underlyings; instantiate the straddle-calc + peak-detection + S/R detection engines to feed ALL active underlyings through the single shared pipeline (R-H — peak/SR engines are per-underlying-stateful, one process). Wire the S/R detection engine (T-43-C) into bootstrap here.",
+    "portfolio-risk.ts: the portfolio-level stop is scoped PER (personality, underlying) so each index is an independent book (D2 Option A); a global circuit-breaker is explicitly deferred to M6 (T-50) — leave a clear TODO note, do not implement it.",
+    "Backward compatible: with INDICES unset/'NIFTY' and ACTIVE_PHASE unset/1, behavior is identical to today.",
+    "Unit/integration tests: BSE vs NSE prefix, calendar-driven expiry + holiday shift, expired-calendar hard-fail, symbol-resolution disable path, multi-underlying bootstrap, per-underlying portfolio stop. tsc --noEmit clean; named exports."
+  ],
+  "dependencies": ["T-43-A", "T-43-C", "T-44"],
+  "output_format": "code plus plain English explanation of every non-obvious decision (esp. the sim-fixture vs live-master split and the per-index portfolio-stop scoping)"
+}

@@ -1,0 +1,35 @@
+{
+  "task_id": "T-46",
+  "title": "Guarded deterministic 1-D optimizer for min_probability (Bayesian-deferred, Decision-1 Option B)",
+  "assigned_to": "implementor",
+  "risk_flags": [],
+  "scope": {
+    "files_to_create": [
+      "src/retrospection/optimizer.ts",
+      "src/retrospection/__tests__/optimizer.test.ts"
+    ],
+    "files_to_modify": [
+      "src/retrospection/evolution-engine.ts",
+      "src/jobs/eod-retrospection-job.ts"
+    ],
+    "files_forbidden": [
+      "src/db/schema.ts",
+      "src/db/migrations/**",
+      "src/signals/**",
+      "src/ingestion/**",
+      "src/index.ts",
+      "src/trading/portfolio-risk.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "evolution-engine.ts: refactor so the guard layer is reusable by the optimizer WITHOUT duplication — export the clamp [0.30,0.90], the 8pp comparison-integrity cap, the FROZEN_VIOLATION check, the 7-day cooldown, the approval-gate write path, and the shared MINIMUM-SAMPLE constant. Existing runEvolutionEngine behavior is preserved unchanged (regression-safe).",
+    "optimizer.ts: a deterministic 1-D search (golden-section or fixed grid) over min_probability in [0.30,0.90] for a single momentum_exhaustion personality. Objective = a risk-adjusted metric from retrospection_results (Sharpe or Beat-Clockwork delta), evaluated over the TRAIN window only — the reserved holdout period is never read (R-C/overfitting). NO GP / matrix math (Decision-1 Option B; GP deferred).",
+    "Min-sample gate (R-J): applied AFTER any freshness/regime/poc-consistency filtering; counts the POST-FILTER regime-tagged rows (not raw rows); uses the SHARED constant imported from evolution-engine (>=200 for 'stable'); below threshold returns NO suggestion (never a low-confidence one).",
+    "Routes EVERY proposal through the same guard layer: FROZEN_VIOLATION throws on Clockwork / frozen personalities; result clamped to [0.30,0.90]; 8pp integrity cap enforced; 7-day cooldown respected; approval gate honored (EVOLUTION_REQUIRE_APPROVAL default TRUE → writes proposal to retrospection_results, FALSE → applies + audit-logs).",
+    "sr_anchored personalities (Levelhead) are EXCLUDED from the optimizer entirely and from the 8pp set; sr_strength_threshold is never tuned (R-B explicit non-goal).",
+    "eod-retrospection-job.ts: invoke the optimizer in the EOD BullMQ job, off the critical path, after metrics computation; failures are caught and logged (never crash the batch) and fall back to the existing rule-based runEvolutionEngine.",
+    "Unit tests: golden-section convergence on a synthetic objective, holdout never read, min-sample gate (below→no suggestion, post-filter count), FROZEN_VIOLATION on Clockwork, clamp + 8pp cap + cooldown + approval-vs-autonomous paths, sr_anchored exclusion. tsc --noEmit clean; named exports."
+  ],
+  "dependencies": [],
+  "output_format": "code plus plain English explanation of every non-obvious decision (esp. the objective metric chosen, the train/holdout split source, and how the shared guard layer is extracted without changing rule-engine behavior)"
+}
