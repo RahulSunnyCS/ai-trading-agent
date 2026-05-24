@@ -14,6 +14,8 @@
  *  - null     → em dash  "—" (open trades have no realised P&L yet)
  */
 
+import type { ReactNode } from 'react';
+
 import { usePaperTrades } from '../hooks/usePaperTrades.js';
 import { formatIstDateTime, formatPnl, toNumberOrNull } from '../lib/format.js';
 import { type PaperTrade } from '../types/trading.js';
@@ -182,7 +184,7 @@ function ErrorState({ message }: { message: string }) {
 /**
  * Column header cell — consistent padding + text style.
  */
-function Th({ children }: { children: React.ReactNode }) {
+function Th({ children }: { children: ReactNode }) {
   return (
     <th
       scope="col"

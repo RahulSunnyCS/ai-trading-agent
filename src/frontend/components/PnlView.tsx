@@ -22,8 +22,9 @@
  *    visually distinguish "real zero-activity day" from "fetch failed").
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createChart } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 
 import { usePaperTrades } from '../hooks/usePaperTrades.js';
 import { formatPnl } from '../lib/format.js';
@@ -164,14 +165,19 @@ interface CumulativeChartProps {
 /**
  * Renders the cumulative P&L line using Lightweight Charts v4.
  *
- * Lightweight Charts is an imperative DOM API — we bridge it to React with a
- * ref on the container div and a useEffect that creates, populates, and then
- * cleans up the chart instance on unmount.
+ * Follows the same split-effect pattern as TickChart in LiveView.tsx:
+ *  - Effect 1 (empty deps): creates the chart, line series, and ResizeObserver
+ *    exactly once on mount, stores them in refs, and cleans them up on unmount.
+ *  - Effect 2 ([series] dep): pushes new data into the existing series via
+ *    seriesRef.current.setData(). Because the chart instance is never torn down
+ *    between polls, the user's zoom/scroll position is preserved across every
+ *    10 s update.
  *
  * Edge-case handling:
- *  - 0 points: we render a placeholder message rather than an empty chart,
- *    because Lightweight Charts with no data looks broken.
- *  - 1 point: `setData([single])` is valid in LWC v4; it renders a single dot.
+ *  - 0 points: the parent gates rendering behind closedCount > 0, so
+ *    CumulativeChart only mounts when there is at least one closed trade.
+ *    The data effect still guards series.length === 0 for safety.
+ *  - 1 point: setData([single]) is valid in LWC v4; it renders a single dot.
  *  - Many points: normal line chart.
  *
  * Why a separate component: the chart imperative setup is complex enough to
@@ -180,13 +186,19 @@ interface CumulativeChartProps {
 function CumulativeChart({ series }: CumulativeChartProps) {
   // Ref to the DOM container element that Lightweight Charts mounts into.
   const containerRef = useRef<HTMLDivElement>(null);
+  // Chart and series instances stored in refs so the data-update effect can
+  // reach them without re-triggering the mount effect.
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<'Line'> | null>(null);
 
+  // Effect 1: create the chart + series + ResizeObserver exactly once on mount.
+  // Empty deps array ensures this runs only at mount/unmount — not on every poll.
   useEffect(() => {
     const container = containerRef.current;
     if (container === null) return;
 
-    // Create the chart instance.  We size it to the container's width and use
-    // a fixed height.  Dark-theme colours match the rest of the dashboard
+    // Create the chart instance. We size it to the container's width and use
+    // a fixed height. Dark-theme colours match the rest of the dashboard
     // (bg-gray-900 background, gray-700 grid/border lines).
     const chart = createChart(container, {
       width: container.clientWidth,
@@ -204,15 +216,13 @@ function CumulativeChart({ series }: CumulativeChartProps) {
       },
       timeScale: {
         borderColor: '#374151',
-        // Fit all data into the visible window on initial render.
-        // This avoids the user having to scroll to see historical points.
+        // Leave a small gap on the right so the last label is not clipped.
         rightOffset: 2,
       },
     });
 
-    // Add the line series.  We colour it green for profit, but since the
-    // series value can go negative (running total), a static green line is
-    // the simplest convention — the value label makes the sign clear.
+    // Add the line series. We colour it green for profit — the value label
+    // makes the sign clear when the running total goes negative.
     const lineSeries = chart.addLineSeries({
       color: '#4ade80',        // green-400 — visible on dark background
       lineWidth: 2,
@@ -220,18 +230,11 @@ function CumulativeChart({ series }: CumulativeChartProps) {
       lastValueVisible: true,
     });
 
-    // Provide data only if we have points; setData([]) is valid but produces
-    // an invisible chart that wastes space — we gate the component at the
-    // parent level instead (only rendered when closedCount > 0).
-    if (series.length > 0) {
-      // PnlSeriesPoint.time is YYYY-MM-DD which LWC v4 accepts as `Time`.
-      lineSeries.setData(series);
-      // Fit all points into the visible window after loading data.
-      chart.timeScale().fitContent();
-    }
+    chartRef.current = chart;
+    seriesRef.current = lineSeries;
 
     // Resize observer: keep the chart width in sync if the container resizes.
-    // Without this, the chart overflows or leaves blank space on window resize.
+    // Without this the chart overflows or leaves blank space on window resize.
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         chart.applyOptions({ width: entry.contentRect.width });
@@ -239,13 +242,32 @@ function CumulativeChart({ series }: CumulativeChartProps) {
     });
     observer.observe(container);
 
-    // Cleanup: remove the chart from the DOM and disconnect the observer to
-    // prevent memory leaks and stale callbacks after the component unmounts.
+    // Cleanup: null the refs first (guards in-flight setData calls in
+    // StrictMode double-invoke), then disconnect the observer and remove
+    // the chart from the DOM.
     return () => {
+      seriesRef.current = null;
+      chartRef.current = null;
       observer.disconnect();
       chart.remove();
     };
-  }, [series]); // Re-run only when the series data changes.
+  }, []); // Empty deps: chart lifecycle is tied to mount/unmount only.
+
+  // Effect 2: push new data into the existing series whenever `series` changes.
+  // The chart instance is NOT recreated — only its data is updated — so the
+  // user's zoom/scroll position survives each 10 s poll cycle.
+  useEffect(() => {
+    const lineSeries = seriesRef.current;
+    if (lineSeries === null) return;
+    // PnlSeriesPoint.time is YYYY-MM-DD which LWC v4 accepts as `Time`.
+    // setData replaces the full series; safe here because P&L points can be
+    // re-ordered/backdated on the same day if new closed trades arrive.
+    if (series.length > 0) {
+      lineSeries.setData(series);
+      // Fit all points into the visible window after loading data.
+      chartRef.current?.timeScale().fitContent();
+    }
+  }, [series]);
 
   return (
     <div
@@ -276,10 +298,14 @@ function CumulativeChart({ series }: CumulativeChartProps) {
 export function PnlView() {
   const { trades, loading, error } = usePaperTrades();
 
-  // Derive aggregates from the current trade list.
-  // computePnlSummary is pure and cheap; calling it on every render is fine.
-  // We always call it so we have openCount available even in the empty state.
-  const summary = computePnlSummary(trades);
+  // Memoize the summary so that computePnlSummary returns a stable object
+  // reference when `trades` has not changed. Without this, every render
+  // (including React StrictMode double-invokes) produces a new `summary`
+  // object with a new `cumulativeSeries` array reference, which triggers
+  // CumulativeChart's data effect on every poll cycle — causing the chart
+  // to flash and lose user zoom. useMemo ensures the reference only changes
+  // when `trades` identity changes (i.e. when the hook receives new data).
+  const summary = useMemo(() => computePnlSummary(trades), [trades]);
 
   // Colour-code the total P&L value: green = profit, red = loss, neutral = zero.
   function totalPnlClass(): string {

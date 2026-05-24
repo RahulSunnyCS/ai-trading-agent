@@ -26,6 +26,6 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "coverage", "bun.lock", "frontend/node_modules", "*.sql"]
+    "ignore": ["node_modules", "dist", "coverage", "bun.lock", "*.sql"]
   }
 }

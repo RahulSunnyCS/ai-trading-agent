@@ -3,8 +3,14 @@
  * normalised trade list.
  *
  * Design goals:
- *  - Single source of truth: both TradesView (T-02) and PnlView (T-03) import
- *    this hook — no duplicate fetch logic.
+ *  - Centralised fetch logic: both TradesView (T-02) and PnlView (T-03) import
+ *    this hook so the polling and normalisation code lives in exactly one place.
+ *    Note: state is per-hook-instance, not shared across mounts. Mounting this
+ *    hook in two places simultaneously would produce two independent polling
+ *    loops. This is currently safe because App.tsx renders tabs exclusively
+ *    (only one tab is mounted at a time). If both tabs were ever mounted
+ *    simultaneously, the correct fix would be to lift the state into a Zustand
+ *    store or a React context — not to duplicate the logic here.
  *  - No overlapping requests: if a poll is still in-flight when the next
  *    tick fires, the new tick is skipped entirely (not queued).
  *  - Clean unmount: the AbortController cancels the in-flight fetch and the
