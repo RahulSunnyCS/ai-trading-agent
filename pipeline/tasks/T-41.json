@@ -1,0 +1,35 @@
+{
+  "task_id": "T-41",
+  "title": "REST API endpoints for retrospection + evolution, and server wiring",
+  "assigned_to": "implementor",
+  "risk_flags": ["backend", "financial-logic"],
+  "scope": {
+    "files_to_create": ["src/api/routes/retrospection.ts"],
+    "files_to_modify": ["src/server/index.ts"],
+    "files_forbidden": [
+      "src/db/migrations/",
+      "src/db/schema.ts",
+      "src/retrospection/daily-metrics.ts",
+      "src/retrospection/brier-score.ts",
+      "src/retrospection/management-effectiveness.ts",
+      "src/retrospection/evolution-engine.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "src/api/routes/retrospection.ts exports `retrospectionRoutes: FastifyPluginAsync<{ db: Pool }>` using `fastify-plugin` (fp wrapper)",
+    "GET /api/retrospection — accepts optional query params: personality_id (UUID format), regime (enum: RANGING|TRENDING_STRONG|VOLATILE_REVERTING|EVENT_DAY), from (YYYY-MM-DD), to (YYYY-MM-DD); builds a parameterized SQL query against retrospection_results with only the supplied filters applied; returns 200 with { data: rows }",
+    "All query parameter values are used only via parameterized SQL ($1, $2, etc.) — no string interpolation into SQL at any point; invalid UUID or enum values for personality_id/regime return 400 with a descriptive error message before any DB access",
+    "POST /api/retrospection/trigger — accepts body { trade_date: string } where trade_date must match /^\\d{4}-\\d{2}-\\d{2}$/; validates the pattern and rejects with 400 if malformed; adds a one-off BullMQ job { trade_date } to the 'eod-retrospection' queue with jobId set to 'manual-' + trade_date (deduplication); returns 202 with { queued: true, trade_date }",
+    "GET /api/retrospection/evolution/pending — queries retrospection_results WHERE proposed_adjustments IS NOT NULL AND adjustments_applied = FALSE ORDER BY created_at DESC; accepts optional personality_id query param (UUID, validated); returns 200 with { data: rows }",
+    "POST /api/retrospection/evolution/apply/:personalityId — path param personalityId validated as UUID format via Fastify JSON Schema (pattern: '^[0-9a-fA-F-]{36}$'); body: { trade_date: string (YYYY-MM-DD, required) }",
+    "apply/:personalityId implementation — step-by-step: (a) BEGIN; (b) SELECT id, personality_id, proposed_adjustments, adjustments_applied FROM retrospection_results WHERE personality_id=$1 AND trade_date=$2 AND adjustments_applied=FALSE FOR UPDATE — if no row → ROLLBACK + 404 { error: 'no_pending_adjustment' }; if adjustments_applied=TRUE → ROLLBACK + 409 { error: 'already_applied' }; (c) SELECT id, name, is_frozen, params FROM personality_configs WHERE id=$1 FOR UPDATE — if is_frozen=TRUE → ROLLBACK + 403 { error: 'FROZEN_VIOLATION' }; (d) read proposedValue = proposed_adjustments.min_probability (number, guard Number.isFinite — if invalid → ROLLBACK + 422 { error: 'invalid_proposed_value' }); (e) UPDATE personality_configs SET params=jsonb_set(params, '{min_probability}', to_json($val::float8)::jsonb), last_evolved_at=NOW() WHERE id=$1; (f) INSERT INTO personality_audit_log (id, personality_id, changed_at, changed_by, old_params, new_params, reason) VALUES (gen_random_uuid(), $1, NOW(), 'api-manual-apply', $oldParams::jsonb, $newParams::jsonb, 'manual approval via API'); (g) UPDATE retrospection_results SET adjustments_applied=TRUE WHERE id=$retrospectionRowId; (h) COMMIT; returns 200 with the updated personality_configs row",
+    "The POST /apply route uses a raw pg client (pool.connect()) for the manual transaction — NOT withTransaction() from db/client.ts — because it needs to interleave Fastify reply sends with ROLLBACK on validation failures mid-transaction",
+    "In src/server/index.ts: import retrospectionRoutes from '../api/routes/retrospection.js' and register it: await server.register(retrospectionRoutes, { db: pool, prefix: '/api' })",
+    "In src/server/index.ts: import createEodRetrospectionQueue and createEodRetrospectionWorker from '../jobs/eod-retrospection-job.js'; after the server is fully configured (all plugins + routes registered), start the worker ONLY when process.env.SIMULATE !== 'true' OR process.env.EOD_WORKER_ENABLED === 'true'; store the worker reference and call worker.close() in the server onClose hook to drain cleanly",
+    "The queue instance must be shared between the POST /trigger route (to enqueue jobs) and the server wiring (to start the worker) — pass the queue instance into the route plugin via the plugin options or via a server decorator named 'eodQueue'",
+    "No default exports in retrospection.ts — named exports only (project convention)",
+    "All route handler errors from DB queries are caught and returned as 500 { error: 'internal_error' } — no unhandled promise rejections"
+  ],
+  "dependencies": ["T-34", "T-35", "T-37", "T-38", "T-40", "T-42"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}
