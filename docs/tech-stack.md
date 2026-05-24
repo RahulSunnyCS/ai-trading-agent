@@ -4,6 +4,19 @@ A short description of every tool in the AI Trading Agent stack — what it is,
 why it's here, and what we use it for. Grouped by the part of the system it
 serves.
 
+## Deep dives
+
+Longer, code-grounded explainers for individual topics live in
+[`docs/tech/`](./tech/):
+
+- [Redis Streams vs BullMQ](./tech/redis-streams-vs-bullmq.md) — same Redis,
+  opposite-shaped problems; why ticks use Streams and the EOD job will use
+  BullMQ.
+- [TimescaleDB & Hypertables](./tech/timescaledb-and-hypertables.md) — what a
+  hypertable does and why a missing time-range filter destroys performance.
+- [No ORM — Raw SQL via the `pg` Pool](./tech/no-orm-raw-sql.md) — what raw SQL
+  buys and costs in a precision-sensitive, time-series system.
+
 ## Language & Runtime
 
 ### TypeScript 5.x (strict mode)
