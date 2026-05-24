@@ -26,9 +26,12 @@ import fastifyWebsocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
+import type { Queue } from 'bullmq';
 
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
 import { paymentRoutes } from './routes/payment';
+import { createEodRetrospectionQueue, createEodRetrospectionWorker } from '../jobs/eod-retrospection-job.js';
+import { retrospectionRoutes } from '../api/routes/retrospection.js';
 
 // ---------------------------------------------------------------------------
 // Fastify module augmentation — makes server.db typed as Pool
@@ -37,6 +40,9 @@ import { paymentRoutes } from './routes/payment';
 declare module 'fastify' {
   interface FastifyInstance {
     db: Pool;
+    // Decorated in buildServer() so route plugins can enqueue EOD jobs via
+    // the same Queue instance (and Redis connection) without creating their own.
+    eodQueue: Queue;
   }
 }
 
@@ -108,6 +114,14 @@ export async function buildServer(
   const pool = externalPool ?? buildPool();
   const ownsPool = externalPool === undefined;
   server.decorate('db', pool);
+
+  // Create the BullMQ EOD queue and decorate the server so route plugins can
+  // enqueue jobs without importing the queue factory themselves. The queue is
+  // always created here (even in test runs) because the Queue constructor only
+  // opens a Redis connection lazily — creating it does not force a Redis
+  // connection at startup, so tests without Redis do not break.
+  const eodQueue = createEodRetrospectionQueue();
+  server.decorate('eodQueue', eodQueue);
 
   // Close the pool on server close ONLY when we created it.  If an external
   // pool was injected, the caller owns it and will close it during shutdown.
@@ -364,6 +378,11 @@ export async function buildServer(
   await server.register(paymentRoutes);
   await server.register(fyersAuthRoutes);
 
+  // Register retrospection routes under /api prefix so all four endpoints are
+  // reachable at /api/retrospection/*, matching the REST path convention used
+  // by the other API routes in this server.
+  await server.register(retrospectionRoutes, { db: pool, eodQueue, prefix: '/api' });
+
   return server;
 }
 
@@ -385,10 +404,31 @@ export async function startServer(externalPool?: Pool): Promise<void> {
   const rawPort = process.env.PORT ?? '3000';
   const port = Number.parseInt(rawPort, 10);
 
+  // Start the EOD retrospection worker unless we are in simulation mode without
+  // the explicit opt-in flag. In simulation mode the market data is synthetic
+  // and there are no real trades to retrospect, so running the worker would
+  // produce zero-trade rows and skip immediately. EOD_WORKER_ENABLED=true lets
+  // a developer force the worker on even when SIMULATE=true (e.g. for manual
+  // testing of the retrospection pipeline with synthetic data).
+  //
+  // We use externalPool if provided (same pool the caller shares with ingestion),
+  // otherwise fall back to server.db (the pool created inside buildServer).
+  // Both point to the same underlying pool in normal startup flows where
+  // src/index.ts calls startServer(sharedPool); this guard just makes it
+  // explicit which pool the worker owns.
+  let eodWorker: import('bullmq').Worker | undefined;
+  if (process.env.SIMULATE !== 'true' || process.env.EOD_WORKER_ENABLED === 'true') {
+    eodWorker = createEodRetrospectionWorker(externalPool ?? server.db);
+  }
+
   // Graceful shutdown — close the server before the process exits.
   const shutdown = async (signal: string): Promise<void> => {
     server.log.info(`[server] received ${signal} — shutting down`);
     try {
+      // Close the EOD worker first so in-flight jobs can finish before the DB
+      // pool is torn down by server.close(). Worker.close() waits for the
+      // current job to complete before resolving.
+      if (eodWorker) { await eodWorker.close(); }
       await server.close();
     } finally {
       process.exit(0);
