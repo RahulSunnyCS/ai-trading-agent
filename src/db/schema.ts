@@ -41,6 +41,12 @@ export interface MarketTick {
   bid: number | null;
   ask: number | null;
   source: string;
+  /**
+   * Candle resolution when source = 'fyers-historical' (migration 007).
+   * NULL for all live rows (source = 'fyers' | 'simulator').
+   * Example values: '1', '5', '15', 'D' (matches FyersResolution in fyers-historical.ts).
+   */
+  resolution: string | null;
 }
 
 export interface StraddleSnapshot {
@@ -66,6 +72,84 @@ export interface OptionTick {
   oi: number | null;
   delta: number | null;
   iv: number | null;
+  /**
+   * Data source tag added by migration 007.
+   * 'fyers'           — live WebSocket tick
+   * 'fyers-historical' — historical backfill candle (written by backfill.ts)
+   * Existing rows receive the default value 'fyers' at migration time.
+   */
+  source: string;
+  /**
+   * Candle resolution when source = 'fyers-historical' (migration 007).
+   * NULL for all live rows (source = 'fyers').
+   * Example values: '1', '5', '15', 'D' (matches FyersResolution in fyers-historical.ts).
+   */
+  resolution: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Historical backfill tracking (migration 007)
+// ---------------------------------------------------------------------------
+
+/** Valid values for BackfillRange.status */
+export type BackfillRangeStatus =
+  | 'pending'   // Queued but not yet started
+  | 'running'   // Currently executing (stale detection: check updated_at + timeout)
+  | 'partial'   // Interrupted (FyersAuthError); resume from checkpoint_ts
+  | 'complete'  // All candles written; NO calendar gaps detected
+  | 'gapped'    // All candles written but calendar gaps were found; see gaps_json
+  | 'error';    // Non-resumable failure
+
+/**
+ * One row in the backfill_ranges table.
+ *
+ * Tracks the progress of a historical candle backfill job for one
+ * (symbol, from_ts, to_ts, resolution) range. Used by the backfill writer
+ * in src/ingestion/historical/backfill.ts to implement resumable downloads
+ * and calendar-gap recording.
+ *
+ * Invariant: if gaps_detected > 0, status MUST be 'partial' or 'gapped',
+ * NEVER 'complete'. The writer enforces this; the CHECK constraint in
+ * migration 007 provides a database-level guard.
+ */
+export interface BackfillRange {
+  id: number;
+  symbol: string;
+  from_ts: Date;
+  to_ts: Date;
+  resolution: string;
+  status: BackfillRangeStatus;
+  rows_written: number;
+  /**
+   * Timestamp of the last successfully persisted candle.
+   * NULL if no candles have been written yet (start from from_ts on resume).
+   * Set by the writer on FyersAuthError so a re-run continues from here.
+   */
+  checkpoint_ts: Date | null;
+  /**
+   * Number of calendar gaps detected during NSE-calendar reconciliation.
+   * When > 0, status must be 'partial' or 'gapped' — never 'complete'.
+   */
+  gaps_detected: number;
+  /**
+   * JSON-serialised array of gap records: [{ from: string, to: string, reason: string }].
+   * NULL when no gaps were detected.
+   * Parse with JSON.parse(gaps_json) and cast to GapRecord[].
+   */
+  gaps_json: string | null;
+  updated_at: Date;
+  created_at: Date;
+}
+
+/**
+ * A single calendar gap record as stored in BackfillRange.gaps_json.
+ * from and to are ISO-8601 strings (not Date objects) because the field is
+ * stored as a JSON TEXT column — callers must new Date(gap.from) to get a Date.
+ */
+export interface BackfillGapRecord {
+  from: string;
+  to: string;
+  reason: string;
 }
 
 // ---------------------------------------------------------------------------
