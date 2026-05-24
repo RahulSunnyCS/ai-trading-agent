@@ -14,7 +14,9 @@
 | Phase 1 — Planning + Red Team (×3 + 1 re-plan delta) | ✅ Done |
 | Human Gate 1 | ✅ Approved (D1/D2/D3 + R1 + R2) |
 | Phase 2 — Decomposition (M3a: T-54,T-55,T-56,T-57,T-33) | ✅ Done — contracts in pipeline/tasks/ |
-| Phase 3 — Implementation | 🟡 In progress (Phase 3 complete (M3a: T-54,55,56,57,33)) |
+| Phase 3 — Implementation | ✅ Done (M3a: T-54,55,56,57,33 — 440 unit tests pass) |
+| Phase 4 — Specialist Review (security + perf + arch) | 🟡 In progress |
+| Human Gate 2 | ⏳ Pending |
 
 ## Notes
 - M2 (personality router T-27) and M4 (regime tagging T-33) are not yet built; both are forward dependencies for T-51 / T-58. Surfaced as Gate-1 decisions.
