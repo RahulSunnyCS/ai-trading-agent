@@ -48,27 +48,33 @@ The server starts on `http://localhost:3000`.
 
 ### 5. View the dashboard
 
-In development, serve the frontend separately:
+The dashboard lives at the repository root (`index.html` + `src/frontend/`, root `vite.config.ts`). In development, run the Vite dev server alongside the backend:
 
 ```bash
-cd frontend
-bun install
-bun run dev      # Vite dev server at http://localhost:5173
+bunx vite        # Vite dev server at http://localhost:5173
 ```
 
-In production (after `cd frontend && bun run build`), the built files are in `frontend/dist/`. Point a static server or the Fastify static plugin at that directory.
+It proxies `/api` and `/ws` to the backend on `http://localhost:3000` (see `vite.config.ts`).
 
-### API endpoints
+For a production build run `bunx vite build`; the static files are emitted to `dist/`. Point a static server or the Fastify static plugin at that directory.
+
+### Dashboard Wiring
+
+The three main dashboard tabs (Live, Trades, P&L) are now wired to backend endpoints:
+
+- **Live tab** — Polls `GET /api/straddle/latest` (~10 s interval). Currently returns `data: null` (stub). Displays a **synthetic NIFTY index feed** via `WS /ws/ticks` — this is a random-walk dev feed for testing, not real straddle data. The component clearly labels this as synthetic.
+- **Trades tab** — Polls `GET /api/trades` (~10 s interval) for the paper trade log.
+- **P&L tab** — Uses the same `GET /api/trades` hook to compute realized P&L aggregates and a cumulative P&L line chart.
+
+### API Endpoints
 
 | Endpoint | Description |
 |---|---|
 | `GET /health` | Health check |
-| `GET /api/trades` | Open paper trades |
-| `GET /api/trades/history` | Last 100 closed trades |
-| `GET /dashboard/live` | Latest straddle snapshot |
-| `GET /dashboard/summary` | Today's trades summary |
-| `GET /paper-trades` | Paper trades with filters |
-| `WS /ws/ticks` | Real-time straddle tick stream |
+| `GET /api/trades` | Paper trades (open + closed) |
+| `GET /api/straddle/latest` | Latest straddle snapshot — currently stubs `data: null` |
+| `GET /api/positions` | Active positions summary |
+| `WS /ws/ticks` | Real-time synthetic NIFTY tick stream (dev only) |
 
 ### Environment variables
 
