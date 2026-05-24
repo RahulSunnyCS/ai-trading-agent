@@ -156,8 +156,8 @@ export class MarketDataSimulator implements BrokerFeed {
         underlying: 'NIFTY',
         // Round to 2 decimal places — NIFTY is quoted to the paisa.
         ltp: Math.round(this._price * 100) / 100,
-        timestamp: this._config.clock.timestamp(),
-        time: this._config.clock.timestamp(),
+        timestamp: this._config.clock.timestamp?.() ?? this._config.clock.now(),
+        time: this._config.clock.timestamp?.() ?? this._config.clock.now(),
         isIndex: true,
         // Synthetic volume: uniform random in [10 000, 60 000) to mimic
         // realistic intraday session volume without modelling microstructure.

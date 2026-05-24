@@ -41,6 +41,6 @@ export interface QuantiplyClient {
  */
 export class QuantiplyStub implements QuantiplyClient {
   async recordTrade(_trade: unknown): Promise<void> {
-    console.info("Quantiply stub: recordTrade called (no-op in MVP)");
+    console.info('Quantiply stub: recordTrade called (no-op in MVP)');
   }
 }

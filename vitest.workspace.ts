@@ -17,17 +17,17 @@
 export default [
   {
     test: {
-      name: "unit",
-      include: ["src/**/*.test.ts"],
+      name: 'unit',
+      include: ['src/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
       // Exclude integration tests from the unit project so that
       // `bun run test:unit` does not require Docker services to be running.
-      exclude: ["src/test/integration/**"],
+      exclude: ['src/test/integration/**', 'src/**/__tests__/**/*.integration.test.ts'],
     },
   },
   {
     test: {
-      name: "integration",
-      include: ["src/test/integration/**/*.test.ts"],
+      name: 'integration',
+      include: ['src/test/integration/**/*.test.ts', 'src/**/__tests__/**/*.integration.test.ts'],
     },
   },
 ];

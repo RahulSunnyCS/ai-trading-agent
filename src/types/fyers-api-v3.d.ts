@@ -22,7 +22,7 @@
  * but production code should use the factory interface.
  */
 
-declare module "fyers-api-v3" {
+declare module 'fyers-api-v3' {
   /**
    * A Fyers data socket instance returned by fyersDataSocket.getInstance().
    *
@@ -34,10 +34,10 @@ declare module "fyers-api-v3" {
    */
   interface FyersDataSocketInstance {
     /** Register an event handler. */
-    on(event: "connect", handler: () => void): this;
-    on(event: "message", handler: (tick: FyersTick) => void): this;
-    on(event: "error", handler: (err: FyersSocketError) => void): this;
-    on(event: "close", handler: () => void): this;
+    on(event: 'connect', handler: () => void): this;
+    on(event: 'message', handler: (tick: FyersTick) => void): this;
+    on(event: 'error', handler: (err: FyersSocketError) => void): this;
+    on(event: 'close', handler: () => void): this;
     on(event: string, handler: (...args: unknown[]) => void): this;
 
     /** Subscribe to market data for the given Fyers symbol strings. */

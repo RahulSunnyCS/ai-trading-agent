@@ -62,23 +62,23 @@ function buildMockPool(client: ReturnType<typeof buildMockClient>): Pool {
 
 describe('isPaymentEnabled()', () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    // vi.unstubAllEnvs() not in Vitest 2.0
   });
 
   it('should return true when RAZORPAY_KEY_ID is set', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_test_abc123');
+    process.env.RAZORPAY_KEY_ID = 'rzp_test_abc123';
     const { isPaymentEnabled } = await import('../razorpay.ts');
     expect(isPaymentEnabled()).toBe(true);
   });
 
   it('should return false when RAZORPAY_KEY_ID is not set', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', '');
+    process.env.RAZORPAY_KEY_ID = '';
     const { isPaymentEnabled } = await import('../razorpay.ts');
     expect(isPaymentEnabled()).toBe(false);
   });
 
   it('should return false when RAZORPAY_KEY_ID is empty string', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', '');
+    process.env.RAZORPAY_KEY_ID = '';
     const { isPaymentEnabled } = await import('../razorpay.ts');
     expect(isPaymentEnabled()).toBe(false);
   });
@@ -90,23 +90,23 @@ describe('isPaymentEnabled()', () => {
 
 describe('isTestMode()', () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
+    // vi.unstubAllEnvs() not in Vitest 2.0
   });
 
   it('should return true for a rzp_test_ prefixed key', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_test_abc123');
+    process.env.RAZORPAY_KEY_ID = 'rzp_test_abc123';
     const { isTestMode } = await import('../razorpay.ts');
     expect(isTestMode()).toBe(true);
   });
 
   it('should return false for a rzp_live_ prefixed key', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_live_abc123');
+    process.env.RAZORPAY_KEY_ID = 'rzp_live_abc123';
     const { isTestMode } = await import('../razorpay.ts');
     expect(isTestMode()).toBe(false);
   });
 
   it('should return false when RAZORPAY_KEY_ID is not set', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', '');
+    process.env.RAZORPAY_KEY_ID = '';
     const { isTestMode } = await import('../razorpay.ts');
     expect(isTestMode()).toBe(false);
   });
@@ -120,39 +120,39 @@ describe('initRazorpay()', () => {
   // Each test gets a fresh module instance so the singleton (_razorpayClient)
   // starts as null.
   beforeEach(() => {
-    vi.resetModules();
-    vi.unstubAllEnvs();
+    vi.clearAllMocks(); // resetModules not in Vitest 2.0
+    // vi.unstubAllEnvs() not in Vitest 2.0
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    // vi.unstubAllEnvs() not in Vitest 2.0
   });
 
   it('should throw a descriptive error when RAZORPAY_KEY_ID is missing', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', '');
-    vi.stubEnv('RAZORPAY_KEY_SECRET', 'some_secret');
+    process.env.RAZORPAY_KEY_ID = '';
+    process.env.RAZORPAY_KEY_SECRET = 'some_secret';
     const { initRazorpay } = await import('../razorpay.ts');
     expect(() => initRazorpay()).toThrowError('RAZORPAY_KEY_ID is not set');
   });
 
   it('should not include key secret in the error when RAZORPAY_KEY_ID is missing', async () => {
     const secretValue = 'super_secret_key_value';
-    vi.stubEnv('RAZORPAY_KEY_ID', '');
+    process.env.RAZORPAY_KEY_ID = '';
     vi.stubEnv('RAZORPAY_KEY_SECRET', secretValue);
     const { initRazorpay } = await import('../razorpay.ts');
     expect(() => initRazorpay()).not.toThrowError(secretValue);
   });
 
   it('should throw a descriptive error when RAZORPAY_KEY_SECRET is missing', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_test_abc123');
-    vi.stubEnv('RAZORPAY_KEY_SECRET', '');
+    process.env.RAZORPAY_KEY_ID = 'rzp_test_abc123';
+    process.env.RAZORPAY_KEY_SECRET = '';
     const { initRazorpay } = await import('../razorpay.ts');
     expect(() => initRazorpay()).toThrowError('RAZORPAY_KEY_SECRET is missing');
   });
 
   it('should return a Razorpay instance when both keys are present', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_test_abc123');
-    vi.stubEnv('RAZORPAY_KEY_SECRET', 'secret_value');
+    process.env.RAZORPAY_KEY_ID = 'rzp_test_abc123';
+    process.env.RAZORPAY_KEY_SECRET = 'secret_value';
     const { initRazorpay } = await import('../razorpay.ts');
     const instance = initRazorpay();
     expect(instance).toBeDefined();
@@ -161,8 +161,8 @@ describe('initRazorpay()', () => {
   });
 
   it('should return the same instance on subsequent calls (singleton)', async () => {
-    vi.stubEnv('RAZORPAY_KEY_ID', 'rzp_test_abc123');
-    vi.stubEnv('RAZORPAY_KEY_SECRET', 'secret_value');
+    process.env.RAZORPAY_KEY_ID = 'rzp_test_abc123';
+    process.env.RAZORPAY_KEY_SECRET = 'secret_value';
     const { initRazorpay } = await import('../razorpay.ts');
     const first = initRazorpay();
     const second = initRazorpay();
@@ -180,12 +180,12 @@ describe('verifyPaymentSignature()', () => {
   const PAYMENT_ID = 'pay_XYZ789';
 
   beforeEach(() => {
-    vi.resetModules();
-    vi.unstubAllEnvs();
+    vi.clearAllMocks(); // resetModules not in Vitest 2.0
+    // vi.unstubAllEnvs() not in Vitest 2.0
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    // vi.unstubAllEnvs() not in Vitest 2.0
   });
 
   it('should return true for a correctly computed HMAC-SHA256 signature', async () => {
@@ -202,7 +202,7 @@ describe('verifyPaymentSignature()', () => {
   });
 
   it('should return false (never throw) when RAZORPAY_KEY_SECRET is not set', async () => {
-    vi.stubEnv('RAZORPAY_KEY_SECRET', '');
+    process.env.RAZORPAY_KEY_SECRET = '';
     const { verifyPaymentSignature } = await import('../razorpay.ts');
     const sig = computePaymentHmac(ORDER_ID, PAYMENT_ID, SECRET);
     expect(() => verifyPaymentSignature(ORDER_ID, PAYMENT_ID, sig)).not.toThrow();
@@ -239,12 +239,12 @@ describe('verifyWebhookSignature()', () => {
   const WEBHOOK_SECRET = 'webhook_secret_value';
 
   beforeEach(() => {
-    vi.resetModules();
-    vi.unstubAllEnvs();
+    vi.clearAllMocks(); // resetModules not in Vitest 2.0
+    // vi.unstubAllEnvs() not in Vitest 2.0
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    // vi.unstubAllEnvs() not in Vitest 2.0
   });
 
   it('should return true for a correctly computed HMAC of the raw body buffer', async () => {
@@ -273,7 +273,7 @@ describe('verifyWebhookSignature()', () => {
   });
 
   it('should return false (never throw) when RAZORPAY_WEBHOOK_SECRET is not set', async () => {
-    vi.stubEnv('RAZORPAY_WEBHOOK_SECRET', '');
+    process.env.RAZORPAY_WEBHOOK_SECRET = '';
     const { verifyWebhookSignature } = await import('../razorpay.ts');
     const body = Buffer.from('{}');
     expect(() => verifyWebhookSignature(body, 'anysig')).not.toThrow();
@@ -306,7 +306,7 @@ describe('verifyWebhookSignature()', () => {
 
 describe('getCreditBalance()', () => {
   beforeEach(() => {
-    vi.resetModules();
+    vi.clearAllMocks(); // resetModules not in Vitest 2.0
   });
 
   it('should return the parsed numeric balance from the credit_balance view', async () => {
@@ -342,7 +342,7 @@ describe('getCreditBalance()', () => {
 
 describe('consumeCredit()', () => {
   beforeEach(() => {
-    vi.resetModules();
+    vi.clearAllMocks(); // resetModules not in Vitest 2.0
   });
 
   // ---- Input validation ----

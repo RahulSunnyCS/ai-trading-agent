@@ -11,9 +11,9 @@
  * All state is passed in as parameters so the functions are trivially testable.
  */
 
-import Decimal from "decimal.js";
-import type { OpenPosition } from "../db/schema.js";
-import type { Clock } from "../utils/clock.js";
+import Decimal from 'decimal.js';
+import type { OpenPosition } from '../db/schema.js';
+import type { Clock } from '../utils/clock.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,7 +43,7 @@ export interface TriggerConfig {
  * A discriminated union so callers must handle both cases explicitly.
  */
 export type ExitDecision =
-  | { shouldExit: true; reason: "SL" | "TSL" | "TARGET" | "EOD" | "DAILY_LOSS" | "EXIT_WINDOW" }
+  | { shouldExit: true; reason: 'SL' | 'TSL' | 'TARGET' | 'EOD' | 'DAILY_LOSS' | 'EXIT_WINDOW' }
   | { shouldExit: false };
 
 // ---------------------------------------------------------------------------
@@ -106,14 +106,14 @@ export function evaluateTriggers(
   // threshold = entry * (1 + hardSlPct)
   const hardSlThreshold = entry.mul(new Decimal(1).add(config.hardSlPct));
   if (current.gte(hardSlThreshold)) {
-    return { shouldExit: true, reason: "SL" };
+    return { shouldExit: true, reason: 'SL' };
   }
 
   // --- 2. Daily loss cap ---
   // todayNetPnl is negative when we are losing. Exit if loss exceeds maxDailyLoss.
   // Condition: todayNetPnl <= -maxDailyLoss
-  if (todayPnl.lte(new Decimal("-1").mul(maxLoss))) {
-    return { shouldExit: true, reason: "DAILY_LOSS" };
+  if (todayPnl.lte(new Decimal('-1').mul(maxLoss))) {
+    return { shouldExit: true, reason: 'DAILY_LOSS' };
   }
 
   // --- 3. EOD square-off ---
@@ -121,7 +121,7 @@ export function evaluateTriggers(
   // overnight/post-market exposure. Indian weekly options can lose value
   // dramatically after market hours so this is a hard risk rule.
   if (nowHHMM >= config.eodExitTime) {
-    return { shouldExit: true, reason: "EOD" };
+    return { shouldExit: true, reason: 'EOD' };
   }
 
   // --- 4. Exit cutoff window ---
@@ -129,7 +129,7 @@ export function evaluateTriggers(
   // This fires after EOD in priority, but in practice exitCutoffTime > eodExitTime
   // so EOD will have already fired. This is a safety net if config is unusual.
   if (nowHHMM >= config.exitCutoffTime) {
-    return { shouldExit: true, reason: "EXIT_WINDOW" };
+    return { shouldExit: true, reason: 'EXIT_WINDOW' };
   }
 
   // --- 5. Trailing stop-loss ---
@@ -144,7 +144,7 @@ export function evaluateTriggers(
   // which would cause premature exits that the hard SL should handle instead.
   const trailingThreshold = lowest.mul(new Decimal(1).add(config.trailingSlPct));
   if (current.gte(trailingThreshold) && current.lt(entry)) {
-    return { shouldExit: true, reason: "TSL" };
+    return { shouldExit: true, reason: 'TSL' };
   }
 
   // --- 6. Profit target ---
@@ -152,7 +152,7 @@ export function evaluateTriggers(
   // threshold = entry * (1 - profitTargetPct)
   const profitTargetThreshold = entry.mul(new Decimal(1).sub(config.profitTargetPct));
   if (current.lte(profitTargetThreshold)) {
-    return { shouldExit: true, reason: "TARGET" };
+    return { shouldExit: true, reason: 'TARGET' };
   }
 
   // No trigger fired — hold the position.
@@ -196,11 +196,11 @@ export function updateTrailingStop(position: OpenPosition, currentStraddleValue:
  */
 export function loadTriggerConfig(): TriggerConfig {
   return {
-    hardSlPct: Number.parseFloat(process.env.HARD_SL_PCT ?? "0.3"),
-    trailingSlPct: Number.parseFloat(process.env.TRAILING_SL_PCT ?? "0.15"),
-    profitTargetPct: Number.parseFloat(process.env.PROFIT_TARGET_PCT ?? "0.3"),
-    eodExitTime: process.env.EOD_EXIT_TIME ?? "15:25",
-    exitCutoffTime: process.env.EXIT_CUTOFF_TIME ?? "15:30",
-    maxDailyLoss: process.env.MAX_DAILY_LOSS ?? "10000",
+    hardSlPct: Number.parseFloat(process.env.HARD_SL_PCT ?? '0.3'),
+    trailingSlPct: Number.parseFloat(process.env.TRAILING_SL_PCT ?? '0.15'),
+    profitTargetPct: Number.parseFloat(process.env.PROFIT_TARGET_PCT ?? '0.3'),
+    eodExitTime: process.env.EOD_EXIT_TIME ?? '15:25',
+    exitCutoffTime: process.env.EXIT_CUTOFF_TIME ?? '15:30',
+    maxDailyLoss: process.env.MAX_DAILY_LOSS ?? '10000',
   };
 }

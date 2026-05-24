@@ -17,7 +17,7 @@
 // We inline a minimal shape declaration below so internal usage is type-safe.
 // The package exports a CJS module with no bundled types; @ts-ignore suppresses
 // the TS7016 "Could not find a declaration file" error.
-import smartapiLib from "smartapi-javascript";
+import smartapiLib from 'smartapi-javascript';
 
 // Minimal inline type declarations for the parts of smartapi-javascript we use.
 // The SDK is a plain CommonJS module with no bundled types, so @ts-ignore above
@@ -49,8 +49,8 @@ interface SmartAPISessionResponse {
 interface WebSocketV2Instance {
   connect(): Promise<void>;
   fetchData(req: WebSocketV2Request): void;
-  on(event: "tick", cb: (data: AngelOneLTPTick) => void): void;
-  on(event: "connect", cb: () => void): void;
+  on(event: 'tick', cb: (data: AngelOneLTPTick) => void): void;
+  on(event: 'connect', cb: () => void): void;
   close(): void;
   customError(): void;
 }
@@ -76,10 +76,10 @@ interface AngelOneLTPTick {
 
 // generateSync is the synchronous TOTP generator in otplib v13's functional API.
 // It uses Noble crypto and Scure base32 by default (no crypto plugin needed).
-import { generateSync as totpGenerateSync } from "otplib";
-import type { Clock } from "../../utils/clock.js";
-import type { BrokerFeed, BrokerTick } from "./types.js";
-import { DisconnectReason } from "./types.js";
+import { generateSync as totpGenerateSync } from 'otplib';
+import type { Clock } from '../../utils/clock.js';
+import type { BrokerFeed, BrokerTick } from './types.js';
+import { DisconnectReason } from './types.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -90,8 +90,8 @@ import { DisconnectReason } from "./types.js";
  * is a placeholder and produces incorrect tokens for index instruments.
  */
 const INSTRUMENT_TOKENS = {
-  NIFTY50: "99926000",
-  INDIAVIX: "99919000",
+  NIFTY50: '99926000',
+  INDIAVIX: '99919000',
 } as const;
 
 /**
@@ -99,16 +99,16 @@ const INSTRUMENT_TOKENS = {
  * expected by the rest of the pipeline (Fyers-style format).
  */
 const TOKEN_TO_SYMBOL: Record<string, string> = {
-  [INSTRUMENT_TOKENS.NIFTY50]: "NSE:NIFTY50-INDEX",
-  [INSTRUMENT_TOKENS.INDIAVIX]: "NSE:INDIAVIX-INDEX",
+  [INSTRUMENT_TOKENS.NIFTY50]: 'NSE:NIFTY50-INDEX',
+  [INSTRUMENT_TOKENS.INDIAVIX]: 'NSE:INDIAVIX-INDEX',
 };
 
 /**
  * Maps instrument tokens to their underlying name (used in BrokerTick.underlying).
  */
 const TOKEN_TO_UNDERLYING: Record<string, string> = {
-  [INSTRUMENT_TOKENS.NIFTY50]: "NIFTY",
-  [INSTRUMENT_TOKENS.INDIAVIX]: "INDIAVIX",
+  [INSTRUMENT_TOKENS.NIFTY50]: 'NIFTY',
+  [INSTRUMENT_TOKENS.INDIAVIX]: 'INDIAVIX',
 };
 
 /** Exchange type for NSE cash/index segment in the Angel One WebSocket v2 protocol. */
@@ -226,29 +226,37 @@ export class AngelOneBroker implements BrokerFeed {
   }
 
   // Overloaded on() signatures — TypeScript enforces the correct payload types.
-  on(event: "tick", handler: TickHandler): this;
-  on(event: "error", handler: ErrorHandler): this;
-  on(event: "disconnect", handler: DisconnectHandler): this;
-  on(event: "reconnecting", handler: ReconnectHandler): this;
+  on(event: 'tick', handler: TickHandler): this;
+  on(event: 'error', handler: ErrorHandler): this;
+  on(event: 'disconnect', handler: DisconnectHandler): this;
+  on(event: 'reconnecting', handler: ReconnectHandler): this;
   on(
-    event: "tick" | "error" | "disconnect" | "reconnecting",
+    event: 'tick' | 'error' | 'disconnect' | 'reconnecting',
     handler: TickHandler | ErrorHandler | DisconnectHandler | ReconnectHandler,
   ): this {
     switch (event) {
-      case "tick":
+      case 'tick':
         this.tickHandlers.push(handler as TickHandler);
         break;
-      case "error":
+      case 'error':
         this.errorHandlers.push(handler as ErrorHandler);
         break;
-      case "disconnect":
+      case 'disconnect':
         this.disconnectHandlers.push(handler as DisconnectHandler);
         break;
-      case "reconnecting":
+      case 'reconnecting':
         this.reconnectHandlers.push(handler as ReconnectHandler);
         break;
     }
     return this;
+  }
+
+  onTick(callback: (tick: BrokerTick) => void): void {
+    this.on('tick', callback);
+  }
+
+  onDisconnect(callback: (reason: string) => void): void {
+    this.on('disconnect', callback);
   }
 
   // ── Core connection logic ─────────────────────────────────────────────────
@@ -324,21 +332,21 @@ export class AngelOneBroker implements BrokerFeed {
     // Angel One returns status=false and an error code for credential failures.
     if (!response.status || !response.data) {
       const isAuthFailure =
-        response.errorCode === "AG8001" || // invalid credentials
-        response.message?.toLowerCase().includes("invalid") ||
-        response.message?.toLowerCase().includes("unauthorized");
+        response.errorCode === 'AG8001' || // invalid credentials
+        response.message?.toLowerCase().includes('invalid') ||
+        response.message?.toLowerCase().includes('unauthorized');
 
       if (isAuthFailure) {
         // Log for operator debugging — API key prefix only, never full key.
         console.error(
-          `[AngelOneBroker] Angel One auth failure (apiKey: ${this.apiKeyPrefix}): ${response.message ?? response.errorCode ?? "unknown"}`,
+          `[AngelOneBroker] Angel One auth failure (apiKey: ${this.apiKeyPrefix}): ${response.message ?? response.errorCode ?? 'unknown'}`,
         );
         this.emitDisconnect(DisconnectReason.AUTH_FAILURE);
         throw new Error(`Angel One auth failure: ${response.message ?? response.errorCode}`);
       }
 
       // Non-auth API-level error — surface as transient.
-      throw new Error(`Angel One login failed: ${response.message ?? "unknown"}`);
+      throw new Error(`Angel One login failed: ${response.message ?? 'unknown'}`);
     }
 
     // Store tokens in memory only. Never log them.
@@ -357,7 +365,7 @@ export class AngelOneBroker implements BrokerFeed {
    */
   private async openWebSocket(): Promise<void> {
     if (!this.jwtToken || !this.feedToken) {
-      throw new Error("[AngelOneBroker] Cannot open WebSocket: not authenticated");
+      throw new Error('[AngelOneBroker] Cannot open WebSocket: not authenticated');
     }
 
     // Close any previous connection before creating a new one.
@@ -379,7 +387,7 @@ export class AngelOneBroker implements BrokerFeed {
 
     // Register for raw tick events from the SDK. The SDK calls our callback
     // with the decoded LTP packet for each subscribed instrument.
-    ws.on("tick", (raw: AngelOneLTPTick) => {
+    ws.on('tick', (raw: AngelOneLTPTick) => {
       this.handleRawTick(raw);
     });
 
@@ -410,7 +418,7 @@ export class AngelOneBroker implements BrokerFeed {
     if (!this.wsClient) return;
 
     const req: WebSocketV2Request = {
-      correlationID: "trading-agent-index-feed",
+      correlationID: 'trading-agent-index-feed',
       action: ACTION_SUBSCRIBE,
       mode: MODE_LTP,
       exchangeType: NSE_CM_EXCHANGE_TYPE,
@@ -418,7 +426,7 @@ export class AngelOneBroker implements BrokerFeed {
     };
 
     this.wsClient.fetchData(req);
-    console.log("[AngelOneBroker] Subscribed to NIFTY50 and INDIAVIX (LTP mode)");
+    console.log('[AngelOneBroker] Subscribed to NIFTY50 and INDIAVIX (LTP mode)');
   }
 
   // ── Tick normalisation ────────────────────────────────────────────────────
@@ -441,10 +449,10 @@ export class AngelOneBroker implements BrokerFeed {
     try {
       tokenStr = JSON.parse(raw.token) as string;
       // Trim null bytes that may be left over from fixed-length buffer padding.
-      tokenStr = tokenStr.replace(/\0/g, "").trim();
+      tokenStr = tokenStr.replace(/\0/g, '').trim();
     } catch {
       // If parsing fails the token is already a plain string — use it as-is.
-      tokenStr = raw.token.replace(/\0/g, "").trim();
+      tokenStr = raw.token.replace(/\0/g, '').trim();
     }
 
     const symbol = TOKEN_TO_SYMBOL[tokenStr];
@@ -453,13 +461,15 @@ export class AngelOneBroker implements BrokerFeed {
       return;
     }
 
-    const underlying = TOKEN_TO_UNDERLYING[tokenStr] ?? "UNKNOWN";
+    const underlying = TOKEN_TO_UNDERLYING[tokenStr] ?? 'UNKNOWN';
 
     // Price arrives in paise; convert to rupees.
     const ltpRupees = Number.parseInt(raw.last_traded_price, 10) / 100;
 
+    const nowMs = this.config.clock.now();
     const tick: BrokerTick = {
-      time: this.config.clock.now(),
+      time: nowMs,
+      timestamp: nowMs,
       symbol,
       underlying,
       ltp: ltpRupees,

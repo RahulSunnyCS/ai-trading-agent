@@ -1,4 +1,4 @@
-import Redis from "ioredis";
+import Redis from 'ioredis';
 
 // Singleton Redis client — created once at module load time.
 // REDIS_URL defaults to localhost so simulation mode works without extra config.
@@ -6,16 +6,16 @@ import Redis from "ioredis";
 // lazyConnect: false — open the TCP connection immediately so a misconfigured
 // REDIS_URL or missing Redis container surfaces as a startup error rather than
 // a mysterious failure minutes later when the first command fires.
-export const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+export const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
   maxRetriesPerRequest: 3,
   lazyConnect: false,
 });
 
-redis.on("error", (err: Error) => {
+redis.on('error', (err: Error) => {
   // Log but do not crash — ioredis reconnects automatically after transient
   // blips (container restart, network hiccup).  Throwing here would kill the
   // entire process for a problem that will self-heal in seconds.
-  console.error("[redis] connection error:", err.message);
+  console.error('[redis] connection error:', err.message);
 });
 
 // ---------------------------------------------------------------------------
@@ -23,15 +23,15 @@ redis.on("error", (err: Error) => {
 // ---------------------------------------------------------------------------
 
 // Flat constants for backward compatibility with milestones-0-1 branch code.
-export const STREAM_TICKS = "market.ticks";
-export const STREAM_STRADDLE = "straddle.values";
-export const STREAM_SIGNALS = "signals.generated";
+export const STREAM_TICKS = 'market.ticks';
+export const STREAM_STRADDLE = 'straddle.values';
+export const STREAM_SIGNALS = 'signals.generated';
 
 // Namespaced constants for the payment branch / new code.
 export const STREAMS = {
-  MARKET_TICKS: "market.ticks",
-  STRADDLE_VALUES: "straddle.values",
-  SIGNALS_GENERATED: "signals.generated",
+  MARKET_TICKS: 'market.ticks',
+  STRADDLE_VALUES: 'straddle.values',
+  SIGNALS_GENERATED: 'signals.generated',
 } as const;
 
 export type StreamName = (typeof STREAMS)[keyof typeof STREAMS];
@@ -68,7 +68,7 @@ export async function streamPublish(
     flatFields.push(k, v);
   }
   // The '*' ID lets Redis assign a monotonically increasing timestamp-based ID.
-  const id = await redis.xadd(stream, "*", ...flatFields);
+  const id = await redis.xadd(stream, '*', ...flatFields);
   // Redis guarantees xadd with '*' always returns an ID string, never null.
   if (id === null) throw new Error(`XADD to ${stream} returned null`);
   return id;
@@ -85,11 +85,11 @@ export interface StreamEntry {
 
 export async function streamRead(
   stream: string,
-  lastId = "0",
+  lastId = '0',
   count = 100,
 ): Promise<StreamEntry[]> {
   // XREAD COUNT n STREAMS stream lastId
-  const results = await redis.xread("COUNT", count, "STREAMS", stream, lastId);
+  const results = await redis.xread('COUNT', count, 'STREAMS', stream, lastId);
   if (!results || results.length === 0) return [];
 
   const streamResult = results[0];
@@ -126,9 +126,9 @@ async function ensureGroup(stream: string, group: string): Promise<void> {
     // historical messages before group creation are not replayed.
     // MKSTREAM creates the stream key if it does not yet exist,
     // avoiding a race condition between stream creation and group creation.
-    await redis.xgroup("CREATE", stream, group, "$", "MKSTREAM");
+    await redis.xgroup('CREATE', stream, group, '$', 'MKSTREAM');
   } catch (err: unknown) {
-    if (err instanceof Error && err.message.startsWith("BUSYGROUP")) {
+    if (err instanceof Error && err.message.startsWith('BUSYGROUP')) {
       return;
     }
     throw err;
@@ -195,16 +195,16 @@ export function streamConsume(
       let raw: unknown;
       try {
         raw = await redis.xreadgroup(
-          "GROUP",
+          'GROUP',
           group,
           consumer,
-          "COUNT",
+          'COUNT',
           count,
-          "BLOCK",
+          'BLOCK',
           blockMs,
-          "STREAMS",
+          'STREAMS',
           stream,
-          ">",
+          '>',
         );
       } catch (err: unknown) {
         if (shuttingDown) break;
@@ -253,7 +253,7 @@ export async function recoverPending(
         count: number,
       ) => Promise<[string, Array<[string, string[]]>, string[]]>;
     }
-  ).xautoclaim(stream, group, consumer, 60000, "0-0", "COUNT", 100);
+  ).xautoclaim(stream, group, consumer, 60000, '0-0', 'COUNT', 100);
 
   const claimed = result[1] ?? [];
   return claimed.map(([id]) => id);

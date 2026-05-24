@@ -17,11 +17,14 @@
  *   which is acceptable for a research paper-trading tool.
  */
 
-import type { Redis } from "ioredis";
-import type { Pool } from "pg";
-import { query } from "../db/client.js";
-import { STREAM_STRADDLE, streamConsume } from "../redis/client.js";
-import type { Clock } from "../utils/clock.js";
+import type { Redis } from 'ioredis';
+import type { Pool } from 'pg';
+// `query` import removed in M2: the global open-position DB query was removed.
+// `Pool` is kept because the constructor signature still accepts `db: Pool`
+// for interface compatibility with existing callers — the field is retained
+// unused rather than breaking the public constructor API.
+import { STREAM_STRADDLE, streamConsume } from '../redis/client.js';
+import type { Clock } from '../utils/clock.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -41,7 +44,7 @@ import type { Clock } from "../utils/clock.js";
 export interface EntryIntent {
   straddleValue: string;
   atmStrike: number;
-  underlying: "NIFTY";
+  underlying: 'NIFTY';
   spot: string;
   vixAtEntry: string | null;
   entryTimeMs: number;
@@ -119,22 +122,22 @@ export class EntryEngine {
     // not store it — callers that inject a test Redis client are intentionally
     // NOT supported at the streamConsume level; that layer is tested separately.
 
-    this._entryStartTime = process.env.ENTRY_START_TIME ?? "09:20";
-    this._entryCutoffTime = process.env.ENTRY_CUTOFF_TIME ?? "14:30";
+    this._entryStartTime = process.env.ENTRY_START_TIME ?? '09:20';
+    this._entryCutoffTime = process.env.ENTRY_CUTOFF_TIME ?? '14:30';
 
     // BLOCKED_DATES is a JSON array of 'YYYY-MM-DD' strings.
     // We parse it once and store it as a Set for O(1) lookups.
     // Invalid JSON defaults to an empty set rather than crashing — a mis-set
     // env var should not prevent the engine from starting.
-    const rawBlocked = process.env.BLOCKED_DATES ?? "[]";
+    const rawBlocked = process.env.BLOCKED_DATES ?? '[]';
     let parsedBlocked: string[] = [];
     try {
       const parsed = JSON.parse(rawBlocked);
       if (Array.isArray(parsed)) {
-        parsedBlocked = parsed.filter((d): d is string => typeof d === "string");
+        parsedBlocked = parsed.filter((d): d is string => typeof d === 'string');
       }
     } catch {
-      console.warn("[entry-engine] BLOCKED_DATES is not valid JSON; defaulting to empty list");
+      console.warn('[entry-engine] BLOCKED_DATES is not valid JSON; defaulting to empty list');
     }
     this._blockedDates = new Set(parsedBlocked);
 
@@ -147,7 +150,7 @@ export class EntryEngine {
       this._vixMax = null;
     }
 
-    const parsedCooldown = Number.parseInt(process.env.ENTRY_COOLDOWN_MS ?? "300000", 10);
+    const parsedCooldown = Number.parseInt(process.env.ENTRY_COOLDOWN_MS ?? '300000', 10);
     // Guard against an env var that parses to NaN or a negative value —
     // fall back to the 5-minute default. parseInt("abc") = NaN, which is not finite.
     this._cooldownMs =
@@ -172,9 +175,9 @@ export class EntryEngine {
 
     streamConsume(
       STREAM_STRADDLE,
-      "entry-engine",
-      "primary",
-      async (id: string, fields: Record<string, string>) => {
+      'entry-engine',
+      'primary',
+      async (_id: string, fields: Record<string, string>) => {
         // If stop() was called between when the message was delivered and when
         // the handler executes, discard the message without emitting.
         if (this._stopped) return;
@@ -204,7 +207,7 @@ export class EntryEngine {
    * Register a handler for the 'entry' event.
    * Returns `this` for method chaining, mirroring the EventEmitter API.
    */
-  on(event: "entry", handler: (intent: EntryIntent) => void): this {
+  on(event: 'entry', handler: (intent: EntryIntent) => void): this {
     const existing = this._handlers.get(event) ?? [];
     existing.push(handler);
     this._handlers.set(event, existing);
@@ -243,25 +246,19 @@ export class EntryEngine {
       return;
     }
 
-    // --- Gate c: no existing open positions ---
-    // We query paper_trades here rather than caching state because the position
-    // monitor (a separate module) writes trades to DB. Querying is the only safe
-    // way to get ground truth; an in-memory cache here would be a race condition.
-    const openTrades = await query<{ id: string }>(
-      "SELECT id FROM paper_trades WHERE status = $1 LIMIT 1",
-      ["open"],
-    );
-    if (openTrades.length > 0) {
-      // An open position exists — no new entry until it is closed.
-      return;
-    }
+    // Removed in M2: per-personality check now in personality-filter Stage 2.
+    // The global open-position gate that blocked all personalities when ANY
+    // open trade existed has been removed. Each personality independently
+    // checks its own open position count in Stage 2 of the filter chain
+    // (see src/signals/personality-filter.ts). This allows multiple
+    // personalities to hold simultaneous positions as intended.
 
     // --- Gate d: VIX ceiling ---
     // VIX is optional in the snapshot (not always available at startup).
     // We only block if VIX_MAX is configured AND the snapshot carries a VIX value.
     // Missing VIX = gate passes (do not penalise for unavailable data).
     const rawVix = fields.vix;
-    const vixValue = rawVix !== undefined && rawVix !== "" ? Number.parseFloat(rawVix) : null;
+    const vixValue = rawVix !== undefined && rawVix !== '' ? Number.parseFloat(rawVix) : null;
 
     if (this._vixMax !== null && vixValue !== null && vixValue > this._vixMax) {
       console.info(`[entry-engine] Skipping entry: VIX ${vixValue} > VIX_MAX ${this._vixMax}`);
@@ -280,15 +277,15 @@ export class EntryEngine {
     // Accept both camelCase and snake_case field names because the straddle
     // calculator may publish under either convention depending on when it was
     // written. The camelCase key is checked first (preferred going forward).
-    const straddleValue = fields.straddleValue ?? fields.straddle_value ?? "";
-    const rawAtmStrike = fields.atmStrike ?? fields.atm_strike ?? "0";
+    const straddleValue = fields.straddleValue ?? fields.straddle_value ?? '';
+    const rawAtmStrike = fields.atmStrike ?? fields.atm_strike ?? '0';
     const atmStrike = Number.parseInt(rawAtmStrike, 10);
-    const spot = fields.spot ?? "0";
+    const spot = fields.spot ?? '0';
 
     // straddleValue must be a non-empty numeric string — if the snapshot is
     // malformed we log and skip rather than emitting a bad intent.
-    if (straddleValue === "") {
-      console.warn("[entry-engine] Received snapshot with missing straddleValue — skipping");
+    if (straddleValue === '') {
+      console.warn('[entry-engine] Received snapshot with missing straddleValue — skipping');
       return;
     }
 
@@ -296,7 +293,7 @@ export class EntryEngine {
       straddleValue,
       atmStrike,
       // Phase 1 only supports NIFTY. BankNifty/Sensex are Phase 2.
-      underlying: "NIFTY",
+      underlying: 'NIFTY',
       spot,
       // vixAtEntry is null when VIX data is unavailable, matching the DB
       // column's nullable constraint (paper_trades.vix_at_entry).
@@ -308,7 +305,7 @@ export class EntryEngine {
     // handler cannot re-enter this path within the same tick.
     this._lastEntryMs = nowMs;
 
-    this._emit("entry", intent);
+    this._emit('entry', intent);
   }
 
   // ---------------------------------------------------------------------------
@@ -320,11 +317,11 @@ export class EntryEngine {
    * Errors in individual handlers are caught and logged so one bad handler
    * does not prevent others from receiving the event.
    */
-  private _emit(event: "entry", intent: EntryIntent): void {
+  private _emit(event: 'entry', intent: EntryIntent): void {
     const handlers = this._handlers.get(event) ?? [];
     for (const handler of handlers) {
       try {
-        (handler as EntryEngineEvents["entry"])(intent);
+        (handler as EntryEngineEvents['entry'])(intent);
       } catch (err: unknown) {
         console.error(`[entry-engine] Error in '${event}' handler:`, err);
       }

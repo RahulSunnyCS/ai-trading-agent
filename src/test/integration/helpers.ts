@@ -8,17 +8,17 @@
  * All exports are named exports (no default export) per project convention.
  */
 
-import type { Redis } from "ioredis";
-import type { Pool } from "pg";
+import type { Redis } from 'ioredis';
+import type { Pool } from 'pg';
 
 // ioredis's default export is the Redis class constructor. We import it as a
 // value so we can call `new RedisClient(url, opts)` inside createTestRedis().
 // The `type { Redis }` import above gives us the instance type for the return
 // annotation without creating a circular value/type dependency.
-import RedisClient from "ioredis";
-import pg from "pg";
-import { runMigrations } from "../../db/migrate.js";
-import { FixedClock } from "../../utils/clock.js";
+import RedisClient from 'ioredis';
+import pg from 'pg';
+import { runMigrations } from '../../db/migrate.js';
+import { FixedClock } from '../../utils/clock.js';
 
 // ---------------------------------------------------------------------------
 // PostgreSQL helpers
@@ -41,7 +41,7 @@ import { FixedClock } from "../../utils/clock.js";
  */
 export async function createTestDb(): Promise<Pool> {
   const connectionString =
-    process.env.DATABASE_URL ?? "postgresql://trading:trading@localhost:5432/trading_test";
+    process.env.DATABASE_URL ?? 'postgresql://trading:trading@localhost:5432/trading_test';
 
   const testPool = new pg.Pool({
     connectionString,
@@ -131,7 +131,7 @@ export async function cleanTestDb(db: Pool): Promise<void> {
  * annotated as the imported Redis interface type to keep the call sites clean.
  */
 export function createTestRedis(): Redis {
-  const url = process.env.REDIS_URL ?? "redis://localhost:6379";
+  const url = process.env.REDIS_URL ?? 'redis://localhost:6379';
 
   // connectTimeout: ioredis-specific option that caps the TCP handshake.
   // lazyConnect: false (default) means the client connects immediately so any

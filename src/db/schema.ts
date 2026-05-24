@@ -41,6 +41,12 @@ export interface MarketTick {
   bid: number | null;
   ask: number | null;
   source: string;
+  /**
+   * Candle resolution when source = 'fyers-historical' (migration 007).
+   * NULL for all live rows (source = 'fyers' | 'simulator').
+   * Example values: '1', '5', '15', 'D' (matches FyersResolution in fyers-historical.ts).
+   */
+  resolution: string | null;
 }
 
 export interface StraddleSnapshot {
@@ -55,6 +61,15 @@ export interface StraddleSnapshot {
   roc: number | null;
   roc_acceleration: number | null;
   vix: number | null;
+  /**
+   * Candle resolution tag added by migration 008 (T-33).
+   * Populated only for historically reconstructed rows (via T-56 reconstructor).
+   * NULL for live rows (source = 'fyers' | 'simulator').
+   * Example values: '1' (1-min), '5' (5-min), '15' (15-min), 'D' (daily).
+   * Persisting this here closes the T-56 gap: reconstruct-straddle.ts computed
+   * the resolution per snapshot but had no DB column to store it previously.
+   */
+  resolution: string | null;
 }
 
 export interface OptionTick {
@@ -66,6 +81,84 @@ export interface OptionTick {
   oi: number | null;
   delta: number | null;
   iv: number | null;
+  /**
+   * Data source tag added by migration 007.
+   * 'fyers'           — live WebSocket tick
+   * 'fyers-historical' — historical backfill candle (written by backfill.ts)
+   * Existing rows receive the default value 'fyers' at migration time.
+   */
+  source: string;
+  /**
+   * Candle resolution when source = 'fyers-historical' (migration 007).
+   * NULL for all live rows (source = 'fyers').
+   * Example values: '1', '5', '15', 'D' (matches FyersResolution in fyers-historical.ts).
+   */
+  resolution: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Historical backfill tracking (migration 007)
+// ---------------------------------------------------------------------------
+
+/** Valid values for BackfillRange.status */
+export type BackfillRangeStatus =
+  | 'pending' // Queued but not yet started
+  | 'running' // Currently executing (stale detection: check updated_at + timeout)
+  | 'partial' // Interrupted (FyersAuthError); resume from checkpoint_ts
+  | 'complete' // All candles written; NO calendar gaps detected
+  | 'gapped' // All candles written but calendar gaps were found; see gaps_json
+  | 'error'; // Non-resumable failure
+
+/**
+ * One row in the backfill_ranges table.
+ *
+ * Tracks the progress of a historical candle backfill job for one
+ * (symbol, from_ts, to_ts, resolution) range. Used by the backfill writer
+ * in src/ingestion/historical/backfill.ts to implement resumable downloads
+ * and calendar-gap recording.
+ *
+ * Invariant: if gaps_detected > 0, status MUST be 'partial' or 'gapped',
+ * NEVER 'complete'. The writer enforces this; the CHECK constraint in
+ * migration 007 provides a database-level guard.
+ */
+export interface BackfillRange {
+  id: number;
+  symbol: string;
+  from_ts: Date;
+  to_ts: Date;
+  resolution: string;
+  status: BackfillRangeStatus;
+  rows_written: number;
+  /**
+   * Timestamp of the last successfully persisted candle.
+   * NULL if no candles have been written yet (start from from_ts on resume).
+   * Set by the writer on FyersAuthError so a re-run continues from here.
+   */
+  checkpoint_ts: Date | null;
+  /**
+   * Number of calendar gaps detected during NSE-calendar reconciliation.
+   * When > 0, status must be 'partial' or 'gapped' — never 'complete'.
+   */
+  gaps_detected: number;
+  /**
+   * JSON-serialised array of gap records: [{ from: string, to: string, reason: string }].
+   * NULL when no gaps were detected.
+   * Parse with JSON.parse(gaps_json) and cast to GapRecord[].
+   */
+  gaps_json: string | null;
+  updated_at: Date;
+  created_at: Date;
+}
+
+/**
+ * A single calendar gap record as stored in BackfillRange.gaps_json.
+ * from and to are ISO-8601 strings (not Date objects) because the field is
+ * stored as a JSON TEXT column — callers must new Date(gap.from) to get a Date.
+ */
+export interface BackfillGapRecord {
+  from: string;
+  to: string;
+  reason: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +319,161 @@ export interface Straddle1Min {
 }
 
 // ---------------------------------------------------------------------------
+// Regime tagging interfaces (migration 008, T-33)
+// ---------------------------------------------------------------------------
+
+/**
+ * Valid values for DailyRegimeTag.regime.
+ *
+ * The four core regimes (RANGING, TRENDING_STRONG, VOLATILE_REVERTING,
+ * EVENT_DAY) are the same values used in paper_trades.market_regime and
+ * retrospection_results.market_regime. UNCLASSIFIED is an additional value
+ * emitted when the day's data is too sparse or gapped to classify reliably.
+ *
+ * Precedence (highest first): EVENT_DAY > VOLATILE_REVERTING > TRENDING_STRONG > RANGING.
+ * UNCLASSIFIED is not a regime — it is a sentinel meaning "insufficient data".
+ */
+export type RegimeTagValue =
+  | 'RANGING'
+  | 'TRENDING_STRONG'
+  | 'VOLATILE_REVERTING'
+  | 'EVENT_DAY'
+  | 'UNCLASSIFIED';
+
+/**
+ * One row in the daily_regime_tags table (migration 008).
+ *
+ * Written by the regime tagging engine (src/trading/regime-tagging.ts) after
+ * classifying each reconstructed trading day. One row per (trade_date, symbol).
+ *
+ * regime_confidence [0.0, 1.0]:
+ *   - EVENT_DAY: always 1.0 (calendar lookup is deterministic).
+ *   - UNCLASSIFIED: data-present fraction (lower = more data missing).
+ *   - Other regimes: fraction of intraday windows that agreed with the label.
+ *
+ * classified_at: wall-clock time the row was written. Use this to detect
+ * stale classifications after a data reingestion.
+ */
+export interface DailyRegimeTag {
+  id: number;
+  trade_date: Date; // DATE column — pg returns a Date at midnight UTC
+  symbol: string;
+  regime: RegimeTagValue;
+  /**
+   * Classification confidence [0.0, 1.0].
+   * The pg NUMERIC(5,4) column is returned as a string by the pg client
+   * (when the numeric parser is set to raw-string mode). Callers must
+   * parseFloat() if they need arithmetic.
+   */
+  regime_confidence: number;
+  classified_at: Date;
+}
+
+/**
+ * Valid event types for the event_calendar table (migration 008).
+ *
+ * This is not an exhaustive CHECK constraint in the DB (TEXT column is open-
+ * ended so operators can add custom types). These are the seed values.
+ */
+export type EventCalendarType =
+  | 'RBI_POLICY'
+  | 'UNION_BUDGET'
+  | 'FNO_EXPIRY'
+  | 'STATE_ELECTION'
+  | 'HOLIDAY'
+  | string; // open-ended for operator extensions
+
+/**
+ * One row in the event_calendar table (migration 008).
+ *
+ * A checked-in, dated table of known Indian market event days. Used by the
+ * regime tagging engine to assign EVENT_DAY without relying on the live
+ * BLOCKED_DATES env var (which is not reproducible in historical backtests).
+ *
+ * Multiple rows per event_date are allowed (e.g. F&O expiry + RBI policy on
+ * the same day). The regime engine treats any matching row as EVENT_DAY.
+ *
+ * UNIQUE constraint: (event_date, event_type) — prevents duplicate seeding.
+ */
+export interface EventCalendarEntry {
+  id: number;
+  event_date: Date; // DATE column — pg returns midnight UTC Date
+  event_type: EventCalendarType;
+  description: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Payment / access-control interfaces (UPI/Razorpay integration)
+// M2 legacy interfaces (camelCase, used by position-monitor and other M2 code)
+// ---------------------------------------------------------------------------
+
+/**
+ * One trading personality — camelCase version used by M2 trading engine code.
+ * Maps to the same personality_configs table as PersonalityConfig above.
+ */
+export interface PersonalityConfigM2 {
+  id: string;
+  name: string;
+  displayName: string;
+  groupType: 'reference' | 'learning';
+  entryType: 'fixed_time' | 'momentum_exhaustion' | 'any_signal' | 'sr_anchored';
+  managementStyle: 'hold' | 'roll' | 'cut_reenter';
+  isFrozen: boolean;
+  isActive: boolean;
+  phase: number;
+  params: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * One immutable audit record capturing a parameter change on a personality.
+ */
+export interface PersonalityAuditLog {
+  id: string;
+  personalityId: string;
+  changedAt: Date;
+  changedBy: string;
+  oldParams: Record<string, unknown>;
+  newParams: Record<string, unknown>;
+  reason: string | null;
+}
+
+/**
+ * One signal event produced by the peak detection engine (M2 camelCase version).
+ */
+export interface StraddleSignalM2 {
+  id: string;
+  time: Date;
+  underlying: string;
+  signalType: 'MOMENTUM_EXHAUSTION' | 'SCHEDULED' | 'PULLBACK';
+  atmStrike: string;
+  spot: string;
+  straddleValue: string;
+  vix: string | null;
+  rawExhaustionScore: string | null;
+  adjustedProbability: string;
+  confidenceTier: 'HIGH' | 'MEDIUM' | 'LOW';
+  expansionPct: string | null;
+  rocDeclineCandles: number | null;
+  accelerationValue: string | null;
+  adjustmentBreakdown: string | null;
+}
+
+/**
+ * The in-memory shape consumed by the trigger engine to evaluate
+ * whether an open position should be closed, rolled, or held.
+ */
+export interface OpenPosition {
+  id: string;
+  entryStraddleValue: string;
+  lowestStraddleValueSeen: string;
+  entryTimeMs: number;
+  todayNetPnl: string;
+}
+
+// ---------------------------------------------------------------------------
+// Payment / access-control interfaces (migration 003+)
 // ---------------------------------------------------------------------------
 
 export type GrantType = 'monthly_pass' | 'credits_pack';

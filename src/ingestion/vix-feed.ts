@@ -150,7 +150,7 @@ export function createVixFeed(redisClient: Redis, config?: VixFeedConfig): VixFe
         ? obj.timestamp
         : typeof obj.time === 'number'
           ? obj.time
-          : clock.timestamp();
+          : (clock.timestamp?.() ?? clock.now());
 
     return { symbol: obj.symbol, ltp: obj.ltp, timestamp };
   }
@@ -231,7 +231,7 @@ export function createVixFeed(redisClient: Redis, config?: VixFeedConfig): VixFe
           // Only care about the VIX symbol.
           if (tick.symbol !== VIX_TICK_SYMBOL) continue;
 
-          const now = clock.timestamp();
+          const now = clock.timestamp?.() ?? clock.now();
           const reading: VixReading = {
             vix: tick.ltp,
             timestamp: now,
@@ -278,7 +278,7 @@ export function createVixFeed(redisClient: Redis, config?: VixFeedConfig): VixFe
    */
   async function pollNse(): Promise<void> {
     // If a fresh tick-based VIX arrived recently, skip the poll publish.
-    const now = clock.timestamp();
+    const now = clock.timestamp?.() ?? clock.now();
     if (lastTickVixTimestamp !== null && now - lastTickVixTimestamp < TICK_FRESHNESS_MS) {
       return;
     }
@@ -331,7 +331,7 @@ export function createVixFeed(redisClient: Redis, config?: VixFeedConfig): VixFe
 
       const reading: VixReading = {
         vix: vixEntry.last,
-        timestamp: clock.timestamp(),
+        timestamp: clock.timestamp?.() ?? clock.now(),
         source: 'poll',
       };
 

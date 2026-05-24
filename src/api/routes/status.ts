@@ -1,5 +1,5 @@
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import type { Clock } from "../../utils/clock.js";
+import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import type { Clock } from '../../utils/clock.js';
 
 /**
  * Options passed in when the plugin is registered via fastify.register().
@@ -28,24 +28,24 @@ export const statusRoutes: FastifyPluginAsync<StatusRoutesOptions> = async (
    * Returns { status: "ok", time: epochMs } — the time field confirms the clock is working.
    */
   fastify.get(
-    "/health",
+    '/health',
     {
       schema: {
         response: {
           200: {
-            type: "object",
+            type: 'object',
             properties: {
-              status: { type: "string" },
+              status: { type: 'string' },
               // time is epoch-ms from clock.now() — a JS number (integer).
-              time: { type: "number" },
+              time: { type: 'number' },
             },
-            required: ["status", "time"],
+            required: ['status', 'time'],
           },
         },
       },
     },
     async (_request, _reply) => {
-      return { status: "ok", time: opts.clock.now() };
+      return { status: 'ok', time: opts.clock.now() };
     },
   );
 };

@@ -9,6 +9,7 @@
     "sim": "SIMULATE=true bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "migrate": "bun run src/db/migrate.ts",
+    "replay": "bun run scripts/replay.ts",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
@@ -18,7 +19,8 @@
     "lint": "[ -f ./tools/biome ] && ./tools/biome check . || echo 'biome not installed — run: bash scripts/install-biome.sh'",
     "lint:fix": "[ -f ./tools/biome ] && ./tools/biome check --write . || echo 'biome not installed — run: bash scripts/install-biome.sh'",
     "format": "[ -f ./tools/biome ] && ./tools/biome format --write . || echo 'biome not installed — run: bash scripts/install-biome.sh'",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
@@ -41,7 +43,8 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.46.0",
+    "@biomejs/biome": "^1.9.0",
+    "@playwright/test": "^1.59.1",
     "@types/bun": "latest",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.11.0",
@@ -58,8 +61,5 @@
     "vite": "^5.4.0",
     "vitest": "^2.0.0"
   },
-  "trustedDependencies": [
-    "esbuild",
-    "msgpackr-extract"
-  ]
+  "trustedDependencies": ["esbuild", "msgpackr-extract"]
 }

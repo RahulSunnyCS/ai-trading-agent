@@ -1,22 +1,41 @@
 import { useState } from 'react';
 
+import { BackfillView } from './components/BackfillView';
 import { LiveView } from './components/LiveView';
 import { PaymentTestModeBanner } from './components/PaymentTestModeBanner';
+import { PersonalitiesView } from './components/PersonalitiesView';
 import { PnlView } from './components/PnlView';
 import { PricingPage } from './components/PricingPage';
+import { RegimeView } from './components/RegimeView';
+import { ReplayView } from './components/ReplayView';
 import { TradesView } from './components/TradesView';
 
 /**
- * The four dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
+ * The eight dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
+ * 'regime', 'backfill' and 'replay' are the Milestone-3 additions.
+ * 'personalities' is the Milestone-2 personalities engine surface.
  */
-type Tab = 'live' | 'pnl' | 'pricing' | 'trades';
+type Tab =
+  | 'live'
+  | 'pnl'
+  | 'pricing'
+  | 'trades'
+  | 'personalities'
+  | 'regime'
+  | 'backfill'
+  | 'replay';
 
 /**
  * Returns a human-readable label for each tab.
- * Centralises the special-case for 'pnl' so the nav map stays clean.
+ * Centralises the special-cases for 'pnl' and multi-word tabs so the nav map
+ * stays clean.
  */
 function tabLabel(tab: Tab): string {
   if (tab === 'pnl') return 'P&L';
+  if (tab === 'regime') return 'Regimes';
+  if (tab === 'backfill') return 'Backfill';
+  if (tab === 'replay') return 'Replay';
+  if (tab === 'personalities') return 'Personalities';
   // Capitalise first letter; remaining tabs are single words so slice(1) is safe.
   // 'pricing' → "Pricing", 'live' → "Live", 'trades' → "Trades"
   return tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -38,7 +57,18 @@ export function App() {
       </header>
 
       <nav className="flex gap-1 border-b border-gray-800 px-6">
-        {(['live', 'trades', 'pnl', 'pricing'] as Tab[]).map((tab) => (
+        {(
+          [
+            'live',
+            'trades',
+            'personalities',
+            'pnl',
+            'pricing',
+            'regime',
+            'backfill',
+            'replay',
+          ] as Tab[]
+        ).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -57,8 +87,12 @@ export function App() {
       <main className="p-6">
         {activeTab === 'live' && <LiveView />}
         {activeTab === 'trades' && <TradesView />}
+        {activeTab === 'personalities' && <PersonalitiesView />}
         {activeTab === 'pnl' && <PnlView />}
         {activeTab === 'pricing' && <PricingPage />}
+        {activeTab === 'regime' && <RegimeView />}
+        {activeTab === 'backfill' && <BackfillView />}
+        {activeTab === 'replay' && <ReplayView />}
       </main>
     </div>
   );

@@ -17,11 +17,11 @@
  * All exports are named exports (no default export) per project conventions.
  */
 
-import type { Clock, ClockWithTick } from "../../utils/clock.js";
-import { MarketDataSimulator } from "../market-data-sim.js";
-import { AngelOneBroker } from "./angelone.js";
-import { FyersBroker } from "./fyers.js";
-import type { BrokerFeed } from "./types.js";
+import type { Clock, ClockWithTick } from '../../utils/clock.js';
+import { MarketDataSimulator } from '../market-data-sim.js';
+import { AngelOneBroker } from './angelone.js';
+import { FyersBroker } from './fyers.js';
+import type { BrokerFeed } from './types.js';
 
 // ---------------------------------------------------------------------------
 // createBroker
@@ -37,18 +37,18 @@ import type { BrokerFeed } from "./types.js";
  * @throws Error if the selected broker's required env vars are missing.
  */
 export function createBroker(clock: ClockWithTick): BrokerFeed {
-  const brokerName = (process.env.BROKER ?? "").toLowerCase().trim();
+  const brokerName = (process.env.BROKER ?? '').toLowerCase().trim();
   const simulate = process.env.SIMULATE?.toLowerCase().trim();
 
-  if (brokerName === "fyers") {
+  if (brokerName === 'fyers') {
     return _createFyersBroker(clock);
   }
 
-  if (brokerName === "angelone") {
+  if (brokerName === 'angelone') {
     return _createAngelOneBroker(clock);
   }
 
-  if (brokerName === "sim" || simulate === "true") {
+  if (brokerName === 'sim' || simulate === 'true') {
     // Simulator: no broker credentials needed.
     return _createSimulator(clock);
   }
@@ -56,8 +56,8 @@ export function createBroker(clock: ClockWithTick): BrokerFeed {
   // Default: simulator. Safe choice — prevents accidental live broker
   // connection when BROKER is unset (e.g. in a fresh dev environment).
   console.log(
-    "[BrokerFactory] No BROKER env var set — defaulting to MarketDataSimulator. " +
-      "Set BROKER=fyers or BROKER=angelone for live market data.",
+    '[BrokerFactory] No BROKER env var set — defaulting to MarketDataSimulator. ' +
+      'Set BROKER=fyers or BROKER=angelone for live market data.',
   );
   return _createSimulator(clock);
 }
@@ -82,16 +82,16 @@ function _createFyersBroker(clock: Clock): FyersBroker {
   const accessToken = process.env.FYERS_ACCESS_TOKEN;
 
   const missing: string[] = [];
-  if (!appId || appId.trim() === "") missing.push("FYERS_APP_ID");
-  if (!accessToken || accessToken.trim() === "") missing.push("FYERS_ACCESS_TOKEN");
+  if (!appId || appId.trim() === '') missing.push('FYERS_APP_ID');
+  if (!accessToken || accessToken.trim() === '') missing.push('FYERS_ACCESS_TOKEN');
 
   if (missing.length > 0) {
     throw new Error(
-      `[BrokerFactory] BROKER=fyers requires the following env vars: ${missing.join(", ")}. Set them in .env or your shell before starting the app.`,
+      `[BrokerFactory] BROKER=fyers requires the following env vars: ${missing.join(', ')}. Set them in .env or your shell before starting the app.`,
     );
   }
 
-  console.log("[BrokerFactory] Instantiating FyersBroker");
+  console.log('[BrokerFactory] Instantiating FyersBroker');
 
   // Type-cast via `as string` after the non-empty guard above. Biome disallows
   // the non-null assertion operator (!) so we use an explicit cast instead.
@@ -123,18 +123,18 @@ function _createAngelOneBroker(clock: Clock): AngelOneBroker {
   const totpSecret = process.env.AO_TOTP_SECRET;
 
   const missing: string[] = [];
-  if (!apiKey || apiKey.trim() === "") missing.push("AO_API_KEY");
-  if (!clientCode || clientCode.trim() === "") missing.push("AO_CLIENT_CODE");
-  if (!clientPin || clientPin.trim() === "") missing.push("AO_CLIENT_PIN");
-  if (!totpSecret || totpSecret.trim() === "") missing.push("AO_TOTP_SECRET");
+  if (!apiKey || apiKey.trim() === '') missing.push('AO_API_KEY');
+  if (!clientCode || clientCode.trim() === '') missing.push('AO_CLIENT_CODE');
+  if (!clientPin || clientPin.trim() === '') missing.push('AO_CLIENT_PIN');
+  if (!totpSecret || totpSecret.trim() === '') missing.push('AO_TOTP_SECRET');
 
   if (missing.length > 0) {
     throw new Error(
-      `[BrokerFactory] BROKER=angelone requires the following env vars: ${missing.join(", ")}. Set them in .env or your shell before starting the app.`,
+      `[BrokerFactory] BROKER=angelone requires the following env vars: ${missing.join(', ')}. Set them in .env or your shell before starting the app.`,
     );
   }
 
-  console.log("[BrokerFactory] Instantiating AngelOneBroker");
+  console.log('[BrokerFactory] Instantiating AngelOneBroker');
 
   // Type-cast via `as string` after the non-empty guard above. Biome disallows
   // the non-null assertion operator (!) so we use an explicit cast instead.
@@ -155,7 +155,7 @@ function _createAngelOneBroker(clock: Clock): AngelOneBroker {
  * or slow down synthetic data generation without code changes.
  */
 function _createSimulator(clock: ClockWithTick): MarketDataSimulator {
-  const envInterval = Number.parseInt(process.env.SIM_TICK_INTERVAL_MS ?? "", 10);
+  const envInterval = Number.parseInt(process.env.SIM_TICK_INTERVAL_MS ?? '', 10);
   const tickIntervalMs = Number.isFinite(envInterval) && envInterval > 0 ? envInterval : 1_000;
 
   console.log(
