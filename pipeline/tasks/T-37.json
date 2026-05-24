@@ -1,0 +1,28 @@
+{
+  "task_id": "T-37",
+  "title": "Brier score calibration for signal-driven trades",
+  "assigned_to": "implementor",
+  "risk_flags": ["backend", "financial-logic"],
+  "scope": {
+    "files_to_create": ["src/retrospection/brier-score.ts"],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/db/migrations/",
+      "src/db/schema.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "Exports `computeBrierScore(pool: Pool, personalityId: string, tradeDateISO: string): Promise<number | null>`",
+    "First fetches the personality's entry_type: SELECT entry_type FROM personality_configs WHERE id = $1 — if entry_type is NOT 'momentum_exhaustion', immediately returns NULL without querying paper_trades (fixed_time personalities have no signal_id so Brier score is not applicable)",
+    "Query for signal-linked trades: SELECT ss.adjusted_probability, pt.pnl_abs FROM paper_trades pt INNER JOIN straddle_signals ss ON pt.signal_id = ss.id WHERE pt.personality_id = $1 AND pt.status = 'closed' AND pt.pnl_abs IS NOT NULL AND ss.time >= $2 AND ss.time < $3 — fully parameterized",
+    "Sargable time filter on the straddle_signals hypertable: $2 = tradeDateISO + 'T00:00:00.000Z', $3 = start of next day UTC — the filter is on ss.time (the hypertable column) not pt.entry_time",
+    "Outcome computation: outcome = Number(row.pnl_abs) > 0 ? 1 : 0 — NOT Boolean(row.pnl_abs), which would be truthy for any non-empty string including '0' or '-5.00'",
+    "Brier score formula: mean of (probability - outcome)^2 for all rows, where probability = Number(row.adjusted_probability)",
+    "Guards Number.isFinite(Number(row.adjusted_probability)) before including a row — rows failing the guard are logged and excluded",
+    "Returns NULL when COUNT = 0 rows from the join (no signal-driven closed trades on that day) — never divides by zero",
+    "The return value is a number between 0.0 and 1.0 (inclusive); 0.0 is perfect calibration, 1.0 is worst possible",
+    "No default exports — named exports only"
+  ],
+  "dependencies": ["T-42"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

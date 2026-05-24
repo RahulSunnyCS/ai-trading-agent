@@ -1,0 +1,29 @@
+{
+  "task_id": "T-38",
+  "title": "Management effectiveness score computation",
+  "assigned_to": "implementor",
+  "risk_flags": ["backend", "financial-logic"],
+  "scope": {
+    "files_to_create": ["src/retrospection/management-effectiveness.ts"],
+    "files_to_modify": [],
+    "files_forbidden": [
+      "src/db/migrations/",
+      "src/db/schema.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "Exports `computeManagementEffectiveness(pool: Pool, personalityId: string, tradeDateISO: string): Promise<number | null>`",
+    "Query: SELECT exit_reason, pnl_pct FROM paper_trades WHERE personality_id = $1 AND status = 'closed' AND pnl_abs IS NOT NULL AND exit_reason IS NOT NULL AND entry_time >= $2 AND entry_time < $3 — fully parameterized",
+    "Sargable time filter: $2 = tradeDateISO + 'T00:00:00.000Z' (start of day UTC), $3 = start of next day UTC",
+    "Exit reason scoring map (exact values): TARGET = 1.0, TSL = 0.5, EOD = 0.0, SL = -1.0, DAILY_LOSS_CAP = -0.5, MANUAL = 0.0, TIME = 0.0",
+    "Any exit_reason value not in the scoring map is treated as 0.0 and logged as a warning (open-ended extensibility without crashing)",
+    "Weighted average formula: sum(score * |pnl_pct|) / sum(|pnl_pct|) — weighted by the absolute P&L magnitude so a large winning TARGET exit dominates more than a small one",
+    "Returns NULL when zero closed trades — no division by zero",
+    "Returns NULL when sum of |pnl_pct| weights is 0 (all trades have pnl_pct = 0) — avoids 0/0",
+    "All pg NUMERIC pnl_pct values are cast with Number() and guarded with Number.isFinite() before arithmetic — non-finite rows are logged and excluded",
+    "The return value is in the range [-1.0, 1.0]; higher is better management execution",
+    "No default exports — named exports only"
+  ],
+  "dependencies": ["T-42"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}
