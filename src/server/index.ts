@@ -161,6 +161,123 @@ export async function buildServer(
     return reply.send({ data: [], message: 'no open positions' });
   });
 
+  // GET /api/regime-tags — daily regime tags from daily_regime_tags table.
+  //
+  // Query params (all optional):
+  //   symbol  — default 'NIFTY'
+  //   from    — YYYY-MM-DD start date (inclusive), default: 30 days ago
+  //   to      — YYYY-MM-DD end date (inclusive), default: today
+  //
+  // Range is capped at 366 days to bound the hypertable scan: the
+  // daily_regime_tags table is date-partitioned and a 366-day cap keeps
+  // the worst-case query to a single calendar year.
+  server.get('/api/regime-tags', async (request, reply) => {
+    const query = request.query as Record<string, string | undefined>;
+    const symbol = query.symbol ?? 'NIFTY';
+
+    // Compute default date range: last 30 days ending today.
+    const nowMs = Date.now();
+    const todayIso = new Date(nowMs).toISOString().slice(0, 10);
+    const thirtyDaysAgoIso = new Date(nowMs - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const fromStr = query.from ?? thirtyDaysAgoIso;
+    const toStr = query.to ?? todayIso;
+
+    // Validate that the provided date strings parse as actual calendar dates.
+    // Date.parse() returns NaN for strings that are not valid ISO dates;
+    // we reject rather than silently fall back to the default so callers get
+    // immediate feedback on bad inputs.
+    const fromMs = Date.parse(fromStr);
+    const toMs = Date.parse(toStr);
+
+    if (Number.isNaN(fromMs)) {
+      return reply.code(400).send({ error: `Invalid 'from' date: ${fromStr}` });
+    }
+    if (Number.isNaN(toMs)) {
+      return reply.code(400).send({ error: `Invalid 'to' date: ${toStr}` });
+    }
+
+    // Cap range at 366 days to prevent full-table scans on the hypertable.
+    const diffDays = (toMs - fromMs) / (24 * 60 * 60 * 1000);
+    if (diffDays > 366) {
+      return reply.code(400).send({
+        error: `Date range exceeds 366 days (${Math.ceil(diffDays)} days requested).`,
+      });
+    }
+
+    try {
+      const result = await server.db.query<{
+        id: number;
+        trade_date: Date;
+        symbol: string;
+        regime: string;
+        regime_confidence: string;
+        classified_at: Date;
+      }>(
+        `SELECT id, trade_date, symbol, regime, regime_confidence, classified_at
+         FROM daily_regime_tags
+         WHERE symbol = $1
+           AND trade_date >= $2
+           AND trade_date <= $3
+         ORDER BY trade_date DESC`,
+        [symbol, fromStr, toStr],
+      );
+
+      return reply.send({ data: result.rows });
+    } catch {
+      // Table does not exist yet or DB is unavailable — return a graceful empty
+      // response rather than a 500 so the frontend renders the empty state.
+      return reply.send({ data: [], message: 'no regime tags yet' });
+    }
+  });
+
+  // GET /api/backfill — backfill job ranges from backfill_ranges table.
+  //
+  // Query params (optional):
+  //   symbol — if provided, filter rows to that symbol; else return all.
+  //
+  // Hard LIMIT 200 ORDER BY from_ts DESC keeps the response bounded even
+  // without date params (backfill_ranges has one row per job, so 200 rows
+  // represents at most 200 backfill runs — a sensible UI ceiling).
+  server.get('/api/backfill', async (request, reply) => {
+    const query = request.query as Record<string, string | undefined>;
+    const symbol = query.symbol;
+
+    try {
+      // Use a parameterised query that optionally filters by symbol.
+      // When symbol is undefined we pass NULL and the IS NULL check falls
+      // through so all rows are returned — avoids string interpolation.
+      const result = await server.db.query<{
+        id: number;
+        symbol: string;
+        from_ts: Date;
+        to_ts: Date;
+        resolution: string;
+        status: string;
+        rows_written: number;
+        checkpoint_ts: Date | null;
+        gaps_detected: number;
+        gaps_json: string | null;
+        updated_at: Date;
+        created_at: Date;
+      }>(
+        `SELECT id, symbol, from_ts, to_ts, resolution, status,
+                rows_written, checkpoint_ts, gaps_detected, gaps_json,
+                updated_at, created_at
+         FROM backfill_ranges
+         WHERE ($1::text IS NULL OR symbol = $1)
+         ORDER BY from_ts DESC
+         LIMIT 200`,
+        [symbol ?? null],
+      );
+
+      return reply.send({ data: result.rows });
+    } catch {
+      // Table does not exist yet or DB is unavailable.
+      return reply.send({ data: [], message: 'no backfill ranges yet' });
+    }
+  });
+
   // WS /ws/ticks — synthetic tick broadcast; real wiring in T-21
   server.get('/ws/ticks', { websocket: true }, (socket, _request) => {
     // Send a "connected" confirmation immediately so the dashboard knows the

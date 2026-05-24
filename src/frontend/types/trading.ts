@@ -107,3 +107,54 @@ export interface WsTickMessage {
  * Switch on `msg.type` to narrow to the concrete variant.
  */
 export type TickMessage = WsConnectedMessage | WsTickMessage;
+
+// ---------------------------------------------------------------------------
+// Regime Tags (GET /api/regime-tags)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single row returned by GET /api/regime-tags.
+ *
+ * trade_date is an ISO-8601 string (the pg driver serialises DATE columns as
+ * midnight UTC Date objects, which JSON.stringify converts to ISO strings).
+ *
+ * regime_confidence is the raw NUMERIC string from pg — typed as string|null so
+ * callers must parseFloat() before arithmetic.  null should not appear in
+ * practice (the column has a NOT NULL constraint) but is kept here defensively
+ * to match the task contract.
+ */
+export interface RegimeTag {
+  trade_date: string; // ISO-8601, e.g. "2026-05-01T00:00:00.000Z"
+  symbol: string;
+  regime: string; // 'RANGING' | 'TRENDING_STRONG' | 'VOLATILE_REVERTING' | 'EVENT_DAY' | 'UNCLASSIFIED'
+  regime_confidence: string | null; // NUMERIC(5,4) as raw string
+  classified_at: string; // ISO-8601 timestamp
+}
+
+// ---------------------------------------------------------------------------
+// Backfill Status (GET /api/backfill)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single row returned by GET /api/backfill.
+ *
+ * Mirrors BackfillRange from src/db/schema.ts but with:
+ *   - Date fields as ISO-8601 strings (JSON serialisation)
+ *   - rows_written and gaps_detected as number (INTEGER columns — pg returns
+ *     JS numbers for INTEGER, not strings)
+ *   - gaps_json as string|null (JSON-encoded TEXT column; callers parse if needed)
+ */
+export interface BackfillRangeRow {
+  id: number;
+  symbol: string;
+  from_ts: string; // ISO-8601 timestamp
+  to_ts: string; // ISO-8601 timestamp
+  resolution: string; // e.g. '1', '5', '15', 'D'
+  status: string; // 'pending'|'running'|'partial'|'complete'|'gapped'|'error'
+  rows_written: number; // INTEGER — arrives as JS number
+  checkpoint_ts: string | null; // ISO-8601 or null
+  gaps_detected: number; // INTEGER — arrives as JS number
+  gaps_json: string | null; // JSON-encoded gap array or null
+  updated_at: string; // ISO-8601
+  created_at: string; // ISO-8601
+}
