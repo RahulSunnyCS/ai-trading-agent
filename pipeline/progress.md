@@ -40,7 +40,7 @@ Surface this at Gate 2 as an architecture finding (frontend type-safety gap).
 - [x] Phase 4 — CONDITIONAL PASS approved at Gate 2; condition fixed (M1 chart rebuild + L1/L2/L4) & pushed
 - [x] Phase 5 — E2E specs (30 tagged) + README docs done & committed. Hook/component unit tests deferred (no jsdom/testing-library; out of frontend-only scope).
 - [x] Phase 6 — Automation Gate: CI-ONLY (chromium binary absent / no live server); unit 360 pass, frontend tsc clean.
-- [~] Phase 7 — Final review + epic doc → Human Gate 3
+- [~] Phase 7 — Epic doc written (docs/epics/frontend-dashboard-wiring.md) → awaiting Human Gate 3 (then pipeline/ + TODO.md cleanup)
 - [ ] Phase 5 — Tests + Docs + E2E
 - [ ] Phase 6 — Test execution + Automation Gate
 - [ ] Phase 7 — Final review + epic doc → Human Gate 3
