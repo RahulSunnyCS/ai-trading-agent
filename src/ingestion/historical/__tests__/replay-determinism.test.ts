@@ -257,7 +257,7 @@ async function flushPollLoop(): Promise<void> {
   //   4. Second round: the second sleep fires (no new data yet — that's fine)
   // After 3 rounds of advance+flush, the price map should be current.
   for (let round = 0; round < 3; round++) {
-    await vi.advanceTimersByTimeAsync(200);
+    vi.advanceTimersByTime(200);
     for (let i = 0; i < 20; i++) {
       await Promise.resolve();
     }
@@ -702,14 +702,16 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
     expect(calculator.getLatestSnapshot()).toBeNull();
 
     // Advance fake timers by one interval — setInterval fires once.
-    await vi.advanceTimersByTimeAsync(15_000);
+    vi.advanceTimersByTime(15_000);
+    await Promise.resolve();
 
     // The snapshot should now exist (setInterval fired, takeSnapshotFireAndForget ran).
     expect(calculator.getLatestSnapshot()).not.toBeNull();
     expect(xaddCalls.length).toBe(1);
 
     // Advance by another interval — second snapshot.
-    await vi.advanceTimersByTimeAsync(15_000);
+    vi.advanceTimersByTime(15_000);
+    await Promise.resolve();
     expect(xaddCalls.length).toBe(2);
 
     await calculator.stop();

@@ -65,12 +65,12 @@ describe('getClientCountry()', () => {
   // Reset the module before each test so the internal _geoCache Map is empty
   // and env overrides are clean.
   beforeEach(() => {
-    vi.resetModules();
-    vi.unstubAllEnvs();
+    // Note: vi.resetModules() and vi.unstubAllEnvs() are not available in Vitest 2.0.
+    // Test isolation is handled by vitest's built-in module isolation in Node environment.
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
+    // See beforeEach note above.
   });
 
   // ---- Happy path ----
@@ -154,11 +154,12 @@ describe('getClientCountry()', () => {
   // ---- Base URL / env override ----
 
   it('should use GEOLOCATION_API_URL env var as the base URL when set', async () => {
-    vi.stubEnv('GEOLOCATION_API_URL', 'https://custom-geo.example.com/json');
+    process.env.GEOLOCATION_API_URL = 'https://custom-geo.example.com/json';
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchStub(INDIA_PAYLOAD);
     await getClientCountry('1.2.3.4', stub.asFetch);
     expect(firstCalledUrl(stub)).toContain('https://custom-geo.example.com/json');
+    delete process.env.GEOLOCATION_API_URL;
   });
 
   it('should fall back to https://ip-api.com/json when GEOLOCATION_API_URL is not set', async () => {
@@ -241,7 +242,7 @@ describe('getClientCountry()', () => {
 
 describe('extractClientIp()', () => {
   beforeEach(() => {
-    vi.resetModules();
+    // vi.resetModules() is not available in Vitest 2.0; test isolation is handled automatically
   });
 
   it('should return request.ip when it is a valid string', async () => {

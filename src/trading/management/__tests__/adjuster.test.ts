@@ -153,7 +153,7 @@ describe('AdjusterManager.evaluatePosition', () => {
     vi.clearAllMocks();
     manager = new AdjusterManager();
     // Default: evaluateTriggers says hold (most tests override this when needed).
-    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
+    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
   });
 
   // -------------------------------------------------------------------------
@@ -188,7 +188,7 @@ describe('AdjusterManager.evaluatePosition', () => {
   it('does NOT return ROLL when |currentSpot - entrySpotProxy| < roll_trigger_points', async () => {
     // spotsFromEntry = |369 - 300| = 69 < 70 → no roll.
     const mockDb = makeMockDb(makeMockClient([]), 0);
-    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
+    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
 
     const result = await manager.evaluatePosition(
       mockPosition,
@@ -213,7 +213,7 @@ describe('AdjusterManager.evaluatePosition', () => {
     // With openLegs = 2 and max_open_legs = 4, the threshold is 4/2 = 2.
     // 2 >= 2 → cap is at-or-exceeded → treat as Holder.
     const mockDb = makeMockDb(makeMockClient([]), /* openLegs */ 2);
-    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
+    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
 
     // Spot has moved 80 points (well above roll_trigger_points = 70), so roll
     // would normally fire — but the cap prevents it.
@@ -261,7 +261,7 @@ describe('AdjusterManager.evaluatePosition', () => {
 
   it('forwards evaluateTriggers result when spot is within roll threshold', async () => {
     const mockDb = makeMockDb(makeMockClient([]), 0);
-    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: true, reason: 'SL' });
+    (evaluateTriggers as any).mockReturnValue({ shouldExit: true, reason: 'SL' });
 
     // spotsFromEntry = |360 - 300| = 60 < 70 → no roll → fall through to SL.
     const result = await manager.evaluatePosition(
@@ -303,7 +303,7 @@ describe('AdjusterManager.evaluatePosition', () => {
     expect(resultBelow.exitReason).not.toBe('ROLL');
 
     vi.clearAllMocks();
-    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
+    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
     const mockDb2 = makeMockDb(makeMockClient([]), 0);
 
     // 70 points — SHOULD roll.

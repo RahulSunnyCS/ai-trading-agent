@@ -167,7 +167,7 @@ describe('portfolioRiskCheck — Rule 1: event-day gate', () => {
 
     expect(result).toEqual({ allowed: false, reason: 'EVENT_DAY_BLOCKED' });
     // Confirm DB was not touched (event-day check is pure in-memory)
-    expect(vi.mocked(db.query)).not.toHaveBeenCalled();
+    expect(db.query).not.toHaveBeenCalled();
   });
 
   it('returns EVENT_DAY_BLOCKED on Thursday before 11:00 AM IST', async () => {
@@ -180,7 +180,7 @@ describe('portfolioRiskCheck — Rule 1: event-day gate', () => {
     const result = await portfolioRiskCheck(db, baseIntent, clock, 0);
 
     expect(result).toEqual({ allowed: false, reason: 'EVENT_DAY_BLOCKED' });
-    expect(vi.mocked(db.query)).not.toHaveBeenCalled();
+    expect(db.query).not.toHaveBeenCalled();
   });
 
   it('passes event-day gate on Thursday at or after 11:00 AM IST', async () => {
@@ -215,7 +215,7 @@ describe('portfolioRiskCheck — Rule 2: VIX staleness gate', () => {
 
     expect(result).toEqual({ allowed: false, reason: 'VIX_STALE' });
     // VIX check is in-memory; DB should not be reached
-    expect(vi.mocked(db.query)).not.toHaveBeenCalled();
+    expect(db.query).not.toHaveBeenCalled();
   });
 
   it('passes VIX gate when vixAgeMs exactly equals VIX_STALE_MS (boundary: > not >=)', async () => {
@@ -408,7 +408,7 @@ describe('portfolioRiskCheck — Rule 5: max legs / advisory lock', () => {
     await portfolioRiskCheck(db, baseIntent, clock, 0);
 
     // connect() is called once; the client.release() must always be called
-    const client = await vi.mocked(db.connect).mock.results[0]?.value;
+    const client = await (db.connect as any).mock.results[0]?.value;
     expect(client?.release).toHaveBeenCalledOnce();
   });
 });
@@ -473,7 +473,7 @@ describe('portfolioRiskCheck — client lifecycle', () => {
 
     await portfolioRiskCheck(db, baseIntent, clock, 0);
 
-    const client = await vi.mocked(db.connect).mock.results[0]?.value;
+    const client = await (db.connect as any).mock.results[0]?.value;
     expect(client?.release).toHaveBeenCalledOnce();
   });
 
