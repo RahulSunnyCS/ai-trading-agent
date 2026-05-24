@@ -38,10 +38,9 @@ Surface this at Gate 2 as an architecture finding (frontend type-safety gap).
 - [ ] Phase 2 — Decomposition
 - [ ] Phase 3 — Implementation
 - [x] Phase 4 — CONDITIONAL PASS approved at Gate 2; condition fixed (M1 chart rebuild + L1/L2/L4) & pushed
-- [~] Phase 5 — Test generation: E2E specs (from qa-checklist) + light docs.
-  - Unit: pure logic already covered (format 27 + pnl 27 = 54). React hook/component unit tests
-    DEFERRED — project has no jsdom/@testing-library/react; adding them is out of frontend-only scope.
-  - E2E: @playwright/test already a devDep → bootstrap playwright.config + tagged specs (CI-only run here, no live backend).
+- [x] Phase 5 — E2E specs (30 tagged) + README docs done & committed. Hook/component unit tests deferred (no jsdom/testing-library; out of frontend-only scope).
+- [x] Phase 6 — Automation Gate: CI-ONLY (chromium binary absent / no live server); unit 360 pass, frontend tsc clean.
+- [~] Phase 7 — Final review + epic doc → Human Gate 3
 - [ ] Phase 5 — Tests + Docs + E2E
 - [ ] Phase 6 — Test execution + Automation Gate
 - [ ] Phase 7 — Final review + epic doc → Human Gate 3
