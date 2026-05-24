@@ -37,7 +37,8 @@ Surface this at Gate 2 as an architecture finding (frontend type-safety gap).
   - QA checklist: 16 Critical / 17 Functional / 9 Non-blocker (42 total). File: pipeline/qa-checklist.md
 - [ ] Phase 2 — Decomposition
 - [ ] Phase 3 — Implementation
-- [ ] Phase 4 — Architecture review (LOW → architecture only) → Human Gate 2
+- [~] Phase 4 — Architecture review DONE: CONDITIONAL PASS (0 Crit / 1 Med / 5 Low) → awaiting Human Gate 2
+  - Condition: M1 CumulativeChart rebuild-per-poll (flash/lost-zoom). Lows are hygiene/opt-in.
 - [ ] Phase 5 — Tests + Docs + E2E
 - [ ] Phase 6 — Test execution + Automation Gate
 - [ ] Phase 7 — Final review + epic doc → Human Gate 3
