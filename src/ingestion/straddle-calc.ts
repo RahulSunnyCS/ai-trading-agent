@@ -248,7 +248,7 @@ export function createStraddleCalculator(
           ? obj.timestamp
           : typeof obj.time === 'number'
             ? obj.time
-            : clock.timestamp();
+            : (clock.timestamp?.() ?? clock.now());
 
       const tick: BrokerTick = {
         symbol: obj.symbol,
@@ -271,7 +271,7 @@ export function createStraddleCalculator(
    * Update the in-memory price map for a single tick.
    */
   function processTick(tick: BrokerTick): void {
-    const ts = tick.timestamp ?? tick.time ?? clock.timestamp();
+    const ts = tick.timestamp ?? tick.time ?? clock.timestamp?.() ?? clock.now();
     priceMap.set(tick.symbol, { price: tick.ltp, timestamp: ts });
   }
 
@@ -345,7 +345,7 @@ export function createStraddleCalculator(
 
     const snapshot: StraddleSnapshot = {
       underlying,
-      timestamp: clock.timestamp(),
+      timestamp: clock.timestamp?.() ?? clock.now(),
       atmStrike,
       cePrice,
       pePrice,
@@ -564,7 +564,7 @@ export function createStraddleCalculator(
 // ---------------------------------------------------------------------------
 
 /**
- * Promise-based sleep.  Used in the poll loop to avoid a tight spin when
+ * Promise-based sleep.  Used in the poll loop to avoid a tight CPU spin when
  * no new messages are available in the Redis stream.
  */
 function sleep(ms: number): Promise<void> {

@@ -206,6 +206,14 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
     return super.on(event, handler);
   }
 
+  onTick(callback: (tick: BrokerTick) => void): void {
+    this.on('tick', callback);
+  }
+
+  onDisconnect(callback: (reason: string) => void): void {
+    this.on('disconnect', callback);
+  }
+
   // ─── Internal socket lifecycle ──────────────────────────────────────────
 
   /**
@@ -314,6 +322,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
       return;
     }
 
+    const nowMs = this._clock.now();
     const brokerTick: BrokerTick = {
       symbol: tick.symbol,
       underlying: this._deriveUnderlying(tick.symbol),
@@ -321,7 +330,8 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
       // Use the clock for timestamp so tests can inject a deterministic clock.
       // Fyers sends epoch seconds in tick.timestamp; we use the clock's now()
       // (epoch ms) instead for consistency with the rest of the pipeline.
-      time: this._clock.now(),
+      time: nowMs,
+      timestamp: nowMs,
       volume: tick.vol_traded_today ?? tick.v ?? 0,
       oi: tick.oi ?? 0,
       bid: tick.bid_price ?? 0,

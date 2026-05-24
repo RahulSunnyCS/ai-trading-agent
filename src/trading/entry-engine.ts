@@ -19,7 +19,10 @@
 
 import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
-import { query } from '../db/client.js';
+// `query` import removed in M2: the global open-position DB query was removed.
+// `Pool` is kept because the constructor signature still accepts `db: Pool`
+// for interface compatibility with existing callers — the field is retained
+// unused rather than breaking the public constructor API.
 import { STREAM_STRADDLE, streamConsume } from '../redis/client.js';
 import type { Clock } from '../utils/clock.js';
 
@@ -243,18 +246,12 @@ export class EntryEngine {
       return;
     }
 
-    // --- Gate c: no existing open positions ---
-    // We query paper_trades here rather than caching state because the position
-    // monitor (a separate module) writes trades to DB. Querying is the only safe
-    // way to get ground truth; an in-memory cache here would be a race condition.
-    const openTrades = await query<{ id: string }>(
-      'SELECT id FROM paper_trades WHERE status = $1 LIMIT 1',
-      ['open'],
-    );
-    if (openTrades.length > 0) {
-      // An open position exists — no new entry until it is closed.
-      return;
-    }
+    // Removed in M2: per-personality check now in personality-filter Stage 2.
+    // The global open-position gate that blocked all personalities when ANY
+    // open trade existed has been removed. Each personality independently
+    // checks its own open position count in Stage 2 of the filter chain
+    // (see src/signals/personality-filter.ts). This allows multiple
+    // personalities to hold simultaneous positions as intended.
 
     // --- Gate d: VIX ceiling ---
     // VIX is optional in the snapshot (not always available at startup).

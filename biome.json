@@ -26,7 +26,7 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "coverage", "bun.lock", "*.sql"]
+    "ignore": ["node_modules", "dist", "coverage", "bun.lock", "frontend/node_modules", "*.sql"]
   },
   "overrides": [
     {

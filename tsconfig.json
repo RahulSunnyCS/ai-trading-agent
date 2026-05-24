@@ -9,6 +9,8 @@
     "moduleResolution": "bundler",
     // Strict mode: required by project conventions
     "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
     // No emit — Bun runs TypeScript natively; tsc is type-check only
     "noEmit": true,
     // Additional strict checks beyond the strict flag
@@ -20,7 +22,6 @@
     // Allow .ts extension in imports (required for some Bun patterns; payment branch)
     "allowImportingTsExtensions": true,
     // Path alias: import from "@/..." resolves to "src/..."
-    // This lets us write `import { query } from "@/db/client"` throughout the codebase
     "paths": {
       "@/*": ["./src/*"]
     },

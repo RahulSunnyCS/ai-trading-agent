@@ -404,6 +404,76 @@ export interface EventCalendarEntry {
 
 // ---------------------------------------------------------------------------
 // Payment / access-control interfaces (UPI/Razorpay integration)
+// M2 legacy interfaces (camelCase, used by position-monitor and other M2 code)
+// ---------------------------------------------------------------------------
+
+/**
+ * One trading personality — camelCase version used by M2 trading engine code.
+ * Maps to the same personality_configs table as PersonalityConfig above.
+ */
+export interface PersonalityConfigM2 {
+  id: string;
+  name: string;
+  displayName: string;
+  groupType: 'reference' | 'learning';
+  entryType: 'fixed_time' | 'momentum_exhaustion' | 'any_signal' | 'sr_anchored';
+  managementStyle: 'hold' | 'roll' | 'cut_reenter';
+  isFrozen: boolean;
+  isActive: boolean;
+  phase: number;
+  params: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * One immutable audit record capturing a parameter change on a personality.
+ */
+export interface PersonalityAuditLog {
+  id: string;
+  personalityId: string;
+  changedAt: Date;
+  changedBy: string;
+  oldParams: Record<string, unknown>;
+  newParams: Record<string, unknown>;
+  reason: string | null;
+}
+
+/**
+ * One signal event produced by the peak detection engine (M2 camelCase version).
+ */
+export interface StraddleSignalM2 {
+  id: string;
+  time: Date;
+  underlying: string;
+  signalType: 'MOMENTUM_EXHAUSTION' | 'SCHEDULED' | 'PULLBACK';
+  atmStrike: string;
+  spot: string;
+  straddleValue: string;
+  vix: string | null;
+  rawExhaustionScore: string | null;
+  adjustedProbability: string;
+  confidenceTier: 'HIGH' | 'MEDIUM' | 'LOW';
+  expansionPct: string | null;
+  rocDeclineCandles: number | null;
+  accelerationValue: string | null;
+  adjustmentBreakdown: string | null;
+}
+
+/**
+ * The in-memory shape consumed by the trigger engine to evaluate
+ * whether an open position should be closed, rolled, or held.
+ */
+export interface OpenPosition {
+  id: string;
+  entryStraddleValue: string;
+  lowestStraddleValueSeen: string;
+  entryTimeMs: number;
+  todayNetPnl: string;
+}
+
+// ---------------------------------------------------------------------------
+// Payment / access-control interfaces (migration 003+)
 // ---------------------------------------------------------------------------
 
 export type GrantType = 'monthly_pass' | 'credits_pack';

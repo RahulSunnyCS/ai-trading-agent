@@ -117,7 +117,7 @@ function hhmmToMinutes(hhmm: string): number {
  * We do UTC arithmetic on the adjusted timestamp — no host-TZ dependency.
  */
 function currentISTMinutes(clock: Clock): number {
-  const istMs = clock.timestamp() + IST_OFFSET_MS;
+  const istMs = (clock.timestamp?.() ?? clock.now()) + IST_OFFSET_MS;
   const d = new Date(istMs);
   return d.getUTCHours() * 60 + d.getUTCMinutes();
 }

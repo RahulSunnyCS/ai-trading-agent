@@ -33,7 +33,7 @@
 
 import type { Redis } from 'ioredis';
 
-import type { PositionMonitor } from '../../trading/position-monitor';
+import type { PositionMonitorInterface } from '../../trading/position-monitor';
 import type { VirtualClock } from '../../utils/clock';
 import type { BrokerTick } from '../brokers/types';
 import type { StraddleCalculator } from '../straddle-calc';
@@ -101,7 +101,7 @@ export function createReplayDriver(
   feed: HistoricalFeed,
   redis: Redis,
   straddleCalc: StraddleCalculator,
-  positionMonitor: PositionMonitor,
+  positionMonitor: PositionMonitorInterface,
   clock: VirtualClock,
   config?: ReplayConfig,
 ): { run(): Promise<ReplaySummary> } {

@@ -33,8 +33,13 @@ export interface Clock {
    * Returns the current timestamp as epoch milliseconds.
    * Alias for now() — added for compatibility with the payment branch's
    * Clock interface which uses timestamp() instead of now().
+   *
+   * Optional: M2 engine code and its test doubles implement the four-method
+   * Clock (now/today/toISTDate/toISTTime) without timestamp(). Callers that
+   * need an epoch must fall back to now() — see `clockTimestamp()` helpers /
+   * the `clock.timestamp?.() ?? clock.now()` idiom in ingestion code.
    */
-  timestamp(): number;
+  timestamp?(): number;
 }
 
 /**
@@ -302,7 +307,7 @@ export function createClock(options?: {
  * Used by entry/exit window logic in the trading engine.
  */
 export function toISTTimeString(clock: Clock): string {
-  const istMs = clock.timestamp() + IST_OFFSET_MS;
+  const istMs = (clock.timestamp?.() ?? clock.now()) + IST_OFFSET_MS;
   const d = new Date(istMs);
   const h = String(d.getUTCHours()).padStart(2, '0');
   const m = String(d.getUTCMinutes()).padStart(2, '0');

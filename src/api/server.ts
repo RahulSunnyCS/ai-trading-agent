@@ -6,6 +6,7 @@ import type { Pool } from 'pg';
 import type { Clock } from '../utils/clock.js';
 import { dashboardRoutes } from './routes/dashboard.js';
 import { paperTradesRoutes } from './routes/paper-trades.js';
+import { personalitiesRoutes } from './routes/personalities.js';
 import { statusRoutes } from './routes/status.js';
 import { tradesRoutes } from './routes/trades.js';
 import { registerWebSocket } from './websocket.js';
@@ -84,6 +85,7 @@ export function buildServer(opts: BuildServerOpts): FastifyInstance {
   // tradesRoutes mounts /api/trades and /api/trades/history.
   // dashboardRoutes mounts /dashboard/live and /dashboard/summary.
   // paperTradesRoutes mounts /paper-trades (paginated, date + status filtered).
+  // personalitiesRoutes mounts /api/personalities (CRUD + performance queries).
   //
   // Each is a separate Fastify plugin so they can be registered, tested, and
   // reasoned about independently without coupling them to the server factory.
@@ -91,6 +93,7 @@ export function buildServer(opts: BuildServerOpts): FastifyInstance {
   server.register(tradesRoutes, { db: opts.db });
   server.register(dashboardRoutes, { db: opts.db, clock: opts.clock });
   server.register(paperTradesRoutes, { db: opts.db, clock: opts.clock });
+  server.register(personalitiesRoutes, { db: opts.db });
 
   return server;
 }

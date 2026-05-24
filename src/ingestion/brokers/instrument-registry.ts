@@ -223,7 +223,7 @@ export function getCurrentExpiry(_underlying: Underlying, clock: Clock = new Rea
   // offset is constant. We use arithmetic rather than Intl.DateTimeFormat
   // to avoid any locale / TZ configuration dependency.
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  const nowUtcMs = clock.timestamp();
+  const nowUtcMs = clock.timestamp?.() ?? clock.now();
 
   // Compute "now" in IST as a UTC Date object (all UTC getters will return IST values)
   const nowIst = new Date(nowUtcMs + IST_OFFSET_MS);

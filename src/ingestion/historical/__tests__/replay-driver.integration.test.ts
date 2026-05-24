@@ -39,7 +39,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Redis } from 'ioredis';
 import { cleanTestRedis, createTestRedis } from '../../../test/integration/helpers.js';
-import type { PositionMonitor } from '../../../trading/position-monitor.js';
+import type { PositionMonitorInterface } from '../../../trading/position-monitor.js';
 import { VirtualClock } from '../../../utils/clock.js';
 import {
   buildOptionSymbol,
@@ -158,7 +158,7 @@ function buildMinimalFeed(clock: VirtualClock, tickCount = 1): HistoricalFeed {
  * Build a stub PositionMonitor that resolves processedThrough() immediately
  * so we can test the ticksConsumed barrier in isolation.
  */
-function buildStubPositionMonitor(): PositionMonitor {
+function buildStubPositionMonitor(): PositionMonitorInterface {
   return {
     async start(): Promise<void> {},
     async stop(): Promise<void> {},

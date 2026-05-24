@@ -14,6 +14,10 @@ dist/
 # bun.lockb is the old binary format from older Bun versions — excluded.
 bun.lockb
 
+# Vite build cache + TypeScript incremental build info
+.vite/
+*.tsbuildinfo
+
 # Logs
 *.log
 npm-debug.log*
@@ -25,15 +29,12 @@ bun-debug.log*
 # Test coverage output
 coverage/
 
-# TypeScript incremental build cache
-*.tsbuildinfo
+# Playwright test artifacts
+test-results/
+playwright-report/
 
 # Biome standalone binary (platform-specific — never commit; install via scripts/install-biome.sh)
 tools/biome*
 
-# Vite build cache
-.vite/
-
-# Playwright test results
-playwright-report/
-test-results/
+# Claude Code agent worktrees (temporary isolated git worktrees used during parallel implementation)
+.claude/worktrees/

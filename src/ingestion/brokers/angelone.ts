@@ -251,6 +251,14 @@ export class AngelOneBroker implements BrokerFeed {
     return this;
   }
 
+  onTick(callback: (tick: BrokerTick) => void): void {
+    this.on('tick', callback);
+  }
+
+  onDisconnect(callback: (reason: string) => void): void {
+    this.on('disconnect', callback);
+  }
+
   // ── Core connection logic ─────────────────────────────────────────────────
 
   /**
@@ -458,8 +466,10 @@ export class AngelOneBroker implements BrokerFeed {
     // Price arrives in paise; convert to rupees.
     const ltpRupees = Number.parseInt(raw.last_traded_price, 10) / 100;
 
+    const nowMs = this.config.clock.now();
     const tick: BrokerTick = {
-      time: this.config.clock.now(),
+      time: nowMs,
+      timestamp: nowMs,
       symbol,
       underlying,
       ltp: ltpRupees,
