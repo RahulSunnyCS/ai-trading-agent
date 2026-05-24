@@ -27,8 +27,8 @@
  */
 
 import pg from 'pg';
-import { createBacktestRunner } from '../src/backtesting/backtest-runner.js';
 import { formatReport, generateReport } from '../src/backtesting/backtest-report.js';
+import { createBacktestRunner } from '../src/backtesting/backtest-runner.js';
 
 // ---------------------------------------------------------------------------
 // Argument parsing
@@ -91,7 +91,9 @@ async function main(): Promise<void> {
 
   // Validate required args
   if (!fromDate || !toDate || !underlying) {
-    console.error('Usage: bun run scripts/backtest.ts --from YYYY-MM-DD --to YYYY-MM-DD --underlying NIFTY [--holdout-days 20] [--train-fraction 0.7] [--json]');
+    console.error(
+      'Usage: bun run scripts/backtest.ts --from YYYY-MM-DD --to YYYY-MM-DD --underlying NIFTY [--holdout-days 20] [--train-fraction 0.7] [--json]',
+    );
     process.exit(1);
   }
 

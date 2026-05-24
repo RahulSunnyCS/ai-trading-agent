@@ -14,8 +14,8 @@
  *   (unknown)      → +0.0 (warn and treat as neutral)
  */
 
-import { describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
+import { describe, expect, it, vi } from 'vitest';
 import { computeManagementEffectiveness } from '../management-effectiveness.js';
 
 // ---------------------------------------------------------------------------
@@ -148,8 +148,8 @@ describe('computeManagementEffectiveness', () => {
     // The corrupt row (pnl_pct='NaN') must be excluded. The valid row drives the result.
     // TARGET trade: score=1.0, pnl_pct='2.00', weight=2.0 → score=1.0
     const rows = [
-      { exit_reason: 'SL', pnl_pct: 'NaN' },  // corrupt — skip
-      { exit_reason: 'TARGET', pnl_pct: '2.00' },  // valid
+      { exit_reason: 'SL', pnl_pct: 'NaN' }, // corrupt — skip
+      { exit_reason: 'TARGET', pnl_pct: '2.00' }, // valid
     ];
     const pool = makePool(rows);
 

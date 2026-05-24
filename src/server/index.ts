@@ -24,15 +24,18 @@
 import fastifyCors from '@fastify/cors';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyWebsocket from '@fastify/websocket';
+import type { Queue } from 'bullmq';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { Pool } from 'pg';
-import type { Queue } from 'bullmq';
 
+import { retrospectionRoutes } from '../api/routes/retrospection.js';
+import {
+  createEodRetrospectionQueue,
+  createEodRetrospectionWorker,
+} from '../jobs/eod-retrospection-job.js';
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
 import { paymentRoutes } from './routes/payment';
-import { createEodRetrospectionQueue, createEodRetrospectionWorker } from '../jobs/eod-retrospection-job.js';
-import { retrospectionRoutes } from '../api/routes/retrospection.js';
 
 // ---------------------------------------------------------------------------
 // Fastify module augmentation — makes server.db typed as Pool
@@ -433,7 +436,9 @@ export async function startServer(externalPool?: Pool): Promise<void> {
       // Close the EOD worker first so in-flight jobs can finish before the DB
       // pool is torn down by server.close(). Worker.close() waits for the
       // current job to complete before resolving.
-      if (eodWorker) { await eodWorker.close(); }
+      if (eodWorker) {
+        await eodWorker.close();
+      }
       // Close the queue's Redis connection before closing the server — the
       // queue holds an open connection even when no worker is running.
       await server.eodQueue.close();

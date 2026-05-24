@@ -18,12 +18,12 @@
  */
 
 import type { Pool } from 'pg';
-import { FixedClock } from '../utils/clock.js';
+import type { PersonalityConfigM2 } from '../db/schema.js';
+import { runPersonalityFilter } from '../signals/personality-filter.js';
+import type { DailyState, StraddleSignalInput } from '../signals/personality-filter.js';
 import { evaluateTriggers, updateTrailingStop } from '../trading/trigger-engine.js';
 import type { TriggerConfig } from '../trading/trigger-engine.js';
-import { runPersonalityFilter } from '../signals/personality-filter.js';
-import type { StraddleSignalInput, DailyState } from '../signals/personality-filter.js';
-import type { PersonalityConfigM2 } from '../db/schema.js';
+import { FixedClock } from '../utils/clock.js';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -122,14 +122,6 @@ function toISTHHMM(epochMs: number): string {
   return `${h}:${m}`;
 }
 
-function toISTDate(epochMs: number): string {
-  const d = new Date(epochMs + IST_OFFSET_MS);
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 /** Parses numeric columns that pg may return as string (NUMERIC columns) or number. */
 function toNum(v: string | number | null | undefined): number | null {
   if (v === null || v === undefined) return null;
@@ -219,7 +211,12 @@ interface PeakDetectionState {
 function updatePeakState(
   snap: InMemorySnapshot,
   state: PeakDetectionState,
-  config: Required<Pick<BacktestConfig, 'minExpansionPct' | 'accelerationThreshold' | 'rocDeclineCandles' | 'confirmationCandles'>>,
+  config: Required<
+    Pick<
+      BacktestConfig,
+      'minExpansionPct' | 'accelerationThreshold' | 'rocDeclineCandles' | 'confirmationCandles'
+    >
+  >,
 ): boolean {
   // Lock the open straddle value at the first non-zero snapshot after 09:15 IST
   if (state.openStraddleValue === null) {
@@ -455,9 +452,9 @@ export function createBacktestRunner(pool: Pool) {
 
       // Trigger config (fall back to production defaults)
       const triggerConfig: TriggerConfig = {
-        hardSlPct: config.hardSlPct ?? 0.30,
+        hardSlPct: config.hardSlPct ?? 0.3,
         trailingSlPct: config.trailingSlPct ?? 0.15,
-        profitTargetPct: config.profitTargetPct ?? 0.30,
+        profitTargetPct: config.profitTargetPct ?? 0.3,
         eodExitTime: config.eodExitTimeIST ?? '15:25',
         // exitCutoffTime is used as a safety net; set 5 min after EOD
         exitCutoffTime: '15:30',
@@ -469,15 +466,11 @@ export function createBacktestRunner(pool: Pool) {
       const split = computeSplit(allDays, holdoutDays, trainFraction);
 
       // Build a fast lookup: date → split label
-      const trainSet = new Set(
-        calendarDaysBetween(split.train.from, split.train.to),
-      );
-      const testSet = new Set(
-        calendarDaysBetween(split.test.from, split.test.to),
-      );
-      const holdoutSet = new Set(
-        calendarDaysBetween(split.holdout.from, split.holdout.to),
-      );
+      // trainSet is constructed for symmetry but only holdoutSet and testSet are
+      // queried directly; getSplitLabel returns 'train' as the default fallback.
+      const _trainSet = new Set(calendarDaysBetween(split.train.from, split.train.to));
+      const testSet = new Set(calendarDaysBetween(split.test.from, split.test.to));
+      const holdoutSet = new Set(calendarDaysBetween(split.holdout.from, split.holdout.to));
 
       function getSplitLabel(date: string): 'train' | 'test' | 'holdout' {
         if (holdoutSet.has(date)) return 'holdout';
@@ -587,7 +580,7 @@ export function createBacktestRunner(pool: Pool) {
             snapshotIdx: momentumSignalSnapshotIdx,
             timeMs: momentumSignalTimeMs,
             signalType: 'MOMENTUM_EXHAUSTION',
-            adjustedProbability: 0.70,
+            adjustedProbability: 0.7,
           });
         }
 

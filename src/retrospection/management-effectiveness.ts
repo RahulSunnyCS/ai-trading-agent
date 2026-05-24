@@ -139,9 +139,7 @@ export async function computeManagementEffectiveness(
       // This can only happen if the DB contains a corrupt value — log it and
       // continue so one bad row doesn't wipe out the whole day's score.
       console.warn(
-        `[management-effectiveness] Skipping trade with non-finite pnl_pct: ` +
-          `personality=${personalityId} date=${tradeDateISO} ` +
-          `exit_reason=${trade.exit_reason} pnl_pct=${trade.pnl_pct}`,
+        `[management-effectiveness] Skipping trade with non-finite pnl_pct: personality=${personalityId} date=${tradeDateISO} exit_reason=${trade.exit_reason} pnl_pct=${trade.pnl_pct}`,
       );
       continue;
     }

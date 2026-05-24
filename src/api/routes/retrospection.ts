@@ -27,20 +27,15 @@
  *    from silently corrupting numeric parameters.
  */
 
-import fp from 'fastify-plugin';
+import type { Queue } from 'bullmq';
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import fp from 'fastify-plugin';
 import type { Pool } from 'pg';
-import { Queue } from 'bullmq';
 
 // ---------------------------------------------------------------------------
 // Allowed values for the regime query param
 // ---------------------------------------------------------------------------
-const ALLOWED_REGIMES = new Set([
-  'RANGING',
-  'TRENDING_STRONG',
-  'VOLATILE_REVERTING',
-  'EVENT_DAY',
-]);
+const ALLOWED_REGIMES = new Set(['RANGING', 'TRENDING_STRONG', 'VOLATILE_REVERTING', 'EVENT_DAY']);
 
 // Regex for UUID format validation (8-4-4-4-12 hex).
 // Used for personality_id query params and personalityId path param.
@@ -126,8 +121,7 @@ export const retrospectionRoutes: FastifyPluginAsync<RetrospectionPluginOptions>
         conditions.push(`trade_date <= $${params.length}`);
       }
 
-      const whereClause =
-        conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
       const sql = `
         SELECT *
@@ -282,10 +276,14 @@ export const retrospectionRoutes: FastifyPluginAsync<RetrospectionPluginOptions>
             return reply.code(404).send({ error: 'no_pending_adjustment' });
           }
 
-          // Non-null assertion: length === 0 guard above ensures rows[0] exists.
-          // noUncheckedIndexedAccess requires the assertion even after the guard.
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          const retroRow = retroResult.rows[0]!;
+          // rows[0] is guaranteed non-undefined: the length === 0 guard above
+          // returns early if empty. Assign to a const and narrow to satisfy
+          // strict index checking without a non-null assertion.
+          const retroRow = retroResult.rows[0];
+          if (retroRow === undefined) {
+            await client.query('ROLLBACK');
+            return reply.code(404).send({ error: 'no_pending_adjustment' });
+          }
 
           // Defensive check: adjustments_applied should be FALSE given the WHERE
           // clause above, but guard explicitly in case the FOR UPDATE races with
@@ -314,9 +312,14 @@ export const retrospectionRoutes: FastifyPluginAsync<RetrospectionPluginOptions>
             return reply.code(404).send({ error: 'personality_not_found' });
           }
 
-          // Non-null assertion: length === 0 guard above ensures rows[0] exists.
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          const personalityRow = personalityResult.rows[0]!;
+          // rows[0] is guaranteed non-undefined: the length === 0 guard above
+          // returns early if empty. Assign to a const and narrow to satisfy
+          // strict index checking without a non-null assertion.
+          const personalityRow = personalityResult.rows[0];
+          if (personalityRow === undefined) {
+            await client.query('ROLLBACK');
+            return reply.code(404).send({ error: 'personality_not_found' });
+          }
 
           // Frozen personalities must not be modified — this is the
           // FROZEN_VIOLATION guard from the project invariants. We check it
@@ -329,8 +332,7 @@ export const retrospectionRoutes: FastifyPluginAsync<RetrospectionPluginOptions>
 
           // Step 3: extract and validate the proposed min_probability value.
           // proposed_adjustments may be any JSON shape — guard defensively.
-          const proposedValue =
-            retroRow.proposed_adjustments?.min_probability;
+          const proposedValue = retroRow.proposed_adjustments?.min_probability;
 
           // Number.isFinite() rejects NaN, Infinity, -Infinity, strings, null,
           // and undefined — all of which would silently corrupt the parameter.

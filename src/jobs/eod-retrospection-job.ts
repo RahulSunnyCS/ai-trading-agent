@@ -28,11 +28,11 @@
 import { Queue, Worker } from 'bullmq';
 import type { Pool } from 'pg';
 
-import { computeDailyMetrics, computeBeatClockworkDelta } from '../retrospection/daily-metrics.js';
-import { computeBrierScore } from '../retrospection/brier-score.js';
-import { computeManagementEffectiveness } from '../retrospection/management-effectiveness.js';
-import { runEvolutionEngine } from '../retrospection/evolution-engine.js';
 import { withTransaction } from '../db/client.js';
+import { computeBrierScore } from '../retrospection/brier-score.js';
+import { computeBeatClockworkDelta, computeDailyMetrics } from '../retrospection/daily-metrics.js';
+import { runEvolutionEngine } from '../retrospection/evolution-engine.js';
+import { computeManagementEffectiveness } from '../retrospection/management-effectiveness.js';
 
 // ---------------------------------------------------------------------------
 // Connection helper
@@ -75,9 +75,13 @@ export function createEodRetrospectionQueue(): Queue {
   // factory function and cannot await the add() call. BullMQ persists the
   // repeat job in Redis so a failure here only means the cron is not registered
   // for this process restart; BullMQ will attempt again on the next run.
-  void queue.add('eod-retrospection', {}, {
-    repeat: { pattern: '0 16 * * 1-5', tz: 'Asia/Kolkata' },
-  });
+  void queue.add(
+    'eod-retrospection',
+    {},
+    {
+      repeat: { pattern: '0 16 * * 1-5', tz: 'Asia/Kolkata' },
+    },
+  );
 
   return queue;
 }
@@ -142,9 +146,7 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
       // -----------------------------------------------------------------------
       const personalitiesResult = await pool.query<{
         id: string;
-      }>(
-        'SELECT id FROM personality_configs WHERE is_active = TRUE',
-      );
+      }>('SELECT id FROM personality_configs WHERE is_active = TRUE');
 
       const personalities = personalitiesResult.rows;
 
@@ -225,11 +227,11 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
                 metrics.totalTrades,
                 metrics.winningTrades,
                 metrics.totalPnlPct,
-                beatClockworkDelta,    // number | null
-                brierScore,            // number | null
+                beatClockworkDelta, // number | null
+                brierScore, // number | null
                 managementEffectiveness, // number | null
-                null,                  // proposed_adjustments — populated by evolution engine (5f)
-                false,                 // adjustments_applied
+                null, // proposed_adjustments — populated by evolution engine (5f)
+                false, // adjustments_applied
               ],
             );
           });

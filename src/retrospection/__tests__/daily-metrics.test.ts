@@ -6,8 +6,8 @@
  * the runtime behaviour of the pg.types.setTypeParser(1700) override.
  */
 
-import { describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
+import { describe, expect, it, vi } from 'vitest';
 import { computeBeatClockworkDelta, computeDailyMetrics } from '../daily-metrics.js';
 
 // ---------------------------------------------------------------------------
@@ -19,15 +19,6 @@ function makePool(rows: Record<string, unknown>[]): Pool {
   return {
     query: vi.fn().mockResolvedValue({ rows }),
   } as unknown as Pool;
-}
-
-/** Build a mock Pool that sequences multiple query() return values. */
-function makeSequencedPool(responses: Record<string, unknown>[][]): Pool {
-  const queryMock = vi.fn();
-  for (const rows of responses) {
-    queryMock.mockResolvedValueOnce({ rows });
-  }
-  return { query: queryMock } as unknown as Pool;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +138,12 @@ describe('computeBeatClockworkDelta', () => {
     // even be called.
     const pool = makePool([{ count: '5', total: 2.0 }]);
 
-    const result = await computeBeatClockworkDelta(pool, Infinity, '2024-11-15', 'RANGING');
+    const result = await computeBeatClockworkDelta(
+      pool,
+      Number.POSITIVE_INFINITY,
+      '2024-11-15',
+      'RANGING',
+    );
 
     expect(result).toBeNull();
   });
@@ -155,7 +151,7 @@ describe('computeBeatClockworkDelta', () => {
   it('returns null when personalityTotalPnlPct is NaN', async () => {
     const pool = makePool([{ count: '5', total: 2.0 }]);
 
-    const result = await computeBeatClockworkDelta(pool, NaN, '2024-11-15', 'RANGING');
+    const result = await computeBeatClockworkDelta(pool, Number.NaN, '2024-11-15', 'RANGING');
 
     expect(result).toBeNull();
   });

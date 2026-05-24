@@ -71,10 +71,12 @@ export async function computeBrierScore(
   }
 
   // rows[0] is guaranteed non-undefined because we checked length === 0 above.
-  // TypeScript strict mode does not narrow array indexing automatically, so
-  // we use the non-null assertion here rather than a redundant null check.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const { entry_type } = entryTypeResult.rows[0]!;
+  // Assign to a const and guard against undefined to satisfy strict indexing.
+  const entryTypeRow = entryTypeResult.rows[0];
+  if (entryTypeRow === undefined) {
+    return null;
+  }
+  const { entry_type } = entryTypeRow;
 
   if (entry_type !== 'momentum_exhaustion') {
     // Non-signal personality: Brier score is not applicable.
@@ -159,9 +161,7 @@ export async function computeBrierScore(
     // not abort the entire day's retrospection calculation.
     if (!Number.isFinite(probability)) {
       console.warn(
-        `[brier-score] Skipping row with non-finite adjusted_probability: ` +
-          `${JSON.stringify(row.adjusted_probability)} ` +
-          `(personality=${personalityId}, date=${tradeDateISO})`,
+        `[brier-score] Skipping row with non-finite adjusted_probability: ${JSON.stringify(row.adjusted_probability)} (personality=${personalityId}, date=${tradeDateISO})`,
       );
       continue;
     }

@@ -95,7 +95,7 @@ interface PersonalityRow {
  *                        this personality on this date
  */
 export async function runEvolutionEngine(
-  pool: Pool,
+  _pool: Pool,
   personalityId: string,
   tradeDateISO: string,
   metrics: { winRate: number; totalTrades: number; totalPnlPct: number },
@@ -188,9 +188,7 @@ export async function runEvolutionEngine(
     // personality that is not in this group.
     const targetRow = allRows.find((r) => r.id === personalityId);
     if (targetRow === undefined) {
-      throw new Error(
-        'personality ' + personalityId + ' not found in momentum_exhaustion group',
-      );
+      throw new Error(`personality ${personalityId} not found in momentum_exhaustion group`);
     }
 
     // -----------------------------------------------------------------------
@@ -199,9 +197,7 @@ export async function runEvolutionEngine(
     // evolve, and throwing here makes any accidental invocation visible.
     // -----------------------------------------------------------------------
     if (targetRow.is_frozen) {
-      throw new Error(
-        'FROZEN_VIOLATION: cannot evolve frozen personality ' + targetRow.name,
-      );
+      throw new Error(`FROZEN_VIOLATION: cannot evolve frozen personality ${targetRow.name}`);
     }
 
     // -----------------------------------------------------------------------
@@ -235,7 +231,7 @@ export async function runEvolutionEngine(
     //   - 0.90 upper bound: requiring 90%+ confidence on every trade would
     //     effectively turn off the strategy (signals this strong are rare).
     // -----------------------------------------------------------------------
-    let proposedValue = Math.max(0.30, Math.min(0.90, minProb + delta));
+    let proposedValue = Math.max(0.3, Math.min(0.9, minProb + delta));
 
     // -----------------------------------------------------------------------
     // Integrity cap — keeps all active momentum_exhaustion personalities within
@@ -288,7 +284,7 @@ export async function runEvolutionEngine(
 
         // Re-clamp after integrity adjustment — the cap arithmetic could push us
         // outside [0.30, 0.90] in edge cases where the entire group is near a boundary.
-        proposedValue = Math.max(0.30, Math.min(0.90, proposedValue));
+        proposedValue = Math.max(0.3, Math.min(0.9, proposedValue));
       }
     }
 
@@ -365,50 +361,52 @@ export async function runEvolutionEngine(
       );
 
       return { action: 'proposed', proposedValue };
-    } else {
-      // -------------------------------------------------------------------
-      // Autonomous mode: apply the change immediately to personality_configs.
-      //
-      // jsonb_set(params, '{min_probability}', ...) creates or replaces the
-      // min_probability key inside the params JSONB object without touching
-      // any other keys. to_json($1::float8)::jsonb converts the TypeScript
-      // number to a JSONB numeric literal.
-      //
-      // We also increment evolution_consecutive_applications so the evolution
-      // scheduler can detect runaway changes (e.g. 5 consecutive decreases)
-      // and raise an alert.
-      // -------------------------------------------------------------------
-      await client.query(
-        `UPDATE personality_configs
-         SET params                              = jsonb_set(params, '{min_probability}', to_json($1::float8)::jsonb),
-             last_evolved_at                     = NOW(),
-             evolution_consecutive_applications  = evolution_consecutive_applications + 1
-         WHERE id = $2`,
-        [proposedValue, personalityId],
-      );
-
-      // Build old_params and new_params snapshots for the audit log.
-      // We construct new_params by shallow-merging the updated field rather
-      // than re-querying — the transaction has not committed yet so a
-      // re-SELECT would return the updated row, making old_params identical.
-      const oldParams = JSON.stringify(targetRow.params);
-      const newParamsObj = { ...(targetRow.params as Record<string, unknown>), min_probability: proposedValue };
-      const newParams = JSON.stringify(newParamsObj);
-
-      // Insert an immutable audit record. gen_random_uuid() is called inside
-      // PostgreSQL so we do not need to import a UUID library into this module.
-      // The reason string is human-readable and includes the rule name and the
-      // numeric values so it is self-contained — someone reading the audit log
-      // in 6 months does not need to cross-reference the evolution engine source.
-      const reason = `${ruleName}: winRate=${metrics.winRate.toFixed(4)}, trades=${metrics.totalTrades}, ${minProb.toFixed(4)} → ${proposedValue.toFixed(4)}`;
-
-      await client.query(
-        `INSERT INTO personality_audit_log (id, personality_id, changed_at, changed_by, old_params, new_params, reason)
-         VALUES (gen_random_uuid(), $1, NOW(), 'evolution-engine', $2::jsonb, $3::jsonb, $4)`,
-        [personalityId, oldParams, newParams, reason],
-      );
-
-      return { action: 'applied', proposedValue };
     }
+    // -------------------------------------------------------------------
+    // Autonomous mode: apply the change immediately to personality_configs.
+    //
+    // jsonb_set(params, '{min_probability}', ...) creates or replaces the
+    // min_probability key inside the params JSONB object without touching
+    // any other keys. to_json($1::float8)::jsonb converts the TypeScript
+    // number to a JSONB numeric literal.
+    //
+    // We also increment evolution_consecutive_applications so the evolution
+    // scheduler can detect runaway changes (e.g. 5 consecutive decreases)
+    // and raise an alert.
+    // -------------------------------------------------------------------
+    await client.query(
+      `UPDATE personality_configs
+       SET params                              = jsonb_set(params, '{min_probability}', to_json($1::float8)::jsonb),
+           last_evolved_at                     = NOW(),
+           evolution_consecutive_applications  = evolution_consecutive_applications + 1
+       WHERE id = $2`,
+      [proposedValue, personalityId],
+    );
+
+    // Build old_params and new_params snapshots for the audit log.
+    // We construct new_params by shallow-merging the updated field rather
+    // than re-querying — the transaction has not committed yet so a
+    // re-SELECT would return the updated row, making old_params identical.
+    const oldParams = JSON.stringify(targetRow.params);
+    const newParamsObj = {
+      ...(targetRow.params as Record<string, unknown>),
+      min_probability: proposedValue,
+    };
+    const newParams = JSON.stringify(newParamsObj);
+
+    // Insert an immutable audit record. gen_random_uuid() is called inside
+    // PostgreSQL so we do not need to import a UUID library into this module.
+    // The reason string is human-readable and includes the rule name and the
+    // numeric values so it is self-contained — someone reading the audit log
+    // in 6 months does not need to cross-reference the evolution engine source.
+    const reason = `${ruleName}: winRate=${metrics.winRate.toFixed(4)}, trades=${metrics.totalTrades}, ${minProb.toFixed(4)} → ${proposedValue.toFixed(4)}`;
+
+    await client.query(
+      `INSERT INTO personality_audit_log (id, personality_id, changed_at, changed_by, old_params, new_params, reason)
+       VALUES (gen_random_uuid(), $1, NOW(), 'evolution-engine', $2::jsonb, $3::jsonb, $4)`,
+      [personalityId, oldParams, newParams, reason],
+    );
+
+    return { action: 'applied', proposedValue };
   });
 }

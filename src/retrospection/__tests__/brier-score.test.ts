@@ -12,8 +12,8 @@
  *   outcome = 1 when pnl_abs > 0, else 0
  */
 
-import { describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
+import { describe, expect, it, vi } from 'vitest';
 import { computeBrierScore } from '../brier-score.js';
 
 // ---------------------------------------------------------------------------

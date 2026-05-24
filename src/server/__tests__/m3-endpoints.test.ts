@@ -42,7 +42,9 @@ vi.mock('../../jobs/eod-retrospection-job.js', () => ({
   createEodRetrospectionWorker: vi.fn(() => ({ close: vi.fn() })),
 }));
 vi.mock('../../api/routes/retrospection.js', () => ({
-  retrospectionRoutes: async () => { /* noop plugin stub */ },
+  retrospectionRoutes: async () => {
+    /* noop plugin stub */
+  },
 }));
 
 // ---------------------------------------------------------------------------

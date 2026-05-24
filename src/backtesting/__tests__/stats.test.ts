@@ -6,13 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  mannWhitneyU,
-  maxDrawdown,
-  normalCDF,
-  sharpeRatio,
-  welchTTest,
-} from '../stats.js';
+import { mannWhitneyU, maxDrawdown, normalCDF, sharpeRatio, welchTTest } from '../stats.js';
 
 // ---------------------------------------------------------------------------
 // normalCDF
@@ -159,15 +153,15 @@ describe('sharpeRatio', () => {
   });
 
   it('scales with sqrt(252) — higher absolute value for higher signal-to-noise', () => {
-    const highSignal = sharpeRatio([0.10, 0.12, 0.11, 0.10, 0.12]);
-    const lowSignal = sharpeRatio([0.001, 0.10, -0.08, 0.001, 0.10]);
+    const highSignal = sharpeRatio([0.1, 0.12, 0.11, 0.1, 0.12]);
+    const lowSignal = sharpeRatio([0.001, 0.1, -0.08, 0.001, 0.1]);
     // highSignal has tighter distribution, so higher Sharpe
     expect(highSignal).toBeGreaterThan(lowSignal);
   });
 
   it('accepts custom risk-free rate', () => {
     const withLowRate = sharpeRatio([0.01, 0.02, 0.015], 0.02);
-    const withHighRate = sharpeRatio([0.01, 0.02, 0.015], 0.10);
+    const withHighRate = sharpeRatio([0.01, 0.02, 0.015], 0.1);
     // Higher risk-free rate → lower Sharpe
     expect(withLowRate).toBeGreaterThan(withHighRate);
   });

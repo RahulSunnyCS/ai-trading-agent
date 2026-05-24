@@ -230,7 +230,7 @@ describe('PersonalityRouter', () => {
   // crash _openTradeForPersonality before openTrade is reached).
   beforeEach(() => {
     vi.resetAllMocks();
-    (portfolioRiskCheck as any).mockResolvedValue({ allowed: true });
+    vi.mocked(portfolioRiskCheck).mockResolvedValue({ allowed: true });
   });
 
   afterEach(() => {
@@ -249,14 +249,14 @@ describe('PersonalityRouter', () => {
     });
 
     // fetchDailyState returns a safe default DailyState for each personality.
-    (fetchDailyState as any).mockResolvedValue({
+    vi.mocked(fetchDailyState).mockResolvedValue({
       tradeCount: 0,
       netPnl: '0',
       openPositions: 0,
     });
 
     // Both personalities pass all 5 filter stages.
-    (runPersonalityFilter as any).mockReturnValue({ pass: true, stage: 6, reason: 'PASS' });
+    vi.mocked(runPersonalityFilter).mockReturnValue({ pass: true, stage: 6, reason: 'PASS' });
 
     const signalFields = makeSignalFields();
     const xreadgroupResponses = [makeXreadgroupResponse('1-0', signalFields)];
@@ -268,7 +268,7 @@ describe('PersonalityRouter', () => {
     // Set up the executor mock BEFORE constructing the router: the executor is
     // created in the constructor (P2 fix), so the mock must be in place first.
     const mockOpenTrade = vi.fn().mockResolvedValue('trade-uuid');
-    (PaperTradeExecutor as any).mockImplementation(
+    vi.mocked(PaperTradeExecutor).mockImplementation(
       () =>
         ({
           openTrade: mockOpenTrade,
@@ -294,14 +294,14 @@ describe('PersonalityRouter', () => {
     const personality1 = makePersonality({ id: 'pers-001', name: 'precision' });
     const personality2 = makePersonality({ id: 'pers-002', name: 'blitz' });
 
-    (fetchDailyState as any).mockResolvedValue({
+    vi.mocked(fetchDailyState).mockResolvedValue({
       tradeCount: 5, // hit daily limit
       netPnl: '0',
       openPositions: 0,
     });
 
     // All personalities fail at stage 2 (max daily trades reached).
-    (runPersonalityFilter as any).mockReturnValue({
+    vi.mocked(runPersonalityFilter).mockReturnValue({
       pass: false,
       stage: 2,
       reason: 'MAX_DAILY_TRADES_REACHED',
@@ -317,7 +317,7 @@ describe('PersonalityRouter', () => {
     const router = new PersonalityRouter(db, redis, clock);
 
     const mockOpenTrade = vi.fn().mockResolvedValue('trade-uuid');
-    (PaperTradeExecutor as any).mockImplementation(
+    vi.mocked(PaperTradeExecutor).mockImplementation(
       () =>
         ({
           openTrade: mockOpenTrade,
@@ -338,14 +338,14 @@ describe('PersonalityRouter', () => {
     const personality1 = makePersonality({ id: 'pers-001', name: 'precision' });
     const personality2 = makePersonality({ id: 'pers-002', name: 'blitz' });
 
-    (fetchDailyState as any).mockResolvedValue({
+    vi.mocked(fetchDailyState).mockResolvedValue({
       tradeCount: 0,
       netPnl: '0',
       openPositions: 0,
     });
 
     // First personality passes; second is rejected.
-    (runPersonalityFilter as any)
+    vi.mocked(runPersonalityFilter)
       .mockReturnValueOnce({ pass: true, stage: 6, reason: 'PASS' })
       .mockReturnValueOnce({ pass: false, stage: 4, reason: 'PROBABILITY_BELOW_THRESHOLD' });
 
@@ -358,7 +358,7 @@ describe('PersonalityRouter', () => {
 
     // Set up the executor mock BEFORE constructing the router.
     const mockOpenTrade = vi.fn().mockResolvedValue('trade-uuid');
-    (PaperTradeExecutor as any).mockImplementation(
+    vi.mocked(PaperTradeExecutor).mockImplementation(
       () =>
         ({
           openTrade: mockOpenTrade,
@@ -429,12 +429,12 @@ describe('PersonalityRouter', () => {
   it('logs a WARN when VIX is null and continues processing', async () => {
     const personality1 = makePersonality({ id: 'pers-001', name: 'precision' });
 
-    (fetchDailyState as any).mockResolvedValue({
+    vi.mocked(fetchDailyState).mockResolvedValue({
       tradeCount: 0,
       netPnl: '0',
       openPositions: 0,
     });
-    (runPersonalityFilter as any).mockReturnValue({ pass: true, stage: 6, reason: 'PASS' });
+    vi.mocked(runPersonalityFilter).mockReturnValue({ pass: true, stage: 6, reason: 'PASS' });
 
     // Signal with vix = "null" string (how the stream encodes a missing VIX).
     const signalFields = makeSignalFields({ vix: 'null' });
@@ -453,7 +453,7 @@ describe('PersonalityRouter', () => {
 
     // Set up the executor mock BEFORE constructing the router.
     const mockOpenTrade = vi.fn().mockResolvedValue('trade-uuid');
-    (PaperTradeExecutor as any).mockImplementation(
+    vi.mocked(PaperTradeExecutor).mockImplementation(
       () =>
         ({
           openTrade: mockOpenTrade,
@@ -485,12 +485,12 @@ describe('PersonalityRouter', () => {
     const personality2 = makePersonality({ id: 'pers-002', name: 'blitz' });
     const personality3 = makePersonality({ id: 'pers-003', name: 'scanner' });
 
-    (fetchDailyState as any).mockResolvedValue({
+    vi.mocked(fetchDailyState).mockResolvedValue({
       tradeCount: 0,
       netPnl: '0',
       openPositions: 0,
     });
-    (runPersonalityFilter as any).mockReturnValue({
+    vi.mocked(runPersonalityFilter).mockReturnValue({
       pass: false,
       stage: 1,
       reason: 'PERSONALITY_INACTIVE',

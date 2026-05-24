@@ -22,8 +22,8 @@
  *   8. Autonomous mode: action is 'applied'
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Pool, PoolClient } from 'pg';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runEvolutionEngine } from '../evolution-engine.js';
 
 // ---------------------------------------------------------------------------
@@ -58,22 +58,24 @@ const noopPool = { query: vi.fn() } as unknown as Pool;
 // ---------------------------------------------------------------------------
 
 /** Minimal metrics payload that will pass the totalTrades ≥ 20 guard. */
-const metricsAboveMinSample = {
+const _metricsAboveMinSample = {
   winRate: 0.55, // in the 40-70% "no change" range
   totalTrades: 25,
   totalPnlPct: 10.0,
 };
 
 /** Minimal PersonalityRow returned by the SELECT FOR UPDATE query inside the transaction. */
-function makePersonalityRow(overrides: Partial<{
-  id: string;
-  name: string;
-  is_frozen: boolean;
-  entry_type: string;
-  is_active: boolean;
-  params: Record<string, unknown>;
-  last_evolved_at: Date | null;
-}> = {}) {
+function makePersonalityRow(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    is_frozen: boolean;
+    entry_type: string;
+    is_active: boolean;
+    params: Record<string, unknown>;
+    last_evolved_at: Date | null;
+  }> = {},
+) {
   return {
     id: 'p-target',
     name: 'Precision',
@@ -118,12 +120,11 @@ describe('runEvolutionEngine — minimum sample guard', () => {
   });
 
   it('returns action="none" when totalTrades = 0', async () => {
-    const result = await runEvolutionEngine(
-      noopPool,
-      'p-target',
-      '2024-11-15',
-      { winRate: 0.0, totalTrades: 0, totalPnlPct: 0.0 },
-    );
+    const result = await runEvolutionEngine(noopPool, 'p-target', '2024-11-15', {
+      winRate: 0.0,
+      totalTrades: 0,
+      totalPnlPct: 0.0,
+    });
 
     expect(result).toEqual({ action: 'none' });
   });
@@ -158,9 +159,9 @@ describe('runEvolutionEngine — frozen personality', () => {
 
     const metrics = { winRate: 0.3, totalTrades: 25, totalPnlPct: -3.0 };
 
-    await expect(
-      runEvolutionEngine(noopPool, 'p-target', '2024-11-15', metrics),
-    ).rejects.toThrow('FROZEN_VIOLATION');
+    await expect(runEvolutionEngine(noopPool, 'p-target', '2024-11-15', metrics)).rejects.toThrow(
+      'FROZEN_VIOLATION',
+    );
   });
 });
 
@@ -216,7 +217,7 @@ describe('runEvolutionEngine — Rule 1: raise threshold when winRate < 0.4', ()
 
     const result = await runEvolutionEngine(noopPool, 'p-target', '2024-11-15', metrics);
 
-    expect(result.proposedValue).toBeCloseTo(0.70, 8);
+    expect(result.proposedValue).toBeCloseTo(0.7, 8);
     expect(result.proposedValue!).toBeGreaterThan(0.65);
   });
 
@@ -230,7 +231,7 @@ describe('runEvolutionEngine — Rule 1: raise threshold when winRate < 0.4', ()
     const result = await runEvolutionEngine(noopPool, 'p-target', '2024-11-15', metrics);
 
     // 0.87 + 0.05 = 0.92 → clamped to 0.90
-    expect(result.proposedValue).toBeCloseTo(0.90, 8);
+    expect(result.proposedValue).toBeCloseTo(0.9, 8);
   });
 });
 
@@ -263,7 +264,7 @@ describe('runEvolutionEngine — Rule 2: lower threshold when winRate > 0.7', ()
     const result = await runEvolutionEngine(noopPool, 'p-target', '2024-11-15', metrics);
 
     // 0.31 - 0.03 = 0.28 → clamped to 0.30
-    expect(result.proposedValue).toBeCloseTo(0.30, 8);
+    expect(result.proposedValue).toBeCloseTo(0.3, 8);
   });
 });
 
@@ -293,7 +294,7 @@ describe('runEvolutionEngine — integrity cap', () => {
       is_frozen: false,
       entry_type: 'momentum_exhaustion',
       is_active: true,
-      params: { min_probability: 0.60 },
+      params: { min_probability: 0.6 },
       last_evolved_at: null,
     };
 
@@ -308,7 +309,7 @@ describe('runEvolutionEngine — integrity cap', () => {
     // The cap should clamp the proposed value to 0.60 + 0.08 = 0.68 (not 0.70)
     expect(result.proposedValue).toBeCloseTo(0.68, 8);
     // Verify the spread constraint: proposed - sibling = 0.68 - 0.60 = 0.08
-    expect(result.proposedValue! - 0.60).toBeCloseTo(0.08, 8);
+    expect(result.proposedValue! - 0.6).toBeCloseTo(0.08, 8);
   });
 
   it('caps a lower such that the spread between target and sibling stays at exactly 0.08', async () => {
@@ -474,8 +475,8 @@ describe('runEvolutionEngine — personality not in momentum_exhaustion group', 
 
     const metrics = { winRate: 0.3, totalTrades: 25, totalPnlPct: -3.0 };
 
-    await expect(
-      runEvolutionEngine(noopPool, 'p-target', '2024-11-15', metrics),
-    ).rejects.toThrow('p-target');
+    await expect(runEvolutionEngine(noopPool, 'p-target', '2024-11-15', metrics)).rejects.toThrow(
+      'p-target',
+    );
   });
 });

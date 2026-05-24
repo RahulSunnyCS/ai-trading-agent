@@ -196,7 +196,11 @@ describe('split computation', () => {
     const responses: Array<Array<Record<string, unknown>>> = [
       [makePersonalityRow()],
       [],
-      [], [], [], [], [], // 5 empty snapshot responses
+      [],
+      [],
+      [],
+      [],
+      [], // 5 empty snapshot responses
     ];
     const pool = makeMockPool(responses);
     const runner = createBacktestRunner(pool);
@@ -268,7 +272,9 @@ describe('trade split labelling', () => {
     const responses: Array<Array<Record<string, unknown>>> = [
       [makePersonalityRow()],
       [],
-      [], [], [], // 3 days → all skipped
+      [],
+      [],
+      [], // 3 days → all skipped
     ];
     const pool = makeMockPool(responses);
     const runner = createBacktestRunner(pool);
@@ -293,11 +299,7 @@ describe('trade split labelling', () => {
 
 describe('BacktestResult structure', () => {
   it('includes config, split, personalities, and trades in result', async () => {
-    const pool = makeMockPool([
-      [makePersonalityRow()],
-      [],
-      [],
-    ]);
+    const pool = makeMockPool([[makePersonalityRow()], [], []]);
     const runner = createBacktestRunner(pool);
 
     const config = {

@@ -19,7 +19,12 @@
  *     any third-party table library dependency.
  */
 
-import type { BacktestConfig, BacktestResult, BacktestSplit, SimulatedTrade } from './backtest-runner.js';
+import type {
+  BacktestConfig,
+  BacktestResult,
+  BacktestSplit,
+  SimulatedTrade,
+} from './backtest-runner.js';
 import {
   type DrawdownResult,
   type MannWhitneyResult,
@@ -152,9 +157,7 @@ function metricsForSplit(
     if (arr !== undefined) arr.push(t);
   }
 
-  return personalities.map((p) =>
-    computeMetrics(p.id, p.name, byPersonality.get(p.id) ?? []),
-  );
+  return personalities.map((p) => computeMetrics(p.id, p.name, byPersonality.get(p.id) ?? []));
 }
 
 // ---------------------------------------------------------------------------
@@ -196,8 +199,8 @@ export function generateReport(result: BacktestResult): ExperimentCard {
 
   // Statistical comparisons — test set, each personality vs Clockwork
   // Clockwork is the frozen benchmark; identify by isFrozen first, name fallback
-  const clockworkPersonality = personalities.find((p) => p.isFrozen) ??
-    personalities.find((p) => p.name === 'clockwork');
+  const clockworkPersonality =
+    personalities.find((p) => p.isFrozen) ?? personalities.find((p) => p.name === 'clockwork');
 
   const clockworkTestTrades = clockworkPersonality
     ? testTrades.filter((t) => t.personalityId === clockworkPersonality.id)
@@ -218,7 +221,13 @@ export function generateReport(result: BacktestResult): ExperimentCard {
     const statSig = (tTest?.significant ?? false) || (mannWhitney?.significant ?? false);
     const significantlyBetter = statSig && pMean > clockworkMean;
 
-    comparisons.push({ personalityId: p.id, personalityName: p.name, tTest, mannWhitney, significantlyBetter });
+    comparisons.push({
+      personalityId: p.id,
+      personalityName: p.name,
+      tTest,
+      mannWhitney,
+      significantlyBetter,
+    });
   }
 
   // Data quality notes
