@@ -6,13 +6,14 @@ import { PaymentTestModeBanner } from './components/PaymentTestModeBanner';
 import { PnlView } from './components/PnlView';
 import { PricingPage } from './components/PricingPage';
 import { RegimeView } from './components/RegimeView';
+import { ReplayView } from './components/ReplayView';
 import { TradesView } from './components/TradesView';
 
 /**
- * The six dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
- * 'regime' and 'backfill' are the two Milestone-3 additions.
+ * The seven dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
+ * 'regime', 'backfill' and 'replay' are the Milestone-3 additions.
  */
-type Tab = 'live' | 'pnl' | 'pricing' | 'trades' | 'regime' | 'backfill';
+type Tab = 'live' | 'pnl' | 'pricing' | 'trades' | 'regime' | 'backfill' | 'replay';
 
 /**
  * Returns a human-readable label for each tab.
@@ -23,6 +24,7 @@ function tabLabel(tab: Tab): string {
   if (tab === 'pnl') return 'P&L';
   if (tab === 'regime') return 'Regimes';
   if (tab === 'backfill') return 'Backfill';
+  if (tab === 'replay') return 'Replay';
   // Capitalise first letter; remaining tabs are single words so slice(1) is safe.
   // 'pricing' → "Pricing", 'live' → "Live", 'trades' → "Trades"
   return tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -44,20 +46,22 @@ export function App() {
       </header>
 
       <nav className="flex gap-1 border-b border-gray-800 px-6">
-        {(['live', 'trades', 'pnl', 'pricing', 'regime', 'backfill'] as Tab[]).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-3 text-sm font-medium capitalize transition-colors ${
-              activeTab === tab
-                ? 'border-b-2 border-blue-500 text-blue-400'
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            {tabLabel(tab)}
-          </button>
-        ))}
+        {(['live', 'trades', 'pnl', 'pricing', 'regime', 'backfill', 'replay'] as Tab[]).map(
+          (tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-3 text-sm font-medium capitalize transition-colors ${
+                activeTab === tab
+                  ? 'border-b-2 border-blue-500 text-blue-400'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              {tabLabel(tab)}
+            </button>
+          ),
+        )}
       </nav>
 
       <main className="p-6">
@@ -67,6 +71,7 @@ export function App() {
         {activeTab === 'pricing' && <PricingPage />}
         {activeTab === 'regime' && <RegimeView />}
         {activeTab === 'backfill' && <BackfillView />}
+        {activeTab === 'replay' && <ReplayView />}
       </main>
     </div>
   );
