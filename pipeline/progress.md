@@ -13,8 +13,9 @@
 - [~] Phase 3 — Implementation
   - [x] Wave 1: T-43-A (committed), T-46 (committed; hybrid-objective rework in flight per user)
   - [x] Wave 2: T-43-B + T-44 done — 193 signals tests green (sr-levels 53 + filter/router incl. sr_anchored + ACTIVE_PHASE). Per-index leg cap confirmed correct (paper_trades.symbol = underlying).
-  - [~] T-46 hybrid-objective rework in flight (last running agent).
-  - NOTE: add src/trading/entry-engine.ts to T-45 scope — widen EntryIntent.underlying from literal 'NIFTY' to Underlying (T-44 band-aided with a call-site cast).
+  - [x] T-46 hybrid-objective rework committed (93 tests green). LIMITATION: backtest-runner hardcodes adjustedProbability=0.7 → finalist scoring can't discriminate yet (Gate-2 follow-up).
+  - [~] Wave 3: T-43-C (S/R detection engine) in flight.
+  - [ ] Wave 4: T-45 (multi-index) — ADD src/trading/entry-engine.ts to scope (widen EntryIntent.underlying from literal 'NIFTY' to Underlying).
   - [ ] Wave 3: T-43-C
   - [ ] Wave 4: T-45
   - Gate-2 carry: migration 013 expiry weekdays need live NSE/BSE verification (T-45 symbol-resolution assert is the runtime net)
