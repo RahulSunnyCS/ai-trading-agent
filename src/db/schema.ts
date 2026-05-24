@@ -193,6 +193,33 @@ export interface StraddleSignal {
   vix_at_signal: number | null;
   status: SignalStatus;
   created_at: Date;
+  /**
+   * S/R signal subtype added by migration 012.
+   * NULL for all non-S/R signals (MOMENTUM_EXHAUSTION, SCHEDULED).
+   * 'SR_REVERSAL' = price rejected at a support/resistance level.
+   * TEXT CHECK rather than enum keeps DDL fully transactional and reversible.
+   */
+  sr_subtype: 'SR_REVERSAL' | null;
+  /**
+   * Continuous confidence score [0.0, 1.0] measuring how strongly price
+   * reacted at the S/R level. NULL for non-S/R signals.
+   * The pg NUMERIC column is returned as a string when the numeric type
+   * parser is set to raw-string mode; callers must parseFloat() for math.
+   */
+  sr_strength: string | null;
+  /**
+   * TRUE when the Point of Control (POC) of the session's volume profile
+   * contributed to the S/R level used for this signal.
+   * NULL (not FALSE) for non-S/R signals to avoid misleading semantics.
+   */
+  poc_used: boolean | null;
+  /**
+   * JSONB blob describing which S/R levels were consulted and their weights.
+   * Example: {"levels": [{"price": 22500, "type": "swing_high", "weight": 0.8}]}
+   * NULL for non-S/R signals. Shape is open-ended — the S/R engine's level
+   * taxonomy will evolve in Phase 2. Typed as unknown; callers narrow as needed.
+   */
+  level_source: unknown | null;
 }
 
 /**
@@ -479,6 +506,30 @@ export interface StraddleSignalM2 {
   rocDeclineCandles: number | null;
   accelerationValue: string | null;
   adjustmentBreakdown: string | null;
+  /**
+   * S/R signal subtype added by migration 012.
+   * NULL for all non-S/R signals (MOMENTUM_EXHAUSTION, SCHEDULED).
+   * 'SR_REVERSAL' = price rejected at a support/resistance level.
+   * Optional so pre-012 code and test fixtures that construct StraddleSignalM2
+   * objects without this field continue to compile.
+   */
+  srSubtype?: 'SR_REVERSAL' | null;
+  /**
+   * Continuous confidence score [0.0, 1.0] for S/R level strength.
+   * Returned as a raw string from the pg NUMERIC column.
+   * NULL for non-S/R signals.
+   */
+  srStrength?: string | null;
+  /**
+   * TRUE when the Point of Control of the session volume profile contributed
+   * to the S/R level. NULL (not FALSE) for non-S/R signals.
+   */
+  pocUsed?: boolean | null;
+  /**
+   * JSONB blob of S/R levels consulted and their weights.
+   * NULL for non-S/R signals. Shape is open-ended; callers narrow as needed.
+   */
+  levelSource?: unknown | null;
 }
 
 /**
@@ -523,4 +574,39 @@ export interface CreditTransaction {
 export interface ProcessedWebhookEvent {
   razorpay_event_id: string;
   processed_at: Date;
+}
+
+// ---------------------------------------------------------------------------
+// Index expiry calendar (migration 013)
+// ---------------------------------------------------------------------------
+
+/**
+ * One row in the index_expiry_calendar table.
+ *
+ * Stores weekly options expiry dates per underlying index so the S/R signal
+ * engine and regime tagger can determine proximity-to-expiry without relying
+ * on the non-reproducible BLOCKED_DATES env var.
+ *
+ * PRIMARY KEY is (underlying, expiry_date) — no surrogate key because the
+ * natural composite key is sufficient and always used in queries.
+ *
+ * expiry_date: the DATE column is returned by pg as a Date object at midnight
+ * UTC. Callers that need just the ISO date string should use
+ * expiry_date.toISOString().slice(0, 10).
+ *
+ * is_holiday_shifted: TRUE means the exchange moved this expiry off its
+ * normal weekday (e.g. Thursday for Nifty) to an adjacent trading day due to
+ * a public holiday. Lets downstream code distinguish a shifted expiry from a
+ * normal one without checking the day-of-week explicitly.
+ *
+ * Weekly expiry weekdays per index (as of exchange circulars known up to
+ * August 2025 — VERIFY against live NSE/BSE instrument master before use):
+ *   NIFTY    → Thursday  (NSE circular, effective Nov 2024)
+ *   BANKNIFTY → Wednesday (NSE circular NSCCL/CMPT/56550, effective Sep 2023)
+ *   SENSEX   → Friday    (BSE notice 20230801-50, effective Aug 2023)
+ */
+export interface IndexExpiryCalendar {
+  underlying: string;
+  expiry_date: Date;
+  is_holiday_shifted: boolean;
 }
