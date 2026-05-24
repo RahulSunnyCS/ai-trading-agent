@@ -20,7 +20,8 @@
     "lint:fix": "[ -f ./tools/biome ] && ./tools/biome check --write . || echo 'biome not installed — run: bash scripts/install-biome.sh'",
     "format": "[ -f ./tools/biome ] && ./tools/biome format --write . || echo 'biome not installed — run: bash scripts/install-biome.sh'",
     "prepare": "lefthook install",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "backtest": "bun run scripts/backtest.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",

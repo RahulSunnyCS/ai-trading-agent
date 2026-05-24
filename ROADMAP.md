@@ -46,7 +46,7 @@ Legend: ✅ complete · 🚧 partial · ⬜ not started. Status reflects the
 | **M0.5 — Testing & CI** | ✅ | T-59–T-63 complete. Lean CI, Biome + lefthook, Vitest + property tests, injectable Clock, integration harness. |
 | **M1 — Vertical slice + dashboard** | ✅ | T-07–T-21 complete. Live/sim trade loop, brokers (Fyers/Angel/sim), straddle pipeline, trigger engine, position monitor, Fastify API, React dashboard. |
 | **M2 — Signals + multi-personality** | ✅ | T-22–T-32 complete (merged from `claude/complete-milestone-2-bFvPs`). Peak detection, probability scoring, fallback signals, 10-personality seed, 5-stage filter, router, Holder/Adjuster/Reducer management, portfolio risk rules, personality CRUD + performance API. |
-| **M3 — Historical data, replay & backtesting** | 🚧 | T-54–T-57 complete (M3a: Fyers historical client, idempotent backfill, straddle reconstruction, deterministic replay harness). **T-51 (backtest runner) and T-58 (backtest reporting) deferred** — replay is currently exposed in the dashboard as a read-only Replay tab + CLI (`bun run replay`), not yet a server-driven backtest endpoint. |
+| **M3 — Historical data, replay & backtesting** | ✅ | T-54–T-57 complete (M3a: Fyers historical client, idempotent backfill, straddle reconstruction, deterministic replay harness). T-51 and T-58 now complete — full in-memory backtest runner + experiment-card reporting (`bun run backtest`). |
 | **M4 — Retrospection + evolution** | 🚧 | **T-33 (regime tagging) complete** (pulled forward with M3a; surfaced as the Regimes dashboard tab). T-34–T-42 not started. T-39 (comparison-integrity check) landed with M2. |
 | **M5 — Phase 2 (S/R, multi-index, Bayesian)** | ⬜ | Not started. |
 | **M6 — Phase 3/4 + prod readiness** | ⬜ | Not started. |
