@@ -273,23 +273,37 @@ async function queryIndexPriceAtOrBefore(
 /**
  * Write one reconstructed snapshot to straddle_snapshots.
  *
- * Uses ON CONFLICT DO NOTHING so re-running reconstruction over an already-
- * filled range is safe and idempotent. The unique constraint on (id, time) is
- * the primary key; but since id is BIGSERIAL, conflicts are unlikely unless
- * the same range is reconstructed twice. We use the partial-key approach of
- * the primary key combined with the fact that TimescaleDB will not create
- * duplicate rows for the same (time, symbol, strike, expiry) combination in
- * practice — but we still wrap in ON CONFLICT DO NOTHING for safety.
+ * Uses ON CONFLICT (time, symbol, strike, expiry) DO NOTHING to make
+ * re-running reconstruction over an already-filled range safe and idempotent.
+ *
+ * WHY explicit conflict target instead of DO NOTHING without a target?
+ * The table's composite PRIMARY KEY is (id, time) where id is BIGSERIAL.
+ * Since id is auto-generated, two inserts of the same logical snapshot receive
+ * different id values and are never considered conflicts by the PK — meaning
+ * ON CONFLICT DO NOTHING (without a target) was dead code and re-running
+ * reconstruction silently duplicated rows. Migration 009 adds a UNIQUE index
+ * on (time, symbol, strike, expiry) which matches the conflict target below.
+ *
+ * WHY DO NOTHING rather than DO UPDATE?
+ * The first write wins: if a row already exists for this (time, symbol, strike,
+ * expiry) it means the range was previously reconstructed. Preserving the first
+ * write is correct — we never want a re-run to silently overwrite production
+ * data, and the operator can always DELETE + re-reconstruct if truly needed.
  *
  * vix is always NULL for historical reconstruction — it is not available
  * from the Fyers historical candle endpoint.
+ *
+ * resolution is included so downstream consumers can query fidelity tags
+ * (e.g. '1', '5', 'D') without joining back to option_ticks. Before migration
+ * 008 added the column, this field was omitted and every reconstructed row
+ * persisted NULL for resolution. The column is now explicitly populated.
  */
 async function writeSnapshot(pool: Pool, snap: ReconstructedSnapshot): Promise<void> {
   await pool.query(
     `INSERT INTO straddle_snapshots
-       (time, symbol, expiry, strike, call_ltp, put_ltp, straddle_value, roc, roc_acceleration, vix)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     ON CONFLICT DO NOTHING`,
+       (time, symbol, expiry, strike, call_ltp, put_ltp, straddle_value, roc, roc_acceleration, vix, resolution)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (time, symbol, strike, expiry) DO NOTHING`,
     [
       snap.time.toISOString(),
       snap.symbol,
@@ -298,9 +312,10 @@ async function writeSnapshot(pool: Pool, snap: ReconstructedSnapshot): Promise<v
       snap.call_ltp,
       snap.put_ltp,
       snap.straddle_value,
-      snap.roc,          // null for first two steps
+      snap.roc,              // null for first two steps
       snap.roc_acceleration, // null for first two steps
-      snap.vix,          // always null for historical data
+      snap.vix,              // always null for historical data
+      snap.resolution,       // resolution tag from option_ticks (e.g. '1', '5', 'D')
     ],
   );
 }

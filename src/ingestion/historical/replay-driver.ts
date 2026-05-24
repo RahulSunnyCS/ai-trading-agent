@@ -124,7 +124,10 @@ export function createReplayDriver(
       //
       // ZERO floating promises: we never use `void redis.xadd(...)` in replay.
       // Every xadd is awaited via the xaddPromises array.
-      const xaddPromises: Array<Promise<unknown>> = [];
+      // Typed as Promise<string | null> (ioredis xadd returns string | null).
+      // We extract the last non-null ID to use as the input-side barrier target for
+      // straddleCalc.ticksConsumed() — proving all published ticks are in the price map.
+      const xaddPromises: Array<Promise<string | null>> = [];
 
       feed.onTick((tick: BrokerTick) => {
         // Serialise the tick exactly as the live pipeline does in src/index.ts.
@@ -161,24 +164,35 @@ export function createReplayDriver(
 
         // Step 2: await all xadd calls before snapshotStep so ticks are in Redis.
         // ZERO floating promises: every xadd from this interval is awaited here.
+        // Capture the last published stream ID so we can use it as the barrier target.
+        let lastPublishedId: string | null = null;
         if (xaddPromises.length > 0) {
-          await Promise.all(xaddPromises);
+          const ids = await Promise.all(xaddPromises);
+          // The last non-null resolved ID is the highest in this batch (xadd IDs are
+          // monotonically increasing). We search from the end to find the last non-null.
+          // A null from xadd would be a Redis error case but we guard defensively.
+          for (let i = ids.length - 1; i >= 0; i--) {
+            const id = ids[i];
+            if (id !== null && id !== undefined) {
+              lastPublishedId = id;
+              break;
+            }
+          }
         }
 
-        // Give the poll loop a chance to read the freshly published ticks.
-        // WHY yield here?
-        // The StraddleCalculator poll loop runs concurrently (it was start()ed
-        // by the caller). It reads market.ticks via XREAD. We need it to have
-        // processed the ticks before snapshotStep() fires so the price map is
-        // populated. A single microtask yield is sufficient because XREAD is
-        // non-blocking and the loop is already spinning.
+        // Wait until the StraddleCalculator poll loop has consumed all ticks published
+        // in this step BEFORE calling snapshotStep(). This replaces the previous
+        // 10-microtask-yield heuristic which was only reliable against a synchronous
+        // in-memory fake Redis. Under real Redis latency, snapshotStep() could fire
+        // against a stale price map and silently corrupt the snapshot — breaking the
+        // determinism guarantee that is the whole point of this milestone.
         //
-        // We use 10 yields to match the pattern in straddle-calc.test.ts which
-        // shows that multiple await turns are needed for the async loop to process
-        // one XREAD result. This is not a sleep — it yields control back to the
-        // event loop without a timer, so it completes in <1ms of wall time.
-        for (let i = 0; i < 10; i++) {
-          await Promise.resolve();
+        // ticksConsumed(lastPublishedId) is a named, concrete barrier: it resolves
+        // ONLY when the calculator's XREAD cursor has advanced past lastPublishedId,
+        // proving all ticks are in the price map. It mirrors the output-side barrier
+        // (processedThrough) already used by the PositionMonitor.
+        if (lastPublishedId !== null) {
+          await straddleCalc.ticksConsumed(lastPublishedId);
         }
 
         // Step 3: take a deterministic snapshot.

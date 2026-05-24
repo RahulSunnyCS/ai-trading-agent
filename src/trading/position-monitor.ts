@@ -419,6 +419,19 @@ export function createPositionMonitor(
       // The poll loop checks `running` at the top of each iteration and exits
       // naturally.  No forced termination is needed because XREAD is called
       // without BLOCK, so the next iteration check will see running=false.
+
+      // Drain any pending output-side barriers so the replay driver does not hang
+      // forever if stop() is called while a processedThrough() await is in flight.
+      // This can happen when the poll loop exits between snapshotStep() publishing
+      // to straddle.values and the driver's processedThrough() resolving — without
+      // this drain, the unresolved Promise would block the driver with no timeout.
+      // We resolve (not reject) so the driver proceeds to clean shutdown cleanly.
+      for (const resolvers of pendingBarriers.values()) {
+        for (const resolve of resolvers) {
+          resolve();
+        }
+      }
+      pendingBarriers.clear();
     },
 
     processedThrough(streamId: string): Promise<void> {

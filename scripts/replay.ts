@@ -58,6 +58,7 @@ function parseArgs(argv: string[]): {
   verbose: boolean;
   regenerateFixture: boolean;
   dryRun: boolean;
+  againstLive: boolean;
 } {
   const args = argv.slice(2); // strip 'bun' and script path
 
@@ -68,6 +69,10 @@ function parseArgs(argv: string[]): {
   let verbose = false;
   let regenerateFixture = false;
   let dryRun = false;
+  // --against-live: explicit opt-in required to run replay against a non-scratch DB.
+  // Without this flag, replay refuses to run against DATABASE_URL so it cannot
+  // silently close real open paper trades via the PositionMonitor.
+  let againstLive = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -117,12 +122,18 @@ function parseArgs(argv: string[]): {
         dryRun = true;
         break;
       }
+      case '--against-live': {
+        // Explicit acknowledgement that this replay will connect to the live DB
+        // and Redis and that the PositionMonitor may close real open paper trades.
+        againstLive = true;
+        break;
+      }
       default:
         console.warn(`[replay] Unknown argument: ${arg}`);
     }
   }
 
-  return { from, to, underlying, speed, verbose, regenerateFixture, dryRun };
+  return { from, to, underlying, speed, verbose, regenerateFixture, dryRun, againstLive };
 }
 
 // ---------------------------------------------------------------------------
@@ -149,12 +160,41 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // ---------------------------------------------------------------------------
+  // Live-DB guard — default invocation must NOT silently close real trades
+  // ---------------------------------------------------------------------------
+  //
+  // The PositionMonitor in replay mode evaluates ALL open paper_trades and can
+  // close them against replayed historical prices. Without an explicit opt-in,
+  // a developer who runs `bun run replay` against the production DATABASE_URL
+  // could wipe out all live open positions with no warning.
+  //
+  // Guard: require --against-live OR REPLAY_CONFIRM_LIVE=true env var before
+  // proceeding. The --dry-run path is exempt (it does not start the pipeline).
+  //
+  // To run replay against a scratch / test database, point DATABASE_URL at a
+  // non-production connection string. No flag is needed for that case — the flag
+  // is the human's acknowledgement that the *current* DATABASE_URL is live.
+  const replayConfirmLive = process.env.REPLAY_CONFIRM_LIVE === 'true';
+  if (!opts.dryRun && !opts.againstLive && !replayConfirmLive) {
+    console.error('[replay] SAFETY GUARD: replay connects to the live DATABASE_URL and can close');
+    console.error('[replay] real open paper trades via the PositionMonitor.');
+    console.error('[replay]');
+    console.error('[replay] To proceed, add --against-live (or set REPLAY_CONFIRM_LIVE=true).');
+    console.error('[replay] Use --dry-run to connect and load ticks without running the pipeline.');
+    console.error('[replay] Point DATABASE_URL at a replay/scratch database to avoid this guard.');
+    process.exit(1);
+  }
+
   console.log('[replay] Starting deterministic replay');
   console.log(`[replay]   Underlying : ${opts.underlying}`);
   console.log(`[replay]   From       : ${opts.from.toISOString()}`);
   console.log(`[replay]   To         : ${opts.to.toISOString()}`);
   console.log(`[replay]   Speed      : ${opts.speed}x`);
   console.log(`[replay]   Verbose    : ${opts.verbose}`);
+  if (opts.againstLive || replayConfirmLive) {
+    console.log('[replay]   LIVE MODE  : --against-live acknowledged — PositionMonitor may close real trades');
+  }
 
   // ---------------------------------------------------------------------------
   // Connect to real infrastructure

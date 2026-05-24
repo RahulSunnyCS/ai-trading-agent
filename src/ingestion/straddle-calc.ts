@@ -101,6 +101,30 @@ export interface StraddleCalculator {
    *   that says "live mode behaviour is unchanged".
    */
   snapshotStep(): Promise<string | null>;
+  /**
+   * INPUT-SIDE DRAIN BARRIER — resolves when the poll loop's market.ticks cursor
+   * has advanced past (or to) the given stream ID.
+   *
+   * WHY this is needed:
+   * The poll loop runs concurrently and reads from market.ticks via XREAD. After
+   * publishing ticks to Redis, the replay driver must wait until the calculator
+   * has actually consumed those entries and updated its price map BEFORE calling
+   * snapshotStep(). Without this barrier, snapshotStep() could fire against a stale
+   * price map and silently produce wrong snapshot values, breaking the determinism
+   * guarantee. The previous microtask-yield loop (10× await Promise.resolve()) was
+   * a hand-tuned heuristic that only worked against a synchronous in-memory fake
+   * Redis — it is not reliable under real Redis latency.
+   *
+   * USAGE: after all xadd calls for a step resolve, capture the last published
+   * stream ID and await calculator.ticksConsumed(lastXaddId) before calling
+   * snapshotStep().
+   *
+   * LIVE MODE: never call this from live code. It is a no-op for live use and
+   * has no overhead when never called.
+   *
+   * @param lastXaddId  The Redis stream ID of the last tick published to market.ticks.
+   */
+  ticksConsumed(lastXaddId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -161,6 +185,37 @@ export function createStraddleCalculator(
   // We assert: replay callers MUST NOT pass '$' — enforced at the config layer.
   const startIdValue = config.startId ?? '$';
   let lastId = startIdValue;
+
+  // ---------------------------------------------------------------------------
+  // Input-side drain barrier — ticksConsumed(lastXaddId) implementation
+  // ---------------------------------------------------------------------------
+  //
+  // Mirrors the output-side barrier in PositionMonitor (pendingBarriers).
+  // When the poll loop advances lastId, it calls resolveTickBarriers() to
+  // resolve any waiting promises whose target ID is now <= lastId.
+  //
+  // WHY Map<string, Array<() => void>>?
+  // Same reasoning as PositionMonitor.pendingBarriers — multiple callers could
+  // await different IDs simultaneously (though in practice the driver awaits
+  // one at a time). The array handles multiple callers at the same ID.
+  const pendingTickBarriers = new Map<string, Array<() => void>>();
+
+  /**
+   * Internal: resolve any tick barriers whose target <= currentId.
+   * Called by the poll loop after advancing lastId.
+   */
+  function resolveTickBarriers(currentId: string): void {
+    for (const [targetId, resolvers] of pendingTickBarriers) {
+      // Lexicographic comparison is correct for Redis stream IDs (ms-part is
+      // fixed-width 13 digits for dates in the range 2001-2286).
+      if (currentId >= targetId) {
+        for (const resolve of resolvers) {
+          resolve();
+        }
+        pendingTickBarriers.delete(targetId);
+      }
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Tick processing
@@ -389,6 +444,12 @@ export function createStraddleCalculator(
           if (tick !== null) {
             processTick(tick);
           }
+
+          // Resolve any input-side barriers whose target ID is now <= lastId.
+          // This is called per-entry (not per-batch) to resolve barriers as early
+          // as possible: if only 3 of 100 entries were published in a step, the
+          // driver's barrier resolves after entry 3, not after all 100.
+          resolveTickBarriers(lastId);
         }
       } catch (err) {
         // Log but continue — transient Redis hiccups should not crash the loop.
@@ -428,6 +489,18 @@ export function createStraddleCalculator(
         clearInterval(snapshotInterval);
         snapshotInterval = null;
       }
+
+      // Drain any pending input-side barriers so callers do not hang forever.
+      // If the poll loop exits (running=false) while a driver is still awaiting
+      // ticksConsumed(), that promise would never resolve without this drain.
+      // We resolve (not reject) so the driver can proceed cleanly to shutdown
+      // rather than catching an error it has no way to handle.
+      for (const resolvers of pendingTickBarriers.values()) {
+        for (const resolve of resolvers) {
+          resolve();
+        }
+      }
+      pendingTickBarriers.clear();
     },
 
     getLatestSnapshot(): StraddleSnapshot | null {
@@ -447,6 +520,36 @@ export function createStraddleCalculator(
      */
     snapshotStep(): Promise<string | null> {
       return computeAndPublishSnapshot();
+    },
+
+    /**
+     * Input-side drain barrier — resolves when the poll loop cursor has advanced
+     * past (or to) the given market.ticks stream ID.
+     *
+     * Used by the replay driver to guarantee that all ticks published in one step
+     * are in the price map BEFORE snapshotStep() fires. Replacing the previous
+     * 10-microtask-yield heuristic which was only reliable against a synchronous
+     * in-memory fake Redis and could silently produce wrong snapshots under real
+     * Redis latency.
+     *
+     * Resolves immediately if the poll loop has already advanced past lastXaddId.
+     */
+    ticksConsumed(lastXaddId: string): Promise<void> {
+      // Fast path: the poll loop has already consumed past this ID.
+      if (lastId >= lastXaddId) {
+        return Promise.resolve();
+      }
+
+      // Slow path: register a deferred resolve under this target ID.
+      // resolveTickBarriers() will fire it when the poll loop advances past lastXaddId.
+      return new Promise<void>((resolve) => {
+        const existing = pendingTickBarriers.get(lastXaddId);
+        if (existing !== undefined) {
+          existing.push(resolve);
+        } else {
+          pendingTickBarriers.set(lastXaddId, [resolve]);
+        }
+      });
     },
   };
 }
