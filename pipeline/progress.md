@@ -18,7 +18,9 @@
 | Phase 4 — Specialist Review (security + perf + arch) | ✅ Done — CONDITIONAL PASS (0 Crit / 1 High / 13 Med / 10 Low) |
 | Human Gate 2 | ✅ Approved — fix C1–C4 then proceed (H1/M1 tracked) |
 | Gate-2 fix cycle (C1–C4) | ✅ Done — verified (tsc clean, 440 unit pass); C1 INSERT+migration 009, C2 ticksConsumed barrier, C3 --against-live guard, C4 barrier drain |
-| Phase 5 — Test generation (unit/integration/docs) | 🟡 Next — MUST add coverage for ticksConsumed + real ReplayDriver path (C2 currently untested) |
+| Phase 5 — Test generation (unit/integration/docs) | ✅ Done — barrier unit test + 3 integration tests; README M3a docs present |
+| Phase 6 — Test execution loop | ✅ Done — unit 451 pass / 3 skip; new integration tests skip cleanly w/o Docker (CI-ONLY). Pre-existing smoke.test.ts fails only on absent Redis (environmental, untouched). |
+| Phase 7 — Final review + Gate 3 | ⏳ Next |
 
 ## Tracked follow-ups (post-Gate-2, accepted)
 - H1 (Perf High): N+1 per-step leg queries in reconstructor — fix before 15s reconstruction over >2-3 week ranges.
