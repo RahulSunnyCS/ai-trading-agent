@@ -87,3 +87,63 @@ See `.env.example` for the full list. Key variables:
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection string |
 | `BROKER` | `sim` | Broker adapter: `sim`, `fyers`, or `angelone` |
 | `PORT` | `3000` | Fastify server port |
+
+## Historical data, backfill & replay (M3a)
+
+### Backfill — load historical market data
+
+The backfill writer (`src/ingestion/historical/backfill.ts`) populates the database with historical OHLCV candles from Fyers. Call `runBackfill()` with a date range and symbol; it fetches candles and writes them into market_ticks and option_ticks hypertables.
+
+**Key properties:**
+- **Resumable:** if interrupted by auth failure (FyersAuthError), subsequent calls with the same options resume from the last checkpoint saved in backfill_ranges table.
+- **Idempotent:** partial unique indexes prevent duplicate re-ingestion; re-running a completed range writes zero duplicates (INSERT ... ON CONFLICT DO NOTHING).
+- **Fail-loud:** missing option legs (CE or PE contracts at any step) throw MissingLegError immediately — never interpolated or skipped.
+- **Time-bounded:** all hypertable writes respect TimescaleDB's partitioning discipline — queries always include time-range filters.
+
+### Replay — deterministic history simulation
+
+Run the trading pipeline against historical data with a deterministic virtual clock:
+
+```bash
+# Against a scratch database (safe, no confirmation needed)
+DATABASE_URL=postgresql://user:pass@localhost:5432/test_db \
+  bun run replay --from 2024-01-25T03:45:00Z --to 2024-01-25T10:00:00Z --underlying NIFTY
+
+# Against the live database (requires explicit acknowledgement)
+bun run replay --from 2024-01-25T03:45:00Z --to 2024-01-25T10:00:00Z --underlying NIFTY --against-live
+```
+
+**Safety guard:** `bun run replay` refuses to connect to the live DATABASE_URL unless you pass `--against-live` (or set `REPLAY_CONFIRM_LIVE=true`), because the PositionMonitor can close real open paper trades. Point at a scratch database for normal use — no flag needed in that case.
+
+**Flags:**
+- `--from <ISO>`: replay window start (required)
+- `--to <ISO>`: replay window end (required)
+- `--underlying NIFTY|BANKNIFTY|SENSEX`: index to replay (default: NIFTY)
+- `--speed <multiplier>`: virtual-time acceleration for log output (default: 1.0)
+- `--verbose`: log each emitted tick (very noisy for long windows)
+- `--dry-run`: load ticks without starting the pipeline (no paper-trade writes)
+- `--against-live`: explicit opt-in to run against the live database
+- `--regenerate-fixture`: developer-only; regenerate golden test fixtures (never in CI)
+
+### Market regime tagging (M3a)
+
+Historical days are automatically tagged with market regimes (RANGING, TRENDING_STRONG, VOLATILE_REVERTING, EVENT_DAY, UNCLASSIFIED) based on intraday straddle behavior and a deterministic event calendar.
+
+**Causal/point-in-time:** regime classification uses only data observable at 14:30 IST — the same cutoff a real trader would use to decide whether to enter a position. No lookahead, no future bars consulted.
+
+**Deterministic:** classification thresholds are compile-time constants (no learned values). Same input data always produces the same regime label.
+
+**Event calendar:** EVENT_DAY dates (RBI policy days, Union Budgets, F&O expiry mornings, NSE holidays) are checked into the `event_calendar` table (seeded in migration 008). Operators can extend the table with new events via migrations; no env var needed for reproducible backtests.
+
+### Database migrations (M3a)
+
+Migrations 007, 008, and 009 support historical backfill and regime tagging:
+
+- **007_historical_backfill.sql** — backfill checkpoint tracking and unique indexes for idempotent candle writes
+- **008_regime_tagging.sql** — daily regime tags table, event calendar, and `resolution` column on straddle_snapshots
+- **009_straddle_snapshots_unique.sql** — unique index on (time, symbol, strike, expiry) to enforce snapshot uniqueness in reconstruction
+
+Apply all three with `bun run migrate`. 
+
+**Note on 009:** if your straddle_snapshots table has duplicates from dev testing, dedup them before applying the migration (it will fail on duplicate rows). For a fresh dev database, this is not a concern.
+
