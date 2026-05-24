@@ -191,6 +191,7 @@ export interface StraddleSignal {
 /** Valid values for PersonalityConfig.management_style */
 export type ManagementStyle = 'HOLD' | 'ADJUST' | 'REDUCE';
 
+// M2 columns (display_name, group_type, params, last_evolved_at, evolution_consecutive_applications) are on PersonalityConfigM2, not here.
 export interface PersonalityConfig {
   id: string;
   name: string;
@@ -286,6 +287,12 @@ export interface RetrospectionResult {
   proposed_adjustments: unknown | null; // JSONB — shape varies by rule type
   adjustments_applied: boolean;
   created_at: Date;
+  /** Risk-adjusted return for the day. NULL when fewer than 2 trades (std dev undefined). Added by migration 010. */
+  sharpe: number | null;
+  /** Peak-to-trough intraday drawdown as a percentage of notional. NULL when no trades. Added by migration 010. */
+  max_drawdown_pct: number | null;
+  /** Wall-clock time when the evolution rule engine queued proposed_adjustments. NULL until the rule engine has run. Added by migration 010. */
+  proposed_adjustments_at: Date | null;
 }
 
 /**
@@ -424,6 +431,10 @@ export interface PersonalityConfigM2 {
   params: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
+  /** Wall-clock time of the most recent automated parameter change. NULL if this personality has never been evolved. Added by migration 010. Optional so pre-010 test fixtures compile. */
+  lastEvolvedAt?: Date | null;
+  /** Number of consecutive evolution rule applications accepted without an intervening losing day. Added by migration 010. Optional so pre-010 test fixtures compile. */
+  evolutionConsecutiveApplications?: number;
 }
 
 /**
