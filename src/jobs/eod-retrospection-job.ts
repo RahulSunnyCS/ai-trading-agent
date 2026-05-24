@@ -210,15 +210,6 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
           );
 
           // --- 5e: persist retrospection row inside a transaction ------------
-          //
-          // INSERT must come BEFORE the evolution engine call (5f). The evolution
-          // engine's requireApproval branch issues an UPDATE to this row to write
-          // proposed_adjustments. If the row doesn't exist yet, that UPDATE hits
-          // zero rows and the proposal is silently discarded.
-          //
-          // ON CONFLICT DO NOTHING: if this job fires twice on the same day
-          // (restart, retry), the second INSERT is silently ignored. The row
-          // written by the first run is preserved.
           await withTransaction(async (client) => {
             await client.query(
               `INSERT INTO retrospection_results
@@ -244,8 +235,9 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
           });
 
           // --- 5f: run evolution engine (may propose or apply a param change) --
-          // Runs after the retrospection row is committed so the requireApproval
-          // UPDATE lands on an existing row.
+          // Must run AFTER the INSERT above: the evolution engine's requireApproval branch
+          // UPDATEs this row to write proposed_adjustments. Without the row, the UPDATE hits
+          // zero rows and silently discards the proposal.
           await runEvolutionEngine(pool, personality.id, tradeDateISO, {
             winRate: metrics.winRate,
             totalTrades: metrics.totalTrades,

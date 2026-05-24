@@ -154,6 +154,9 @@ export async function runEvolutionEngine(
   // SELECT FOR UPDATE prevents two concurrent EOD jobs from racing on the same
   // comparison group.
   // -------------------------------------------------------------------------
+  // Note: the injected `pool` parameter is not passed to withTransaction because
+  // the helper currently uses the module-level pool singleton. When transaction
+  // helpers are refactored to accept an external pool, this will wire through.
   return withTransaction(async (client) => {
     // -----------------------------------------------------------------------
     // Lock all active momentum_exhaustion rows simultaneously.
