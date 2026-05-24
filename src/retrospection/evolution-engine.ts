@@ -125,24 +125,25 @@ export async function runEvolutionEngine(
     return { action: 'none' };
   }
 
-  // Rule 1: win rate too low → lower the threshold (accept only stronger signals)
-  // Rule 2: win rate very high → raise the threshold (be more selective to stay comparable)
+  // Rule 1: win rate too low  → raise min_probability (require stronger signals to enter)
+  // Rule 2: win rate very high → lower min_probability (relax bar to allow more signals)
+  //
+  // min_probability is the MINIMUM required signal probability for a trade entry.
+  // Higher value = harder to enter = fewer but stronger trades.
+  // Lower  value = easier to enter = more trades, weaker signal filter.
   let delta: number;
-  let ruleName: 'lower_threshold' | 'raise_threshold';
+  let ruleName: 'raise_threshold' | 'lower_threshold';
 
   if (metrics.winRate < 0.4) {
-    // Win rate below 40% — the personality is taking too many weak signals.
-    // Lower min_probability by 0.05 so future entries require more conviction.
-    // Note: "lower threshold" means "require higher probability" — higher
-    // min_probability = harder to enter = fewer but better trades.
-    delta = -0.05;
-    ruleName = 'lower_threshold';
-  } else if (metrics.winRate > 0.7) {
-    // Win rate above 70% — the personality may be too conservative and missing
-    // good signals. Raise min_probability slightly to allow more signals through.
-    // Counter-intuitive naming: raise_threshold means relax the entry bar.
-    delta = +0.03;
+    // Win rate below 40% — too many weak signals accepted.
+    // Raise min_probability by 0.05: harder entry bar → fewer but stronger trades.
+    delta = +0.05;
     ruleName = 'raise_threshold';
+  } else if (metrics.winRate > 0.7) {
+    // Win rate above 70% — personality may be too conservative and missing good signals.
+    // Lower min_probability by 0.03: relax entry bar slightly → more trades allowed.
+    delta = -0.03;
+    ruleName = 'lower_threshold';
   } else {
     // Win rate is in the acceptable 40–70% range. No adjustment needed.
     return { action: 'none' };

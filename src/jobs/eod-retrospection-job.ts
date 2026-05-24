@@ -209,28 +209,16 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
             marketRegime,
           );
 
-          // --- 5e: run evolution engine (may propose or apply a param change) --
-          await runEvolutionEngine(pool, personality.id, tradeDateISO, {
-            winRate: metrics.winRate,
-            totalTrades: metrics.totalTrades,
-            totalPnlPct: metrics.totalPnlPct,
-          });
-
-          // --- 5f: persist retrospection row inside a transaction ------------
+          // --- 5e: persist retrospection row inside a transaction ------------
+          //
+          // INSERT must come BEFORE the evolution engine call (5f). The evolution
+          // engine's requireApproval branch issues an UPDATE to this row to write
+          // proposed_adjustments. If the row doesn't exist yet, that UPDATE hits
+          // zero rows and the proposal is silently discarded.
           //
           // ON CONFLICT DO NOTHING: if this job fires twice on the same day
           // (restart, retry), the second INSERT is silently ignored. The row
-          // written by the first run is preserved. The evolution engine's UPDATE
-          // path runs independently and will overwrite proposed_adjustments if
-          // the engine fires again — this is acceptable because the metrics are
-          // deterministic for a given trade_date.
-          //
-          // proposed_adjustments is written as null here. The evolution engine
-          // UPDATEs this column via its own internal transaction (see
-          // runEvolutionEngine → requireApproval branch). Writing null first
-          // and letting the evolution engine update it keeps responsibilities
-          // separated: this job owns the INSERT, the evolution engine owns the
-          // proposed_adjustments payload.
+          // written by the first run is preserved.
           await withTransaction(async (client) => {
             await client.query(
               `INSERT INTO retrospection_results
@@ -249,10 +237,19 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
                 beatClockworkDelta,    // number | null
                 brierScore,            // number | null
                 managementEffectiveness, // number | null
-                null,                  // proposed_adjustments — populated by evolution engine
+                null,                  // proposed_adjustments — populated by evolution engine (5f)
                 false,                 // adjustments_applied
               ],
             );
+          });
+
+          // --- 5f: run evolution engine (may propose or apply a param change) --
+          // Runs after the retrospection row is committed so the requireApproval
+          // UPDATE lands on an existing row.
+          await runEvolutionEngine(pool, personality.id, tradeDateISO, {
+            winRate: metrics.winRate,
+            totalTrades: metrics.totalTrades,
+            totalPnlPct: metrics.totalPnlPct,
           });
         } catch (err) {
           // Per-personality catch: log and continue to the next personality.
