@@ -774,4 +774,268 @@ describe('fetchDailyState', () => {
     // The closed-trade query must include the date as the second parameter
     expect(call0Params).toContain('2026-05-19');
   });
+
+  it('passes underlying to the open-positions query when provided (T-44 per-index leg cap)', async () => {
+    // When `underlying` is supplied, the open-positions query param array must
+    // contain the underlying value so the SQL `$2::text IS NULL OR symbol = $2`
+    // filter scopes the count to that index.
+    const mockQuery = vi.fn((_sql: string, _params?: unknown[]) =>
+      Promise.resolve({ rows: [{ today_trade_count: '0', today_net_pnl: '0', open_legs: '0' }], rowCount: 1 }),
+    );
+
+    const mockDb = { query: mockQuery } as unknown as Pool;
+
+    await fetchDailyState(mockDb, 'personality-uuid-123', '2026-05-19', 'NIFTY');
+
+    // The open-positions query is Query 2 (second call).
+    const openQueryParams = mockQuery.mock.calls[1]?.[1] as unknown[];
+    expect(openQueryParams).toContain('NIFTY');
+
+    // The closed-trade query (Query 1) must NOT contain the underlying — it
+    // aggregates cross-index (max_daily_loss / max_daily_trades are whole-personality).
+    const closedQueryParams = mockQuery.mock.calls[0]?.[1] as unknown[];
+    expect(closedQueryParams).not.toContain('NIFTY');
+  });
+
+  it('passes null for underlying when not provided (backward-compat: no index filter)', async () => {
+    // When underlying is absent, the open-positions query receives null as $2
+    // so the `IS NULL` branch matches and all open positions are counted.
+    const mockQuery = vi.fn((_sql: string, _params?: unknown[]) =>
+      Promise.resolve({ rows: [{ today_trade_count: '0', today_net_pnl: '0', open_legs: '2' }], rowCount: 1 }),
+    );
+
+    const mockDb = { query: mockQuery } as unknown as Pool;
+
+    await fetchDailyState(mockDb, 'personality-uuid-123', '2026-05-19');
+
+    const openQueryParams = mockQuery.mock.calls[1]?.[1] as unknown[];
+    // null must be passed so the SQL $2::text IS NULL branch evaluates to true
+    expect(openQueryParams).toContain(null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 1 — sr_anchored signal-type gate (T-44)
+// ---------------------------------------------------------------------------
+
+describe('Stage 1 — sr_anchored entry type (T-44)', () => {
+  /** Levelhead-style personality fixture. */
+  function makeLevelheadPersonality(overrides: Partial<PersonalityConfig> = {}): PersonalityConfig {
+    return {
+      id: 'pers-levelhead',
+      name: 'levelhead',
+      displayName: 'Levelhead',
+      groupType: 'reference',
+      entryType: 'sr_anchored',
+      managementStyle: 'cut_reenter',
+      isFrozen: false,
+      isActive: true,
+      phase: 2,
+      params: {
+        sr_strength_threshold: 0.65,
+        sr_proximity_points: 20,
+        max_daily_trades: 2,
+        max_daily_loss: 12000,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...overrides,
+    };
+  }
+
+  /** An SR_REVERSAL signal that Levelhead should accept. */
+  function makeSRSignal(overrides: Partial<StraddleSignalInput> = {}): StraddleSignalInput {
+    return {
+      signalType: 'MOMENTUM_EXHAUSTION', // base signal type is reused; sr_subtype discriminates
+      signalId: 'sig-sr-001',
+      underlying: 'NIFTY',
+      atmStrike: 22000,
+      spot: 22000,
+      straddleValue: 200,
+      vix: 15,
+      adjustedProbability: 0.5, // irrelevant for sr_anchored Stage 4
+      confidenceTier: 'MEDIUM',
+      signalTimeMs: IST_1030_MAY19,
+      sr_subtype: 'SR_REVERSAL',
+      sr_strength: 0.8,
+      ...overrides,
+    };
+  }
+
+  it('accepts an SR_REVERSAL signal for sr_anchored personality (Stage 1 pass)', () => {
+    const levelhead = makeLevelheadPersonality();
+
+    const result = runPersonalityFilter(makeSRSignal(), levelhead, emptyDailyState, IST_1030_MAY19);
+
+    // Should clear Stage 1 (may pass all stages or fail at a later stage)
+    if (!result.pass) {
+      expect(result.stage).toBeGreaterThan(1);
+    }
+  });
+
+  it('rejects a MOMENTUM_EXHAUSTION signal without sr_subtype for sr_anchored personality', () => {
+    const levelhead = makeLevelheadPersonality();
+
+    // A plain MOMENTUM_EXHAUSTION signal has no sr_subtype — must be rejected
+    const result = runPersonalityFilter(
+      makeSignal({ signalType: 'MOMENTUM_EXHAUSTION' }), // no sr_subtype
+      levelhead,
+      emptyDailyState,
+      IST_1030_MAY19,
+    );
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(1);
+    expect(result.reason).toMatch(/ENTRY_TYPE_MISMATCH/);
+    expect(result.reason).toMatch(/sr_anchored/);
+  });
+
+  it('rejects a SCHEDULED signal for sr_anchored personality', () => {
+    const levelhead = makeLevelheadPersonality();
+
+    const result = runPersonalityFilter(
+      makeScheduledSignal(), // SCHEDULED — no sr_subtype
+      levelhead,
+      emptyDailyState,
+      IST_1030_MAY19,
+    );
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(1);
+    expect(result.reason).toMatch(/ENTRY_TYPE_MISMATCH/);
+    expect(result.reason).toMatch(/sr_anchored/);
+  });
+
+  it('rejects a MOMENTUM_EXHAUSTION signal with sr_subtype=null for sr_anchored personality', () => {
+    const levelhead = makeLevelheadPersonality();
+
+    const result = runPersonalityFilter(
+      makeSRSignal({ sr_subtype: null }), // explicit null — not SR_REVERSAL
+      levelhead,
+      emptyDailyState,
+      IST_1030_MAY19,
+    );
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(1);
+    expect(result.reason).toMatch(/ENTRY_TYPE_MISMATCH/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 4 — sr_anchored strength-threshold gate (T-44)
+// ---------------------------------------------------------------------------
+
+describe('Stage 4 — sr_anchored strength threshold (T-44)', () => {
+  /** Levelhead with sr_strength_threshold=0.65 and a permissive VIX/trade ceiling. */
+  function makeLevelheadPersonality(srThreshold = 0.65): PersonalityConfig {
+    return {
+      id: 'pers-levelhead',
+      name: 'levelhead',
+      displayName: 'Levelhead',
+      groupType: 'reference',
+      entryType: 'sr_anchored',
+      managementStyle: 'cut_reenter',
+      isFrozen: false,
+      isActive: true,
+      phase: 2,
+      params: {
+        sr_strength_threshold: srThreshold,
+        max_daily_trades: 10,
+        max_daily_loss: 50000,
+        vix_max: 50,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  /** SR_REVERSAL signal with a configurable sr_strength. */
+  function makeSRSignal(sr_strength: number | null): StraddleSignalInput {
+    return {
+      signalType: 'MOMENTUM_EXHAUSTION',
+      signalId: 'sig-sr-002',
+      underlying: 'NIFTY',
+      atmStrike: 22000,
+      spot: 22000,
+      straddleValue: 200,
+      vix: 15,
+      adjustedProbability: 0.3, // below typical min_probability — must NOT gate sr_anchored
+      confidenceTier: 'LOW',
+      signalTimeMs: IST_1030_MAY19,
+      sr_subtype: 'SR_REVERSAL',
+      sr_strength,
+    };
+  }
+
+  it('passes Stage 4 when sr_strength meets sr_strength_threshold (boundary: >= check)', () => {
+    const levelhead = makeLevelheadPersonality(0.65);
+
+    // sr_strength = 0.65 = threshold → should pass
+    const result = runPersonalityFilter(makeSRSignal(0.65), levelhead, emptyDailyState, IST_1030_MAY19);
+
+    // Stage 4 must not block; any failure must be stage 5+
+    if (!result.pass) {
+      expect(result.stage).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it('rejects at Stage 4 when sr_strength is below sr_strength_threshold', () => {
+    const levelhead = makeLevelheadPersonality(0.65);
+
+    // sr_strength = 0.50 < 0.65 threshold → must reject at Stage 4
+    const result = runPersonalityFilter(makeSRSignal(0.5), levelhead, emptyDailyState, IST_1030_MAY19);
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(4);
+    expect(result.reason).toBe('SR_STRENGTH_BELOW_THRESHOLD');
+  });
+
+  it('rejects at Stage 4 when sr_strength is null (treated as 0, conservative default)', () => {
+    const levelhead = makeLevelheadPersonality(0.65);
+
+    // null sr_strength → treated as 0 → 0 < 0.65 → reject
+    const result = runPersonalityFilter(makeSRSignal(null), levelhead, emptyDailyState, IST_1030_MAY19);
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(4);
+    expect(result.reason).toBe('SR_STRENGTH_BELOW_THRESHOLD');
+  });
+
+  it('does NOT use min_probability gate for sr_anchored (Stage 4 uses strength only)', () => {
+    // Levelhead has no min_probability in params — and even if it did, Stage 4
+    // must use sr_strength_threshold. adjustedProbability=0.1 would fail any
+    // typical min_probability gate; this test verifies it is not checked.
+    const levelhead = makeLevelheadPersonality(0.65);
+
+    // sr_strength=0.9 well above threshold; adjustedProbability deliberately low
+    const signal = makeSRSignal(0.9);
+    // signal.adjustedProbability is already 0.3 (set in makeSRSignal) — below 0.65
+
+    const result = runPersonalityFilter(signal, levelhead, emptyDailyState, IST_1030_MAY19);
+
+    // Stage 4 must not fire PROBABILITY_BELOW_THRESHOLD; it must pass strength gate
+    if (!result.pass) {
+      expect(result.reason).not.toBe('PROBABILITY_BELOW_THRESHOLD');
+    }
+  });
+
+  it('min_probability gate still works for momentum_exhaustion personalities (unchanged)', () => {
+    // Regression: T-44 must not break the existing probability gate for
+    // momentum_exhaustion personalities.
+    const precision = makePersonality({
+      params: { min_probability: 0.7, max_daily_trades: 2, max_daily_loss: 8000, vix_max: 30 },
+    });
+
+    const result = runPersonalityFilter(
+      makeSignal({ adjustedProbability: 0.5 }), // 0.5 < 0.7 → should reject
+      precision,
+      emptyDailyState,
+      IST_1030_MAY19,
+    );
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(4);
+    expect(result.reason).toBe('PROBABILITY_BELOW_THRESHOLD');
+  });
 });

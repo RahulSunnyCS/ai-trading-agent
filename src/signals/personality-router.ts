@@ -52,6 +52,7 @@ import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
 import type { PersonalityConfigM2 as PersonalityConfig } from '../db/schema.js';
 import { STREAM_SIGNALS } from '../redis/client.js';
+import type { EntryIntent } from '../trading/entry-engine.js';
 import { PaperTradeExecutor } from '../trading/paper-trade-executor.js';
 import { portfolioRiskCheck } from '../trading/portfolio-risk.js';
 import { QuantiplyStub } from '../trading/quantiply-stub.js';
@@ -74,6 +75,11 @@ import {
  * passing to the filter, which expects number types (see StraddleSignalInput).
  * vix is `string | null` — a literal 'null' string from the stream or missing
  * field both map to null here, before numeric parsing.
+ *
+ * sr_subtype and sr_strength are optional — absent for MOMENTUM_EXHAUSTION and
+ * SCHEDULED signals; present when the S/R detection engine (Phase 2) emits an
+ * SR_REVERSAL signal. Both are optional in the interface so the type remains
+ * compatible with Phase-1-only callers that don't set them.
  */
 export interface IncomingSignal {
   signalId: string;
@@ -86,6 +92,14 @@ export interface IncomingSignal {
   adjusted_probability: number;
   confidence_tier: string;
   signal_time: number;
+  /** S/R signal sub-type. Present only for S/R signals (Phase 2+). */
+  sr_subtype?: 'SR_REVERSAL' | null;
+  /**
+   * S/R strength score as a raw string from the stream (parsed from the pg
+   * NUMERIC column). The router parses this to a number before passing to
+   * the filter. Optional — absent for non-S/R signals.
+   */
+  sr_strength?: string | null;
 }
 
 /**
@@ -165,6 +179,21 @@ export class PersonalityRouter {
    */
   private readonly _vixStaleMs: number;
 
+  /**
+   * Maximum phase number of personalities to activate.
+   * Read from ACTIVE_PHASE env var; defaults to 1.
+   *
+   * Phase 1 (default): only Phase-1 personalities are loaded. Levelhead
+   *   (phase=2) is excluded even if is_active=TRUE.
+   * Phase 2 (ACTIVE_PHASE=2): includes Levelhead and all other Phase-2
+   *   personalities. Set this when the S/R detection engine is deployed.
+   *
+   * This replaces the previous hardcoded `phase <= 1` filter in
+   * _loadActivePersonalities so Phase 2 can be toggled via env without a
+   * code change.
+   */
+  private readonly _activePhase: number;
+
   // ---------------------------------------------------------------------------
   // Personality config cache
   //
@@ -198,6 +227,13 @@ export class PersonalityRouter {
     const rawVixStaleMs = Number.parseInt(process.env.VIX_STALE_MS ?? '300000', 10);
     this._vixStaleMs =
       Number.isFinite(rawVixStaleMs) && rawVixStaleMs > 0 ? rawVixStaleMs : 300_000;
+
+    // Parse ACTIVE_PHASE env var. Defaults to 1 (Phase 1 personalities only).
+    // A non-positive or non-finite value falls back to 1 to avoid accidentally
+    // activating Phase 2 personalities in a misconfigured environment.
+    const rawActivePhase = Number.parseInt(process.env.ACTIVE_PHASE ?? '1', 10);
+    this._activePhase =
+      Number.isFinite(rawActivePhase) && rawActivePhase > 0 ? rawActivePhase : 1;
   }
 
   // ---------------------------------------------------------------------------
@@ -323,8 +359,13 @@ export class PersonalityRouter {
       return this._personalityCache;
     }
 
+    // phase <= $1 replaces the previous hardcoded `phase <= 1` so Phase 2
+    // personalities (e.g. Levelhead) can be activated by setting ACTIVE_PHASE=2
+    // without a code change. The parameterised form ($1) prevents SQL injection
+    // even though _activePhase is parsed from env (defence in depth).
     const result = await this._db.query<DbPersonalityRow>(
-      'SELECT * FROM personality_configs WHERE is_active = TRUE AND phase <= 1 ORDER BY created_at',
+      'SELECT * FROM personality_configs WHERE is_active = TRUE AND phase <= $1 ORDER BY created_at',
+      [this._activePhase],
     );
 
     this._personalityCache = result.rows.map((row) => ({
@@ -463,8 +504,10 @@ export class PersonalityRouter {
       return;
     }
 
-    // --- Step 5: Load active personalities (phase <= 1 for Phase 1 scope) ---
-    // Uses the 60-second in-memory cache to avoid a DB round-trip on every signal.
+    // --- Step 5: Load active personalities (phase <= ACTIVE_PHASE) ---
+    // ACTIVE_PHASE defaults to 1; set to 2 to include Phase-2 personalities
+    // (e.g. Levelhead). Uses the 60-second in-memory cache to avoid a DB
+    // round-trip on every signal.
     const personalities = await this._loadActivePersonalities();
 
     if (personalities.length === 0) {
@@ -476,8 +519,12 @@ export class PersonalityRouter {
     // todayIST is the IST date string used by fetchDailyState's date filter.
     const todayIST = this._clock.today();
 
+    // Pass signal.underlying so the open-leg count is scoped per index (T-44
+    // D2 Option A). Each personality sees only its own open legs for the
+    // current signal's underlying — NIFTY legs don't count against a BANKNIFTY
+    // leg cap and vice versa.
     const dailyStates = await Promise.all(
-      personalities.map((p) => fetchDailyState(this._db, p.id, todayIST)),
+      personalities.map((p) => fetchDailyState(this._db, p.id, todayIST, signal.underlying)),
     );
 
     // --- Step 7: Parallel filter fan-out ---
@@ -587,15 +634,14 @@ export class PersonalityRouter {
     }
 
     // Build an EntryIntent from the signal — the shape required by openTrade().
-    // The EntryIntent.underlying type is narrowed to 'NIFTY' in entry-engine.ts;
-    // we preserve this for Phase 1 and will widen it in Phase 2 when BankNifty
-    // and Sensex signals start flowing.
+    // T-44: remove the `as 'NIFTY'` cast that was a Phase 1 placeholder. The
+    // real underlying from the signal is propagated directly so that Phase 2
+    // BankNifty and Sensex signals are handled correctly. PaperTradeExecutor
+    // accepts `string` for underlying, so no downstream cast is needed.
     const entryIntent = {
       straddleValue: signal.straddle_value,
       atmStrike: signal.atm_strike,
-      // Phase 1 only supports NIFTY; all signals in this phase carry NIFTY.
-      // Using 'as' cast is intentional — the type is narrow by design.
-      underlying: signal.underlying as 'NIFTY',
+      underlying: signal.underlying,
       spot: signal.spot,
       // vix is a string | null on IncomingSignal; openTrade expects string | null.
       vixAtEntry: signal.vix !== 'null' ? signal.vix : null,
@@ -607,7 +653,12 @@ export class PersonalityRouter {
 
     let tradeId: string;
     try {
-      tradeId = await executor.openTrade(entryIntent);
+      // EntryIntent.underlying is typed as literal 'NIFTY' in entry-engine.ts
+      // (Phase 1 constraint, out of scope for T-44 to change). We cast the
+      // whole object here so the real underlying value flows through at runtime
+      // while the legacy EntryIntent type constraint is satisfied. When Phase 2
+      // widens EntryIntent.underlying to string, this cast can be removed.
+      tradeId = await executor.openTrade(entryIntent as EntryIntent);
     } catch (err: unknown) {
       console.error(
         `[personality-router] openTrade failed for personality ${personality.name}:`,
@@ -729,6 +780,23 @@ export class PersonalityRouter {
       return null;
     }
 
+    // sr_subtype: optional S/R discriminator field. Only 'SR_REVERSAL' is
+    // accepted; any other value (or absent) maps to null. We are strict here
+    // so that a malformed or unexpected sr_subtype value never accidentally
+    // passes the sr_anchored Stage 1 gate.
+    const rawSrSubtype = fields.sr_subtype;
+    const sr_subtype: 'SR_REVERSAL' | null =
+      rawSrSubtype === 'SR_REVERSAL' ? 'SR_REVERSAL' : null;
+
+    // sr_strength: optional [0.0, 1.0] score, transmitted as a string on the
+    // stream. Absent or non-numeric values map to null (treated as 0 by Stage
+    // 4 when doing the sr_strength_threshold comparison).
+    const rawSrStrength = fields.sr_strength;
+    const sr_strength: string | null =
+      rawSrStrength !== undefined && rawSrStrength !== '' && rawSrStrength !== 'null'
+        ? rawSrStrength
+        : null;
+
     return {
       signalId: signalId,
       signal_type,
@@ -740,6 +808,8 @@ export class PersonalityRouter {
       adjusted_probability,
       confidence_tier,
       signal_time: signal_time_ms,
+      sr_subtype,
+      sr_strength,
     };
   }
 }
@@ -775,5 +845,14 @@ export function toStraddleSignalInput(signal: IncomingSignal): StraddleSignalInp
       ? signal.confidence_tier
       : 'LOW') as 'HIGH' | 'MEDIUM' | 'LOW',
     signalTimeMs: signal.signal_time,
+    // Pass through sr_subtype directly — it is already validated/normalised to
+    // 'SR_REVERSAL' | null by _parseSignal (no re-validation needed here).
+    sr_subtype: signal.sr_subtype ?? null,
+    // sr_strength: the stream carries it as a string; parse to number for the
+    // filter. null when absent so Stage 4 treats it as 0 (conservative default).
+    sr_strength:
+      signal.sr_strength !== null && signal.sr_strength !== undefined
+        ? Number.parseFloat(signal.sr_strength)
+        : null,
   };
 }

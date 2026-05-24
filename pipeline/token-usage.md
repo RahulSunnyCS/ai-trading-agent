@@ -12,3 +12,5 @@
 | Phase 2 | Decomposition (6 contracts) | orchestrator | opus | high | ~20k |
 | Phase 3 | T-43-A: schema & migrations | implementor | sonnet | high | ~14k |
 | Phase 3 | T-46: deterministic optimizer | implementor | sonnet | high | ~18k |
+| Phase 3 | T-43-B: S/R level computation | implementor | sonnet | high | ~16k |
+| Phase 3 | T-44: Levelhead activation | implementor | sonnet | high | ~14k |

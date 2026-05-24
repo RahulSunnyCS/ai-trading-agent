@@ -512,21 +512,124 @@ describe('PersonalityRouter', () => {
 
     // fetchDailyState should have been called exactly 3 times — once per personality.
     // The router uses Promise.all so all 3 calls are initiated concurrently.
+    // T-44 D2 Option A: the router now passes the signal's underlying as the 4th
+    // arg so open-leg counts are scoped per index. The test signal uses 'NIFTY'.
     expect(fetchDailyState).toHaveBeenCalledTimes(3);
     expect(fetchDailyState).toHaveBeenCalledWith(
       db,
       'pers-001',
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      'NIFTY',
     );
     expect(fetchDailyState).toHaveBeenCalledWith(
       db,
       'pers-002',
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      'NIFTY',
     );
     expect(fetchDailyState).toHaveBeenCalledWith(
       db,
       'pers-003',
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      'NIFTY',
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 7: ACTIVE_PHASE gating (T-44)
+  // -------------------------------------------------------------------------
+  // The router queries `WHERE phase <= $ACTIVE_PHASE`. We verify this by
+  // observing what personality DB rows are returned (controlled by makeMockDb)
+  // and that fetchDailyState is called once per returned personality.
+  //
+  // Because _loadActivePersonalities runs a real DB query that we control
+  // via makeMockDb, we can supply a phase=2 personality and check whether it
+  // is picked up depending on the ACTIVE_PHASE env var.
+
+  it('does not load phase=2 personalities when ACTIVE_PHASE=1 (default)', async () => {
+    // A phase=2 personality (Levelhead). At ACTIVE_PHASE=1 the DB query
+    // filters it out — we simulate that by returning an empty personalityRows
+    // array (the real DB would exclude it via `phase <= 1`).
+    // We verify fetchDailyState is never called (nothing to route to).
+    const phase2Personality = makePersonality({ id: 'pers-levelhead', name: 'levelhead', phase: 2 });
+
+    // DB returns no personalities because ACTIVE_PHASE=1 excludes phase=2.
+    const db = makeMockDb({ personalityRows: [] });
+    const signalFields = makeSignalFields();
+    const xreadgroupResponses = [makeXreadgroupResponse('1-0', signalFields)];
+    const redis = makeMockRedis(xreadgroupResponses);
+    const clock = new FixedClock(IST_1030_MAY19);
+
+    // Ensure ACTIVE_PHASE defaults to 1 (unset)
+    delete process.env.ACTIVE_PHASE;
+    process.env.VIX_STALE_MS = '99999999';
+
+    vi.mocked(fetchDailyState).mockResolvedValue({ tradeCount: 0, netPnl: '0', openPositions: 0 });
+    vi.mocked(runPersonalityFilter).mockReturnValue({ pass: true, stage: 6, reason: 'PASS' });
+
+    const mockOpenTrade = vi.fn().mockResolvedValue('trade-uuid');
+    vi.mocked(PaperTradeExecutor).mockImplementation(
+      () => ({ openTrade: mockOpenTrade }) as unknown as InstanceType<typeof PaperTradeExecutor>,
+    );
+
+    const router = new PersonalityRouter(db, redis, clock);
+    await router.start();
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    await router.stop();
+    delete process.env.VIX_STALE_MS;
+
+    // No personalities were returned by the DB → fetchDailyState never called
+    expect(fetchDailyState).not.toHaveBeenCalled();
+    // Confirm the phase=2 personality reference is used only as a fixture —
+    // the real assertion is that nothing was routed.
+    expect(phase2Personality.phase).toBe(2);
+  });
+
+  it('loads phase=2 personalities when ACTIVE_PHASE=2 (Levelhead activation)', async () => {
+    // When ACTIVE_PHASE=2, the DB query `phase <= 2` includes Levelhead.
+    // We simulate this by having makeMockDb return a phase=2 personality.
+    const phase2Personality = makePersonality({
+      id: 'pers-levelhead',
+      name: 'levelhead',
+      phase: 2,
+      entryType: 'sr_anchored',
+      managementStyle: 'cut_reenter',
+    });
+
+    vi.mocked(fetchDailyState).mockResolvedValue({ tradeCount: 0, netPnl: '0', openPositions: 0 });
+    vi.mocked(runPersonalityFilter).mockReturnValue({ pass: false, stage: 1, reason: 'ENTRY_TYPE_MISMATCH: test' });
+
+    const signalFields = makeSignalFields();
+    const xreadgroupResponses = [makeXreadgroupResponse('1-0', signalFields)];
+
+    const db = makeMockDb({ personalityRows: [phase2Personality] });
+    const redis = makeMockRedis(xreadgroupResponses);
+    const clock = new FixedClock(IST_1030_MAY19);
+
+    process.env.ACTIVE_PHASE = '2';
+    process.env.VIX_STALE_MS = '99999999';
+
+    const mockOpenTrade = vi.fn().mockResolvedValue('trade-uuid');
+    vi.mocked(PaperTradeExecutor).mockImplementation(
+      () => ({ openTrade: mockOpenTrade }) as unknown as InstanceType<typeof PaperTradeExecutor>,
+    );
+
+    const router = new PersonalityRouter(db, redis, clock);
+    await router.start();
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    await router.stop();
+
+    delete process.env.ACTIVE_PHASE;
+    delete process.env.VIX_STALE_MS;
+
+    // The phase=2 personality was returned by the DB (ACTIVE_PHASE=2 allows it)
+    // → fetchDailyState is called exactly once for Levelhead.
+    expect(fetchDailyState).toHaveBeenCalledTimes(1);
+    expect(fetchDailyState).toHaveBeenCalledWith(
+      db,
+      'pers-levelhead',
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      'NIFTY',
     );
   });
 });

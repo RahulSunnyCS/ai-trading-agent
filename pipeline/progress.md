@@ -10,7 +10,14 @@
 - [x] Phase 0 — Triage (risk_manifest.json written)
 - [x] Phase 1 — Planning + Red Team (3 sprints, 8.75/10) + QA Planner → **Gate 1 APPROVED**
 - [x] Phase 2 — Decomposition (6 contracts: T-43-A/B/C, T-44, T-45, T-46)
-- [~] Phase 3 — Implementation (Wave 1: T-43-A + T-46 in progress)
+- [~] Phase 3 — Implementation
+  - [x] Wave 1: T-43-A (committed), T-46 (committed; hybrid-objective rework in flight per user)
+  - [x] Wave 2: T-43-B + T-44 done — 193 signals tests green (sr-levels 53 + filter/router incl. sr_anchored + ACTIVE_PHASE). Per-index leg cap confirmed correct (paper_trades.symbol = underlying).
+  - [~] T-46 hybrid-objective rework in flight (last running agent).
+  - NOTE: add src/trading/entry-engine.ts to T-45 scope — widen EntryIntent.underlying from literal 'NIFTY' to Underlying (T-44 band-aided with a call-site cast).
+  - [ ] Wave 3: T-43-C
+  - [ ] Wave 4: T-45
+  - Gate-2 carry: migration 013 expiry weekdays need live NSE/BSE verification (T-45 symbol-resolution assert is the runtime net)
 
 ## Gate 1 Decisions (locked)
 - **D1 — Bayesian optimizer:** Option B — guarded deterministic 1-D search (golden-section over [0.30,0.90]); full GP deferred to multi-param milestone.

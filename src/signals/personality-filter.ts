@@ -28,6 +28,13 @@
  *   - Regime check is explicitly deferred: per the task contract, regime tagging
  *     is not available in Phase 1. The comment ensures reviewers can find the
  *     deferral when Phase 2 / T-33 is implemented.
+ *   - Per-index open-leg counting (T-44 D2 Option A): fetchDailyState accepts an
+ *     optional `underlying` parameter. When supplied, the open-positions query is
+ *     filtered by underlying so each index is an independent leg book. The closed-
+ *     trade count (tradeCount) and P&L (netPnl) remain per-personality-per-day
+ *     (not per-underlying) because max_daily_trades and max_daily_loss are whole-
+ *     personality budgets — a personality blowing its loss limit on one index
+ *     should block it from trading all indexes for the rest of the day.
  */
 
 import type { Pool } from 'pg';
@@ -44,6 +51,10 @@ import type { PersonalityConfigM2 as PersonalityConfig } from '../db/schema.js';
  * caller (PersonalityRouter, T-27) will have parsed them from the Redis stream
  * message before invoking this function. Keeping them as numbers avoids
  * repeated parseFloat() inside every stage call.
+ *
+ * sr_subtype and sr_strength are optional so that existing callers that construct
+ * StraddleSignalInput for MOMENTUM_EXHAUSTION or SCHEDULED signals do not need
+ * to be updated — absent/undefined is treated identically to null (no SR data).
  */
 export interface StraddleSignalInput {
   signalType: 'MOMENTUM_EXHAUSTION' | 'SCHEDULED' | 'PULLBACK';
@@ -59,6 +70,19 @@ export interface StraddleSignalInput {
   confidenceTier: 'HIGH' | 'MEDIUM' | 'LOW';
   /** Epoch milliseconds of signal creation */
   signalTimeMs: number;
+  /**
+   * S/R signal sub-type (migration 012). Present only when the S/R detection
+   * engine emits a signal; absent/undefined/null for all other signal types.
+   * Stage 1 uses this to gate sr_anchored personalities.
+   */
+  sr_subtype?: 'SR_REVERSAL' | null;
+  /**
+   * S/R level strength score [0.0, 1.0]. Parsed to a number by the router
+   * before it is handed to the filter (not the raw NUMERIC string from pg).
+   * Stage 4 uses this to gate sr_anchored personalities in place of
+   * min_probability.
+   */
+  sr_strength?: number | null;
 }
 
 /**
@@ -121,16 +145,35 @@ export interface ComparisonIntegrityResult {
  * PositionMonitor hardcodes '0' because it doesn't know the real cumulative
  * P&L. This function computes the correct sum from closed trades.
  *
- * @param db - pg Pool (not the module-level pool, so callers can inject a test pool)
+ * T-44 per-index leg cap (D2 Option A):
+ * The optional `underlying` parameter scopes the open-positions count to a
+ * single index (e.g. 'NIFTY'). When supplied, the open-positions query adds a
+ * `symbol = underlying` filter so each index is an independent leg book.
+ * When omitted (undefined/null), the query counts open legs across all
+ * underlying indexes for the personality — preserving the original behaviour
+ * for callers that don't yet provide the index (e.g. the integration tests,
+ * the backtest runner which constructs DailyState manually).
+ *
+ * Deliberate scoping decision (tradeCount / netPnl remain cross-index):
+ * max_daily_trades and max_daily_loss are whole-personality daily budgets.
+ * A personality hitting its loss limit on NIFTY should block it from trading
+ * BANKNIFTY for the rest of the day too — cross-index totals are correct here.
+ * Only the leg-count (openPositions) is per-index because max_open_legs is an
+ * "open position count" per book — a personality may hold NIFTY legs while
+ * independently opening BANKNIFTY legs.
+ *
+ * @param db          - pg Pool (injected so callers can pass a test pool)
  * @param personalityId - UUID of the personality row
- * @param todayIST - date string in 'YYYY-MM-DD' format, in IST
+ * @param todayIST    - date string in 'YYYY-MM-DD' format, in IST
+ * @param underlying  - optional: when provided, open-leg count is scoped to this index
  */
 export async function fetchDailyState(
   db: Pool,
   personalityId: string,
   todayIST: string,
+  underlying?: string,
 ): Promise<DailyState> {
-  // Query 1: closed-trade count and net P&L for today
+  // Query 1: closed-trade count and net P&L for today (always cross-index).
   // Using parameterised $1/$2 to prevent SQL injection — personalityId is
   // a UUID from the DB but we never assume caller input is safe.
   const closedResult = await db.query<{
@@ -147,16 +190,23 @@ export async function fetchDailyState(
     [personalityId, todayIST],
   );
 
-  // Query 2: count of currently open legs for this personality (not date-filtered:
-  // open trades from a prior day that were not closed at EOD are still "open").
-  // In normal operation this should never happen, but we count all open rows to
-  // be safe rather than missing a stale open position.
+  // Query 2: count of currently open legs for this personality.
+  //
+  // T-44 D2 Option A: when `underlying` is provided, add a symbol filter so
+  // that leg counts are per-index. The $3 parameter is either the index name
+  // (e.g. 'NIFTY') or SQL NULL. The IS NULL branch in the WHERE clause means
+  // "no index filter" — backward-compatible with callers that omit underlying.
+  //
+  // Not date-filtered: open trades from a prior day that were not closed at
+  // EOD are still "open". In normal operation this should never happen, but we
+  // count all open rows to be safe rather than missing a stale open position.
   const openResult = await db.query<{ open_legs: string }>(
     `SELECT COUNT(*)::text AS open_legs
      FROM paper_trades
      WHERE personality_id = $1
-       AND status = 'open'`,
-    [personalityId],
+       AND status = 'open'
+       AND ($2::text IS NULL OR symbol = $2)`,
+    [personalityId, underlying ?? null],
   );
 
   // pg returns COUNT(*) as a string when custom type parsers are active
@@ -210,8 +260,11 @@ export function runPersonalityFilter(
   //   - fixed_time personalities (Clockwork, Learners) only accept SCHEDULED
   //   - momentum_exhaustion personalities only accept MOMENTUM_EXHAUSTION or PULLBACK
   //   - any_signal personalities (Scanner, Blitz) accept all three types
-  //   - sr_anchored (Levelhead, Phase 2) treated like any_signal for now since
-  //     the S/R signal type is not yet emitted — it won't match real traffic
+  //   - sr_anchored personalities (Levelhead, Phase 2) accept ONLY signals that
+  //     carry sr_subtype='SR_REVERSAL'. Any other signal — including
+  //     MOMENTUM_EXHAUSTION without SR metadata or a SCHEDULED signal — is
+  //     rejected. This keeps Levelhead's trade-count purely S/R-sourced so
+  //     its retrospection data is not contaminated by non-SR entries.
   if (personality.entryType === 'fixed_time' && signal.signalType !== 'SCHEDULED') {
     return {
       pass: false,
@@ -226,6 +279,18 @@ export function runPersonalityFilter(
       stage: 1,
       reason:
         'ENTRY_TYPE_MISMATCH: momentum_exhaustion personality does not accept SCHEDULED signals',
+    };
+  }
+
+  if (personality.entryType === 'sr_anchored' && signal.sr_subtype !== 'SR_REVERSAL') {
+    // sr_anchored personalities require an explicit SR_REVERSAL subtype marker.
+    // If sr_subtype is absent, null, or any other value, the signal is not an
+    // S/R signal and must be rejected. We do not fall through to any_signal
+    // semantics here — sr_anchored has its own explicit gate.
+    return {
+      pass: false,
+      stage: 1,
+      reason: `ENTRY_TYPE_MISMATCH: sr_anchored personality requires SR_REVERSAL signal (got sr_subtype=${String(signal.sr_subtype ?? 'undefined')})`,
     };
   }
 
@@ -312,11 +377,29 @@ export function runPersonalityFilter(
   // -------------------------------------------------------------------------
   // Stage 4 — Signal quality
   // -------------------------------------------------------------------------
-  // Enforces the minimum probability threshold for momentum-based personalities.
-  // SCHEDULED signals skip this check: Clockwork and the Learners are not
-  // probability-gated (they enter at a fixed time regardless of signal quality).
+  // Two separate gates depending on entry_type:
+  //
+  // (a) sr_anchored personalities (Levelhead, Phase 2): gate on
+  //     params.sr_strength_threshold vs signal.sr_strength.
+  //     min_probability is NOT used for S/R signals — the strength score is
+  //     a different dimension (how decisively price reacted at the S/R level).
+  //     We treat a missing sr_strength (null/undefined) as 0, which fails any
+  //     non-zero threshold. This is the conservative choice: a signal without
+  //     a strength score should not be entered by a strength-gated personality.
+  //
+  // (b) All other personalities: the existing min_probability gate.
+  //     SCHEDULED signals skip the gate entirely (Clockwork and the Learners
+  //     enter at a fixed time regardless of signal quality).
 
-  if (signal.signalType !== 'SCHEDULED') {
+  if (personality.entryType === 'sr_anchored') {
+    // sr_anchored uses strength, not probability.
+    const srStrengthThreshold =
+      (personality.params.sr_strength_threshold as number | undefined) ?? 0;
+    const signalStrength = signal.sr_strength ?? 0;
+    if (signalStrength < srStrengthThreshold) {
+      return { pass: false, stage: 4, reason: 'SR_STRENGTH_BELOW_THRESHOLD' };
+    }
+  } else if (signal.signalType !== 'SCHEDULED') {
     const minProbability = (personality.params.min_probability as number | undefined) ?? 0;
     if (signal.adjustedProbability < minProbability) {
       return { pass: false, stage: 4, reason: 'PROBABILITY_BELOW_THRESHOLD' };
