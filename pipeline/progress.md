@@ -22,8 +22,16 @@
 - [~] Phase 3 — Implementation in progress
   - T-04 shared scaffolding: DONE (27 tests pass, typecheck clean) — committed pending
   - T-05 delete stale frontend/: DONE & committed (pre-delete grep clean, typecheck passed)
-  - T-01 Live tab + T-02 Trades tab: running in parallel
-  - T-03 P&L tab: queued (depends on T-02)
+  - T-01 Live tab: DONE (useLiveTicks + LiveView, Lightweight Charts, synthetic-labeled)
+  - T-02 Trades tab: DONE (usePaperTrades + TradesView, 4 distinct states, single-source hook)
+  - T-03 P&L tab: running (depends on T-02)
+
+### IMPORTANT verification finding
+tsconfig.json `exclude` lists `src/frontend/**/*` (and `src/payment/**/*`), so `bun run typecheck`
+does NOT typecheck any frontend code — pre-existing project posture, not introduced by this task.
+Vitest DOES run `src/**/*.ts` tests (format.test.ts/pnl.test.ts execute). For Phase 6 verification,
+run a one-off frontend tsc via a temp config (not committed) to genuinely validate the new .tsx/.ts.
+Surface this at Gate 2 as an architecture finding (frontend type-safety gap).
   - Internal score ~8.5/10 (>8 → no extra sprint, per feature-fast = 1 sprint)
   - Red Team fixes accepted: running WS shape; realized-only P&L; synthetic labeling on chart; one-shot straddle fetch; StrictMode-safe + backoff reconnect; null-safe NUMERIC coercion; IST-explicit dates.
   - QA checklist: 16 Critical / 17 Functional / 9 Non-blocker (42 total). File: pipeline/qa-checklist.md
