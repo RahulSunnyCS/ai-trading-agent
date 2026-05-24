@@ -24,6 +24,7 @@ import type { Redis } from 'ioredis';
 import type { Clock } from '../utils/clock';
 import { RealClock } from '../utils/clock';
 import { buildOptionSymbol, getAtmStrike, getCurrentExpiry } from './brokers/instrument-registry';
+import { computeAcceleration, computeRoc } from './straddle-math';
 import type { BrokerTick, Underlying } from './brokers/types';
 
 // ---------------------------------------------------------------------------
@@ -76,52 +77,12 @@ interface PriceEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Rolling-buffer helpers (pure, exported for unit testing)
+// Rolling-buffer helpers — re-exported from straddle-math for backward
+// compatibility with existing tests that import them from straddle-calc.
+// The implementation now lives exclusively in straddle-math.ts.
 // ---------------------------------------------------------------------------
 
-/**
- * Compute ROC from the last two straddle values in the buffer.
- *
- * Returns 0 when:
- *   - fewer than 2 values are present (not enough history), or
- *   - the previous value is 0 (would produce divide-by-zero / Infinity).
- *
- * Formula: (current - previous) / previous * 100
- */
-export function computeRoc(buffer: readonly number[]): number {
-  if (buffer.length < 2) return 0;
-  const prev = buffer[buffer.length - 2];
-  const curr = buffer[buffer.length - 1];
-  // Both indexes are guaranteed non-undefined because of the length guard above,
-  // but TypeScript with noUncheckedIndexedAccess requires explicit checks.
-  if (prev === undefined || curr === undefined || prev === 0) return 0;
-  return ((curr - prev) / prev) * 100;
-}
-
-/**
- * Compute acceleration (second derivative of straddle value) from the rolling
- * buffer by comparing the two most recent ROC values.
- *
- * Returns 0 when fewer than 3 values are in the buffer (need two consecutive
- * ROC intervals to compare).
- */
-export function computeAcceleration(buffer: readonly number[]): number {
-  if (buffer.length < 3) return 0;
-
-  // ROC between the last three values: [... a, b, c]
-  // roc_prev = (b - a) / a * 100
-  // roc_curr = (c - b) / b * 100
-  const a = buffer[buffer.length - 3];
-  const b = buffer[buffer.length - 2];
-  const c = buffer[buffer.length - 1];
-
-  if (a === undefined || b === undefined || c === undefined) return 0;
-  if (a === 0 || b === 0) return 0;
-
-  const rocPrev = ((b - a) / a) * 100;
-  const rocCurr = ((c - b) / b) * 100;
-  return rocCurr - rocPrev;
-}
+export { computeRoc, computeAcceleration } from './straddle-math';
 
 // ---------------------------------------------------------------------------
 // Factory
