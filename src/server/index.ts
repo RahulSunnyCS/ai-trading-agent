@@ -22,6 +22,7 @@
  */
 
 import fastifyCors from '@fastify/cors';
+import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyWebsocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
@@ -99,6 +100,10 @@ export async function buildServer(
   // Production note: replace with a specific origin allowlist before deploying
   // to a public-facing environment.
   await server.register(fastifyCors, { origin: true });
+
+  // Rate limiting — 60 requests per minute per IP globally; mutating POST
+  // routes are the primary concern (FOR UPDATE locks + pool contention).
+  await server.register(fastifyRateLimit, { max: 60, timeWindow: '1 minute' });
 
   // WebSocket support — required before any route uses { websocket: true }.
   await server.register(fastifyWebsocket);
@@ -429,6 +434,9 @@ export async function startServer(externalPool?: Pool): Promise<void> {
       // pool is torn down by server.close(). Worker.close() waits for the
       // current job to complete before resolving.
       if (eodWorker) { await eodWorker.close(); }
+      // Close the queue's Redis connection before closing the server — the
+      // queue holds an open connection even when no worker is running.
+      await server.eodQueue.close();
       await server.close();
     } finally {
       process.exit(0);

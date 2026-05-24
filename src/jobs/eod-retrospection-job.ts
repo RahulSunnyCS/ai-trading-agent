@@ -102,18 +102,19 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
 
   return new Worker(
     'eod-retrospection',
-    async (_job) => {
+    async (job) => {
       // -----------------------------------------------------------------------
-      // Step 1: compute today's IST date
+      // Step 1: compute the trade date
       //
+      // For scheduled (cron) runs, job.data.trade_date is absent → use today's
+      // IST date. For manual trigger runs (POST /retrospection/trigger), the
+      // caller supplies trade_date so historical backfill works correctly.
       // toLocaleDateString with en-CA locale always yields 'YYYY-MM-DD' format.
-      // We use IST (Asia/Kolkata) because NSE trade dates are IST calendar dates.
-      // A UTC date would produce the wrong date during early-morning UTC hours
-      // that are still "yesterday" in India (UTC midnight = 05:30 IST).
       // -----------------------------------------------------------------------
-      const tradeDateISO = new Date().toLocaleDateString('en-CA', {
+      const todayIST = new Date().toLocaleDateString('en-CA', {
         timeZone: 'Asia/Kolkata',
       });
+      const tradeDateISO = (job.data as { trade_date?: string }).trade_date ?? todayIST;
 
       // -----------------------------------------------------------------------
       // Step 2: holiday / event check

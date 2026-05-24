@@ -111,11 +111,17 @@ export const retrospectionRoutes: FastifyPluginAsync<RetrospectionPluginOptions>
       }
 
       if (q.from !== undefined) {
+        if (!DATE_PATTERN.test(q.from)) {
+          return reply.code(400).send({ error: 'invalid_from_date' });
+        }
         params.push(q.from);
         conditions.push(`trade_date >= $${params.length}`);
       }
 
       if (q.to !== undefined) {
+        if (!DATE_PATTERN.test(q.to)) {
+          return reply.code(400).send({ error: 'invalid_to_date' });
+        }
         params.push(q.to);
         conditions.push(`trade_date <= $${params.length}`);
       }
