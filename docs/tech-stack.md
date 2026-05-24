@@ -22,6 +22,9 @@ Longer, code-grounded explainers for individual topics live in
 - [Pipeline Internals — A Detailed Reference](./tech/pipeline-internals.md) —
   the deep companion to the walkthrough: per-component data structures,
   algorithms, the concurrency/ACK model, and failure handling.
+- [Database Schema — Definition & Architecture](./tech/database-schema-architecture.md)
+  — the migrations-as-source-of-truth model, the migration runner, table
+  taxonomy, type conventions, and the branch-merge drift to watch.
 
 ## Language & Runtime
 
