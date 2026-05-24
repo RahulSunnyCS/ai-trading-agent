@@ -16,6 +16,9 @@ Longer, code-grounded explainers for individual topics live in
   hypertable does and why a missing time-range filter destroys performance.
 - [No ORM — Raw SQL via the `pg` Pool](./tech/no-orm-raw-sql.md) — what raw SQL
   buys and costs in a precision-sensitive, time-series system.
+- [The Tick → Trade Pipeline](./tech/tick-to-trade-pipeline.md) — one market
+  tick walked end to end through all four layers, from broker feed to paper
+  trade.
 
 ## Language & Runtime
 
