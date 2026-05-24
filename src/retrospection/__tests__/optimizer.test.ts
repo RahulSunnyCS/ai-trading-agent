@@ -5,12 +5,14 @@
  * withTransaction from src/db/client.ts (module-level singleton). We:
  *   - Inject a mock pool for read queries (fetchTrainingRows, personality lookup)
  *   - Mock withTransaction so the write path is exercised without a real DB
+ *   - Override backtestRunnerFactory.create for hybrid-path tests so the
+ *     backtest runs without a real DB
  *
  * Tests cover:
  *   1. Golden-section convergence on a synthetic objective
  *   2. Holdout set is never read (only train-window rows flow in)
- *   3. Min-sample gate: below MINIMUM_SAMPLE_STABLE → action 'none'
- *   4. Min-sample gate: post-filter count (not raw count)
+ *   3. Min-sample gate (Stage 1): below MINIMUM_SAMPLE_STABLE → action 'none'
+ *   4. Min-sample gate (Stage 1): post-filter count (not raw count)
  *   5. FROZEN_VIOLATION on Clockwork / frozen personalities
  *   6. sr_anchored exclusion (Levelhead)
  *   7. Clamp: candidate is always within [0.30, 0.90]
@@ -19,18 +21,30 @@
  *  10. Approval mode (action = 'proposed')
  *  11. Autonomous mode (action = 'applied')
  *  12. No improvement: current value is already optimal → action 'none'
+ *  13. Hybrid path: shortlist + backtest scoring + finalist selection
+ *  14. Hybrid path: backtest failure → action 'none', reason 'backtest_failed'
+ *  15. Hybrid path: no eligible finalist → action 'none', reason 'no_eligible_finalist'
+ *  16. Hybrid path: holdout trades are NEVER scored
+ *  17. scoreFinalists / pickBestFinalist unit tests
+ *  18. buildShortlist unit tests
  */
 
 import type { Pool, PoolClient } from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { BacktestConfig, SimulatedTrade } from '../../backtesting/backtest-runner.js';
 import {
   MINIMUM_SAMPLE_STABLE,
   MIN_PROBABILITY_LOWER,
   MIN_PROBABILITY_UPPER,
   OPTIMIZER_HOLDOUT_DAYS,
+  SHORTLIST_MIN_TRADES,
+  backtestRunnerFactory,
+  buildShortlist,
   computeObjective,
   goldenSectionSearch,
+  pickBestFinalist,
   runOptimizer,
+  scoreFinalists,
 } from '../optimizer.js';
 
 // ---------------------------------------------------------------------------
@@ -98,6 +112,11 @@ function makePersonalityRow(
  *
  * pg returns NUMERIC as strings via the OID-1700 parser, so sharpe and
  * beat_clockwork_delta are typed as strings in the raw query result.
+ *
+ * IMPORTANT: When all rows have the SAME sharpe, the kernel objective is flat
+ * across all candidates (the Gaussian weighting cancels out). Use
+ * makePeakedTrainingRows() instead when you need the kernel to converge to a
+ * specific peak value for the golden-section search to find.
  */
 function makeTrainingRows(
   n: number,
@@ -125,17 +144,210 @@ function makeTrainingRows(
   }));
 }
 
+/**
+ * Generates N training rows that produce a genuinely peaked kernel near `peakMp`.
+ *
+ * Uses a THREE-CLUSTER "mountain" configuration:
+ *   - 50% of rows at `peakMp` with high sharpe (3.0)    — the mountain top
+ *   - 25% of rows at `peakMp - 0.20` with low sharpe (-2.0) — left slope penalty
+ *   - 25% of rows at `peakMp + 0.15` with low sharpe (-2.0) — right slope penalty
+ *
+ * This creates a genuine interior maximum in the kernel objective so the
+ * golden-section search converges to a value near `peakMp` (not to a boundary).
+ *
+ * The actual kernel peak will be slightly below `peakMp` (typically ~peakMp-0.02)
+ * because the right-slope cluster pulls the weighted average leftward. The
+ * shortlist [peak-0.05, peak, peak+0.05] will still be centred well below 0.70
+ * for any peakMp <= 0.65, which is the requirement for backtest trade eligibility
+ * (all trades have adjustedProbability=0.7, so candidates <= 0.70 are eligible).
+ *
+ * WHY THREE CLUSTERS (not two):
+ *   Two clusters (good at peakMp, bad at peakMp-0.20) do NOT produce an interior
+ *   peak — they produce a kernel that is flat from peakMp to 0.90 (the good-row
+ *   plateau). Adding a right-slope cluster at peakMp+0.15 pulls the kernel down
+ *   for candidates above peakMp, creating a true mountain shape.
+ *
+ * Use this instead of makeTrainingRows when the test needs the optimizer to
+ * reach the transaction guard layer (FROZEN_VIOLATION race, cooldown, integrity
+ * cap, approval/autonomous write path).
+ *
+ * @param n      - Total number of rows (split 50% peak / 25% low / 25% high)
+ * @param peakMp - The min_probability value the kernel should peak near
+ */
+function makePeakedTrainingRows(n: number, peakMp: number) {
+  const goodCount = Math.ceil(n * 0.5);
+  const lowBadCount = Math.floor(n * 0.25);
+  const highBadCount = n - goodCount - lowBadCount;
+
+  // Left-slope cluster: low sharpe at peakMp-0.20 (or at lower bound).
+  // Penalises candidates below peakMp.
+  const lowBadMp = Math.max(0.30, peakMp - 0.20);
+
+  // Right-slope cluster: low sharpe at peakMp+0.15 (or at upper bound).
+  // Penalises candidates above peakMp — this is what makes the kernel peak
+  // at an interior value rather than at the right boundary.
+  const highBadMp = Math.min(0.90, peakMp + 0.15);
+
+  // Mountain-top rows: high sharpe → kernel rewards candidates near peakMp.
+  // Always set proposed_min_prob explicitly so active_min_probability = peakMp.
+  const goodRows = Array.from({ length: goodCount }, (_, i) => ({
+    trade_date: new Date(`2024-01-${String((i % 28) + 1).padStart(2, '0')}`),
+    market_regime: 'RANGING',
+    total_trades: 25,
+    sharpe: '3.0',
+    beat_clockwork_delta: null as null,
+    proposed_min_prob: String(peakMp),
+  }));
+
+  // Left-slope rows: low sharpe near peakMp-0.20.
+  const lowBadRows = Array.from({ length: lowBadCount }, (_, i) => ({
+    trade_date: new Date(`2024-02-${String((i % 28) + 1).padStart(2, '0')}`),
+    market_regime: 'RANGING',
+    total_trades: 25,
+    sharpe: '-2.0',
+    beat_clockwork_delta: null as null,
+    proposed_min_prob: String(lowBadMp),
+  }));
+
+  // Right-slope rows: low sharpe near peakMp+0.15.
+  // These create the downslope ABOVE peakMp so the kernel peak is interior.
+  const highBadRows = Array.from({ length: highBadCount }, (_, i) => ({
+    trade_date: new Date(`2024-03-${String((i % 28) + 1).padStart(2, '0')}`),
+    market_regime: 'RANGING',
+    total_trades: 25,
+    sharpe: '-2.0',
+    beat_clockwork_delta: null as null,
+    proposed_min_prob: String(highBadMp),
+  }));
+
+  return [...goodRows, ...lowBadRows, ...highBadRows];
+}
+
+/**
+ * Creates a SimulatedTrade for use in backtest mock results.
+ * Defaults to a train-split MOMENTUM_EXHAUSTION trade.
+ */
+function makeSimulatedTrade(overrides: Partial<SimulatedTrade> = {}): SimulatedTrade {
+  return {
+    personalityId: 'p-target',
+    personalityName: 'Precision',
+    date: '2024-01-15',
+    regime: 'RANGING',
+    signalType: 'MOMENTUM_EXHAUSTION',
+    adjustedProbability: 0.7,
+    entryStraddleValue: 100,
+    exitStraddleValue: 90,
+    exitReason: 'PROFIT_TARGET',
+    pnlPct: 0.1,
+    pnlAbs: 10,
+    entryTimeMs: 1705290600000,
+    exitTimeMs: 1705294200000,
+    split: 'train',
+    ...overrides,
+  };
+}
+
+/**
+ * Creates an array of N MOMENTUM_EXHAUSTION train trades with varied pnlPct.
+ * Used to produce a non-trivial Sharpe in backtest scoring tests.
+ */
+function makeTrainMomentumTrades(n: number, pnlPct = 0.05): SimulatedTrade[] {
+  return Array.from({ length: n }, (_, i) =>
+    makeSimulatedTrade({
+      date: `2024-01-${String(i + 1).padStart(2, '0')}`,
+      pnlPct: pnlPct + (i % 3 === 0 ? 0.01 : -0.01), // slight variance so Sharpe is finite
+      adjustedProbability: 0.7,
+      split: 'train',
+    }),
+  );
+}
+
+/**
+ * Installs a mock backtest runner that returns the given trades.
+ * Returns a restore function to call in afterEach.
+ *
+ * We replace backtestRunnerFactory.create (the injectable factory) instead of
+ * vi.mock'ing the entire backtest-runner module, because backtestRunnerFactory
+ * is exported as a mutable object precisely for this pattern.
+ */
+function mockBacktestRunner(trades: SimulatedTrade[]) {
+  // We do NOT capture original here — afterEach always restores from
+  // savedBacktestRunnerCreate (the value at the start of the test). The
+  // return value is kept for explicit mid-test restores in the inlined
+  // hybrid-path test (test 14) that captures config.
+  backtestRunnerFactory.create = (_pool: Pool) => ({
+    async run(config: BacktestConfig) {
+      return {
+        config,
+        split: {
+          train: { from: '2023-01-01', to: '2023-12-01', days: 230 },
+          test: { from: '2023-12-02', to: '2023-12-22', days: 15 },
+          holdout: { from: '2023-12-23', to: '2024-01-12', days: 20 },
+        },
+        trades,
+        personalities: [],
+        tradingDays: 245,
+        skippedDates: [],
+      };
+    },
+  });
+  // Return a no-op — afterEach restores the factory. This is kept for call-site
+  // symmetry so test code that calls restoreBacktest() continues to compile.
+  return () => {
+    // No-op: afterEach handles restoration via savedBacktestRunnerCreate.
+  };
+}
+
+/**
+ * Installs a mock backtest runner that throws an error.
+ * Returns a restore function.
+ */
+function mockBacktestRunnerFailure(errorMsg = 'DB timeout') {
+  backtestRunnerFactory.create = (_pool: Pool) => ({
+    async run(_config: BacktestConfig) {
+      throw new Error(errorMsg);
+    },
+  });
+  // No-op: afterEach handles restoration.
+  return () => {};
+}
+
 // ---------------------------------------------------------------------------
 // Setup / teardown
+//
+// backtestRunnerFactory.create is NOT a vi.fn() spy, so vi.clearAllMocks()
+// does not reset it. We save and restore it manually in beforeEach/afterEach
+// to ensure full test isolation. The default (saved) value is the REAL
+// createBacktestRunner from backtest-runner.ts — it will throw if called
+// with mockPool (no real DB), which surfaces as 'backtest_failed'/'none'.
+// Tests that need the hybrid path to proceed MUST install their own mock via
+// mockBacktestRunner() before calling runOptimizer.
 // ---------------------------------------------------------------------------
 
+let savedBacktestRunnerCreate: typeof backtestRunnerFactory.create;
+
 beforeEach(() => {
-  vi.clearAllMocks();
+  // mockPoolQuery.mockReset() and mockClientQuery.mockReset() clear both call
+  // history AND the queued mockResolvedValueOnce values for these two specific
+  // mocks. This prevents unconsumed queue entries from leaking between tests
+  // (e.g. a FROZEN_VIOLATION test that exits early leaving a queued client
+  // response that the next test would inadvertently consume).
+  //
+  // We deliberately do NOT use vi.resetAllMocks() here because that would also
+  // reset the withTransaction implementation set by the vi.mock() factory,
+  // breaking the transaction mock for all subsequent tests.
+  mockPoolQuery.mockReset();
+  mockClientQuery.mockReset();
   delete process.env.EVOLUTION_REQUIRE_APPROVAL;
+  // Save the current factory so we can restore it even if a test fails
+  // without calling its own restore function.
+  savedBacktestRunnerCreate = backtestRunnerFactory.create;
 });
 
 afterEach(() => {
   delete process.env.EVOLUTION_REQUIRE_APPROVAL;
+  // Always restore — guards against tests that fail before calling restore.
+  backtestRunnerFactory.create = savedBacktestRunnerCreate;
 });
 
 // ===========================================================================
@@ -310,7 +522,7 @@ describe('runOptimizer — holdout never read', () => {
 });
 
 // ===========================================================================
-// 4. Min-sample gate — post-filter count
+// 4. Min-sample gate (Stage 1) — post-filter count
 // ===========================================================================
 
 describe('runOptimizer — min-sample gate (post-filter count)', () => {
@@ -328,9 +540,12 @@ describe('runOptimizer — min-sample gate (post-filter count)', () => {
     expect(result.reason).toContain('50');
   });
 
-  it('proceeds past min-sample gate when post-filter count >= MINIMUM_SAMPLE_STABLE', async () => {
-    // 200 rows = exactly at the threshold. Gate should not fire.
-    // We need the transaction mock to return a valid locked row for the write path.
+  it('proceeds past min-sample gate (Stage 1) when post-filter count >= MINIMUM_SAMPLE_STABLE', async () => {
+    // 200 rows = exactly at the threshold. Stage-1 gate should not fire.
+    // We need the backtest runner mock and transaction mock for the write path.
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 2);
+    const restoreBacktest = mockBacktestRunner(trainTrades);
+
     mockPoolQuery
       .mockResolvedValueOnce({ rows: [makePersonalityRow()] })
       .mockResolvedValueOnce({ rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE) });
@@ -344,7 +559,9 @@ describe('runOptimizer — min-sample gate (post-filter count)', () => {
 
     const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
 
-    // Min-sample gate passed; verify the reason is NOT insufficient_sample.
+    restoreBacktest();
+
+    // Min-sample gate (Stage 1) passed; verify the reason is NOT insufficient_sample.
     // result.reason may be undefined (e.g. when action='proposed'), so we use
     // optional chaining to guard the match.
     expect(result.reason ?? '').not.toMatch(/insufficient_sample/);
@@ -372,10 +589,28 @@ describe('runOptimizer — FROZEN_VIOLATION', () => {
 
   it('throws "FROZEN_VIOLATION" when the locked row is frozen (step 6 re-check inside transaction)', async () => {
     // Rare race: personality became frozen between step 1 read and SELECT FOR UPDATE.
-    // Step 1: not frozen
+    //
+    // To reach the transaction guard, the optimizer must:
+    //   (a) pass min-sample gate (200 rows) ✓
+    //   (b) run backtest + produce an eligible finalist ✓ (7 trades, prob=0.7, candidates <= 0.70)
+    //   (c) produce a candidate that differs from current value by > 1e-4 ✓
+    //
+    // Setup: current min_probability = 0.50, training data PEAKED near 0.60.
+    // makePeakedTrainingRows(200, 0.60) uses a 3-cluster mountain:
+    //   - 100 good rows at 0.60 (sharpe=3.0) — mountain top
+    //   - 50 bad rows at 0.40 (sharpe=-2.0)  — left slope
+    //   - 50 bad rows at 0.75 (sharpe=-2.0)  — right slope
+    // Kernel genuinely peaks at ~0.577 (interior, not at boundary).
+    // Shortlist [~0.527, ~0.577, ~0.627] — all <= 0.70.
+    // Trades with prob=0.7 pass all three → all eligible.
+    // Best finalist ≈ 0.577. |0.577 - 0.50| = 0.077 > 1e-4 → reaches transaction.
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 2);
+    mockBacktestRunner(trainTrades);
+
+    // Step 1: not frozen, current value = 0.50 (differs from kernel peak 0.60)
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [makePersonalityRow({ is_frozen: false })] })
-      .mockResolvedValueOnce({ rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE) });
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ is_frozen: false, params: { min_probability: 0.50 } })] })
+      .mockResolvedValueOnce({ rows: makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.60) });
 
     // Inside transaction: locked row is now frozen (race condition simulation).
     mockClientQuery.mockResolvedValueOnce({
@@ -425,9 +660,12 @@ describe('runOptimizer — sr_anchored exclusion', () => {
   });
 
   it('does not include sr_anchored personalities in the 8pp peer set', async () => {
-    // The SELECT FOR UPDATE in step 6 filters WHERE entry_type = 'momentum_exhaustion',
+    // The SELECT FOR UPDATE in the guard layer filters WHERE entry_type = 'momentum_exhaustion',
     // so sr_anchored rows are never in the locked set. We verify the mock transaction
     // query only returns momentum_exhaustion rows.
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 2);
+    const restoreBacktest = mockBacktestRunner(trainTrades);
+
     mockPoolQuery
       .mockResolvedValueOnce({ rows: [makePersonalityRow()] })
       .mockResolvedValueOnce({ rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE) });
@@ -444,6 +682,8 @@ describe('runOptimizer — sr_anchored exclusion', () => {
     // No exception should be thrown for the sr_anchored absence in the peer set.
     const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
 
+    restoreBacktest();
+
     // Should proceed to proposal or no_improvement — not a FROZEN_VIOLATION or error.
     expect(['proposed', 'none', 'applied', 'skipped']).toContain(result.action);
   });
@@ -459,6 +699,12 @@ describe('runOptimizer — clamp bounds', () => {
     // so the optimizer is likely to push toward the lower bound.
     const rows = makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.31, sharpe: 2.0 });
 
+    // Return low-probability trades so the shortlist candidate near 0.31 is eligible
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 2);
+    // Set all trades to a probability that passes the candidate threshold
+    const lowProbTrades = trainTrades.map((t) => ({ ...t, adjustedProbability: 0.31 }));
+    const restoreBacktest = mockBacktestRunner(lowProbTrades);
+
     mockPoolQuery
       .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
       .mockResolvedValueOnce({ rows: rows });
@@ -470,6 +716,8 @@ describe('runOptimizer — clamp bounds', () => {
     mockClientQuery.mockResolvedValueOnce({ rows: [] }); // write stub
 
     const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
+
+    restoreBacktest();
 
     if (result.candidateValue !== undefined) {
       expect(result.candidateValue).toBeGreaterThanOrEqual(0.3);
@@ -484,32 +732,42 @@ describe('runOptimizer — clamp bounds', () => {
 
 describe('runOptimizer — integrity cap', () => {
   it('caps the proposed candidate so the spread stays at most 0.08 from any sibling', async () => {
-    // Target current = 0.65, objective pushes toward 0.80
-    // Sibling at 0.50 → uncapped spread = 0.80 - 0.50 = 0.30 > 0.08 → cap to 0.50 + 0.08 = 0.58
-    const rows = makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.80, sharpe: 3.0 });
+    // Setup: kernel peaks near 0.577 (3-cluster mountain training data). Current = 0.40.
+    // Sibling at 0.35. Kernel candidate ≈ 0.577 > sibling+0.08=0.43.
+    // Guard layer: cap = min(0.577, 0.35 + 0.08) = 0.43.
+    // |0.43 - 0.40| = 0.03 > 1e-4 → writes 0.43. Spread = |0.43 - 0.35| = 0.08 ✓
+    //
+    // makePeakedTrainingRows uses the 3-cluster mountain to ensure a genuine
+    // interior kernel peak (not at 0.90 due to a flat plateau from uniform sharpe).
+    const rows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.60);
 
+    // Trades with adjustedProbability=0.7 pass filter for candidates 0.55, 0.60, 0.65 (all <= 0.70)
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5);
+    mockBacktestRunner(trainTrades);
+
+    // Current target value 0.40
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.40 } })] })
       .mockResolvedValueOnce({ rows: rows });
 
     const siblingRow = makePersonalityRow({
       id: 'p-sibling',
       name: 'Adjuster',
-      params: { min_probability: 0.50 },
+      params: { min_probability: 0.35 }, // sibling at 0.35; cap limit = 0.35 + 0.08 = 0.43
     });
 
-    // Locked set includes target + sibling
+    // Locked set includes target (min_probability=0.40) + sibling (0.35)
     mockClientQuery.mockResolvedValueOnce({
-      rows: [makePersonalityRow({ params: { min_probability: 0.65 } }), siblingRow],
+      rows: [makePersonalityRow({ params: { min_probability: 0.40 } }), siblingRow],
     });
     mockClientQuery.mockResolvedValueOnce({ rows: [] }); // write stub
 
     const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
 
     if (result.action === 'proposed' || result.action === 'applied') {
-      // The cap should have applied: max spread = 0.58 - 0.50 = 0.08
+      // The cap should have applied: max spread from sibling (0.35) = 0.08
       expect(result.candidateValue).toBeDefined();
-      const spread = Math.abs(result.candidateValue! - 0.50);
+      const spread = Math.abs(result.candidateValue! - 0.35);
       expect(spread).toBeLessThanOrEqual(0.08 + 1e-9); // allow tiny floating-point error
     }
     // If no improvement / skipped, that is also acceptable — the cap might have
@@ -524,14 +782,20 @@ describe('runOptimizer — integrity cap', () => {
 describe('runOptimizer — cooldown', () => {
   it('returns action="skipped" with reason="cooldown" when last_evolved_at was 3 days ago', async () => {
     const lastEvolvedAt = new Date('2024-11-12T10:00:00Z'); // tradeDateISO = 2024-11-15 → 3 days
-    const rows = makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.75, sharpe: 1.5 });
+
+    // Use peaked training rows (3-cluster mountain, kernel peak near 0.577) with current=0.50.
+    // This ensures the optimizer reaches the transaction guard (not the no_improvement path).
+    // |0.577 - 0.50| = 0.077 > 1e-4 → proceeds to transaction where cooldown fires.
+    const rows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.60);
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 2);
+    mockBacktestRunner(trainTrades);
 
     mockPoolQuery
       .mockResolvedValueOnce({
         rows: [
           makePersonalityRow({
             last_evolved_at: lastEvolvedAt,
-            params: { min_probability: 0.65 },
+            params: { min_probability: 0.50 }, // differs from kernel peak 0.60
           }),
         ],
       })
@@ -542,7 +806,7 @@ describe('runOptimizer — cooldown', () => {
       rows: [
         makePersonalityRow({
           last_evolved_at: lastEvolvedAt,
-          params: { min_probability: 0.65 },
+          params: { min_probability: 0.50 },
         }),
       ],
     });
@@ -555,14 +819,18 @@ describe('runOptimizer — cooldown', () => {
 
   it('proceeds past cooldown when last_evolved_at was exactly 7 days ago', async () => {
     const lastEvolvedAt = new Date('2024-11-08T00:00:00Z'); // 7 days ago
-    const rows = makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.75, sharpe: 1.5 });
+
+    // Same 3-cluster mountain training data setup as the 3-day cooldown test.
+    const rows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.60);
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 2);
+    mockBacktestRunner(trainTrades);
 
     mockPoolQuery
       .mockResolvedValueOnce({
         rows: [
           makePersonalityRow({
             last_evolved_at: lastEvolvedAt,
-            params: { min_probability: 0.65 },
+            params: { min_probability: 0.50 },
           }),
         ],
       })
@@ -573,7 +841,7 @@ describe('runOptimizer — cooldown', () => {
       rows: [
         makePersonalityRow({
           last_evolved_at: lastEvolvedAt,
-          params: { min_probability: 0.65 },
+          params: { min_probability: 0.50 },
         }),
       ],
     });
@@ -594,16 +862,22 @@ describe('runOptimizer — approval mode', () => {
   it('returns action="proposed" when EVOLUTION_REQUIRE_APPROVAL is unset', async () => {
     delete process.env.EVOLUTION_REQUIRE_APPROVAL;
 
-    // Training rows: objective strongly peaks at 0.75, current = 0.65 → meaningful improvement
-    const rows = makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.75, sharpe: 2.0 });
+    // Use peaked training rows (3-cluster mountain, kernel peak near 0.577) with current=0.50.
+    // This ensures the kernel has a genuine interior maximum (not flat → boundary), so
+    // the finalist differs from current and the optimizer reaches the write path.
+    const rows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.60);
+
+    // Trades eligible (adjustedProbability = 0.7 >= all shortlist candidates ~0.527-0.627)
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5);
+    mockBacktestRunner(trainTrades);
 
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.50 } })] })
       .mockResolvedValueOnce({ rows: rows });
 
     // Locked row in transaction
     mockClientQuery.mockResolvedValueOnce({
-      rows: [makePersonalityRow({ params: { min_probability: 0.65 } })],
+      rows: [makePersonalityRow({ params: { min_probability: 0.50 } })],
     });
     // UPDATE retrospection_results (approval mode write)
     mockClientQuery.mockResolvedValueOnce({ rows: [] });
@@ -620,14 +894,17 @@ describe('runOptimizer — approval mode', () => {
   it('returns action="proposed" when EVOLUTION_REQUIRE_APPROVAL = "true"', async () => {
     process.env.EVOLUTION_REQUIRE_APPROVAL = 'true';
 
-    const rows = makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.75, sharpe: 2.5 });
+    const rows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.60);
+
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5);
+    mockBacktestRunner(trainTrades);
 
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.50 } })] })
       .mockResolvedValueOnce({ rows: rows });
 
     mockClientQuery.mockResolvedValueOnce({
-      rows: [makePersonalityRow({ params: { min_probability: 0.65 } })],
+      rows: [makePersonalityRow({ params: { min_probability: 0.50 } })],
     });
     mockClientQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -647,16 +924,20 @@ describe('runOptimizer — autonomous mode', () => {
   it('returns action="applied" when EVOLUTION_REQUIRE_APPROVAL = "false"', async () => {
     process.env.EVOLUTION_REQUIRE_APPROVAL = 'false';
 
-    // Strong objective peak at 0.75, current = 0.65
-    const rows = makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.75, sharpe: 3.0 });
+    // 3-cluster mountain peaked near 0.577, current = 0.50
+    // |0.577 - 0.50| = 0.077 > 1e-4 → reaches autonomous write path
+    const rows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.60);
+
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5);
+    mockBacktestRunner(trainTrades);
 
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.50 } })] })
       .mockResolvedValueOnce({ rows: rows });
 
     mockClientQuery
       .mockResolvedValueOnce({
-        rows: [makePersonalityRow({ params: { min_probability: 0.65 } })],
+        rows: [makePersonalityRow({ params: { min_probability: 0.50 } })],
       })
       .mockResolvedValueOnce({ rows: [] }) // UPDATE personality_configs
       .mockResolvedValueOnce({ rows: [] }); // INSERT personality_audit_log
@@ -672,16 +953,19 @@ describe('runOptimizer — autonomous mode', () => {
   it('issues exactly 3 queries to the transaction client in autonomous mode', async () => {
     process.env.EVOLUTION_REQUIRE_APPROVAL = 'false';
 
-    const rows = makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.75, sharpe: 3.0 });
+    const rows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.60);
+
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5);
+    mockBacktestRunner(trainTrades);
 
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.50 } })] })
       .mockResolvedValueOnce({ rows: rows });
 
     // Transaction: SELECT FOR UPDATE + UPDATE personality_configs + INSERT audit_log
     mockClientQuery
       .mockResolvedValueOnce({
-        rows: [makePersonalityRow({ params: { min_probability: 0.65 } })],
+        rows: [makePersonalityRow({ params: { min_probability: 0.50 } })],
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
@@ -760,5 +1044,391 @@ describe('runOptimizer — personality not found', () => {
     await expect(runOptimizer(mockPool, 'p-nonexistent', '2024-11-15')).rejects.toThrow(
       'p-nonexistent',
     );
+  });
+});
+
+// ===========================================================================
+// 14. Hybrid path: backtest invoked once, train-only scoring, finalist selection
+// ===========================================================================
+
+describe('runOptimizer — hybrid path (backtest scoring)', () => {
+  it('invokes the backtest runner with a valid config and returns a result', async () => {
+    // This is the end-to-end hybrid path test: enough training rows to pass Stage-1
+    // gate, and enough train trades to pass Stage-2 gate.
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 10);
+    let backtestCallCount = 0;
+
+    // Use a wrapper object (not a let variable) so TypeScript's control-flow
+    // narrowing does not collapse the type to 'never' after the null-check.
+    // Assignment inside an async callback is not visible to TypeScript's flow
+    // analysis for simple let variables — the object reference sidesteps this.
+    const capture: { config: BacktestConfig | null } = { config: null };
+
+    const original = backtestRunnerFactory.create;
+    backtestRunnerFactory.create = (_pool: Pool) => ({
+      async run(config) {
+        backtestCallCount++;
+        capture.config = config;
+        return {
+          config,
+          split: {
+            train: { from: '2023-01-01', to: '2023-12-01', days: 230 },
+            test: { from: '2023-12-02', to: '2023-12-22', days: 15 },
+            holdout: { from: '2023-12-23', to: '2024-01-12', days: 20 },
+          },
+          trades: trainTrades,
+          personalities: [],
+          tradingDays: 245,
+          skippedDates: [],
+        };
+      },
+    });
+
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.50 } })] })
+      .mockResolvedValueOnce({
+        rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.65, sharpe: 2.0 }),
+      });
+
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.50 } })] })
+      .mockResolvedValueOnce({ rows: [] }); // write stub
+
+    await runOptimizer(mockPool, 'p-target', '2024-11-15');
+
+    backtestRunnerFactory.create = original;
+
+    // Backtest must be called exactly once (efficiency requirement)
+    expect(backtestCallCount).toBe(1);
+
+    // capture.config is BacktestConfig | null; non-null after backtestCallCount assertion.
+    if (capture.config === null) {
+      throw new Error('capture.config was not set — backtest was not called');
+    }
+
+    // Config must include holdoutDays = OPTIMIZER_HOLDOUT_DAYS
+    expect(capture.config.holdoutDays).toBe(OPTIMIZER_HOLDOUT_DAYS);
+
+    // Config toDate must be the tradeDateISO passed to runOptimizer
+    expect(capture.config.toDate).toBe('2024-11-15');
+  });
+
+  it('selects the finalist with the higher train Sharpe', () => {
+    // Unit test of scoreFinalists + pickBestFinalist directly.
+    // Two shortlist entries; trades give different Sharpes for each.
+    //
+    // Candidate 0.60 (adjustedProbability >= 0.60): all 10 trades pass
+    // Candidate 0.80 (adjustedProbability >= 0.80): zero trades pass (all have prob=0.70)
+    const shortlist = [
+      { candidate: 0.60, kernelScore: 1.0 },
+      { candidate: 0.80, kernelScore: 0.5 },
+    ];
+
+    const trades: SimulatedTrade[] = Array.from({ length: 10 }, (_, i) =>
+      makeSimulatedTrade({
+        pnlPct: 0.05 + (i % 2 === 0 ? 0.01 : -0.01),
+        adjustedProbability: 0.7,
+        split: 'train',
+      }),
+    );
+
+    const scored = scoreFinalists(shortlist, trades);
+
+    // Candidate 0.80 has zero eligible trades → ineligible → not in scored
+    // Candidate 0.60 has 10 eligible trades → scored
+    expect(scored.some((s) => s.candidate === 0.60)).toBe(true);
+    expect(scored.every((s) => s.candidate !== 0.80)).toBe(true);
+
+    const best = pickBestFinalist(scored);
+    expect(best?.candidate).toBe(0.60);
+    expect(best?.eligibleTradeCount).toBe(10);
+  });
+
+  it('breaks ties between equal train Sharpes using kernel score', () => {
+    // Two candidates with the same set of eligible trades (and thus the same
+    // Sharpe). The one with the higher kernel score should win.
+    const trades: SimulatedTrade[] = Array.from({ length: 10 }, (_, i) =>
+      makeSimulatedTrade({
+        pnlPct: 0.05 + (i % 2 === 0 ? 0.01 : -0.01),
+        adjustedProbability: 0.5, // passes both candidates (0.40 and 0.50)
+        split: 'train',
+      }),
+    );
+
+    const shortlist = [
+      { candidate: 0.40, kernelScore: 1.5 }, // higher kernel score
+      { candidate: 0.50, kernelScore: 0.8 }, // lower kernel score
+    ];
+
+    const scored = scoreFinalists(shortlist, trades);
+
+    // Both candidates eligible (all trades have prob 0.5 >= both 0.40 and 0.50)
+    expect(scored.length).toBe(2);
+
+    // Train Sharpes should be identical (same eligible trade set)
+    expect(scored[0]!.trainSharpe).toBeCloseTo(scored[1]!.trainSharpe, 6);
+
+    const best = pickBestFinalist(scored);
+
+    // Tie broken by kernel score → candidate 0.40 wins
+    expect(best?.candidate).toBe(0.40);
+  });
+});
+
+// ===========================================================================
+// 15. Hybrid path: backtest failure → action 'none', reason 'backtest_failed'
+// ===========================================================================
+
+describe('runOptimizer — backtest failure fallback', () => {
+  it('returns action="none" with reason="backtest_failed" when backtest throws', async () => {
+    const restoreBacktest = mockBacktestRunnerFailure('simulated DB timeout');
+
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow()] })
+      .mockResolvedValueOnce({
+        rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.65, sharpe: 2.0 }),
+      });
+
+    const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
+
+    restoreBacktest();
+
+    expect(result.action).toBe('none');
+    expect(result.reason).toBe('backtest_failed');
+  });
+
+  it('does NOT throw when the backtest fails — failure is caught and returned as none', async () => {
+    const restoreBacktest = mockBacktestRunnerFailure('network error');
+
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow()] })
+      .mockResolvedValueOnce({
+        rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.65, sharpe: 2.0 }),
+      });
+
+    // Must not throw
+    await expect(runOptimizer(mockPool, 'p-target', '2024-11-15')).resolves.toBeDefined();
+
+    restoreBacktest();
+  });
+});
+
+// ===========================================================================
+// 16. Hybrid path: no eligible finalist → action 'none', reason 'no_eligible_finalist'
+// ===========================================================================
+
+describe('runOptimizer — no eligible finalist (Stage-2 gate)', () => {
+  it('returns action="none" when all shortlisted candidates exceed adjustedProbability of all trades', async () => {
+    // All backtest trades have adjustedProbability = 0.7 (the hardcoded backtest value).
+    // If the kernel peak is > 0.70 (e.g. shortlist = [0.80, 0.75, 0.85]), all
+    // candidates exceed 0.70 and no trades pass the filter → no eligible finalist.
+    //
+    // We simulate this by returning fewer than SHORTLIST_MIN_TRADES trades total.
+    // The backtest returns only 2 train momentum trades, which is below the floor.
+    const tooFewTrades = makeTrainMomentumTrades(2); // below SHORTLIST_MIN_TRADES (5)
+    const restoreBacktest = mockBacktestRunner(tooFewTrades);
+
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow()] })
+      .mockResolvedValueOnce({
+        rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.65, sharpe: 2.0 }),
+      });
+
+    const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
+
+    restoreBacktest();
+
+    expect(result.action).toBe('none');
+    expect(result.reason).toBe('no_eligible_finalist');
+  });
+});
+
+// ===========================================================================
+// 17. Hybrid path: holdout trades are NEVER scored
+// ===========================================================================
+
+describe('scoreFinalists — holdout trades never read', () => {
+  it('excludes holdout-split trades from scoring regardless of probability', () => {
+    // Mix: 3 train trades + 3 holdout trades. All have adjustedProbability = 0.5.
+    // Only the 3 train trades should count toward the Sharpe.
+    // 3 < SHORTLIST_MIN_TRADES (5) → candidate ineligible.
+    const trades: SimulatedTrade[] = [
+      ...Array.from({ length: 3 }, (_, i) =>
+        makeSimulatedTrade({ split: 'train', adjustedProbability: 0.5, pnlPct: 0.1 + i * 0.01 }),
+      ),
+      ...Array.from({ length: 3 }, (_, i) =>
+        makeSimulatedTrade({ split: 'holdout', adjustedProbability: 0.5, pnlPct: 0.2 + i * 0.01 }),
+      ),
+    ];
+
+    const shortlist = [{ candidate: 0.40, kernelScore: 1.0 }];
+    const scored = scoreFinalists(shortlist, trades);
+
+    // Only 3 train trades eligible (holdout excluded) → below SHORTLIST_MIN_TRADES
+    expect(scored.length).toBe(0);
+  });
+
+  it('excludes test-split trades from scoring', () => {
+    // 3 train + 10 test trades. Only train trades count; 3 < SHORTLIST_MIN_TRADES → ineligible.
+    const trades: SimulatedTrade[] = [
+      ...Array.from({ length: 3 }, () =>
+        makeSimulatedTrade({ split: 'train', adjustedProbability: 0.5 }),
+      ),
+      ...Array.from({ length: 10 }, () =>
+        makeSimulatedTrade({ split: 'test', adjustedProbability: 0.5 }),
+      ),
+    ];
+
+    const shortlist = [{ candidate: 0.40, kernelScore: 1.0 }];
+    const scored = scoreFinalists(shortlist, trades);
+
+    expect(scored.length).toBe(0);
+  });
+
+  it('correctly counts only train trades when scoring', () => {
+    // SHORTLIST_MIN_TRADES train trades + holdout trades with higher pnlPct.
+    // The Sharpe must be computed on train trades only.
+    const trainPnlPcts = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]; // 6 trades, mean = 0.1, stddev = 0
+    // Would give Sharpe = 0 (zero variance case)
+
+    // Holdout trades with pnlPct = 1.0 — should NOT contribute to Sharpe.
+    const trades: SimulatedTrade[] = [
+      ...trainPnlPcts.map((pnl) =>
+        makeSimulatedTrade({ split: 'train', adjustedProbability: 0.5, pnlPct: pnl }),
+      ),
+      ...Array.from({ length: 10 }, () =>
+        makeSimulatedTrade({ split: 'holdout', adjustedProbability: 0.5, pnlPct: 1.0 }),
+      ),
+    ];
+
+    const shortlist = [{ candidate: 0.40, kernelScore: 1.0 }];
+    const scored = scoreFinalists(shortlist, trades);
+
+    // 6 train trades pass (6 >= SHORTLIST_MIN_TRADES = 5).
+    expect(scored.length).toBe(1);
+    // All train pnlPcts are identical → stddev = 0 → Sharpe = 0.0
+    expect(scored[0]!.trainSharpe).toBe(0.0);
+    // Eligible trade count must equal the train trade count only
+    expect(scored[0]!.eligibleTradeCount).toBe(6);
+  });
+
+  it('filters out SCHEDULED trades — only MOMENTUM_EXHAUSTION trades are scored', () => {
+    // Mix: SHORTLIST_MIN_TRADES MOMENTUM_EXHAUSTION train trades +
+    //      many SCHEDULED train trades with high probability.
+    // Only MOMENTUM_EXHAUSTION trades should contribute.
+    const meTradeCount = SHORTLIST_MIN_TRADES + 2; // above floor
+    const trades: SimulatedTrade[] = [
+      ...Array.from({ length: meTradeCount }, () =>
+        makeSimulatedTrade({
+          split: 'train',
+          signalType: 'MOMENTUM_EXHAUSTION',
+          adjustedProbability: 0.7,
+          pnlPct: 0.05,
+        }),
+      ),
+      ...Array.from({ length: 10 }, () =>
+        makeSimulatedTrade({
+          split: 'train',
+          signalType: 'SCHEDULED',
+          adjustedProbability: 1.0, // high probability — would inflate Sharpe if included
+          pnlPct: 1.0,
+        }),
+      ),
+    ];
+
+    const shortlist = [{ candidate: 0.65, kernelScore: 1.0 }];
+    const scored = scoreFinalists(shortlist, trades);
+
+    expect(scored.length).toBe(1);
+    // Eligible count must equal only the MOMENTUM_EXHAUSTION trade count
+    expect(scored[0]!.eligibleTradeCount).toBe(meTradeCount);
+  });
+});
+
+// ===========================================================================
+// 18. buildShortlist unit tests
+// ===========================================================================
+
+describe('buildShortlist — shortlist generation', () => {
+  // Minimal rows array for kernel scoring (single row at 0.65 with sharpe 1.0)
+  const minRows = [
+    {
+      trade_date: '2024-01-01',
+      market_regime: 'RANGING',
+      total_trades: 25,
+      sharpe: 1.0,
+      beat_clockwork_delta: null,
+      active_min_probability: 0.65,
+    },
+  ];
+
+  it('produces at most SHORTLIST_COUNT entries (or fewer when clamping collapses duplicates)', () => {
+    const shortlist = buildShortlist(0.65, minRows);
+    expect(shortlist.length).toBeLessThanOrEqual(3);
+    expect(shortlist.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('all candidates are within [MIN_PROBABILITY_LOWER, MIN_PROBABILITY_UPPER]', () => {
+    for (const peak of [0.30, 0.45, 0.65, 0.80, 0.90]) {
+      const shortlist = buildShortlist(peak, minRows);
+      for (const entry of shortlist) {
+        expect(entry.candidate).toBeGreaterThanOrEqual(MIN_PROBABILITY_LOWER);
+        expect(entry.candidate).toBeLessThanOrEqual(MIN_PROBABILITY_UPPER);
+      }
+    }
+  });
+
+  it('candidates are deduplicated when both flanks clamp to the same value', () => {
+    // Peak at 0.30 → left flank = 0.25 (clamped to 0.30) → duplicate of peak.
+    // Expect only 2 unique candidates: 0.30 and 0.35 (peak and right flank).
+    const shortlist = buildShortlist(0.30, minRows);
+    const unique = new Set(shortlist.map((e) => e.candidate.toFixed(6)));
+    expect(unique.size).toBe(shortlist.length);
+  });
+
+  it('sorts candidates by kernel score descending', () => {
+    // With rows centred at 0.65, the kernel peak is the best-scoring candidate.
+    const shortlist = buildShortlist(0.65, minRows);
+    for (let i = 1; i < shortlist.length; i++) {
+      expect(shortlist[i - 1]!.kernelScore).toBeGreaterThanOrEqual(shortlist[i]!.kernelScore);
+    }
+  });
+
+  it('contains the kernel peak as the first (best-scored) candidate', () => {
+    // The kernel peak must be in the shortlist — it is the primary candidate.
+    // With single-row data at 0.65, the kernel peak at 0.65 has the highest weight.
+    const shortlist = buildShortlist(0.65, minRows);
+    // The first entry (sorted by kernel score desc) should be at or very near 0.65
+    expect(shortlist[0]!.candidate).toBeCloseTo(0.65, 6);
+  });
+});
+
+// ===========================================================================
+// 19. pickBestFinalist edge cases
+// ===========================================================================
+
+describe('pickBestFinalist — edge cases', () => {
+  it('returns null for empty array', () => {
+    expect(pickBestFinalist([])).toBeNull();
+  });
+
+  it('returns the single entry when only one finalist', () => {
+    const entry = {
+      candidate: 0.65,
+      kernelScore: 1.0,
+      trainSharpe: 0.8,
+      eligibleTradeCount: 10,
+    };
+    expect(pickBestFinalist([entry])).toBe(entry);
+  });
+
+  it('selects the entry with the higher trainSharpe', () => {
+    const entries = [
+      { candidate: 0.60, kernelScore: 1.0, trainSharpe: 0.5, eligibleTradeCount: 10 },
+      { candidate: 0.65, kernelScore: 0.9, trainSharpe: 1.2, eligibleTradeCount: 8 },
+    ];
+    const best = pickBestFinalist(entries);
+    expect(best?.candidate).toBe(0.65);
+    expect(best?.trainSharpe).toBe(1.2);
   });
 });
