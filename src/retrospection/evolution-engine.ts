@@ -32,10 +32,69 @@
  *     consistent values from all comparison group members. Locking only the
  *     target would allow another concurrent job to change a sibling's
  *     min_probability between the read and the write, invalidating the cap check.
+ *
+ * Guard layer (T-46 refactor):
+ *   Several pure functions and constants are now exported so the deterministic
+ *   optimizer (optimizer.ts) can reuse the same guards without duplication.
+ *   The guards are: clampMinProbability, applyIntegrityCap, checkCooldown,
+ *   writeProposal, writeApplied. runEvolutionEngine is refactored to call these
+ *   extracted helpers — its observable behavior is byte-for-byte unchanged.
  */
 
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { withTransaction } from '../db/client.js';
+
+// ---------------------------------------------------------------------------
+// Exported constants (shared with optimizer.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Lower bound for min_probability — below 30% the signal is essentially noise
+ * and we should not be trading at all.
+ */
+export const MIN_PROBABILITY_LOWER = 0.3;
+
+/**
+ * Upper bound for min_probability — requiring 90%+ confidence on every trade
+ * would effectively turn off the strategy (signals this strong are rare).
+ */
+export const MIN_PROBABILITY_UPPER = 0.9;
+
+/**
+ * Maximum allowed spread between any two active momentum_exhaustion personalities'
+ * min_probability values. Exceeding 0.08 means personalities are entering on
+ * meaningfully different quality signals, invalidating management-style comparisons.
+ */
+export const INTEGRITY_CAP_MAX_SPREAD = 0.08;
+
+/**
+ * Minimum number of regime-tagged retrospection rows required for the
+ * deterministic optimizer's 'stable' classification. Below this threshold
+ * the optimizer returns no suggestion (sample is too small to be reliable).
+ *
+ * This constant is distinct from the rule engine's per-day 20-trade floor
+ * (which gates a single-day rule from firing). This 200-row floor gates the
+ * entire optimizer run across the training window.
+ *
+ * 200 rows ≈ ~10 trading months of daily data per personality — enough to
+ * detect statistically meaningful signal in the objective metric.
+ */
+export const MINIMUM_SAMPLE_STABLE = 200;
+
+/**
+ * Minimum number of closed trades on a single day before the rule-based engine
+ * can fire for that day. Kept separate from MINIMUM_SAMPLE_STABLE because it
+ * is a per-day gate, not a training-window gate.
+ */
+export const MINIMUM_DAILY_TRADES = 20;
+
+/**
+ * Cooldown period in calendar days. The engine will not apply or propose a
+ * change if the last evolution was fewer than this many days ago. Roughly 5
+ * trading days — enough to accumulate a meaningful sample after the previous
+ * adjustment before deciding to adjust again.
+ */
+export const COOLDOWN_DAYS = 7;
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -79,6 +138,230 @@ interface PersonalityRow {
 }
 
 // ---------------------------------------------------------------------------
+// Exported pure guard functions (shared with optimizer.ts — T-46)
+// ---------------------------------------------------------------------------
+
+/**
+ * Clamps a proposed min_probability value to [MIN_PROBABILITY_LOWER, MIN_PROBABILITY_UPPER].
+ *
+ * Exported so the optimizer can apply the same bounds without duplicating the
+ * domain constants. This is a pure function — no DB access.
+ *
+ * @param value - Raw proposed value before clamping
+ * @returns The clamped value in [0.30, 0.90]
+ */
+export function clampMinProbability(value: number): number {
+  return Math.max(MIN_PROBABILITY_LOWER, Math.min(MIN_PROBABILITY_UPPER, value));
+}
+
+/**
+ * Applies the 8-percentage-point integrity cap to a proposed min_probability.
+ *
+ * The cap ensures all active momentum_exhaustion personalities stay within
+ * INTEGRITY_CAP_MAX_SPREAD of each other, preserving comparison validity.
+ *
+ * If the proposed spread would exceed the cap:
+ *   - Raising (delta > 0): cap to minOtherProb + INTEGRITY_CAP_MAX_SPREAD
+ *   - Lowering (delta < 0): cap to maxOtherProb - INTEGRITY_CAP_MAX_SPREAD
+ * After capping, the value is re-clamped to [0.30, 0.90].
+ *
+ * Returns `null` when:
+ *   - otherProbs is empty (no peers to compare against — cap cannot fire)
+ *   - The cap makes the effective change negligibly small (< 1e-6 vs currentValue)
+ *     meaning the system is at the integrity limit and no change should be written.
+ *
+ * Exported as a pure function so the optimizer reuses identical cap logic.
+ * No DB access.
+ *
+ * @param proposed     - Proposed value (already clamped to [0.30, 0.90])
+ * @param currentValue - Current min_probability of the target personality
+ * @param otherProbs   - Finite min_probability values of all peer personalities
+ *                       (already filtered to exclude NaN/Infinity)
+ * @param delta        - Direction of the proposed change (positive = raise, negative = lower)
+ * @returns The integrity-capped proposed value, or null to suppress the change
+ */
+export function applyIntegrityCap(
+  proposed: number,
+  currentValue: number,
+  otherProbs: number[],
+  delta: number,
+): number | null {
+  // No peers → spread is zero by definition; cap never fires.
+  if (otherProbs.length === 0) {
+    // Check if the change is negligibly small (< 1e-6). With no peers, this
+    // only matters if proposed ≈ currentValue after clamping.
+    if (Math.abs(proposed - currentValue) < 1e-6) {
+      return null;
+    }
+    return proposed;
+  }
+
+  // Simulate the spread after applying the proposed value.
+  const allSimulatedProbs = [...otherProbs, proposed];
+  const simMax = Math.max(...allSimulatedProbs);
+  const simMin = Math.min(...allSimulatedProbs);
+  const simulatedSpread = simMax - simMin;
+
+  let capped = proposed;
+
+  if (simulatedSpread > INTEGRITY_CAP_MAX_SPREAD) {
+    const maxOtherProb = Math.max(...otherProbs);
+    const minOtherProb = Math.min(...otherProbs);
+
+    if (delta < 0) {
+      // Lowering: cap so spread stays at exactly INTEGRITY_CAP_MAX_SPREAD relative to max.
+      capped = maxOtherProb - INTEGRITY_CAP_MAX_SPREAD;
+    } else {
+      // Raising: cap so spread stays at exactly INTEGRITY_CAP_MAX_SPREAD relative to min.
+      capped = minOtherProb + INTEGRITY_CAP_MAX_SPREAD;
+    }
+
+    // Re-clamp after integrity adjustment — the cap arithmetic could push us
+    // outside [0.30, 0.90] in edge cases where the entire group is near a boundary.
+    capped = clampMinProbability(capped);
+  }
+
+  // If the effective change after capping is negligibly small (< 1e-6), there is
+  // no point writing a DB record. Return null rather than a no-op write.
+  // This is not a suppression of a valid change — it is a case where the
+  // integrity constraint means the system is already at the limit of what is safe.
+  if (Math.abs(capped - currentValue) < 1e-6) {
+    return null;
+  }
+
+  return capped;
+}
+
+/**
+ * Checks whether a personality is within the 7-day cooldown window.
+ *
+ * Returns true if the cooldown is active (caller should skip/return 'skipped'),
+ * false if the cooldown has elapsed or never started (caller may proceed).
+ *
+ * Exported as a pure function so the optimizer reuses identical cooldown logic.
+ * No DB access.
+ *
+ * IST date comparison: converts last_evolved_at to the IST calendar date using
+ * toLocaleDateString with Asia/Kolkata timezone. This ensures we count the same
+ * number of calendar days as a human would reading the retrospection dashboard
+ * in India, regardless of the server's UTC offset.
+ *
+ * @param lastEvolvedAt - Timestamp of the most recent evolution (null = never evolved)
+ * @param tradeDateISO  - Trade date in 'YYYY-MM-DD' format (IST calendar date)
+ */
+export function checkCooldown(lastEvolvedAt: Date | null, tradeDateISO: string): boolean {
+  if (lastEvolvedAt === null) {
+    return false; // Never evolved → no cooldown active
+  }
+
+  const lastEvolvedISTDate = new Date(lastEvolvedAt).toLocaleDateString('en-CA', {
+    timeZone: 'Asia/Kolkata',
+  });
+  // en-CA locale returns 'YYYY-MM-DD' format — same as tradeDateISO.
+  const lastMs = new Date(lastEvolvedISTDate).getTime();
+  const tradeMs = new Date(tradeDateISO).getTime();
+  const diffDays = (tradeMs - lastMs) / (1000 * 60 * 60 * 24);
+
+  return diffDays < COOLDOWN_DAYS;
+}
+
+/**
+ * Writes a proposed adjustment to retrospection_results (approval mode).
+ *
+ * The caller is responsible for supplying a pg PoolClient that is already
+ * inside a BEGIN/COMMIT transaction (i.e. the SELECT FOR UPDATE has already
+ * locked the relevant rows).
+ *
+ * Uses $1::jsonb cast so PostgreSQL parses the string as JSONB rather than TEXT.
+ *
+ * @param client         - pg PoolClient (inside a live transaction)
+ * @param personalityId  - UUID of the target personality
+ * @param tradeDateISO   - 'YYYY-MM-DD' of the trade date (matches the row to update)
+ * @param proposedValue  - The new min_probability value to propose
+ * @param ruleName       - Human-readable name of the rule that fired
+ * @param currentValue   - The existing min_probability (for audit logging in the JSON)
+ */
+export async function writeProposal(
+  client: PoolClient,
+  personalityId: string,
+  tradeDateISO: string,
+  proposedValue: number,
+  ruleName: string,
+  currentValue: number,
+): Promise<void> {
+  const adjustmentJson = JSON.stringify({
+    min_probability: proposedValue,
+    rule: ruleName,
+    original: currentValue,
+  });
+
+  await client.query(
+    `UPDATE retrospection_results
+     SET proposed_adjustments       = $1::jsonb,
+         proposed_adjustments_at    = NOW(),
+         adjustments_applied        = FALSE
+     WHERE personality_id = $2
+       AND trade_date     = $3`,
+    [adjustmentJson, personalityId, tradeDateISO],
+  );
+}
+
+/**
+ * Applies an approved adjustment directly to personality_configs and inserts
+ * an audit log entry (autonomous mode).
+ *
+ * The caller is responsible for supplying a pg PoolClient inside a transaction
+ * (the SELECT FOR UPDATE lock must already be held).
+ *
+ * jsonb_set(params, '{min_probability}', ...) replaces only the min_probability
+ * key without touching other params. to_json($1::float8)::jsonb converts the
+ * TypeScript number to a JSONB numeric literal.
+ *
+ * Also increments evolution_consecutive_applications so the scheduler can detect
+ * runaway changes (e.g. 5 consecutive decreases) and raise an alert.
+ *
+ * @param client         - pg PoolClient (inside a live transaction)
+ * @param personalityId  - UUID of the target personality
+ * @param proposedValue  - The new min_probability value to apply
+ * @param currentParams  - Full params object before change (for audit snapshot)
+ * @param ruleName       - Human-readable rule name for the audit reason
+ * @param metricsDesc    - Metrics description string for the audit reason (e.g. "winRate=0.35")
+ * @param currentValue   - Current min_probability (for audit reason string)
+ */
+export async function writeApplied(
+  client: PoolClient,
+  personalityId: string,
+  proposedValue: number,
+  currentParams: Record<string, unknown>,
+  ruleName: string,
+  metricsDesc: string,
+  currentValue: number,
+): Promise<void> {
+  await client.query(
+    `UPDATE personality_configs
+     SET params                              = jsonb_set(params, '{min_probability}', to_json($1::float8)::jsonb),
+         last_evolved_at                     = NOW(),
+         evolution_consecutive_applications  = evolution_consecutive_applications + 1
+     WHERE id = $2`,
+    [proposedValue, personalityId],
+  );
+
+  const oldParams = JSON.stringify(currentParams);
+  const newParamsObj = { ...currentParams, min_probability: proposedValue };
+  const newParams = JSON.stringify(newParamsObj);
+
+  const reason = `${ruleName}: ${metricsDesc}, ${currentValue.toFixed(4)} → ${proposedValue.toFixed(4)}`;
+
+  // gen_random_uuid() is called inside PostgreSQL so we do not need to import
+  // a UUID library into this module.
+  await client.query(
+    `INSERT INTO personality_audit_log (id, personality_id, changed_at, changed_by, old_params, new_params, reason)
+     VALUES (gen_random_uuid(), $1, NOW(), 'evolution-engine', $2::jsonb, $3::jsonb, $4)`,
+    [personalityId, oldParams, newParams, reason],
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
@@ -116,12 +399,11 @@ export async function runEvolutionEngine(
   // with no DB round-trip.
   // -------------------------------------------------------------------------
 
-  // Require a minimum sample of 20 trades before any rule can fire.
-  // Fewer than 20 trades is statistically unreliable: a 3/5 winning streak
-  // looks like 60% win-rate but has enormous confidence intervals. The 20-trade
-  // floor is the same minimum used by the retrospection engine's signal
-  // calibration scorer.
-  if (metrics.totalTrades < 20) {
+  // Require a minimum sample of MINIMUM_DAILY_TRADES trades before any rule can fire.
+  // Fewer trades is statistically unreliable: a 3/5 winning streak looks like 60%
+  // win-rate but has enormous confidence intervals. The 20-trade floor is the same
+  // minimum used by the retrospection engine's signal calibration scorer.
+  if (metrics.totalTrades < MINIMUM_DAILY_TRADES) {
     return { action: 'none' };
   }
 
@@ -225,186 +507,64 @@ export async function runEvolutionEngine(
     // -----------------------------------------------------------------------
     // Compute proposed value and clamp to [0.30, 0.90].
     //
-    // The clamp bounds are domain constants for this strategy type:
-    //   - 0.30 lower bound: below 30% probability the signal is essentially
-    //     noise and we should not be trading at all regardless of win rate.
-    //   - 0.90 upper bound: requiring 90%+ confidence on every trade would
-    //     effectively turn off the strategy (signals this strong are rare).
+    // Now delegates to the exported clampMinProbability helper so the optimizer
+    // uses the same bounds. Behavior is identical to the previous inline logic.
     // -----------------------------------------------------------------------
-    let proposedValue = Math.max(0.3, Math.min(0.9, minProb + delta));
+    const rawProposed = clampMinProbability(minProb + delta);
 
     // -----------------------------------------------------------------------
     // Integrity cap — keeps all active momentum_exhaustion personalities within
     // 0.08 (8 percentage points) of each other.
     //
-    // This preserves the comparison validity between Precision, Adjuster, and
-    // Reducer. If they drift beyond 8pp they are entering on meaningfully
-    // different quality signals and we can no longer attribute P&L differences
-    // to management style alone.
-    //
-    // The cap works by simulating what the spread would be AFTER this proposed
-    // change, and if it would exceed 0.08, we compute the tightest proposed
-    // value that keeps the spread at exactly 0.08.
-    //
-    // This is a CAP, not a BLOCK. We find the best value we can apply within
-    // constraints rather than refusing to evolve at all. The only exception is
-    // when the cap makes the effective change so small it rounds to zero (< 1e-6
-    // difference), in which case we return 'none' to avoid writing a no-op.
+    // Delegates to the exported applyIntegrityCap helper.
     // -----------------------------------------------------------------------
     const otherProbs: number[] = allRows
       .filter((r) => r.id !== personalityId)
       .map((r) => Number((r.params as Record<string, unknown>).min_probability))
       .filter((v) => Number.isFinite(v));
-    // Note: if all other personalities have non-finite min_probability, otherProbs
-    // is empty. In that case the spread is 0 and the cap never fires — which is
-    // the correct behaviour: we cannot compute a meaningful spread without peers.
 
-    if (otherProbs.length > 0) {
-      // Simulate the spread after applying proposedValue to the target.
-      const allSimulatedProbs = [...otherProbs, proposedValue];
-      const simMax = Math.max(...allSimulatedProbs);
-      const simMin = Math.min(...allSimulatedProbs);
-      const simulatedSpread = simMax - simMin;
+    const proposedValue = applyIntegrityCap(rawProposed, minProb, otherProbs, delta);
 
-      if (simulatedSpread > 0.08) {
-        const maxOtherProb = Math.max(...otherProbs);
-        const minOtherProb = Math.min(...otherProbs);
-
-        if (delta < 0) {
-          // We are lowering proposedValue (lowering min_probability = accepting weaker signals).
-          // The new proposed value is pulling the spread too wide at the bottom.
-          // Cap it so the spread stays at exactly 0.08 relative to the current max.
-          proposedValue = maxOtherProb - 0.08;
-        } else {
-          // We are raising proposedValue (raising min_probability = being more selective).
-          // The new proposed value is pulling the spread too wide at the top.
-          // Cap it so the spread stays at exactly 0.08 relative to the current min.
-          proposedValue = minOtherProb + 0.08;
-        }
-
-        // Re-clamp after integrity adjustment — the cap arithmetic could push us
-        // outside [0.30, 0.90] in edge cases where the entire group is near a boundary.
-        proposedValue = Math.max(0.3, Math.min(0.9, proposedValue));
-      }
-    }
-
-    // If the effective change after capping is negligibly small (< 1e-6), there is
-    // no point writing a DB record. Return 'none' rather than 'skipped' because
-    // this is not a suppression of a valid change — it is a case where the
-    // integrity constraint means the system is already at the limit of what is
-    // safe to change.
-    if (Math.abs(proposedValue - minProb) < 1e-6) {
+    if (proposedValue === null) {
+      // applyIntegrityCap returns null when the effective change is negligibly
+      // small — the integrity constraint means the system is already at the limit.
       return { action: 'none', reason: 'integrity_cap_no_change' };
     }
 
     // -----------------------------------------------------------------------
     // 7-day cooldown check.
     //
-    // The cooldown prevents the engine from applying multiple adjustments in
-    // quick succession before we can observe whether the previous change had
-    // any effect. 7 calendar days corresponds to roughly 5 trading days —
-    // enough to accumulate a meaningful sample after the previous adjustment.
-    //
-    // IST date comparison: we convert last_evolved_at to the IST calendar date
-    // using toLocaleDateString with the Asia/Kolkata timezone. This ensures we
-    // count the same number of calendar days as a human would reading the
-    // retrospection dashboard in India, regardless of the server's UTC offset.
-    //
-    // Note: The cooldown check is done INSIDE the transaction (after the
-    // SELECT FOR UPDATE) intentionally. This prevents a race where two
-    // concurrent jobs both read last_evolved_at as old, both pass the cooldown
-    // check, and both proceed to apply a change.
+    // Delegates to the exported checkCooldown helper. Note: done INSIDE the
+    // transaction (after SELECT FOR UPDATE) intentionally to prevent a race
+    // where two concurrent jobs both read last_evolved_at as old, both pass
+    // the cooldown check, and both proceed to apply a change.
     // -----------------------------------------------------------------------
-    if (targetRow.last_evolved_at !== null) {
-      const lastEvolvedISTDate = new Date(targetRow.last_evolved_at).toLocaleDateString('en-CA', {
-        timeZone: 'Asia/Kolkata',
-      });
-      // en-CA locale returns 'YYYY-MM-DD' format — the same format as tradeDateISO.
-      // We parse both as dates at midnight UTC and compute the difference in days.
-      const lastMs = new Date(lastEvolvedISTDate).getTime();
-      const tradeMs = new Date(tradeDateISO).getTime();
-      const diffDays = (tradeMs - lastMs) / (1000 * 60 * 60 * 24);
-
-      if (diffDays < 7) {
-        return { action: 'skipped', reason: 'cooldown' };
-      }
+    if (checkCooldown(targetRow.last_evolved_at, tradeDateISO)) {
+      return { action: 'skipped', reason: 'cooldown' };
     }
 
     // -----------------------------------------------------------------------
     // Write path — diverges based on EVOLUTION_REQUIRE_APPROVAL
     // -----------------------------------------------------------------------
 
-    const adjustmentJson = JSON.stringify({
-      min_probability: proposedValue,
-      rule: ruleName,
-      original: minProb,
-    });
-
     if (requireApproval) {
-      // -------------------------------------------------------------------
       // Approval mode: write the proposed adjustment into retrospection_results.
-      // A human (or an API endpoint) reviews the proposal and applies it via
-      // a separate code path when ready.
-      //
-      // We use $1::jsonb cast so PostgreSQL parses the string as JSONB rather
-      // than treating it as TEXT. Not using a JS object directly because the
-      // pg driver would serialise it as TEXT for a JSONB column without the cast.
-      // -------------------------------------------------------------------
-      await client.query(
-        `UPDATE retrospection_results
-         SET proposed_adjustments       = $1::jsonb,
-             proposed_adjustments_at    = NOW(),
-             adjustments_applied        = FALSE
-         WHERE personality_id = $2
-           AND trade_date     = $3`,
-        [adjustmentJson, personalityId, tradeDateISO],
-      );
-
+      // Delegates to the exported writeProposal helper.
+      await writeProposal(client, personalityId, tradeDateISO, proposedValue, ruleName, minProb);
       return { action: 'proposed', proposedValue };
     }
-    // -------------------------------------------------------------------
-    // Autonomous mode: apply the change immediately to personality_configs.
-    //
-    // jsonb_set(params, '{min_probability}', ...) creates or replaces the
-    // min_probability key inside the params JSONB object without touching
-    // any other keys. to_json($1::float8)::jsonb converts the TypeScript
-    // number to a JSONB numeric literal.
-    //
-    // We also increment evolution_consecutive_applications so the evolution
-    // scheduler can detect runaway changes (e.g. 5 consecutive decreases)
-    // and raise an alert.
-    // -------------------------------------------------------------------
-    await client.query(
-      `UPDATE personality_configs
-       SET params                              = jsonb_set(params, '{min_probability}', to_json($1::float8)::jsonb),
-           last_evolved_at                     = NOW(),
-           evolution_consecutive_applications  = evolution_consecutive_applications + 1
-       WHERE id = $2`,
-      [proposedValue, personalityId],
-    );
 
-    // Build old_params and new_params snapshots for the audit log.
-    // We construct new_params by shallow-merging the updated field rather
-    // than re-querying — the transaction has not committed yet so a
-    // re-SELECT would return the updated row, making old_params identical.
-    const oldParams = JSON.stringify(targetRow.params);
-    const newParamsObj = {
-      ...(targetRow.params as Record<string, unknown>),
-      min_probability: proposedValue,
-    };
-    const newParams = JSON.stringify(newParamsObj);
-
-    // Insert an immutable audit record. gen_random_uuid() is called inside
-    // PostgreSQL so we do not need to import a UUID library into this module.
-    // The reason string is human-readable and includes the rule name and the
-    // numeric values so it is self-contained — someone reading the audit log
-    // in 6 months does not need to cross-reference the evolution engine source.
-    const reason = `${ruleName}: winRate=${metrics.winRate.toFixed(4)}, trades=${metrics.totalTrades}, ${minProb.toFixed(4)} → ${proposedValue.toFixed(4)}`;
-
-    await client.query(
-      `INSERT INTO personality_audit_log (id, personality_id, changed_at, changed_by, old_params, new_params, reason)
-       VALUES (gen_random_uuid(), $1, NOW(), 'evolution-engine', $2::jsonb, $3::jsonb, $4)`,
-      [personalityId, oldParams, newParams, reason],
+    // Autonomous mode: apply the change immediately to personality_configs
+    // and insert an audit log record. Delegates to the exported writeApplied helper.
+    const metricsDesc = `winRate=${metrics.winRate.toFixed(4)}, trades=${metrics.totalTrades}`;
+    await writeApplied(
+      client,
+      personalityId,
+      proposedValue,
+      targetRow.params as Record<string, unknown>,
+      ruleName,
+      metricsDesc,
+      minProb,
     );
 
     return { action: 'applied', proposedValue };

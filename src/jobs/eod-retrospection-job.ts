@@ -33,6 +33,7 @@ import { computeBrierScore } from '../retrospection/brier-score.js';
 import { computeBeatClockworkDelta, computeDailyMetrics } from '../retrospection/daily-metrics.js';
 import { runEvolutionEngine } from '../retrospection/evolution-engine.js';
 import { computeManagementEffectiveness } from '../retrospection/management-effectiveness.js';
+import { runOptimizer } from '../retrospection/optimizer.js';
 
 // ---------------------------------------------------------------------------
 // Connection helper
@@ -245,6 +246,46 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
             totalTrades: metrics.totalTrades,
             totalPnlPct: metrics.totalPnlPct,
           });
+
+          // --- 5g: run deterministic 1-D optimizer (off the critical path) ----
+          //
+          // The optimizer is a secondary signal — it proposes or applies a
+          // data-driven min_probability from the training window. It runs AFTER
+          // the rule-based engine (5f) and is completely independent of it.
+          //
+          // Key properties:
+          //   - Caught independently: a failure here does not abort the batch or
+          //     affect the rule engine result. The catch falls back to the rule
+          //     engine implicitly (it has already run in 5f).
+          //   - Off the critical path: any failure is logged but the personality's
+          //     retrospection row is already written (5e) and the rule engine has
+          //     already run (5f). The optimizer is an additional suggestion, not a
+          //     replacement.
+          //   - sr_anchored personalities and frozen personalities are excluded
+          //     inside runOptimizer itself — the catch here handles unexpected
+          //     errors (DB timeout, etc.), not expected exclusions.
+          try {
+            const optimizerResult = await runOptimizer(pool, personality.id, tradeDateISO);
+            if (optimizerResult.action !== 'none' && optimizerResult.action !== 'skipped') {
+              console.log(
+                '[eod-retrospection] optimizer %s for personality %s on %s: candidate=%s',
+                optimizerResult.action,
+                personality.id,
+                tradeDateISO,
+                optimizerResult.candidateValue?.toFixed(4) ?? 'n/a',
+              );
+            }
+          } catch (optimizerErr) {
+            // Log and continue — the rule-based engine (5f) has already run.
+            // The optimizer failing never crashes the batch or discards the rule
+            // engine's result.
+            console.error(
+              '[eod-retrospection] optimizer failed for personality %s on %s — falling back to rule engine result only:',
+              personality.id,
+              tradeDateISO,
+              optimizerErr,
+            );
+          }
         } catch (err) {
           // Per-personality catch: log and continue to the next personality.
           // A single personality failing (e.g. locked row, corrupt data, a
