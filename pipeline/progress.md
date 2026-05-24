@@ -19,7 +19,11 @@
 ## Phase status
 - [x] Phase 0 — Triage (risk_manifest.json written)
 - [x] Phase 1 — APPROVED at Gate 1 (option A: defer server consolidation)
-- [~] Phase 2 — Decomposition done (T-01..T-05 contracts written); awaiting "proceed with implementation"
+- [~] Phase 3 — Implementation in progress
+  - T-04 shared scaffolding: DONE (27 tests pass, typecheck clean) — committed pending
+  - T-05 delete stale frontend/: DONE & committed (pre-delete grep clean, typecheck passed)
+  - T-01 Live tab + T-02 Trades tab: running in parallel
+  - T-03 P&L tab: queued (depends on T-02)
   - Internal score ~8.5/10 (>8 → no extra sprint, per feature-fast = 1 sprint)
   - Red Team fixes accepted: running WS shape; realized-only P&L; synthetic labeling on chart; one-shot straddle fetch; StrictMode-safe + backoff reconnect; null-safe NUMERIC coercion; IST-explicit dates.
   - QA checklist: 16 Critical / 17 Functional / 9 Non-blocker (42 total). File: pipeline/qa-checklist.md
