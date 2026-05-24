@@ -138,7 +138,7 @@ describe('initRazorpay()', () => {
   it('should not include key secret in the error when RAZORPAY_KEY_ID is missing', async () => {
     const secretValue = 'super_secret_key_value';
     process.env.RAZORPAY_KEY_ID = '';
-    vi.stubEnv('RAZORPAY_KEY_SECRET', secretValue);
+    process.env.RAZORPAY_KEY_SECRET = secretValue;
     const { initRazorpay } = await import('../razorpay.ts');
     expect(() => initRazorpay()).not.toThrowError(secretValue);
   });
@@ -189,14 +189,14 @@ describe('verifyPaymentSignature()', () => {
   });
 
   it('should return true for a correctly computed HMAC-SHA256 signature', async () => {
-    vi.stubEnv('RAZORPAY_KEY_SECRET', SECRET);
+    process.env.RAZORPAY_KEY_SECRET = SECRET;
     const { verifyPaymentSignature } = await import('../razorpay.ts');
     const sig = computePaymentHmac(ORDER_ID, PAYMENT_ID, SECRET);
     expect(verifyPaymentSignature(ORDER_ID, PAYMENT_ID, sig)).toBe(true);
   });
 
   it('should return false for an incorrect signature', async () => {
-    vi.stubEnv('RAZORPAY_KEY_SECRET', SECRET);
+    process.env.RAZORPAY_KEY_SECRET = SECRET;
     const { verifyPaymentSignature } = await import('../razorpay.ts');
     expect(verifyPaymentSignature(ORDER_ID, PAYMENT_ID, 'totally_wrong_signature')).toBe(false);
   });
@@ -210,7 +210,7 @@ describe('verifyPaymentSignature()', () => {
   });
 
   it('should return false for a signature that is the right length but wrong value', async () => {
-    vi.stubEnv('RAZORPAY_KEY_SECRET', SECRET);
+    process.env.RAZORPAY_KEY_SECRET = SECRET;
     const { verifyPaymentSignature } = await import('../razorpay.ts');
     // A SHA-256 hex digest is always 64 chars — craft a wrong one of same length
     const correctSig = computePaymentHmac(ORDER_ID, PAYMENT_ID, SECRET);
@@ -221,7 +221,7 @@ describe('verifyPaymentSignature()', () => {
   });
 
   it('should use crypto.timingSafeEqual for comparison', async () => {
-    vi.stubEnv('RAZORPAY_KEY_SECRET', SECRET);
+    process.env.RAZORPAY_KEY_SECRET = SECRET;
     const { verifyPaymentSignature } = await import('../razorpay.ts');
     const spy = vi.spyOn(crypto, 'timingSafeEqual');
     const sig = computePaymentHmac(ORDER_ID, PAYMENT_ID, SECRET);
@@ -248,7 +248,7 @@ describe('verifyWebhookSignature()', () => {
   });
 
   it('should return true for a correctly computed HMAC of the raw body buffer', async () => {
-    vi.stubEnv('RAZORPAY_WEBHOOK_SECRET', WEBHOOK_SECRET);
+    process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET;
     const { verifyWebhookSignature } = await import('../razorpay.ts');
     const body = Buffer.from('{"event":"payment.captured","id":"evt_001"}');
     const sig = computeWebhookHmac(body, WEBHOOK_SECRET);
@@ -256,7 +256,7 @@ describe('verifyWebhookSignature()', () => {
   });
 
   it('should return false when body bytes are tampered (same signature, different body)', async () => {
-    vi.stubEnv('RAZORPAY_WEBHOOK_SECRET', WEBHOOK_SECRET);
+    process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET;
     const { verifyWebhookSignature } = await import('../razorpay.ts');
     const originalBody = Buffer.from('{"event":"payment.captured","id":"evt_001"}');
     const tamperedBody = Buffer.from('{"event":"payment.captured","id":"evt_TAMPERED"}');
@@ -266,7 +266,7 @@ describe('verifyWebhookSignature()', () => {
   });
 
   it('should return false for a correct body but incorrect signature', async () => {
-    vi.stubEnv('RAZORPAY_WEBHOOK_SECRET', WEBHOOK_SECRET);
+    process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET;
     const { verifyWebhookSignature } = await import('../razorpay.ts');
     const body = Buffer.from('{"event":"payment.captured"}');
     expect(verifyWebhookSignature(body, 'bad_sig')).toBe(false);
@@ -281,7 +281,7 @@ describe('verifyWebhookSignature()', () => {
   });
 
   it('should correctly verify a body containing non-ASCII bytes', async () => {
-    vi.stubEnv('RAZORPAY_WEBHOOK_SECRET', WEBHOOK_SECRET);
+    process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET;
     const { verifyWebhookSignature } = await import('../razorpay.ts');
     // Non-ASCII bytes: UTF-8 encoded Indian Rupee sign and some emoji bytes
     const body = Buffer.from([0xe2, 0x82, 0xb9, 0xf0, 0x9f, 0x92, 0xb0, 0xff, 0x00]);
@@ -290,7 +290,7 @@ describe('verifyWebhookSignature()', () => {
   });
 
   it('should return false (not throw) for a malformed headerSignature', async () => {
-    vi.stubEnv('RAZORPAY_WEBHOOK_SECRET', WEBHOOK_SECRET);
+    process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET;
     const { verifyWebhookSignature } = await import('../razorpay.ts');
     const body = Buffer.from('{"event":"payment.captured"}');
     // timingSafeEqual will throw if buffers are different lengths — the impl must

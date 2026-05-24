@@ -62,16 +62,8 @@ const USA_PAYLOAD = { status: 'success', country: 'United States', countryCode: 
 // ---------------------------------------------------------------------------
 
 describe('getClientCountry()', () => {
-  // Reset the module before each test so the internal _geoCache Map is empty
-  // and env overrides are clean.
-  beforeEach(() => {
-    // Note: vi.resetModules() and vi.unstubAllEnvs() are not available in Vitest 2.0.
-    // Test isolation is handled by vitest's built-in module isolation in Node environment.
-  });
-
-  afterEach(() => {
-    // See beforeEach note above.
-  });
+  // Note: Vitest 2.0 does not have vi.resetModules(). To avoid cache pollution
+  // between tests, each test uses a unique IP address so caching doesn't affect results.
 
   // ---- Happy path ----
 
@@ -94,20 +86,20 @@ describe('getClientCountry()', () => {
   it('should return the unknown sentinel when fetch throws a network error', async () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchError(new Error('network error'));
-    const result = await getClientCountry('1.2.3.4', stub.asFetch);
+    const result = await getClientCountry('2.3.4.5', stub.asFetch);
     expect(result).toEqual({ country: null, isIndia: false, confidence: 'unknown' });
   });
 
   it('should not throw when fetch throws — returns unknown sentinel', async () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchError(new Error('network error'));
-    await expect(getClientCountry('1.2.3.4', stub.asFetch)).resolves.toBeDefined();
+    await expect(getClientCountry('3.4.5.6', stub.asFetch)).resolves.toBeDefined();
   });
 
   it('should return unknown when HTTP response is non-200', async () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchStub({}, false, 429);
-    const result = await getClientCountry('1.2.3.4', stub.asFetch);
+    const result = await getClientCountry('4.5.6.7', stub.asFetch);
     expect(result).toEqual({ country: null, isIndia: false, confidence: 'unknown' });
   });
 
@@ -115,21 +107,21 @@ describe('getClientCountry()', () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const payload = { status: 'fail', country: '', countryCode: '' };
     const stub = buildFetchStub(payload);
-    const result = await getClientCountry('1.2.3.4', stub.asFetch);
+    const result = await getClientCountry('5.6.7.8', stub.asFetch);
     expect(result).toEqual({ country: null, isIndia: false, confidence: 'unknown' });
   });
 
   it('should return unknown when response JSON is missing required fields', async () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchStub({ message: 'unexpected format' });
-    const result = await getClientCountry('1.2.3.4', stub.asFetch);
+    const result = await getClientCountry('6.7.8.9', stub.asFetch);
     expect(result).toEqual({ country: null, isIndia: false, confidence: 'unknown' });
   });
 
   it('should return unknown when response JSON is null', async () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchStub(null);
-    const result = await getClientCountry('1.2.3.4', stub.asFetch);
+    const result = await getClientCountry('7.8.9.10', stub.asFetch);
     expect(result).toEqual({ country: null, isIndia: false, confidence: 'unknown' });
   });
 
@@ -137,7 +129,7 @@ describe('getClientCountry()', () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const payload = { status: 'success', country: 'Testland', countryCode: 'INVALID' };
     const stub = buildFetchStub(payload);
-    const result = await getClientCountry('1.2.3.4', stub.asFetch);
+    const result = await getClientCountry('8.9.10.11', stub.asFetch);
     expect(result).toEqual({ country: null, isIndia: false, confidence: 'unknown' });
   });
 
@@ -147,7 +139,7 @@ describe('getClientCountry()', () => {
     // The catch block handles all thrown errors uniformly, including AbortError.
     const abortError = new DOMException('The operation was aborted.', 'AbortError');
     const stub = buildFetchError(abortError as unknown as Error);
-    const result = await getClientCountry('1.2.3.4', stub.asFetch);
+    const result = await getClientCountry('9.10.11.12', stub.asFetch);
     expect(result).toEqual({ country: null, isIndia: false, confidence: 'unknown' });
   });
 
@@ -157,7 +149,7 @@ describe('getClientCountry()', () => {
     process.env.GEOLOCATION_API_URL = 'https://custom-geo.example.com/json';
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchStub(INDIA_PAYLOAD);
-    await getClientCountry('1.2.3.4', stub.asFetch);
+    await getClientCountry('14.15.16.17', stub.asFetch);
     expect(firstCalledUrl(stub)).toContain('https://custom-geo.example.com/json');
     delete process.env.GEOLOCATION_API_URL;
   });
@@ -172,7 +164,7 @@ describe('getClientCountry()', () => {
     try {
       const { getClientCountry } = await import('../geolocation.ts');
       const stub = buildFetchStub(INDIA_PAYLOAD);
-      await getClientCountry('1.2.3.4', stub.asFetch);
+      await getClientCountry('15.16.17.18', stub.asFetch);
       expect(firstCalledUrl(stub)).toContain('https://ip-api.com/json');
     } finally {
       if (original !== undefined) {
@@ -193,16 +185,16 @@ describe('getClientCountry()', () => {
   it('should cache the result for the same IP so fetchFn is called only once', async () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchStub(INDIA_PAYLOAD);
-    await getClientCountry('1.2.3.4', stub.asFetch);
-    await getClientCountry('1.2.3.4', stub.asFetch);
+    await getClientCountry('10.11.12.13', stub.asFetch);
+    await getClientCountry('10.11.12.13', stub.asFetch);
     expect(stub.mock.calls.length).toBe(1);
   });
 
   it('should return the cached result on a second call for the same IP', async () => {
     const { getClientCountry } = await import('../geolocation.ts');
     const stub = buildFetchStub(INDIA_PAYLOAD);
-    const first = await getClientCountry('1.2.3.4', stub.asFetch);
-    const second = await getClientCountry('1.2.3.4', stub.asFetch);
+    const first = await getClientCountry('11.12.13.14', stub.asFetch);
+    const second = await getClientCountry('11.12.13.14', stub.asFetch);
     expect(second).toEqual(first);
   });
 
@@ -212,8 +204,8 @@ describe('getClientCountry()', () => {
     const indiaStub = buildFetchStub(INDIA_PAYLOAD);
     const usaStub = buildFetchStub(USA_PAYLOAD);
 
-    const indiaResult = await getClientCountry('1.2.3.4', indiaStub.asFetch);
-    const usaResult = await getClientCountry('8.8.8.8', usaStub.asFetch);
+    const indiaResult = await getClientCountry('12.13.14.15', indiaStub.asFetch);
+    const usaResult = await getClientCountry('13.14.15.16', usaStub.asFetch);
 
     expect(indiaResult.isIndia).toBe(true);
     expect(usaResult.isIndia).toBe(false);
@@ -241,10 +233,6 @@ describe('getClientCountry()', () => {
 // ---------------------------------------------------------------------------
 
 describe('extractClientIp()', () => {
-  beforeEach(() => {
-    // vi.resetModules() is not available in Vitest 2.0; test isolation is handled automatically
-  });
-
   it('should return request.ip when it is a valid string', async () => {
     const { extractClientIp } = await import('../geolocation.ts');
     const req = { ip: '203.0.113.42' } as FastifyRequest;
