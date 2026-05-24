@@ -134,3 +134,53 @@ and Redis 7.
 
 ### Railway / Fly.io
 Planned production hosting targets.
+
+---
+
+## Deep dive: BullMQ & the EOD retrospection job
+
+> **Current state (Sprint 1):** `bullmq` is declared in `package.json`
+> (`^5.13.0`) but is **not yet imported anywhere in `src/`**. The EOD
+> retrospection engine is still a planned skeleton — the personality,
+> paper-trade, and regime-tagging building blocks it will consume already
+> exist under `src/trading/`, but no queue, worker, or scheduler is wired up
+> yet. The design below is the intended shape, not shipped code.
+
+### Why a queue at all
+End-of-day retrospection is heavy, batch work: for each of the 10
+personalities it computes daily metrics, Beat-Clockwork deltas, signal
+calibration (Brier) scores, management effectiveness, and then queues
+rule-based parameter-evolution suggestions. This should not run inside a
+request/response cycle or block the live ingestion pipeline — it runs once,
+after market close, and can take time. A Redis-backed job queue gives us
+durability (a crash mid-run doesn't lose the job), retries with backoff, and a
+clean separation between "trigger the job" and "do the work".
+
+### How it will be wired
+BullMQ reuses the same Redis 7 instance already used for Streams and caching:
+
+- **Queue** — a producer (e.g. a `POST /api/retrospection/run` route or a
+  cron/scheduled trigger after market close) calls `queue.add(...)` with the
+  trading day and underlying as job data.
+- **Worker** — a separate process consumes jobs, pulls that day's paper trades
+  and straddle snapshots from PostgreSQL/TimescaleDB, computes the metrics, and
+  writes regime-tagged rows into `retrospection_results`.
+- **Connection** — both point at `REDIS_URL`. BullMQ requires Redis 7+ (it uses
+  Streams features absent in Redis 6) — the same constraint the event bus
+  already imposes.
+
+### Guardrails it must respect
+Two project invariants apply to whatever code lands here:
+- **Clockwork immutability** — any parameter-evolution suggestion the job
+  queues must honour `personality_configs.is_frozen`; the evolution engine
+  throws `FROZEN_VIOLATION` rather than silently skipping a frozen row.
+- **Approval gate** — suggestions are proposals only. With
+  `EVOLUTION_REQUIRE_APPROVAL=true`, nothing the job produces is applied to
+  personality parameters without human review.
+
+### Where to look when it's built
+The natural home is a `src/trading/` (or a new `src/jobs/`) module exporting
+the queue definition and the worker. The metric inputs already live in
+`src/trading/` (`paper-trade.ts`, `regime-tagging.ts`, the `management/`
+styles) and `src/db/schema.ts` defines the `retrospection_results` shape the
+worker writes to.
