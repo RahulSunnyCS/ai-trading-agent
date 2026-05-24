@@ -5,8 +5,8 @@
 | Phase | Status | Notes |
 |---|---|---|
 | Phase 0 Triage | ✅ Done | MEDIUM risk, feature-full, 2 Red Team sprints |
-| Phase 1 Planning | 🔄 In progress | Red Team 2 sprints complete; QA Planner running |
-| Gate 1 | ⏳ Pending | Awaiting plan approval |
+| Phase 1 Planning | ✅ Done | 2 Red Team sprints; QA Planner + Translator done |
+| Gate 1 | 🔄 In progress | Plan Report presented — awaiting user approval |
 | Phase 2 Decomposition | ⏳ Pending | |
 | Phase 3 Implementation | ⏳ Pending | |
 | Phase 4 Specialist Review | ⏳ Pending | |
