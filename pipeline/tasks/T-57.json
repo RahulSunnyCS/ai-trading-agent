@@ -1,0 +1,44 @@
+{
+  "task_id": "T-57",
+  "title": "Deterministic replay harness + frozen golden-replay oracle",
+  "assigned_to": "implementor",
+  "milestone": "M3a",
+  "risk_flags": ["financial-logic"],
+  "scope": {
+    "files_to_create": [
+      "src/ingestion/historical/historical-feed.ts",
+      "src/ingestion/historical/replay-driver.ts",
+      "src/ingestion/historical/__tests__/replay-determinism.test.ts",
+      "src/ingestion/historical/__tests__/fixtures/golden/README.md",
+      "scripts/replay.ts"
+    ],
+    "files_to_modify": [
+      "src/ingestion/straddle-calc.ts",
+      "src/trading/position-monitor.ts",
+      "package.json"
+    ],
+    "files_forbidden": [
+      "src/ingestion/straddle-math.ts",
+      "src/ingestion/historical/reconstruct-straddle.ts",
+      "src/ingestion/historical/backfill.ts",
+      "src/db/migrations/*",
+      "src/trading/regime-tagging.ts"
+    ]
+  },
+  "acceptance_criteria": [
+    "HistoricalFeed implements BrokerFeed: reads market_ticks/option_ticks for a window in time order and emits via the SAME pipeline that trades live (market.ticks -> StraddleCalculator -> straddle.values -> PositionMonitor -> paper_trades). Single code path — no separate synchronous fan-out.",
+    "Determinism is clock-driven: VirtualClock.tick() drives snapshot cadence in replay (NOT setInterval). Live mode keeps its existing setInterval + void takeSnapshot() untouched in behaviour.",
+    "StraddleCalculator exposes an awaitable snapshotStep() that resolves only AFTER the snapshot is written to straddle.values. The replay driver awaits it.",
+    "NAMED DRAIN BARRIER: PositionMonitor exposes an awaitable processedThrough(streamId) (or the replay path uses a Redis consumer group and asserts XPENDING==0). The driver awaits this barrier before clock.advance(). The barrier primitive is concrete and named, not 'drain'.",
+    "The replay code path contains ZERO floating promises (no bare `void`/un-awaited async) — assert/enforce this in review and tests.",
+    "Forbid '$' Redis cursors in the replay path: replay consumers are pinned to a fixed start id ('0'); HistoricalFeed publish/consume ordering is asserted so no leading ticks are dropped.",
+    "Live-path regression: existing straddle-calc.test.ts AND position-monitor.test.ts pass unchanged; add a SIMULATE snapshot-cadence assertion proving live behaviour is preserved.",
+    "GOLDEN ORACLE: a small FROZEN, CHECKED-IN historical fixture + checked-in expected trade ledger. A test asserts replay reproduces the ledger. Comparison is a canonicalized STRUCTURAL compare (decimals normalized to fixed precision via decimal.js, stable key ordering, typed field equality) — NOT byte-for-byte. The fixture is authored once from the synthetic generator and committed; CI replays the FROZEN fixture (never regenerates it per run).",
+    "The fixture includes >=1 calendar-gap-marked range and >=1 resolution tag so it is a valid M3b backtest input by construction.",
+    "100x-identical-ledger gate runs in this task's harness. (Worker-context equivalence inside a BullMQ worker is an M3b ENTRY criterion for T-51, not a blocker here.)",
+    "Adds `bun run replay` script (date range, speed, underlying args).",
+    "Named exports only; TS strict; passes tsc --noEmit and lint."
+  ],
+  "dependencies": ["T-56"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}

@@ -1,0 +1,37 @@
+{
+  "task_id": "T-55",
+  "title": "Historical backfill store + writer (idempotent, resumable)",
+  "assigned_to": "implementor",
+  "milestone": "M3a",
+  "risk_flags": ["financial-logic", "infra"],
+  "scope": {
+    "files_to_create": [
+      "src/db/migrations/007_historical_backfill.sql",
+      "src/ingestion/historical/backfill.ts",
+      "src/ingestion/historical/__tests__/backfill.test.ts"
+    ],
+    "files_to_modify": [
+      "src/db/schema.ts"
+    ],
+    "files_forbidden": [
+      "src/ingestion/straddle-calc.ts",
+      "src/trading/position-monitor.ts",
+      "src/db/migrations/001_core_schema.sql"
+    ]
+  },
+  "acceptance_criteria": [
+    "Migration 007 is idempotent (IF NOT EXISTS throughout) and does NOT alter the existing live-data hypertable PKs.",
+    "Adds a `resolution` column to market_ticks and option_ticks (nullable for existing live rows).",
+    "Adds a PARTIAL UNIQUE index `(symbol, time) WHERE source='fyers-historical'` (the index MUST include the partition column `time`). Live ingestion writes source='fyers'/'simulator' — a disjoint key space, so the historical index never collides with live writers. Build non-concurrently on the effectively-empty key space; detect and clean up an INVALID index on failure.",
+    "Creates table `backfill_ranges(symbol, from_ts, to_ts, resolution, status, rows_written, updated_at)` to track completed/partial ranges (resumable).",
+    "Writer consumes T-54's candle output; synthesizes one row per candle (candle close -> ltp, candle time -> time) tagged source='fyers-historical' and the source resolution. Re-running a completed range writes ZERO duplicate rows (ON CONFLICT on the partial-unique key).",
+    "Resumable: on T-54's 401 resumable-error, checkpoint progress in backfill_ranges and fail loud with a resume marker; a subsequent run continues from the checkpoint without re-downloading completed data.",
+    "Trading-calendar reconciliation: reconcile fetched candle timestamps against the NSE calendar (holidays, expiry-morning half-days) using instrument-registry expiry helpers; mark gaps explicitly in backfill_ranges — NEVER silently mark a gappy range 'complete'.",
+    "All hypertable writes/reads are time-range bounded (hypertable discipline).",
+    "schema.ts gains typed interfaces for backfill_ranges and the resolution column.",
+    "Integration-style test (against the existing test DB harness) proves: idempotent re-run = zero dupes; interrupted run resumes from checkpoint; a calendar gap is marked, not hidden.",
+    "Named exports only; TS strict; passes tsc --noEmit and lint."
+  ],
+  "dependencies": ["T-54"],
+  "output_format": "code plus plain English explanation of every non-obvious decision"
+}
