@@ -19,9 +19,9 @@
 ## Phase status
 - [x] Phase 0 — Triage (risk_manifest.json written)
 - [x] Phase 1 — APPROVED at Gate 1 (option A: defer server consolidation)
-- [~] Phase 3 — Implementation in progress
+- [x] Phase 3 — Implementation COMPLETE (all 5 tasks committed + pushed)
+  - Frontend typecheck (one-off, since tsconfig excludes frontend): caught + fixed an exactOptionalPropertyTypes error in api.ts; now clean. Full suite 360 pass / 4 skip.
   - T-04 shared scaffolding: DONE (27 tests pass, typecheck clean) — committed pending
-  - T-05 delete stale frontend/: DONE & committed (pre-delete grep clean, typecheck passed)
   - T-01 Live tab: DONE (useLiveTicks + LiveView, Lightweight Charts, synthetic-labeled)
   - T-02 Trades tab: DONE (usePaperTrades + TradesView, 4 distinct states, single-source hook)
   - T-03 P&L tab: running (depends on T-02)

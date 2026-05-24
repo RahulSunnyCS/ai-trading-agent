@@ -11,3 +11,6 @@
 | Phase 3 | T-05: delete stale frontend | implementor | sonnet | medium | ~9k |
 | Phase 3 | T-01: Live tab | implementor | sonnet | high | ~16k |
 | Phase 3 | T-02: Trades tab | implementor | sonnet | high | ~14k |
+| Phase 3 | T-03: P&L tab | implementor | sonnet | high | ~17k |
+| Phase 3 | api.ts type fix (orchestrator) | orchestrator | opus | low | ~2k |
+| Phase 4 | Architecture review | architecture-reviewer | sonnet | high | ~18k |
