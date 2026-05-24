@@ -1,0 +1,283 @@
+{
+  "metadata": {
+    "underlying": "NIFTY",
+    "from": "2024-01-25T03:45:00.000Z",
+    "to": "2024-01-25T03:48:00.000Z",
+    "tickCount": 15,
+    "gapMarkerCount": 2,
+    "resolutionTags": ["1"],
+    "snapshotIntervalMs": 15000,
+    "_frozen": true,
+    "_version": 1,
+    "_comment": "FROZEN v1 — do not edit without re-running scripts/replay.ts --regenerate-fixture. See README.md."
+  },
+  "ticks": [
+    {
+      "symbol": "NSE:NIFTY50-INDEX",
+      "ltp": 22400,
+      "timestamp": 1706154300000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400CE",
+      "ltp": 150,
+      "timestamp": 1706154300000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400PE",
+      "ltp": 145,
+      "timestamp": 1706154300000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY50-INDEX",
+      "ltp": 22400,
+      "timestamp": 1706154315000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400CE",
+      "ltp": 155,
+      "timestamp": 1706154315000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400PE",
+      "ltp": 148,
+      "timestamp": 1706154315000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY50-INDEX",
+      "ltp": 22400,
+      "timestamp": 1706154330000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400CE",
+      "ltp": 160,
+      "timestamp": 1706154330000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400PE",
+      "ltp": 152,
+      "timestamp": 1706154330000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY50-INDEX",
+      "ltp": 22400,
+      "timestamp": 1706154345000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400CE",
+      "ltp": 165,
+      "timestamp": 1706154345000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400PE",
+      "ltp": 155,
+      "timestamp": 1706154345000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    },
+    {
+      "symbol": "NSE:NIFTY50-INDEX",
+      "ltp": 22400,
+      "timestamp": 1706154480000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": true,
+      "_note": "gapMarker: first tick after a 2-minute calendar gap (1706154360000-1706154480000 is absent from source data)"
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400CE",
+      "ltp": 168,
+      "timestamp": 1706154480000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": true,
+      "_note": "gapMarker: CE leg after the calendar gap"
+    },
+    {
+      "symbol": "NSE:NIFTY2412522400PE",
+      "ltp": 157,
+      "timestamp": 1706154480000,
+      "source": "fyers-historical",
+      "resolution": "1",
+      "gapMarker": false
+    }
+  ],
+  "expectedSnapshotLedger": [
+    {
+      "snapshotIndex": 0,
+      "virtualTimeMs": 1706154300000,
+      "atmStrike": 22400,
+      "cePrice": 150,
+      "pePrice": 145,
+      "straddleValue": 295,
+      "roc": 0,
+      "acceleration": 0,
+      "snapshotCount": 1
+    },
+    {
+      "snapshotIndex": 1,
+      "virtualTimeMs": 1706154315000,
+      "atmStrike": 22400,
+      "cePrice": 155,
+      "pePrice": 148,
+      "straddleValue": 303,
+      "roc": 2.711864406779661,
+      "acceleration": 0,
+      "snapshotCount": 2
+    },
+    {
+      "snapshotIndex": 2,
+      "virtualTimeMs": 1706154330000,
+      "atmStrike": 22400,
+      "cePrice": 160,
+      "pePrice": 152,
+      "straddleValue": 312,
+      "roc": 2.9702970297029703,
+      "acceleration": 0.2584326229233094,
+      "snapshotCount": 3
+    },
+    {
+      "snapshotIndex": 3,
+      "virtualTimeMs": 1706154345000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 2.564102564102564,
+      "acceleration": -0.4061944656004064,
+      "snapshotCount": 4
+    },
+    {
+      "snapshotIndex": 4,
+      "virtualTimeMs": 1706154360000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 0,
+      "acceleration": -2.564102564102564,
+      "snapshotCount": 5
+    },
+    {
+      "snapshotIndex": 5,
+      "virtualTimeMs": 1706154375000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 0,
+      "acceleration": 0,
+      "snapshotCount": 6
+    },
+    {
+      "snapshotIndex": 6,
+      "virtualTimeMs": 1706154390000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 0,
+      "acceleration": 0,
+      "snapshotCount": 7
+    },
+    {
+      "snapshotIndex": 7,
+      "virtualTimeMs": 1706154405000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 0,
+      "acceleration": 0,
+      "snapshotCount": 8
+    },
+    {
+      "snapshotIndex": 8,
+      "virtualTimeMs": 1706154420000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 0,
+      "acceleration": 0,
+      "snapshotCount": 9
+    },
+    {
+      "snapshotIndex": 9,
+      "virtualTimeMs": 1706154435000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 0,
+      "acceleration": 0,
+      "snapshotCount": 10
+    },
+    {
+      "snapshotIndex": 10,
+      "virtualTimeMs": 1706154450000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 0,
+      "acceleration": 0,
+      "snapshotCount": 11
+    },
+    {
+      "snapshotIndex": 11,
+      "virtualTimeMs": 1706154465000,
+      "atmStrike": 22400,
+      "cePrice": 165,
+      "pePrice": 155,
+      "straddleValue": 320,
+      "roc": 0,
+      "acceleration": 0,
+      "snapshotCount": 12
+    },
+    {
+      "snapshotIndex": 12,
+      "virtualTimeMs": 1706154480000,
+      "atmStrike": 22400,
+      "cePrice": 168,
+      "pePrice": 157,
+      "straddleValue": 325,
+      "roc": 1.5625,
+      "acceleration": 1.5625,
+      "snapshotCount": 13
+    }
+  ]
+}

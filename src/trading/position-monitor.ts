@@ -47,6 +47,32 @@ export interface PositionMonitorConfig {
 export interface PositionMonitor {
   start(): Promise<void>;
   stop(): Promise<void>;
+  /**
+   * NAMED DRAIN BARRIER — resolves when the poll loop has processed the entry
+   * with the given Redis stream ID (or any entry with a later ID, which implies
+   * the given entry was also processed since XREAD delivers entries in order).
+   *
+   * WHY this primitive instead of a sleep?
+   * Sleeping is not observable — there is no way to assert it in a test without
+   * relying on wall-clock time, which is non-deterministic. A concrete Promise
+   * keyed on the stream ID is observable: the test (or driver) awaits it, and
+   * it resolves when the poll loop's cursor has advanced past the target ID.
+   * The comparison is a simple lexicographic comparison of Redis stream IDs,
+   * which have the form "<ms>-<seq>" and compare correctly as strings under the
+   * same semantics Redis itself uses.
+   *
+   * WHY at this boundary (before clock.advance)?
+   * In the replay driver, after snapshotStep() publishes to straddle.values,
+   * the position monitor poll loop must consume that entry BEFORE we advance
+   * the virtual clock to the next interval. If we advance first, positions
+   * would be evaluated at the wrong clock time, breaking determinism.
+   *
+   * REPLAY PATH ONLY: in live mode this method is never called. The poll loop
+   * always runs and the barrier bookkeeping has negligible overhead.
+   *
+   * @param streamId  Redis stream ID of the entry to wait for, e.g. "1700000000000-0".
+   */
+  processedThrough(streamId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +194,43 @@ export function createPositionMonitor(
 
   // Running flag — set to false by stop() to terminate the poll loop cleanly.
   let running = false;
+
+  // ---------------------------------------------------------------------------
+  // Drain barrier — processedThrough(streamId) implementation
+  // ---------------------------------------------------------------------------
+  //
+  // We store pending barriers as a Map from target stream ID to a list of
+  // resolve functions. When the poll loop advances lastId to >= targetId, all
+  // pending barriers whose target is <= lastId are resolved.
+  //
+  // WHY a Map of arrays?
+  // Multiple callers could await processedThrough() for different stream IDs
+  // simultaneously (though in practice the replay driver only awaits one at a
+  // time). The array handles the edge case where two callers await the same ID.
+  //
+  // WHY lexicographic comparison?
+  // Redis stream IDs have the form "<milliseconds>-<sequence>". Lexicographic
+  // comparison works correctly when the millisecond parts have the same number
+  // of digits (which they always do — epoch ms is always 13 digits for dates
+  // in the range 2001–2286). The sequence suffix is zero-padded by Redis.
+  // This is the same comparison Redis itself uses in commands like XRANGE.
+  const pendingBarriers = new Map<string, Array<() => void>>();
+
+  /**
+   * Internal: called by the poll loop after updating lastId.
+   * Resolves any barriers whose target ID is <= the current lastId.
+   */
+  function resolveBarriers(currentId: string): void {
+    for (const [targetId, resolvers] of pendingBarriers) {
+      // Compare as Redis IDs: lexicographic works because ms-part is fixed-width.
+      if (currentId >= targetId) {
+        for (const resolve of resolvers) {
+          resolve();
+        }
+        pendingBarriers.delete(targetId);
+      }
+    }
+  }
 
   // -------------------------------------------------------------------------
   // Core evaluation logic (called on every new snapshot)
@@ -310,6 +373,9 @@ export function createPositionMonitor(
 
           if (rawData === undefined) {
             console.warn('[position-monitor] stream entry missing `data` field, id:', entryId);
+            // Advance drain barrier even for skipped entries: we have processed
+            // (or rather, skipped) up to this ID, so barriers targeting it can resolve.
+            resolveBarriers(lastId);
             continue;
           }
 
@@ -320,6 +386,12 @@ export function createPositionMonitor(
             // This prevents two snapshots from racing to close the same trade.
             await evaluateSnapshot(snapshot);
           }
+
+          // Resolve any drain barriers keyed on this stream ID AFTER the
+          // snapshot is fully processed. This guarantees that processedThrough()
+          // callers see the side-effects (DB writes, watermark updates) before
+          // their await resolves.
+          resolveBarriers(lastId);
         }
       } catch (err) {
         // Log but continue — transient Redis errors should not crash the loop.
@@ -347,6 +419,26 @@ export function createPositionMonitor(
       // The poll loop checks `running` at the top of each iteration and exits
       // naturally.  No forced termination is needed because XREAD is called
       // without BLOCK, so the next iteration check will see running=false.
+    },
+
+    processedThrough(streamId: string): Promise<void> {
+      // If the poll loop has already advanced past this ID, resolve immediately.
+      // This handles the case where the snapshot was consumed before processedThrough()
+      // was called — common in unit tests where the poll loop runs ahead.
+      if (lastId >= streamId) {
+        return Promise.resolve();
+      }
+
+      // Otherwise register a deferred resolve under this target ID.
+      // The poll loop calls resolveBarriers() after each entry is processed.
+      return new Promise<void>((resolve) => {
+        const existing = pendingBarriers.get(streamId);
+        if (existing !== undefined) {
+          existing.push(resolve);
+        } else {
+          pendingBarriers.set(streamId, [resolve]);
+        }
+      });
     },
   };
 }

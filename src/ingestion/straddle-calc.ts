@@ -56,6 +56,25 @@ export interface StraddleCalcConfig {
   rocWindowSize?: number;
   /** Injectable clock for deterministic testing (default: RealClock) */
   clock?: Clock;
+  /**
+   * XREAD cursor start ID (default: '$' for live mode = only new messages).
+   * In replay mode, set to '0' so the poll loop reads from the beginning of the stream.
+   * We never pass '$' in replay because '$' would skip all ticks published before
+   * the poll loop starts, breaking publish/consume ordering.
+   */
+  startId?: string;
+  /**
+   * If true, start() does NOT set up a setInterval for snapshot cadence.
+   * Used in replay mode where snapshotStep() drives cadence directly.
+   * Default: false (live mode uses setInterval).
+   *
+   * WHY needed in tests?
+   * The replay test uses vi.useFakeTimers(). When fake timers advance past
+   * snapshotIntervalMs, the setInterval would fire an extra void snapshot,
+   * corrupting the deterministic snapshot count. Setting noInterval=true
+   * prevents this by not registering the interval at all.
+   */
+  noInterval?: boolean;
 }
 
 export interface StraddleCalculator {
@@ -65,6 +84,23 @@ export interface StraddleCalculator {
   stop(): Promise<void>;
   /** Returns the last published snapshot, or null if none yet. */
   getLatestSnapshot(): StraddleSnapshot | null;
+  /**
+   * Deterministic replay hook: compute one snapshot from current price map state
+   * and resolve ONLY after the snapshot is written to the `straddle.values` stream.
+   *
+   * The returned string is the Redis stream ID assigned by XADD (e.g. "1700000000000-0").
+   * Returns null and skips when required prices (CE or PE) are missing.
+   *
+   * LIVE MODE: never call this from live code — use setInterval + void takeSnapshot().
+   * REPLAY MODE: the driver awaits this to guarantee ordering (no floating promise).
+   *
+   * Why a dedicated method rather than making takeSnapshot() public?
+   * - We need the stream ID returned to callers (the drain barrier needs it).
+   * - It makes the live/replay distinction explicit in the type signature.
+   * - The live setInterval path stays fire-and-forget (no await) per the contract
+   *   that says "live mode behaviour is unchanged".
+   */
+  snapshotStep(): Promise<string | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,9 +154,13 @@ export function createStraddleCalculator(
   let running = false;
   let snapshotInterval: ReturnType<typeof setInterval> | null = null;
 
-  // Last XREAD cursor — '$' means "only new messages from now on".
-  // We start at '$' so we do not replay the entire stream history on start.
-  let lastId = '$';
+  // Last XREAD cursor.
+  // '$' (default, live mode) = only new messages from now on; we skip history.
+  // '0' (replay mode) = read from the beginning so ticks published before poll
+  // loop starts are NOT dropped. The startId config option controls which.
+  // We assert: replay callers MUST NOT pass '$' — enforced at the config layer.
+  const startIdValue = config.startId ?? '$';
+  let lastId = startIdValue;
 
   // ---------------------------------------------------------------------------
   // Tick processing
@@ -185,12 +225,23 @@ export function createStraddleCalculator(
   // ---------------------------------------------------------------------------
 
   /**
-   * Build and publish one snapshot.  Called by setInterval every `snapshotIntervalMs`.
+   * Core snapshot compute-and-publish.
    *
-   * Skips the snapshot (with a debug log) if CE or PE price is not yet known —
-   * this is normal on startup before the first relevant ticks arrive.
+   * Returns the Redis stream ID assigned by XADD when a snapshot was published,
+   * or null when the snapshot was skipped (missing prices).
+   *
+   * This function is the single implementation used by BOTH paths:
+   *   - Live path: called by setInterval via takeSnapshotFireAndForget() which
+   *     wraps this in `void` so the live path is unchanged.
+   *   - Replay path: snapshotStep() calls this and AWAITS it, guaranteeing that
+   *     the xadd completes before the driver advances the clock.
+   *
+   * WHY return the stream ID?
+   * The replay driver passes it to positionMonitor.processedThrough(streamId)
+   * so the drain barrier knows exactly which snapshot to wait for. Without the
+   * ID, the barrier would have no concrete observable to key on.
    */
-  async function takeSnapshot(): Promise<void> {
+  async function computeAndPublishSnapshot(): Promise<string | null> {
     // Resolve the current ATM strike from the latest underlying price.
     const expiry = getCurrentExpiry(underlying, clock);
     const underlyingSymbol =
@@ -205,7 +256,7 @@ export function createStraddleCalculator(
       console.debug(
         `[straddle-calc] skipping snapshot — no underlying price for ${underlyingSymbol}`,
       );
-      return;
+      return null;
     }
 
     const atmStrike = getAtmStrike(underlying, underlyingEntry.price);
@@ -219,7 +270,7 @@ export function createStraddleCalculator(
       console.debug(
         `[straddle-calc] skipping snapshot — missing CE (${ceSymbol}) or PE (${peSymbol}) price`,
       );
-      return;
+      return null;
     }
 
     const cePrice = ceEntry.price;
@@ -251,12 +302,28 @@ export function createStraddleCalculator(
 
     latestSnapshot = snapshot;
 
-    // Publish to Redis stream `straddle.values`.
+    // Publish to Redis stream `straddle.values` and return the assigned stream ID.
+    // The returned ID is used by the replay drain barrier in position-monitor.
     try {
-      await redisClient.xadd('straddle.values', '*', 'data', JSON.stringify(snapshot));
+      const streamId = await redisClient.xadd('straddle.values', '*', 'data', JSON.stringify(snapshot));
+      // ioredis xadd with '*' always returns a non-null string per Redis spec.
+      // Guard anyway so the return type is correct at runtime.
+      return streamId ?? null;
     } catch (err) {
       console.error('[straddle-calc] failed to publish snapshot to Redis:', err);
+      return null;
     }
+  }
+
+  /**
+   * Live-path wrapper: fire-and-forget wrapper around computeAndPublishSnapshot.
+   *
+   * Called by setInterval in live mode. The `void` discards the Promise so the
+   * interval callback stays synchronous — unchanged live behaviour.
+   * This function is NEVER called from the replay path.
+   */
+  function takeSnapshotFireAndForget(): void {
+    void computeAndPublishSnapshot();
   }
 
   // ---------------------------------------------------------------------------
@@ -344,10 +411,14 @@ export function createStraddleCalculator(
       // We do not await it — it runs concurrently with the snapshot interval.
       void pollLoop();
 
-      // Schedule periodic snapshots.
-      snapshotInterval = setInterval(() => {
-        void takeSnapshot();
-      }, snapshotIntervalMs);
+      // Schedule periodic snapshots using fire-and-forget — live behaviour unchanged.
+      // In replay mode (noInterval=true), the setInterval is skipped entirely;
+      // cadence is driven by snapshotStep() calls instead. This prevents the
+      // interval from firing extra void snapshots during replay (which would corrupt
+      // the deterministic snapshot count when fake timers advance).
+      if (!config.noInterval) {
+        snapshotInterval = setInterval(takeSnapshotFireAndForget, snapshotIntervalMs);
+      }
     },
 
     async stop(): Promise<void> {
@@ -361,6 +432,21 @@ export function createStraddleCalculator(
 
     getLatestSnapshot(): StraddleSnapshot | null {
       return latestSnapshot;
+    },
+
+    /**
+     * Replay-path awaitable snapshot hook.
+     *
+     * Runs the same compute-and-publish logic as the live path but returns the
+     * Redis stream ID so the driver can pass it to the drain barrier.
+     * The caller MUST await this call — it resolves ONLY after the XADD completes.
+     *
+     * ZERO floating promises: computeAndPublishSnapshot is fully awaited here.
+     * The live path's void wrapper (takeSnapshotFireAndForget) is NEVER called
+     * from replay — this method is the only entry point in the replay path.
+     */
+    snapshotStep(): Promise<string | null> {
+      return computeAndPublishSnapshot();
     },
   };
 }

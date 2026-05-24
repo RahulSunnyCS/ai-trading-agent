@@ -61,6 +61,15 @@ export interface StraddleSnapshot {
   roc: number | null;
   roc_acceleration: number | null;
   vix: number | null;
+  /**
+   * Candle resolution tag added by migration 008 (T-33).
+   * Populated only for historically reconstructed rows (via T-56 reconstructor).
+   * NULL for live rows (source = 'fyers' | 'simulator').
+   * Example values: '1' (1-min), '5' (5-min), '15' (15-min), 'D' (daily).
+   * Persisting this here closes the T-56 gap: reconstruct-straddle.ts computed
+   * the resolution per snapshot but had no DB column to store it previously.
+   */
+  resolution: string | null;
 }
 
 export interface OptionTick {
@@ -307,6 +316,90 @@ export interface Straddle1Min {
   close: number;
   avg_roc: number | null; // nullable because roc itself is nullable
   avg_vix: number | null; // nullable because vix is not always available
+}
+
+// ---------------------------------------------------------------------------
+// Regime tagging interfaces (migration 008, T-33)
+// ---------------------------------------------------------------------------
+
+/**
+ * Valid values for DailyRegimeTag.regime.
+ *
+ * The four core regimes (RANGING, TRENDING_STRONG, VOLATILE_REVERTING,
+ * EVENT_DAY) are the same values used in paper_trades.market_regime and
+ * retrospection_results.market_regime. UNCLASSIFIED is an additional value
+ * emitted when the day's data is too sparse or gapped to classify reliably.
+ *
+ * Precedence (highest first): EVENT_DAY > VOLATILE_REVERTING > TRENDING_STRONG > RANGING.
+ * UNCLASSIFIED is not a regime — it is a sentinel meaning "insufficient data".
+ */
+export type RegimeTagValue =
+  | 'RANGING'
+  | 'TRENDING_STRONG'
+  | 'VOLATILE_REVERTING'
+  | 'EVENT_DAY'
+  | 'UNCLASSIFIED';
+
+/**
+ * One row in the daily_regime_tags table (migration 008).
+ *
+ * Written by the regime tagging engine (src/trading/regime-tagging.ts) after
+ * classifying each reconstructed trading day. One row per (trade_date, symbol).
+ *
+ * regime_confidence [0.0, 1.0]:
+ *   - EVENT_DAY: always 1.0 (calendar lookup is deterministic).
+ *   - UNCLASSIFIED: data-present fraction (lower = more data missing).
+ *   - Other regimes: fraction of intraday windows that agreed with the label.
+ *
+ * classified_at: wall-clock time the row was written. Use this to detect
+ * stale classifications after a data reingestion.
+ */
+export interface DailyRegimeTag {
+  id: number;
+  trade_date: Date; // DATE column — pg returns a Date at midnight UTC
+  symbol: string;
+  regime: RegimeTagValue;
+  /**
+   * Classification confidence [0.0, 1.0].
+   * The pg NUMERIC(5,4) column is returned as a string by the pg client
+   * (when the numeric parser is set to raw-string mode). Callers must
+   * parseFloat() if they need arithmetic.
+   */
+  regime_confidence: number;
+  classified_at: Date;
+}
+
+/**
+ * Valid event types for the event_calendar table (migration 008).
+ *
+ * This is not an exhaustive CHECK constraint in the DB (TEXT column is open-
+ * ended so operators can add custom types). These are the seed values.
+ */
+export type EventCalendarType =
+  | 'RBI_POLICY'
+  | 'UNION_BUDGET'
+  | 'FNO_EXPIRY'
+  | 'STATE_ELECTION'
+  | 'HOLIDAY'
+  | string; // open-ended for operator extensions
+
+/**
+ * One row in the event_calendar table (migration 008).
+ *
+ * A checked-in, dated table of known Indian market event days. Used by the
+ * regime tagging engine to assign EVENT_DAY without relying on the live
+ * BLOCKED_DATES env var (which is not reproducible in historical backtests).
+ *
+ * Multiple rows per event_date are allowed (e.g. F&O expiry + RBI policy on
+ * the same day). The regime engine treats any matching row as EVENT_DAY.
+ *
+ * UNIQUE constraint: (event_date, event_type) — prevents duplicate seeding.
+ */
+export interface EventCalendarEntry {
+  id: number;
+  event_date: Date; // DATE column — pg returns midnight UTC Date
+  event_type: EventCalendarType;
+  description: string | null;
 }
 
 // ---------------------------------------------------------------------------
