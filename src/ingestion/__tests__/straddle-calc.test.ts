@@ -219,7 +219,7 @@ describe('createStraddleCalculator — snapshot skipping', () => {
     }
 
     // Advance fake clock by one interval to fire the setInterval callback.
-    await vi.advanceTimersByTimeAsync(15_000);
+    vi.advanceTimersByTime(15_000);
 
     // The snapshot should have been skipped because CE/PE prices are missing.
     expect(redis.xadd).not.toHaveBeenCalled();
@@ -301,7 +301,7 @@ describe('createStraddleCalculator — snapshot publication', () => {
     for (let i = 0; i < 10; i++) {
       await Promise.resolve();
     }
-    await vi.advanceTimersByTimeAsync(15_000);
+    vi.advanceTimersByTime(15_000);
 
     // xadd must have been called exactly once.
     expect(redis.xadd).toHaveBeenCalledTimes(1);
@@ -377,7 +377,7 @@ describe('createStraddleCalculator — snapshot publication', () => {
     for (let i = 0; i < 10; i++) {
       await Promise.resolve();
     }
-    await vi.advanceTimersByTimeAsync(15_000);
+    vi.advanceTimersByTime(15_000);
 
     const latest = calculator.getLatestSnapshot();
     expect(latest).not.toBeNull();

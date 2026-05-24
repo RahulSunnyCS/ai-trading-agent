@@ -90,7 +90,7 @@ function makeInMemoryRedis() {
 
 async function flushPollLoop(): Promise<void> {
   for (let round = 0; round < 3; round++) {
-    await vi.advanceTimersByTimeAsync(200);
+    vi.advanceTimersByTime(200);
     for (let i = 0; i < 20; i++) {
       await Promise.resolve();
     }

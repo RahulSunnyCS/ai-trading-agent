@@ -265,7 +265,7 @@ describe('createVixFeed — NSE poll fallback', () => {
     await feed.start();
 
     // Advance timers to trigger the poll interval.
-    await vi.advanceTimersByTimeAsync(60_000);
+    vi.advanceTimersByTime(60_000);
     await flushMicrotasks();
 
     const latest = feed.getLatestVix();
@@ -337,7 +337,7 @@ describe('createVixFeed — poll dedup (tick freshness gate)', () => {
     expect(firstPublished.source).toBe('tick');
 
     // Advance to trigger the poll interval.
-    await vi.advanceTimersByTimeAsync(60_000);
+    vi.advanceTimersByTime(60_000);
     await flushMicrotasks();
 
     // xadd must still only have been called once (the tick publish).
@@ -384,7 +384,7 @@ describe('createVixFeed — NSE API error handling', () => {
     });
 
     await feed.start();
-    await vi.advanceTimersByTimeAsync(60_000);
+    vi.advanceTimersByTime(60_000);
     await flushMicrotasks();
 
     // VIX must remain null.
@@ -418,7 +418,7 @@ describe('createVixFeed — NSE API error handling', () => {
     });
 
     await feed.start();
-    await vi.advanceTimersByTimeAsync(60_000);
+    vi.advanceTimersByTime(60_000);
     await flushMicrotasks();
 
     expect(feed.getLatestVix()).toBeNull();
@@ -475,7 +475,7 @@ describe('createVixFeed — missing INDIA VIX in NSE response', () => {
     });
 
     await feed.start();
-    await vi.advanceTimersByTimeAsync(60_000);
+    vi.advanceTimersByTime(60_000);
     await flushMicrotasks();
 
     expect(feed.getLatestVix()).toBeNull();
@@ -511,7 +511,7 @@ describe('createVixFeed — missing INDIA VIX in NSE response', () => {
     });
 
     await feed.start();
-    await vi.advanceTimersByTimeAsync(60_000);
+    vi.advanceTimersByTime(60_000);
     await flushMicrotasks();
 
     expect(feed.getLatestVix()).toBeNull();
