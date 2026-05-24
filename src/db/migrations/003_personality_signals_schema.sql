@@ -4,6 +4,10 @@
 -- ---------------------------------------------------------------------------
 -- personality_configs
 -- ---------------------------------------------------------------------------
+-- NOTE: This CREATE TABLE is now an idempotent no-op on fresh installs because
+-- 001_core_schema.sql creates the canonical params-shape table first.
+-- Edits to this file do not affect the running table; use 001 for schema changes.
+--
 -- Each row describes one trading personality: its decision strategy, management
 -- style, and the tunable parameter set (params JSONB) that the evolution engine
 -- adjusts over time.
@@ -57,6 +61,10 @@ CREATE TABLE IF NOT EXISTS personality_audit_log (
 -- ---------------------------------------------------------------------------
 -- straddle_signals
 -- ---------------------------------------------------------------------------
+-- NOTE: This CREATE TABLE is now an idempotent no-op on fresh installs because
+-- 001_core_schema.sql creates the canonical hypertable with composite PK first.
+-- Edits to this file do not affect the running table; use 001 for schema changes.
+--
 -- One signal event produced by the peak detection engine when it identifies a
 -- momentum exhaustion, a scheduled entry window, or a pullback opportunity.
 -- Each signal is broadcast to all active personalities; the personality decision
@@ -77,7 +85,9 @@ CREATE TABLE IF NOT EXISTS personality_audit_log (
 -- TimescaleDB hypertable on `time` — all queries must include a time-range filter.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS straddle_signals (
-  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- Composite PK (id, time): TimescaleDB requires the partition column to be
+  -- included in the primary key; a simple (id) PK is rejected at create_hypertable.
+  id                   UUID        NOT NULL DEFAULT gen_random_uuid(),
   time                 TIMESTAMPTZ NOT NULL,
   underlying           TEXT        NOT NULL,
   signal_type          TEXT        NOT NULL CHECK (signal_type IN ('MOMENTUM_EXHAUSTION', 'SCHEDULED', 'PULLBACK')),
@@ -91,7 +101,8 @@ CREATE TABLE IF NOT EXISTS straddle_signals (
   expansion_pct        NUMERIC,
   roc_decline_candles  INTEGER,
   acceleration_value   NUMERIC,
-  adjustment_breakdown TEXT
+  adjustment_breakdown TEXT,
+  PRIMARY KEY (id, "time")
 );
 
 -- if_not_exists = true keeps this idempotent if the migration is re-applied.

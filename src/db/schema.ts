@@ -171,9 +171,16 @@ export type SignalType = 'MOMENTUM_EXHAUSTION' | 'SCHEDULED' | 'PULLBACK';
 /** Valid values for StraddleSignal.direction and trade direction fields */
 export type TradeDirection = 'LONG' | 'SHORT';
 
-/** Valid values for StraddleSignal.status */
+/**
+ * @deprecated M1 shape — not present on fresh installs; use StraddleSignalM2.
+ * Valid values for StraddleSignal.status (M1 schema only).
+ */
 export type SignalStatus = 'pending' | 'consumed' | 'expired';
 
+/**
+ * @deprecated M1 shape — not present on fresh installs; use StraddleSignalM2.
+ * Signal row as stored in the M1 straddle_signals table schema.
+ */
 export interface StraddleSignal {
   id: string;
   time: Date;
@@ -188,7 +195,10 @@ export interface StraddleSignal {
   created_at: Date;
 }
 
-/** Valid values for PersonalityConfig.management_style */
+/**
+ * @deprecated M1 shape — not present on fresh installs; use PersonalityConfigM2 (which uses managementStyle: 'hold' | 'roll' | 'cut_reenter').
+ * Valid values for PersonalityConfig.management_style (M1 schema only).
+ */
 export type ManagementStyle = 'HOLD' | 'ADJUST' | 'REDUCE';
 
 // M2 columns (display_name, group_type, params, last_evolved_at, evolution_consecutive_applications) are on PersonalityConfigM2, not here.

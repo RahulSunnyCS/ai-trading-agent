@@ -9,41 +9,22 @@
 -- running bun run migrate twice (or after a partial failure) produces no
 -- duplicate row error and leaves the existing row untouched.
 --
--- Only Clockwork is seeded here. The full 10-personality set
--- (Precision, Adjuster, Reducer, Levelhead, etc.) is deferred to the
--- M2 seed migration (T-25).
+-- The name 'clockwork' (lowercase) matches the row in 005_personality_seed.sql.
+-- This dedup is critical: on a fresh migration chain both files run, but the
+-- ON CONFLICT clause ensures exactly one Clockwork row ends up in the table.
+-- The full 10-personality set is seeded by 005_personality_seed.sql.
 
-INSERT INTO personality_configs (
-  name,
-  description,
-  phase,
-  is_frozen,
-  entry_type,
-  management_style,
-  min_probability,
-  sl_pct,
-  target_pct,
-  tsl_trigger_pct,
-  max_daily_loss_pct,
-  entry_window_start,
-  entry_window_end,
-  exit_time,
-  is_active
-) VALUES (
+INSERT INTO personality_configs
+  (name, display_name, group_type, entry_type, management_style, is_frozen, is_active, phase, params)
+VALUES (
+  'clockwork',   -- lowercase: matches 005_personality_seed.sql for ON CONFLICT dedup
   'Clockwork',
-  'Frozen benchmark personality. Never evolves. All other personalities are compared against it.',
-  1,         -- phase 1: active in the current sprint, not gated behind a later phase flag
-  TRUE,      -- is_frozen: the evolution engine must never modify this row
-  'MOMENTUM_EXHAUSTION',
-  'HOLD',    -- management_style HOLD: Clockwork never adjusts or cuts — it is the unchanging control
-  0.5500,    -- min_probability: 55% threshold — the baseline signal quality gate
-  0.1500,    -- sl_pct: 15% stop-loss as a fraction of entry straddle value
-  0.2500,    -- target_pct: 25% profit target as a fraction of entry straddle value
-  NULL,      -- tsl_trigger_pct: NULL because HOLD style never activates a trailing stop
-  0.0300,    -- max_daily_loss_pct: 3% daily loss cap — trading halts for the day if breached
-  '09:20',   -- entry_window_start: 10 minutes after NSE open (avoids opening auction noise)
-  '14:30',   -- entry_window_end: no new entries after 2:30 PM IST (leaves time to exit before EOD)
-  '15:15',   -- exit_time: force-close all positions 15 minutes before NSE close (3:30 PM IST)
-  TRUE       -- is_active: Clockwork participates in all live trading sessions
+  'reference',
+  'fixed_time',  -- Clockwork enters at a fixed time every day, not on signal quality
+  'hold',        -- HOLD: never adjusts or cuts — it is the unchanging control
+  TRUE,          -- is_frozen: evolution engine must refuse to modify this row (FROZEN_VIOLATION)
+  TRUE,          -- is_active: Clockwork participates in all live trading sessions
+  1,             -- phase 1: active from the current sprint, not gated behind a later phase flag
+  '{"max_daily_trades":1,"max_daily_loss":5000}'
 )
 ON CONFLICT (name) DO NOTHING;

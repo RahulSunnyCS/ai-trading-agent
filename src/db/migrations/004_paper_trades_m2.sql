@@ -21,7 +21,7 @@ ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS parent_trade_id UUID REFERENCE
 -- signal_id — the straddle_signals row that triggered this trade.
 -- NULL for Milestone 1 trades and for Clockwork fixed-time entries (which do not
 -- originate from a detected signal).
-ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS signal_id       UUID REFERENCES straddle_signals(id);
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS signal_id       UUID;
 
 -- Index on personality_id: the API and retrospection engine query trades grouped
 -- by personality frequently (e.g. WHERE personality_id = $1 AND status = 'open').

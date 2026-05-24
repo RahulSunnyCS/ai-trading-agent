@@ -142,9 +142,8 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
       // -----------------------------------------------------------------------
       const personalitiesResult = await pool.query<{
         id: string;
-        primary_symbol: string | null;
       }>(
-        'SELECT id, primary_symbol FROM personality_configs WHERE is_active = TRUE',
+        'SELECT id FROM personality_configs WHERE is_active = TRUE',
       );
 
       const personalities = personalitiesResult.rows;

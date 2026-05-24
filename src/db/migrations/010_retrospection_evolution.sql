@@ -21,35 +21,20 @@ ALTER TABLE personality_configs
 
 -- params: JSONB bag for M2-style personality parameters. NOT NULL with empty
 -- object default so that M2 code can always safely read `params->>'key'`
--- without a null check. Existing rows start with '{}' and are populated below.
+-- without a null check. New rows are seeded with specific params by the M2
+-- seed migration; existing rows start with '{}' and are evolved at runtime.
 ALTER TABLE personality_configs
   ADD COLUMN IF NOT EXISTS params JSONB NOT NULL DEFAULT '{}';
-
--- ---------------------------------------------------------------------------
--- Data migration: populate params from M1 top-level columns for existing rows
--- ---------------------------------------------------------------------------
-
--- For any row that still has the empty default, seed params from the M1
--- columns that are authoritative on M1 rows. max_daily_trades is set to 5
--- as a safe operational default (not stored in M1 schema; no M1 column exists
--- to read it from). Only runs when min_probability is non-NULL to guard
--- against any future rows that legitimately have no M1 data.
-UPDATE personality_configs
-SET params = jsonb_build_object(
-  'min_probability', min_probability,
-  'max_daily_loss', max_daily_loss_pct,
-  'max_daily_trades', 5
-)
-WHERE params = '{}'::jsonb AND min_probability IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- Data migration: backfill display_name and group_type for the Clockwork row
 -- ---------------------------------------------------------------------------
 
--- The Clockwork row was seeded by 002_seed_clockwork.sql using the M1 schema,
--- which predates the display_name / group_type columns. Set them now.
--- The WHERE clause is conservative: only updates if display_name is still NULL,
--- so re-running this migration (idempotent) will not overwrite operator edits.
+-- NOTE: This UPDATE is a retained-for-safety no-op on current seeds because
+-- 001_core_schema.sql now creates personality_configs with both columns, and
+-- 002_seed_clockwork.sql inserts with name='clockwork' (lowercase). The WHERE
+-- clause guard (display_name IS NULL) ensures idempotency on existing DBs.
+-- The row is never updated on fresh installs; it is a no-op safeguard for legacy.
 UPDATE personality_configs
 SET display_name = 'Clockwork', group_type = 'reference'
 WHERE name = 'Clockwork' AND display_name IS NULL;

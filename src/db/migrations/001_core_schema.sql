@@ -80,52 +80,97 @@ SELECT create_hypertable(
 -- Regular (non-hypertable) tables
 -- ---------------------------------------------------------------------------
 
--- Detected trading signals emitted by the peak detection engine.
--- signal_type and status use CHECK constraints rather than enums so that
--- adding new values is a migration-only change, not a type drop/recreate.
+-- ---------------------------------------------------------------------------
+-- straddle_signals
+-- ---------------------------------------------------------------------------
+-- One signal event produced by the peak detection engine when it identifies a
+-- momentum exhaustion, a scheduled entry window, or a pullback opportunity.
+-- Each signal is broadcast to all active personalities; the personality decision
+-- engine records its accept/reject decision in paper_trades.signal_id.
+--
+-- adjusted_probability is the final probability score after VIX and time-of-day
+-- adjustments — not the raw exhaustion score. Typed separately so callers can
+-- compare them to understand how context adjustments shifted the signal quality.
+--
+-- confidence_tier is a pre-computed categorical bucket derived from
+-- adjusted_probability so the decision engine can apply simple equality checks
+-- rather than threshold comparisons on every filter step.
+--
+-- Columns such as expansion_pct, roc_decline_candles, and acceleration_value are
+-- nullable: SCHEDULED signals are not produced by the peak detection algorithm and
+-- do not have these algorithm-specific fields.
+--
+-- TimescaleDB hypertable on `time` — all queries must include a time-range filter.
+-- Composite PRIMARY KEY (id, time) is required by TimescaleDB for unique indexes
+-- on hypertables: every unique constraint must include the partition column.
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS straddle_signals (
-  id                  UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  time                TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  symbol              TEXT          NOT NULL,
-  signal_type         TEXT          NOT NULL CHECK (signal_type IN ('MOMENTUM_EXHAUSTION', 'SCHEDULED', 'PULLBACK')),
-  direction           TEXT          CHECK (direction IN ('LONG', 'SHORT')),
-  probability         NUMERIC(5,4),    -- relative ranking score [0,1], not a calibrated probability
-  peak_roc            NUMERIC(8,4),
-  peak_acceleration   NUMERIC(8,4),
-  vix_at_signal       NUMERIC(6,2),
-  status              TEXT          NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'consumed', 'expired')),
-  created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+  id                   UUID        NOT NULL DEFAULT gen_random_uuid(),
+  time                 TIMESTAMPTZ NOT NULL,
+  underlying           TEXT        NOT NULL,
+  signal_type          TEXT        NOT NULL CHECK (signal_type IN ('MOMENTUM_EXHAUSTION', 'SCHEDULED', 'PULLBACK')),
+  atm_strike           NUMERIC     NOT NULL,
+  spot                 NUMERIC     NOT NULL,
+  straddle_value       NUMERIC     NOT NULL,
+  vix                  NUMERIC,
+  raw_exhaustion_score NUMERIC,
+  adjusted_probability NUMERIC     NOT NULL,
+  confidence_tier      TEXT        NOT NULL CHECK (confidence_tier IN ('HIGH', 'MEDIUM', 'LOW')),
+  expansion_pct        NUMERIC,
+  roc_decline_candles  INTEGER,
+  acceleration_value   NUMERIC,
+  adjustment_breakdown TEXT,
+  PRIMARY KEY (id, "time")
 );
 
--- The 10 trading personalities plus the immutable Clockwork benchmark.
--- is_frozen = TRUE for the Clockwork row; the evolution engine must check
--- this flag and throw FROZEN_VIOLATION rather than silently skipping.
--- TIME columns store the wall-clock windows within which a personality may enter/exit.
+-- if_not_exists = true keeps this idempotent if the migration is re-applied.
+SELECT create_hypertable('straddle_signals', 'time', if_not_exists => true);
+
+-- ---------------------------------------------------------------------------
+-- personality_configs
+-- ---------------------------------------------------------------------------
+-- Each row describes one trading personality: its decision strategy, management
+-- style, and the tunable parameter set (params JSONB) that the evolution engine
+-- adjusts over time.
+--
+-- is_frozen = TRUE marks the Clockwork benchmark: the evolution engine MUST
+-- throw FROZEN_VIOLATION rather than silently skipping it when this flag is set.
+--
+-- is_active = FALSE personalities are deployed but not yet running; they can be
+-- activated via PUT /personalities/:id without a code change.
+--
+-- group_type: 'reference' personalities have fixed entry logic; 'learning'
+-- personalities have their params tuned by the retrospection engine.
+--
+-- management_style values: 'hold', 'roll', 'cut_reenter' (lowercase, params-shape).
+-- entry_type values: 'fixed_time', 'momentum_exhaustion', 'any_signal', 'sr_anchored'.
+--
+-- IF NOT EXISTS makes every CREATE idempotent — safe to re-run migrations.
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS personality_configs (
-  id                  UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
-  name                TEXT          NOT NULL UNIQUE,
-  description         TEXT,
-  phase               INTEGER       NOT NULL DEFAULT 1,
-  is_frozen           BOOLEAN       NOT NULL DEFAULT FALSE,
-  entry_type          TEXT          NOT NULL DEFAULT 'MOMENTUM_EXHAUSTION',
-  management_style    TEXT          NOT NULL CHECK (management_style IN ('HOLD', 'ADJUST', 'REDUCE')),
-  min_probability     NUMERIC(5,4)  NOT NULL DEFAULT 0.55,
-  sl_pct              NUMERIC(6,4)  NOT NULL DEFAULT 0.15,   -- stop-loss threshold as fraction
-  target_pct          NUMERIC(6,4)  NOT NULL DEFAULT 0.25,   -- profit target as fraction
-  tsl_trigger_pct     NUMERIC(6,4),                          -- trailing SL activation threshold (nullable — HOLD style doesn't use it)
-  max_daily_loss_pct  NUMERIC(6,4)  NOT NULL DEFAULT 0.03,
-  entry_window_start  TIME          NOT NULL DEFAULT '09:20',
-  entry_window_end    TIME          NOT NULL DEFAULT '14:30',
-  exit_time           TIME          NOT NULL DEFAULT '15:15',
-  is_active           BOOLEAN       NOT NULL DEFAULT TRUE,
-  created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  updated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             TEXT        NOT NULL UNIQUE,
+  display_name     TEXT        NOT NULL,
+  group_type       TEXT        NOT NULL CHECK (group_type IN ('reference', 'learning')),
+  entry_type       TEXT        NOT NULL CHECK (entry_type IN ('fixed_time', 'momentum_exhaustion', 'any_signal', 'sr_anchored')),
+  management_style TEXT        NOT NULL CHECK (management_style IN ('hold', 'roll', 'cut_reenter')),
+  is_frozen        BOOLEAN     NOT NULL DEFAULT FALSE,
+  is_active        BOOLEAN     NOT NULL DEFAULT TRUE,
+  phase            INTEGER     NOT NULL DEFAULT 1,
+  params           JSONB       NOT NULL DEFAULT '{}',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Individual paper trade records.
--- Both FKs (personality_id, signal_id) are referenced here.
--- signal_id is nullable because SCHEDULED entries are not triggered by a
--- detected signal — they enter at a fixed time regardless.
+-- personality_id FK points to personality_configs(id).
+-- signal_id is nullable (no FK) because SCHEDULED entries are not triggered
+-- by a detected signal — they enter at a fixed time regardless.
+-- The FK to straddle_signals is intentionally omitted: straddle_signals is a
+-- hypertable with composite PK (id, time); a FK to (id) alone is not possible
+-- without including the partition column, and referencing (id, time) would
+-- require storing the signal's time redundantly in paper_trades. Using signal_id
+-- as a bare UUID reference without a FK constraint is the correct approach here.
 -- market_regime is nullable on entry; the EOD retrospection engine fills
 -- it in after classifying the day.
 -- exit_reason uses CHECK rather than enum for the same extensibility reason
@@ -133,7 +178,7 @@ CREATE TABLE IF NOT EXISTS personality_configs (
 CREATE TABLE IF NOT EXISTS paper_trades (
   id                    UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
   personality_id        UUID          REFERENCES personality_configs(id),
-  signal_id             UUID          REFERENCES straddle_signals(id),
+  signal_id             UUID,
   symbol                TEXT          NOT NULL,
   expiry                DATE,
   strike                NUMERIC(10,2),
@@ -204,10 +249,6 @@ CREATE INDEX IF NOT EXISTS idx_personality_configs_is_frozen
 -- position monitor: list open trades per personality
 CREATE INDEX IF NOT EXISTS idx_paper_trades_personality_status
   ON paper_trades (personality_id, status);
-
--- signal router: fetch pending signals ordered by time
-CREATE INDEX IF NOT EXISTS idx_straddle_signals_status_time
-  ON straddle_signals (status, time DESC);
 
 -- ---------------------------------------------------------------------------
 -- Continuous aggregate: straddle_1min
