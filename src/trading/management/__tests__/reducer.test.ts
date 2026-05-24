@@ -240,7 +240,7 @@ describe('ReducerManager — cut trigger', () => {
   it('does NOT fire cut when |currentSpot - entrySpot| < cut_trigger_points — delegates to evaluateTriggers', async () => {
     // Arrange: spot has moved 30 points — well below the 70-point threshold.
     // evaluateTriggers should be called and its result returned.
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
 
     const currentSpot = SPOT_AT_ENTRY + 30; // 30 < 70 → no cut
 
@@ -265,7 +265,7 @@ describe('ReducerManager — cut trigger', () => {
 
   it('returns the trigger-engine result (SL) when spot is within cut_trigger_points', async () => {
     // evaluateTriggers returns SL — hard stop was hit at the current straddle price.
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: true, reason: 'SL' });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: true, reason: 'SL' });
 
     const currentSpot = SPOT_AT_ENTRY + 20; // within threshold
 
@@ -287,7 +287,7 @@ describe('ReducerManager — cut trigger', () => {
   });
 
   it('returns the trigger-engine result (TARGET) when spot is within cut_trigger_points', async () => {
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: true, reason: 'TARGET' });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: true, reason: 'TARGET' });
 
     const result = await manager.evaluatePosition(
       mockPosition,
@@ -310,7 +310,7 @@ describe('ReducerManager — cut trigger', () => {
       params: { ...reducerPersonality.params, cut_trigger_points: 50 },
     };
 
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
 
     // Spot 60 points from entry — fires with 50-point threshold but NOT with 70.
     const currentSpot = SPOT_AT_ENTRY + 60;
@@ -338,7 +338,7 @@ describe('ReducerManager — cut trigger', () => {
       params: {},
     };
 
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
 
     // Spot 69 points from entry — below the default 70-point threshold.
     const currentSpot = SPOT_AT_ENTRY + 69;
@@ -364,7 +364,7 @@ describe('ReducerManager — cut trigger', () => {
       query: vi.fn().mockResolvedValue({ rows: [{ spot_at_entry: null }] }),
     } as unknown as Pool;
 
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
 
     // Even with currentSpot far from zero (no entry to compare), should not CUT.
     const result = await manager.evaluatePosition(

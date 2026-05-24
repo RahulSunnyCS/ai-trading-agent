@@ -74,8 +74,9 @@ function captureStreamHandler(): {
 } {
   let captured: ((id: string, fields: Record<string, string>) => Promise<void>) | undefined;
 
-  (streamConsume as any).mockImplementation((_stream, _group, _consumer, handler) => {
-    captured = handler;
+  vi.mocked(streamConsume).mockImplementation((_stream, _group, _consumer, handler) => {
+    captured = handler as typeof captured;
+    return Promise.resolve();
   });
 
   return {
@@ -90,7 +91,7 @@ function captureStreamHandler(): {
 beforeEach(() => {
   vi.clearAllMocks();
   // Default: no open positions
-  (query as any).mockResolvedValue([]);
+  vi.mocked(query).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -348,7 +349,7 @@ describe('EntryEngine — cooldown throttle', () => {
     // Create a NEW engine (simulates app restart / fresh cooldown state)
     // so the second call is not throttled
     vi.clearAllMocks();
-    (query as any).mockResolvedValue([]);
+    vi.mocked(query).mockResolvedValue([]);
 
     const clockT1 = new FixedClock(IST_1000_MAY18 + 5000); // 5s later — past 1s cooldown
     const { getHandler: captureT1 } = captureStreamHandler();

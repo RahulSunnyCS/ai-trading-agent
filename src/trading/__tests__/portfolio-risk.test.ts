@@ -408,7 +408,7 @@ describe('portfolioRiskCheck — Rule 5: max legs / advisory lock', () => {
     await portfolioRiskCheck(db, baseIntent, clock, 0);
 
     // connect() is called once; the client.release() must always be called
-    const client = await (db.connect as any).mock.results[0]?.value;
+    const client = await vi.mocked(db.connect).mock.results[0]?.value;
     expect(client?.release).toHaveBeenCalledOnce();
   });
 });
@@ -473,7 +473,7 @@ describe('portfolioRiskCheck — client lifecycle', () => {
 
     await portfolioRiskCheck(db, baseIntent, clock, 0);
 
-    const client = await (db.connect as any).mock.results[0]?.value;
+    const client = await vi.mocked(db.connect).mock.results[0]?.value;
     expect(client?.release).toHaveBeenCalledOnce();
   });
 

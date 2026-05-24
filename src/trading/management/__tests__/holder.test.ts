@@ -130,7 +130,7 @@ describe('HolderManager', () => {
 
   it('evaluatePosition calls evaluateTriggers with the correct position and config', async () => {
     // Arrange: trigger engine returns "hold"
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
 
     const currentStraddleValue = 310;
     const currentSpot = 22_000;
@@ -167,7 +167,7 @@ describe('HolderManager', () => {
     // Note: the actual reason string comes from the trigger engine ('SL'), not
     // the literal 'SL_HIT' — the test description uses 'SL_HIT' colloquially,
     // but we assert the actual ExitDecision reason value 'SL'.
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: true, reason: 'SL' });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: true, reason: 'SL' });
 
     // Act
     const result = await manager.evaluatePosition(
@@ -191,7 +191,7 @@ describe('HolderManager', () => {
 
   it('evaluatePosition returns { shouldExit: false } when trigger engine says hold', async () => {
     // Arrange: trigger engine says hold
-    (evaluateTriggers as any).mockReturnValue({ shouldExit: false });
+    vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
 
     // Act
     const result = await manager.evaluatePosition(
@@ -253,7 +253,7 @@ describe('HolderManager', () => {
   ] as const)(
     "evaluatePosition returns shouldExit:true with reason '%s' when trigger engine fires",
     async (reason, straddleValue) => {
-      (evaluateTriggers as any).mockReturnValue({ shouldExit: true, reason });
+      vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: true, reason });
 
       const result = await manager.evaluatePosition(
         mockPosition,
@@ -295,10 +295,11 @@ describe('PositionMonitor dispatch', () => {
       | ((id: string, fields: Record<string, string>) => Promise<void>)
       | undefined;
 
-    (streamConsume as any).mockImplementation((_stream: any, _group: any, _consumer: any, handler: any) => {
-      capturedStreamHandler = handler;
+    vi.mocked(streamConsume).mockImplementation((_stream, _group, _consumer, handler) => {
+      capturedStreamHandler = handler as typeof capturedStreamHandler;
+      return Promise.resolve();
     });
-    (recoverPending as any).mockResolvedValue([]);
+    vi.mocked(recoverPending).mockResolvedValue([]);
 
     // The DB mock returns one open position with 'hold' personality on the
     // positions query and the personality config on the configs query.
@@ -397,10 +398,11 @@ describe('PositionMonitor dispatch', () => {
       | ((id: string, fields: Record<string, string>) => Promise<void>)
       | undefined;
 
-    (streamConsume as any).mockImplementation((_stream: any, _group: any, _consumer: any, handler: any) => {
-      capturedStreamHandler = handler;
+    vi.mocked(streamConsume).mockImplementation((_stream, _group, _consumer, handler) => {
+      capturedStreamHandler = handler as typeof capturedStreamHandler;
+      return Promise.resolve();
     });
-    (recoverPending as any).mockResolvedValue([]);
+    vi.mocked(recoverPending).mockResolvedValue([]);
 
     const mockDbForMonitor = {
       query: vi.fn().mockImplementation((sql: string) => {
