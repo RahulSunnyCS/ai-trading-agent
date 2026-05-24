@@ -31,6 +31,9 @@ Longer, code-grounded explainers for individual topics live in
 - [The Probability Scorer in Full](./tech/probability-scorer.md) — all 9 macro
   adjustment factors, their caps, the penalty-heavy asymmetry, and how
   confidence tiers are set.
+- [The Global Macro Feed](./tech/global-macro-feed.md) — how US VIX / S&P / DAX /
+  crude / gold are polled from Yahoo Finance, cached in Redis, and degraded to
+  null on failure (TTL-as-staleness).
 
 ## Language & Runtime
 
