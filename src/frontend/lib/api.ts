@@ -46,7 +46,9 @@ export type ApiResult<T> =
  */
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<ApiResult<T>> {
   try {
-    const response = await fetch(path, { signal });
+    // Only pass `signal` when defined: with exactOptionalPropertyTypes, fetch's
+    // RequestInit.signal is `AbortSignal | null` and will not accept `undefined`.
+    const response = await fetch(path, signal ? { signal } : undefined);
 
     // Surface HTTP errors explicitly.
     // We do NOT swallow 404/500 as "empty data" — the caller must decide how to
