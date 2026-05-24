@@ -28,6 +28,9 @@ Longer, code-grounded explainers for individual topics live in
 - [Migrations 007 & 008 — Historical Backfill & Regime Tagging](./tech/migrations-007-008-historical-regime.md)
   — resumable/idempotent candle ingestion, the disjoint-keyspace partial index
   trick, and the causal, deterministic regime classifier.
+- [The Probability Scorer in Full](./tech/probability-scorer.md) — all 9 macro
+  adjustment factors, their caps, the penalty-heavy asymmetry, and how
+  confidence tiers are set.
 
 ## Language & Runtime
 
