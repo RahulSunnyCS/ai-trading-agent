@@ -37,8 +37,11 @@ Surface this at Gate 2 as an architecture finding (frontend type-safety gap).
   - QA checklist: 16 Critical / 17 Functional / 9 Non-blocker (42 total). File: pipeline/qa-checklist.md
 - [ ] Phase 2 — Decomposition
 - [ ] Phase 3 — Implementation
-- [~] Phase 4 — Architecture review DONE: CONDITIONAL PASS (0 Crit / 1 Med / 5 Low) → awaiting Human Gate 2
-  - Condition: M1 CumulativeChart rebuild-per-poll (flash/lost-zoom). Lows are hygiene/opt-in.
+- [x] Phase 4 — CONDITIONAL PASS approved at Gate 2; condition fixed (M1 chart rebuild + L1/L2/L4) & pushed
+- [~] Phase 5 — Test generation: E2E specs (from qa-checklist) + light docs.
+  - Unit: pure logic already covered (format 27 + pnl 27 = 54). React hook/component unit tests
+    DEFERRED — project has no jsdom/@testing-library/react; adding them is out of frontend-only scope.
+  - E2E: @playwright/test already a devDep → bootstrap playwright.config + tagged specs (CI-only run here, no live backend).
 - [ ] Phase 5 — Tests + Docs + E2E
 - [ ] Phase 6 — Test execution + Automation Gate
 - [ ] Phase 7 — Final review + epic doc → Human Gate 3

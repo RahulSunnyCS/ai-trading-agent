@@ -14,3 +14,7 @@
 | Phase 3 | T-03: P&L tab | implementor | sonnet | high | ~17k |
 | Phase 3 | api.ts type fix (orchestrator) | orchestrator | opus | low | ~2k |
 | Phase 4 | Architecture review | architecture-reviewer | sonnet | high | ~18k |
+| Phase 6 | Gate 2 fix cycle (M1 + lows) | implementor | sonnet | high | ~12k |
+| Phase 5 | E2E test writer | e2e-test-writer | sonnet | medium | ~14k |
+| Phase 5 | Docs writer | docs-writer | haiku | low | ~5k |
+| Phase 6 | Automation Gate | orchestrator | haiku | low | ~2k |
