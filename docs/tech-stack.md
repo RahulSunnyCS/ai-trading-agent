@@ -25,6 +25,9 @@ Longer, code-grounded explainers for individual topics live in
 - [Database Schema — Definition & Architecture](./tech/database-schema-architecture.md)
   — the migrations-as-source-of-truth model, the migration runner, table
   taxonomy, type conventions, and the branch-merge drift to watch.
+- [Migrations 007 & 008 — Historical Backfill & Regime Tagging](./tech/migrations-007-008-historical-regime.md)
+  — resumable/idempotent candle ingestion, the disjoint-keyspace partial index
+  trick, and the causal, deterministic regime classifier.
 
 ## Language & Runtime
 
