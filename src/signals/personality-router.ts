@@ -60,6 +60,7 @@ import type { Clock } from '../utils/clock.js';
 import {
   type StraddleSignalInput,
   fetchDailyState,
+  parseBlockedDatesSet,
   runPersonalityFilter,
 } from './personality-filter.js';
 
@@ -535,6 +536,13 @@ export class PersonalityRouter {
     const nowMs = this._clock.now();
     const straddleSignal = toStraddleSignalInput(signal);
 
+    // M5a fix: parse BLOCKED_DATES once per signal (env is static after startup).
+    // Previously, runPersonalityFilter called parseBlockedDates() internally,
+    // which runs JSON.parse(process.env.BLOCKED_DATES) on every invocation —
+    // 10 JSON.parse() calls per signal with 10 personalities. Parsing once here
+    // and passing the ReadonlySet eliminates 9 redundant parses per signal.
+    const blockedDatesSet = parseBlockedDatesSet();
+
     const filterResults = await Promise.all(
       personalities.map((p, i) => {
         // personalities and dailyStates arrays are co-indexed: both are produced
@@ -543,7 +551,7 @@ export class PersonalityRouter {
         if (dailyState === undefined) {
           throw new Error('[personality-router] dailyStates not co-indexed with personalities');
         }
-        return runPersonalityFilter(straddleSignal, p, dailyState, nowMs);
+        return runPersonalityFilter(straddleSignal, p, dailyState, nowMs, blockedDatesSet);
       }),
     );
 
@@ -598,12 +606,21 @@ export class PersonalityRouter {
    *
    * Converts the IncomingSignal to an EntryIntent (as required by
    * PaperTradeExecutor.openTrade), then immediately UPDATEs the paper_trades
-   * row to populate personality_id and signal_id (migration 004 columns).
+   * row to populate personality_id, signal_id, and underlying (migration 004
+   * and migration 015 columns respectively).
    *
    * Why the two-step INSERT + UPDATE instead of a single INSERT?
-   *   PaperTradeExecutor.openTrade() does not accept personalityId/signalId —
-   *   adding those parameters would require modifying that module (which is out
-   *   of scope for T-27). The UPDATE is equivalent and keeps concerns separated.
+   *   PaperTradeExecutor.openTrade() does not accept personalityId/signalId/
+   *   underlying — adding those parameters would require modifying that module
+   *   (which is out of scope for T-27). The UPDATE is equivalent and keeps
+   *   concerns separated.
+   *
+   * Why underlying in the same UPDATE?
+   *   Migration 015 (FIX-A) added an `underlying TEXT` column so that the
+   *   per-index daily-stop and open-leg-cap queries can filter on
+   *   `underlying = $N`. Without populating this column the per-index risk
+   *   controls match nothing (NULL = fail-open). We set it here in the same
+   *   UPDATE round-trip to avoid a second DB query.
    *
    * Errors from openTrade are caught and logged: one failed trade open must not
    * prevent other personalities from opening their trades in the same signal batch.
@@ -667,22 +684,31 @@ export class PersonalityRouter {
       return;
     }
 
-    // Associate the trade with the personality and signal (migration 004 columns).
-    // These are set via UPDATE rather than inside openTrade() because
-    // PaperTradeExecutor.openTrade() does not accept these fields — see module header.
+    // Associate the trade with the personality, signal, and underlying index
+    // (migration 004 columns: personality_id, signal_id; migration 015 column:
+    // underlying). All three are set in one UPDATE round-trip — no second query.
+    //
+    // underlying is set here because PaperTradeExecutor.openTrade() does not
+    // accept it (out of scope), and without it the per-index daily-stop /
+    // open-leg-cap queries (FIX-A) match nothing (NULL = fail-open).
+    //
+    // signal.underlying is the bare index name (e.g. 'NIFTY', 'BANKNIFTY',
+    // 'SENSEX') — exactly what the per-index risk queries compare against.
     try {
       await this._db.query(
         `UPDATE paper_trades
            SET personality_id = $1,
-               signal_id      = $2
-         WHERE id = $3`,
-        [personalityId, signal.signalId, tradeId],
+               signal_id      = $2,
+               underlying     = $3
+         WHERE id = $4`,
+        [personalityId, signal.signalId, signal.underlying, tradeId],
       );
     } catch (err: unknown) {
-      // Personality association update failed. The trade row exists but is
-      // unlinked. Log for investigation; do not throw (the trade is already open).
+      // Personality/signal/underlying association update failed. The trade row
+      // exists but is unlinked and unindexed. Log for investigation; do not
+      // throw (the trade is already open).
       console.error(
-        `[personality-router] Failed to set personality_id/signal_id on trade ${tradeId}:`,
+        `[personality-router] Failed to set personality_id/signal_id/underlying on trade ${tradeId}:`,
         err,
       );
       return;

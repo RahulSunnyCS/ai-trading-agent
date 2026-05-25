@@ -456,6 +456,167 @@ describe('portfolioRiskCheck — happy path', () => {
 });
 
 // ---------------------------------------------------------------------------
+// C1 regression — SQL query column safety
+//
+// The daily-stop query previously referenced `underlying` without that column
+// existing on paper_trades (pre-migration 015). Migration 015 adds the column.
+// These tests prove the SQL only references columns that exist post-migration.
+// ---------------------------------------------------------------------------
+
+describe('portfolioRiskCheck — C1: SQL column safety for Rule 3', () => {
+  it('Rule 3 query includes `underlying` as a parameterised filter ($4)', async () => {
+    // This test captures the exact query structure. If someone removes the
+    // `underlying = $4` filter, the test documents the regression path.
+    process.env.BLOCKED_DATES = '[]';
+    process.env.PORTFOLIO_DAILY_STOP = '20000';
+
+    const clock = new FixedClock(WED_1000_IST);
+
+    // Collect all pool.query calls so we can inspect the SQL.
+    const queryCalls: Array<{ sql: string; params: unknown[] }> = [];
+    const db: Pool = {
+      query: vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+        queryCalls.push({ sql, params });
+        if (sql.includes('SUM(net_pnl)')) return Promise.resolve({ rows: [{ total_pnl: '0' }] });
+        if (sql.includes('COUNT(*)')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        return Promise.resolve({ rows: [] });
+      }),
+      connect: vi.fn().mockImplementation(() => {
+        const c = {
+          query: vi.fn().mockImplementation((sql: string) => {
+            if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return Promise.resolve({ rows: [] });
+            if (sql.includes('pg_try_advisory_xact_lock')) return Promise.resolve({ rows: [{ acquired: true }] });
+            if (sql.includes('COUNT(*)')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+            return Promise.resolve({ rows: [] });
+          }),
+          release: vi.fn(),
+        };
+        return Promise.resolve(c);
+      }),
+    } as unknown as Pool;
+
+    await portfolioRiskCheck(db, baseIntent, clock, 0);
+
+    // Find the SUM(net_pnl) query (Rule 3)
+    const rule3Call = queryCalls.find((c) => c.sql.includes('SUM(net_pnl)'));
+    expect(rule3Call).toBeTruthy();
+
+    // The query must reference `underlying` in the SQL text (column added by migration 015).
+    expect(rule3Call!.sql).toMatch(/underlying\s*=\s*\$4/);
+
+    // The query must NOT reference `symbol` in a per-filter context — `symbol`
+    // holds the full Fyers option symbol and cannot be compared to a bare index name.
+    // (symbol may appear in comments but not as a WHERE filter for the index name)
+    expect(rule3Call!.sql).not.toMatch(/symbol\s*=\s*\$4/);
+
+    // Parameter $4 (index 3) must be the underlying value from the intent.
+    expect(rule3Call!.params[3]).toBe('NIFTY');
+  });
+
+  it('Rule 4 query scopes open-leg count by underlying (M4 fix)', async () => {
+    // Rule 4 previously counted ALL open legs globally, over-estimating margin
+    // in a mixed-index book. After the M4 fix it uses `underlying = $1` so
+    // only legs from the current index are counted.
+    process.env.BLOCKED_DATES = '[]';
+
+    const clock = new FixedClock(WED_1000_IST);
+    const queryCalls: Array<{ sql: string; params: unknown[] }> = [];
+
+    const db: Pool = {
+      query: vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+        queryCalls.push({ sql, params });
+        if (sql.includes('SUM(net_pnl)')) return Promise.resolve({ rows: [{ total_pnl: '0' }] });
+        if (sql.includes('COUNT(*)')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        return Promise.resolve({ rows: [] });
+      }),
+      connect: vi.fn().mockImplementation(() => {
+        const c = {
+          query: vi.fn().mockImplementation((sql: string) => {
+            if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return Promise.resolve({ rows: [] });
+            if (sql.includes('pg_try_advisory_xact_lock')) return Promise.resolve({ rows: [{ acquired: true }] });
+            if (sql.includes('COUNT(*)')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+            return Promise.resolve({ rows: [] });
+          }),
+          release: vi.fn(),
+        };
+        return Promise.resolve(c);
+      }),
+    } as unknown as Pool;
+
+    await portfolioRiskCheck(db, baseIntent, clock, 0);
+
+    // Find the Rule 4 COUNT(*) query (open count for margin estimate).
+    // It is the pool-level COUNT (not inside the transaction).
+    const rule4Call = queryCalls.find(
+      (c) => c.sql.includes('COUNT(*)') && c.sql.includes("status = 'open'"),
+    );
+    expect(rule4Call).toBeTruthy();
+
+    // After the M4 fix, the query must include an underlying filter.
+    expect(rule4Call!.sql).toMatch(/underlying\s*=\s*\$1/);
+
+    // The underlying from the intent must be passed as the parameter.
+    expect(rule4Call!.params[0]).toBe('NIFTY');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H2 regression — NULL personality_id rows do not affect specific personality stops
+// ---------------------------------------------------------------------------
+
+describe('portfolioRiskCheck — H2: NULL personality_id rows excluded from per-personality stop', () => {
+  it('Rule 3 query uses personality_id = $3 (SQL equality never matches NULL rows)', async () => {
+    // NULL personality_id rows (pre-M2 trades) must not count against any
+    // personality's daily stop. SQL equality (personality_id = $3) naturally
+    // excludes NULL rows — this is the correct and intended behaviour.
+    //
+    // The risk: if someone changes the query to use IS NOT DISTINCT FROM or
+    // COALESCE, NULL rows could bleed into the stop calculation. This test
+    // locks down the query shape to use strict equality.
+    process.env.BLOCKED_DATES = '[]';
+    process.env.PORTFOLIO_DAILY_STOP = '20000';
+
+    const clock = new FixedClock(WED_1000_IST);
+    const queryCalls: Array<{ sql: string; params: unknown[] }> = [];
+
+    const db: Pool = {
+      query: vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+        queryCalls.push({ sql, params });
+        if (sql.includes('SUM(net_pnl)')) return Promise.resolve({ rows: [{ total_pnl: '0' }] });
+        if (sql.includes('COUNT(*)')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        return Promise.resolve({ rows: [] });
+      }),
+      connect: vi.fn().mockImplementation(() => {
+        const c = {
+          query: vi.fn().mockImplementation((sql: string) => {
+            if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return Promise.resolve({ rows: [] });
+            if (sql.includes('pg_try_advisory_xact_lock')) return Promise.resolve({ rows: [{ acquired: true }] });
+            if (sql.includes('COUNT(*)')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+            return Promise.resolve({ rows: [] });
+          }),
+          release: vi.fn(),
+        };
+        return Promise.resolve(c);
+      }),
+    } as unknown as Pool;
+
+    await portfolioRiskCheck(db, baseIntent, clock, 0);
+
+    const rule3Call = queryCalls.find((c) => c.sql.includes('SUM(net_pnl)'));
+    expect(rule3Call).toBeTruthy();
+
+    // Must use strict equality (=) not IS NOT DISTINCT FROM or COALESCE.
+    // This ensures NULL personality_id rows are excluded naturally.
+    expect(rule3Call!.sql).toMatch(/personality_id\s*=\s*\$3/);
+    expect(rule3Call!.sql).not.toMatch(/IS NOT DISTINCT FROM/i);
+    expect(rule3Call!.sql).not.toMatch(/COALESCE\s*\(\s*personality_id/i);
+
+    // The personality_id parameter must be the actual intent personality, not NULL.
+    expect(rule3Call!.params[2]).toBe('precision');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Client lifecycle — ensures no pool leaks across success and error paths
 // ---------------------------------------------------------------------------
 

@@ -133,8 +133,17 @@ export interface ComparisonIntegrityResult {
  * personality from the database.
  *
  * todayIST must be in 'YYYY-MM-DD' format (India Standard Time date). The
- * query uses DATE(entry_time AT TIME ZONE 'Asia/Kolkata') for the filter to
- * match trades entered on the given IST date regardless of the server timezone.
+ * closed-trade query uses IST-midnight UTC bounds (computed from todayIST)
+ * to filter entry_time, keeping the filter index-friendly — wrapping
+ * entry_time in DATE(... AT TIME ZONE ...) defeats the
+ * idx_paper_trades_status_entry_time index, causing a sequential scan per
+ * personality per signal on the hot routing path.
+ *
+ * H3 fix: instead of DATE(entry_time AT TIME ZONE 'Asia/Kolkata') = $2::date,
+ * we compute the IST-day boundaries as UTC timestamps and use a range predicate
+ * (entry_time >= istMidnightISO AND entry_time < istTomorrowISO). This mirrors
+ * the identical computation in portfolio-risk.ts Rule 3 and keeps the same IST
+ * calendar semantics while remaining index-friendly.
  *
  * Two separate queries are used (not a UNION ALL) because they aggregate
  * different status values — closed trades for P&L/count and open trades for
@@ -148,11 +157,16 @@ export interface ComparisonIntegrityResult {
  * T-44 per-index leg cap (D2 Option A):
  * The optional `underlying` parameter scopes the open-positions count to a
  * single index (e.g. 'NIFTY'). When supplied, the open-positions query adds a
- * `symbol = underlying` filter so each index is an independent leg book.
- * When omitted (undefined/null), the query counts open legs across all
- * underlying indexes for the personality — preserving the original behaviour
- * for callers that don't yet provide the index (e.g. the integration tests,
- * the backtest runner which constructs DailyState manually).
+ * `underlying = $2` filter (using the `underlying` column added by migration 015)
+ * so each index is an independent leg book. When omitted (undefined/null), the
+ * query counts open legs across all underlying indexes for the personality —
+ * preserving the original behaviour for callers that don't yet provide the
+ * index (e.g. the integration tests, the backtest runner).
+ *
+ * C1 fix: the open-positions query previously used `symbol = $2` (comparing
+ * the full Fyers option symbol like 'NSE:NIFTY25O0924500CE' to the bare index
+ * name 'NIFTY'), which could never match. It now uses `underlying = $2`
+ * (the bare index name column added by migration 015).
  *
  * Deliberate scoping decision (tradeCount / netPnl remain cross-index):
  * max_daily_trades and max_daily_loss are whole-personality daily budgets.
@@ -173,8 +187,28 @@ export async function fetchDailyState(
   todayIST: string,
   underlying?: string,
 ): Promise<DailyState> {
+  // Compute IST-midnight UTC bounds from the todayIST date string.
+  //
+  // H3 fix: wrapping entry_time in DATE(... AT TIME ZONE 'Asia/Kolkata') prevents
+  // use of the idx_paper_trades_status_entry_time index, causing a sequential scan
+  // per personality per signal on the hot signal-routing path. Using an explicit
+  // timestamp range (entry_time >= $2 AND entry_time < $3) keeps the predicate
+  // index-friendly.
+  //
+  // Computation: parse 'YYYY-MM-DD' as UTC midnight, add the IST offset back to
+  // get the UTC timestamp that corresponds to IST midnight. The arithmetic is the
+  // same as in portfolio-risk.ts getISTDateStr/istMidnightMs — kept consistent so
+  // both modules produce the same day boundaries.
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // UTC+5:30 in ms
+  const istMidnightMs = new Date(todayIST).getTime() - IST_OFFSET_MS;
+  // todayIST is 'YYYY-MM-DD'; new Date(todayIST) parses it as UTC midnight.
+  // Subtracting IST offset gives the UTC moment corresponding to IST midnight.
+  // Example: '2026-05-19' → UTC 2026-05-18T18:30:00Z (= 2026-05-19T00:00:00+05:30).
+  const istMidnightISO = new Date(istMidnightMs).toISOString();
+  const istTomorrowISO = new Date(istMidnightMs + 24 * 60 * 60 * 1000).toISOString();
+
   // Query 1: closed-trade count and net P&L for today (always cross-index).
-  // Using parameterised $1/$2 to prevent SQL injection — personalityId is
+  // Using parameterised $1/$2/$3 to prevent SQL injection — personalityId is
   // a UUID from the DB but we never assume caller input is safe.
   const closedResult = await db.query<{
     today_trade_count: string;
@@ -186,16 +220,23 @@ export async function fetchDailyState(
      FROM paper_trades
      WHERE personality_id = $1
        AND status = 'closed'
-       AND DATE(entry_time AT TIME ZONE 'Asia/Kolkata') = $2::date`,
-    [personalityId, todayIST],
+       AND entry_time >= $2
+       AND entry_time < $3`,
+    [personalityId, istMidnightISO, istTomorrowISO],
   );
 
   // Query 2: count of currently open legs for this personality.
   //
-  // T-44 D2 Option A: when `underlying` is provided, add a symbol filter so
-  // that leg counts are per-index. The $3 parameter is either the index name
-  // (e.g. 'NIFTY') or SQL NULL. The IS NULL branch in the WHERE clause means
-  // "no index filter" — backward-compatible with callers that omit underlying.
+  // T-44 D2 Option A / C1 fix: when `underlying` is provided, filter by the
+  // `underlying` column (added in migration 015) so leg counts are per-index.
+  // The $2 parameter is either the index name (e.g. 'NIFTY') or SQL NULL.
+  // The IS NULL branch in the WHERE clause means "no index filter" —
+  // backward-compatible with callers that omit underlying.
+  //
+  // Using `underlying = $2` (not `symbol = $2`) is the C1 fix: `symbol`
+  // holds the full Fyers option symbol ('NSE:NIFTY25O0924500CE') and can
+  // never equal the bare index name 'NIFTY'. The `underlying` column added
+  // by migration 015 holds the bare index name and is the correct filter target.
   //
   // Not date-filtered: open trades from a prior day that were not closed at
   // EOD are still "open". In normal operation this should never happen, but we
@@ -205,7 +246,7 @@ export async function fetchDailyState(
      FROM paper_trades
      WHERE personality_id = $1
        AND status = 'open'
-       AND ($2::text IS NULL OR symbol = $2)`,
+       AND ($2::text IS NULL OR underlying = $2)`,
     [personalityId, underlying ?? null],
   );
 
@@ -234,16 +275,24 @@ export async function fetchDailyState(
  *
  * Stage execution order: 1 → 2 → 3 → 4 → 5. Returns on the first rejection.
  *
- * @param signal     - The incoming straddle signal
- * @param personality - Full personality config row from personality_configs
- * @param dailyState - Pre-fetched daily state (from fetchDailyState)
- * @param nowMs      - Current epoch ms (injected for testability — not Date.now())
+ * @param signal       - The incoming straddle signal
+ * @param personality  - Full personality config row from personality_configs
+ * @param dailyState   - Pre-fetched daily state (from fetchDailyState)
+ * @param nowMs        - Current epoch ms (injected for testability — not Date.now())
+ * @param blockedDates - Pre-parsed blocked dates set (M5a: parse once per signal
+ *                       in the router, not once per personality per signal).
+ *                       If omitted, the function falls back to parsing
+ *                       process.env.BLOCKED_DATES internally for backward
+ *                       compatibility with existing test callers that do not
+ *                       yet pass the set. Pass an empty Set when the router
+ *                       has already checked the env var and found it empty.
  */
 export function runPersonalityFilter(
   signal: StraddleSignalInput,
   personality: PersonalityConfig,
   dailyState: DailyState,
   nowMs: number,
+  blockedDates?: ReadonlySet<string>,
 ): FilterResult {
   // -------------------------------------------------------------------------
   // Stage 1 — Hard filters
@@ -330,9 +379,21 @@ export function runPersonalityFilter(
 
   // (d) Blocked-dates guard: today must not be in the BLOCKED_DATES list.
   // BLOCKED_DATES is a JSON array of 'YYYY-MM-DD' strings (e.g. RBI policy days).
+  //
+  // M5a fix: parseBlockedDates() previously ran JSON.parse(process.env.BLOCKED_DATES)
+  // on every call to runPersonalityFilter. With 10 personalities per signal,
+  // that is 10 JSON.parse() calls per signal on a static env var. The caller
+  // (personality-router.ts) now parses BLOCKED_DATES once per signal and passes
+  // it as a ReadonlySet<string>. The fallback to parseBlockedDates() preserves
+  // backward compatibility with test callers that do not supply the set.
   const todayIST = toISTDate(nowMs);
-  const blockedDates = parseBlockedDates();
-  if (blockedDates.includes(todayIST)) {
+  const effectiveBlockedDates: ReadonlySet<string> | readonly string[] =
+    blockedDates ?? parseBlockedDates();
+  const isBlocked =
+    effectiveBlockedDates instanceof Set
+      ? effectiveBlockedDates.has(todayIST)
+      : (effectiveBlockedDates as readonly string[]).includes(todayIST);
+  if (isBlocked) {
     return {
       pass: false,
       stage: 1,
@@ -568,10 +629,38 @@ function toISTDate(epochMs: number): string {
 }
 
 /**
+ * Parses the BLOCKED_DATES environment variable into a ReadonlySet<string>.
+ *
+ * M5a: exported so personality-router.ts can call this ONCE per signal and
+ * pass the result to every runPersonalityFilter call, avoiding repeated
+ * JSON.parse() on a static env var for each of the 10 personalities.
+ *
+ * Returns an empty Set on parse failure rather than throwing — a misconfigured
+ * env var should not crash the process; it simply skips the blocked-date check.
+ *
+ * Returning a Set (O(1) lookup) instead of an array (O(N) includes) is a minor
+ * win for the typical case where BLOCKED_DATES has ≤ 30 entries, and makes the
+ * O-notation explicit for future maintainers.
+ */
+export function parseBlockedDatesSet(): ReadonlySet<string> {
+  const raw = process.env.BLOCKED_DATES;
+  if (!raw) return new Set<string>();
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set<string>(parsed.filter((v): v is string => typeof v === 'string'));
+    }
+    return new Set<string>();
+  } catch {
+    return new Set<string>();
+  }
+}
+
+/**
  * Parses the BLOCKED_DATES environment variable.
- * Expects a JSON array of 'YYYY-MM-DD' strings. Returns [] on parse failure
- * rather than throwing — a misconfigured env var should not crash the process,
- * it should simply skip the blocked-date check.
+ * Internal fallback used by runPersonalityFilter when the caller does not
+ * supply a pre-parsed blockedDates set. Kept for backward compatibility.
+ * Prefer parseBlockedDatesSet() in new callers.
  */
 function parseBlockedDates(): string[] {
   const raw = process.env.BLOCKED_DATES;

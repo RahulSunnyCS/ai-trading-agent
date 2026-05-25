@@ -17,6 +17,7 @@ import {
   type StraddleSignalInput,
   checkComparisonIntegrity,
   fetchDailyState,
+  parseBlockedDatesSet,
   runPersonalityFilter,
 } from '../personality-filter.js';
 
@@ -895,7 +896,16 @@ describe('fetchDailyState', () => {
     expect(result.openPositions).toBe(0);
   });
 
-  it('passes personalityId and todayIST as parameterised query arguments', async () => {
+  it('passes personalityId and IST-midnight UTC bounds as parameterised query arguments', async () => {
+    // H3 fix: fetchDailyState no longer passes the raw 'YYYY-MM-DD' todayIST
+    // string as a query parameter. Instead it computes the IST-midnight UTC
+    // bounds and passes them as ISO timestamp strings so the query can use a
+    // range predicate (entry_time >= $2 AND entry_time < $3) without wrapping
+    // entry_time in a function (which defeats the index).
+    //
+    // For '2026-05-19' (IST = UTC+5:30):
+    //   IST midnight UTC = 2026-05-18T18:30:00.000Z
+    //   IST tomorrow UTC = 2026-05-19T18:30:00.000Z
     const mockQuery = vi.fn((_sql: string, _params?: unknown[]) =>
       Promise.resolve({ rows: [{ today_trade_count: '0', today_net_pnl: '0' }], rowCount: 1 }),
     );
@@ -913,14 +923,24 @@ describe('fetchDailyState', () => {
     expect(call0Params).toContain('personality-uuid-123');
     expect(call1Params).toContain('personality-uuid-123');
 
-    // The closed-trade query must include the date as the second parameter
-    expect(call0Params).toContain('2026-05-19');
+    // The closed-trade query (Query 1) must use ISO timestamp bounds, not the
+    // raw 'YYYY-MM-DD' string. Verify that the IST-midnight UTC bounds are passed.
+    // '2026-05-19' IST midnight = 2026-05-18T18:30:00.000Z in UTC.
+    const expectedMidnightISO = '2026-05-18T18:30:00.000Z';
+    const expectedTomorrowISO = '2026-05-19T18:30:00.000Z';
+    expect(call0Params).toContain(expectedMidnightISO);
+    expect(call0Params).toContain(expectedTomorrowISO);
+
+    // The raw 'YYYY-MM-DD' string must NOT be passed — the function now computes
+    // derived timestamps instead. This assertion documents the H3 fix contract:
+    // no function-wrapped entry_time in the SQL (verified by the parameter shape).
+    expect(call0Params).not.toContain('2026-05-19');
   });
 
   it('passes underlying to the open-positions query when provided (T-44 per-index leg cap)', async () => {
     // When `underlying` is supplied, the open-positions query param array must
-    // contain the underlying value so the SQL `$2::text IS NULL OR symbol = $2`
-    // filter scopes the count to that index.
+    // contain the underlying value so the SQL `$2::text IS NULL OR underlying = $2`
+    // filter scopes the count to that index (C1 fix: now `underlying` not `symbol`).
     const mockQuery = vi.fn((_sql: string, _params?: unknown[]) =>
       Promise.resolve({ rows: [{ today_trade_count: '0', today_net_pnl: '0', open_legs: '0' }], rowCount: 1 }),
     );
@@ -953,6 +973,120 @@ describe('fetchDailyState', () => {
     const openQueryParams = mockQuery.mock.calls[1]?.[1] as unknown[];
     // null must be passed so the SQL $2::text IS NULL branch evaluates to true
     expect(openQueryParams).toContain(null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C1 regression — open-positions query uses `underlying` not `symbol`
+// ---------------------------------------------------------------------------
+
+describe('fetchDailyState — C1: open-positions query uses `underlying` column', () => {
+  it('uses `underlying = $2` (not `symbol = $2`) in the open-positions SQL', async () => {
+    // C1 fix: the pre-fix query filtered `symbol = $2`, comparing the full Fyers
+    // option symbol ('NSE:NIFTY25O0924500CE') to the bare index name ('NIFTY').
+    // That comparison can never be true, making the per-index open-leg cap a no-op.
+    //
+    // After the fix, the query uses `underlying = $2` (the column added by
+    // migration 015 which holds the bare index name). This test captures the
+    // correct SQL shape so a regression can be detected immediately.
+    const capturedSqls: string[] = [];
+    const mockQuery = vi.fn((_sql: string, _params?: unknown[]) => {
+      capturedSqls.push(_sql);
+      return Promise.resolve({ rows: [{ today_trade_count: '0', today_net_pnl: '0', open_legs: '0' }], rowCount: 1 });
+    });
+
+    const mockDb = { query: mockQuery } as unknown as Pool;
+
+    await fetchDailyState(mockDb, 'pers-001', '2026-05-19', 'NIFTY');
+
+    // The open-positions query is the second call.
+    const openSql = capturedSqls[1] ?? '';
+
+    // Must use the `underlying` column, not `symbol`.
+    expect(openSql).toContain('underlying');
+    expect(openSql).not.toMatch(/symbol\s*=\s*\$2/);
+
+    // The exact C1 fix: `underlying = $2` (case-insensitive for SQL safety).
+    expect(openSql).toMatch(/underlying\s*=\s*\$2/i);
+  });
+
+  it('a bare index name like `NIFTY` can never match a Fyers symbol like `NSE:NIFTY25O0924500CE` via symbol= (pre-fix would always return 0)', () => {
+    // This test documents the root cause of C1 for reviewers: the pre-fix query
+    // compared `symbol = 'NIFTY'` but symbols are stored as 'NSE:NIFTY25O0924500CE'.
+    // The comparison always returned false → openPositions was always 0 → the
+    // per-index open-leg cap in Stage 2 was never enforced.
+    //
+    // We verify this by confirming that 'NSE:NIFTY25O0924500CE' !== 'NIFTY'
+    // (a basic sanity check that documents the bug, not a DB test).
+    const storedSymbol = 'NSE:NIFTY25O0924500CE';
+    const indexName = 'NIFTY';
+    expect(storedSymbol).not.toBe(indexName);
+    // The fix: the `underlying` column in migration 015 holds 'NIFTY' directly.
+    // Comparing underlying = 'NIFTY' correctly identifies NIFTY option rows.
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M5a regression — parseBlockedDatesSet exported and returns a Set
+// ---------------------------------------------------------------------------
+
+describe('parseBlockedDatesSet', () => {
+  it('returns an empty Set when BLOCKED_DATES is not set', () => {
+    delete process.env.BLOCKED_DATES;
+    // The router calls this once per signal instead of per-personality.
+    const result = parseBlockedDatesSet();
+    expect(result).toBeInstanceOf(Set);
+    expect(result.size).toBe(0);
+  });
+
+  it('returns a Set containing the parsed dates when BLOCKED_DATES is valid JSON', () => {
+    process.env.BLOCKED_DATES = JSON.stringify(['2026-05-19', '2026-01-15']);
+    const result = parseBlockedDatesSet();
+    expect(result).toBeInstanceOf(Set);
+    expect(result.has('2026-05-19')).toBe(true);
+    expect(result.has('2026-01-15')).toBe(true);
+    expect(result.has('2026-12-25')).toBe(false);
+    delete process.env.BLOCKED_DATES;
+  });
+
+  it('returns an empty Set on malformed BLOCKED_DATES (parse error is swallowed)', () => {
+    process.env.BLOCKED_DATES = 'not-valid-json';
+    const result = parseBlockedDatesSet();
+    expect(result).toBeInstanceOf(Set);
+    expect(result.size).toBe(0);
+    delete process.env.BLOCKED_DATES;
+  });
+
+  it('runPersonalityFilter accepts a pre-parsed Set and uses it (M5a contract)', () => {
+    // The router passes a ReadonlySet<string> so the filter does not re-parse
+    // the env var on every call. Verify that passing a Set works correctly:
+    // a date in the Set should be blocked, a date not in it should pass.
+    const personality = makePersonality();
+    const signal = makeSignal(); // signalTimeMs = IST_1030_MAY19 → 2026-05-19 IST
+
+    // Block 2026-05-19 via the pre-parsed Set.
+    const blockedSet = new Set(['2026-05-19']);
+    const result = runPersonalityFilter(signal, personality, emptyDailyState, IST_1030_MAY19, blockedSet);
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(1);
+    expect(result.reason).toMatch(/BLOCKED_DATE/);
+  });
+
+  it('runPersonalityFilter without a blockedDates arg falls back to env var (backward compat)', () => {
+    // Callers that do not pass the blockedDates set fall back to parseBlockedDates().
+    // Verify the fallback works so existing test callers don't need updating.
+    process.env.BLOCKED_DATES = JSON.stringify(['2026-05-19']);
+    const personality = makePersonality();
+    const signal = makeSignal();
+
+    // No blockedDates argument — should fall back to env var.
+    const result = runPersonalityFilter(signal, personality, emptyDailyState, IST_1030_MAY19);
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(1);
+    expect(result.reason).toMatch(/BLOCKED_DATE/);
+    delete process.env.BLOCKED_DATES;
   });
 });
 

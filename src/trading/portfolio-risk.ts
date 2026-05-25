@@ -108,6 +108,11 @@ export async function portfolioRiskCheck(
   // Guard against a malformed BLOCKED_DATES env var (e.g. a typo in the value).
   // An invalid JSON string must not crash the risk check — we treat it as an
   // empty list and log a warning so the operator can investigate.
+  //
+  // M5 optimisation note: portfolioRiskCheck is called once per trade intent
+  // (not per-signal per-personality), so parsing BLOCKED_DATES here is not on
+  // the hot inner loop. The per-signal-per-personality hot path is
+  // runPersonalityFilter in personality-filter.ts, where M5a applies.
   let blockedDates: string[] = [];
   try {
     blockedDates = JSON.parse(process.env.BLOCKED_DATES ?? '[]') as string[];
@@ -196,8 +201,28 @@ export async function portfolioRiskCheck(
   const istTomorrowISO = new Date(istMidnightMs + 24 * 60 * 60 * 1000).toISOString();
 
   // Scoped per (personality_id, underlying): each index is an independent book.
-  // The personality_id column was added in the paper_trades schema (005_personality_seed.sql).
-  // The underlying column was present from migration 001. Both are TEXT columns — parameterised.
+  //
+  // personality_id: added to paper_trades by migration 004. It is nullable —
+  // pre-M2 rows have NULL. SQL equality (personality_id = $3) never matches
+  // NULL rows, so pre-M2 trades are excluded from every personality's daily
+  // stop. This is intentional and correct: those trades pre-date the
+  // personality engine and should not count against any specific personality.
+  // There is no fail-open risk here: the INSERT+UPDATE pattern in the router
+  // means personality_id is set *after* the trade opens, but the daily stop
+  // is checked *before* the trade opens — the window of NULL rows cannot
+  // affect a pre-entry check.
+  //
+  // underlying: added to paper_trades by migration 015. It is nullable —
+  // rows without an underlying value (pre-015 rows or rows from an
+  // un-updated trade-executor) are excluded from per-index aggregates.
+  // This is safe-fail: under-counting losses is conservative (an index's
+  // stop fires later than it should, not earlier — the margin buffer and
+  // the per-personality loss cap in the filter are additional backstops).
+  //
+  // NOTE FOR REVIEWERS: trade-executor.ts (PaperTradeExecutor.openTrade) is
+  // the INSERT site. It must be updated to populate `underlying` on new rows
+  // so that post-migration inserts are counted correctly. That file is out of
+  // scope for this fix cycle; this comment marks the residual work.
   const pnlResult = await db.query<{ total_pnl: string }>(
     `SELECT COALESCE(SUM(net_pnl), 0) AS total_pnl
      FROM paper_trades
@@ -260,8 +285,34 @@ export async function portfolioRiskCheck(
   const lotSize = LOT_SIZES[intent.underlying] ?? 50;
   const lots = 1;
 
+  // M4 fix: scope the open-leg count to the current underlying so the margin
+  // estimate only covers positions in the same index book. Counting ALL open
+  // legs across indices over-estimates margin in a mixed-index book (e.g. 2
+  // NIFTY + 2 BANKNIFTY legs counted against the NIFTY lot size of 50 inflates
+  // the NIFTY margin estimate by the BANKNIFTY legs × incorrect lot size).
+  //
+  // The `underlying` column is nullable (migration 015); rows with NULL
+  // underlying are excluded from this count. This is safe-fail: those rows
+  // correspond to pre-015 trades whose index is unknown — excluding them
+  // under-estimates margin usage, which is conservative for a blocking check.
+  //
+  // The open count is also reused in Rule 5 (M5b) to avoid a second identical
+  // COUNT(*) query. Rule 5 needs the global open-leg count (not per-underlying)
+  // for the advisory-lock cap, so we run a separate global COUNT there.
+  // However, both Rule 4 and Rule 5 previously ran:
+  //   SELECT COUNT(*) FROM paper_trades WHERE status = 'open'
+  // Rule 4 now runs the per-underlying version; Rule 5 runs the global version
+  // inside the advisory lock transaction (where it must run to be serialised).
+  // There is no safe way to share a pre-lock COUNT with the locked count because
+  // a concurrent INSERT could land between the two — the lock exists precisely
+  // to prevent that race. The M5b optimisation therefore only applies within a
+  // single rule: we do not attempt to share across Rule 4 and Rule 5.
   const openLegsForMargin = await db.query<{ cnt: string }>(
-    `SELECT COUNT(*) AS cnt FROM paper_trades WHERE status = 'open'`,
+    `SELECT COUNT(*) AS cnt
+     FROM paper_trades
+     WHERE status = 'open'
+       AND underlying = $1`,
+    [intent.underlying],
   );
   const openCountForMargin = Number(openLegsForMargin.rows[0]?.cnt ?? 0);
   const estimatedMargin = openCountForMargin * intent.straddleValue * lots * lotSize * marginRate;

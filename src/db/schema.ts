@@ -263,6 +263,17 @@ export interface PaperTrade {
   personality_id: string | null;
   signal_id: string | null;
   symbol: string;
+  /**
+   * The bare underlying index name, e.g. 'NIFTY', 'BANKNIFTY', 'SENSEX'.
+   * Added by migration 015. NULL for rows inserted before the migration or
+   * before trade-executor.ts is updated to populate this field on new inserts.
+   *
+   * The `symbol` column holds the full Fyers option symbol such as
+   * 'NSE:NIFTY25O0924500CE'; `underlying` holds just the index name so
+   * per-index queries (daily stop, open-leg cap) can filter efficiently
+   * without substring matching on every row.
+   */
+  underlying: string | null;
   expiry: Date | null;
   strike: number | null;
   entry_type: string;

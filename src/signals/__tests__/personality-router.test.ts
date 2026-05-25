@@ -44,9 +44,12 @@ vi.mock('../../redis/client.js', () => ({
 
 // Mock the personality-filter module so we can control filter outcomes
 // without depending on the time-gate logic inside runPersonalityFilter.
+// parseBlockedDatesSet is included so the router can import it; returning
+// an empty Set is the correct behaviour for tests (no blocked dates).
 vi.mock('../personality-filter.js', () => ({
   fetchDailyState: vi.fn(),
   runPersonalityFilter: vi.fn(),
+  parseBlockedDatesSet: vi.fn().mockReturnValue(new Set<string>()),
 }));
 
 // Mock the paper-trade-executor module so no real DB INSERTs happen.
@@ -533,6 +536,99 @@ describe('PersonalityRouter', () => {
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       'NIFTY',
     );
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 6b: UPDATE sets personality_id, signal_id, AND underlying (FIX-A C1)
+  // -------------------------------------------------------------------------
+  // Verifies that the post-open UPDATE populates `underlying` as parameter $3
+  // and shifts tradeId to $4.  Without this fix the per-index daily-stop and
+  // open-leg-cap queries (migration 015) match nothing because underlying=NULL.
+  it('UPDATE after openTrade sets underlying = signal.underlying as $3 parameter', async () => {
+    const personality1 = makePersonality({ id: 'pers-001', name: 'precision' });
+
+    vi.mocked(fetchDailyState).mockResolvedValue({
+      tradeCount: 0,
+      netPnl: '0',
+      openPositions: 0,
+    });
+    vi.mocked(runPersonalityFilter).mockReturnValue({ pass: true, stage: 6, reason: 'PASS' });
+
+    // Use a BANKNIFTY signal so the assertion is unambiguous (not the default NIFTY).
+    const signalFields = makeSignalFields({ underlying: 'BANKNIFTY', signal_id: 'sig-bn-001' });
+    const xreadgroupResponses = [makeXreadgroupResponse('1-0', signalFields)];
+
+    // Use a custom mockQuery so we can capture every call's SQL + params.
+    const capturedQueries: Array<{ sql: string; params: unknown[] }> = [];
+    const mockQuery = vi.fn().mockImplementation((sql: string, params: unknown[]) => {
+      capturedQueries.push({ sql, params });
+      const callIndex = capturedQueries.length;
+      if (callIndex === 1) {
+        // reconciliation SELECT: no open trades
+        return Promise.resolve({ rows: [], command: 'SELECT', rowCount: 0, oid: 0, fields: [] });
+      }
+      if (callIndex === 2) {
+        // personality SELECT: one personality
+        const dbRow = {
+          id: personality1.id,
+          name: personality1.name,
+          display_name: personality1.displayName,
+          group_type: personality1.groupType,
+          entry_type: personality1.entryType,
+          management_style: personality1.managementStyle,
+          is_frozen: personality1.isFrozen,
+          is_active: personality1.isActive,
+          phase: personality1.phase,
+          params: personality1.params,
+          created_at: personality1.createdAt,
+          updated_at: personality1.updatedAt,
+        };
+        return Promise.resolve({ rows: [dbRow], command: 'SELECT', rowCount: 1, oid: 0, fields: [] });
+      }
+      // call 3: UPDATE paper_trades
+      return Promise.resolve({ rows: [], command: 'UPDATE', rowCount: 1, oid: 0, fields: [] });
+    });
+
+    const db = { query: mockQuery } as unknown as Pool;
+    const redis = makeMockRedis(xreadgroupResponses);
+    const clock = new FixedClock(IST_1030_MAY19);
+
+    process.env.VIX_STALE_MS = '99999999';
+
+    const mockOpenTrade = vi.fn().mockResolvedValue('trade-uuid-bn');
+    vi.mocked(PaperTradeExecutor).mockImplementation(
+      () =>
+        ({
+          openTrade: mockOpenTrade,
+        }) as unknown as InstanceType<typeof PaperTradeExecutor>,
+    );
+
+    const router = new PersonalityRouter(db, redis, clock);
+    await router.start();
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    await router.stop();
+
+    delete process.env.VIX_STALE_MS;
+
+    // The UPDATE must have been issued (call index 3).
+    // We assert-then-narrow: if updateCall is undefined the expect throws and the
+    // test fails; the non-null assertion on the next line is safe after that guard.
+    const updateCall = capturedQueries[2];
+    expect(updateCall).toBeDefined();
+    // Narrow away `undefined` for strict-mode property access below.
+    const update = updateCall!;
+
+    // SQL must reference all four placeholders including $3 (underlying) and $4 (id).
+    expect(update.sql).toMatch(/SET\s+personality_id\s*=\s*\$1/i);
+    expect(update.sql).toMatch(/signal_id\s*=\s*\$2/i);
+    expect(update.sql).toMatch(/underlying\s*=\s*\$3/i);
+    expect(update.sql).toMatch(/WHERE\s+id\s*=\s*\$4/i);
+
+    // Parameters: [$1=personalityId, $2=signalId, $3=underlying, $4=tradeId]
+    expect(update.params[0]).toBe('pers-001');       // $1: personality_id
+    expect(update.params[1]).toBe('sig-bn-001');     // $2: signal_id
+    expect(update.params[2]).toBe('BANKNIFTY');      // $3: underlying (bare index name)
+    expect(update.params[3]).toBe('trade-uuid-bn');  // $4: trade id
   });
 
   // -------------------------------------------------------------------------
