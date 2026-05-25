@@ -530,6 +530,19 @@ export class PeakDetectionEngine {
 
     // Write to straddle_signals table.
     // All parameterised — no string interpolation.
+    //
+    // FIX M2 — Idempotent INSERT:
+    //   $1 uses the snapshot's `time` field (epoch ms from the stream message),
+    //   NOT clock.now(). Using the snapshot time makes the value deterministic
+    //   for the same re-delivered stream message: if this message is re-delivered
+    //   after a restart (partial shutdown before ACK), the INSERT sees the same
+    //   (signal_type, time, underlying, atm_strike) and the ON CONFLICT clause
+    //   skips the duplicate silently. Using clock.now() would produce a different
+    //   timestamp on each delivery, defeating the unique constraint.
+    //
+    //   ON CONFLICT DO NOTHING targets the unique index added by migration 014
+    //   on (signal_type, time, underlying, atm_strike) for MOMENTUM_EXHAUSTION.
+    //   RETURNING id returns NULL rows on conflict — handled below.
     const dbResult = await this._db.query<{ id: string }>(
       `INSERT INTO straddle_signals
          (time, underlying, signal_type, atm_strike, spot, straddle_value,
@@ -537,9 +550,10 @@ export class PeakDetectionEngine {
           expansion_pct, roc_decline_candles, acceleration_value, adjustment_breakdown)
        VALUES
          ($1, $2, 'MOMENTUM_EXHAUSTION', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       ON CONFLICT DO NOTHING
        RETURNING id`,
       [
-        new Date(now), // $1: time (TIMESTAMPTZ)
+        new Date(time), // $1: time (TIMESTAMPTZ) — snapshot time, NOT clock.now()
         underlying, // $2: underlying
         String(atmStrike), // $3: atm_strike (NUMERIC)
         String(spot), // $4: spot (NUMERIC)
@@ -554,6 +568,19 @@ export class PeakDetectionEngine {
         JSON.stringify(adjustmentBreakdown), // $13: adjustment_breakdown (TEXT JSON)
       ],
     );
+
+    // ON CONFLICT DO NOTHING returns 0 rows on a duplicate — handle gracefully.
+    // A duplicate means the same snapshot was re-delivered after a partial
+    // shutdown (the INSERT committed but the ACK never reached Redis). We log
+    // at debug level and skip re-publishing to signals.generated — the original
+    // publish already happened, so downstream consumers already have this signal.
+    if (dbResult.rows.length === 0) {
+      console.debug(
+        `[PeakDetectionEngine] Duplicate signal skipped (ON CONFLICT DO NOTHING): ` +
+          `${underlying} atm=${atmStrike} time=${new Date(time).toISOString()}`,
+      );
+      return;
+    }
 
     const signalId = dbResult.rows[0]?.id ?? 'unknown';
 

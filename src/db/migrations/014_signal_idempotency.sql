@@ -1,0 +1,140 @@
+-- Migration 014: Signal idempotency — unique indexes on straddle_signals +
+-- sr_level_price column for S/R signal deduplication.
+--
+-- Addresses FIX M2 from the Milestone 5 Phase-6 fix cycle.
+--
+-- =========================================================================
+-- WHY THIS MIGRATION EXISTS
+-- =========================================================================
+--
+-- The peak-detection-engine and sr-detection-engine INSERT into straddle_signals
+-- inside a Redis consumer-group loop. They ACK the stream message AFTER the
+-- INSERT commits. A partial shutdown between INSERT commit and ACK leaves the
+-- message in the Redis "pending entries list" (PEL). On restart the engine
+-- re-delivers the same message and re-executes the INSERT, producing a
+-- duplicate row. Both engines are now changed to:
+--   1. Use the snapshot `time` field (stable across re-deliveries) for the
+--      straddle_signals.time column rather than clock.now() (which changes
+--      after restart).
+--   2. Use ON CONFLICT DO NOTHING on a natural unique key per signal type.
+--
+-- =========================================================================
+-- UNIQUE KEY DESIGN
+-- =========================================================================
+--
+-- One signal occurrence is uniquely identified by the *snapshot* that triggered
+-- it, not the wall-clock time of the INSERT. Two partial unique indexes are
+-- used (one per signal_type) so the key shapes remain independent:
+--
+-- MOMENTUM_EXHAUSTION:
+--   Natural key = (signal_type, time, underlying, atm_strike).
+--   At any given snapshot instant (time), the engine emits at most one
+--   MOMENTUM_EXHAUSTION signal per underlying per ATM strike.
+--
+-- PULLBACK (SR_REVERSAL):
+--   Natural key = (signal_type, time, underlying, atm_strike, sr_level_price).
+--   Multiple S/R levels may qualify at the same instant — each produces a
+--   separate signal distinguished by the level price. sr_level_price is a new
+--   nullable column added below; SR signals always write a non-null value.
+--
+-- =========================================================================
+-- TIMESCALEDB REQUIREMENT
+-- =========================================================================
+--
+-- TimescaleDB requires that every unique index on a hypertable INCLUDES the
+-- partition column (`time`). Both indexes include `time`, satisfying this rule.
+-- See migration 009 (straddle_snapshots) for the same pattern.
+--
+-- =========================================================================
+-- DUPLICATE DATA WARNING
+-- =========================================================================
+--
+-- CREATE UNIQUE INDEX IF NOT EXISTS will FAIL if existing data already contains
+-- rows that violate the uniqueness constraint. This is only possible if the
+-- system experienced a partial-shutdown/restart scenario BEFORE this migration
+-- was applied — i.e. if the bug described above already produced duplicates.
+--
+-- To check for pre-existing duplicates, run the following queries BEFORE
+-- applying this migration:
+--
+--   -- MOMENTUM_EXHAUSTION duplicates:
+--   SELECT signal_type, time, underlying, atm_strike, COUNT(*)
+--     FROM straddle_signals
+--    WHERE signal_type = 'MOMENTUM_EXHAUSTION'
+--    GROUP BY signal_type, time, underlying, atm_strike
+--   HAVING COUNT(*) > 1;
+--
+--   -- PULLBACK duplicates (once sr_level_price column exists):
+--   SELECT signal_type, time, underlying, atm_strike, sr_level_price, COUNT(*)
+--     FROM straddle_signals
+--    WHERE signal_type = 'PULLBACK'
+--    GROUP BY signal_type, time, underlying, atm_strike, sr_level_price
+--   HAVING COUNT(*) > 1;
+--
+-- If duplicates exist, clean them up with a CTE that keeps only the earliest id:
+--   DELETE FROM straddle_signals
+--    WHERE id NOT IN (
+--      SELECT DISTINCT ON (signal_type, time, underlying, atm_strike) id
+--        FROM straddle_signals
+--       WHERE signal_type = 'MOMENTUM_EXHAUSTION'
+--       ORDER BY signal_type, time, underlying, atm_strike, id
+--    )
+--    AND signal_type = 'MOMENTUM_EXHAUSTION';
+--
+-- This migration is idempotent-safe at the DDL level (IF NOT EXISTS guards),
+-- but the INDEX creation step will error if duplicates exist — which is the
+-- correct behaviour (the operator must resolve the data issue first).
+--
+-- =========================================================================
+-- STEP 1: Add sr_level_price column
+-- =========================================================================
+--
+-- sr_level_price stores the S/R level price that triggered each PULLBACK signal.
+-- NULL for MOMENTUM_EXHAUSTION and SCHEDULED signals (they have no level price).
+--
+-- Nullable (no NOT NULL constraint) so existing MOMENTUM_EXHAUSTION/SCHEDULED
+-- rows are unaffected. The SR engine always writes a non-null value for PULLBACK
+-- signals via migration 014's updated INSERT.
+--
+-- ADD COLUMN IF NOT EXISTS makes this step idempotent — safe to re-run.
+
+ALTER TABLE straddle_signals
+  ADD COLUMN IF NOT EXISTS sr_level_price NUMERIC;
+
+-- =========================================================================
+-- STEP 2: Unique index for MOMENTUM_EXHAUSTION signals
+-- =========================================================================
+--
+-- Partial index (WHERE clause) scopes to MOMENTUM_EXHAUSTION rows only.
+-- The WHERE predicate is evaluated at index-build time and at INSERT time.
+--
+-- Partial indexes on TimescaleDB hypertables work the same as on regular
+-- tables — the index is built on each chunk independently. The `time` column
+-- satisfies TimescaleDB's "unique index must include partition column" rule.
+--
+-- IF NOT EXISTS: idempotent — re-running this migration on a DB where the
+-- index already exists is a no-op. However, if duplicates exist in the data,
+-- this statement will fail with a unique-violation error — see warning above.
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_straddle_signals_momentum_exhaustion_idem
+  ON straddle_signals (signal_type, time, underlying, atm_strike)
+  WHERE signal_type = 'MOMENTUM_EXHAUSTION';
+
+-- =========================================================================
+-- STEP 3: Unique index for PULLBACK (SR_REVERSAL) signals
+-- =========================================================================
+--
+-- Partial index scoped to PULLBACK rows. sr_level_price is included so that
+-- multiple S/R levels at the same (time, underlying, atm_strike) do NOT
+-- conflict with each other — each level price is a distinct signal event.
+--
+-- sr_level_price is NOT NULL in all PULLBACK rows written after this migration
+-- (the SR engine writes a non-null value per $19 in the updated INSERT). The
+-- index will not match rows where sr_level_price IS NULL (null != null in
+-- standard SQL unique index semantics), so pre-migration PULLBACK rows without
+-- a level price will not participate in the conflict check — that is acceptable
+-- because those rows pre-date the idempotency mechanism.
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_straddle_signals_pullback_idem
+  ON straddle_signals (signal_type, time, underlying, atm_strike, sr_level_price)
+  WHERE signal_type = 'PULLBACK';

@@ -27,6 +27,15 @@ import { buildOptionSymbol, getAtmStrike, getCurrentExpiry } from './brokers/ins
 import type { BrokerTick, Underlying } from './brokers/types';
 import { computeAcceleration, computeRoc } from './straddle-math';
 
+// IST offset in milliseconds — used for expiry rollover detection.
+// IST = UTC+5:30, no DST. Declared at module level to avoid re-computing
+// inside the hot 15s snapshot path.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+// Expiry is considered expired after 15:30 IST on expiry day.
+// We check this as: (istHour > 15) || (istHour === 15 && istMin >= 30)
+const EXPIRY_CUTOFF_HOUR = 15;
+const EXPIRY_CUTOFF_MIN = 30;
+
 // ---------------------------------------------------------------------------
 // Public interfaces
 // ---------------------------------------------------------------------------
@@ -75,6 +84,43 @@ export interface StraddleCalcConfig {
    * prevents this by not registering the interval at all.
    */
   noInterval?: boolean;
+  /**
+   * Pre-resolved current weekly expiry date for this underlying.
+   *
+   * When provided, the calculator uses this date for option symbol building
+   * instead of the synchronous Thursday-weekday formula (getCurrentExpiry).
+   * This is REQUIRED for BankNifty (Wednesday expiry) and Sensex (Friday
+   * expiry) to produce correct symbols — getCurrentExpiry always returns a
+   * Thursday and is therefore wrong for those underlyings.
+   *
+   * Resolution: call getCurrentExpiryFromCalendar(pool, underlying, clock) in
+   * index.ts at startup and pass the result here. The calculator caches it
+   * and refreshes in-memory when the clock advances past the expiry date so
+   * there are NO per-tick DB calls.
+   *
+   * Week rollover: when the clock indicates the cached expiry has passed
+   * (15:30 IST on expiry day), the calculator calls resolveExpiry() to fetch
+   * the next expiry and caches the result. This is a one-off async call at
+   * the week boundary — not a hot-path operation.
+   *
+   * When omitted, falls back to getCurrentExpiry (Thursday formula).
+   * NIFTY is unaffected — its weekly expiry is always Thursday, matching the
+   * formula. Always provide this for BANKNIFTY and SENSEX.
+   */
+  currentExpiry?: Date;
+  /**
+   * Async function to re-resolve the expiry from the calendar when the cached
+   * expiry has rolled over. Called at most once per expiry week (not per tick).
+   *
+   * Must be provided when currentExpiry is provided. If omitted, week rollover
+   * falls back to the Thursday formula (safe for NIFTY, wrong for others).
+   *
+   * WHY not injected via the pool directly?
+   * Keeping the DB pool out of StraddleCalcConfig preserves the existing
+   * contract (straddle-calc.ts does not import 'pg' directly). index.ts
+   * owns the pool and wraps the call in this closure.
+   */
+  resolveExpiry?: () => Promise<Date>;
 }
 
 export interface StraddleCalculator {
@@ -161,6 +207,119 @@ export function createStraddleCalculator(
   const snapshotIntervalMs = config.snapshotIntervalMs ?? 15_000;
   const rocWindowSize = config.rocWindowSize ?? 5;
   const clock: Clock = config.clock ?? new RealClock();
+
+  // ---------------------------------------------------------------------------
+  // Expiry caching — FIX H1
+  //
+  // The synchronous getCurrentExpiry() always returns the nearest Thursday
+  // regardless of the `underlying` argument. BankNifty options expire on
+  // Wednesdays and Sensex options expire on Fridays — so the Thursday formula
+  // produces wrong symbols for those underlyings.
+  //
+  // We solve this by accepting a pre-resolved calendar expiry at construction
+  // time (config.currentExpiry) and refreshing it in-memory on week rollover.
+  //
+  // Week rollover detection: after the expiry date's 15:30 IST cutoff, the
+  // current expiry is "expired". We detect this synchronously in
+  // resolveCurrentExpiry() using the clock, then kick off a single async
+  // refresh. The refresh is debounced via `expiryRefreshInFlight` so concurrent
+  // snapshot calls during the rollover moment never trigger multiple DB hits.
+  //
+  // WHY cache in a mutable variable rather than re-computing per snapshot?
+  // getCurrentExpiryFromCalendar() is async (DB call). The 15s snapshot path
+  // is fire-and-forget and cannot await async work on the hot path. Caching
+  // the result and refreshing lazily on rollover is the only correct approach.
+  // ---------------------------------------------------------------------------
+
+  // Mutable cached expiry — updated on week rollover.
+  let cachedExpiry: Date | null = config.currentExpiry ?? null;
+  // Guards against concurrent refresh calls during the rollover window.
+  let expiryRefreshInFlight = false;
+
+  /**
+   * Return the expiry date to use for this snapshot.
+   *
+   * Uses the cached calendar expiry when available. Falls back to the Thursday
+   * formula (getCurrentExpiry) only when no calendar expiry was injected.
+   * Triggers an async rollover refresh when the clock is past the expiry cutoff
+   * on the expiry day — the current snapshot still uses the OLD expiry (which
+   * is still correct until 15:30 IST), and subsequent snapshots see the new
+   * one once the refresh resolves.
+   *
+   * WHY still return the old expiry during refresh?
+   * The old expiry is valid up to (and including) 15:30 IST on expiry day.
+   * Returning null or blocking would break the current snapshot. The async
+   * refresh updates cachedExpiry before the next snapshot fires (15s later).
+   */
+  function resolveCurrentExpiry(): Date {
+    if (cachedExpiry === null) {
+      // No calendar expiry injected — use Thursday fallback.
+      // NIFTY is correct with this; BANKNIFTY/SENSEX are wrong but this is a
+      // config error (caller must always provide currentExpiry for non-NIFTY).
+      return getCurrentExpiry(underlying, clock);
+    }
+
+    // Check if the cached expiry has rolled over. We detect rollover as:
+    //   clock is >= 15:30 IST on the expiry day OR clock is past the expiry day.
+    //
+    // We compare UTC calendar dates: the cached expiry is UTC-midnight-aligned
+    // (parsed as YYYY-MM-DDT00:00:00.000Z in instrument-registry), so its
+    // getUTCDate/Month/Year are the correct IST calendar date values.
+    const nowMs = clock.timestamp?.() ?? clock.now();
+    const nowIst = new Date(nowMs + IST_OFFSET_MS);
+    const expiryUtcDate = cachedExpiry;
+
+    // Check if the IST calendar date is PAST the expiry date
+    const nowIstDateOnly = new Date(
+      Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()),
+    );
+    const expiryDateOnly = new Date(
+      Date.UTC(
+        expiryUtcDate.getUTCFullYear(),
+        expiryUtcDate.getUTCMonth(),
+        expiryUtcDate.getUTCDate(),
+      ),
+    );
+
+    const isPastExpiryDay = nowIstDateOnly > expiryDateOnly;
+    const isExpiryDay = nowIstDateOnly.getTime() === expiryDateOnly.getTime();
+    const istHour = nowIst.getUTCHours();
+    const istMin = nowIst.getUTCMinutes();
+    const isPastCutoff =
+      istHour > EXPIRY_CUTOFF_HOUR ||
+      (istHour === EXPIRY_CUTOFF_HOUR && istMin >= EXPIRY_CUTOFF_MIN);
+
+    const needsRollover = isPastExpiryDay || (isExpiryDay && isPastCutoff);
+
+    if (needsRollover && !expiryRefreshInFlight && config.resolveExpiry) {
+      // Trigger the async refresh. This is NOT awaited — the current snapshot
+      // still uses the old expiry (valid up to 15:30 IST on expiry day), and
+      // the next snapshot (15s later) will see the refreshed expiry.
+      expiryRefreshInFlight = true;
+      config
+        .resolveExpiry()
+        .then((newExpiry) => {
+          cachedExpiry = newExpiry;
+          console.log(
+            `[straddle-calc] Week rollover for ${underlying}: ` +
+              `new expiry ${newExpiry.toISOString().slice(0, 10)}`,
+          );
+        })
+        .catch((err: unknown) => {
+          console.error(
+            `[straddle-calc] Failed to refresh expiry for ${underlying} on rollover:`,
+            err,
+          );
+          // Leave cachedExpiry as-is — the next snapshot will retry
+          // (expiryRefreshInFlight is reset in finally).
+        })
+        .finally(() => {
+          expiryRefreshInFlight = false;
+        });
+    }
+
+    return cachedExpiry;
+  }
 
   // In-memory map from Fyers symbol string → latest price + timestamp.
   const priceMap = new Map<string, PriceEntry>();
@@ -298,7 +457,10 @@ export function createStraddleCalculator(
    */
   async function computeAndPublishSnapshot(): Promise<string | null> {
     // Resolve the current ATM strike from the latest underlying price.
-    const expiry = getCurrentExpiry(underlying, clock);
+    // resolveCurrentExpiry() returns the calendar-correct expiry (injected at
+    // construction) and triggers an async refresh on week rollover. Falls back
+    // to the Thursday formula only when no calendar expiry was injected.
+    const expiry = resolveCurrentExpiry();
     const underlyingSymbol =
       underlying === 'NIFTY'
         ? 'NSE:NIFTY50-INDEX'

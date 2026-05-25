@@ -622,22 +622,34 @@ export class SRDetectionEngine {
 
     // Write to straddle_signals.
     // Column order and param positions mirror peak-detection-engine.ts for consistency.
-    // SR-specific columns (sr_subtype, sr_strength, poc_used, level_source) are appended.
+    // SR-specific columns (sr_subtype, sr_strength, poc_used, level_source, sr_level_price)
+    // are appended. sr_level_price is added by migration 014 and is part of the
+    // unique key for SR signals — see FIX M2 comment below.
     //
     // We use sr_strength as adjusted_probability: both are [0,1] and represent
     // "how confident is this signal". The generic scorer is not applicable here.
+    //
+    // FIX M2 — Idempotent INSERT:
+    //   $1 uses the snapshot `time` field (epoch ms from the stream message),
+    //   NOT clock.now(). This makes the value deterministic for re-delivered messages.
+    //   ON CONFLICT DO NOTHING targets the unique index on
+    //   (signal_type, time, underlying, atm_strike, sr_level_price) added by
+    //   migration 014. Multiple SR levels can fire at the same (time, underlying,
+    //   atm_strike) — sr_level_price distinguishes them so signals for different
+    //   levels are not treated as duplicates of each other.
     const dbResult = await this._db.query<{ id: string }>(
       `INSERT INTO straddle_signals
          (time, underlying, signal_type, atm_strike, spot, straddle_value,
           vix, raw_exhaustion_score, adjusted_probability, confidence_tier,
           expansion_pct, roc_decline_candles, acceleration_value, adjustment_breakdown,
-          sr_subtype, sr_strength, poc_used, level_source)
+          sr_subtype, sr_strength, poc_used, level_source, sr_level_price)
        VALUES
          ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-          $15, $16, $17, $18)
+          $15, $16, $17, $18, $19)
+       ON CONFLICT DO NOTHING
        RETURNING id`,
       [
-        new Date(now), // $1: time (TIMESTAMPTZ) — use clock.now() not snapshot.time
+        new Date(time), // $1: time (TIMESTAMPTZ) — snapshot time, NOT clock.now()
         underlying, // $2: underlying
         SR_SIGNAL_TYPE, // $3: signal_type ('PULLBACK')
         String(atmStrike), // $4: atm_strike (NUMERIC → string)
@@ -655,8 +667,21 @@ export class SRDetectionEngine {
         String(level.strength), // $16: sr_strength [0,1]
         level.poc_used, // $17: poc_used (BOOLEAN)
         JSON.stringify(levelSourcePayload), // $18: level_source (JSONB)
+        String(level.price), // $19: sr_level_price (NUMERIC) — part of idempotency key
       ],
     );
+
+    // ON CONFLICT DO NOTHING returns 0 rows on a duplicate — handle gracefully.
+    // A duplicate here means this level's signal for this snapshot was already
+    // written (committed INSERT but un-ACK'd before shutdown). Log at debug level
+    // and skip the Redis publish — the original publish already occurred.
+    if (dbResult.rows.length === 0) {
+      console.debug(
+        `[SRDetectionEngine] Duplicate SR signal skipped (ON CONFLICT DO NOTHING): ` +
+          `${underlying} level=${level.price} atm=${atmStrike} time=${new Date(time).toISOString()}`,
+      );
+      return;
+    }
 
     const signalId = dbResult.rows[0]?.id ?? 'unknown';
 

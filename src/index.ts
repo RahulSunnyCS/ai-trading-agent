@@ -420,10 +420,72 @@ async function main(): Promise<void> {
   //
   // Backward compat: when INDICES=NIFTY (default), this produces exactly one
   // StraddleCalculator for NIFTY — identical behaviour to before T-45.
+  //
+  // FIX H1: Inject a pre-resolved calendar expiry into each calculator.
+  //
+  // getCurrentExpiry (the Thursday formula) ignores the underlying argument
+  // and always returns a Thursday. BankNifty options expire on Wednesdays and
+  // Sensex options expire on Fridays — so the Thursday formula produces wrong
+  // option symbols for those underlyings. The startup assert already resolved
+  // the correct expiry via getCurrentExpiryFromCalendar; we pass it here so
+  // the calculator uses the calendar-correct date for symbol building.
+  //
+  // We also pass a resolveExpiry closure so the calculator can refresh
+  // in-memory when the current expiry rolls over (at 15:30 IST on expiry day).
+  // The closure captures the pool so straddle-calc.ts does not need to import
+  // 'pg' directly (keeping its existing dependency surface unchanged).
   // -------------------------------------------------------------------------
-  const straddleCalcs = activeIndices.map((underlying) =>
-    createStraddleCalculator(redis, { underlying, clock }),
-  );
+
+  // Resolve the current calendar expiry for each active underlying.
+  // assertUnderlyingReadiness already called getCurrentExpiryFromCalendar
+  // inside, but it did not return the Date. We call it again here; the DB
+  // round-trip is at startup only (not on the hot path) so the cost is fine.
+  const expiryByUnderlying = new Map<Underlying, Date>();
+  for (const underlying of activeIndices) {
+    try {
+      const expiry = await getCurrentExpiryFromCalendar(underlying, pool, clock);
+      expiryByUnderlying.set(underlying, expiry);
+      console.log(
+        `[index] ${underlying}: resolved calendar expiry ${expiry.toISOString().slice(0, 10)}`,
+      );
+    } catch (err) {
+      // This should not happen — assertUnderlyingReadiness already passed for
+      // this underlying, meaning a future expiry exists. Guard defensively: if
+      // it fails here, fall back to the Thursday formula (NIFTY is unaffected;
+      // BANKNIFTY/SENSEX would be wrong but this path is extremely unlikely).
+      console.error(
+        `[index] ${underlying}: unexpected failure re-resolving calendar expiry — ` +
+          `falling back to Thursday formula (BANKNIFTY/SENSEX symbols may be wrong):`,
+        err,
+      );
+    }
+  }
+
+  const straddleCalcs = activeIndices.map((underlying) => {
+    const currentExpiry = expiryByUnderlying.get(underlying);
+
+    // Build the config conditionally to satisfy exactOptionalPropertyTypes.
+    // When currentExpiry is undefined (calendar resolve failed — extremely rare
+    // defensive path), we omit both optional properties so the calculator falls
+    // back to the Thursday formula rather than receiving explicit undefineds.
+    if (currentExpiry !== undefined) {
+      // resolveExpiry closure: called by the calculator on week rollover (at
+      // most once per expiry week, never on the hot 15s snapshot path).
+      const resolveExpiry = async (): Promise<Date> =>
+        getCurrentExpiryFromCalendar(underlying, pool, clock);
+
+      return createStraddleCalculator(redis, {
+        underlying,
+        clock,
+        currentExpiry,
+        resolveExpiry,
+      });
+    }
+
+    // Fallback — no calendar expiry available (extremely rare; assertUnderlyingReadiness
+    // already passed so this branch should never be reached in practice).
+    return createStraddleCalculator(redis, { underlying, clock });
+  });
 
   // PeakDetectionEngine — single instance, consumes ALL underlyings' snapshots
   // via the straddle.values stream. The engine is per-underlying-stateful
@@ -727,11 +789,24 @@ async function main(): Promise<void> {
       }
       await positionMonitor.stop();
       await vixFeed.stop();
-      // Stop signal engines
+      // FIX M2: Stop straddle calculators BEFORE signal engines.
+      //
+      // The straddle calculators publish to the straddle.values stream.
+      // The signal engines (peakEngine, srEngine) consume from straddle.values
+      // via their XREADGROUP poll loops. If we stopped the engines first, any
+      // straddle.values messages produced by the calculators between engine
+      // loop exit and calculator stop would be delivered but not ACK'd,
+      // causing them to be re-delivered on restart (the "pending" PEL entries).
+      //
+      // Stopping calculators first ensures no new straddle.values messages are
+      // produced once the engines have stopped consuming. Any in-flight messages
+      // already in the pending list are handled by the ON CONFLICT DO NOTHING
+      // idempotent INSERTs added in migration 014.
+      await Promise.all(straddleCalcs.map((sc) => sc.stop()));
+      // Stop signal engines after calculators so no new snapshots arrive once
+      // the engines exit their consumer loops.
       await peakEngine.stop();
       await srEngine.stop();
-      // Stop all straddle calculators
-      await Promise.all(straddleCalcs.map((sc) => sc.stop()));
       if (feed) await feed.disconnect();
       await pool.end();
       await redis.quit();
