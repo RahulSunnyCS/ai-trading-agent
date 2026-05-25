@@ -23,3 +23,6 @@
 | Phase 4 | Architecture Reviewer (M5 diff, backend+infra) | architecture-reviewer | sonnet | high | ~18k |
 | Phase 4 | Synthesis (3 reports) | orchestrator | opus | high | ~12k |
 | Phase 4 | Gate-2 Translator pass | translator | haiku | medium | ~7k |
+| Phase 6 | FIX-A: risk controls (C1,H2,H3,M4,M5) | implementor | sonnet | high | ~20k |
+| Phase 6 | FIX-B: optimizer/EOD (C2,M3,M1,H4) | implementor | sonnet | high | ~20k |
+| Phase 6 | FIX-C: multi-index/lifecycle (H1,M2) | implementor | sonnet | high | ~20k |
