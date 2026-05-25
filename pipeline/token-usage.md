@@ -26,3 +26,7 @@
 | Phase 6 | FIX-A: risk controls (C1,H2,H3,M4,M5) | implementor | sonnet | high | ~20k |
 | Phase 6 | FIX-B: optimizer/EOD (C2,M3,M1,H4) | implementor | sonnet | high | ~20k |
 | Phase 6 | FIX-C: multi-index/lifecycle (H1,M2) | implementor | sonnet | high | ~20k |
+| Phase 6 | FIX-A2: populate underlying (C1 completion) | implementor | sonnet | medium | ~7k |
+| Phase 6 | Re-review: security (fix diff) | security-auditor | opus | high | ~22k |
+| Phase 6 | Re-review: performance (fix diff) | performance-reviewer | sonnet | high | ~12k |
+| Phase 6 | Re-review: architecture (fix diff) | architecture-reviewer | sonnet | high | ~12k |
