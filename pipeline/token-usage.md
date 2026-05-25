@@ -21,3 +21,5 @@
 | Phase 4 | Security Auditor (M5 diff) | security-auditor | opus | max | ~45k |
 | Phase 4 | Performance Reviewer (M5 diff) | performance-reviewer | sonnet | high | ~18k |
 | Phase 4 | Architecture Reviewer (M5 diff, backend+infra) | architecture-reviewer | sonnet | high | ~18k |
+| Phase 4 | Synthesis (3 reports) | orchestrator | opus | high | ~12k |
+| Phase 4 | Gate-2 Translator pass | translator | haiku | medium | ~7k |
