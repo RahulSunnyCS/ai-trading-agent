@@ -15,7 +15,8 @@
   - [x] Wave 2: T-43-B + T-44 done — 193 signals tests green (sr-levels 53 + filter/router incl. sr_anchored + ACTIVE_PHASE). Per-index leg cap confirmed correct (paper_trades.symbol = underlying).
   - [x] T-46 hybrid-objective rework committed (93 tests green). LIMITATION: backtest-runner hardcodes adjustedProbability=0.7 → finalist scoring can't discriminate yet (Gate-2 follow-up).
   - [x] Wave 3: T-43-C (S/R detection engine) committed — 39 tests. Found integration leak: SR signals (signal_type=PULLBACK) would route to momentum_exhaustion personalities.
-  - [~] Wave 4: T-45 (multi-index, + entry-engine.ts widening) in flight; SR-leak fix in personality-filter.ts in flight (parallel, disjoint files).
+  - [x] Wave 4: T-45 (multi-index) committed — 1019 tests green. Phase 3 COMPLETE.
+- [~] Phase 4: security + performance + architecture reviewers running in parallel vs c1b5b48..HEAD. → Human Gate 2 next.
   - Gate-2 carries: (1) migration 013 expiry weekdays need live NSE/BSE verification; (2) backtest-runner hardcodes adjustedProbability=0.7 (T-46 finalist scoring inert until fixed); (3) T-43-C session-boundary level reload (levels load once per engine lifetime — stale across midnight); (4) T-43-C minHistoryBars=500 default.
   - [ ] Wave 3: T-43-C
   - [ ] Wave 4: T-45

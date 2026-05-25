@@ -18,3 +18,6 @@
 | Phase 3 | T-43-C: S/R detection engine | implementor | sonnet | high | ~16k |
 | Phase 3 | T-45: multi-index expansion | implementor | sonnet | high | ~22k |
 | Phase 3 | Fix: SR-signal leak into momentum personalities | implementor | sonnet | medium | ~8k |
+| Phase 4 | Security Auditor (M5 diff) | security-auditor | opus | max | ~45k |
+| Phase 4 | Performance Reviewer (M5 diff) | performance-reviewer | sonnet | high | ~18k |
+| Phase 4 | Architecture Reviewer (M5 diff, backend+infra) | architecture-reviewer | sonnet | high | ~18k |
