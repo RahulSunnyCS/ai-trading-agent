@@ -33,3 +33,5 @@
 | Gate 2 | Re-review synthesis + Translator | orchestrator/translator | opus/haiku | high/med | ~14k |
 | Phase 5 | E2E test writer (M5 specs) | e2e-test-writer | sonnet | medium | ~14k |
 | Phase 5 | Docs writer (overview/technical) | docs-writer | haiku | low | ~5k |
+| Phase 6 | Automation Gate classify | orchestrator | haiku | low | ~2k |
+| Phase 7 | Epic doc writer | epic-doc-writer | sonnet | medium | ~16k |

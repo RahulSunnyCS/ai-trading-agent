@@ -15,9 +15,9 @@
 - [x] Phase 6 — Fix cycle (user chose Critical+High+Medium): FIX-A/A2 (C1,H3,M4,M5 + underlying populate), FIX-B (C2,M3,M1,H4), FIX-C (H1,M2). 1144 unit tests green, tsc clean.
 - [x] Re-review: Security PASS · Performance PASS · Architecture CONDITIONAL PASS. All Criticals/Highs resolved.
 - [x] **Human Gate 2 — CONDITIONAL PASS APPROVED** (user: approve & proceed).
-- [~] Phase 5 — Test Generation (E2E specs + docs). NOTE: no Docker in this env → integration + E2E Automation Gate are CI-ONLY (non-blocking per Automation Gate rules).
-- [ ] Phase 6 — Automation Gate (CI-ONLY here) 
-- [ ] Phase 7 — Epic doc + Final Review → Human Gate 3
+- [x] Phase 5 — Test Generation: docs (overview/technical updated, verified) + 5 new E2E specs (82 total tests compile/list clean). Unit tests already green (1144).
+- [x] Phase 6 — Automation Gate: **CI-ONLY** (no Docker → dev server can't start; non-blocking per rules). See pipeline/reviews/automation-gate.md. Unit PASS; integration + E2E run in CI.
+- [~] Phase 7 — Epic doc (epic-doc-writer running → docs/epics/) + Final Summary Report → Human Gate 3 next.
 
 ## Mandatory pre-Phase-2 follow-ups (from Gate 2)
 - **N1 (Medium):** add internal entry_type guard to runEvolutionEngine (not just EOD-caller filter).
