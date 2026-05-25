@@ -294,6 +294,23 @@ export function runPersonalityFilter(
     };
   }
 
+  // Converse S/R guard: an SR_REVERSAL signal must only be accepted by an
+  // sr_anchored personality. The S/R detection engine writes signals with
+  // signal_type='PULLBACK' and sr_subtype='SR_REVERSAL' — without this guard,
+  // the PULLBACK signal_type would pass the momentum_exhaustion check above
+  // (which only blocks SCHEDULED), allowing S/R signals to contaminate
+  // momentum_exhaustion, fixed_time, and any_signal trade populations.
+  // This must sit after the sr_anchored gate so the two checks compose
+  // cleanly: SR_REVERSAL → only sr_anchored passes; non-SR → sr_anchored
+  // is blocked by the gate above.
+  if (signal.sr_subtype === 'SR_REVERSAL' && personality.entryType !== 'sr_anchored') {
+    return {
+      pass: false,
+      stage: 1,
+      reason: `ENTRY_TYPE_MISMATCH: non-sr_anchored personality does not accept SR_REVERSAL signals`,
+    };
+  }
+
   // (c) Time-window gate: signal must be within the configured trading hours.
   // ENTRY_START_TIME and ENTRY_CUTOFF_TIME are read from env. Defaults match
   // NSE morning open and pre-expiry cutoff for weekly options.

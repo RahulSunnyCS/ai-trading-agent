@@ -59,6 +59,25 @@ function makeSignal(overrides: Partial<StraddleSignalInput> = {}): StraddleSigna
   };
 }
 
+/** An SR_REVERSAL signal emitted by the S/R detection engine. */
+function makeSRReversalSignal(overrides: Partial<StraddleSignalInput> = {}): StraddleSignalInput {
+  return {
+    signalType: 'PULLBACK',      // the only signal_type the DB CHECK constraint allows for S/R
+    signalId: 'sig-sr-reversal-001',
+    underlying: 'NIFTY',
+    atmStrike: 22000,
+    spot: 22000,
+    straddleValue: 200,
+    vix: 15,
+    adjustedProbability: 0.6,
+    confidenceTier: 'MEDIUM',
+    signalTimeMs: IST_1030_MAY19,
+    sr_subtype: 'SR_REVERSAL',   // discriminates: this is the S/R identity marker
+    sr_strength: 0.8,
+    ...overrides,
+  };
+}
+
 /** A SCHEDULED signal for Clockwork-style tests. */
 function makeScheduledSignal(overrides: Partial<StraddleSignalInput> = {}): StraddleSignalInput {
   return {
@@ -235,6 +254,129 @@ describe('Stage 1 — signal type matching', () => {
     // Should not fail at stage 1 for a non-blocked date (may pass all stages)
     if (!result.pass) {
       // Only acceptable failure is from a stage > 1
+      expect(result.stage).toBeGreaterThan(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 1 — SR_REVERSAL converse guard (S/R signal routing)
+// ---------------------------------------------------------------------------
+// The S/R detection engine emits signals with signalType='PULLBACK' and
+// sr_subtype='SR_REVERSAL'. Without the converse guard, momentum_exhaustion
+// and any_signal personalities would accept PULLBACK signals (their only
+// existing block is SCHEDULED), contaminating their trade populations.
+
+describe('Stage 1 — SR_REVERSAL converse guard', () => {
+  it('(a) rejects an SR_REVERSAL signal for a momentum_exhaustion personality', () => {
+    // Precision, Adjuster, and Reducer are momentum_exhaustion. An S/R signal
+    // (PULLBACK + sr_subtype=SR_REVERSAL) must not reach them.
+    const precision = makePersonality({
+      name: 'precision',
+      entryType: 'momentum_exhaustion',
+      params: { min_probability: 0.7, max_daily_trades: 2, max_daily_loss: 8000, vix_max: 25 },
+    });
+
+    const result = runPersonalityFilter(
+      makeSRReversalSignal(),
+      precision,
+      emptyDailyState,
+      IST_1030_MAY19,
+    );
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(1);
+    expect(result.reason).toMatch(/ENTRY_TYPE_MISMATCH/);
+    expect(result.reason).toMatch(/non-sr_anchored/);
+  });
+
+  it('(b) rejects an SR_REVERSAL signal for an any_signal personality', () => {
+    // any_signal personalities (Scanner, Blitz) accept all three signal types,
+    // but the SR_REVERSAL guard must still fire before the any_signal pass-through.
+    const scanner = makePersonality({
+      name: 'scanner',
+      entryType: 'any_signal',
+      params: { min_probability: 0.5, max_daily_trades: 5, max_daily_loss: 15000, vix_max: 30 },
+    });
+
+    const result = runPersonalityFilter(
+      makeSRReversalSignal(),
+      scanner,
+      emptyDailyState,
+      IST_1030_MAY19,
+    );
+
+    expect(result.pass).toBe(false);
+    expect(result.stage).toBe(1);
+    expect(result.reason).toMatch(/ENTRY_TYPE_MISMATCH/);
+    expect(result.reason).toMatch(/non-sr_anchored/);
+  });
+
+  it('(c) still accepts an SR_REVERSAL signal for an sr_anchored personality', () => {
+    // The converse guard must NOT fire for sr_anchored — the existing gate
+    // (sr_anchored requires SR_REVERSAL) already handles it, and the two
+    // guards must compose without double-blocking.
+    const levelhead: PersonalityConfig = {
+      id: 'pers-levelhead',
+      name: 'levelhead',
+      displayName: 'Levelhead',
+      groupType: 'reference',
+      entryType: 'sr_anchored',
+      managementStyle: 'cut_reenter',
+      isFrozen: false,
+      isActive: true,
+      phase: 2,
+      params: {
+        sr_strength_threshold: 0.65,
+        max_daily_trades: 10,
+        max_daily_loss: 50000,
+        vix_max: 50,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const result = runPersonalityFilter(
+      makeSRReversalSignal({ sr_strength: 0.9 }), // above threshold
+      levelhead,
+      emptyDailyState,
+      IST_1030_MAY19,
+    );
+
+    // Stage 1 must pass; result may pass all stages or fail at a later one
+    if (!result.pass) {
+      expect(result.stage).toBeGreaterThan(1);
+    }
+  });
+
+  it('(d) a plain PULLBACK signal without sr_subtype is still accepted by momentum_exhaustion (no regression)', () => {
+    // A PULLBACK signal emitted by an existing non-S/R path (no sr_subtype field)
+    // must continue to route to momentum_exhaustion personalities unchanged.
+    // The guard must only fire when sr_subtype is explicitly 'SR_REVERSAL'.
+    const precision = makePersonality({
+      name: 'precision',
+      entryType: 'momentum_exhaustion',
+      params: { min_probability: 0.5, max_daily_trades: 2, max_daily_loss: 8000, vix_max: 25 },
+    });
+
+    const plainPullback: StraddleSignalInput = {
+      signalType: 'PULLBACK',
+      signalId: 'sig-pullback-plain',
+      underlying: 'NIFTY',
+      atmStrike: 22000,
+      spot: 22000,
+      straddleValue: 200,
+      vix: 15,
+      adjustedProbability: 0.75,
+      confidenceTier: 'HIGH',
+      signalTimeMs: IST_1030_MAY19,
+      // sr_subtype intentionally absent — plain PULLBACK, not an S/R signal
+    };
+
+    const result = runPersonalityFilter(plainPullback, precision, emptyDailyState, IST_1030_MAY19);
+
+    // Stage 1 must pass; the signal is a regular PULLBACK, not an S/R signal
+    if (!result.pass) {
       expect(result.stage).toBeGreaterThan(1);
     }
   });
