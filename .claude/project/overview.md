@@ -28,7 +28,7 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 
 - **Phase 1 (complete):**
   - M0/M0.5: Bun scaffolding, Docker infra, DB/Redis clients, Vitest + CI, injectable Clock
-  - M1: Live/sim paper-trade loop, Fyers/Angel One/simulator brokers, straddle pipeline, trigger engine, Fastify API, React dashboard
+  - M1: Live/sim paper-trade loop, Fyers/Angel One/simulator brokers, straddle pipeline, trigger engine, Fastify API, React dashboard. Phase A (2026-05-25): Hardened Fyers integration with socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection, real broker-factory wiring (safe default-throw), synthetic ATM CE/PE option-leg ticks in simulator, /ws/ticks + /api/meta endpoints with max-connection cap, OAuth state CSRF validation, pre-market token-validity check job, broker-status state for frontend. Token refresh-grant, broker_tokens at-rest encryption, FYERS_PIN deferred to Phase B.
   - M2: Peak detection, probability scoring, 10-personality engine, 5-stage filter, Holder/Adjuster/Reducer management, portfolio risk rules, Personalities dashboard tab
   - M3a: Fyers historical REST client, idempotent backfill, straddle reconstruction, deterministic replay harness, regime tagging (T-33)
   - M7: Razorpay UPI payment system — order creation, HMAC webhook verification, credit consumption, geolocation, access-gate middleware, pricing page

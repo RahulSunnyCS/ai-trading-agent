@@ -7,8 +7,8 @@
  *   1. BROKER=fyers       → FyersBroker    (requires FYERS_APP_ID + FYERS_ACCESS_TOKEN)
  *   2. BROKER=angelone    → AngelOneBroker (requires AO_API_KEY + AO_CLIENT_CODE + AO_CLIENT_PIN + AO_TOTP_SECRET)
  *   3. BROKER=sim         → MarketDataSimulator
- *   4. SIMULATE=true      → MarketDataSimulator (legacy env-var, kept for backwards compat)
- *   5. (default)          → MarketDataSimulator
+ *   4. SIMULATE=true      → MarketDataSimulator (explicit simulation mode)
+ *   5. (no BROKER + SIMULATE!==true) → THROWS — prevents silent live-mode misconfiguration
  *
  * Throws a descriptive Error immediately if required env vars for the selected
  * broker are missing, so misconfiguration is caught at startup rather than
@@ -30,13 +30,22 @@ import type { BrokerFeed } from './types.js';
 /**
  * Instantiates the correct broker adapter based on the BROKER / SIMULATE env vars.
  *
+ * The clock parameter is typed as the base Clock interface (not ClockWithTick)
+ * because live brokers (Fyers, AngelOne) never call clock.tick() — they use
+ * the clock only for timestamp arithmetic. The simulator DOES call clock.tick()
+ * to drive synthetic data generation, so it narrows to ClockWithTick internally
+ * via an explicit cast inside _createSimulator. This allows callers to pass any
+ * Clock (e.g. RealClock, VirtualClock, FixedClock) without an upcast.
+ *
  * @param clock - Clock instance to inject into whichever adapter is selected.
- *                The Fyers and AngelOne adapters use it for tick timestamps.
- *                The simulator uses it for deterministic tick scheduling.
+ *                The Fyers and AngelOne adapters use it for tick timestamps only.
+ *                The simulator uses it for deterministic tick scheduling (needs tick()).
  * @returns A BrokerFeed instance ready to call connect() on.
  * @throws Error if the selected broker's required env vars are missing.
+ * @throws Error if BROKER is unset/empty AND SIMULATE is not exactly 'true' —
+ *         prevents silent fallback to the simulator in an intended-live environment.
  */
-export function createBroker(clock: ClockWithTick): BrokerFeed {
+export function createBroker(clock: Clock): BrokerFeed {
   const brokerName = (process.env.BROKER ?? '').toLowerCase().trim();
   const simulate = process.env.SIMULATE?.toLowerCase().trim();
 
@@ -49,17 +58,27 @@ export function createBroker(clock: ClockWithTick): BrokerFeed {
   }
 
   if (brokerName === 'sim' || simulate === 'true') {
-    // Simulator: no broker credentials needed.
-    return _createSimulator(clock);
+    // Simulator path: clock must support tick() for interval callbacks.
+    // We cast here because live brokers never reach this branch.
+    // Callers in simulation mode always pass a VirtualClock or another
+    // ClockWithTick, so the cast is safe in practice. If a caller passes a
+    // plain Clock (e.g. RealClock) with SIMULATE=true, the simulator will
+    // fail at runtime when it calls clock.tick() — this is the correct
+    // failure mode (misconfiguration caught at startup, not silently ignored).
+    return _createSimulator(clock as ClockWithTick);
   }
 
-  // Default: simulator. Safe choice — prevents accidental live broker
-  // connection when BROKER is unset (e.g. in a fresh dev environment).
-  console.log(
-    '[BrokerFactory] No BROKER env var set — defaulting to MarketDataSimulator. ' +
-      'Set BROKER=fyers or BROKER=angelone for live market data.',
+  // Safe default: BROKER is unset/empty AND SIMULATE !== 'true'.
+  // Do NOT silently fall back to the simulator — that would mask an operator
+  // misconfiguration where BROKER was forgotten in a live/staging environment.
+  // Throwing here forces the operator to make an explicit choice: set BROKER
+  // to a real adapter, or set SIMULATE=true for development.
+  throw new Error(
+    '[BrokerFactory] No broker configured. ' +
+      'Set BROKER=fyers or BROKER=angelone for live market data, ' +
+      'or set SIMULATE=true to run with the built-in market simulator. ' +
+      'Silently defaulting to the simulator is not allowed in ambiguous environments.',
   );
-  return _createSimulator(clock);
 }
 
 // ---------------------------------------------------------------------------

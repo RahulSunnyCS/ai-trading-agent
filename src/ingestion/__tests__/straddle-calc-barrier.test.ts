@@ -47,8 +47,17 @@ function makeInMemoryRedis() {
   }
 
   return {
-    async xadd(stream: string, _idArg: string, field: string, data: string): Promise<string> {
-      if (field !== 'data') throw new Error(`[fake-redis] unexpected field '${field}'`);
+    async xadd(stream: string, ...rest: string[]): Promise<string> {
+      // Locate the 'data' field robustly regardless of whether MAXLEN trimming
+      // args ('MAXLEN', '~', '10000') precede the stream-ID arg. The payload
+      // is always the element immediately after the literal 'data' field name.
+      const dataIdx = rest.indexOf('data');
+      if (dataIdx === -1 || dataIdx + 1 >= rest.length) {
+        throw new Error(
+          `[fake-redis] xadd: could not find 'data' field in args: ${JSON.stringify(rest)}`,
+        );
+      }
+      const data = rest[dataIdx + 1]!;
       const id = makeId();
       counter++;
       getStream(stream).push({ id, data });

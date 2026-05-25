@@ -17,6 +17,7 @@
 
 import type { Clock } from '../utils/clock';
 import { RealClock } from '../utils/clock';
+import { buildOptionSymbol, getAtmStrike, getCurrentExpiry } from './brokers/instrument-registry';
 import type { BrokerFeed, BrokerTick } from './brokers/types';
 
 // ---------------------------------------------------------------------------
@@ -151,23 +152,143 @@ export class MarketDataSimulator implements BrokerFeed {
     this._interval = setInterval(() => {
       this._price = this._nextPrice();
 
-      const tick: BrokerTick = {
+      const now = this._config.clock.timestamp?.() ?? this._config.clock.now();
+      // Round to 2 decimal places — NIFTY is quoted to the paisa.
+      const spot = Math.round(this._price * 100) / 100;
+
+      const indexTick: BrokerTick = {
         symbol: 'NSE:NIFTY50-INDEX',
         underlying: 'NIFTY',
-        // Round to 2 decimal places — NIFTY is quoted to the paisa.
-        ltp: Math.round(this._price * 100) / 100,
-        timestamp: this._config.clock.timestamp?.() ?? this._config.clock.now(),
-        time: this._config.clock.timestamp?.() ?? this._config.clock.now(),
+        ltp: spot,
+        timestamp: now,
+        time: now,
         isIndex: true,
         // Synthetic volume: uniform random in [10 000, 60 000) to mimic
         // realistic intraday session volume without modelling microstructure.
         volume: Math.floor(Math.random() * 50_000) + 10_000,
       };
 
+      // Emit the index tick first — unchanged from before (backward compatible).
       for (const cb of this._tickCallbacks) {
-        cb(tick);
+        cb(indexTick);
+      }
+
+      // Emit synthetic ATM CE and PE option ticks so straddle-calc's priceMap
+      // lookup for the ATM legs succeeds and straddle_snapshots are produced.
+      // The symbols are built with exactly the same functions straddle-calc uses
+      // (buildOptionSymbol / getCurrentExpiry / getAtmStrike from instrument-registry)
+      // so the symbol strings are guaranteed to match the lookup keys.
+      const expiry = getCurrentExpiry('NIFTY', this._config.clock);
+      const atmStrike = getAtmStrike('NIFTY', spot);
+
+      const ceSymbol = buildOptionSymbol('NIFTY', expiry, atmStrike, 'CE');
+      const peSymbol = buildOptionSymbol('NIFTY', expiry, atmStrike, 'PE');
+
+      // Expiry as ISO 'YYYY-MM-DD' — BrokerTick.expiry convention (not Fyers
+      // compact notation) so any consumer that reads the field gets a safe date string.
+      const expiryIso = expiry.toISOString().slice(0, 10);
+
+      const cePrice = this._syntheticOptionPrice(spot, atmStrike, expiry, now, 'CE');
+      const pePrice = this._syntheticOptionPrice(spot, atmStrike, expiry, now, 'PE');
+
+      const ceTick: BrokerTick = {
+        symbol: ceSymbol,
+        underlying: 'NIFTY',
+        ltp: cePrice,
+        timestamp: now,
+        time: now,
+        isIndex: false,
+        optionType: 'CE',
+        strike: atmStrike,
+        expiry: expiryIso,
+        // Synthetic option OI: realistic intraday OI range for ATM NIFTY options.
+        oi: Math.floor(Math.random() * 500_000) + 100_000,
+      };
+
+      const peTick: BrokerTick = {
+        symbol: peSymbol,
+        underlying: 'NIFTY',
+        ltp: pePrice,
+        timestamp: now,
+        time: now,
+        isIndex: false,
+        optionType: 'PE',
+        strike: atmStrike,
+        expiry: expiryIso,
+        oi: Math.floor(Math.random() * 500_000) + 100_000,
+      };
+
+      for (const cb of this._tickCallbacks) {
+        cb(ceTick);
+        cb(peTick);
       }
     }, this._config.intervalMs);
+  }
+
+  /**
+   * Compute a plausible synthetic option price for the ATM leg.
+   *
+   * This is a development simulator approximation — it does NOT need to be
+   * financially exact. The goal is that:
+   *   (a) Both CE and PE are strictly positive (never zero or negative).
+   *   (b) Prices move meaningfully as spot moves.
+   *   (c) The CE+PE straddle value is in a realistic NIFTY range (~150–350pt
+   *       for a weekly ATM straddle, depending on VIX and DTE).
+   *
+   * Approximation used: a simplified Black-Scholes-ish formula that captures
+   * the two main drivers — moneyness and time value — without requiring the
+   * full N(d1)/N(d2) machinery:
+   *
+   *   intrinsic = max(direction * (spot - strike), 0)
+   *   timeValue = sigma * sqrt(dteYears) * spot * TV_SCALE
+   *   price     = intrinsic + timeValue
+   *
+   * where TV_SCALE ≈ 0.4 (empirically tuned so a typical ATM straddle at
+   * ~5 DTE with 18% vol sits around ₹200–250pt, which matches typical NIFTY
+   * weekly ATM straddle levels).
+   *
+   * Since this is the ATM strike (strike == round(spot)), intrinsic is usually
+   * 0 or a few ticks, so the time-value term dominates — which is correct for
+   * an ATM option.
+   *
+   * The price is floored at 0.05 to prevent negative or zero LTP, which would
+   * confuse any downstream consumer that logs or divides by option price.
+   */
+  private _syntheticOptionPrice(
+    spot: number,
+    strike: number,
+    expiry: Date,
+    nowMs: number,
+    optionType: 'CE' | 'PE',
+  ): number {
+    // Days to expiry in trading-year fraction (same normalisation as _nextPrice).
+    const TRADING_YEAR_MS = 252 * 6.25 * 3600 * 1000;
+    const dteMs = Math.max(expiry.getTime() - nowMs, 0);
+    // Floor DTE at 0.25 trading days so same-day expiry still produces a
+    // non-zero time value (avoids a degenerate 0-price on expiry Friday morning).
+    const dteYears = Math.max(dteMs / TRADING_YEAR_MS, 0.25 / 252);
+
+    const sigma = this._config.annualVolatility;
+
+    // Intrinsic value: the amount the option is in-the-money.
+    // For an ATM strike, intrinsic ≈ 0 most of the time (|spot - strike| < 50).
+    const direction = optionType === 'CE' ? 1 : -1;
+    const intrinsic = Math.max(direction * (spot - strike), 0);
+
+    // Time value: approximation of the BS at-the-money option value.
+    // ATM BS ≈ S * sigma * sqrt(T) * 0.3989 (the N'(0) term = 1/sqrt(2π)).
+    // We use 0.4 as a round-number substitute for 0.3989 — close enough for
+    // a simulator.
+    const timeValue = sigma * Math.sqrt(dteYears) * spot * 0.4;
+
+    // Add a small random jitter (±2%) to make successive ticks look like a
+    // live market rather than a perfectly smooth curve.
+    const jitter = 1 + (Math.random() - 0.5) * 0.04;
+
+    const price = (intrinsic + timeValue) * jitter;
+
+    // Hard floor: option LTP is always at least ₹0.05 (one paisa increment).
+    return Math.max(Math.round(price * 100) / 100, 0.05);
   }
 
   /**

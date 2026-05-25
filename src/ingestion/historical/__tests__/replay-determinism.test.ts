@@ -171,10 +171,18 @@ function makeInMemoryRedis() {
   return {
     // Simulate XADD with auto-generated zero-padded ID.
     // Returns the assigned ID (e.g. "00000001-0", "00000002-0" ...).
-    async xadd(stream: string, _idArg: string, field: string, data: string): Promise<string> {
-      if (field !== 'data') {
-        throw new Error(`[fake-redis] xadd: unexpected field name '${field}'`);
+    // Accepts rest args so it works with both the old positional signature and
+    // the new MAXLEN trimming signature ('MAXLEN', '~', '10000', '*', 'data', json).
+    // The 'data' field name is located by searching rest[] so this fake is robust
+    // to any number of leading args before the field/value pairs.
+    async xadd(stream: string, ...rest: string[]): Promise<string> {
+      const dataIdx = rest.indexOf('data');
+      if (dataIdx === -1 || dataIdx + 1 >= rest.length) {
+        throw new Error(
+          `[fake-redis] xadd: could not find 'data' field in args: ${JSON.stringify(rest)}`,
+        );
       }
+      const data = rest[dataIdx + 1]!;
       const id = makeId();
       counter++;
       getStream(stream).push({ id, data });

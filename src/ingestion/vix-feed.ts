@@ -165,7 +165,17 @@ export function createVixFeed(redisClient: Redis, config?: VixFeedConfig): VixFe
   async function publishVix(reading: VixReading): Promise<void> {
     latestVix = reading;
     try {
-      await redisClient.xadd('market.vix', '*', 'data', JSON.stringify(reading));
+      // MAXLEN ~10000: approximate trim (O(1) amortised) caps the stream at ~10k
+      // entries so it never grows unbounded across a long trading session.
+      await redisClient.xadd(
+        'market.vix',
+        'MAXLEN',
+        '~',
+        '10000',
+        '*',
+        'data',
+        JSON.stringify(reading),
+      );
     } catch (err) {
       console.error('[vix-feed] failed to publish VIX reading to Redis:', err);
     }

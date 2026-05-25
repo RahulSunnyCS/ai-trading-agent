@@ -69,6 +69,31 @@ export interface FyersBrokerConfig {
   appId: string;
   accessToken: string;
   clock: Clock;
+  /**
+   * Optional factory used to create Fyers socket instances.
+   *
+   * Defaults to the module-level `fyersDataSocket` factory resolved from the
+   * CJS→ESM bridge above. Pass a custom factory in tests to inject a fake
+   * EventEmitter-based socket, making the adapter unit-testable without a live
+   * Fyers connection or real credentials.
+   *
+   * Production callers should omit this — the default is correct.
+   */
+  socketFactory?: FyersDataSocketFactory;
+  /**
+   * Maximum number of consecutive transient reconnect attempts before the
+   * circuit breaker trips.
+   *
+   * When this limit is reached the adapter stops retrying, emits a
+   * disconnect with reason AUTH_FAILURE (used here to mean "unrecoverable —
+   * operator must intervene"), and halts. This makes an infinite reconnect
+   * loop impossible even if the Fyers err.code===1 assumption is wrong at
+   * runtime.
+   *
+   * Default: 10.  Set to Infinity only in tests that explicitly test the
+   * no-cap behaviour (not recommended for production).
+   */
+  maxReconnectAttempts?: number;
 }
 
 // ─── FyersBroker ─────────────────────────────────────────────────────────────
@@ -87,6 +112,21 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
   private readonly _appId: string;
   private readonly _accessToken: string;
   private readonly _clock: Clock;
+
+  /**
+   * The socket factory used to create FyersDataSocketInstance objects.
+   * Defaults to the module-level fyersDataSocket; overridable in tests via
+   * the `socketFactory` constructor option so no live Fyers connection is
+   * needed for unit tests.
+   */
+  private readonly _socketFactory: FyersDataSocketFactory;
+
+  /**
+   * Circuit-breaker cap: maximum consecutive transient reconnect attempts
+   * before we stop and treat the situation as unrecoverable.
+   * Sourced from config.maxReconnectAttempts (default 10).
+   */
+  private readonly _maxReconnectAttempts: number;
 
   /** The active Fyers socket instance. Null before connect() or after stop(). */
   private _socket: FyersDataSocketInstance | null = null;
@@ -110,7 +150,7 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
   /** Reference to the pending reconnect timer so stop() can cancel it. */
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Count of consecutive transient reconnect attempts. For logging purposes. */
+  /** Count of consecutive transient reconnect attempts. For logging + circuit breaker. */
   private _reconnectAttempt = 0;
 
   constructor(config: FyersBrokerConfig) {
@@ -127,6 +167,16 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
     this._appId = config.appId;
     this._accessToken = config.accessToken;
     this._clock = config.clock;
+
+    // Fall back to the module-level factory (resolved from CJS→ESM bridge).
+    // Tests inject a fake factory here to avoid any live network calls.
+    this._socketFactory = config.socketFactory ?? fyersDataSocket;
+
+    // Default circuit-breaker cap to 10. This is conservative but sufficient
+    // for ~30 minutes of max-backoff (10 × 64 s ≈ 11 min) before we stop.
+    // Callers can raise it for long-running processes that should survive
+    // extended broker outages, but should NEVER set it to Infinity in prod.
+    this._maxReconnectAttempts = config.maxReconnectAttempts ?? 10;
   }
 
   // ─── BrokerFeed public API ──────────────────────────────────────────────
@@ -238,7 +288,10 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
     // We disable SDK auto-reconnect entirely (autoreconnect(false)) because we
     // implement our own exponential-backoff reconnection loop. Letting the SDK
     // also reconnect would cause duplicate subscriptions and unpredictable state.
-    const socket = fyersDataSocket.getInstance(
+    //
+    // All socket creation goes through _socketFactory so tests can inject a
+    // fake EventEmitter-based socket without any live network connections.
+    const socket = this._socketFactory.getInstance(
       combinedToken,
       '', // no SDK log files
       false, // SDK logging disabled
@@ -313,8 +366,42 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
    * index suffix from the symbol. E.g. 'NSE:NIFTY50-INDEX' → 'NIFTY'.
    * This heuristic covers the two default symbols; option tick symbols use a
    * different format parsed elsewhere (straddle-calc).
+   *
+   * AUTH-FAILURE INLINE DETECTION: Fyers may signal token expiry via the
+   * "message" event stream rather than the "error" event (the err.code===1
+   * path in _handleError). If a message arrives with `tick.s === 'error'` or
+   * `tick.code === 1`, it is an error payload masquerading as a tick. We route
+   * it to _handleError so the auth-failure / circuit-breaker logic fires
+   * consistently regardless of which channel Fyers uses.
    */
   private _handleTick(tick: FyersTick): void {
+    // ── Inline error detection ────────────────────────────────────────────
+    // Check for an error-shaped message BEFORE the symbol/ltp guard.
+    // Fyers sometimes delivers auth errors as tick-channel messages with
+    // s==='error' or code===1 instead of (or in addition to) the error event.
+    // We treat both forms identically to prevent silent infinite retry loops.
+    if (tick.s === 'error' || tick.code === 1) {
+      console.warn(
+        `[FyersBroker] Received inline error tick (s=${tick.s ?? 'n/a'}, code=${tick.code ?? 'n/a'}, message=${tick.message ?? 'n/a'}) — routing to error handler`,
+      );
+      // Synthesise a FyersSocketError so _handleError's existing logic applies.
+      // We default code to 1 (auth failure) because that is the only known
+      // in-band error Fyers documents; if Fyers adds other inline error codes
+      // in the future, this will conservatively treat them as auth failures
+      // until we know more — a safe fallback (stops retrying) vs. a dangerous
+      // one (retries forever).
+      //
+      // We use a conditional spread to avoid assigning `undefined` to optional
+      // properties, which would violate exactOptionalPropertyTypes.
+      this._handleError({
+        code: tick.code ?? 1,
+        ...(tick.message !== undefined ? { message: tick.message } : {}),
+        ...(tick.s !== undefined ? { s: tick.s } : {}),
+      });
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     // Validate that the tick carries the minimum required fields.
     // Malformed ticks (missing ltp or symbol) are silently dropped — they
     // cannot be usefully forwarded and there is no corrective action to take.
@@ -323,6 +410,28 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
     }
 
     const nowMs = this._clock.now();
+
+    // ── Exchange timestamp ────────────────────────────────────────────────
+    // Fyers sends tick.timestamp as epoch SECONDS (confirmed in SDK README
+    // and the comment in FyersTick type shim). Multiply by 1000 to normalise
+    // to epoch milliseconds, consistent with the rest of the pipeline.
+    //
+    // We do NOT replace `time` (which stays clock.now()) because:
+    //   - `time` is the wall-clock processing timestamp used by everything
+    //     downstream (straddle-calc, signal engine, etc.).
+    //   - `exchangeTime` is the exchange-side event time for replay parity
+    //     and latency measurement. Keeping them separate is intentional.
+    //   - tick.timestamp may be absent on some tick types (e.g. index spot
+    //     lite-mode). We only set exchangeTime when the field is present and
+    //     non-zero to avoid misleading zeros.
+    const exchangeTime: number | undefined =
+      tick.timestamp != null && tick.timestamp > 0 ? tick.timestamp * 1000 : undefined;
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Build the BrokerTick object. We use a conditional spread for `exchangeTime`
+    // to avoid assigning `undefined` to an optional property, which is rejected
+    // by exactOptionalPropertyTypes. The spread is a no-op when exchangeTime is
+    // absent, so the field simply does not appear on the emitted tick object.
     const brokerTick: BrokerTick = {
       symbol: tick.symbol,
       underlying: this._deriveUnderlying(tick.symbol),
@@ -338,6 +447,9 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
       ask: tick.ask_price ?? 0,
       // Index spot ticks have no optionType/strike/expiry — those remain undefined.
       isIndex: this._isIndexSymbol(tick.symbol),
+      // Optional exchange-side event time (epoch ms). Only spread when present
+      // to satisfy exactOptionalPropertyTypes (no undefined assignment).
+      ...(exchangeTime !== undefined ? { exchangeTime } : {}),
     };
 
     this.emit('tick', brokerTick);
@@ -399,7 +511,8 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
   // ─── Exponential backoff reconnect ─────────────────────────────────────
 
   /**
-   * Schedules the next reconnect attempt with jittered exponential backoff.
+   * Schedules the next reconnect attempt with jittered exponential backoff,
+   * subject to the circuit-breaker cap (`_maxReconnectAttempts`).
    *
    * We use setTimeout here (not the Clock abstraction) because:
    *   1. The Clock abstraction is tick-driven and not designed for scheduling
@@ -409,12 +522,29 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
    *   3. The timer reference is stored in _reconnectTimer so stop() can
    *      cancel it cleanly.
    *
-   * Maximum retry attempts is Infinity — index data is critical during market
-   * hours and we never give up on transient failures.
+   * CIRCUIT BREAKER: if `_reconnectAttempt` would exceed `_maxReconnectAttempts`,
+   * we stop immediately and emit AUTH_FAILURE. This makes an infinite reconnect
+   * loop impossible even when the Fyers err.code===1 assumption is wrong at
+   * runtime (e.g. Fyers changes how it signals token expiry). The counter is
+   * reset to zero on every successful connect, so only *consecutive* failures
+   * count toward the cap.
    */
   private _scheduleReconnect(): void {
     this._reconnecting = true;
     this._reconnectAttempt += 1;
+
+    // ── Circuit breaker ───────────────────────────────────────────────────
+    // Check AFTER incrementing so the logged attempt number is correct.
+    if (this._reconnectAttempt > this._maxReconnectAttempts) {
+      console.error(
+        `[FyersBroker] Circuit breaker tripped after ${this._reconnectAttempt - 1} consecutive reconnect attempts (cap=${this._maxReconnectAttempts}). Stopping — operator must investigate and restart. token prefix=${this._accessToken.slice(0, 4)}...`,
+      );
+      this._reconnecting = false;
+      this._stopped = true; // prevent any further reconnects
+      this.emit('disconnect', DisconnectReason.AUTH_FAILURE);
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────
 
     // Apply ±JITTER_FRACTION random jitter to prevent thundering-herd if
     // multiple instances restart simultaneously.

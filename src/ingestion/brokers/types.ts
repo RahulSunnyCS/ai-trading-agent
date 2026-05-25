@@ -48,6 +48,20 @@ export interface BrokerTick {
   expiry?: string;
   /** true for index spot ticks (NIFTY spot, VIX) — false for option ticks. */
   isIndex?: boolean;
+  /**
+   * Exchange-side timestamp in epoch milliseconds, taken directly from the
+   * broker's tick payload (Fyers: tick.timestamp × 1000, since Fyers sends
+   * epoch seconds).
+   *
+   * Kept separate from `time` (which is always clock.now()) so that:
+   *  - Replay / backtest harnesses can restore the original exchange event
+   *    ordering without touching wall-clock references.
+   *  - Any latency measurement between exchange event and our processing can
+   *    be computed as `time - exchangeTime`.
+   *
+   * Optional so other producers (simulator, AngelOne stub) need not set it.
+   */
+  exchangeTime?: number;
 }
 
 /**

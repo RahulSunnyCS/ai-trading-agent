@@ -359,9 +359,14 @@ export function createStraddleCalculator(
 
     // Publish to Redis stream `straddle.values` and return the assigned stream ID.
     // The returned ID is used by the replay drain barrier in position-monitor.
+    // MAXLEN ~10000: approximate trim (O(1) amortised) caps the stream at ~10k
+    // entries so it never grows unbounded in long-running sessions.
     try {
       const streamId = await redisClient.xadd(
         'straddle.values',
+        'MAXLEN',
+        '~',
+        '10000',
         '*',
         'data',
         JSON.stringify(snapshot),

@@ -133,10 +133,32 @@ export interface WsTickMessage {
 }
 
 /**
+ * A straddle snapshot broadcast by /ws/ticks whenever straddle.values stream
+ * has a new entry (approximately every 15 seconds from the straddle calculator).
+ *
+ * Field names match the server's message exactly (src/server/index.ts straddleLoop):
+ *   { type:'straddle', straddleValue, atmStrike, cePrice, pePrice, timestamp, roc?, acceleration? }
+ *
+ * `roc` and `acceleration` are optional — the server only includes them when
+ * the straddle snapshot itself carries those fields (i.e., after enough ticks
+ * have accumulated for the ROC window).
+ */
+export interface WsStraddleMessage {
+  type: 'straddle';
+  straddleValue: number;
+  atmStrike: number;
+  cePrice: number;
+  pePrice: number;
+  timestamp: number; // epoch ms
+  roc?: number; // rate of change — present only when the ROC window is satisfied
+  acceleration?: number; // second derivative — present only with roc
+}
+
+/**
  * Discriminated union covering all known /ws/ticks message shapes.
  * Switch on `msg.type` to narrow to the concrete variant.
  */
-export type TickMessage = WsConnectedMessage | WsTickMessage;
+export type TickMessage = WsConnectedMessage | WsTickMessage | WsStraddleMessage;
 
 // ---------------------------------------------------------------------------
 // Regime Tags (GET /api/regime-tags)

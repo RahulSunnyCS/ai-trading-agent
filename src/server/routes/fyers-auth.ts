@@ -8,17 +8,55 @@
  * The frontend opens /login in a new tab. After approving on fyers.in the user
  * is redirected to /callback, which writes the token to the broker_tokens
  * table and returns a small HTML page that closes itself.
+ *
+ * CSRF protection: /login generates a random `state` token and stores it in
+ * the module-level pendingStates map (TTL = 10 minutes). Fyers echoes the
+ * state back in the redirect URL (?state=...). /callback verifies the echoed
+ * state is present in the map and removes it (one-time use). Mismatches are
+ * rejected with HTTP 400. This prevents cross-site request forgery where an
+ * attacker could craft a callback URL with a stolen auth_code.
  */
 
 import { randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { checkTokenValidity, deriveStatusFlags } from '../../jobs/token-validity-check.js';
 import {
   buildAuthUrl,
   exchangeAuthCode,
   loadFyersOAuthConfig,
   loadStoredToken,
+  redactToken,
   saveToken,
 } from '../services/fyers-auth.js';
+
+// ---------------------------------------------------------------------------
+// OAuth state store — CSRF protection
+// ---------------------------------------------------------------------------
+// We use a module-level Map (rather than @fastify/cookie or a DB) because:
+//  1. @fastify/cookie is not a current dependency — adding it just for state
+//     would introduce unnecessary churn.
+//  2. The app is single-instance (see business.md); no distributed state
+//     needed across multiple processes.
+//  3. State tokens are short-lived (STATE_TTL_MS) and single-use.
+// The Map is pruned on every /login call to avoid unbounded growth.
+// ---------------------------------------------------------------------------
+
+/** How long a pending OAuth state is valid, in milliseconds. */
+const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes — enough for any human to complete login
+
+/**
+ * Map of state token → expiry timestamp (ms since epoch).
+ * Kept module-level so it survives across requests within the same process.
+ */
+const pendingStates = new Map<string, number>();
+
+/** Remove expired entries from pendingStates to prevent unbounded growth. */
+function pruneExpiredStates(): void {
+  const now = Date.now();
+  for (const [token, expiry] of pendingStates) {
+    if (now > expiry) pendingStates.delete(token);
+  }
+}
 
 export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
   server.get('/api/auth/fyers/login', async (_request, reply) => {
@@ -29,7 +67,13 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
         message: 'Set FYERS_APP_ID and FYERS_APP_SECRET in the server environment.',
       });
     }
+
+    // Prune stale entries before inserting a new one.
+    pruneExpiredStates();
+
     const state = randomBytes(16).toString('hex');
+    pendingStates.set(state, Date.now() + STATE_TTL_MS);
+
     return reply.send({ url: buildAuthUrl(cfg, state), state });
   });
 
@@ -38,7 +82,44 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
     if (!cfg) {
       return reply.code(503).send({ error: 'fyers_oauth_not_configured' });
     }
+
     const query = request.query as Record<string, string | undefined>;
+
+    // -----------------------------------------------------------------------
+    // CSRF: verify the echoed state matches a pending (non-expired) entry.
+    // Fyers echoes the state value we sent in the authorization URL back as
+    // ?state=... on the redirect. We reject anything that didn't originate
+    // from our own /login route — which blocks CSRF replay attacks.
+    // -----------------------------------------------------------------------
+    const incomingState = query.state;
+    if (!incomingState) {
+      return reply
+        .code(400)
+        .send({ error: 'missing_state', message: 'OAuth state parameter is required.' });
+    }
+    const stateExpiry = pendingStates.get(incomingState);
+    if (stateExpiry === undefined) {
+      // State not found — either forged or already consumed (replay attempt).
+      request.log.warn(
+        '[fyers-auth] OAuth callback received unknown state — possible CSRF attempt',
+      );
+      return reply.code(400).send({
+        error: 'invalid_state',
+        message: 'OAuth state mismatch — please start the login flow again.',
+      });
+    }
+    if (Date.now() > stateExpiry) {
+      // State found but expired.
+      pendingStates.delete(incomingState);
+      request.log.warn('[fyers-auth] OAuth callback received expired state');
+      return reply.code(400).send({
+        error: 'expired_state',
+        message: 'OAuth state expired — please start the login flow again.',
+      });
+    }
+    // Consume the state (one-time use) regardless of subsequent success/failure.
+    pendingStates.delete(incomingState);
+
     const authCode = query.auth_code ?? query.code;
     if (!authCode) {
       return reply.code(400).send({ error: 'missing_auth_code', details: query });
@@ -56,27 +137,59 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
 <script>setTimeout(() => window.close(), 1500);</script>
 </body></html>`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      request.log.error({ err }, '[fyers-auth] token exchange failed');
-      return reply.code(502).send({ error: 'token_exchange_failed', message });
+      // Log only a redacted token reference (first 4 chars) — never the full
+      // token or secret. The error message from Fyers may embed the auth code,
+      // so we log the safe message string only, not the raw error object.
+      const safeMessage = err instanceof Error ? err.message : String(err);
+      request.log.error(
+        { authCode: redactToken(authCode) },
+        `[fyers-auth] token exchange failed: ${safeMessage}`,
+      );
+      return reply.code(502).send({ error: 'token_exchange_failed', message: safeMessage });
     }
   });
 
   server.get('/api/auth/fyers/status', async (_request, reply) => {
     const cfg = loadFyersOAuthConfig();
     if (!cfg) {
-      return reply.send({ configured: false, connected: false });
+      // No OAuth config → cannot be connected. Degraded/needsReauth are also
+      // true so the dashboard banner can prompt the operator to configure
+      // the env vars, not just re-authenticate.
+      return reply.send({
+        configured: false,
+        connected: false,
+        degraded: true,
+        needsReauth: true,
+      });
     }
+
     const token = await loadStoredToken(server.db);
+
+    // Reuse checkTokenValidity from token-validity-check.ts so the validity
+    // computation lives in exactly one place — the status route and the
+    // scheduled job share identical logic with no duplication.
+    const state = checkTokenValidity(token?.expiresAt ?? null);
+    const { degraded, needsReauth } = deriveStatusFlags(state);
+
     if (!token) {
-      return reply.send({ configured: true, connected: false });
+      return reply.send({
+        configured: true,
+        connected: false,
+        degraded,
+        needsReauth,
+      });
     }
-    const expired = token.expiresAt.getTime() <= Date.now();
+
     return reply.send({
       configured: true,
-      connected: !expired,
+      // connected reflects whether the token is usable right now:
+      // near-expiry tokens are still technically valid, so connected=true.
+      // Only missing/expired tokens make connected=false.
+      connected: !needsReauth,
       expiresAt: token.expiresAt.toISOString(),
       appId: token.appId,
+      degraded,
+      needsReauth,
     });
   });
 };

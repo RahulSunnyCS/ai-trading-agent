@@ -37,14 +37,14 @@ this file.
 
 ## Delivery Status
 
-Legend: ✅ complete · 🚧 partial · ⬜ not started. Status as of 2026-05-24
-(`claude/eloquent-babbage-RwHSq` branch).
+Legend: ✅ complete · 🚧 partial · ⬜ not started. Status as of 2026-05-25
+(Phase A Fyers live-feed hardening complete).
 
 | Milestone | Status | Notes |
 |---|---|---|
 | **M0 — Scaffolding** | ✅ | T-01–T-06 complete. Bun project, Docker infra, DB/Redis clients, core schema + seed. |
 | **M0.5 — Testing & CI** | ✅ | T-59–T-63 complete. Lean CI, Biome + lefthook, Vitest + property tests, injectable Clock, integration harness. |
-| **M1 — Vertical slice + dashboard** | ✅ | T-07–T-21 complete. Live/sim trade loop, brokers (Fyers/Angel/sim), straddle pipeline, trigger engine, position monitor, Fastify API, React dashboard. |
+| **M1 — Vertical slice + dashboard** | ✅ | T-07–T-21 complete. Live/sim trade loop, brokers (Fyers/Angel/sim), straddle pipeline, trigger engine, position monitor, Fastify API, React dashboard. **Phase A (2026-05-25):** Hardened FyersBroker (socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection), real broker-factory wiring, simulator ATM CE/PE option-leg ticks, /ws/ticks + /api/meta endpoints, OAuth state validation, pre-market token-validity check job, broker-status state shared with frontend. Deferred to Phase B: token refresh-grant, broker_tokens encryption, FYERS_PIN. |
 | **M2 — Signals + multi-personality** | ✅ | T-22–T-32 complete. Peak detection, probability scoring, fallback signals, 10-personality seed, 5-stage filter, router, Holder/Adjuster/Reducer management, portfolio risk rules, personality CRUD + performance API. Personalities dashboard tab wired. |
 | **M3 — Historical data, replay & backtesting** | ✅ | T-54–T-57 + T-33 complete (M3a: Fyers historical client, idempotent backfill, straddle reconstruction, deterministic replay harness, regime tagging). T-51 (backtest runner) and T-58 (backtest reporting) complete — full in-memory backtest runner + experiment-card reporting (`bun run backtest`). |
 | **M4 — Retrospection + evolution** | ✅ | T-34–T-42 complete. EOD retrospection engine, Beat-Clockwork delta, Brier score, management effectiveness, rule-based evolution with integrity cap, BullMQ job orchestrator, REST API. See `docs/epics/m4-eod-retrospection-evolution.md`. |

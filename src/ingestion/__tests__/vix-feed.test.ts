@@ -172,10 +172,15 @@ describe('createVixFeed — tick-based VIX', () => {
     expect(redis.xadd).toHaveBeenCalledTimes(1);
     const args = redis.xadd.mock.calls[0] as unknown[];
     expect(args[0]).toBe('market.vix');
-    expect(args[1]).toBe('*');
-    expect(args[2]).toBe('data');
+    // New MAXLEN trimming args: args[1]='MAXLEN', args[2]='~', args[3]='10000'
+    expect(args[1]).toBe('MAXLEN');
+    expect(args[2]).toBe('~');
+    expect(args[3]).toBe('10000');
+    // Stream ID and field/value args follow the MAXLEN block
+    expect(args[4]).toBe('*');
+    expect(args[5]).toBe('data');
 
-    const published = JSON.parse(args[3] as string) as VixReading;
+    const published = JSON.parse(args[6] as string) as VixReading;
     expect(published.vix).toBe(17.5);
     expect(published.source).toBe('tick');
 
@@ -276,7 +281,12 @@ describe('createVixFeed — NSE poll fallback', () => {
     // xadd must have been called once with the poll reading.
     expect(redis.xadd).toHaveBeenCalledTimes(1);
     const args = redis.xadd.mock.calls[0] as unknown[];
-    const published = JSON.parse(args[3] as string) as VixReading;
+    // Verify MAXLEN trimming args are present
+    expect(args[1]).toBe('MAXLEN');
+    expect(args[2]).toBe('~');
+    expect(args[3]).toBe('10000');
+    // JSON payload is now at index 6 (after stream, MAXLEN, ~, 10000, *, data)
+    const published = JSON.parse(args[6] as string) as VixReading;
     expect(published.source).toBe('poll');
 
     await feed.stop();
@@ -333,7 +343,12 @@ describe('createVixFeed — poll dedup (tick freshness gate)', () => {
     // The difference is 0, which is less than 5 minutes — poll should be suppressed.
     expect(redis.xadd).toHaveBeenCalledTimes(1);
     const firstCallArgs = redis.xadd.mock.calls[0] as unknown[];
-    const firstPublished = JSON.parse(firstCallArgs[3] as string) as VixReading;
+    // Verify MAXLEN trimming args are present
+    expect(firstCallArgs[1]).toBe('MAXLEN');
+    expect(firstCallArgs[2]).toBe('~');
+    expect(firstCallArgs[3]).toBe('10000');
+    // JSON payload is now at index 6 (after stream, MAXLEN, ~, 10000, *, data)
+    const firstPublished = JSON.parse(firstCallArgs[6] as string) as VixReading;
     expect(firstPublished.source).toBe('tick');
 
     // Advance to trigger the poll interval.

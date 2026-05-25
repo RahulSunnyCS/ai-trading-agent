@@ -6,7 +6,8 @@
  *  - GET  /api/straddle/latest    — latest StraddleSnapshot stub (wired in T-21)
  *  - GET  /api/trades             — paper trades from DB (graceful fallback)
  *  - GET  /api/positions          — open positions stub
- *  - WS   /ws/ticks               — synthetic tick broadcast (wired in T-21)
+ *  - GET  /api/meta               — environment metadata for the frontend banner
+ *  - WS   /ws/ticks               — real tick feed from Redis streams
  *
  * Design decisions:
  *  - `buildServer` does NOT call listen() so tests can use server.inject()
@@ -15,10 +16,20 @@
  *    that tests can inject a mock pool via the decorator before any route runs.
  *  - CORS origin:true is intentionally permissive for development; production
  *    will lock this down to a specific allowed-origin list.
- *  - The WS synthetic tick interval is stored on the socket object so it is
- *    cleared on socket close, preventing timer leaks during tests.
+ *  - The WS handler uses a per-connection duplicated Redis client for stream
+ *    reads so the shared `redis` client (used everywhere else) is never blocked
+ *    by long-running XREAD calls. The duplicate is quit()'d on socket close.
+ *  - When `redis` is not provided (unit tests), the WS endpoint degrades
+ *    gracefully: sends 'connected' and no ticks — no crash.
  *  - process.env keys are accessed via dot notation to satisfy Biome's
  *    useLiteralKeys rule (no bracket notation).
+ *  - A single server-level onClose hook (registered once in buildServer) drains
+ *    the wsCleanupCallbacks Set. Per-connection cleanup is added to the Set on
+ *    open and removed on socket 'close' — no per-connection onClose hooks so
+ *    there is no unbounded hook accumulation.
+ *  - MAX_WS_CONNECTIONS (default 50, env-configurable) caps concurrent /ws/ticks
+ *    connections. A new connection that exceeds the cap receives a JSON error
+ *    frame and is closed before any Redis duplicate() is called.
  */
 
 import fastifyCors from '@fastify/cors';
@@ -27,6 +38,7 @@ import fastifyWebsocket from '@fastify/websocket';
 import type { Queue } from 'bullmq';
 import Fastify from 'fastify';
 import type { FastifyInstance, FastifyServerOptions } from 'fastify';
+import type { Redis } from 'ioredis';
 import { Pool } from 'pg';
 
 import { retrospectionRoutes } from '../api/routes/retrospection.js';
@@ -34,11 +46,58 @@ import {
   createEodRetrospectionQueue,
   createEodRetrospectionWorker,
 } from '../jobs/eod-retrospection-job.js';
+import { isAuthDegraded } from '../state/broker-status.js';
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
 import { paymentRoutes } from './routes/payment';
 
 // ---------------------------------------------------------------------------
-// Fastify module augmentation — makes server.db typed as Pool
+// WebSocket connection tracking — module-scoped to survive per-call scope
+// ---------------------------------------------------------------------------
+
+/**
+ * Set of cleanup callbacks for currently active /ws/ticks connections.
+ *
+ * Each connection registers its own cleanup() function here on open and
+ * removes it on socket 'close'. A single server-level onClose hook (registered
+ * once in buildServer) iterates this Set to drain all active connections when
+ * the server shuts down. This replaces the old pattern of calling
+ * server.addHook('onClose', ...) inside the per-connection handler, which
+ * caused an unbounded accumulation of server hooks — one per historical
+ * connection, never removed.
+ */
+const wsCleanupCallbacks = new Set<() => void>();
+
+/**
+ * Count of currently open /ws/ticks connections.
+ * Incremented before the connection is fully established; decremented in the
+ * socket 'close' handler (which always fires, even after a rejected upgrade).
+ */
+let wsConnectionCount = 0;
+
+/**
+ * Maximum concurrent /ws/ticks connections allowed.
+ *
+ * Configurable via MAX_WS_CONNECTIONS env var (must be a positive integer).
+ * Defaults to 50. When exceeded the new connection receives a JSON error frame
+ * and is immediately closed — no Redis duplicate() is opened.
+ *
+ * The cap is intentionally conservative: each active WS connection holds one
+ * duplicated Redis client (TCP connection) and two long-running async loops.
+ * 50 is well within normal Redis connection limits (default 10 000) while
+ * preventing runaway resource consumption from connection floods.
+ */
+const MAX_WS_CONNECTIONS: number = (() => {
+  const raw = process.env.MAX_WS_CONNECTIONS;
+  if (raw !== undefined) {
+    const parsed = Number.parseInt(raw, 10);
+    // Silently ignore non-positive or non-integer values and fall back to 50.
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return 50;
+})();
+
+// ---------------------------------------------------------------------------
+// Fastify module augmentation — makes server.db and server.redis typed
 // ---------------------------------------------------------------------------
 
 declare module 'fastify' {
@@ -47,6 +106,9 @@ declare module 'fastify' {
     // Decorated in buildServer() so route plugins can enqueue EOD jobs via
     // the same Queue instance (and Redis connection) without creating their own.
     eodQueue: Queue;
+    // Optional Redis client — absent when buildServer is called without one
+    // (e.g. unit tests). Routes must check for its presence before use.
+    redis: Redis | undefined;
   }
 }
 
@@ -87,10 +149,14 @@ function buildPool(): Pool {
  *   connection pools competing for the same PostgreSQL connections. When absent,
  *   buildServer() creates its own pool (used in tests and standalone server
  *   runs where pool sharing is not required).
+ * @param externalRedis  When provided, the server decorates itself with this
+ *   Redis client and uses it to stream live ticks and straddle values to WS
+ *   clients. When absent (unit tests), the WS endpoint degrades gracefully.
  */
 export async function buildServer(
   opts?: FastifyServerOptions,
   externalPool?: Pool,
+  externalRedis?: Redis,
 ): Promise<FastifyInstance> {
   const server = Fastify({
     logger: opts?.logger ?? true,
@@ -123,6 +189,11 @@ export async function buildServer(
   const ownsPool = externalPool === undefined;
   server.decorate('db', pool);
 
+  // Decorate with the optional Redis client.  When absent (unit tests or
+  // standalone server without Redis), routes and the WS handler guard against
+  // undefined before using it — no crashes.
+  server.decorate('redis', externalRedis);
+
   // Create the BullMQ EOD queue and decorate the server so route plugins can
   // enqueue jobs without importing the queue factory themselves. The queue is
   // always created here (even in test runs) because the Queue constructor only
@@ -138,6 +209,25 @@ export async function buildServer(
       await pool.end();
     });
   }
+
+  // Single server-level onClose hook for WS connection drain.
+  //
+  // This is registered ONCE here (buildServer scope) rather than once per
+  // WebSocket connection. Each active /ws/ticks connection adds its cleanup()
+  // to wsCleanupCallbacks on open and removes it on socket 'close'. When the
+  // server shuts down, this hook drains whatever connections are still open.
+  //
+  // Idempotency: cleanup() sets a `cleanupCalled` flag so calling it twice
+  // (once from 'close', once from here) is safe.
+  server.addHook('onClose', (_instance, done) => {
+    for (const cb of wsCleanupCallbacks) {
+      cb();
+    }
+    // The Set is drained by each cb() call (cb removes itself). Clear any
+    // stragglers defensively.
+    wsCleanupCallbacks.clear();
+    done();
+  });
 
   // ── Routes ────────────────────────────────────────────────────────────────
 
@@ -348,33 +438,308 @@ export async function buildServer(
     }
   });
 
-  // WS /ws/ticks — synthetic tick broadcast; real wiring in T-21
+  // GET /api/meta — environment metadata for the frontend banner.
+  // Returns the simulation flag, broker name, and live auth-degraded state so
+  // the UI can display a contextual status label ("SIM mode / Fyers" etc.) and
+  // a "re-login required" banner when the Fyers WebSocket has failed mid-session.
+  //
+  // authDegraded is read from the module-private state in broker-status.ts via
+  // the pure getter isAuthDegraded(). It never throws — the getter returns false
+  // if the module is not yet initialised (i.e. the broker has not disconnected).
+  server.get('/api/meta', async (_request, reply) => {
+    return reply.send({
+      simulate: process.env.SIMULATE === 'true',
+      broker: process.env.BROKER ?? '',
+      authDegraded: isAuthDegraded(),
+    });
+  });
+
+  // WS /ws/ticks — real tick feed from Redis streams market.ticks and
+  // straddle.values. Each connected socket gets its own duplicated Redis client
+  // so that per-connection XREAD calls never block the shared client used by
+  // the ingestion pipeline and other routes.
+  //
+  // Message shapes forwarded to the client:
+  //   { type: 'tick', symbol, ltp, timestamp }        — from market.ticks
+  //   { type: 'straddle', straddleValue, atmStrike,
+  //     cePrice, pePrice, timestamp, roc?, acceleration? } — from straddle.values
+  //
+  // When redis is not provided (unit tests), the handler sends 'connected' and
+  // returns immediately — no crash, no ticks.
+  //
+  // Connection cap: MAX_WS_CONNECTIONS (default 50, env-configurable).
+  // When exceeded, the new socket receives a JSON error frame and is closed
+  // immediately before any redis.duplicate() is called. This prevents unbounded
+  // resource consumption from connection floods (each active connection holds
+  // one duplicated Redis TCP connection and two async poll loops).
+  //
+  // Lifecycle / cleanup design:
+  //   - Each connection's cleanup() is added to wsCleanupCallbacks on open.
+  //   - The socket 'close' handler removes it and decrements wsConnectionCount.
+  //   - A single server-level onClose hook (registered once below, outside this
+  //     per-connection handler) drains the entire Set on server shutdown.
+  //   - NO per-connection server.addHook('onClose', ...) is used — the old
+  //     pattern accumulated one hook per historical connection, never cleaned up.
   server.get('/ws/ticks', { websocket: true }, (socket, _request) => {
-    // Send a "connected" confirmation immediately so the dashboard knows the
-    // socket is live.
+    // ── Connection cap check ──────────────────────────────────────────────────
+    // Check BEFORE opening any Redis connection or starting loops.
+    if (wsConnectionCount >= MAX_WS_CONNECTIONS) {
+      // Send a structured error so the client can surface a meaningful message
+      // rather than a bare close frame with no context.
+      socket.send(
+        JSON.stringify({
+          type: 'error',
+          code: 'TOO_MANY_CONNECTIONS',
+          message: `Server has reached the maximum of ${MAX_WS_CONNECTIONS} concurrent WebSocket connections. Try again later.`,
+        }),
+      );
+      socket.close();
+      return;
+    }
+
+    // Track this connection. Increment before the async path so the count is
+    // accurate even if an error occurs during setup.
+    wsConnectionCount++;
+
+    // Always send the 'connected' acknowledgement immediately so the client
+    // knows the socket is live regardless of Redis availability.
     socket.send(JSON.stringify({ type: 'connected', timestamp: Date.now() }));
 
-    // Broadcast synthetic NIFTY ticks every 5 seconds so the dashboard has
-    // data to render before the real straddle calculator is wired up (T-21).
-    const interval = setInterval(() => {
-      if (socket.readyState !== socket.OPEN) {
-        clearInterval(interval);
-        return;
-      }
-      // Synthetic random-walk tick — not representative of real market data.
-      const syntheticTick = {
-        type: 'tick',
-        symbol: 'NSE:NIFTY50-INDEX',
-        ltp: 22_000 + Math.round(Math.random() * 500),
-        timestamp: Date.now(),
-      };
-      socket.send(JSON.stringify(syntheticTick));
-    }, 5_000);
+    const redis = server.redis;
+    if (!redis) {
+      // Redis not configured (unit tests / standalone) — degrade gracefully.
+      // Decrement the count now; the socket 'close' event will also fire but
+      // the cleanup registered below handles deduplication via the Set.
+      // We still register the socket 'close' handler to keep the count correct.
+      socket.on('close', () => {
+        wsConnectionCount--;
+      });
+      return;
+    }
 
-    // Clear interval on client disconnect to prevent timer leaks.
-    socket.on('close', () => {
-      clearInterval(interval);
+    // Duplicate the shared Redis client for this connection's poll loop.
+    // Using duplicate() means this client's connection is independent — an
+    // XREAD that yields no results for 100 ms does not hold up any other
+    // Redis command in the main client.
+    const streamClient = redis.duplicate();
+
+    // A flag owned by this connection's closure. Setting it to false causes
+    // the poll loops to exit at their next iteration check.
+    let running = true;
+
+    // Helper: small non-blocking sleep (same pattern as straddle-calc.ts).
+    const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // Helper: safely send a JSON frame only when the socket is still open.
+    // Swallows the send if the socket has already closed — avoids the "send
+    // after close" WebSocket error that would propagate up and crash the loop.
+    const safeSend = (payload: unknown): void => {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify(payload));
+      }
+    };
+
+    // Poll loop for market.ticks — forwards { type:'tick', ... } frames.
+    // Starts cursor at '$' so we only deliver messages that arrive AFTER this
+    // connection is established (historical tick replay is not desirable here).
+    const ticksLoop = async (): Promise<void> => {
+      // '$' is the special Redis cursor meaning "start from the latest entry
+      // already in the stream"; we advance it to the actual message ID after
+      // the first successful read so we never re-deliver the same message.
+      let lastTickId = '$';
+
+      while (running) {
+        try {
+          // Non-blocking XREAD — no BLOCK option so we can check `running`
+          // on every iteration without waiting for Redis to timeout.
+          const results = await streamClient.xread(
+            'COUNT',
+            100,
+            'STREAMS',
+            'market.ticks',
+            lastTickId,
+          );
+
+          if (!results || results.length === 0) {
+            await sleep(100);
+            continue;
+          }
+
+          const streamResult = results[0];
+          if (!streamResult) {
+            await sleep(100);
+            continue;
+          }
+
+          // results shape: [ [ streamName, [ [id, [k, v, ...]], ... ] ] ]
+          const entries = streamResult[1] as [string, string[]][];
+
+          for (const entry of entries) {
+            const id = entry[0];
+            const rawFields = entry[1];
+            if (!id || !rawFields) continue;
+
+            // Advance the cursor so we never re-deliver this message.
+            lastTickId = id;
+
+            // Extract the serialised `data` field written by the ingestion pipeline.
+            let rawData: string | undefined;
+            for (let i = 0; i + 1 < rawFields.length; i += 2) {
+              if (rawFields[i] === 'data') {
+                rawData = rawFields[i + 1];
+                break;
+              }
+            }
+            if (rawData === undefined) continue;
+
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(rawData);
+            } catch {
+              continue; // Malformed entry — skip silently.
+            }
+
+            const tick = parsed as Record<string, unknown>;
+            safeSend({
+              type: 'tick',
+              symbol: tick.symbol,
+              ltp: tick.ltp,
+              timestamp: tick.timestamp,
+            });
+          }
+        } catch (err) {
+          // Transient Redis error — log and resume after a short pause.
+          // We intentionally do NOT check `running` in the catch block because
+          // the error may have been triggered by quit() during cleanup; in that
+          // case the while(!running) guard on the next iteration exits cleanly.
+          server.log.error({ err }, '[ws/ticks] market.ticks poll error');
+          await sleep(100);
+        }
+      }
+    };
+
+    // Poll loop for straddle.values — forwards { type:'straddle', ... } frames.
+    // Mirrors the ticksLoop pattern exactly; kept separate so each stream gets
+    // its own cursor and the two loops are independently throttled by Redis.
+    const straddleLoop = async (): Promise<void> => {
+      let lastStraddleId = '$';
+
+      while (running) {
+        try {
+          const results = await streamClient.xread(
+            'COUNT',
+            100,
+            'STREAMS',
+            'straddle.values',
+            lastStraddleId,
+          );
+
+          if (!results || results.length === 0) {
+            await sleep(100);
+            continue;
+          }
+
+          const streamResult = results[0];
+          if (!streamResult) {
+            await sleep(100);
+            continue;
+          }
+
+          const entries = streamResult[1] as [string, string[]][];
+
+          for (const entry of entries) {
+            const id = entry[0];
+            const rawFields = entry[1];
+            if (!id || !rawFields) continue;
+
+            lastStraddleId = id;
+
+            // Extract the `data` field containing the serialised straddle snapshot.
+            let rawData: string | undefined;
+            for (let i = 0; i + 1 < rawFields.length; i += 2) {
+              if (rawFields[i] === 'data') {
+                rawData = rawFields[i + 1];
+                break;
+              }
+            }
+            if (rawData === undefined) continue;
+
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(rawData);
+            } catch {
+              continue;
+            }
+
+            const snap = parsed as Record<string, unknown>;
+            // Build the straddle WS message. Optional fields (roc, acceleration)
+            // are included only when present so the client type can check for them.
+            const msg: Record<string, unknown> = {
+              type: 'straddle',
+              straddleValue: snap.straddleValue,
+              atmStrike: snap.atmStrike,
+              cePrice: snap.cePrice,
+              pePrice: snap.pePrice,
+              timestamp: snap.timestamp,
+            };
+            if (snap.roc !== undefined) msg.roc = snap.roc;
+            if (snap.acceleration !== undefined) msg.acceleration = snap.acceleration;
+
+            safeSend(msg);
+          }
+        } catch (err) {
+          server.log.error({ err }, '[ws/ticks] straddle.values poll error');
+          await sleep(100);
+        }
+      }
+    };
+
+    // Start both loops concurrently. We attach a top-level catch so an
+    // unexpected thrown error (not caught inside the loop) does not become an
+    // unhandled rejection — it is logged and the loop simply terminates.
+    ticksLoop().catch((err: unknown) => {
+      server.log.error({ err }, '[ws/ticks] ticksLoop terminated unexpectedly');
     });
+    straddleLoop().catch((err: unknown) => {
+      server.log.error({ err }, '[ws/ticks] straddleLoop terminated unexpectedly');
+    });
+
+    // Cleanup: stop the poll loops and quit the duplicated client when the
+    // WebSocket connection closes. quit() sends a Redis QUIT command which
+    // causes the in-flight XREAD in the duplicate client to reject, which is
+    // caught by the try/catch inside each loop and terminates gracefully.
+    //
+    // cleanup() is idempotent: the first call sets running=false and removes
+    // itself from wsCleanupCallbacks; subsequent calls (if the server onClose
+    // hook fires after the socket 'close' event) are no-ops because running is
+    // already false and the Set.delete is idempotent.
+    let cleanupCalled = false;
+    const cleanup = (): void => {
+      if (cleanupCalled) return;
+      cleanupCalled = true;
+      running = false;
+      wsCleanupCallbacks.delete(cleanup);
+      wsConnectionCount--;
+      // Disconnect the per-connection duplicate client.  We do not await quit()
+      // here because the 'close' handler is synchronous — we fire and forget.
+      // The duplicate is not shared with anything else, so losing it is safe.
+      streamClient.quit().catch(() => {
+        // Suppress errors from quit() — the socket is already closed, the
+        // connection is being torn down, any error here is unactionable.
+      });
+    };
+
+    // Register in the server-scoped Set so the single server onClose hook can
+    // drain this connection if the server shuts down before the client disconnects.
+    wsCleanupCallbacks.add(cleanup);
+
+    // Normal per-socket cleanup path: fires when the client disconnects or the
+    // connection drops. This is the common case — cleanup() removes itself from
+    // wsCleanupCallbacks so the server onClose hook skips already-cleaned entries.
+    socket.on('close', cleanup);
+
+    // NOTE: NO per-connection server.addHook('onClose', ...) here.
+    // The server-level drain hook is registered once in buildServer() below.
   });
 
   // ── Payment routes ────────────────────────────────────────────────────────
@@ -402,11 +767,14 @@ export async function buildServer(
  * Build the server and bind to PORT (default 3000) on 0.0.0.0.
  * Registers SIGINT/SIGTERM handlers for graceful shutdown.
  *
- * @param externalPool  Optional shared pool — forwarded to buildServer().
+ * @param externalPool   Optional shared pool — forwarded to buildServer().
  *   See buildServer() doc for the ownership semantics.
+ * @param externalRedis  Optional shared Redis client — forwarded to buildServer()
+ *   so the WS handler can stream live ticks and straddle values. When absent
+ *   the WS endpoint degrades gracefully (no ticks).
  */
-export async function startServer(externalPool?: Pool): Promise<void> {
-  const server = await buildServer(undefined, externalPool);
+export async function startServer(externalPool?: Pool, externalRedis?: Redis): Promise<void> {
+  const server = await buildServer(undefined, externalPool, externalRedis);
 
   // Read port from env using dot notation (Biome useLiteralKeys requirement).
   const rawPort = process.env.PORT ?? '3000';

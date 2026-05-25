@@ -76,8 +76,14 @@ ai-trading-agent/
 │   │   ├── market-data-sim.ts      # Random-walk simulator for dev (no broker needed)
 │   │   └── brokers/
 │   │       ├── types.ts            # BrokerFeed interface + BrokerTick type
-│   │       ├── fyers.ts            # Fyers fyersDataSocket adapter
+│   │       ├── broker-factory.ts   # createBroker() factory — selects adapter by BROKER / SIMULATE env
+│   │       ├── fyers.ts            # Fyers fyersDataSocket adapter (socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection)
+│   │       ├── angelone.ts         # Angel One (SmartAPI) adapter
 │   │       └── instrument-registry.ts  # Weekly/monthly symbol builder + expiry helpers
+│   ├── jobs/
+│   │   └── token-validity-check.ts # Pre-market Fyers token expiry check + BullMQ scheduler
+│   ├── state/
+│   │   └── broker-status.ts        # Runtime broker auth degradation flag (AUTH_FAILURE detection)
 │   ├── trading/                    # Personalities, signal detection, paper execution (Sprint 2+)
 │   ├── types/
 │   │   └── fyers-api-v3.d.ts       # TypeScript declaration shim for untyped Fyers SDK
@@ -115,7 +121,8 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Migration files:** Named `NNN_description.sql` in `src/db/migrations/`. The runner applies them in order and records applied versions in `schema_migrations`. Always add new migrations as new files — never edit applied ones. Runner identifies migrations by **filename only** (no content checksum): once a file is applied, its name is registered in `schema_migrations` and re-runs are skipped. Editing already-applied migrations affects only fresh installs; existing databases skip them. For schema changes, determine the canonical source: `personality_configs` and `straddle_signals` are canonically defined in `001_core_schema.sql` (params-shape); later migration files that repeat these CREATE TABLEs are no-ops on fresh installs. When editing historical migrations, verify the change applies to the intended phase of deployment (fresh vs. existing DB).
 - **Broker symbol format (Fyers):** Weekly options: `NSE:NIFTY{YY}{M}{DD}{STRIKE}{TYPE}` where months Oct–Dec use single letter codes (O, N, D). See `instrument-registry.ts` for the encoder/decoder
 - **ATM strike intervals:** NIFTY = 50pt, BankNifty = 100pt, Sensex = 100pt. Always use `getAtmStrike()` — never compute this inline
-- **Simulation mode:** Controlled by `SIMULATE=true` env var. The simulator generates realistic random-walk NIFTY tick data at configurable interval. Everything downstream is identical — simulation is not a test mode, it uses the real pipeline
+- **Broker adapter selection:** All brokers (Fyers, Angel One, simulator) implement the common `BrokerFeed` interface. The `createBroker()` factory in `src/ingestion/brokers/broker-factory.ts` selects the adapter based on `BROKER` and `SIMULATE` env vars: `BROKER=fyers` → FyersBroker, `BROKER=angelone` → AngelOneBroker, `BROKER=sim` or `SIMULATE=true` → MarketDataSimulator. If `BROKER` is unset/empty AND `SIMULATE !== 'true'`, the factory throws a descriptive error at startup — safe default-throw prevents silent misconfiguration in live environments.
+- **Simulation mode:** Controlled by `SIMULATE=true` env var. The simulator generates realistic random-walk NIFTY tick data at configurable interval AND emits synthetic ATM CE/PE option-leg ticks so the straddle pipeline works end-to-end. Everything downstream is identical — simulation is not a test mode, it uses the real pipeline. Hypertable writes are trimmed to ~10000 rows via MAXLEN on all ingestion xadds.
 - **Regime tagging:** Every retrospection result must carry a `market_regime` tag. Never compare personality performance across different regimes without filtering. The four tags are: `RANGING`, `TRENDING_STRONG`, `VOLATILE_REVERTING`, `EVENT_DAY`
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`
 - **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `src/types/fyers-api-v3.d.ts` covers the SDK surface we use
@@ -137,11 +144,14 @@ Critical variables whose misconfiguration causes real pain:
 |---|---|
 | `DATABASE_URL` | Must point at PostgreSQL 16 with TimescaleDB extension installed. Missing extension → migration fails with `type "timestamptz" does not exist in hypertable` or similar |
 | `REDIS_URL` | Must be Redis 7+. BullMQ uses Redis Streams features not in Redis 6 |
-| `FYERS_ACCESS_TOKEN` | **Expires daily.** Must be regenerated every morning before live market open. Stale token → silent WebSocket disconnect with no reconnect retry in current implementation |
+| `FYERS_ACCESS_TOKEN` | **Expires daily.** Must be regenerated every morning before live market open. AUTH_FAILURE on stale token is detected and surfaced to the frontend via /api/meta `authDegraded=true` and /api/auth/fyers/status `needsReauth=true` |
 | `FYERS_APP_ID` | Format is `XXXXXXXXXXXX-100` (app ID + `-100` suffix). Wrong format → Fyers SDK auth failure |
 | `QUANTIPLY_API_KEY` | Required in live mode. Missing → paper trade writes fail silently if error handling isn't tight |
-| `SIMULATE` | Set to `true` for all development. Omitting this in dev → app tries to connect to Fyers and fails immediately |
+| `BROKER` | Selects the adapter: `fyers` (default), `angelone`, or `sim`. Omitting this AND omitting `SIMULATE=true` → safe default-throw error at startup (no silent fallback) |
+| `SIMULATE` | Set to `true` for credential-free development mode. When set, MarketDataSimulator is selected regardless of `BROKER` value |
+| `MAX_WS_CONNECTIONS` | Max concurrent /ws/ticks WebSocket connections (default 50). Positive integers only; non-positive values silently fall back to 50 |
 | `EVOLUTION_REQUIRE_APPROVAL` | Should be `true` in any environment where the retrospection engine runs. Setting `false` allows the system to autonomously modify personality parameters without human review |
+| `TOKEN_VALIDITY_SCHEDULER_ENABLED` | When set to `true`, registers a BullMQ cron job that checks Fyers token expiry at 08:45 IST weekdays. Disabled by default; opt-in via this flag |
 
 ## Common Tasks
 
@@ -166,7 +176,7 @@ Critical variables whose misconfiguration causes real pain:
 
 ## Gotchas
 
-- **Fyers token expires daily** — there is no automatic refresh yet. Every live market day requires a manual token regeneration step before 9:00 AM IST. Automate this before the first live market day
+- **Fyers token expires daily** — there is no automatic refresh yet (deferred to Phase B). The system detects AUTH_FAILURE mid-session and sets the `authDegraded` flag in broker-status state, surfaced to the frontend via /api/meta and /api/auth/fyers/status. A pre-market token-validity check job runs at 08:45 IST on weekdays (opt-in via TOKEN_VALIDITY_SCHEDULER_ENABLED env). Operators must manually regenerate the token before market open when the status endpoint shows `needsReauth=true`
 - **TimescaleDB is not optional** — the standard `postgres:16-alpine` image does NOT have TimescaleDB. The Docker Compose uses `timescale/timescaledb:latest-pg16`. Pointing the app at a vanilla PostgreSQL instance will fail on migration
 - **Hypertable full-table scans** — a query on `market_ticks` or `straddle_snapshots` without a `WHERE time > ...` filter will scan years of data. Always filter by time range
 - **Two test commands** — `bun run test:integration` requires Docker services running. Running it without them produces confusing connection errors, not a test-not-found error

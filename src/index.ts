@@ -13,7 +13,9 @@
  * deterministically without real wall-clock time passing at 1:1 speed.
  *
  * All exports are named exports per project convention. This file has no exports
- * because it is the process entry point.
+ * because it is the process entry point; the broker auth-degraded flag lives in
+ * src/state/broker-status.ts so the server can import it without pulling in the
+ * full entry-point module.
  *
  * Payment routes (Razorpay/UPI): registered via startServer() from src/server/index.ts
  * which wires up the payment routes alongside the existing trading API routes.
@@ -21,12 +23,20 @@
 
 import { pool } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
-import { createBrokerFeed } from './ingestion/brokers/index.js';
+import { createBroker } from './ingestion/brokers/broker-factory.js';
+import {
+  buildOptionSymbol,
+  getAtmStrike,
+  getCurrentExpiry,
+} from './ingestion/brokers/instrument-registry.js';
+import type { BrokerTick } from './ingestion/brokers/types.js';
 import { createStraddleCalculator } from './ingestion/straddle-calc.js';
 import { createVixFeed } from './ingestion/vix-feed.js';
+import { registerTokenValiditySchedule } from './jobs/token-validity-check.js';
 import { redis } from './redis/client.js';
 import { startServer } from './server/index.js';
 import { loadStoredToken } from './server/services/fyers-auth.js';
+import { setAuthDegraded } from './state/broker-status.js';
 import { createPositionMonitor } from './trading/position-monitor.js';
 import { RealClock, VirtualClock } from './utils/clock.js';
 
@@ -64,10 +74,25 @@ async function main(): Promise<void> {
   }
 
   // Step 3: instantiate all components.
-  // If BROKER=fyers and FYERS_ACCESS_TOKEN is not in the env, try the DB —
-  // the dashboard OAuth flow writes tokens to broker_tokens. This lets the
-  // operator "Login with Fyers" instead of pasting a daily token into .env.
+  //
+  // Credential resolution for the Fyers broker must happen BEFORE createBroker()
+  // is called, because _createFyersBroker() (inside broker-factory) validates
+  // FYERS_APP_ID and FYERS_ACCESS_TOKEN at construction time and throws if they
+  // are missing. We centralise the resolution here so the factory stays pure
+  // (env-var reads only; no DB access) and this file owns the DB→env fallback.
+  //
+  // Resolution order:
+  //   1. Env var already set (e.g. .env or shell export) — use as-is.
+  //   2. Not in env → try broker_tokens DB table (written by the dashboard
+  //      OAuth "Login with Fyers" flow). If found and not expired, write to
+  //      process.env so _createFyersBroker() sees them on the same path as
+  //      operators who provide tokens via the environment.
+  // The credential resolution block only runs when BROKER=fyers AND we are not
+  // in simulation mode. When SIMULATE=true the broker-factory will use the
+  // simulator path regardless of what BROKER is set to — so we must not
+  // attempt Fyers credential resolution (it would throw for missing tokens).
   if (
+    !simulate &&
     (process.env.BROKER ?? '').toLowerCase().trim() === 'fyers' &&
     !process.env.FYERS_ACCESS_TOKEN
   ) {
@@ -75,6 +100,8 @@ async function main(): Promise<void> {
       const stored = await loadStoredToken(pool);
       if (stored && stored.expiresAt.getTime() > Date.now()) {
         process.env.FYERS_ACCESS_TOKEN = stored.accessToken;
+        // APP_ID may already be set via env; only overwrite when absent to avoid
+        // clobbering a deliberately different app ID in a multi-app deployment.
         if (!process.env.FYERS_APP_ID) process.env.FYERS_APP_ID = stored.appId;
         console.log(
           `[index] Loaded Fyers token from DB — expires ${stored.expiresAt.toISOString()}`,
@@ -93,8 +120,21 @@ async function main(): Promise<void> {
     }
   }
 
-  // createBrokerFeed reads BROKER and SIMULATE env vars and picks the right adapter.
-  const feed = createBrokerFeed();
+  // When SIMULATE=true the operator intends to run the simulator regardless of
+  // what BROKER is set to (e.g. BROKER=fyers may be present in .env for live
+  // usage but SIMULATE=true overrides it for development). broker-factory.ts
+  // checks BROKER before SIMULATE, so we must set BROKER=sim here to ensure
+  // _createSimulator() is selected. This is the only place we mutate BROKER
+  // at runtime and only when simulate===true, so live runs are unaffected.
+  // broker-factory.ts is in files_forbidden so we handle the precedence here.
+  if (simulate) {
+    process.env.BROKER = 'sim';
+  }
+
+  // createBroker reads BROKER and SIMULATE env vars and picks the right adapter.
+  // Credentials are already resolved into process.env above (Fyers path) or
+  // are validated against their own env vars by the factory (AngelOne path).
+  const feed = createBroker(clock);
 
   // Straddle calculator reads market.ticks from Redis → publishes straddle.values.
   const straddleCalc = createStraddleCalculator(redis, { underlying: 'NIFTY', clock });
@@ -107,17 +147,78 @@ async function main(): Promise<void> {
 
   // Wire tick publisher: each tick from the broker feed is serialised and written to
   // the market.ticks Redis stream so the straddle calculator and VIX feed can consume it.
-  // Use optional chaining because BrokerFeed.onTick / onDisconnect are optional methods —
-  // some broker adapters use the EventEmitter .on() pattern instead; those are wired via
-  // the .on('tick') and .on('disconnect') overloads, which createBrokerFeed sets up before
-  // returning.  The onTick/onDisconnect style is used by the simulator and the Fyers adapter.
-  feed.onTick?.((tick) => {
+  //
+  // Dynamic ATM option-leg subscription (live brokers only):
+  // After the feed connects, the first index spot tick (NSE:NIFTY50-INDEX) lets us
+  // compute the ATM strike. We then subscribe to the CE and PE legs so the Fyers
+  // WebSocket delivers option prices directly — the straddle calculator needs them.
+  //
+  // This block intentionally does NOT run in SIMULATE mode because the simulator
+  // (T-03) already generates synthetic CE and PE ticks internally. Calling
+  // feed.subscribe() on the simulator would be a no-op (it ignores symbol lists)
+  // but guarding here makes the intent explicit and avoids any future confusion.
+  //
+  // We track lastAtmStrike to avoid redundant subscribe() calls when the spot
+  // price drifts within the same ATM bucket. A new subscribe is only issued when
+  // the ATM strike actually changes (spot crosses a 50-point boundary for NIFTY).
+
+  // Underlying is NIFTY for now (configurable via env in a future task).
+  const LIVE_UNDERLYING = 'NIFTY' as const;
+  // Fyers full symbol for the NIFTY spot index tick.
+  const NIFTY_INDEX_SYMBOL = 'NSE:NIFTY50-INDEX';
+  let lastAtmStrike: number | null = null;
+
+  feed.onTick?.((tick: BrokerTick) => {
     // Fire-and-forget: we do not await here because onTick is a synchronous callback.
-    void redis.xadd('market.ticks', '*', 'data', JSON.stringify(tick));
+    // MAXLEN ~ 10000 caps the stream size to approximately 10 000 entries (the ~
+    // tilde allows Redis to trim lazily at radix-tree node boundaries for O(1)
+    // amortised cost). Without a cap, this stream grows unboundedly — the Fyers
+    // integration added CE and PE option-leg ticks so volume tripled from M1.
+    void redis.xadd('market.ticks', 'MAXLEN', '~', '10000', '*', 'data', JSON.stringify(tick));
+
+    // Dynamic ATM subscription — live mode only. In simulate mode the simulator
+    // already emits CE/PE legs, so we skip this block entirely.
+    if (!simulate && tick.symbol === NIFTY_INDEX_SYMBOL && tick.ltp > 0) {
+      const atm = getAtmStrike(LIVE_UNDERLYING, tick.ltp);
+      if (atm !== lastAtmStrike) {
+        lastAtmStrike = atm;
+        const expiry = getCurrentExpiry(LIVE_UNDERLYING, clock);
+        const ceSymbol = buildOptionSymbol(LIVE_UNDERLYING, expiry, atm, 'CE');
+        const peSymbol = buildOptionSymbol(LIVE_UNDERLYING, expiry, atm, 'PE');
+        console.log(
+          `[index] ATM strike changed to ${atm} — subscribing to ${ceSymbol}, ${peSymbol}`,
+        );
+        // subscribe() may return void or Promise<void> depending on the adapter.
+        // We always handle it as a promise and catch errors defensively so that
+        // a transient subscription failure does not crash the ingestion pipeline.
+        const subscribeResult = feed.subscribe([ceSymbol, peSymbol]);
+        if (subscribeResult instanceof Promise) {
+          subscribeResult.catch((err: unknown) => {
+            console.error('[index] ATM option-leg subscribe() failed:', err);
+          });
+        }
+      }
+    }
   });
 
-  feed.onDisconnect?.((reason) => {
-    console.warn(`[feed] disconnected — reason: ${reason}`);
+  feed.onDisconnect?.((reason: string) => {
+    // DisconnectReason (from types.ts) is a string enum whose AUTH_FAILURE
+    // member has the runtime value 'AUTH_FAILURE'. We compare the string
+    // literal directly here to avoid importing the enum value at runtime.
+    if (reason === 'AUTH_FAILURE') {
+      // Fyers daily token expired mid-session. Set the shared degraded flag so
+      // the dashboard can display an actionable "re-login required" banner.
+      // We do NOT crash the process — ingestion is suspended but the HTTP API
+      // and the dashboard remain available for the operator to initiate re-login.
+      setAuthDegraded(true);
+      console.error(
+        '[feed] AUTH_FAILURE — Fyers token has expired. ' +
+          'Open the dashboard and click "Login with Fyers" to generate a new token, ' +
+          'then restart the application. Market data feed is suspended until re-login.',
+      );
+    } else {
+      console.warn(`[feed] disconnected — reason: ${reason}`);
+    }
   });
 
   // Step 4: start components in dependency order.
@@ -128,8 +229,18 @@ async function main(): Promise<void> {
     // startServer registers its own SIGINT/SIGTERM handlers for server.close().
     // Our outer handlers (below) also call feed.disconnect(), pool.end(), and
     // redis.quit() which the server's handlers do not cover.
-    startServer(pool),
+    //
+    // Pass the shared redis singleton so the server's WS /ws/ticks handler can
+    // stream live ticks and straddle values to connected dashboard clients.
+    // The param name `externalRedis` matches the startServer signature in
+    // src/server/index.ts (confirmed by reading that file).
+    startServer(pool, redis),
   ]);
+
+  // Pre-market Fyers token-validity check (opt-in via TOKEN_VALIDITY_SCHEDULER_ENABLED).
+  // Self-guards and returns null when disabled / Redis unavailable, so this is safe
+  // in every environment. Surfaces a "re-login required" degraded state, no refresh-grant.
+  const tokenSchedule = registerTokenValiditySchedule(pool);
 
   // Connect broker feed after all consumers are ready so no ticks are dropped.
   await feed.connect();
@@ -152,6 +263,10 @@ async function main(): Promise<void> {
     try {
       if (simInterval !== null) {
         clearInterval(simInterval);
+      }
+      if (tokenSchedule) {
+        await tokenSchedule.worker.close();
+        await tokenSchedule.queue.close();
       }
       await positionMonitor.stop();
       await vixFeed.stop();

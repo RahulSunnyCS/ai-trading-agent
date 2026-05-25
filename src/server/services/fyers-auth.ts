@@ -15,6 +15,28 @@
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 
+// ---------------------------------------------------------------------------
+// Token / secret redaction helper
+// ---------------------------------------------------------------------------
+// Used wherever we must include token-like values in log output. We never
+// log the full token, refresh token, app secret, or auth code — only a
+// prefix long enough to correlate with a known value during debugging.
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns a redacted version of a token/secret suitable for log output.
+ * Shows only the first 4 characters followed by "..." so sensitive material
+ * is never written to log storage.
+ *
+ * Safe to call with null/undefined — returns "<empty>" so callers don't need
+ * to guard.
+ */
+export function redactToken(value: string | null | undefined): string {
+  if (!value) return '<empty>';
+  if (value.length <= 4) return '****';
+  return `${value.slice(0, 4)}...`;
+}
+
 const FYERS_AUTH_URL = 'https://api-t1.fyers.in/api/v3/generate-authcode';
 const FYERS_TOKEN_URL = 'https://api-t1.fyers.in/api/v3/validate-authcode';
 
@@ -79,7 +101,11 @@ export async function exchangeAuthCode(
 
   const body = (await res.json()) as ValidateAuthCodeResponse;
   if (body.s !== 'ok' || !body.access_token) {
-    throw new Error(`Fyers token exchange failed: ${body.message ?? JSON.stringify(body)}`);
+    // Redact the body before embedding in the error message — a partial
+    // success response from Fyers could contain access_token/refresh_token
+    // fields, which must never appear in exception messages or logs.
+    const safeDetail = body.message ?? `s=${body.s ?? 'unknown'} code=${body.code ?? '-'}`;
+    throw new Error(`Fyers token exchange failed: ${safeDetail}`);
   }
 
   // Fyers v3 access tokens expire ~24h; expires_in is seconds. Fall back to 24h

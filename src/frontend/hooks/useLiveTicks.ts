@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TickMessage } from '../types/trading.js';
+import type { TickMessage, WsStraddleMessage } from '../types/trading.js';
 
 // ---------------------------------------------------------------------------
 // Public API types
@@ -26,6 +26,21 @@ export interface TickPoint {
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
+/**
+ * Snapshot of the latest straddle values received over the WebSocket.
+ * Mirrors the fields of WsStraddleMessage but lives in the hook return
+ * so consumers don't need to import the WS type directly.
+ */
+export interface StraddleSnapshot {
+  straddleValue: number;
+  atmStrike: number;
+  cePrice: number;
+  pePrice: number;
+  timestamp: number; // epoch ms
+  roc?: number;
+  acceleration?: number;
+}
+
 export interface UseLiveTicksResult {
   /** Reflects the current WebSocket readyState in plain terms. */
   status: ConnectionStatus;
@@ -35,6 +50,12 @@ export interface UseLiveTicksResult {
   latestTimestamp: number | null;
   /** Bounded ring buffer of recent ticks (oldest first). Max BUFFER_CAP entries. */
   ticks: readonly TickPoint[];
+  /**
+   * Latest straddle snapshot received via /ws/ticks, or null before the first
+   * 'straddle' message arrives. Updates whenever the server pushes a new
+   * straddle.values entry (approximately every 15 s).
+   */
+  latestStraddle: StraddleSnapshot | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +114,7 @@ export function useLiveTicks(): UseLiveTicksResult {
   const [latestLtp, setLatestLtp] = useState<number | null>(null);
   const [latestTimestamp, setLatestTimestamp] = useState<number | null>(null);
   const [ticks, setTicks] = useState<TickPoint[]>([]);
+  const [latestStraddle, setLatestStraddle] = useState<StraddleSnapshot | null>(null);
 
   // `attemptRef` tracks the current reconnect attempt count so the backoff
   // callback always reads the latest value without needing it in the
@@ -148,28 +170,53 @@ export function useLiveTicks(): UseLiveTicksResult {
         return;
       }
 
-      // Narrow via the discriminated union; only process 'tick' messages.
+      // Narrow via the discriminated union; dispatch on `type`.
       // 'connected' messages are acknowledged by the server and intentionally
       // ignored here (status is already set in onopen).
+      // Unknown types are silently dropped — this keeps the hook
+      // backward-compatible if the server ever adds new message types.
       const typed = msg as TickMessage;
-      if (typed.type !== 'tick') return;
 
-      const { ltp, timestamp } = typed;
+      if (typed.type === 'tick') {
+        const { ltp, timestamp } = typed;
 
-      setLatestLtp(ltp);
-      setLatestTimestamp(timestamp);
+        setLatestLtp(ltp);
+        setLatestTimestamp(timestamp);
 
-      // Append to the ring buffer, dropping the oldest point when full.
-      // We use a functional setState so the closure always sees the latest
-      // array — avoids stale capture if the hook re-runs.
-      setTicks((prev) => {
-        const next: TickPoint[] =
-          prev.length >= BUFFER_CAP
-            ? // Slice from index 1 drops the oldest entry.
-              [...prev.slice(1), { time: timestamp, ltp }]
-            : [...prev, { time: timestamp, ltp }];
-        return next;
-      });
+        // Append to the ring buffer, dropping the oldest point when full.
+        // We use a functional setState so the closure always sees the latest
+        // array — avoids stale capture if the hook re-runs.
+        setTicks((prev) => {
+          const next: TickPoint[] =
+            prev.length >= BUFFER_CAP
+              ? // Slice from index 1 drops the oldest entry.
+                [...prev.slice(1), { time: timestamp, ltp }]
+              : [...prev, { time: timestamp, ltp }];
+          return next;
+        });
+        return;
+      }
+
+      if (typed.type === 'straddle') {
+        // Cast to the concrete straddle type — the discriminated union already
+        // narrowed `type` to 'straddle', so this is safe and avoids importing
+        // WsStraddleMessage into the component layer.
+        const s = typed as import('../types/trading.js').WsStraddleMessage;
+        setLatestStraddle({
+          straddleValue: s.straddleValue,
+          atmStrike: s.atmStrike,
+          cePrice: s.cePrice,
+          pePrice: s.pePrice,
+          timestamp: s.timestamp,
+          // Spread optional fields only when present to keep the snapshot lean.
+          ...(s.roc !== undefined ? { roc: s.roc } : {}),
+          ...(s.acceleration !== undefined ? { acceleration: s.acceleration } : {}),
+        });
+        return;
+      }
+
+      // All other types ('connected' and any future unknown types) are
+      // intentionally ignored — backward compatibility is preserved.
     };
 
     ws.onerror = () => {
@@ -254,5 +301,5 @@ export function useLiveTicks(): UseLiveTicksResult {
     };
   }, [connect]);
 
-  return { status, latestLtp, latestTimestamp, ticks };
+  return { status, latestLtp, latestTimestamp, ticks, latestStraddle };
 }

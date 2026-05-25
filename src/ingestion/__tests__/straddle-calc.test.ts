@@ -308,12 +308,16 @@ describe('createStraddleCalculator — snapshot publication', () => {
 
     // Extract and parse the published snapshot.
     const xaddArgs: unknown[] = redis.xadd.mock.calls[0] as unknown[];
-    // xadd('straddle.values', '*', 'data', <json>)
+    // New call shape: xadd('straddle.values', 'MAXLEN', '~', '10000', '*', 'data', <json>)
     expect(xaddArgs[0]).toBe('straddle.values');
-    expect(xaddArgs[1]).toBe('*');
-    expect(xaddArgs[2]).toBe('data');
+    // Verify MAXLEN trimming args are present
+    expect(xaddArgs[1]).toBe('MAXLEN');
+    expect(xaddArgs[2]).toBe('~');
+    expect(xaddArgs[3]).toBe('10000');
+    expect(xaddArgs[4]).toBe('*');
+    expect(xaddArgs[5]).toBe('data');
 
-    const snapshot = JSON.parse(xaddArgs[3] as string) as StraddleSnapshot;
+    const snapshot = JSON.parse(xaddArgs[6] as string) as StraddleSnapshot;
 
     expect(snapshot.straddleValue).toBe(cePrice + pePrice);
     expect(snapshot.cePrice).toBe(cePrice);
