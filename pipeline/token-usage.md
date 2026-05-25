@@ -30,3 +30,6 @@
 | Phase 6 | Re-review: security (fix diff) | security-auditor | opus | high | ~22k |
 | Phase 6 | Re-review: performance (fix diff) | performance-reviewer | sonnet | high | ~12k |
 | Phase 6 | Re-review: architecture (fix diff) | architecture-reviewer | sonnet | high | ~12k |
+| Gate 2 | Re-review synthesis + Translator | orchestrator/translator | opus/haiku | high/med | ~14k |
+| Phase 5 | E2E test writer (M5 specs) | e2e-test-writer | sonnet | medium | ~14k |
+| Phase 5 | Docs writer (overview/technical) | docs-writer | haiku | low | ~5k |

@@ -10,25 +10,21 @@
 - [x] Phase 0 — Triage (risk_manifest.json written)
 - [x] Phase 1 — Planning + Red Team (3 sprints, 8.75/10) + QA Planner → **Gate 1 APPROVED**
 - [x] Phase 2 — Decomposition (6 contracts: T-43-A/B/C, T-44, T-45, T-46)
-- [~] Phase 3 — Implementation
-  - [x] Wave 1: T-43-A (committed), T-46 (committed; hybrid-objective rework in flight per user)
-  - [x] Wave 2: T-43-B + T-44 done — 193 signals tests green (sr-levels 53 + filter/router incl. sr_anchored + ACTIVE_PHASE). Per-index leg cap confirmed correct (paper_trades.symbol = underlying).
-  - [x] T-46 hybrid-objective rework committed (93 tests green). LIMITATION: backtest-runner hardcodes adjustedProbability=0.7 → finalist scoring can't discriminate yet (Gate-2 follow-up).
-  - [x] Wave 3: T-43-C (S/R detection engine) committed — 39 tests. Found integration leak: SR signals (signal_type=PULLBACK) would route to momentum_exhaustion personalities.
-  - [x] Wave 4: T-45 (multi-index) committed — 1019 tests green. Phase 3 COMPLETE.
-- [~] Phase 4: security + performance + architecture reviewers running in parallel vs c1b5b48..HEAD. → Human Gate 2 next.
-  - Gate-2 carries: (1) migration 013 expiry weekdays need live NSE/BSE verification; (2) backtest-runner hardcodes adjustedProbability=0.7 (T-46 finalist scoring inert until fixed); (3) T-43-C session-boundary level reload (levels load once per engine lifetime — stale across midnight); (4) T-43-C minHistoryBars=500 default.
-  - [ ] Wave 3: T-43-C
-  - [ ] Wave 4: T-45
-  - Gate-2 carry: migration 013 expiry weekdays need live NSE/BSE verification (T-45 symbol-resolution assert is the runtime net)
+- [x] Phase 3 — Implementation COMPLETE (all 6 tasks + SR-leak fix). Rebased onto origin/main @ c4b5919 mid-flight (index.ts broker-API merge).
+- [x] Phase 4 — Specialist Review: verdict FAIL (2 Critical C1/C2 + 4 High H1–H4 + 5 Med + 4 Low).
+- [x] Phase 6 — Fix cycle (user chose Critical+High+Medium): FIX-A/A2 (C1,H3,M4,M5 + underlying populate), FIX-B (C2,M3,M1,H4), FIX-C (H1,M2). 1144 unit tests green, tsc clean.
+- [x] Re-review: Security PASS · Performance PASS · Architecture CONDITIONAL PASS. All Criticals/Highs resolved.
+- [x] **Human Gate 2 — CONDITIONAL PASS APPROVED** (user: approve & proceed).
+- [~] Phase 5 — Test Generation (E2E specs + docs). NOTE: no Docker in this env → integration + E2E Automation Gate are CI-ONLY (non-blocking per Automation Gate rules).
+- [ ] Phase 6 — Automation Gate (CI-ONLY here) 
+- [ ] Phase 7 — Epic doc + Final Review → Human Gate 3
+
+## Mandatory pre-Phase-2 follow-ups (from Gate 2)
+- **N1 (Medium):** add internal entry_type guard to runEvolutionEngine (not just EOD-caller filter).
+- **Optimizer latent (Low):** BACKTEST_UNDERLYING='NSE:NIFTY50-INDEX' ≠ stored straddle_snapshots.symbol='NIFTY' → backtest returns 0 rows; will silently no-op once Phase 2 calibration lands. Fix constant to 'NIFTY'. Also remove kernel_only's `precomputedTrades===undefined` condition.
+- Backlog Lows: loadPersonalities×2/EOD, composite index (personality_id,status,entry_time), IST_OFFSET_MS dedup, populate underlying at INSERT, L1–L4 (seed-date verify, bound NUMERICs, stale comment/signal_type conflation, magic-number SR thresholds).
 
 ## Gate 1 Decisions (locked)
-- **D1 — Bayesian optimizer:** Option B — guarded deterministic 1-D search (golden-section over [0.30,0.90]); full GP deferred to multi-param milestone.
-- **D2 — Multi-index risk caps:** Option A — per-index caps (each index an independent book); global circuit-breaker deferred to M6 (T-50).
-- **Optional recommendations:** none accepted (recommendation_rounds_used stays 0).
-- Rebased onto origin/main @ c1b5b48 before decomposition.
-- [ ] Phase 3 — Implementation
-- [ ] Phase 4 — Specialist Review → Human Gate 2
-- [ ] Phase 5 — Test Generation
-- [ ] Phase 6 — Test Execution + Automation Gate
-- [ ] Phase 7 — Final Review → Human Gate 3
+- **D1 — optimizer:** Option B — guarded deterministic 1-D golden-section over [0.30,0.90]; full GP deferred.
+- **D2 — Multi-index risk caps:** Option A — per-index books; global circuit-breaker deferred to M6 (T-50).
+- **Optional recommendations:** none accepted (recommendation_rounds_used = 0).
