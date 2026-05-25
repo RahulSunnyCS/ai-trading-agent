@@ -29,11 +29,18 @@ import { Queue, Worker } from 'bullmq';
 import type { Pool } from 'pg';
 
 import { withTransaction } from '../db/client.js';
+import type { SimulatedTrade } from '../backtesting/backtest-runner.js';
 import { computeBrierScore } from '../retrospection/brier-score.js';
 import { computeBeatClockworkDelta, computeDailyMetrics } from '../retrospection/daily-metrics.js';
 import { runEvolutionEngine } from '../retrospection/evolution-engine.js';
 import { computeManagementEffectiveness } from '../retrospection/management-effectiveness.js';
-import { runOptimizer } from '../retrospection/optimizer.js';
+import {
+  BACKTEST_LOOKBACK_DAYS,
+  BACKTEST_UNDERLYING,
+  OPTIMIZER_HOLDOUT_DAYS,
+  backtestRunnerFactory,
+  runOptimizer,
+} from '../retrospection/optimizer.js';
 
 // ---------------------------------------------------------------------------
 // Connection helper
@@ -143,11 +150,19 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
       }
 
       // -----------------------------------------------------------------------
-      // Step 3: fetch all active personalities
+      // Step 3: fetch all active personalities (including entry_type for H4 guard)
+      //
+      // entry_type is fetched here so the EOD loop can pre-filter before
+      // calling runEvolutionEngine. The evolution engine's SELECT FOR UPDATE
+      // locks ONLY momentum_exhaustion rows — passing an sr_anchored personality
+      // to runEvolutionEngine throws "not found in momentum_exhaustion group"
+      // every EOD run (a false-alarm error). Pre-filtering here eliminates the
+      // false alarm without touching runEvolutionEngine's internal logic.
       // -----------------------------------------------------------------------
       const personalitiesResult = await pool.query<{
         id: string;
-      }>('SELECT id FROM personality_configs WHERE is_active = TRUE');
+        entry_type: string;
+      }>('SELECT id, entry_type FROM personality_configs WHERE is_active = TRUE');
 
       const personalities = personalitiesResult.rows;
 
@@ -174,6 +189,61 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
       );
 
       const marketRegime: string = regimeResult.rows[0]?.regime ?? 'RANGING';
+
+      // -----------------------------------------------------------------------
+      // Step 4c: pre-compute the shared backtest once (C2 dedup)
+      //
+      // All momentum_exhaustion personalities use an identical BacktestConfig
+      // (same underlying=NIFTY, same tradeDateISO window, same holdoutDays).
+      // Running a separate 365-day backtest per personality (~1095 queries at
+      // EOD for 3 personalities) is wasteful when the trade set is identical.
+      //
+      // We run ONE backtest here and pass the resulting SimulatedTrade[] to
+      // runOptimizer via the precomputedTrades option. runOptimizer skips its
+      // internal backtest call when precomputedTrades is supplied.
+      //
+      // Correctness guarantee: we only share trades across personalities whose
+      // BacktestConfig is genuinely identical. The BacktestConfig depends on:
+      //   - underlying: always BACKTEST_UNDERLYING (NIFTY) for supported personalities
+      //   - tradeDateISO: the same for all personalities in one EOD batch
+      //   - fromDate: derived from tradeDateISO - BACKTEST_LOOKBACK_DAYS (same)
+      //   - holdoutDays: OPTIMIZER_HOLDOUT_DAYS (same constant)
+      // Non-NIFTY personalities are rejected by runOptimizer's M1 guard before
+      // using precomputedTrades, so sharing NIFTY trades with them is harmless.
+      //
+      // Note: the M3 kernel_only guard in runOptimizer may skip the backtest
+      // entirely (when all candidates ≤ 0.70). In that case precomputedTrades
+      // is passed but unused — that is correct and cheap (no extra work).
+      //
+      // On failure: log and set precomputedTrades = undefined. runOptimizer will
+      // either run its own backtest or return 'backtest_failed' / 'kernel_only'.
+      // The EOD batch must not abort because of a backtest failure.
+      // -----------------------------------------------------------------------
+      let sharedBacktestTrades: SimulatedTrade[] | undefined;
+      try {
+        const toMs = new Date(`${tradeDateISO}T12:00:00Z`).getTime();
+        const fromMs = toMs - BACKTEST_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+        const fromDate = new Date(fromMs).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+
+        const sharedRunner = backtestRunnerFactory.create(pool);
+        const sharedResult = await sharedRunner.run({
+          underlying: BACKTEST_UNDERLYING,
+          fromDate,
+          toDate: tradeDateISO,
+          holdoutDays: OPTIMIZER_HOLDOUT_DAYS,
+          trainFraction: 0.7,
+        });
+        sharedBacktestTrades = sharedResult.trades;
+      } catch (btErr) {
+        // Non-fatal: log and continue. runOptimizer will fall back to its own
+        // backtest or the kernel_only path.
+        console.warn(
+          '[eod-retrospection] shared backtest failed for %s — each optimizer will handle independently:',
+          tradeDateISO,
+          btErr,
+        );
+        sharedBacktestTrades = undefined;
+      }
 
       // -----------------------------------------------------------------------
       // Step 5: process each personality sequentially
@@ -241,11 +311,19 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
           // Must run AFTER the INSERT above: the evolution engine's requireApproval branch
           // UPDATEs this row to write proposed_adjustments. Without the row, the UPDATE hits
           // zero rows and silently discards the proposal.
-          await runEvolutionEngine(pool, personality.id, tradeDateISO, {
-            winRate: metrics.winRate,
-            totalTrades: metrics.totalTrades,
-            totalPnlPct: metrics.totalPnlPct,
-          });
+          //
+          // H4 guard: the evolution engine's SELECT FOR UPDATE is scoped to
+          // entry_type='momentum_exhaustion'. Calling it for an sr_anchored or
+          // fixed_time personality throws "not found in momentum_exhaustion group"
+          // every EOD run (caught by the outer try/catch but logs a false alarm).
+          // Pre-filtering here avoids the false-alarm error entirely.
+          if (personality.entry_type === 'momentum_exhaustion') {
+            await runEvolutionEngine(pool, personality.id, tradeDateISO, {
+              winRate: metrics.winRate,
+              totalTrades: metrics.totalTrades,
+              totalPnlPct: metrics.totalPnlPct,
+            });
+          }
 
           // --- 5g: run deterministic 1-D optimizer (off the critical path) ----
           //
@@ -265,7 +343,20 @@ export function createEodRetrospectionWorker(pool: Pool): Worker {
           //     inside runOptimizer itself — the catch here handles unexpected
           //     errors (DB timeout, etc.), not expected exclusions.
           try {
-            const optimizerResult = await runOptimizer(pool, personality.id, tradeDateISO);
+            // Pass pre-computed shared backtest trades when available (C2 dedup).
+            // When sharedBacktestTrades is undefined (shared backtest failed),
+            // pass an empty options object so runOptimizer handles it gracefully
+            // (falls back to kernel_only or its own backtest attempt).
+            const optimizerOptions =
+              sharedBacktestTrades !== undefined
+                ? { precomputedTrades: sharedBacktestTrades }
+                : {};
+            const optimizerResult = await runOptimizer(
+              pool,
+              personality.id,
+              tradeDateISO,
+              optimizerOptions,
+            );
             if (optimizerResult.action !== 'none' && optimizerResult.action !== 'skipped') {
               console.log(
                 '[eod-retrospection] optimizer %s for personality %s on %s: candidate=%s',

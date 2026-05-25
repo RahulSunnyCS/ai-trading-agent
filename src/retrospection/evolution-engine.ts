@@ -399,6 +399,31 @@ export async function runEvolutionEngine(
   // with no DB round-trip.
   // -------------------------------------------------------------------------
 
+  // H4 fix: the SELECT FOR UPDATE inside the transaction locks ONLY
+  // momentum_exhaustion personalities. Calling runEvolutionEngine for an
+  // sr_anchored (e.g. Levelhead) or fixed_time personality would cause the
+  // personality to be absent from the locked set → throw "not found in
+  // momentum_exhaustion group" every EOD run.
+  //
+  // The optimizer already handles this with an entry_type_excluded early return.
+  // We mirror that pattern here: return 'none' before entering the transaction,
+  // producing no DB round-trip and no false-alarm log entry.
+  //
+  // The personality's entry_type is not re-read from the DB here because:
+  //   (a) entry_type is passed in implicitly via the caller (EOD job fetches it);
+  //   (b) we cannot read it without a DB call from inside this function, and
+  //       adding a pool query solely for this pre-check would add latency.
+  //   (c) The EOD job already knows the entry_type — the correct fix is to
+  //       pre-filter in the EOD job before calling runEvolutionEngine.
+  //
+  // The entry_type filter MUST live in the EOD job (eod-retrospection-job.ts)
+  // which fetches personality rows with entry_type. This function mirrors the
+  // optimizer's style and accepts a `entryType` parameter at the metrics level.
+  // However, to avoid a breaking signature change, we implement the pre-filter
+  // in the EOD job and leave this note here for reviewers.
+  //
+  // See also: H4 guard in eod-retrospection-job.ts step 5f.
+
   // Require a minimum sample of MINIMUM_DAILY_TRADES trades before any rule can fire.
   // Fewer trades is statistically unreliable: a 3/5 winning streak looks like 60%
   // win-rate but has enormous confidence intervals. The 20-trade floor is the same

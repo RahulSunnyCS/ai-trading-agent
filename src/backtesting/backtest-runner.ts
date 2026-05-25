@@ -327,36 +327,75 @@ async function loadRegimeTags(
   return map;
 }
 
-/** Loads intraday straddle snapshots for a single day (UTC midnight to midnight). */
-async function loadDaySnapshots(
+/**
+ * Loads all intraday straddle snapshots for the full [fromDate, toDate] window
+ * in a SINGLE range query, then groups them into a Map<dateISO, InMemorySnapshot[]>.
+ *
+ * This replaces the previous per-day loop (N+1 queries over ~365 days) with
+ * one query per backtest run, dramatically reducing DB round-trips.
+ *
+ * The time-range predicate (time >= rangeStart AND time < rangeEnd) is REQUIRED:
+ * straddle_snapshots is a TimescaleDB hypertable partitioned by `time`. A scan
+ * without a time filter reads every chunk (potentially years of data) and is
+ * explicitly forbidden by project conventions.
+ *
+ * UTC bounds: midnight to 23:59:59.999 of the last calendar date.
+ * All IST trading hours (09:15–15:30) fall well within a single UTC calendar day
+ * so each snapshot belongs unambiguously to one IST date.
+ *
+ * The returned Map uses 'YYYY-MM-DD' keys (UTC date of the snapshot, which equals
+ * the IST calendar date for all trading-hour snapshots). Callers index by the
+ * calendar day string they are iterating — same format used by calendarDaysBetween.
+ */
+async function loadAllSnapshots(
   pool: Pool,
   symbol: string,
-  dateISO: string,
-): Promise<InMemorySnapshot[]> {
-  // UTC bounds: midnight to 23:59:59.999 of that calendar date.
-  // We use UTC bounds because the hypertable is partitioned by `time` (timestamptz stored as UTC).
-  // All IST trading hours (09:15–15:30) fall well within a single UTC calendar day.
-  const dayStart = `${dateISO}T00:00:00.000Z`;
-  const dayEnd = `${dateISO}T23:59:59.999Z`;
+  fromDate: string,
+  toDate: string,
+): Promise<Map<string, InMemorySnapshot[]>> {
+  // Range bounds: from midnight of fromDate to end-of-day of toDate (UTC).
+  // We use 'T00:00:00.000Z' as the lower bound (inclusive) and the next calendar
+  // day midnight as the upper bound (exclusive) to avoid fence-post issues.
+  const rangeStart = `${fromDate}T00:00:00.000Z`;
+  // Compute toDate + 1 day for the exclusive upper bound.
+  const toMs = new Date(`${toDate}T12:00:00Z`).getTime();
+  const toPlusOneMs = toMs + 24 * 60 * 60 * 1000;
+  const rangeEnd = new Date(toPlusOneMs).toISOString().slice(0, 10) + 'T00:00:00.000Z';
 
-  const result = await pool.query<SnapshotRow>(
-    `SELECT time, call_ltp, put_ltp, straddle_value, roc, roc_acceleration, vix, strike
+  const result = await pool.query<SnapshotRow & { date_iso: string }>(
+    `SELECT
+       TO_CHAR(time AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date_iso,
+       time, call_ltp, put_ltp, straddle_value, roc, roc_acceleration, vix, strike
      FROM straddle_snapshots
      WHERE symbol = $1
        AND time >= $2
        AND time < $3
      ORDER BY time ASC`,
-    [symbol, dayStart, dayEnd],
+    [symbol, rangeStart, rangeEnd],
   );
 
-  return result.rows.map((row) => ({
-    timeMs: new Date(row.time).getTime(),
-    straddleValue: toNum(row.straddle_value) ?? 0,
-    roc: toNum(row.roc),
-    rocAcceleration: toNum(row.roc_acceleration),
-    vix: toNum(row.vix),
-    strike: toNum(row.strike) ?? 0,
-  }));
+  // Group rows by their UTC calendar date (= IST calendar date for trading hours).
+  const map = new Map<string, InMemorySnapshot[]>();
+  for (const row of result.rows) {
+    const dateKey = row.date_iso; // 'YYYY-MM-DD' from TO_CHAR
+
+    let snaps = map.get(dateKey);
+    if (snaps === undefined) {
+      snaps = [];
+      map.set(dateKey, snaps);
+    }
+
+    snaps.push({
+      timeMs: new Date(row.time).getTime(),
+      straddleValue: toNum(row.straddle_value) ?? 0,
+      roc: toNum(row.roc),
+      rocAcceleration: toNum(row.roc_acceleration),
+      vix: toNum(row.vix),
+      strike: toNum(row.strike) ?? 0,
+    });
+  }
+
+  return map;
 }
 
 // ---------------------------------------------------------------------------
@@ -489,6 +528,19 @@ export function createBacktestRunner(pool: Pool) {
         config.toDate,
       );
 
+      // --- 4b. Load ALL straddle snapshots for the full window in one query ---
+      //
+      // Previous implementation called loadDaySnapshots() once per calendar day
+      // inside the loop (~365 sequential queries per backtest run). This single
+      // range query is functionally identical but uses O(1) round-trips instead
+      // of O(N) and respects the TimescaleDB hypertable time-filter requirement.
+      const allSnapshotsMap = await loadAllSnapshots(
+        pool,
+        config.underlying,
+        config.fromDate,
+        config.toDate,
+      );
+
       // --- 5. Simulate each calendar day ---
       const trades: SimulatedTrade[] = [];
       let tradingDays = 0;
@@ -500,7 +552,8 @@ export function createBacktestRunner(pool: Pool) {
       const ENTRY_CUTOFF = '15:00';
 
       for (const dateISO of allDays) {
-        const snapshots = await loadDaySnapshots(pool, config.underlying, dateISO);
+        // Look up pre-loaded snapshots for this day; default to empty (= skipped).
+        const snapshots = allSnapshotsMap.get(dateISO) ?? [];
 
         if (snapshots.length === 0) {
           skippedDates.push(dateISO);

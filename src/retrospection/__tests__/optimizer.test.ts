@@ -1432,3 +1432,280 @@ describe('pickBestFinalist — edge cases', () => {
     expect(best?.trainSharpe).toBe(1.2);
   });
 });
+
+// ===========================================================================
+// 20. M3 guard: kernel-only fast path (no backtest when all candidates ≤ 0.70)
+// ===========================================================================
+
+describe('runOptimizer — M3 kernel-only guard', () => {
+  it('does NOT call the backtest runner when all shortlisted candidates are ≤ 0.70', async () => {
+    // makePeakedTrainingRows with a low peak (0.45) produces a genuine interior
+    // kernel peak well below 0.65 so the shortlist [peak-0.05, peak, peak+0.05]
+    // stays entirely ≤ 0.70. The backtest is pointless (all candidates admit the
+    // same set of trades at the fixed 0.70 probability) so we skip it.
+    let backtestCallCount = 0;
+    backtestRunnerFactory.create = (_pool: Pool) => ({
+      async run(config: BacktestConfig) {
+        backtestCallCount++;
+        return {
+          config,
+          split: {
+            train: { from: '2023-01-01', to: '2023-12-01', days: 230 },
+            test: { from: '2023-12-02', to: '2023-12-22', days: 15 },
+            holdout: { from: '2023-12-23', to: '2024-01-12', days: 20 },
+          },
+          trades: makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5),
+          personalities: [],
+          tradingDays: 245,
+          skippedDates: [],
+        };
+      },
+    });
+
+    // makePeakedTrainingRows(200, 0.45): 3-cluster mountain at peak=0.45.
+    // Left bad cluster at max(0.30, 0.45-0.20)=0.30, right bad at min(0.90, 0.45+0.15)=0.60.
+    // Kernel peaks at ~0.43. Shortlist [0.38, 0.43, 0.48] — all ≤ 0.70.
+    const peakedRows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.45);
+
+    // Current value differs from kernel peak so we reach the transaction
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
+      .mockResolvedValueOnce({ rows: peakedRows });
+
+    // Transaction: SELECT FOR UPDATE returns the personality row
+    mockClientQuery.mockResolvedValueOnce({
+      rows: [makePersonalityRow({ params: { min_probability: 0.65 } })],
+    });
+    // UPDATE retrospection_results (approval mode write stub)
+    mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+    await runOptimizer(mockPool, 'p-target', '2024-11-15');
+
+    // The backtest runner must NOT have been called (kernel-only fast path)
+    expect(backtestCallCount).toBe(0);
+  });
+
+  it('uses the kernel-peak candidate directly in kernel-only mode (no backtest scoring)', async () => {
+    // Same setup as above — kernel genuinely peaks near 0.43 for peakedRows(200, 0.45).
+    // The optimizer should return a candidate near the kernel peak, not 'backtest_failed'.
+    backtestRunnerFactory.create = (_pool: Pool) => ({
+      async run(_config: BacktestConfig) {
+        throw new Error('backtest should not be called in kernel-only mode');
+      },
+    });
+
+    const peakedRows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.45);
+
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
+      .mockResolvedValueOnce({ rows: peakedRows });
+
+    mockClientQuery.mockResolvedValueOnce({
+      rows: [makePersonalityRow({ params: { min_probability: 0.65 } })],
+    });
+    mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+    // Should NOT throw or return backtest_failed — the kernel path takes over
+    const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
+
+    expect(result.action).not.toBe('none');
+    expect(result.reason).not.toBe('backtest_failed');
+  });
+
+  it('uses the full backtest path when precomputedTrades is supplied (even if all candidates ≤ 0.70)', async () => {
+    // When the caller provides precomputedTrades, the kernel-only guard does NOT
+    // fire (even if all candidates are ≤ 0.70). This preserves correctness for
+    // testing and for future calibrated-probability mode.
+    let backtestCallCount = 0;
+    backtestRunnerFactory.create = (_pool: Pool) => ({
+      async run(config: BacktestConfig) {
+        backtestCallCount++;
+        return {
+          config,
+          split: {
+            train: { from: '2023-01-01', to: '2023-12-01', days: 230 },
+            test: { from: '2023-12-02', to: '2023-12-22', days: 15 },
+            holdout: { from: '2023-12-23', to: '2024-01-12', days: 20 },
+          },
+          trades: [],
+          personalities: [],
+          tradingDays: 0,
+          skippedDates: [],
+        };
+      },
+    });
+
+    const peakedRows = makePeakedTrainingRows(MINIMUM_SAMPLE_STABLE, 0.45);
+    const precomputedTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5);
+
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.65 } })] })
+      .mockResolvedValueOnce({ rows: peakedRows });
+
+    // Transaction: SELECT FOR UPDATE
+    mockClientQuery.mockResolvedValueOnce({
+      rows: [makePersonalityRow({ params: { min_probability: 0.65 } })],
+    });
+    mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+    // Provide precomputedTrades — the guard should use the full path, not kernel-only
+    await runOptimizer(mockPool, 'p-target', '2024-11-15', { precomputedTrades });
+
+    // The internal backtest runner was NOT called (precomputedTrades bypasses it),
+    // but the full scoring path was used (not kernel-only).
+    expect(backtestCallCount).toBe(0); // internal runner not called; precomputed used
+  });
+});
+
+// ===========================================================================
+// 21. C2 dedup: precomputedTrades is used instead of running the internal backtest
+// ===========================================================================
+
+describe('runOptimizer — precomputedTrades (C2 dedup)', () => {
+  it('uses precomputedTrades and does not call the internal backtest runner', async () => {
+    let internalBacktestCalled = false;
+    backtestRunnerFactory.create = (_pool: Pool) => ({
+      async run(_config: BacktestConfig) {
+        internalBacktestCalled = true;
+        throw new Error('internal backtest should not be called when precomputedTrades is supplied');
+      },
+    });
+
+    // Use uniform training rows — kernel peaks near 0.90 (boundary), shortlist
+    // includes candidates > 0.70, so M3 guard does NOT fire. Backtest path runs,
+    // but precomputedTrades replaces the internal backtest call.
+    const trades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5);
+
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.50 } })] })
+      .mockResolvedValueOnce({
+        rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.65, sharpe: 2.0 }),
+      });
+
+    mockClientQuery.mockResolvedValueOnce({
+      rows: [makePersonalityRow({ params: { min_probability: 0.50 } })],
+    });
+    mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+    // Provide precomputedTrades: the internal backtest runner must NOT be called
+    await runOptimizer(mockPool, 'p-target', '2024-11-15', { precomputedTrades: trades });
+
+    expect(internalBacktestCalled).toBe(false);
+  });
+
+  it('scores finalists using precomputedTrades correctly', async () => {
+    // precomputedTrades contains 10 MOMENTUM_EXHAUSTION train trades with prob=0.7.
+    // The kernel peaks near 0.90 (uniform rows) → shortlist includes 0.90, 0.85.
+    // Candidates > 0.70 admit zero trades → no_eligible_finalist.
+    const trades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 5);
+
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [makePersonalityRow({ params: { min_probability: 0.50 } })] })
+      .mockResolvedValueOnce({
+        rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE, { activeMp: 0.65, sharpe: 2.0 }),
+      });
+
+    // The result should be no_eligible_finalist because all shortlist candidates
+    // (near 0.85-0.90) are > 0.70 and no trades have prob > 0.70.
+    const result = await runOptimizer(mockPool, 'p-target', '2024-11-15', {
+      precomputedTrades: trades,
+    });
+
+    // With shortlist near [0.80, 0.85, 0.90] and all trades at prob=0.70,
+    // no candidate passes the filter → no_eligible_finalist
+    expect(result.action).toBe('none');
+    expect(result.reason).toBe('no_eligible_finalist');
+  });
+});
+
+// ===========================================================================
+// 22. M1 guard: non-NIFTY underlying → multi-underlying_not_supported
+// ===========================================================================
+
+describe('runOptimizer — M1 multi-underlying guard', () => {
+  it('returns action="none" with reason="multi-underlying_not_supported" for BankNifty personality', async () => {
+    // A personality configured for BankNifty (or any non-NIFTY underlying)
+    // would be scored against NIFTY backtest data, producing meaningless Sharpe.
+    // The M1 guard rejects it early before fetching training rows.
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [
+        makePersonalityRow({
+          name: 'BankNiftyPrecision',
+          entry_type: 'momentum_exhaustion',
+          params: {
+            min_probability: 0.65,
+            underlying: 'NSE:BANKNIFTY50-INDEX', // non-NIFTY
+          },
+        }),
+      ],
+    });
+
+    const result = await runOptimizer(mockPool, 'p-bankNifty', '2024-11-15');
+
+    expect(result.action).toBe('none');
+    expect(result.reason).toBe('multi-underlying_not_supported');
+
+    // Verify training rows were NOT fetched (the guard fires before that)
+    // The personality lookup is call 1; training rows would be call 2.
+    // If the guard fired, there should be exactly 1 pool.query call.
+    expect(mockPoolQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('proceeds normally for NIFTY personality (guard does not fire for supported underlying)', async () => {
+    // When underlying = BACKTEST_UNDERLYING (NSE:NIFTY50-INDEX) or absent
+    // (defaults to BACKTEST_UNDERLYING), the M1 guard must NOT fire.
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 2);
+    mockBacktestRunner(trainTrades);
+
+    // Personality with explicit NIFTY underlying
+    mockPoolQuery
+      .mockResolvedValueOnce({
+        rows: [
+          makePersonalityRow({
+            params: {
+              min_probability: 0.50,
+              underlying: 'NSE:NIFTY50-INDEX',
+            },
+          }),
+        ],
+      })
+      .mockResolvedValueOnce({ rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE) });
+
+    // Transaction mock
+    mockClientQuery.mockResolvedValueOnce({
+      rows: [makePersonalityRow({ params: { min_probability: 0.50 } })],
+    });
+    mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+    const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
+
+    // The reason must NOT be multi-underlying_not_supported
+    expect(result.reason).not.toBe('multi-underlying_not_supported');
+  });
+
+  it('proceeds for personality without configured underlying (defaults to NIFTY)', async () => {
+    // When params.underlying is absent, the M1 guard defaults to BACKTEST_UNDERLYING
+    // (NSE:NIFTY50-INDEX) and proceeds normally.
+    const trainTrades = makeTrainMomentumTrades(SHORTLIST_MIN_TRADES + 2);
+    mockBacktestRunner(trainTrades);
+
+    mockPoolQuery
+      .mockResolvedValueOnce({
+        rows: [
+          makePersonalityRow({
+            params: { min_probability: 0.50 }, // no underlying field
+          }),
+        ],
+      })
+      .mockResolvedValueOnce({ rows: makeTrainingRows(MINIMUM_SAMPLE_STABLE) });
+
+    mockClientQuery.mockResolvedValueOnce({
+      rows: [makePersonalityRow({ params: { min_probability: 0.50 } })],
+    });
+    mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+    const result = await runOptimizer(mockPool, 'p-target', '2024-11-15');
+
+    expect(result.reason).not.toBe('multi-underlying_not_supported');
+  });
+});

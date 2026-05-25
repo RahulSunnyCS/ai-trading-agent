@@ -243,6 +243,25 @@ export interface OptimizerResult {
 }
 
 /**
+ * Options for runOptimizer — all fields are optional.
+ *
+ * precomputedTrades: when supplied, Phase B skips the internal backtest call
+ *   and uses these trades directly. Only valid when the BacktestConfig that
+ *   produced them is identical to what runOptimizer would have built (same
+ *   underlying, same tradeDateISO window, same holdoutDays). The EOD job is
+ *   the only caller that should supply this; it deduplicates the backtest
+ *   across all personalities that share an identical config.
+ *
+ * Rationale for an options object rather than a positional parameter:
+ *   positional parameters are brittle when adding optional arguments to a
+ *   function that already has three. An options object is self-documenting
+ *   and extensible without a signature-breaking change.
+ */
+export interface RunOptimizerOptions {
+  precomputedTrades?: SimulatedTrade[];
+}
+
+/**
  * One retrospection row consumed by the optimizer's kernel phase.
  * Only the columns needed for computing the kernel objective score.
  */
@@ -752,13 +771,25 @@ function buildBacktestConfig(tradeDateISO: string): BacktestConfig {
  *
  * Phase A (Shortlist — kernel-based, cheap):
  *   1. Fetch personality row — check entry_type, is_active, NOT sr_anchored.
+ *      M1 guard: non-NIFTY underlying → early return (not yet supported).
  *   2. Fetch training rows from retrospection_results (holdout excluded).
  *   3. Min-sample gate: if post-filter row count < MINIMUM_SAMPLE_STABLE → 'none'.
  *   4. Golden-section search on the kernel objective → kernel peak.
  *   5. Build shortlist of SHORTLIST_COUNT candidates centred on the kernel peak.
  *
- * Phase B (Finalist scoring — real backtest, one run):
- *   6. Run ONE backtest over the train window (holdoutDays = OPTIMIZER_HOLDOUT_DAYS).
+ * Phase B (Finalist scoring — backtest or kernel-only):
+ *   M3 guard: if ALL shortlisted candidates are ≤ BACKTEST_RUNNER_FIXED_PROB
+ *     (the fixed adjustedProbability emitted by the current backtest runner),
+ *     the backtest provides ZERO discrimination between candidates. In this
+ *     common case we skip Phase B entirely and return the kernel-peak candidate
+ *     directly ('kernel_only' reason). This avoids a pointless 365-day DB scan.
+ *     The two-phase code path is preserved for when calibrated per-signal
+ *     probabilities arrive (candidates can then exceed the fixed ceiling).
+ *
+ *   When NOT in kernel-only mode:
+ *   6. Use precomputedTrades if supplied (C2 dedup — EOD job shares one backtest
+ *      across all personalities with an identical BacktestConfig). Otherwise run
+ *      ONE backtest over the train window (holdoutDays = OPTIMIZER_HOLDOUT_DAYS).
  *      Wrapped in try/catch: backtest failure → 'none' (EOD job continues).
  *   7. Score each shortlisted candidate by Sharpe of its eligible train trades.
  *      Holdout trades are NEVER read (filtered in scoreFinalists).
@@ -776,11 +807,13 @@ function buildBacktestConfig(tradeDateISO: string): BacktestConfig {
  * @param pool          - pg Pool (injected for testability)
  * @param personalityId - UUID of the target personality_configs row
  * @param tradeDateISO  - Trade date in 'YYYY-MM-DD' format (IST calendar date)
+ * @param options       - Optional settings; see RunOptimizerOptions
  */
 export async function runOptimizer(
   pool: Pool,
   personalityId: string,
   tradeDateISO: string,
+  options: RunOptimizerOptions = {},
 ): Promise<OptimizerResult> {
   // =========================================================================
   // PHASE A — SHORTLIST (kernel-based, cheap)
@@ -826,6 +859,28 @@ export async function runOptimizer(
     return { action: 'none', reason: 'personality_inactive' };
   }
 
+  // -------------------------------------------------------------------------
+  // M1 guard: non-NIFTY underlying personalities are not supported yet.
+  //
+  // The backtest runner is hardcoded to load straddle_snapshots for a single
+  // underlying. When the runner accepts per-personality underlying config,
+  // remove this guard. Until then, running the optimizer against NIFTY data
+  // for a BankNifty/Sensex personality would produce meaningless Sharpe scores
+  // — we reject early rather than silently produce garbage.
+  //
+  // We check the personality's configured underlying, not BACKTEST_UNDERLYING,
+  // so the guard remains correct even if BACKTEST_UNDERLYING changes.
+  // -------------------------------------------------------------------------
+  const configuredUnderlying = String(
+    (personality.params as Record<string, unknown>).underlying ?? BACKTEST_UNDERLYING,
+  );
+  if (configuredUnderlying !== BACKTEST_UNDERLYING) {
+    return {
+      action: 'none',
+      reason: 'multi-underlying_not_supported',
+    };
+  }
+
   const currentMinProb = Number((personality.params as Record<string, unknown>).min_probability);
 
   if (!Number.isFinite(currentMinProb)) {
@@ -868,65 +923,130 @@ export async function runOptimizer(
   const shortlist = buildShortlist(kernelPeak, trainingRows);
 
   // =========================================================================
-  // PHASE B — FINALIST SCORING (real backtest, one run)
+  // PHASE B — FINALIST SCORING (backtest or kernel-only)
   // =========================================================================
 
   // -------------------------------------------------------------------------
-  // Step 6: run ONE backtest over the train window
+  // M3 guard: kernel-only fast path
   //
-  // Wrapped in try/catch: any backtest failure (DB timeout, config error,
-  // empty underlying data) is caught and the optimizer falls back to 'none'.
-  // The EOD job's outer try/catch also catches optimizer failures, but we
-  // want to return a structured 'none' rather than throwing.
+  // The current backtest runner assigns a FIXED adjustedProbability = 0.70 to
+  // every MOMENTUM_EXHAUSTION signal (hardcoded in backtest-runner.ts). This
+  // means post-hoc filtering on `adjustedProbability >= candidate` is binary:
+  //   - candidates ≤ 0.70 → ALL momentum train trades pass (identical Sharpe)
+  //   - candidates > 0.70 → ZERO trades pass → ineligible
+  //
+  // If every shortlisted candidate is ≤ BACKTEST_RUNNER_FIXED_PROB, the
+  // backtest provides ZERO discrimination. Running a 365-day DB scan in this
+  // common case adds ~1095 queries to each EOD batch (3 personalities × 365
+  // days) with no benefit. We skip the backtest entirely and return the
+  // kernel-peak candidate (the best Phase-A candidate, first in the list after
+  // sorting by kernel score descending).
+  //
+  // WHEN this guard fires: any time all three shortlist candidates are ≤ 0.70,
+  // which is the common case for personalities whose kernel peak is below 0.65
+  // (±0.05 shortlist spread stays under 0.70).
+  //
+  // WHEN this guard does NOT fire: when calibrated per-signal probabilities
+  // arrive (runner emits values > 0.70), some candidates will exceed the fixed
+  // ceiling and the two-phase path resumes providing real discrimination.
+  //
+  // Named constant for clarity — this is the fixed probability the runner
+  // currently emits, NOT a business threshold. When the runner is upgraded,
+  // update this constant and the kernel-only guard fires less often.
   // -------------------------------------------------------------------------
-  let backtestTrades: SimulatedTrade[];
-  try {
-    const runner = backtestRunnerFactory.create(pool);
-    const backtestConfig = buildBacktestConfig(tradeDateISO);
-    const backtestResult = await runner.run(backtestConfig);
-    backtestTrades = backtestResult.trades;
-  } catch (backtestErr) {
-    // Log at warn level (not error) — backtest failure is a known-possible
-    // transient state (e.g. no snapshot data for the lookback window on a
-    // freshly set-up instance). The rule engine has already run (step 5f of
-    // the EOD job) so no signal is lost.
-    console.warn(
-      '[optimizer] backtest failed for personality %s on %s — returning no suggestion:',
-      personalityId,
-      tradeDateISO,
-      backtestErr,
-    );
-    return { action: 'none', reason: 'backtest_failed' };
+  const BACKTEST_RUNNER_FIXED_PROB = 0.70;
+
+  const allCandidatesAtOrBelowFixedProb = shortlist.every(
+    (e) => e.candidate <= BACKTEST_RUNNER_FIXED_PROB,
+  );
+
+  let bestFinalistCandidate: number;
+  let bestFinalistFromBacktest = false;
+
+  if (allCandidatesAtOrBelowFixedProb && options.precomputedTrades === undefined) {
+    // Fast path: use the kernel-peak candidate (first entry — highest kernel
+    // score after sort). No backtest needed; discrimination comes entirely
+    // from Phase A. This is correct: all candidates have identical backtest
+    // Sharpe so Phase B would tie-break by kernel score anyway.
+    //
+    // We do NOT apply this fast path when precomputedTrades is supplied —
+    // the caller explicitly wants backtest scoring, possibly for testing or
+    // future calibrated-probability mode.
+    bestFinalistCandidate = shortlist[0]!.candidate;
+    // Fall through to guard layer with kernel_only reason recorded below.
+  } else {
+    // Full path: score candidates via backtest trades.
+    bestFinalistFromBacktest = true;
+
+    // -----------------------------------------------------------------------
+    // Step 6: obtain backtest trades
+    //
+    // Use precomputedTrades if supplied by the caller (C2 dedup: EOD job ran
+    // one backtest per unique BacktestConfig and passes the result here).
+    // Otherwise run ONE backtest. Wrapped in try/catch: any failure → 'none'.
+    // -----------------------------------------------------------------------
+    let backtestTrades: SimulatedTrade[];
+    if (options.precomputedTrades !== undefined) {
+      // Caller-supplied trades: skip the internal backtest call.
+      // Correctness requirement (enforced by EOD job caller, not here):
+      //   precomputedTrades MUST come from a BacktestConfig with the same
+      //   underlying, same tradeDateISO, and same holdoutDays as this optimizer
+      //   run. The EOD job keys the shared backtest on those exact fields.
+      backtestTrades = options.precomputedTrades;
+    } else {
+      try {
+        const runner = backtestRunnerFactory.create(pool);
+        const backtestConfig = buildBacktestConfig(tradeDateISO);
+        const backtestResult = await runner.run(backtestConfig);
+        backtestTrades = backtestResult.trades;
+      } catch (backtestErr) {
+        // Log at warn level (not error) — backtest failure is a known-possible
+        // transient state (e.g. no snapshot data for the lookback window on a
+        // freshly set-up instance). The rule engine has already run (step 5f of
+        // the EOD job) so no signal is lost.
+        console.warn(
+          '[optimizer] backtest failed for personality %s on %s — returning no suggestion:',
+          personalityId,
+          tradeDateISO,
+          backtestErr,
+        );
+        return { action: 'none', reason: 'backtest_failed' };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 7: score each shortlisted candidate against train trades
+    //
+    // scoreFinalists internally filters to split==='train' AND
+    // signalType==='MOMENTUM_EXHAUSTION'. Holdout trades are never read.
+    // -----------------------------------------------------------------------
+    const scored = scoreFinalists(shortlist, backtestTrades);
+
+    // -----------------------------------------------------------------------
+    // Step 8: pick the finalist with the best train Sharpe
+    // -----------------------------------------------------------------------
+    const bestFinalist = pickBestFinalist(scored);
+
+    // -----------------------------------------------------------------------
+    // Step 9: min-sample gate (Stage 2) — no eligible finalist
+    //
+    // If no candidate had enough eligible train trades, return 'none'.
+    // This is consistent with the Phase-A min-sample philosophy: we only act
+    // when we have enough evidence.
+    // -----------------------------------------------------------------------
+    if (bestFinalist === null) {
+      return {
+        action: 'none',
+        reason: 'no_eligible_finalist',
+      };
+    }
+
+    bestFinalistCandidate = bestFinalist.candidate;
   }
 
-  // -------------------------------------------------------------------------
-  // Step 7: score each shortlisted candidate against train trades
-  //
-  // scoreFinalists internally filters to split==='train' AND
-  // signalType==='MOMENTUM_EXHAUSTION'. Holdout trades are never read.
-  // -------------------------------------------------------------------------
-  const scored = scoreFinalists(shortlist, backtestTrades);
-
-  // -------------------------------------------------------------------------
-  // Step 8: pick the finalist with the best train Sharpe
-  // -------------------------------------------------------------------------
-  const bestFinalist = pickBestFinalist(scored);
-
-  // -------------------------------------------------------------------------
-  // Step 9: min-sample gate (Stage 2) — no eligible finalist
-  //
-  // If no candidate had enough eligible train trades, return 'none'.
-  // This is consistent with the Phase-A min-sample philosophy: we only act
-  // when we have enough evidence.
-  // -------------------------------------------------------------------------
-  if (bestFinalist === null) {
-    return {
-      action: 'none',
-      reason: 'no_eligible_finalist',
-    };
-  }
-
-  const clampedCandidate = clampMinProbability(bestFinalist.candidate);
+  const clampedCandidate = clampMinProbability(bestFinalistCandidate);
+  // Record the path taken for logging/debug; only used in the metricsDesc string.
+  const phaseBReason = bestFinalistFromBacktest ? 'backtest' : 'kernel_only';
 
   // =========================================================================
   // GUARD LAYER + WRITE (same as original optimizer)
@@ -1047,10 +1167,11 @@ export async function runOptimizer(
       return { action: 'proposed', candidateValue: proposedValue, currentValue: lockedMinProb };
     }
 
+    // phaseBReason captures how Phase B resolved ('kernel_only' or 'backtest').
+    // In kernel_only mode, trainSharpe and eligibleTrades are not available.
     const metricsDesc = [
       `candidate=${proposedValue.toFixed(4)}`,
-      `trainSharpe=${bestFinalist.trainSharpe.toFixed(4)}`,
-      `eligibleTrades=${bestFinalist.eligibleTradeCount}`,
+      `phaseB=${phaseBReason}`,
       `trainRows=${trainingRows.length}`,
     ].join(',');
 

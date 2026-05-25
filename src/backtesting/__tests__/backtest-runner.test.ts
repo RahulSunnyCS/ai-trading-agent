@@ -320,3 +320,160 @@ describe('BacktestResult structure', () => {
     expect(Array.isArray(result.trades)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C2 N+1 fix: single range query replaces per-day loop
+// ---------------------------------------------------------------------------
+
+describe('single-range snapshot query (C2 N+1 fix)', () => {
+  /**
+   * Counts total pool.query() calls made during runner.run().
+   *
+   * Before the fix: 2 (personalities + regimes) + N (one per calendar day)
+   * After the fix:  2 (personalities + regimes) + 1 (range query for all days)
+   *
+   * We use a tracking wrapper around pool.query to count calls precisely.
+   */
+  function makeCountingPool(queryResponses: Array<Array<Record<string, unknown>>>): {
+    pool: Pool;
+    getCallCount: () => number;
+  } {
+    let callIdx = 0;
+    let callCount = 0;
+    const mockQuery = vi.fn(() => {
+      callCount++;
+      const rows = queryResponses[callIdx] ?? [];
+      callIdx++;
+      return Promise.resolve({ rows, rowCount: rows.length });
+    });
+    const pool = {
+      query: mockQuery,
+      end: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Pool;
+    return { pool, getCallCount: () => callCount };
+  }
+
+  it('issues exactly 3 pool.query() calls regardless of the date range length', async () => {
+    // 10-day range. Before fix: 2 + 10 = 12 calls. After fix: 2 + 1 = 3 calls.
+    // The mock returns:
+    //   - call 1: personality rows
+    //   - call 2: regime tags (empty)
+    //   - call 3: all straddle snapshots for the full range (empty)
+    const { pool, getCallCount } = makeCountingPool([
+      [makePersonalityRow()], // personalities
+      [],                      // regime tags
+      [],                      // single range query (all days, no snapshots)
+    ]);
+
+    const runner = createBacktestRunner(pool);
+    await runner.run({
+      underlying: 'NIFTY',
+      fromDate: '2024-01-01',
+      toDate: '2024-01-10', // 10 calendar days
+      holdoutDays: 0,
+      trainFraction: 0.7,
+    });
+
+    // Exactly 3 DB calls: personalities, regime tags, single snapshot range query
+    expect(getCallCount()).toBe(3);
+  });
+
+  it('issues exactly 3 pool.query() calls for a 100-day range', async () => {
+    // Verify the O(1) query count holds for a larger range (was O(N) before fix).
+    const { pool, getCallCount } = makeCountingPool([
+      [makePersonalityRow()],
+      [],
+      [], // single range response
+    ]);
+
+    const runner = createBacktestRunner(pool);
+    await runner.run({
+      underlying: 'NIFTY',
+      fromDate: '2024-01-01',
+      toDate: '2024-04-09', // ~100 calendar days
+      holdoutDays: 10,
+      trainFraction: 0.7,
+    });
+
+    // Still exactly 3 calls regardless of date range width
+    expect(getCallCount()).toBe(3);
+  });
+
+  it('correctly groups snapshots by date when the range query returns rows', async () => {
+    // Verify that rows returned by the range query are correctly assigned to their
+    // calendar day. We inject 2 snapshot rows for 2024-01-01 and verify they
+    // produce 1 trading day (not 0 skipped).
+    //
+    // The range query returns rows with a computed `date_iso` column
+    // (TO_CHAR(time AT TIME ZONE 'UTC', 'YYYY-MM-DD')) that the runner uses to
+    // group rows into the per-day map.
+    //
+    // We simulate a row that has time = '2024-01-01T09:30:00Z' (IST 15:00 trading hour)
+    // and provide the computed date_iso = '2024-01-01'.
+    const snapshotRows = [
+      {
+        date_iso: '2024-01-01',
+        time: new Date('2024-01-01T09:30:00Z'),
+        call_ltp: '100',
+        put_ltp: '100',
+        straddle_value: '200',
+        roc: '0.5',
+        roc_acceleration: '-0.1',
+        vix: '15',
+        strike: '21000',
+      },
+      {
+        date_iso: '2024-01-01',
+        time: new Date('2024-01-01T10:00:00Z'),
+        call_ltp: '105',
+        put_ltp: '95',
+        straddle_value: '200',
+        roc: '0.3',
+        roc_acceleration: '-0.2',
+        vix: '15',
+        strike: '21000',
+      },
+    ];
+
+    const { pool } = makeCountingPool([
+      [makePersonalityRow()], // personalities
+      [],                      // regime tags
+      snapshotRows,            // range query returns 2 rows for 2024-01-01
+    ]);
+
+    const runner = createBacktestRunner(pool);
+    const result = await runner.run({
+      underlying: 'NIFTY',
+      fromDate: '2024-01-01',
+      toDate: '2024-01-01',
+      holdoutDays: 0,
+      trainFraction: 0.7,
+    });
+
+    // 2024-01-01 has snapshots → it is a trading day (not skipped)
+    expect(result.tradingDays).toBe(1);
+    expect(result.skippedDates).not.toContain('2024-01-01');
+  });
+
+  it('skips days with no snapshots in the range (same behavior as per-day query)', async () => {
+    // A 3-day range with an empty range query → all 3 days are skipped.
+    // This is the same behavior as the old per-day loop returning empty arrays.
+    const { pool } = makeCountingPool([
+      [makePersonalityRow()],
+      [],
+      [], // empty range = no snapshots for any day
+    ]);
+
+    const runner = createBacktestRunner(pool);
+    const result = await runner.run({
+      underlying: 'NIFTY',
+      fromDate: '2024-01-01',
+      toDate: '2024-01-03',
+      holdoutDays: 0,
+      trainFraction: 0.7,
+    });
+
+    expect(result.tradingDays).toBe(0);
+    expect(result.skippedDates).toEqual(['2024-01-01', '2024-01-02', '2024-01-03']);
+  });
+});

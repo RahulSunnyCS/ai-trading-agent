@@ -480,3 +480,50 @@ describe('runEvolutionEngine — personality not in momentum_exhaustion group', 
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// H4 fix: pre-filtering non-momentum_exhaustion personalities in the EOD job
+//
+// The evolution engine itself throws for non-momentum_exhaustion personalities
+// (they aren't in the SELECT FOR UPDATE result). The correct fix is to pre-filter
+// in the EOD job. This test verifies that the EOD job's pre-filter is the
+// recommended approach, and that runEvolutionEngine throws (not silently returns)
+// when called with an sr_anchored personality that reaches the transaction.
+//
+// NOTE: The pre-filter lives in eod-retrospection-job.ts (entry_type check before
+// calling runEvolutionEngine). The test here documents the underlying behavior.
+// ---------------------------------------------------------------------------
+
+describe('runEvolutionEngine — H4 invariant: throws for non-momentum_exhaustion when it reaches the transaction', () => {
+  it('throws "not found in momentum_exhaustion group" when personality is sr_anchored and the locked set has no match', async () => {
+    // An sr_anchored personality is NOT in the SELECT FOR UPDATE (which filters
+    // to entry_type = 'momentum_exhaustion'). If the EOD job fails to pre-filter
+    // and calls runEvolutionEngine for an sr_anchored personality, this error fires.
+    //
+    // The locked set is empty (no momentum_exhaustion rows in test DB).
+    mockClientQuery.mockResolvedValueOnce({ rows: [] }); // empty locked set
+
+    const metrics = { winRate: 0.3, totalTrades: 25, totalPnlPct: -3.0 };
+
+    // The call throws — the EOD job pre-filter (H4 fix) prevents this from ever
+    // happening in production. This test documents the invariant and ensures the
+    // error message is distinguishable from a FROZEN_VIOLATION.
+    await expect(
+      runEvolutionEngine(noopPool, 'p-levelhead', '2024-11-15', metrics),
+    ).rejects.toThrow('p-levelhead');
+  });
+
+  it('does NOT throw when the totalTrades gate fires before the transaction (no DB call for sr_anchored with < 20 trades)', async () => {
+    // When metrics.totalTrades < 20, the engine returns early BEFORE entering
+    // the transaction. Even without a pre-filter in the EOD job, a zero-trade
+    // sr_anchored personality would not throw (it returns 'none' silently).
+    // This is a safety net — real protection is the EOD job pre-filter.
+    const metrics = { winRate: 0.0, totalTrades: 0, totalPnlPct: 0.0 };
+
+    // Must not throw, must not call the transaction client
+    const result = await runEvolutionEngine(noopPool, 'p-levelhead', '2024-11-15', metrics);
+
+    expect(result).toEqual({ action: 'none' });
+    expect(mockClientQuery).not.toHaveBeenCalled();
+  });
+});
