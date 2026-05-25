@@ -152,6 +152,16 @@ Critical variables whose misconfiguration causes real pain:
 | `MAX_WS_CONNECTIONS` | Max concurrent /ws/ticks WebSocket connections (default 50). Positive integers only; non-positive values silently fall back to 50 |
 | `EVOLUTION_REQUIRE_APPROVAL` | Should be `true` in any environment where the retrospection engine runs. Setting `false` allows the system to autonomously modify personality parameters without human review |
 | `TOKEN_VALIDITY_SCHEDULER_ENABLED` | When set to `true`, registers a BullMQ cron job that checks Fyers token expiry at 08:45 IST weekdays. Disabled by default; opt-in via this flag |
+| `INDICES` | Comma-separated active underlyings (default `NIFTY`). E.g. `INDICES=NIFTY,BANKNIFTY,SENSEX`. One StraddleCalculator + per-underlying engines/risk-book are spun up per entry; unknown names are skipped |
+| `ACTIVE_PHASE` | Integer gate (default `1`). Must be `>= 2` to load Phase-2 personalities (Levelhead) and to let the S/R detection engine emit signals. Keeps Phase-1 deployments free of S/R rows |
+| `SR_PROXIMITY_POINTS` | How close (index points) spot must come to an S/R level to trigger (default `50` = one NIFTY ATM interval) |
+| `SR_STRENGTH_FLOOR` | Minimum level strength [0,1] to qualify for signalling (default `0.2`) |
+| `SR_DEDUP_WINDOW_SECS` | Min seconds between SR signals for the same underlying+level bucket (default `300`) |
+| `SR_MIN_HISTORY_BARS` | Min 15s bars of prior-week history required before S/R is trusted; below this, S/R is disabled for that underlying for the session (default `500`) |
+| `SR_LEVEL_BUCKET_PTS` | Index-point grid that levels snap to for the dedup key (default `50`) |
+| `LOT_SIZE_NIFTY` / `LOT_SIZE_BANKNIFTY` / `LOT_SIZE_SENSEX` | Straddle units per trade per underlying (defaults `50` / `15` / `10`) |
+| `CALENDAR_REFILL_DAYS` | Console-warn reminder threshold: warns on startup if the max seeded `index_expiry_calendar` expiry for an underlying is within this many days (default `14`) |
+| `BACKTEST_UNDERLYING` | Underlying the optimizer's backtest finalist scoring queries. NOTE (pre-Phase-2 follow-up): currently mismatched — must be the stored snapshot symbol (`NIFTY`), not `NSE:NIFTY50-INDEX`, or the backtest returns 0 rows and finalist scoring silently no-ops |
 
 ## Common Tasks
 
@@ -185,3 +195,6 @@ Critical variables whose misconfiguration causes real pain:
 - **Simulation is not a mock** — `SIMULATE=true` runs the full production pipeline with synthetic data. It writes to the real database and Redis. Use `docker compose down -v` to reset state between test runs if needed
 - **Port conflicts** — PostgreSQL default port 5432, Redis default 6379. If either is in use locally, edit the port mapping in `docker-compose.yml` and update the corresponding `_URL` env var
 - **Bun-only repo** — do not run `npm install` or `yarn install`. They generate a `package-lock.json` or `yarn.lock` that will conflict with `bun.lock`
+- **SR signal type reuse** — S/R signals are written as `signal_type='PULLBACK'` with `sr_subtype='SR_REVERSAL'` (no new signal_type). The personality filter enforces a converse guard: SR_REVERSAL is accepted ONLY by `sr_anchored` personalities, and `sr_anchored` personalities accept ONLY SR_REVERSAL — this prevents S/R signals from contaminating the momentum_exhaustion comparison set
+- **Multi-underlying state isolation** — each StraddleCalculator, PeakDetectionEngine, and SRDetectionEngine is per-underlying-stateful and subscribes independently to `straddle.values`. Portfolio risk is scoped per `(personality, underlying)`. Never share mutable per-underlying state across underlyings or multi-index runs cross-contaminate
+- **Optimizer backtest scoring is inert** — the backtest runner currently hardcodes `adjustedProbability=0.70`, so all candidates in [0.30,0.70] score identically and candidates >0.70 admit no trades. The golden-section kernel shortlist and the full guard layer (FROZEN_VIOLATION, 8pp comparison-integrity) are active, but finalist scoring cannot discriminate until the runner emits calibrated per-signal probabilities and `BACKTEST_UNDERLYING` is corrected

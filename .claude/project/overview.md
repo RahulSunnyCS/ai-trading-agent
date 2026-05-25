@@ -5,11 +5,11 @@
 ## Core Feature Areas
 
 - **Data Ingestion** — Real-time market tick ingestion via Fyers WebSocket (or a built-in random-walk simulator); ATM straddle calculation every 15 seconds; India VIX feed; Redis Streams as the event bus
-- **Signal Generation** — Momentum exhaustion peak detection engine (rate-of-change + second derivative + EMA crossover); scheduled fallback entries; probability scoring adjusted for VIX, time of day, and day of week; Phase 2 will add S/R-level signal detection
+- **Signal Generation** — Momentum exhaustion peak detection engine (rate-of-change + second derivative + EMA crossover); S/R-level signal detection (previous-week H/L, pivot levels, volume POC with confluence weighting; gated by ACTIVE_PHASE≥2); scheduled fallback entries; probability scoring adjusted for VIX, time of day, and day of week
 - **10-Personality Decision Engine** — Each personality independently filters every signal through 5 stages (hard filters → state checks → context checks → signal quality → optional profit gate) and then executes or skips the paper trade
 - **Paper Trade Execution** — Simulated straddle entries and exits recorded to PostgreSQL; Quantiply API integration for paper trade tracking; 3 management styles: Hold, Roll (Adjuster), Cut + Re-enter (Reducer)
 - **EOD Retrospection Engine** — BullMQ batch job computes per-personality daily metrics, Beat-Clockwork deltas, signal calibration scores, management effectiveness, and queues rule-based parameter suggestions; all results are regime-tagged (RANGING / TRENDING_STRONG / VOLATILE_REVERTING / EVENT_DAY)
-- **Parameter Evolution** — Phase 1: rule-based adjustments with minimum sample sizes, cooldown periods, and approval gates; Phase 2: Bayesian optimization; Phase 3: genetic algorithms; Phase 4: RL (if data warrants)
+- **Parameter Evolution** — Phase 1: rule-based adjustments with minimum sample sizes, cooldown periods, and approval gates; Phase 2 (M5): guarded deterministic 1-D optimizer (golden-section kernel search over min_probability + optional backtest finalist scoring; full Bayesian GP still deferred); Phase 3: genetic algorithms; Phase 4: RL (if data warrants)
 - **React Dashboard** — Real-time straddle value + momentum indicators, active signals, per-personality running P&L, EOD retrospection charts; served via Vite; uses Lightweight Charts and Zustand
 
 ## Target Users
@@ -34,7 +34,10 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
   - M7: Razorpay UPI payment system — order creation, HMAC webhook verification, credit consumption, geolocation, access-gate middleware, pricing page
   - **M3 gaps remaining:** backtest runner (T-51) and per-regime statistical reporting (T-58) deferred
   - **M4 gaps remaining:** BullMQ EOD job and full retrospection + evolution engine (T-34–T-38, T-40–T-42) not started
-- **Phase 2:** S/R signal detection engine, Levelhead personality, BankNifty/Sensex expansion, Bayesian optimisation
+- **Phase 2 (M5 partial):**
+  - **Done:** S/R signal detection engine (prev-week H/L, pivots, volume POC, confluence weighting; emits SR_REVERSAL via signal_type=PULLBACK + sr_subtype, gated by ACTIVE_PHASE≥2); Levelhead personality (entry_type=sr_anchored, Phase-2 gated); BankNifty/Sensex expansion (per-underlying StraddleCalculator, per-underlying portfolio risk books, index_expiry_calendar with BSE prefix for Sensex); guarded deterministic 1-D optimizer (golden-section kernel search + optional backtest finalist scoring, preserving Clockwork is_frozen + 8pp comparison-integrity guards).
+  - **Deferred:** full Bayesian GP optimization. **Pre-Phase-2 follow-ups:** (1) optimizer backtest finalist scoring is inert until the backtest runner emits per-signal probabilities (currently hardcoded 0.70) and the BACKTEST_UNDERLYING symbol mismatch ('NSE:NIFTY50-INDEX' vs stored 'NIFTY') is fixed; (2) add an internal entry_type self-guard inside runEvolutionEngine (not just the EOD-caller filter).
+- **Phase 2 (remaining):** Bayesian GP optimisation
 - **Phase 3:** Strategies 2 & 3, genetic algorithms, microstructure-aware slippage
 - **Phase 4:** Reinforcement learning, live trading readiness assessment
 
