@@ -128,6 +128,18 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
     try {
       const token = await exchangeAuthCode(cfg, authCode);
       await saveToken(server.db, token);
+
+      // Fire the in-process broker reload hook fire-and-forget. The token is
+      // already persisted at this point, so even if the reload fails the operator
+      // still sees the success page. The callback response must not wait on feed
+      // reconnection — that can take seconds and is best-effort. Any reload error
+      // is logged via request.log and the authDegraded flag remains true until the
+      // next successful reload attempt (e.g. the 30-second /api/meta poll will
+      // flip it once the feed is live).
+      void Promise.resolve(server.onTokenStored?.()).catch((e) => {
+        request.log.error(e, '[fyers-auth] broker reload after login failed');
+      });
+
       reply.header('Content-Type', 'text/html; charset=utf-8');
       return reply.send(`<!doctype html>
 <html><body style="font-family:system-ui;background:#0f172a;color:#e2e8f0;padding:2rem">

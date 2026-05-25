@@ -109,6 +109,13 @@ declare module 'fastify' {
     // Optional Redis client — absent when buildServer is called without one
     // (e.g. unit tests). Routes must check for its presence before use.
     redis: Redis | undefined;
+    /**
+     * In-process broker reload hook — called by the Fyers OAuth callback after
+     * a fresh token is stored. Fires the broker reconnect in the main entry
+     * point (src/index.ts) without restarting the process. Null when
+     * buildServer is called without the hook (unit tests, standalone server).
+     */
+    onTokenStored: (() => void | Promise<void>) | null;
   }
 }
 
@@ -152,11 +159,17 @@ function buildPool(): Pool {
  * @param externalRedis  When provided, the server decorates itself with this
  *   Redis client and uses it to stream live ticks and straddle values to WS
  *   clients. When absent (unit tests), the WS endpoint degrades gracefully.
+ * @param onTokenStored  Optional hook called by the Fyers OAuth callback after
+ *   a fresh token is persisted. Wired to the in-process broker reload function
+ *   from src/index.ts so a successful dashboard login brings the feed up live
+ *   without a process restart. When absent (unit tests / standalone server) the
+ *   hook decoration is null and the callback fires nothing.
  */
 export async function buildServer(
   opts?: FastifyServerOptions,
   externalPool?: Pool,
   externalRedis?: Redis,
+  onTokenStored?: () => void | Promise<void>,
 ): Promise<FastifyInstance> {
   const server = Fastify({
     logger: opts?.logger ?? true,
@@ -193,6 +206,14 @@ export async function buildServer(
   // standalone server without Redis), routes and the WS handler guard against
   // undefined before using it — no crashes.
   server.decorate('redis', externalRedis);
+
+  // Decorate with the optional broker reload hook. Routes call
+  // server.onTokenStored?.() after storing a fresh token. Null when the
+  // server is built without a hook (unit tests / standalone). We store null
+  // rather than a no-op function so callers can distinguish "no hook wired"
+  // from "hook wired but produced no error" — the OAuth callback logs the
+  // fire-and-forget result only when the hook is present.
+  server.decorate('onTokenStored', onTokenStored ?? null);
 
   // Create the BullMQ EOD queue and decorate the server so route plugins can
   // enqueue jobs without importing the queue factory themselves. The queue is
@@ -772,9 +793,16 @@ export async function buildServer(
  * @param externalRedis  Optional shared Redis client — forwarded to buildServer()
  *   so the WS handler can stream live ticks and straddle values. When absent
  *   the WS endpoint degrades gracefully (no ticks).
+ * @param onTokenStored  Optional broker reload hook — forwarded to buildServer().
+ *   Wired from src/index.ts so a successful Fyers OAuth login fires an in-process
+ *   broker reconnect without requiring a process restart.
  */
-export async function startServer(externalPool?: Pool, externalRedis?: Redis): Promise<void> {
-  const server = await buildServer(undefined, externalPool, externalRedis);
+export async function startServer(
+  externalPool?: Pool,
+  externalRedis?: Redis,
+  onTokenStored?: () => void | Promise<void>,
+): Promise<void> {
+  const server = await buildServer(undefined, externalPool, externalRedis, onTokenStored);
 
   // Read port from env using dot notation (Biome useLiteralKeys requirement).
   const rawPort = process.env.PORT ?? '3000';

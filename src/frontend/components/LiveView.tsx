@@ -454,16 +454,48 @@ function FeedModeBanner({
         <p className="text-xs font-semibold uppercase tracking-wider text-red-400">
           {brokerLabel} token expired / connection degraded — re-login required
         </p>
-        {/* Provide a direct path to the re-login flow so the operator does not
-            have to hunt for it. Opens in the same tab so the dashboard context
-            is preserved in browser history. */}
-        <a
-          href={FYERS_LOGIN_PATH}
-          className="text-xs text-red-300 underline underline-offset-2 hover:text-red-200"
-          aria-label={`Re-login with ${brokerLabel} at ${FYERS_LOGIN_PATH}`}
+        {/* /login returns JSON { url, state } — the server stores the CSRF state
+            server-side and embeds it in the returned Fyers authorization URL.
+            We must fetch it and then navigate to url, NOT link directly to the
+            endpoint (that would just render the JSON). Same-tab navigation keeps
+            the dashboard in browser history. */}
+        <button
+          type="button"
+          onClick={() => {
+            // Open the popup SYNCHRONOUSLY inside the click gesture so the
+            // browser's popup blocker allows it (a window.open() after an
+            // `await` loses the user-gesture token and gets blocked). We then
+            // point the popup at the Fyers OAuth URL once /login responds.
+            // The OAuth flow MUST run in a separate tab: the /callback success
+            // page closes itself via window.close(), and doing this in the
+            // dashboard's own tab would navigate the SPA away ("shut off").
+            const popup = window.open('', '_blank');
+            void (async () => {
+              try {
+                const res = await fetch(FYERS_LOGIN_PATH);
+                const data = (await res.json()) as { url?: string };
+                if (!data.url) {
+                  console.error('[LiveView] Fyers login URL missing in response', data);
+                  popup?.close();
+                  return;
+                }
+                if (popup) {
+                  popup.location.href = data.url;
+                } else {
+                  // Popup blocked — fall back to same-tab navigation.
+                  window.location.href = data.url;
+                }
+              } catch (err) {
+                console.error('[LiveView] Failed to start Fyers login flow', err);
+                popup?.close();
+              }
+            })();
+          }}
+          className="self-start text-xs text-red-300 underline underline-offset-2 hover:text-red-200"
+          aria-label={`Re-login with ${brokerLabel}`}
         >
           Re-login with {brokerLabel} →
-        </a>
+        </button>
       </div>
     );
   }
@@ -507,14 +539,8 @@ function FeedModeBanner({
  */
 function TickChart({
   ticks,
-  simulate,
-  broker,
-  authDegraded,
 }: {
   ticks: readonly { time: number; ltp: number }[];
-  simulate: boolean | null;
-  broker: string;
-  authDegraded: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   // These refs hold the chart and series instances across renders.
@@ -606,13 +632,7 @@ function TickChart({
     chartRef.current?.timeScale().scrollToRealTime();
   }, [ticks]);
 
-  return (
-    <div>
-      {/* Feed mode banner — conditionally renders based on simulate and authDegraded flags. */}
-      <FeedModeBanner simulate={simulate} broker={broker} authDegraded={authDegraded} />
-      <div ref={containerRef} className="w-full rounded-md bg-gray-800" />
-    </div>
-  );
+  return <div ref={containerRef} className="w-full rounded-md bg-gray-800" />;
 }
 
 // ---------------------------------------------------------------------------
@@ -694,6 +714,13 @@ export function LiveView() {
 
   return (
     <div className="space-y-4">
+      {/* Feed-mode banner — rendered at the top of the view so it ALWAYS shows,
+          independent of whether any ticks have arrived. This matters most in the
+          degraded/cold-start case (no token → no feed → zero ticks): the operator
+          needs the "Login with Fyers" re-login button precisely when there is no
+          data, so it must not live inside the tick-gated chart. */}
+      <FeedModeBanner simulate={simulate} broker={broker} authDegraded={authDegraded} />
+
       {/* ------------------------------------------------------------------ */}
       {/* Section 1: NIFTY index live tick                                    */}
       {/* ------------------------------------------------------------------ */}
@@ -732,14 +759,7 @@ export function LiveView() {
         {/* Sparkline chart — only rendered once we have at least one tick to
             avoid an empty chart flash on load. Handles 0 points gracefully
             (returns null) and 1+ points without crashing. */}
-        {ticks.length > 0 && (
-          <TickChart
-            ticks={ticks}
-            simulate={simulate}
-            broker={broker}
-            authDegraded={authDegraded}
-          />
-        )}
+        {ticks.length > 0 && <TickChart ticks={ticks} />}
 
         {/* Empty state when connected but no ticks yet */}
         {ticks.length === 0 && status === 'connected' && (
