@@ -5,7 +5,8 @@
  * {allowed: true} on pass. Rules are checked in this exact order:
  *   1. Event-day gate  (no DB — cheapest)
  *   2. VIX staleness   (no DB — caller-supplied age)
- *   3. Portfolio daily stop (one aggregate DB query)
+ *   3. Portfolio daily stop (one aggregate DB query) — T-45: now scoped per
+ *      (personality, underlying) so each index is an independent book.
  *   4. Margin buffer   (one COUNT DB query)
  *   5. Max-legs / advisory lock (client checkout + transaction — most expensive)
  *
@@ -13,6 +14,20 @@
  * in-memory, the two aggregate queries run on the shared pool, and the advisory
  * lock — which needs a dedicated client + transaction — only fires when
  * everything else has already passed.
+ *
+ * T-45 multi-index scoping (Decision 2 — Option A: per-index books):
+ *   Rule 3 (daily stop) is now scoped per (personality, underlying). Each
+ *   underlying's daily P&L is tracked independently — a large BANKNIFTY loss
+ *   does not block a NIFTY trade, and vice versa. This matches the independent
+ *   index-book model where each underlying runs its own paper book.
+ *
+ *   TODO (T-50 / M6): implement a GLOBAL circuit-breaker across ALL personalities
+ *   and ALL underlyings. The global breaker guards against a systemic model
+ *   failure (e.g. a bad signal model producing losses on all indices simultaneously).
+ *   Deferred to T-50 because: (a) it requires additional DB schema work to track
+ *   cross-index totals efficiently, (b) the per-index stop already provides the
+ *   primary per-book protection, and (c) with only one operator the manual
+ *   override path is simpler. Remove this TODO when T-50 is implemented.
  */
 
 import type { Pool } from 'pg';
@@ -137,21 +152,28 @@ export async function portfolioRiskCheck(
   }
 
   // -------------------------------------------------------------------------
-  // Rule 3 — Portfolio daily stop
+  // Rule 3 — Portfolio daily stop (T-45: scoped per personality + underlying)
   //
-  // If today's total realised P&L has hit or breached the daily stop loss
-  // threshold, no more opens are permitted for the rest of the session. This
-  // prevents a bad sequence from compounding into a catastrophic loss.
+  // If today's total realised P&L for THIS personality on THIS underlying has
+  // hit or breached the daily stop loss threshold, no more opens are permitted
+  // for that (personality, underlying) combination for the rest of the session.
   //
-  // The WHERE clause anchors to midnight IST (cast to date then back to
-  // timestamptz) so that sessions spanning UTC midnight are still bounded by
-  // the IST trading calendar day. This is the correct timezone for Indian market
-  // sessions.
+  // T-45 change: the stop is now per (personality, underlying) — Decision 2
+  // Option A: per-index books. A BANKNIFTY loss for personality X does NOT
+  // block a NIFTY trade for the same personality X. Each index is an independent
+  // trading book with its own stop.
   //
-  // We include both open and closed trades in the SUM so that paper-loss on
-  // still-open positions is counted; this prevents a scenario where all
-  // positions are open (net_pnl = NULL) and the stop never triggers.
-  // net_pnl is NULL for open trades, so COALESCE(..., 0) is critical.
+  // TODO (T-50 / M6): add a GLOBAL circuit-breaker across all personalities and
+  // all underlyings. See module-level comment for rationale and deferral reason.
+  //
+  // The WHERE clause anchors to midnight IST (computed in TypeScript to avoid
+  // session-TZ issues with PostgreSQL's ::timestamptz cast). This ensures the
+  // trading calendar day matches the IST session, not UTC midnight.
+  //
+  // net_pnl is NULL for open trades; COALESCE(..., 0) counts them as zero so
+  // the stop triggers on realised losses only. Paper-loss on open positions is
+  // NOT counted (unlike the previous portfolio-wide version) because per-index
+  // unrealised P&L is not yet tracked at this granularity.
   // -------------------------------------------------------------------------
 
   const portfolioDailyStop = Number(process.env.PORTFOLIO_DAILY_STOP ?? '20000');
@@ -173,16 +195,23 @@ export async function portfolioRiskCheck(
   const istMidnightISO = new Date(istMidnightMs).toISOString();
   const istTomorrowISO = new Date(istMidnightMs + 24 * 60 * 60 * 1000).toISOString();
 
+  // Scoped per (personality_id, underlying): each index is an independent book.
+  // The personality_id column was added in the paper_trades schema (005_personality_seed.sql).
+  // The underlying column was present from migration 001. Both are TEXT columns — parameterised.
   const pnlResult = await db.query<{ total_pnl: string }>(
     `SELECT COALESCE(SUM(net_pnl), 0) AS total_pnl
      FROM paper_trades
-     WHERE entry_time >= $1 AND entry_time < $2`,
-    [istMidnightISO, istTomorrowISO],
+     WHERE entry_time >= $1
+       AND entry_time < $2
+       AND personality_id = $3
+       AND underlying = $4`,
+    [istMidnightISO, istTomorrowISO, intent.personalityId, intent.underlying],
   );
   const totalPnl = Number(pnlResult.rows[0]?.total_pnl ?? 0);
   if (totalPnl <= -portfolioDailyStop) {
     console.warn(
-      `[portfolioRiskCheck] Portfolio daily stop hit: ${totalPnl}, blocking for ${intent.personalityId}`,
+      `[portfolioRiskCheck] Portfolio daily stop hit for ${intent.personalityId}/${intent.underlying}: ` +
+        `${totalPnl}, blocking further ${intent.underlying} entries today.`,
     );
     return { allowed: false, reason: 'PORTFOLIO_DAILY_STOP' };
   }
@@ -208,7 +237,27 @@ export async function portfolioRiskCheck(
 
   const marginCapital = Number(process.env.MARGIN_CAPITAL ?? '100000');
   const marginRate = Number(process.env.MARGIN_RATE ?? '0.20');
-  const lotSize = 50; // NIFTY lot size — project constant; BankNifty/Sensex will need env var when added
+
+  // Lot sizes by underlying — used for margin estimation. NSE lot sizes change
+  // periodically; the values below were the project constants when this module was
+  // written and match the original hardcoded 50 for NIFTY (backward compat).
+  // Configurable via env vars so operators can update without a code change.
+  //   NIFTY    = 50  (original project constant — override via LOT_SIZE_NIFTY if changed)
+  //   BANKNIFTY = 15 (NSE lot size as of 2023 — override via LOT_SIZE_BANKNIFTY)
+  //   SENSEX    = 10 (BSE lot size as of 2023 — override via LOT_SIZE_SENSEX)
+  //
+  // NOTE: NSE changed NIFTY lot size from 50 to 75 in November 2024. If deploying
+  // after that date, set LOT_SIZE_NIFTY=75 in env. The default stays 50 for backward
+  // compat with existing tests and config that hardcoded the old value.
+  //
+  // TODO (T-50): Move lot sizes to a DB config table so they survive process restarts.
+  const LOT_SIZES: Record<string, number> = {
+    NIFTY: Number(process.env.LOT_SIZE_NIFTY ?? '50'),
+    BANKNIFTY: Number(process.env.LOT_SIZE_BANKNIFTY ?? '15'),
+    SENSEX: Number(process.env.LOT_SIZE_SENSEX ?? '10'),
+  };
+  // Fall back to 50 for unknown underlyings (pre-T-45 backward compat and tests).
+  const lotSize = LOT_SIZES[intent.underlying] ?? 50;
   const lots = 1;
 
   const openLegsForMargin = await db.query<{ cnt: string }>(

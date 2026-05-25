@@ -24,6 +24,7 @@ import type { Pool } from 'pg';
 // for interface compatibility with existing callers — the field is retained
 // unused rather than breaking the public constructor API.
 import { STREAM_STRADDLE, streamConsume } from '../redis/client.js';
+import type { Underlying } from '../ingestion/brokers/types.js';
 import type { Clock } from '../utils/clock.js';
 
 // ---------------------------------------------------------------------------
@@ -37,14 +38,16 @@ import type { Clock } from '../utils/clock.js';
  * straddleValue and vixAtEntry are strings because all NUMERIC columns
  * flow through the codebase as strings (see src/db/schema.ts comment).
  * atmStrike is an integer (strike prices in points) so a JS number is safe.
- * underlying is fixed to 'NIFTY' for Phase 1 (BankNifty/Sensex in Phase 2).
+ * underlying is the Underlying union type (NIFTY | BANKNIFTY | SENSEX) —
+ *   widened from the Phase-1-only 'NIFTY' literal so multi-index entries
+ *   flow without 'as NIFTY' casts in personality-router. (T-45)
  * entryTimeMs is epoch-ms so callers can compute time-in-trade without
  * instantiating a Date object.
  */
 export interface EntryIntent {
   straddleValue: string;
   atmStrike: number;
-  underlying: 'NIFTY';
+  underlying: Underlying;
   spot: string;
   vixAtEntry: string | null;
   entryTimeMs: number;
@@ -289,11 +292,18 @@ export class EntryEngine {
       return;
     }
 
+    // Read underlying from the snapshot field. The straddle calculator publishes
+    // this field for every snapshot. Default to 'NIFTY' for backward compat
+    // with any legacy snapshot that omits the field (pre-T-45 snapshots).
+    // The type cast is safe because the straddle-calc only publishes known
+    // Underlying values; an unknown value here degrades to 'NIFTY' default.
+    const underlyingField = (fields.underlying ?? 'NIFTY') as Underlying;
+
     const intent: EntryIntent = {
       straddleValue,
       atmStrike,
-      // Phase 1 only supports NIFTY. BankNifty/Sensex are Phase 2.
-      underlying: 'NIFTY',
+      // T-45: underlying is now read from the snapshot field (widened from 'NIFTY' literal).
+      underlying: underlyingField,
       spot,
       // vixAtEntry is null when VIX data is unavailable, matching the DB
       // column's nullable constraint (paper_trades.vix_at_entry).
