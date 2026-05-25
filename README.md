@@ -13,6 +13,16 @@ A frozen **Clockwork** personality acts as the immutable benchmark. Its paramete
 
 At end-of-day, a retrospection engine tags each day's results by market regime (`RANGING`, `TRENDING_STRONG`, `VOLATILE_REVERTING`, `EVENT_DAY`) and computes per-personality metrics: Beat-Clockwork delta, signal calibration score, management effectiveness. Rule-based parameter evolution then proposes adjustments — with human approval gates — so the personalities adapt to evidence rather than intuition.
 
+## Tech Stack
+
+Built on Bun + TypeScript, with Fastify for the API, PostgreSQL + TimescaleDB
+for time-series storage, Redis Streams + BullMQ for the event bus and EOD jobs,
+and a React + Vite dashboard. Market data comes from Fyers (read-only) with an
+NSE VIX fallback; paper trades are tracked via Quantiply; billing runs on
+Razorpay (India UPI). See [`docs/tech-stack.md`](docs/tech-stack.md) for a
+short description of every tool — what it is, why it's here, and what we use it
+for.
+
 ## Quick Start
 
 ### Prerequisites
