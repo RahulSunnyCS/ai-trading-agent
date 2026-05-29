@@ -17,9 +17,9 @@
  *     without any live network calls.
  *
  * Fyers endpoint assumptions (v3 data/history — verify against live docs):
- *   URL   : https://api-t1.fyers.in/api/v3/data/history
- *   Params: symbol, resolution, date_format (1 = epoch seconds), range_from,
- *           range_to (both epoch seconds when date_format=1)
+ *   URL   : https://api-t1.fyers.in/data/history
+ *   Params: symbol, resolution, date_format (0 = epoch seconds), range_from,
+ *           range_to (both epoch seconds when date_format=0)
  *   Auth  : Authorization header value is "{appId}:{accessToken}"
  *   Response shape: { s: "ok"|"error", candles: number[][], message?: string }
  *     where each candle is [epochSeconds, open, high, low, close, volume]
@@ -48,7 +48,7 @@ import { loadStoredToken } from '../../server/services/fyers-auth.js';
 
 /** The only host this client will ever contact. */
 const FYERS_HISTORY_HOST = 'https://api-t1.fyers.in';
-const FYERS_HISTORY_PATH = '/api/v3/data/history';
+const FYERS_HISTORY_PATH = '/data/history';
 const FYERS_HISTORY_URL = `${FYERS_HISTORY_HOST}${FYERS_HISTORY_PATH}`;
 
 /**
@@ -491,9 +491,11 @@ async function fetchChunk(
   const params = new URLSearchParams({
     symbol,
     resolution,
-    // date_format=1 tells Fyers to interpret range_from/range_to as epoch seconds
-    // and to return candle timestamps as epoch seconds.
-    date_format: '1',
+    // date_format=0 tells Fyers to interpret range_from/range_to as epoch seconds
+    // and to return candle timestamps as epoch seconds. (date_format=1 instead
+    // expects/returns YYYY-MM-DD strings — verified against the live v3 API,
+    // which rejects epoch values with code -50 when date_format=1.)
+    date_format: '0',
     range_from: String(Math.floor(chunk.from.getTime() / 1000)),
     range_to: String(Math.floor(chunk.to.getTime() / 1000)),
     // cont_adjustment is intentionally omitted — we accept the Fyers default of
