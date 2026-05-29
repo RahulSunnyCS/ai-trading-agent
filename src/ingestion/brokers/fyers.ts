@@ -473,9 +473,11 @@ export class FyersBroker extends EventEmitter implements BrokerFeed {
         `[FyersBroker] Fyers auth failure — regenerate access token. token prefix=${this._accessToken.slice(0, 4)}...`,
       );
 
+      // Set _stopped BEFORE teardown so the 'close' event fired by the SDK
+      // during teardown is ignored by _handleClose and no reconnect is scheduled.
+      this._stopped = true;
       this._teardownSocket();
       this.emit('disconnect', DisconnectReason.AUTH_FAILURE);
-      // Do not schedule a reconnect.
       return;
     }
 

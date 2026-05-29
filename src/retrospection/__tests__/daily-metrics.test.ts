@@ -75,8 +75,8 @@ describe('computeDailyMetrics', () => {
     // Only the good row contributes to aggregates
     expect(result.winningTrades).toBe(1);
     expect(result.totalPnlPct).toBeCloseTo(2.0, 10);
-    // winRate divides winning by raw total (2), not the finite subset (1)
-    expect(result.winRate).toBeCloseTo(1 / 2, 10);
+    // winRate divides by validTradeCount (finite rows only = 1), not raw total
+    expect(result.winRate).toBeCloseTo(1 / 1, 10);
     // Both IDs appear in closedTradeIds — audit trail includes the bad row
     expect(result.closedTradeIds).toContain('trade-good');
     expect(result.closedTradeIds).toContain('trade-bad');

@@ -443,7 +443,7 @@ describe('evaluateTriggers — happy path and individual triggers', () => {
     // maxDailyLoss = '10000' → fires when pnl <= -10000
     const posAtLimit = makePosition({ todayNetPnl: '-10000' });
     const result = evaluateTriggers(posAtLimit, '180', clock, safeConfig);
-    expect(result).toEqual({ shouldExit: true, reason: 'DAILY_LOSS' });
+    expect(result).toEqual({ shouldExit: true, reason: 'DAILY_LOSS_CAP' });
 
     // One cent above the limit — should NOT fire daily loss
     const posJustAbove = makePosition({ todayNetPnl: '-9999.99' });
@@ -451,21 +451,21 @@ describe('evaluateTriggers — happy path and individual triggers', () => {
     expect(noFire.shouldExit).toBe(false);
   });
 
-  it('SL wins over DAILY_LOSS when both would fire', () => {
+  it('SL wins over DAILY_LOSS_CAP when both would fire', () => {
     const clock = new FixedClock(IST_1000_MAY18_2026);
-    // Both triggers active: SL (current=260 >= 260) and DAILY_LOSS (pnl=-10000)
+    // Both triggers active: SL (current=260 >= 260) and DAILY_LOSS_CAP (pnl=-10000)
     const pos = makePosition({ todayNetPnl: '-10000' });
     const result = evaluateTriggers(pos, '260', clock, safeConfig);
     expect(result).toEqual({ shouldExit: true, reason: 'SL' });
   });
 
-  it('DAILY_LOSS wins over EOD when both would fire', () => {
-    // Set clock to 15:25 IST (EOD fires) and pnl at daily limit (DAILY_LOSS fires)
+  it('DAILY_LOSS_CAP wins over EOD when both would fire', () => {
+    // Set clock to 15:25 IST (EOD fires) and pnl at daily limit (DAILY_LOSS_CAP fires)
     const clock = new FixedClock(IST_1525_MAY18_2026);
     const pos = makePosition({ todayNetPnl: '-10000' });
     const result = evaluateTriggers(pos, '180', clock, safeConfig);
-    // Priority: SL > DAILY_LOSS > EOD — DAILY_LOSS is at priority 2, EOD at 3
-    expect(result).toEqual({ shouldExit: true, reason: 'DAILY_LOSS' });
+    // Priority: SL > DAILY_LOSS_CAP > EOD — DAILY_LOSS_CAP is at priority 2, EOD at 3
+    expect(result).toEqual({ shouldExit: true, reason: 'DAILY_LOSS_CAP' });
   });
 
   it('EOD wins over TSL when both would fire', () => {

@@ -248,7 +248,7 @@ describe('HolderManager', () => {
     ['TSL', 295],
     ['TARGET', 210],
     ['EOD', 285],
-    ['DAILY_LOSS', 285],
+    ['DAILY_LOSS_CAP', 285],
     ['EXIT_WINDOW', 285],
   ] as const)(
     "evaluatePosition returns shouldExit:true with reason '%s' when trigger engine fires",

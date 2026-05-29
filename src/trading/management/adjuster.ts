@@ -124,7 +124,7 @@ export class AdjusterManager implements ManagementHandler {
   async evaluatePosition(
     position: OpenPosition,
     currentStraddleValue: number,
-    currentSpot: number,
+    _currentSpot: number,
     clock: Clock,
     triggerConfig: TriggerConfig,
     db: Pool,
@@ -136,10 +136,11 @@ export class AdjusterManager implements ManagementHandler {
     // entry spot before a roll is triggered. Defaults to 70 (NIFTY tick convention).
     const rollTriggerPoints = (personality.params.roll_trigger_points as number) ?? 70;
 
-    // Use the entry straddle value as the entry spot proxy (M2 accepted limitation —
-    // see design decision note in the method comment above).
-    const entrySpotProxy = Number(position.entryStraddleValue);
-    const spotsFromEntry = Math.abs(currentSpot - entrySpotProxy);
+    // Compare straddle value movement (entry vs current) as the roll trigger metric.
+    // currentSpot (NIFTY index ~22000) cannot be compared to entryStraddleValue (~250)
+    // — they are different quantities. Using straddle-value movement means
+    // rollTriggerPoints is interpreted as straddle points, which is self-consistent.
+    const spotsFromEntry = Math.abs(currentStraddleValue - Number(position.entryStraddleValue));
 
     if (spotsFromEntry >= rollTriggerPoints) {
       // Count open straddles for this personality to enforce max_open_legs.

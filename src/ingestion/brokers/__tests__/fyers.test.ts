@@ -631,18 +631,6 @@ describe('FyersBroker — reconnect circuit breaker', () => {
 
 // ---------------------------------------------------------------------------
 // 6. AUTH_FAILURE stops all reconnect attempts
-//
-// KNOWN PRODUCTION BUG (do not fix here — report only):
-//   _handleError() for code===1 does NOT set this._stopped = true before
-//   returning. When the Fyers SDK fires a subsequent 'close' event (which it
-//   always does after an error), _handleClose() sees _stopped===false and
-//   schedules a reconnect — exactly what the code comment says it should NOT
-//   do. The inline auth-error path (_handleTick routing to _handleError) also
-//   calls _teardownSocket() + emits AUTH_FAILURE but leaves _stopped=false.
-//
-//   The tests below document the ACTUAL current behaviour. The correct
-//   behaviour (no reconnect after AUTH_FAILURE) is shown in the "should"
-//   comment inline.
 // ---------------------------------------------------------------------------
 
 describe('FyersBroker — reconnect behaviour after AUTH_FAILURE via error event', () => {
@@ -666,16 +654,7 @@ describe('FyersBroker — reconnect behaviour after AUTH_FAILURE via error event
     expect(disconnects).toContain(DisconnectReason.AUTH_FAILURE);
   });
 
-  /**
-   * BUG DOCUMENTATION TEST:
-   *   _handleError does not set _stopped=true, so a 'close' event that fires
-   *   after code===1 will trigger _scheduleReconnect. This test ASSERTS the
-   *   buggy behaviour so a fix will cause this test to fail (and be updated).
-   *
-   *   Expected correct behaviour: reconnectAttempts should have length 0.
-   *   Actual (buggy) behaviour:   a 'close' after code===1 schedules attempt 1.
-   */
-  it('BUG: schedules a reconnect when close fires after code===1 error (stopped flag not set)', async () => {
+  it('does NOT schedule a reconnect when close fires after code===1 error', async () => {
     const { broker, socket } = makeBroker({ maxReconnectAttempts: 100 });
     const reconnectAttempts: number[] = [];
     broker.on('reconnecting', (attempt) => reconnectAttempts.push(attempt));
@@ -683,14 +662,13 @@ describe('FyersBroker — reconnect behaviour after AUTH_FAILURE via error event
 
     await broker.connect();
     socket.emit('connect');
-    // Auth failure via error event — does NOT set _stopped=true
+    // Auth failure — _stopped is set to true before teardown
     socket.emit('error', { code: 1, message: 'Token expired' });
-    // The SDK fires 'close' after every error — _handleClose will see _stopped===false
+    // SDK fires 'close' after every error — _handleClose must see _stopped===true and bail
     socket.emit('close');
 
-    // BUGGY: _stopped is false so _handleClose schedules a reconnect
-    // A passing assertion here documents the bug; failing = bug is fixed
-    expect(reconnectAttempts.length).toBeGreaterThan(0);
+    // No reconnect should be scheduled after an auth failure
+    expect(reconnectAttempts.length).toBe(0);
   });
 });
 

@@ -142,7 +142,7 @@ export class PaperTradeExecutor {
    *
    * @param tradeId            UUID of the paper_trades row to close
    * @param exitStraddleValue  Current combined straddle value (CE + PE) as a decimal string
-   * @param exitReason         One of: "SL" | "TSL" | "TARGET" | "EOD" | "DAILY_LOSS" | "EXIT_WINDOW"
+   * @param exitReason         One of: "SL" | "TSL" | "TARGET" | "EOD" | "DAILY_LOSS_CAP" | "EXIT_WINDOW"
    * @param clock              Clock instance — used for exit_time (injected for testability)
    */
   async closeTrade(
@@ -161,13 +161,14 @@ export class PaperTradeExecutor {
     }>(
       `SELECT straddle_at_entry, lots, lot_size
        FROM paper_trades
-       WHERE id = $1`,
+       WHERE id = $1 AND status = 'open'`,
       [tradeId],
     );
 
     const trade = rows.rows[0];
     if (!trade) {
-      throw new Error(`[paper-trade-executor] closeTrade: trade not found for id=${tradeId}`);
+      // Trade not found as open — already closed by a prior call (idempotent retry).
+      return;
     }
 
     // P&L calculation uses the shared helper from src/utils/pnl.ts which
@@ -198,7 +199,7 @@ export class PaperTradeExecutor {
          status       = 'closed',
          gross_pnl    = $5,
          net_pnl      = $6
-       WHERE id = $7`,
+       WHERE id = $7 AND status = 'open'`,
       [
         new Date(clock.now()), // $1  exit_time
         exitHalf, // $2  exit_ce_price
