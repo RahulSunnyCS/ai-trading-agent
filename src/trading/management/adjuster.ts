@@ -124,7 +124,7 @@ export class AdjusterManager implements ManagementHandler {
   async evaluatePosition(
     position: OpenPosition,
     currentStraddleValue: number,
-    currentSpot: number,
+    _currentSpot: number,
     clock: Clock,
     triggerConfig: TriggerConfig,
     db: Pool,
