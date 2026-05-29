@@ -1,11 +1,14 @@
 import { Menu } from 'lucide-react';
 
+import { PendingInfo } from '../ui/PendingInfo';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { SystemStatus } from './SystemStatus';
 
 interface TopbarProps {
   title: string;
   subtitle?: string;
+  /** "What's still pending" checklist for the active tab. */
+  pending: string[];
   /** Opens the mobile nav drawer (button only shown below lg). */
   onOpenMenu: () => void;
 }
@@ -14,7 +17,7 @@ interface TopbarProps {
  * Sticky page header: mobile menu trigger + current view title on the left,
  * live system status + theme toggle on the right.
  */
-export function Topbar({ title, subtitle, onOpenMenu }: TopbarProps) {
+export function Topbar({ title, subtitle, pending, onOpenMenu }: TopbarProps) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur sm:px-6">
       <button
@@ -27,7 +30,10 @@ export function Topbar({ title, subtitle, onOpenMenu }: TopbarProps) {
       </button>
 
       <div className="min-w-0">
-        <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">{title}</h1>
+        <div className="flex items-center gap-1.5">
+          <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">{title}</h1>
+          <PendingInfo items={pending} />
+        </div>
         {subtitle ? <p className="truncate text-xs text-muted">{subtitle}</p> : null}
       </div>
 

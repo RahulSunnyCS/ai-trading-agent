@@ -3,6 +3,7 @@ export type { Tone } from './Badge';
 export { Button } from './Button';
 export { Card, CardHeader } from './Card';
 export { CodeBlock } from './CodeBlock';
+export { PendingInfo } from './PendingInfo';
 export { Skeleton, SkeletonRows } from './Skeleton';
 export { StatCard } from './StatCard';
 export { StateMessage } from './StateMessage';

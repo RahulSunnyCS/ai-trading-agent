@@ -13,6 +13,7 @@ import { TradesView } from './components/TradesView';
 import { Sidebar } from './components/shell/Sidebar';
 import { Topbar } from './components/shell/Topbar';
 import { type Tab, tabLabel } from './components/shell/nav';
+import { PENDING_BY_TAB } from './components/shell/pending';
 
 /** One-line subtitle shown under each view's title in the top bar. */
 const SUBTITLES: Record<Tab, string> = {
@@ -83,6 +84,7 @@ export function App() {
         <Topbar
           title={tabLabel(activeTab)}
           subtitle={SUBTITLES[activeTab]}
+          pending={PENDING_BY_TAB[activeTab]}
           onOpenMenu={() => setMenuOpen(true)}
         />
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
