@@ -43,15 +43,15 @@ import { Pool } from 'pg';
 
 import { retrospectionRoutes } from '../api/routes/retrospection.js';
 import {
-  createEodRetrospectionQueue,
-  createEodRetrospectionWorker,
-} from '../jobs/eod-retrospection-job.js';
-import { isAuthDegraded } from '../state/broker-status.js';
-import {
   type BackfillJobData,
   createBackfillQueue,
   createBackfillWorker,
 } from '../jobs/backfill-job.js';
+import {
+  createEodRetrospectionQueue,
+  createEodRetrospectionWorker,
+} from '../jobs/eod-retrospection-job.js';
+import { isAuthDegraded } from '../state/broker-status.js';
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
 import { paymentRoutes } from './routes/payment';
 
@@ -499,8 +499,10 @@ export async function buildServer(
     const fromDate = new Date(fromStr);
     const toDate = new Date(toStr);
 
-    if (isNaN(fromDate.getTime())) return reply.status(400).send({ error: `invalid from date: ${fromStr}` });
-    if (isNaN(toDate.getTime())) return reply.status(400).send({ error: `invalid to date: ${toStr}` });
+    if (Number.isNaN(fromDate.getTime()))
+      return reply.status(400).send({ error: `invalid from date: ${fromStr}` });
+    if (Number.isNaN(toDate.getTime()))
+      return reply.status(400).send({ error: `invalid to date: ${toStr}` });
     if (fromDate > toDate) return reply.status(400).send({ error: 'from must not be after to' });
 
     try {

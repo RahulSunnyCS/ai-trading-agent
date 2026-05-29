@@ -91,8 +91,7 @@ export function createBackfillWorker(pool: Pool): Worker {
           // with status='partial'. Resolve (don't rethrow) so BullMQ does not
           // auto-retry with a stale token. User re-triggers after refreshing.
           await job.log(
-            `[BackfillWorker] Auth expired — checkpoint at ${err.checkpointTs}. ` +
-              `Refresh FYERS_ACCESS_TOKEN and POST /api/backfill again to resume.`,
+            `[BackfillWorker] Auth expired — checkpoint at ${err.checkpointTs}. Refresh FYERS_ACCESS_TOKEN and POST /api/backfill again to resume.`,
           );
           return { status: 'partial', checkpointTs: err.checkpointTs, rangeId: err.rangeId };
         }
