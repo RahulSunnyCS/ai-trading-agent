@@ -184,8 +184,9 @@ describe('createStraddleCalculator — snapshot skipping', () => {
   it('does not call xadd when only the underlying price is known (CE and PE missing)', async () => {
     const redis = makeFakeRedis();
 
-    // A Thursday in IST (2024-01-25 is a Thursday). We pick noon IST (06:30 UTC).
-    // This avoids the 15:30 cut-off so getCurrentExpiry returns this Thursday.
+    // 2024-01-25 is a Thursday; noon IST (06:30 UTC). NIFTY weekly expiry is
+    // Tuesday, so getCurrentExpiry resolves to 2024-01-30 (this test seeds no
+    // CE/PE, so it only checks the snapshot is skipped when legs are missing).
     const fixedDate = new Date('2024-01-25T06:30:00Z');
     const clock = new FixedClock(fixedDate);
 
@@ -244,14 +245,14 @@ describe('createStraddleCalculator — snapshot publication', () => {
   it('publishes a snapshot with straddleValue = cePrice + pePrice when all prices are known', async () => {
     const redis = makeFakeRedis();
 
-    // Thursday noon IST — expiry is same-day Thursday (before 15:30 cut-off).
+    // Thursday noon IST — NIFTY weekly expiry (Tuesday) resolves to 2024-01-30.
     const fixedDate = new Date('2024-01-25T06:30:00Z');
     const clock = new FixedClock(fixedDate);
 
     // NIFTY spot = 22400 → ATM = 22400
-    // Expiry 2024-01-25 → Fyers code: yy=24, month=1, dd=25 → '24125'
-    // CE symbol: NSE:NIFTY2412522400CE
-    // PE symbol: NSE:NIFTY2412522400PE
+    // Expiry 2024-01-30 → Fyers code: yy=24, month=1, dd=30 → '24130'
+    // CE symbol: NSE:NIFTY2413022400CE
+    // PE symbol: NSE:NIFTY2413022400PE
     const cePrice = 150;
     const pePrice = 145;
 
@@ -267,7 +268,7 @@ describe('createStraddleCalculator — snapshot publication', () => {
       {
         id: '1-2',
         data: JSON.stringify({
-          symbol: 'NSE:NIFTY2412522400CE',
+          symbol: 'NSE:NIFTY2413022400CE',
           ltp: cePrice,
           timestamp: fixedDate.getTime(),
         }),
@@ -275,7 +276,7 @@ describe('createStraddleCalculator — snapshot publication', () => {
       {
         id: '1-3',
         data: JSON.stringify({
-          symbol: 'NSE:NIFTY2412522400PE',
+          symbol: 'NSE:NIFTY2413022400PE',
           ltp: pePrice,
           timestamp: fixedDate.getTime(),
         }),
@@ -350,7 +351,7 @@ describe('createStraddleCalculator — snapshot publication', () => {
       {
         id: '2-2',
         data: JSON.stringify({
-          symbol: 'NSE:NIFTY2412522400CE',
+          symbol: 'NSE:NIFTY2413022400CE',
           ltp: 200,
           timestamp: fixedDate.getTime(),
         }),
@@ -358,7 +359,7 @@ describe('createStraddleCalculator — snapshot publication', () => {
       {
         id: '2-3',
         data: JSON.stringify({
-          symbol: 'NSE:NIFTY2412522400PE',
+          symbol: 'NSE:NIFTY2413022400PE',
           ltp: 180,
           timestamp: fixedDate.getTime(),
         }),

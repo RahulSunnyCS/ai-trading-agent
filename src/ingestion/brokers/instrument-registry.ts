@@ -7,7 +7,7 @@
  *
  * Usage:
  *   const strike = getAtmStrike('NIFTY', 22437);           // 22450
- *   const expiry = getCurrentExpiry('NIFTY');              // nearest Thursday
+ *   const expiry = getCurrentExpiry('NIFTY');              // nearest Tuesday (NSE)
  *   const symbol = buildOptionSymbol('NIFTY', expiry, strike, 'CE');
  */
 
@@ -42,6 +42,43 @@ export const STRIKE_INTERVALS: Record<Underlying, number> = {
 export const ATM_STRIKE_INTERVALS = STRIKE_INTERVALS;
 
 // ---------------------------------------------------------------------------
+// Weekly expiry weekday per underlying
+// ---------------------------------------------------------------------------
+
+/**
+ * Day-of-week (0=Sun … 6=Sat, UTC/IST) that each index's WEEKLY options expire.
+ *
+ * These are NOT all Thursday — NSE and BSE diverged:
+ *   - NIFTY  (NSE): Tuesday  (verified against the live Fyers symbol master —
+ *     listed weekly expiries 2026-06-02/09/16/23 are all Tuesdays).
+ *   - SENSEX (BSE): Thursday (master: 2026-06-04/11/18 are all Thursdays).
+ *   - BANKNIFTY: weekly options were discontinued by NSE; it now trades monthly
+ *     only. Kept here for completeness (not in active backfill scope) — treated
+ *     as Tuesday to match the current NSE index-options expiry day.
+ *
+ * Source of truth for the CURRENT rule is the Fyers symbol master
+ * (src/ingestion/brokers/symbol-master.ts); these constants are the pure,
+ * network-free fallback the registry uses for deterministic symbol math
+ * (live + historical derivation).
+ */
+export const WEEKLY_EXPIRY_DOW: Record<Underlying, number> = {
+  NIFTY: 2, // Tuesday
+  BANKNIFTY: 2, // weekly discontinued; placeholder
+  SENSEX: 4, // Thursday
+};
+
+/**
+ * Exchange prefix per underlying. NIFTY/BankNifty are NSE; Sensex is a BSE
+ * index, so its option symbols are 'BSE:SENSEX…' (verified against the BSE
+ * symbol master — 'NSE:SENSEX…' is not a valid contract).
+ */
+export const EXCHANGE_BY_UNDERLYING: Record<Underlying, 'NSE' | 'BSE'> = {
+  NIFTY: 'NSE',
+  BANKNIFTY: 'NSE',
+  SENSEX: 'BSE',
+};
+
+// ---------------------------------------------------------------------------
 // ATM strike rounding
 // ---------------------------------------------------------------------------
 
@@ -69,26 +106,35 @@ export function getAtmStrike(underlying: Underlying, price: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Given a Date (interpreted as a UTC calendar date), return the nearest
- * Thursday that is on or after that date.
+ * Given a Date (interpreted as a UTC calendar date) and a target weekday
+ * (0=Sun … 6=Sat), return the nearest occurrence of that weekday on or after
+ * the date.
  *
- * NSE weekly index options expire on Thursdays. Same-day Thursday expiry
- * is valid until 15:30 IST, so a Thursday date is returned as-is here —
- * the 15:30 cut-off is handled one level up in getCurrentExpiry().
+ * Same-day expiry is valid until 15:30 IST, so a date already on the target
+ * weekday is returned as-is — the 15:30 cut-off is handled one level up in
+ * getCurrentExpiry().
  *
  * The returned Date has its time components zeroed so callers get a pure
  * calendar date and can format it without worrying about hour noise.
  */
-export function getNearestThursday(date: Date): Date {
-  // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+export function getNearestWeekday(date: Date, targetDow: number): Date {
   const day = date.getUTCDay();
-  // (4 - day + 7) % 7 gives 0 if already Thursday, 1–6 otherwise
-  const daysUntilThursday = (4 - day + 7) % 7;
+  // (target - day + 7) % 7 gives 0 if already on target, 1–6 otherwise
+  const daysUntil = (targetDow - day + 7) % 7;
   const result = new Date(date);
-  result.setUTCDate(date.getUTCDate() + daysUntilThursday);
+  result.setUTCDate(date.getUTCDate() + daysUntil);
   // Zero the time component so this is a pure date value
   result.setUTCHours(0, 0, 0, 0);
   return result;
+}
+
+/**
+ * @deprecated NIFTY weekly expiry moved to Tuesday; this Thursday-only helper
+ * is retained for backward compatibility. Prefer getNearestWeekday(date, dow)
+ * with the per-underlying WEEKLY_EXPIRY_DOW.
+ */
+export function getNearestThursday(date: Date): Date {
+  return getNearestWeekday(date, 4);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,13 +172,14 @@ export function formatFyersExpiry(date: Date): string {
 /**
  * Build the full Fyers option symbol string for a given strike and expiry.
  *
- * Format: NSE:{UNDERLYING}{expiry}{strike}{type}
- * where expiry is the compact Fyers encoding (see formatFyersExpiry).
+ * Format: {EXCHANGE}:{UNDERLYING}{expiry}{strike}{type}
+ * where expiry is the compact Fyers encoding (see formatFyersExpiry) and the
+ * exchange is NSE for NIFTY/BankNifty, BSE for Sensex (see EXCHANGE_BY_UNDERLYING).
  *
  * Examples:
- *   buildOptionSymbol('NIFTY',    Jan25Expiry, 24500, 'CE') → 'NSE:NIFTY2412524500CE'
- *   buildOptionSymbol('NIFTY',    Oct10Expiry, 24500, 'PE') → 'NSE:NIFTY24O1024500PE'
- *   buildOptionSymbol('BANKNIFTY', expiry,     47400, 'CE') → 'NSE:BANKNIFTY24...'
+ *   buildOptionSymbol('NIFTY',  Jun02Expiry, 23550, 'CE') → 'NSE:NIFTY2660223550CE'
+ *   buildOptionSymbol('NIFTY',  Oct10Expiry, 24500, 'PE') → 'NSE:NIFTY24O1024500PE'
+ *   buildOptionSymbol('SENSEX', Jun04Expiry, 81000, 'CE') → 'BSE:SENSEX2660481000CE'
  */
 export function buildOptionSymbol(
   underlying: Underlying,
@@ -141,7 +188,7 @@ export function buildOptionSymbol(
   type: 'CE' | 'PE',
 ): string {
   const expiryStr = formatFyersExpiry(expiry);
-  return `NSE:${underlying}${expiryStr}${strike}${type}`;
+  return `${EXCHANGE_BY_UNDERLYING[underlying]}:${underlying}${expiryStr}${strike}${type}`;
 }
 
 /**
@@ -201,10 +248,16 @@ export function buildAngelOneToken(opts: {
  * Returns the nearest weekly expiry date for the given underlying,
  * taking the current IST time into account.
  *
- * Rule:
- *   - If today is Thursday AND the IST wall clock is at or past 15:30,
- *     today's expiry has closed; advance to the following Thursday.
- *   - Otherwise, return the nearest Thursday on or after today.
+ * Rule (using the underlying's expiry weekday — Tuesday for NIFTY, Thursday
+ * for Sensex — see WEEKLY_EXPIRY_DOW):
+ *   - If today IS the expiry weekday AND the IST wall clock is at or past
+ *     15:30, today's expiry has closed; advance to the following week.
+ *   - Otherwise, return the nearest expiry weekday on or after today.
+ *
+ * NOTE: this does NOT yet apply NSE/BSE holiday shifts (if the expiry weekday
+ * is a trading holiday the exchange moves expiry to the prior session). The
+ * symbol master is authoritative for current contracts; holiday-shifted
+ * historical weeks surface as detectable gaps rather than silent errors.
  *
  * The clock parameter is injectable so this function is fully deterministic
  * in tests — pass a FixedClock at any IST instant to verify boundary conditions.
@@ -213,12 +266,11 @@ export function buildAngelOneToken(opts: {
  * arithmetic rather than relying on the host TZ setting, which can vary
  * across environments (Docker, CI, dev machine).
  *
- * @param underlying The index (NIFTY, BANKNIFTY, SENSEX) — reserved for
- *   future per-underlying expiry calendar differences; currently all three
- *   use Thursday expiry.
+ * @param underlying The index (NIFTY, BANKNIFTY, SENSEX) — selects the expiry
+ *   weekday via WEEKLY_EXPIRY_DOW.
  * @param clock Injectable clock (default: RealClock for production)
  */
-export function getCurrentExpiry(_underlying: Underlying, clock: Clock = new RealClock()): Date {
+export function getCurrentExpiry(underlying: Underlying, clock: Clock = new RealClock()): Date {
   // IST = UTC + 5h30m. India does not observe daylight saving, so this
   // offset is constant. We use arithmetic rather than Intl.DateTimeFormat
   // to avoid any locale / TZ configuration dependency.
@@ -228,17 +280,18 @@ export function getCurrentExpiry(_underlying: Underlying, clock: Clock = new Rea
   // Compute "now" in IST as a UTC Date object (all UTC getters will return IST values)
   const nowIst = new Date(nowUtcMs + IST_OFFSET_MS);
 
-  const isThursday = nowIst.getUTCDay() === 4;
+  const expiryDow = WEEKLY_EXPIRY_DOW[underlying];
+  const isExpiryDay = nowIst.getUTCDay() === expiryDow;
   // 15:30 IST is the cut-off after which same-day expiry is no longer valid
   const pastEOD =
     nowIst.getUTCHours() > 15 || (nowIst.getUTCHours() === 15 && nowIst.getUTCMinutes() >= 30);
 
   // When today's expiry window is closed, jump forward by exactly 7 days
-  // so getNearestThursday lands on next week's Thursday.
+  // so getNearestWeekday lands on next week's expiry.
   const referenceDate =
-    isThursday && pastEOD ? new Date(nowUtcMs + IST_OFFSET_MS + 7 * 24 * 60 * 60 * 1000) : nowIst;
+    isExpiryDay && pastEOD ? new Date(nowUtcMs + IST_OFFSET_MS + 7 * 24 * 60 * 60 * 1000) : nowIst;
 
-  return getNearestThursday(referenceDate);
+  return getNearestWeekday(referenceDate, expiryDow);
 }
 
 /**

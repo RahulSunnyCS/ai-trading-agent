@@ -12,7 +12,14 @@
 
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { type Underlying, getAtmStrike } from '../instrument-registry.js';
+import { FixedClock } from '../../../utils/clock.js';
+import {
+  type Underlying,
+  buildOptionSymbol,
+  getAtmStrike,
+  getCurrentExpiry,
+  getNearestWeekday,
+} from '../instrument-registry.js';
 
 // ─── NIFTY concrete cases (50-point intervals) ───────────────────────────────
 
@@ -155,5 +162,58 @@ describe('getAtmStrike — property: rounds by at most half the interval', () =>
         return Math.abs(strike - spot) <= 50;
       }),
     );
+  });
+});
+
+// ─── Weekly expiry weekday (NIFTY=Tue, Sensex=Thu) ───────────────────────────
+
+describe('getNearestWeekday', () => {
+  it('returns the date unchanged when already on the target weekday', () => {
+    const tue = new Date('2026-06-02T00:00:00Z'); // Tuesday
+    expect(getNearestWeekday(tue, 2).toISOString().slice(0, 10)).toBe('2026-06-02');
+  });
+
+  it('advances Mon → next Tue', () => {
+    const mon = new Date('2026-06-01T00:00:00Z'); // Monday
+    expect(getNearestWeekday(mon, 2).toISOString().slice(0, 10)).toBe('2026-06-02');
+  });
+
+  it('advances Wed → next Tue (wraps the week)', () => {
+    const wed = new Date('2026-06-03T00:00:00Z'); // Wednesday
+    expect(getNearestWeekday(wed, 2).toISOString().slice(0, 10)).toBe('2026-06-09');
+  });
+});
+
+describe('getCurrentExpiry — per-underlying weekday', () => {
+  // 2026-05-30 is a Saturday; nearest NIFTY (Tue) expiry is 2026-06-02,
+  // nearest Sensex (Thu) expiry is 2026-06-04. These match real Fyers contracts
+  // (NSE:NIFTY2660223550CE / BSE:SENSEX2660481000CE exist in the symbol master).
+  const sat = new Date('2026-05-30T06:00:00Z');
+
+  it('resolves NIFTY to the nearest Tuesday', () => {
+    expect(getCurrentExpiry('NIFTY', new FixedClock(sat)).toISOString().slice(0, 10)).toBe(
+      '2026-06-02',
+    );
+  });
+
+  it('resolves SENSEX to the nearest Thursday', () => {
+    expect(getCurrentExpiry('SENSEX', new FixedClock(sat)).toISOString().slice(0, 10)).toBe(
+      '2026-06-04',
+    );
+  });
+
+  it('rolls past 15:30 IST on the NIFTY expiry day to the next Tuesday', () => {
+    // 2026-06-02 10:30 UTC = 16:00 IST (past the 15:30 cut-off)
+    const expiryDayLate = new Date('2026-06-02T10:30:00Z');
+    expect(
+      getCurrentExpiry('NIFTY', new FixedClock(expiryDayLate)).toISOString().slice(0, 10),
+    ).toBe('2026-06-09');
+  });
+
+  it('builds the exact Fyers symbols verified against the live history API', () => {
+    const niftyExpiry = getCurrentExpiry('NIFTY', new FixedClock(sat));
+    expect(buildOptionSymbol('NIFTY', niftyExpiry, 23550, 'CE')).toBe('NSE:NIFTY2660223550CE');
+    const sensexExpiry = getCurrentExpiry('SENSEX', new FixedClock(sat));
+    expect(buildOptionSymbol('SENSEX', sensexExpiry, 81000, 'CE')).toBe('BSE:SENSEX2660481000CE');
   });
 });

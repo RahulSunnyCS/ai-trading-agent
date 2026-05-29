@@ -58,9 +58,10 @@ const SKIP = !process.env.DATABASE_URL;
 /**
  * A Thursday during NSE market hours (IST 09:30 = UTC 04:00).
  *
- * Using 2024-01-25 (a known Thursday in the past) so getCurrentExpiry() inside
- * reconstructStraddle returns 2024-01-25 as the weekly expiry — matching the
- * option symbols we pre-insert into option_ticks.
+ * Using 2024-01-25 (a known Thursday in the past). NIFTY weekly expiry is
+ * Tuesday, so getCurrentExpiry() inside reconstructStraddle returns 2024-01-30
+ * as the weekly expiry — matching the option symbols we pre-insert into
+ * option_ticks.
  *
  * We use a 1-minute cadence (60 000 ms) to keep the test fast: two cadence
  * steps = two reconstructed snapshots = small number of DB inserts.
@@ -83,8 +84,8 @@ const EXPIRY_DATE = '2024-01-25';
 // Encoding: NSE:NIFTY{YY}{M}{DD}{STRIKE}{TYPE}
 //   YY=24, Month code for January=1, DD=25, STRIKE=22400, TYPE=CE/PE
 // Verified against the instrument-registry encoder pattern.
-const CE_SYMBOL = 'NSE:NIFTY2412522400CE';
-const PE_SYMBOL = 'NSE:NIFTY2412522400PE';
+const CE_SYMBOL = 'NSE:NIFTY2413022400CE';
+const PE_SYMBOL = 'NSE:NIFTY2413022400PE';
 
 const CE_PRICE_T0 = 155;
 const PE_PRICE_T0 = 145;

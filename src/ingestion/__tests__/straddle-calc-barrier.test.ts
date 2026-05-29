@@ -264,13 +264,13 @@ describe('B. ticksConsumed — slow path (poll loop not yet at target)', () => {
       'market.ticks',
       '*',
       'data',
-      makeTick('NSE:NIFTY2412522400CE', 150),
+      makeTick('NSE:NIFTY2413022400CE', 150),
     );
     const id3 = await redis.xadd(
       'market.ticks',
       '*',
       'data',
-      makeTick('NSE:NIFTY2412522400PE', 145),
+      makeTick('NSE:NIFTY2413022400PE', 145),
     );
 
     // We target id3 — the barrier should resolve only after all 3 are consumed.
@@ -441,7 +441,7 @@ describe('D. ticksConsumed — multiple barriers on different IDs', () => {
       'market.ticks',
       '*',
       'data',
-      makeTick('NSE:NIFTY2412522400CE', 150),
+      makeTick('NSE:NIFTY2413022400CE', 150),
     );
 
     const resolved1Order: number[] = [];

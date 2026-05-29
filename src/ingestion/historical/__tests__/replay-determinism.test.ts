@@ -683,8 +683,8 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
 
     const ticks = [
       { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: fixedDate.getTime() },
-      { symbol: 'NSE:NIFTY2412522400CE', ltp: 150, timestamp: fixedDate.getTime() },
-      { symbol: 'NSE:NIFTY2412522400PE', ltp: 145, timestamp: fixedDate.getTime() },
+      { symbol: 'NSE:NIFTY2413022400CE', ltp: 150, timestamp: fixedDate.getTime() },
+      { symbol: 'NSE:NIFTY2413022400PE', ltp: 145, timestamp: fixedDate.getTime() },
     ];
 
     fakeRedis.xread
@@ -746,8 +746,8 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
     // Prime the price map by calling processRawTick via xread simulation.
     const ticks = [
       { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: fixedDate.getTime() },
-      { symbol: 'NSE:NIFTY2412522400CE', ltp: 150, timestamp: fixedDate.getTime() },
-      { symbol: 'NSE:NIFTY2412522400PE', ltp: 145, timestamp: fixedDate.getTime() },
+      { symbol: 'NSE:NIFTY2413022400CE', ltp: 150, timestamp: fixedDate.getTime() },
+      { symbol: 'NSE:NIFTY2413022400PE', ltp: 145, timestamp: fixedDate.getTime() },
     ];
 
     fakeRedis.xread

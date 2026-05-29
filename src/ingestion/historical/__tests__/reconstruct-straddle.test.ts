@@ -86,9 +86,9 @@ function makeIndexRow(ltp: number): { ltp: string } {
 
 /**
  * Build a fixed date for use in test steps.
- * 2024-01-25T06:30:00Z = Thursday 2024-01-25 at noon IST (12:00 IST).
- * This is within market hours (09:15–15:30 IST) so getCurrentExpiry
- * returns 2024-01-25 (same-day Thursday).
+ * 2024-01-25T06:30:00Z = Thursday 2024-01-25 at noon IST (12:00 IST), within
+ * market hours. NIFTY weekly options expire on Tuesday, so getCurrentExpiry
+ * resolves to the following Tuesday 2024-01-30 (Fyers code '24130').
  */
 const BASE_TIME = new Date('2024-01-25T06:30:00.000Z');
 
@@ -134,8 +134,8 @@ describe('LOOK-AHEAD AUDIT', () => {
     // CE/PE prices for each step (original data)
     const originalLtps: Record<string, Record<number, number>> = {
       // Keyed by (symbol stem, step index): [t0, t1, t2]
-      'NSE:NIFTY2412522400CE': { 0: 150, 1: 155, 2: 160 },
-      'NSE:NIFTY2412522400PE': { 0: 145, 1: 148, 2: 152 },
+      'NSE:NIFTY2413022400CE': { 0: 150, 1: 155, 2: 160 },
+      'NSE:NIFTY2413022400PE': { 0: 145, 1: 148, 2: 152 },
     };
 
     // Track which timestamps were queried for which symbols.
@@ -208,8 +208,8 @@ describe('LOOK-AHEAD AUDIT', () => {
     // We drastically change the LTP at t1 and t2 — if step T0 had looked ahead
     // and used these values, its output would differ from Run 1's T0 output.
     const mutatedLtps: typeof originalLtps = {
-      'NSE:NIFTY2412522400CE': { 0: 150, 1: 9999, 2: 9999 }, // t1/t2 mutated
-      'NSE:NIFTY2412522400PE': { 0: 145, 1: 9999, 2: 9999 }, // t1/t2 mutated
+      'NSE:NIFTY2413022400CE': { 0: 150, 1: 9999, 2: 9999 }, // t1/t2 mutated
+      'NSE:NIFTY2413022400PE': { 0: 145, 1: 9999, 2: 9999 }, // t1/t2 mutated
     };
 
     const pool2 = makeMockPool(makeHandler(mutatedLtps)) as unknown as import('pg').Pool;
@@ -768,10 +768,9 @@ describe('HAPPY-PATH RECONSTRUCTION', () => {
   });
 
   it('uses the correct weekly expiry for the step timestamp', async () => {
-    // 2024-01-25 is a Thursday. getCurrentExpiry at noon IST = 2024-01-25.
-    // The option symbols must include the Fyers encoding for 2024-01-25:
-    //   yy=24, month=1, dd=25 → '24125'
-    // So the CE symbol should be 'NSE:NIFTY2412522400CE'
+    // 2024-01-25 is a Thursday. NIFTY weekly expiry is Tuesday, so
+    // getCurrentExpiry resolves to 2024-01-30 → Fyers code yy=24,month=1,dd=30
+    // = '24130'. So the CE symbol should be 'NSE:NIFTY2413022400CE'.
 
     const queriedSymbols: string[] = [];
 
@@ -789,9 +788,9 @@ describe('HAPPY-PATH RECONSTRUCTION', () => {
       persist: false,
     });
 
-    // The queried symbols must use the Thursday 2024-01-25 expiry encoding
-    expect(queriedSymbols).toContain('NSE:NIFTY2412522400CE');
-    expect(queriedSymbols).toContain('NSE:NIFTY2412522400PE');
+    // The queried symbols must use the Tuesday 2024-01-30 expiry encoding
+    expect(queriedSymbols).toContain('NSE:NIFTY2413022400CE');
+    expect(queriedSymbols).toContain('NSE:NIFTY2413022400PE');
   });
 });
 
