@@ -4,8 +4,8 @@
  *  2. Trigger Backfill card — queue a new historical data fetch job
  *  3. Backfill Status table — history from GET /api/backfill
  *
- * Status → tone: complete → positive · running → info · partial/gapped → warning ·
- * error → negative · else neutral.
+ * Status (normalised by the API to three buckets): completed → positive ·
+ * in_progress → info · failed → negative.
  */
 
 import { Play, RefreshCw } from 'lucide-react';
@@ -26,19 +26,30 @@ import { THead, TRow, Table, Td, Th } from './ui/Table';
 // Helpers
 // ---------------------------------------------------------------------------
 
+// The API normalises every backfill row to one of three statuses.
 function statusTone(status: string): Tone {
   switch (status) {
-    case 'complete':
+    case 'completed':
       return 'positive';
-    case 'running':
+    case 'in_progress':
       return 'info';
-    case 'partial':
-    case 'gapped':
-      return 'warning';
-    case 'error':
+    case 'failed':
       return 'negative';
     default:
       return 'neutral';
+  }
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'completed':
+      return 'Completed';
+    case 'in_progress':
+      return 'In Progress';
+    case 'failed':
+      return 'Failed';
+    default:
+      return status;
   }
 }
 
@@ -70,6 +81,14 @@ const INPUT_CLS =
   ' placeholder:text-faint focus:border-primary focus:outline-none';
 
 const LABEL_CLS = 'mb-1 block text-xs font-medium text-muted';
+
+// Phase-1 scope: backfill is limited to NIFTY and Sensex. These values must
+// match BACKFILL_SUPPORTED_SYMBOLS on the server (src/ingestion/brokers/types.ts)
+// — the POST /api/backfill route rejects anything else with a 400.
+const BACKFILL_SYMBOLS = [
+  { value: 'NSE:NIFTY50-INDEX', label: 'NIFTY' },
+  { value: 'BSE:SENSEX-INDEX', label: 'Sensex' },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -104,7 +123,7 @@ function BackfillTable({ ranges }: { ranges: BackfillRangeRow[] }) {
             <Td className="text-muted">{row.resolution}</Td>
             <Td>
               <Badge tone={statusTone(row.status)} dot>
-                {row.status}
+                {statusLabel(row.status)}
               </Badge>
             </Td>
             <Td numeric align="right" className="text-foreground">
@@ -136,7 +155,7 @@ interface TriggerCardProps {
 function TriggerBackfillCard({ onQueued }: TriggerCardProps) {
   const defaults = defaultDateRange();
 
-  const [symbol, setSymbol] = useState('NSE:NIFTY50-INDEX');
+  const [symbol, setSymbol] = useState<string>(BACKFILL_SYMBOLS[0].value);
   const [resolution, setResolution] = useState('1');
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -184,15 +203,19 @@ function TriggerBackfillCard({ onQueued }: TriggerCardProps) {
             <label htmlFor="bf-symbol" className={LABEL_CLS}>
               Symbol
             </label>
-            <input
+            <select
               id="bf-symbol"
-              type="text"
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
-              placeholder="NSE:NIFTY50-INDEX"
               required
               className={INPUT_CLS}
-            />
+            >
+              {BACKFILL_SYMBOLS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Resolution */}
@@ -297,7 +320,9 @@ export function BackfillView() {
             <h2 className="text-base font-semibold tracking-tight text-foreground">
               Backfill Status
             </h2>
-            <p className="mt-0.5 text-sm text-muted">Historical tick-data ingestion coverage</p>
+            <p className="mt-0.5 text-sm text-muted">
+              Latest backfill per symbol — each rerun replaces the previous one
+            </p>
           </div>
           <Button size="sm" onClick={refresh} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />

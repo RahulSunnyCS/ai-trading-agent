@@ -42,6 +42,8 @@ import type { Redis } from 'ioredis';
 import { Pool } from 'pg';
 
 import { retrospectionRoutes } from '../api/routes/retrospection.js';
+import { type BackfillRangeStatus, toBackfillDisplayStatus } from '../db/schema.js';
+import { BACKFILL_SUPPORTED_SYMBOLS } from '../ingestion/brokers/types.js';
 import {
   type BackfillJobData,
   createBackfillQueue,
@@ -421,14 +423,15 @@ export async function buildServer(
     }
   });
 
-  // GET /api/backfill — backfill job ranges from backfill_ranges table.
+  // GET /api/backfill — the LATEST backfill range per symbol.
   //
   // Query params (optional):
-  //   symbol — if provided, filter rows to that symbol; else return all.
+  //   symbol — if provided, filter to that symbol; else return one row per symbol.
   //
-  // Hard LIMIT 200 ORDER BY from_ts DESC keeps the response bounded even
-  // without date params (backfill_ranges has one row per job, so 200 rows
-  // represents at most 200 backfill runs — a sensible UI ceiling).
+  // Phase-1 product rule: only the most recent backfill per symbol is retained
+  // (older runs are purged on rerun — see runBackfill's purgeStaleBackfillData),
+  // so DISTINCT ON (symbol) ... ORDER BY updated_at DESC returns the current
+  // state. The outer query orders the (at most a handful of) rows by recency.
   server.get('/api/backfill', async (request, reply) => {
     const query = request.query as Record<string, string | undefined>;
     const symbol = query.symbol;
@@ -451,17 +454,28 @@ export async function buildServer(
         updated_at: Date;
         created_at: Date;
       }>(
-        `SELECT id, symbol, from_ts, to_ts, resolution, status,
-                rows_written, checkpoint_ts, gaps_detected, gaps_json,
-                updated_at, created_at
-         FROM backfill_ranges
-         WHERE ($1::text IS NULL OR symbol = $1)
-         ORDER BY from_ts DESC
+        `SELECT * FROM (
+           SELECT DISTINCT ON (symbol)
+                  id, symbol, from_ts, to_ts, resolution, status,
+                  rows_written, checkpoint_ts, gaps_detected, gaps_json,
+                  updated_at, created_at
+           FROM backfill_ranges
+           WHERE ($1::text IS NULL OR symbol = $1)
+           ORDER BY symbol, updated_at DESC, id DESC
+         ) latest
+         ORDER BY updated_at DESC
          LIMIT 200`,
         [symbol ?? null],
       );
 
-      return reply.send({ data: result.rows });
+      // Collapse the six internal statuses into the three user-facing buckets
+      // (failed / in_progress / completed) — the UI never sees partial/gapped.
+      const data = result.rows.map((row) => ({
+        ...row,
+        status: toBackfillDisplayStatus(row.status as BackfillRangeStatus),
+      }));
+
+      return reply.send({ data });
     } catch {
       // Table does not exist yet or DB is unavailable.
       return reply.send({ data: [], message: 'no backfill ranges yet' });
@@ -492,6 +506,14 @@ export async function buildServer(
     const toStr = typeof body?.to === 'string' ? body.to.trim() : '';
 
     if (!symbol) return reply.status(400).send({ error: 'symbol is required' });
+    // Phase-1 scope: backfill is limited to NIFTY and Sensex (see
+    // BACKFILL_SUPPORTED_SYMBOLS). Reject anything else rather than enqueue a
+    // job that would fetch data we don't support.
+    if (!(BACKFILL_SUPPORTED_SYMBOLS as readonly string[]).includes(symbol)) {
+      return reply.status(400).send({
+        error: `unsupported symbol '${symbol}' — allowed: ${BACKFILL_SUPPORTED_SYMBOLS.join(', ')}`,
+      });
+    }
     if (!resolution) return reply.status(400).send({ error: 'resolution is required' });
     if (!fromStr) return reply.status(400).send({ error: 'from is required (ISO date)' });
     if (!toStr) return reply.status(400).send({ error: 'to is required (ISO date)' });

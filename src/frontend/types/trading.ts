@@ -202,7 +202,7 @@ export interface BackfillRangeRow {
   from_ts: string; // ISO-8601 timestamp
   to_ts: string; // ISO-8601 timestamp
   resolution: string; // e.g. '1', '5', '15', 'D'
-  status: string; // 'pending'|'running'|'partial'|'complete'|'gapped'|'error'
+  status: string; // normalised by the API to 'failed'|'in_progress'|'completed'
   rows_written: number; // INTEGER — arrives as JS number
   checkpoint_ts: string | null; // ISO-8601 or null
   gaps_detected: number; // INTEGER — arrives as JS number
