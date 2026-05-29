@@ -1,3 +1,4 @@
+import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 
 import { BackfillView } from './components/BackfillView';
@@ -9,91 +10,88 @@ import { PricingPage } from './components/PricingPage';
 import { RegimeView } from './components/RegimeView';
 import { ReplayView } from './components/ReplayView';
 import { TradesView } from './components/TradesView';
+import { Sidebar } from './components/shell/Sidebar';
+import { Topbar } from './components/shell/Topbar';
+import { type Tab, tabLabel } from './components/shell/nav';
 
-/**
- * The eight dashboard tabs. 'pnl' is rendered as "P&L" in the nav.
- * 'regime', 'backfill' and 'replay' are the Milestone-3 additions.
- * 'personalities' is the Milestone-2 personalities engine surface.
- */
-type Tab =
-  | 'live'
-  | 'pnl'
-  | 'pricing'
-  | 'trades'
-  | 'personalities'
-  | 'regime'
-  | 'backfill'
-  | 'replay';
+/** One-line subtitle shown under each view's title in the top bar. */
+const SUBTITLES: Record<Tab, string> = {
+  live: 'Real-time straddle, momentum, and feed status',
+  trades: 'Simulated paper-trade log',
+  personalities: 'The 10 decision engines and their configs',
+  pnl: 'Realized P&L across closed paper trades',
+  regime: 'Daily market-regime classification history',
+  backfill: 'Historical tick-data ingestion coverage',
+  replay: 'Deterministic replay of historical sessions',
+  pricing: 'Subscription access and feature credits',
+};
 
-/**
- * Returns a human-readable label for each tab.
- * Centralises the special-cases for 'pnl' and multi-word tabs so the nav map
- * stays clean.
- */
-function tabLabel(tab: Tab): string {
-  if (tab === 'pnl') return 'P&L';
-  if (tab === 'regime') return 'Regimes';
-  if (tab === 'backfill') return 'Backfill';
-  if (tab === 'replay') return 'Replay';
-  if (tab === 'personalities') return 'Personalities';
-  // Capitalise first letter; remaining tabs are single words so slice(1) is safe.
-  // 'pricing' → "Pricing", 'live' → "Live", 'trades' → "Trades"
-  return tab.charAt(0).toUpperCase() + tab.slice(1);
+function renderView(tab: Tab) {
+  switch (tab) {
+    case 'live':
+      return <LiveView />;
+    case 'trades':
+      return <TradesView />;
+    case 'personalities':
+      return <PersonalitiesView />;
+    case 'pnl':
+      return <PnlView />;
+    case 'regime':
+      return <RegimeView />;
+    case 'backfill':
+      return <BackfillView />;
+    case 'replay':
+      return <ReplayView />;
+    case 'pricing':
+      return <PricingPage />;
+  }
 }
 
 /**
- * Root application shell.
- * Renders a header, tab navigation, and the active tab content.
- * PaymentTestModeBanner is always mounted — it self-hides in live mode.
+ * Application shell: a fixed grouped sidebar (desktop) / slide-over drawer
+ * (mobile), a sticky top bar with live status + theme toggle, and the active
+ * view rendered in a centered content column.
  */
 export function App() {
   const [activeTab, setActiveTab] = useState<Tab>('live');
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <header className="border-b border-gray-800 px-6 py-4">
-        <h1 className="text-xl font-bold text-white">AI Trading Agent</h1>
-        <PaymentTestModeBanner />
-      </header>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-surface/50 lg:block">
+        <Sidebar activeTab={activeTab} onSelect={setActiveTab} />
+      </aside>
 
-      <nav className="flex gap-1 border-b border-gray-800 px-6">
-        {(
-          [
-            'live',
-            'trades',
-            'personalities',
-            'pnl',
-            'pricing',
-            'regime',
-            'backfill',
-            'replay',
-          ] as Tab[]
-        ).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-3 text-sm font-medium capitalize transition-colors ${
-              activeTab === tab
-                ? 'border-b-2 border-blue-500 text-blue-400'
-                : 'text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            {tabLabel(tab)}
-          </button>
-        ))}
-      </nav>
+      {/* Mobile nav drawer */}
+      <Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm data-[state=open]:animate-fade-in lg:hidden" />
+          <Dialog.Content className="fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-surface shadow-elevated focus:outline-none data-[state=open]:animate-fade-in lg:hidden">
+            <Dialog.Title className="sr-only">Navigation</Dialog.Title>
+            <Sidebar
+              activeTab={activeTab}
+              onSelect={setActiveTab}
+              onNavigate={() => setMenuOpen(false)}
+            />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
-      <main className="p-6">
-        {activeTab === 'live' && <LiveView />}
-        {activeTab === 'trades' && <TradesView />}
-        {activeTab === 'personalities' && <PersonalitiesView />}
-        {activeTab === 'pnl' && <PnlView />}
-        {activeTab === 'pricing' && <PricingPage />}
-        {activeTab === 'regime' && <RegimeView />}
-        {activeTab === 'backfill' && <BackfillView />}
-        {activeTab === 'replay' && <ReplayView />}
-      </main>
+      {/* Main column */}
+      <div className="lg:pl-64">
+        <Topbar
+          title={tabLabel(activeTab)}
+          subtitle={SUBTITLES[activeTab]}
+          onOpenMenu={() => setMenuOpen(true)}
+        />
+        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+          <PaymentTestModeBanner />
+          <div key={activeTab} className="animate-fade-in">
+            {renderView(activeTab)}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
