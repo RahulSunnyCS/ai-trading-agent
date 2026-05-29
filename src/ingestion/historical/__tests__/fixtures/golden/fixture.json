@@ -1,8 +1,8 @@
 {
   "metadata": {
     "underlying": "NIFTY",
-    "from": "2024-01-25T03:45:00.000Z",
-    "to": "2024-01-25T03:48:00.000Z",
+    "from": "2024-01-23T03:45:00.000Z",
+    "to": "2024-01-23T03:48:00.000Z",
     "tickCount": 15,
     "gapMarkerCount": 2,
     "resolutionTags": ["1"],
@@ -15,23 +15,23 @@
     {
       "symbol": "NSE:NIFTY50-INDEX",
       "ltp": 22400,
-      "timestamp": 1706154300000,
+      "timestamp": 1705981500000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
     },
     {
-      "symbol": "NSE:NIFTY2412522400CE",
+      "symbol": "NSE:NIFTY2412322400CE",
       "ltp": 150,
-      "timestamp": 1706154300000,
+      "timestamp": 1705981500000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
     },
     {
-      "symbol": "NSE:NIFTY2412522400PE",
+      "symbol": "NSE:NIFTY2412322400PE",
       "ltp": 145,
-      "timestamp": 1706154300000,
+      "timestamp": 1705981500000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
@@ -39,23 +39,23 @@
     {
       "symbol": "NSE:NIFTY50-INDEX",
       "ltp": 22400,
-      "timestamp": 1706154315000,
+      "timestamp": 1705981515000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
     },
     {
-      "symbol": "NSE:NIFTY2412522400CE",
+      "symbol": "NSE:NIFTY2412322400CE",
       "ltp": 155,
-      "timestamp": 1706154315000,
+      "timestamp": 1705981515000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
     },
     {
-      "symbol": "NSE:NIFTY2412522400PE",
+      "symbol": "NSE:NIFTY2412322400PE",
       "ltp": 148,
-      "timestamp": 1706154315000,
+      "timestamp": 1705981515000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
@@ -63,23 +63,23 @@
     {
       "symbol": "NSE:NIFTY50-INDEX",
       "ltp": 22400,
-      "timestamp": 1706154330000,
+      "timestamp": 1705981530000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
     },
     {
-      "symbol": "NSE:NIFTY2412522400CE",
+      "symbol": "NSE:NIFTY2412322400CE",
       "ltp": 160,
-      "timestamp": 1706154330000,
+      "timestamp": 1705981530000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
     },
     {
-      "symbol": "NSE:NIFTY2412522400PE",
+      "symbol": "NSE:NIFTY2412322400PE",
       "ltp": 152,
-      "timestamp": 1706154330000,
+      "timestamp": 1705981530000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
@@ -87,23 +87,23 @@
     {
       "symbol": "NSE:NIFTY50-INDEX",
       "ltp": 22400,
-      "timestamp": 1706154345000,
+      "timestamp": 1705981545000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
     },
     {
-      "symbol": "NSE:NIFTY2412522400CE",
+      "symbol": "NSE:NIFTY2412322400CE",
       "ltp": 165,
-      "timestamp": 1706154345000,
+      "timestamp": 1705981545000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
     },
     {
-      "symbol": "NSE:NIFTY2412522400PE",
+      "symbol": "NSE:NIFTY2412322400PE",
       "ltp": 155,
-      "timestamp": 1706154345000,
+      "timestamp": 1705981545000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
@@ -111,25 +111,25 @@
     {
       "symbol": "NSE:NIFTY50-INDEX",
       "ltp": 22400,
-      "timestamp": 1706154480000,
+      "timestamp": 1705981680000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": true,
-      "_note": "gapMarker: first tick after a 2-minute calendar gap (1706154360000-1706154480000 is absent from source data)"
+      "_note": "gapMarker: first tick after a 2-minute calendar gap (1705981560000-1705981680000 is absent from source data)"
     },
     {
-      "symbol": "NSE:NIFTY2412522400CE",
+      "symbol": "NSE:NIFTY2412322400CE",
       "ltp": 168,
-      "timestamp": 1706154480000,
+      "timestamp": 1705981680000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": true,
       "_note": "gapMarker: CE leg after the calendar gap"
     },
     {
-      "symbol": "NSE:NIFTY2412522400PE",
+      "symbol": "NSE:NIFTY2412322400PE",
       "ltp": 157,
-      "timestamp": 1706154480000,
+      "timestamp": 1705981680000,
       "source": "fyers-historical",
       "resolution": "1",
       "gapMarker": false
@@ -138,7 +138,7 @@
   "expectedSnapshotLedger": [
     {
       "snapshotIndex": 0,
-      "virtualTimeMs": 1706154300000,
+      "virtualTimeMs": 1705981500000,
       "atmStrike": 22400,
       "cePrice": 150,
       "pePrice": 145,
@@ -149,7 +149,7 @@
     },
     {
       "snapshotIndex": 1,
-      "virtualTimeMs": 1706154315000,
+      "virtualTimeMs": 1705981515000,
       "atmStrike": 22400,
       "cePrice": 155,
       "pePrice": 148,
@@ -160,7 +160,7 @@
     },
     {
       "snapshotIndex": 2,
-      "virtualTimeMs": 1706154330000,
+      "virtualTimeMs": 1705981530000,
       "atmStrike": 22400,
       "cePrice": 160,
       "pePrice": 152,
@@ -171,7 +171,7 @@
     },
     {
       "snapshotIndex": 3,
-      "virtualTimeMs": 1706154345000,
+      "virtualTimeMs": 1705981545000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -182,7 +182,7 @@
     },
     {
       "snapshotIndex": 4,
-      "virtualTimeMs": 1706154360000,
+      "virtualTimeMs": 1705981560000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -193,7 +193,7 @@
     },
     {
       "snapshotIndex": 5,
-      "virtualTimeMs": 1706154375000,
+      "virtualTimeMs": 1705981575000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -204,7 +204,7 @@
     },
     {
       "snapshotIndex": 6,
-      "virtualTimeMs": 1706154390000,
+      "virtualTimeMs": 1705981590000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -215,7 +215,7 @@
     },
     {
       "snapshotIndex": 7,
-      "virtualTimeMs": 1706154405000,
+      "virtualTimeMs": 1705981605000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -226,7 +226,7 @@
     },
     {
       "snapshotIndex": 8,
-      "virtualTimeMs": 1706154420000,
+      "virtualTimeMs": 1705981620000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -237,7 +237,7 @@
     },
     {
       "snapshotIndex": 9,
-      "virtualTimeMs": 1706154435000,
+      "virtualTimeMs": 1705981635000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -248,7 +248,7 @@
     },
     {
       "snapshotIndex": 10,
-      "virtualTimeMs": 1706154450000,
+      "virtualTimeMs": 1705981650000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -259,7 +259,7 @@
     },
     {
       "snapshotIndex": 11,
-      "virtualTimeMs": 1706154465000,
+      "virtualTimeMs": 1705981665000,
       "atmStrike": 22400,
       "cePrice": 165,
       "pePrice": 155,
@@ -270,7 +270,7 @@
     },
     {
       "snapshotIndex": 12,
-      "virtualTimeMs": 1706154480000,
+      "virtualTimeMs": 1705981680000,
       "atmStrike": 22400,
       "cePrice": 168,
       "pePrice": 157,

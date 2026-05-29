@@ -478,6 +478,29 @@ export function createStraddleCalculator(
       if (running) return;
       running = true;
 
+      // Resolve a '$' cursor to the stream's CURRENT last ID before polling.
+      //
+      // '$' only has meaning for a BLOCKING XREAD ("block for anything newer
+      // than now"). Our poll loop is NON-blocking, where '$' re-resolves to the
+      // live max on every call and therefore never returns an entry — the cursor
+      // would stay pinned at '$' forever and no tick is ever consumed. We resolve
+      // it once here to a concrete last ID; subsequent non-blocking XREADs with a
+      // real ID correctly return everything published after it. An empty/missing
+      // stream falls back to '0' (read from the beginning). Replay callers pass an
+      // explicit startId ('0'), so this branch never runs for them.
+      if (lastId === '$') {
+        try {
+          const info = (await redisClient.xinfo('STREAM', 'market.ticks')) as unknown[];
+          const idx = info.indexOf('last-generated-id');
+          const lastGenerated = idx >= 0 ? (info[idx + 1] as string) : undefined;
+          lastId = lastGenerated && lastGenerated !== '0-0' ? lastGenerated : '0';
+        } catch {
+          // Stream does not exist yet (no ticks published): start from the
+          // beginning so the first ticks after creation are not dropped.
+          lastId = '0';
+        }
+      }
+
       // Start the polling loop (runs until stop() is called).
       // We do not await it — it runs concurrently with the snapshot interval.
       void pollLoop();

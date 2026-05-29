@@ -551,6 +551,29 @@ export async function buildServer(
     // Helper: small non-blocking sleep (same pattern as straddle-calc.ts).
     const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+    // Resolve a '$' start cursor to the stream's CURRENT last entry ID.
+    //
+    // '$' only has meaning for a BLOCKING XREAD ("block for anything newer than
+    // now"). These poll loops are NON-blocking (so they can re-check `running`
+    // each iteration), and a non-blocking XREAD with a literal '$' re-resolves to
+    // the live max on every call and therefore never returns an entry — the
+    // cursor would stay pinned at '$' forever and NO frame is ever delivered to
+    // the client. We resolve '$' once to a concrete last ID here; subsequent
+    // non-blocking XREADs with a real ID correctly return everything published
+    // after the connection was established. An empty/missing stream yields '0'
+    // (deliver from the beginning), which is acceptable because the stream is
+    // MAXLEN-trimmed and a brand-new connection has no prior cursor anyway.
+    const resolveStartCursor = async (stream: string): Promise<string> => {
+      try {
+        const info = (await streamClient.xinfo('STREAM', stream)) as unknown[];
+        const idx = info.indexOf('last-generated-id');
+        const last = idx >= 0 ? (info[idx + 1] as string) : undefined;
+        return last && last !== '0-0' ? last : '0';
+      } catch {
+        return '0';
+      }
+    };
+
     // Helper: safely send a JSON frame only when the socket is still open.
     // Swallows the send if the socket has already closed — avoids the "send
     // after close" WebSocket error that would propagate up and crash the loop.
@@ -564,10 +587,10 @@ export async function buildServer(
     // Starts cursor at '$' so we only deliver messages that arrive AFTER this
     // connection is established (historical tick replay is not desirable here).
     const ticksLoop = async (): Promise<void> => {
-      // '$' is the special Redis cursor meaning "start from the latest entry
-      // already in the stream"; we advance it to the actual message ID after
-      // the first successful read so we never re-deliver the same message.
-      let lastTickId = '$';
+      // Start from the stream's current last ID (see resolveStartCursor) so we
+      // only deliver ticks that arrive AFTER this connection is established, then
+      // advance to each real message ID as we read.
+      let lastTickId = await resolveStartCursor('market.ticks');
 
       while (running) {
         try {
@@ -643,7 +666,7 @@ export async function buildServer(
     // Mirrors the ticksLoop pattern exactly; kept separate so each stream gets
     // its own cursor and the two loops are independently throttled by Redis.
     const straddleLoop = async (): Promise<void> => {
-      let lastStraddleId = '$';
+      let lastStraddleId = await resolveStartCursor('straddle.values');
 
       while (running) {
         try {

@@ -56,17 +56,19 @@ const SKIP = !process.env.DATABASE_URL;
 // ---------------------------------------------------------------------------
 
 /**
- * A Thursday during NSE market hours (IST 09:30 = UTC 04:00).
+ * A Tuesday during NSE market hours (IST 09:30 = UTC 04:00).
  *
- * Using 2024-01-25 (a known Thursday in the past) so getCurrentExpiry() inside
- * reconstructStraddle returns 2024-01-25 as the weekly expiry — matching the
+ * Using 2024-01-23 (a known Tuesday in the past) so getCurrentExpiry('NIFTY') inside
+ * reconstructStraddle returns 2024-01-23 as the weekly expiry — matching the
  * option symbols we pre-insert into option_ticks.
+ *
+ * NIFTY now uses Tuesday expiry (corrected from the old Thursday assumption).
  *
  * We use a 1-minute cadence (60 000 ms) to keep the test fast: two cadence
  * steps = two reconstructed snapshots = small number of DB inserts.
  */
-const STEP_T0 = new Date('2024-01-25T04:00:00.000Z'); // IST 09:30 Thursday
-const STEP_T1 = new Date('2024-01-25T04:01:00.000Z'); // 1 minute later
+const STEP_T0 = new Date('2024-01-23T04:00:00.000Z'); // IST 09:30 Tuesday
+const STEP_T1 = new Date('2024-01-23T04:01:00.000Z'); // 1 minute later
 
 const NIFTY_SPOT = 22400;
 
@@ -76,15 +78,15 @@ const INDEX_SYMBOL = 'NSE:NIFTY50-INDEX';
 // ATM strike for NIFTY at 22400 (50-pt intervals) = 22400.
 const ATM_STRIKE = 22400;
 
-// Expiry date matching 2024-01-25 in DATE column format (YYYY-MM-DD).
-const EXPIRY_DATE = '2024-01-25';
+// Expiry date matching 2024-01-23 in DATE column format (YYYY-MM-DD).
+const EXPIRY_DATE = '2024-01-23';
 
-// The Fyers-encoded option symbols for the 2024-01-25 expiry, 22400 strike.
+// The Fyers-encoded option symbols for the 2024-01-23 expiry, 22400 strike.
 // Encoding: NSE:NIFTY{YY}{M}{DD}{STRIKE}{TYPE}
-//   YY=24, Month code for January=1, DD=25, STRIKE=22400, TYPE=CE/PE
+//   YY=24, Month code for January=1, DD=23, STRIKE=22400, TYPE=CE/PE
 // Verified against the instrument-registry encoder pattern.
-const CE_SYMBOL = 'NSE:NIFTY2412522400CE';
-const PE_SYMBOL = 'NSE:NIFTY2412522400PE';
+const CE_SYMBOL = 'NSE:NIFTY2412322400CE';
+const PE_SYMBOL = 'NSE:NIFTY2412322400PE';
 
 const CE_PRICE_T0 = 155;
 const PE_PRICE_T0 = 145;

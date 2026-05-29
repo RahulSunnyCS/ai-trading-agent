@@ -677,14 +677,16 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
     // Pre-seed the price map by having the calculator read from a stream
     // that already has the right ticks. We do this by making xread return
     // them on the first call.
-    const fixedDate = new Date('2024-01-25T06:30:00Z'); // Thursday noon IST
+    // Tuesday noon IST — NIFTY expires on Tuesdays. 2024-01-23 is a Tuesday.
+    // getCurrentExpiry('NIFTY', clock) returns 2024-01-23 → Fyers code '24123'.
+    const fixedDate = new Date('2024-01-23T06:30:00Z'); // Tuesday noon IST
     const { FixedClock } = await import('../../../utils/clock');
     const clock = new FixedClock(fixedDate);
 
     const ticks = [
       { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: fixedDate.getTime() },
-      { symbol: 'NSE:NIFTY2412522400CE', ltp: 150, timestamp: fixedDate.getTime() },
-      { symbol: 'NSE:NIFTY2412522400PE', ltp: 145, timestamp: fixedDate.getTime() },
+      { symbol: 'NSE:NIFTY2412322400CE', ltp: 150, timestamp: fixedDate.getTime() },
+      { symbol: 'NSE:NIFTY2412322400PE', ltp: 145, timestamp: fixedDate.getTime() },
     ];
 
     fakeRedis.xread
@@ -739,15 +741,17 @@ describe('D. Live-path regression — setInterval snapshot cadence unchanged', (
       ),
     };
 
-    const fixedDate = new Date('2024-01-25T06:30:00Z');
+    // Tuesday noon IST — NIFTY expires on Tuesdays. 2024-01-23 is a Tuesday.
+    const fixedDate = new Date('2024-01-23T06:30:00Z');
     const { FixedClock } = await import('../../../utils/clock');
     const clock = new FixedClock(fixedDate);
 
     // Prime the price map by calling processRawTick via xread simulation.
+    // Symbols use the Tuesday 2024-01-23 expiry code '24123'.
     const ticks = [
       { symbol: 'NSE:NIFTY50-INDEX', ltp: 22400, timestamp: fixedDate.getTime() },
-      { symbol: 'NSE:NIFTY2412522400CE', ltp: 150, timestamp: fixedDate.getTime() },
-      { symbol: 'NSE:NIFTY2412522400PE', ltp: 145, timestamp: fixedDate.getTime() },
+      { symbol: 'NSE:NIFTY2412322400CE', ltp: 150, timestamp: fixedDate.getTime() },
+      { symbol: 'NSE:NIFTY2412322400PE', ltp: 145, timestamp: fixedDate.getTime() },
     ];
 
     fakeRedis.xread

@@ -113,7 +113,10 @@ async function flushPollLoop(): Promise<void> {
 // - FixedClock at Thursday noon IST to get a stable expiry
 // ---------------------------------------------------------------------------
 
-const FIXED_DATE = new Date('2024-01-25T06:30:00Z'); // Thursday noon IST
+// Tuesday noon IST — NIFTY expires on Tuesdays; 2024-01-23 is a Tuesday.
+// getCurrentExpiry('NIFTY', clock) with this date returns 2024-01-23 itself
+// (before the 15:30 IST cut-off), so Fyers symbols contain the code '24123'.
+const FIXED_DATE = new Date('2024-01-23T06:30:00Z'); // Tuesday noon IST
 
 function makeCalculator(redis: ReturnType<typeof makeInMemoryRedis>) {
   const clock = new FixedClock(FIXED_DATE);
@@ -264,13 +267,13 @@ describe('B. ticksConsumed — slow path (poll loop not yet at target)', () => {
       'market.ticks',
       '*',
       'data',
-      makeTick('NSE:NIFTY2412522400CE', 150),
+      makeTick('NSE:NIFTY2412322400CE', 150),
     );
     const id3 = await redis.xadd(
       'market.ticks',
       '*',
       'data',
-      makeTick('NSE:NIFTY2412522400PE', 145),
+      makeTick('NSE:NIFTY2412322400PE', 145),
     );
 
     // We target id3 — the barrier should resolve only after all 3 are consumed.
@@ -441,7 +444,7 @@ describe('D. ticksConsumed — multiple barriers on different IDs', () => {
       'market.ticks',
       '*',
       'data',
-      makeTick('NSE:NIFTY2412522400CE', 150),
+      makeTick('NSE:NIFTY2412322400CE', 150),
     );
 
     const resolved1Order: number[] = [];

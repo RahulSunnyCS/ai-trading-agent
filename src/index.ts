@@ -24,6 +24,7 @@
 import { pool } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
 import { createBroker } from './ingestion/brokers/broker-factory.js';
+import { resolveCurrentExpiry } from './ingestion/brokers/expiry-resolver.js';
 import {
   buildOptionSymbol,
   getAtmStrike,
@@ -162,6 +163,41 @@ async function main(): Promise<void> {
   // outside attachFeedHandlers so reloadBroker() can null it before re-wiring.
   let lastAtmStrike: number | null = null;
 
+  // Cached expiry resolved from Fyers option-chain.
+  // We resolve this asynchronously on ATM changes and cache the result so the
+  // synchronous onTick handler can use it without blocking. On the first tick
+  // before a live resolution completes, we fall back to getCurrentExpiry() to
+  // guarantee the system never stalls waiting for a network call.
+  let cachedExpiry: Date | null = null;
+
+  // Guard: only one resolution in flight at a time (prevents concurrent calls
+  // when ticks arrive faster than the network round-trip).
+  let expiryResolutionInFlight = false;
+
+  /**
+   * Kick off an async expiry resolution using the Fyers option-chain API.
+   * On success, updates cachedExpiry. On failure, leaves cachedExpiry unchanged
+   * (the sync fallback in the tick handler will continue to be used).
+   *
+   * This is fire-and-forget — we never await it from onTick.
+   */
+  function refreshExpiry(appId: string, accessToken: string): void {
+    if (expiryResolutionInFlight) return;
+    expiryResolutionInFlight = true;
+    resolveCurrentExpiry(LIVE_UNDERLYING, { appId, accessToken, clock })
+      .then((expiry) => {
+        cachedExpiry = expiry;
+      })
+      .catch((err: unknown) => {
+        // resolveCurrentExpiry should never reject (it catches internally and falls
+        // back). This catch is a last-resort guard against any unexpected throw.
+        console.warn('[index] Unexpected error in refreshExpiry (ignored):', err);
+      })
+      .finally(() => {
+        expiryResolutionInFlight = false;
+      });
+  }
+
   // Current live feed instance. null means degraded (no token) or sim mode.
   let feed: ReturnType<typeof createBroker> | null = null;
 
@@ -193,7 +229,24 @@ async function main(): Promise<void> {
         const atm = getAtmStrike(LIVE_UNDERLYING, tick.ltp);
         if (atm !== lastAtmStrike) {
           lastAtmStrike = atm;
-          const expiry = getCurrentExpiry(LIVE_UNDERLYING, clock);
+
+          // Use the cached Fyers-authoritative expiry when available; fall back
+          // to the deterministic local rule while the async resolution is in flight.
+          // This avoids blocking the sync onTick handler on a network call.
+          // refreshExpiry() is fire-and-forget — the next ATM change (or the next
+          // tick that triggers another change) will pick up the resolved value.
+          const expiry = cachedExpiry ?? getCurrentExpiry(LIVE_UNDERLYING, clock);
+
+          // Kick off an async refresh using the credentials that were loaded at
+          // startup (written to process.env by the credential resolution block).
+          // If credentials are missing, resolveCurrentExpiry() will fall back
+          // gracefully — no crash.
+          const appId = process.env.FYERS_APP_ID ?? '';
+          const accessToken = process.env.FYERS_ACCESS_TOKEN ?? '';
+          if (appId && accessToken) {
+            refreshExpiry(appId, accessToken);
+          }
+
           const ceSymbol = buildOptionSymbol(LIVE_UNDERLYING, expiry, atm, 'CE');
           const peSymbol = buildOptionSymbol(LIVE_UNDERLYING, expiry, atm, 'PE');
           console.log(
@@ -307,6 +360,10 @@ async function main(): Promise<void> {
       // Reset the ATM strike tracker so the first index tick after reconnect
       // unconditionally re-subscribes the CE/PE legs.
       lastAtmStrike = null;
+      // Reset the cached expiry so the next tick forces a fresh Fyers resolution.
+      // The new token may correspond to a different trading day (e.g. the operator
+      // re-logged in after midnight), so the previously cached expiry may be stale.
+      cachedExpiry = null;
 
       // Build a fresh adapter and wire the shared handlers.
       feed = createBroker(clock);
