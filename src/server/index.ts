@@ -47,6 +47,10 @@ import {
   createEodRetrospectionWorker,
 } from '../jobs/eod-retrospection-job.js';
 import { isAuthDegraded } from '../state/broker-status.js';
+import {
+  BackfillResumeError,
+  runBackfill,
+} from '../ingestion/historical/backfill.js';
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
 import { paymentRoutes } from './routes/payment';
 
@@ -456,6 +460,64 @@ export async function buildServer(
     } catch {
       // Table does not exist yet or DB is unavailable.
       return reply.send({ data: [], message: 'no backfill ranges yet' });
+    }
+  });
+
+  // POST /api/backfill — trigger a historical backfill run.
+  //
+  // Body (JSON):
+  //   symbol     : string  — Fyers-format symbol e.g. "NSE:NIFTY50-INDEX"
+  //   resolution : string  — candle resolution e.g. "1", "5", "15", "D"
+  //   from       : string  — ISO date string (inclusive) e.g. "2026-05-19"
+  //   to         : string  — ISO date string (inclusive) e.g. "2026-05-23"
+  //
+  // The call is synchronous (waits for the full fetch + write). For large ranges
+  // the client should set an appropriate timeout. The response mirrors the
+  // BackfillResult shape so the caller knows final status, rows written, and gaps.
+  //
+  // Returns:
+  //   200  { status, rowsWritten, totalRowsWritten, gaps, rangeId }
+  //   400  { error: "validation message" }
+  //   503  { error: "...", checkpointTs, rangeId }  — BackfillResumeError (auth expired)
+  //   500  { error: "..." }  — unrecoverable failure
+  server.post('/api/backfill', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+
+    const symbol = typeof body?.symbol === 'string' ? body.symbol.trim() : '';
+    const resolution = typeof body?.resolution === 'string' ? body.resolution.trim() : '';
+    const fromStr = typeof body?.from === 'string' ? body.from.trim() : '';
+    const toStr = typeof body?.to === 'string' ? body.to.trim() : '';
+
+    if (!symbol) return reply.status(400).send({ error: 'symbol is required' });
+    if (!resolution) return reply.status(400).send({ error: 'resolution is required' });
+    if (!fromStr) return reply.status(400).send({ error: 'from is required (ISO date)' });
+    if (!toStr) return reply.status(400).send({ error: 'to is required (ISO date)' });
+
+    const fromDate = new Date(fromStr);
+    const toDate = new Date(toStr);
+
+    if (isNaN(fromDate.getTime())) return reply.status(400).send({ error: `invalid from date: ${fromStr}` });
+    if (isNaN(toDate.getTime())) return reply.status(400).send({ error: `invalid to date: ${toStr}` });
+    if (fromDate > toDate) return reply.status(400).send({ error: 'from must not be after to' });
+
+    try {
+      const result = await runBackfill(server.db, {
+        symbol,
+        resolution: resolution as Parameters<typeof runBackfill>[1]['resolution'],
+        from: fromDate,
+        to: toDate,
+      });
+      return reply.send(result);
+    } catch (err) {
+      if (err instanceof BackfillResumeError) {
+        return reply.status(503).send({
+          error: err.message,
+          checkpointTs: err.checkpointTs,
+          rangeId: err.rangeId,
+        });
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
     }
   });
 
