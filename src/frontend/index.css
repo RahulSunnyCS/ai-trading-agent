@@ -1,3 +1,123 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Design tokens — a warm, "Claude-style" minimalist system.
+ * Colors are semantic (intent, not literal) and expressed as HSL channels so
+ * Tailwind utilities can apply opacity, e.g. bg-warning/15. The same token
+ * names resolve to different values in light vs .dark, so components never
+ * hardcode a theme.
+ */
+@layer base {
+  :root {
+    /* Surfaces — warm ivory, not stark white */
+    --background: 40 30% 97%;
+    --surface: 40 40% 99.5%;
+    --surface-2: 40 22% 93%;
+    --border: 36 17% 86%;
+    --border-strong: 34 15% 78%;
+
+    /* Text — warm ink */
+    --foreground: 32 16% 17%;
+    --muted: 33 9% 42%;
+    --faint: 34 8% 58%;
+
+    /* Accent — Claude terracotta/clay, used sparingly */
+    --primary: 15 55% 52%;
+    --primary-foreground: 40 40% 98%;
+    --ring: 15 55% 52%;
+
+    /* Semantic status */
+    --positive: 146 48% 33%;
+    --negative: 8 62% 47%;
+    --warning: 33 74% 42%;
+    --info: 208 52% 42%;
+    --accent: 264 38% 50%;
+
+    --radius: 0.75rem;
+    color-scheme: light;
+  }
+
+  .dark {
+    /* Surfaces — warm-tinted charcoal, not pure gray */
+    --background: 30 8% 10%;
+    --surface: 30 7% 13.5%;
+    --surface-2: 30 6% 18%;
+    --border: 30 6% 23%;
+    --border-strong: 30 6% 32%;
+
+    /* Text — warm off-white */
+    --foreground: 40 18% 92%;
+    --muted: 38 8% 64%;
+    --faint: 34 6% 47%;
+
+    /* Accent — slightly brighter clay for low light */
+    --primary: 16 62% 59%;
+    --primary-foreground: 30 12% 10%;
+    --ring: 16 62% 59%;
+
+    /* Semantic status — lifted for dark surfaces */
+    --positive: 146 44% 55%;
+    --negative: 8 66% 64%;
+    --warning: 38 78% 60%;
+    --info: 205 58% 63%;
+    --accent: 265 48% 71%;
+
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Tabular, lining numerals everywhere money/metrics appear */
+  .tabular-nums,
+  table,
+  .metric {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.22);
+  }
+
+  /* Quiet, theme-aware scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border-strong)) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border-strong));
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
