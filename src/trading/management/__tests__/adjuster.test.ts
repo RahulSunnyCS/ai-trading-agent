@@ -58,13 +58,12 @@ const IST_1000_MAY18 = new Date('2026-05-18T04:30:00.000Z').getTime();
 const clock = new FixedClock(IST_1000_MAY18);
 
 /**
- * An open position whose entryStraddleValue is "300". This doubles as the
- * entry spot proxy in evaluatePosition (M2 accepted limitation — see adjuster.ts).
- * The entry spot proxy = 300.
+ * An open position whose entryStraddleValue is "300".
+ * Roll fires when |currentStraddleValue - entryStraddleValue| >= roll_trigger_points.
  */
 const mockPosition: OpenPosition = {
   id: 'aaaaaaaa-0000-0000-0000-000000000001',
-  entryStraddleValue: '300', // also used as entry spot proxy
+  entryStraddleValue: '300',
   lowestStraddleValueSeen: '280',
   entryTimeMs: IST_1000_MAY18 - 60_000, // entered 1 minute ago
   todayNetPnl: '0',
@@ -160,15 +159,14 @@ describe('AdjusterManager.evaluatePosition', () => {
   // Test 1: Roll fires when spot has moved >= roll_trigger_points
   // -------------------------------------------------------------------------
 
-  it('returns ROLL when |currentSpot - entrySpotProxy| >= roll_trigger_points', async () => {
-    // entryStraddleValue is "300" (used as entry spot proxy).
-    // currentSpot = 300 + 70 = 370 → spotsFromEntry = 70 → fires at exactly the threshold.
+  it('returns ROLL when |currentStraddleValue - entryStraddleValue| >= roll_trigger_points', async () => {
+    // entryStraddleValue = "300", currentStraddleValue = 370 → |370-300| = 70 → fires.
     const mockDb = makeMockDb(makeMockClient([]), /* openLegs */ 0);
 
     const result = await manager.evaluatePosition(
       mockPosition,
-      310, // currentStraddleValue — irrelevant for the roll check
-      370, // currentSpot — 70 points above entry proxy
+      370, // currentStraddleValue — 70 points above entry (300)
+      22_000, // currentSpot — NIFTY index level (not used for roll trigger)
       clock,
       mockTriggerConfig,
       mockDb,
@@ -185,15 +183,15 @@ describe('AdjusterManager.evaluatePosition', () => {
   // Test 2: Roll does NOT fire when spot < roll_trigger_points
   // -------------------------------------------------------------------------
 
-  it('does NOT return ROLL when |currentSpot - entrySpotProxy| < roll_trigger_points', async () => {
-    // spotsFromEntry = |369 - 300| = 69 < 70 → no roll.
+  it('does NOT return ROLL when |currentStraddleValue - entryStraddleValue| < roll_trigger_points', async () => {
+    // |369 - 300| = 69 < 70 → no roll.
     const mockDb = makeMockDb(makeMockClient([]), 0);
     vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
 
     const result = await manager.evaluatePosition(
       mockPosition,
-      295, // currentStraddleValue
-      369, // currentSpot — 69 points above entry proxy (one below threshold)
+      369, // currentStraddleValue — 69 points above entry (300), one below threshold
+      22_000, // currentSpot — NIFTY index level (not used for roll trigger)
       clock,
       mockTriggerConfig,
       mockDb,
@@ -215,12 +213,12 @@ describe('AdjusterManager.evaluatePosition', () => {
     const mockDb = makeMockDb(makeMockClient([]), /* openLegs */ 2);
     vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
 
-    // Spot has moved 80 points (well above roll_trigger_points = 70), so roll
+    // Straddle has moved 80 points (well above roll_trigger_points = 70), so roll
     // would normally fire — but the cap prevents it.
     const result = await manager.evaluatePosition(
       mockPosition,
-      310, // currentStraddleValue
-      380, // currentSpot — 80 points above entry proxy
+      380, // currentStraddleValue — 80 points above entry (300), would roll without cap
+      22_000, // currentSpot — NIFTY index level (not used for roll trigger)
       clock,
       mockTriggerConfig,
       mockDb,
@@ -239,11 +237,11 @@ describe('AdjusterManager.evaluatePosition', () => {
   it('rolls at exactly roll_trigger_points (boundary — >= not >)', async () => {
     const mockDb = makeMockDb(makeMockClient([]), 0);
 
-    // spotsFromEntry = |300 + 70 - 300| = 70 === roll_trigger_points → fires.
+    // |300 + 70 - 300| = 70 === roll_trigger_points → fires at the boundary.
     const result = await manager.evaluatePosition(
       mockPosition,
-      310,
-      370, // exactly 70 above entry proxy 300
+      370, // currentStraddleValue — exactly 70 above entry (300)
+      22_000, // currentSpot — NIFTY index level (not used for roll trigger)
       clock,
       mockTriggerConfig,
       mockDb,
@@ -259,15 +257,15 @@ describe('AdjusterManager.evaluatePosition', () => {
   //         spot is within roll_trigger_points
   // -------------------------------------------------------------------------
 
-  it('forwards evaluateTriggers result when spot is within roll threshold', async () => {
+  it('forwards evaluateTriggers result when straddle movement is within roll threshold', async () => {
     const mockDb = makeMockDb(makeMockClient([]), 0);
     vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: true, reason: 'SL' });
 
-    // spotsFromEntry = |360 - 300| = 60 < 70 → no roll → fall through to SL.
+    // |360 - 300| = 60 < 70 → no roll → fall through to SL.
     const result = await manager.evaluatePosition(
       mockPosition,
-      390, // straddle has risen above SL threshold
-      360, // spot is within roll threshold
+      360, // currentStraddleValue — 60 points above entry (300), below roll threshold
+      22_000, // currentSpot — NIFTY index level (not used for roll trigger)
       clock,
       mockTriggerConfig,
       mockDb,
@@ -290,11 +288,11 @@ describe('AdjusterManager.evaluatePosition', () => {
     };
     const mockDb = makeMockDb(makeMockClient([]), 0);
 
-    // 69 points — should NOT roll.
+    // 69 points straddle movement — should NOT roll.
     const resultBelow = await manager.evaluatePosition(
       mockPosition,
-      310,
-      369, // 69 points
+      369, // currentStraddleValue — 69 points above entry (300)
+      22_000, // currentSpot
       clock,
       mockTriggerConfig,
       mockDb,
@@ -306,11 +304,11 @@ describe('AdjusterManager.evaluatePosition', () => {
     vi.mocked(evaluateTriggers).mockReturnValue({ shouldExit: false });
     const mockDb2 = makeMockDb(makeMockClient([]), 0);
 
-    // 70 points — SHOULD roll.
+    // 70 points straddle movement — SHOULD roll.
     const resultAtThreshold = await manager.evaluatePosition(
       mockPosition,
-      310,
-      370, // exactly 70 points
+      370, // currentStraddleValue — exactly 70 points above entry (300)
+      22_000, // currentSpot
       clock,
       mockTriggerConfig,
       mockDb2,
@@ -364,7 +362,7 @@ describe('AdjusterManager.closePosition', () => {
     expect(mockDb.connect).not.toHaveBeenCalled();
   });
 
-  it.each(['TSL', 'TARGET', 'EOD', 'DAILY_LOSS', 'EXIT_WINDOW'] as const)(
+  it.each(['TSL', 'TARGET', 'EOD', 'DAILY_LOSS_CAP', 'EXIT_WINDOW'] as const)(
     "non-ROLL exit ('%s'): delegates to executor.closeTrade",
     async (reason) => {
       const mockClient = makeMockClient([]);

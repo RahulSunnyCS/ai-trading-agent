@@ -43,7 +43,7 @@ export interface TriggerConfig {
  * A discriminated union so callers must handle both cases explicitly.
  */
 export type ExitDecision =
-  | { shouldExit: true; reason: 'SL' | 'TSL' | 'TARGET' | 'EOD' | 'DAILY_LOSS' | 'EXIT_WINDOW' }
+  | { shouldExit: true; reason: 'SL' | 'TSL' | 'TARGET' | 'EOD' | 'DAILY_LOSS_CAP' | 'EXIT_WINDOW' }
   | { shouldExit: false };
 
 // ---------------------------------------------------------------------------
@@ -72,11 +72,11 @@ function toHHMM(istTimeStr: string): string {
  * straddle value, returns an ExitDecision.
  *
  * Priority (when multiple triggers fire simultaneously):
- *   SL > DAILY_LOSS > EOD > EXIT_WINDOW > TSL > TARGET
+ *   SL > DAILY_LOSS_CAP > EOD > EXIT_WINDOW > TSL > TARGET
  *
  * Rationale for priority order:
  * - SL first: hard stop-loss is a loss-limiting emergency — always overrides.
- * - DAILY_LOSS second: account-level risk cap is more important than trade-level
+ * - DAILY_LOSS_CAP second: account-level risk cap is more important than trade-level
  *   profit/time considerations.
  * - EOD before EXIT_WINDOW: EOD square-off is the intended graceful close; EXIT_WINDOW
  *   is the hard boundary that prevents re-entry, but EOD fires earlier.
@@ -113,7 +113,7 @@ export function evaluateTriggers(
   // todayNetPnl is negative when we are losing. Exit if loss exceeds maxDailyLoss.
   // Condition: todayNetPnl <= -maxDailyLoss
   if (todayPnl.lte(new Decimal('-1').mul(maxLoss))) {
-    return { shouldExit: true, reason: 'DAILY_LOSS' };
+    return { shouldExit: true, reason: 'DAILY_LOSS_CAP' };
   }
 
   // --- 3. EOD square-off ---

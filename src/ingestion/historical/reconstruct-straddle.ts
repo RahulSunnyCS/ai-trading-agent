@@ -347,10 +347,12 @@ function getExpiryAtStep(underlying: Underlying, stepTime: Date): Date {
       return stepTime.toISOString().slice(0, 10);
     },
     toISTDate(_ms: number): string {
-      return stepTime.toISOString().slice(0, 10);
+      const istMs = stepTime.getTime() + 330 * 60 * 1000;
+      return new Date(istMs).toISOString().slice(0, 10);
     },
     toISTTime(_ms: number): string {
-      return stepTime.toISOString().slice(11, 19);
+      const istMs = stepTime.getTime() + 330 * 60 * 1000;
+      return new Date(istMs).toISOString().slice(11, 19);
     },
   };
   return getCurrentExpiry(underlying, clock);

@@ -552,6 +552,9 @@ export function createBacktestRunner(pool: Pool) {
           const snap = snapshots[i];
           if (snap === undefined) continue;
           const hhmm = toISTHHMM(snap.timeMs);
+          // Restrict to trading hours — same bounds as the momentum scan above —
+          // so pre-market or post-market snapshots cannot win the closest-to-11:30 search.
+          if (hhmm < ENTRY_START || hhmm > ENTRY_CUTOFF) continue;
           // Compute diff in minutes from 11:30
           const [hStr, mStr] = SCHEDULED_HHMM.split(':');
           const targetMinutes = Number(hStr) * 60 + Number(mStr);

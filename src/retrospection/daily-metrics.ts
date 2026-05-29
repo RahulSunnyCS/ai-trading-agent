@@ -126,6 +126,7 @@ export async function computeDailyMetrics(
   }
 
   let winningTrades = 0;
+  let validTradeCount = 0;
   let totalPnlPct = 0;
   const closedTradeIds: string[] = [];
 
@@ -151,6 +152,7 @@ export async function computeDailyMetrics(
 
     closedTradeIds.push(row.id);
     totalPnlPct += pnlPct;
+    validTradeCount += 1;
 
     // A winning trade is one where pnl_pct > 0 (strictly positive).
     // Breakeven trades (pnl_pct === 0) are not counted as wins.
@@ -159,13 +161,15 @@ export async function computeDailyMetrics(
     }
   }
 
-  // totalTrades is the raw DB row count, not the count of finite rows.
-  // This ensures callers can detect how many excluded rows there were by
-  // comparing totalTrades to closedTradeIds.length.
+  // totalTrades is the raw DB row count (includes non-finite/excluded rows)
+  // so callers can detect how many rows were excluded by comparing
+  // totalTrades to validTradeCount.
   const totalTrades = rows.length;
 
-  // totalTrades > 0 is guaranteed here (the fast path handles the zero case).
-  const winRate = winningTrades / totalTrades;
+  // Divide by validTradeCount (finite-only) so excluded rows don't deflate winRate.
+  // validTradeCount > 0 is guaranteed: the fast path handles rows.length === 0,
+  // and at least one finite row must exist to reach here (non-finite rows continue).
+  const winRate = validTradeCount > 0 ? winningTrades / validTradeCount : 0;
 
   return {
     totalTrades,

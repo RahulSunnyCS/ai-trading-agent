@@ -660,6 +660,7 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
 
     // ── 3. Write candles to the hypertable ──────────────────────────────────
     let rowsWrittenThisRun = 0;
+    let lastWrittenCandle: FyersCandle | null = null;
 
     try {
       const batches = chunkArray(candles, BATCH_SIZE);
@@ -669,11 +670,12 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
         } else {
           rowsWrittenThisRun += await writeOptionTicks(client, symbol, resolution, batch);
         }
+        lastWrittenCandle = batch[batch.length - 1] ?? lastWrittenCandle;
       }
     } catch (err) {
-      // Write failure partway through. Checkpoint what was written and mark partial.
-      const lastCandle = candles[candles.length - 1];
-      const checkpointTs = lastCandle?.timestamp ?? null;
+      // Write failure partway through. Checkpoint only the last successfully
+      // written batch so a resume re-fetches and retries the failed batch.
+      const checkpointTs = lastWrittenCandle?.timestamp ?? null;
       try {
         await checkpointRange(client, resolvedRangeId, checkpointTs, rowsWrittenThisRun);
       } catch (dbErr) {
