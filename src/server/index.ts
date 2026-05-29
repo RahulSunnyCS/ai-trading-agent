@@ -48,9 +48,10 @@ import {
 } from '../jobs/eod-retrospection-job.js';
 import { isAuthDegraded } from '../state/broker-status.js';
 import {
-  BackfillResumeError,
-  runBackfill,
-} from '../ingestion/historical/backfill.js';
+  type BackfillJobData,
+  createBackfillQueue,
+  createBackfillWorker,
+} from '../jobs/backfill-job.js';
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
 import { paymentRoutes } from './routes/payment';
 
@@ -110,6 +111,7 @@ declare module 'fastify' {
     // Decorated in buildServer() so route plugins can enqueue EOD jobs via
     // the same Queue instance (and Redis connection) without creating their own.
     eodQueue: Queue;
+    backfillQueue: Queue;
     // Optional Redis client — absent when buildServer is called without one
     // (e.g. unit tests). Routes must check for its presence before use.
     redis: Redis | undefined;
@@ -226,6 +228,9 @@ export async function buildServer(
   // connection at startup, so tests without Redis do not break.
   const eodQueue = createEodRetrospectionQueue();
   server.decorate('eodQueue', eodQueue);
+
+  const backfillQueue = createBackfillQueue();
+  server.decorate('backfillQueue', backfillQueue);
 
   // Close the pool on server close ONLY when we created it.  If an external
   // pool was injected, the caller owns it and will close it during shutdown.
@@ -463,7 +468,7 @@ export async function buildServer(
     }
   });
 
-  // POST /api/backfill — trigger a historical backfill run.
+  // POST /api/backfill — enqueue a historical backfill job and return immediately.
   //
   // Body (JSON):
   //   symbol     : string  — Fyers-format symbol e.g. "NSE:NIFTY50-INDEX"
@@ -471,15 +476,13 @@ export async function buildServer(
   //   from       : string  — ISO date string (inclusive) e.g. "2026-05-19"
   //   to         : string  — ISO date string (inclusive) e.g. "2026-05-23"
   //
-  // The call is synchronous (waits for the full fetch + write). For large ranges
-  // the client should set an appropriate timeout. The response mirrors the
-  // BackfillResult shape so the caller knows final status, rows written, and gaps.
+  // The job runs in the background (BullMQ worker). Poll GET /api/backfill?symbol=...
+  // to track progress via the backfill_ranges row.
   //
   // Returns:
-  //   200  { status, rowsWritten, totalRowsWritten, gaps, rangeId }
-  //   400  { error: "validation message" }
-  //   503  { error: "...", checkpointTs, rangeId }  — BackfillResumeError (auth expired)
-  //   500  { error: "..." }  — unrecoverable failure
+  //   202  { jobId }           — job enqueued
+  //   400  { error: "..." }    — bad input
+  //   500  { error: "..." }    — queue unavailable
   server.post('/api/backfill', async (request, reply) => {
     const body = request.body as Record<string, unknown> | null;
 
@@ -501,21 +504,15 @@ export async function buildServer(
     if (fromDate > toDate) return reply.status(400).send({ error: 'from must not be after to' });
 
     try {
-      const result = await runBackfill(server.db, {
+      const jobData: BackfillJobData = {
         symbol,
-        resolution: resolution as Parameters<typeof runBackfill>[1]['resolution'],
-        from: fromDate,
-        to: toDate,
-      });
-      return reply.send(result);
+        resolution: resolution as BackfillJobData['resolution'],
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
+      };
+      const job = await server.backfillQueue.add('backfill', jobData);
+      return reply.status(202).send({ jobId: job.id });
     } catch (err) {
-      if (err instanceof BackfillResumeError) {
-        return reply.status(503).send({
-          error: err.message,
-          checkpointTs: err.checkpointTs,
-          rangeId: err.rangeId,
-        });
-      }
       const msg = err instanceof Error ? err.message : String(err);
       return reply.status(500).send({ error: msg });
     }
@@ -887,19 +884,23 @@ export async function startServer(
     eodWorker = createEodRetrospectionWorker(externalPool ?? server.db);
   }
 
+  // Backfill worker — always started. Jobs only run when explicitly enqueued
+  // via POST /api/backfill. If credentials are missing the job fails with a
+  // clear FyersNoCredentialsError; no guard needed here.
+  const backfillWorker = createBackfillWorker(externalPool ?? server.db);
+
   // Graceful shutdown — close the server before the process exits.
   const shutdown = async (signal: string): Promise<void> => {
     server.log.info(`[server] received ${signal} — shutting down`);
     try {
-      // Close the EOD worker first so in-flight jobs can finish before the DB
-      // pool is torn down by server.close(). Worker.close() waits for the
-      // current job to complete before resolving.
+      // Close workers first so in-flight jobs finish before the pool goes away.
       if (eodWorker) {
         await eodWorker.close();
       }
-      // Close the queue's Redis connection before closing the server — the
-      // queue holds an open connection even when no worker is running.
+      await backfillWorker.close();
+      // Close queue Redis connections before closing the server.
       await server.eodQueue.close();
+      await server.backfillQueue.close();
       await server.close();
     } finally {
       process.exit(0);
