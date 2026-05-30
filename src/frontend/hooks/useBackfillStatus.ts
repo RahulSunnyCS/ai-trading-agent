@@ -47,19 +47,16 @@ export function useBackfillStatus(symbol?: string): BackfillStatusState {
     error: null,
   });
 
-  const inFlightRef = useRef(false);
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetch = useCallback(async () => {
-    if (controllerRef.current) {
-      controllerRef.current.abort();
-    }
-
-    if (inFlightRef.current) return;
-
+    // Cancel any in-flight request; THIS call becomes the current one. We do not
+    // bail when a request is already in flight — the latest refresh must always
+    // win and always resolve `loading`, otherwise an aborted earlier request can
+    // leave the spinner stuck on forever (a refresh that never settles).
+    controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
-    inFlightRef.current = true;
 
     setState((prev) => ({ ...prev, loading: true, error: null }));
 
@@ -73,9 +70,9 @@ export function useBackfillStatus(symbol?: string): BackfillStatusState {
       controller.signal,
     );
 
-    inFlightRef.current = false;
-
-    if (!result.ok && result.error === 'AbortError') return;
+    // Ignore results from a request that was superseded by a newer fetch or
+    // aborted on unmount — only the current controller may update state.
+    if (controller.signal.aborted || controllerRef.current !== controller) return;
 
     if (!result.ok) {
       setState((prev) => ({ ...prev, loading: false, error: result.error }));

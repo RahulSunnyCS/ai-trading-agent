@@ -1,13 +1,17 @@
 /**
- * PersonalitiesView — the personality engine config table from GET /api/personalities.
+ * PersonalitiesView — the personality engine config table from GET /api/personalities,
+ * plus an "approval inbox" for evolution suggestions and a per-row Edit dialog.
  *
  * Management style → tone:  hold → info · roll → warning · cut_reenter → accent.
  */
 
-import { RefreshCw } from 'lucide-react';
+import { Pencil, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 
 import { usePersonalities } from '../hooks/usePersonalities.js';
 import type { Personality } from '../types/trading.js';
+import { EditPersonalityDialog } from './EditPersonalityDialog.js';
+import { PendingSuggestionsCard } from './PendingSuggestionsCard.js';
 import { Badge, type Tone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
@@ -45,7 +49,12 @@ function ParamsSummary({ params }: { params: Record<string, unknown> }) {
   return <span className="text-xs tabular-nums text-muted">{parts.join(' · ')}</span>;
 }
 
-function PersonalitiesTable({ personalities }: { personalities: Personality[] }) {
+interface PersonalitiesTableProps {
+  personalities: Personality[];
+  onEdit: (p: Personality) => void;
+}
+
+function PersonalitiesTable({ personalities, onEdit }: PersonalitiesTableProps) {
   return (
     <Table>
       <THead>
@@ -56,6 +65,7 @@ function PersonalitiesTable({ personalities }: { personalities: Personality[] })
         <Th>Management</Th>
         <Th align="right">Phase</Th>
         <Th>Key Params</Th>
+        <Th>{''}</Th>
       </THead>
       <tbody>
         {personalities.map((p) => (
@@ -83,6 +93,21 @@ function PersonalitiesTable({ personalities }: { personalities: Personality[] })
             <Td>
               <ParamsSummary params={p.params} />
             </Td>
+            <Td align="right">
+              {/* Frozen personalities (Clockwork) reject any param edit at the
+                  API layer with 403 FROZEN_VIOLATION; disable the button so
+                  the operator never wastes a click. */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onEdit(p)}
+                disabled={p.is_frozen}
+                title={p.is_frozen ? 'Frozen — parameters immutable' : 'Edit parameters'}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Button>
+            </Td>
           </TRow>
         ))}
       </tbody>
@@ -94,42 +119,64 @@ export function PersonalitiesView() {
   const { personalities, loading, error, refresh } = usePersonalities();
   const hasData = personalities.length > 0;
 
-  return (
-    <Card flush>
-      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight text-foreground">
-            Trading Personalities
-          </h2>
-          <p className="mt-0.5 text-sm text-muted">
-            Decision-engine configurations for the M2 engine
-          </p>
-        </div>
-        <Button size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+  // Tracks which personality (if any) is being edited via the dialog.
+  // `null` = dialog closed.
+  const [editing, setEditing] = useState<Personality | null>(null);
 
-      <div className="px-2 py-1">
-        {loading && !hasData && <SkeletonRows rows={5} className="px-1 pt-2" />}
-        {error !== null && (
-          <StateMessage
-            variant="error"
-            title="Couldn't load personalities — retrying…"
-            description={error}
-            className="m-3"
-          />
-        )}
-        {!loading && error === null && !hasData && (
-          <StateMessage
-            variant="empty"
-            title="No personalities found"
-            description="Personality configs appear once the M2 seed migration has run."
-          />
-        )}
-        {hasData && <PersonalitiesTable personalities={personalities} />}
-      </div>
-    </Card>
+  return (
+    <div className="space-y-4">
+      {/* Approval inbox — only meaningful once paper trades exist; gracefully empty otherwise. */}
+      <PendingSuggestionsCard personalities={personalities} onApplied={refresh} />
+
+      <Card flush>
+        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">
+              Trading Personalities
+            </h2>
+            <p className="mt-0.5 text-sm text-muted">
+              Decision-engine configurations for the M2 engine — click Edit to tune
+            </p>
+          </div>
+          <Button size="sm" onClick={refresh} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="px-2 py-1">
+          {loading && !hasData && <SkeletonRows rows={5} className="px-1 pt-2" />}
+          {error !== null && (
+            <StateMessage
+              variant="error"
+              title="Couldn't load personalities — retrying…"
+              description={error}
+              className="m-3"
+            />
+          )}
+          {!loading && error === null && !hasData && (
+            <StateMessage
+              variant="empty"
+              title="No personalities found"
+              description="Personality configs appear once the M2 seed migration has run."
+            />
+          )}
+          {hasData && <PersonalitiesTable personalities={personalities} onEdit={setEditing} />}
+        </div>
+      </Card>
+
+      {/* The dialog mounts only when a personality is selected — keeps the
+          form's local state cleanly scoped per-edit-session. */}
+      {editing !== null && (
+        <EditPersonalityDialog
+          personality={editing}
+          open={true}
+          onOpenChange={(next) => {
+            if (!next) setEditing(null);
+          }}
+          onSaved={refresh}
+        />
+      )}
+    </div>
   );
 }

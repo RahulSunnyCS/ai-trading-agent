@@ -80,6 +80,63 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<Api
 }
 
 // ---------------------------------------------------------------------------
+// POST helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch a JSON endpoint with POST and return a typed result.
+ *
+ * @param path  Absolute path starting with `/` (e.g. `/api/backfill`).
+ * @param body  Request body, serialised to JSON.
+ *
+ * Mirrors apiGet: errors are never thrown — callers check `result.ok`.
+ */
+export async function apiPost<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  return apiJsonBody<T>('POST', path, body);
+}
+
+/** PUT counterpart — same error-shape contract as apiGet/apiPost. */
+export async function apiPut<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  return apiJsonBody<T>('PUT', path, body);
+}
+
+/**
+ * Shared body-fetcher for POST/PUT/PATCH — keeps error handling in one place
+ * so apiPost / apiPut / future apiPatch all return the same { ok, ... } shape.
+ */
+async function apiJsonBody<T>(
+  method: 'POST' | 'PUT' | 'PATCH',
+  path: string,
+  body: unknown,
+): Promise<ApiResult<T>> {
+  try {
+    const response = await fetch(path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      let errMsg = `HTTP ${response.status} ${response.statusText}`;
+      try {
+        const errBody = (await response.json()) as { error?: string };
+        if (errBody.error) errMsg = errBody.error;
+      } catch {
+        // JSON parse failed — use the HTTP status message
+      }
+      return { ok: false, error: errMsg, status: response.status };
+    }
+    const data = (await response.json()) as T;
+    return { ok: true, data };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return { ok: false, error: 'AbortError' };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Convenience unwrap helper
 // ---------------------------------------------------------------------------
 

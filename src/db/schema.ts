@@ -110,6 +110,26 @@ export type BackfillRangeStatus =
   | 'error'; // Non-resumable failure
 
 /**
+ * User-facing backfill status. The six internal states above are load-bearing
+ * for resume/gap logic, but the dashboard only distinguishes three outcomes.
+ * The API normalises to this set so the UI never shows 'partial'/'gapped' etc.
+ */
+export type BackfillDisplayStatus = 'failed' | 'in_progress' | 'completed';
+
+/** Collapse an internal backfill status into the three user-facing buckets. */
+export function toBackfillDisplayStatus(status: BackfillRangeStatus): BackfillDisplayStatus {
+  switch (status) {
+    case 'complete':
+    case 'gapped': // a run with calendar gaps still completed — gaps are a detail, not a status
+      return 'completed';
+    case 'error':
+      return 'failed';
+    default: // pending, running, partial — work that is not yet done and has not failed
+      return 'in_progress';
+  }
+}
+
+/**
  * One row in the backfill_ranges table.
  *
  * Tracks the progress of a historical candle backfill job for one

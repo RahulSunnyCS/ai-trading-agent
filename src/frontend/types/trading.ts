@@ -108,6 +108,24 @@ export interface Personality {
   updated_at: string; // ISO-8601 timestamp
 }
 
+/**
+ * One pending evolution-engine suggestion — a row from retrospection_results
+ * where the engine proposed a parameter change that's awaiting human approval.
+ */
+export interface PendingSuggestion {
+  id: string;
+  personality_id: string;
+  trade_date: string; // 'YYYY-MM-DD'
+  market_regime: string | null;
+  total_trades: number | string;
+  winning_trades: number | string;
+  total_pnl_pct: number | string | null;
+  beat_clockwork_delta: number | string | null;
+  proposed_adjustments: Record<string, unknown> | null; // e.g. { min_probability: 0.55 }
+  adjustments_applied: boolean;
+  created_at: string; // ISO-8601 timestamp
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket tick messages
 // ---------------------------------------------------------------------------
@@ -202,7 +220,7 @@ export interface BackfillRangeRow {
   from_ts: string; // ISO-8601 timestamp
   to_ts: string; // ISO-8601 timestamp
   resolution: string; // e.g. '1', '5', '15', 'D'
-  status: string; // 'pending'|'running'|'partial'|'complete'|'gapped'|'error'
+  status: string; // normalised by the API to 'failed'|'in_progress'|'completed'
   rows_written: number; // INTEGER — arrives as JS number
   checkpoint_ts: string | null; // ISO-8601 or null
   gaps_detected: number; // INTEGER — arrives as JS number

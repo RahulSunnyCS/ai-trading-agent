@@ -153,6 +153,69 @@ export function resolveSymbolTable(symbol: string): SymbolTable {
   return 'market_ticks';
 }
 
+/**
+ * Purge stale backfill data for a symbol, keeping ONLY the current run.
+ *
+ * Phase-1 product rule: each symbol retains just its most recent backfill — no
+ * accumulating history. After a run finishes successfully we therefore delete,
+ * for this symbol:
+ *   1. Every OTHER backfill_ranges row (id <> the current run's id), so the
+ *      status table shows exactly one row per symbol.
+ *   2. Every historical candle that is NOT part of the current run — i.e. any
+ *      `source = 'fyers-historical'` row outside the kept [from, to] window or
+ *      written at a different resolution.
+ *
+ * SAFETY: the candle delete is scoped to `source = 'fyers-historical'`, so live
+ * and simulator ticks (other source values) are never touched. The metadata
+ * delete is scoped to the single symbol.
+ *
+ * This is best-effort cleanup: the new data is already committed and valid, so a
+ * failure here is logged and swallowed rather than failing the backfill.
+ */
+async function purgeStaleBackfillData(
+  client: PoolClient,
+  table: SymbolTable,
+  symbol: string,
+  keepRangeId: number,
+  keepFrom: Date,
+  keepTo: Date,
+  keepResolution: string,
+): Promise<void> {
+  try {
+    // 1. Drop older range rows for this symbol (any resolution / window).
+    await client.query('DELETE FROM backfill_ranges WHERE symbol = $1 AND id <> $2', [
+      symbol,
+      keepRangeId,
+    ]);
+
+    // 2. Drop historical candles that are not part of the kept run. The time
+    //    bounds keep the predicate sargable against the hypertable's partial
+    //    unique index on (symbol, time) WHERE source = 'fyers-historical'.
+    //
+    //    keepTo arrives at UTC midnight (callers pass the request `to` directly),
+    //    but intraday candles for that day sit at 03:45–10:00 UTC etc. — strictly
+    //    greater than midnight. Without extending keepTo to end-of-day, the
+    //    just-written final-day candles would be purged immediately. Mirrors
+    //    fetchChunk's range_to extension in fyers-historical.ts.
+    const keepFromStart = new Date(keepFrom);
+    keepFromStart.setUTCHours(0, 0, 0, 0);
+    const keepToEndOfDay = new Date(keepTo);
+    keepToEndOfDay.setUTCHours(23, 59, 59, 999);
+    await client.query(
+      `DELETE FROM ${table}
+       WHERE source = 'fyers-historical'
+         AND symbol = $1
+         AND NOT (time >= $2 AND time <= $3 AND resolution = $4)`,
+      [symbol, keepFromStart.toISOString(), keepToEndOfDay.toISOString(), keepResolution],
+    );
+  } catch (err) {
+    console.error(
+      `[BackfillWriter] Stale-data purge failed for ${symbol} (rangeId=${keepRangeId}); new data is intact, leftover old data may remain:`,
+      err,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Calendar reconciliation
 // ---------------------------------------------------------------------------
@@ -579,6 +642,9 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
 
       // Short-circuit: range already fully processed.
       if (existing.status === 'complete' || existing.status === 'gapped') {
+        // Even on a no-op rerun, enforce "one run per symbol": purge any older
+        // ranges/candles for this symbol so the latest is the only one kept.
+        await purgeStaleBackfillData(client, targetTable, symbol, rangeId, from, to, resolution);
         releaseClient();
         const storedGaps = parseStoredGaps(existing.gaps_json);
         return {
@@ -704,6 +770,18 @@ export async function runBackfill(db: Pool, options: BackfillOptions): Promise<B
       resolvedRangeId,
       rowsWrittenThisRun,
       calendarGaps,
+    );
+
+    // Keep only this run's data per symbol — delete older ranges and any
+    // historical candles outside the just-written [from, to] / resolution.
+    await purgeStaleBackfillData(
+      client,
+      targetTable,
+      symbol,
+      resolvedRangeId,
+      from,
+      to,
+      resolution,
     );
 
     releaseClient();

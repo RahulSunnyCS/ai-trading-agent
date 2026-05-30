@@ -42,6 +42,13 @@ import type { Redis } from 'ioredis';
 import { Pool } from 'pg';
 
 import { retrospectionRoutes } from '../api/routes/retrospection.js';
+import { type BackfillRangeStatus, toBackfillDisplayStatus } from '../db/schema.js';
+import { BACKFILL_SUPPORTED_SYMBOLS } from '../ingestion/brokers/types.js';
+import {
+  type BackfillJobData,
+  createBackfillQueue,
+  createBackfillWorker,
+} from '../jobs/backfill-job.js';
 import {
   createEodRetrospectionQueue,
   createEodRetrospectionWorker,
@@ -106,6 +113,7 @@ declare module 'fastify' {
     // Decorated in buildServer() so route plugins can enqueue EOD jobs via
     // the same Queue instance (and Redis connection) without creating their own.
     eodQueue: Queue;
+    backfillQueue: Queue;
     // Optional Redis client — absent when buildServer is called without one
     // (e.g. unit tests). Routes must check for its presence before use.
     redis: Redis | undefined;
@@ -222,6 +230,9 @@ export async function buildServer(
   // connection at startup, so tests without Redis do not break.
   const eodQueue = createEodRetrospectionQueue();
   server.decorate('eodQueue', eodQueue);
+
+  const backfillQueue = createBackfillQueue();
+  server.decorate('backfillQueue', backfillQueue);
 
   // Close the pool on server close ONLY when we created it.  If an external
   // pool was injected, the caller owns it and will close it during shutdown.
@@ -412,14 +423,15 @@ export async function buildServer(
     }
   });
 
-  // GET /api/backfill — backfill job ranges from backfill_ranges table.
+  // GET /api/backfill — the LATEST backfill range per symbol.
   //
   // Query params (optional):
-  //   symbol — if provided, filter rows to that symbol; else return all.
+  //   symbol — if provided, filter to that symbol; else return one row per symbol.
   //
-  // Hard LIMIT 200 ORDER BY from_ts DESC keeps the response bounded even
-  // without date params (backfill_ranges has one row per job, so 200 rows
-  // represents at most 200 backfill runs — a sensible UI ceiling).
+  // Phase-1 product rule: only the most recent backfill per symbol is retained
+  // (older runs are purged on rerun — see runBackfill's purgeStaleBackfillData),
+  // so DISTINCT ON (symbol) ... ORDER BY updated_at DESC returns the current
+  // state. The outer query orders the (at most a handful of) rows by recency.
   server.get('/api/backfill', async (request, reply) => {
     const query = request.query as Record<string, string | undefined>;
     const symbol = query.symbol;
@@ -442,20 +454,91 @@ export async function buildServer(
         updated_at: Date;
         created_at: Date;
       }>(
-        `SELECT id, symbol, from_ts, to_ts, resolution, status,
-                rows_written, checkpoint_ts, gaps_detected, gaps_json,
-                updated_at, created_at
-         FROM backfill_ranges
-         WHERE ($1::text IS NULL OR symbol = $1)
-         ORDER BY from_ts DESC
+        `SELECT * FROM (
+           SELECT DISTINCT ON (symbol)
+                  id, symbol, from_ts, to_ts, resolution, status,
+                  rows_written, checkpoint_ts, gaps_detected, gaps_json,
+                  updated_at, created_at
+           FROM backfill_ranges
+           WHERE ($1::text IS NULL OR symbol = $1)
+           ORDER BY symbol, updated_at DESC, id DESC
+         ) latest
+         ORDER BY updated_at DESC
          LIMIT 200`,
         [symbol ?? null],
       );
 
-      return reply.send({ data: result.rows });
+      // Collapse the six internal statuses into the three user-facing buckets
+      // (failed / in_progress / completed) — the UI never sees partial/gapped.
+      const data = result.rows.map((row) => ({
+        ...row,
+        status: toBackfillDisplayStatus(row.status as BackfillRangeStatus),
+      }));
+
+      return reply.send({ data });
     } catch {
       // Table does not exist yet or DB is unavailable.
       return reply.send({ data: [], message: 'no backfill ranges yet' });
+    }
+  });
+
+  // POST /api/backfill — enqueue a historical backfill job and return immediately.
+  //
+  // Body (JSON):
+  //   symbol     : string  — Fyers-format symbol e.g. "NSE:NIFTY50-INDEX"
+  //   resolution : string  — candle resolution e.g. "1", "5", "15", "D"
+  //   from       : string  — ISO date string (inclusive) e.g. "2026-05-19"
+  //   to         : string  — ISO date string (inclusive) e.g. "2026-05-23"
+  //
+  // The job runs in the background (BullMQ worker). Poll GET /api/backfill?symbol=...
+  // to track progress via the backfill_ranges row.
+  //
+  // Returns:
+  //   202  { jobId }           — job enqueued
+  //   400  { error: "..." }    — bad input
+  //   500  { error: "..." }    — queue unavailable
+  server.post('/api/backfill', async (request, reply) => {
+    const body = request.body as Record<string, unknown> | null;
+
+    const symbol = typeof body?.symbol === 'string' ? body.symbol.trim() : '';
+    const resolution = typeof body?.resolution === 'string' ? body.resolution.trim() : '';
+    const fromStr = typeof body?.from === 'string' ? body.from.trim() : '';
+    const toStr = typeof body?.to === 'string' ? body.to.trim() : '';
+
+    if (!symbol) return reply.status(400).send({ error: 'symbol is required' });
+    // Phase-1 scope: backfill is limited to NIFTY and Sensex (see
+    // BACKFILL_SUPPORTED_SYMBOLS). Reject anything else rather than enqueue a
+    // job that would fetch data we don't support.
+    if (!(BACKFILL_SUPPORTED_SYMBOLS as readonly string[]).includes(symbol)) {
+      return reply.status(400).send({
+        error: `unsupported symbol '${symbol}' — allowed: ${BACKFILL_SUPPORTED_SYMBOLS.join(', ')}`,
+      });
+    }
+    if (!resolution) return reply.status(400).send({ error: 'resolution is required' });
+    if (!fromStr) return reply.status(400).send({ error: 'from is required (ISO date)' });
+    if (!toStr) return reply.status(400).send({ error: 'to is required (ISO date)' });
+
+    const fromDate = new Date(fromStr);
+    const toDate = new Date(toStr);
+
+    if (Number.isNaN(fromDate.getTime()))
+      return reply.status(400).send({ error: `invalid from date: ${fromStr}` });
+    if (Number.isNaN(toDate.getTime()))
+      return reply.status(400).send({ error: `invalid to date: ${toStr}` });
+    if (fromDate > toDate) return reply.status(400).send({ error: 'from must not be after to' });
+
+    try {
+      const jobData: BackfillJobData = {
+        symbol,
+        resolution: resolution as BackfillJobData['resolution'],
+        from: fromDate.toISOString(),
+        to: toDate.toISOString(),
+      };
+      const job = await server.backfillQueue.add('backfill', jobData);
+      return reply.status(202).send({ jobId: job.id });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: msg });
     }
   });
 
@@ -848,19 +931,23 @@ export async function startServer(
     eodWorker = createEodRetrospectionWorker(externalPool ?? server.db);
   }
 
+  // Backfill worker — always started. Jobs only run when explicitly enqueued
+  // via POST /api/backfill. If credentials are missing the job fails with a
+  // clear FyersNoCredentialsError; no guard needed here.
+  const backfillWorker = createBackfillWorker(externalPool ?? server.db);
+
   // Graceful shutdown — close the server before the process exits.
   const shutdown = async (signal: string): Promise<void> => {
     server.log.info(`[server] received ${signal} — shutting down`);
     try {
-      // Close the EOD worker first so in-flight jobs can finish before the DB
-      // pool is torn down by server.close(). Worker.close() waits for the
-      // current job to complete before resolving.
+      // Close workers first so in-flight jobs finish before the pool goes away.
       if (eodWorker) {
         await eodWorker.close();
       }
-      // Close the queue's Redis connection before closing the server — the
-      // queue holds an open connection even when no worker is running.
+      await backfillWorker.close();
+      // Close queue Redis connections before closing the server.
       await server.eodQueue.close();
+      await server.backfillQueue.close();
       await server.close();
     } finally {
       process.exit(0);

@@ -233,20 +233,44 @@ export class ScheduledSignalEmitter {
    * straddleValue, vix.
    */
   private async _handleSnapshot(fields: Record<string, string>): Promise<void> {
+    // Canonical publisher (StraddleCalculator) writes a single 'data' field
+    // containing a JSON-serialised StraddleSnapshot. Older / test call-sites
+    // may pass flat key-value fields — we accept both shapes here.
+    // Snapshot field name in JSON is `timestamp`; aliased to `time` below.
+    let parsed: Record<string, unknown> = fields;
+    if (typeof fields.data === 'string') {
+      try {
+        parsed = JSON.parse(fields.data) as Record<string, unknown>;
+      } catch {
+        console.warn('[scheduled-signal-emitter] snapshot data was not valid JSON — skipping');
+        return;
+      }
+    }
+
     // --- Parse and validate the snapshot ---
-    const underlying = fields.underlying ?? 'NIFTY';
-    const straddleValueStr = fields.straddleValue ?? fields.straddle_value ?? '';
+    const underlying =
+      typeof parsed.underlying === 'string' ? parsed.underlying : 'NIFTY';
+    const straddleValueRaw = parsed.straddleValue ?? parsed.straddle_value;
     const straddleValue =
-      straddleValueStr !== '' ? Number.parseFloat(straddleValueStr) : Number.NaN;
-    const spot = fields.spot ?? '0';
-    const atmStrike = fields.atmStrike ?? fields.atm_strike ?? '0';
-    const vix = fields.vix ?? '';
+      typeof straddleValueRaw === 'number'
+        ? straddleValueRaw
+        : straddleValueRaw !== undefined && straddleValueRaw !== ''
+          ? Number.parseFloat(String(straddleValueRaw))
+          : Number.NaN;
+    const spot = String(parsed.spot ?? '0');
+    const atmStrike = String(parsed.atmStrike ?? parsed.atm_strike ?? '0');
+    const vix = parsed.vix === null || parsed.vix === undefined ? '' : String(parsed.vix);
 
     // Use the snapshot's own time for market-hours checking (supports simulation
     // where wall-clock time differs from the simulated trading day).
-    // The `time` field is a Unix-ms string published by straddle-calc.ts.
+    // JSON snapshot uses `timestamp`; legacy flat-field tests use `time`.
+    const timeRaw = parsed.time ?? parsed.timestamp;
     const snapshotTimeMs =
-      fields.time !== undefined ? Number.parseInt(fields.time, 10) : this.clock.now();
+      typeof timeRaw === 'number'
+        ? timeRaw
+        : timeRaw !== undefined
+          ? Number.parseInt(String(timeRaw), 10)
+          : this.clock.now();
     const snapshotTimeMsValid = Number.isFinite(snapshotTimeMs) ? snapshotTimeMs : this.clock.now();
 
     // Skip zero-value snapshots (simulator placeholder before first tick arrives).
@@ -296,7 +320,7 @@ export class ScheduledSignalEmitter {
         underlying,
         atmStrike,
         spot,
-        straddleValue: straddleValueStr,
+        straddleValue: String(straddleValue),
         vix,
         adjustedProbability: '0.60',
         confidenceTier: 'HIGH',
@@ -344,7 +368,7 @@ export class ScheduledSignalEmitter {
           underlying,
           atmStrike,
           spot,
-          straddleValue: straddleValueStr,
+          straddleValue: String(straddleValue),
           vix,
           adjustedProbability: '0.60',
           confidenceTier: 'MEDIUM',

@@ -43,6 +43,15 @@ import type { Underlying } from '../src/ingestion/brokers/types.js';
 import { createHistoricalFeed } from '../src/ingestion/historical/historical-feed.js';
 import { createReplayDriver } from '../src/ingestion/historical/replay-driver.js';
 import { createStraddleCalculator } from '../src/ingestion/straddle-calc.js';
+import {
+  PeakDetectionEngine,
+  readConfigFromEnv as readPeakConfigFromEnv,
+} from '../src/signals/peak-detection-engine.js';
+import { PersonalityRouter } from '../src/signals/personality-router.js';
+import {
+  ScheduledSignalEmitter,
+  buildConfigFromEnv as buildScheduledConfigFromEnv,
+} from '../src/signals/scheduled-signal-emitter.js';
 import { createPositionMonitor } from '../src/trading/position-monitor.js';
 import { VirtualClock } from '../src/utils/clock.js';
 
@@ -285,6 +294,35 @@ async function main(): Promise<void> {
   await straddleCalc.start();
   await positionMonitor.start();
 
+  // Signal generators — both consume straddle.values and publish to
+  // signals.generated. Started AFTER straddleCalc/positionMonitor so their
+  // consumer groups exist at '$' = current end-of-stream (empty at this point),
+  // and BEFORE the replay driver starts publishing snapshots — guaranteeing
+  // they see every replay snapshot. Without these, signals.generated stays
+  // empty and the personality engine never fires entries.
+  //
+  // IMPORTANT: each blocking consumer (XREADGROUP BLOCK 2s) gets its OWN
+  // duplicated Redis client. ioredis holds the connection during BLOCK, so a
+  // shared client would queue every XADD / XREAD behind the engines' blocks —
+  // empirically a 13-second 30-min replay became a 10+ minute crawl.
+  const peakRedis = redisClient.duplicate();
+  const scheduledRedis = redisClient.duplicate();
+  const routerRedis = redisClient.duplicate();
+  const peakEngine = new PeakDetectionEngine(pool, peakRedis, readPeakConfigFromEnv(), clock);
+  const scheduledEmitter = new ScheduledSignalEmitter(
+    scheduledRedis,
+    buildScheduledConfigFromEnv(),
+    clock,
+  );
+  // PersonalityRouter consumes signals.generated and writes paper_trades for
+  // personalities that accept. Without it, signals fire but no trade is ever
+  // opened — the final missing link in the live + replay pipeline.
+  const personalityRouter = new PersonalityRouter(pool, routerRedis, clock);
+  await peakEngine.start();
+  await personalityRouter.start();
+  // ScheduledSignalEmitter.start() runs the consume loop inline — fire-and-forget.
+  void scheduledEmitter.start();
+
   // NOTE: tick publishing to market.ticks is owned by the ReplayDriver, which
   // registers its own feed.onTick handler and awaits every xadd (zero floating
   // promises) before each snapshotStep(). We must NOT register a second onTick
@@ -321,9 +359,25 @@ async function main(): Promise<void> {
   // Graceful shutdown
   // ---------------------------------------------------------------------------
 
+  // Give the signal engines a short drain window so they consume the final
+  // snapshots before we stop them. Both use a 2s BLOCK on XREADGROUP, so 3s
+  // wall-clock is enough for one extra read cycle after the last publish.
+  await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+  await peakEngine.stop();
+  await scheduledEmitter.stop();
+  await personalityRouter.stop();
+
+  // Report what landed BEFORE closing the Redis client.
+  const signalsLen = await redisClient.xlen('signals.generated').catch(() => 0);
+  console.log(`[replay]   Signals generated      : ${signalsLen}`);
+
   await straddleCalc.stop();
   await positionMonitor.stop();
   await pool.end();
+  // Close engine-owned connections first, then the primary client.
+  await peakRedis.quit();
+  await scheduledRedis.quit();
+  await routerRedis.quit();
   await redisClient.quit();
 
   console.log('[replay] Clean shutdown complete.');

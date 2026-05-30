@@ -147,3 +147,18 @@ export const UNDERLYING_SYMBOLS = {
 } as const;
 
 export type Underlying = keyof typeof UNDERLYING_SYMBOLS;
+
+/**
+ * Index symbols permitted for historical backfill.
+ *
+ * Phase 1 scope: NIFTY and Sensex only (BankNifty deferred). The POST
+ * /api/backfill route rejects any symbol not in this list with a 400, and the
+ * dashboard only offers these two. Kept here so the API and UI share one
+ * source of truth.
+ */
+export const BACKFILL_SUPPORTED_SYMBOLS = [
+  UNDERLYING_SYMBOLS.NIFTY,
+  UNDERLYING_SYMBOLS.SENSEX,
+] as const;
+
+export type BackfillSupportedSymbol = (typeof BACKFILL_SUPPORTED_SYMBOLS)[number];

@@ -38,3 +38,9 @@ tools/biome*
 
 # Claude Code agent worktrees (temporary isolated git worktrees used during parallel implementation)
 .claude/worktrees/
+
+# Fyers symbol-master on-disk cache (re-downloaded daily; never commit)
+data/sym_master/
+
+# Postman collections — may embed live API tokens, keep local-only
+docs/*.postman_collection.json

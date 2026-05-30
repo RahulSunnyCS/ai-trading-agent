@@ -17,9 +17,9 @@
  *     without any live network calls.
  *
  * Fyers endpoint assumptions (v3 data/history — verify against live docs):
- *   URL   : https://api-t1.fyers.in/api/v3/data/history
- *   Params: symbol, resolution, date_format (1 = epoch seconds), range_from,
- *           range_to (both epoch seconds when date_format=1)
+ *   URL   : https://api-t1.fyers.in/data/history
+ *   Params: symbol, resolution, date_format (0 = epoch seconds), range_from,
+ *           range_to (both epoch seconds when date_format=0)
  *   Auth  : Authorization header value is "{appId}:{accessToken}"
  *   Response shape: { s: "ok"|"error", candles: number[][], message?: string }
  *     where each candle is [epochSeconds, open, high, low, close, volume]
@@ -48,7 +48,7 @@ import { loadStoredToken } from '../../server/services/fyers-auth.js';
 
 /** The only host this client will ever contact. */
 const FYERS_HISTORY_HOST = 'https://api-t1.fyers.in';
-const FYERS_HISTORY_PATH = '/api/v3/data/history';
+const FYERS_HISTORY_PATH = '/data/history';
 const FYERS_HISTORY_URL = `${FYERS_HISTORY_HOST}${FYERS_HISTORY_PATH}`;
 
 /**
@@ -491,11 +491,18 @@ async function fetchChunk(
   const params = new URLSearchParams({
     symbol,
     resolution,
-    // date_format=1 tells Fyers to interpret range_from/range_to as epoch seconds
-    // and to return candle timestamps as epoch seconds.
-    date_format: '1',
+    // date_format=0 tells Fyers to interpret range_from/range_to as epoch seconds
+    // and to return candle timestamps as epoch seconds. (date_format=1 instead
+    // expects/returns YYYY-MM-DD strings — verified against the live v3 API,
+    // which rejects epoch values with code -50 when date_format=1.)
+    date_format: '0',
     range_from: String(Math.floor(chunk.from.getTime() / 1000)),
-    range_to: String(Math.floor(chunk.to.getTime() / 1000)),
+    // Extend range_to to the END of chunk.to's UTC day. chunkDateRange emits
+    // boundaries at UTC midnight, which means a single-day chunk has
+    // from == to — and Fyers returns s='no_data' for any zero-width range.
+    // Adding (1 day − 1 second) makes every chunk a valid >0 request that
+    // covers chunk.to's full trading day. Verified against the live API.
+    range_to: String(Math.floor(chunk.to.getTime() / 1000) + 24 * 60 * 60 - 1),
     // cont_adjustment is intentionally omitted — we accept the Fyers default of
     // adjusted (split/bonus-adjusted) data, recorded in ADJUSTED_DATA_ASSUMPTION.
   });
@@ -564,6 +571,15 @@ async function fetchChunk(
       body = (await res.json()) as FyersHistoryResponse;
     } catch {
       throw new Error('Fyers history response was not valid JSON');
+    }
+
+    // Fyers returns s="no_data" (HTTP 200, code 200, empty message) for any
+    // range with zero candles — a weekend, a holiday, or a degenerate window.
+    // This is NOT an error: yield an empty candle array so the chunk-level gap
+    // detector in fetchHistoricalCandles records it as a gap, just like a
+    // missing trading day inside a successful chunk.
+    if (body.s === 'no_data') {
+      return [];
     }
 
     // Fyers-level auth error: s !== "ok" with an auth-related payload.

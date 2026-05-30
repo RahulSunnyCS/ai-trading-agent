@@ -136,7 +136,7 @@ export interface ReconstructResult {
 export interface ReconstructGap {
   /** Timestamp of the cadence step that could not be computed. */
   stepTime: Date;
-  /** The specific symbol that was missing, e.g. 'NSE:NIFTY2412524000CE'. */
+  /** The specific symbol that was missing, e.g. 'NSE:NIFTY2413024000CE'. */
   missingSymbol: string;
   /** Human-readable explanation. */
   reason: string;
