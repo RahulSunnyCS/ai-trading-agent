@@ -35,6 +35,8 @@ export interface StraddleSnapshot {
   underlying: Underlying;
   /** Unix ms (from clock) */
   timestamp: number;
+  /** Underlying index price (spot) at snapshot time — the input to getAtmStrike. */
+  spot: number;
   atmStrike: number;
   cePrice: number;
   pePrice: number;
@@ -346,6 +348,7 @@ export function createStraddleCalculator(
     const snapshot: StraddleSnapshot = {
       underlying,
       timestamp: clock.timestamp?.() ?? clock.now(),
+      spot: underlyingEntry.price,
       atmStrike,
       cePrice,
       pePrice,

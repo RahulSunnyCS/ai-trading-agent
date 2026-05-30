@@ -34,6 +34,15 @@ import type { BrokerTick } from './ingestion/brokers/types.js';
 import { createStraddleCalculator } from './ingestion/straddle-calc.js';
 import { createVixFeed } from './ingestion/vix-feed.js';
 import { registerTokenValiditySchedule } from './jobs/token-validity-check.js';
+import {
+  PeakDetectionEngine,
+  readConfigFromEnv as readPeakConfigFromEnv,
+} from './signals/peak-detection-engine.js';
+import { PersonalityRouter } from './signals/personality-router.js';
+import {
+  ScheduledSignalEmitter,
+  buildConfigFromEnv as buildScheduledConfigFromEnv,
+} from './signals/scheduled-signal-emitter.js';
 import { redis } from './redis/client.js';
 import { startServer } from './server/index.js';
 import { loadStoredToken } from './server/services/fyers-auth.js';
@@ -140,6 +149,31 @@ async function main(): Promise<void> {
 
   // Position monitor: reads straddle.values and evaluates open positions for exit conditions.
   const positionMonitor = createPositionMonitor(redis, pool, { clock });
+
+  // Signal generators — both subscribe to straddle.values and publish
+  // MOMENTUM_EXHAUSTION / SCHEDULED / PULLBACK signals to signals.generated.
+  // Without these the personality engine never receives an entry signal and
+  // paper_trades stays empty even with full live tick flow. See
+  // src/signals/{peak-detection-engine,scheduled-signal-emitter}.ts.
+  //
+  // Each engine gets its OWN duplicated Redis connection: their XREADGROUP
+  // BLOCK 2s would otherwise stall every other command (tick ingest, dashboard
+  // WS fan-out, position-monitor polls) sharing the singleton client.
+  const peakRedis = redis.duplicate();
+  const scheduledRedis = redis.duplicate();
+  const peakEngine = new PeakDetectionEngine(pool, peakRedis, readPeakConfigFromEnv(), clock);
+  const scheduledEmitter = new ScheduledSignalEmitter(
+    scheduledRedis,
+    buildScheduledConfigFromEnv(),
+    clock,
+  );
+
+  // Personality router — the consumer of signals.generated that runs each
+  // signal through the 10 personalities' filter chains and creates paper_trades
+  // for personalities that accept. Without this, signals.generated stays
+  // unconsumed and no paper trade is ever opened, regardless of signal volume.
+  const routerRedis = redis.duplicate();
+  const personalityRouter = new PersonalityRouter(pool, routerRedis, clock);
 
   // ---------------------------------------------------------------------------
   // Live broker feed — mutable so reloadBroker() can swap it in-process.
@@ -375,6 +409,14 @@ async function main(): Promise<void> {
     straddleCalc.start(),
     vixFeed.start(),
     positionMonitor.start(),
+    peakEngine.start(),
+    personalityRouter.start(),
+    // ScheduledSignalEmitter.start() enters a long-running consume loop that
+    // only returns when stop() is called; awaiting it here would block startup
+    // forever. Fire-and-forget — the loop's own error handler logs any issue.
+    (async () => {
+      void scheduledEmitter.start();
+    })(),
     // startServer registers its own SIGINT/SIGTERM handlers for server.close().
     // Our outer handlers (below) also call feed.disconnect(), pool.end(), and
     // redis.quit() which the server's handlers do not cover.
@@ -436,11 +478,21 @@ async function main(): Promise<void> {
         await tokenSchedule.worker.close();
         await tokenSchedule.queue.close();
       }
+      // Stop signal generators FIRST (consumers of straddle.values) so they
+      // drain pending work before the publishers below are torn down. Then
+      // the personality router (consumer of signals.generated).
+      await peakEngine.stop();
+      await scheduledEmitter.stop();
+      await personalityRouter.stop();
       await positionMonitor.stop();
       await vixFeed.stop();
       await straddleCalc.stop();
       if (feed) await feed.disconnect();
       await pool.end();
+      // Close engine-owned duplicated Redis connections first, then the singleton.
+      await peakRedis.quit().catch(() => undefined);
+      await scheduledRedis.quit().catch(() => undefined);
+      await routerRedis.quit().catch(() => undefined);
       await redis.quit();
     } finally {
       process.exit(0);

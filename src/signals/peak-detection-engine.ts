@@ -348,14 +348,32 @@ export class PeakDetectionEngine {
    *   4. If yes and not deduplicated: fetch macro/OI context, score, write DB, publish.
    */
   async _handleSnapshot(fields: Record<string, string>): Promise<void> {
-    // Parse required fields. Missing or unparseable fields abort the snapshot.
-    const time = Number(fields.time);
-    const underlying = fields.underlying;
-    const spot = Number(fields.spot);
-    const atmStrike = Number(fields.atmStrike);
-    const straddleValue = Number(fields.straddleValue);
-    const vixRaw = fields.vix;
-    const vix = vixRaw === 'null' || vixRaw === undefined ? null : Number(vixRaw);
+    // The canonical publisher (StraddleCalculator) writes one Redis-stream field
+    // named 'data' containing a JSON-serialised StraddleSnapshot. Older / test
+    // call-sites may pass flat key-value fields directly — we accept both.
+    // Field-name aliases:
+    //   StraddleSnapshot.timestamp → engine's `time`
+    //   StraddleSnapshot.spot      → engine's `spot`
+    //   vix is not on the snapshot — left null until a separate VIX feed is wired.
+    let parsed: Record<string, unknown> = fields;
+    if (typeof fields.data === 'string') {
+      try {
+        const obj = JSON.parse(fields.data) as Record<string, unknown>;
+        parsed = obj;
+      } catch {
+        console.warn('[PeakDetectionEngine] Snapshot data was not valid JSON — skipping');
+        return;
+      }
+    }
+
+    const time = Number(parsed.time ?? parsed.timestamp);
+    const underlying = typeof parsed.underlying === 'string' ? parsed.underlying : '';
+    const spot = Number(parsed.spot);
+    const atmStrike = Number(parsed.atmStrike);
+    const straddleValue = Number(parsed.straddleValue);
+    const vixRaw = parsed.vix;
+    const vix =
+      vixRaw === null || vixRaw === 'null' || vixRaw === undefined ? null : Number(vixRaw);
 
     // Guard against malformed messages. All numeric fields must be finite.
     if (
@@ -365,7 +383,7 @@ export class PeakDetectionEngine {
       !Number.isFinite(atmStrike) ||
       !Number.isFinite(straddleValue)
     ) {
-      console.warn('[PeakDetectionEngine] Malformed snapshot — skipping:', fields);
+      console.warn('[PeakDetectionEngine] Malformed snapshot — skipping:', parsed);
       return;
     }
 
