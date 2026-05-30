@@ -41,3 +41,6 @@ tools/biome*
 
 # Fyers symbol-master on-disk cache (re-downloaded daily; never commit)
 data/sym_master/
+
+# Postman collections — may embed live API tokens, keep local-only
+docs/*.postman_collection.json
