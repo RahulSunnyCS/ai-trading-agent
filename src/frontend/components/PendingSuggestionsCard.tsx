@@ -29,6 +29,21 @@ interface PendingSuggestionsCardProps {
   onApplied: () => void;
 }
 
+/**
+ * The retrospection API returns `trade_date` as an ISO timestamp because
+ * pg-node serialises DATE columns by converting them to a Date at midnight
+ * SERVER-LOCAL time, which then JSON-stringifies to UTC. With a server in
+ * Asia/Kolkata, stored DATE '2026-05-29' arrives as '2026-05-28T18:30:00.000Z'.
+ * A naive `slice(0, 10)` on that ISO string gives '2026-05-28' — wrong by one
+ * day. We add the IST offset back so we recover the original calendar date,
+ * which is what the apply endpoint matches against.
+ */
+function toIstDateString(isoOrDate: string): string {
+  const ms = new Date(isoOrDate).getTime();
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  return new Date(ms + IST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 function formatProposedAdjustments(adj: Record<string, unknown> | null): string {
   if (!adj) return '—';
   const parts: string[] = [];
@@ -55,13 +70,14 @@ export function PendingSuggestionsCard({
   const nameById = new Map(personalities.map((p) => [p.id, p.display_name]));
 
   async function approve(s: PendingSuggestion) {
-    const key = `${s.personality_id}:${s.trade_date}`;
+    const tradeDate = toIstDateString(s.trade_date);
+    const key = `${s.personality_id}:${tradeDate}`;
     setApplyingId(key);
     setErrorById((prev) => ({ ...prev, [key]: '' }));
     // See usePendingSuggestions for why this path is not under /api.
     const res = await apiPost<{ data: unknown }>(
       `/retrospection/evolution/apply/${s.personality_id}`,
-      { trade_date: s.trade_date },
+      { trade_date: tradeDate },
     );
     setApplyingId(null);
     if (!res.ok) {
@@ -122,7 +138,11 @@ export function PendingSuggestionsCard({
             </THead>
             <tbody>
               {suggestions.map((s) => {
-                const key = `${s.personality_id}:${s.trade_date}`;
+                // Normalise the API's ISO timestamp to the original IST DATE so
+                // both the row key and the displayed date match what the apply
+                // endpoint expects (and what the operator actually meant).
+                const tradeDate = toIstDateString(s.trade_date);
+                const key = `${s.personality_id}:${tradeDate}`;
                 const total = Number(s.total_trades);
                 const wins = Number(s.winning_trades);
                 const winRate = total > 0 ? (wins / total) * 100 : null;
@@ -132,7 +152,7 @@ export function PendingSuggestionsCard({
                     <Td className="font-medium text-foreground">
                       {nameById.get(s.personality_id) ?? s.personality_id.slice(0, 8)}
                     </Td>
-                    <Td className="tabular-nums text-muted">{s.trade_date}</Td>
+                    <Td className="tabular-nums text-muted">{tradeDate}</Td>
                     <Td className="text-muted">{s.market_regime ?? '—'}</Td>
                     <Td numeric align="right" className="text-foreground">
                       {total.toLocaleString('en-IN')}
