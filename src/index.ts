@@ -29,6 +29,7 @@ import {
   getAtmStrike,
   getCurrentExpiry,
 } from './ingestion/brokers/instrument-registry.js';
+import { getSymbolMaster } from './ingestion/brokers/symbol-master.js';
 import type { BrokerTick } from './ingestion/brokers/types.js';
 import { createStraddleCalculator } from './ingestion/straddle-calc.js';
 import { createVixFeed } from './ingestion/vix-feed.js';
@@ -208,6 +209,26 @@ async function main(): Promise<void> {
               console.error('[index] ATM option-leg subscribe() failed:', err);
             });
           }
+          // Validate against the Fyers symbol master in the background. The
+          // registry's deterministic build is authoritative; this only catches
+          // future rule drift (NSE/BSE expiry-day changes, holiday shifts)
+          // before it causes silent "no option ticks" symptoms. Best-effort —
+          // a failed master load never blocks live trading.
+          void getSymbolMaster()
+            .load()
+            .then((): void => {
+              const m = getSymbolMaster();
+              for (const sym of [ceSymbol, peSymbol]) {
+                if (!m.isSymbolListed(sym)) {
+                  console.warn(
+                    `[index] WARNING: built symbol ${sym} is NOT in the Fyers master — exchange may have shifted the expiry weekday or hit a holiday. Check WEEKLY_EXPIRY_DOW in instrument-registry.ts.`,
+                  );
+                }
+              }
+            })
+            .catch((err: unknown) => {
+              console.warn('[index] symbol-master validation skipped:', err);
+            });
         }
       }
     });
