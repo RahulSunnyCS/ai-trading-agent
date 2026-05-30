@@ -92,9 +92,26 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<Api
  * Mirrors apiGet: errors are never thrown — callers check `result.ok`.
  */
 export async function apiPost<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  return apiJsonBody<T>('POST', path, body);
+}
+
+/** PUT counterpart — same error-shape contract as apiGet/apiPost. */
+export async function apiPut<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  return apiJsonBody<T>('PUT', path, body);
+}
+
+/**
+ * Shared body-fetcher for POST/PUT/PATCH — keeps error handling in one place
+ * so apiPost / apiPut / future apiPatch all return the same { ok, ... } shape.
+ */
+async function apiJsonBody<T>(
+  method: 'POST' | 'PUT' | 'PATCH',
+  path: string,
+  body: unknown,
+): Promise<ApiResult<T>> {
   try {
     const response = await fetch(path, {
-      method: 'POST',
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
