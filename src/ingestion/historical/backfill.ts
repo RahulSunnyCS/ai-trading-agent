@@ -191,12 +191,22 @@ async function purgeStaleBackfillData(
     // 2. Drop historical candles that are not part of the kept run. The time
     //    bounds keep the predicate sargable against the hypertable's partial
     //    unique index on (symbol, time) WHERE source = 'fyers-historical'.
+    //
+    //    keepTo arrives at UTC midnight (callers pass the request `to` directly),
+    //    but intraday candles for that day sit at 03:45–10:00 UTC etc. — strictly
+    //    greater than midnight. Without extending keepTo to end-of-day, the
+    //    just-written final-day candles would be purged immediately. Mirrors
+    //    fetchChunk's range_to extension in fyers-historical.ts.
+    const keepFromStart = new Date(keepFrom);
+    keepFromStart.setUTCHours(0, 0, 0, 0);
+    const keepToEndOfDay = new Date(keepTo);
+    keepToEndOfDay.setUTCHours(23, 59, 59, 999);
     await client.query(
       `DELETE FROM ${table}
        WHERE source = 'fyers-historical'
          AND symbol = $1
          AND NOT (time >= $2 AND time <= $3 AND resolution = $4)`,
-      [symbol, keepFrom.toISOString(), keepTo.toISOString(), keepResolution],
+      [symbol, keepFromStart.toISOString(), keepToEndOfDay.toISOString(), keepResolution],
     );
   } catch (err) {
     console.error(
