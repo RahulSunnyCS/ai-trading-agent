@@ -30,6 +30,7 @@
 import Decimal from 'decimal.js';
 import type { Pool } from 'pg';
 import type { OpenPosition } from '../db/schema.js';
+import { getCurrentWeeklyExpiry } from '../ingestion/brokers/instrument-registry.js';
 import type { Clock } from '../utils/clock.js';
 import { calculatePnl } from '../utils/pnl.js';
 import type { EntryIntent } from './entry-engine.js';
@@ -73,8 +74,26 @@ export class PaperTradeExecutor {
     // moneyness/skew. A real option chain query is deferred to Phase 2.
     const halfStraddle = new Decimal(intent.straddleValue).div(2).toFixed(2);
 
+    // NOTE: `symbol`, `strike`, and `entry_straddle_value` are M1-era columns
+    // that are NOT NULL in the schema; the M2 CE/PE-leg columns (entry_ce_*,
+    // entry_pe_*) were added later (migration 012) and live alongside them.
+    // We populate both sets so existing readers (legacy code paths, the trades
+    // API, downstream tooling) and the new leg-aware management code both see
+    // consistent values. For an ATM straddle the underlying-symbol single
+    // `strike` equals the leg strikes; storing them all keeps the INSERT
+    // schema-compatible without further migrations.
+    // Resolve the weekly expiry covering the entry time so downstream
+    // management code (time-to-expiry computations in adjuster/reducer/exit)
+    // never has to deal with a null expiry column.
+    const entryDate = new Date(intent.entryTimeMs);
+    const expiry = getCurrentWeeklyExpiry(intent.underlying, entryDate);
+
     const result = await this._db.query<{ id: string }>(
       `INSERT INTO paper_trades (
+        symbol,
+        strike,
+        expiry,
+        entry_straddle_value,
         entry_ce_strike,
         entry_pe_strike,
         entry_ce_price,
@@ -86,19 +105,23 @@ export class PaperTradeExecutor {
         vix_at_entry,
         spot_at_entry,
         status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'open')
       RETURNING id`,
       [
-        intent.atmStrike, // $1  entry_ce_strike — ATM strike for both legs
-        intent.atmStrike, // $2  entry_pe_strike — same strike (ATM straddle)
-        halfStraddle, // $3  entry_ce_price
-        halfStraddle, // $4  entry_pe_price
-        1, // $5  lots — always 1 in MVP (multi-lot is Phase 2)
-        resolvedLotSize, // $6  lot_size
-        intent.straddleValue, // $7  straddle_at_entry
-        intent.straddleValue, // $8  lowest_straddle_value_seen — initialised to entry
-        intent.vixAtEntry, // $9  vix_at_entry (nullable)
-        intent.spot, // $10 spot_at_entry
+        intent.underlying, // $1  symbol — underlying identifier (legacy column)
+        intent.atmStrike, // $2  strike — ATM strike (legacy column)
+        expiry.toISOString().slice(0, 10), // $3  expiry — weekly expiry YYYY-MM-DD
+        intent.straddleValue, // $4  entry_straddle_value — legacy NOT NULL field
+        intent.atmStrike, // $5  entry_ce_strike — ATM strike for both legs
+        intent.atmStrike, // $6  entry_pe_strike — same strike (ATM straddle)
+        halfStraddle, // $7  entry_ce_price
+        halfStraddle, // $8  entry_pe_price
+        1, // $9  lots — always 1 in MVP (multi-lot is Phase 2)
+        resolvedLotSize, // $10 lot_size
+        intent.straddleValue, // $11 straddle_at_entry
+        intent.straddleValue, // $12 lowest_straddle_value_seen — initialised to entry
+        intent.vixAtEntry, // $13 vix_at_entry (nullable)
+        intent.spot, // $14 spot_at_entry
       ],
     );
 
