@@ -1,0 +1,46 @@
+# Environment files — never commit real credentials
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Bun binary lockfile (OLD format — bun.lock text format IS committed)
+# The text-format bun.lock must be committed so the repo is reproducible.
+# bun.lockb is the old binary format from older Bun versions — excluded.
+bun.lockb
+
+# Vite build cache + TypeScript incremental build info
+.vite/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+bun-debug.log*
+
+# macOS metadata
+.DS_Store
+
+# Test coverage output
+coverage/
+
+# Playwright test artifacts
+test-results/
+playwright-report/
+
+# Biome standalone binary (platform-specific — never commit; install via scripts/install-biome.sh)
+tools/biome*
+
+# Claude Code agent worktrees (temporary isolated git worktrees used during parallel implementation)
+.claude/worktrees/
+
+# Fyers symbol-master on-disk cache (re-downloaded daily; never commit)
+data/sym_master/
+
+# Postman collections — may embed live API tokens, keep local-only
+docs/*.postman_collection.json

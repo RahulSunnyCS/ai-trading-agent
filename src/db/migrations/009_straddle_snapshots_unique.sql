@@ -1,0 +1,31 @@
+-- 009_straddle_snapshots_unique.sql
+--
+-- Adds a unique index on straddle_snapshots (time, symbol, strike, expiry) to
+-- make ON CONFLICT idempotency work correctly in the historical reconstructor.
+--
+-- WHY this is needed:
+--   The table's only existing uniqueness constraint is the composite PRIMARY KEY
+--   (id, time), where id is BIGSERIAL. Because id is auto-generated, two inserts
+--   of the "same" logical snapshot (same time + symbol + strike + expiry) receive
+--   different id values and are therefore NOT considered conflicts — the existing
+--   ON CONFLICT clause in writeSnapshot() was dead code. Re-running reconstruction
+--   over an already-filled range silently duplicated rows, corrupting the regime
+--   classifier's inputs.
+--
+-- WHY this index shape:
+--   TimescaleDB requires that every unique index on a hypertable INCLUDES the
+--   partitioning column (here: `time`). This index satisfies that requirement.
+--   The natural business key for a snapshot is (time, symbol, strike, expiry) —
+--   at any instant T there is at most one ATM straddle snapshot per symbol per
+--   expiry/strike combination.
+--
+-- Nullability:
+--   In migration 001, `time`, `symbol`, `strike`, and `expiry` are all
+--   declared NOT NULL on straddle_snapshots, so no partial index or COALESCE
+--   expression is needed — NULLs cannot appear in these columns.
+--
+-- Idempotency:
+--   IF NOT EXISTS means re-running this migration is a no-op.
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_straddle_snapshots_unique_snapshot
+  ON straddle_snapshots (time, symbol, strike, expiry);

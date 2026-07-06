@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    // Target modern JS — Bun supports ES2022 natively
+    "target": "ES2022",
+    // Include DOM lib for React frontend; ES2022 for backend
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    // bundler resolution works with Bun's module system (no .js extension required)
+    "moduleResolution": "bundler",
+    // Strict mode: required by project conventions
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    // No emit — Bun runs TypeScript natively; tsc is type-check only
+    "noEmit": true,
+    // Additional strict checks beyond the strict flag
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    // JSX support for the React frontend (payment branch addition)
+    "jsx": "react-jsx",
+    // Allow .ts extension in imports (required for some Bun patterns; payment branch)
+    "allowImportingTsExtensions": true,
+    // Path alias: import from "@/..." resolves to "src/..."
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    // Allow Bun's non-standard globals (Bun, $, etc.) + Node types for compat
+    "types": ["bun-types", "node"],
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    // Source maps for readable stack traces in Bun
+    "sourceMap": true,
+    "declaration": false
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "src/frontend/**/*",
+    "src/payment/**/*",
+    "src/test/integration/smoke.test.ts",
+    "src/trading/__tests__/entry-engine.test.ts"
+  ]
+}

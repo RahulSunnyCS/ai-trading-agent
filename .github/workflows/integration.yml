@@ -1,0 +1,60 @@
+name: Integration Tests
+on:
+  # Allow manual trigger from the GitHub Actions UI — useful for running
+  # integration tests on demand without waiting for the nightly schedule.
+  workflow_dispatch:
+  schedule:
+    # 2 AM UTC Monday–Friday; avoids weekends when markets are closed and
+    # avoids peak-hour resource contention on GitHub-hosted runners.
+    - cron: '0 2 * * 1-5'
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+
+    # Service containers are started before the job steps and torn down after.
+    # They run in the same Docker network, so the job can reach them via
+    # localhost + the mapped host port.
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_DB: trading_test
+          POSTGRES_USER: trading
+          POSTGRES_PASSWORD: trading
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Integration tests
+        run: bun run test:integration
+        env:
+          # Constructed from service container config above — no real secrets.
+          # These credentials exist only inside the ephemeral CI runner network
+          # and are thrown away when the job ends.
+          DATABASE_URL: postgresql://trading:trading@localhost:5432/trading_test
+          REDIS_URL: redis://localhost:6379

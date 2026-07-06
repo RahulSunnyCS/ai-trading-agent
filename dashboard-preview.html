@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Trading Agent — Dashboard Preview (mocked data)</title>
+<!--
+  STANDALONE PREVIEW — no build step, no network, no backend.
+  Open this file directly in any browser to see what the final dashboard
+  looks like. ALL DATA IS MOCKED (see the MOCK object in the script below).
+  Design tokens, layout, and view structure mirror the real React app in
+  src/frontend/. This file is a throwaway visual reference, not production code.
+-->
+<style>
+  /* ── Design tokens — copied from src/frontend/index.css ────────────── */
+  :root {
+    --background: 40 30% 97%;
+    --surface: 40 40% 99.5%;
+    --surface-2: 40 22% 93%;
+    --border: 36 17% 86%;
+    --border-strong: 34 15% 78%;
+    --foreground: 32 16% 17%;
+    --muted: 33 9% 42%;
+    --faint: 34 8% 58%;
+    --primary: 15 55% 52%;
+    --primary-foreground: 40 40% 98%;
+    --ring: 15 55% 52%;
+    --positive: 146 48% 33%;
+    --negative: 8 62% 47%;
+    --warning: 33 74% 42%;
+    --info: 208 52% 42%;
+    --accent: 264 38% 50%;
+    --radius: 0.75rem;
+    color-scheme: light;
+  }
+  .dark {
+    --background: 30 8% 10%;
+    --surface: 30 7% 13.5%;
+    --surface-2: 30 6% 18%;
+    --border: 30 6% 23%;
+    --border-strong: 30 6% 32%;
+    --foreground: 40 18% 92%;
+    --muted: 38 8% 64%;
+    --faint: 34 6% 47%;
+    --primary: 16 62% 59%;
+    --primary-foreground: 30 12% 10%;
+    --ring: 16 62% 59%;
+    --positive: 146 44% 55%;
+    --negative: 8 66% 64%;
+    --warning: 38 78% 60%;
+    --info: 205 58% 63%;
+    --accent: 265 48% 71%;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    margin: 0;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+  .metric, .tabular-nums, table { font-variant-numeric: tabular-nums lining-nums; }
+  ::selection { background-color: hsl(var(--primary) / 0.22); }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb { background-color: hsl(var(--border-strong)); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+
+  /* ── Layout ────────────────────────────────────────────────────────── */
+  .app { min-height: 100vh; }
+  .sidebar {
+    position: fixed; inset: 0 auto 0 0; width: 256px; z-index: 30;
+    border-right: 1px solid hsl(var(--border));
+    background: hsl(var(--surface) / 0.5);
+    display: flex; flex-direction: column; gap: 24px; padding: 20px 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
+  .brand-badge {
+    height: 32px; width: 32px; border-radius: 10px;
+    background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 11px; color: hsl(var(--faint)); }
+  nav { display: flex; flex-direction: column; gap: 20px; }
+  .nav-group-heading {
+    padding: 0 12px 4px; font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.12em; color: hsl(var(--faint));
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    border: 0; background: transparent; cursor: pointer;
+    border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 500;
+    color: hsl(var(--muted)); text-align: left; transition: background .12s, color .12s;
+    font-family: inherit;
+  }
+  .nav-item:hover { background: hsl(var(--surface-2)); color: hsl(var(--foreground)); }
+  .nav-item.active { background: hsl(var(--primary) / 0.12); color: hsl(var(--primary)); }
+  .nav-item svg { height: 16px; width: 16px; flex-shrink: 0; }
+
+  .main { padding-left: 256px; }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.8); backdrop-filter: blur(8px);
+    padding: 14px 24px;
+  }
+  .topbar h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar p { margin: 2px 0 0; font-size: 13px; color: hsl(var(--muted)); }
+  .content { max-width: 1152px; margin: 0 auto; padding: 24px; }
+  .stack { display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── UI atoms ──────────────────────────────────────────────────────── */
+  .card {
+    border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+    background: hsl(var(--surface)); padding: 20px;
+    box-shadow: 0 1px 2px rgb(40 33 28 / 0.04), 0 1px 3px rgb(40 33 28 / 0.06);
+  }
+  .card.flush { padding: 0; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .card-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .card-desc { font-size: 13px; color: hsl(var(--muted)); margin-top: 2px; }
+  .hint { font-size: 12px; color: hsl(var(--faint)); }
+  .eyebrow { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: hsl(var(--faint)); }
+  .metric-xl { font-size: 36px; font-weight: 600; letter-spacing: -0.02em; margin: 4px 0 0; }
+  .metric-lg { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+
+  .grid { display: grid; gap: 20px; }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 1023px) {
+    .sidebar { display: none; }
+    .main { padding-left: 0; }
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 9999px; padding: 2px 10px; font-size: 12px; font-weight: 500;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .badge.positive { color: hsl(var(--positive)); background: hsl(var(--positive)/0.12); border-color: hsl(var(--positive)/0.25); }
+  .badge.negative { color: hsl(var(--negative)); background: hsl(var(--negative)/0.12); border-color: hsl(var(--negative)/0.25); }
+  .badge.warning  { color: hsl(var(--warning));  background: hsl(var(--warning)/0.12);  border-color: hsl(var(--warning)/0.25); }
+  .badge.info     { color: hsl(var(--info));     background: hsl(var(--info)/0.12);     border-color: hsl(var(--info)/0.25); }
+  .badge.accent   { color: hsl(var(--accent));   background: hsl(var(--accent)/0.12);   border-color: hsl(var(--accent)/0.25); }
+  .badge.neutral  { color: hsl(var(--muted));    background: hsl(var(--surface-2));     border-color: hsl(var(--border)); }
+
+  .dot { height: 8px; width: 8px; border-radius: 9999px; flex-shrink: 0; }
+  .dot.positive { background: hsl(var(--positive)); }
+  .dot.negative { background: hsl(var(--negative)); }
+  .dot.warning  { background: hsl(var(--warning)); }
+  .dot.neutral  { background: hsl(var(--faint)); }
+  .dot.pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .text-positive { color: hsl(var(--positive)); }
+  .text-negative { color: hsl(var(--negative)); }
+  .text-warning  { color: hsl(var(--warning)); }
+  .text-info     { color: hsl(var(--info)); }
+  .text-accent   { color: hsl(var(--accent)); }
+  .text-muted    { color: hsl(var(--muted)); }
+  .text-faint    { color: hsl(var(--faint)); }
+
+  .statcard { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--surface)); padding: 14px 16px; }
+  .statcard .label { font-size: 12px; color: hsl(var(--faint)); }
+  .statcard .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+  .statcard .note  { font-size: 11px; color: hsl(var(--faint)); margin-top: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: hsl(var(--faint));
+    padding: 10px 12px; border-bottom: 1px solid hsl(var(--border));
+  }
+  tbody td { padding: 11px 12px; border-bottom: 1px solid hsl(var(--border)); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: hsl(var(--surface-2) / 0.5); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .strong { font-weight: 600; color: hsl(var(--foreground)); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; font-family: inherit;
+    border: 1px solid hsl(var(--border-strong)); background: hsl(var(--surface));
+    color: hsl(var(--foreground)); border-radius: 8px; padding: 6px 12px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .btn:hover { background: hsl(var(--surface-2)); }
+  .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+  .btn-primary:hover { filter: brightness(1.05); }
+
+  .banner {
+    display: flex; align-items: center; gap: 8px; border-radius: 10px;
+    padding: 8px 12px; font-size: 12px; font-weight: 500;
+  }
+  .banner.warning  { color: hsl(var(--warning));  background: hsl(var(--warning)/0.1);  border: 1px solid hsl(var(--warning)/0.25); }
+  .banner.positive { color: hsl(var(--positive)); background: hsl(var(--positive)/0.1); border: 1px solid hsl(var(--positive)/0.25); }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: hsl(var(--muted)); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .progress { height: 6px; border-radius: 9999px; background: hsl(var(--surface-2)); overflow: hidden; }
+  .progress > i { display: block; height: 100%; border-radius: 9999px; background: hsl(var(--primary)); }
+
+  .hidden { display: none; }
+  .fade-in { animation: fade .18s ease-out both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+  .preview-tag {
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em;
+    color: hsl(var(--accent)); background: hsl(var(--accent)/0.12); border: 1px solid hsl(var(--accent)/0.25);
+    border-radius: 6px; padding: 2px 7px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      </span>
+      <div>
+        <div class="brand-title">AI Trading Agent</div>
+        <div class="brand-sub">Research console</div>
+      </div>
+    </div>
+    <nav id="nav"></nav>
+    <div style="margin-top:auto; padding:0 8px;">
+      <button class="btn" id="themeToggle" style="width:100%; justify-content:center;">
+        <span id="themeIcon">🌙</span> <span id="themeLabel">Dark</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="viewTitle">Live</h1>
+        <p id="viewSubtitle">Real-time straddle, momentum, and feed status</p>
+      </div>
+      <span class="preview-tag">Preview · mocked data</span>
+    </header>
+    <main class="content">
+      <div id="view" class="fade-in"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+//  MOCKED DATA  — everything below is fabricated for visual preview only.
+//  Mirrors the real API shapes from src/frontend/types/ and the views.
+// ════════════════════════════════════════════════════════════════════════
+const inr = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
+const inrSigned = (n) => (n >= 0 ? '+' : '−') + '₹' + Math.abs(Math.round(n)).toLocaleString('en-IN');
+const num2 = (n) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const MOCK = {
+  meta: { simulate: true, broker: 'sim', authDegraded: false, ist: '29 May 2026, 14:32:18 IST' },
+
+  live: {
+    niftyLtp: 24871.45,
+    niftyChange: +0.42,
+    lastUpdate: '29 May 2026, 14:32:11 IST',
+    // ~60 NIFTY ticks for the sparkline
+    ticks: Array.from({ length: 60 }, (_, i) => 24810 + Math.sin(i / 5) * 28 + i * 1.05 + (i % 7) * 4),
+    straddle: { value: 318.65, atmStrike: 24850, ce: 162.40, pe: 156.25, roc: 0.0214, accel: -0.0061, updated: '29 May 2026, 14:32:05 IST' },
+    vix: 13.8,
+    signal: { active: true, type: 'MOMENTUM_EXHAUSTION', probability: 0.78, time: '14:31:48', side: 'PEAK' },
+  },
+
+  // 10 personalities — names & roles from PERSONALITIES.md
+  personalities: [
+    { id: 1, name: 'clockwork',      display: 'Clockwork',            group: 'reference', entry: 'TIME_BASED',          mgmt: 'hold',        phase: 1, active: true,  frozen: true,  minProb: null, sl: 35 },
+    { id: 2, name: 'precision',      display: 'Precision',            group: 'reference', entry: 'MOMENTUM_EXHAUSTION', mgmt: 'hold',        phase: 1, active: true,  frozen: false, minProb: 0.70, sl: 35 },
+    { id: 3, name: 'scanner',        display: 'Scanner',              group: 'reference', entry: 'MOMENTUM_EXHAUSTION', mgmt: 'hold',        phase: 1, active: true,  frozen: false, minProb: 0.55, sl: 35 },
+    { id: 4, name: 'adjuster',       display: 'Adjuster',             group: 'reference', entry: 'MOMENTUM_EXHAUSTION', mgmt: 'roll',        phase: 1, active: true,  frozen: false, minProb: 0.70, sl: 35 },
+    { id: 5, name: 'reducer',        display: 'Reducer',              group: 'reference', entry: 'MOMENTUM_EXHAUSTION', mgmt: 'cut_reenter', phase: 1, active: true,  frozen: false, minProb: 0.70, sl: 35 },
+    { id: 6, name: 'blitz',          display: 'Blitz',                group: 'reference', entry: 'MOMENTUM_EXHAUSTION', mgmt: 'roll',        phase: 1, active: true,  frozen: false, minProb: 0.55, sl: 35 },
+    { id: 7, name: 'levelhead',      display: 'Levelhead',            group: 'reference', entry: 'SR_LEVEL',            mgmt: 'cut_reenter', phase: 2, active: false, frozen: false, minProb: 0.65, sl: 35 },
+    { id: 8, name: 'learner_cons',   display: 'Conservative Learner', group: 'learning',  entry: 'TIME_BASED',          mgmt: 'hold',        phase: 1, active: true,  frozen: false, minProb: null, sl: 35 },
+    { id: 9, name: 'learner_med',    display: 'Medium Learner',       group: 'learning',  entry: 'TIME_BASED',          mgmt: 'hold',        phase: 1, active: true,  frozen: false, minProb: null, sl: 35 },
+    { id: 10, name: 'learner_aggr',  display: 'Aggressive Learner',   group: 'learning',  entry: 'TIME_BASED',          mgmt: 'hold',        phase: 1, active: true,  frozen: false, minProb: null, sl: 28 },
+  ],
+
+  // Per-personality cumulative P&L over 22 trading days, plus vs-Clockwork
+  perf: [
+    { name: 'Clockwork',            pnl: +14820, trades: 22, win: 0.59, vsClock: 0,     frozen: true },
+    { name: 'Precision',            pnl: +21340, trades: 14, win: 0.71, vsClock: +6520 },
+    { name: 'Scanner',              pnl: +9180,  trades: 31, win: 0.52, vsClock: -5640 },
+    { name: 'Adjuster',             pnl: +18760, trades: 14, win: 0.64, vsClock: +3940 },
+    { name: 'Reducer',              pnl: +12450, trades: 17, win: 0.58, vsClock: -2370 },
+    { name: 'Blitz',                pnl: +6320,  trades: 38, win: 0.49, vsClock: -8500 },
+    { name: 'Levelhead',            pnl: null,   trades: 0,  win: null, vsClock: null, inactive: true },
+    { name: 'Conservative Learner', pnl: +14820, trades: 22, win: 0.59, vsClock: 0 },
+    { name: 'Medium Learner',       pnl: +15110, trades: 22, win: 0.60, vsClock: +290 },
+    { name: 'Aggressive Learner',   pnl: +17980, trades: 19, win: 0.63, vsClock: +3160 },
+  ],
+
+  // Cumulative realized P&L series (closed trades), Precision vs Clockwork
+  pnlSeries: {
+    clockwork: [0,820,1640,1180,2400,3210,2950,4100,5320,6010,5680,7240,8190,7820,9450,10300,11120,10860,12410,13200,14010,14820],
+    precision: [0,1110,1110,2220,2220,4060,4060,5740,7180,7180,9020,9020,11340,13160,13160,15340,17220,17220,19460,19460,21340,21340],
+  },
+  pnlSummary: { realized: 21340, today: +1880, winRate: 0.714, closed: 14, open: 2 },
+
+  // Recent paper-trade log
+  trades: [
+    { id: 'T-8842', time: '14:18', pers: 'Precision', symbol: 'NIFTY 24850 CE+PE', side: 'SHORT_STRADDLE', entry: 322.10, exit: 298.40, qty: 50, pnl: +1185, status: 'CLOSED', regime: 'RANGING' },
+    { id: 'T-8841', time: '13:46', pers: 'Adjuster',  symbol: 'NIFTY 24850 CE+PE', side: 'SHORT_STRADDLE', entry: 318.65, exit: null,   qty: 50, pnl: null,  status: 'OPEN',   regime: 'RANGING' },
+    { id: 'T-8840', time: '11:52', pers: 'Reducer',   symbol: 'NIFTY 24800 CE+PE', side: 'SHORT_STRADDLE', entry: 341.20, exit: 352.80, qty: 50, pnl: -580,  status: 'CLOSED', regime: 'TRENDING_STRONG' },
+    { id: 'T-8839', time: '10:31', pers: 'Scanner',   symbol: 'NIFTY 24800 CE+PE', side: 'SHORT_STRADDLE', entry: 336.40, exit: 321.10, qty: 50, pnl: +765,  status: 'CLOSED', regime: 'TRENDING_STRONG' },
+    { id: 'T-8838', time: '09:17', pers: 'Clockwork', symbol: 'NIFTY 24800 CE+PE', side: 'SHORT_STRADDLE', entry: 348.90, exit: 332.55, qty: 50, pnl: +817,  status: 'CLOSED', regime: 'TRENDING_STRONG' },
+    { id: 'T-8837', time: '09:17', pers: 'Blitz',     symbol: 'NIFTY 24800 CE+PE', side: 'SHORT_STRADDLE', entry: 348.90, exit: null,   qty: 50, pnl: null,  status: 'OPEN',   regime: 'TRENDING_STRONG' },
+  ],
+
+  // Regime classification history (EOD)
+  regimes: [
+    { date: '29 May 2026', regime: 'RANGING',           vix: 13.8, niftyMove: '+0.42%', confidence: 0.81, note: 'Tight intraday range, low VIX' },
+    { date: '28 May 2026', regime: 'TRENDING_STRONG',   vix: 16.2, niftyMove: '-1.18%', confidence: 0.88, note: 'Sustained directional sell-off' },
+    { date: '27 May 2026', regime: 'VOLATILE_REVERTING',vix: 19.4, niftyMove: '+0.05%', confidence: 0.74, note: 'Whipsaw, two intraday reversals' },
+    { date: '26 May 2026', regime: 'RANGING',           vix: 12.9, niftyMove: '+0.21%', confidence: 0.79, note: 'Quiet pre-event session' },
+    { date: '23 May 2026', regime: 'EVENT_DAY',         vix: 22.1, niftyMove: '-2.04%', confidence: 0.93, note: 'RBI policy — trading blocked AM' },
+  ],
+  regimeMix: [ { r: 'RANGING', pct: 45, tone: 'info' }, { r: 'TRENDING_STRONG', pct: 27, tone: 'warning' }, { r: 'VOLATILE_REVERTING', pct: 18, tone: 'accent' }, { r: 'EVENT_DAY', pct: 10, tone: 'negative' } ],
+
+  backfill: {
+    coverage: 0.82,
+    rangeStart: '01 Dec 2025',
+    rangeEnd: '29 May 2026',
+    tradingDays: 118,
+    backfilled: 97,
+    gaps: 3,
+    lastRun: '29 May 2026, 06:12 IST',
+    instruments: [
+      { sym: 'NIFTY',     days: 118, done: 118, pct: 1.00 },
+      { sym: 'BANKNIFTY', days: 118, done: 84,  pct: 0.71 },
+      { sym: 'SENSEX',    days: 118, done: 71,  pct: 0.60 },
+    ],
+  },
+
+  replay: {
+    session: '23 May 2026 (EVENT_DAY — RBI policy)',
+    status: 'COMPLETE',
+    speed: '8×',
+    ticksReplayed: 24380,
+    signalsFired: 11,
+    tradesSimulated: 27,
+    determinismHash: 'a3f9c1…7e2b',
+  },
+
+  pricing: {
+    enabled: true,
+    accessActive: true,
+    accessExpires: '14 Jun 2026 (16 days left)',
+    credits: 137,
+    tiers: [
+      { name: 'Monthly Access Pass', price: '₹1,499 / 30 days', desc: 'Full dashboard + live simulation access', cta: 'Active' },
+      { name: 'Credits Pack (50)',   price: '₹499 one-time',     desc: '50 feature tokens (e.g. backtest runs)', cta: 'Buy' },
+      { name: 'Credits Pack (200)',  price: '₹1,699 one-time',   desc: '200 feature tokens — best value', cta: 'Buy' },
+    ],
+    recent: [
+      { date: '14 May 2026', kind: 'Monthly Access Pass', amount: '₹1,499', credits: '—' },
+      { date: '08 May 2026', kind: 'Credits Pack (200)',  amount: '₹1,699', credits: '+200' },
+      { date: '21 Apr 2026', kind: 'Backtest run',        amount: '—',      credits: '−1' },
+    ],
+  },
+};
+
+// ── tiny SVG chart helpers (no external libs — fully offline) ───────────
+function svgLine(series, opts = {}) {
+  const w = opts.w || 720, h = opts.h || 200, pad = opts.pad ?? 8;
+  const all = [].concat(...series.map(s => s.data));
+  const min = Math.min(...all), max = Math.max(...all);
+  const span = max - min || 1;
+  const x = (i, len) => pad + (i / (len - 1)) * (w - pad * 2);
+  const y = (v) => h - pad - ((v - min) / span) * (h - pad * 2);
+  const paths = series.map(s => {
+    const d = s.data.map((v, i) => `${i ? 'L' : 'M'}${x(i, s.data.length).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const area = s.fill ? `${d} L${x(s.data.length - 1, s.data.length).toFixed(1)},${h - pad} L${pad},${h - pad} Z` : '';
+    return `${s.fill ? `<path d="${area}" fill="${s.color}" opacity="0.08"/>` : ''}<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px;display:block;">${paths}</svg>`;
+}
+
+function cssVar(name) { return 'hsl(' + getComputedStyle(document.documentElement).getPropertyValue('--' + name).trim() + ')'; }
+
+const regimeTone = { RANGING: 'info', TRENDING_STRONG: 'warning', VOLATILE_REVERTING: 'accent', EVENT_DAY: 'negative' };
+const mgmtTone = { hold: 'info', roll: 'warning', cut_reenter: 'accent' };
+const mgmtLabel = (s) => s === 'cut_reenter' ? 'Cut+Re-enter' : s.charAt(0).toUpperCase() + s.slice(1);
+
+// ════════════════════════════════════════════════════════════════════════
+//  VIEWS
+// ════════════════════════════════════════════════════════════════════════
+const views = {
+  live() {
+    const d = MOCK.live;
+    const chg = d.niftyChange >= 0 ? 'positive' : 'negative';
+    return `
+    <div class="stack">
+      <div class="banner warning"><span>⚠</span> Synthetic dev feed — not real straddle data (SIMULATE=true)</div>
+
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px;">
+          <div>
+            <p class="eyebrow">NIFTY Index · Live</p>
+            <p class="metric-xl">${num2(d.niftyLtp)} <span class="badge ${chg}" style="vertical-align:middle;">${d.niftyChange >= 0 ? '▲' : '▼'} ${Math.abs(d.niftyChange)}%</span></p>
+            <p class="hint" style="margin-top:6px;">Last update: ${d.lastUpdate}</p>
+          </div>
+          <span class="badge positive"><span class="dot positive pulse"></span> Connected</span>
+        </div>
+        <div style="border:1px solid hsl(var(--border)); border-radius:10px; background:hsl(var(--surface-2)/0.4); padding:6px;">
+          ${svgLine([{ data: d.ticks, color: cssVar('primary'), fill: true }], { h: 180 })}
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Straddle (Live Push)</span><span class="hint">WebSocket · ~15s</span></div>
+          <p class="metric-lg">${num2(d.straddle.value)}</p>
+          <div class="grid grid-3" style="gap:8px; margin-top:12px;">
+            <div class="statcard"><div class="label">ATM</div><div class="value" style="font-size:16px;">${d.straddle.atmStrike}</div></div>
+            <div class="statcard"><div class="label">CE</div><div class="value text-info" style="font-size:16px;">${num2(d.straddle.ce)}</div></div>
+            <div class="statcard"><div class="label">PE</div><div class="value text-accent" style="font-size:16px;">${num2(d.straddle.pe)}</div></div>
+          </div>
+          <div style="display:flex; gap:20px; margin-top:12px;" class="hint">
+            <span>ROC <span class="strong">+${d.straddle.roc.toFixed(4)}</span></span>
+            <span>Accel <span class="strong">${d.straddle.accel.toFixed(4)}</span></span>
+          </div>
+          <p class="hint" style="margin-top:8px;">Updated: ${d.straddle.updated}</p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Active Signal</span><span class="hint">Peak detection</span></div>
+          ${d.signal.active ? `
+            <div class="pill-row" style="margin-bottom:12px;">
+              <span class="badge warning"><span class="dot warning pulse"></span> ${d.signal.side}</span>
+              <span class="badge neutral">${d.signal.type.replace(/_/g,' ')}</span>
+            </div>
+            <p class="eyebrow">Probability score</p>
+            <p class="metric-lg" style="font-size:26px;">${(d.signal.probability*100).toFixed(0)}%</p>
+            <div class="progress" style="margin-top:8px;"><i style="width:${d.signal.probability*100}%"></i></div>
+            <p class="hint" style="margin-top:10px;">Fired ${d.signal.time} · broadcast to all 9 active personalities</p>
+          ` : `<p class="text-muted">No active signal.</p>`}
+          <div style="display:flex; gap:20px; margin-top:16px; padding-top:14px; border-top:1px solid hsl(var(--border));">
+            <div><p class="eyebrow">India VIX</p><p class="strong" style="font-size:18px;">${d.vix}</p></div>
+            <div><p class="eyebrow">Feed mode</p><p class="strong" style="font-size:18px;">Simulator</p></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  trades() {
+    const rows = MOCK.trades.map(t => `
+      <tr>
+        <td class="text-faint">${t.id}</td>
+        <td>${t.time}</td>
+        <td class="strong">${t.pers}</td>
+        <td class="text-muted">${t.symbol}</td>
+        <td><span class="badge ${regimeTone[t.regime]}">${t.regime.replace(/_/g,' ')}</span></td>
+        <td class="num">${num2(t.entry)}</td>
+        <td class="num">${t.exit !== null ? num2(t.exit) : '—'}</td>
+        <td class="num ${t.pnl === null ? '' : t.pnl >= 0 ? 'text-positive' : 'text-negative'} strong">${t.pnl === null ? '—' : inrSigned(t.pnl)}</td>
+        <td><span class="badge ${t.status === 'OPEN' ? 'warning' : 'neutral'}">${t.status}</span></td>
+      </tr>`).join('');
+    return `
+    <div class="card flush">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid hsl(var(--border));">
+        <div><div class="card-title">Paper-Trade Log</div><div class="card-desc">Simulated straddle entries & exits (most recent first)</div></div>
+        <span class="badge neutral">${MOCK.trades.length} shown</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>ID</th><th>Time</th><th>Personality</th><th>Symbol</th><th>Regime</th><th class="num">Entry</th><th class="num">Exit</th><th class="num">P&L</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  },
+
+  personalities() {
+    const rows = MOCK.personalities.map(p => {
+      const params = [];
+      if (p.minProb !== null) params.push(`min_prob: ${(p.minProb*100).toFixed(0)}%`);
+      params.push(`sl: ${p.sl}%`);
+      return `
+      <tr>
+        <td><div style="display:flex; align-items:center; gap:8px;"><span class="dot ${p.active ? 'positive pulse' : 'neutral'}"></span>${p.frozen ? '<span class="badge neutral">Frozen</span>' : ''}</div></td>
+        <td><span class="strong">${p.display}</span> <span class="text-faint" style="font-size:11px;">${p.name}</span></td>
+        <td class="text-muted" style="text-transform:capitalize;">${p.group}</td>
+        <td class="text-muted">${p.entry.replace(/_/g,' ')}</td>
+        <td><span class="badge ${mgmtTone[p.mgmt] || 'neutral'}">${mgmtLabel(p.mgmt)}</span></td>
+        <td class="num text-muted">${p.phase}</td>
+        <td class="text-muted" style="font-size:12px;">${params.join(' · ')}</td>
+      </tr>`;
+    }).join('');
+    return `
+    <div class="card flush">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid hsl(var(--border));">
+        <div><div class="card-title">Trading Personalities</div><div class="card-desc">The 10 decision engines (M2). Clockwork is the frozen benchmark.</div></div>
+        <button class="btn">↻ Refresh</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Status</th><th>Name</th><th>Group</th><th>Entry Type</th><th>Management</th><th class="num">Phase</th><th>Key Params</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  },
+
+  pnl() {
+    const s = MOCK.pnlSummary;
+    const series = [
+      { data: MOCK.pnlSeries.clockwork, color: cssVar('faint'), width: 2 },
+      { data: MOCK.pnlSeries.precision, color: cssVar('positive'), width: 2.5, fill: true },
+    ];
+    return `
+    <div class="stack">
+      <div class="card">
+        <p class="eyebrow">Realized P&L · closed trades (Precision)</p>
+        <p class="metric-xl text-positive">${inrSigned(s.realized)}</p>
+        <p class="text-muted" style="margin-top:4px;">Across ${s.closed} closed trades · ${(s.winRate*100).toFixed(1)}% win rate</p>
+      </div>
+      <div class="grid grid-4">
+        <div class="statcard"><div class="label">Today's P&L (IST)</div><div class="value text-positive">${inrSigned(s.today)}</div></div>
+        <div class="statcard"><div class="label">Win Rate</div><div class="value">${(s.winRate*100).toFixed(1)}%</div></div>
+        <div class="statcard"><div class="label">Closed Trades</div><div class="value">${s.closed}</div></div>
+        <div class="statcard"><div class="label">Open Positions</div><div class="value text-muted">${s.open}</div><div class="note">Unrealized P&L not shown</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><span class="card-title">Cumulative Realized P&L</span><div class="card-desc">Precision vs the frozen Clockwork benchmark</div></div></div>
+        ${svgLine(series, { h: 240 })}
+        <div class="legend" style="margin-top:12px;">
+          <span><span class="swatch" style="background:${cssVar('positive')}"></span> Precision</span>
+          <span><span class="swatch" style="background:${cssVar('faint')}"></span> Clockwork (benchmark)</span>
+        </div>
+      </div>
+
+      <div class="card flush">
+        <div style="padding:16px 20px; border-bottom:1px solid hsl(var(--border));">
+          <div class="card-title">Beat-Clockwork Leaderboard</div>
+          <div class="card-desc">22-day cumulative P&L vs the frozen baseline — the core research output</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Personality</th><th class="num">Trades</th><th class="num">Win %</th><th class="num">Net P&L</th><th class="num">vs Clockwork</th></tr></thead>
+            <tbody>
+            ${MOCK.perf.map(p => p.inactive ? `
+              <tr><td><span class="strong">${p.name}</span> <span class="badge neutral">Phase 2 · inactive</span></td><td class="num text-faint">—</td><td class="num text-faint">—</td><td class="num text-faint">—</td><td class="num text-faint">—</td></tr>
+            ` : `
+              <tr>
+                <td><span class="strong">${p.name}</span>${p.frozen ? ' <span class="badge neutral">Benchmark</span>' : ''}</td>
+                <td class="num text-muted">${p.trades}</td>
+                <td class="num text-muted">${(p.win*100).toFixed(0)}%</td>
+                <td class="num strong ${p.pnl >= 0 ? 'text-positive' : 'text-negative'}">${inrSigned(p.pnl)}</td>
+                <td class="num strong ${p.vsClock === 0 ? 'text-muted' : p.vsClock > 0 ? 'text-positive' : 'text-negative'}">${p.frozen ? 'baseline' : (p.vsClock === 0 ? '=₹0' : inrSigned(p.vsClock))}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  regime() {
+    const mixBar = MOCK.regimeMix.map(m => `<div style="flex:${m.pct}; background:${cssVar(regimeTone[m.r] || m.tone)}; opacity:.85;" title="${m.r} ${m.pct}%"></div>`).join('');
+    const rows = MOCK.regimes.map(r => `
+      <tr>
+        <td class="strong">${r.date}</td>
+        <td><span class="badge ${regimeTone[r.regime]}">${r.regime.replace(/_/g,' ')}</span></td>
+        <td class="num">${r.vix}</td>
+        <td class="num ${r.niftyMove.startsWith('-') ? 'text-negative' : 'text-positive'}">${r.niftyMove}</td>
+        <td class="num">${(r.confidence*100).toFixed(0)}%</td>
+        <td class="text-muted">${r.note}</td>
+      </tr>`).join('');
+    return `
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><div><span class="card-title">Regime Mix · last 22 sessions</span><div class="card-desc">Every retrospection result is regime-tagged — never compare across regimes</div></div></div>
+        <div style="display:flex; height:14px; border-radius:9999px; overflow:hidden; gap:2px;">${mixBar}</div>
+        <div class="legend" style="margin-top:12px;">
+          ${MOCK.regimeMix.map(m => `<span><span class="swatch" style="background:${cssVar(regimeTone[m.r])}; height:10px; width:10px; border-radius:3px;"></span> ${m.r.replace(/_/g,' ')} · ${m.pct}%</span>`).join('')}
+        </div>
+      </div>
+      <div class="card flush">
+        <div style="padding:16px 20px; border-bottom:1px solid hsl(var(--border));"><div class="card-title">Daily Regime Classification</div><div class="card-desc">EOD classifier output (RANGING / TRENDING_STRONG / VOLATILE_REVERTING / EVENT_DAY)</div></div>
+        <div style="overflow-x:auto;">
+          <table><thead><tr><th>Date</th><th>Regime</th><th class="num">VIX</th><th class="num">NIFTY move</th><th class="num">Confidence</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  backfill() {
+    const b = MOCK.backfill;
+    const rows = b.instruments.map(i => `
+      <tr>
+        <td class="strong">${i.sym}</td>
+        <td class="num text-muted">${i.done} / ${i.days}</td>
+        <td style="width:40%;"><div class="progress"><i style="width:${i.pct*100}%; background:${i.pct>=0.95?cssVar('positive'):i.pct>=0.7?cssVar('warning'):cssVar('negative')};"></i></div></td>
+        <td class="num strong">${(i.pct*100).toFixed(0)}%</td>
+      </tr>`).join('');
+    return `
+    <div class="stack">
+      <div class="grid grid-4">
+        <div class="statcard"><div class="label">Coverage</div><div class="value">${(b.coverage*100).toFixed(0)}%</div></div>
+        <div class="statcard"><div class="label">Trading days</div><div class="value">${b.tradingDays}</div></div>
+        <div class="statcard"><div class="label">Backfilled</div><div class="value text-positive">${b.backfilled}</div></div>
+        <div class="statcard"><div class="label">Gaps</div><div class="value ${b.gaps>0?'text-warning':''}">${b.gaps}</div><div class="note">${b.rangeStart} → ${b.rangeEnd}</div></div>
+      </div>
+      <div class="card flush">
+        <div style="padding:16px 20px; border-bottom:1px solid hsl(var(--border));"><div class="card-title">Historical Tick Coverage</div><div class="card-desc">Idempotent Fyers REST backfill · last run ${b.lastRun}</div></div>
+        <div style="overflow-x:auto;"><table><thead><tr><th>Instrument</th><th class="num">Days</th><th>Progress</th><th class="num">%</th></tr></thead><tbody>${rows}</tbody></table></div>
+      </div>
+      <div class="banner positive"><span>✓</span> NIFTY fully backfilled — sufficient for deterministic replay. BankNifty / Sensex expansion is Phase 2.</div>
+    </div>`;
+  },
+
+  replay() {
+    const r = MOCK.replay;
+    return `
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><div><span class="card-title">Deterministic Replay</span><div class="card-desc">Re-run a historical session tick-by-tick through the live pipeline</div></div><span class="badge positive"><span class="dot positive"></span> ${r.status}</span></div>
+        <p class="eyebrow" style="margin-top:8px;">Session</p>
+        <p class="strong" style="font-size:18px;">${r.session}</p>
+        <div class="grid grid-4" style="margin-top:16px;">
+          <div class="statcard"><div class="label">Speed</div><div class="value">${r.speed}</div></div>
+          <div class="statcard"><div class="label">Ticks replayed</div><div class="value">${r.ticksReplayed.toLocaleString('en-IN')}</div></div>
+          <div class="statcard"><div class="label">Signals fired</div><div class="value">${r.signalsFired}</div></div>
+          <div class="statcard"><div class="label">Trades simulated</div><div class="value">${r.tradesSimulated}</div></div>
+        </div>
+        <div style="margin-top:16px; padding-top:14px; border-top:1px solid hsl(var(--border)); display:flex; justify-content:space-between; align-items:center;">
+          <span class="hint">Determinism hash: <span class="strong" style="font-family:ui-monospace,monospace;">${r.determinismHash}</span></span>
+          <div class="pill-row"><button class="btn">Change session</button><button class="btn btn-primary">▶ Replay again</button></div>
+        </div>
+      </div>
+      <div class="banner positive"><span>✓</span> Same hash across runs — replay is byte-for-byte deterministic, so personality comparisons stay valid.</div>
+    </div>`;
+  },
+
+  pricing() {
+    const p = MOCK.pricing;
+    const tiers = p.tiers.map(t => `
+      <div class="card">
+        <div class="card-title">${t.name}</div>
+        <p class="metric-lg" style="font-size:24px; margin:8px 0;">${t.price}</p>
+        <p class="text-muted" style="font-size:13px; min-height:36px;">${t.desc}</p>
+        <button class="btn ${t.cta==='Active'?'':'btn-primary'}" style="width:100%; justify-content:center; margin-top:8px;" ${t.cta==='Active'?'disabled style="opacity:.6;cursor:default;"':''}>${t.cta==='Active'?'✓ Active':'Pay via UPI'}</button>
+      </div>`).join('');
+    const recent = p.recent.map(r => `<tr><td>${r.date}</td><td class="text-muted">${r.kind}</td><td class="num">${r.amount}</td><td class="num ${r.credits.startsWith('+')?'text-positive':r.credits.startsWith('−')||r.credits.startsWith('-')?'text-negative':'text-muted'}">${r.credits}</td></tr>`).join('');
+    return `
+    <div class="stack">
+      <div class="grid grid-2">
+        <div class="card"><p class="eyebrow">Subscription access</p><p class="metric-lg" style="margin-top:6px;"><span class="badge positive"><span class="dot positive"></span> Active</span></p><p class="text-muted" style="margin-top:8px;">Expires ${p.accessExpires}</p></div>
+        <div class="card"><p class="eyebrow">Feature credits</p><p class="metric-xl">${p.credits}</p><p class="text-muted">tokens remaining · 1 per backtest run</p></div>
+      </div>
+      <div class="grid grid-3">${tiers}</div>
+      <div class="banner positive"><span>₹</span> Payments via Razorpay UPI (India only). One-time Orders — no autopay. We store only order/payment IDs, never UPI or card credentials.</div>
+      <div class="card flush">
+        <div style="padding:16px 20px; border-bottom:1px solid hsl(var(--border));"><div class="card-title">Recent Transactions</div></div>
+        <div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Item</th><th class="num">Amount</th><th class="num">Credits</th></tr></thead><tbody>${recent}</tbody></table></div>
+      </div>
+    </div>`;
+  },
+};
+
+// ── nav config (mirrors src/frontend/components/shell/nav.ts) ───────────
+const icon = {
+  live:'M22 12h-4l-3 9L9 3l-3 9H2', trades:'M17 1l4 4-4 4 M3 11V9a4 4 0 0 1 4-4h14 M7 23l-4-4 4-4 M21 13v2a4 4 0 0 1-4 4H3',
+  personalities:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75',
+  pnl:'M21 12V7H5a2 2 0 0 1 0-4h14v4 M3 5v14a2 2 0 0 0 2 2h16v-5 M18 12a2 2 0 0 0 0 4h4v-4z',
+  regime:'M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z M7 7h.01',
+  backfill:'M12 2a9 3 0 0 0-9 3v14a9 3 0 0 0 18 0V5a9 3 0 0 0-9-3z M3 12a9 3 0 0 0 18 0',
+  replay:'M21 8v6 M21 11a9 9 0 1 0-3 6.7L21 14 M12 7v5l3 3',
+  pricing:'M1 4h22v16H1z M1 10h22',
+};
+const NAV = [
+  { heading: 'Trading',  items: [['live','Live'],['trades','Trades'],['personalities','Personalities'],['pnl','P&L']] },
+  { heading: 'Research', items: [['regime','Regimes'],['backfill','Backfill'],['replay','Replay']] },
+  { heading: 'Account',  items: [['pricing','Pricing']] },
+];
+const SUB = {
+  live:'Real-time straddle, momentum, and feed status', trades:'Simulated paper-trade log',
+  personalities:'The 10 decision engines and their configs', pnl:'Realized P&L across closed paper trades',
+  regime:'Daily market-regime classification history', backfill:'Historical tick-data ingestion coverage',
+  replay:'Deterministic replay of historical sessions', pricing:'Subscription access and feature credits',
+};
+const TITLE = { live:'Live', trades:'Trades', personalities:'Personalities', pnl:'P&L', regime:'Regimes', backfill:'Backfill', replay:'Replay', pricing:'Pricing' };
+
+let active = 'live';
+function buildNav() {
+  document.getElementById('nav').innerHTML = NAV.map(g => `
+    <div>
+      <div class="nav-group-heading">${g.heading}</div>
+      ${g.items.map(([id,label]) => `
+        <button class="nav-item${id===active?' active':''}" data-tab="${id}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${icon[id]}"/></svg>
+          ${label}
+        </button>`).join('')}
+    </div>`).join('');
+  document.querySelectorAll('.nav-item').forEach(b => b.onclick = () => select(b.dataset.tab));
+}
+function select(tab) {
+  active = tab;
+  document.getElementById('viewTitle').textContent = TITLE[tab];
+  document.getElementById('viewSubtitle').textContent = SUB[tab];
+  const el = document.getElementById('view');
+  el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in');
+  el.innerHTML = views[tab]();
+  buildNav();
+}
+
+// theme toggle
+document.getElementById('themeToggle').onclick = () => {
+  const root = document.documentElement;
+  const dark = root.classList.toggle('dark');
+  document.getElementById('themeIcon').textContent = dark ? '🌙' : '☀️';
+  document.getElementById('themeLabel').textContent = dark ? 'Dark' : 'Light';
+  select(active); // re-render so cssVar()-based chart colors update
+};
+
+buildNav();
+select('live');
+</script>
+</body>
+</html>
