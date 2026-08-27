@@ -78,3 +78,18 @@ describe("buildAccountValues()", () => {
     expect(vals).toEqual([50, 0, 0, 0, 50]);
   });
 });
+
+describe("isDateCell()", () => {
+  const { isDateCell } = require("../updateSheet");
+
+  test("recognises the date format this pipeline writes", () => {
+    expect(isDateCell("26 May 26")).toBe(true);
+    expect(isDateCell("01-May-25")).toBe(true);
+  });
+
+  test("does not treat totals rows, notes or blanks as dates", () => {
+    for (const value of ["", null, undefined, "Total", "Grand Total", "notes"]) {
+      expect(isDateCell(value)).toBe(false);
+    }
+  });
+});
