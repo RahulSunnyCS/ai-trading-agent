@@ -51,6 +51,12 @@ SHEET_NAME=your_sheet_name
 
 Supported `broker` values: `finvasia`, `angelone`.
 
+### F&O-only numbers
+
+Only equity-derivative (F&O) trades are recorded. Contract notes are issued per day, not per segment, so an equity/cash trade taken on the same day arrives in the same PDF and is included in the note's own totals. The parsers read the obligation table one exchange/segment row at a time (`NSEFNO-NCL`, `NSECASH-NCL`, `BSE-FUTURES`, `NSE-CASH`, …) and keep only the F&O rows — the note's `TOTAL(NET)` and `Total Brokerage` figures are used as cross-checks, never as values, since they span every segment. Per-segment brokerage is derived from the row's taxable value of supply.
+
+A note with only equity rows records zeros. A segment label that the classifier in `brokers/segments.js` does not recognise is reported as an error rather than guessed at, so nothing unexpected is silently added to or dropped from the day's P&L.
+
 `sheetStartColumn` is the leftmost Google Sheet column for that account's daily values. Each account writes a contiguous 5-column block starting there:
 
 | Offset | Column (e.g. start = `D`) | Value                                                |

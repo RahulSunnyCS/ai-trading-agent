@@ -48,6 +48,14 @@ const parseResults = { succeeded: [], failed: [] };
 
       logger.info(`Extraction complete`, { broker: meta.broker, account: meta.accountId });
 
+      if (summary.skipped_segments && summary.skipped_segments.length) {
+        logger.info("Non-F&O segments ignored", {
+          broker: meta.broker,
+          account: meta.accountId,
+          segments: summary.skipped_segments.join(", "),
+        });
+      }
+
       const accountEntry = { account: meta.accountId, broker: meta.broker, email: meta.email };
       for (const f of SUMMARY_FIELDS) {
         const v = summary[f] ?? 0;

@@ -3,3 +3,4 @@ node_modules
 data/*
 daily_summary.json
 row_tracker.json
+coverage

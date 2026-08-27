@@ -4,6 +4,8 @@ const path = require("path");
 
 const sampleText = fs.readFileSync(path.join(__dirname, "../fixtures/finvasia-sample.txt"), "utf-8");
 const noMatchText = fs.readFileSync(path.join(__dirname, "../fixtures/finvasia-no-match.txt"), "utf-8");
+const mixedText = fs.readFileSync(path.join(__dirname, "../fixtures/finvasia-mixed-segments.txt"), "utf-8");
+const equityOnlyText = fs.readFileSync(path.join(__dirname, "../fixtures/finvasia-equity-only.txt"), "utf-8");
 
 describe("finvasia.extract()", () => {
   test("extracts all three fields from valid PDF text", () => {
@@ -40,9 +42,9 @@ describe("finvasia.extract()", () => {
     expect(result.payin_payout_obligation).toBeCloseTo(-9275.75, 1);
   });
 
-  test("returns error when NSE FNO line not present", () => {
+  test("returns error when the obligation table is not present", () => {
     const result = extract(noMatchText);
-    expect(result.error).toMatch(/NSE FNO line not matched/);
+    expect(result.error).toMatch(/Obligation Detail table not found/);
   });
 
   test("error includes text preview", () => {
@@ -58,6 +60,50 @@ describe("finvasia.extract()", () => {
   test("returns error for null/undefined text", () => {
     expect(extract(null).error).toBeDefined();
     expect(extract(undefined).error).toBeDefined();
+  });
+});
+
+describe("finvasia.extract() segment filtering", () => {
+  test("ignores the cash/equity row when a note mixes equity and F&O", () => {
+    // Same F&O trades as the F&O-only sample, plus an NSECASH-NCL row.
+    const mixed = extract(mixedText);
+    const fnoOnly = extract(sampleText);
+    expect(mixed.error).toBeUndefined();
+    expect(mixed.payin_payout_obligation).toBeCloseTo(fnoOnly.payin_payout_obligation, 2);
+    expect(mixed.net_brokerage).toBeCloseTo(fnoOnly.net_brokerage, 2);
+    expect(mixed.other_charges).toBeCloseTo(fnoOnly.other_charges, 2);
+  });
+
+  test("reports which segments were skipped", () => {
+    expect(extract(mixedText).skipped_segments).toEqual(["NSECASH-NCL (equity)"]);
+    expect(extract(sampleText).skipped_segments).toEqual([]);
+  });
+
+  test("keeps only the F&O brokerage when equity is present", () => {
+    // The equity row carries 94.70 of brokerage; only the F&O 160.00 counts.
+    expect(mixedText).toContain("94.70");
+    expect(extract(mixedText).net_brokerage).toBeCloseTo(160, 2);
+  });
+
+  test("returns zeros for a note with no F&O segment", () => {
+    const result = extract(equityOnlyText);
+    expect(result.error).toBeUndefined();
+    expect(result.payin_payout_obligation).toBe(0);
+    expect(result.net_brokerage).toBe(0);
+    expect(result.other_charges).toBe(0);
+    expect(result.skipped_segments).toEqual(["NSECASH-NCL (equity)"]);
+  });
+
+  test("fails loudly on an unrecognised segment label", () => {
+    const result = extract(sampleText.replace(/NSEFNO-NCL/, "NSEWOMBAT-NCL"));
+    expect(result.error).toMatch(/unrecognised segment: NSEWOMBAT-NCL/);
+  });
+
+  test("does not silently mis-read reordered cells", () => {
+    // Swap the Final Net and Pay in/Payout Obligation cells: the charges
+    // identity must no longer hold and the extractor must refuse the row.
+    const corrupted = sampleText.replace("-10015.11\n-9275.75", "-9275.75\n-10015.11");
+    expect(extract(corrupted).error).toMatch(/column mismatch/);
   });
 });
 

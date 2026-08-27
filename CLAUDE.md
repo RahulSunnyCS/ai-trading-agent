@@ -38,7 +38,7 @@ Gmail (IMAP) → fetchMail.js → data/*.pdf (encrypted)
                         updateSheet.js → Google Sheet row
 ```
 
-**`brokers/`** — Per-broker plugins. Each plugin exports `subject(accountId, date)` (the IMAP `SUBJECT` search string for that broker's contract-note emails) and `extract(text)` (returns `{ payin_payout_obligation, net_brokerage, other_charges }` from decrypted PDF text; `total_charges` and `final_net` are derived later by `updateSheet.js`). `brokers/index.js` is the registry plus the `BROKER_ACCOUNTS_JSON` config loader and the filename helpers (`makeFileName` / `parseFileName`).
+**`brokers/`** — Per-broker plugins. Each plugin exports `subject(accountId, date)` (the IMAP `SUBJECT` search string for that broker's contract-note emails) and `extract(text)` (returns `{ payin_payout_obligation, net_brokerage, other_charges, skipped_segments }` from decrypted PDF text; `total_charges` and `final_net` are derived later by `updateSheet.js`). `brokers/index.js` is the registry plus the `BROKER_ACCOUNTS_JSON` config loader and the filename helpers (`makeFileName` / `parseFileName`). `brokers/segments.js` holds the shared exchange-segment classifier — see **F&O-only extraction** below.
 
 **`fetchMail.js`** — Loads `BROKER_ACCOUNTS_JSON`, opens **one IMAP connection per email**, then iterates the broker accounts inside that mailbox. For each account it runs the broker-specific subject search, saves attachments as `<safeEmail>__<broker>__<accountId>__<originalName>.pdf`, and decrypts via the system `qpdf` binary using `pdfPassword` from the same account entry.
 
@@ -86,9 +86,21 @@ A single env var holds a JSON array of mailboxes. Each mailbox has one Gmail log
 
 Columns A–C are reserved for serial number / day name / formatted date. Pick `sheetStartColumn` for each account so the per-account 5-column blocks don't overlap; gaps between blocks (and any cells with formulas) are preserved from the previous row via `PASTE_FORMULA`.
 
+### F&O-only extraction
+
+The analytics track **equity derivatives (F&O) only**. A contract note is per-day, not per-segment: if an equity/cash trade is taken on the same day, the broker adds its row to the same note and folds it into the note's own totals. Reading those totals would mix equity P&L, brokerage and charges into the F&O numbers.
+
+Both extractors therefore parse the **obligation table row by row** (one row per exchange/segment — `NSEFNO-NCL`, `NSECASH-NCL`, `BSE-FUTURES`, `NSE-CASH`, …), classify each label via `brokers/segments.js`, and aggregate the F&O rows only. Broker-reported grand totals (`TOTAL(NET)`, `Total Brokerage = …`) are never used as values, only as cross-checks, because they span every segment.
+
+- **Brokerage per segment** is derived from the row's own *taxable value of supply*, which both brokers define as `brokerage + exchange transaction charges + SEBI turnover fees + IPF charges` (Finvasia also prints brokerage in the row directly).
+- **Unknown segment labels** (`classifySegment` returns `"unknown"`) are a hard error rather than a guess — silently keeping or dropping an unrecognised segment would corrupt the day's P&L. Add the label to the patterns in `brokers/segments.js` when a new segment shows up.
+- **Notes with no F&O row at all** (a pure equity day) extract as zeros rather than an error, so a cash-only contract note contributes nothing instead of failing the run.
+- **Column-order guard**: each extractor verifies that `obligation − itemised charges` equals the note's own final-net cell, and refuses the row if it does not. This catches a change in the PDF layout instead of writing a wrong number to the sheet.
+- `skipped_segments` lists the non-F&O rows that were dropped; `parser.js` logs it per account.
+
 ### Adding a New Broker
 
-1. Create `brokers/<name>.js` exporting `subject(accountId, date)` and `extract(text)`. Use `finvasia.js` and `angelone.js` as templates.
+1. Create `brokers/<name>.js` exporting `subject(accountId, date)` and `extract(text)`. Use `finvasia.js` and `angelone.js` as templates, including the segment filtering described above.
 2. Register it in `brokers/index.js` by adding it to the `BROKERS` map.
 3. Reference it in `BROKER_ACCOUNTS_JSON` with `"broker": "<name>"`.
 
