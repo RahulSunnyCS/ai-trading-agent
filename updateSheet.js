@@ -3,6 +3,7 @@ const { JWT } = require("google-auth-library");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const { loadBrokerAccounts, flattenAccounts } = require("./brokers");
+const { parseDateCell } = require("./checkDates");
 const { requireEnv } = require("./utils/validate");
 const { withRetry } = require("./utils/retry");
 const logger = require("./utils/logger");
@@ -28,6 +29,17 @@ function letterToColumn(letter) {
 }
 
 const ACCOUNT_COLUMN_COUNT = 5;
+
+// True when a column C cell holds a date this pipeline wrote ("26 May 26"),
+// as opposed to a totals row, a note, or an empty cell.
+function isDateCell(value) {
+  if (!value) return false;
+  try {
+    return !isNaN(parseDateCell(String(value)).getTime());
+  } catch {
+    return false;
+  }
+}
 
 function buildAccountValues(match) {
   const payin = match?.payin_payout_obligation ?? 0;
@@ -102,19 +114,24 @@ async function updateGoogleSheet() {
     year: "2-digit",
   });
 
-  const lastRowData =
+  // Two rows in one read: the row being appended after, and the row below it,
+  // which must still be empty for the tracker to be trustworthy.
+  const window =
     lastRow > 0
       ? (
           await withRetry(
             () =>
               sheets.spreadsheets.values.get({
                 spreadsheetId,
-                range: `${sheetName}!A${lastRow}:ZZ${lastRow}`,
+                range: `${sheetName}!A${lastRow}:ZZ${lastRow + 1}`,
               }),
             sheetsRetryOpts
           )
-        ).data.values?.[0] || []
+        ).data.values || []
       : [];
+
+  const lastRowData = window[0] || [];
+  const nextRowDateCell = window[1]?.[2];
 
   const lastRowValue = lastRowData[0] || 0;
   const lastDateCell = lastRowData[2];
@@ -122,6 +139,43 @@ async function updateGoogleSheet() {
   if (lastDateCell === dateFormatted) {
     logger.info("Date already exists in sheet, skipping", { date: dateFormatted });
     return;
+  }
+
+  // row_tracker.json is restored from a CI artifact, so it can lag behind the
+  // sheet if a previous run died before uploading it. Rows are only ever
+  // appended, so a dated row directly below the tracked one means the tracker
+  // is stale — inserting here would duplicate rows and push the rest down.
+  // Non-date content below (a totals or notes row) is left alone.
+  if (lastRow > 0 && nextRowDateCell && isDateCell(nextRowDateCell)) {
+    throw new Error(
+      `row_tracker.json is behind the sheet: row ${lastRow + 1} already holds "${nextRowDateCell}". ` +
+        `Run the "Update Last Updated Row" workflow with the sheet's real last row before re-running.`
+    );
+  }
+
+  // Dates are only ever appended, so anything at or before the last row's date
+  // would land out of order.
+  if (lastDateCell) {
+    try {
+      const lastDate = parseDateCell(lastDateCell);
+      const target = Date.UTC(
+        targetDate.getFullYear(),
+        targetDate.getMonth(),
+        targetDate.getDate()
+      );
+      if (target <= lastDate.getTime()) {
+        logger.warn("Target date is not after the last row — skipping", {
+          date: dateFormatted,
+          lastRowDate: lastDateCell,
+        });
+        return;
+      }
+    } catch (err) {
+      logger.warn("Could not parse last row date — skipping order check", {
+        cell: lastDateCell,
+        error: err.message,
+      });
+    }
   }
 
   const summaryPath = "daily_summary.json";
@@ -238,4 +292,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { columnToLetter, letterToColumn, buildAccountValues, updateGoogleSheet };
+module.exports = { columnToLetter, letterToColumn, buildAccountValues, isDateCell, updateGoogleSheet };

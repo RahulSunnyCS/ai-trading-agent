@@ -65,22 +65,58 @@ jobs:
             exit 0
           fi
           updated=false
+          skipped=""
           while IFS= read -r date; do
-            echo "Processing gap date $date"
-            TARGET_DATE="$date" npm run fetch
-            TARGET_DATE="$date" npm run parse
-            count=$(find ./data -type f -name '*_decrypted.pdf' | wc -l)
+            [ -z "$date" ] && continue
+            echo "::group::Processing gap date $date"
+            rm -rf ./data
+
+            # A date that cannot be fetched, decrypted or parsed is left as a
+            # gap and reported at the end. It must not abort the run: the
+            # remaining dates, and the row-tracker progress made so far, are
+            # worth far more than failing fast on one bad contract note.
+            if ! TARGET_DATE="$date" npm run fetch; then
+              echo "::warning title=Fetch failed::$date could not be fetched or decrypted — left as a gap"
+              skipped="$skipped $date"
+              rm -rf ./data
+              echo "::endgroup::"
+              continue
+            fi
+
+            count=$(find ./data -type f -name '*_decrypted.pdf' 2>/dev/null | wc -l)
             if [ "$count" -eq 0 ]; then
               echo "📭 No decrypted PDF files found for $date. Skipping."
               rm -rf ./data
+              echo "::endgroup::"
               continue
             fi
             echo "✅ Decrypted PDF files found: $count"
+
+            if ! TARGET_DATE="$date" npm run parse; then
+              echo "::warning title=Parse failed::$date could not be parsed — left as a gap"
+              skipped="$skipped $date"
+              rm -rf ./data
+              echo "::endgroup::"
+              continue
+            fi
+
             TARGET_DATE="$date" npm run sheet
             updated=true
+            # Recorded per date, so the artifact is still uploaded if a later
+            # date aborts the run.
+            echo "updated=true" >> $GITHUB_ENV
             rm -rf ./data
+            echo "::endgroup::"
           done < gap_dates.txt
+
           echo "updated=$updated" >> $GITHUB_ENV
+
+          if [ -n "$skipped" ]; then
+            echo "### Dates left as gaps" >> $GITHUB_STEP_SUMMARY
+            for d in $skipped; do echo "- $d" >> $GITHUB_STEP_SUMMARY; done
+            echo "::error title=Dates left unprocessed::$skipped"
+            exit 1
+          fi
         env:
           BROKER_ACCOUNTS_JSON: ${{ secrets.BROKER_ACCOUNTS_JSON }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
@@ -88,15 +124,17 @@ jobs:
           SHEET_GID: ${{ secrets.SHEET_GID }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
 
+      # always(): rows already written to the sheet must not be re-written on
+      # the next run just because a later date failed.
       - name: Upload updated row_tracker.json as artifact
-        if: env.updated == 'true'
+        if: always() && env.updated == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: row-tracker
           path: row_tracker.json
 
       - name: Delete old artifacts
-        if: env.updated == 'true'
+        if: success() && env.updated == 'true'
         uses: c-hive/gha-remove-artifacts@v1
         with:
           age: "2 day"
