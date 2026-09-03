@@ -3,7 +3,7 @@ const { JWT } = require("google-auth-library");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const { loadBrokerAccounts, flattenAccounts } = require("./brokers");
-const { parseDateCell } = require("./checkDates");
+const { parseDateCell, formatDateCell } = require("./checkDates");
 const { requireEnv } = require("./utils/validate");
 const { withRetry } = require("./utils/retry");
 const logger = require("./utils/logger");
@@ -108,11 +108,7 @@ async function updateGoogleSheet() {
       })();
 
   const dayName = targetDate.toLocaleDateString("en-GB", { weekday: "long" });
-  const dateFormatted = targetDate.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "2-digit",
-  });
+  const dateFormatted = formatDateCell(targetDate);
 
   // Two rows in one read: the row being appended after, and the row below it,
   // which must still be empty for the tracker to be trustworthy.
@@ -136,7 +132,31 @@ async function updateGoogleSheet() {
   const lastRowValue = lastRowData[0] || 0;
   const lastDateCell = lastRowData[2];
 
-  if (lastDateCell === dateFormatted) {
+  // Column C can hold more than one spelling of the same day: rows written
+  // before formatDateCell() carry the locale's "1 Sept 26", rows written after
+  // carry "1 Sep 26". Compare the parsed dates so a re-run is still recognised
+  // as a duplicate across both.
+  const targetTime = Date.UTC(
+    targetDate.getFullYear(),
+    targetDate.getMonth(),
+    targetDate.getDate()
+  );
+
+  let lastDate = null;
+  if (lastDateCell) {
+    try {
+      const parsed = parseDateCell(lastDateCell);
+      if (!isNaN(parsed.getTime())) lastDate = parsed;
+      else throw new Error(`Not a valid date: "${lastDateCell}"`);
+    } catch (err) {
+      logger.warn("Could not parse last row date — skipping order check", {
+        cell: lastDateCell,
+        error: err.message,
+      });
+    }
+  }
+
+  if (lastDate && lastDate.getTime() === targetTime) {
     logger.info("Date already exists in sheet, skipping", { date: dateFormatted });
     return;
   }
@@ -155,27 +175,12 @@ async function updateGoogleSheet() {
 
   // Dates are only ever appended, so anything at or before the last row's date
   // would land out of order.
-  if (lastDateCell) {
-    try {
-      const lastDate = parseDateCell(lastDateCell);
-      const target = Date.UTC(
-        targetDate.getFullYear(),
-        targetDate.getMonth(),
-        targetDate.getDate()
-      );
-      if (target <= lastDate.getTime()) {
-        logger.warn("Target date is not after the last row — skipping", {
-          date: dateFormatted,
-          lastRowDate: lastDateCell,
-        });
-        return;
-      }
-    } catch (err) {
-      logger.warn("Could not parse last row date — skipping order check", {
-        cell: lastDateCell,
-        error: err.message,
-      });
-    }
+  if (lastDate && targetTime <= lastDate.getTime()) {
+    logger.warn("Target date is not after the last row — skipping", {
+      date: dateFormatted,
+      lastRowDate: lastDateCell,
+    });
+    return;
   }
 
   const summaryPath = "daily_summary.json";

@@ -1,4 +1,9 @@
-const { findMissingDates, parseDateCell, todayUTC } = require("../checkDates");
+const {
+  findMissingDates,
+  parseDateCell,
+  formatDateCell,
+  todayUTC,
+} = require("../checkDates");
 
 describe("parseDateCell()", () => {
   test("parses en-GB dash format into UTC date", () => {
@@ -26,6 +31,60 @@ describe("parseDateCell()", () => {
 
   test("throws on unknown month abbreviation", () => {
     expect(() => parseDateCell("15-Xyz-25")).toThrow(/Unknown month/);
+  });
+
+  // CLDR renders en-GB September as "Sept", the only four-letter abbreviation,
+  // so rows written by earlier runs carry it and must still parse.
+  test('parses the four-letter "Sept" written by earlier locale-formatted runs', () => {
+    expect(parseDateCell("1 Sept 26").toISOString().slice(0, 10)).toBe("2026-09-01");
+    expect(parseDateCell("01-Sept-25").toISOString().slice(0, 10)).toBe("2025-09-01");
+  });
+
+  test("accepts longer and differently-cased month spellings", () => {
+    const cases = ["Sept.", "September", "SEPT", "sep", "sept"];
+    cases.forEach((mon) => {
+      expect(parseDateCell(`15 ${mon} 26`).getUTCMonth()).toBe(8);
+    });
+  });
+
+  test("tolerates surrounding whitespace", () => {
+    expect(parseDateCell("  1 Sept 26 ").toISOString().slice(0, 10)).toBe("2026-09-01");
+  });
+
+  // Guards the exact failure that broke the 3 Sep 2026 run: whatever the
+  // installed ICU emits for en-GB must round-trip back through parseDateCell.
+  test("parses every month as en-GB Intl formats it", () => {
+    for (let m = 0; m < 12; m += 1) {
+      const cell = new Date(2026, m, 15).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "2-digit",
+      });
+      expect(parseDateCell(cell).getUTCMonth()).toBe(m);
+    }
+  });
+});
+
+describe("formatDateCell()", () => {
+  test("formats without Intl so ICU changes cannot alter the sheet", () => {
+    expect(formatDateCell(new Date(2026, 8, 1))).toBe("1 Sep 26");
+    expect(formatDateCell(new Date(2025, 3, 30))).toBe("30 Apr 25");
+  });
+
+  test("uses a three-letter abbreviation for every month", () => {
+    for (let m = 0; m < 12; m += 1) {
+      const [, mon] = formatDateCell(new Date(2026, m, 15)).split(" ");
+      expect(mon).toHaveLength(3);
+    }
+  });
+
+  test("round-trips through parseDateCell", () => {
+    for (let m = 0; m < 12; m += 1) {
+      const parsed = parseDateCell(formatDateCell(new Date(2026, m, 15)));
+      expect(parsed.toISOString().slice(0, 10)).toBe(
+        `2026-${String(m + 1).padStart(2, "0")}-15`
+      );
+    }
   });
 });
 

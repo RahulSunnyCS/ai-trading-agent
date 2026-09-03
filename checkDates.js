@@ -8,17 +8,35 @@ const logger = require("./utils/logger");
 
 dotenv.config();
 
-const MONTHS = {
-  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
-};
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+const MONTH_INDEX = new Map(MONTHS.map((m, i) => [m.toLowerCase(), i]));
+
+// Month names reach us in whatever shape the sheet holds. Locale data is not a
+// fixed target: CLDR renders en-GB September as "Sept", the one four-letter
+// abbreviation, so a strict three-letter table breaks for one month a year.
+// Match on the first three letters instead, which is stable for every month in
+// every form we can be handed ("Sep", "Sept", "Sept.", "September", "SEPT").
+function monthIndex(mon) {
+  if (!mon) return undefined;
+  return MONTH_INDEX.get(mon.slice(0, 3).toLowerCase());
+}
 
 function parseDateCell(str) {
   // Handles both "26 May 26" (space-separated, written by updateSheet.js) and "01-May-25" (dash-separated)
-  const [dd, mon, yy] = str.split(/[\s-]+/);
-  const month = MONTHS[mon];
+  const [dd, mon, yy] = String(str).trim().split(/[\s-]+/);
+  const month = monthIndex(mon);
   if (month === undefined) throw new Error(`Unknown month abbreviation: "${mon}"`);
   return new Date(Date.UTC(2000 + parseInt(yy, 10), month, parseInt(dd, 10)));
+}
+
+// The sheet's own date format, produced without Intl so that an ICU or Node
+// upgrade can never silently change what gets written into column C.
+function formatDateCell(date) {
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${String(date.getFullYear()).slice(-2)}`;
 }
 
 function todayUTC() {
@@ -123,4 +141,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { findMissingDates, parseDateCell, todayUTC };
+module.exports = { findMissingDates, parseDateCell, formatDateCell, todayUTC };
