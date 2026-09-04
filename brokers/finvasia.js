@@ -77,22 +77,34 @@ function extract(text) {
     return { error: `Finvasia exchange/segment rows not matched. Text preview: ${snippet}` };
   }
 
-  const badRow = rows.find((r) => r.amounts.length !== COLUMN_COUNT);
-  if (badRow) {
-    const snippet = block.slice(0, 800).replace(/\n/g, " ");
-    return {
-      error:
-        `Finvasia row "${badRow.label}" has ${badRow.amounts.length} amounts, expected ${COLUMN_COUNT}. ` +
-        `Text preview: ${snippet}`,
-    };
-  }
-
   const { kept, dropped, unknown } = splitBySegment(rows);
   if (unknown.length) {
     return {
       error:
         `Finvasia obligation row(s) with unrecognised segment: ${unknown.join(", ")}. ` +
         `Add the label to brokers/segments.js so it is classified as F&O or excluded.`,
+    };
+  }
+
+  // Only the F&O rows are read, so only they must have the full set of cells.
+  // A cash or currency row with an odd shape is noted and ignored rather than
+  // failing a note whose F&O side parses perfectly well.
+  const oddDropped = rows.filter(
+    (r) => !kept.includes(r) && r.amounts.length !== COLUMN_COUNT
+  );
+  if (oddDropped.length) {
+    logger.warn("Finvasia ignored non-F&O row with unexpected cell count", {
+      rows: oddDropped.map((r) => `${r.label}=${r.amounts.length}`).join(", "),
+    });
+  }
+
+  const badRow = kept.find((r) => r.amounts.length !== COLUMN_COUNT);
+  if (badRow) {
+    const snippet = block.slice(0, 800).replace(/\n/g, " ");
+    return {
+      error:
+        `Finvasia row "${badRow.label}" has ${badRow.amounts.length} amounts, expected ${COLUMN_COUNT}. ` +
+        `Text preview: ${snippet}`,
     };
   }
 

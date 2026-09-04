@@ -7,6 +7,12 @@ const logger = require("./utils/logger");
 const SUMMARY_FIELDS = ["payin_payout_obligation", "net_brokerage", "other_charges"];
 
 const dataDir = path.join(__dirname, "data");
+const outputPath = path.join(__dirname, "daily_summary.json");
+
+// The workspace is reused across dates in CI, so a summary left behind by an
+// earlier date must never be mistaken for this one's.
+if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+
 const pdfFiles = fs
   .readdirSync(dataDir)
   .filter((file) => file.endsWith("_decrypted.pdf"));
@@ -70,22 +76,21 @@ const parseResults = { succeeded: [], failed: [] };
     }
   }
 
+  // Any failure fails the date. updateSheet.js fills a missing account with
+  // zeros, so writing a partial summary would record a real trading day as flat
+  // for that broker and move the tracker past it — the date would never be
+  // retried. Leaving it as a gap keeps it recoverable.
   if (parseResults.failed.length > 0) {
     const errPath = path.join(__dirname, "parse_errors.json");
     fs.writeFileSync(errPath, JSON.stringify(parseResults.failed, null, 2));
-    logger.warn("Some files failed to parse", {
+    logger.error("Some files failed to parse — no output written", null, {
       failed: parseResults.failed.length,
       succeeded: parseResults.succeeded.length,
       errorsFile: "parse_errors.json",
     });
-  }
-
-  if (parseResults.succeeded.length === 0) {
-    logger.error("All PDFs failed to parse — no output written");
     process.exit(1);
   }
 
-  const outputPath = path.join(__dirname, "daily_summary.json");
   fs.writeFileSync(outputPath, JSON.stringify(mergedSummary, null, 2));
   logger.info("Merged summary saved", { file: "daily_summary.json" });
 })();

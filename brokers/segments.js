@@ -10,7 +10,9 @@
 // whitespace/dots first, so "NSE FNO - NCL" and "NSEFNO-NCL" classify alike.
 const OTHER_SEGMENT = /(CURRENCY|CUR\b|CDS|CD\b|COMMODITY|COMM|COM\b|MCX|NCDEX|DEBT|SLB|IRF|GSEC|GOLD)/;
 const FNO_SEGMENT = /(FNO|F&O|FO\b|FUT|OPT|DERIV)/;
-const EQUITY_SEGMENT = /(CASH|EQUITY|CAPITAL|DELIVERY|INTRADAY|EQ\b|CM\b)/;
+// CAP covers Finvasia's "NSECAP-NCL" / "BSECAP-ICCL" as well as the spelled-out
+// CAPITAL that Angel One uses for the same cash segment.
+const EQUITY_SEGMENT = /(CASH|EQUITY|CAP|DELIVERY|INTRADAY|EQ\b|CM\b)/;
 
 const TOTAL_ROW = /^(TOTAL|GRANDTOTAL|NETTOTAL|SUMMARY)/;
 
