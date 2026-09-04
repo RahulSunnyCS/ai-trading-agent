@@ -22,7 +22,19 @@ describe("classifySegment()", () => {
   });
 
   test("recognises cash/equity labels", () => {
-    for (const label of ["NSECASH-NCL", "BSECASH-ICCL", "NSE-CASH", "BSE-EQUITY", "NSE-CM", "BSE-EQ"]) {
+    for (const label of [
+      // Regression: NSECAP-NCL is what Finvasia actually prints for the cash
+      // segment. It was classified "unknown" and failed the whole note.
+      "NSECAP-NCL",
+      "BSECAP-ICCL",
+      "NSECASH-NCL",
+      "BSECASH-ICCL",
+      "NSE-CASH",
+      "NSE-CAPITAL",
+      "BSE-EQUITY",
+      "NSE-CM",
+      "BSE-EQ",
+    ]) {
       expect(classifySegment(label)).toBe("equity");
     }
   });

@@ -90,12 +90,13 @@ Columns A–C are reserved for serial number / day name / formatted date. Pick `
 
 The analytics track **equity derivatives (F&O) only**. A contract note is per-day, not per-segment: if an equity/cash trade is taken on the same day, the broker adds its row to the same note and folds it into the note's own totals. Reading those totals would mix equity P&L, brokerage and charges into the F&O numbers.
 
-Both extractors therefore parse the **obligation table row by row** (one row per exchange/segment — `NSEFNO-NCL`, `NSECASH-NCL`, `BSE-FUTURES`, `NSE-CASH`, …), classify each label via `brokers/segments.js`, and aggregate the F&O rows only. Broker-reported grand totals (`TOTAL(NET)`, `Total Brokerage = …`) are never used as values, only as cross-checks, because they span every segment.
+Both extractors therefore parse the **obligation table row by row** (one row per exchange/segment — Finvasia prints `NSEFNO-NCL` and `NSECAP-NCL`, Angel One `BSE-FUTURES` and `NSE-CASH`), classify each label via `brokers/segments.js`, and aggregate the F&O rows only. Broker-reported grand totals (`TOTAL(NET)`, `Total Brokerage = …`) are never used as values, only as cross-checks, because they span every segment.
 
 - **Brokerage per segment** is derived from the row's own *taxable value of supply*, which both brokers define as `brokerage + exchange transaction charges + SEBI turnover fees + IPF charges` (Finvasia also prints brokerage in the row directly).
 - **Unknown segment labels** (`classifySegment` returns `"unknown"`) are a hard error rather than a guess — silently keeping or dropping an unrecognised segment would corrupt the day's P&L. Add the label to the patterns in `brokers/segments.js` when a new segment shows up.
 - **Notes with no F&O row at all** (a pure equity day) extract as zeros rather than an error, so a cash-only contract note contributes nothing instead of failing the run.
-- **Column-order guard**: each extractor verifies that `obligation − itemised charges` equals the note's own final-net cell, and refuses the row if it does not. This catches a change in the PDF layout instead of writing a wrong number to the sheet.
+- **Column-order guard**: each extractor verifies that `obligation − itemised charges` equals the note's own final-net cell, and refuses the row if it does not. This catches a change in the PDF layout instead of writing a wrong number to the sheet. Only the F&O rows are held to the expected cell count — an odd-shaped cash row is logged and ignored.
+- **A failed extract fails the whole date.** `parser.js` exits non-zero if *any* PDF fails, and writes no `daily_summary.json`. `updateSheet.js` fills a missing account with zeros, so a partial summary would record a real trading day as flat for that broker and advance the row tracker past it, putting the date beyond reach. The CI loop leaves it as a gap instead.
 - `skipped_segments` lists the non-F&O rows that were dropped; `parser.js` logs it per account.
 
 ### Adding a New Broker

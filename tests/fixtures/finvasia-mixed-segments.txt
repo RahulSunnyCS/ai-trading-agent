@@ -602,7 +602,7 @@ Charges
 IPF
  Charges
 Final NetBrokerage
-NSECASH-NCL 250.00 120.00
+NSECAP-NCL 250.00 120.00
    21.60
  0.30 15.00 25.00
  4688.10

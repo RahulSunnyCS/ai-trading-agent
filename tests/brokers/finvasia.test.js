@@ -65,7 +65,7 @@ describe("finvasia.extract()", () => {
 
 describe("finvasia.extract() segment filtering", () => {
   test("ignores the cash/equity row when a note mixes equity and F&O", () => {
-    // Same F&O trades as the F&O-only sample, plus an NSECASH-NCL row.
+    // Same F&O trades as the F&O-only sample, plus an NSECAP-NCL row.
     const mixed = extract(mixedText);
     const fnoOnly = extract(sampleText);
     expect(mixed.error).toBeUndefined();
@@ -75,7 +75,7 @@ describe("finvasia.extract() segment filtering", () => {
   });
 
   test("reports which segments were skipped", () => {
-    expect(extract(mixedText).skipped_segments).toEqual(["NSECASH-NCL (equity)"]);
+    expect(extract(mixedText).skipped_segments).toEqual(["NSECAP-NCL (equity)"]);
     expect(extract(sampleText).skipped_segments).toEqual([]);
   });
 
@@ -91,12 +91,25 @@ describe("finvasia.extract() segment filtering", () => {
     expect(result.payin_payout_obligation).toBe(0);
     expect(result.net_brokerage).toBe(0);
     expect(result.other_charges).toBe(0);
-    expect(result.skipped_segments).toEqual(["NSECASH-NCL (equity)"]);
+    expect(result.skipped_segments).toEqual(["NSECAP-NCL (equity)"]);
   });
 
   test("fails loudly on an unrecognised segment label", () => {
     const result = extract(sampleText.replace(/NSEFNO-NCL/, "NSEWOMBAT-NCL"));
     expect(result.error).toMatch(/unrecognised segment: NSEWOMBAT-NCL/);
+  });
+
+  test("ignores a dropped row whose cell count is unexpected", () => {
+    // Only the F&O rows are read, so an odd-shaped cash row must not fail a
+    // note whose F&O side parses cleanly.
+    const shortCashRow = mixedText.replace(
+      "NSECAP-NCL 250.00 120.00",
+      "NSECAP-NCL 250.00"
+    );
+    const result = extract(shortCashRow);
+    expect(result.error).toBeUndefined();
+    expect(result.payin_payout_obligation).toBeCloseTo(-9275.75, 2);
+    expect(result.net_brokerage).toBeCloseTo(160, 2);
   });
 
   test("does not silently mis-read reordered cells", () => {
