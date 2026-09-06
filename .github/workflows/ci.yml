@@ -67,6 +67,28 @@ jobs:
       - name: Dashboard unit tests
         run: bun run --filter @ata/dashboard test
 
+  python:
+    name: option-backtesting — Ruff · Pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/option-backtesting
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: '0.8.x'
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Pytest
+        run: uv run pytest
+
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest

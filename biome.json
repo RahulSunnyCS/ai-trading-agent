@@ -26,7 +26,14 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", "dist", "coverage", "bun.lock", "*.sql"]
+    "ignore": [
+      "node_modules",
+      "dist",
+      "coverage",
+      "bun.lock",
+      "*.sql",
+      "packages/option-backtesting/**"
+    ]
   },
   "overrides": [
     {

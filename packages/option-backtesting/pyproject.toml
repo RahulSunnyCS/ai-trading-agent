@@ -1,0 +1,63 @@
+[project]
+name = "option-backtesting"
+version = "0.1.0"
+description = "Options backtesting engine for Indian index options (NIFTY / SENSEX / BANKNIFTY) — strategy-research workbench, not a duplicate of the TypeScript personality replay backtester."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.9",
+    "duckdb>=1.1",
+    "pyarrow>=17.0",
+    "pyyaml>=6.0",
+    "numpy>=2.1",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "mcp>=1.1",
+    "typer>=0.13",
+]
+
+[project.optional-dependencies]
+# Only needed for R2 (reading daily_regime_tags from the trading DB). Omit
+# entirely if DATABASE_URL is never set — analytics/regime_source.py checks
+# for the env var before importing this.
+regime = ["psycopg[binary]>=3.2"]
+
+[project.scripts]
+obt = "option_backtesting.cli:app"
+obt-api = "option_backtesting.api.app:main"
+obt-mcp = "option_backtesting.mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+    "pyright>=1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/option_backtesting"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+# typer.Option(...)/typer.Argument(...) as parameter defaults is the
+# library's documented API, not a mutable-default-argument bug — B008
+# doesn't know that without this allowlist.
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test fixture data is literal JSON-shaped dicts (real vendor responses /
+# ported golden-fixture arrays) — wrapping them for line length would make
+# them harder to diff against their source, not easier to read.
+"tests/**" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -18,6 +18,7 @@
 | Paper Trading | Quantiply API (paper trade execution tracking) |
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
+| Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL (data layer built; strategy/engine ahead) |
 
 ## Package Manager & Runtime
 
@@ -51,14 +52,24 @@ bun run start                # production-style start (apps/server)
 # Dashboard dev server (Vite, proxies /api to the server on :3000)
 bun run --filter @ata/dashboard dev
 
-# Type-check both packages (server + dashboard)
+# Type-check the server (root script is scoped to @ata/server only — the
+# dashboard has one pre-existing type error and isn't CI-enforced yet; run
+# its own check explicitly if you touch apps/dashboard)
 bun run typecheck
+bun run --filter @ata/dashboard typecheck
 
 # Tests
 bun run test                # unit tests in every workspace package
 bun run test:unit           # server unit tests only
 bun run test:integration    # server integration tests (requires Docker services running)
 bun run test:e2e            # dashboard Playwright suite (start the Vite dev server first)
+
+# option-backtesting (Python) — run from packages/option-backtesting/
+cd packages/option-backtesting
+uv sync
+uv run pytest
+uv run obt ingest plan --date YYYY-MM-DD --to YYYY-MM-DD --underlying NIFTY
+uv run obt ingest --date YYYY-MM-DD --underlying NIFTY
 
 # Teardown
 docker compose down         # stop services, keep data volumes
@@ -67,7 +78,7 @@ docker compose down -v      # stop + destroy data volumes (full reset)
 
 ## Repository Structure
 
-A Bun-workspaces monorepo: `apps/server` (Fastify/Bun backend), `apps/dashboard` (React/Vite frontend), and — once the options-backtesting epic lands — `packages/option-backtesting` (a Python sub-package, not a Bun workspace member). Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
+A Bun-workspaces monorepo: `apps/server` (Fastify/Bun backend), `apps/dashboard` (React/Vite frontend), and `packages/option-backtesting` (a Python/uv sub-package — the options-backtesting research workbench, not a Bun workspace member). Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
 
 ```
 ai-trading-agent/
@@ -114,7 +125,26 @@ ai-trading-agent/
 │       ├── e2e/                     # Playwright specs
 │       └── src/                     # App.tsx, components/, hooks/, lib/, store/, types/
 └── packages/
-    └── option-backtesting/          # Python sub-package (uv-managed) — see the options-backtesting epic doc once it lands
+    └── option-backtesting/          # Python 3.12 / uv — strategy-research workbench over AlgoTest option
+                                      # bars, answering "is this strategy worth becoming a personality?"
+                                      # (a different question from apps/server's `bun run backtest`, which
+                                      # replays the live personalities historically). Not a Bun workspace
+                                      # member — has its own pyproject.toml/uv.lock. Data layer (providers,
+                                      # resolver, reference tables, quality gates, raw->Parquet ingest,
+                                      # DuckDB cache) is built; strategy DSL/engine/API are still ahead —
+                                      # see the epic doc once it lands.
+        ├── pyproject.toml · uv.lock · .python-version · DECISIONS.md
+        ├── src/option_backtesting/
+        │   ├── data/
+        │   │   ├── providers/{base,algotest,dhan}.py   # MarketDataProvider Protocol, canonical Bar/InstrumentKey
+        │   │   ├── resolver.py         # ATM/OTMn/ITMn/EXACT -> concrete strike, independent of any vendor
+        │   │   ├── reference/          # effective-dated CSVs: expiry_calendar, holidays, lot_sizes, strike_step, margin
+        │   │   ├── quality.py          # ingest-time gates: identical_series, bar_gaps, zero_volume, etc.
+        │   │   ├── raw.py              # raw AlgoTest JSON manifest read/write (data/raw/algotest/, tracked)
+        │   │   ├── ingest.py           # raw JSON -> quality-gated Parquet (data/cache/, gitignored)
+        │   │   └── cache.py            # DuckDB façade the engine will read (never a provider directly)
+        │   └── cli.py                  # `obt` — ingest plan | ingest; validate/run/registry stubbed until M-2/M-3/M-5
+        └── tests/{golden,parity,unit}/
 ```
 
 ## Architecture

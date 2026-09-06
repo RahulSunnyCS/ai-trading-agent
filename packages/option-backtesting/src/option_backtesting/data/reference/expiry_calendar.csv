@@ -1,0 +1,4 @@
+underlying,cadence,weekday,effective_date
+NIFTY,WEEKLY,1,2018-01-01
+SENSEX,WEEKLY,3,2018-01-01
+BANKNIFTY,MONTHLY_LAST,1,2018-01-01

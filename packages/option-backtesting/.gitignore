@@ -1,0 +1,13 @@
+# Derived from data/raw/ — never commit, regenerate via `obt ingest`.
+data/cache/
+data/registry.sqlite
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# uv
+uv.lock.bak
