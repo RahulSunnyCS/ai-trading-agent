@@ -1,0 +1,49 @@
+# Variant C — B's ladders, plus a fallback: if neither ladder has fired by
+# 12:00, add the third lot anyway.
+#
+# Reference semantics: pyramid_backtest.py / golden_15_sessions.py's
+# `sim(d, "C")` — "fires only if NO trigger has fired strictly before
+# FALLBACK_TIME (12:00)". `caps.max_lots=4` is a hard ceiling below the
+# arithmetic maximum (entry 2 + ladders 1+1 + fallback 1 = 5), matching the
+# reference: on a day where both ladders AND the fallback would fire, the
+# cap silently drops whichever add would exceed it.
+features:
+  atm_straddle:
+    type: leg_sum
+    legs: [ATM.CE, ATM.PE]
+    fix_time: "09:17"
+
+strategy:
+  id: nifty_pyramid_fallback_C
+  version: 1
+  universe: { underlying: NIFTY, expiry: weekly, session: REGULAR }
+  legs:
+    - { id: ce, kind: OPT, strike: OTM1, option: CE, side: SELL }
+    - { id: pe, kind: OPT, strike: OTM1, option: PE, side: SELL }
+  entry:
+    time: "09:17"
+    lots: 2
+  ladders:
+    - id: t1
+      when:
+        feature: atm_straddle
+        op: ">="
+        ref: { feature: atm_straddle, at: entry, plus: 10 }
+      lots: 1
+    - id: t2
+      when:
+        feature: atm_straddle
+        op: ">="
+        ref: { feature: atm_straddle, at: entry, plus: 20 }
+      after: t1
+      lots: 1
+  fallback:
+    time: "12:00"
+    lots: 1
+    unless_fired_before: true
+  caps: { max_lots: 4 }
+  exits:
+    - { type: time, at: "15:15" }
+  fills: { model: trigger_level, slippage_bps: 0 }
+  costs: { per_leg_rt: 60 }
+  sizing: { mode: fixed_lots }

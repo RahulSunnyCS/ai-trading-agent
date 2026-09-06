@@ -1,0 +1,23 @@
+# Variant A — flat MAX_LOTS at entry, no ladders, no triggers.
+#
+# Reference semantics: pyramid_backtest.py / golden_15_sessions.py's
+# `sim(d, "A")` — the entry fills all 4 lots immediately at 09:17 and holds
+# to the time exit. This is the simplest possible pyramid variant and the
+# baseline the golden fixture's other three variants (B/C/D) are compared
+# against (see tests/golden/).
+strategy:
+  id: nifty_flat_A
+  version: 1
+  universe: { underlying: NIFTY, expiry: weekly, session: REGULAR }
+  legs:
+    - { id: ce, kind: OPT, strike: OTM1, option: CE, side: SELL }
+    - { id: pe, kind: OPT, strike: OTM1, option: PE, side: SELL }
+  entry:
+    time: "09:17"
+    lots: 4
+  caps: { max_lots: 4 }
+  exits:
+    - { type: time, at: "15:15" }
+  fills: { model: trigger_level, slippage_bps: 0 }
+  costs: { per_leg_rt: 60 }
+  sizing: { mode: fixed_lots }

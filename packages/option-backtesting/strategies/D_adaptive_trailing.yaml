@@ -1,0 +1,57 @@
+# Variant D — adaptive trailing: BASE_LOTS(2) at entry, then up to two more
+# adds whenever the straddle runs up beyond a *rolling 5-day average*
+# max-runup threshold, measured from a running low that resets after each
+# add fires.
+#
+# Reference semantics: golden_15_sessions.py's `sim_D` — the threshold
+# (`spike_thr_5d`) is the trailing 5-session mean of `max_runup`, lagged by
+# one session so today's own (incomplete) runup never leaks into today's
+# own threshold — this is the exact case the design handoff's point-in-time
+# non-negotiable exists for, and the first 5 sessions of any window are
+# calibration-only (no threshold history yet). `at: running_low` tells the
+# engine to anchor each ladder's trigger to the lowest straddle value since
+# that ladder's own anchor was last reset, not to the fixed entry price.
+features:
+  atm_straddle:
+    type: leg_sum
+    legs: [ATM.CE, ATM.PE]
+    fix_time: "09:17"
+  straddle_runup:
+    type: max_runup
+    source: atm_straddle
+  spike_thr_5d:
+    type: rolling_mean
+    source: straddle_runup
+    days: 5
+    lag: 1
+
+strategy:
+  id: nifty_trailing_D
+  version: 1
+  universe: { underlying: NIFTY, expiry: weekly, session: REGULAR }
+  legs:
+    - { id: ce, kind: OPT, strike: OTM1, option: CE, side: SELL }
+    - { id: pe, kind: OPT, strike: OTM1, option: PE, side: SELL }
+  entry:
+    time: "09:17"
+    lots: 2
+  ladders:
+    - id: t1
+      when:
+        feature: atm_straddle
+        op: ">="
+        ref: { feature: atm_straddle, at: running_low, plus: { feature: spike_thr_5d } }
+      lots: 1
+    - id: t2
+      when:
+        feature: atm_straddle
+        op: ">="
+        ref: { feature: atm_straddle, at: running_low, plus: { feature: spike_thr_5d } }
+      after: t1
+      lots: 1
+  caps: { max_lots: 4 }
+  exits:
+    - { type: time, at: "15:15" }
+  fills: { model: trigger_level, slippage_bps: 0 }
+  costs: { per_leg_rt: 60 }
+  sizing: { mode: fixed_lots }

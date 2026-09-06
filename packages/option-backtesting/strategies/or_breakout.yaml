@@ -1,0 +1,48 @@
+# Opening-range breakout — a new archetype (not in the golden fixture),
+# demonstrating the composite `any`/`ref`-without-`plus` condition grammar
+# and the fuller exit vocabulary (stop_loss + trailing, on top of the plain
+# time exit the golden-fixture-reproducing strategies use).
+#
+# Enters an ATM short straddle at 09:45 (right after the opening range
+# closes) only if the cash index has already broken outside its own
+# 09:15-09:45 high/low — i.e. a range-bound/short-vol bet that is skipped
+# entirely on a trending-breakout morning. `entry.filter` gates whether the
+# fixed-time entry proceeds; it does not change *when* the entry happens
+# (the DSL's entry is always evaluated at a fixed time — an event-triggered
+# entry time is a tracked follow-up, not needed until a strategy actually
+# requires one).
+features:
+  cash_price:
+    type: raw
+    source: cash
+  or_high:
+    type: session_high
+    source: cash
+    until: "09:45"
+  or_low:
+    type: session_low
+    source: cash
+    until: "09:45"
+
+strategy:
+  id: nifty_or_breakout
+  version: 1
+  universe: { underlying: NIFTY, expiry: weekly, session: REGULAR }
+  legs:
+    - { id: ce, kind: OPT, strike: ATM, option: CE, side: SELL }
+    - { id: pe, kind: OPT, strike: ATM, option: PE, side: SELL }
+  entry:
+    time: "09:45"
+    lots: 2
+    filter:
+      - any:
+          - { feature: cash_price, op: ">", ref: { feature: or_high } }
+          - { feature: cash_price, op: "<", ref: { feature: or_low } }
+  caps: { max_lots: 2 }
+  exits:
+    - { type: time, at: "15:15" }
+    - { type: stop_loss, basis: premium_pct, value: 40 }
+    - { type: trailing, basis: mtm_inr, trail: 1500, activate_at: 2500 }
+  fills: { model: trigger_level, slippage_bps: 25 }
+  costs: { per_leg_rt: 60 }
+  sizing: { mode: fixed_lots }

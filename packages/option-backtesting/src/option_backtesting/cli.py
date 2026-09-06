@@ -76,9 +76,24 @@ def ingest_main(
 
 @app.command()
 def validate(strategy_path: Path) -> None:
-    """Validate a strategy YAML against the DSL schema. Coming in M-2."""
-    typer.echo("Not yet implemented — strategy DSL + loader land in M-2.")
-    raise typer.Exit(code=1)
+    """Validate a strategy YAML against the DSL schema."""
+    from .strategy.loader import StrategyValidationError, load_strategy
+
+    try:
+        loaded = load_strategy(strategy_path)
+    except StrategyValidationError as e:
+        typer.echo(f"INVALID: {strategy_path}")
+        for err in e.errors:
+            typer.echo(f"  {err}")
+        raise typer.Exit(code=1) from None
+
+    n_ladders = len(loaded.strategy.ladders)
+    n_exits = len(loaded.strategy.exits)
+    n_features = len(loaded.features)
+    typer.echo(
+        f"Valid. {loaded.strategy.id}: {n_features} feature(s), "
+        f"{n_ladders} ladder(s), {n_exits} exit(s)."
+    )
 
 
 @app.command()
