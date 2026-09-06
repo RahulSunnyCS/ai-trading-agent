@@ -96,6 +96,35 @@ class Cache:
             for r in rows
         ]
 
+    def coverage(self, underlying: str) -> dict[str, dict[str, str]]:
+        """Returns `{timeframe: {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}}`
+        for every timeframe directory cached under `underlying`, queried off
+        the ATM CE option series' actual min/max timestamp (a series every
+        ingested underlying has). Used by the FastAPI service so a caller
+        (dashboard/MCP) knows what date range it can actually request before
+        calling `obt run` / `POST /runs`."""
+        result: dict[str, dict[str, str]] = {}
+        underlying_dir = self._dir / underlying
+        if not underlying_dir.exists():
+            return result
+        for tf_dir in sorted(p.name for p in underlying_dir.iterdir() if p.is_dir()):
+            pattern = self._glob(underlying, tf_dir, "opt", "ATM", "CE")
+            con = duckdb.connect(":memory:")
+            try:
+                row = con.execute(
+                    "SELECT min(ts), max(ts) FROM read_parquet(?)", [pattern]
+                ).fetchone()
+            except duckdb.IOException:
+                continue
+            finally:
+                con.close()
+            if row is not None and row[0] is not None:
+                result[tf_dir] = {
+                    "start": row[0].date().isoformat(),
+                    "end": row[1].date().isoformat(),
+                }
+        return result
+
     def get_greeks(
         self,
         underlying: str,

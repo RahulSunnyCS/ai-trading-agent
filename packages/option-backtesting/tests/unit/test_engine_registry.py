@@ -1,7 +1,7 @@
 from datetime import date
 from pathlib import Path
 
-from option_backtesting.engine.registry import list_runs, record_run, strategy_hash
+from option_backtesting.engine.registry import get_run, list_runs, record_run, strategy_hash
 from option_backtesting.engine.result import AggregateResult
 from option_backtesting.strategy.loader import load_strategy
 
@@ -66,3 +66,26 @@ def test_strategy_hash_is_stable_for_the_same_strategy() -> None:
     a1 = load_strategy(STRATEGIES_DIR / "A_flat.yaml").strategy
     a2 = load_strategy(STRATEGIES_DIR / "A_flat.yaml").strategy
     assert strategy_hash(a1) == strategy_hash(a2)
+
+
+def test_get_run_returns_the_matching_record(tmp_path) -> None:
+    loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
+    db_path = tmp_path / "registry.sqlite"
+    run_id = record_run(
+        db_path, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result()
+    )
+    record = get_run(db_path, run_id)
+    assert record is not None
+    assert record.run_id == run_id
+    assert record.strategy_id == "nifty_flat_A"
+
+
+def test_get_run_returns_none_for_unknown_id(tmp_path) -> None:
+    loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
+    db_path = tmp_path / "registry.sqlite"
+    record_run(db_path, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result())
+    assert get_run(db_path, "does-not-exist") is None
+
+
+def test_get_run_on_nonexistent_db_returns_none(tmp_path) -> None:
+    assert get_run(tmp_path / "does_not_exist.sqlite", "any-id") is None

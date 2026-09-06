@@ -18,7 +18,7 @@
 | Paper Trading | Quantiply API (paper trade execution tracking) |
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
-| Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee); FastAPI service/MCP server/dashboard tab still ahead |
+| Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee), FastAPI service + MCP server, fronted by a Fastify proxy and a React dashboard tab; walk-forward/sweeps/overfitting-guard/personality-export (M-5) still ahead |
 
 ## Package Manager & Runtime
 
@@ -70,6 +70,17 @@ uv sync
 uv run pytest
 uv run obt ingest plan --date YYYY-MM-DD --to YYYY-MM-DD --underlying NIFTY
 uv run obt ingest --date YYYY-MM-DD --underlying NIFTY
+uv run obt validate strategies/B_pyramid.yaml
+uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
+uv run obt registry
+
+# option-backtesting FastAPI service (loopback-only, port 8000) — from repo root
+bun run py:api               # equivalent to: cd packages/option-backtesting && uv run obt-api
+# The Fastify proxy (BACKTEST_API_URL, default http://127.0.0.1:8000) is the only
+# public-facing surface in front of it — see apps/server/src/server/routes/backtest.ts.
+
+# option-backtesting MCP server (stdio) — registered in root .mcp.json as "option-backtesting";
+# a Claude Code session picks it up automatically, no manual start needed.
 
 # Teardown
 docker compose down         # stop services, keep data volumes
@@ -88,6 +99,7 @@ ai-trading-agent/
 ├── docker-compose.yml               # TimescaleDB (timescale/timescaledb:latest-pg16) + Redis 7
 ├── .env.example                     # single shared .env at repo root; both apps read it
 ├── biome.json · lefthook.yml        # repo-wide lint/format + pre-commit hooks
+├── .mcp.json                        # registers the "option-backtesting" MCP server (obt-mcp, stdio)
 ├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
 ├── apps/
 │   ├── server/                      # @ata/server — the Fastify/Bun backend
@@ -124,6 +136,9 @@ ai-trading-agent/
 │       ├── index.html · tailwind.config.ts · postcss.config.js
 │       ├── e2e/                     # Playwright specs
 │       └── src/                     # App.tsx, components/, hooks/, lib/, store/, types/
+│                                     # components/BacktestView.tsx + hooks/useBacktest{Presets,Runs,Validate}.ts
+│                                     # + types/backtest.ts — the options-backtesting research tab (M-4),
+│                                     # fed entirely through /api/backtest/* (never the Python service directly)
 └── packages/
     └── option-backtesting/          # Python 3.12 / uv — strategy-research workbench over AlgoTest option
                                       # bars, answering "is this strategy worth becoming a personality?"
@@ -131,10 +146,15 @@ ai-trading-agent/
                                       # replays the live personalities historically). Not a Bun workspace
                                       # member — has its own pyproject.toml/uv.lock. Data layer, strategy
                                       # DSL, and the bar-by-bar engine are built and golden-fixture-verified
-                                      # to the rupee (M-1/M-2/M-3); FastAPI service/MCP server/dashboard tab
-                                      # are still ahead — see the epic doc once it lands.
+                                      # to the rupee (M-1/M-2/M-3); the FastAPI service, MCP server, Fastify
+                                      # proxy, and dashboard tab are built (M-4) — walk-forward/sweeps/
+                                      # overfitting-guard/personality-export (M-5) are still ahead.
         ├── pyproject.toml · uv.lock · .python-version · DECISIONS.md
         ├── src/option_backtesting/
+        │   ├── config.py                 # BACKTEST_DATA_DIR-derived cache/registry path resolution — shared
+        │   │                              # by api/app.py and mcp/server.py
+        │   ├── presets.py                # preset_names()/STRATEGIES_DIR — the allow-list both the API and
+        │   │                              # the MCP server check BEFORE building a filesystem path (no traversal)
         │   ├── data/
         │   │   ├── providers/{base,algotest,dhan}.py   # MarketDataProvider Protocol, canonical Bar/InstrumentKey
         │   │   ├── resolver.py         # ATM/OTMn/ITMn/EXACT -> concrete strike, independent of any vendor
@@ -160,6 +180,15 @@ ai-trading-agent/
         │   │   ├── ledger.py · state.py  # Fill/SessionLedger; per-session running-anchor/last-fill state
         │   │   ├── result.py           # SessionResult/AggregateResult, bootstrap_ci (R1a), render_report
         │   │   └── registry.py         # SQLite run history (data/registry.sqlite, gitignored)
+        │   ├── api/                      # FastAPI service (M-4), loopback-only (127.0.0.1:8000) — the
+        │   │   │                         # Fastify proxy is the only public-facing surface in front of it
+        │   │   ├── app.py              # create_app() factory + `obt-api` uvicorn entry point
+        │   │   ├── routes.py           # validate/runs/presets/coverage/health
+        │   │   └── models.py           # pydantic request/response models
+        │   ├── mcp/
+        │   │   └── server.py             # `obt-mcp` stdio MCP server (M-4) — mcp 2.x's MCPServer (see
+        │   │                             # DECISIONS.md); tools: plan_requests, validate_strategy,
+        │   │                             # run_backtest, list_runs, critique_result, propose_strategy
         │   └── cli.py                    # `obt` — ingest plan | ingest | validate | run | registry;
         │                                 # export-personality stubbed until M-5
         └── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
@@ -224,6 +253,8 @@ Critical variables whose misconfiguration causes real pain:
 | `MAX_WS_CONNECTIONS` | Max concurrent /ws/ticks WebSocket connections (default 50). Positive integers only; non-positive values silently fall back to 50 |
 | `EVOLUTION_REQUIRE_APPROVAL` | Should be `true` in any environment where the retrospection engine runs. Setting `false` allows the system to autonomously modify personality parameters without human review |
 | `TOKEN_VALIDITY_SCHEDULER_ENABLED` | When set to `true`, registers a BullMQ cron job that checks Fyers token expiry at 08:45 IST weekdays. Disabled by default; opt-in via this flag |
+| `BACKTEST_API_URL` | Base URL of the loopback-only Python FastAPI service (default `http://127.0.0.1:8000`). The Fastify proxy validates this resolves to loopback/private address space at startup — a public host throws (safe default-throw), the proxy never starts against it |
+| `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet cache and writes its run registry (`<dir>/cache`, `<dir>/registry.sqlite`). Defaults to `packages/option-backtesting`'s own `data/` when unset |
 
 ## Common Tasks
 

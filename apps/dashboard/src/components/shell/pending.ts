@@ -50,6 +50,13 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Render replay results in the UI',
     'Add one-click dry-run from a coverage row',
   ],
+  backtest: [
+    'Add weekday and regime buckets alongside the DTE breakdown (M-5)',
+    'Add walk-forward / sweep reporting and overfitting guard (M-5)',
+    'Surface ingest-time quality flags on the run result, not just P&L',
+    'Add a compare view across multiple past runs',
+    'Add an export-to-personality action once a run looks promising (M-5)',
+  ],
   pricing: [
     'Show the current subscription / credit balance',
     'Add purchase history and receipts',

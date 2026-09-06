@@ -51,3 +51,18 @@ that close this gap fully.
 - **`hatchling` build backend.** No compiled extensions, no reason for anything heavier.
 - **`typer` for the CLI**, not raw `argparse`— the CLI has multiple subcommands
   (`ingest plan`, `ingest`, `validate`, `run`, `registry`, `export-personality`) from day one.
+
+## `mcp` SDK is v2.x (`MCPServer`), not v1.x (`FastMCP`) — M-4
+
+`pyproject.toml`'s `mcp>=1.1` dependency spec (written at M-1 scaffolding time, before any MCP
+server code existed) had no upper bound, so `uv sync` resolved and locked `mcp==2.1.1` by the
+time M-4 actually wrote `mcp/server.py`. Between v1 and v2 the SDK renamed its high-level
+decorator API: `mcp.server.fastmcp.FastMCP` no longer exists — the module raises
+`ModuleNotFoundError` with an explicit migration message pointing at
+`mcp.server.mcpserver.MCPServer`. The replacement's `.tool()` decorator and `.run()` (defaulting
+to stdio transport) behave the same way for our purposes; `mcp/server.py` is written against
+`MCPServer`. Not repinning the dependency spec to `mcp>=2.0` — `uv.lock` already pins the exact
+resolved `2.1.1`, which is what actually matters for reproducibility; the loose `pyproject.toml`
+constraint being technically satisfiable by a now-incompatible v1 install is a latent footgun
+for a *fresh* `uv sync` against a hypothetically-yanked lockfile, not something this session hit
+in practice — flagged here rather than "fixed" with a change that has no test coverage behind it.

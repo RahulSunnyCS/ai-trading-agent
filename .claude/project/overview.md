@@ -21,6 +21,7 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - Fastify REST API (port 3000) — signal management, personality CRUD, paper-trade queries, retrospection triggers, live dashboard data, payment/order endpoints
 - WebSocket endpoint (`/ws/ticks`) — live tick stream for the React frontend
 - Payment routes — `POST /payment/create-order`, `POST /payment/webhook`, `GET /payment/balance`; access-gate middleware for subscription + credit checks
+- Backtest proxy routes (`/api/backtest/*`) — proxies to the loopback-only Python FastAPI service (`packages/option-backtesting`); `POST /runs` is access-gated and credit-consuming (feature `backtest_run`), `validate`/`presets`/`coverage`/`health` are free
 - Docker Compose — development infrastructure (TimescaleDB + Redis)
 - Simulation mode (`SIMULATE=true`) — fully self-contained, no broker credentials needed
 
@@ -37,6 +38,18 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - **Phase 2:** S/R signal detection engine, Levelhead personality, BankNifty/Sensex expansion, Bayesian optimisation
 - **Phase 3:** Strategies 2 & 3, genetic algorithms, microstructure-aware slippage
 - **Phase 4:** Reinforcement learning, live trading readiness assessment
+
+**`packages/option-backtesting` epic** (own M-0..M-5 numbering, distinct from the Phase/M-numbers
+above, which describe the TS trading engine): M-0 (monorepo move), M-1 (data layer + 90-day real
+backfill), M-2 (strategy DSL + feature registry), and M-3 (bar-by-bar engine, golden-fixture-
+verified to the rupee) are done. **M-4 (this milestone) is done:** FastAPI service
+(`obt-api`/`packages/option-backtesting/src/option_backtesting/api/`) exposing
+validate/run/registry/presets/coverage; the Fastify proxy above; a React "Backtest" dashboard tab
+(preset picker, debounced YAML validation, run + past-runs tables); and an MCP server (`obt-mcp`,
+registered in root `.mcp.json`) exposing `plan_requests`/`validate_strategy`/`run_backtest`/
+`list_runs`/`critique_result`/`propose_strategy` so a Claude Code session can drive the engine
+directly. Remaining: **M-5** (walk-forward/sweeps, overfitting guard, margin model, regime
+buckets, personality export, nightly ingest Routine).
 
 ## Project File Maintenance
 

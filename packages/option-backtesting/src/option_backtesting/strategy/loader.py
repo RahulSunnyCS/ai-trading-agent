@@ -91,12 +91,31 @@ def load_strategy(path: Path) -> LoadedStrategy:
     StrategyValidationError with every line-numbered problem found (not just
     the first) — a strategy author fixing five bad features one at a time
     would otherwise re-run five times for no reason."""
-    source = path.read_text()
-    data = yaml.safe_load(source)
-    lines = _build_line_map(source)
+    return load_strategy_from_source(path.read_text(), label=str(path))
+
+
+def load_strategy_from_source(source: str, *, label: str = "<string>") -> LoadedStrategy:
+    """Same validation as `load_strategy`, over an in-memory YAML string
+    rather than a file path — used by the FastAPI service (api/routes.py),
+    which receives strategy YAML as request-body text, never a filesystem
+    path, so it never has occasion to open an arbitrary caller-supplied
+    path. `label` only appears in the one error message that needs a
+    human-readable source name."""
+    try:
+        data = yaml.safe_load(source)
+    except yaml.YAMLError as e:
+        raise StrategyValidationError([f"{label}: could not parse YAML: {e}"]) from None
 
     if not isinstance(data, dict):
-        raise StrategyValidationError([f"{path}: top-level YAML document must be a mapping"])
+        raise StrategyValidationError([f"{label}: top-level YAML document must be a mapping"])
+
+    try:
+        lines = _build_line_map(source)
+    except yaml.YAMLError:
+        # yaml.safe_load already succeeded above (a single-pass parser), so
+        # this is unreachable in practice — but never let a purely cosmetic
+        # line-number pass crash validation that otherwise succeeded.
+        lines = {}
 
     errors: list[str] = []
     features: dict[str, FeatureSpec] = {}

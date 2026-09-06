@@ -112,6 +112,17 @@ def record_run(
     return run_id
 
 
+def get_run(db_path: Path, run_id: str) -> RunRecord | None:
+    if not db_path.exists():
+        return None
+    con = _connect(db_path)
+    try:
+        row = con.execute(f"SELECT {_COLUMNS} FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    finally:
+        con.close()
+    return RunRecord(*row) if row is not None else None
+
+
 def list_runs(db_path: Path, limit: int = 20) -> list[RunRecord]:
     if not db_path.exists():
         return []

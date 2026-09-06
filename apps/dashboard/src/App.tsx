@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useState } from 'react';
 
 import { BackfillView } from './components/BackfillView';
+import { BacktestView } from './components/BacktestView';
 import { LiveView } from './components/LiveView';
 import { PaymentTestModeBanner } from './components/PaymentTestModeBanner';
 import { PersonalitiesView } from './components/PersonalitiesView';
@@ -24,6 +25,7 @@ const SUBTITLES: Record<Tab, string> = {
   regime: 'Daily market-regime classification history',
   backfill: 'Historical tick-data ingestion coverage',
   replay: 'Deterministic replay of historical sessions',
+  backtest: 'Options strategy backtesting research workbench',
   pricing: 'Subscription access and feature credits',
 };
 
@@ -43,6 +45,8 @@ function renderView(tab: Tab) {
       return <BackfillView />;
     case 'replay':
       return <ReplayView />;
+    case 'backtest':
+      return <BacktestView />;
     case 'pricing':
       return <PricingPage />;
   }

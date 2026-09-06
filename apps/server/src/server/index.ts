@@ -54,6 +54,7 @@ import {
   createEodRetrospectionWorker,
 } from '../jobs/eod-retrospection-job.js';
 import { isAuthDegraded } from '../state/broker-status.js';
+import { backtestRoutes } from './routes/backtest';
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
 import { paymentRoutes } from './routes/payment';
 
@@ -877,6 +878,7 @@ export async function buildServer(
   // and can access all decorators without re-declaration.
   await server.register(paymentRoutes);
   await server.register(fyersAuthRoutes);
+  await server.register(backtestRoutes);
 
   // Register retrospection routes under /api prefix so all four endpoints are
   // reachable at /api/retrospection/*, matching the REST path convention used

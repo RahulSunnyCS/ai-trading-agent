@@ -7,7 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from option_backtesting.strategy.loader import StrategyValidationError, load_strategy
+from option_backtesting.strategy.loader import (
+    StrategyValidationError,
+    load_strategy,
+    load_strategy_from_source,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -45,6 +49,30 @@ class TestLoadStrategy:
         p.write_text("- just\n- a\n- list\n")
         with pytest.raises(StrategyValidationError, match="must be a mapping"):
             load_strategy(p)
+
+    def test_malformed_yaml_is_a_validation_error_not_a_crash(self, tmp_path: Path) -> None:
+        # A real gap this test closes: yaml.safe_load can raise yaml.YAMLError
+        # (e.g. an unclosed flow mapping) — this must surface as a normal
+        # StrategyValidationError, never propagate as an uncaught YAMLError
+        # (the FastAPI service's /validate route depends on this: a bad
+        # request body must never turn into an unhandled 500).
+        p = tmp_path / "malformed.yaml"
+        p.write_text("{{{not yaml")
+        with pytest.raises(StrategyValidationError, match="could not parse YAML"):
+            load_strategy(p)
+
+
+class TestLoadStrategyFromSource:
+    def test_validates_an_in_memory_yaml_string(self) -> None:
+        source = (FIXTURES / "valid_minimal.yaml").read_text()
+        loaded = load_strategy_from_source(source)
+        assert loaded.strategy is not None
+        assert loaded.strategy.id == "test"
+
+    def test_errors_use_the_given_label(self) -> None:
+        with pytest.raises(StrategyValidationError) as exc_info:
+            load_strategy_from_source("- a\n- list\n", label="request body")
+        assert "request body" in exc_info.value.errors[0]
 
     def test_multiple_errors_all_reported_at_once(self, tmp_path: Path) -> None:
         p = tmp_path / "multi_bad.yaml"
