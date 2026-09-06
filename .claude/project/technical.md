@@ -18,7 +18,7 @@
 | Paper Trading | Quantiply API (paper trade execution tracking) |
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
-| Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL (data layer built; strategy/engine ahead) |
+| Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee); FastAPI service/MCP server/dashboard tab still ahead |
 
 ## Package Manager & Runtime
 
@@ -129,10 +129,10 @@ ai-trading-agent/
                                       # bars, answering "is this strategy worth becoming a personality?"
                                       # (a different question from apps/server's `bun run backtest`, which
                                       # replays the live personalities historically). Not a Bun workspace
-                                      # member — has its own pyproject.toml/uv.lock. Data layer (providers,
-                                      # resolver, reference tables, quality gates, raw->Parquet ingest,
-                                      # DuckDB cache) is built; strategy DSL/engine/API are still ahead —
-                                      # see the epic doc once it lands.
+                                      # member — has its own pyproject.toml/uv.lock. Data layer, strategy
+                                      # DSL, and the bar-by-bar engine are built and golden-fixture-verified
+                                      # to the rupee (M-1/M-2/M-3); FastAPI service/MCP server/dashboard tab
+                                      # are still ahead — see the epic doc once it lands.
         ├── pyproject.toml · uv.lock · .python-version · DECISIONS.md
         ├── src/option_backtesting/
         │   ├── data/
@@ -142,9 +142,28 @@ ai-trading-agent/
         │   │   ├── quality.py          # ingest-time gates: identical_series, bar_gaps, zero_volume, etc.
         │   │   ├── raw.py              # raw AlgoTest JSON manifest read/write (data/raw/algotest/, tracked)
         │   │   ├── ingest.py           # raw JSON -> quality-gated Parquet (data/cache/, gitignored)
-        │   │   └── cache.py            # DuckDB façade the engine will read (never a provider directly)
-        │   └── cli.py                  # `obt` — ingest plan | ingest; validate/run/registry stubbed until M-2/M-3/M-5
-        └── tests/{golden,parity,unit}/
+        │   │   └── cache.py            # DuckDB façade the engine reads (never a provider directly)
+        │   ├── features/                # named, cached, point-in-time feature evaluation (leg_sum, raw, gap,
+        │   │   │                         # greek, days_to_expiry, max_runup, session_high/low, rolling_mean/
+        │   │   │                         # ewma/rolling_pctile) — registry.py (M-2) is the declarative schema,
+        │   │   │                         # the rest (M-3) is the runtime evaluator
+        │   │   ├── registry.py · store.py · evaluator.py
+        │   │   └── leg.py · greeks.py · calendar.py · path.py · rolling.py
+        │   ├── strategy/                 # schema.py (M-2 pydantic AST) · loader.py (line-numbered YAML errors)
+        │   ├── engine/                   # bar-by-bar event engine (M-3), pinned to reproduce the design
+        │   │   │                         # handoff's reference implementation to the rupee — see
+        │   │   │                         # engine/loop.py's module docstring before changing any formula
+        │   │   ├── loop.py             # SessionContext, build_sessions, simulate_session, run_backtest
+        │   │   ├── conditions.py       # Condition/Ref grammar evaluation (all/any/not/feature/time, anchors)
+        │   │   ├── fills.py            # trigger_level (default)/bar_close/worst_of_bar/next_open + slippage
+        │   │   ├── costs.py            # flat cost = total_lots × 2 legs × per_leg_rt
+        │   │   ├── ledger.py · state.py  # Fill/SessionLedger; per-session running-anchor/last-fill state
+        │   │   ├── result.py           # SessionResult/AggregateResult, bootstrap_ci (R1a), render_report
+        │   │   └── registry.py         # SQLite run history (data/registry.sqlite, gitignored)
+        │   └── cli.py                    # `obt` — ingest plan | ingest | validate | run | registry;
+        │                                 # export-personality stubbed until M-5
+        └── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
+                                            # reproduces golden_15_sessions.expected.txt to the rupee for A/B/C/D
 ```
 
 ## Architecture

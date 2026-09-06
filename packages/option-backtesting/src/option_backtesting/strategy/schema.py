@@ -102,6 +102,10 @@ class Universe(DslModel):
     # ("Session flag on every bar. Engine defaults to REGULAR."); this is
     # the only value accepted at the strategy-definition level today.
     session: Literal["REGULAR"] = "REGULAR"
+    # One timeframe per strategy run, threaded through every Cache bar/greek
+    # fetch — every committed strategy implicitly assumes 15m (matching the
+    # golden fixture), so this default preserves current behavior exactly.
+    timeframe: str = "15m"
 
 
 class Leg(DslModel):

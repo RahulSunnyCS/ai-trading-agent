@@ -1,9 +1,10 @@
 """
 `obt` — the option-backtesting CLI.
 
-M-1 implements `ingest plan` and `ingest`. `validate`/`run`/`registry`/
-`export-personality` are stubbed here (not `NotImplementedError` — a CLI
-should say plainly what's missing) until their milestones land.
+M-1 implements `ingest plan` and `ingest`. M-2 implements `validate`. M-3
+implements `run` and `registry`. `export-personality` is still stubbed
+(not `NotImplementedError` — a CLI should say plainly what's missing) until
+M-5.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import typer
 from .data.ingest import DEFAULT_CACHE_DIR, ingest_date
 from .data.providers.algotest import plan_requests
 from .data.raw import DEFAULT_RAW_DIR
+from .engine.registry import DEFAULT_REGISTRY_DB
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 ingest_app = typer.Typer(no_args_is_help=True)
@@ -101,18 +103,76 @@ def run(
     strategy_path: Path,
     from_: str = typer.Option(..., "--from"),
     to: str = typer.Option(..., "--to"),
+    cache_dir: Path = typer.Option(DEFAULT_CACHE_DIR, "--cache-dir"),
+    registry_db: Path = typer.Option(DEFAULT_REGISTRY_DB, "--registry-db"),
+    bootstrap: bool = typer.Option(False, "--bootstrap", help="Print a session-level bootstrap CI"),
+    bootstrap_resamples: int = typer.Option(2000, "--bootstrap-resamples"),
+    seed: int = typer.Option(0, "--seed"),
 ) -> None:
-    """Run a backtest over the cached window. Coming in M-3 (the golden
-    fixture must reproduce expected.txt to the rupee before this ships)."""
-    typer.echo("Not yet implemented — the engine (loop/fills/costs/ledger) lands in M-3.")
-    raise typer.Exit(code=1)
+    """Run a backtest over the cached window and record it in the run registry."""
+    from .data.cache import Cache
+    from .data.reference.loader import default_reference_data
+    from .engine.loop import run_backtest
+    from .engine.registry import record_run
+    from .engine.result import aggregate, bootstrap_ci, render_bootstrap, render_report
+    from .strategy.loader import StrategyValidationError, load_strategy
+
+    try:
+        loaded = load_strategy(strategy_path)
+    except StrategyValidationError as e:
+        typer.echo(f"INVALID: {strategy_path}")
+        for err in e.errors:
+            typer.echo(f"  {err}")
+        raise typer.Exit(code=1) from None
+
+    start = date.fromisoformat(from_)
+    end = date.fromisoformat(to)
+    cache = Cache(cache_dir)
+    reference = default_reference_data()
+
+    sessions = run_backtest(loaded, cache, reference, start, end)
+    if not sessions:
+        typer.echo(
+            f"No cached sessions found for {loaded.strategy.universe.underlying} "
+            f"in [{start}, {end}]."
+        )
+        raise typer.Exit(code=1)
+
+    result = aggregate(sessions)
+    typer.echo(render_report(result))
+
+    run_id = record_run(registry_db, loaded.strategy, start, end, result)
+    typer.echo(f"\nRecorded as run {run_id} in {registry_db}")
+
+    if bootstrap:
+        ci = bootstrap_ci(
+            [s.net for s in sessions],
+            [s.lot_days for s in sessions],
+            n_resamples=bootstrap_resamples,
+            seed=seed,
+        )
+        typer.echo("")
+        typer.echo(render_bootstrap(ci))
 
 
 @app.command()
-def registry() -> None:
-    """List past backtest runs. Coming in M-3 (SQLite registry)."""
-    typer.echo("Not yet implemented — the run registry lands in M-3.")
-    raise typer.Exit(code=1)
+def registry(
+    registry_db: Path = typer.Option(DEFAULT_REGISTRY_DB, "--registry-db"),
+    limit: int = typer.Option(20, "--limit"),
+) -> None:
+    """List past backtest runs."""
+    from .engine.registry import list_runs
+
+    runs = list_runs(registry_db, limit=limit)
+    if not runs:
+        typer.echo(f"No runs recorded yet in {registry_db}.")
+        return
+    for r in runs:
+        typer.echo(
+            f"{r.run_id}  {r.strategy_id} (v{r.strategy_version})  "
+            f"{r.date_from}..{r.date_to}  net={r.net_inr:.0f}  "
+            f"win_days={r.win_days}  INR/lot-day={r.inr_per_lot_day:.0f}"
+        )
 
 
 @app.command(name="export-personality")
