@@ -122,15 +122,21 @@ export async function runMigrations(): Promise<void> {
     // ------------------------------------------------------------------
     // 4. Discover migration files
     // ------------------------------------------------------------------
-    // Resolve relative to the repository root (process.cwd()) so this works
-    // whether invoked via `bun run migrate` from root or directly.
-    const migrationsDir = join(process.cwd(), 'src', 'db', 'migrations');
+    // Resolve relative to this module's own location, not process.cwd() —
+    // cwd varies with how the process is invoked (repo root via a workspace
+    // filter, this package's own directory, a script elsewhere) and a
+    // cwd-relative path silently resolved to the wrong directory before this
+    // fix. A missing migrations directory is a fatal misconfiguration, not a
+    // no-op: a stale/empty schema booting silently is worse than a crash.
+    const migrationsDir = join(import.meta.dirname, 'migrations');
     let files: string[];
     try {
       files = await readdir(migrationsDir);
-    } catch {
-      console.log('Migration: migrations directory not found or empty — nothing to apply.');
-      return;
+    } catch (err) {
+      throw new Error(
+        `Migration: migrations directory not found at ${migrationsDir}. This is fatal — refusing to boot against a schema that cannot be verified/applied.`,
+        { cause: err },
+      );
     }
 
     // Filter to .sql files only (ignore .gitkeep and other artefacts) and sort

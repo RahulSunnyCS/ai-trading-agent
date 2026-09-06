@@ -10,8 +10,8 @@ on:
   workflow_dispatch:        # allow manual trigger
 
 jobs:
-  ci:
-    name: Typecheck · Lint · Unit Tests
+  ts:
+    name: Server — Typecheck · Lint · Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,8 +32,14 @@ jobs:
       - name: Verify lockfile not modified
         run: git diff --exit-code bun.lock
 
-      - name: TypeScript typecheck
-        run: bun run --bun tsc --noEmit
+      # The dashboard package is intentionally not typechecked here — it
+      # inherits the same exclusion the pre-split root tsconfig had (its
+      # frontend tree was never covered by CI typecheck). It has its own
+      # `bun run --filter @ata/dashboard typecheck` for local/opt-in use;
+      # wiring it into CI is tracked as a follow-up once its existing type
+      # errors are fixed.
+      - name: TypeScript typecheck (server)
+        run: bun run typecheck
 
       # Download Biome binary from GitHub Releases (avoids the JFrog npm proxy
       # which does not have @biomejs/biome cached). GitHub Releases is reachable
@@ -44,8 +50,22 @@ jobs:
       - name: Biome lint
         run: ./tools/biome check .
 
-      - name: Unit tests
+      - name: Server unit tests
         run: bun run test:unit
+
+  dashboard:
+    name: Dashboard — Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+      - run: bun install --frozen-lockfile
+      - name: Vite build
+        run: bun run --filter @ata/dashboard build
+      - name: Dashboard unit tests
+        run: bun run --filter @ata/dashboard test
 
   integration:
     name: Integration Tests

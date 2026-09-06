@@ -9,7 +9,7 @@ import type { Config } from 'tailwindcss';
 export default {
   darkMode: 'class',
   // Scan only the frontend source tree — keeps Tailwind's JIT purge fast.
-  content: ['./index.html', './src/frontend/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {

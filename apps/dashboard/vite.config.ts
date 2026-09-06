@@ -3,6 +3,10 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
+  // Load .env from the repo root (single shared .env for the whole monorepo)
+  // instead of this package's own directory. VITE_-prefixed vars (e.g.
+  // VITE_RAZORPAY_KEY_ID) are still the only ones exposed to client code.
+  envDir: '../../',
   server: {
     port: 5173,
     proxy: {

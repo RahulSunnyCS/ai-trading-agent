@@ -52,6 +52,6 @@ pre-commit:
 # it cannot intercept method calls like Date.now() or constructor calls like
 # new Date(). There is no native Biome rule that blocks these at the call site.
 # Convention: all timestamp reads MUST go through the Clock interface in
-# src/utils/clock.ts so that tests can inject a deterministic FakeClock.
-# Any PR introducing Date.now() or new Date() outside src/utils/clock.ts
+# apps/server/src/utils/clock.ts so that tests can inject a deterministic
+# FakeClock. Any PR introducing Date.now() or new Date() outside that file
 # must be rejected at code review.

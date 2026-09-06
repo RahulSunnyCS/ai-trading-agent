@@ -28,8 +28,6 @@
 
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-// @ts-expect-error — 'ws' has no @types/ws in this project; the pattern mirrors
-// the smoke.test.ts dynamic-import fallback (see src/test/integration/smoke.test.ts).
 import WebSocket from 'ws';
 
 import type { FastifyInstance } from 'fastify';

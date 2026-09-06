@@ -49,8 +49,21 @@ export const DEFAULT_MASTER_SOURCES: Readonly<Record<'NSE' | 'BSE', string>> = {
 /** 24-hour cache freshness — re-download once a day at most. */
 export const DEFAULT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-/** Default on-disk cache root (relative to process cwd). Gitignored. */
-export const DEFAULT_CACHE_DIR = path.join('data', 'sym_master');
+/**
+ * Default on-disk cache root, anchored to this package's own directory
+ * rather than process.cwd() — cwd varies with how the process is launched
+ * (workspace filter, this package's directory, elsewhere) and a cwd-relative
+ * path would silently write the cache somewhere different depending on
+ * invocation. Gitignored.
+ */
+export const DEFAULT_CACHE_DIR = path.join(
+  import.meta.dirname,
+  '..',
+  '..',
+  '..',
+  'data',
+  'sym_master',
+);
 
 /**
  * Underlyings we care about. The master also lists FINNIFTY, MIDCPNIFTY, etc.

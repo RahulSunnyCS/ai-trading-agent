@@ -48,15 +48,15 @@ The server starts on `http://localhost:3000`.
 
 ### 5. View the dashboard
 
-The dashboard lives at the repository root (`index.html` + `src/frontend/`, root `vite.config.ts`). In development, run the Vite dev server alongside the backend:
+The dashboard lives in `apps/dashboard/` (`index.html` + `src/`, its own `vite.config.ts`). In development, run the Vite dev server alongside the backend:
 
 ```bash
-bunx vite        # Vite dev server at http://localhost:5173
+bun run --filter @ata/dashboard dev   # Vite dev server at http://localhost:5173
 ```
 
-It proxies `/api` and `/ws` to the backend on `http://localhost:3000` (see `vite.config.ts`).
+It proxies `/api` and `/ws` to the backend on `http://localhost:3000` (see `apps/dashboard/vite.config.ts`).
 
-For a production build run `bunx vite build`; the static files are emitted to `dist/`. Point a static server or the Fastify static plugin at that directory.
+For a production build run `bun run --filter @ata/dashboard build`; the static files are emitted to `apps/dashboard/dist/`. Point a static server or the Fastify static plugin at that directory.
 
 ### Dashboard Wiring
 
@@ -92,7 +92,7 @@ See `.env.example` for the full list. Key variables:
 
 ### Backfill — load historical market data
 
-The backfill writer (`src/ingestion/historical/backfill.ts`) populates the database with historical OHLCV candles from Fyers. Call `runBackfill()` with a date range and symbol; it fetches candles and writes them into market_ticks and option_ticks hypertables.
+The backfill writer (`apps/server/src/ingestion/historical/backfill.ts`) populates the database with historical OHLCV candles from Fyers. Call `runBackfill()` with a date range and symbol; it fetches candles and writes them into market_ticks and option_ticks hypertables.
 
 **Key properties:**
 - **Resumable:** if interrupted by auth failure (FyersAuthError), subsequent calls with the same options resume from the last checkpoint saved in backfill_ranges table.

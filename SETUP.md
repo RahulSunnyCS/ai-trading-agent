@@ -586,27 +586,32 @@ bun run migrate
 
 #### 10. TypeScript errors
 ```bash
-# Check for compilation errors
-bun run --bun tsc --noEmit
+# Check for compilation errors (both workspace packages)
+bun run typecheck
 ```
 
 ---
 
 ## Project Structure
 
+A Bun-workspaces monorepo — see `.claude/project/technical.md` for the full breakdown.
+
 ```
 ai-trading-agent/
-├── src/
-│   ├── db/              # PostgreSQL client, migrations, schema types
-│   ├── redis/           # Redis client, stream helpers
-│   ├── ingestion/       # Fyers broker adapter, straddle calculator, VIX feed
-│   ├── trading/         # Trading personalities, signal detection, execution
-│   ├── types/           # Shared TypeScript types
-│   └── index.ts         # Main entry point
+├── apps/
+│   ├── server/          # @ata/server — Fastify backend
+│   │   └── src/
+│   │       ├── db/              # PostgreSQL client, migrations, schema types
+│   │       ├── redis/           # Redis client, stream helpers
+│   │       ├── ingestion/       # Fyers broker adapter, straddle calculator, VIX feed
+│   │       ├── trading/         # Trading personalities, signal detection, execution
+│   │       ├── types/           # Shared TypeScript types
+│   │       └── index.ts         # Main entry point
+│   └── dashboard/        # @ata/dashboard — React/Vite SPA
 ├── docker-compose.yml   # PostgreSQL + Redis infrastructure
-├── .env.example         # Environment variable template
-├── package.json         # Bun project config
-└── tsconfig.json        # TypeScript config
+├── .env.example         # Environment variable template (single, shared by both apps)
+├── package.json         # workspace root — Bun project config, fan-out scripts
+└── tsconfig.base.json   # Shared TypeScript config, extended per-package
 ```
 
 ---

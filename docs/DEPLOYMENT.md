@@ -589,7 +589,7 @@ bun run migrate
 ```
 
 The migration runner:
-- Applies all pending migrations in `src/db/migrations/` in `NNN_` order
+- Applies all pending migrations in `apps/server/src/db/migrations/` in `NNN_` order
 - Records each applied version in `schema_migrations`
 - Is idempotent — safe to re-run on every deployment
 - Creates TimescaleDB hypertables and continuous aggregates
@@ -599,7 +599,7 @@ The migration runner:
 **Verify the database after first deploy:**
 ```bash
 bun -e "
-import { pool } from './src/db/client.ts';
+import { pool } from './apps/server/src/db/client.ts';
 const r = await pool.query('SELECT hypertable_name FROM timescaledb_information.hypertables;');
 console.log('Hypertables:', r.rows.map(r=>r.hypertable_name));
 await pool.end();
@@ -616,13 +616,13 @@ In production, build the React frontend into static files and serve them from Fa
 #### Build
 
 ```bash
-bun run build
-# Output: dist/ directory (index.html + hashed JS/CSS bundles)
+bun run --filter @ata/dashboard build
+# Output: apps/dashboard/dist/ (index.html + hashed JS/CSS bundles)
 ```
 
 #### Configure Fastify to Serve Static Files
 
-Ensure `src/server/index.ts` registers the static plugin:
+Ensure `apps/server/src/server/index.ts` registers the static plugin:
 
 ```typescript
 import fastifyStatic from '@fastify/static';
@@ -631,7 +631,7 @@ import path from 'path';
 // In production, serve the built frontend
 if (process.env.NODE_ENV === 'production') {
   await server.register(fastifyStatic, {
-    root: path.join(import.meta.dir, '../../dist'),
+    root: path.join(import.meta.dirname, '../../../dashboard/dist'),
     prefix: '/',
     decorateReply: false,
   });

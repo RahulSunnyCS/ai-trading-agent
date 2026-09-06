@@ -1,0 +1,49 @@
+{
+  "name": "@ata/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env run --watch src/index.ts",
+    "sim": "SIMULATE=true bun --env-file=../../.env run --watch src/index.ts",
+    "start": "bun --env-file=../../.env run src/index.ts",
+    "migrate": "bun --env-file=../../.env run src/db/migrate.ts",
+    "replay": "bun --env-file=../../.env run scripts/replay.ts",
+    "backtest": "bun --env-file=../../.env run scripts/backtest.ts",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:watch": "vitest --project unit",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "bun run --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/websocket": "^11.2.0",
+    "bullmq": "^5.13.0",
+    "date-fns": "^4.3.0",
+    "date-fns-tz": "^3.2.0",
+    "decimal.js": "^10.6.0",
+    "dotenv": "^16.4.0",
+    "fastify": "^5.8.0",
+    "fastify-plugin": "^5.0.0",
+    "fyers-api-v3": "^1.8.0",
+    "ioredis": "^5.3.2",
+    "otplib": "^13.4.0",
+    "pg": "^8.13.0",
+    "razorpay": "^2.9.0",
+    "smartapi-javascript": "^1.0.27"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
+    "@types/ws": "^8.5.0",
+    "@vitest/coverage-v8": "^4.1.6",
+    "fast-check": "^4.8.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "ws": "^8.16.0"
+  }
+}

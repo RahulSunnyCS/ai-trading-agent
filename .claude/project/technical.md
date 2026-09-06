@@ -8,27 +8,30 @@
 | Runtime | Bun (latest) — used for all execution, including migrations and scripts |
 | Web Framework | Fastify 4.x — schema-validated routes, ~2ms p99 latency target |
 | Primary DB | PostgreSQL 16 + TimescaleDB 2.x extension (required, not optional) |
-| ORM / DB Access | Raw SQL via `pg` pool — no ORM. Custom migration runner in `src/db/migrate.ts` |
+| ORM / DB Access | Raw SQL via `pg` pool — no ORM. Custom migration runner in `apps/server/src/db/migrate.ts` |
 | Message Queue / Event Bus | Redis 7 Streams — topics: `market.ticks`, `straddle.values`, `signals.generated` |
 | Background Jobs | BullMQ (Redis-backed) — EOD retrospection batch |
 | Cache | Redis 7 — sub-ms reads for price cache and personality state |
 | Frontend | React 18 + Vite + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts |
 | Testing | Vitest (unit + integration) + Playwright (E2E) |
-| Market Data | Fyers WebSocket via `fyers-api-v3` SDK (untyped — TypeScript shim in `src/types/`) |
+| Market Data | Fyers WebSocket via `fyers-api-v3` SDK (untyped — TypeScript shim in `apps/server/src/types/`) |
 | Paper Trading | Quantiply API (paper trade execution tracking) |
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
 
 ## Package Manager & Runtime
 
-- **Package manager:** Bun — single lockfile (`bun.lock`). Do not use `npm` or `yarn`; they will create a second lockfile and conflict
+- **Package manager:** Bun — single lockfile (`bun.lock`) at the repo root. Do not use `npm` or `yarn`; they will create a second lockfile and conflict
 - **Runtime:** Bun (latest) — `bun run <script>` for everything. Node.js is NOT used directly
 - **TypeScript:** Compiled and executed natively by Bun — no `tsc` build step for running. `tsc --noEmit` is used only for type-checking
+- **Monorepo:** Bun workspaces (`"workspaces": ["apps/*"]` in the root `package.json`). All root-level scripts fan out to the workspace packages via `bun run --filter <pkg> <script>` or `bun run --workspaces <script>` — run them from the repo root, not from inside a package directory, unless you deliberately want to scope a command to one package
 
 ## Essential Commands
 
+All commands below are run from the **repo root** and fan out to the relevant workspace package(s).
+
 ```bash
-# Install dependencies
+# Install dependencies (single lockfile for the whole monorepo)
 bun install
 
 # Start infrastructure (PostgreSQL + Redis via Docker)
@@ -39,19 +42,23 @@ docker compose ps          # verify both show (healthy)
 bun run migrate
 
 # Development — simulation mode (no broker credentials needed)
-SIMULATE=true bun run dev   # or: bun run sim
+bun run sim                 # equivalent to SIMULATE=true bun run dev
 
 # Development — live mode (Fyers credentials required)
-bun run dev                 # watch mode with auto-reload
-bun start                   # production-style start
+bun run dev                 # watch mode with auto-reload (apps/server)
+bun run start                # production-style start (apps/server)
 
-# Type-check only (no emit)
-bun run --bun tsc --noEmit
+# Dashboard dev server (Vite, proxies /api to the server on :3000)
+bun run --filter @ata/dashboard dev
+
+# Type-check both packages (server + dashboard)
+bun run typecheck
 
 # Tests
-bun test                    # all tests
-bun run test:unit           # unit tests only
-bun run test:integration    # integration tests (requires Docker services running)
+bun run test                # unit tests in every workspace package
+bun run test:unit           # server unit tests only
+bun run test:integration    # server integration tests (requires Docker services running)
+bun run test:e2e            # dashboard Playwright suite (start the Vite dev server first)
 
 # Teardown
 docker compose down         # stop services, keep data volumes
@@ -60,38 +67,54 @@ docker compose down -v      # stop + destroy data volumes (full reset)
 
 ## Repository Structure
 
+A Bun-workspaces monorepo: `apps/server` (Fastify/Bun backend), `apps/dashboard` (React/Vite frontend), and — once the options-backtesting epic lands — `packages/option-backtesting` (a Python sub-package, not a Bun workspace member). Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
+
 ```
 ai-trading-agent/
-├── src/
-│   ├── db/
-│   │   ├── client.ts               # PostgreSQL pool + query helpers
-│   │   ├── migrate.ts              # Custom migration runner with retry logic
-│   │   ├── schema.ts               # TypeScript types for every DB table
-│   │   └── migrations/             # Sequential SQL migration files (001_*.sql, etc.)
-│   ├── redis/
-│   │   └── client.ts               # Redis client + streamPublish / streamRead helpers
-│   ├── ingestion/
-│   │   ├── straddle-calc.ts        # ATM strike calculation, 15s snapshots, ROC/acceleration
-│   │   ├── vix-feed.ts             # VIX poller (NSE public API fallback)
-│   │   ├── market-data-sim.ts      # Random-walk simulator for dev (no broker needed)
-│   │   └── brokers/
-│   │       ├── types.ts            # BrokerFeed interface + BrokerTick type
-│   │       ├── broker-factory.ts   # createBroker() factory — selects adapter by BROKER / SIMULATE env
-│   │       ├── fyers.ts            # Fyers fyersDataSocket adapter (socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection)
-│   │       ├── angelone.ts         # Angel One (SmartAPI) adapter
-│   │       └── instrument-registry.ts  # Weekly/monthly symbol builder + expiry helpers
-│   ├── jobs/
-│   │   └── token-validity-check.ts # Pre-market Fyers token expiry check + BullMQ scheduler
-│   ├── state/
-│   │   └── broker-status.ts        # Runtime broker auth degradation flag (AUTH_FAILURE detection)
-│   ├── trading/                    # Personalities, signal detection, paper execution (Sprint 2+)
-│   ├── types/
-│   │   └── fyers-api-v3.d.ts       # TypeScript declaration shim for untyped Fyers SDK
-│   └── index.ts                    # Main entry point (branches on SIMULATE env var)
-├── docker-compose.yml              # TimescaleDB (postgres:16-alpine + timescaledb) + Redis 7
-├── .env.example                    # All required env vars documented with defaults
-├── package.json                    # Bun project config + scripts
-└── tsconfig.json                   # TypeScript config (strict mode)
+├── package.json                     # workspace root: "workspaces": ["apps/*"]; scripts fan out via --filter/--workspaces
+├── bun.lock                         # single lockfile for the whole monorepo
+├── tsconfig.base.json               # shared strict compilerOptions, extended by each package's tsconfig.json
+├── docker-compose.yml               # TimescaleDB (timescale/timescaledb:latest-pg16) + Redis 7
+├── .env.example                     # single shared .env at repo root; both apps read it
+├── biome.json · lefthook.yml        # repo-wide lint/format + pre-commit hooks
+├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
+├── apps/
+│   ├── server/                      # @ata/server — the Fastify/Bun backend
+│   │   ├── package.json · tsconfig.json · vitest.config.ts · vitest.workspace.ts
+│   │   ├── scripts/                 # replay.ts, backtest.ts, backfill-legs.ts, reconstruct.ts
+│   │   └── src/
+│   │       ├── db/
+│   │       │   ├── client.ts               # PostgreSQL pool + query helpers
+│   │       │   ├── migrate.ts              # Custom migration runner with retry logic
+│   │       │   ├── schema.ts               # TypeScript types for every DB table
+│   │       │   └── migrations/             # Sequential SQL migration files (001_*.sql, etc.)
+│   │       ├── redis/
+│   │       │   └── client.ts               # Redis client + streamPublish / streamRead helpers
+│   │       ├── ingestion/
+│   │       │   ├── straddle-calc.ts        # ATM strike calculation, 15s snapshots, ROC/acceleration
+│   │       │   ├── vix-feed.ts             # VIX poller (NSE public API fallback)
+│   │       │   ├── market-data-sim.ts      # Random-walk simulator for dev (no broker needed)
+│   │       │   └── brokers/
+│   │       │       ├── types.ts            # BrokerFeed interface + BrokerTick type
+│   │       │       ├── broker-factory.ts   # createBroker() factory — selects adapter by BROKER / SIMULATE env
+│   │       │       ├── fyers.ts            # Fyers fyersDataSocket adapter (socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection)
+│   │       │       ├── angelone.ts         # Angel One (SmartAPI) adapter
+│   │       │       └── instrument-registry.ts  # Weekly/monthly symbol builder + expiry helpers
+│   │       ├── jobs/
+│   │       │   └── token-validity-check.ts # Pre-market Fyers token expiry check + BullMQ scheduler
+│   │       ├── state/
+│   │       │   └── broker-status.ts        # Runtime broker auth degradation flag (AUTH_FAILURE detection)
+│   │       ├── trading/                    # Personalities, signal detection, paper execution
+│   │       ├── types/
+│   │       │   └── fyers-api-v3.d.ts       # TypeScript declaration shim for untyped Fyers SDK
+│   │       └── index.ts                    # Main entry point (branches on SIMULATE env var)
+│   └── dashboard/                   # @ata/dashboard — the React/Vite SPA
+│       ├── package.json · tsconfig.json · vite.config.ts · vitest.config.ts · playwright.config.ts
+│       ├── index.html · tailwind.config.ts · postcss.config.js
+│       ├── e2e/                     # Playwright specs
+│       └── src/                     # App.tsx, components/, hooks/, lib/, store/, types/
+└── packages/
+    └── option-backtesting/          # Python sub-package (uv-managed) — see the options-backtesting epic doc once it lands
 ```
 
 ## Architecture
@@ -117,15 +140,15 @@ The system is a **real-time event-driven pipeline** in four layers:
 
 ## Key Patterns & Conventions
 
-- **No ORM:** All DB access is raw SQL via the `pg` pool. Query results are typed against the interfaces in `src/db/schema.ts`
-- **Migration files:** Named `NNN_description.sql` in `src/db/migrations/`. The runner applies them in order and records applied versions in `schema_migrations`. Always add new migrations as new files — never edit applied ones. Runner identifies migrations by **filename only** (no content checksum): once a file is applied, its name is registered in `schema_migrations` and re-runs are skipped. Editing already-applied migrations affects only fresh installs; existing databases skip them. For schema changes, determine the canonical source: `personality_configs` and `straddle_signals` are canonically defined in `001_core_schema.sql` (params-shape); later migration files that repeat these CREATE TABLEs are no-ops on fresh installs. When editing historical migrations, verify the change applies to the intended phase of deployment (fresh vs. existing DB).
+- **No ORM:** All DB access is raw SQL via the `pg` pool. Query results are typed against the interfaces in `apps/server/src/db/schema.ts`
+- **Migration files:** Named `NNN_description.sql` in `apps/server/src/db/migrations/`. The runner applies them in order and records applied versions in `schema_migrations`. Always add new migrations as new files — never edit applied ones. Runner identifies migrations by **filename only** (no content checksum): once a file is applied, its name is registered in `schema_migrations` and re-runs are skipped. Editing already-applied migrations affects only fresh installs; existing databases skip them. For schema changes, determine the canonical source: `personality_configs` and `straddle_signals` are canonically defined in `001_core_schema.sql` (params-shape); later migration files that repeat these CREATE TABLEs are no-ops on fresh installs. When editing historical migrations, verify the change applies to the intended phase of deployment (fresh vs. existing DB).
 - **Broker symbol format (Fyers):** Weekly options: `NSE:NIFTY{YY}{M}{DD}{STRIKE}{TYPE}` where months Oct–Dec use single letter codes (O, N, D). See `instrument-registry.ts` for the encoder/decoder
 - **ATM strike intervals:** NIFTY = 50pt, BankNifty = 100pt, Sensex = 100pt. Always use `getAtmStrike()` — never compute this inline
-- **Broker adapter selection:** All brokers (Fyers, Angel One, simulator) implement the common `BrokerFeed` interface. The `createBroker()` factory in `src/ingestion/brokers/broker-factory.ts` selects the adapter based on `BROKER` and `SIMULATE` env vars: `BROKER=fyers` → FyersBroker, `BROKER=angelone` → AngelOneBroker, `BROKER=sim` or `SIMULATE=true` → MarketDataSimulator. If `BROKER` is unset/empty AND `SIMULATE !== 'true'`, the factory throws a descriptive error at startup — safe default-throw prevents silent misconfiguration in live environments.
+- **Broker adapter selection:** All brokers (Fyers, Angel One, simulator) implement the common `BrokerFeed` interface. The `createBroker()` factory in `apps/server/src/ingestion/brokers/broker-factory.ts` selects the adapter based on `BROKER` and `SIMULATE` env vars: `BROKER=fyers` → FyersBroker, `BROKER=angelone` → AngelOneBroker, `BROKER=sim` or `SIMULATE=true` → MarketDataSimulator. If `BROKER` is unset/empty AND `SIMULATE !== 'true'`, the factory throws a descriptive error at startup — safe default-throw prevents silent misconfiguration in live environments.
 - **Simulation mode:** Controlled by `SIMULATE=true` env var. The simulator generates realistic random-walk NIFTY tick data at configurable interval AND emits synthetic ATM CE/PE option-leg ticks so the straddle pipeline works end-to-end. Everything downstream is identical — simulation is not a test mode, it uses the real pipeline. Hypertable writes are trimmed to ~10000 rows via MAXLEN on all ingestion xadds.
 - **Regime tagging:** Every retrospection result must carry a `market_regime` tag. Never compare personality performance across different regimes without filtering. The four tags are: `RANGING`, `TRENDING_STRONG`, `VOLATILE_REVERTING`, `EVENT_DAY`
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`
-- **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `src/types/fyers-api-v3.d.ts` covers the SDK surface we use
+- **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `apps/server/src/types/fyers-api-v3.d.ts` covers the SDK surface we use
 - **No default exports:** Use named exports throughout
 
 ## Testing
@@ -156,9 +179,9 @@ Critical variables whose misconfiguration causes real pain:
 ## Common Tasks
 
 **Add a new broker adapter:**
-1. Implement `BrokerFeed` interface from `src/ingestion/brokers/types.ts`
-2. Add the adapter file under `src/ingestion/brokers/`
-3. Update `src/index.ts` to select the new adapter based on an env var
+1. Implement `BrokerFeed` interface from `apps/server/src/ingestion/brokers/types.ts`
+2. Add the adapter file under `apps/server/src/ingestion/brokers/`
+3. Update `apps/server/src/index.ts` to select the new adapter based on an env var
 
 **Add a new personality:**
 1. Insert a row into `personality_configs` in the seed migration (or via a new migration)
@@ -166,13 +189,13 @@ Critical variables whose misconfiguration causes real pain:
 3. If Phase 2+, set `phase = 2` so it is gated behind the Phase 2 flag
 
 **Add a database table:**
-1. Create a new migration file `src/db/migrations/NNN_description.sql`
-2. Add TypeScript interface to `src/db/schema.ts`
+1. Create a new migration file `apps/server/src/db/migrations/NNN_description.sql`
+2. Add TypeScript interface to `apps/server/src/db/schema.ts`
 3. Run `bun run migrate` to apply
 
 **Change a signal parameter:**
 1. Adjust the env var (e.g., `SIGNAL_MIN_EXPANSION_PCT`) — no code change needed for thresholds in `PeakDetectionConfig`
-2. For structural algorithm changes, modify `src/ingestion/straddle-calc.ts`
+2. For structural algorithm changes, modify `apps/server/src/ingestion/straddle-calc.ts`
 
 ## Gotchas
 
