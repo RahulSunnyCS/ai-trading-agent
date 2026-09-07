@@ -133,6 +133,13 @@ class TestRuns:
         assert round(body["gross_inr"]) > round(body["net_inr"])  # cost was subtracted
         assert body["bootstrap"] is None
         assert len(body["sessions"]) == 15
+        assert body["margin"]["strategy_type"] == "short-straddle"
+        assert body["margin"]["peak_lots"] == 4
+        assert body["margin"]["margin_per_lot_inr"] == 140000
+        assert body["margin"]["peak_margin_inr"] == 560000
+        assert body["margin"]["return_on_peak_margin"] == pytest.approx(
+            body["net_inr"] / 560000
+        )
 
     def test_bootstrap_flag_populates_the_bootstrap_field(self, real_cache_client: TestClient) -> None:
         yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()

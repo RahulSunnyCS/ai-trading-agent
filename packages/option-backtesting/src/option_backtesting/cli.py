@@ -2,9 +2,8 @@
 `obt` — the option-backtesting CLI.
 
 M-1 implements `ingest plan` and `ingest`. M-2 implements `validate`. M-3
-implements `run` and `registry`. `export-personality` is still stubbed
-(not `NotImplementedError` — a CLI should say plainly what's missing) until
-M-5.
+implements `run` and `registry`. M-5 adds `walkforward`, `sweep` (with
+`--overfit`), and `export-personality`.
 """
 
 from __future__ import annotations
@@ -141,7 +140,26 @@ def run(
     result = aggregate(sessions)
     typer.echo(render_report(result))
 
-    run_id = record_run(registry_db, loaded.strategy, start, end, result)
+    from .engine.margin import compute_return_on_peak_margin, render_margin
+
+    try:
+        margin = compute_return_on_peak_margin(loaded.strategy, reference, result)
+    except (NotImplementedError, ValueError) as e:
+        margin = None
+        typer.echo(f"\n(margin not computed: {e})")
+    if margin is not None:
+        typer.echo("")
+        typer.echo(render_margin(margin))
+
+    from .features.regime import regime_bucket_report
+
+    regime_buckets = regime_bucket_report(sessions, loaded.strategy.universe.underlying)
+    if regime_buckets is not None:
+        typer.echo("\nRegime breakdown (lag-1):")
+        for regime_name in sorted(regime_buckets):
+            typer.echo(f"  {regime_name}: {regime_buckets[regime_name]:.0f}")
+
+    run_id = record_run(registry_db, loaded.strategy, start, end, result, strategy_path.read_text())
     typer.echo(f"\nRecorded as run {run_id} in {registry_db}")
 
     if bootstrap:
@@ -175,11 +193,152 @@ def registry(
         )
 
 
+@app.command()
+def walkforward(
+    strategy_path: Path,
+    is_from: str = typer.Option(..., "--is-from"),
+    is_to: str = typer.Option(..., "--is-to"),
+    oos_from: str = typer.Option(..., "--oos-from"),
+    oos_to: str = typer.Option(..., "--oos-to"),
+    cache_dir: Path = typer.Option(DEFAULT_CACHE_DIR, "--cache-dir"),
+) -> None:
+    """Run a strategy, unchanged, over an in-sample window and a strictly
+    later out-of-sample window; the OOS figures are the headline. No
+    parameter re-fitting happens between windows — our strategies are
+    hand-authored YAML, not tunable, so this is a same-strategy split-window
+    comparison, not a re-optimizing walk-forward loop."""
+    from .analytics.walkforward import render_walkforward, run_walkforward
+    from .data.cache import Cache
+    from .data.reference.loader import default_reference_data
+    from .strategy.loader import StrategyValidationError, load_strategy
+
+    try:
+        loaded = load_strategy(strategy_path)
+    except StrategyValidationError as e:
+        typer.echo(f"INVALID: {strategy_path}")
+        for err in e.errors:
+            typer.echo(f"  {err}")
+        raise typer.Exit(code=1) from None
+
+    cache = Cache(cache_dir)
+    reference = default_reference_data()
+
+    try:
+        result = run_walkforward(
+            loaded,
+            cache,
+            reference,
+            date.fromisoformat(is_from),
+            date.fromisoformat(is_to),
+            date.fromisoformat(oos_from),
+            date.fromisoformat(oos_to),
+        )
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1) from None
+
+    typer.echo(render_walkforward(result))
+
+
+@app.command()
+def sweep(
+    strategy_path: Path,
+    changes_path: Path = typer.Option(..., "--changes", help="JSON file: a list of change-dicts"),
+    from_: str = typer.Option(..., "--from"),
+    to: str = typer.Option(..., "--to"),
+    cache_dir: Path = typer.Option(DEFAULT_CACHE_DIR, "--cache-dir"),
+    overfit: bool = typer.Option(
+        False, "--overfit", help="Also run CSCV/PBO + deflated Sharpe over the sweep results"
+    ),
+    n_blocks: int = typer.Option(4, "--n-blocks", help="CSCV block count (even, >=2)"),
+) -> None:
+    """Run `strategy_path` as the base, deep-merging each change-dict in
+    `--changes` (a JSON array) over it, and report every configuration's
+    result over the same window — the raw material for CSCV/PBO overfitting
+    analysis (see `analytics.overfit`, `--overfit`)."""
+    from .analytics.sweep import render_sweep, run_sweep
+    from .data.cache import Cache
+    from .data.reference.loader import default_reference_data
+
+    changes_list = json.loads(changes_path.read_text())
+    if not isinstance(changes_list, list):
+        typer.echo(f"{changes_path} must contain a JSON array of change-dicts.")
+        raise typer.Exit(code=1)
+
+    cache = Cache(cache_dir)
+    reference = default_reference_data()
+
+    try:
+        report = run_sweep(
+            strategy_path.read_text(),
+            changes_list,
+            cache,
+            reference,
+            date.fromisoformat(from_),
+            date.fromisoformat(to),
+        )
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1) from None
+
+    typer.echo(render_sweep(report))
+
+    if overfit:
+        from .analytics.overfit import render_overfit, run_cscv, run_deflated_sharpe
+
+        try:
+            cscv = run_cscv(report, n_blocks=n_blocks)
+            dsr = run_deflated_sharpe(report)
+        except ValueError as e:
+            typer.echo(f"\n(overfit analysis not computed: {e})")
+            return
+        typer.echo("")
+        typer.echo(render_overfit(cscv, dsr))
+
+
 @app.command(name="export-personality")
-def export_personality(run_id: str) -> None:
-    """Export a validated run as a personality_configs candidate. Coming in M-5."""
-    typer.echo("Not yet implemented — personality export lands in M-5.")
-    raise typer.Exit(code=1)
+def export_personality_cmd(
+    run_id: str,
+    registry_db: Path = typer.Option(DEFAULT_REGISTRY_DB, "--registry-db"),
+) -> None:
+    """Export a recorded run's strategy as a personality_configs candidate
+    ({entryType, managementStyle, params}), with anything the DSL expresses
+    that PersonalityConfigM2 has no field for listed under manual_review.
+    Never writes to any database — prints JSON for a human to review."""
+    from .engine.registry import get_run
+    from .export.personality import export_personality
+    from .strategy.loader import StrategyValidationError, load_strategy_from_source
+
+    record = get_run(registry_db, run_id)
+    if record is None:
+        typer.echo(f"Unknown run_id {run_id!r} in {registry_db}.")
+        raise typer.Exit(code=1)
+    if record.strategy_yaml is None:
+        typer.echo(
+            f"Run {run_id} was recorded before strategy_yaml was tracked (pre-M-5) — "
+            f"re-run `obt run` on this strategy to record it with export support."
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        loaded = load_strategy_from_source(record.strategy_yaml, label=f"run {run_id}")
+    except StrategyValidationError as e:
+        typer.echo("Stored strategy_yaml failed to re-validate:")
+        for err in e.errors:
+            typer.echo(f"  {err}")
+        raise typer.Exit(code=1) from None
+    assert loaded.strategy is not None
+
+    export = export_personality(loaded.strategy)
+    output = {
+        "source_run_id": run_id,
+        "source_strategy_id": loaded.strategy.id,
+        "entryType": export.entry_type,
+        "managementStyle": export.management_style,
+        "params": export.params,
+        "manual_review": export.manual_review,
+    }
+    typer.echo(json.dumps(output, indent=2))
 
 
 def main() -> None:

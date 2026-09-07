@@ -74,6 +74,8 @@ class TestRunBacktest:
         assert round(body["net_inr"]) == 7568
         assert "run_id" in body
         assert len(body["sessions"]) == 15
+        assert body["margin"]["strategy_type"] == "short-straddle"
+        assert body["margin"]["peak_margin_inr"] == 560000
 
     async def test_invalid_strategy_returns_error_dict(self) -> None:
         result = await _call(
@@ -109,6 +111,144 @@ class TestRunBacktest:
         assert body["bootstrap"]["seed"] == 5
 
 
+class TestRunWalkforward:
+    async def test_headlines_out_of_sample_against_real_cache(self) -> None:
+        yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
+        result = await _call(
+            "run_walkforward",
+            {
+                "yaml_text": yaml_text,
+                "is_from_date": "2026-08-17",
+                "is_to_date": "2026-08-27",
+                "oos_from_date": "2026-08-28",
+                "oos_to_date": "2026-09-04",
+            },
+        )
+        body = json.loads(result.content[0].text)
+        assert body["in_sample"]["from"] == "2026-08-17"
+        assert body["out_of_sample"]["from"] == "2026-08-28"
+        assert body["in_sample"]["n_sessions"] > 0
+        assert body["out_of_sample"]["n_sessions"] > 0
+
+    async def test_overlapping_windows_returns_error_dict(self) -> None:
+        yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
+        result = await _call(
+            "run_walkforward",
+            {
+                "yaml_text": yaml_text,
+                "is_from_date": "2026-08-17",
+                "is_to_date": "2026-08-27",
+                "oos_from_date": "2026-08-27",
+                "oos_to_date": "2026-09-04",
+            },
+        )
+        body = json.loads(result.content[0].text)
+        assert body["error"] == "bad_window"
+
+    async def test_invalid_strategy_returns_error_dict(self) -> None:
+        result = await _call(
+            "run_walkforward",
+            {
+                "yaml_text": "not: valid",
+                "is_from_date": "2026-08-17",
+                "is_to_date": "2026-08-27",
+                "oos_from_date": "2026-08-28",
+                "oos_to_date": "2026-09-04",
+            },
+        )
+        body = json.loads(result.content[0].text)
+        assert body["error"] == "invalid_strategy"
+
+
+class TestRunSweep:
+    async def test_runs_every_config_against_real_cache(self) -> None:
+        yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
+        result = await _call(
+            "run_sweep",
+            {
+                "base_yaml_text": yaml_text,
+                "changes_list": [
+                    {"strategy": {"entry": {"lots": 4}, "caps": {"max_lots": 4}}},
+                    {"strategy": {"entry": {"lots": 2}, "caps": {"max_lots": 2}}},
+                ],
+                "from_date": "2026-08-17",
+                "to_date": "2026-09-04",
+            },
+        )
+        body = json.loads(result.content[0].text)
+        assert body["n_configs"] == 2
+        assert body["n_successful"] == 2
+        assert len(body["configs"]) == 2
+
+    async def test_empty_changes_list_returns_error_dict(self) -> None:
+        yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
+        result = await _call(
+            "run_sweep",
+            {
+                "base_yaml_text": yaml_text,
+                "changes_list": [],
+                "from_date": "2026-08-17",
+                "to_date": "2026-09-04",
+            },
+        )
+        body = json.loads(result.content[0].text)
+        assert body["error"] == "bad_sweep"
+
+    async def test_invalid_config_recorded_with_error_not_dropped(self) -> None:
+        yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
+        result = await _call(
+            "run_sweep",
+            {
+                "base_yaml_text": yaml_text,
+                "changes_list": [{"strategy": {"caps": {"max_lots": -1}}}],
+                "from_date": "2026-08-17",
+                "to_date": "2026-09-04",
+            },
+        )
+        body = json.loads(result.content[0].text)
+        assert body["n_configs"] == 1
+        assert body["n_successful"] == 0
+        assert body["configs"][0]["error"] is not None
+
+
+class TestCheckOverfit:
+    async def test_computes_pbo_and_deflated_sharpe_against_real_cache(self) -> None:
+        yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
+        result = await _call(
+            "check_overfit",
+            {
+                "base_yaml_text": yaml_text,
+                "changes_list": [
+                    {"strategy": {"entry": {"lots": 4}, "caps": {"max_lots": 4}}},
+                    {"strategy": {"entry": {"lots": 3}, "caps": {"max_lots": 3}}},
+                    {"strategy": {"entry": {"lots": 2}, "caps": {"max_lots": 2}}},
+                ],
+                "from_date": "2026-08-17",
+                "to_date": "2026-09-04",
+                "n_blocks": 4,
+            },
+        )
+        body = json.loads(result.content[0].text)
+        assert body["n_configs"] == 3
+        assert body["n_combinations"] == 6  # C(4, 2)
+        assert 0.0 <= body["pbo"] <= 1.0
+        assert body["deflated_sharpe"]["n_trials"] == 3
+
+    async def test_too_few_configs_returns_error_dict(self) -> None:
+        yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
+        result = await _call(
+            "check_overfit",
+            {
+                "base_yaml_text": yaml_text,
+                "changes_list": [{"strategy": {"caps": {"max_lots": 4}}}],
+                "from_date": "2026-08-17",
+                "to_date": "2026-09-04",
+            },
+        )
+        body = json.loads(result.content[0].text)
+        assert body["error"] == "cannot_compute"
+
+
 class TestListRunsAndCritique:
     async def test_list_runs_after_a_run_includes_it(self) -> None:
         yaml_text = (STRATEGIES_DIR / "A_flat.yaml").read_text()
@@ -140,6 +280,29 @@ class TestListRunsAndCritique:
         assert body["run_id"] == run_id
         assert isinstance(body["notes"], list)
         assert len(body["notes"]) > 0
+
+
+class TestExportPersonality:
+    async def test_unknown_run_id_returns_error_dict(self) -> None:
+        result = await _call("export_personality", {"run_id": "does-not-exist"})
+        body = json.loads(result.content[0].text)
+        assert "error" in body
+
+    async def test_exports_a_real_run(self) -> None:
+        yaml_text = (STRATEGIES_DIR / "B_pyramid.yaml").read_text()
+        run_result = await _call(
+            "run_backtest",
+            {"yaml_text": yaml_text, "from_date": "2026-08-17", "to_date": "2026-09-04"},
+        )
+        run_id = json.loads(run_result.content[0].text)["run_id"]
+
+        result = await _call("export_personality", {"run_id": run_id})
+        body = json.loads(result.content[0].text)
+        assert body["source_run_id"] == run_id
+        assert body["source_strategy_id"] == "nifty_pyramid_B"
+        assert body["entryType"] == "fixed_time"
+        assert body["managementStyle"] == "roll"
+        assert len(body["manual_review"]) > 0
 
 
 class TestProposeStrategy:

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS runs (
     strategy_id TEXT NOT NULL,
     strategy_version INTEGER NOT NULL,
     strategy_hash TEXT NOT NULL,
+    strategy_yaml TEXT,
     date_from TEXT NOT NULL,
     date_to TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -38,7 +39,7 @@ CREATE TABLE IF NOT EXISTS runs (
 """
 
 _COLUMNS = (
-    "run_id, strategy_id, strategy_version, strategy_hash, date_from, date_to, "
+    "run_id, strategy_id, strategy_version, strategy_hash, strategy_yaml, date_from, date_to, "
     "created_at, net_inr, win_days, worst_day, sum_peak_loss, lot_days, "
     "inr_per_lot_day, n_sessions"
 )
@@ -50,6 +51,8 @@ class RunRecord:
     strategy_id: str
     strategy_version: int
     strategy_hash: str
+    # None only for rows written before this column existed (pre-M-5).
+    strategy_yaml: str | None
     date_from: str
     date_to: str
     created_at: str
@@ -74,7 +77,20 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     con.execute(_SCHEMA)
+    _migrate(con)
     return con
+
+
+def _migrate(con: sqlite3.Connection) -> None:
+    """`CREATE TABLE IF NOT EXISTS` is a no-op against a pre-existing
+    database from an earlier milestone — a column added since then (e.g.
+    `strategy_yaml`, M-5) would silently never appear, and every INSERT/
+    SELECT referencing it would fail with "no such column". Add any
+    missing column by hand, once, idempotently."""
+    existing = {row[1] for row in con.execute("PRAGMA table_info(runs)").fetchall()}
+    if "strategy_yaml" not in existing:
+        con.execute("ALTER TABLE runs ADD COLUMN strategy_yaml TEXT")
+        con.commit()
 
 
 def record_run(
@@ -83,17 +99,26 @@ def record_run(
     date_from: date,
     date_to: date,
     result: AggregateResult,
+    strategy_yaml: str | None = None,
 ) -> str:
+    """`strategy_yaml` (the original YAML text the strategy was loaded
+    from) is stored alongside the headline metrics so a later
+    `obt export-personality <run_id>` can reconstruct the exact strategy —
+    the `strategy_hash` alone is only a fingerprint, not enough to rebuild
+    the definition. Optional (defaults to None) so existing callers that
+    don't have the source text handy keep working; a run recorded without
+    it simply can't be exported later."""
     run_id = uuid.uuid4().hex[:12]
     con = _connect(db_path)
     try:
         con.execute(
-            f"INSERT INTO runs ({_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            f"INSERT INTO runs ({_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 run_id,
                 strategy.id,
                 strategy.version,
                 strategy_hash(strategy),
+                strategy_yaml,
                 date_from.isoformat(),
                 date_to.isoformat(),
                 datetime.now().isoformat(),

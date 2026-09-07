@@ -50,6 +50,17 @@ class ExpiryCalendarRow:
     effective_date: date
 
 
+@dataclass(frozen=True)
+class MarginRow:
+    underlying: str
+    strategy_type: str
+    # First day of the effective month — margin.csv's "month" column is
+    # YYYY-MM (coarser than the day-level effective_date used elsewhere),
+    # since exchange margin requirements don't change intra-month in practice.
+    month: date
+    margin_inr: float
+
+
 def _most_recent_as_of(rows: list, as_of: date, *, label: str, underlying: str):
     """Return the row with the latest effective_date <= as_of, for the given
     underlying. Raises rather than silently falling back to a wrong-era row —
@@ -64,6 +75,10 @@ def _most_recent_as_of(rows: list, as_of: date, *, label: str, underlying: str):
     return max(candidates, key=lambda r: r.effective_date)
 
 
+def _month_start(d: date) -> date:
+    return date(d.year, d.month, 1)
+
+
 class ReferenceData:
     """Loads all reference CSVs once and serves effective-dated lookups.
     Cheap to construct — a fresh instance per test/run is fine."""
@@ -74,6 +89,7 @@ class ReferenceData:
         self._strike_steps = self._load_strike_steps()
         self._expiry_calendar = self._load_expiry_calendar()
         self._holidays = self._load_holidays()
+        self._margins = self._load_margins()
 
     # -- loading --------------------------------------------------------
 
@@ -111,6 +127,18 @@ class ReferenceData:
         with open(self._dir / "holidays.csv", newline="") as f:
             return frozenset(_parse_date(row["date"]) for row in csv.DictReader(f))
 
+    def _load_margins(self) -> list[MarginRow]:
+        with open(self._dir / "margin.csv", newline="") as f:
+            return [
+                MarginRow(
+                    row["underlying"],
+                    row["strategy_type"],
+                    _month_start(date.fromisoformat(row["month"] + "-01")),
+                    float(row["margin_inr"]),
+                )
+                for row in csv.DictReader(f)
+            ]
+
     # -- lookups ----------------------------------------------------------
 
     def lot_size(self, underlying: str, as_of: date) -> int:
@@ -127,6 +155,27 @@ class ReferenceData:
         return _most_recent_as_of(
             self._expiry_calendar, as_of, label="expiry_calendar", underlying=underlying
         )
+
+    def margin_per_lot(self, underlying: str, strategy_type: str, as_of: date) -> float:
+        """Flat per-lot margin requirement effective on `as_of`'s month.
+        Raises rather than guessing if no (underlying, strategy_type) row
+        applies — same "never silently guess" convention as every other
+        reference lookup in this class."""
+        as_of_month = _month_start(as_of)
+        candidates = [
+            r
+            for r in self._margins
+            if r.underlying == underlying
+            and r.strategy_type == strategy_type
+            and r.month <= as_of_month
+        ]
+        if not candidates:
+            raise ValueError(
+                f"No margin row for {underlying}/{strategy_type} effective on or before "
+                f"{as_of_month.isoformat()[:7]}. Add one to data/reference/margin.csv "
+                f"rather than guessing."
+            )
+        return max(candidates, key=lambda r: r.month).margin_inr
 
     def is_holiday(self, d: date) -> bool:
         return d in self._holidays

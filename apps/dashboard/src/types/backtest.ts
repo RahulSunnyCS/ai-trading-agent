@@ -45,6 +45,15 @@ export interface BootstrapResult {
   seed: number;
 }
 
+export interface MarginResult {
+  strategy_type: string;
+  peak_lots: number;
+  peak_date: string;
+  margin_per_lot_inr: number;
+  peak_margin_inr: number;
+  return_on_peak_margin: number;
+}
+
 export interface RunResult {
   run_id: string;
   net_inr: number;
@@ -58,6 +67,12 @@ export interface RunResult {
   dte_buckets: Record<string, number>;
   sessions: SessionResult[];
   bootstrap: BootstrapResult | null;
+  /** null when the strategy's leg shape isn't a classifiable margin
+   * category, or no margin.csv row applies for the run's date range. */
+  margin: MarginResult | null;
+  /** null when regime data isn't available (DATABASE_URL unset server-side)
+   * or no regime row applies to this window. */
+  regime_buckets: Record<string, number> | null;
 }
 
 export interface RunSummary {

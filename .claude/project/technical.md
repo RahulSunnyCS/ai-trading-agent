@@ -18,7 +18,7 @@
 | Paper Trading | Quantiply API (paper trade execution tracking) |
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
-| Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee), FastAPI service + MCP server, fronted by a Fastify proxy and a React dashboard tab; walk-forward/sweeps/overfitting-guard/personality-export (M-5) still ahead |
+| Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee), FastAPI service + MCP server, fronted by a Fastify proxy and a React dashboard tab; walk-forward, parameter sweeps, a CSCV/PBO + deflated-Sharpe overfitting guard, a margin model, regime bucketing, and personality export are all built (M-5) — the epic is feature-complete |
 
 ## Package Manager & Runtime
 
@@ -73,6 +73,9 @@ uv run obt ingest --date YYYY-MM-DD --underlying NIFTY
 uv run obt validate strategies/B_pyramid.yaml
 uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
 uv run obt registry
+uv run obt walkforward strategies/B_pyramid.yaml --is-from YYYY-MM-DD --is-to YYYY-MM-DD --oos-from YYYY-MM-DD --oos-to YYYY-MM-DD
+uv run obt sweep strategies/B_pyramid.yaml --changes changes.json --from YYYY-MM-DD --to YYYY-MM-DD [--overfit --n-blocks 4]
+uv run obt export-personality <run_id>
 
 # option-backtesting FastAPI service (loopback-only, port 8000) — from repo root
 bun run py:api               # equivalent to: cd packages/option-backtesting && uv run obt-api
@@ -144,11 +147,13 @@ ai-trading-agent/
                                       # bars, answering "is this strategy worth becoming a personality?"
                                       # (a different question from apps/server's `bun run backtest`, which
                                       # replays the live personalities historically). Not a Bun workspace
-                                      # member — has its own pyproject.toml/uv.lock. Data layer, strategy
-                                      # DSL, and the bar-by-bar engine are built and golden-fixture-verified
-                                      # to the rupee (M-1/M-2/M-3); the FastAPI service, MCP server, Fastify
-                                      # proxy, and dashboard tab are built (M-4) — walk-forward/sweeps/
-                                      # overfitting-guard/personality-export (M-5) are still ahead.
+                                      # member — has its own pyproject.toml/uv.lock. Feature-complete
+                                      # end to end (M-0 through M-5): data layer, strategy DSL, and the
+                                      # bar-by-bar engine (golden-fixture-verified to the rupee, M-1/M-2/
+                                      # M-3); FastAPI service, MCP server, Fastify proxy, dashboard tab
+                                      # (M-4); walk-forward, sweeps, a CSCV/PBO + deflated-Sharpe
+                                      # overfitting guard, a margin model, regime bucketing, personality
+                                      # export, and a nightly ingest Routine (M-5).
         ├── pyproject.toml · uv.lock · .python-version · DECISIONS.md
         ├── src/option_backtesting/
         │   ├── config.py                 # BACKTEST_DATA_DIR-derived cache/registry path resolution — shared
@@ -168,8 +173,11 @@ ai-trading-agent/
         │   │   │                         # ewma/rolling_pctile) — registry.py (M-2) is the declarative schema,
         │   │   │                         # the rest (M-3) is the runtime evaluator
         │   │   ├── registry.py · store.py · evaluator.py
-        │   │   └── leg.py · greeks.py · calendar.py · path.py · rolling.py
+        │   │   ├── leg.py · greeks.py · calendar.py · path.py · rolling.py
+        │   │   └── regime.py           # M-5, R2: post-hoc regime bucketing only, NOT a DSL condition
+        │   │                           # feature — see DECISIONS.md for why
         │   ├── strategy/                 # schema.py (M-2 pydantic AST) · loader.py (line-numbered YAML errors)
+        │   │   │                         # · mutate.py (M-5: deep_merge, shared by propose_strategy + sweep)
         │   ├── engine/                   # bar-by-bar event engine (M-3), pinned to reproduce the design
         │   │   │                         # handoff's reference implementation to the rupee — see
         │   │   │                         # engine/loop.py's module docstring before changing any formula
@@ -179,18 +187,34 @@ ai-trading-agent/
         │   │   ├── costs.py            # flat cost = total_lots × 2 legs × per_leg_rt
         │   │   ├── ledger.py · state.py  # Fill/SessionLedger; per-session running-anchor/last-fill state
         │   │   ├── result.py           # SessionResult/AggregateResult, bootstrap_ci (R1a), render_report
-        │   │   └── registry.py         # SQLite run history (data/registry.sqlite, gitignored)
+        │   │   ├── margin.py           # M-5, R1: classify_strategy_type + return on peak margin
+        │   │   └── registry.py         # SQLite run history (data/registry.sqlite, gitignored) — the
+        │   │                           # `strategy_yaml` column (M-5) lets export-personality reconstruct
+        │   │                           # a run's exact strategy from just its run_id
+        │   ├── analytics/                 # M-5: research tools that consume the engine's output, not part
+        │   │   │                          # of a single backtest run
+        │   │   ├── walkforward.py      # same-strategy in-sample/out-of-sample split (no re-fitting)
+        │   │   ├── sweep.py            # run a base strategy against many change-dicts over one window
+        │   │   ├── overfit.py          # CSCV/PBO + simplified (Gaussian) Deflated Sharpe over a sweep
+        │   │   └── regime_source.py    # reads daily_regime_tags from Postgres, gated on DATABASE_URL,
+        │   │                           # lazy psycopg import (optional "regime" extra)
+        │   ├── export/
+        │   │   └── personality.py        # M-5, R3: StrategySpec -> PersonalityConfigM2 candidate
+        │   │                             # ({entryType, managementStyle, params}); unrepresentable DSL
+        │   │                             # constructs go under manual_review, never guessed; never writes
+        │   │                             # to any database
         │   ├── api/                      # FastAPI service (M-4), loopback-only (127.0.0.1:8000) — the
         │   │   │                         # Fastify proxy is the only public-facing surface in front of it
         │   │   ├── app.py              # create_app() factory + `obt-api` uvicorn entry point
         │   │   ├── routes.py           # validate/runs/presets/coverage/health
         │   │   └── models.py           # pydantic request/response models
         │   ├── mcp/
-        │   │   └── server.py             # `obt-mcp` stdio MCP server (M-4) — mcp 2.x's MCPServer (see
+        │   │   └── server.py             # `obt-mcp` stdio MCP server (M-4/M-5) — mcp 2.x's MCPServer (see
         │   │                             # DECISIONS.md); tools: plan_requests, validate_strategy,
-        │   │                             # run_backtest, list_runs, critique_result, propose_strategy
-        │   └── cli.py                    # `obt` — ingest plan | ingest | validate | run | registry;
-        │                                 # export-personality stubbed until M-5
+        │   │                             # run_backtest, run_walkforward, run_sweep, check_overfit,
+        │   │                             # list_runs, critique_result, export_personality, propose_strategy
+        │   └── cli.py                    # `obt` — ingest plan | ingest | validate | run | registry |
+        │                                 # walkforward | sweep [--overfit] | export-personality
         └── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
                                             # reproduces golden_15_sessions.expected.txt to the rupee for A/B/C/D
 ```

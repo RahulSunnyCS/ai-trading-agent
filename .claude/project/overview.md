@@ -40,16 +40,23 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - **Phase 4:** Reinforcement learning, live trading readiness assessment
 
 **`packages/option-backtesting` epic** (own M-0..M-5 numbering, distinct from the Phase/M-numbers
-above, which describe the TS trading engine): M-0 (monorepo move), M-1 (data layer + 90-day real
-backfill), M-2 (strategy DSL + feature registry), and M-3 (bar-by-bar engine, golden-fixture-
-verified to the rupee) are done. **M-4 (this milestone) is done:** FastAPI service
-(`obt-api`/`packages/option-backtesting/src/option_backtesting/api/`) exposing
-validate/run/registry/presets/coverage; the Fastify proxy above; a React "Backtest" dashboard tab
-(preset picker, debounced YAML validation, run + past-runs tables); and an MCP server (`obt-mcp`,
-registered in root `.mcp.json`) exposing `plan_requests`/`validate_strategy`/`run_backtest`/
-`list_runs`/`critique_result`/`propose_strategy` so a Claude Code session can drive the engine
-directly. Remaining: **M-5** (walk-forward/sweeps, overfitting guard, margin model, regime
-buckets, personality export, nightly ingest Routine).
+above, which describe the TS trading engine) is **done, M-0 through M-5**: M-0 (monorepo move),
+M-1 (data layer + 90-day real backfill), M-2 (strategy DSL + feature registry), M-3 (bar-by-bar
+engine, golden-fixture-verified to the rupee), and M-4 (FastAPI service, Fastify proxy, React
+"Backtest" dashboard tab, MCP server). **M-5 (this milestone) is done:** margin model + return on
+peak margin (`engine/margin.py`); walk-forward analysis (`analytics/walkforward.py`, `obt
+walkforward`); parameter sweeps (`analytics/sweep.py`, `obt sweep`); an overfitting guard — CSCV/
+PBO + a simplified Deflated Sharpe Ratio (`analytics/overfit.py`, `obt sweep --overfit`); regime
+buckets read from the trading DB when `DATABASE_URL` is set, gracefully omitted otherwise
+(`analytics/regime_source.py` + `features/regime.py`) — bucketing only, not wired as a live
+strategy-DSL condition (see `DECISIONS.md`); personality export to a `PersonalityConfigM2`
+candidate with unrepresentable DSL constructs listed under `manual_review`, never guessed
+(`export/personality.py`, `obt export-personality <run_id>`); and a nightly ingest Routine
+(self-bound to a session rather than fresh-per-fire — this org's Routines don't support granting
+MCP connectors to a fresh session; see `DECISIONS.md`). The MCP server (`obt-mcp`) now also
+exposes `run_walkforward`/`run_sweep`/`check_overfit`/`export_personality`. The `packages/
+option-backtesting` epic itself is now feature-complete per its original scope; further work is
+tracked as ordinary follow-ups, not a new milestone number.
 
 ## Project File Maintenance
 

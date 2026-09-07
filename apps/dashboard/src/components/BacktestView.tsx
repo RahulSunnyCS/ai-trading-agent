@@ -240,7 +240,22 @@ function ResultCard({ result }: { result: RunResult }) {
           value={`₹${fmtInr(result.inr_per_lot_day)}`}
           tone={result.inr_per_lot_day >= 0 ? 'positive' : 'negative'}
         />
+        {result.margin && (
+          <StatCard
+            label="Return on peak margin"
+            value={`${(result.margin.return_on_peak_margin * 100).toFixed(2)}%`}
+            tone={result.margin.return_on_peak_margin >= 0 ? 'positive' : 'negative'}
+          />
+        )}
       </div>
+
+      {result.margin && (
+        <p className="mt-3 text-xs text-muted">
+          Peak margin: ₹{fmtInr(result.margin.peak_margin_inr)} ({result.margin.peak_lots} lots × ₹
+          {fmtInr(result.margin.margin_per_lot_inr)}/lot on {result.margin.peak_date}, category:{' '}
+          {result.margin.strategy_type})
+        </p>
+      )}
 
       {result.bootstrap && (
         <p className="mt-3 text-xs text-muted">
@@ -270,6 +285,30 @@ function ResultCard({ result }: { result: RunResult }) {
             ))}
         </tbody>
       </Table>
+
+      {result.regime_buckets && (
+        <>
+          <h3 className="mb-2 mt-5 text-sm font-semibold text-foreground">
+            Regime breakdown (lag-1)
+          </h3>
+          <Table>
+            <THead>
+              <Th>Regime</Th>
+              <Th align="right">Net</Th>
+            </THead>
+            <tbody>
+              {Object.entries(result.regime_buckets).map(([regimeName, net]) => (
+                <TRow key={regimeName}>
+                  <Td>{regimeName}</Td>
+                  <Td align="right" numeric>
+                    ₹{fmtInr(net)}
+                  </Td>
+                </TRow>
+              ))}
+            </tbody>
+          </Table>
+        </>
+      )}
 
       <h3 className="mb-2 mt-5 text-sm font-semibold text-foreground">Sessions</h3>
       <Table>

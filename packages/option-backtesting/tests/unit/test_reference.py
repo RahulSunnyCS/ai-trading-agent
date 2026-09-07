@@ -53,6 +53,32 @@ class TestLotSize:
             rd.lot_size("NIFTY", date(2020, 1, 1))
 
 
+class TestMargin:
+    """margin.csv currently carries one committed row: NIFTY/short-straddle
+    effective 2026-08 at 140000/lot."""
+
+    def test_nifty_short_straddle_current_month(self, rd: ReferenceData) -> None:
+        assert rd.margin_per_lot("NIFTY", "short-straddle", date(2026, 9, 1)) == 140000
+
+    def test_effective_dating_uses_most_recent_month_on_or_before(
+        self, rd: ReferenceData
+    ) -> None:
+        # A date within the same effective month still resolves.
+        assert rd.margin_per_lot("NIFTY", "short-straddle", date(2026, 8, 17)) == 140000
+
+    def test_missing_row_raises(self, rd: ReferenceData) -> None:
+        with pytest.raises(ValueError, match="No margin row"):
+            rd.margin_per_lot("NIFTY", "short-straddle", date(2026, 1, 1))
+
+    def test_unknown_underlying_raises(self, rd: ReferenceData) -> None:
+        with pytest.raises(ValueError, match="No margin row"):
+            rd.margin_per_lot("SENSEX", "short-straddle", date(2026, 9, 1))
+
+    def test_unknown_strategy_type_raises(self, rd: ReferenceData) -> None:
+        with pytest.raises(ValueError, match="No margin row"):
+            rd.margin_per_lot("NIFTY", "iron-condor", date(2026, 9, 1))
+
+
 class TestHolidays:
     def test_known_holiday(self, rd: ReferenceData) -> None:
         assert rd.is_holiday(date(2026, 8, 15))  # Independence Day

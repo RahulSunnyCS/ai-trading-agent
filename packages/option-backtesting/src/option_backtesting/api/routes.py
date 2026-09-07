@@ -19,12 +19,15 @@ from fastapi import APIRouter, HTTPException, Request
 from ..data.cache import Cache
 from ..data.reference.loader import default_reference_data
 from ..engine.loop import run_backtest
+from ..engine.margin import compute_return_on_peak_margin
 from ..engine.registry import RunRecord, get_run, list_runs, record_run
 from ..engine.result import aggregate, bootstrap_ci
+from ..features.regime import regime_bucket_report
 from ..presets import STRATEGIES_DIR, preset_names
 from ..strategy.loader import StrategyValidationError, load_strategy_from_source
 from .models import (
     BootstrapOut,
+    MarginOut,
     PresetDetail,
     PresetSummary,
     RunRequest,
@@ -99,7 +102,9 @@ def create_run(body: RunRequest, request: Request) -> RunResponse:
         )
 
     result = aggregate(sessions)
-    run_id = record_run(request.app.state.registry_db, loaded.strategy, body.from_, body.to, result)
+    run_id = record_run(
+        request.app.state.registry_db, loaded.strategy, body.from_, body.to, result, body.yaml
+    )
 
     bootstrap_out = None
     if body.bootstrap:
@@ -116,6 +121,21 @@ def create_run(body: RunRequest, request: Request) -> RunResponse:
             inr_per_lot_day_hi=ci.inr_per_lot_day_hi,
             n_resamples=ci.n_resamples,
             seed=ci.seed,
+        )
+
+    margin_out = None
+    try:
+        margin = compute_return_on_peak_margin(loaded.strategy, reference, result)
+    except (NotImplementedError, ValueError):
+        margin = None
+    if margin is not None:
+        margin_out = MarginOut(
+            strategy_type=margin.strategy_type,
+            peak_lots=margin.peak_lots,
+            peak_date=margin.peak_date,
+            margin_per_lot_inr=margin.margin_per_lot_inr,
+            peak_margin_inr=margin.peak_margin_inr,
+            return_on_peak_margin=margin.return_on_peak_margin,
         )
 
     return RunResponse(
@@ -143,6 +163,8 @@ def create_run(body: RunRequest, request: Request) -> RunResponse:
             for s in result.sessions
         ],
         bootstrap=bootstrap_out,
+        margin=margin_out,
+        regime_buckets=regime_bucket_report(sessions, loaded.strategy.universe.underlying),
     )
 
 

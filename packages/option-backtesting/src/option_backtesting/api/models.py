@@ -51,6 +51,15 @@ class BootstrapOut(BaseModel):
     seed: int
 
 
+class MarginOut(BaseModel):
+    strategy_type: str
+    peak_lots: int
+    peak_date: date
+    margin_per_lot_inr: float
+    peak_margin_inr: float
+    return_on_peak_margin: float
+
+
 class RunResponse(BaseModel):
     run_id: str
     net_inr: float
@@ -64,6 +73,12 @@ class RunResponse(BaseModel):
     dte_buckets: dict[int, float]
     sessions: list[SessionResultOut]
     bootstrap: BootstrapOut | None = None
+    # None when the strategy's leg shape isn't a classifiable margin
+    # category, or no margin.csv row applies — never fabricated.
+    margin: MarginOut | None = None
+    # None when regime data isn't available (DATABASE_URL unset) or no
+    # regime row applies to this window — never fabricated.
+    regime_buckets: dict[str, float] | None = None
 
 
 class RunSummaryOut(BaseModel):

@@ -1,7 +1,14 @@
+import sqlite3
 from datetime import date
 from pathlib import Path
 
-from option_backtesting.engine.registry import get_run, list_runs, record_run, strategy_hash
+from option_backtesting.engine.registry import (
+    _SCHEMA,
+    get_run,
+    list_runs,
+    record_run,
+    strategy_hash,
+)
 from option_backtesting.engine.result import AggregateResult
 from option_backtesting.strategy.loader import load_strategy
 
@@ -89,3 +96,74 @@ def test_get_run_returns_none_for_unknown_id(tmp_path) -> None:
 
 def test_get_run_on_nonexistent_db_returns_none(tmp_path) -> None:
     assert get_run(tmp_path / "does_not_exist.sqlite", "any-id") is None
+
+
+def test_strategy_yaml_round_trips_through_record_and_get(tmp_path) -> None:
+    loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
+    source = (STRATEGIES_DIR / "A_flat.yaml").read_text()
+    db_path = tmp_path / "registry.sqlite"
+    run_id = record_run(
+        db_path,
+        loaded.strategy,
+        date(2026, 8, 17),
+        date(2026, 9, 4),
+        _aggregate_result(),
+        source,
+    )
+    record = get_run(db_path, run_id)
+    assert record is not None
+    assert record.strategy_yaml == source
+
+    listed = list_runs(db_path)
+    assert listed[0].strategy_yaml == source
+
+
+def test_strategy_yaml_defaults_to_none_when_not_provided(tmp_path) -> None:
+    loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
+    db_path = tmp_path / "registry.sqlite"
+    run_id = record_run(
+        db_path, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result()
+    )
+    record = get_run(db_path, run_id)
+    assert record is not None
+    assert record.strategy_yaml is None
+
+
+def test_migrate_adds_strategy_yaml_column_to_a_pre_m5_database(tmp_path) -> None:
+    """Simulates a real pre-existing registry.sqlite from before M-5: a `runs`
+    table created without the `strategy_yaml` column. `_connect()` (used by
+    every public function) must add it on the fly rather than failing every
+    subsequent INSERT/SELECT with "no such column"."""
+    db_path = tmp_path / "pre_m5_registry.sqlite"
+    pre_m5_schema = _SCHEMA.replace("    strategy_yaml TEXT,\n", "")
+    assert "strategy_yaml" not in pre_m5_schema
+
+    con = sqlite3.connect(db_path)
+    try:
+        con.execute(pre_m5_schema)
+        con.commit()
+        columns_before = {row[1] for row in con.execute("PRAGMA table_info(runs)").fetchall()}
+        assert "strategy_yaml" not in columns_before
+    finally:
+        con.close()
+
+    loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
+    run_id = record_run(
+        db_path,
+        loaded.strategy,
+        date(2026, 8, 17),
+        date(2026, 9, 4),
+        _aggregate_result(),
+        "id: nifty_flat_A\n",
+    )
+
+    record = get_run(db_path, run_id)
+    assert record is not None
+    assert record.strategy_yaml == "id: nifty_flat_A\n"
+
+    con = sqlite3.connect(db_path)
+    try:
+        columns_after = {row[1] for row in con.execute("PRAGMA table_info(runs)").fetchall()}
+        assert "strategy_yaml" in columns_after
+    finally:
+        con.close()

@@ -25,16 +25,24 @@ from datetime import date
 import yaml
 from mcp.server.mcpserver import MCPServer
 
+from ..analytics.overfit import run_cscv as _run_cscv
+from ..analytics.overfit import run_deflated_sharpe as _run_deflated_sharpe
+from ..analytics.sweep import run_sweep as _run_sweep
+from ..analytics.walkforward import run_walkforward as _run_walkforward
 from ..config import resolve_cache_dir, resolve_registry_db
 from ..data.cache import Cache
 from ..data.providers.algotest import plan_requests as _plan_requests
 from ..data.reference.loader import default_reference_data
 from ..engine.loop import run_backtest as _run_backtest
+from ..engine.margin import compute_return_on_peak_margin
 from ..engine.registry import get_run, record_run
 from ..engine.registry import list_runs as _list_runs
 from ..engine.result import aggregate, bootstrap_ci
+from ..export.personality import export_personality as _export_personality
+from ..features.regime import regime_bucket_report as _regime_bucket_report
 from ..presets import STRATEGIES_DIR, preset_names
 from ..strategy.loader import StrategyValidationError, load_strategy_from_source
+from ..strategy.mutate import deep_merge
 
 mcp = MCPServer("option-backtesting")
 
@@ -106,7 +114,7 @@ def run_backtest(
         }
 
     result = aggregate(sessions)
-    run_id = record_run(resolve_registry_db(), loaded.strategy, start, end, result)
+    run_id = record_run(resolve_registry_db(), loaded.strategy, start, end, result, yaml_text)
 
     out: dict = {
         "run_id": run_id,
@@ -145,7 +153,185 @@ def run_backtest(
             "n_resamples": ci.n_resamples,
             "seed": ci.seed,
         }
+
+    try:
+        margin = compute_return_on_peak_margin(loaded.strategy, reference, result)
+    except (NotImplementedError, ValueError):
+        margin = None
+    if margin is not None:
+        out["margin"] = {
+            "strategy_type": margin.strategy_type,
+            "peak_lots": margin.peak_lots,
+            "peak_date": margin.peak_date.isoformat(),
+            "margin_per_lot_inr": margin.margin_per_lot_inr,
+            "peak_margin_inr": margin.peak_margin_inr,
+            "return_on_peak_margin": margin.return_on_peak_margin,
+        }
+
+    regime_buckets = _regime_bucket_report(sessions, loaded.strategy.universe.underlying)
+    if regime_buckets is not None:
+        out["regime_buckets"] = regime_buckets
     return out
+
+
+@mcp.tool()
+def run_walkforward(
+    yaml_text: str,
+    is_from_date: str,
+    is_to_date: str,
+    oos_from_date: str,
+    oos_to_date: str,
+) -> dict:
+    """Run a strategy (YAML text), unchanged, over an in-sample window and a
+    strictly later out-of-sample window (all dates YYYY-MM-DD); returns both
+    aggregates with the out-of-sample one headlined. No re-fitting between
+    windows — our strategies are hand-authored, not tunable. Returns
+    {"error": ...} rather than raising for invalid input or missing data,
+    matching run_backtest's convention."""
+    try:
+        loaded = load_strategy_from_source(yaml_text)
+    except StrategyValidationError as e:
+        return {"error": "invalid_strategy", "errors": e.errors}
+    assert loaded.strategy is not None
+
+    cache = Cache(resolve_cache_dir())
+    reference = default_reference_data()
+    try:
+        result = _run_walkforward(
+            loaded,
+            cache,
+            reference,
+            date.fromisoformat(is_from_date),
+            date.fromisoformat(is_to_date),
+            date.fromisoformat(oos_from_date),
+            date.fromisoformat(oos_to_date),
+        )
+    except ValueError as e:
+        return {"error": "bad_window", "message": str(e)}
+
+    def _out(agg):
+        return {
+            "net_inr": agg.net_inr,
+            "gross_inr": agg.gross_inr,
+            "win_days": agg.win_days,
+            "worst_day": agg.worst_day,
+            "sum_peak_loss": agg.sum_peak_loss,
+            "lot_days": agg.lot_days,
+            "inr_per_lot_day": agg.inr_per_lot_day,
+            "n_sessions": len(agg.sessions),
+        }
+
+    return {
+        "in_sample": {
+            "from": result.in_sample_from.isoformat(),
+            "to": result.in_sample_to.isoformat(),
+            **_out(result.in_sample),
+        },
+        "out_of_sample": {
+            "from": result.out_of_sample_from.isoformat(),
+            "to": result.out_of_sample_to.isoformat(),
+            **_out(result.out_of_sample),
+        },
+    }
+
+
+@mcp.tool()
+def run_sweep(
+    base_yaml_text: str,
+    changes_list: list[dict],
+    from_date: str,
+    to_date: str,
+) -> dict:
+    """Run `base_yaml_text` as the base, deep-merging each dict in
+    `changes_list` over it (same mechanism as propose_strategy), and return
+    every configuration's headline result over [from_date, to_date] — the
+    raw material an overfitting check (CSCV/PBO) needs: how many configs
+    were tried and how each performed, not just the best-looking one. A
+    config that fails to validate or finds no cached data is included with
+    its error, never silently dropped, so the reported config count is
+    always accurate. Returns {"error": ...} for an empty changes_list."""
+    cache = Cache(resolve_cache_dir())
+    reference = default_reference_data()
+    try:
+        report = _run_sweep(
+            base_yaml_text,
+            changes_list,
+            cache,
+            reference,
+            date.fromisoformat(from_date),
+            date.fromisoformat(to_date),
+        )
+    except ValueError as e:
+        return {"error": "bad_sweep", "message": str(e)}
+
+    return {
+        "n_configs": report.n_configs,
+        "n_successful": len(report.successful),
+        "configs": [
+            {
+                "label": c.label,
+                "changes": c.changes,
+                "net_inr": c.result.net_inr if c.result else None,
+                "inr_per_lot_day": c.result.inr_per_lot_day if c.result else None,
+                "win_days": c.result.win_days if c.result else None,
+                "n_sessions": len(c.result.sessions) if c.result else 0,
+                "error": c.error,
+            }
+            for c in report.configs
+        ],
+    }
+
+
+@mcp.tool()
+def check_overfit(
+    base_yaml_text: str,
+    changes_list: list[dict],
+    from_date: str,
+    to_date: str,
+    n_blocks: int = 4,
+) -> dict:
+    """Run the same sweep as run_sweep, then check whether picking the
+    best-looking config is likely to be picking noise: CSCV/PBO
+    (probability of backtest overfitting) and a simplified Deflated Sharpe
+    Ratio over the successful configs. Needs >= 2 successful configs all
+    sharing the same session count, and >= 2*n_blocks sessions for CSCV.
+    Returns {"error": ...} rather than raising when those conditions
+    aren't met (e.g. too few configs, or configs that found no cached
+    data)."""
+    cache = Cache(resolve_cache_dir())
+    reference = default_reference_data()
+    try:
+        report = _run_sweep(
+            base_yaml_text,
+            changes_list,
+            cache,
+            reference,
+            date.fromisoformat(from_date),
+            date.fromisoformat(to_date),
+        )
+    except ValueError as e:
+        return {"error": "bad_sweep", "message": str(e)}
+
+    try:
+        cscv = _run_cscv(report, n_blocks=n_blocks)
+        dsr = _run_deflated_sharpe(report)
+    except ValueError as e:
+        return {"error": "cannot_compute", "message": str(e)}
+
+    return {
+        "n_configs": cscv.n_configs,
+        "n_blocks": cscv.n_blocks,
+        "n_combinations": cscv.n_combinations,
+        "pbo": cscv.pbo,
+        "deflated_sharpe": {
+            "best_config_label": dsr.best_config_label,
+            "observed_sharpe": dsr.observed_sharpe,
+            "expected_max_sharpe": dsr.expected_max_sharpe,
+            "deflated_sharpe": dsr.deflated_sharpe,
+            "n_trials": dsr.n_trials,
+            "n_sessions": dsr.n_sessions,
+        },
+    }
 
 
 @mcp.tool()
@@ -160,8 +346,8 @@ def critique_result(run_id: str) -> dict:
     metrics — flags a low win rate, a worst day that dominates the total
     net, or a negative INR/lot-day. This reads only the registry's already-
     computed headline row (no new computation) — it is NOT a substitute for
-    the overfitting-guard analytics (CSCV / deflated Sharpe) planned for
-    M-5."""
+    the overfitting-guard analytics (CSCV / deflated Sharpe — see
+    check_overfit)."""
     record = get_run(resolve_registry_db(), run_id)
     if record is None:
         return {"error": f"Unknown run_id {run_id!r}"}
@@ -196,14 +382,41 @@ def critique_result(run_id: str) -> dict:
     }
 
 
-def _deep_merge(base: dict, overrides: dict) -> dict:
-    result = dict(base)
-    for k, v in overrides.items():
-        if isinstance(v, dict) and isinstance(result.get(k), dict):
-            result[k] = _deep_merge(result[k], v)
-        else:
-            result[k] = v
-    return result
+@mcp.tool()
+def export_personality(run_id: str) -> dict:
+    """Export a recorded run's strategy as a personality_configs candidate
+    ({entryType, managementStyle, params}), with anything the DSL expresses
+    that PersonalityConfigM2 has no field for listed under manual_review.
+    NEVER writes to any database — the caller (a human, or an agent acting
+    on a human's behalf) decides whether and how to create the row.
+    Returns {"error": ...} for an unknown run_id, or a run recorded before
+    strategy_yaml was tracked (pre-M-5)."""
+    record = get_run(resolve_registry_db(), run_id)
+    if record is None:
+        return {"error": f"Unknown run_id {run_id!r}"}
+    if record.strategy_yaml is None:
+        return {
+            "error": (
+                f"Run {run_id} was recorded before strategy_yaml was tracked (pre-M-5) "
+                f"— re-run run_backtest on this strategy to record it with export support."
+            )
+        }
+
+    try:
+        loaded = load_strategy_from_source(record.strategy_yaml, label=f"run {run_id}")
+    except StrategyValidationError as e:
+        return {"error": "stored strategy_yaml failed to re-validate", "errors": e.errors}
+    assert loaded.strategy is not None
+
+    export = _export_personality(loaded.strategy)
+    return {
+        "source_run_id": run_id,
+        "source_strategy_id": loaded.strategy.id,
+        "entryType": export.entry_type,
+        "managementStyle": export.management_style,
+        "params": export.params,
+        "manual_review": export.manual_review,
+    }
 
 
 @mcp.tool()
@@ -219,7 +432,7 @@ def propose_strategy(base_preset: str, changes: dict) -> dict:
         return {"valid": False, "errors": [f"Unknown preset {base_preset!r}"], "yaml": None}
 
     base_data = yaml.safe_load((STRATEGIES_DIR / f"{base_preset}.yaml").read_text())
-    merged = _deep_merge(base_data, changes)
+    merged = deep_merge(base_data, changes)
     merged_yaml = yaml.safe_dump(merged, sort_keys=False)
 
     try:
