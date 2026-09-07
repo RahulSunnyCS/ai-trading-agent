@@ -18,6 +18,12 @@ At end-of-day, a retrospection engine tags each day's results by market regime (
 ### Prerequisites
 - Docker and Docker Compose
 - [Bun](https://bun.sh) runtime
+- Python 3.12 and [`uv`](https://docs.astral.sh/uv/) — only for `packages/option-backtesting`
+
+> Setting this up on a fresh machine? **[`docs/TEST_PLAN.md`](docs/TEST_PLAN.md)** walks the whole
+> stack end to end — install matrix, infrastructure bring-up, and ~56 numbered verification steps
+> with exact expected values, including the parts that need real Docker/Postgres and so have never
+> run in CI.
 
 ### 1. Start infrastructure
 
