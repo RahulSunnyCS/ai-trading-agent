@@ -161,7 +161,7 @@ async function main(): Promise<number> {
   try {
     config = loadConfig();
   } catch (error) {
-    const message = `AlgoTest broker login - STARTUP FAILED, ${istTimestamp()} IST\n${describe(error)}`;
+    const message = `🚨 Startup failed\nAlgoTest broker login, ${istTimestamp()} IST\n${describe(error)}`;
     console.error(message);
     await sendTelegram(telegram, message);
     return 1;
@@ -217,7 +217,7 @@ async function main(): Promise<number> {
  */
 function crashAlert(source: string, error: unknown): void {
   console.error(`${source}:`, describe(error));
-  const message = `AlgoTest broker login - CRASHED (${source}), ${istTimestamp()} IST\n${describe(error)}`;
+  const message = `💥 Crashed (${source})\nAlgoTest broker login, ${istTimestamp()} IST\n${describe(error)}`;
   sendTelegram(readTelegramConfig(), message)
     .catch(() => undefined)
     .finally(() => process.exit(1));

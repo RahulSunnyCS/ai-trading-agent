@@ -131,7 +131,7 @@ async function checkTelegram(): Promise<void> {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: `AlgoTest broker login - test message from npm run check (${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST)`,
+        text: `🧪 Test message from npm run check\nAlgoTest broker login, ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`,
       }),
       signal: AbortSignal.timeout(15_000),
     });
