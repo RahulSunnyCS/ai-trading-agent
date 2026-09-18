@@ -1,0 +1,99 @@
+name: Daily broker login
+
+on:
+  schedule:
+    # 03:05 UTC = 08:35 IST. Weekdays only - markets are shut at the weekend.
+    - cron: '5 3 * * 1-5'
+    # 09:05 IST backstop. A no-op when the first run already succeeded, because
+    # brokers that are logged in are skipped.
+    - cron: '35 3 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Single broker to run (angelone or shoonya). Blank runs both.'
+        required: false
+        default: ''
+      trace:
+        description: 'Capture a Playwright trace (contains sensitive DOM snapshots)'
+        type: boolean
+        required: false
+        default: false
+      skip_window_guard:
+        description: 'Skip waiting for the 08:30 IST window (off-hours testing)'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: broker-login
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    # Browsers are preinstalled here, so there is no download step and no cache to
+    # invalidate. The tag must stay in lockstep with the playwright version in
+    # package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    # Generous, because the window guard can sleep if the scheduler fires early.
+    timeout-minutes: 45
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: npm ci
+
+      - name: Log in brokers
+        env:
+          ALGOTEST_PHONE: ${{ secrets.ALGOTEST_PHONE }}
+          ALGOTEST_PASSWORD: ${{ secrets.ALGOTEST_PASSWORD }}
+          ANGELONE_CLIENT_CODE: ${{ secrets.ANGELONE_CLIENT_CODE }}
+          ANGELONE_MPIN: ${{ secrets.ANGELONE_MPIN }}
+          ANGELONE_TOTP_SECRET: ${{ secrets.ANGELONE_TOTP_SECRET }}
+          SHOONYA_CLIENT_ID: ${{ secrets.SHOONYA_CLIENT_ID }}
+          SHOONYA_PASSWORD: ${{ secrets.SHOONYA_PASSWORD }}
+          SHOONYA_TOTP_SECRET: ${{ secrets.SHOONYA_TOTP_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ONLY: ${{ inputs.only }}
+          TRACE: ${{ inputs.trace && '1' || '' }}
+          SKIP_WINDOW_GUARD: ${{ inputs.skip_window_guard && '1' || '' }}
+        run: npm run login
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-${{ github.run_id }}
+          path: artifacts/
+          retention-days: 3
+          if-no-files-found: ignore
+
+      # GitHub disables scheduled workflows after 60 days without *repository*
+      # activity - workflow runs alone do not count. This daily commit resets that
+      # clock and doubles as an audit trail.
+      - name: Update run log
+        if: always()
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '%s  %s  run %s\n' \
+            "$(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M %Z')" \
+            "${{ job.status }}" \
+            "${{ github.run_id }}" >> run-log.md
+          git add run-log.md
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: broker login run log"
+          for attempt in 1 2 3; do
+            git pull --rebase --autostash && git push && exit 0
+            echo "push attempt $attempt failed, retrying"
+            sleep 5
+          done
+          echo "could not push run log" >&2
