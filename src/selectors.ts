@@ -38,34 +38,54 @@ export const loginPage = {
       .or(page.getByText(/invalid (phone|password|credentials)|incorrect password/i).first()),
 };
 
+/**
+ * VERIFIED against a real My Brokers (2) session on 2026-09-18 (angelonelimited +
+ * finvasia, both logged in). Two findings changed the design from the provisional
+ * version:
+ *
+ * 1. The tab is a plain <button>My Brokers (2)</button>, not an ARIA tab/link.
+ * 2. Each card's action button carries a stable, purpose-built identifier:
+ *      <button data-broker="angelone_Broker.AngelOne_<accountId>">Re-login</button>
+ *    "Logout" never carries this attribute (and is disabled while logged in). This
+ *    is a far more reliable anchor than matching on button label text, which
+ *    switches between "Login" (never-logged-in-today) and "Re-login" (has a session,
+ *    possibly stale) - both trigger the same login flow, so we target either via the
+ *    data-broker attribute rather than asserting a specific label.
+ *
+ * The logged-in state was confirmed end to end; the logged-out rendering (does the
+ * badge/button actually reset each trading morning, or stay stale?) is inferred from
+ * the user's description, not yet observed directly - see project memory.
+ */
 export const brokerPage = {
-  /** PROVISIONAL - bundle confirms the literal string "My Brokers" */
   myBrokersTab: (page: Page): Locator =>
-    page
-      .getByRole('tab', { name: /my brokers/i })
-      .or(page.getByRole('button', { name: /my brokers/i }))
-      .or(page.getByRole('link', { name: /my brokers/i }))
-      .or(page.getByText(/^\s*My Brokers\s*$/))
-      .first(),
+    page.getByRole('button', { name: /my brokers/i }).first(),
 
   /**
-   * A broker's row/card, found relationally rather than structurally: the smallest
-   * element that mentions the broker AND carries a Login/Logout control. `.last()`
-   * picks the innermost match, avoiding the "whole page contains the text" trap.
+   * The broker's card, found relationally: the smallest element that mentions the
+   * broker's display name (e.g. "Angel One - Rahul") and also contains its
+   * data-broker action button. `.last()` picks the innermost match.
    */
-  card: (page: Page, broker: RegExp): Locator =>
+  card: (page: Page, broker: RegExp, dataBrokerKey: string): Locator =>
     page
-      .locator('div, tr, li')
+      .locator('div')
       .filter({ hasText: broker })
-      .filter({ has: page.getByText(/^\s*(Login|Logout)\s*$/) })
+      .filter({ has: page.locator(`[data-broker*="${dataBrokerKey}"]`) })
       .last(),
 
-  loginButton: (card: Locator): Locator =>
-    card.getByRole('button', { name: /^\s*login\s*$/i }).first(),
+  /**
+   * The Login / Re-login button - both states use this same attribute, so no
+   * assumption is made about which label is currently showing.
+   */
+  actionButton: (page: Page, dataBrokerKey: string): Locator =>
+    page.locator(`button[data-broker*="${dataBrokerKey}"]`).first(),
 
-  /** Presence of a Logout control is our proof that the broker is logged in. */
-  logoutButton: (card: Locator): Locator =>
-    card.getByRole('button', { name: /^\s*logout\s*$/i }).first(),
+  /**
+   * <div><p>Status</p><p class="...">Logged in</p></div> - anchored on the "Status"
+   * label and its immediate sibling, not on the (redesign-prone) utility classes
+   * that give the value element its green/uppercase styling.
+   */
+  statusText: (card: Locator): Locator =>
+    card.getByText('Status', { exact: true }).locator('xpath=following-sibling::p[1]'),
 };
 
 /** Inline form AlgoTest shows for Shoonya: password + rotating TOTP. PROVISIONAL */
@@ -123,4 +143,10 @@ export const errorPatterns = {
 export const brokerNames = {
   angelone: /angel\s*one/i,
   shoonya: /shoonya|finvasia/i,
+};
+
+/** The `Broker.<Name>` fragment inside each broker's data-broker attribute. */
+export const dataBrokerKeys = {
+  angelone: 'AngelOne',
+  shoonya: 'Finvasia',
 };

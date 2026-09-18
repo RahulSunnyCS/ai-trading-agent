@@ -63,15 +63,29 @@ export async function openMyBrokers(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Reads the "Status" badge text (e.g. "Logged in"). Anything other than exactly
+ * "logged in" is treated as logged_out, which is the safe default: it just causes a
+ * login attempt rather than a silent skip. Falls back to action-button presence if
+ * the card itself can't be found at all.
+ */
 export async function readBrokerState(page: Page, broker: Broker): Promise<BrokerState> {
-  const card = brokerPage.card(page, broker.match);
+  const card = brokerPage.card(page, broker.match, broker.dataBrokerKey);
 
   if ((await card.count()) === 0) return 'unknown';
 
-  if (await brokerPage.logoutButton(card).isVisible().catch(() => false)) return 'logged_in';
-  if (await brokerPage.loginButton(card).isVisible().catch(() => false)) return 'logged_out';
+  const status = await brokerPage
+    .statusText(card)
+    .innerText()
+    .then((text) => text.trim().toLowerCase())
+    .catch(() => '');
 
-  return 'unknown';
+  if (status) return status === 'logged in' ? 'logged_in' : 'logged_out';
+
+  // Status label not found - fall back to whether the action button exists at all.
+  return (await brokerPage.actionButton(page, broker.dataBrokerKey).count()) > 0
+    ? 'logged_out'
+    : 'unknown';
 }
 
 /**

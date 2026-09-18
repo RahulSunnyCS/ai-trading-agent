@@ -2,25 +2,24 @@ import type { Page } from 'playwright';
 import type { Config } from '../config.js';
 import { classifyError, visibleErrorText } from '../algotest.js';
 import { step } from '../diagnose.js';
-import { brokerNames, brokerPage, shoonyaForm } from '../selectors.js';
+import { brokerNames, brokerPage, dataBrokerKeys, shoonyaForm } from '../selectors.js';
 import { freshTotp } from '../totp.js';
 import { BrokerLoginError, type Broker } from './types.js';
 
 /**
- * Shoonya logs in entirely on AlgoTest: clicking Login reveals an inline form asking
- * for the account password and a rotating TOTP code. The client ID is already stored
- * in the AlgoTest broker config.
+ * Shoonya logs in entirely on AlgoTest: clicking Login/Re-login reveals an inline
+ * form asking for the account password and a rotating TOTP code. The client ID is
+ * already stored in the AlgoTest broker config.
  */
 export const shoonya: Broker = {
   key: 'shoonya',
   name: 'Finvasia',
   match: brokerNames.shoonya,
+  dataBrokerKey: dataBrokerKeys.shoonya,
 
   async login(page: Page, config: Config): Promise<void> {
-    const card = brokerPage.card(page, brokerNames.shoonya);
-
     await step(page, 'shoonya-click-login', async () => {
-      await brokerPage.loginButton(card).click();
+      await brokerPage.actionButton(page, dataBrokerKeys.shoonya).click();
     });
 
     await step(page, 'shoonya-fill-form', async () => {

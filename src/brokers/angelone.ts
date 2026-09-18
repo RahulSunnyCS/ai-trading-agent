@@ -2,7 +2,7 @@ import type { Page } from 'playwright';
 import type { Config } from '../config.js';
 import { BASE_URL, classifyError, visibleErrorText } from '../algotest.js';
 import { step } from '../diagnose.js';
-import { angelOneForm, brokerNames, brokerPage } from '../selectors.js';
+import { angelOneForm, brokerNames, brokerPage, dataBrokerKeys } from '../selectors.js';
 import { freshTotp } from '../totp.js';
 import { BrokerLoginError, type Broker } from './types.js';
 
@@ -18,17 +18,16 @@ export const angelone: Broker = {
   key: 'angelone',
   name: 'Angel One',
   match: brokerNames.angelone,
+  dataBrokerKey: dataBrokerKeys.angelone,
 
   async login(page: Page, config: Config): Promise<void> {
-    const card = brokerPage.card(page, brokerNames.angelone);
-
     const popupPromise = page
       .context()
       .waitForEvent('page', { timeout: 15_000 })
       .catch(() => null);
 
     await step(page, 'angelone-click-login', async () => {
-      await brokerPage.loginButton(card).click();
+      await brokerPage.actionButton(page, dataBrokerKeys.angelone).click();
     });
 
     const popup = await popupPromise;

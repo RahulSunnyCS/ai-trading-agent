@@ -32,6 +32,8 @@ export interface Broker {
   name: string;
   /** Matches the broker's row on the My Brokers tab. */
   match: RegExp;
+  /** The `Broker.<Name>` fragment inside this broker's data-broker attribute. */
+  dataBrokerKey: string;
   /**
    * Performs the login. Called with the My Brokers tab open and the broker's row
    * confirmed present and logged out. Must throw BrokerLoginError on failure.
