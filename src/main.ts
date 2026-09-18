@@ -10,9 +10,9 @@ import {
   type BrokerResult,
   type FailureKind,
 } from './brokers/types.js';
-import { loadConfig, type Config } from './config.js';
+import { loadConfig, readTelegramConfig, type Config } from './config.js';
 import { ARTIFACTS_DIR, describe, dumpHtml, safeScreenshot } from './diagnose.js';
-import { formatReport, sendTelegram } from './notify.js';
+import { formatReport, istTimestamp, sendTelegram } from './notify.js';
 import { brokerPage } from './selectors.js';
 import { waitForNextWindow } from './totp.js';
 
@@ -148,40 +148,54 @@ async function run(config: Config, context: BrowserContext): Promise<BrokerResul
   return results;
 }
 
+/**
+ * Read independently of loadConfig() up front, so a failure IN loadConfig() (a
+ * missing or misnamed secret) can still be reported - the alert path can't depend on
+ * the same validation that might be what's broken. Every exit from main() past this
+ * point goes through a Telegram send; nothing after it is allowed to bypass that.
+ */
 async function main(): Promise<number> {
-  const config = loadConfig();
-  await mkdir(ARTIFACTS_DIR, { recursive: true });
+  const telegram = readTelegramConfig();
+
+  let config: Config;
+  try {
+    config = loadConfig();
+  } catch (error) {
+    const message = `AlgoTest broker login - STARTUP FAILED, ${istTimestamp()} IST\n${describe(error)}`;
+    console.error(message);
+    await sendTelegram(telegram, message);
+    return 1;
+  }
+
+  await mkdir(ARTIFACTS_DIR, { recursive: true }).catch(() => undefined);
   await waitForLoginWindow(config);
 
   const tracing = process.env.TRACE === '1';
-  const browser = await chromium.launch({
-    headless: !config.headed,
-    slowMo: config.slowMo,
-  });
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    locale: 'en-IN',
-    timezoneId: 'Asia/Kolkata',
-  });
-
-  // Opt-in only: trace snapshots record input values, including the typed password.
-  if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
-
   let results: BrokerResult[] = [];
   let fatal: string | null = null;
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 
   try {
+    browser = await chromium.launch({ headless: !config.headed, slowMo: config.slowMo });
+    const context: BrowserContext = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      locale: 'en-IN',
+      timezoneId: 'Asia/Kolkata',
+    });
+
+    // Opt-in only: trace snapshots record input values, including the typed password.
+    if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });
+
     results = await run(config, context);
+
+    if (tracing) {
+      await context.tracing.stop({ path: `${ARTIFACTS_DIR}/trace.zip` }).catch(() => undefined);
+    }
   } catch (error) {
     fatal = describe(error);
     console.error(`\nfatal: ${fatal}`);
   } finally {
-    if (tracing) {
-      await context.tracing
-        .stop({ path: `${ARTIFACTS_DIR}/trace.zip` })
-        .catch(() => undefined);
-    }
-    await browser.close().catch(() => undefined);
+    if (browser) await browser.close().catch(() => undefined);
   }
 
   const report = fatal
@@ -189,16 +203,29 @@ async function main(): Promise<number> {
     : formatReport(results, config.runUrl);
 
   console.log(`\n${report}`);
-  await sendTelegram(config, report);
+  await sendTelegram(config.telegram, report);
 
   const failed = results.some((r) => r.status === 'FAIL');
   return fatal || failed ? 1 : 0;
 }
 
+/**
+ * Last-resort net: anything that escapes every try/catch above (a bug in this file
+ * itself, a stray unawaited rejection) still gets one attempt at a Telegram alert
+ * before the process dies, using the same env-var read as everywhere else - not
+ * `config.telegram`, since config may never have loaded.
+ */
+function crashAlert(source: string, error: unknown): void {
+  console.error(`${source}:`, describe(error));
+  const message = `AlgoTest broker login - CRASHED (${source}), ${istTimestamp()} IST\n${describe(error)}`;
+  sendTelegram(readTelegramConfig(), message)
+    .catch(() => undefined)
+    .finally(() => process.exit(1));
+}
+
+process.on('unhandledRejection', (reason) => crashAlert('unhandled rejection', reason));
+process.on('uncaughtException', (error) => crashAlert('uncaught exception', error));
+
 main()
   .then((code) => process.exit(code))
-  .catch((error) => {
-    // Config errors land here, before a browser or report exists.
-    console.error('startup failed:', describe(error));
-    process.exit(1);
-  });
+  .catch((error) => crashAlert('main() rejected', error));

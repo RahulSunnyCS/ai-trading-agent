@@ -1,11 +1,16 @@
 import { existsSync } from 'node:fs';
 import { registerSecret } from './secrets.js';
 
+export interface TelegramConfig {
+  botToken: string;
+  chatId: string;
+}
+
 export interface Config {
   algotest: { phone: string; password: string };
   angelone: { clientCode: string; mpin: string; totpSecret: string };
   shoonya: { clientId: string; password: string; totpSecret: string };
-  telegram: { botToken: string; chatId: string } | null;
+  telegram: TelegramConfig | null;
   headed: boolean;
   slowMo: number;
   skipWindowGuard: boolean;
@@ -47,6 +52,20 @@ function runUrl(): string | null {
   return `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`;
 }
 
+/**
+ * Deliberately independent of loadConfig() and never throws: a failure loading the
+ * REST of the config (a missing or misnamed secret, say) must still be able to reach
+ * Telegram, so the alert path can't depend on the same validation that might be
+ * what's broken.
+ */
+export function readTelegramConfig(): TelegramConfig | null {
+  if (existsSync('.env')) process.loadEnvFile('.env');
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
+  if (botToken) registerSecret(botToken);
+  return botToken && chatId ? { botToken, chatId } : null;
+}
+
 export function loadConfig(): Config {
   if (existsSync('.env')) process.loadEnvFile('.env');
 
@@ -86,10 +105,6 @@ export function loadConfig(): Config {
   const readOrBlank = (broker: keyof typeof BROKER_SECRET_KEYS, key: SecretKey): string =>
     activeBrokers.includes(broker) ? read(key) : '';
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
-  if (botToken) registerSecret(botToken);
-
   return {
     algotest: {
       phone: normalizePhone(read('ALGOTEST_PHONE')),
@@ -105,7 +120,7 @@ export function loadConfig(): Config {
       password: readOrBlank('shoonya', 'SHOONYA_PASSWORD'),
       totpSecret: readOrBlank('shoonya', 'SHOONYA_TOTP_SECRET'),
     },
-    telegram: botToken && chatId ? { botToken, chatId } : null,
+    telegram: readTelegramConfig(),
     headed: process.env.HEADED === '1',
     slowMo: Number(process.env.SLOW_MO ?? 0),
     skipWindowGuard: process.env.SKIP_WINDOW_GUARD === '1',

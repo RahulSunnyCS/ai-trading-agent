@@ -1,10 +1,10 @@
-import type { Config } from './config.js';
+import type { TelegramConfig } from './config.js';
 import { redact } from './secrets.js';
 import type { BrokerResult } from './brokers/types.js';
 
 const IST = 'Asia/Kolkata';
 
-function istTimestamp(): string {
+export function istTimestamp(): string {
   return new Date().toLocaleString('en-IN', {
     timeZone: IST,
     day: '2-digit',
@@ -38,26 +38,23 @@ export function formatReport(results: BrokerResult[], runUrl: string | null): st
   return redact(lines.join('\n'));
 }
 
-export async function sendTelegram(config: Config, text: string): Promise<void> {
-  if (!config.telegram) {
+export async function sendTelegram(telegram: TelegramConfig | null, text: string): Promise<void> {
+  if (!telegram) {
     console.log('\n[telegram not configured, report below]\n' + text);
     return;
   }
 
   try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${config.telegram.botToken}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: config.telegram.chatId,
-          text,
-          disable_web_page_preview: true,
-        }),
-        signal: AbortSignal.timeout(15_000),
-      },
-    );
+    const response = await fetch(`https://api.telegram.org/bot${telegram.botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: telegram.chatId,
+        text,
+        disable_web_page_preview: true,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!response.ok) {
       console.error(`  telegram returned ${response.status}: ${redact(await response.text())}`);
     }
