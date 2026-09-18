@@ -29,7 +29,7 @@ type SecretKey =
  * The login field sits next to a static "+91" prefix and wants the bare 10 digits,
  * so accept whatever format the secret is stored in and strip it down.
  */
-function normalizePhone(raw: string): string {
+export function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
   const local = digits.replace(/^(?:0|91)(?=\d{10}$)/, '');
   if (local.length !== 10) {

@@ -127,7 +127,7 @@ async function run(config: Config, context: BrowserContext): Promise<BrokerResul
   const page = await context.newPage();
   page.setDefaultTimeout(15_000);
 
-  await algotestLogin(page, config);
+  await algotestLogin(page, config.algotest);
   console.log('AlgoTest login OK');
 
   await openMyBrokers(page);

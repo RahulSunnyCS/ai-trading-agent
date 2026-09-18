@@ -1,5 +1,4 @@
 import type { Page } from 'playwright';
-import type { Config } from './config.js';
 import { step } from './diagnose.js';
 import { brokerPage, errorPatterns, loginPage } from './selectors.js';
 import { BrokerLoginError, type Broker, type FailureKind } from './brokers/types.js';
@@ -8,15 +7,25 @@ export const BASE_URL = 'https://algotest.in';
 
 export type BrokerState = 'logged_in' | 'logged_out' | 'unknown';
 
-export async function algotestLogin(page: Page, config: Config): Promise<void> {
+export interface AlgotestCredentials {
+  phone: string;
+  password: string;
+}
+
+/**
+ * Takes just the site credentials, not the full Config, so callers that never touch
+ * a broker - like the read-only test-login smoke check - don't need broker secrets
+ * to exist at all.
+ */
+export async function algotestLogin(page: Page, credentials: AlgotestCredentials): Promise<void> {
   await step(page, 'goto-login', async () => {
     await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
   });
 
   await step(page, 'fill-credentials', async () => {
     await loginPage.form(page).waitFor({ state: 'visible', timeout: 30_000 });
-    await loginPage.phone(page).fill(config.algotest.phone);
-    await loginPage.password(page).fill(config.algotest.password);
+    await loginPage.phone(page).fill(credentials.phone);
+    await loginPage.password(page).fill(credentials.password);
   });
 
   await step(page, 'submit-login', async () => {

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "login": "tsx src/main.ts",
+    "test-login": "tsx scripts/test-login.ts",
     "check": "tsx scripts/check.ts",
     "record": "tsx scripts/record.ts",
     "typecheck": "tsc --noEmit"
