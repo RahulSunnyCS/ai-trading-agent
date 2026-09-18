@@ -13,6 +13,7 @@ import {
 import { loadConfig, type Config } from './config.js';
 import { ARTIFACTS_DIR, describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { formatReport, sendTelegram } from './notify.js';
+import { brokerPage } from './selectors.js';
 import { waitForNextWindow } from './totp.js';
 
 const ALL_BROKERS: Broker[] = [angelone, shoonya];
@@ -74,6 +75,14 @@ async function attemptBroker(page: Page, broker: Broker, config: Config): Promis
     await safeScreenshot(page, `${broker.key}-row-not-found`);
     await dumpHtml(page, `${broker.key}-row-not-found`);
     return result('FAIL', 'row not found on My Brokers - selector may have changed');
+  }
+
+  // Outside 08:30-15:28 IST, AlgoTest swaps the Login/Re-login button for a disabled
+  // "Market Closed" placeholder with no data-broker attribute at all - confirmed on a
+  // live capture. Fail fast here instead of waiting out a 15s timeout on a button
+  // that will never appear.
+  if ((await brokerPage.actionButton(page, broker.dataBrokerKey).count()) === 0) {
+    return result('FAIL', 'market closed - outside 08:30-15:28 IST login window');
   }
 
   let lastDetail = 'unknown failure';

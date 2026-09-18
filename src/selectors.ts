@@ -39,22 +39,24 @@ export const loginPage = {
 };
 
 /**
- * VERIFIED against a real My Brokers (2) session on 2026-09-18 (angelonelimited +
- * finvasia, both logged in). Two findings changed the design from the provisional
- * version:
+ * VERIFIED against a real My Brokers (2) session on 2026-09-18, in both a logged-in
+ * state (during market hours) and a logged-out state (outside the 08:30-15:28 IST
+ * broker login window). Findings that shaped the design:
  *
  * 1. The tab is a plain <button>My Brokers (2)</button>, not an ARIA tab/link.
- * 2. Each card's action button carries a stable, purpose-built identifier:
+ * 2. During the login window, each card's action button carries a stable,
+ *    purpose-built identifier:
  *      <button data-broker="angelone_Broker.AngelOne_<accountId>">Re-login</button>
  *    "Logout" never carries this attribute (and is disabled while logged in). This
- *    is a far more reliable anchor than matching on button label text, which
+ *    is a far more reliable click target than matching on button label text, which
  *    switches between "Login" (never-logged-in-today) and "Re-login" (has a session,
- *    possibly stale) - both trigger the same login flow, so we target either via the
- *    data-broker attribute rather than asserting a specific label.
- *
- * The logged-in state was confirmed end to end; the logged-out rendering (does the
- * badge/button actually reset each trading morning, or stay stale?) is inferred from
- * the user's description, not yet observed directly - see project memory.
+ *    possibly stale) - both trigger the same login flow.
+ * 3. OUTSIDE the login window, AlgoTest replaces the action button entirely with a
+ *    disabled "Market Closed" placeholder that carries NO data-broker attribute at
+ *    all - confirmed empty on a live capture. So `card` (used to read status at any
+ *    time, including diagnostics) must not depend on data-broker existing; only
+ *    `actionButton` (used solely to click, which only makes sense inside the window
+ *    anyway) does.
  */
 export const brokerPage = {
   myBrokersTab: (page: Page): Locator =>
@@ -62,19 +64,21 @@ export const brokerPage = {
 
   /**
    * The broker's card, found relationally: the smallest element that mentions the
-   * broker's display name (e.g. "Angel One - Rahul") and also contains its
-   * data-broker action button. `.last()` picks the innermost match.
+   * broker's display name (e.g. "Angel One - Rahul") and also has a "Status" label -
+   * present in every state, unlike the action button. `.last()` picks the innermost
+   * match, avoiding the "whole page contains the text" trap.
    */
-  card: (page: Page, broker: RegExp, dataBrokerKey: string): Locator =>
+  card: (page: Page, broker: RegExp): Locator =>
     page
       .locator('div')
       .filter({ hasText: broker })
-      .filter({ has: page.locator(`[data-broker*="${dataBrokerKey}"]`) })
+      .filter({ has: page.getByText('Status', { exact: true }) })
       .last(),
 
   /**
    * The Login / Re-login button - both states use this same attribute, so no
-   * assumption is made about which label is currently showing.
+   * assumption is made about which label is currently showing. Only present during
+   * the 08:30-15:28 IST login window; outside it there is nothing to click.
    */
   actionButton: (page: Page, dataBrokerKey: string): Locator =>
     page.locator(`button[data-broker*="${dataBrokerKey}"]`).first(),

@@ -70,7 +70,7 @@ export async function openMyBrokers(page: Page): Promise<void> {
  * the card itself can't be found at all.
  */
 export async function readBrokerState(page: Page, broker: Broker): Promise<BrokerState> {
-  const card = brokerPage.card(page, broker.match, broker.dataBrokerKey);
+  const card = brokerPage.card(page, broker.match);
 
   if ((await card.count()) === 0) return 'unknown';
 
