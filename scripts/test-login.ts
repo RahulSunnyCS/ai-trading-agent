@@ -32,7 +32,14 @@ const phone = normalizePhone(rawPhone);
 const ALL_BROKERS: Broker[] = [angelone, shoonya];
 
 async function main(credentials: { phone: string; password: string }): Promise<number> {
-  const browser = await chromium.launch({ headless: process.env.HEADED !== '1' });
+  const headed = process.env.HEADED === '1';
+  // Headed mode exists so a human can watch it - on a fast local run, every step
+  // otherwise completes before the window is even drawn. 400ms/action and a pause
+  // at the end (both overridable) make that actually possible.
+  const slowMo = Number(process.env.SLOW_MO ?? (headed ? 400 : 0));
+  const holdMs = Number(process.env.HOLD_MS ?? (headed ? 6_000 : 0));
+
+  const browser = await chromium.launch({ headless: !headed, slowMo });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     locale: 'en-IN',
@@ -68,6 +75,10 @@ async function main(credentials: { phone: string; password: string }): Promise<n
     ok = false;
     console.error(`\nfatal: ${describe(error)}`);
   } finally {
+    if (holdMs > 0) {
+      console.log(`\nholding the window open for ${Math.round(holdMs / 1000)}s...`);
+      await page.waitForTimeout(holdMs).catch(() => undefined);
+    }
     await browser.close().catch(() => undefined);
   }
 
