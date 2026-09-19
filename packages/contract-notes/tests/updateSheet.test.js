@@ -77,6 +77,21 @@ describe('buildAccountValues()', () => {
     // total = 0; final = 50 - 0 = 50
     expect(vals).toEqual([50, 0, 0, 0, 50]);
   });
+
+  test('total_charges is exact for values that break native float addition', () => {
+    // 0.1 + 0.2 === 0.30000000000000004 in native JS — this is exactly the
+    // class of bug decimal.js exists to rule out for real-money figures.
+    expect(0.1 + 0.2).not.toBe(0.3);
+
+    const [, brokerage, other, total] = buildAccountValues({
+      payin_payout_obligation: 0,
+      net_brokerage: 0.1,
+      other_charges: 0.2,
+    });
+    expect(brokerage).toBe(0.1);
+    expect(other).toBe(0.2);
+    expect(total).toBe(0.3);
+  });
 });
 
 describe('isDateCell()', () => {

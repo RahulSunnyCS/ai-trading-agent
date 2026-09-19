@@ -1,3 +1,4 @@
+const Decimal = require('decimal.js');
 const {
   normaliseLabel,
   isTotalRow,
@@ -73,7 +74,16 @@ describe('normaliseLabel()', () => {
 
 describe('parseAmounts()', () => {
   test('parses signed amounts and strips thousands separators', () => {
-    expect(parseAmounts('447.00 -10,015.11 0.00')).toEqual([447, -10015.11, 0]);
+    const amounts = parseAmounts('447.00 -10,015.11 0.00');
+    expect(amounts.map((d) => d.toNumber())).toEqual([447, -10015.11, 0]);
+  });
+
+  test('returns Decimal instances, not plain numbers — these are real-money', () => {
+    // amounts get summed/subtracted/compared across rows downstream, and
+    // native JS number arithmetic is not exact for base-10 fractions.
+    const [amount] = parseAmounts('447.00');
+    expect(amount).toBeInstanceOf(Decimal);
+    expect(amount.toFixed(2)).toBe('447.00');
   });
 
   test('returns an empty array when there are no amounts', () => {

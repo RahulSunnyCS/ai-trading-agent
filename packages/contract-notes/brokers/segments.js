@@ -1,3 +1,5 @@
+const Decimal = require('decimal.js');
+
 // Contract notes settle several exchange segments in a single note: the
 // "obligation" table carries one row per exchange/segment (equity derivatives,
 // cash/equity, currency, commodity...). This pipeline tracks equity-derivative
@@ -43,10 +45,20 @@ function classifySegment(label) {
 }
 
 // Pulls the numeric cells out of a table row, tolerating thousands separators.
+//
+// Returns Decimal instances, not plain numbers: these are real-money rupee
+// amounts that get summed, subtracted and compared across several rows
+// downstream (brokers/finvasia.js, brokers/angelone.js, ../updateSheet.js),
+// and native JS number arithmetic is not exact for base-10 fractions (e.g.
+// 0.1 + 0.2 === 0.30000000000000004). Constructing the Decimal directly from
+// the matched digit string (after stripping thousands separators) — rather
+// than via Number.parseFloat first — also avoids ever routing the value
+// through a binary float, so no precision is lost even before the first
+// arithmetic operation.
 function parseAmounts(chunk) {
   const matches = String(chunk == null ? '' : chunk).match(/-?\d+(?:,\d{3})*\.\d{2}/g);
   if (!matches) return [];
-  return matches.map((n) => Number.parseFloat(n.replace(/,/g, '')));
+  return matches.map((n) => new Decimal(n.replace(/,/g, '')));
 }
 
 // Splits the obligation table into { label, amounts } rows, classifies them and

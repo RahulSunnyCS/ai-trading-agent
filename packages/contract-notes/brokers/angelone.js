@@ -1,3 +1,4 @@
+const Decimal = require('decimal.js');
 const { isTotalRow, parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
 
@@ -58,11 +59,14 @@ function obligationBlock(text) {
 // exchange transaction charges + SEBI turnover fees + IPF charges. Inverting
 // that gives this segment's own brokerage.
 function segmentBrokerage(a) {
-  return a[COL.TAXABLE] - a[COL.EXCHANGE_TXN] - a[COL.SEBI] - a[COL.IPF];
+  return a[COL.TAXABLE].minus(a[COL.EXCHANGE_TXN]).minus(a[COL.SEBI]).minus(a[COL.IPF]);
 }
 
+// n is a Decimal (all money math in this file stays in Decimal until this
+// boundary); returns a plain number, since that is what daily_summary.json
+// and the Sheets API expect.
 function round2(n) {
-  return Math.round(n * 100) / 100;
+  return n.toDecimalPlaces(2).toNumber();
 }
 
 function parseRows(block) {
@@ -125,26 +129,33 @@ function extract(text) {
     };
   }
 
-  let obligation = 0;
-  let netAmount = 0;
-  let brokerage = 0;
-  let itemisedCharges = 0;
+  let obligation = new Decimal(0);
+  let netAmount = new Decimal(0);
+  let brokerage = new Decimal(0);
+  let itemisedCharges = new Decimal(0);
 
   for (const row of kept) {
     const a = row.amounts;
-    if (a.some((n) => !Number.isFinite(n))) {
+    if (a.some((n) => !n.isFinite())) {
       return { error: `Angel One row "${row.label}" contains a non-numeric amount` };
     }
-    obligation += a[COL.OBLIGATION];
-    netAmount += a[COL.NET];
-    brokerage += segmentBrokerage(a);
-    itemisedCharges += CHARGE_COLS.reduce((sum, c) => sum + a[c], 0);
+    obligation = obligation.plus(a[COL.OBLIGATION]);
+    netAmount = netAmount.plus(a[COL.NET]);
+    brokerage = brokerage.plus(segmentBrokerage(a));
+    itemisedCharges = itemisedCharges.plus(
+      CHARGE_COLS.reduce((sum, c) => sum.plus(a[c]), new Decimal(0)),
+    );
   }
 
   // obligation - charges must land on the note's own net amount; if it does
   // not, the columns were read in the wrong order and the numbers are unsafe.
-  const charges = obligation - netAmount;
-  if (Math.abs(charges - itemisedCharges) > TOLERANCE * kept.length) {
+  const charges = obligation.minus(netAmount);
+  if (
+    charges
+      .minus(itemisedCharges)
+      .abs()
+      .greaterThan(TOLERANCE * kept.length)
+  ) {
     return {
       error:
         `Angel One column mismatch: obligation ${obligation.toFixed(2)} - net ${netAmount.toFixed(2)} ` +
@@ -158,9 +169,14 @@ function extract(text) {
   if (totalBrokerageMatch) {
     const allRowsBrokerage = rows
       .filter((r) => !isTotalRow(r.label))
-      .reduce((sum, r) => sum + segmentBrokerage(r.amounts), 0);
-    const reported = Number.parseFloat(totalBrokerageMatch[1].replace(/,/g, ''));
-    if (Math.abs(allRowsBrokerage - reported) > TOLERANCE * rows.length) {
+      .reduce((sum, r) => sum.plus(segmentBrokerage(r.amounts)), new Decimal(0));
+    const reported = new Decimal(totalBrokerageMatch[1].replace(/,/g, ''));
+    if (
+      allRowsBrokerage
+        .minus(reported)
+        .abs()
+        .greaterThan(TOLERANCE * rows.length)
+    ) {
       logger.warn('Angel One derived brokerage does not match reported Total Brokerage', {
         derived: allRowsBrokerage.toFixed(2),
         reported: reported.toFixed(2),
@@ -174,9 +190,9 @@ function extract(text) {
 
   return {
     // Angel One's obligation already has brokerage deducted; add it back for a consistent raw P&L
-    payin_payout_obligation: round2(obligation + brokerage),
+    payin_payout_obligation: round2(obligation.plus(brokerage)),
     net_brokerage: round2(brokerage),
-    other_charges: round2(Math.abs(charges)),
+    other_charges: round2(charges.abs()),
     skipped_segments: dropped,
   };
 }

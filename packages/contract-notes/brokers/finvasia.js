@@ -1,3 +1,4 @@
+const Decimal = require('decimal.js');
 const { parseAmounts, splitBySegment } = require('./segments');
 const logger = require('../utils/logger');
 
@@ -40,8 +41,11 @@ function subject(accountId, date) {
   return `Combined Contract Note for ${accountId} ${dd}-${mm}-${yyyy}`;
 }
 
+// n is a Decimal (all money math in this file stays in Decimal until this
+// boundary); returns a plain number, since that is what daily_summary.json
+// and the Sheets API expect.
 function round2(n) {
-  return Math.round(n * 100) / 100;
+  return n.toDecimalPlaces(2).toNumber();
 }
 
 function obligationBlock(text) {
@@ -119,31 +123,43 @@ function extract(text) {
     };
   }
 
-  let obligation = 0;
-  let netAmount = 0;
-  let brokerage = 0;
-  let itemisedCharges = 0;
-  let taxable = 0;
-  let taxableComponents = 0;
+  let obligation = new Decimal(0);
+  let netAmount = new Decimal(0);
+  let brokerage = new Decimal(0);
+  let itemisedCharges = new Decimal(0);
+  let taxable = new Decimal(0);
+  let taxableComponents = new Decimal(0);
 
   for (const row of kept) {
     const a = row.amounts;
-    if (a.some((n) => !Number.isFinite(n))) {
+    if (a.some((n) => !n.isFinite())) {
       return { error: `Finvasia row "${row.label}" contains a non-numeric amount` };
     }
-    obligation += a[COL.OBLIGATION];
-    netAmount += a[COL.NET];
-    brokerage += a[COL.BROKERAGE];
-    itemisedCharges += CHARGE_COLS.reduce((sum, c) => sum + a[c], 0);
-    taxable += a[COL.TAXABLE];
-    taxableComponents +=
-      a[COL.BROKERAGE] + a[COL.TRANSACTION] + a[COL.SEBI] + a[COL.CLEARING] + a[COL.IPF];
+    obligation = obligation.plus(a[COL.OBLIGATION]);
+    netAmount = netAmount.plus(a[COL.NET]);
+    brokerage = brokerage.plus(a[COL.BROKERAGE]);
+    itemisedCharges = itemisedCharges.plus(
+      CHARGE_COLS.reduce((sum, c) => sum.plus(a[c]), new Decimal(0)),
+    );
+    taxable = taxable.plus(a[COL.TAXABLE]);
+    taxableComponents = taxableComponents.plus(
+      a[COL.BROKERAGE]
+        .plus(a[COL.TRANSACTION])
+        .plus(a[COL.SEBI])
+        .plus(a[COL.CLEARING])
+        .plus(a[COL.IPF]),
+    );
   }
 
   // obligation - charges must land on the note's own Final Net; if it does not,
   // the cells were read in the wrong order and the numbers are unsafe.
-  const charges = obligation - netAmount;
-  if (Math.abs(charges - itemisedCharges) > TOLERANCE * kept.length) {
+  const charges = obligation.minus(netAmount);
+  if (
+    charges
+      .minus(itemisedCharges)
+      .abs()
+      .greaterThan(TOLERANCE * kept.length)
+  ) {
     return {
       error:
         `Finvasia column mismatch: obligation ${obligation.toFixed(2)} - final net ${netAmount.toFixed(2)} ` +
@@ -153,7 +169,12 @@ function extract(text) {
 
   // Taxable value of supply = brokerage + transaction + SEBI + clearing + IPF.
   // A mismatch means the brokerage cell is probably not where we think it is.
-  if (Math.abs(taxable - taxableComponents) > TOLERANCE * kept.length) {
+  if (
+    taxable
+      .minus(taxableComponents)
+      .abs()
+      .greaterThan(TOLERANCE * kept.length)
+  ) {
     logger.warn('Finvasia brokerage cross-check failed against taxable value of supply', {
       taxable: taxable.toFixed(2),
       components: taxableComponents.toFixed(2),
@@ -168,7 +189,7 @@ function extract(text) {
     payin_payout_obligation: round2(obligation),
     net_brokerage: round2(brokerage),
     // |finalNet - obligation| spans brokerage + other charges; strip brokerage to isolate other charges
-    other_charges: round2(Math.abs(charges) - brokerage),
+    other_charges: round2(charges.abs().minus(brokerage)),
     skipped_segments: dropped,
   };
 }

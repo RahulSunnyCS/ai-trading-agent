@@ -1,5 +1,6 @@
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
+const Decimal = require('decimal.js');
 const dotenv = require('dotenv');
 const fs = require('node:fs');
 const { loadBrokerAccounts, flattenAccounts } = require('./brokers');
@@ -41,13 +42,25 @@ function isDateCell(value) {
   }
 }
 
+// payin/brokerage/other are already 2dp-rounded rupee values from the broker
+// extractors, but total/final still go through Decimal rather than native +/-:
+// these are real-money figures written straight to the sheet, and native JS
+// number arithmetic is not exact for base-10 fractions (0.1 + 0.2 !==
+// 0.3 in a float). Only the final [payin, brokerage, ...] array crosses back
+// to plain numbers, since that is what the Sheets API's RAW value input wants.
 function buildAccountValues(match) {
-  const payin = match?.payin_payout_obligation ?? 0;
-  const brokerage = match?.net_brokerage ?? 0;
-  const other = match?.other_charges ?? 0;
-  const totalCharges = brokerage + other;
-  const finalNet = payin - totalCharges;
-  return [payin, brokerage, other, totalCharges, finalNet];
+  const payin = new Decimal(match?.payin_payout_obligation ?? 0);
+  const brokerage = new Decimal(match?.net_brokerage ?? 0);
+  const other = new Decimal(match?.other_charges ?? 0);
+  const totalCharges = brokerage.plus(other);
+  const finalNet = payin.minus(totalCharges);
+  return [
+    payin.toNumber(),
+    brokerage.toNumber(),
+    other.toNumber(),
+    totalCharges.toNumber(),
+    finalNet.toNumber(),
+  ];
 }
 
 const sheetsRetryOpts = {
