@@ -40,7 +40,7 @@ export const loginPage = {
 
 /**
  * VERIFIED against a real My Brokers (2) session on 2026-09-18, in both a logged-in
- * state (during market hours) and a logged-out state (outside the 08:30-15:28 IST
+ * state (during market hours) and a logged-out state (outside the 08:15-15:40 IST
  * broker login window). Findings that shaped the design:
  *
  * 1. The tab is a plain <button>My Brokers (2)</button>, not an ARIA tab/link.
@@ -78,7 +78,7 @@ export const brokerPage = {
   /**
    * The Login / Re-login button - both states use this same attribute, so no
    * assumption is made about which label is currently showing. Only present during
-   * the 08:30-15:28 IST login window; outside it there is nothing to click.
+   * the 08:15-15:40 IST login window; outside it there is nothing to click.
    */
   actionButton: (page: Page, dataBrokerKey: string): Locator =>
     page.locator(`button[data-broker*="${dataBrokerKey}"]`).first(),
@@ -92,48 +92,46 @@ export const brokerPage = {
     card.getByText('Status', { exact: true }).locator('xpath=following-sibling::p[1]'),
 };
 
-/** Inline form AlgoTest shows for Shoonya: password + rotating TOTP. PROVISIONAL */
+/**
+ * VERIFIED against Finvasia's OAuth login page (captured live 2026-09-19). AlgoTest's
+ * docs describe an inline password + TOTP form, but the real flow redirects to
+ * Finvasia's own page - the same shape as Angel One - with all three fields on one
+ * screen. The ids are stable; the surrounding smart-* widgets are not worth touching.
+ */
 export const shoonyaForm = {
-  password: (page: Page): Locator =>
-    page
-      .getByLabel(/password/i)
-      .or(page.getByPlaceholder(/password/i))
-      .or(page.locator('input[type="password"]'))
-      .first(),
+  userId: (page: Page): Locator => page.locator('#lgnusrid'),
 
-  totp: (page: Page): Locator =>
-    page
-      .getByLabel(/totp|otp|authenticator/i)
-      .or(page.getByPlaceholder(/totp|otp/i))
-      .first(),
+  password: (page: Page): Locator => page.locator('#lgnpwd'),
 
-  submit: (page: Page): Locator =>
-    page.getByRole('button', { name: /^\s*(login|submit|verify)\s*$/i }).first(),
+  totp: (page: Page): Locator => page.locator('#lgnotp'),
+
+  submit: (page: Page): Locator => page.locator('button.lgnBtnClss'),
 };
 
-/** Angel One's own login page, reached by redirect. PROVISIONAL */
+/**
+ * VERIFIED against Angel One's SmartAPI login page (captured live 2026-09-19), reached
+ * by redirect from AlgoTest's Login/Re-login button.
+ */
 export const angelOneForm = {
+  /**
+   * The SmartAPI page defaults to Mobile Number + SMS OTP, which can't be automated.
+   * Its "TOTP" radio reveals Client ID + 4-digit PIN + 6-digit TOTP instead. The
+   * radio input itself is styled away, so the wrapping label is what gets clicked.
+   */
+  totpModeOption: (page: Page): Locator =>
+    page.locator('label.login-option').filter({ hasText: /^\s*TOTP\s*$/ }).first(),
+
+  /** The page holds hidden duplicates for the other modes - only the visible one counts. */
   clientCode: (page: Page): Locator =>
-    page
-      .getByLabel(/client ?code|user ?id/i)
-      .or(page.getByPlaceholder(/client ?code|user ?id/i))
-      .first(),
+    page.locator('input[placeholder="Enter your Client ID"]:visible').first(),
 
-  mpin: (page: Page): Locator =>
-    page
-      .getByLabel(/m?pin|password/i)
-      .or(page.getByPlaceholder(/m?pin|password/i))
-      .or(page.locator('input[type="password"]'))
-      .first(),
+  mpin: (page: Page): Locator => page.locator('#tot-pin'),
 
-  totp: (page: Page): Locator =>
-    page
-      .getByLabel(/totp|otp|authenticator/i)
-      .or(page.getByPlaceholder(/totp|otp/i))
-      .first(),
+  totp: (page: Page): Locator => page.locator('#tot-totp'),
 
-  submit: (page: Page): Locator =>
-    page.getByRole('button', { name: /^\s*(login|submit|continue|verify)\s*$/i }).first(),
+  submit: (page: Page): Locator => page.locator('#totp-login'),
+
+  error: (page: Page): Locator => page.locator('#login-error'),
 };
 
 /** Matched against error text to decide whether a retry is safe. */
@@ -141,7 +139,7 @@ export const errorPatterns = {
   totpRejected: /invalid\s*(totp|otp)|totp.*(invalid|incorrect|expired)|otp.*(invalid|incorrect|expired)/i,
   credentialsRejected:
     /invalid\s*(password|pin|mpin|credential|user)|incorrect\s*(password|pin|mpin)|blocked|locked|too many/i,
-  loginWindowClosed: /login.*(not allowed|window|timing)|allowed between|08:30|3:28/i,
+  loginWindowClosed: /only possible between|trading days|login.*(not allowed|window|timing)|allowed between|08:15|15:40/i,
 };
 
 export const brokerNames = {

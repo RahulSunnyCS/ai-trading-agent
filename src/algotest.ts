@@ -131,7 +131,7 @@ export async function waitForState(
 
 export async function visibleErrorText(page: Page): Promise<string> {
   const candidates = page.getByText(
-    /invalid|incorrect|expired|failed|error|blocked|locked|not allowed|try again/i,
+    /invalid|incorrect|expired|failed|error|blocked|locked|not allowed|only possible|trading days|try again/i,
   );
   const count = Math.min(await candidates.count().catch(() => 0), 5);
 

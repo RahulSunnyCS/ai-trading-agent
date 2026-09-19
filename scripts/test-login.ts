@@ -14,7 +14,7 @@ import type { Broker } from '../src/brokers/types.js';
  * login`. It signs into AlgoTest for real and reads each broker's card, but never
  * clicks Login, so it needs no broker secrets (Shoonya's aren't set up yet) and
  * can't touch a live broker session either way. AlgoTest itself disables the actual
- * login button outside 08:30-15:28 IST - that gate is on their side, not something
+ * login button outside 08:15-15:40 IST - that gate is on their side, not something
  * any script can test around, so this deliberately doesn't try.
  */
 
@@ -68,7 +68,7 @@ async function main(credentials: { phone: string; password: string }): Promise<n
       }
 
       const clickable = (await brokerPage.actionButton(page, broker.dataBrokerKey).count()) > 0;
-      const window = clickable ? 'login button present' : 'outside 08:30-15:28 IST window';
+      const window = clickable ? 'login button present' : 'outside 08:15-15:40 IST window';
       console.log(`${broker.name}: OK - status "${state}" (${window})`);
     }
   } catch (error) {

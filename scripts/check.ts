@@ -33,7 +33,12 @@ console.log('\nerror classification:');
 check('invalid TOTP -> retryable', classifyError('Invalid TOTP'), 'TOTP_REJECTED');
 check('invalid password -> no retry', classifyError('Invalid password'), 'CREDENTIALS_REJECTED');
 check('locked -> no retry', classifyError('Account is locked'), 'CREDENTIALS_REJECTED');
-check('window -> no retry', classifyError('allowed between 08:30'), 'LOGIN_WINDOW_CLOSED');
+check('window -> no retry', classifyError('allowed between 08:15'), 'LOGIN_WINDOW_CLOSED');
+check(
+  'AlgoTest toast -> no retry',
+  classifyError('Broker login is only possible between 08:15 IST - 15:40 IST on trading days'),
+  'LOGIN_WINDOW_CLOSED',
+);
 
 console.log('\nredaction:');
 registerSecret('hunter2hunter2');

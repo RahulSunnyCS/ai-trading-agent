@@ -1,6 +1,13 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { algotestLogin, openMyBrokers, readBrokerState, waitForState } from './algotest.js';
+import {
+  algotestLogin,
+  classifyError,
+  openMyBrokers,
+  readBrokerState,
+  visibleErrorText,
+  waitForState,
+} from './algotest.js';
 import { angelone } from './brokers/angelone.js';
 import { shoonya } from './brokers/shoonya.js';
 import {
@@ -18,9 +25,9 @@ import { waitForNextWindow } from './totp.js';
 
 const ALL_BROKERS: Broker[] = [angelone, shoonya];
 
-/** AlgoTest rejects broker logins outside 08:30-15:28 IST. */
-const WINDOW_OPENS_MINUTES = 8 * 60 + 31;
-const WINDOW_CLOSES_MINUTES = 15 * 60 + 28;
+/** AlgoTest rejects broker logins outside 08:15-15:40 IST. */
+const WINDOW_OPENS_MINUTES = 8 * 60 + 16;
+const WINDOW_CLOSES_MINUTES = 15 * 60 + 40;
 const MAX_ATTEMPTS = 2;
 
 function istMinutesNow(): number {
@@ -37,7 +44,7 @@ function istMinutesNow(): number {
 
 /**
  * GitHub's scheduler drifts late, which is harmless, but can also fire early. Logging
- * in before 08:30 IST gets rejected server-side, so wait it out rather than fail.
+ * in before 08:15 IST gets rejected server-side, so wait it out rather than fail.
  */
 async function waitForLoginWindow(config: Config): Promise<void> {
   if (config.skipWindowGuard) return;
@@ -45,7 +52,7 @@ async function waitForLoginWindow(config: Config): Promise<void> {
   const now = istMinutesNow();
   if (now >= WINDOW_OPENS_MINUTES) {
     if (now > WINDOW_CLOSES_MINUTES) {
-      console.warn('! past 15:28 IST - AlgoTest may reject broker logins now');
+      console.warn('! past 15:40 IST - AlgoTest may reject broker logins now');
     }
     return;
   }
@@ -53,12 +60,29 @@ async function waitForLoginWindow(config: Config): Promise<void> {
   const gapMinutes = WINDOW_OPENS_MINUTES - now;
   // Bounded so the sleep can never approach the workflow's 45min timeout.
   if (gapMinutes > 30) {
-    console.warn(`! ${gapMinutes}min before the 08:30 IST window; continuing anyway`);
+    console.warn(`! ${gapMinutes}min before the 08:15 IST window; continuing anyway`);
     return;
   }
 
-  console.log(`waiting ${gapMinutes}min for the 08:30 IST broker login window`);
+  console.log(`waiting ${gapMinutes}min for the 08:15 IST broker login window`);
   await new Promise((resolve) => setTimeout(resolve, gapMinutes * 60_000 + 30_000));
+}
+
+/**
+ * AlgoTest reports a refused broker login (wrong window, non-trading day, bad
+ * credentials) as a toast that vanishes within seconds - far sooner than the 40s
+ * state poll would notice - so look for it right after the login step. Stops early
+ * once the broker shows logged in, and only returns text it can classify, so an
+ * unrelated word on the page can't masquerade as a rejection.
+ */
+async function lookForRejection(page: Page, broker: Broker): Promise<string> {
+  for (let i = 0; i < 6; i += 1) {
+    if ((await readBrokerState(page, broker)) === 'logged_in') return '';
+    const text = await visibleErrorText(page);
+    if (text && classifyError(text) !== 'UNKNOWN') return text;
+    await page.waitForTimeout(1_000);
+  }
+  return '';
 }
 
 async function attemptBroker(page: Page, broker: Broker, config: Config): Promise<BrokerResult> {
@@ -77,12 +101,12 @@ async function attemptBroker(page: Page, broker: Broker, config: Config): Promis
     return result('FAIL', 'row not found on My Brokers - selector may have changed');
   }
 
-  // Outside 08:30-15:28 IST, AlgoTest swaps the Login/Re-login button for a disabled
+  // Outside 08:15-15:40 IST, AlgoTest swaps the Login/Re-login button for a disabled
   // "Market Closed" placeholder with no data-broker attribute at all - confirmed on a
   // live capture. Fail fast here instead of waiting out a 15s timeout on a button
   // that will never appear.
   if ((await brokerPage.actionButton(page, broker.dataBrokerKey).count()) === 0) {
-    return result('FAIL', 'market closed - outside 08:30-15:28 IST login window');
+    return result('FAIL', 'market closed - outside 08:15-15:40 IST login window (or not a trading day)');
   }
 
   let lastDetail = 'unknown failure';
@@ -93,6 +117,9 @@ async function attemptBroker(page: Page, broker: Broker, config: Config): Promis
 
     try {
       await broker.login(page, config);
+
+      const rejection = await lookForRejection(page, broker);
+      if (rejection) throw new BrokerLoginError(rejection, classifyError(rejection));
 
       const state = await waitForState(page, broker, 'logged_in');
       if (state === 'logged_in') {

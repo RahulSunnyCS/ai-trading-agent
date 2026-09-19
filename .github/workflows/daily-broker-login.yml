@@ -19,7 +19,7 @@ on:
         required: false
         default: false
       skip_window_guard:
-        description: 'Skip waiting for the 08:30 IST window (off-hours testing)'
+        description: 'Skip waiting for the 08:15 IST window (off-hours testing)'
         type: boolean
         required: false
         default: false

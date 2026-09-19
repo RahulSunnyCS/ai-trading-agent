@@ -6,7 +6,7 @@ export type FailureKind =
   | 'TOTP_REJECTED'
   /** Wrong password/PIN. Never retry - brokers lock the account. */
   | 'CREDENTIALS_REJECTED'
-  /** Outside AlgoTest's 08:30-15:28 IST broker login window. Retry is pointless. */
+  /** Outside AlgoTest's 08:15-15:40 IST broker login window. Retry is pointless. */
   | 'LOGIN_WINDOW_CLOSED'
   /** Anything else, usually a selector that stopped matching. Retry once. */
   | 'UNKNOWN';

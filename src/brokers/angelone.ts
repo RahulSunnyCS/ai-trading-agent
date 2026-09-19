@@ -1,7 +1,7 @@
 import type { Page } from 'playwright';
 import type { Config } from '../config.js';
 import { BASE_URL, classifyError, visibleErrorText } from '../algotest.js';
-import { step } from '../diagnose.js';
+import { safeScreenshot, step } from '../diagnose.js';
 import { angelOneForm, brokerNames, brokerPage, dataBrokerKeys } from '../selectors.js';
 import { freshTotp } from '../totp.js';
 import { BrokerLoginError, type Broker } from './types.js';
@@ -40,11 +40,18 @@ export const angelone: Broker = {
       }
     });
 
+    await step(target, 'angelone-select-totp-mode', async () => {
+      const option = angelOneForm.totpModeOption(target);
+      await option.waitFor({ state: 'visible', timeout: 20_000 });
+      await option.click();
+    });
+
     await step(target, 'angelone-fill-form', async () => {
       const clientCode = angelOneForm.clientCode(target);
-      await clientCode.waitFor({ state: 'visible', timeout: 20_000 });
+      await clientCode.waitFor({ state: 'visible', timeout: 10_000 });
       await clientCode.fill(config.angelone.clientCode);
       await angelOneForm.mpin(target).fill(config.angelone.mpin);
+      // Generated last so as little of the 30-second window as possible is spent.
       await angelOneForm.totp(target).fill(await freshTotp(config.angelone.totpSecret));
     });
 
@@ -53,7 +60,17 @@ export const angelone: Broker = {
     });
 
     await target.waitForTimeout(3_000);
-    const error = await visibleErrorText(target);
+    if (!target.isClosed()) {
+      console.log(`  after submit: ${new URL(target.url()).origin}${new URL(target.url()).pathname}`);
+      await safeScreenshot(target, 'angelone-after-submit');
+    }
+    // Only scan for errors while still on Angel's page - after a successful login the
+    // tab is back on AlgoTest, where the generic error-word scan could false-positive.
+    const stillOnAngel = !target.isClosed() && ANGEL_HOST.test(new URL(target.url()).hostname);
+    const inlineError = stillOnAngel
+      ? ((await angelOneForm.error(target).innerText().catch(() => '')) || '').trim()
+      : '';
+    const error = inlineError || (stillOnAngel ? await visibleErrorText(target) : '');
     if (error) throw new BrokerLoginError(error, classifyError(error));
 
     // Wait for the round trip back to AlgoTest before the caller verifies the row.
