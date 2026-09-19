@@ -16,6 +16,7 @@
  *   9.  MAX_LEGS_EXCEEDED — advisory lock not acquired
  */
 
+import { lotSize } from '@trading/market-reference';
 import type { Pool, PoolClient } from 'pg';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FixedClock } from '../../utils/clock.js';
@@ -307,8 +308,8 @@ describe('portfolioRiskCheck — Rule 4: margin buffer', () => {
     // 3 open straddles + good pnl
     const db = mockPool({ totalPnl: '500', openCountForMargin: '3' });
 
-    // straddleValue=200, 3 opens → estimatedMargin = 3 * 200 * 1 * 50 * 0.20 = 6000
-    // 70% of 8000 = 5600 → 6000 > 5600 → EXCEEDED
+    // straddleValue=200, 3 opens → 3 * 200 * 1 * LOT_SIZE * 0.20
+    // At LOT_SIZE=65 that is 7800; 70% of 8000 = 5600 → EXCEEDED
     const result = await portfolioRiskCheck(db, baseIntent, clock, 0);
 
     expect(result).toEqual({ allowed: false, reason: 'MARGIN_BUFFER_EXCEEDED' });
@@ -316,24 +317,29 @@ describe('portfolioRiskCheck — Rule 4: margin buffer', () => {
 
   it('passes margin check when estimated margin is exactly at 70% of capital (boundary: > not >=)', async () => {
     process.env.BLOCKED_DATES = '[]';
-    process.env.MARGIN_CAPITAL = '10000';
-    process.env.MARGIN_RATE = '0.20';
 
-    // 70% of 10000 = 7000
-    // To get estimatedMargin = 7000: count * straddleValue * 1 * 50 * 0.20 = 7000
-    // → count * straddleValue = 700 → with straddleValue=200, count=3.5 (non-integer)
-    // Instead use straddleValue=700/3 — not clean, so adjust MARGIN_CAPITAL to match.
-    //
-    // Simpler: MARGIN_CAPITAL=1000, MARGIN_RATE=0.20, openCount=1, straddleValue=700
-    // → estimatedMargin = 1 * 700 * 1 * 50 * 0.20 = 7000
-    // → 70% of 1000 = 700 ... no, 70% * 10000 = 7000. Let's use MARGIN_CAPITAL=10000.
-    // openCount=1, straddle=700: estimatedMargin = 1 * 700 * 50 * 0.20 = 7000 = exactly 70%. Should PASS.
+    // Derived from the reference data rather than hard-coded, so a future NSE
+    // lot-size change moves this boundary with it instead of silently breaking
+    // the test. The exact value is pinned in market-reference-parity.test.ts.
+    const lot = lotSize('NIFTY', new Date(WED_1000_IST));
+    const straddleValue = 700;
+    const openCount = 1;
+    const marginRate = 0.2;
+    const estimatedMargin = openCount * straddleValue * 1 * lot * marginRate;
+
+    // Capital chosen so estimatedMargin lands exactly on the 70% threshold.
+    process.env.MARGIN_CAPITAL = String(estimatedMargin / 0.7);
+    process.env.MARGIN_RATE = String(marginRate);
 
     const clock = new FixedClock(WED_1000_IST);
-    const db = mockPool({ totalPnl: '0', openCountForMargin: '1', openLegsInTx: '0' });
+    const db = mockPool({
+      totalPnl: '0',
+      openCountForMargin: String(openCount),
+      openLegsInTx: '0',
+    });
 
-    // straddleValue=700: exactly at 70% threshold. Condition is `>` so this passes.
-    const intentAtBoundary: TradeIntent = { ...baseIntent, straddleValue: 700 };
+    // Exactly at the threshold. The condition is `>`, so this passes.
+    const intentAtBoundary: TradeIntent = { ...baseIntent, straddleValue };
     const result = await portfolioRiskCheck(db, intentAtBoundary, clock, 0);
 
     expect(result).toEqual({ allowed: true });

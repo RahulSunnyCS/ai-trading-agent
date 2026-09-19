@@ -27,6 +27,7 @@
  *   accidentally return yesterday's trades as "today's open positions".
  */
 
+import { lotSize as marketLotSize } from '@trading/market-reference';
 import Decimal from 'decimal.js';
 import type { Pool } from 'pg';
 import type { OpenPosition } from '../db/schema.js';
@@ -61,13 +62,17 @@ export class PaperTradeExecutor {
    * Inserts a new open paper trade into the database and notifies Quantiply.
    *
    * @param intent   EntryIntent produced by the entry engine (all fields validated upstream)
-   * @param lotSize  Lot size override; defaults to 50 (NIFTY standard lot size as of Phase 1).
+   * @param lotSize  Lot size override. Defaults to the effective-dated contract
+   *                 size from @trading/market-reference — never a constant. NSE has
+   *                 changed NIFTY's lot size within a single year, and this was
+   *                 pinned at 50 while the real (and backtested) size was 65.
    *                 Passed as an explicit parameter so BankNifty/Sensex (Phase 2) can use
    *                 different lot sizes without changing this method's signature.
    * @returns        The new paper_trades.id (UUID string) for use by the position monitor.
    */
   async openTrade(intent: EntryIntent, lotSize?: number): Promise<string> {
-    const resolvedLotSize = lotSize ?? 50;
+    const resolvedLotSize =
+      lotSize ?? marketLotSize(intent.underlying, new Date(intent.entryTimeMs));
 
     // Split the straddle value 50/50 across CE and PE legs.
     // This is a placeholder: in reality CE and PE have different prices based on

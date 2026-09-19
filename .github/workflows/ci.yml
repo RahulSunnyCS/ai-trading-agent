@@ -57,6 +57,14 @@ jobs:
       - name: Biome lint
         run: ./tools/biome check .
 
+      # Reference-data parity: these assert the same lot sizes and strike steps
+      # the Python suite asserts, against the same CSVs. They are the guard that
+      # was missing when apps/server hard-coded NIFTY at 50 while the backtest
+      # engine used 65.
+      - name: Market reference tests
+        run: bun run test
+        working-directory: packages/market-reference
+
       - name: Server unit tests
         run: bun run test:unit
 

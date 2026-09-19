@@ -15,6 +15,7 @@
  * everything else has already passed.
  */
 
+import { type Underlying, lotSize as marketLotSize } from '@trading/market-reference';
 import type { Pool } from 'pg';
 import type { Clock } from '../utils/clock.js';
 
@@ -208,7 +209,14 @@ export async function portfolioRiskCheck(
 
   const marginCapital = Number(process.env.MARGIN_CAPITAL ?? '100000');
   const marginRate = Number(process.env.MARGIN_RATE ?? '0.20');
-  const lotSize = 50; // NIFTY lot size — project constant; BankNifty/Sensex will need env var when added
+  // Effective-dated, never a constant — see @trading/market-reference. This was
+  // hard-coded at 50 while the contract size was 65, understating estimated
+  // margin by 30% and letting the capital gate pass trades it should have blocked.
+  // Effective-dated via the injected clock, so a replay resolves the lot size
+  // that was actually in force on the replayed date rather than today's.
+  // The cast is safe by failure: the loader throws on an underlying it has no
+  // row for, which fails the risk check closed.
+  const lotSize = marketLotSize(intent.underlying as Underlying, new Date(clock.now()));
   const lots = 1;
 
   const openLegsForMargin = await db.query<{ cnt: string }>(

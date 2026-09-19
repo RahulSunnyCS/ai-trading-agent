@@ -44,6 +44,7 @@
         "@fastify/cors": "^11.2.0",
         "@fastify/rate-limit": "^10.3.0",
         "@fastify/websocket": "^11.2.0",
+        "@trading/market-reference": "workspace:*",
         "bullmq": "^5.13.0",
         "date-fns": "^4.3.0",
         "date-fns-tz": "^3.2.0",
@@ -97,6 +98,15 @@
       },
       "devDependencies": {
         "jest": "^30.4.2",
+      },
+    },
+    "packages/market-reference": {
+      "name": "@trading/market-reference",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "^22.10.0",
+        "typescript": "^5.7.0",
+        "vitest": "^2.0.0",
       },
     },
     "packages/notify": {
@@ -589,6 +599,8 @@
     "@trading/broker-login": ["@trading/broker-login@workspace:packages/broker-login"],
 
     "@trading/contract-notes": ["@trading/contract-notes@workspace:packages/contract-notes"],
+
+    "@trading/market-reference": ["@trading/market-reference@workspace:packages/market-reference"],
 
     "@trading/notify": ["@trading/notify@workspace:packages/notify"],
 
@@ -1917,6 +1929,8 @@
     "@sinonjs/commons/type-detect": ["type-detect@4.0.8", "", {}, "sha512-0fr/mIH1dlO+x7TlcMy+bIDqKPsw/70tVyeHW787goQjhmqaZe10uwLujubK9q9Lg6Fiho1KUKDYz0Z7k7g5/g=="],
 
     "@trading/broker-login/@types/node": ["@types/node@22.20.4", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA=="],
+
+    "@trading/market-reference/@types/node": ["@types/node@22.20.4", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA=="],
 
     "@trading/notify/@types/node": ["@types/node@22.20.4", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA=="],
 
