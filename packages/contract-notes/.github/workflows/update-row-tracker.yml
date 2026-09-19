@@ -1,0 +1,61 @@
+name: Update Last Updated Row
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_row:
+        description: "New value for lastUpdatedRow"
+        required: true
+        type: string
+
+jobs:
+  update-last-row:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download row-tracker from previous successful workflow run (if exists)
+        run: |
+          echo "Trying to find latest row-tracker artifact..."
+
+          ARTIFACT_INFO=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts")
+
+          ARTIFACT_ID=$(echo "$ARTIFACT_INFO" | jq -r '.artifacts[] | select(.name=="row-tracker") | .id' | head -n 1)
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "No previous artifact found, proceeding without it."
+          else
+            echo "Found artifact ID: $ARTIFACT_ID"
+            curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -o artifact.zip \
+              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip"
+            
+            unzip artifact.zip -d ./row-tracker
+          fi
+        shell: bash
+
+      - name: Check if row-tracker directory exists and has row_tracker.json
+        run: |
+          if [ ! -f ./row-tracker/row_tracker.json ]; then
+            echo "Error: row_tracker.json not found in ./row-tracker"
+            exit 1
+          else
+            echo "row_tracker.json found"
+          fi
+
+      - name: View existing row_tracker.json
+        run: cat ./row-tracker/row_tracker.json
+
+      - name: Update lastUpdatedRow inside row_tracker.json
+        run: |
+          echo "Updating lastUpdatedRow to ${{ github.event.inputs.new_row }}..."
+          jq '.lastUpdatedRow = (${{ github.event.inputs.new_row }} | tonumber)' ./row-tracker/row_tracker.json > ./row-tracker/row_tracker_updated.json
+          mv ./row-tracker/row_tracker_updated.json ./row-tracker/row_tracker.json
+
+      - name: Upload updated artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: row-tracker
+          path: ./row-tracker/row_tracker.json

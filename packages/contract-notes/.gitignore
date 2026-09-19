@@ -1,0 +1,6 @@
+node_modules
+.env
+data/*
+daily_summary.json
+row_tracker.json
+coverage

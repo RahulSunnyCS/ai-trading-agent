@@ -1,0 +1,264 @@
+
+
+ 
+ 
+CONTRACT NOTE CUM TAX INVOICE
+(TAX Invoice under section 31 of GST ACT)
+Angel One Limited
+Registered Office: 601, 6th Floor, Ackruti Star, Central Road, MIDC, Andheri East, Mumbai - 400093. Toll Free No: 1800-1020 / Fax No: 022-68070107,
+CIN No :-L67120MH1996PLC101709
+SEBI Regn.No.: INZ000161534 - BSE : CM, F&O, CD | NSE : CM, F&O, CD |MSEI: CD |MCX:F&O | NCDEX : F&O
+Member Code: BSE: 612 | MSEI: 10500 | NSE: 12798 |MCX: 12685 |NCDEX: 00220
+Visit us at :www.angelone.in | For Investor complaints / queries / feedback email us at support@angelone.in or call us on Toll Free No.1800-1020
+Compliance Officer : Mr. Bineet Jha  (Email Id:Compliance@angelone.in, Toll Free No: 1800-1020)
+Dealing Office Address: #35/2,3rd floor,chaman building,cunnigham road,BANGALORE-560052 KARNATAKA
+GST Location : KERALA TRIVANDRUM TC.17/3317 R.S COMPLEX PATTOM , TRIVANDRUM KERALA 695004 KERALA
+Client Name :  RAHUL SUNNY C S
+Address :  CHAKKALAPARAMBIL HOUSE,
+   KUMBALANGI SOUTH ERNAKULAM,
+   KERALA, 
+   ERNAKULAM, 
+   KERALA-682007.
+Client Code(UCC):  R59799620(BNG/BNDIY)
+PAN Number  :  CCLPC7628D
+Trading Back office code :  Same as UCC Code for all segment
+Contract Note No :  0011599763
+GST NO :  
+Trade Date :  29/04/2026
+EXCHANGEBSE CAPITALNSE CAPITAL
+SETTLEMENT NONANA
+SETTLEMENT
+DATE
+NANA
+
+Name of Clearing Corporation : NCL
+Sir/Madam,
+I/We have this day done by your order and on your account the following transactions:
+Derivative Segment - Trade Summary
+Contract DescriptionBuy (B)/ Sell
+(S)/BF/CF
+QuantityWAP Per Unit (Rs)Brokerage Per Unit
+(Rs)
+WAP Per Unit After
+Brokerage (Rs)
+Closing Rate Per
+Unit
+Net Total (Before
+Levies) (Rs)
+Remarks
+OPTIDX SENSEX Apr 30 2026 77200.00  PE(BT)BUY40161.000.0000161.000.00-6440.00
+OPTIDX SENSEX Apr 30 2026 77200.00  PE(BT)SELL40224.800.0000224.800.008992.00
+OPTIDX SENSEX Apr 30 2026 77600.00  CE(BT)BUY40389.800.0000389.800.00-15592.00
+OPTIDX SENSEX Apr 30 2026 77600.00  CE(BT)SELL40223.330.0000223.330.008933.00
+OPTIDX SENSEX Apr 30 2026 77600.00  PE(BT)BUY40263.150.0000263.150.00-10526.00
+OPTIDX SENSEX Apr 30 2026 77600.00  PE(BT)SELL40288.750.0000288.750.0011550.00
+OPTIDX SENSEX Apr 30 2026 77700.00  PE(BT)BUY40460.750.0000460.750.00-18430.00
+OPTIDX SENSEX Apr 30 2026 77700.00  PE(BT)SELL40300.600.0000300.600.0012024.00
+OPTIDX SENSEX Apr 30 2026 77800.00  CE(BT)BUY40345.000.0000345.000.00-13800.00
+OPTIDX SENSEX Apr 30 2026 77800.00  CE(BT)SELL40295.900.0000295.900.0011836.00
+OPTIDX SENSEX Apr 30 2026 77900.00  CE(BT)BUY40125.250.0000125.250.00-5010.00
+OPTIDX SENSEX Apr 30 2026 77900.00  CE(BT)SELL40322.350.0000322.350.0012894.00
+Total480-3569.00
+Exchange-wise details of orders and trades provided in separate annexure.
+Obligation Details
+Exchange
+Pay In/Pay Out
+Obligation
+Securities
+Transaction
+Tax
+Taxable value of
+supply
+*CGST
+(@ 9.00%)
+*SGST
+(@ 9.00%)
+Exchange
+Transaction
+Charges
+SEBI
+turnover
+Fees.
+Stamp
+Duty
+IPF Charges
+Auction/
+Other
+Charges
+Net Amount Receivable by
+Client /(Payable by Client)
+BSE-FUTURES-3809.0099.00284.3525.5925.5944.210.142.000.000.00-4005.53
+TOTAL(NET)-3809.0099.00284.3525.5925.5944.210.142.000.000.00-4005.53
+Total Brokerage = 240.00
+Taxable Value of Supply Includes Total Brokerage + Exchange Transaction Charges + SEBI Turnover Fees + IPF Charges
+PAGE NO :1Client Code : R59799620
+
+Annexure
+Registered Office: 601, 6th Floor, Ackruti Star, Central Road, MIDC, Andheri East, Mumbai - 400093. Toll Free No: 1800-1020 / Fax No: 022-68070107,
+CIN No :-L67120MH1996PLC101709
+SEBI Regn.No.: INZ000161534 - BSE : CM, F&O, CD | NSE : CM, F&O, CD |MSEI: CD |MCX:F&O | NCDEX : F&O
+Member Code: BSE: 612 | MSEI: 10500 | NSE: 12798 |MCX: 12685 |NCDEX: 00220
+Visit us at :www.angelone.in | For Investor complaints / queries / feedback email us at support@angelone.in or call us on Toll Free No.1800-1020
+Compliance Officer : Mr. Bineet Jha  (Email Id:Compliance@angelone.in, Toll Free No: 1800-1020)
+Order NoOrder TimeTrade No.Trade Time
+Security/Contract
+Description
+Buy
+/
+Sell
+Qty
+Gross Rate/Trade
+Price Per Unit(
+@
+Brokerage
+Per
+Unit(
+Net Rate Per Unit
+(
+Closing Rate
+per Unit (Only
+for Derivatives)
+(
+Net Total (Before
+Levies
+(
+Remarks
+BSE - FUTURES - REF. NO: 2394071
+177743613739918680509:46:33583640009:46:33
+BSXOPT
+SENSEX26APR77200PE
+855402 (BT)
+SELL40224.80000.0000224.80000.00008992.0000
+177743742009761510810:10:59761248010:10:59
+BSXOPT
+SENSEX26APR77200PE
+855402 (BT)
+BUY40161.00000.0000161.00000.0000-6440.0000
+
+(NET TOTAL)
+02552.0000
+177743618930601536609:46:33253282009:46:33
+BSXOPT
+SENSEX26APR77600CE
+854725 (BT)
+SELL20223.30000.0000223.30000.00004466.0000
+177743618930601536609:46:33253280009:46:33
+BSXOPT
+SENSEX26APR77600CE
+854725 (BT)
+SELL20223.35000.0000223.35000.00004467.0000
+177743765715501583710:10:59555336010:10:59
+BSXOPT
+SENSEX26APR77600CE
+854725 (BT)
+BUY40389.80000.0000389.80000.0000-15592.0000
+
+(NET TOTAL)
+0-6659.0000
+177743774368471627910:16:27327796010:16:27
+BSXOPT
+SENSEX26APR77600PE
+856453 (BT)
+SELL40288.75000.0000288.75000.000011550.0000
+177743806430849396410:20:24359516010:20:24
+BSXOPT
+SENSEX26APR77600PE
+856453 (BT)
+BUY40263.15000.0000263.15000.0000-10526.0000
+
+(NET TOTAL)
+01024.0000
+177743816059392854110:23:46253485010:23:46
+BSXOPT
+SENSEX26APR77700PE
+854446 (BT)
+SELL40300.60000.0000300.60000.000012024.0000
+177745629285837387915:26:301891053015:26:30
+BSXOPT
+SENSEX26APR77700PE
+854446 (BT)
+BUY40460.75000.0000460.75000.0000-18430.0000
+
+(NET TOTAL)
+0-6406.0000
+177743795020013374210:16:27494596010:16:27
+BSXOPT
+SENSEX26APR77800CE
+855228 (BT)
+SELL40295.90000.0000295.90000.000011836.0000
+177743815571136620810:20:24542222010:20:24
+BSXOPT
+SENSEX26APR77800CE
+855228 (BT)
+BUY40345.00000.0000345.00000.0000-13800.0000
+
+(NET TOTAL)
+0-1964.0000
+177743836080922629810:23:46491035010:23:46
+BSXOPT
+SENSEX26APR77900CE
+853222 (BT)
+SELL40322.35000.0000322.35000.000012894.0000
+177745629582031241515:26:302349826015:26:30
+BSXOPT
+SENSEX26APR77900CE
+853222 (BT)
+BUY40125.25000.0000125.25000.0000-5010.0000
+
+(NET TOTAL)
+07884.0000
+Order Wise Brokerage Details:
+Exchange / SegmentSecurity/Contract DescriptionBuy/ SellOrder NoQtyGross Rate/Trade Price**Trade ValueBrokerage
+BSE-FUTURES
+BSXOPT SENSEX26APR77200PE 855402 (BT)SELL177743613739918680540224.80003096992.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77200PE 855402 (BT)BUY177743742009761510840161.00003094440.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77600CE 854725 (BT)SELL177743618930601536640223.32503112933.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77600CE 854725 (BT)BUY177743765715501583740389.80003119592.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77600PE 856453 (BT)SELL177743774368471627940288.75003115550.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77600PE 856453 (BT)BUY177743806430849396440263.15003114526.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77700PE 854446 (BT)SELL177743816059392854140300.60003120024.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77700PE 854446 (BT)BUY177745629285837387940460.75003126430.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77800CE 855228 (BT)SELL177743795020013374240295.90003123836.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77800CE 855228 (BT)BUY177743815571136620840345.00003125800.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77900CE 853222 (BT)SELL177743836080922629840322.35003128894.000020.0000
+BSE-FUTURES
+BSXOPT SENSEX26APR77900CE 853222 (BT)BUY177745629582031241540125.25003121010.000020.0000
+TOTAL37400027.00240.00
+*CGST:-Central GST; SGST: - State GST; IGST:- Integrated GST; UTT:- Union Territory Tax.Yours faithfully,
+** Trade value for options is calculated as (Strike + Premium ) x Lot size.
+
+Brokerage is also charged on expired, exercised and assigned options contracts.
+For Angel One Limited
+@ Converted into INR based on RBI reference rate as on the date of transaction.
+ISIN's are subject to change due to corporate actions.
+Details of trade-wise levies shall be provided on request.
+PAGE NO :2Client Code : R59799620
+
+Registered Office: 601, 6th Floor, Ackruti Star, Central Road, MIDC, Andheri East, Mumbai - 400093. Toll Free No: 1800-1020 / Fax No: 022-68070107,
+CIN No :-L67120MH1996PLC101709
+SEBI Regn.No.: INZ000161534 - BSE : CM, F&O, CD | NSE : CM, F&O, CD |MSEI: CD |MCX:F&O | NCDEX : F&O
+Member Code: BSE: 612 | MSEI: 10500 | NSE: 12798 |MCX: 12685 |NCDEX: 00220
+Visit us at :www.angelone.in | For Investor complaints / queries / feedback email us at support@angelone.in or call us on Toll Free No.1800-1020
+Compliance Officer : Mr. Bineet Jha  (Email Id:Compliance@angelone.in, Toll Free No: 1800-1020)
+Transactions mentioned in this contract note cum Tax invoice shall be governed and subject to the Rules, Bye-laws and Regulations
+and Circulars of the respective Exchanges on which trades have been executed and Securities and Exchange Board of IndiaAuthorised Signatory
+from time to time. It shall also be subject to the relevant Acts, Rules, Regulations, Directives, Notifications, Guidelines (including GST Laws) &PAN No.:AAACM6094R
+Circulars issued by SEBI / Government of India / State Governments and Union Territory Governments issued from time to time.Description of Services : Stock Broking services
+The Exchanges provide Complaint Resolution, Arbitration and Appellate arbitration facilities at the Regional Arbitration Centres (RAC).Accounting code of services : 997152
+The client may approach its nearest centre, details of which are available on respective Exchangewebsite.GST NO.: 32AAACM6094R1ZY
+
+
+
+Please visit www.bseindia.com for BSE, www.msei.in for MSEI, www.nseindia.com for NSE.
+Date: 29/04/2026
+PAGE NO :3Client Code : R59799620

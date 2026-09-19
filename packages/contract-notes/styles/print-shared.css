@@ -1,0 +1,41 @@
+/* Shared print rules intended for both client preview and server HTML template. */
+.print-document {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  color: #111827;
+  font-family: Inter, Arial, sans-serif;
+  line-height: 1.4;
+  overflow: visible;
+}
+
+/* Paged.js host should not hide overflow, otherwise early page overflows can crash traversal. */
+.print-paged-root {
+  position: relative;
+  overflow: visible;
+}
+
+.print-block,
+.print-card,
+.print-section,
+.print-row,
+.print-table,
+.print-chart {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Freeze interactions while pagination mutates DOM in-place. */
+.print-preview-shell[data-pagination-running="true"] {
+  pointer-events: none;
+}
+
+/* Raw source HTML is used only as Paged.js input. */
+.print-source {
+  position: absolute;
+  width: 210mm;
+  left: -99999px;
+  top: 0;
+  visibility: hidden;
+  overflow: visible;
+}

@@ -1,0 +1,30 @@
+{
+  "name": "shoonya-contract-parser",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "fetch-parse": "npm run fetch && npm run check-dates && npm run parse && npm run sheet",
+    "fetch": "node fetchMail.js",
+    "parse": "node parser.js",
+    "sheet": "node updateSheet.js",
+    "check-dates": "node checkDates.js",
+    "start": "npm run fetch-parse"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "google-spreadsheet": "^4.1.4",
+    "googleapis": "^148.0.0",
+    "imap": "^0.8.19",
+    "mailparser": "^3.7.2",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "jest": "^30.4.2"
+  }
+}

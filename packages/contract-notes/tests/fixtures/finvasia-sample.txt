@@ -1,0 +1,651 @@
+
+
+Registered Address : H NO 1108 SECTOR 21 B CHANDIGARH PIN 160022 Phone No.:9779902002  
+Head Office Address : Finvasia Tower, C-214,4th Floor, Phase 8 B,Sector 74, Industrial Focal Point, SAS Nagar (Mohali), Punjab–160055 
+Phone No.:9779902002  
+Website : WWW.SHOONYA.COM Investor Grievance Email : ccofspl@shoonya.com
+SEBI Registration No : INZ000176037 PAN  : AABCF6759K CIN :  U74992CH2011PTC032718
+Compliance Officer Detail :  Name : TRILOK SINGLA Email ID : ccofspl@shoonya.com Phone : 172 667 0000 
+Member ID's: Nse:14846 Bse:4043 Mcx:55135 Ncdex:01259
+FINVASIA SECURITIES PRIVATE LIMITED
+CONTRACT NOTE CUM TAX INVOICE
+(Tax Invoice under section 31 of GST Act)
+PADINJAREVEETTIL PETER MARIA SHINY(FA 342824)
+Chakkalaparambil House,Ernakulam
+Kumbalangy-682007
+Ernakulam(Kerala / KL)
+India
+PAN of Client : JEZPM7875F
+UCC of Code : FA 342824
+Trading Backoffice Code : FA 342824
+Mobile No : 6238966021
+Dealing Office Address 
+Finvasia Tower, C-214,4th Floor, Phase 8 B,Sector 74,Industrial 
+Focal Point, SAS Nagar (Mohali)
+PIN/ZIP Code 160055
+Punjab
+India
+03AABCF6759K1ZF
+Trade Date 
+24-04-2026
+CN/243776
+Contract Note No.
+ ExchangeSettlement NoSettlement DescriptionSett.Date
+Settlement Detail
+NSE FNO27-04-2026
+Invoice Reference No 
+(IRN)
+PB0426OBL0259790
+Name of Clearing Corporation & 
+Segment
+Cash Seg. NCLF & O Seg. NCLCurrency Seg. NCLMCX Seg. MCXCCLNCDEX Seg. NCCLNSECOM Seg. NCL
+Sir/ Madam,
+I / We have this day done by your order and on your account the following transactions:
+Derivative Segment
+Contract DescriptionBuy(B)/Sell(S)/
+BF/CF
+RemarksQuantityWAP Per Unit (in for 
+foreign currency)
+WAP Per 
+Unit
+WAP Per Unit after 
+brokerage (Rs)
+Closing Rate 
+Per Unit
+Brokerage Per 
+Unit (Rs)
+Net Total (Before 
+Levies) (Rs)
+FNO OPTIDX BANKNIFTY 28APR2026 55700.00 PEB 30.00 0.00 288.85 0.1667 289.02 0.00-8670.50
+FNO OPTIDX BANKNIFTY 28APR2026 55700.00 PES 30.00 0.00 383.40 0.1667 383.23 0.00 11497.00
+FNO OPTIDX BANKNIFTY 28APR2026 55900.00 CES 30.00 0.00 482.05 0.1667 481.88 0.00 14456.50
+FNO OPTIDX BANKNIFTY 28APR2026 55900.00 CEB 30.00 0.00 617.95 0.1667 618.12 0.00-18543.50
+FNO OPTIDX BANKNIFTY 28APR2026 55900.00 PES 30.00 0.00 391.75 0.1667 391.58 0.00 11747.50
+FNO OPTIDX BANKNIFTY 28APR2026 55900.00 PEB 30.00 0.00 523.25 0.1667 523.42 0.00-15702.50
+FNO OPTIDX BANKNIFTY 28APR2026 56100.00 CES 30.00 0.00 491.65 0.1667 491.48 0.00 14744.50
+FNO OPTIDX BANKNIFTY 28APR2026 56100.00 CEB 30.00 0.00 353.90 0.1667 354.07 0.00-10622.00
+FNO OPTIDX BANKNIFTY 28APR2026 56100.00 PEB 30.00 0.00 633.05 0.1667 633.22 0.00-18996.50
+FNO OPTIDX BANKNIFTY 28APR2026 56100.00 PES 30.00 0.00 409.35 0.1667 409.18 0.00 12275.50
+FNO OPTIDX BANKNIFTY 28APR2026 56300.00 CEB 30.00 0.00 278.20 0.1667 278.37 0.00-8351.00
+FNO OPTIDX BANKNIFTY 28APR2026 56300.00 CES 30.00 0.00 448.40 0.1667 448.23 0.00 13447.00
+FNO OPTIDX NIFTY 28APR2026 23750.00 PEB 130.00 0.00 102.55 0.0385 102.59 0.00-13336.50
+FNO OPTIDX NIFTY 28APR2026 23750.00 PES 130.00 0.00 126.90 0.0385 126.86 0.00 16492.00
+Page 1 of 6
+FA342824
+Account ID :
+
+FNO OPTIDX NIFTY 28APR2026 23800.00 PES 195.00 0.00 116.25 0.0256 116.22 0.00 22663.75
+FNO OPTIDX NIFTY 28APR2026 23800.00 PEB 195.00 0.00 115.55 0.0256 115.58 0.00-22537.25
+FNO OPTIDX NIFTY 28APR2026 23900.00 PES 65.00 0.00 120.75 0.0769 120.67 0.00 7843.75
+FNO OPTIDX NIFTY 28APR2026 23900.00 PEB 65.00 0.00 212.05 0.0769 212.13 0.00-13788.25
+FNO OPTIDX NIFTY 28APR2026 23950.00 CES 130.00 0.00 133.45 0.0385 133.41 0.00 17343.50
+FNO OPTIDX NIFTY 28APR2026 23950.00 CEB 130.00 0.00 162.50 0.0385 162.54 0.00-21130.00
+FNO OPTIDX NIFTY 28APR2026 24000.00 CES 195.00 0.00 147.25 0.0256 147.22 0.00 28708.75
+FNO OPTIDX NIFTY 28APR2026 24000.00 CEB 195.00 0.00 143.38 0.0256 143.41 0.00-27964.75
+FNO OPTIDX NIFTY 28APR2026 24000.00 PES 390.00 0.00 205.53 0.0256 205.50 0.00 80144.75
+FNO OPTIDX NIFTY 28APR2026 24000.00 PEB 390.00 0.00 209.25 0.0256 209.28 0.00-81617.50
+FNO OPTIDX NIFTY 28APR2026 24100.00 CEB 65.00 0.00 77.35 0.0769 77.43 0.00-5032.75
+FNO OPTIDX NIFTY 28APR2026 24100.00 CES 65.00 0.00 141.35 0.0769 141.27 0.00 9182.75
+FNO OPTIDX NIFTY 28APR2026 24100.00 PES 130.00 0.00 143.75 0.0385 143.71 0.00 18682.50
+FNO OPTIDX NIFTY 28APR2026 24100.00 PEB 130.00 0.00 212.90 0.0385 212.94 0.00-27682.00
+FNO OPTIDX NIFTY 28APR2026 24200.00 CEB 130.00 0.00 102.95 0.0385 102.99 0.00-13388.50
+FNO OPTIDX NIFTY 28APR2026 24200.00 CES 130.00 0.00 145.10 0.0385 145.06 0.00 18858.00
+*Exchange-wise details of orders and trades provided in separate annexure
+Rema
+rks
+Net Total 
+(Before Levies)  
+(Rs.)
+Closing Rate 
+Per Unit (Only 
+For 
+Derivative) 
+(Rs.)
+Net Rate Per 
+Unit (Rs.)
+Brokerage
+ Per Unit 
+(Rs.)
+Gross 
+Rate/ 
+Trade 
+Price Per 
+Unit (Rs.)
+QtyBuy(B)/ 
+Sell(S)
+Security/Contract Description
+Trade 
+Time
+Trade 
+No.
+Order 
+Time
+Order No.Gross Rate/ 
+Trade Price 
+Per Unit (in 
+foreign 
+currency)
+Equity Derivative Segment of National Stock Exchange of India Ltd.
+1800000113511496790834S
+ 30 383.4000 0.1667 383.2333 11497.00
+OPTIDX BANKNIFTY 28APR2026 
+55700.00 PE
+14:11:0314:11:03
+1800000113513159871895B
+ 30 288.8500 0.1667 289.0167-8670.50
+OPTIDX BANKNIFTY 28APR2026 
+55700.00 PE
+14:34:1114:34:11
+Contract Total 
+ 30 30 0
+Buy QuantitySell QuantityNet Quantity
+ 2826.50-8670.50 11497.00
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 8,665.50
+Sell Turnover
+ 11,502.00
+2000000104681111769474S
+ 30 482.0500 0.1667 481.8833 14456.50
+OPTIDX BANKNIFTY 28APR2026 
+55900.00 CE
+14:11:0314:11:03
+2000000104682778854085B
+ 30 617.9500 0.1667 618.1167-18543.50
+OPTIDX BANKNIFTY 28APR2026 
+55900.00 CE
+14:34:1114:34:11
+Contract Total 
+ 30 30 0
+Buy QuantitySell QuantityNet Quantity
+-4087.00-18543.50 14456.50
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 18,538.50
+Sell Turnover
+ 14,461.50
+2000000010339027134853S
+ 30 391.7500 0.1667 391.5833 11747.50
+OPTIDX BANKNIFTY 28APR2026 
+55900.00 PE
+09:37:1909:37:19
+2000000010342267756435B
+ 30 523.2500 0.1667 523.4167-15702.50
+OPTIDX BANKNIFTY 28APR2026 
+55900.00 PE
+14:06:5914:06:59
+Contract Total 
+ 30 30 0
+Buy QuantitySell QuantityNet Quantity
+-3955.00-15702.50 11747.50
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 15,697.50
+Sell Turnover
+ 11,752.50
+1800000011248110147150S
+ 30 491.6500 0.1667 491.4833 14744.50
+OPTIDX BANKNIFTY 28APR2026 
+56100.00 CE
+09:37:1909:37:19
+Page 2 of 6
+FA342824
+Account ID :
+
+Rema
+rks
+Net Total 
+(Before Levies)  
+(Rs.)
+Closing Rate 
+Per Unit (Only 
+For 
+Derivative) 
+(Rs.)
+Net Rate Per 
+Unit (Rs.)
+Brokerage
+ Per Unit 
+(Rs.)
+Gross 
+Rate/ 
+Trade 
+Price Per 
+Unit (Rs.)
+QtyBuy(B)/ 
+Sell(S)
+Security/Contract Description
+Trade 
+Time
+Trade 
+No.
+Order 
+Time
+Order No.Gross Rate/ 
+Trade Price 
+Per Unit (in 
+foreign 
+currency)
+1800000011250813777496B
+ 30 353.9000 0.1667 354.0667-10622.00
+OPTIDX BANKNIFTY 28APR2026 
+56100.00 CE
+14:06:5914:06:59
+Contract Total 
+ 30 30 0
+Buy QuantitySell QuantityNet Quantity
+ 4122.50-10622.00 14744.50
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 10,617.00
+Sell Turnover
+ 14,749.50
+180000000745542297558S
+ 30 409.3500 0.1667 409.1833 12275.50
+OPTIDX BANKNIFTY 28APR2026 
+56100.00 PE
+09:29:5209:29:52
+1800000007457873777495B
+ 30 633.0500 0.1667 633.2167-18996.50
+OPTIDX BANKNIFTY 28APR2026 
+56100.00 PE
+14:06:5914:06:59
+Contract Total 
+ 30 30 0
+Buy QuantitySell QuantityNet Quantity
+-6721.00-18996.50 12275.50
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 18,991.50
+Sell Turnover
+ 12,280.50
+200000000680955690880S
+ 30 448.4000 0.1667 448.2333 13447.00
+OPTIDX BANKNIFTY 28APR2026 
+56300.00 CE
+09:29:5209:29:52
+2000000006812854756423B
+ 30 278.2000 0.1667 278.3667-8351.00
+OPTIDX BANKNIFTY 28APR2026 
+56300.00 CE
+14:06:5914:06:59
+Contract Total 
+ 30 30 0
+Buy QuantitySell QuantityNet Quantity
+ 5096.00-8351.00 13447.00
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 8,346.00
+Sell Turnover
+ 13,452.00
+16000001898464243131006S
+ 65 126.9000 0.0385 126.8615 8246.00
+OPTIDX NIFTY 28APR2026 23750.00 
+PE
+14:10:5214:10:52
+16000001898464243131007S
+ 65 126.9000 0.0385 126.8615 8246.00
+OPTIDX NIFTY 28APR2026 23750.00 
+PE
+14:10:5214:10:52
+16000001898503593351939B
+ 130 102.5500 0.0385 102.5885-13336.50
+OPTIDX NIFTY 28APR2026 23750.00 
+PE
+14:34:1114:34:11
+Contract Total 
+ 130 130 0
+Buy QuantitySell QuantityNet Quantity
+ 3155.50-13336.50 16492.00
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 13,331.50
+Sell Turnover
+ 16,497.00
+10000002270332743862396S
+ 195 116.2500 0.0256 116.2244 22663.75
+OPTIDX NIFTY 28APR2026 23800.00 
+PE
+14:46:0614:46:06
+10000002270387084510574B
+ 195 115.5500 0.0256 115.5756-22537.25
+OPTIDX NIFTY 28APR2026 23800.00 
+PE
+15:27:5915:27:59
+Contract Total 
+ 195 195 0
+Buy QuantitySell QuantityNet Quantity
+ 126.50-22537.25 22663.75
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 22,532.25
+Sell Turnover
+ 22,668.75
+1200000020408279495500S
+ 65 120.7500 0.0769 120.6731 7843.75
+OPTIDX NIFTY 28APR2026 23900.00 
+PE
+09:37:0709:37:07
+12000000204197893667669B
+ 65 212.0500 0.0769 212.1269-13788.25
+OPTIDX NIFTY 28APR2026 23900.00 
+PE
+14:06:5914:06:59
+Contract Total 
+ 65 65 0
+Buy QuantitySell QuantityNet Quantity
+-5944.50-13788.25 7843.75
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 13,783.25
+Sell Turnover
+ 7,848.75
+13000001959010113418878S
+ 65 133.4500 0.0385 133.4115 8671.75
+OPTIDX NIFTY 28APR2026 23950.00 
+CE
+14:10:5214:10:52
+Page 3 of 6
+FA342824
+Account ID :
+
+Rema
+rks
+Net Total 
+(Before Levies)  
+(Rs.)
+Closing Rate 
+Per Unit (Only 
+For 
+Derivative) 
+(Rs.)
+Net Rate Per 
+Unit (Rs.)
+Brokerage
+ Per Unit 
+(Rs.)
+Gross 
+Rate/ 
+Trade 
+Price Per 
+Unit (Rs.)
+QtyBuy(B)/ 
+Sell(S)
+Security/Contract Description
+Trade 
+Time
+Trade 
+No.
+Order 
+Time
+Order No.Gross Rate/ 
+Trade Price 
+Per Unit (in 
+foreign 
+currency)
+13000001959010113418877S
+ 65 133.4500 0.0385 133.4115 8671.75
+OPTIDX NIFTY 28APR2026 23950.00 
+CE
+14:10:5214:10:52
+13000001959051413669338B
+ 65 162.5000 0.0385 162.5385-10565.00
+OPTIDX NIFTY 28APR2026 23950.00 
+CE
+14:34:1114:34:11
+13000001959051413669339B
+ 65 162.5000 0.0385 162.5385-10565.00
+OPTIDX NIFTY 28APR2026 23950.00 
+CE
+14:34:1114:34:11
+Contract Total 
+ 130 130 0
+Buy QuantitySell QuantityNet Quantity
+-3786.50-21130.00 17343.50
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 21,125.00
+Sell Turnover
+ 17,348.50
+14000002242122724679129S
+ 195 147.2500 0.0256 147.2244 28708.75
+OPTIDX NIFTY 28APR2026 24000.00 
+CE
+14:46:0614:46:06
+14000002242175465400345B
+ 130 143.4000 0.0256 143.4256-18645.33
+OPTIDX NIFTY 28APR2026 24000.00 
+CE
+15:27:5915:27:59
+14000002242175465400344B
+ 65 143.3500 0.0256 143.3756-9319.42
+OPTIDX NIFTY 28APR2026 24000.00 
+CE
+15:27:5915:27:59
+Contract Total 
+ 195 195 0
+Buy QuantitySell QuantityNet Quantity
+ 744.00-27964.75 28708.75
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 27,959.75
+Sell Turnover
+ 28,713.75
+14000002158587504511467S
+ 130 209.2500 0.0256 209.2244 27199.17
+OPTIDX NIFTY 28APR2026 24000.00 
+PE
+14:35:3214:35:32
+14000002158587504511468S
+ 65 209.2500 0.0256 209.2244 13599.58
+OPTIDX NIFTY 28APR2026 24000.00 
+PE
+14:35:3214:35:32
+14000002160320764561510B
+ 195 213.0000 0.0256 213.0256-41540.00
+OPTIDX NIFTY 28APR2026 24000.00 
+PE
+14:37:5014:37:50
+14000002188612744576287S
+ 195 201.8000 0.0256 201.7744 39346.00
+OPTIDX NIFTY 28APR2026 24000.00 
+PE
+14:39:0314:39:03
+14000002204345224603898B
+ 130 205.5000 0.0256 205.5256-26718.33
+OPTIDX NIFTY 28APR2026 24000.00 
+PE
+14:41:1414:41:14
+14000002204345224603899B
+ 65 205.5000 0.0256 205.5256-13359.17
+OPTIDX NIFTY 28APR2026 24000.00 
+PE
+14:41:1414:41:14
+Contract Total 
+ 390 390 0
+Buy QuantitySell QuantityNet Quantity
+-1472.75-81617.50 80144.75
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 81,607.50
+Sell Turnover
+ 80,154.75
+1600000022109547813526S
+ 65 141.3500 0.0769 141.2731 9182.75
+OPTIDX NIFTY 28APR2026 24100.00 
+CE
+09:37:0709:37:07
+16000000221213253085398B
+ 65 77.3500 0.0769 77.4269-5032.75
+OPTIDX NIFTY 28APR2026 24100.00 
+CE
+14:06:5914:06:59
+Contract Total 
+ 65 65 0
+Buy QuantitySell QuantityNet Quantity
+ 4150.00-5032.75 9182.75
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 5,027.75
+Sell Turnover
+ 9,187.75
+1600000002281646123094S
+ 130 143.7500 0.0385 143.7115 18682.50
+OPTIDX NIFTY 28APR2026 24100.00 
+PE
+09:16:5909:16:59
+1600000002292646802114B
+ 130 212.9000 0.0385 212.9385-27682.00
+OPTIDX NIFTY 28APR2026 24100.00 
+PE
+09:36:5309:36:53
+Page 4 of 6
+FA342824
+Account ID :
+
+Rema
+rks
+Net Total 
+(Before Levies)  
+(Rs.)
+Closing Rate 
+Per Unit (Only 
+For 
+Derivative) 
+(Rs.)
+Net Rate Per 
+Unit (Rs.)
+Brokerage
+ Per Unit 
+(Rs.)
+Gross 
+Rate/ 
+Trade 
+Price Per 
+Unit (Rs.)
+QtyBuy(B)/ 
+Sell(S)
+Security/Contract Description
+Trade 
+Time
+Trade 
+No.
+Order 
+Time
+Order No.Gross Rate/ 
+Trade Price 
+Per Unit (in 
+foreign 
+currency)
+Contract Total 
+ 130 130 0
+Buy QuantitySell QuantityNet Quantity
+-8999.50-27682.00 18682.50
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 27,677.00
+Sell Turnover
+ 18,687.50
+1100000002420212142187S
+ 130 145.1000 0.0385 145.0615 18858.00
+OPTIDX NIFTY 28APR2026 24200.00 
+CE
+09:16:5909:16:59
+1100000002431909661634B
+ 65 102.9500 0.0385 102.9885-6694.25
+OPTIDX NIFTY 28APR2026 24200.00 
+CE
+09:36:5309:36:53
+1100000002431909661633B
+ 65 102.9500 0.0385 102.9885-6694.25
+OPTIDX NIFTY 28APR2026 24200.00 
+CE
+09:36:5309:36:53
+Contract Total 
+ 130 130 0
+Buy QuantitySell QuantityNet Quantity
+ 5469.50-13388.50 18858.00
+Buy Value/MTMSell Value/MTMNet Value/MTM
+Buy Turnover
+ 13,383.50
+Sell Turnover
+ 18,863.00
+-9275.75
+Net Value/MTM
+Sell Value
+ 298087.75
+Sell Turnover
+ 298,167.75
+Buy Value
+-307363.50
+Buy Turnover
+ 307,283.50
+Exchange  Total
+Turnover Total
+Name Of
+Exchange/CC &
+Segment
+Pay in/Payout 
+Obligation
+Security 
+Transaction 
+Tax
+Taxable Value 
+of Supply
+IGST @18%SEBI Turnover 
+Fee
+Exchange 
+Clearing 
+Charges
+Stamp DutyTransaction 
+Charges
+IPF
+ Charges
+Final NetBrokerage
+NSEFNO-NCL 447.00 375.73
+   67.63
+ 0.61 9.00 215.12
+-10015.11
+-9275.75 0.00 160.00 0.00
+By Client Net Payable(-)/Receivable(+)
+-10015.1100
+Obligation Detail
+* CGST:-Central GST; SGST: - State GST; IGST:-Integrated GST; UTT: - Union Territory Tax. Details of trade-wise levies shall be provided on request.
+@ Converted into INR based on RBI reference rate as on the date of transaction
+Transactions  mentioned  in  this  contract  note  cum  bill  shall  be  governed  and  subject  to  the  Rules,  Bye-laws,  Regulations  and  Circulars  of  the  respective  Exchanges  on  which  trades  have  been  executed  and  Securities  and  Exchange  Board  of  India  issued  from 
+time   to   time.   It   shall   also   be   subject   to   the   relevant   Acts,   Rules,      Regulations,      Directives,      Notifications,   Guidelines   (including   GST   Laws)   &   Circulars   issued   by   SEBI   /   Government   of   India   /   State   Governments   and   Union   Territory   Governments   issued   from 
+time   to   time.   The   Exchanges   provide   Complaint   Resolution,   Arbitration   and  Appellate   arbitration   facilities   at   the   Regional   Arbitration   Centres   (RAC).   The   client   may   approach   its   nearest   centre,   details   of   which   are   available   on   respective   Exchange’s   website. 
+Please visit http://www.bseindia.com for BSE, http://www.msei.in for MSEI and  http://www.nseindia.com for NSE and http://www.mcxindia.com for MCX.
+FINVASIA SECURITIES PRIVATE LIMITED is collects stamp duty and Securities Transaction Tax as a pure agent of investor and hence the same is not consider in the Taxable value of supply of charging GST.
+Disclaimer:   The   purchase   of   Rights   Entitlement   (REs)   only   gives   you   the   right   to   participate   in   the   ongoing   Rights   Issue   of   the   concerned   company   by   making   an   application   with   requisite   application   money.   You   can   also   choose   to   renounce   the   REs   before 
+the issue closes. REs which are neither subscribed nor renounced, on or before the Issue closing date shall lapse and shall be extinguished after the Issue closing date.
+Please  note  that  any  person  who  is  dealing  in  shares  of  listed  stock  exchanges  must  comply  with  regulation  19  and  20  of  SECC  Regulations,  2018  which  state  that  only  fit  and  proper  person  are  eligible  to  deal  in  shares  of  listed  stock  exchanges.  The  detailed 
+regulations are given below:
+https://shoonya.com/static/website/pdf/regulation_19_and_20.pdf
+Page 5 of 6
+FA342824
+Account ID :
+
+Your faithfully
+For FINVASIA SECURITIES PRIVATE LIMITED
+Authorized Signatory
+TRILOK SINGLA
+SAC Code : 997152
+GST Service Code : 997152
+Service Name : Stock Broking
+GSTIN Of TM : 03AABCF6759K1ZF
+PAN                  :  AABCF6759K
+Date :
+Place :
+24/04/2026
+PUNJAB
+* Trades were executed due to non-compliance by the client towards margin calls made by the Member.
+P   - Open position of the traded contract is to be physically settled. 
+Page 6 of 6
+FA342824
+Account ID :
+Digitally Signed
+By: DS FINVASIA SECURITIES PRIVATE LIMITED
+Date: 2026-04-24 21:16
+Reason: Billing
+Location: PUNJAB
