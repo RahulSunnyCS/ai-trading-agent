@@ -6,7 +6,7 @@ completable by a single implementor in one focused pass — not a one-line
 change, not a whole subsystem. `TODO.md` is the at-a-glance mirror of
 this file.
 
-> Source specs: `docs/product.md`, `docs/architecture.md`, `docs/setup.md`. This roadmap sequences them; it does
+> Source specs: `docs/product.md`, `docs/architecture.md`. This roadmap sequences them; it does
 > not restate them.
 
 ---

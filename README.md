@@ -27,8 +27,11 @@ bun run sim                   # simulation mode, no broker credentials needed
 Server on `http://localhost:3000`. For the dashboard:
 `bun run --filter @ata/dashboard dev` (Vite on `:5173`, proxies `/api` and `/ws`).
 
-Full install matrix — Docker, local, hosted, corporate proxy — and production
-deployment: **[`docs/setup.md`](docs/setup.md)**.
+Local install paths beyond Docker Compose — native, hosted, corporate proxy —
+and production deployment: **[`docs/architecture.md`](docs/architecture.md)**.
+Day-to-day commands live in
+[`.claude/project/technical.md`](.claude/project/technical.md), which is
+auto-loaded into every Claude Code session.
 
 ## Documentation
 
@@ -36,9 +39,7 @@ deployment: **[`docs/setup.md`](docs/setup.md)**.
 |---|---|
 | [**`TODO.md`**](TODO.md) | **Single source of truth for open work** — priorities, owner-blocked vs codeable, and task contracts. Start here |
 | [`docs/product.md`](docs/product.md) | Why these strategies, how decisions are made, success criteria, risks, and the full 10-personality reference |
-| [`docs/architecture.md`](docs/architecture.md) | System architecture, database schema, signal and evolution engines, API endpoints, backfill/replay/regime reference |
-| [`docs/setup.md`](docs/setup.md) | Local development (four paths), troubleshooting, production deployment |
-| [`docs/testing.md`](docs/testing.md) | Manual verification — numbered steps with expected values, plus the E2E catalogue |
+| [`docs/architecture.md`](docs/architecture.md) | System architecture, database schema, signal and evolution engines, API endpoints, plus deployment and the local-setup paths Docker Compose does not cover |
 | [`docs/roadmap.md`](docs/roadmap.md) | Task catalogue — what each T-number covers — plus candidate work not committed to, with the case against each. Reference only; no status |
 | [`docs/algotest-execution.md`](docs/algotest-execution.md) | The AlgoTest execution loop — the verified API contract, decision log, and cutover runbook. Reference only; open items live in `TODO.md` |
 | [`docs/epics.md`](docs/epics.md) | Delivery records, one section per completed epic — archival |

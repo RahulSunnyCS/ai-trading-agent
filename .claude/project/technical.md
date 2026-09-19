@@ -395,4 +395,13 @@ Critical variables whose misconfiguration causes real pain:
   alerts through the server would mean losing the alert that says the server
   is down. Python callers reimplement ~40 lines against the same
   `Notification` shape
+- **`DATABASE_URL` must be exported in the process that runs `obt`/`obt-api`** —
+  not merely present in a `.env` the *server* reads. The regime section is
+  omitted silently when it is missing, so a backtest that "lost" its regime
+  buckets is usually this, not a data problem
+- **Dashboard shows a proxy error** — `bun run py:api` is not running, or
+  `BACKTEST_API_URL` does not match where it bound. The dashboard never talks
+  to the Python service directly; everything goes through the Fastify proxy
+- **Backtest returns "no cached sessions"** — wrong `--cache-dir`, or
+  `BACKTEST_DATA_DIR` pointing somewhere other than the cache you built
 - **Bun-only repo** — do not run `npm install` or `yarn install`. They generate a `package-lock.json` or `yarn.lock` that will conflict with `bun.lock`
