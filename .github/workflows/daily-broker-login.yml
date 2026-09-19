@@ -1,12 +1,12 @@
 name: Daily broker login
 
 on:
-  schedule:
-    # 03:05 UTC = 08:35 IST. Weekdays only - markets are shut at the weekend.
-    - cron: '5 3 * * 1-5'
-    # 09:05 IST backstop. A no-op when the first run already succeeded, because
-    # brokers that are logged in are skipped.
-    - cron: '35 3 * * 1-5'
+  # SCHEDULE DISABLED until a manual workflow_dispatch run has passed. To enable,
+  # uncomment the block below. 03:05 UTC = 08:35 IST, weekdays only; the second entry
+  # is a 09:05 IST backstop that is a no-op when the first run already succeeded.
+  # schedule:
+  #   - cron: '5 3 * * 1-5'
+  #   - cron: '35 3 * * 1-5'
   workflow_dispatch:
     inputs:
       only:
