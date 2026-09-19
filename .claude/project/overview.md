@@ -84,13 +84,12 @@ P&L to measure the signal against. Execution runs through Playwright behind a
 Telegram approval gate — the paid AlgoTest Signals API (₹1,299/mo) was
 evaluated and declined.
 
-**Start here — these three documents carry the state:**
+**Start here — this document carries the state:**
 
 | Document | What it holds |
 |---|---|
-| `docs/algotest-execution-plan.md` | Phases, the verified AlgoTest API contract, and the decision log with rationale |
-| `docs/pending-actions.md` | Everything blocked on the repo owner — secrets, cutover steps, open decisions |
-| `docs/runbooks/contract-notes-handover.md` | Ordered cutover for the daily sheet pipeline, with rollback |
+| `docs/algotest-execution.md` | The whole workstream: phases and the verified AlgoTest API contract, the decision log, everything blocked on the repo owner, and the ordered contract-notes cutover with rollback |
+| `docs/roadmap.md` | Task catalogue, plus candidate work deliberately not committed to with the case against each |
 
 Nothing trades live yet. The measurement layer this depends on **does** exist —
 `apps/server/src/backtesting/` (T-51), `apps/server/src/retrospection/`

@@ -128,3 +128,71 @@ The rest of the pipeline (`fetchMail.js`, `parser.js`, `updateSheet.js`, `checkD
 `.github/workflows/` contains two workflows:
 - **Daily Trading Data Processing** — runs at 00:01 UTC daily; downloads the `row-tracker` artifact, calls `check-dates`, loops over `gap_dates.txt` processing each missing date, uploads the updated artifact.
 - **Update Last Updated Row** — manual `workflow_dispatch` to correct `lastUpdatedRow` in the artifact when the sheet is manually edited.
+
+---
+
+## Setup
+
+### Helpful Links
+
+- **How to Create Google Service Account and Get Credentials:**  
+  [Guide: Creating Service Account and Enabling Google Sheets API](https://cloud.google.com/iam/docs/creating-managing-service-account-keys)
+
+- **How to Get Google Sheet ID and GID:**
+
+  - **Sheet ID**: It's the long string in the URL between `/d/` and `/edit`.  
+    Example: `https://docs.google.com/spreadsheets/d/your_google_sheet_id/edit#gid=0`
+  - **GID**: It’s the value after `gid=` in the URL.
+
+- **Base64 Encode your Credentials:**
+  You can encode your service account JSON file using:
+  ```bash
+  base64 service-account.json
+  ```
+
+---
+
+### Example `.env` (Generic)
+
+```env
+BROKER_ACCOUNTS_JSON=[{"email":"user1@gmail.com","emailPassword":"yourpassword1","accounts":[{"broker":"finvasia","accountId":"accountid1","pdfPassword":"pdfpwd1","sheetStartColumn":"D"}]},{"email":"user2@gmail.com","emailPassword":"yourpassword2","accounts":[{"broker":"angelone","accountId":"accountid2","pdfPassword":"pdfpwd2","sheetStartColumn":"I"}]}]
+GOOGLE_CREDENTIALS=your_base64_encoded_service_account_json
+GOOGLE_SHEET_ID=your_google_sheet_id_here
+SHEET_GID=your_sheet_gid_here
+SHEET_NAME=your_sheet_name_here
+```
+
+---
+
+### Adding Environment Variables to GitHub Actions
+
+To use this project with **GitHub Actions**, make sure you add the environment variables as **GitHub Secrets**:
+
+#### Steps:
+
+1. Go to your GitHub repository.
+2. Navigate to **Settings** → **Secrets and variables** → **Actions**.
+3. Click **"New repository secret"**.
+4. Add each of the following as separate secrets:
+
+| GitHub Secret Name     | Corresponds to .env Variable |
+| ---------------------- | ---------------------------- |
+| `BROKER_ACCOUNTS_JSON` | `BROKER_ACCOUNTS_JSON`       |
+| `GOOGLE_CREDENTIALS`   | `GOOGLE_CREDENTIALS`         |
+| `GOOGLE_SHEET_ID`      | `GOOGLE_SHEET_ID`            |
+| `SHEET_GID`            | `SHEET_GID`                  |
+| `SHEET_NAME`           | `SHEET_NAME`                 |
+
+#### Notes:
+
+- Make sure your GitHub Actions workflow is configured to load these secrets using the `secrets` context.
+- You can access the secrets in your workflow like this:
+
+```yaml
+env:
+  BROKER_ACCOUNTS_JSON: ${{ secrets.BROKER_ACCOUNTS_JSON }}
+  GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+  GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+  SHEET_GID: ${{ secrets.SHEET_GID }}
+  SHEET_NAME: ${{ secrets.SHEET_NAME }}
+```

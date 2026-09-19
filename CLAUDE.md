@@ -497,7 +497,7 @@ Check:
 - Documentation updated?
 - Collated epic document written?
 
-Before the Final Summary Report, delegate to the Epic Doc Writer agent (.claude/agents/epic-doc-writer.md) to produce the collated epic/large-chunk delivery document at docs/epics/<epic-slug>.md — what was done, how it helps, limitations/tradeoffs and why, the tests the AI ran, manual test cases for humans, and security/risk notes. It reads pipeline artifacts read-only and never writes TODO.md or pipeline/progress.md. Trigger it on demand via /epic-doc when a large chunk completes mid-pipeline, not only at the end.
+Before the Final Summary Report, delegate to the Epic Doc Writer agent (.claude/agents/epic-doc-writer.md) to produce the collated epic/large-chunk delivery record as a new section in docs/epics.md — what was done, how it helps, limitations/tradeoffs and why, the tests the AI ran, manual test cases for humans, and security/risk notes. It reads pipeline artifacts read-only and never writes TODO.md or pipeline/progress.md. Trigger it on demand via /epic-doc when a large chunk completes mid-pipeline, not only at the end.
 
 Produce the Final Summary Report, then hand it to the Translator agent (.claude/agents/translator.md) for a plain-English pass before presenting (preserve the resolved-findings counts, accepted risks, and the final recommendation verbatim).
 
@@ -505,9 +505,9 @@ HUMAN GATE 3: Final approval required before any merge or submit action. Present
 
 After Gate 3 approval, immediately clean up all pipeline working state:
 1. Delete the entire `pipeline/` directory — this includes risk_manifest.json, progress.md, token-usage.md, qa-checklist.md, tasks/, reviews/, diagnosis.md, and any other files written during the pipeline run.
-2. Delete `TODO.md` from the repository root — it is a mirror of the task list, now permanently superseded by the epic doc at `docs/epics/<slug>.md`.
+2. Delete `TODO.md` from the repository root — it is a mirror of the task list, now permanently superseded by the epic record in `docs/epics.md`.
 3. Commit the cleanup with message: `chore: clean up pipeline working state after Gate 3`.
-4. The permanent record is `docs/epics/<slug>.md`. Never delete that.
+4. The permanent record is `docs/epics.md`. Never delete that.
 
 This cleanup is only permitted after explicit Gate 3 approval. Never delete pipeline/ mid-run or before the human has confirmed.
 

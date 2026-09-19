@@ -156,7 +156,7 @@ ai-trading-agent/
     │                                 # OAuth handshake happens on the broker's own domain, so it cannot
     │                                 # be done over HTTP. Every locator lives in src/selectors.ts.
     │                                 # Daily workflow's schedule is currently disabled — see
-    │                                 # docs/runbooks/contract-notes-handover.md
+    │                                 # docs/algotest-execution.md
     ├── contract-notes/              # Node 20 + CommonJS + Jest. Was the trade-analytics repo, merged via
     │                                 # git subtree. Gmail IMAP → qpdf decrypt → PDF parse → Google Sheet,
     │                                 # producing realised F&O P&L per broker account. Needs the qpdf

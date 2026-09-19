@@ -38,12 +38,9 @@ deployment: **[`docs/setup.md`](docs/setup.md)**.
 | [`docs/architecture.md`](docs/architecture.md) | System architecture, database schema, signal and evolution engines, API endpoints, backfill/replay/regime reference |
 | [`docs/setup.md`](docs/setup.md) | Local development (four paths), troubleshooting, production deployment |
 | [`docs/testing.md`](docs/testing.md) | Manual verification — numbered steps with expected values, plus the E2E catalogue |
-| [`docs/roadmap.md`](docs/roadmap.md) | Task catalogue: what each T-number covers and what "done" meant |
-| [`docs/ideas.md`](docs/ideas.md) | Candidate work that is not committed to — with the case against each |
-| [`docs/algotest-execution-plan.md`](docs/algotest-execution-plan.md) | The AlgoTest execution loop: phases, API contract, decision log |
-| [`docs/pending-actions.md`](docs/pending-actions.md) | Everything blocked on the repo owner |
-| [`docs/runbooks/`](docs/runbooks/) | Operational procedures |
-| [`docs/epics/`](docs/epics/) | Delivery records, one per completed epic — archival |
+| [`docs/roadmap.md`](docs/roadmap.md) | Task catalogue — what each T-number covers — plus candidate work not committed to, with the case against each |
+| [`docs/algotest-execution.md`](docs/algotest-execution.md) | The AlgoTest execution loop — plan and API contract, actions blocked on the owner, and the cutover runbook |
+| [`docs/epics.md`](docs/epics.md) | Delivery records, one section per completed epic — archival |
 
 **Current status** lives in [`.claude/project/overview.md`](.claude/project/overview.md);
 the stack, commands, layout and environment variables in
