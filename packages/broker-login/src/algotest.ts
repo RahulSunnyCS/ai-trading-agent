@@ -1,7 +1,7 @@
 import type { Page } from 'playwright';
+import { type Broker, BrokerLoginError, type FailureKind } from './brokers/types.js';
 import { step } from './diagnose.js';
 import { brokerPage, errorPatterns, loginPage } from './selectors.js';
-import { BrokerLoginError, type Broker, type FailureKind } from './brokers/types.js';
 
 export const BASE_URL = 'https://algotest.in';
 
@@ -118,7 +118,9 @@ export async function waitForState(
 
     if (!reloaded && Date.now() > reloadAt) {
       reloaded = true;
-      await page.goto(`${BASE_URL}/broker`, { waitUntil: 'domcontentloaded' }).catch(() => undefined);
+      await page
+        .goto(`${BASE_URL}/broker`, { waitUntil: 'domcontentloaded' })
+        .catch(() => undefined);
       await openMyBrokers(page).catch(() => undefined);
       continue;
     }

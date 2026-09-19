@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import React, { memo, useEffect, useRef } from "react";
-import "../styles/print-shared.css";
+import React, { memo, useEffect, useRef } from 'react';
+import '../styles/print-shared.css';
 
 type PreviewerLike = {
   preview: (content: Element, stylesheets?: string[], renderTo?: Element) => Promise<unknown>;
@@ -22,11 +22,11 @@ export type PaginatedPreviewProps = {
  * Shared asset loading guard to avoid running pagination against unstable layout.
  */
 async function waitForFontsAndImages(container: HTMLElement): Promise<void> {
-  if (typeof document !== "undefined" && "fonts" in document) {
+  if (typeof document !== 'undefined' && 'fonts' in document) {
     await (document as Document & { fonts: FontFaceSet }).fonts.ready;
   }
 
-  const images = Array.from(container.querySelectorAll("img"));
+  const images = Array.from(container.querySelectorAll('img'));
   if (images.length === 0) return;
 
   await Promise.all(
@@ -39,13 +39,13 @@ async function waitForFontsAndImages(container: HTMLElement): Promise<void> {
           }
 
           const onDone = () => {
-            img.removeEventListener("load", onDone);
-            img.removeEventListener("error", onDone);
+            img.removeEventListener('load', onDone);
+            img.removeEventListener('error', onDone);
             resolve();
           };
 
-          img.addEventListener("load", onDone);
-          img.addEventListener("error", onDone);
+          img.addEventListener('load', onDone);
+          img.addEventListener('error', onDone);
         }),
     ),
   );
@@ -68,21 +68,25 @@ const PaginatedPreview = ({ html, className, debounceMs = 120 }: PaginatedPrevie
 
     try {
       previewerRef.current.destroy?.();
-      console.info("[PaginatedPreview] destroyed previous previewer");
+      console.info('[PaginatedPreview] destroyed previous previewer');
     } catch (error) {
-      console.warn("[PaginatedPreview] previewer destroy failed", error);
+      console.warn('[PaginatedPreview] previewer destroy failed', error);
     }
 
     previewerRef.current = null;
   };
 
+  // FIXME: biome flags a genuinely missing dependency here (destroyPreviewer).
+  // Not fixed blind — adding it can cause a re-render loop, and this component
+  // has no tests and is not wired into the pipeline. Needs a deliberate review.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see FIXME above
   useEffect(() => {
     const wrapper = wrapperRef.current;
     const content = contentRef.current;
     const pagedRoot = pagedRootRef.current;
 
     if (!wrapper || !content || !pagedRoot) {
-      console.warn("[PaginatedPreview] skipped pagination: required container is missing");
+      console.warn('[PaginatedPreview] skipped pagination: required container is missing');
       return;
     }
 
@@ -98,12 +102,12 @@ const PaginatedPreview = ({ html, className, debounceMs = 120 }: PaginatedPrevie
 
       // Hard guard against concurrent runs.
       if (runningRef.current) {
-        console.info("[PaginatedPreview] skipped run: pagination already in progress");
+        console.info('[PaginatedPreview] skipped run: pagination already in progress');
         return;
       }
 
       runningRef.current = true;
-      wrapper.dataset.paginationRunning = "true";
+      wrapper.dataset.paginationRunning = 'true';
 
       try {
         await waitForFontsAndImages(content);
@@ -115,7 +119,7 @@ const PaginatedPreview = ({ html, className, debounceMs = 120 }: PaginatedPrevie
 
         const Paged = (window as Window & { Paged?: PagedLike }).Paged;
         if (!Paged?.Previewer) {
-          console.warn("[PaginatedPreview] skipped pagination: window.Paged.Previewer unavailable");
+          console.warn('[PaginatedPreview] skipped pagination: window.Paged.Previewer unavailable');
           return;
         }
 
@@ -123,11 +127,11 @@ const PaginatedPreview = ({ html, className, debounceMs = 120 }: PaginatedPrevie
         destroyPreviewer();
 
         // Reset previous output in a controlled way before new layout.
-        pagedRoot.innerHTML = "";
+        pagedRoot.innerHTML = '';
 
         const previewer = new Paged.Previewer();
         previewerRef.current = previewer;
-        console.info("[PaginatedPreview] starting pagination run");
+        console.info('[PaginatedPreview] starting pagination run');
 
         // Keep width deterministic to avoid resize underflow checks in paged internals.
         const width = wrapper.getBoundingClientRect().width;
@@ -136,13 +140,13 @@ const PaginatedPreview = ({ html, className, debounceMs = 120 }: PaginatedPrevie
         }
 
         await previewer.preview(content, [], pagedRoot);
-        console.info("[PaginatedPreview] pagination completed");
+        console.info('[PaginatedPreview] pagination completed');
       } catch (error) {
-        console.error("[PaginatedPreview] pagination failed", error);
+        console.error('[PaginatedPreview] pagination failed', error);
       } finally {
         if (currentRunId === runIdRef.current) {
           runningRef.current = false;
-          wrapper.dataset.paginationRunning = "false";
+          wrapper.dataset.paginationRunning = 'false';
         }
       }
     }, debounceMs);
@@ -155,13 +159,16 @@ const PaginatedPreview = ({ html, className, debounceMs = 120 }: PaginatedPrevie
       // Invalidate in-flight async work and cleanup singleton previewer instance.
       runIdRef.current += 1;
       runningRef.current = false;
-      wrapper.dataset.paginationRunning = "false";
+      wrapper.dataset.paginationRunning = 'false';
       destroyPreviewer();
     };
   }, [html, debounceMs]);
 
   return (
-    <section ref={wrapperRef} className={["print-preview-shell", className].filter(Boolean).join(" ")}>
+    <section
+      ref={wrapperRef}
+      className={['print-preview-shell', className].filter(Boolean).join(' ')}
+    >
       <div ref={contentRef} className="print-source" aria-hidden="true" />
       <div ref={pagedRootRef} className="print-paged-root print-document" />
     </section>

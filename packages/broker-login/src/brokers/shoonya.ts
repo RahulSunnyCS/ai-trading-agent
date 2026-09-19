@@ -1,10 +1,10 @@
 import type { Page } from 'playwright';
-import type { Config } from '../config.js';
 import { BASE_URL, classifyError, visibleErrorText } from '../algotest.js';
+import type { Config } from '../config.js';
 import { safeScreenshot, step } from '../diagnose.js';
 import { brokerNames, brokerPage, dataBrokerKeys, shoonyaForm } from '../selectors.js';
 import { freshTotp } from '../totp.js';
-import { BrokerLoginError, type Broker } from './types.js';
+import { type Broker, BrokerLoginError } from './types.js';
 
 /**
  * Finvasia redirects to its own login page (user id, password and TOTP on one
@@ -40,7 +40,12 @@ export const shoonya: Broker = {
         .waitFor({ state: 'visible', timeout: 30_000 });
     });
 
-    if (await shoonyaForm.authorize(target).isVisible().catch(() => false)) {
+    if (
+      await shoonyaForm
+        .authorize(target)
+        .isVisible()
+        .catch(() => false)
+    ) {
       await step(target, 'shoonya-authorize', async () => {
         await shoonyaForm.authorize(target).click();
       });
@@ -59,12 +64,20 @@ export const shoonya: Broker = {
 
     await target.waitForTimeout(3_000);
     if (!target.isClosed()) {
-      console.log(`  after submit: ${new URL(target.url()).origin}${new URL(target.url()).pathname}`);
+      console.log(
+        `  after submit: ${new URL(target.url()).origin}${new URL(target.url()).pathname}`,
+      );
       await safeScreenshot(target, 'shoonya-after-submit');
     }
 
     // Some sessions get the consent screen after the credentials are accepted instead.
-    if (!target.isClosed() && (await shoonyaForm.authorize(target).isVisible().catch(() => false))) {
+    if (
+      !target.isClosed() &&
+      (await shoonyaForm
+        .authorize(target)
+        .isVisible()
+        .catch(() => false))
+    ) {
       await step(target, 'shoonya-authorize', async () => {
         await shoonyaForm.authorize(target).click();
       });
@@ -74,7 +87,11 @@ export const shoonya: Broker = {
     // Only scan for errors while the login form is still showing - after a successful
     // login the tab is back on AlgoTest, where the scan could false-positive.
     const stillOnLoginForm =
-      !target.isClosed() && (await shoonyaForm.userId(target).count().catch(() => 0)) > 0;
+      !target.isClosed() &&
+      (await shoonyaForm
+        .userId(target)
+        .count()
+        .catch(() => 0)) > 0;
     const error = stillOnLoginForm ? await visibleErrorText(target) : '';
     if (error) throw new BrokerLoginError(error, classifyError(error));
 

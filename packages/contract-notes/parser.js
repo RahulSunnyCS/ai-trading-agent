@@ -1,24 +1,22 @@
-const fs = require("fs");
-const path = require("path");
-const pdfParse = require("pdf-parse");
-const { getBroker, parseFileName } = require("./brokers");
-const logger = require("./utils/logger");
+const fs = require('node:fs');
+const path = require('node:path');
+const pdfParse = require('pdf-parse');
+const { getBroker, parseFileName } = require('./brokers');
+const logger = require('./utils/logger');
 
-const SUMMARY_FIELDS = ["payin_payout_obligation", "net_brokerage", "other_charges"];
+const SUMMARY_FIELDS = ['payin_payout_obligation', 'net_brokerage', 'other_charges'];
 
-const dataDir = path.join(__dirname, "data");
-const outputPath = path.join(__dirname, "daily_summary.json");
+const dataDir = path.join(__dirname, 'data');
+const outputPath = path.join(__dirname, 'daily_summary.json');
 
 // The workspace is reused across dates in CI, so a summary left behind by an
 // earlier date must never be mistaken for this one's.
 if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
 
-const pdfFiles = fs
-  .readdirSync(dataDir)
-  .filter((file) => file.endsWith("_decrypted.pdf"));
+const pdfFiles = fs.readdirSync(dataDir).filter((file) => file.endsWith('_decrypted.pdf'));
 
 if (!pdfFiles.length) {
-  logger.info("No decrypted PDF files found in data/");
+  logger.info('No decrypted PDF files found in data/');
   process.exit(0);
 }
 
@@ -33,8 +31,8 @@ const parseResults = { succeeded: [], failed: [] };
   for (const file of pdfFiles) {
     const meta = parseFileName(file);
     if (!meta) {
-      logger.warn("Skipping file with unrecognised filename format", { file });
-      parseResults.failed.push({ file, error: "Filename does not match expected pattern" });
+      logger.warn('Skipping file with unrecognised filename format', { file });
+      parseResults.failed.push({ file, error: 'Filename does not match expected pattern' });
       continue;
     }
 
@@ -42,12 +40,12 @@ const parseResults = { succeeded: [], failed: [] };
     try {
       const pdfBuffer = fs.readFileSync(pdfPath);
       const data = await pdfParse(pdfBuffer);
-      logger.info("PDF loaded", { file, broker: meta.broker, account: meta.accountId });
+      logger.info('PDF loaded', { file, broker: meta.broker, account: meta.accountId });
 
       const broker = getBroker(meta.broker);
       const summary = broker.extract(data.text);
       if (summary.error) {
-        logger.error("Extractor failed", null, { file, error: summary.error });
+        logger.error('Extractor failed', null, { file, error: summary.error });
         parseResults.failed.push({ file, error: summary.error });
         continue;
       }
@@ -55,10 +53,10 @@ const parseResults = { succeeded: [], failed: [] };
       logger.info(`Extraction complete`, { broker: meta.broker, account: meta.accountId });
 
       if (summary.skipped_segments && summary.skipped_segments.length) {
-        logger.info("Non-F&O segments ignored", {
+        logger.info('Non-F&O segments ignored', {
           broker: meta.broker,
           account: meta.accountId,
-          segments: summary.skipped_segments.join(", "),
+          segments: summary.skipped_segments.join(', '),
         });
       }
 
@@ -71,7 +69,7 @@ const parseResults = { succeeded: [], failed: [] };
       mergedSummary.individual_account.push(accountEntry);
       parseResults.succeeded.push(file);
     } catch (err) {
-      logger.error("Error parsing PDF", err, { file });
+      logger.error('Error parsing PDF', err, { file });
       parseResults.failed.push({ file, error: err.message });
     }
   }
@@ -81,16 +79,16 @@ const parseResults = { succeeded: [], failed: [] };
   // for that broker and move the tracker past it — the date would never be
   // retried. Leaving it as a gap keeps it recoverable.
   if (parseResults.failed.length > 0) {
-    const errPath = path.join(__dirname, "parse_errors.json");
+    const errPath = path.join(__dirname, 'parse_errors.json');
     fs.writeFileSync(errPath, JSON.stringify(parseResults.failed, null, 2));
-    logger.error("Some files failed to parse — no output written", null, {
+    logger.error('Some files failed to parse — no output written', null, {
       failed: parseResults.failed.length,
       succeeded: parseResults.succeeded.length,
-      errorsFile: "parse_errors.json",
+      errorsFile: 'parse_errors.json',
     });
     process.exit(1);
   }
 
   fs.writeFileSync(outputPath, JSON.stringify(mergedSummary, null, 2));
-  logger.info("Merged summary saved", { file: "daily_summary.json" });
+  logger.info('Merged summary saved', { file: 'daily_summary.json' });
 })();

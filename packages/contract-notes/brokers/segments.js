@@ -8,7 +8,8 @@
 // Matched in this order: a label is checked against the non-equity segments
 // first, then F&O, then cash/equity. Labels are upper-cased and stripped of
 // whitespace/dots first, so "NSE FNO - NCL" and "NSEFNO-NCL" classify alike.
-const OTHER_SEGMENT = /(CURRENCY|CUR\b|CDS|CD\b|COMMODITY|COMM|COM\b|MCX|NCDEX|DEBT|SLB|IRF|GSEC|GOLD)/;
+const OTHER_SEGMENT =
+  /(CURRENCY|CUR\b|CDS|CD\b|COMMODITY|COMM|COM\b|MCX|NCDEX|DEBT|SLB|IRF|GSEC|GOLD)/;
 const FNO_SEGMENT = /(FNO|F&O|FO\b|FUT|OPT|DERIV)/;
 // CAP covers Finvasia's "NSECAP-NCL" / "BSECAP-ICCL" as well as the spelled-out
 // CAPITAL that Angel One uses for the same cash segment.
@@ -17,9 +18,9 @@ const EQUITY_SEGMENT = /(CASH|EQUITY|CAP|DELIVERY|INTRADAY|EQ\b|CM\b)/;
 const TOTAL_ROW = /^(TOTAL|GRANDTOTAL|NETTOTAL|SUMMARY)/;
 
 function normaliseLabel(label) {
-  return String(label == null ? "" : label)
+  return String(label == null ? '' : label)
     .toUpperCase()
-    .replace(/[\s.]+/g, "");
+    .replace(/[\s.]+/g, '');
 }
 
 // A summary row ("TOTAL(NET)") aggregates every segment, so it is never a
@@ -34,18 +35,18 @@ function isTotalRow(label) {
 // dropping it would corrupt the daily P&L.
 function classifySegment(label) {
   const s = normaliseLabel(label);
-  if (!s) return "unknown";
-  if (OTHER_SEGMENT.test(s)) return "other";
-  if (FNO_SEGMENT.test(s)) return "fno";
-  if (EQUITY_SEGMENT.test(s)) return "equity";
-  return "unknown";
+  if (!s) return 'unknown';
+  if (OTHER_SEGMENT.test(s)) return 'other';
+  if (FNO_SEGMENT.test(s)) return 'fno';
+  if (EQUITY_SEGMENT.test(s)) return 'equity';
+  return 'unknown';
 }
 
 // Pulls the numeric cells out of a table row, tolerating thousands separators.
 function parseAmounts(chunk) {
-  const matches = String(chunk == null ? "" : chunk).match(/-?\d+(?:,\d{3})*\.\d{2}/g);
+  const matches = String(chunk == null ? '' : chunk).match(/-?\d+(?:,\d{3})*\.\d{2}/g);
   if (!matches) return [];
-  return matches.map((n) => parseFloat(n.replace(/,/g, "")));
+  return matches.map((n) => Number.parseFloat(n.replace(/,/g, '')));
 }
 
 // Splits the obligation table into { label, amounts } rows, classifies them and
@@ -58,8 +59,8 @@ function splitBySegment(rows) {
   for (const row of rows) {
     if (isTotalRow(row.label)) continue;
     const kind = classifySegment(row.label);
-    if (kind === "fno") kept.push(row);
-    else if (kind === "unknown") unknown.push(row.label);
+    if (kind === 'fno') kept.push(row);
+    else if (kind === 'unknown') unknown.push(row.label);
     else dropped.push(`${row.label} (${kind})`);
   }
 

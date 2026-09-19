@@ -110,7 +110,9 @@ export class PaperTradeExecutor {
       [
         intent.underlying, // $1  symbol — underlying identifier (legacy column)
         intent.atmStrike, // $2  strike — ATM strike (legacy column)
-        expiry.toISOString().slice(0, 10), // $3  expiry — weekly expiry YYYY-MM-DD
+        expiry
+          .toISOString()
+          .slice(0, 10), // $3  expiry — weekly expiry YYYY-MM-DD
         intent.straddleValue, // $4  entry_straddle_value — legacy NOT NULL field
         intent.atmStrike, // $5  entry_ce_strike — ATM strike for both legs
         intent.atmStrike, // $6  entry_pe_strike — same strike (ATM straddle)

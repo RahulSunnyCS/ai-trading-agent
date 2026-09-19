@@ -35,6 +35,9 @@ import type { BrokerTick } from './ingestion/brokers/types.js';
 import { createStraddleCalculator } from './ingestion/straddle-calc.js';
 import { createVixFeed } from './ingestion/vix-feed.js';
 import { registerTokenValiditySchedule } from './jobs/token-validity-check.js';
+import { redis } from './redis/client.js';
+import { startServer } from './server/index.js';
+import { loadStoredToken } from './server/services/fyers-auth.js';
 import {
   PeakDetectionEngine,
   readConfigFromEnv as readPeakConfigFromEnv,
@@ -44,9 +47,6 @@ import {
   ScheduledSignalEmitter,
   buildConfigFromEnv as buildScheduledConfigFromEnv,
 } from './signals/scheduled-signal-emitter.js';
-import { redis } from './redis/client.js';
-import { startServer } from './server/index.js';
-import { loadStoredToken } from './server/services/fyers-auth.js';
 import { setAuthDegraded } from './state/broker-status.js';
 import { createPositionMonitor } from './trading/position-monitor.js';
 import { RealClock, VirtualClock } from './utils/clock.js';

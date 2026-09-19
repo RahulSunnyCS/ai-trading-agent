@@ -16,8 +16,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FixedClock } from '../../../utils/clock.js';
-import type { FetchFn } from '../fyers-historical.js';
 import { clearExpiryCache, resolveCurrentExpiry } from '../expiry-resolver.js';
+import type { FetchFn } from '../fyers-historical.js';
 import { getCurrentExpiry } from '../instrument-registry.js';
 
 // ---------------------------------------------------------------------------
@@ -91,9 +91,7 @@ describe('resolveCurrentExpiry — happy path', () => {
     // Clock: Monday 2024-01-22 noon IST. Fyers returns next two Tuesdays.
     const clock = new FixedClock(new Date('2024-01-22T06:30:00Z')); // Monday
 
-    const fetchFn = makeFetchFn(
-      makeFyersResponse([THIS_TUE_EPOCH_SEC, NEXT_TUE_EPOCH_SEC]),
-    );
+    const fetchFn = makeFetchFn(makeFyersResponse([THIS_TUE_EPOCH_SEC, NEXT_TUE_EPOCH_SEC]));
 
     const result = await resolveCurrentExpiry('NIFTY', { ...CREDENTIALS, clock, fetchFn });
 
@@ -105,9 +103,7 @@ describe('resolveCurrentExpiry — happy path', () => {
     // Clock: Tuesday 2024-01-23 at noon IST (06:30 UTC).
     const clock = new FixedClock(TUE_NOON_UTC);
 
-    const fetchFn = makeFetchFn(
-      makeFyersResponse([THIS_TUE_EPOCH_SEC, NEXT_TUE_EPOCH_SEC]),
-    );
+    const fetchFn = makeFetchFn(makeFyersResponse([THIS_TUE_EPOCH_SEC, NEXT_TUE_EPOCH_SEC]));
 
     const result = await resolveCurrentExpiry('NIFTY', { ...CREDENTIALS, clock, fetchFn });
     expect(result.toISOString().slice(0, 10)).toBe(THIS_TUE_ISO);
@@ -133,9 +129,7 @@ describe('resolveCurrentExpiry — 15:30 IST cut-off', () => {
     // Clock: Tuesday 2024-01-23 at 16:00 IST (10:30 UTC) — past cut-off.
     const clock = new FixedClock(TUE_PAST_EOD_UTC);
 
-    const fetchFn = makeFetchFn(
-      makeFyersResponse([THIS_TUE_EPOCH_SEC, NEXT_TUE_EPOCH_SEC]),
-    );
+    const fetchFn = makeFetchFn(makeFyersResponse([THIS_TUE_EPOCH_SEC, NEXT_TUE_EPOCH_SEC]));
 
     const result = await resolveCurrentExpiry('NIFTY', { ...CREDENTIALS, clock, fetchFn });
     // Today's expiry is closed → should return next Tuesday 2024-01-30.

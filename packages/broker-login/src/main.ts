@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises';
-import { chromium, type BrowserContext, type Page } from 'playwright';
+import { type BrowserContext, type Page, chromium } from 'playwright';
 import {
   algotestLogin,
   classifyError,
@@ -11,13 +11,13 @@ import {
 import { angelone } from './brokers/angelone.js';
 import { shoonya } from './brokers/shoonya.js';
 import {
-  BrokerLoginError,
-  isRetryable,
   type Broker,
+  BrokerLoginError,
   type BrokerResult,
   type FailureKind,
+  isRetryable,
 } from './brokers/types.js';
-import { loadConfig, readTelegramConfig, type Config } from './config.js';
+import { type Config, loadConfig, readTelegramConfig } from './config.js';
 import { ARTIFACTS_DIR, describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { formatReport, istTimestamp, sendTelegram } from './notify.js';
 import { brokerPage } from './selectors.js';
@@ -106,7 +106,10 @@ async function attemptBroker(page: Page, broker: Broker, config: Config): Promis
   // live capture. Fail fast here instead of waiting out a 15s timeout on a button
   // that will never appear.
   if ((await brokerPage.actionButton(page, broker.dataBrokerKey).count()) === 0) {
-    return result('FAIL', 'market closed - outside 08:15-15:40 IST login window (or not a trading day)');
+    return result(
+      'FAIL',
+      'market closed - outside 08:15-15:40 IST login window (or not a trading day)',
+    );
   }
 
   let lastDetail = 'unknown failure';
@@ -164,9 +167,7 @@ async function run(config: Config, context: BrowserContext): Promise<BrokerResul
   await openMyBrokers(page);
   console.log('My Brokers tab open');
 
-  const brokers = config.only
-    ? ALL_BROKERS.filter((b) => b.key === config.only)
-    : ALL_BROKERS;
+  const brokers = config.only ? ALL_BROKERS.filter((b) => b.key === config.only) : ALL_BROKERS;
 
   if (brokers.length === 0) {
     throw new Error(`ONLY=${config.only} matched no broker (expected: angelone, shoonya)`);

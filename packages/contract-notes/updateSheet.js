@@ -1,17 +1,17 @@
-const { google } = require("googleapis");
-const { JWT } = require("google-auth-library");
-const dotenv = require("dotenv");
-const fs = require("fs");
-const { loadBrokerAccounts, flattenAccounts } = require("./brokers");
-const { parseDateCell, formatDateCell } = require("./checkDates");
-const { requireEnv } = require("./utils/validate");
-const { withRetry } = require("./utils/retry");
-const logger = require("./utils/logger");
+const { google } = require('googleapis');
+const { JWT } = require('google-auth-library');
+const dotenv = require('dotenv');
+const fs = require('node:fs');
+const { loadBrokerAccounts, flattenAccounts } = require('./brokers');
+const { parseDateCell, formatDateCell } = require('./checkDates');
+const { requireEnv } = require('./utils/validate');
+const { withRetry } = require('./utils/retry');
+const logger = require('./utils/logger');
 
 dotenv.config();
 
 function columnToLetter(column) {
-  let letter = "";
+  let letter = '';
   while (column > 0) {
     const temp = (column - 1) % 26;
     letter = String.fromCharCode(65 + temp) + letter;
@@ -35,7 +35,7 @@ const ACCOUNT_COLUMN_COUNT = 5;
 function isDateCell(value) {
   if (!value) return false;
   try {
-    return !isNaN(parseDateCell(String(value)).getTime());
+    return !Number.isNaN(parseDateCell(String(value)).getTime());
   } catch {
     return false;
   }
@@ -58,45 +58,45 @@ const sheetsRetryOpts = {
     return code >= 500 || code === 429;
   },
   onRetry: (err, attempt, delay) =>
-    logger.warn("Sheets API retry", { attempt, delayMs: delay, error: err.message }),
+    logger.warn('Sheets API retry', { attempt, delayMs: delay, error: err.message }),
 };
 
 async function updateGoogleSheet() {
-  requireEnv(["GOOGLE_CREDENTIALS", "GOOGLE_SHEET_ID", "SHEET_GID", "SHEET_NAME"]);
+  requireEnv(['GOOGLE_CREDENTIALS', 'GOOGLE_SHEET_ID', 'SHEET_GID', 'SHEET_NAME']);
 
   const credentials = JSON.parse(
-    Buffer.from(process.env.GOOGLE_CREDENTIALS, "base64").toString("utf8")
+    Buffer.from(process.env.GOOGLE_CREDENTIALS, 'base64').toString('utf8'),
   );
 
   const auth = new JWT({
     email: credentials.client_email,
     key: credentials.private_key,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
-  const sheets = google.sheets({ version: "v4", auth });
+  const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheetId = process.env.GOOGLE_SHEET_ID;
   const sheetId = process.env.SHEET_GID;
   const sheetName = process.env.SHEET_NAME;
 
   let lastRow = 0;
   try {
-    const trackerRaw = fs.readFileSync("row_tracker.json", "utf-8");
+    const trackerRaw = fs.readFileSync('row_tracker.json', 'utf-8');
     const trackerData = JSON.parse(trackerRaw);
     lastRow = trackerData.lastUpdatedRow || 0;
-    logger.info("Row from tracker", { lastRow });
+    logger.info('Row from tracker', { lastRow });
   } catch {
-    logger.warn("No row_tracker.json found — falling back to sheet");
+    logger.warn('No row_tracker.json found — falling back to sheet');
   }
 
   if (lastRow === 0) {
     const readResponse = await withRetry(
       () => sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A:A` }),
-      sheetsRetryOpts
+      sheetsRetryOpts,
     );
     const rows = readResponse.data.values;
     lastRow = rows ? rows.length : 0;
-    logger.info("Row from sheet", { lastRow });
+    logger.info('Row from sheet', { lastRow });
   }
 
   const targetDate = process.env.TARGET_DATE
@@ -107,7 +107,7 @@ async function updateGoogleSheet() {
         return d;
       })();
 
-  const dayName = targetDate.toLocaleDateString("en-GB", { weekday: "long" });
+  const dayName = targetDate.toLocaleDateString('en-GB', { weekday: 'long' });
   const dateFormatted = formatDateCell(targetDate);
 
   // Two rows in one read: the row being appended after, and the row below it,
@@ -121,7 +121,7 @@ async function updateGoogleSheet() {
                 spreadsheetId,
                 range: `${sheetName}!A${lastRow}:ZZ${lastRow + 1}`,
               }),
-            sheetsRetryOpts
+            sheetsRetryOpts,
           )
         ).data.values || []
       : [];
@@ -139,17 +139,17 @@ async function updateGoogleSheet() {
   const targetTime = Date.UTC(
     targetDate.getFullYear(),
     targetDate.getMonth(),
-    targetDate.getDate()
+    targetDate.getDate(),
   );
 
   let lastDate = null;
   if (lastDateCell) {
     try {
       const parsed = parseDateCell(lastDateCell);
-      if (!isNaN(parsed.getTime())) lastDate = parsed;
+      if (!Number.isNaN(parsed.getTime())) lastDate = parsed;
       else throw new Error(`Not a valid date: "${lastDateCell}"`);
     } catch (err) {
-      logger.warn("Could not parse last row date — skipping order check", {
+      logger.warn('Could not parse last row date — skipping order check', {
         cell: lastDateCell,
         error: err.message,
       });
@@ -157,7 +157,7 @@ async function updateGoogleSheet() {
   }
 
   if (lastDate && lastDate.getTime() === targetTime) {
-    logger.info("Date already exists in sheet, skipping", { date: dateFormatted });
+    logger.info('Date already exists in sheet, skipping', { date: dateFormatted });
     return;
   }
 
@@ -169,35 +169,35 @@ async function updateGoogleSheet() {
   if (lastRow > 0 && nextRowDateCell && isDateCell(nextRowDateCell)) {
     throw new Error(
       `row_tracker.json is behind the sheet: row ${lastRow + 1} already holds "${nextRowDateCell}". ` +
-        `Run the "Update Last Updated Row" workflow with the sheet's real last row before re-running.`
+        `Run the "Update Last Updated Row" workflow with the sheet's real last row before re-running.`,
     );
   }
 
   // Dates are only ever appended, so anything at or before the last row's date
   // would land out of order.
   if (lastDate && targetTime <= lastDate.getTime()) {
-    logger.warn("Target date is not after the last row — skipping", {
+    logger.warn('Target date is not after the last row — skipping', {
       date: dateFormatted,
       lastRowDate: lastDateCell,
     });
     return;
   }
 
-  const summaryPath = "daily_summary.json";
+  const summaryPath = 'daily_summary.json';
   if (!fs.existsSync(summaryPath)) {
-    logger.warn("No daily_summary.json found, skipping update");
+    logger.warn('No daily_summary.json found, skipping update');
     return;
   }
-  const data = JSON.parse(fs.readFileSync(summaryPath, "utf-8"));
+  const data = JSON.parse(fs.readFileSync(summaryPath, 'utf-8'));
   if (!data.individual_account || data.individual_account.length === 0) {
-    logger.warn("No account data in daily_summary.json, skipping update");
+    logger.warn('No account data in daily_summary.json, skipping update');
     return;
   }
 
   const flatAccounts = flattenAccounts(loadBrokerAccounts());
 
-  const newRow = lastRow ? parseInt(lastRow, 10) + 1 : 2;
-  const newRowValue = lastRowValue ? parseInt(lastRowValue, 10) + 1 : 1;
+  const newRow = lastRow ? Number.parseInt(lastRow, 10) + 1 : 2;
+  const newRowValue = lastRowValue ? Number.parseInt(lastRowValue, 10) + 1 : 1;
 
   await withRetry(
     () =>
@@ -209,7 +209,7 @@ async function updateGoogleSheet() {
               insertDimension: {
                 range: {
                   sheetId,
-                  dimension: "ROWS",
+                  dimension: 'ROWS',
                   startIndex: newRow - 1,
                   endIndex: newRow,
                 },
@@ -219,7 +219,7 @@ async function updateGoogleSheet() {
           ],
         },
       }),
-    sheetsRetryOpts
+    sheetsRetryOpts,
   );
 
   if (lastRow > 0 && lastRowData.length > 0) {
@@ -245,13 +245,13 @@ async function updateGoogleSheet() {
                     startColumnIndex: 0,
                     endColumnIndex: lastRowData.length,
                   },
-                  pasteType: "PASTE_FORMULA",
+                  pasteType: 'PASTE_FORMULA',
                 },
               },
             ],
           },
         }),
-      sheetsRetryOpts
+      sheetsRetryOpts,
     );
   }
 
@@ -276,25 +276,31 @@ async function updateGoogleSheet() {
     () =>
       sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
-        resource: { valueInputOption: "RAW", data: valueUpdates },
+        resource: { valueInputOption: 'RAW', data: valueUpdates },
       }),
-    sheetsRetryOpts
+    sheetsRetryOpts,
   );
 
-  logger.info("Sheet updated successfully", { row: newRow, date: dateFormatted });
+  logger.info('Sheet updated successfully', { row: newRow, date: dateFormatted });
 
   fs.writeFileSync(
-    "row_tracker.json",
+    'row_tracker.json',
     JSON.stringify({ lastUpdatedRow: newRow }, null, 2),
-    "utf-8"
+    'utf-8',
   );
 }
 
 if (require.main === module) {
   updateGoogleSheet().catch((err) => {
-    logger.error("updateGoogleSheet failed", err);
+    logger.error('updateGoogleSheet failed', err);
     process.exit(1);
   });
 }
 
-module.exports = { columnToLetter, letterToColumn, buildAccountValues, isDateCell, updateGoogleSheet };
+module.exports = {
+  columnToLetter,
+  letterToColumn,
+  buildAccountValues,
+  isDateCell,
+  updateGoogleSheet,
+};

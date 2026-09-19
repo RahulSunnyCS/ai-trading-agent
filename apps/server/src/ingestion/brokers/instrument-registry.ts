@@ -115,11 +115,7 @@ export function getNearestThursday(date: Date): Date {
  *
  * Used for BANKNIFTY which expires on the last Tuesday of each month.
  */
-export function getLastWeekdayOfMonth(
-  year: number,
-  monthIndex0: number,
-  targetDow: number,
-): Date {
+export function getLastWeekdayOfMonth(year: number, monthIndex0: number, targetDow: number): Date {
   // Start from the last day of the month and walk backward until we hit the target DOW.
   // Using 0 as the day in Date constructor gives the last day of the previous month,
   // so monthIndex0 + 1 with day=0 gives the last day of monthIndex0.
@@ -321,9 +317,7 @@ export function getCurrentExpiry(underlying: Underlying, clock: Clock = new Real
     const isTuesday = nowIst.getUTCDay() === 2;
     // If today is expiry day and market is closed, skip to next week's expiry
     const referenceDate =
-      isTuesday && pastEOD
-        ? new Date(nowUtcMs + IST_OFFSET_MS + 7 * 24 * 60 * 60 * 1000)
-        : nowIst;
+      isTuesday && pastEOD ? new Date(nowUtcMs + IST_OFFSET_MS + 7 * 24 * 60 * 60 * 1000) : nowIst;
     return getNearestWeekday(referenceDate, 2); // 2 = Tuesday
   }
 
@@ -331,9 +325,7 @@ export function getCurrentExpiry(underlying: Underlying, clock: Clock = new Real
     // SENSEX: weekly Thursday expiry (DOW 4), BSE-listed
     const isThursday = nowIst.getUTCDay() === 4;
     const referenceDate =
-      isThursday && pastEOD
-        ? new Date(nowUtcMs + IST_OFFSET_MS + 7 * 24 * 60 * 60 * 1000)
-        : nowIst;
+      isThursday && pastEOD ? new Date(nowUtcMs + IST_OFFSET_MS + 7 * 24 * 60 * 60 * 1000) : nowIst;
     return getNearestWeekday(referenceDate, 4); // 4 = Thursday
   }
 

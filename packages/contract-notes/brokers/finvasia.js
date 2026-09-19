@@ -1,5 +1,5 @@
-const { parseAmounts, splitBySegment } = require("./segments");
-const logger = require("../utils/logger");
+const { parseAmounts, splitBySegment } = require('./segments');
+const logger = require('../utils/logger');
 
 // Order in which pdf-parse emits the "Obligation Detail" cells for each
 // exchange/segment row. It follows the PDF's draw order, which is not the
@@ -34,8 +34,8 @@ const TOLERANCE = 0.05;
 const SEGMENT_LABEL = /\b((?:NSE|BSE|MSEI|MSE|MCX|NCDEX|ICEX)[A-Z& ]*-\s*[A-Z]+)/gi;
 
 function subject(accountId, date) {
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
   const yyyy = date.getFullYear();
   return `Combined Contract Note for ${accountId} ${dd}-${mm}-${yyyy}`;
 }
@@ -63,17 +63,17 @@ function parseRows(block) {
 }
 
 function extract(text) {
-  if (!text) return { error: "Finvasia extract received empty text" };
+  if (!text) return { error: 'Finvasia extract received empty text' };
 
   const block = obligationBlock(text);
   if (!block) {
-    const snippet = text.slice(0, 500).replace(/\n/g, " ");
+    const snippet = text.slice(0, 500).replace(/\n/g, ' ');
     return { error: `Finvasia Obligation Detail table not found. Text preview: ${snippet}` };
   }
 
   const rows = parseRows(block);
   if (!rows.length) {
-    const snippet = block.slice(0, 500).replace(/\n/g, " ");
+    const snippet = block.slice(0, 500).replace(/\n/g, ' ');
     return { error: `Finvasia exchange/segment rows not matched. Text preview: ${snippet}` };
   }
 
@@ -81,7 +81,7 @@ function extract(text) {
   if (unknown.length) {
     return {
       error:
-        `Finvasia obligation row(s) with unrecognised segment: ${unknown.join(", ")}. ` +
+        `Finvasia obligation row(s) with unrecognised segment: ${unknown.join(', ')}. ` +
         `Add the label to brokers/segments.js so it is classified as F&O or excluded.`,
     };
   }
@@ -89,18 +89,16 @@ function extract(text) {
   // Only the F&O rows are read, so only they must have the full set of cells.
   // A cash or currency row with an odd shape is noted and ignored rather than
   // failing a note whose F&O side parses perfectly well.
-  const oddDropped = rows.filter(
-    (r) => !kept.includes(r) && r.amounts.length !== COLUMN_COUNT
-  );
+  const oddDropped = rows.filter((r) => !kept.includes(r) && r.amounts.length !== COLUMN_COUNT);
   if (oddDropped.length) {
-    logger.warn("Finvasia ignored non-F&O row with unexpected cell count", {
-      rows: oddDropped.map((r) => `${r.label}=${r.amounts.length}`).join(", "),
+    logger.warn('Finvasia ignored non-F&O row with unexpected cell count', {
+      rows: oddDropped.map((r) => `${r.label}=${r.amounts.length}`).join(', '),
     });
   }
 
   const badRow = kept.find((r) => r.amounts.length !== COLUMN_COUNT);
   if (badRow) {
-    const snippet = block.slice(0, 800).replace(/\n/g, " ");
+    const snippet = block.slice(0, 800).replace(/\n/g, ' ');
     return {
       error:
         `Finvasia row "${badRow.label}" has ${badRow.amounts.length} amounts, expected ${COLUMN_COUNT}. ` +
@@ -110,8 +108,8 @@ function extract(text) {
 
   // Every row was cash / currency / commodity: no F&O activity to record.
   if (!kept.length) {
-    logger.info("Finvasia note has no F&O segment — recording zeros", {
-      skipped: dropped.join(", ") || "none",
+    logger.info('Finvasia note has no F&O segment — recording zeros', {
+      skipped: dropped.join(', ') || 'none',
     });
     return {
       payin_payout_obligation: 0,
@@ -130,7 +128,7 @@ function extract(text) {
 
   for (const row of kept) {
     const a = row.amounts;
-    if (a.some((n) => !isFinite(n))) {
+    if (a.some((n) => !Number.isFinite(n))) {
       return { error: `Finvasia row "${row.label}" contains a non-numeric amount` };
     }
     obligation += a[COL.OBLIGATION];
@@ -156,14 +154,14 @@ function extract(text) {
   // Taxable value of supply = brokerage + transaction + SEBI + clearing + IPF.
   // A mismatch means the brokerage cell is probably not where we think it is.
   if (Math.abs(taxable - taxableComponents) > TOLERANCE * kept.length) {
-    logger.warn("Finvasia brokerage cross-check failed against taxable value of supply", {
+    logger.warn('Finvasia brokerage cross-check failed against taxable value of supply', {
       taxable: taxable.toFixed(2),
       components: taxableComponents.toFixed(2),
     });
   }
 
   if (dropped.length) {
-    logger.info("Finvasia non-F&O segments excluded", { segments: dropped.join(", ") });
+    logger.info('Finvasia non-F&O segments excluded', { segments: dropped.join(', ') });
   }
 
   return {

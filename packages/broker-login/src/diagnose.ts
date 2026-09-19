@@ -8,7 +8,10 @@ let counter = 0;
 
 function slug(label: string): string {
   counter += 1;
-  const safe = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const safe = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
   return `${String(counter).padStart(2, '0')}-${safe}`.slice(0, 80);
 }
 

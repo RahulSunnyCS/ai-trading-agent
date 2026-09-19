@@ -58,10 +58,7 @@ function formatProposedAdjustments(adj: Record<string, unknown> | null): string 
   return parts.join(' · ');
 }
 
-export function PendingSuggestionsCard({
-  personalities,
-  onApplied,
-}: PendingSuggestionsCardProps) {
+export function PendingSuggestionsCard({ personalities, onApplied }: PendingSuggestionsCardProps) {
   const { suggestions, loading, error, refresh } = usePendingSuggestions();
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [errorById, setErrorById] = useState<Record<string, string>>({});

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
-import { generateTotp } from '../src/totp.js';
 import { classifyError } from '../src/algotest.js';
 import { redact, registerSecret } from '../src/secrets.js';
+import { generateTotp } from '../src/totp.js';
 
 /**
  * Preflight, run locally before the first real login.
@@ -20,7 +20,9 @@ let failures = 0;
 function check(label: string, actual: unknown, expected: unknown): void {
   const ok = actual === expected;
   if (!ok) failures += 1;
-  console.log(`  ${ok ? 'pass' : 'FAIL'}  ${label}${ok ? '' : ` (got ${actual}, want ${expected})`}`);
+  console.log(
+    `  ${ok ? 'pass' : 'FAIL'}  ${label}${ok ? '' : ` (got ${actual}, want ${expected})`}`,
+  );
 }
 
 console.log('RFC 6238 test vectors:');
@@ -42,11 +44,7 @@ check(
 
 console.log('\nredaction:');
 registerSecret('hunter2hunter2');
-check(
-  'secret scrubbed',
-  redact('pw=hunter2hunter2'),
-  'pw=***REDACTED***',
-);
+check('secret scrubbed', redact('pw=hunter2hunter2'), 'pw=***REDACTED***');
 
 if (existsSync('.env')) {
   process.loadEnvFile('.env');
@@ -103,7 +101,9 @@ async function checkTelegram(): Promise<void> {
       const body = (await res.json()) as {
         ok: boolean;
         description?: string;
-        result?: { message?: { chat: { id: number; type: string; first_name?: string; title?: string } } }[];
+        result?: {
+          message?: { chat: { id: number; type: string; first_name?: string; title?: string } };
+        }[];
       };
       if (!body.ok) {
         failures += 1;

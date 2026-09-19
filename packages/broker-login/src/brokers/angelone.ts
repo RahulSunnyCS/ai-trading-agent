@@ -1,10 +1,10 @@
 import type { Page } from 'playwright';
-import type { Config } from '../config.js';
 import { BASE_URL, classifyError, visibleErrorText } from '../algotest.js';
+import type { Config } from '../config.js';
 import { safeScreenshot, step } from '../diagnose.js';
 import { angelOneForm, brokerNames, brokerPage, dataBrokerKeys } from '../selectors.js';
 import { freshTotp } from '../totp.js';
-import { BrokerLoginError, type Broker } from './types.js';
+import { type Broker, BrokerLoginError } from './types.js';
 
 const ANGEL_HOST = /angel(one|broking)/i;
 
@@ -61,14 +61,21 @@ export const angelone: Broker = {
 
     await target.waitForTimeout(3_000);
     if (!target.isClosed()) {
-      console.log(`  after submit: ${new URL(target.url()).origin}${new URL(target.url()).pathname}`);
+      console.log(
+        `  after submit: ${new URL(target.url()).origin}${new URL(target.url()).pathname}`,
+      );
       await safeScreenshot(target, 'angelone-after-submit');
     }
     // Only scan for errors while still on Angel's page - after a successful login the
     // tab is back on AlgoTest, where the generic error-word scan could false-positive.
     const stillOnAngel = !target.isClosed() && ANGEL_HOST.test(new URL(target.url()).hostname);
     const inlineError = stillOnAngel
-      ? ((await angelOneForm.error(target).innerText().catch(() => '')) || '').trim()
+      ? (
+          (await angelOneForm
+            .error(target)
+            .innerText()
+            .catch(() => '')) || ''
+        ).trim()
       : '';
     const error = inlineError || (stillOnAngel ? await visibleErrorText(target) : '');
     if (error) throw new BrokerLoginError(error, classifyError(error));

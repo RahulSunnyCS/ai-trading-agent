@@ -59,8 +59,7 @@ export const loginPage = {
  *    anyway) does.
  */
 export const brokerPage = {
-  myBrokersTab: (page: Page): Locator =>
-    page.getByRole('button', { name: /my brokers/i }).first(),
+  myBrokersTab: (page: Page): Locator => page.getByRole('button', { name: /my brokers/i }).first(),
 
   /**
    * The broker's card, found relationally: the smallest element that mentions the
@@ -126,7 +125,10 @@ export const angelOneForm = {
    * radio input itself is styled away, so the wrapping label is what gets clicked.
    */
   totpModeOption: (page: Page): Locator =>
-    page.locator('label.login-option').filter({ hasText: /^\s*TOTP\s*$/ }).first(),
+    page
+      .locator('label.login-option')
+      .filter({ hasText: /^\s*TOTP\s*$/ })
+      .first(),
 
   /** The page holds hidden duplicates for the other modes - only the visible one counts. */
   clientCode: (page: Page): Locator =>
@@ -143,10 +145,12 @@ export const angelOneForm = {
 
 /** Matched against error text to decide whether a retry is safe. */
 export const errorPatterns = {
-  totpRejected: /invalid\s*(totp|otp)|totp.*(invalid|incorrect|expired)|otp.*(invalid|incorrect|expired)/i,
+  totpRejected:
+    /invalid\s*(totp|otp)|totp.*(invalid|incorrect|expired)|otp.*(invalid|incorrect|expired)/i,
   credentialsRejected:
     /invalid\s*(password|pin|mpin|credential|user)|incorrect\s*(password|pin|mpin)|blocked|locked|too many/i,
-  loginWindowClosed: /only possible between|trading days|login.*(not allowed|window|timing)|allowed between|08:15|15:40/i,
+  loginWindowClosed:
+    /only possible between|trading days|login.*(not allowed|window|timing)|allowed between|08:15|15:40/i,
 };
 
 export const brokerNames = {

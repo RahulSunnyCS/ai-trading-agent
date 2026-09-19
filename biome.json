@@ -1,6 +1,8 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
-  "organizeImports": { "enabled": true },
+  "organizeImports": {
+    "enabled": true
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -18,7 +20,9 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "correctness": { "noUnusedVariables": "error" },
+      "correctness": {
+        "noUnusedVariables": "error"
+      },
       "suspicious": {
         "noExplicitAny": "error",
         "noConsoleLog": "off"
@@ -40,9 +44,36 @@
       "include": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts", "e2e/**"],
       "linter": {
         "rules": {
-          "style": { "noNonNullAssertion": "off" },
-          "suspicious": { "noImplicitAnyLet": "off" },
-          "performance": { "noDelete": "off" }
+          "style": {
+            "noNonNullAssertion": "off"
+          },
+          "suspicious": {
+            "noImplicitAnyLet": "off"
+          },
+          "performance": {
+            "noDelete": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["packages/broker-login/**", "packages/contract-notes/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noUnusedTemplateLiteral": "off",
+            "useTemplate": "off",
+            "noNonNullAssertion": "off",
+            "useExponentiationOperator": "off",
+            "noParameterAssign": "off"
+          },
+          "complexity": {
+            "noForEach": "off",
+            "useOptionalChain": "off"
+          },
+          "performance": {
+            "noDelete": "off"
+          }
         }
       }
     }

@@ -1,21 +1,21 @@
-require("dotenv").config();
-const Imap = require("imap");
-const { simpleParser } = require("mailparser");
-const fs = require("fs");
-const path = require("path");
-const { spawnSync } = require("child_process");
+require('dotenv').config();
+const Imap = require('imap');
+const { simpleParser } = require('mailparser');
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
-const { loadBrokerAccounts, getBroker, makeFileName } = require("./brokers");
-const { requireEnv } = require("./utils/validate");
-const { withRetry } = require("./utils/retry");
-const logger = require("./utils/logger");
+const { loadBrokerAccounts, getBroker, makeFileName } = require('./brokers');
+const { requireEnv } = require('./utils/validate');
+const { withRetry } = require('./utils/retry');
+const logger = require('./utils/logger');
 
 const targetDate = process.env.TARGET_DATE
   ? new Date(process.env.TARGET_DATE)
   : new Date(Date.now() - 24 * 60 * 60 * 1000);
 const formattedDate = targetDate.toISOString().slice(0, 10);
 
-const dataDir = path.join(__dirname, "data");
+const dataDir = path.join(__dirname, 'data');
 
 // qpdf exit codes: 0 = clean, 3 = succeeded with warnings (the output file is
 // still written and readable), anything else = real failure. Treating 3 as a
@@ -25,74 +25,75 @@ const dataDir = path.join(__dirname, "data");
 const QPDF_WARNINGS = 3;
 
 function decryptWithQpdf(filePath, password) {
-  const decryptedPath = filePath.replace(/\.pdf$/i, "_decrypted.pdf");
+  const decryptedPath = filePath.replace(/\.pdf$/i, '_decrypted.pdf');
   const file = path.basename(filePath);
 
   const result = spawnSync(
-    "qpdf",
-    [`--password=${password}`, "--decrypt", filePath, decryptedPath],
-    { encoding: "utf8", timeout: 30000 }
+    'qpdf',
+    [`--password=${password}`, '--decrypt', filePath, decryptedPath],
+    { encoding: 'utf8', timeout: 30000 },
   );
 
   if (result.error) {
     const reason =
-      result.error.code === "ENOENT"
-        ? "qpdf binary not found on PATH"
-        : result.error.message;
-    logger.error("qpdf could not be run", null, { file, error: reason });
+      result.error.code === 'ENOENT' ? 'qpdf binary not found on PATH' : result.error.message;
+    logger.error('qpdf could not be run', null, { file, error: reason });
     return { path: null, error: reason };
   }
 
   // qpdf never echoes the password back, so its stderr is safe to log.
-  const stderr = (result.stderr || "").trim();
+  const stderr = (result.stderr || '').trim();
   const wroteOutput = fs.existsSync(decryptedPath) && fs.statSync(decryptedPath).size > 0;
 
   if (result.status === 0 || (result.status === QPDF_WARNINGS && wroteOutput)) {
     if (result.status === QPDF_WARNINGS) {
-      logger.warn("PDF decrypted with qpdf warnings", { file, warnings: stderr });
+      logger.warn('PDF decrypted with qpdf warnings', { file, warnings: stderr });
     } else {
-      logger.info("PDF decrypted", { file: path.basename(decryptedPath) });
+      logger.info('PDF decrypted', { file: path.basename(decryptedPath) });
     }
     return { path: decryptedPath, error: null };
   }
 
   const error = stderr || `qpdf exited with status ${result.status}`;
-  logger.error("qpdf failed to decrypt", null, { file, status: result.status, error });
+  logger.error('qpdf failed to decrypt', null, { file, status: result.status, error });
   return { path: null, error };
 }
 
 function fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr) {
   return new Promise((resolve, reject) => {
     imap.search(
-      [["SINCE", formattedDate], ["SUBJECT", subjectSearch]],
+      [
+        ['SINCE', formattedDate],
+        ['SUBJECT', subjectSearch],
+      ],
       (err, results) => {
         if (err) return reject(err);
         if (!results || !results.length) return resolve([]);
 
         const attachments = [];
         const parsePromises = [];
-        const f = imap.fetch(results, { bodies: "", struct: true });
+        const f = imap.fetch(results, { bodies: '', struct: true });
 
-        f.on("message", (msg) => {
-          msg.on("body", (stream) => {
+        f.on('message', (msg) => {
+          msg.on('body', (stream) => {
             parsePromises.push(
               simpleParser(stream).then((parsed) => {
                 if (bodyFilterStr) {
-                  const bodyText = parsed.text || parsed.html || "";
+                  const bodyText = parsed.text || parsed.html || '';
                   if (!bodyText.includes(bodyFilterStr)) return;
                 }
                 for (const att of parsed.attachments || []) {
-                  if (att.filename && att.filename.toLowerCase().endsWith(".pdf")) {
+                  if (att.filename && att.filename.toLowerCase().endsWith('.pdf')) {
                     attachments.push(att);
                   }
                 }
-              })
+              }),
             );
           });
         });
 
-        f.once("error", reject);
-        f.once("end", async () => {
+        f.once('error', reject);
+        f.once('end', async () => {
           try {
             await Promise.all(parsePromises);
             resolve(attachments);
@@ -100,7 +101,7 @@ function fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr) {
             reject(parseErr);
           }
         });
-      }
+      },
     );
   });
 }
@@ -117,19 +118,19 @@ async function processMailbox(mailbox) {
     const imap = new Imap({
       user: mailbox.email,
       password: mailbox.emailPassword,
-      host: "imap.gmail.com",
+      host: 'imap.gmail.com',
       port: 993,
       tls: true,
       tlsOptions: {
-        servername: "imap.gmail.com",
-        minVersion: "TLSv1.2",
+        servername: 'imap.gmail.com',
+        minVersion: 'TLSv1.2',
       },
       connTimeout: 30000,
       authTimeout: 15000,
     });
 
-    imap.once("ready", () => {
-      imap.openBox("INBOX", false, async (err) => {
+    imap.once('ready', () => {
+      imap.openBox('INBOX', false, async (err) => {
         if (err) {
           imap.end();
           return reject(err);
@@ -147,9 +148,13 @@ async function processMailbox(mailbox) {
               subject: subjectSearch,
             });
 
-            const attachments = await fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr);
+            const attachments = await fetchAttachmentsForSubject(
+              imap,
+              subjectSearch,
+              bodyFilterStr,
+            );
             if (!attachments.length) {
-              logger.info("No mail found", { broker: acc.broker, account: acc.accountId });
+              logger.info('No mail found', { broker: acc.broker, account: acc.accountId });
               continue;
             }
 
@@ -158,9 +163,9 @@ async function processMailbox(mailbox) {
               const filePath = path.join(dataDir, filename);
               try {
                 fs.writeFileSync(filePath, att.content);
-                logger.info("Attachment saved", { file: filename });
+                logger.info('Attachment saved', { file: filename });
               } catch (writeErr) {
-                logger.error("Failed to save attachment", writeErr, { file: filename });
+                logger.error('Failed to save attachment', writeErr, { file: filename });
                 result.failed.push(acc.accountId);
                 result.errors.push({ account: acc.accountId, error: writeErr.message });
                 continue;
@@ -185,7 +190,7 @@ async function processMailbox(mailbox) {
       });
     });
 
-    imap.once("error", (err) => {
+    imap.once('error', (err) => {
       logger.error(`IMAP error`, err, { email: mailbox.email });
       reject(err);
     });
@@ -197,7 +202,7 @@ async function processMailbox(mailbox) {
 }
 
 async function main() {
-  requireEnv(["BROKER_ACCOUNTS_JSON"]);
+  requireEnv(['BROKER_ACCOUNTS_JSON']);
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
   const mailboxes = loadBrokerAccounts();
 
@@ -207,23 +212,33 @@ async function main() {
       const result = await withRetry(() => processMailbox(mb), {
         attempts: 3,
         baseDelayMs: 2000,
-        retryIf: (err) => !err.message.includes("Invalid credentials"),
+        retryIf: (err) => !err.message.includes('Invalid credentials'),
         onRetry: (err, attempt, delay) =>
-          logger.warn(`IMAP retry`, { email: mb.email, attempt, delayMs: delay, error: err.message }),
+          logger.warn(`IMAP retry`, {
+            email: mb.email,
+            attempt,
+            delayMs: delay,
+            error: err.message,
+          }),
       });
       summary.push(result);
     } catch (err) {
       logger.error(`Mailbox processing failed after retries`, err, { email: mb.email });
-      summary.push({ email: mb.email, succeeded: [], failed: ["all"], errors: [{ error: err.message }] });
+      summary.push({
+        email: mb.email,
+        succeeded: [],
+        failed: ['all'],
+        errors: [{ error: err.message }],
+      });
     }
   }
 
-  logger.info("=== Fetch summary ===");
+  logger.info('=== Fetch summary ===');
   for (const s of summary) {
     logger.info(`Mailbox result`, {
       email: s.email,
-      succeeded: s.succeeded.join(",") || "none",
-      failed: s.failed.join(",") || "none",
+      succeeded: s.succeeded.join(',') || 'none',
+      failed: s.failed.join(',') || 'none',
     });
   }
 

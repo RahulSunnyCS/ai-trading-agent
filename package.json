@@ -4,10 +4,7 @@
   "description": "Paper-trading research platform for weekly index options strategies on Indian markets",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "bun run --filter @ata/server dev",
     "sim": "bun run --filter @ata/server sim",
@@ -32,9 +29,5 @@
     "@biomejs/biome": "^1.9.0",
     "lefthook": "^2.1.6"
   },
-  "trustedDependencies": [
-    "esbuild",
-    "msgpackr-extract",
-    "playwright"
-  ]
+  "trustedDependencies": ["esbuild", "msgpackr-extract", "playwright"]
 }

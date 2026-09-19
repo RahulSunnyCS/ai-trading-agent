@@ -1,6 +1,6 @@
-import { createInterface } from 'node:readline/promises';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { chromium, type Page } from 'playwright';
+import { createInterface } from 'node:readline/promises';
+import { type Page, chromium } from 'playwright';
 
 /**
  * One-off discovery harness. Opens a real browser, you log in by hand, and it captures
@@ -24,7 +24,11 @@ const SENSITIVE_HEADERS = new Set([
 ]);
 
 async function redactHar(): Promise<number> {
+  // Playwright's HAR is arbitrary third-party JSON and this is a one-off
+  // discovery harness, not scheduled code — narrowing it to a real type would
+  // be guesswork that rots the next time Playwright changes the format.
   const har = JSON.parse(await readFile(HAR_RAW, 'utf8')) as {
+    // biome-ignore lint/suspicious/noExplicitAny: untyped third-party HAR payload
     log: { entries: Array<Record<string, any>> };
   };
 
@@ -42,7 +46,10 @@ async function redactHar(): Promise<number> {
     }
     // Request bodies carry the password and TOTP in plain text.
     if (entry.request?.postData) {
-      entry.request.postData = { mimeType: entry.request.postData.mimeType, text: '***REDACTED***' };
+      entry.request.postData = {
+        mimeType: entry.request.postData.mimeType,
+        text: '***REDACTED***',
+      };
     }
   }
 

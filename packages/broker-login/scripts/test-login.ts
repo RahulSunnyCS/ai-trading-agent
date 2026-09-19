@@ -3,11 +3,11 @@ import { chromium } from 'playwright';
 import { algotestLogin, openMyBrokers, readBrokerState } from '../src/algotest.js';
 import { angelone } from '../src/brokers/angelone.js';
 import { shoonya } from '../src/brokers/shoonya.js';
-import { describe, dumpHtml, safeScreenshot } from '../src/diagnose.js';
-import { normalizePhone } from '../src/config.js';
-import { brokerPage } from '../src/selectors.js';
-import { registerSecret } from '../src/secrets.js';
 import type { Broker } from '../src/brokers/types.js';
+import { normalizePhone } from '../src/config.js';
+import { describe, dumpHtml, safeScreenshot } from '../src/diagnose.js';
+import { registerSecret } from '../src/secrets.js';
+import { brokerPage } from '../src/selectors.js';
 
 /**
  * Connectivity + selector health check - works any time of day, unlike `npm run

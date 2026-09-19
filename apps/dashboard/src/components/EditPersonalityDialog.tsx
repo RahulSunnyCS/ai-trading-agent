@@ -97,8 +97,8 @@ export function EditPersonalityDialog({
                 Edit {personality.display_name}
               </Dialog.Title>
               <Dialog.Description className="mt-0.5 text-xs text-muted">
-                Tune signal-acceptance threshold and stop-loss. Backend enforces
-                the frozen-Clockwork guard and the ±8pp integrity cap.
+                Tune signal-acceptance threshold and stop-loss. Backend enforces the
+                frozen-Clockwork guard and the ±8pp integrity cap.
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
@@ -120,9 +120,7 @@ export function EditPersonalityDialog({
                 className="mb-1 flex items-baseline justify-between text-xs font-medium"
               >
                 <span className="text-muted">Minimum probability</span>
-                <span className="tabular-nums text-foreground">
-                  {(minProb * 100).toFixed(0)}%
-                </span>
+                <span className="tabular-nums text-foreground">{(minProb * 100).toFixed(0)}%</span>
               </label>
               <input
                 id={`min-prob-${personality.id}`}

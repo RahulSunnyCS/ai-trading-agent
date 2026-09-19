@@ -248,8 +248,7 @@ export class ScheduledSignalEmitter {
     }
 
     // --- Parse and validate the snapshot ---
-    const underlying =
-      typeof parsed.underlying === 'string' ? parsed.underlying : 'NIFTY';
+    const underlying = typeof parsed.underlying === 'string' ? parsed.underlying : 'NIFTY';
     const straddleValueRaw = parsed.straddleValue ?? parsed.straddle_value;
     const straddleValue =
       typeof straddleValueRaw === 'number'

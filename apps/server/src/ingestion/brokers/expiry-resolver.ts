@@ -22,7 +22,7 @@
 import type { Clock } from '../../utils/clock';
 import { RealClock } from '../../utils/clock';
 import type { FetchFn } from './fyers-historical';
-import { getCurrentExpiry, INDEX_SYMBOLS } from './instrument-registry';
+import { INDEX_SYMBOLS, getCurrentExpiry } from './instrument-registry';
 import type { Underlying } from './types';
 
 // ---------------------------------------------------------------------------
@@ -242,11 +242,7 @@ export async function resolveCurrentExpiry(
     // This is the nearest valid expiry — normalise to midnight UTC for consistency
     // with getCurrentExpiry() which also returns midnight-UTC dates.
     const result = new Date(
-      Date.UTC(
-        expiryDate.getUTCFullYear(),
-        expiryDate.getUTCMonth(),
-        expiryDate.getUTCDate(),
-      ),
+      Date.UTC(expiryDate.getUTCFullYear(), expiryDate.getUTCMonth(), expiryDate.getUTCDate()),
     );
 
     // Store in cache so subsequent calls today return immediately.
