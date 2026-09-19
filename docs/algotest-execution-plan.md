@@ -34,9 +34,12 @@ gated by an env var never set in the subscriber deployment.
 Source: official SDK, `Algo-Test/algotest-api-trading`, folder `signal-api-demo-1`.
 
 ### Auth — pure HTTP, no browser
+
+Base URL: **`https://api.algotest.in`** (confirmed).
+
 ```
-POST {base}/login
-body:    { "phoneNumber": "...", "password": "..." }
+POST https://api.algotest.in/login
+body:    { "phoneNumber": "+91XXXXXXXXXX", "password": "..." }
 returns: cookies csrf_access_token, access_token_cookie
 then:    header X-CSRF-TOKEN-ACCESS: <csrf>
          header Authorization:       <jwt>
@@ -93,14 +96,16 @@ what `src/trading/paper-trade-executor.ts` simulates. Mapping from
 | **No token refresh in SDK** | Long-running process must re-login on 401. |
 | **`broker_id` is live-only** | **Paper needs no broker session at all** → shadow mode does not depend on the Playwright broker-login bot. |
 | **`exit_time` is required** | Free EOD auto-square-off safety net. Always set it. |
+| **Phone format differs from the UI** | API schema is `^\+91\d{10}$` — the **`+91` prefix is required**. The web form wants bare 10 digits, so `algo-automation`'s `normalizePhone()` (which strips `+91`) must NOT be reused here. Needs its own formatter. |
 
 ---
 
 ## 3. Open questions — blocking Phase 1
 
-- [ ] **Q1 — Base URL.** SDK takes it as a `main_url` param; nothing hardcoded.
-      Almost certainly `https://api.algotest.in` (see `scripts/record.ts:87` in
-      `algo-automation`). Confirm.
+- [x] **Q1 — Base URL: `https://api.algotest.in`** ✅ CONFIRMED 2026-09-19.
+      `POST /login` returned HTTP 400 with an AlgoTest `application-user-id`
+      header and a schema error naming the `phoneNumber` field — i.e. the
+      request reached their application layer and matched the SDK's contract.
 - [ ] **Q2 — `access_token` in the payload body.** A *second* credential,
       separate from the login cookies. Demo sets it to the literal `"anything"`.
       Hypothesis: it is the **webhook secret** issued when you create a Signal /
