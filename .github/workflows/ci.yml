@@ -93,6 +93,24 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check .
 
+      # data/cache/ is gitignored — "Derived from data/raw/ — never commit,
+      # regenerate via `obt ingest`". A fresh checkout therefore has no cache,
+      # and every test that reads one fails with {"error": "no_data"}. Rebuild
+      # it from the committed raw JSON, and cache the result so only the first
+      # run after a fixture change pays the ingest cost.
+      - name: Restore Parquet cache
+        id: obt-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/option-backtesting/data/cache
+            packages/option-backtesting/data/registry.sqlite
+          key: obt-cache-${{ hashFiles('packages/option-backtesting/data/raw/**') }}
+
+      - name: Build Parquet cache from data/raw
+        if: steps.obt-cache.outputs.cache-hit != 'true'
+        run: ./scripts/build-cache.sh
+
       - name: Pytest
         run: uv run pytest
 

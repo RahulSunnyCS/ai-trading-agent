@@ -74,6 +74,7 @@ bun run test:e2e            # dashboard Playwright suite (start the Vite dev ser
 # option-backtesting (Python) — run from packages/option-backtesting/
 cd packages/option-backtesting
 uv sync
+./scripts/build-cache.sh   # REQUIRED on a fresh clone before pytest — see note below
 uv run pytest
 uv run obt ingest plan --date YYYY-MM-DD --to YYYY-MM-DD --underlying NIFTY
 uv run obt ingest --date YYYY-MM-DD --underlying NIFTY
@@ -330,6 +331,13 @@ Critical variables whose misconfiguration causes real pain:
 - **Comparison integrity drift** — if Precision, Adjuster, or Reducer `min_probability` thresholds drift more than 8 percentage points apart, the management comparison is invalidated. The `checkComparisonIntegrity()` function must run before any threshold evolution rule is applied
 - **Simulation is not a mock** — `SIMULATE=true` runs the full production pipeline with synthetic data. It writes to the real database and Redis. Use `docker compose down -v` to reset state between test runs if needed
 - **Port conflicts** — PostgreSQL default port 5432, Redis default 6379. If either is in use locally, edit the port mapping in `docker-compose.yml` and update the corresponding `_URL` env var
+- **`data/cache/` is gitignored and the Python tests need it** — a fresh clone
+  has no Parquet cache, so ~16 tests in `tests/unit/test_mcp_server.py` fail with
+  `{"error": "no_data"}` before you have done anything wrong. Run
+  `packages/option-backtesting/scripts/build-cache.sh`, which rebuilds it from
+  the raw JSON committed under `data/raw/` (range derived from the fixture
+  filenames, so it does not rot). CI does the same, behind an `actions/cache`
+  keyed on `data/raw/**`
 - **Hoisting differs by bun version** — 1.2 hoists, 1.3 isolates. A transitive
   dependency that resolves by accident under 1.2 will fail under 1.3. Four such
   latent bugs were found during the monorepo merge (`fastify-plugin`, `ws`,
