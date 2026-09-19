@@ -2,12 +2,29 @@
 
 Everything currently waiting on **you** — things I cannot do from a session:
 create secrets, click through a UI, read your Google Sheet, authorize a
-connector, or merge to a default branch.
+connector, or verify a Routine is alive.
 
 Nothing here is urgent today. Both daily crons are disabled in this repo and
 `trade-analytics` still runs unchanged, so the existing pipeline is intact.
 
-Last updated: 2026-09-19
+Last updated: 2026-09-19 (after the option-backtesting reconciliation)
+
+---
+
+## 0. Repo shape — read this first
+
+Two monorepo restructures were reconciled onto the `option-backtesting` layout:
+
+```
+apps/server              @ata/server    — Fastify/Bun backend (was src/)
+apps/dashboard           @ata/dashboard — React/Vite
+packages/broker-login    Node 20 + Playwright   (was algo-automation)
+packages/contract-notes  Node 20 + CJS + Jest   (was trade-analytics)
+packages/option-backtesting  Python 3.12 + uv   (not a Bun workspace)
+```
+
+Local setup needs **four** toolchains: `bun`, `node@20`, `qpdf`
+(contract-notes PDF decryption) and `uv` (the Python package).
 
 ---
 
@@ -31,7 +48,17 @@ Last updated: 2026-09-19
       **Environment** with required reviewers, not plain repository secrets.
       Merging the repos removed the boundary that used to keep broker
       credentials away from the Razorpay keys — an Environment restores it.
-      Your call; say the word and I will wire the workflow to it.
+
+- [ ] **Authorize the AlgoTest MCP connector.** No longer optional:
+      `packages/option-backtesting` ingests AlgoTest option bars *through MCP*,
+      not a REST client — see its `DECISIONS.md`. Without it the nightly ingest
+      cannot run. Authorize via claude.ai connector settings, or `/mcp` in an
+      interactive session.
+
+- [ ] **Check the nightly ingest Routine is still alive.** M-5 bound it to a
+      specific session rather than fresh-per-fire, because this org cannot grant
+      MCP connectors to fresh-session Routines. A session-bound Routine dies with
+      its session. Verify it still fires, or rebind it.
 
 ---
 
@@ -65,7 +92,7 @@ Ordered — step 3 is the one that can damage the sheet.
 
 ---
 
-## 4. Needed before I can build the Telegram approval gate (Phase 2)
+## 4. Needed before I can build the Telegram approval gate
 
 - [ ] **Your Telegram numeric user ID.** The gate verifies
       `callback_query.from.id` against it, so that only you can fire a trade —
@@ -73,17 +100,16 @@ Ordered — step 3 is the one that can damage the sheet.
 - [ ] **Confirm the bot can receive `callback_query`.** In `@BotFather`, the
       bot needs inline keyboard callbacks enabled (default for private chats).
 - [ ] **Decide the expiry window** — how stale may a signal be before the
-      button refuses it? A momentum-exhaustion entry approved 40 minutes late
-      is a different trade. My suggestion: 5 minutes.
+      button refuses it? Suggestion: 5 minutes.
 
 ---
 
 ## 5. Open decisions
 
-- [ ] **Root convenience scripts?** `test:all` / `typecheck:all` wrapping
-      `bun run --filter '*'`, so one command covers all three packages. ~4
-      lines, no new dependencies. (Turborepo/Nx stay rejected — no
-      cross-package dependencies exist and CI runs in seconds.)
+- [ ] **Default branch: `main-demo` or `main`?** `main-demo` is currently the
+      default and carries the work; `main` is still at the initial commit. If
+      `main` is meant to be canonical, switch the default in GitHub settings and
+      I will fast-forward it.
 - [ ] **CODEOWNERS on `packages/broker-login/`** so execution changes always
       get a review.
 - [ ] **Archive `trade-analytics` and `algo-automation`** once both cutovers
@@ -94,9 +120,6 @@ Ordered — step 3 is the one that can damage the sheet.
 
 ## 6. Parked
 
-- [ ] **Authorize the AlgoTest MCP connector** (also Notion, PostHog) via
-      claude.ai connector settings or `/mcp` in an interactive session. Would
-      let me query AlgoTest directly instead of inferring from the SDK.
 - [ ] **AlgoTest Q4 — is there a broker re-login endpoint?** Open DevTools →
       Network → Fetch/XHR, click "Re-login" on a broker card inside the login
       window. A redirect to the broker's domain means Playwright stays; an XHR
@@ -111,8 +134,17 @@ confirmed and recorded.
 
 ## Not waiting on you — my queue
 
-- Phase 2: Telegram approval gate (needs §4 first)
-- Phase 3: Playwright strategy activation, with read-back assertion and dry-run default
-- Repo hygiene: Shoonya/Finvasia single name, "Related Systems" blocks in each `CLAUDE.md`
-- Phase 4: backtest runner (T-51) and the M4 retrospection gaps — still the
-  real prerequisite before anything trades live
+- **Telegram approval gate** — blocked on §4
+- **Playwright strategy activation** — read-back assertion before every click,
+  dry-run default, kill switch, daily cap
+- **Repo hygiene** — Shoonya/Finvasia under one name, "Related Systems" blocks
+  in each `CLAUDE.md`
+
+**Correction to earlier versions of this file:** the measurement layer is not
+missing. `apps/server/src/backtesting/` (T-51), `apps/server/src/retrospection/`
+(daily metrics, Brier scores, evolution engine), `jobs/eod-retrospection-job.ts`
+and `packages/option-backtesting` (feature-complete through M-5) all exist.
+What remains before live execution is **running the signals through them** —
+probability scores are still not empirically calibrated, so the edge is
+unmeasured rather than unmeasurable. T-58 is the genuine partial: the M-5 regime
+work is bucketing for analysis, not a live strategy-DSL condition.
