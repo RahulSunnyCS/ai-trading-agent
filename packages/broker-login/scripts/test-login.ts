@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { algotestLogin, openMyBrokers, readBrokerState } from '../src/algotest.js';
 import { angelone } from '../src/brokers/angelone.js';
-import { shoonya } from '../src/brokers/shoonya.js';
+import { finvasia } from '../src/brokers/finvasia.js';
 import type { Broker } from '../src/brokers/types.js';
 import { normalizePhone } from '../src/config.js';
 import { describe, dumpHtml, safeScreenshot } from '../src/diagnose.js';
@@ -12,7 +12,7 @@ import { brokerPage } from '../src/selectors.js';
 /**
  * Connectivity + selector health check - works any time of day, unlike `npm run
  * login`. It signs into AlgoTest for real and reads each broker's card, but never
- * clicks Login, so it needs no broker secrets (Shoonya's aren't set up yet) and
+ * clicks Login, so it needs no broker secrets (Finvasia's aren't set up yet) and
  * can't touch a live broker session either way. AlgoTest itself disables the actual
  * login button outside 08:15-15:40 IST - that gate is on their side, not something
  * any script can test around, so this deliberately doesn't try.
@@ -29,7 +29,7 @@ if (!rawPhone || !password) {
 registerSecret(password);
 const phone = normalizePhone(rawPhone);
 
-const ALL_BROKERS: Broker[] = [angelone, shoonya];
+const ALL_BROKERS: Broker[] = [angelone, finvasia];
 
 async function main(credentials: { phone: string; password: string }): Promise<number> {
   const headed = process.env.HEADED === '1';

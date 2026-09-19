@@ -1,21 +1,39 @@
-# CI for the Node workspaces that ci.yml path-ignores: packages/broker-login
-# and packages/notify. Without this they would land with no checks at all.
+# CI for the Node workspaces that ci.yml path-ignores: packages/broker-login,
+# packages/notify, and packages/broker-identity. Without this they would land
+# with no checks at all.
 #
-# broker-login depends on notify, so a change to either must typecheck both —
-# which is why they share one workflow rather than getting one each.
+# broker-login depends on notify and broker-identity (and broker-identity
+# depends on notify), so a change to any one of them must typecheck all three
+# — which is why they share one workflow rather than getting one each.
+# broker-identity is NOT path-ignored in ci.yml, since apps/server also
+# depends on it — this workflow runs alongside ci.yml on a broker-identity
+# change, not instead of it.
 #
-# Kept deliberately thin: neither package has a test suite, and broker-login's
-# real verification is a manual workflow_dispatch run of "Daily broker login"
-# against the live site.
+# Kept deliberately thin: broker-login itself has no test suite (its real
+# verification is a manual workflow_dispatch run of "Daily broker login"
+# against the live site), though broker-identity does — see the typecheck
+# step below.
 name: Node Packages CI
 
 on:
   push:
     branches: ['**']
-    paths: ['packages/broker-login/**', 'packages/notify/**', '.github/workflows/broker-login-ci.yml']
+    paths:
+      [
+        'packages/broker-login/**',
+        'packages/notify/**',
+        'packages/broker-identity/**',
+        '.github/workflows/broker-login-ci.yml',
+      ]
   pull_request:
     branches: ['**']
-    paths: ['packages/broker-login/**', 'packages/notify/**', '.github/workflows/broker-login-ci.yml']
+    paths:
+      [
+        'packages/broker-login/**',
+        'packages/notify/**',
+        'packages/broker-identity/**',
+        '.github/workflows/broker-login-ci.yml',
+      ]
   workflow_dispatch:
 
 jobs:
@@ -40,6 +58,12 @@ jobs:
       - name: Typecheck notify
         run: bun run typecheck
         working-directory: packages/notify
+
+      - name: Typecheck + test broker-identity
+        run: |
+          bun run typecheck
+          bun run test
+        working-directory: packages/broker-identity
 
       - name: Typecheck broker-login
         run: bun run typecheck

@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "playwright": "1.63.0",
+    "@trading/broker-identity": "workspace:*",
     "@trading/notify": "workspace:*"
   },
   "devDependencies": {

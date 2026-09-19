@@ -9,7 +9,7 @@ export interface TelegramConfig {
 export interface Config {
   algotest: { phone: string; password: string };
   angelone: { clientCode: string; mpin: string; totpSecret: string };
-  shoonya: { clientId: string; password: string; totpSecret: string };
+  finvasia: { clientId: string; password: string; totpSecret: string };
   telegram: TelegramConfig | null;
   headed: boolean;
   slowMo: number;
@@ -20,15 +20,24 @@ export interface Config {
 
 const ALWAYS_REQUIRED = ['ALGOTEST_PHONE', 'ALGOTEST_PASSWORD'] as const;
 
+// The object key is the internal broker identifier (`finvasia`, matching
+// BrokerId in @trading/broker-identity and the `finvasia` broker/config
+// keys everywhere else in this package). The env var names on the right
+// stay SHOONYA_* — they are already-configured GitHub Actions repository
+// secrets (an external contract), and renaming them would be a breaking
+// change to that contract for a purely internal naming-consistency fix.
+// Finvasia was formerly branded Shoonya; the broker itself now uses
+// "Finvasia" everywhere (AlgoTest's UI, packages/contract-notes), which is
+// why the internal identifier moved but the secret names didn't need to.
 const BROKER_SECRET_KEYS = {
   angelone: ['ANGELONE_CLIENT_CODE', 'ANGELONE_MPIN', 'ANGELONE_TOTP_SECRET'],
-  shoonya: ['SHOONYA_CLIENT_ID', 'SHOONYA_PASSWORD', 'SHOONYA_TOTP_SECRET'],
+  finvasia: ['SHOONYA_CLIENT_ID', 'SHOONYA_PASSWORD', 'SHOONYA_TOTP_SECRET'],
 } as const;
 
 type SecretKey =
   | (typeof ALWAYS_REQUIRED)[number]
   | (typeof BROKER_SECRET_KEYS)['angelone'][number]
-  | (typeof BROKER_SECRET_KEYS)['shoonya'][number];
+  | (typeof BROKER_SECRET_KEYS)['finvasia'][number];
 
 /**
  * The login field sits next to a static "+91" prefix and wants the bare 10 digits,
@@ -71,11 +80,11 @@ export function loadConfig(): Config {
 
   const only = process.env.ONLY?.trim() || null;
   if (only && !(only in BROKER_SECRET_KEYS)) {
-    throw new Error(`ONLY=${only} matched no broker (expected: angelone, shoonya)`);
+    throw new Error(`ONLY=${only} matched no broker (expected: angelone, finvasia)`);
   }
 
   // A broker's secrets are only required while it's actually going to run, so an
-  // ONLY=angelone run works even with Shoonya's TOTP secret still blank - the point
+  // ONLY=angelone run works even with Finvasia's TOTP secret still blank - the point
   // of ONLY existing at all is to bring brokers online one at a time.
   const activeBrokers = only
     ? [only as keyof typeof BROKER_SECRET_KEYS]
@@ -115,10 +124,10 @@ export function loadConfig(): Config {
       mpin: readOrBlank('angelone', 'ANGELONE_MPIN'),
       totpSecret: readOrBlank('angelone', 'ANGELONE_TOTP_SECRET'),
     },
-    shoonya: {
-      clientId: readOrBlank('shoonya', 'SHOONYA_CLIENT_ID'),
-      password: readOrBlank('shoonya', 'SHOONYA_PASSWORD'),
-      totpSecret: readOrBlank('shoonya', 'SHOONYA_TOTP_SECRET'),
+    finvasia: {
+      clientId: readOrBlank('finvasia', 'SHOONYA_CLIENT_ID'),
+      password: readOrBlank('finvasia', 'SHOONYA_PASSWORD'),
+      totpSecret: readOrBlank('finvasia', 'SHOONYA_TOTP_SECRET'),
     },
     telegram: readTelegramConfig(),
     headed: process.env.HEADED === '1',

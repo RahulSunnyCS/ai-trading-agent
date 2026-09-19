@@ -74,9 +74,13 @@ interface AngelOneLTPTick {
   last_traded_price: string;
 }
 
-// generateSync is the synchronous TOTP generator in otplib v13's functional API.
-// It uses Noble crypto and Scure base32 by default (no crypto plugin needed).
-import { generateSync as totpGenerateSync } from 'otplib';
+// Shared with packages/broker-login so there is exactly one RFC 6238
+// implementation in the repo, instead of this file depending on otplib while
+// broker-login carried its own hand-rolled generator. Cross-checked 18/18
+// against otplib's generateSync output (same secrets, same timestamps)
+// before this file switched over, so the swap changes no observable
+// behavior — only which module owns the math.
+import { generateTotp } from '@trading/broker-identity';
 import type { Clock } from '../../utils/clock.js';
 import type { BrokerFeed, BrokerTick } from './types.js';
 import { DisconnectReason } from './types.js';
@@ -296,18 +300,14 @@ export class AngelOneBroker implements BrokerFeed {
    * tokens expire (~24 h) and because a new TOTP is required for each login.
    */
   private async authenticate(): Promise<void> {
-    // Generate a time-based one-time password using the functional generateSync API.
-    // otplib uses the system wall-clock internally for the TOTP counter — we do NOT
-    // inject the test Clock here because TOTP must match the Angel One server's
-    // real-world wall-clock (a VirtualClock offset would produce an invalid OTP).
-    //
-    // generateSync is used (not the async generate) because:
-    //   1. It keeps authenticate() simpler — no nested await inside an already-async fn.
-    //   2. The Noble crypto plugin bundled in otplib v13 supports sync HMAC natively.
-    //   3. TOTP generation is CPU-only, not I/O, so blocking for <1 ms is fine.
+    // generateTotp uses Date.now() (the system wall-clock) for the TOTP counter — we
+    // do NOT inject the test Clock here because TOTP must match the Angel One
+    // server's real-world wall-clock (a VirtualClock offset would produce an
+    // invalid OTP). It is synchronous and CPU-only (a single HMAC-SHA1 call),
+    // so no nested await inside this already-async function is needed.
     //
     // TOTP secret is NEVER logged. The generated code is valid for ≤30 s.
-    const totpCode = totpGenerateSync({ secret: this.config.totpSecret });
+    const totpCode = generateTotp(this.config.totpSecret);
 
     // The SmartAPI class is a constructor function (old-style JS class).
     const smartApi: SmartAPIInstance = new (

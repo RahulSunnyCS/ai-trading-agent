@@ -222,7 +222,18 @@ The human decides; the machine executes. No unattended trading yet.
 
 #### Parallel track — repo hygiene (independent of all the above)
 - [ ] Delete stray `yarn.lock` in this repo (violates our own Bun-only rule)
-- [ ] Rename Shoonya/Finvasia to one name across repos
+- [x] Rename Shoonya/Finvasia to one name across repos — done for
+      `packages/broker-login` (its only holdout: internal `shoonya` key →
+      `finvasia`, file `brokers/shoonya.ts` → `brokers/finvasia.ts`, plus
+      `config.ts`/`selectors.ts`/`main.ts`); `SHOONYA_*` env var names
+      deliberately kept (already-configured GitHub Actions secrets, an
+      external contract). `packages/contract-notes` already used `finvasia`.
+      Also moved the TOTP generator both packages relied on into
+      `packages/broker-identity` (new shared package: canonical `BrokerId`
+      type + `generateTotp`/`freshTotp`/`waitForNextWindow`), so
+      `apps/server`'s Angel One adapter and `packages/broker-login` share one
+      RFC 6238 implementation instead of the former depending on `otplib`
+      (now removed) while the latter carried its own.
 - [ ] `trade-analytics`: CJS → ESM
 - [ ] Merge `algo-automation` + `trade-analytics` → `trading-ops` monorepo
 - [ ] "Related Systems" block in each repo's `CLAUDE.md`
@@ -236,7 +247,7 @@ Two different logins. Do not conflate:
 | | Mechanism | Owner | When |
 |---|---|---|---|
 | **A. AlgoTest platform login** | `POST /login`, HTTP | `algotest-client` (this repo) | every process start |
-| **B. Broker OAuth (Shoonya / Angel One)** | Browser handshake on the broker's domain | `algo-automation` (Playwright) | daily, 08:35 IST, **live only** |
+| **B. Broker OAuth (Finvasia / Angel One)** | Browser handshake on the broker's domain | `algo-automation` (Playwright) | daily, 08:35 IST, **live only** |
 
 B stays in Playwright: Angel One requires an OAuth consent redirect against
 AlgoTest's redirect URL, and Finvasia redirects to its own login page. Neither
@@ -404,8 +415,8 @@ confirmed and recorded.
 - **Telegram approval gate** — blocked on §4
 - **Playwright strategy activation** — read-back assertion before every click,
   dry-run default, kill switch, daily cap
-- **Repo hygiene** — Shoonya/Finvasia under one name, "Related Systems" blocks
-  in each `CLAUDE.md`
+- **Repo hygiene** — "Related Systems" blocks in each `CLAUDE.md` (the
+  Shoonya/Finvasia naming item above is done)
 
 **Correction to earlier versions of this file:** the measurement layer is not
 missing. `apps/server/src/backtesting/` (T-51), `apps/server/src/retrospection/`

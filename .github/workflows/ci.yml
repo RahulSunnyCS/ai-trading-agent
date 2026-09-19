@@ -65,6 +65,14 @@ jobs:
         run: bun run test
         working-directory: packages/market-reference
 
+      # RFC 6238 vectors + the input-handling tests for the TOTP generator
+      # apps/server's live Angel One auth now depends on (see the commit that
+      # removed the otplib dependency). Not path-ignored above, since this is
+      # the CI that covers apps/server's dependency on this package.
+      - name: Broker identity tests
+        run: bun run test
+        working-directory: packages/broker-identity
+
       - name: Server unit tests
         run: bun run test:unit
 

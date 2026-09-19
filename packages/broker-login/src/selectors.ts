@@ -97,7 +97,7 @@ export const brokerPage = {
  * Finvasia's own page - the same shape as Angel One - with all three fields on one
  * screen. The ids are stable; the surrounding smart-* widgets are not worth touching.
  */
-export const shoonyaForm = {
+export const finvasiaForm = {
   userId: (page: Page): Locator => page.locator('#lgnusrid'),
 
   password: (page: Page): Locator => page.locator('#lgnpwd'),
@@ -155,11 +155,14 @@ export const errorPatterns = {
 
 export const brokerNames = {
   angelone: /angel\s*one/i,
-  shoonya: /shoonya|finvasia/i,
+  // The regex still matches "Shoonya" — AlgoTest's own UI copy used that name
+  // for a while and a stale session/cached page could still show it; only the
+  // object key (the internal identifier) changed to `finvasia`.
+  finvasia: /shoonya|finvasia/i,
 };
 
 /** The `Broker.<Name>` fragment inside each broker's data-broker attribute. */
 export const dataBrokerKeys = {
   angelone: 'AngelOne',
-  shoonya: 'Finvasia',
+  finvasia: 'Finvasia',
 };

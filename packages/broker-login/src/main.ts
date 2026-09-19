@@ -10,7 +10,7 @@ import {
   waitForState,
 } from './algotest.js';
 import { angelone } from './brokers/angelone.js';
-import { shoonya } from './brokers/shoonya.js';
+import { finvasia } from './brokers/finvasia.js';
 import {
   type Broker,
   BrokerLoginError,
@@ -24,7 +24,7 @@ import { formatReport } from './notify.js';
 import { brokerPage } from './selectors.js';
 import { waitForNextWindow } from './totp.js';
 
-const ALL_BROKERS: Broker[] = [angelone, shoonya];
+const ALL_BROKERS: Broker[] = [angelone, finvasia];
 
 /** AlgoTest rejects broker logins outside 08:15-15:40 IST. */
 const WINDOW_OPENS_MINUTES = 8 * 60 + 16;
@@ -171,7 +171,7 @@ async function run(config: Config, context: BrowserContext): Promise<BrokerResul
   const brokers = config.only ? ALL_BROKERS.filter((b) => b.key === config.only) : ALL_BROKERS;
 
   if (brokers.length === 0) {
-    throw new Error(`ONLY=${config.only} matched no broker (expected: angelone, shoonya)`);
+    throw new Error(`ONLY=${config.only} matched no broker (expected: angelone, finvasia)`);
   }
 
   const results: BrokerResult[] = [];

@@ -99,7 +99,7 @@ docker compose down -v      # stop + destroy data volumes (full reset)
 
 ## Repository Structure
 
-A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (React/Vite frontend) — and three packages: `packages/broker-login` and `packages/contract-notes` (both Node 20), plus `packages/option-backtesting` (Python/uv, not a Bun workspace member). Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
+A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (React/Vite frontend) — and six packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The sixth, `packages/option-backtesting`, is Python/uv and not a Bun workspace member. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
 
 ```
 ai-trading-agent/
@@ -154,9 +154,23 @@ ai-trading-agent/
     │                                 # never-emit secret registry. Imported by the Node/Bun
     │                                 # workspaces; Python mirrors the Notification shape
     │                                 # rather than importing (see Notifications below).
+    ├── market-reference/            # @trading/market-reference — effective-dated NSE/BSE lot
+    │                                 # size / strike step lookups, read from the same CSVs as
+    │                                 # the Python engine (packages/option-backtesting). apps/server
+    │                                 # imports this rather than hard-coding a lot size — see the
+    │                                 # NIFTY lot-size gotcha under Gotchas below.
+    ├── broker-identity/              # @trading/broker-identity — the canonical `BrokerId` type
+    │                                 # ('angelone' | 'finvasia') and the one RFC 6238 TOTP
+    │                                 # generator (generateTotp/freshTotp/waitForNextWindow) used
+    │                                 # by every broker login path: apps/server's live Angel One
+    │                                 # WebSocket auth and packages/broker-login's Playwright
+    │                                 # AlgoTest automation both depend on this instead of each
+    │                                 # carrying (or, formerly, apps/server depending on otplib
+    │                                 # for) its own generator. See the TOTP convention under Key
+    │                                 # Patterns & Conventions below.
     ├── broker-login/                # Node 20 + Playwright. Was the algo-automation repo, merged via
     │                                 # git subtree (history preserved). Logs Angel One and
-    │                                 # Finvasia/Shoonya into AlgoTest each morning via TOTP; the broker
+    │                                 # Finvasia into AlgoTest each morning via TOTP; the broker
     │                                 # OAuth handshake happens on the broker's own domain, so it cannot
     │                                 # be done over HTTP. Every locator lives in src/selectors.ts.
     │                                 # Daily workflow's schedule is currently disabled — see
@@ -270,6 +284,8 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Broker symbol format (Fyers):** Weekly options: `NSE:NIFTY{YY}{M}{DD}{STRIKE}{TYPE}` where months Oct–Dec use single letter codes (O, N, D). See `instrument-registry.ts` for the encoder/decoder
 - **ATM strike intervals:** NIFTY = 50pt, BankNifty = 100pt, Sensex = 100pt. Always use `getAtmStrike()` — never compute this inline
 - **Broker adapter selection:** All brokers (Fyers, Angel One, simulator) implement the common `BrokerFeed` interface. The `createBroker()` factory in `apps/server/src/ingestion/brokers/broker-factory.ts` selects the adapter based on `BROKER` and `SIMULATE` env vars: `BROKER=fyers` → FyersBroker, `BROKER=angelone` → AngelOneBroker, `BROKER=sim` or `SIMULATE=true` → MarketDataSimulator. If `BROKER` is unset/empty AND `SIMULATE !== 'true'`, the factory throws a descriptive error at startup — safe default-throw prevents silent misconfiguration in live environments.
+- **TOTP generation is centralised in `@trading/broker-identity`:** `generateTotp()` (RFC 6238, SHA-1/30s/6-digit) is the one implementation in the repo. `apps/server/src/ingestion/brokers/angelone.ts` (live Angel One WebSocket auth) and `packages/broker-login` (Playwright AlgoTest automation, which also uses the package's `freshTotp`/`waitForNextWindow` for its retry-on-stale-code flow) both depend on it — apps/server no longer depends on `otplib`. Never add a second TOTP generator; import this one.
+- **Canonical broker identifier is `finvasia`, not `shoonya`:** `@trading/broker-identity` exports `BrokerId = 'angelone' | 'finvasia'`. `packages/broker-login` used `shoonya` as its internal key until 2026-09 (Shoonya was Finvasia's old product name); every internal identifier there (the broker's `key`, `config.ts`'s field, `selectors.ts`'s `finvasiaForm`/`brokerNames`/`dataBrokerKeys`, the filename `brokers/finvasia.ts`) now says `finvasia`, matching `packages/contract-notes` (which always did). The `SHOONYA_CLIENT_ID`/`SHOONYA_PASSWORD`/`SHOONYA_TOTP_SECRET` env vars deliberately were NOT renamed — they are already-configured GitHub Actions repository secrets (an external contract); only the internal code identifier changed.
 - **Simulation mode:** Controlled by `SIMULATE=true` env var. The simulator generates realistic random-walk NIFTY tick data at configurable interval AND emits synthetic ATM CE/PE option-leg ticks so the straddle pipeline works end-to-end. Everything downstream is identical — simulation is not a test mode, it uses the real pipeline. Hypertable writes are trimmed to ~10000 rows via MAXLEN on all ingestion xadds.
 - **Regime tagging:** Every retrospection result must carry a `market_regime` tag. Never compare personality performance across different regimes without filtering. The four tags are: `RANGING`, `TRENDING_STRONG`, `VOLATILE_REVERTING`, `EVENT_DAY`
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`

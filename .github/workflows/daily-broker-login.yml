@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: 'Single broker to run (angelone or shoonya). Blank runs both.'
+        description: 'Single broker to run (angelone or finvasia). Blank runs both.'
         required: false
         default: ''
       trace:

@@ -108,7 +108,7 @@ Do the whole login by hand in the browser window:
 
   1. Log in at /login
   2. Go to /broker and click the "My Brokers" tab
-  3. Log in Finvasia/Shoonya (inline password + TOTP form)
+  3. Log in Finvasia (inline password + TOTP form)
   4. Log in Angel One (watch for a redirect or a popup)
 
 Press ENTER here at each interesting state to capture a
@@ -116,7 +116,7 @@ snapshot. Capture at least these four:
 
   1. the login form
   2. My Brokers list while both brokers are logged OUT
-  3. the Shoonya password/TOTP form, open and empty
+  3. the Finvasia password/TOTP form, open and empty
   4. the broker list right after Angel One returns
 
 Type q then ENTER when you are done.
