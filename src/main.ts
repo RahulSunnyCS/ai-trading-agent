@@ -129,7 +129,8 @@ async function attemptBroker(page: Page, broker: Broker, config: Config): Promis
       // login() returned without error, so the credentials went in. Resubmitting them
       // would only risk a lockout and can't fix a callback that didn't register.
       await safeScreenshot(page, `${broker.key}-row-not-updated`);
-      return result('FAIL', `submitted but row still shows ${state} - NOT retried`);
+      const at = new URL(page.url()).pathname;
+      return result('FAIL', `submitted but row still shows ${state} (on ${at}) - NOT retried`);
     } catch (error) {
       kind = error instanceof BrokerLoginError ? error.kind : 'UNKNOWN';
       lastDetail = describe(error);

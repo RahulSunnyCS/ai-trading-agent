@@ -58,7 +58,10 @@ export const shoonya: Broker = {
     }
 
     await target.waitForTimeout(3_000);
-    if (!target.isClosed()) await safeScreenshot(target, 'shoonya-after-submit');
+    if (!target.isClosed()) {
+      console.log(`  after submit: ${new URL(target.url()).origin}${new URL(target.url()).pathname}`);
+      await safeScreenshot(target, 'shoonya-after-submit');
+    }
 
     // Some sessions get the consent screen after the credentials are accepted instead.
     if (!target.isClosed() && (await shoonyaForm.authorize(target).isVisible().catch(() => false))) {
