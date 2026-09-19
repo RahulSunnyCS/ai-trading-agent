@@ -6,8 +6,7 @@ completable by a single implementor in one focused pass — not a one-line
 change, not a whole subsystem. `TODO.md` is the at-a-glance mirror of
 this file.
 
-> Source specs: `PRODUCT_OVERVIEW.md`, `TECHNICAL_REFERENCE.md`,
-> `PERSONALITIES.md`, `SETUP.md`. This roadmap sequences them; it does
+> Source specs: `docs/product.md`, `docs/architecture.md`, `docs/setup.md`. This roadmap sequences them; it does
 > not restate them.
 
 ---
@@ -37,34 +36,14 @@ this file.
 
 ## Delivery Status
 
-Legend: ✅ complete · 🚧 partial · ⬜ not started. Status as of 2026-05-25
-(Phase A Fyers live-feed hardening complete).
+**Status lives in `.claude/project/overview.md` → Implementation Phases**, which
+is auto-loaded into every session. It is not repeated here: this file and that
+one drifted apart before (the M3 row claimed T-51/T-58 complete while the gap
+list below still called them outstanding), which is what the one-fact-one-file
+rule in `CLAUDE.md` exists to prevent.
 
-| Milestone | Status | Notes |
-|---|---|---|
-| **M0 — Scaffolding** | ✅ | T-01–T-06 complete. Bun project, Docker infra, DB/Redis clients, core schema + seed. |
-| **M0.5 — Testing & CI** | ✅ | T-59–T-63 complete. Lean CI, Biome + lefthook, Vitest + property tests, injectable Clock, integration harness. |
-| **M1 — Vertical slice + dashboard** | ✅ | T-07–T-21 complete. Live/sim trade loop, brokers (Fyers/Angel/sim), straddle pipeline, trigger engine, position monitor, Fastify API, React dashboard. **Phase A (2026-05-25):** Hardened FyersBroker (socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection), real broker-factory wiring, simulator ATM CE/PE option-leg ticks, /ws/ticks + /api/meta endpoints, OAuth state validation, pre-market token-validity check job, broker-status state shared with frontend. Deferred to Phase B: token refresh-grant, broker_tokens encryption, FYERS_PIN. |
-| **M2 — Signals + multi-personality** | ✅ | T-22–T-32 complete. Peak detection, probability scoring, fallback signals, 10-personality seed, 5-stage filter, router, Holder/Adjuster/Reducer management, portfolio risk rules, personality CRUD + performance API. Personalities dashboard tab wired. |
-| **M3 — Historical data, replay & backtesting** | ✅ | T-54–T-57 + T-33 complete (M3a: Fyers historical client, idempotent backfill, straddle reconstruction, deterministic replay harness, regime tagging). T-51 (backtest runner) and T-58 (backtest reporting) complete — full in-memory backtest runner + experiment-card reporting (`bun run backtest`). |
-| **M4 — Retrospection + evolution** | ✅ | T-34–T-42 complete. EOD retrospection engine, Beat-Clockwork delta, Brier score, management effectiveness, rule-based evolution with integrity cap, BullMQ job orchestrator, REST API. See `docs/epics/m4-eod-retrospection-evolution.md`. |
-| **M7 — UPI India Payment & Access Gateway** | ✅ | T-64–T-69, T-71, T-72 complete. Razorpay Orders API (monthly pass + credits pack), dual HMAC webhook verification, credit consumption with advisory-lock atomicity, geolocation for UPI display, access-gate middleware, Fastify payment routes, React pricing page. See `docs/epics/upi-india-payment.md`. |
-| **M5 — Phase 2 (S/R, multi-index, Bayesian)** | ⬜ | Not started. |
-| **M6 — Phase 3/4 + prod readiness** | ⬜ | Not started. |
-
-**Dashboard tabs live:** Live, Trades, P&L, Pricing (T-69 payment/UPI), Regimes
-(T-33), Backfill (T-55), Replay (read-only, T-57), Personalities (T-32).
-
-**Known gaps / next up:**
-- **T-51 / T-58** — server-driven backtest runner + per-regime statistical
-  reporting remain the main M3 backend gap.
-- **Payment `.env.example` placeholder** — `RAZORPAY_KEY_ID` ships with a
-  non-blank placeholder value; operators must blank it to disable payment mode
-  in dev (accepted Medium risk M-1 from the payment security audit).
-- Integration + E2E suites require Docker (TimescaleDB + Redis); they run in CI,
-  not in the credential-free container.
-
----
+What this file is for: the **task catalogue** — what each T-number covers, what
+it depends on, and what "done" meant for it. That detail exists nowhere else.
 
 ## Milestone 0 — Scaffolding & Infrastructure
 
@@ -179,7 +158,7 @@ the working slice.
 | **T-22** | Peak detection engine | T-13 | Momentum-exhaustion: expansion %, ROC decline window, acceleration threshold, confirmation candles → `exhaustion_score`, writes `straddle_signals` + Redis `signals.generated`. |
 | **T-23** | Probability scoring | T-22 | Base + VIX + time-of-day + day-of-week adjustments → clamped probability + confidence tier. |
 | **T-24** | Fallback signals | T-22 | Scheduled-entry + pullback-entry signal types. |
-| **T-25** | Full 10-personality seed | T-06 | Migration `003` seeds all 10 personalities with starting params (`PERSONALITIES.md`). Clockwork `is_frozen=TRUE`. |
+| **T-25** | Full 10-personality seed | T-06 | Migration `003` seeds all 10 personalities with starting params (`docs/product.md`). Clockwork `is_frozen=TRUE`. |
 | **T-26** | 5-stage decision filter | T-25 | Hard / state / context / signal-quality / profit-gate stages, each independently unit-testable. |
 | **T-27** | Personality router | T-26 | Broadcast every signal to all active personalities; independent filter chains; no shared decision-time state. |
 | **T-28** | Holder management | T-27 | Formalize no-adjustment style (already implicit in MVP); held to SL/TSL/EOD. |

@@ -1,337 +1,428 @@
-# Deployment Guide — Local & Production
+# Setup & Deployment
 
-This guide covers everything needed to run the AI Trading Agent from a fresh checkout to a production-ready deployment.
+One document for getting the stack running, locally or in production. It
+replaces the three that covered overlapping ground before (`SETUP.md`,
+`docs/dev-setup.md`, `docs/DEPLOYMENT.md`), which had drifted into three
+different answers for the same Docker steps.
 
----
+Repository layout and the command reference are in
+`.claude/project/technical.md`; they are not repeated here.
 
-## Table of Contents
 
-1. [Local Development Setup](#local-development-setup)
-   - [Prerequisites](#prerequisites)
-   - [Quick Start (Docker + Simulation)](#quick-start-docker--simulation)
-   - [Environment Variables Reference](#environment-variables-reference)
-   - [Live Mode (Fyers Broker)](#live-mode-fyers-broker)
-   - [Angel One Fallback Broker](#angel-one-fallback-broker)
-   - [Native Setup (Without Docker)](#native-setup-without-docker)
-   - [Running Tests](#running-tests)
-   - [Common Local Issues](#common-local-issues)
-2. [Production Deployment](#production-deployment)
-   - [Infrastructure Requirements](#infrastructure-requirements)
-   - [Railway Deployment](#railway-deployment)
-   - [Fly.io Deployment](#flyio-deployment)
-   - [Production Environment Variables](#production-environment-variables)
-   - [Database Setup in Production](#database-setup-in-production)
-   - [Frontend Build & Serving](#frontend-build--serving)
-   - [Health Checks & Monitoring](#health-checks--monitoring)
-   - [Fyers Token Refresh (Critical)](#fyers-token-refresh-critical)
-   - [Secrets Management](#secrets-management)
-   - [Pre-Launch Checklist](#pre-launch-checklist)
+## Prerequisites (all paths)
 
----
-
-## Local Development Setup
-
-### Prerequisites
-
-| Tool | Minimum version | Install |
-|------|----------------|---------|
-| **Bun** | 1.0+ | `curl -fsSL https://bun.sh/install \| bash` |
-| **Docker** | 24+ | [docker.com/get-started](https://www.docker.com/get-started) |
-| **Docker Compose** | v2+ | Bundled with Docker Desktop; `docker compose version` to verify |
+- **Bun** — install from [bun.sh](https://bun.sh): `curl -fsSL https://bun.sh/install | bash`
+- **Git** — should already be present
 
 ```bash
-# Verify
-bun --version          # e.g. 1.1.34
-docker --version       # e.g. Docker version 26.1.0
-docker compose version # e.g. Docker Compose version v2.27.0
-```
-
-> **Bun is mandatory.** Do not use `npm install` or `yarn install` — they will create a conflicting lockfile. All scripts run via `bun run`.
-
----
-
-### Quick Start (Docker + Simulation)
-
-This is the fastest path. No broker credentials required.
-
-```bash
-# 1. Clone repository
-git clone https://github.com/rahulsunnycs/ai-trading-agent.git
+git clone <repo-url>
 cd ai-trading-agent
-
-# 2. Install dependencies
 bun install
-
-# 3. Start infrastructure (TimescaleDB + Redis)
-docker compose up -d
-
-# 4. Wait for health checks (~30s on first start)
-docker compose ps
-# Both must show (healthy):
-# trading_postgres   Up X seconds (healthy)
-# trading_redis      Up X seconds (healthy)
-
-# 5. Configure environment
-cp .env.example .env
-# The default values in .env work for Docker Compose — no edits needed for simulation mode
-
-# 6. Apply database schema
-bun run migrate
-# Expected: "[migrate] Migration complete."
-
-# 7. Start the backend in simulation mode
-SIMULATE=true bun run dev
-# Expected startup logs:
-# [main] AI Trading Agent — Data Ingestion (Broker: Simulator)
-# [main] Mode: SIMULATION
-# [redis] Connected
-# [sim] Starting market data simulator — NIFTY @ 24000, tick every 1000ms
-# ... (snapshot lines every 15s)
-
-# 8. Start the frontend (in a separate terminal)
-bun run vite
-# Open http://localhost:5173 in your browser
-```
-
-The backend API runs on `http://localhost:3000`. The frontend dev server runs on `http://localhost:5173`.
-
----
-
-### Environment Variables Reference
-
-Copy `.env.example` to `.env` and configure:
-
-#### Always Required
-
-| Variable | Default | Notes |
-|----------|---------|-------|
-| `DATABASE_URL` | `postgresql://trading:trading_dev@localhost:5432/trading` | Must point at PostgreSQL 16 with TimescaleDB. Docker Compose default works as-is |
-| `REDIS_URL` | `redis://localhost:6379` | Must be Redis 7+. Docker Compose default works as-is |
-| `NODE_ENV` | `development` | Set to `production` in prod |
-| `PORT` | `3000` | Fastify listens on this port |
-| `LOG_LEVEL` | `info` | One of: `trace`, `debug`, `info`, `warn`, `error` |
-
-#### Simulation Mode
-
-| Variable | Default | Notes |
-|----------|---------|-------|
-| `SIMULATE` | `false` | Set to `true` to use the random-walk simulator instead of a real broker |
-| `SIM_UNDERLYING` | `NIFTY` | Which underlying to simulate: `NIFTY`, `BANKNIFTY`, `SENSEX` |
-| `SIM_TICK_INTERVAL_MS` | `1000` | Milliseconds between simulated ticks |
-
-#### Fyers Broker (Live Mode)
-
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `FYERS_APP_ID` | Yes (live mode) | Format: `XXXXXXXXXXXX-100` (your App ID + `-100` suffix) |
-| `FYERS_ACCESS_TOKEN` | Yes (live mode) | OAuth token. **Expires every day at midnight.** Must be regenerated before 09:00 IST |
-
-#### Angel One Fallback Broker
-
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `ANGEL_API_KEY` | For Angel One | Your Angel One API key |
-| `ANGEL_CLIENT_ID` | For Angel One | Your Angel One client ID |
-| `ANGEL_TOTP_SECRET` | For Angel One | TOTP secret for login automation |
-
-#### Signal Tuning (Optional Overrides)
-
-| Variable | Default | Notes |
-|----------|---------|-------|
-| `SIGNAL_MIN_EXPANSION_PCT` | `0.10` | Minimum straddle expansion % to qualify as a peak |
-| `SIGNAL_CONFIRMATION_SNAPSHOTS` | `3` | Number of consecutive snapshots needed to confirm a peak |
-| `ENTRY_WINDOW_START_IST` | `09:15` | Entry window open time (IST) |
-| `ENTRY_WINDOW_END_IST` | `09:45` | Entry window close time (IST) |
-| `EOD_SQUAREOFF_IST` | `15:25` | Force-close all positions at this IST time |
-
-#### Payment (Razorpay)
-
-| Variable | Notes |
-|----------|-------|
-| `RAZORPAY_KEY_ID` | If absent, payment subsystem is disabled (free/dev mode). Set to a live key for production |
-| `RAZORPAY_KEY_SECRET` | Required when `RAZORPAY_KEY_ID` is set |
-| `RAZORPAY_WEBHOOK_SECRET` | Required for webhook HMAC verification |
-
-#### Evolution Engine
-
-| Variable | Default | Notes |
-|----------|---------|-------|
-| `EVOLUTION_REQUIRE_APPROVAL` | `true` | **Keep `true` in all real environments.** Setting `false` allows the engine to autonomously modify personality parameters without human review — only safe in offline experiments |
-
----
-
-### Live Mode (Fyers Broker)
-
-#### Step 1: Create a Fyers API App
-
-1. Log in to [myapi.fyers.in/dashboard](https://myapi.fyers.in/dashboard)
-2. Create a new app — note the **App ID** (format: `XXXXXXXXXXXX-100`)
-3. Set the redirect URI to `http://localhost:3000/fyers/callback` (or your server URL)
-
-#### Step 2: Generate an Access Token
-
-Fyers uses an OAuth2 flow. Run the auth helper:
-
-```bash
-bun -e "
-import { FyersAuthHelper } from './src/ingestion/brokers/fyers-auth.ts';
-const helper = new FyersAuthHelper(process.env.FYERS_APP_ID!);
-console.log('Login URL:', helper.getAuthUrl());
-"
-```
-
-Copy the printed URL into a browser, log in, and copy the `auth_code` from the redirect URL. Then exchange it:
-
-```bash
-bun -e "
-import { FyersAuthHelper } from './src/ingestion/brokers/fyers-auth.ts';
-const helper = new FyersAuthHelper(process.env.FYERS_APP_ID!);
-const token = await helper.exchangeCode('PASTE_AUTH_CODE_HERE');
-console.log('Access token:', token);
-"
-```
-
-Set the printed token in `.env`:
-```bash
-FYERS_ACCESS_TOKEN=<the token printed above>
-```
-
-> **Tokens expire daily at midnight IST.** Repeat this process every morning before 09:00 IST for live market sessions. Automate this before your first live day.
-
-#### Step 3: Start in Live Mode
-
-```bash
-SIMULATE=false bun run dev   # watch mode (auto-reload on file changes)
-# or
-bun start                    # production-style (no auto-reload)
+cp .env.example .env   # edit .env with your chosen connection strings
 ```
 
 ---
 
-### Angel One Fallback Broker
 
-The Angel One adapter is the secondary broker. It activates automatically when `FYERS_APP_ID`/`FYERS_ACCESS_TOKEN` are absent and `ANGEL_API_KEY` is present.
+## Path A — Docker Compose (recommended)
+
+Docker handles PostgreSQL 16 + TimescaleDB and Redis 7 in one command. No manual extension setup.
+
+**Requirement:** Docker Desktop (Mac/Windows) or Docker Engine (Linux).
 
 ```bash
-# .env — Angel One only
-SIMULATE=false
-ANGEL_API_KEY=your_api_key
-ANGEL_CLIENT_ID=your_client_id
-ANGEL_TOTP_SECRET=your_totp_secret   # Base32 TOTP secret from Angel One 2FA setup
+docker compose up -d          # start both services
+docker compose ps             # wait until both show (healthy)
+bun run migrate               # apply DB migrations
+SIMULATE=true bun run sim     # start in simulation mode
 ```
 
-> Angel One requires the weekly option master CSV for symbol-to-token mapping. Download it from the Angel One API docs and place it at `data/angel-master.csv`. The adapter logs a warning if the file is missing.
+To stop and keep data:
+```bash
+docker compose down
+```
+
+To reset completely (wipes all trade data):
+```bash
+docker compose down -v
+```
 
 ---
 
-### Native Setup (Without Docker)
 
-Use this if you cannot run Docker. You need to install TimescaleDB-enabled PostgreSQL 16 and Redis 7 yourself.
+## Path B — Local install (no Docker)
 
-#### PostgreSQL 16 + TimescaleDB
+### PostgreSQL 16 + TimescaleDB
 
-**macOS (Homebrew):**
+TimescaleDB is a PostgreSQL extension. Install both together using the official packages.
+
+**macOS (Homebrew)**
+
 ```bash
 brew install postgresql@16
-brew tap timescale/tap
 brew install timescaledb
-brew services start postgresql@16
-timescaledb-tune --quiet --yes
+
+# Enable the extension
+timescaledb-tune --quiet --yes   # adjusts postgresql.conf
+
+# Add to postgresql.conf (Homebrew path shown):
+echo "shared_preload_libraries = 'timescaledb'" >> /opt/homebrew/var/postgresql@16/postgresql.conf
+
 brew services restart postgresql@16
+
+# Create the database and user — run each line separately, do NOT paste as a block.
+# Using -c flags avoids the \c meta-command paste-parsing bug.
+psql postgres -c "CREATE USER trading WITH PASSWORD 'trading';"
+psql postgres -c "CREATE DATABASE trading OWNER trading;"
+psql trading  -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+psql postgres -c "GRANT ALL PRIVILEGES ON DATABASE trading TO trading;"
 ```
 
-**Ubuntu/Debian:**
+**Ubuntu / Debian**
+
 ```bash
-# Add repos
-sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-echo "deb https://packagecloud.io/timescale/timescaledb/ubuntu/ $(lsb_release -c -s) main" | sudo tee /etc/apt/sources.list.d/timescaledb.list
+# Add TimescaleDB repo (installs PostgreSQL 16 + extension together)
+sudo apt install -y gnupg postgresql-common apt-transport-https lsb-release wget
+sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+
+# TimescaleDB repo
+echo "deb https://packagecloud.io/timescale/timescaledb/ubuntu/ $(lsb_release -c -s) main" \
+  | sudo tee /etc/apt/sources.list.d/timescaledb.list
 wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | sudo apt-key add -
 
 sudo apt update
-sudo apt install postgresql-16 timescaledb-2-postgresql-16
+sudo apt install -y timescaledb-2-postgresql-16
+
 sudo timescaledb-tune --quiet --yes
 sudo systemctl restart postgresql
+
+sudo -u postgres psql -c "CREATE USER trading WITH PASSWORD 'trading';"
+sudo -u postgres psql -c "CREATE DATABASE trading OWNER trading;"
+sudo -u postgres psql trading  -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+sudo -u postgres psql postgres -c "GRANT ALL PRIVILEGES ON DATABASE trading TO trading;"
 ```
 
-**Create database and user:**
-```bash
-psql postgres
-```
-```sql
-CREATE USER trading WITH PASSWORD 'trading_dev';
-CREATE DATABASE trading OWNER trading;
-\c trading
-CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
-GRANT ALL PRIVILEGES ON DATABASE trading TO trading;
-\q
-```
+**Windows**
 
-#### Redis 7+
+Use [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install) and follow the Ubuntu steps above. Native Windows PostgreSQL + TimescaleDB installers exist but WSL 2 is simpler for development.
 
-**macOS:**
+### Redis 7
+
+**macOS**
 ```bash
 brew install redis
 brew services start redis
-redis-cli ping   # → PONG
 ```
 
-**Ubuntu:**
+**Ubuntu**
 ```bash
-sudo apt install redis-server
+# Redis 7 is in the official Ubuntu 22.04+ repos; for older Ubuntu use the Redis repo
+sudo apt install -y redis-server
+sudo systemctl enable --now redis-server
+```
+
+### .env for local install
+
+```
+DATABASE_URL=postgresql://trading:trading@localhost:5432/trading
+REDIS_URL=redis://localhost:6379
+```
+
+### Then run
+
+```bash
+bun run migrate
+SIMULATE=true bun run sim
+```
+
+---
+
+
+## Path C — Hosted services (no local services at all)
+
+Use free-tier cloud databases. Zero installation, but requires a network connection while developing.
+
+### PostgreSQL + TimescaleDB — Timescale Cloud
+
+1. Sign up at [console.cloud.timescale.com](https://console.cloud.timescale.com) — free trial, no credit card required for the first 30 days.
+2. Create a service (PostgreSQL 16, TimescaleDB pre-installed).
+3. Copy the connection string from the dashboard.
+
+```
+DATABASE_URL=postgresql://tsdbadmin:<password>@<host>.tsdb.cloud:5432/tsdb?sslmode=require
+```
+
+### Redis — Upstash
+
+1. Sign up at [upstash.com](https://upstash.com) — free tier: 10 000 commands/day.
+2. Create a Redis database, choose the region closest to you.
+3. Copy the Redis URL from the console.
+
+```
+REDIS_URL=rediss://default:<password>@<host>.upstash.io:6379
+```
+
+Note the `rediss://` (with double `s`) — Upstash requires TLS.
+
+### Then run
+
+```bash
+bun run migrate              # applies migrations to the hosted DB
+SIMULATE=true bun run sim    # runs fully on your laptop, data goes to the cloud DBs
+```
+
+---
+
+
+## Verify the setup
+
+Whichever path you chose, run:
+
+```bash
+bun run migrate              # should print "All migrations applied" with no errors
+SIMULATE=true bun run sim    # should print "[index] Simulation mode active"
+```
+
+In a second terminal:
+
+```bash
+curl http://localhost:3000/health
+# → {"status":"ok","time":<epoch-ms>}
+
+curl http://localhost:3000/dashboard/live
+# → 404 until the first 15-second snapshot publishes, then a straddle snapshot object
+```
+
+---
+
+
+## Frontend (optional)
+
+The React dashboard is served separately in development:
+
+```bash
+cd frontend
+bun install
+bun run dev       # Vite dev server at http://localhost:5173
+```
+
+Vite proxies `/api` and `/ws` to the Fastify backend at `localhost:3000`.
+
+---
+
+
+## Corporate / restricted network (JFrog proxy)
+
+If your organisation routes all npm traffic through a JFrog Artifactory proxy and
+`@biomejs/biome` is not cached there, `bun install` will fail with an error like:
+
+```
+error: GET https://<proxy>/artifactory/api/npm/.../biome-1.9.4.tgz
+```
+
+Biome is NOT in `devDependencies` for this reason — it is installed as a standalone
+binary instead.
+
+**One-time setup (run after cloning):**
+
+```bash
+bash scripts/install-biome.sh   # downloads ./tools/biome from GitHub Releases
+```
+
+`bun run lint` and the pre-commit hook both check for `./tools/biome` first; they
+skip gracefully if it is absent (you can still develop, lint just won't run locally).
+
+**If GitHub Releases is also blocked:** download the binary on a machine with internet
+access from `https://github.com/biomejs/biome/releases/tag/cli/v1.9.4`, place it at
+`./tools/biome`, then `chmod +x ./tools/biome`.
+
+**Permanent fix:** ask your JFrog admin to add these packages to the virtual npm repo
+as proxied from `https://registry.npmjs.org`:
+- `@biomejs/biome`
+- `@biomejs/cli-linux-x64`
+- `@biomejs/cli-linux-arm64`
+- `@biomejs/cli-darwin-arm64`
+- `@biomejs/cli-darwin-x64`
+- `@biomejs/cli-win32-x64`
+
+Once they are available, run `bun install` and restore `@biomejs/biome` to
+`devDependencies`; the standalone-binary path can then be removed.
+
+---
+
+
+
+## Troubleshooting
+
+### Common issues
+
+### Docker-Specific Issues
+
+#### 1. Docker services not starting
+```bash
+# Check logs
+docker compose logs postgres
+docker compose logs redis
+
+# Restart services
+docker compose down
+docker compose up -d
+```
+
+#### 2. Port conflicts (5432 or 6379 already in use)
+```bash
+# Check what's using the ports
+lsof -i :5432
+lsof -i :6379
+
+# Either stop the conflicting service or edit docker-compose.yml to use different ports:
+# For PostgreSQL: change "5432:5432" to "5433:5432"
+# For Redis: change "6379:6379" to "6380:6379"
+# Then update DATABASE_URL and REDIS_URL in .env accordingly
+```
+
+#### 3. Migration fails (Docker)
+```bash
+# Reset database (WARNING: deletes all data)
+docker compose down -v
+docker compose up -d
+bun run migrate
+```
+
+### Native Setup Issues
+
+#### 4. PostgreSQL connection refused
+```bash
+# Check if PostgreSQL is running (macOS)
+brew services list | grep postgresql
+
+# Start it if stopped
+brew services start postgresql@16
+
+# Check if PostgreSQL is running (Linux)
+sudo systemctl status postgresql
+
+# Start it if stopped
+sudo systemctl start postgresql
+```
+
+#### 5. TimescaleDB extension not found
+```bash
+# Reinstall TimescaleDB and restart PostgreSQL
+# macOS
+brew reinstall timescaledb
+brew services restart postgresql@16
+
+# Linux
+sudo apt install --reinstall timescaledb-2-postgresql-16
+sudo systemctl restart postgresql
+```
+
+#### 6. Redis connection refused
+```bash
+# Check if Redis is running (macOS)
+brew services list | grep redis
+
+# Start it if stopped
+brew services start redis
+
+# Check if Redis is running (Linux)
+sudo systemctl status redis-server
+
+# Start it if stopped
 sudo systemctl start redis-server
-redis-cli ping   # → PONG
 ```
 
-After installing both services, the rest of the setup is identical to the Docker path (steps 2–8 in Quick Start, skipping `docker compose up -d`).
-
----
-
-### Running Tests
-
+#### 7. PostgreSQL authentication failed
 ```bash
-# Type-check (no compilation)
-bun run --bun tsc --noEmit
+# Edit pg_hba.conf to allow local connections
+# macOS: /usr/local/var/postgresql@16/pg_hba.conf
+# Linux: /etc/postgresql/16/main/pg_hba.conf
 
-# Lint
-bun run lint
+# Add this line:
+# local   all   trading   md5
 
-# Unit tests only (no Docker needed)
-bun run test:unit
+# Restart PostgreSQL
+brew services restart postgresql@16  # macOS
+sudo systemctl restart postgresql    # Linux
+```
 
-# Integration tests (requires Docker services running)
-bun run test:integration
+### General Issues
 
-# All tests
-bun test
+#### 8. Migration fails (schema errors)
+```bash
+# Drop and recreate database (WARNING: deletes all data)
+psql postgres -c "DROP DATABASE IF EXISTS trading;"
+psql postgres -c "CREATE DATABASE trading OWNER trading;"
+psql -U trading -d trading -c "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
+bun run migrate
+```
 
-# E2E tests (requires Vite on :5173 and optionally Fastify on :3000)
-bun run test:e2e
+#### 9. Fyers connection fails
+- Verify `FYERS_APP_ID` and `FYERS_ACCESS_TOKEN` are correct
+- Check if access token has expired (regenerate daily)
+- Try simulation mode first: `SIMULATE=true`
 
-# E2E — only critical tests
-npx playwright test --grep @critical
-
-# Coverage report
-bun run test:coverage
+#### 10. TypeScript errors
+```bash
+# Check for compilation errors (both workspace packages)
+bun run typecheck
 ```
 
 ---
 
-### Common Local Issues
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `docker compose ps` shows `(unhealthy)` | Port 5432 or 6379 in use | `lsof -i :5432` / `lsof -i :6379` to find the conflict; stop it or change the port mapping in `docker-compose.yml` and update `.env` |
-| Migration fails with `type "timestamptz" does not exist in hypertable` | Vanilla PostgreSQL (no TimescaleDB) | Use the Docker Compose image `timescale/timescaledb:latest-pg16`, not `postgres:16` |
-| `FYERS_ACCESS_TOKEN` error on startup | Token expired (expires daily) | Regenerate the token — see Live Mode Step 2 |
-| `bun run test:integration` shows connection errors | Docker services not running | `docker compose up -d` and wait for healthy status |
-| `error TS` from typecheck | TypeScript error in source | Fix the reported error; `tsc --noEmit` must be clean before any commit |
-| `npm install` / `yarn install` accidentally run | Creates conflicting lockfile | Delete `package-lock.json` / `yarn.lock`; run `bun install` only |
-| Straddle snapshots have `roc=null` after 30s | Only one snapshot recorded | ROC needs ≥2 snapshots (30s cadence); wait 60s+  |
+### More problems
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `CREATE EXTENSION timescaledb` fails | TimescaleDB not installed, or not in `shared_preload_libraries` | Re-run `timescaledb-tune` and restart PostgreSQL |
+| `invalid integer value "IF" for connection option "port"` | Pasted a multi-line psql block containing `\c`; psql parsed the next line as `\c` arguments | Use `psql <dbname> -c "..."` one command at a time instead of pasting a block with `\c` inside |
+| `bun run migrate` hangs | PostgreSQL not running, or wrong `DATABASE_URL` | Check the service is up; verify the URL in `.env` |
+| `SIMULATE=true bun run sim` exits immediately | Redis not running, or wrong `REDIS_URL` | Check Redis; `redis-cli ping` should return `PONG` |
+| `rediss://` connection refused | Using Upstash TLS URL against a local Redis | Local Redis uses `redis://` (no `s`); Upstash uses `rediss://` |
+| `FYERS_ACCESS_TOKEN` errors in live mode | Token expires daily | Regenerate before 09:00 IST each market morning |
+| Port 5432 or 6379 already in use | Conflicting local service | Change the Docker Compose port mapping or stop the local service |
+| `bun install` fails fetching `@biomejs/biome` | Corporate npm proxy doesn't have the package | Run `bash scripts/install-biome.sh` — see Corporate / restricted network section above |
+
+### Shutting down
+
+### Docker Setup
+```bash
+# Stop application (Ctrl+C in terminal)
+^C
+
+# Stop Docker services
+docker compose down
+
+# Stop and remove all data (WARNING: deletes volumes)
+docker compose down -v
+```
+
+### Native Setup
+```bash
+# Stop application (Ctrl+C in terminal)
+^C
+
+# PostgreSQL and Redis keep running in the background
+# To stop them:
+
+# macOS
+brew services stop postgresql@16
+brew services stop redis
+
+# Linux
+sudo systemctl stop postgresql
+sudo systemctl stop redis-server
+```
 
 ---
 
-## Production Deployment
+
+
+## Production deployment
+
+
 
 ### Infrastructure Requirements
 
@@ -813,27 +904,3 @@ Work through this before going live with real broker data.
 
 ---
 
-## Shutting Down
-
-### Local
-```bash
-# Stop the application (Ctrl+C in terminal)
-
-# Stop Docker services (data preserved)
-docker compose down
-
-# Full reset — deletes ALL data (use only to start completely fresh)
-docker compose down -v
-```
-
-### Production (Railway)
-```bash
-railway down          # stop services
-# Redeploy with: railway up
-```
-
-### Production (Fly.io)
-```bash
-fly scale count 0    # scale to zero (stop instances without deleting)
-fly apps destroy ai-trading-agent   # permanent destruction
-```

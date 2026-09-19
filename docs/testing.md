@@ -1,22 +1,13 @@
-# Test Plan — Real-Machine Verification
+# Testing & Verification
 
-Everything in this repo from the monorepo migration (M-0) through the options-backtesting epic
-(M-5) was built in a sandbox with **no Docker daemon** and **no live PostgreSQL/Redis**. Unit
-tests, the golden-fixture parity test, `ruff`, `biome` and `tsc` all pass there — but a whole
-class of behaviour structurally cannot be verified without real infrastructure, and was logged as
-a caveat rather than silently assumed working.
+The single manual-verification guide. It replaces four documents that overlapped
+heavily (`TEST_PLAN.md`, `MANUAL_QA_CHECKLIST.md`, `QA_VERIFICATION.md`,
+`E2E_TEST_CATALOG.md`) — the same Docker and migration steps were written out
+three times, in three different ways.
 
-**This document is that backlog, turned into runnable test cases.** Work through it on a real
-machine, top to bottom. Every expected value below is one that was actually observed during
-development, or is derived directly from a committed schema — nothing here is aspirational.
-
-> Scope note: `docs/MANUAL_QA_CHECKLIST.md` covers the TypeScript trading engine's M0–M3
-> features (peak detection, personalities, paper trades). This document covers **the
-> infrastructure-dependent gaps across all milestones** plus **the entire
-> `packages/option-backtesting` epic**, which has never had a manual pass. The two are
-> complementary; neither replaces the other.
-
----
+What runs automatically (Vitest, Jest, pytest, Playwright, and the CI jobs) is
+described in `.claude/project/technical.md`. This file is for the checks a human
+has to do on a real machine.
 
 ## How To Use This Document
 
@@ -44,6 +35,7 @@ development, or is derived directly from a committed schema — nothing here is 
 Realistically: **one focused half-day** for Parts 0–8, with Part 9 observed later.
 
 ---
+
 
 ## Part 0 — Machine Prep
 
@@ -100,6 +92,7 @@ Leave these **unset/commented for now** — later parts turn them on deliberatel
 | [ ] | `RAZORPAY_KEY_ID` is commented out or empty | Part 6 depends on starting from "payments off" |
 
 ---
+
 
 ## Part 1 — Baseline (no Docker needed)
 
@@ -180,6 +173,7 @@ uv run pytest tests/golden/test_engine_golden.py -v
 (sweeps, walk-forward, overfitting stats) is trustworthy until it's green again.
 
 ---
+
 
 ## Part 2 — Infrastructure (closes the M-0 gap)
 
@@ -297,6 +291,7 @@ bun run test:integration
 > that's the confusing failure mode called out in the project gotchas.
 
 ---
+
 
 ## Part 3 — `obt` CLI End-to-End (no Docker)
 
@@ -578,6 +573,7 @@ print('rows:', con.execute('SELECT COUNT(*) FROM runs').fetchone()[0])
 
 ---
 
+
 ## Part 4 — FastAPI Service (no Docker)
 
 **Why this part exists:** the service was exercised via `TestClient` and once as a real uvicorn
@@ -657,6 +653,7 @@ curl -s -o /dev/null -w '%{http_code}\n' "localhost:8000/presets/%2e%2e"
 > encoding too.
 
 ---
+
 
 ## Part 5 — Full Round Trip (closes the M-4 gap)
 
@@ -745,6 +742,7 @@ BACKTEST_API_URL=http://example.com bun run sim
 > the proxy into an open relay stops the process rather than being logged and ignored.
 
 ---
+
 
 ## Part 6 — Payment / Credit Gate (first-ever real execution)
 
@@ -890,6 +888,7 @@ DELETE FROM access_grants      WHERE razorpay_order_id = 'order_TEST_manual_001'
 
 ---
 
+
 ## Part 7 — Regime Bucketing Against Real Postgres (closes the M-5 gap)
 
 **Why this part exists:** the regime data source has only ever been tested against a **fake
@@ -1014,33 +1013,182 @@ DATABASE_URL=postgresql://trading:trading@localhost:9999/nope \
 
 ---
 
+
 ## Part 8 — Playwright E2E
 
-### T8-1: Run the E2E suite
+### How to Run
 
 ```bash
-# Vite dev server must be running (Part 5, terminal 4)
-bun run test:e2e                         # whole suite, from the repo root
+# Start the Vite dev server first (required for all UI tests)
+SIMULATE=true bun run dev &   # Fastify on :3000
+# In another terminal: bun run vite (if you've separated front + back)
 
-# Tag-filtered runs: use the dashboard package directly — flags don't forward
-# reliably through `bun run --filter`.
-cd apps/dashboard
-bunx playwright test --grep @critical
-bunx playwright test --headed            # watch it drive the browser
+# Run all E2E tests
+bun run test:e2e
+
+# Run a single spec file
+npx playwright test e2e/live-view.spec.ts
+
+# Run only critical tests
+npx playwright test --grep @critical
+
+# Run with headed browser (shows the browser window)
+npx playwright test --headed
+
+# Debug a single test
+npx playwright test --debug e2e/navigation.spec.ts
 ```
 
-| # | Check | Expected |
-|---|---|---|
-| [ ] | Browsers installed | if not: `cd apps/dashboard && bunx playwright install` |
-| [ ] | Suite runs | per `docs/E2E_TEST_CATALOG.md` |
-| [ ] | All `@critical` pass | these are the blocking tier |
-| [ ] | `@functional` failures noted, not ignored | record them in the sign-off table |
 
-> Most specs intercept HTTP via `page.route()` and need no backend. The exception is
-> `personalities-api.spec.ts`, which targets the live Fastify server on :3000 and needs a
-> migrated database — so run Part 2 first or expect that one spec to fail.
+### Test Tag Definitions
+
+| Tag | Meaning | Gate impact |
+|-----|---------|-------------|
+| `@critical` | Blocking — a failing critical test blocks Gate 2 | Must be green before merge |
+| `@functional` | CONDITIONAL PASS — failures surface as named conditions at Gate 2 | Should be green; noted if not |
+| `@non-blocker` | Informational — logged but does not block the gate | Track but do not block |
 
 ---
+
+
+### File 1 — `e2e/live-view.spec.ts`
+
+**Purpose:** Verify the Live dashboard tab renders correctly, handles the WebSocket connection lifecycle, and correctly distinguishes synthetic tick data from real straddle data.
+
+All HTTP calls to `/api/straddle/latest` are mocked. WebSocket behaviour is tested by observing what happens when no WS server is reachable (connection transitions to Disconnected).
+
+**Test count:** 7
+
+| # | Test name | Tag | What it verifies |
+|---|-----------|-----|-----------------|
+| 1 | The tick chart area labels the feed as synthetic/dev — not real straddle data | `@critical` | Confirms the NIFTY heading is present, the straddle section shows "not yet connected", and forbidden phrases ("live straddle", "real price") do not appear in the page body |
+| 2 | When /api/straddle/latest returns `{ data: null }` the UI shows a graceful "not yet connected" notice | `@critical` | Stubs the straddle endpoint with `null`; asserts the "Straddle feed not yet connected" text is visible and no large decimal-formatted number appears in the straddle card |
+| 3 | LiveView shows a connection-status pill in Connecting state when no WS server is reachable | `@critical` | Locates the `[role="status"]` pill with `aria-label^="WebSocket status"` and asserts it shows a valid state string (Connecting / Connected / Disconnected) |
+| 4 | Connection pill transitions to Disconnected or reconnecting state when the WebSocket cannot connect | `@critical` | Polls the pill's `aria-label` for up to 8 seconds until it shows "disconnected" or "connected" (i.e. the Connecting initial state resolves) |
+| 5 | Switching away from LiveView to another tab does not leave stale console errors | `@critical` | Listens to `console error` and `pageerror` events; navigates to Trades tab (unmounting LiveView) and asserts no React "state update on unmounted component" warnings fire |
+| 6 | Switching away from LiveView and back does not crash or show visual corruption | `@non-blocker` | Round-trips Live → Trades → Live; asserts NIFTY heading and straddle notice are both present after remount, with no JS errors |
+| 7 | Connection status pill has an accessible aria-label with the current status | `@non-blocker` | Asserts the pill exists and its `aria-label` is longer than 10 characters (is descriptive, not empty) |
+
+---
+
+
+### File 2 — `e2e/navigation.spec.ts`
+
+**Purpose:** Verify the app shell and tab-switching behaviour. Confirms that each tab renders the correct view, the payment test-mode banner persists across tabs, error states surface when the backend is unreachable, and tab buttons are keyboard-accessible.
+
+All API routes are mocked. The "backend unreachable" test aborts all `/api/**` requests.
+
+**Test count:** 4
+
+| # | Test name | Tag | What it verifies |
+|---|-----------|-----|-----------------|
+| 1 | Switching between Live / Trades / P&L / Pricing tabs renders the right view | `@functional` | Clicks each of the four tabs and asserts the expected heading appears and the previous heading disappears: Live→ "NIFTY Index", Trades→ "Paper Trades", P&L→ "P&L Summary", then back to Live |
+| 2 | All three wired tabs show an error or unavailable state when the backend is completely unreachable | `@functional` | Aborts all `/api/**` requests to simulate offline backend; visits Live (WS pill must appear), Trades (error alert must appear), and P&L (error alert must appear) — no white screen, no JS exceptions |
+| 3 | PaymentTestModeBanner remains visible on all four tabs | `@non-blocker` | Cycles through all four tabs and confirms the `<header>` element is visible after each tab switch (the payment test-mode banner lives in the header) |
+| 4 | Tab buttons are keyboard-focusable and activatable via Enter | `@non-blocker` | Focuses the "Live" button, presses Tab to move focus to "Trades", presses Enter, and asserts the "Paper Trades" heading becomes visible |
+
+---
+
+
+### File 3 — `e2e/personalities-api.spec.ts`
+
+**Purpose:** Test the personality CRUD REST API (`/personalities`) at the HTTP level using Playwright's `APIRequestContext`. No browser window is opened — these are pure API tests. Requires a running Fastify server on `http://localhost:3000` with a migrated database.
+
+Personality IDs are fetched dynamically from `GET /personalities` rather than hardcoded, so the tests are not brittle to UUID changes.
+
+**Test count:** 7
+
+| # | Test name | Tag | What it verifies |
+|---|-----------|-----|-----------------|
+| 1 | GET /personalities returns a list of personalities | `@critical` | Status 200, response body is a non-empty JSON array |
+| 2 | GET /personalities returns 9 active personalities by default (Levelhead excluded) | `@functional` | Array length is exactly 9, all items have `isActive:true`, Levelhead is absent |
+| 3 | GET /personalities?include_inactive=true returns 10 personalities | `@functional` | With the flag, all 10 seed rows are returned (including Levelhead with `is_active=FALSE`) |
+| 4 | GET /personalities/:id returns 404 for unknown UUID | `@non-blocker` | A well-formed but non-existent UUID (`00000000-0000-...`) returns 404 with `{"error":"NOT_FOUND"}` |
+| 5 | PUT /personalities/:id returns 403 FROZEN_VIOLATION when target is Clockwork | `@critical` | Fetches the frozen personality ID dynamically; PUT to that ID returns 403 with `error:"FROZEN_VIOLATION"` and a message matching `/immutable/i` |
+| 6 | PUT /personalities/:id returns 409 COMPARISON_INTEGRITY_VIOLATION when min_probability drift > 8pp | `@critical` | Reads current `min_probability` for all momentum_exhaustion personalities, computes a violating value (+9pp from the minimum), PUTs it, and asserts 409 with `error:"COMPARISON_INTEGRITY_VIOLATION"` |
+| 7 | PUT /personalities/:id validates param ranges and returns 400 for out-of-range values | `@functional` | Tests two cases: `min_probability:0.95` (above 0.90 ceiling) and `min_probability:0.30` (below 0.40 floor) — both must return 400 |
+| 8 | PUT /personalities/:id writes audit log entry on successful change | `@functional` | Makes a valid +0.01 change, asserts 200 with updated params, then restores the original value — confirms the happy-path HTTP contract (DB-level audit log is verified in integration tests) |
+| 9 | GET /personalities/:id/performance excludes pre-M2 NULL personality_id rows | `@critical` | Fetches performance for an active personality; asserts `personalityId` matches, `winRate` ∈ [0,1], `totalTrades` ≥ 0 — proves the `WHERE personality_id = $1` query does not leak NULL rows |
+| 10 | GET /personalities/:id/performance returns personality-scoped stats only | `@critical` | Fetches performance for two different personality IDs in parallel; asserts each response's `personalityId` matches the requested ID |
+
+---
+
+
+### File 4 — `e2e/pnl-view.spec.ts`
+
+**Purpose:** Verify the P&L dashboard tab computes and displays financial figures correctly. All critical arithmetic invariants are tested: correct decimal summation, exclusion of open trades from totals, win-rate denominator, IST date boundaries, and correct error/empty states.
+
+All `/api/trades` responses are mocked via `page.route()`. Trade payloads are constructed using the `makeTrade()` factory with field overrides.
+
+**Test count:** 8
+
+| # | Test name | Tag | What it verifies |
+|---|-----------|-----|-----------------|
+| 1 | Total net P&L is the correct arithmetic sum — not string concatenation | `@critical` | Feeds 3 trades (100.00, 200.50, −50.25); asserts the Realized P&L card shows `250.25`, not string concatenation (`"100.00200.50"`) or NaN |
+| 2 | Open trades with null net_pnl are excluded from the total P&L sum | `@critical` | 1 closed trade (300.00) + 1 open trade (null); asserts total is 300.00 and no NaN appears |
+| 3 | When /api/trades returns HTTP 500 PnlView shows an error notice, not a zeroed-out P&L dashboard | `@critical` | Stubs `/api/trades` with 500; asserts `role="alert"` appears with error text, and the Realized P&L stat card is **not** visible (zeroed data looks like a quiet day — very misleading) |
+| 4 | Today's P&L uses IST date boundaries | `@critical` | Uses a trade with `exit_time` at midnight IST on "today"; asserts the value `500.00` appears and no NaN is present — confirms the IST `+05:30` offset logic |
+| 5 | Win rate is computed as closed-wins / total-closed — open trades excluded from denominator | `@functional` | 2 winning + 1 losing closed trades + 2 open trades; asserts win rate shows `66.7%` (2/3), not `40.0%` (2/5) |
+| 6 | Cumulative P&L chart renders without crash when there are only open trades | `@functional` | Single open trade; asserts "No closed trades yet" text visible, cumulative chart is not rendered, no JS errors |
+| 7 | When /api/trades returns an empty array PnlView shows a no-closed-trades empty state | `@functional` | Empty array; asserts "No closed trades yet" visible, Realized P&L card not visible |
+| 8 | Open and closed position counts are displayed separately and accurately | `@functional` | 3 open + 5 closed trades; asserts "Closed Trades" card shows `5` and "Open Positions" card shows `3` |
+| 9 | Total net P&L is colored green for positive values and red for negative | `@non-blocker` | Positive total: asserts a `p.text-green-400` element is visible |
+
+---
+
+
+### File 5 — `e2e/trades-view.spec.ts`
+
+**Purpose:** Verify the Trades dashboard tab renders paper trades correctly — including correct parsing of NUMERIC string fields from the API, color-coded P&L, IST timestamps, status badges, and appropriate error/empty states.
+
+All `/api/trades` responses are mocked. Trades are built with the `makeTrade()` factory.
+
+**Test count:** 9
+
+| # | Test name | Tag | What it verifies |
+|---|-----------|-----|-----------------|
+| 1 | NUMERIC string fields render as formatted numbers, not raw strings | `@critical` | Trade with `net_pnl:"-45.00"` and `straddle_at_entry:"22456.75"` — asserts numbers are formatted (not raw JSON strings with quotes), digits `45` and `22...456` visible in the row |
+| 2 | Negative net_pnl is colored red and positive net_pnl is colored green | `@critical` | 1 negative and 1 positive trade; asserts `span.text-red-400` contains the negative value and `span.text-green-400` contains the positive value |
+| 3 | Open trades with null net_pnl show an em dash placeholder — never NaN or undefined | `@critical` | Open trade with `net_pnl:null`; asserts `span.text-gray-500` with `—` is visible, page body contains neither `NaN` nor `undefined` |
+| 4 | When /api/trades returns an empty array TradesView shows a "No trades yet" empty state | `@critical` | Empty array; asserts "No paper trades yet" text visible, no table rows present (table is not rendered in empty state) |
+| 5 | When /api/trades returns HTTP 500 TradesView shows an error notice and does not crash | `@critical` | 500 stub; asserts `role="alert"` appears, alert text matches `/couldn\|load\|error\|fail/`, no JS exceptions |
+| 6 | Entry times are displayed in IST — 04:00 UTC renders as 09:30 IST | `@functional` | Trade with `entry_time:"2026-05-23T04:00:00.000Z"` (= 09:30 IST); asserts row text contains `09:30` and does not contain `04:00` |
+| 7 | Status badges render for open and closed trade status values | `@functional` | 1 open + 1 closed trade; asserts both "Open" and "Closed" badge texts visible, no "undefined" in page |
+| 8 | When /api/trades returns HTTP 404 TradesView shows an error notice rather than an empty table | `@functional` | 404 stub; asserts `role="alert"` visible, "No paper trades yet" is NOT shown (404 is not the same as no data) |
+| 9 | Exit reason is shown for closed trades and a dash for open trades | `@non-blocker` | Closed trade with `exit_reason:"stop_loss"` + open trade; asserts `stop_loss` text in page body |
+| 10 | Straddle-at-entry column shows a formatted decimal number, not scientific notation | `@non-blocker` | `straddle_at_entry:"22456.75"`; asserts no `e+4` notation in page body, and `22456` digits are present |
+
+---
+
+
+### Coverage Summary
+
+| Spec file | Tests | @critical | @functional | @non-blocker |
+|-----------|-------|-----------|-------------|--------------|
+| live-view.spec.ts | 7 | 4 | 0 | 3 |
+| navigation.spec.ts | 4 | 0 | 2 | 2 |
+| personalities-api.spec.ts | 10 | 6 | 4 | 1 |
+| pnl-view.spec.ts | 9 | 4 | 4 | 1 |
+| trades-view.spec.ts | 10 | 5 | 4 | 2 |
+| **Total** | **40** | **19** | **14** | **9** |
+
+---
+
+
+### What Is Not Covered by E2E Tests
+
+These scenarios are covered in unit or integration tests instead:
+
+| Scenario | Covered in |
+|----------|-----------|
+| DB-level audit log row exists after PUT | `apps/server/src/test/integration/personalities-api.integration.test.ts` |
+| TimescaleDB hypertable migration idempotency | `apps/server/src/test/integration/migrations.integration.test.ts` |
+| Peak detection algorithm correctness | `apps/server/src/signals/__tests__/peak-detection-engine.test.ts` |
+| Replay determinism (100× identical-ledger gate) | `apps/server/src/ingestion/historical/__tests__/replay-determinism.test.ts` |
+| Clockwork evolution guard (`is_frozen` check) | `apps/server/src/trading/__tests__/entry-engine.test.ts` |
+| Razorpay webhook HMAC verification | `apps/server/src/payment/__tests__/razorpay.test.ts` |
+| ATM strike rounding (property tests) | `apps/server/src/utils/__tests__/atm-strike.property.test.ts` |
+| P&L arithmetic sign convention | `apps/server/src/utils/__tests__/pnl.property.test.ts` |
 
 ## Part 9 — Nightly Ingest Routine (observed, not forced)
 
@@ -1081,6 +1229,7 @@ Ask Claude in a session on this repo, or check the Routines UI on claude.ai.
 
 ---
 
+
 ## Part 10 — Sign-Off
 
 | Part | Result | Notes / failing test IDs |
@@ -1111,6 +1260,7 @@ Ask Claude in a session on this repo, or check the Routines UI on claude.ai.
 | Numbers differ from Appendix A | Cache changed (new ingested days shift multi-day windows). Single-day and fixed-window figures should not move |
 
 ---
+
 
 ## Appendix A — Expected Values Reference
 
@@ -1184,6 +1334,7 @@ DSR: best `config_1`, observed Sharpe `0.243`, deflated **97.3%**.
 
 ---
 
+
 ## Appendix B — Reset & Teardown
 
 ```bash
@@ -1211,3 +1362,430 @@ uv run obt ingest --date 2026-09-04 --underlying NIFTY   # repeat per date, or s
 > `data/cache/` and `data/registry.sqlite` are gitignored derived artifacts — safe to delete and
 > regenerate. `data/raw/algotest/` is **tracked and irreplaceable**: AlgoTest only serves a
 > rolling 3-month window, so anything older than that exists nowhere else. Never delete it.
+
+
+---
+
+# Trading engine — milestone verification
+
+
+These predate the Parts above and cover the TypeScript trading engine, which the
+main plan does not touch. Run them when changing signals, personalities or the
+historical pipeline.
+
+## M1 — Live Paper-Trading + Dashboard
+
+### M1-1: All 10 Personalities Seeded
+
+```bash
+curl http://localhost:3000/personalities?include_inactive=true | jq 'length'
+curl http://localhost:3000/personalities | jq 'length'
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | 10 total personalities | `include_inactive=true` → 10 |
+| [ ] | 9 active personalities | Default (no flag) → 9 |
+| [ ] | Levelhead is inactive | `jq '.[] \| select(.name=="Levelhead") \| .isActive'` → `false` |
+| [ ] | Clockwork is frozen | `jq '.[] \| select(.name=="Clockwork") \| .isFrozen'` → `true` |
+
+### M1-2: Entry Engine
+
+Start in simulation mode and check the logs:
+
+```bash
+SIMULATE=true bun run dev
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | No entries before 09:15 IST | Entries logged only after `09:15` appears in the timestamp |
+| [ ] | No entries after 09:45 IST | After 09:45 in logs, no new `[entry]` lines |
+| [ ] | VIX gate respected | If VIX > 30 in sim (force it via env), entries are blocked |
+| [ ] | One-open limit enforced | If a trade is open, a second entry is not taken by the same personality |
+
+### M1-3: Trigger/Exit Engine
+
+With an open paper trade, verify exits work:
+
+| # | Check | Trigger condition |
+|---|-------|------------------|
+| [ ] | Hard stop-loss exits at 30% loss | Straddle value ≥ entry × 1.30 |
+| [ ] | Trailing stop-loss activates | After straddle drops 15% from peak, then reverses 15% — exit triggered |
+| [ ] | Target profit exit at 30% gain | Straddle value ≤ entry × 0.70 |
+| [ ] | EOD square-off at 15:25 IST | Any open trade closes at 15:25 regardless of P&L |
+
+```bash
+# Check closed trades after running through a simulated session
+curl http://localhost:3000/trades | jq '.data | map(select(.status=="closed")) | length'
+```
+
+Expected: > 0 trades with `exit_reason` set to one of: `stop_loss`, `target`, `eod_squareoff`, `trailing_stop`.
+
+### M1-4: Paper Trade API
+
+```bash
+# Get all trades
+curl http://localhost:3000/trades | jq '.data[0]'
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | GET /trades returns array | Status 200, `data` is an array |
+| [ ] | Each trade has required fields | `id`, `entry_time`, `status`, `straddle_at_entry`, `lots`, `lot_size` present |
+| [ ] | Closed trades have `net_pnl` | `exit_time` and `net_pnl` non-null for closed trades |
+| [ ] | `exit_reason` is meaningful | One of: `stop_loss`, `target`, `eod_squareoff`, `trailing_stop` |
+
+### M1-5: REST API & WebSocket
+
+```bash
+# REST health
+curl http://localhost:3000/health
+
+# WebSocket (requires wscat: npm install -g wscat)
+wscat -c ws://localhost:3000/ws/ticks
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | GET /health returns 200 | `{"status":"ok"}` or similar |
+| [ ] | WebSocket connects | `wscat` shows `Connected` |
+| [ ] | Tick messages arrive on WS | JSON messages with `ltp`, `symbol`, `timestamp` every ~1s |
+| [ ] | WS disconnects cleanly | Ctrl+C in wscat → no server error |
+
+### M1-6: React Dashboard — Live Tab
+
+```bash
+# Start Vite frontend separately
+cd ai-trading-agent
+bun run dev &   # starts Fastify on 3000 (sim mode)
+# Open http://localhost:5173 in browser
+```
+
+| # | Check | Expected in Browser |
+|---|-------|---------------------|
+| [ ] | App loads without white screen | Dashboard renders with tab bar |
+| [ ] | Default tab is "Live" | Live tab content visible on load |
+| [ ] | NIFTY LTP ticks update | Number in "NIFTY Index" card increments/changes over time |
+| [ ] | WS status pill is visible | Pill reads "Connected" (green) or "Connecting" / "Disconnected" |
+| [ ] | Straddle section shows value or notice | Either a numeric value or "Straddle feed not yet connected" |
+| [ ] | Tick chart renders | Chart area draws lines as ticks arrive |
+
+### M1-7: React Dashboard — Trades Tab
+
+| # | Check | Expected in Browser |
+|---|-------|---------------------|
+| [ ] | Click "Trades" tab | Table heading "Paper Trades" visible |
+| [ ] | Rows appear as trades are taken | Each sim trade appears in the table |
+| [ ] | Open badge is green/yellow | Colored "Open" badge per row |
+| [ ] | Closed badge renders correctly | "Closed" badge with exit reason |
+| [ ] | IST timestamps displayed | Entry time shows e.g. `09:30:00` (not UTC `04:00:00`) |
+| [ ] | Net P&L colored correctly | Positive = green, negative = red |
+| [ ] | Null P&L shows `—` | Open trades show dash, not NaN |
+
+### M1-8: React Dashboard — P&L Tab
+
+| # | Check | Expected in Browser |
+|---|-------|---------------------|
+| [ ] | Click "P&L" tab | "P&L Summary" heading visible |
+| [ ] | Realized P&L is the correct sum | Check against DB: `SELECT SUM(net_pnl::numeric) FROM paper_trades WHERE status='closed';` |
+| [ ] | Win rate excludes open trades | Win rate denominator = closed trades only |
+| [ ] | Open positions count correct | Matches `SELECT count(*) FROM paper_trades WHERE status='open';` |
+| [ ] | Empty state shows message | On a fresh DB, shows "No closed trades yet" |
+| [ ] | Cumulative chart renders | Line chart appears once ≥1 closed trade exists |
+
+---
+
+
+## M2 — Momentum Signals + Multi-Personality
+
+### M2-1: Personality CRUD API
+
+```bash
+# GET all personalities
+curl http://localhost:3000/personalities | jq '.[0] | keys'
+
+# GET single personality
+PERSONALITY_ID=$(curl -s http://localhost:3000/personalities | jq -r '.[0].id')
+curl http://localhost:3000/personalities/$PERSONALITY_ID | jq '.'
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | GET /personalities returns 9 active | Array length 9, all `isActive:true` |
+| [ ] | GET with `include_inactive=true` returns 10 | All 10 personalities including Levelhead |
+| [ ] | GET /:id returns 404 for unknown UUID | `curl .../personalities/00000000-0000-0000-0000-000000000000` → 404 with `"error":"NOT_FOUND"` |
+| [ ] | Each personality has `params` object | `min_probability`, `max_daily_trades`, `management_style`, etc. |
+
+### M2-2: Clockwork Immutability (FROZEN_VIOLATION)
+
+```bash
+CLOCKWORK_ID=$(curl -s "http://localhost:3000/personalities?include_inactive=true" | jq -r '.[] | select(.isFrozen==true) | .id')
+curl -X PUT http://localhost:3000/personalities/$CLOCKWORK_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"params":{"max_daily_trades":2}}'
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | PUT to Clockwork returns 403 | HTTP status code 403 |
+| [ ] | Error code is FROZEN_VIOLATION | `{"error":"FROZEN_VIOLATION","message":"...immutable..."}` |
+| [ ] | Clockwork params unchanged | GET /personalities/$CLOCKWORK_ID → params identical to before |
+
+### M2-3: Comparison Integrity (8pp Rule)
+
+```bash
+# Get a momentum_exhaustion personality
+MUTABLE_ID=$(curl -s http://localhost:3000/personalities | jq -r '[.[] | select(.entryType=="momentum_exhaustion" and .isFrozen==false)][0].id')
+
+# Try to push min_probability more than 8pp away from others (e.g., 0.85 when others are at 0.70)
+curl -X PUT http://localhost:3000/personalities/$MUTABLE_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"params":{"min_probability":0.90}}'
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | Wide drift returns 409 | HTTP status 409 if the change would put spread > 8pp |
+| [ ] | Error code correct | `{"error":"COMPARISON_INTEGRITY_VIOLATION"}` |
+| [ ] | Small change accepted | Changing by 0.01 within bounds returns 200 |
+
+### M2-4: Param Range Validation
+
+```bash
+# Above ceiling (0.95 > max 0.90)
+curl -X PUT http://localhost:3000/personalities/$MUTABLE_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"params":{"min_probability":0.95}}'
+# Expected: 400
+
+# Below floor (0.30 < min 0.40)
+curl -X PUT http://localhost:3000/personalities/$MUTABLE_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"params":{"min_probability":0.30}}'
+# Expected: 400
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | Value above ceiling → 400 | HTTP 400 |
+| [ ] | Value below floor → 400 | HTTP 400 |
+| [ ] | Boundary value accepted | `0.90` (ceiling) or `0.40` (floor) returns 200 |
+
+### M2-5: Audit Log Written on Param Change
+
+```bash
+# Make a valid change
+curl -X PUT http://localhost:3000/personalities/$MUTABLE_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"params":{"min_probability":0.71},"reason":"manual_qa_test"}'
+
+# Verify audit log (direct DB)
+docker exec trading_postgres psql -U trading -d trading -c \
+  "SELECT personality_id, changed_fields, reason, created_at FROM personality_audit_log ORDER BY created_at DESC LIMIT 3;"
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | PUT returns 200 with updated params | `params.min_probability` in response = `0.71` |
+| [ ] | Audit log row created | At least one row with `reason='manual_qa_test'` |
+| [ ] | `changed_fields` records what changed | Contains `min_probability` key |
+
+### M2-6: Personality Performance API
+
+```bash
+curl http://localhost:3000/personalities/$MUTABLE_ID/performance | jq '.'
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | Returns 200 with stats | `personalityId`, `totalTrades`, `winRate`, `openTrades` all present |
+| [ ] | `winRate` in [0, 1] | Never negative, never > 1 |
+| [ ] | NULL-row isolation | `totalTrades` is 0 for a personality with no linked trades (not counting pre-M2 NULL rows) |
+| [ ] | Personality scoping correct | Two different personality IDs return different `personalityId` in response |
+
+### M2-7: Signal Generation
+
+Run in sim mode and watch for signal events:
+
+```bash
+SIMULATE=true bun run dev 2>&1 | grep -E "\[signal\]|\[peak\]|\[prob\]|\[filter\]"
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | Peak detection fires | Log lines showing peak detected when momentum conditions met |
+| [ ] | Probability score logged | Score value between 0.0 and 1.0 |
+| [ ] | Fallback scheduled signal at 10:00 IST | After 10:00 IST in logs, `SCHEDULED` signal entry if no MOMENTUM signal earlier |
+| [ ] | Signals fan out to all personalities | Multiple `[filter]` lines (one per personality) for each signal |
+
+### M2-8: Management Styles Observed
+
+After several trades close, verify management style is reflected:
+
+```bash
+docker exec trading_postgres psql -U trading -d trading -c "
+SELECT p.name, p.management_style, t.exit_reason, count(*) 
+FROM paper_trades t 
+JOIN personality_configs p ON t.personality_id = p.id
+WHERE t.status = 'closed'
+GROUP BY p.name, p.management_style, t.exit_reason;"
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | Holder trades exit at EOD or SL | Holder personality's closed trades show `eod_squareoff` or `stop_loss` (not roll exits) |
+| [ ] | Adjuster shows roll events | Adjuster personality logs `[roll]` events in console |
+| [ ] | Reducer shows cut/re-entry | Reducer personality logs `[cut]` and `[reenter]` events |
+
+### M2-9: Portfolio Risk Rules
+
+| # | Check | Verification |
+|---|-------|-------------|
+| [ ] | Max 4 open legs enforced | Trigger 5 simultaneous entries; 5th is blocked and logged |
+| [ ] | Daily stop respected | After daily loss cap hit, further entries blocked for that day |
+| [ ] | Event-day gate (RBI/Budget) | Set `today` to a known blocked date in test; verify entries blocked |
+| [ ] | VIX staleness gate | If VIX hasn't updated in >30 min, new entries blocked |
+
+---
+
+
+## M3 — Historical Data, Replay & Backtesting
+
+### M3-1: Historical Backfill (Fyers)
+
+> Requires valid `FYERS_ACCESS_TOKEN` in `.env`. Skip to M3-2 if running credentials-free.
+
+```bash
+# Trigger backfill via API (adjust dates to a recent past week)
+curl -X POST http://localhost:3000/backfill \
+  -H 'Content-Type: application/json' \
+  -d '{"from":"2026-05-01","to":"2026-05-07","underlying":"NIFTY"}'
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | Backfill job starts | HTTP 202 Accepted |
+| [ ] | Straddle snapshots appear in DB | `SELECT count(*) FROM straddle_snapshots WHERE time > '2026-05-01';` increases |
+| [ ] | Backfill is resumable | Stop mid-way (Ctrl+C), restart → picks up from checkpoint, no duplicates |
+| [ ] | Idempotent on re-run | Run same backfill twice → same row count (unique index prevents duplicates) |
+| [ ] | Holidays/gaps marked | Days with no NSE data show gap markers, not missing entries |
+
+### M3-2: Replay Harness (Simulation Mode)
+
+```bash
+# Run a deterministic replay against already-backfilled data (or fixture data)
+bun run replay -- --from 2026-05-01 --to 2026-05-03 --underlying NIFTY --dry-run
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | Replay completes without error | Exit code 0 |
+| [ ] | Events processed in order | Log lines show monotonically increasing timestamps |
+| [ ] | VirtualClock drives time | `[clock]` lines show simulated IST time advancing (not wall time) |
+| [ ] | Replay is deterministic | Run twice with same inputs → identical trade log (same entries, exits, P&L) |
+
+### M3-3: Regime Tagging
+
+```bash
+# Check regime tags on straddle snapshots (after replay or live data)
+docker exec trading_postgres psql -U trading -d trading -c "
+SELECT market_regime, count(*) 
+FROM straddle_snapshots 
+WHERE market_regime IS NOT NULL 
+GROUP BY market_regime;"
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | All four regime tags exist | `RANGING`, `TRENDING_STRONG`, `VOLATILE_REVERTING`, `EVENT_DAY` all appear |
+| [ ] | No look-ahead contamination | Regime determined using only data up to 14:30 IST cutoff |
+| [ ] | Regime tag on every replay row | After replay: `SELECT count(*) FROM straddle_snapshots WHERE market_regime IS NULL AND time < NOW();` → 0 |
+| [ ] | Regime API returns data | `curl http://localhost:3000/regimes` → 200 with regime-tagged data |
+
+### M3-4: Regime API Endpoint
+
+```bash
+curl http://localhost:3000/regimes | jq '.'
+curl "http://localhost:3000/regimes?date=2026-05-01" | jq '.'
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | GET /regimes returns 200 | Array of days with regime tag |
+| [ ] | Each entry has `date` and `regime` | Fields present and typed correctly |
+| [ ] | Date filter works | `?date=2026-05-01` returns only that day's regime |
+
+### M3-5: Dashboard — Backfill Tab
+
+Open `http://localhost:5173` → click "Backfill" tab:
+
+| # | Check | Expected in Browser |
+|---|-------|---------------------|
+| [ ] | Backfill tab is visible and clickable | Tab renders |
+| [ ] | Date range picker present | From/To date inputs visible |
+| [ ] | Submit triggers API call | Network tab shows POST to `/backfill` on form submit |
+| [ ] | Progress or status shown | Status updates as backfill runs |
+
+### M3-6: Dashboard — Replay Tab
+
+Click "Replay" tab:
+
+| # | Check | Expected in Browser |
+|---|-------|---------------------|
+| [ ] | Replay tab is visible | Tab renders |
+| [ ] | Date range inputs visible | From/To fields present |
+| [ ] | Replay starts on submit | POST to `/replay` API triggered |
+| [ ] | Replay results show on completion | Personality P&L comparison visible after replay |
+
+### M3-7: Dashboard — Regimes Tab
+
+Click "Regimes" tab:
+
+| # | Check | Expected in Browser |
+|---|-------|---------------------|
+| [ ] | Regimes tab is visible | Tab renders |
+| [ ] | Regime distribution chart renders | Chart or table with `RANGING/TRENDING_STRONG/VOLATILE_REVERTING/EVENT_DAY` |
+| [ ] | Historical data needed | Shows empty state gracefully if no backfill data available |
+
+---
+
+
+## Cross-Milestone Checks
+
+### Error Handling
+
+| # | Check | How to Verify |
+|---|-------|--------------|
+| [ ] | 500 errors surface in UI | Kill the backend while Trades tab is open → error alert appears, no white screen |
+| [ ] | Offline backend shows error states | Disable Docker, open dashboard → all tabs show error alerts, not blank/zeroed data |
+| [ ] | WebSocket disconnection handled | Stop Fastify → WS pill transitions to "Disconnected", no console errors |
+
+### Data Integrity
+
+| # | Check | How to Verify |
+|---|-------|--------------|
+| [ ] | Clockwork is never modified | After a full sim session: `SELECT params FROM personality_configs WHERE is_frozen=TRUE;` — unchanged from seed |
+| [ ] | Comparison integrity maintained | Precision/Adjuster/Reducer `min_probability` differ by ≤ 8pp at all times |
+| [ ] | No NaN in P&L calculations | `SELECT * FROM paper_trades WHERE net_pnl = 'NaN';` → 0 rows |
+| [ ] | Decimal precision correct | All `net_pnl` values in DB have exactly 2 decimal places |
+
+### Teardown & Reset
+
+```bash
+# Clean shutdown
+docker compose down
+
+# Full reset (destroys all data — use to re-run QA from scratch)
+docker compose down -v
+bun run migrate   # re-apply schema after volume destruction
+```
+
+| # | Check | Expected |
+|---|-------|----------|
+| [ ] | `down` stops services | `docker compose ps` shows no running containers |
+| [ ] | `down -v` destroys data | After `down -v` then `docker compose up -d` + `migrate`, DB is empty again |
+| [ ] | Re-running QA from scratch gives identical results | All checks above pass on a clean slate |
+
+---
+

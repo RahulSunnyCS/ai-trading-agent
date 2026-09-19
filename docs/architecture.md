@@ -1,4 +1,9 @@
-# AI Trading Agent — Technical Reference
+# Architecture Reference
+
+The stack list, essential commands, repository layout, conventions and
+environment variables live in `.claude/project/technical.md`, which is
+auto-loaded into every session. This file is the deep reference underneath it:
+the schema, the engine internals, and the reasoning behind the choices.
 
 ## System Architecture
 
@@ -51,24 +56,28 @@ The system is a **real-time event-driven pipeline** composed of four layers:
 
 ---
 
-## Technology Stack
 
-| Layer | Technology | Version | Rationale |
-|-------|-----------|---------|-----------|
-| **Language** | TypeScript | 5.x | Type safety for financial logic, compile-time error catching |
-| **Runtime** | Bun | Latest | 4× faster startup than Node.js, native TS, better perf |
-| **Web Framework** | Fastify | 4.x | 5× faster than Express, schema validation, ~2ms p99 latency |
-| **Message Queue** | Redis Streams | — | Simpler than Kafka, sub-ms latency, sufficient throughput |
-| **Primary DB** | PostgreSQL | 16 | ACID guarantees, JSONB support, mature ecosystem |
-| **Time-Series DB** | TimescaleDB | 2.x | Auto-partitioning, continuous aggregates, 10–100× faster time queries |
-| **Cache** | Redis | 7 | Sub-ms reads, pub/sub, optional persistence |
-| **Task Queue** | BullMQ | Latest | Redis-backed job processing for EOD retrospection |
-| **Frontend** | React + Vite | 18 | Real-time dashboards, HMR, fast build |
-| **Charts** | Lightweight Charts | — | Professional OHLC trading charts |
-| **State Management** | Zustand | — | Minimal boilerplate, real-time subscriptions |
-| **Styling** | Tailwind CSS | 3.x | Rapid UI development |
-| **Testing** | Vitest + Playwright | — | Fast unit tests, E2E browser coverage |
-| **Deployment** | Docker + Railway/Fly.io | — | Auto-scaling, cost-effective cloud deployment |
+## Why These Technologies
+
+Versions live in `.claude/project/technical.md`; this table is the reasoning.
+
+
+| Layer | Technology | Rationale |
+| ------- | ----------- | ----------- |
+| **Language** | TypeScript | Type safety for financial logic, compile-time error catching |
+| **Runtime** | Bun | 4× faster startup than Node.js, native TS, better perf |
+| **Web Framework** | Fastify | 5× faster than Express, schema validation, ~2ms p99 latency |
+| **Message Queue** | Redis Streams | Simpler than Kafka, sub-ms latency, sufficient throughput |
+| **Primary DB** | PostgreSQL | ACID guarantees, JSONB support, mature ecosystem |
+| **Time-Series DB** | TimescaleDB | Auto-partitioning, continuous aggregates, 10–100× faster time queries |
+| **Cache** | Redis | Sub-ms reads, pub/sub, optional persistence |
+| **Task Queue** | BullMQ | Redis-backed job processing for EOD retrospection |
+| **Frontend** | React + Vite | Real-time dashboards, HMR, fast build |
+| **Charts** | Lightweight Charts | Professional OHLC trading charts |
+| **State Management** | Zustand | Minimal boilerplate, real-time subscriptions |
+| **Styling** | Tailwind CSS | Rapid UI development |
+| **Testing** | Vitest + Playwright | Fast unit tests, E2E browser coverage |
+| **Deployment** | Docker + Railway/Fly.io | Auto-scaling, cost-effective cloud deployment |
 
 ---
 
@@ -127,6 +136,7 @@ final_probability = clamp(base_probability + Σ adjustments, 0.0, 1.0)
 | **Pullback Entry** | 2% retrace from detected peak | Higher-confidence entry after initial peak |
 
 ---
+
 
 ## Multi-Personality Decision Engine
 
@@ -200,6 +210,7 @@ Signal Received
 - `position_size_multiplier`: 0.25 – 2.5
 
 ---
+
 
 ## Database Schema
 
@@ -516,6 +527,7 @@ GROUP BY bucket, underlying, expiry;
 
 ---
 
+
 ## Evolution Engine
 
 ### Core Constraint: What Can Never Change
@@ -621,6 +633,7 @@ Generations: Run weekly on accumulated data
 
 ---
 
+
 ## API Endpoints (Planned)
 
 ### Signal Management
@@ -666,6 +679,7 @@ WebSocket /ws/ticks                      # Live tick stream for frontend
 
 ---
 
+
 ## Performance & Latency Targets
 
 | Metric | Target | Notes |
@@ -679,97 +693,6 @@ WebSocket /ws/ticks                      # Live tick stream for frontend
 
 ---
 
-## Deployment Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Cloud (Railway / Fly.io)                                   │
-│                                                             │
-│  ┌────────────────┐    ┌────────────────┐                  │
-│  │ API Server     │    │ Signal Worker  │                  │
-│  │ (Fastify/Bun)  │    │ (Bun process)  │                  │
-│  └───────┬────────┘    └───────┬────────┘                  │
-│          │                     │                           │
-│          └──────────┬──────────┘                           │
-│                     ▼                                       │
-│  ┌──────────────────────────────────────┐                  │
-│  │  Redis 7 (Streams + Cache + BullMQ)  │                  │
-│  └──────────────────────────────────────┘                  │
-│                     │                                       │
-│  ┌──────────────────────────────────────┐                  │
-│  │  PostgreSQL 16 + TimescaleDB         │                  │
-│  └──────────────────────────────────────┘                  │
-│                                                             │
-│  ┌────────────────┐                                        │
-│  │ React Frontend │ ← served via CDN / static hosting      │
-│  └────────────────┘                                        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Docker Compose Services
-
-```yaml
-services:
-  api:         # Fastify application server
-  worker:      # Signal generation + personality bots
-  retrospect:  # BullMQ EOD job processor
-  postgres:    # PostgreSQL 16 + TimescaleDB extension
-  redis:       # Redis 7 (Streams + cache + BullMQ)
-  frontend:    # Vite dev server (dev) / nginx (prod)
-```
-
----
-
-## Configuration Reference
-
-### Environment Variables
-
-```bash
-# Database
-DATABASE_URL=postgresql://user:pass@host:5432/trading
-REDIS_URL=redis://host:6379
-
-# Market Data
-NSE_WEBSOCKET_URL=...
-QUANTIPLY_API_KEY=...
-QUANTIPLY_API_URL=...
-
-# Signals
-SIGNAL_MIN_EXPANSION_PCT=10        # % expansion before peak detection activates
-SIGNAL_ACCELERATION_THRESHOLD=-0.5 # second derivative cutoff
-SIGNAL_CONFIRMATION_CANDLES=3      # bars needed to confirm
-
-# Evolution
-EVOLUTION_REQUIRE_APPROVAL=true    # require human sign-off on high-impact changes
-EVOLUTION_COOLDOWN_DAYS=3          # minimum days between rule applications
-
-# Runtime
-NODE_ENV=production
-PORT=3000
-LOG_LEVEL=info
-```
-
-### Peak Detection Configuration Object
-
-```typescript
-interface PeakDetectionConfig {
-  minExpansionPercent:     number;    // 5–25, default 10
-  accelerationThreshold:   number;    // -2.0 to -0.1
-  rocDeclineWindowMinutes: number;    // lookback window
-  confirmationCandles:     number;    // 2–5
-  emaWindows: {
-    fast:   number;   // default 8 min
-    medium: number;   // default 5 min (option_ticks)
-    slow:   number;   // default 10 min
-  };
-  baseProbability:     number;   // default 0.55
-  vixAdjustmentFactor: number;
-  timeOfDayFactors:    Record<string, number>;
-  dayOfWeekFactors:    Record<number, number>;  // 0=Sun…6=Sat
-}
-```
-
----
 
 ## Known Technical Risks
 
@@ -811,36 +734,6 @@ All personalities trade the same underlying simultaneously. Their risk is behavi
 
 ---
 
-## Testing Strategy
-
-### Unit Tests (Vitest)
-
-- Peak detection algorithm correctness
-- Decision engine filter stages (each stage independently)
-- Evolution rule trigger conditions
-- P&L calculation accuracy
-- Parameter validation and clamping
-
-### Integration Tests
-
-- Signal → personality → paper trade full flow
-- Redis Streams message passing
-- TimescaleDB continuous aggregate correctness
-
-### E2E Tests (Playwright)
-
-- Dashboard renders live data
-- Trade log updates in real-time
-- Retrospection results display
-
-### Backtesting
-
-Before production deployment:
-- Run against minimum **6 months** of historical tick data
-- Separate training (parameter fitting) and test (out-of-sample) periods
-- Report: signal accuracy, per-personality Sharpe, drawdown by regime
-
----
 
 ## Research Governance
 
@@ -854,4 +747,65 @@ Before any parameter change becomes permanent:
 
 ---
 
-*For product overview, features, and trading strategy details, see [PRODUCT_OVERVIEW.md](./PRODUCT_OVERVIEW.md).*
+*Product reasoning and the personality reference: [docs/product.md](./product.md).*
+
+---
+
+## Historical data, backfill & replay (M3a)
+
+### Backfill — load historical market data
+
+The backfill writer (`apps/server/src/ingestion/historical/backfill.ts`) populates the database with historical OHLCV candles from Fyers. Call `runBackfill()` with a date range and symbol; it fetches candles and writes them into market_ticks and option_ticks hypertables.
+
+**Key properties:**
+- **Resumable:** if interrupted by auth failure (FyersAuthError), subsequent calls with the same options resume from the last checkpoint saved in backfill_ranges table.
+- **Idempotent:** partial unique indexes prevent duplicate re-ingestion; re-running a completed range writes zero duplicates (INSERT ... ON CONFLICT DO NOTHING).
+- **Fail-loud:** missing option legs (CE or PE contracts at any step) throw MissingLegError immediately — never interpolated or skipped.
+- **Time-bounded:** all hypertable writes respect TimescaleDB's partitioning discipline — queries always include time-range filters.
+
+### Replay — deterministic history simulation
+
+Run the trading pipeline against historical data with a deterministic virtual clock:
+
+```bash
+# Against a scratch database (safe, no confirmation needed)
+DATABASE_URL=postgresql://user:pass@localhost:5432/test_db \
+  bun run replay --from 2024-01-25T03:45:00Z --to 2024-01-25T10:00:00Z --underlying NIFTY
+
+# Against the live database (requires explicit acknowledgement)
+bun run replay --from 2024-01-25T03:45:00Z --to 2024-01-25T10:00:00Z --underlying NIFTY --against-live
+```
+
+**Safety guard:** `bun run replay` refuses to connect to the live DATABASE_URL unless you pass `--against-live` (or set `REPLAY_CONFIRM_LIVE=true`), because the PositionMonitor can close real open paper trades. Point at a scratch database for normal use — no flag needed in that case.
+
+**Flags:**
+- `--from <ISO>`: replay window start (required)
+- `--to <ISO>`: replay window end (required)
+- `--underlying NIFTY|BANKNIFTY|SENSEX`: index to replay (default: NIFTY)
+- `--speed <multiplier>`: virtual-time acceleration for log output (default: 1.0)
+- `--verbose`: log each emitted tick (very noisy for long windows)
+- `--dry-run`: load ticks without starting the pipeline (no paper-trade writes)
+- `--against-live`: explicit opt-in to run against the live database
+- `--regenerate-fixture`: developer-only; regenerate golden test fixtures (never in CI)
+
+### Market regime tagging (M3a)
+
+Historical days are automatically tagged with market regimes (RANGING, TRENDING_STRONG, VOLATILE_REVERTING, EVENT_DAY, UNCLASSIFIED) based on intraday straddle behavior and a deterministic event calendar.
+
+**Causal/point-in-time:** regime classification uses only data observable at 14:30 IST — the same cutoff a real trader would use to decide whether to enter a position. No lookahead, no future bars consulted.
+
+**Deterministic:** classification thresholds are compile-time constants (no learned values). Same input data always produces the same regime label.
+
+**Event calendar:** EVENT_DAY dates (RBI policy days, Union Budgets, F&O expiry mornings, NSE holidays) are checked into the `event_calendar` table (seeded in migration 008). Operators can extend the table with new events via migrations; no env var needed for reproducible backtests.
+
+### Database migrations (M3a)
+
+Migrations 007, 008, and 009 support historical backfill and regime tagging:
+
+- **007_historical_backfill.sql** — backfill checkpoint tracking and unique indexes for idempotent candle writes
+- **008_regime_tagging.sql** — daily regime tags table, event calendar, and `resolution` column on straddle_snapshots
+- **009_straddle_snapshots_unique.sql** — unique index on (time, symbol, strike, expiry) to enforce snapshot uniqueness in reconstruction
+
+Apply all three with `bun run migrate`. 
+
+**Note on 009:** if your straddle_snapshots table has duplicates from dev testing, dedup them before applying the migration (it will fail on duplicate rows). For a fresh dev database, this is not a concern.
