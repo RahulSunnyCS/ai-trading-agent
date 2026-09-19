@@ -1,0 +1,45 @@
+# Variant B — fixed-anchor pyramid: BASE_LOTS(2) at entry, +1 lot each time
+# the ATM straddle (the trigger series) rises 10 and 20 points above its
+# 09:17 open.
+#
+# Reference semantics: pyramid_backtest.py / golden_15_sessions.py's
+# `sim(d, "B")`. `ref.at: entry` anchors both ladder thresholds to the
+# straddle's value at the 09:17 entry bar (STEP=10 for NIFTY, from the
+# design handoff's IndexSpec). This is the strategy used as the worked
+# example throughout the design handoff (§5's DSL grammar sample).
+features:
+  atm_straddle:
+    type: leg_sum
+    legs: [ATM.CE, ATM.PE]
+    fix_time: "09:17"
+
+strategy:
+  id: nifty_pyramid_B
+  version: 1
+  universe: { underlying: NIFTY, expiry: weekly, session: REGULAR }
+  legs:
+    - { id: ce, kind: OPT, strike: OTM1, option: CE, side: SELL }
+    - { id: pe, kind: OPT, strike: OTM1, option: PE, side: SELL }
+  entry:
+    time: "09:17"
+    lots: 2
+  ladders:
+    - id: t1
+      when:
+        feature: atm_straddle
+        op: ">="
+        ref: { feature: atm_straddle, at: entry, plus: 10 }
+      lots: 1
+    - id: t2
+      when:
+        feature: atm_straddle
+        op: ">="
+        ref: { feature: atm_straddle, at: entry, plus: 20 }
+      after: t1
+      lots: 1
+  caps: { max_lots: 4 }
+  exits:
+    - { type: time, at: "15:15" }
+  fills: { model: trigger_level, slippage_bps: 0 }
+  costs: { per_leg_rt: 60 }
+  sizing: { mode: fixed_lots }

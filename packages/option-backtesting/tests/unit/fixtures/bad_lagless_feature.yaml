@@ -1,0 +1,23 @@
+features:
+  atm_straddle:
+    type: leg_sum
+    legs: [ATM.CE, ATM.PE]
+    fix_time: "09:17"
+  straddle_runup:
+    type: max_runup
+    source: atm_straddle
+  spike_thr_5d:
+    type: rolling_mean
+    source: straddle_runup
+    days: 5
+strategy:
+  id: test
+  universe: { underlying: NIFTY, expiry: weekly, session: REGULAR }
+  legs:
+    - { id: ce, kind: OPT, strike: ATM, option: CE, side: SELL }
+  entry: { time: "09:17", lots: 1 }
+  caps: { max_lots: 1 }
+  exits:
+    - { type: time, at: "15:15" }
+  fills: { model: trigger_level, slippage_bps: 0 }
+  costs: { per_leg_rt: 60 }

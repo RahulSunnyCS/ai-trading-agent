@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Include DOM lib only if a server-side module ever needs it; today the
+    // backend is DOM-free (the React app lives in apps/dashboard).
+    "lib": ["ES2022"],
+    // Allow Bun's non-standard globals (Bun, $, etc.) + Node types for compat.
+    // Entries here must match the folder name under node_modules/@types/, not
+    // the package's own declared name — the installed folder is @types/bun,
+    // so this must read "bun", not "bun-types" (a stale value carried over
+    // from the pre-split config, which never actually resolved under tsc).
+    "types": ["bun", "node"],
+    // Path alias: import from "@/..." resolves to "src/...". Declared for
+    // parity with the pre-split config; not yet used anywhere in this package.
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "src/payment/**/*",
+    "src/test/integration/smoke.test.ts",
+    "src/trading/__tests__/entry-engine.test.ts"
+  ]
+}

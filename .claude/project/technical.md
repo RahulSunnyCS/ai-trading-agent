@@ -8,34 +8,33 @@
 | Runtime | Bun (latest) — used for all execution, including migrations and scripts |
 | Web Framework | Fastify 4.x — schema-validated routes, ~2ms p99 latency target |
 | Primary DB | PostgreSQL 16 + TimescaleDB 2.x extension (required, not optional) |
-| ORM / DB Access | Raw SQL via `pg` pool — no ORM. Custom migration runner in `src/db/migrate.ts` |
+| ORM / DB Access | Raw SQL via `pg` pool — no ORM. Custom migration runner in `apps/server/src/db/migrate.ts` |
 | Message Queue / Event Bus | Redis 7 Streams — topics: `market.ticks`, `straddle.values`, `signals.generated` |
 | Background Jobs | BullMQ (Redis-backed) — EOD retrospection batch |
 | Cache | Redis 7 — sub-ms reads for price cache and personality state |
 | Frontend | React 18 + Vite + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts |
 | Testing | Vitest (unit + integration) + Playwright (E2E) |
-| Market Data | Fyers WebSocket via `fyers-api-v3` SDK (untyped — TypeScript shim in `src/types/`) |
+| Market Data | Fyers WebSocket via `fyers-api-v3` SDK (untyped — TypeScript shim in `apps/server/src/types/`) |
 | Paper Trading | Quantiply API (paper trade execution tracking) |
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
+| Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee), FastAPI service + MCP server, fronted by a Fastify proxy and a React dashboard tab; walk-forward, parameter sweeps, a CSCV/PBO + deflated-Sharpe overfitting guard, a margin model, regime bucketing, and personality export are all built (M-5) — the epic is feature-complete |
 
 ## Package Manager & Runtime
 
-- **Monorepo:** Bun workspaces (`workspaces: ["packages/*"]`). One `bun.lock` at
-  the root covers the root app and every package
-- **Package manager:** Bun — single lockfile (`bun.lock`). Do not use `npm` or `yarn`; they will create a second lockfile and conflict
-- **Runtime:** Bun for the root app. **`packages/contract-notes` runs on Node 20**
-  — it is CommonJS and its scripts shell out to `node`. Bun owns the install;
-  Node is the runtime there
-- **CI pins bun `1.2.x`**, which *hoists*; bun 1.3+ uses an *isolated* layout for
-  workspaces. Both read the same lockfile — verified — but they produce different
-  `node_modules` trees. See the hoisting gotcha below
+- **Monorepo:** Bun workspaces — `workspaces: ["apps/*", "packages/*"]`. One `bun.lock` at the repo root covers every JS workspace
+- **Package manager:** Bun — single lockfile (`bun.lock`) at the repo root. Do not use `npm` or `yarn`; they will create a second lockfile and conflict
+- **Runtime:** Bun for `apps/*`. Two exceptions: **`packages/contract-notes` runs on Node 20** (CommonJS; its scripts shell out to `node`), and **`packages/option-backtesting` is Python/uv**, not a Bun workspace member
+- **CI pins bun `1.2.x`**, which *hoists*; bun 1.3+ uses an *isolated* layout for workspaces. Both read the same lockfile — verified — but they produce different `node_modules` trees. See the hoisting gotcha below
 - **TypeScript:** Compiled and executed natively by Bun — no `tsc` build step for running. `tsc --noEmit` is used only for type-checking
+- **Monorepo:** Bun workspaces (`"workspaces": ["apps/*"]` in the root `package.json`). All root-level scripts fan out to the workspace packages via `bun run --filter <pkg> <script>` or `bun run --workspaces <script>` — run them from the repo root, not from inside a package directory, unless you deliberately want to scope a command to one package
 
 ## Essential Commands
 
+All commands below are run from the **repo root** and fan out to the relevant workspace package(s).
+
 ```bash
-# Install dependencies
+# Install dependencies (single lockfile for the whole monorepo)
 bun install
 
 # Start infrastructure (PostgreSQL + Redis via Docker)
@@ -46,14 +45,20 @@ docker compose ps          # verify both show (healthy)
 bun run migrate
 
 # Development — simulation mode (no broker credentials needed)
-SIMULATE=true bun run dev   # or: bun run sim
+bun run sim                 # equivalent to SIMULATE=true bun run dev
 
 # Development — live mode (Fyers credentials required)
-bun run dev                 # watch mode with auto-reload
-bun start                   # production-style start
+bun run dev                 # watch mode with auto-reload (apps/server)
+bun run start                # production-style start (apps/server)
 
-# Type-check only (no emit)
-bun run --bun tsc --noEmit
+# Dashboard dev server (Vite, proxies /api to the server on :3000)
+bun run --filter @ata/dashboard dev
+
+# Type-check the server (root script is scoped to @ata/server only — the
+# dashboard has one pre-existing type error and isn't CI-enforced yet; run
+# its own check explicitly if you touch apps/dashboard)
+bun run typecheck
+bun run --filter @ata/dashboard typecheck
 
 # Workspace-wide
 bun run --filter '*' typecheck     # packages only — NOT the root app
@@ -61,9 +66,31 @@ bun run --filter '*' typecheck     # packages only — NOT the root app
 (cd packages/contract-notes && bun run test)   # Jest; needs Node 20 on PATH
 
 # Tests
-bun test                    # all tests
-bun run test:unit           # unit tests only
-bun run test:integration    # integration tests (requires Docker services running)
+bun run test                # unit tests in every workspace package
+bun run test:unit           # server unit tests only
+bun run test:integration    # server integration tests (requires Docker services running)
+bun run test:e2e            # dashboard Playwright suite (start the Vite dev server first)
+
+# option-backtesting (Python) — run from packages/option-backtesting/
+cd packages/option-backtesting
+uv sync
+uv run pytest
+uv run obt ingest plan --date YYYY-MM-DD --to YYYY-MM-DD --underlying NIFTY
+uv run obt ingest --date YYYY-MM-DD --underlying NIFTY
+uv run obt validate strategies/B_pyramid.yaml
+uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
+uv run obt registry
+uv run obt walkforward strategies/B_pyramid.yaml --is-from YYYY-MM-DD --is-to YYYY-MM-DD --oos-from YYYY-MM-DD --oos-to YYYY-MM-DD
+uv run obt sweep strategies/B_pyramid.yaml --changes changes.json --from YYYY-MM-DD --to YYYY-MM-DD [--overfit --n-blocks 4]
+uv run obt export-personality <run_id>
+
+# option-backtesting FastAPI service (loopback-only, port 8000) — from repo root
+bun run py:api               # equivalent to: cd packages/option-backtesting && uv run obt-api
+# The Fastify proxy (BACKTEST_API_URL, default http://127.0.0.1:8000) is the only
+# public-facing surface in front of it — see apps/server/src/server/routes/backtest.ts.
+
+# option-backtesting MCP server (stdio) — registered in root .mcp.json as "option-backtesting";
+# a Claude Code session picks it up automatically, no manual start needed.
 
 # Teardown
 docker compose down         # stop services, keep data volumes
@@ -72,48 +99,143 @@ docker compose down -v      # stop + destroy data volumes (full reset)
 
 ## Repository Structure
 
-Three workspaces. The root app is not itself a workspace member — it lives at
-the root, so `bun run --filter '*'` reaches the packages but not the app.
+A Bun-workspaces monorepo: `apps/server` (Fastify/Bun backend), `apps/dashboard` (React/Vite frontend), and `packages/option-backtesting` (a Python/uv sub-package — the options-backtesting research workbench, not a Bun workspace member). Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
 
 ```
 ai-trading-agent/
-├── packages/
-│   ├── broker-login/               # Node 20 + Playwright. Daily AlgoTest broker
-│   │                               # login (Angel One, Finvasia/Shoonya) via TOTP.
-│   │                               # Was the algo-automation repo.
-│   └── contract-notes/             # Node 20 + CJS + Jest. Gmail IMAP → qpdf →
-│                                   # PDF parse → Google Sheet. Was trade-analytics.
-│                                   # Has its own CLAUDE.md.
-├── src/
-│   ├── db/
-│   │   ├── client.ts               # PostgreSQL pool + query helpers
-│   │   ├── migrate.ts              # Custom migration runner with retry logic
-│   │   ├── schema.ts               # TypeScript types for every DB table
-│   │   └── migrations/             # Sequential SQL migration files (001_*.sql, etc.)
-│   ├── redis/
-│   │   └── client.ts               # Redis client + streamPublish / streamRead helpers
-│   ├── ingestion/
-│   │   ├── straddle-calc.ts        # ATM strike calculation, 15s snapshots, ROC/acceleration
-│   │   ├── vix-feed.ts             # VIX poller (NSE public API fallback)
-│   │   ├── market-data-sim.ts      # Random-walk simulator for dev (no broker needed)
-│   │   └── brokers/
-│   │       ├── types.ts            # BrokerFeed interface + BrokerTick type
-│   │       ├── broker-factory.ts   # createBroker() factory — selects adapter by BROKER / SIMULATE env
-│   │       ├── fyers.ts            # Fyers fyersDataSocket adapter (socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection)
-│   │       ├── angelone.ts         # Angel One (SmartAPI) adapter
-│   │       └── instrument-registry.ts  # Weekly/monthly symbol builder + expiry helpers
-│   ├── jobs/
-│   │   └── token-validity-check.ts # Pre-market Fyers token expiry check + BullMQ scheduler
-│   ├── state/
-│   │   └── broker-status.ts        # Runtime broker auth degradation flag (AUTH_FAILURE detection)
-│   ├── trading/                    # Personalities, signal detection, paper execution (Sprint 2+)
-│   ├── types/
-│   │   └── fyers-api-v3.d.ts       # TypeScript declaration shim for untyped Fyers SDK
-│   └── index.ts                    # Main entry point (branches on SIMULATE env var)
-├── docker-compose.yml              # TimescaleDB (postgres:16-alpine + timescaledb) + Redis 7
-├── .env.example                    # All required env vars documented with defaults
-├── package.json                    # Bun project config + scripts
-└── tsconfig.json                   # TypeScript config (strict mode)
+├── package.json                     # workspace root: "workspaces": ["apps/*"]; scripts fan out via --filter/--workspaces
+├── bun.lock                         # single lockfile for the whole monorepo
+├── tsconfig.base.json               # shared strict compilerOptions, extended by each package's tsconfig.json
+├── docker-compose.yml               # TimescaleDB (timescale/timescaledb:latest-pg16) + Redis 7
+├── .env.example                     # single shared .env at repo root; both apps read it
+├── biome.json · lefthook.yml        # repo-wide lint/format + pre-commit hooks
+├── .mcp.json                        # registers the "option-backtesting" MCP server (obt-mcp, stdio)
+├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
+├── apps/
+│   ├── server/                      # @ata/server — the Fastify/Bun backend
+│   │   ├── package.json · tsconfig.json · vitest.config.ts · vitest.workspace.ts
+│   │   ├── scripts/                 # replay.ts, backtest.ts, backfill-legs.ts, reconstruct.ts
+│   │   └── src/
+│   │       ├── db/
+│   │       │   ├── client.ts               # PostgreSQL pool + query helpers
+│   │       │   ├── migrate.ts              # Custom migration runner with retry logic
+│   │       │   ├── schema.ts               # TypeScript types for every DB table
+│   │       │   └── migrations/             # Sequential SQL migration files (001_*.sql, etc.)
+│   │       ├── redis/
+│   │       │   └── client.ts               # Redis client + streamPublish / streamRead helpers
+│   │       ├── ingestion/
+│   │       │   ├── straddle-calc.ts        # ATM strike calculation, 15s snapshots, ROC/acceleration
+│   │       │   ├── vix-feed.ts             # VIX poller (NSE public API fallback)
+│   │       │   ├── market-data-sim.ts      # Random-walk simulator for dev (no broker needed)
+│   │       │   └── brokers/
+│   │       │       ├── types.ts            # BrokerFeed interface + BrokerTick type
+│   │       │       ├── broker-factory.ts   # createBroker() factory — selects adapter by BROKER / SIMULATE env
+│   │       │       ├── fyers.ts            # Fyers fyersDataSocket adapter (socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection)
+│   │       │       ├── angelone.ts         # Angel One (SmartAPI) adapter
+│   │       │       └── instrument-registry.ts  # Weekly/monthly symbol builder + expiry helpers
+│   │       ├── jobs/
+│   │       │   └── token-validity-check.ts # Pre-market Fyers token expiry check + BullMQ scheduler
+│   │       ├── state/
+│   │       │   └── broker-status.ts        # Runtime broker auth degradation flag (AUTH_FAILURE detection)
+│   │       ├── trading/                    # Personalities, signal detection, paper execution
+│   │       ├── types/
+│   │       │   └── fyers-api-v3.d.ts       # TypeScript declaration shim for untyped Fyers SDK
+│   │       └── index.ts                    # Main entry point (branches on SIMULATE env var)
+│   └── dashboard/                   # @ata/dashboard — the React/Vite SPA
+│       ├── package.json · tsconfig.json · vite.config.ts · vitest.config.ts · playwright.config.ts
+│       ├── index.html · tailwind.config.ts · postcss.config.js
+│       ├── e2e/                     # Playwright specs
+│       └── src/                     # App.tsx, components/, hooks/, lib/, store/, types/
+│                                     # components/BacktestView.tsx + hooks/useBacktest{Presets,Runs,Validate}.ts
+│                                     # + types/backtest.ts — the options-backtesting research tab (M-4),
+│                                     # fed entirely through /api/backtest/* (never the Python service directly)
+└── packages/
+    ├── broker-login/                # Node 20 + Playwright. Was the algo-automation repo, merged via
+    │                                 # git subtree (history preserved). Logs Angel One and
+    │                                 # Finvasia/Shoonya into AlgoTest each morning via TOTP; the broker
+    │                                 # OAuth handshake happens on the broker's own domain, so it cannot
+    │                                 # be done over HTTP. Every locator lives in src/selectors.ts.
+    │                                 # Daily workflow's schedule is currently disabled — see
+    │                                 # docs/runbooks/contract-notes-handover.md
+    ├── contract-notes/              # Node 20 + CommonJS + Jest. Was the trade-analytics repo, merged via
+    │                                 # git subtree. Gmail IMAP → qpdf decrypt → PDF parse → Google Sheet,
+    │                                 # producing realised F&O P&L per broker account. Needs the qpdf
+    │                                 # system binary. Has its own CLAUDE.md. Schedule disabled pending
+    │                                 # cutover — the trade-analytics repo still owns the live cron
+    └── option-backtesting/          # Python 3.12 / uv — strategy-research workbench over AlgoTest option
+                                      # bars, answering "is this strategy worth becoming a personality?"
+                                      # (a different question from apps/server's `bun run backtest`, which
+                                      # replays the live personalities historically). Not a Bun workspace
+                                      # member — has its own pyproject.toml/uv.lock. Feature-complete
+                                      # end to end (M-0 through M-5): data layer, strategy DSL, and the
+                                      # bar-by-bar engine (golden-fixture-verified to the rupee, M-1/M-2/
+                                      # M-3); FastAPI service, MCP server, Fastify proxy, dashboard tab
+                                      # (M-4); walk-forward, sweeps, a CSCV/PBO + deflated-Sharpe
+                                      # overfitting guard, a margin model, regime bucketing, personality
+                                      # export, and a nightly ingest Routine (M-5).
+        ├── pyproject.toml · uv.lock · .python-version · DECISIONS.md
+        ├── src/option_backtesting/
+        │   ├── config.py                 # BACKTEST_DATA_DIR-derived cache/registry path resolution — shared
+        │   │                              # by api/app.py and mcp/server.py
+        │   ├── presets.py                # preset_names()/STRATEGIES_DIR — the allow-list both the API and
+        │   │                              # the MCP server check BEFORE building a filesystem path (no traversal)
+        │   ├── data/
+        │   │   ├── providers/{base,algotest,dhan}.py   # MarketDataProvider Protocol, canonical Bar/InstrumentKey
+        │   │   ├── resolver.py         # ATM/OTMn/ITMn/EXACT -> concrete strike, independent of any vendor
+        │   │   ├── reference/          # effective-dated CSVs: expiry_calendar, holidays, lot_sizes, strike_step, margin
+        │   │   ├── quality.py          # ingest-time gates: identical_series, bar_gaps, zero_volume, etc.
+        │   │   ├── raw.py              # raw AlgoTest JSON manifest read/write (data/raw/algotest/, tracked)
+        │   │   ├── ingest.py           # raw JSON -> quality-gated Parquet (data/cache/, gitignored)
+        │   │   └── cache.py            # DuckDB façade the engine reads (never a provider directly)
+        │   ├── features/                # named, cached, point-in-time feature evaluation (leg_sum, raw, gap,
+        │   │   │                         # greek, days_to_expiry, max_runup, session_high/low, rolling_mean/
+        │   │   │                         # ewma/rolling_pctile) — registry.py (M-2) is the declarative schema,
+        │   │   │                         # the rest (M-3) is the runtime evaluator
+        │   │   ├── registry.py · store.py · evaluator.py
+        │   │   ├── leg.py · greeks.py · calendar.py · path.py · rolling.py
+        │   │   └── regime.py           # M-5, R2: post-hoc regime bucketing only, NOT a DSL condition
+        │   │                           # feature — see DECISIONS.md for why
+        │   ├── strategy/                 # schema.py (M-2 pydantic AST) · loader.py (line-numbered YAML errors)
+        │   │   │                         # · mutate.py (M-5: deep_merge, shared by propose_strategy + sweep)
+        │   ├── engine/                   # bar-by-bar event engine (M-3), pinned to reproduce the design
+        │   │   │                         # handoff's reference implementation to the rupee — see
+        │   │   │                         # engine/loop.py's module docstring before changing any formula
+        │   │   ├── loop.py             # SessionContext, build_sessions, simulate_session, run_backtest
+        │   │   ├── conditions.py       # Condition/Ref grammar evaluation (all/any/not/feature/time, anchors)
+        │   │   ├── fills.py            # trigger_level (default)/bar_close/worst_of_bar/next_open + slippage
+        │   │   ├── costs.py            # flat cost = total_lots × 2 legs × per_leg_rt
+        │   │   ├── ledger.py · state.py  # Fill/SessionLedger; per-session running-anchor/last-fill state
+        │   │   ├── result.py           # SessionResult/AggregateResult, bootstrap_ci (R1a), render_report
+        │   │   ├── margin.py           # M-5, R1: classify_strategy_type + return on peak margin
+        │   │   └── registry.py         # SQLite run history (data/registry.sqlite, gitignored) — the
+        │   │                           # `strategy_yaml` column (M-5) lets export-personality reconstruct
+        │   │                           # a run's exact strategy from just its run_id
+        │   ├── analytics/                 # M-5: research tools that consume the engine's output, not part
+        │   │   │                          # of a single backtest run
+        │   │   ├── walkforward.py      # same-strategy in-sample/out-of-sample split (no re-fitting)
+        │   │   ├── sweep.py            # run a base strategy against many change-dicts over one window
+        │   │   ├── overfit.py          # CSCV/PBO + simplified (Gaussian) Deflated Sharpe over a sweep
+        │   │   └── regime_source.py    # reads daily_regime_tags from Postgres, gated on DATABASE_URL,
+        │   │                           # lazy psycopg import (optional "regime" extra)
+        │   ├── export/
+        │   │   └── personality.py        # M-5, R3: StrategySpec -> PersonalityConfigM2 candidate
+        │   │                             # ({entryType, managementStyle, params}); unrepresentable DSL
+        │   │                             # constructs go under manual_review, never guessed; never writes
+        │   │                             # to any database
+        │   ├── api/                      # FastAPI service (M-4), loopback-only (127.0.0.1:8000) — the
+        │   │   │                         # Fastify proxy is the only public-facing surface in front of it
+        │   │   ├── app.py              # create_app() factory + `obt-api` uvicorn entry point
+        │   │   ├── routes.py           # validate/runs/presets/coverage/health
+        │   │   └── models.py           # pydantic request/response models
+        │   ├── mcp/
+        │   │   └── server.py             # `obt-mcp` stdio MCP server (M-4/M-5) — mcp 2.x's MCPServer (see
+        │   │                             # DECISIONS.md); tools: plan_requests, validate_strategy,
+        │   │                             # run_backtest, run_walkforward, run_sweep, check_overfit,
+        │   │                             # list_runs, critique_result, export_personality, propose_strategy
+        │   └── cli.py                    # `obt` — ingest plan | ingest | validate | run | registry |
+        │                                 # walkforward | sweep [--overfit] | export-personality
+        └── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
+                                            # reproduces golden_15_sessions.expected.txt to the rupee for A/B/C/D
 ```
 
 ## Architecture
@@ -139,15 +261,15 @@ The system is a **real-time event-driven pipeline** in four layers:
 
 ## Key Patterns & Conventions
 
-- **No ORM:** All DB access is raw SQL via the `pg` pool. Query results are typed against the interfaces in `src/db/schema.ts`
-- **Migration files:** Named `NNN_description.sql` in `src/db/migrations/`. The runner applies them in order and records applied versions in `schema_migrations`. Always add new migrations as new files — never edit applied ones. Runner identifies migrations by **filename only** (no content checksum): once a file is applied, its name is registered in `schema_migrations` and re-runs are skipped. Editing already-applied migrations affects only fresh installs; existing databases skip them. For schema changes, determine the canonical source: `personality_configs` and `straddle_signals` are canonically defined in `001_core_schema.sql` (params-shape); later migration files that repeat these CREATE TABLEs are no-ops on fresh installs. When editing historical migrations, verify the change applies to the intended phase of deployment (fresh vs. existing DB).
+- **No ORM:** All DB access is raw SQL via the `pg` pool. Query results are typed against the interfaces in `apps/server/src/db/schema.ts`
+- **Migration files:** Named `NNN_description.sql` in `apps/server/src/db/migrations/`. The runner applies them in order and records applied versions in `schema_migrations`. Always add new migrations as new files — never edit applied ones. Runner identifies migrations by **filename only** (no content checksum): once a file is applied, its name is registered in `schema_migrations` and re-runs are skipped. Editing already-applied migrations affects only fresh installs; existing databases skip them. For schema changes, determine the canonical source: `personality_configs` and `straddle_signals` are canonically defined in `001_core_schema.sql` (params-shape); later migration files that repeat these CREATE TABLEs are no-ops on fresh installs. When editing historical migrations, verify the change applies to the intended phase of deployment (fresh vs. existing DB).
 - **Broker symbol format (Fyers):** Weekly options: `NSE:NIFTY{YY}{M}{DD}{STRIKE}{TYPE}` where months Oct–Dec use single letter codes (O, N, D). See `instrument-registry.ts` for the encoder/decoder
 - **ATM strike intervals:** NIFTY = 50pt, BankNifty = 100pt, Sensex = 100pt. Always use `getAtmStrike()` — never compute this inline
-- **Broker adapter selection:** All brokers (Fyers, Angel One, simulator) implement the common `BrokerFeed` interface. The `createBroker()` factory in `src/ingestion/brokers/broker-factory.ts` selects the adapter based on `BROKER` and `SIMULATE` env vars: `BROKER=fyers` → FyersBroker, `BROKER=angelone` → AngelOneBroker, `BROKER=sim` or `SIMULATE=true` → MarketDataSimulator. If `BROKER` is unset/empty AND `SIMULATE !== 'true'`, the factory throws a descriptive error at startup — safe default-throw prevents silent misconfiguration in live environments.
+- **Broker adapter selection:** All brokers (Fyers, Angel One, simulator) implement the common `BrokerFeed` interface. The `createBroker()` factory in `apps/server/src/ingestion/brokers/broker-factory.ts` selects the adapter based on `BROKER` and `SIMULATE` env vars: `BROKER=fyers` → FyersBroker, `BROKER=angelone` → AngelOneBroker, `BROKER=sim` or `SIMULATE=true` → MarketDataSimulator. If `BROKER` is unset/empty AND `SIMULATE !== 'true'`, the factory throws a descriptive error at startup — safe default-throw prevents silent misconfiguration in live environments.
 - **Simulation mode:** Controlled by `SIMULATE=true` env var. The simulator generates realistic random-walk NIFTY tick data at configurable interval AND emits synthetic ATM CE/PE option-leg ticks so the straddle pipeline works end-to-end. Everything downstream is identical — simulation is not a test mode, it uses the real pipeline. Hypertable writes are trimmed to ~10000 rows via MAXLEN on all ingestion xadds.
 - **Regime tagging:** Every retrospection result must carry a `market_regime` tag. Never compare personality performance across different regimes without filtering. The four tags are: `RANGING`, `TRENDING_STRONG`, `VOLATILE_REVERTING`, `EVENT_DAY`
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`
-- **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `src/types/fyers-api-v3.d.ts` covers the SDK surface we use
+- **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `apps/server/src/types/fyers-api-v3.d.ts` covers the SDK surface we use
 - **No default exports:** Use named exports throughout
 
 ## Testing
@@ -174,13 +296,15 @@ Critical variables whose misconfiguration causes real pain:
 | `MAX_WS_CONNECTIONS` | Max concurrent /ws/ticks WebSocket connections (default 50). Positive integers only; non-positive values silently fall back to 50 |
 | `EVOLUTION_REQUIRE_APPROVAL` | Should be `true` in any environment where the retrospection engine runs. Setting `false` allows the system to autonomously modify personality parameters without human review |
 | `TOKEN_VALIDITY_SCHEDULER_ENABLED` | When set to `true`, registers a BullMQ cron job that checks Fyers token expiry at 08:45 IST weekdays. Disabled by default; opt-in via this flag |
+| `BACKTEST_API_URL` | Base URL of the loopback-only Python FastAPI service (default `http://127.0.0.1:8000`). The Fastify proxy validates this resolves to loopback/private address space at startup — a public host throws (safe default-throw), the proxy never starts against it |
+| `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet cache and writes its run registry (`<dir>/cache`, `<dir>/registry.sqlite`). Defaults to `packages/option-backtesting`'s own `data/` when unset |
 
 ## Common Tasks
 
 **Add a new broker adapter:**
-1. Implement `BrokerFeed` interface from `src/ingestion/brokers/types.ts`
-2. Add the adapter file under `src/ingestion/brokers/`
-3. Update `src/index.ts` to select the new adapter based on an env var
+1. Implement `BrokerFeed` interface from `apps/server/src/ingestion/brokers/types.ts`
+2. Add the adapter file under `apps/server/src/ingestion/brokers/`
+3. Update `apps/server/src/index.ts` to select the new adapter based on an env var
 
 **Add a new personality:**
 1. Insert a row into `personality_configs` in the seed migration (or via a new migration)
@@ -188,13 +312,13 @@ Critical variables whose misconfiguration causes real pain:
 3. If Phase 2+, set `phase = 2` so it is gated behind the Phase 2 flag
 
 **Add a database table:**
-1. Create a new migration file `src/db/migrations/NNN_description.sql`
-2. Add TypeScript interface to `src/db/schema.ts`
+1. Create a new migration file `apps/server/src/db/migrations/NNN_description.sql`
+2. Add TypeScript interface to `apps/server/src/db/schema.ts`
 3. Run `bun run migrate` to apply
 
 **Change a signal parameter:**
 1. Adjust the env var (e.g., `SIGNAL_MIN_EXPANSION_PCT`) — no code change needed for thresholds in `PeakDetectionConfig`
-2. For structural algorithm changes, modify `src/ingestion/straddle-calc.ts`
+2. For structural algorithm changes, modify `apps/server/src/ingestion/straddle-calc.ts`
 
 ## Gotchas
 

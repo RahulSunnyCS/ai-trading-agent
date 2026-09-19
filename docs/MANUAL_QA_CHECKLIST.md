@@ -137,7 +137,7 @@ bun run test:integration
 | # | Check | Expected |
 |---|-------|----------|
 | [ ] | Integration tests skip gracefully if DB is down | Setting `DATABASE_URL` to garbage produces a skip, not a crash |
-| [ ] | Smoke test passes (when DB is up) | `src/test/integration/smoke.test.ts` — 5 tests |
+| [ ] | Smoke test passes (when DB is up) | `apps/server/src/test/integration/smoke.test.ts` — 5 tests |
 | [ ] | Migration idempotency confirmed by test | `migrations.integration.test.ts` passes |
 | [ ] | API routes integration test passes | `api-routes.integration.test.ts` — 18 tests |
 

@@ -1,22 +1,24 @@
 name: CI
 
 on:
-  # packages/* are separate Node workspaces with their own toolchains, each
-  # covered by its own workflow (broker-login-ci.yml, contract-notes-ci.yml),
-  # so a change there does not need the Bun / Biome / TimescaleDB matrix below.
+  # broker-login and contract-notes are separate Node workspaces with their own
+  # toolchains, each covered by its own workflow (broker-login-ci.yml,
+  # contract-notes-ci.yml), so a change there does not need the matrix below.
+  # packages/option-backtesting is NOT ignored — its Python job lives in this
+  # file, so ignoring packages/** wholesale would skip its own CI.
   push:
     branches: ['**']
-    paths-ignore: ['packages/**']
+    paths-ignore: ['packages/broker-login/**', 'packages/contract-notes/**']
   pull_request:
     branches: ['**']
-    paths-ignore: ['packages/**']
+    paths-ignore: ['packages/broker-login/**', 'packages/contract-notes/**']
   schedule:
     - cron: '0 2 * * *'   # nightly at 02:00 UTC
   workflow_dispatch:        # allow manual trigger
 
 jobs:
-  ci:
-    name: Typecheck · Lint · Unit Tests
+  ts:
+    name: Server — Typecheck · Lint · Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,8 +39,14 @@ jobs:
       - name: Verify lockfile not modified
         run: git diff --exit-code bun.lock
 
-      - name: TypeScript typecheck
-        run: bun run --bun tsc --noEmit
+      # The dashboard package is intentionally not typechecked here — it
+      # inherits the same exclusion the pre-split root tsconfig had (its
+      # frontend tree was never covered by CI typecheck). It has its own
+      # `bun run --filter @ata/dashboard typecheck` for local/opt-in use;
+      # wiring it into CI is tracked as a follow-up once its existing type
+      # errors are fixed.
+      - name: TypeScript typecheck (server)
+        run: bun run typecheck
 
       # Download Biome binary from GitHub Releases (avoids the JFrog npm proxy
       # which does not have @biomejs/biome cached). GitHub Releases is reachable
@@ -49,8 +57,44 @@ jobs:
       - name: Biome lint
         run: ./tools/biome check .
 
-      - name: Unit tests
+      - name: Server unit tests
         run: bun run test:unit
+
+  dashboard:
+    name: Dashboard — Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+      - run: bun install --frozen-lockfile
+      - name: Vite build
+        run: bun run --filter @ata/dashboard build
+      - name: Dashboard unit tests
+        run: bun run --filter @ata/dashboard test
+
+  python:
+    name: option-backtesting — Ruff · Pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/option-backtesting
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: '0.8.x'
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Pytest
+        run: uv run pytest
 
   integration:
     name: Integration Tests

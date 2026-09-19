@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "option-backtesting": {
+      "command": "uv",
+      "args": ["run", "--directory", "packages/option-backtesting", "obt-mcp"]
+    }
+  }
+}

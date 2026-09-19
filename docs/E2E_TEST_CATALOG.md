@@ -159,11 +159,11 @@ These scenarios are covered in unit or integration tests instead:
 
 | Scenario | Covered in |
 |----------|-----------|
-| DB-level audit log row exists after PUT | `src/test/integration/personalities-api.integration.test.ts` |
-| TimescaleDB hypertable migration idempotency | `src/test/integration/migrations.integration.test.ts` |
-| Peak detection algorithm correctness | `src/signals/__tests__/peak-detection-engine.test.ts` |
-| Replay determinism (100× identical-ledger gate) | `src/ingestion/historical/__tests__/replay-determinism.test.ts` |
-| Clockwork evolution guard (`is_frozen` check) | `src/trading/__tests__/entry-engine.test.ts` |
-| Razorpay webhook HMAC verification | `src/payment/__tests__/razorpay.test.ts` |
-| ATM strike rounding (property tests) | `src/utils/__tests__/atm-strike.property.test.ts` |
-| P&L arithmetic sign convention | `src/utils/__tests__/pnl.property.test.ts` |
+| DB-level audit log row exists after PUT | `apps/server/src/test/integration/personalities-api.integration.test.ts` |
+| TimescaleDB hypertable migration idempotency | `apps/server/src/test/integration/migrations.integration.test.ts` |
+| Peak detection algorithm correctness | `apps/server/src/signals/__tests__/peak-detection-engine.test.ts` |
+| Replay determinism (100× identical-ledger gate) | `apps/server/src/ingestion/historical/__tests__/replay-determinism.test.ts` |
+| Clockwork evolution guard (`is_frozen` check) | `apps/server/src/trading/__tests__/entry-engine.test.ts` |
+| Razorpay webhook HMAC verification | `apps/server/src/payment/__tests__/razorpay.test.ts` |
+| ATM strike rounding (property tests) | `apps/server/src/utils/__tests__/atm-strike.property.test.ts` |
+| P&L arithmetic sign convention | `apps/server/src/utils/__tests__/pnl.property.test.ts` |

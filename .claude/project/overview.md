@@ -21,6 +21,7 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - Fastify REST API (port 3000) — signal management, personality CRUD, paper-trade queries, retrospection triggers, live dashboard data, payment/order endpoints
 - WebSocket endpoint (`/ws/ticks`) — live tick stream for the React frontend
 - Payment routes — `POST /payment/create-order`, `POST /payment/webhook`, `GET /payment/balance`; access-gate middleware for subscription + credit checks
+- Backtest proxy routes (`/api/backtest/*`) — proxies to the loopback-only Python FastAPI service (`packages/option-backtesting`); `POST /runs` is access-gated and credit-consuming (feature `backtest_run`), `validate`/`presets`/`coverage`/`health` are free
 - Docker Compose — development infrastructure (TimescaleDB + Redis)
 - Simulation mode (`SIMULATE=true`) — fully self-contained, no broker credentials needed
 - **`packages/broker-login`** — daily Playwright job that logs the brokers into
@@ -37,11 +38,39 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
   - M2: Peak detection, probability scoring, 10-personality engine, 5-stage filter, Holder/Adjuster/Reducer management, portfolio risk rules, Personalities dashboard tab
   - M3a: Fyers historical REST client, idempotent backfill, straddle reconstruction, deterministic replay harness, regime tagging (T-33)
   - M7: Razorpay UPI payment system — order creation, HMAC webhook verification, credit consumption, geolocation, access-gate middleware, pricing page
-  - **M3 gaps remaining:** backtest runner (T-51) and per-regime statistical reporting (T-58) deferred
-  - **M4 gaps remaining:** BullMQ EOD job and full retrospection + evolution engine (T-34–T-38, T-40–T-42) not started
+  - **M3 (2026-09): T-51 landed** — `apps/server/src/backtesting/`
+    (`backtest-runner.ts`, `backtest-report.ts`, `stats.ts`). T-58 per-regime
+    statistical reporting is only partly covered: `packages/option-backtesting`
+    M-5 added regime bucketing (`analytics/regime_source.py`,
+    `features/regime.py`), but it is bucketing for analysis only and is not
+    wired as a live strategy-DSL condition — see that package's `DECISIONS.md`
+  - **M4 (2026-09): landed** — BullMQ EOD job (`jobs/eod-retrospection-job.ts`)
+    plus `apps/server/src/retrospection/` (`daily-metrics.ts`, `brier-score.ts`,
+    `management-effectiveness.ts`, `evolution-engine.ts`). T-34–T-38 and
+    T-40–T-42 are implemented; this records the modules' presence, not an audit
+    of their completeness
 - **Phase 2:** S/R signal detection engine, Levelhead personality, BankNifty/Sensex expansion, Bayesian optimisation
 - **Phase 3:** Strategies 2 & 3, genetic algorithms, microstructure-aware slippage
 - **Phase 4:** Reinforcement learning, live trading readiness assessment
+
+**`packages/option-backtesting` epic** (own M-0..M-5 numbering, distinct from the Phase/M-numbers
+above, which describe the TS trading engine) is **done, M-0 through M-5**: M-0 (monorepo move),
+M-1 (data layer + 90-day real backfill), M-2 (strategy DSL + feature registry), M-3 (bar-by-bar
+engine, golden-fixture-verified to the rupee), and M-4 (FastAPI service, Fastify proxy, React
+"Backtest" dashboard tab, MCP server). **M-5 (this milestone) is done:** margin model + return on
+peak margin (`engine/margin.py`); walk-forward analysis (`analytics/walkforward.py`, `obt
+walkforward`); parameter sweeps (`analytics/sweep.py`, `obt sweep`); an overfitting guard — CSCV/
+PBO + a simplified Deflated Sharpe Ratio (`analytics/overfit.py`, `obt sweep --overfit`); regime
+buckets read from the trading DB when `DATABASE_URL` is set, gracefully omitted otherwise
+(`analytics/regime_source.py` + `features/regime.py`) — bucketing only, not wired as a live
+strategy-DSL condition (see `DECISIONS.md`); personality export to a `PersonalityConfigM2`
+candidate with unrepresentable DSL constructs listed under `manual_review`, never guessed
+(`export/personality.py`, `obt export-personality <run_id>`); and a nightly ingest Routine
+(self-bound to a session rather than fresh-per-fire — this org's Routines don't support granting
+MCP connectors to a fresh session; see `DECISIONS.md`). The MCP server (`obt-mcp`) now also
+exposes `run_walkforward`/`run_sweep`/`check_overfit`/`export_personality`. The `packages/
+option-backtesting` epic itself is now feature-complete per its original scope; further work is
+tracked as ordinary follow-ups, not a new milestone number.
 
 ## Work in flight — AlgoTest execution loop
 
@@ -63,9 +92,12 @@ evaluated and declined.
 | `docs/pending-actions.md` | Everything blocked on the repo owner — secrets, cutover steps, open decisions |
 | `docs/runbooks/contract-notes-handover.md` | Ordered cutover for the daily sheet pipeline, with rollback |
 
-Nothing trades live yet, and nothing should until the backtest runner (T-51)
-and the M4 retrospection engine exist — probability scores are still
-uncalibrated, so the signal's edge is unmeasured.
+Nothing trades live yet. The measurement layer this depends on **does** exist —
+`apps/server/src/backtesting/` (T-51), `apps/server/src/retrospection/`
+(daily metrics, Brier scores, evolution engine), `jobs/eod-retrospection-job.ts`,
+and the `packages/option-backtesting` engine above. What remains before live
+execution is running the signal through them: probability scores are still not
+empirically calibrated, so the edge is unmeasured rather than unmeasurable.
 
 ## Project File Maintenance
 
