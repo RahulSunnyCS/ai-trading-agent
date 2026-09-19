@@ -235,8 +235,15 @@ The human decides; the machine executes. No unattended trading yet.
       RFC 6238 implementation instead of the former depending on `otplib`
       (now removed) while the latter carried its own.
 - [ ] `trade-analytics`: CJS → ESM
-- [ ] Merge `algo-automation` + `trade-analytics` → `trading-ops` monorepo
-- [ ] "Related Systems" block in each repo's `CLAUDE.md`
+- [x] Merge `algo-automation` + `trade-analytics` → monorepo — done, but
+      into `ai-trading-agent` itself (as `packages/broker-login` and
+      `packages/contract-notes`) rather than a separate `trading-ops` repo;
+      see "Work in flight" in `.claude/project/overview.md`
+- [x] "Related Systems" block in each repo's `CLAUDE.md` — added to
+      `packages/contract-notes/CLAUDE.md` and the new
+      `packages/broker-login/CLAUDE.md` here, plus the standalone
+      `algo-automation` (new `CLAUDE.md`, it had none) and `trade-analytics`
+      (existing `CLAUDE.md`) repos, on this same branch
 
 ---
 
