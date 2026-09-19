@@ -1,0 +1,38 @@
+# CI for the packages/broker-login workspace.
+#
+# ci.yml path-ignores this directory, so without this workflow a change to the
+# broker-login package would land with no checks at all. Kept deliberately thin:
+# the package has no test suite, and its real verification is a manual
+# workflow_dispatch run of "Daily broker login" against the live site.
+name: Broker Login CI
+
+on:
+  push:
+    branches: ['**']
+    paths: ['packages/broker-login/**', '.github/workflows/broker-login-ci.yml']
+  pull_request:
+    branches: ['**']
+    paths: ['packages/broker-login/**', '.github/workflows/broker-login-ci.yml']
+  workflow_dispatch:
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    env:
+      # No browsers needed to typecheck; skips a ~100MB download per run.
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+
+      - run: bun install --frozen-lockfile
+
+      - name: Verify lockfile not modified
+        run: git diff --exit-code bun.lock
+
+      - run: bun run typecheck
+        working-directory: packages/broker-login

@@ -47,7 +47,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: npm ci
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+
+      # Installs the whole workspace from the root bun.lock. The Playwright
+      # container already carries the browsers, so the postinstall download is
+      # skipped via PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD above.
+      - run: bun install --frozen-lockfile
 
       - name: Log in brokers
         env:
@@ -64,14 +71,15 @@ jobs:
           ONLY: ${{ inputs.only }}
           TRACE: ${{ inputs.trace && '1' || '' }}
           SKIP_WINDOW_GUARD: ${{ inputs.skip_window_guard && '1' || '' }}
-        run: npm run login
+        run: bun run login
+        working-directory: packages/broker-login
 
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: diagnostics-${{ github.run_id }}
-          path: artifacts/
+          path: packages/broker-login/artifacts/
           retention-days: 3
           if-no-files-found: ignore
 
@@ -87,8 +95,8 @@ jobs:
           printf '%s  %s  run %s\n' \
             "$(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M %Z')" \
             "${{ job.status }}" \
-            "${{ github.run_id }}" >> run-log.md
-          git add run-log.md
+            "${{ github.run_id }}" >> packages/broker-login/run-log.md
+          git add packages/broker-login/run-log.md
           git diff --cached --quiet && exit 0
           git commit -m "chore: broker login run log"
           for attempt in 1 2 3; do

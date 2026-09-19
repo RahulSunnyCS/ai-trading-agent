@@ -1,5 +1,5 @@
 {
-  "name": "algotest-login",
+  "name": "@trading/broker-login",
   "version": "1.0.0",
   "private": true,
   "type": "module",

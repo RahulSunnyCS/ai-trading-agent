@@ -1,6 +1,7 @@
 # AlgoTest Execution Integration — Plan
 
-**Status:** Phase 0 complete (API verified). Phase 1 not started.
+**Status:** Phase 0 complete. Signals API declined on cost — executing via
+Playwright behind a Telegram approval gate. Monorepo merge done.
 **Last updated:** 2026-09-19
 **Scope:** Personal account only. Not a subscriber-facing product feature.
 
@@ -127,29 +128,37 @@ what `src/trading/paper-trade-executor.ts` simulates. Mapping from
 - [ ] Confirm Q1–Q3 from live docs *(in progress — user)*
 - [ ] Authorize the AlgoTest MCP connector
 
-### Phase 1 — `algotest-client` (~1 week)
-Location: `src/execution/algotest/` in this repo.
-- [ ] `client.ts` — login, cookie/CSRF handling, re-login on 401
-- [ ] `types.ts` — typed `StrategyPayload`, `ExecutionCommand`, `ExecutionReport`
-- [ ] `idempotency.ts` — persist command ID before send; refuse replay
-- [ ] Kill switch (`ALGOTEST_EXECUTION_ENABLED`) checked on every call
-- [ ] Daily cap (max N starts/day), enforced server-side of our own code
-- [ ] **Paper endpoint hardcoded.** Live requires `ALGOTEST_LIVE=true`,
-      never set in any deployment yet.
-- [ ] Secret redaction — reuse the `registerSecret`/`redact` pattern from
-      `algo-automation/src/secrets.ts`
-- [ ] Vitest: happy path, 401 re-login, replay refusal, kill switch, cap
+### Phase 1 — Monorepo merge ✅ DONE
+- [x] `git subtree` `algo-automation` → `packages/broker-login` (14 commits preserved)
+- [x] Bun workspaces; workflow moved to root `.github/workflows/`
+- [x] Path-filtered CI + `broker-login-ci.yml` so the package still gets checked
+- [x] Dropped `package-lock.json` and the stray root `yarn.lock`
+- [x] `playwright` added to `trustedDependencies` (else Bun skips the browser postinstall)
 
-### Phase 2 — Signal → payload mapping
-- [ ] `personality-to-payload.ts` — `PersonalityConfig` → `StrategyPayload`
-- [ ] Property tests (fast-check is already a devDependency)
-- [ ] Assert lots/strike/expiry round-trip correctly
+### Phase 2 — Telegram approval gate  ← NEXT
+The human decides; the machine executes. No unattended trading yet.
 
-### Phase 3 — Shadow mode (flip on, then 4–8 weeks of data)
-- [ ] Every personality signal fires at the **paper** endpoint
-- [ ] Persist `ExecutionCommand` + AlgoTest response to Postgres
-- [ ] Dashboard panel: internal paper P&L vs AlgoTest paper P&L
-- [ ] Alert on divergence beyond a threshold
+- [ ] Signal fires → Telegram message with an **inline keyboard button**
+- [ ] **Never a clickable URL** — Telegram pre-fetches links for previews and
+      would trigger the trade before you tap it. `callback_query` only: no
+      public endpoint, no preview crawler.
+- [ ] Verify `callback_query.from.id` against our own Telegram user ID
+- [ ] Single-use: mark the command consumed on first tap; second tap no-ops.
+      This is the idempotency layer, sited at the human gate where it is cheapest.
+- [ ] Expiry: refuse a signal older than N minutes (a stale momentum entry is a
+      different trade)
+- [ ] Edit the message after action so the button disappears and the outcome shows
+- [ ] On approval → `repository_dispatch` → `activate-strategy.yml`
+
+### Phase 3 — Playwright strategy activation
+- [ ] Add `repository_dispatch` trigger to a new `activate-strategy.yml`
+- [ ] **Read-back assertion**: scrape strategy name + params from the DOM and
+      assert they match the command *before* clicking. Never click on position alone.
+- [ ] Dry-run default (`ACTIVATE_ENABLED` absent = log only)
+- [ ] Kill switch + daily cap
+- [ ] Post-act reconciliation: re-read AlgoTest state, alert on divergence
+- [ ] All locators in `packages/broker-login/src/selectors.ts` — single-file fix
+      when AlgoTest redesigns
 
 ### Phase 4 — Measure the signal *(the real prerequisite for live — runs in parallel)*
 - [ ] T-51 backtest runner
@@ -209,3 +218,6 @@ browser inside a GitHub Action — the trigger is an RPC either way.
 | Paper-first, live behind an env var | `broker_id` is live-only, so paper costs nothing and risks nothing |
 | Strategy config in our repo, not AlgoTest | The API takes the definition in-body anyway; version-controlled beats UI-defined |
 | Don't go live before Phase 4 | Probability scores are not calibrated (`technical.md`); backtest runner isn't built |
+| **Signals API declined** | ₹1,299/mo (₹4,999/6mo). TradingView Essential turned out *not* to be required — `ai-trading-agent` is the signal source, so TradingView never enters the flow. Cost still judged not worth it at this stage. Revisit if Playwright upkeep exceeds it. |
+| **Playwright + Telegram approval gate** | Keeps a human in the loop while the signal is uncalibrated, and exercises the automation under supervision before it ever runs unattended |
+| **Monorepo: `algo-automation` → `packages/broker-login`** | Owner's call. Isolation replaced in-repo: GitHub Environments with scoped secrets + required reviewers, CODEOWNERS on the package, path-filtered CI |
