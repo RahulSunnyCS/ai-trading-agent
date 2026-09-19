@@ -34,12 +34,13 @@ deployment: **[`docs/setup.md`](docs/setup.md)**.
 
 | Document | What it holds |
 |---|---|
+| [**`TODO.md`**](TODO.md) | **Single source of truth for open work** — priorities, owner-blocked vs codeable, and task contracts. Start here |
 | [`docs/product.md`](docs/product.md) | Why these strategies, how decisions are made, success criteria, risks, and the full 10-personality reference |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture, database schema, signal and evolution engines, API endpoints, backfill/replay/regime reference |
 | [`docs/setup.md`](docs/setup.md) | Local development (four paths), troubleshooting, production deployment |
 | [`docs/testing.md`](docs/testing.md) | Manual verification — numbered steps with expected values, plus the E2E catalogue |
-| [`docs/roadmap.md`](docs/roadmap.md) | Task catalogue — what each T-number covers — plus candidate work not committed to, with the case against each |
-| [`docs/algotest-execution.md`](docs/algotest-execution.md) | The AlgoTest execution loop — plan and API contract, actions blocked on the owner, and the cutover runbook |
+| [`docs/roadmap.md`](docs/roadmap.md) | Task catalogue — what each T-number covers — plus candidate work not committed to, with the case against each. Reference only; no status |
+| [`docs/algotest-execution.md`](docs/algotest-execution.md) | The AlgoTest execution loop — the verified API contract, decision log, and cutover runbook. Reference only; open items live in `TODO.md` |
 | [`docs/epics.md`](docs/epics.md) | Delivery records, one section per completed epic — archival |
 
 **Current status** lives in [`.claude/project/overview.md`](.claude/project/overview.md);

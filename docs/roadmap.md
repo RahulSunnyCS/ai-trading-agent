@@ -36,11 +36,15 @@ this file.
 
 ## Delivery Status
 
-**Status lives in `.claude/project/overview.md` → Implementation Phases**, which
-is auto-loaded into every session. It is not repeated here: this file and that
-one drifted apart before (the M3 row claimed T-51/T-58 complete while the gap
-list below still called them outstanding), which is what the one-fact-one-file
-rule in `CLAUDE.md` exists to prevent.
+**This file tracks no status and no priorities.** It drifted before — the M3 row
+once claimed T-51/T-58 complete while the gap list below still called them
+outstanding — which is exactly what the one-fact-one-file rule in `CLAUDE.md`
+exists to prevent. So:
+
+- **What is left to do** → [`/TODO.md`](../TODO.md), the single source of truth,
+  ordered by priority and marked per item as owner-blocked or codeable.
+- **What is already built** → `.claude/project/overview.md` → Implementation
+  Phases, auto-loaded into every session.
 
 What this file is for: the **task catalogue** — what each T-number covers, what
 it depends on, and what "done" meant for it. That detail exists nowhere else.
@@ -272,7 +276,8 @@ something observed in this codebase, and every item carries the case against it
 — an idea without a stated cost is a wish, not a proposal.
 
 Nothing here should be started without deciding it beats what is already in
-`docs/algotest-execution.md` → Pending actions.
+[`/TODO.md`](../TODO.md). Several of these have since been promoted into that
+file (#1–#7, #9); the rest stay here as the reasoned case for *not* doing them.
 
 Last updated: 2026-09-19
 

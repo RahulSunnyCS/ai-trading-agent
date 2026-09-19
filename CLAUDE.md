@@ -52,13 +52,21 @@ When the user types /start or opens a new session:
 
 ---
 
-## Shared Task Ledger (root TODO.md)
+## Shared Task Ledger (pipeline/todo-mirror.md)
 
-The repository root contains TODO.md — the human-readable mirror of the task plan. It follows a strict single-writer contract:
+**Root `TODO.md` is NOT a pipeline artifact.** It is the hand-maintained single
+source of truth for every open work item in this repository — priorities,
+owner-blocked items, and task contracts. The pipeline never writes it, never
+regenerates it, and never deletes it. Read it for context like any other
+project document.
 
-- The Lead Orchestrator is the ONLY writer. It (re)generates TODO.md from pipeline/tasks/T-XX.json at every phase boundary.
-- pipeline/tasks/T-XX.json is the source of truth; pipeline/progress.md tracks phase/gate state; TODO.md is the at-a-glance mirror — never an independent list.
-- All specialist, implementor, reviewer, and test agents READ TODO.md for context but NEVER write it (Phase 3 runs agents in parallel; shared writes are forbidden by the decomposition rule). Agents report status back to the orchestrator, which updates TODO.md.
+The pipeline's own at-a-glance mirror is `pipeline/todo-mirror.md`, which
+follows a strict single-writer contract:
+
+- The Lead Orchestrator is the ONLY writer. It (re)generates pipeline/todo-mirror.md from pipeline/tasks/T-XX.json at every phase boundary.
+- pipeline/tasks/T-XX.json is the source of truth; pipeline/progress.md tracks phase/gate state; pipeline/todo-mirror.md is the at-a-glance mirror — never an independent list.
+- All specialist, implementor, reviewer, and test agents READ pipeline/todo-mirror.md for context but NEVER write it (Phase 3 runs agents in parallel; shared writes are forbidden by the decomposition rule). Agents report status back to the orchestrator, which updates pipeline/todo-mirror.md.
+- When a pipeline run completes work that closes an item in root `TODO.md`, the orchestrator updates that item in the same commit as the code change — the same same-commit rule that governs `.claude/project/`.
 
 ---
 
@@ -334,7 +342,7 @@ After all sprints, score the plan internally:
 If score is below 8 out of 10, run one more sprint.
 If score is 8 or above, hand to the Translator agent (.claude/agents/translator.md).
 
-Then seed the root TODO.md with the high-level task list from the plan (orchestrator is the sole writer — see Shared Task Ledger).
+Then seed pipeline/todo-mirror.md with the high-level task list from the plan (orchestrator is the sole writer — see Shared Task Ledger). Root TODO.md is hand-maintained and is not touched here.
 
 ### Optional Recommendations (bounded — AI-initiated scope only)
 
@@ -397,7 +405,7 @@ Save each task as pipeline/tasks/T-XX.json:
   "output_format": "code plus plain English explanation of every non-obvious decision"
 }
 
-Regenerate the root TODO.md from these task contracts (read-only-for-agents mirror — see Shared Task Ledger).
+Regenerate pipeline/todo-mirror.md from these task contracts (read-only-for-agents mirror — see Shared Task Ledger).
 
 Present the full task list to the user and ask: Shall I proceed with implementation?
 
@@ -412,7 +420,7 @@ Rules:
 - Each agent must not touch files_forbidden
 - Each agent must output code plus a plain English explanation of every non-obvious decision made
 - If an agent is uncertain about any security-sensitive decision, it must stop and ask rather than assume
-- Agents read the root TODO.md for context but never write it; they report status to the orchestrator, which updates TODO.md and pipeline/progress.md
+- Agents read pipeline/todo-mirror.md (and root TODO.md) for context but never write either; they report status to the orchestrator, which updates pipeline/todo-mirror.md and pipeline/progress.md
 
 ---
 
@@ -497,7 +505,7 @@ Check:
 - Documentation updated?
 - Collated epic document written?
 
-Before the Final Summary Report, delegate to the Epic Doc Writer agent (.claude/agents/epic-doc-writer.md) to produce the collated epic/large-chunk delivery record as a new section in docs/epics.md — what was done, how it helps, limitations/tradeoffs and why, the tests the AI ran, manual test cases for humans, and security/risk notes. It reads pipeline artifacts read-only and never writes TODO.md or pipeline/progress.md. Trigger it on demand via /epic-doc when a large chunk completes mid-pipeline, not only at the end.
+Before the Final Summary Report, delegate to the Epic Doc Writer agent (.claude/agents/epic-doc-writer.md) to produce the collated epic/large-chunk delivery record as a new section in docs/epics.md — what was done, how it helps, limitations/tradeoffs and why, the tests the AI ran, manual test cases for humans, and security/risk notes. It reads pipeline artifacts read-only and never writes root TODO.md, pipeline/todo-mirror.md or pipeline/progress.md. Trigger it on demand via /epic-doc when a large chunk completes mid-pipeline, not only at the end.
 
 Produce the Final Summary Report, then hand it to the Translator agent (.claude/agents/translator.md) for a plain-English pass before presenting (preserve the resolved-findings counts, accepted risks, and the final recommendation verbatim).
 
@@ -505,7 +513,7 @@ HUMAN GATE 3: Final approval required before any merge or submit action. Present
 
 After Gate 3 approval, immediately clean up all pipeline working state:
 1. Delete the entire `pipeline/` directory — this includes risk_manifest.json, progress.md, token-usage.md, qa-checklist.md, tasks/, reviews/, diagnosis.md, and any other files written during the pipeline run.
-2. Delete `TODO.md` from the repository root — it is a mirror of the task list, now permanently superseded by the epic record in `docs/epics.md`.
+2. Delete `pipeline/todo-mirror.md` — it is a mirror of the pipeline task list, now permanently superseded by the epic record in `docs/epics.md`. **Never delete root `TODO.md`** — it is the hand-maintained source of truth and outlives every pipeline run.
 3. Commit the cleanup with message: `chore: clean up pipeline working state after Gate 3`.
 4. The permanent record is `docs/epics.md`. Never delete that.
 
@@ -750,6 +758,6 @@ FINAL RECOMMENDATION
 2. Never skip a Human Gate even if the next phase seems obvious (exception: the express lane and the docs lane each merge the three gates into one lightweight confirmation — see Human Gate Rules — the gate is merged, never skipped, and the human still explicitly approves once).
 3. Always explain decisions in plain English alongside any technical output.
 4. If you find something alarming at any phase, surface it immediately. Do not wait for the review phase.
-5. Keep pipeline/progress.md updated after every phase, and regenerate the root TODO.md from pipeline/tasks/ at every phase boundary (orchestrator is the sole writer; agents read-only). After each agent delegation, append one row to pipeline/token-usage.md (see Pipeline Token Log).
+5. Keep pipeline/progress.md updated after every phase, and regenerate pipeline/todo-mirror.md from pipeline/tasks/ at every phase boundary (orchestrator is the sole writer; agents read-only). Close out any root TODO.md item the run completed, in the same commit as the code. After each agent delegation, append one row to pipeline/token-usage.md (see Pipeline Token Log).
 6. Never delete or overwrite files outside the task scope without explicit user confirmation. Exception: the pipeline/ cleanup after Gate 3 approval is explicitly authorised (see Phase 7).
 7. When in doubt about scope, ask. A short clarifying question is always better than a wrong assumption.
