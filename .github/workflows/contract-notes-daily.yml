@@ -1,8 +1,16 @@
 name: Daily Trading Data Processing
 
 on:
-  schedule:
-    - cron: "1 0 * * *"
+  # SCHEDULE DISABLED for the monorepo migration. The trade-analytics repo still
+  # owns this cron; enabling it here too would have both copies writing the same
+  # Google Sheet on the same night, duplicating rows and corrupting row_tracker.
+  #
+  # To hand over: (1) disable the cron in trade-analytics, (2) run this workflow
+  # once via workflow_dispatch and check the row it picks against the sheet --
+  # the `row-tracker` artifact does NOT migrate, so the first run here falls back
+  # to reading the sheet, (3) then uncomment the block below.
+  # schedule:
+  #   - cron: "1 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -33,7 +41,7 @@ jobs:
               -o artifact.zip \
               "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip"
             
-            unzip artifact.zip
+            unzip artifact.zip -d packages/contract-notes
           fi
         shell: bash
 
@@ -45,14 +53,22 @@ jobs:
       - name: Install qpdf
         run: sudo apt-get update && sudo apt-get install -y qpdf
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+
+      # Bun installs the workspace from the root lockfile. The package's own
+      # scripts still invoke `node`, so setup-node above remains the runtime.
       - name: Install dependencies
-        run: npm install
+        run: bun install --frozen-lockfile
 
       - name: Run unit tests
-        run: npm test
+        run: bun run test
+        working-directory: packages/contract-notes
 
       - name: Check sheet dates
-        run: npm run check-dates
+        run: bun run check-dates
+        working-directory: packages/contract-notes
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
@@ -75,7 +91,7 @@ jobs:
             # gap and reported at the end. It must not abort the run: the
             # remaining dates, and the row-tracker progress made so far, are
             # worth far more than failing fast on one bad contract note.
-            if ! TARGET_DATE="$date" npm run fetch; then
+            if ! TARGET_DATE="$date" bun run fetch; then
               echo "::warning title=Fetch failed::$date could not be fetched or decrypted — left as a gap"
               skipped="$skipped $date"
               rm -rf ./data
@@ -92,7 +108,7 @@ jobs:
             fi
             echo "✅ Decrypted PDF files found: $count"
 
-            if ! TARGET_DATE="$date" npm run parse; then
+            if ! TARGET_DATE="$date" bun run parse; then
               echo "::warning title=Parse failed::$date could not be parsed — left as a gap"
               skipped="$skipped $date"
               rm -rf ./data
@@ -100,7 +116,7 @@ jobs:
               continue
             fi
 
-            TARGET_DATE="$date" npm run sheet
+            TARGET_DATE="$date" bun run sheet
             updated=true
             # Recorded per date, so the artifact is still uploaded if a later
             # date aborts the run.
@@ -117,6 +133,7 @@ jobs:
             echo "::error title=Dates left unprocessed::$skipped"
             exit 1
           fi
+        working-directory: packages/contract-notes
         env:
           BROKER_ACCOUNTS_JSON: ${{ secrets.BROKER_ACCOUNTS_JSON }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
@@ -131,7 +148,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: row-tracker
-          path: row_tracker.json
+          path: packages/contract-notes/row_tracker.json
 
       - name: Delete old artifacts
         if: success() && env.updated == 'true'

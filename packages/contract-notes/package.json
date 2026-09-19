@@ -1,5 +1,5 @@
 {
-  "name": "shoonya-contract-parser",
+  "name": "@trading/contract-notes",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -19,6 +19,7 @@
   "dependencies": {
     "dotenv": "^16.5.0",
     "google-spreadsheet": "^4.1.4",
+    "google-auth-library": "^9.15.1",
     "googleapis": "^148.0.0",
     "imap": "^0.8.19",
     "mailparser": "^3.7.2",

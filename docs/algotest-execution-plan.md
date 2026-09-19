@@ -130,10 +130,32 @@ what `src/trading/paper-trade-executor.ts` simulates. Mapping from
 
 ### Phase 1 — Monorepo merge ✅ DONE
 - [x] `git subtree` `algo-automation` → `packages/broker-login` (14 commits preserved)
+- [x] `git subtree` `trade-analytics` → `packages/contract-notes` (47 commits preserved)
 - [x] Bun workspaces; workflow moved to root `.github/workflows/`
 - [x] Path-filtered CI + `broker-login-ci.yml` so the package still gets checked
 - [x] Dropped `package-lock.json` and the stray root `yarn.lock`
 - [x] `playwright` added to `trustedDependencies` (else Bun skips the browser postinstall)
+- [x] Declared four dependencies that were imported but never listed — they had
+      only ever resolved through hoisting: `fastify-plugin`, `ws` (root),
+      `google-auth-library` (contract-notes), and `tsconfig` types `bun-types` → `bun`
+
+#### ⚠️ contract-notes handover — do this before enabling the cron
+
+The `row-tracker` GitHub Actions artifact is scoped to the **trade-analytics**
+repo and does **not** migrate. `contract-notes-daily.yml` therefore ships with
+its schedule commented out — two live copies would write the same Google Sheet
+on the same night, duplicating rows and corrupting `row_tracker.json`.
+
+- [ ] Disable the cron in the `trade-analytics` repo
+- [ ] Run `Daily Trading Data Processing` here once via `workflow_dispatch`
+- [ ] Check the row it picks against the sheet. With no artifact present,
+      `updateSheet.js` falls back to reading the sheet for the next empty row —
+      verify it did not skip or overwrite a real trading day
+- [ ] Confirm the run uploaded a fresh `row-tracker` artifact
+- [ ] Only then uncomment the `schedule:` block
+
+Note: `contract-notes-row-tracker.yml` **cannot bootstrap this** — it exits 1
+when no artifact exists. The first dispatch run is the only way to seed it.
 
 ### Phase 2 — Telegram approval gate  ← NEXT
 The human decides; the machine executes. No unattended trading yet.

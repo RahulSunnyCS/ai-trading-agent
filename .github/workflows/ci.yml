@@ -1,15 +1,15 @@
 name: CI
 
 on:
-  # packages/broker-login is a separate Node + Playwright workspace with its own
-  # toolchain — it is covered by broker-login-ci.yml instead, so a change there
-  # does not need the Bun / Biome / TimescaleDB matrix below.
+  # packages/* are separate Node workspaces with their own toolchains, each
+  # covered by its own workflow (broker-login-ci.yml, contract-notes-ci.yml),
+  # so a change there does not need the Bun / Biome / TimescaleDB matrix below.
   push:
     branches: ['**']
-    paths-ignore: ['packages/broker-login/**']
+    paths-ignore: ['packages/**']
   pull_request:
     branches: ['**']
-    paths-ignore: ['packages/broker-login/**']
+    paths-ignore: ['packages/**']
   schedule:
     - cron: '0 2 * * *'   # nightly at 02:00 UTC
   workflow_dispatch:        # allow manual trigger

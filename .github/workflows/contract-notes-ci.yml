@@ -1,0 +1,39 @@
+# CI for the packages/contract-notes workspace.
+#
+# ci.yml path-ignores packages/**, so without this the Jest suite covering the
+# broker PDF extractors would never run. No qpdf here: the tests work off the
+# text fixtures in tests/fixtures/, not encrypted PDFs.
+name: Contract Notes CI
+
+on:
+  push:
+    branches: ['**']
+    paths: ['packages/contract-notes/**', '.github/workflows/contract-notes-ci.yml']
+  pull_request:
+    branches: ['**']
+    paths: ['packages/contract-notes/**', '.github/workflows/contract-notes-ci.yml']
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Jest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The package is CommonJS and its scripts shell out to `node`.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+
+      - run: bun install --frozen-lockfile
+
+      - name: Verify lockfile not modified
+        run: git diff --exit-code bun.lock
+
+      - run: bun run test
+        working-directory: packages/contract-notes
