@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "@trading/notify": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

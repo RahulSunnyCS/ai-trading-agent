@@ -1,4 +1,5 @@
 import { mkdir } from 'node:fs/promises';
+import { istTimestamp, sendText } from '@trading/notify';
 import { type BrowserContext, type Page, chromium } from 'playwright';
 import {
   algotestLogin,
@@ -19,7 +20,7 @@ import {
 } from './brokers/types.js';
 import { type Config, loadConfig, readTelegramConfig } from './config.js';
 import { ARTIFACTS_DIR, describe, dumpHtml, safeScreenshot } from './diagnose.js';
-import { formatReport, istTimestamp, sendTelegram } from './notify.js';
+import { formatReport } from './notify.js';
 import { brokerPage } from './selectors.js';
 import { waitForNextWindow } from './totp.js';
 
@@ -195,7 +196,7 @@ async function main(): Promise<number> {
   } catch (error) {
     const message = `🚨 Startup failed\nAlgoTest broker login, ${istTimestamp()} IST\n${describe(error)}`;
     console.error(message);
-    await sendTelegram(telegram, message);
+    await sendText(telegram, message);
     return 1;
   }
 
@@ -235,7 +236,7 @@ async function main(): Promise<number> {
     : formatReport(results, config.runUrl);
 
   console.log(`\n${report}`);
-  await sendTelegram(config.telegram, report);
+  await sendText(config.telegram, report);
 
   const failed = results.some((r) => r.status === 'FAIL');
   return fatal || failed ? 1 : 0;
@@ -250,7 +251,7 @@ async function main(): Promise<number> {
 function crashAlert(source: string, error: unknown): void {
   console.error(`${source}:`, describe(error));
   const message = `💥 Crashed (${source})\nAlgoTest broker login, ${istTimestamp()} IST\n${describe(error)}`;
-  sendTelegram(readTelegramConfig(), message)
+  sendText(readTelegramConfig(), message)
     .catch(() => undefined)
     .finally(() => process.exit(1));
 }

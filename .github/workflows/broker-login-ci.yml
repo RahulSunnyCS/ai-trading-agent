@@ -1,18 +1,21 @@
-# CI for the packages/broker-login workspace.
+# CI for the Node workspaces that ci.yml path-ignores: packages/broker-login
+# and packages/notify. Without this they would land with no checks at all.
 #
-# ci.yml path-ignores this directory, so without this workflow a change to the
-# broker-login package would land with no checks at all. Kept deliberately thin:
-# the package has no test suite, and its real verification is a manual
-# workflow_dispatch run of "Daily broker login" against the live site.
-name: Broker Login CI
+# broker-login depends on notify, so a change to either must typecheck both —
+# which is why they share one workflow rather than getting one each.
+#
+# Kept deliberately thin: neither package has a test suite, and broker-login's
+# real verification is a manual workflow_dispatch run of "Daily broker login"
+# against the live site.
+name: Node Packages CI
 
 on:
   push:
     branches: ['**']
-    paths: ['packages/broker-login/**', '.github/workflows/broker-login-ci.yml']
+    paths: ['packages/broker-login/**', 'packages/notify/**', '.github/workflows/broker-login-ci.yml']
   pull_request:
     branches: ['**']
-    paths: ['packages/broker-login/**', '.github/workflows/broker-login-ci.yml']
+    paths: ['packages/broker-login/**', 'packages/notify/**', '.github/workflows/broker-login-ci.yml']
   workflow_dispatch:
 
 jobs:
@@ -34,5 +37,10 @@ jobs:
       - name: Verify lockfile not modified
         run: git diff --exit-code bun.lock
 
-      - run: bun run typecheck
+      - name: Typecheck notify
+        run: bun run typecheck
+        working-directory: packages/notify
+
+      - name: Typecheck broker-login
+        run: bun run typecheck
         working-directory: packages/broker-login

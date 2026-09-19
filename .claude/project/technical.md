@@ -150,6 +150,10 @@ ai-trading-agent/
 │                                     # + types/backtest.ts — the options-backtesting research tab (M-4),
 │                                     # fed entirely through /api/backtest/* (never the Python service directly)
 └── packages/
+    ├── notify/                      # @trading/notify — outbound notifications plus the
+    │                                 # never-emit secret registry. Imported by the Node/Bun
+    │                                 # workspaces; Python mirrors the Notification shape
+    │                                 # rather than importing (see Notifications below).
     ├── broker-login/                # Node 20 + Playwright. Was the algo-automation repo, merged via
     │                                 # git subtree (history preserved). Logs Angel One and
     │                                 # Finvasia/Shoonya into AlgoTest each morning via TOTP; the broker
@@ -342,4 +346,16 @@ Critical variables whose misconfiguration causes real pain:
   latent bugs were found during the monorepo merge (`fastify-plugin`, `ws`,
   `google-auth-library`, and the `bun-types` types reference). **Always declare
   what you import**; never rely on a transitive copy being reachable
+- **Notifications go through `@trading/notify`** — never call the Telegram API
+  directly. It redacts every outbound string against the same registry that
+  masks GitHub Actions logs, and it deliberately never sets `parse_mode`
+  (broker names break Telegram's Markdown parser and Telegram then drops the
+  whole message silently). `send()` is the structured API; `sendText()` is for
+  a caller that builds its own layout. Buttons are `callback_data`, never
+  URLs — Telegram pre-fetches links for previews, so a URL fires before anyone
+  taps it. **The boundary is the contract, not a service:** `broker-login`
+  runs in GitHub Actions while `apps/server` runs on Railway, so routing
+  alerts through the server would mean losing the alert that says the server
+  is down. Python callers reimplement ~40 lines against the same
+  `Notification` shape
 - **Bun-only repo** — do not run `npm install` or `yarn install`. They generate a `package-lock.json` or `yarn.lock` that will conflict with `bun.lock`

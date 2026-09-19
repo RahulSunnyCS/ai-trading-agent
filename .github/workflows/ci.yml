@@ -8,10 +8,10 @@ on:
   # file, so ignoring packages/** wholesale would skip its own CI.
   push:
     branches: ['**']
-    paths-ignore: ['packages/broker-login/**', 'packages/contract-notes/**']
+    paths-ignore: ['packages/broker-login/**', 'packages/contract-notes/**', 'packages/notify/**']
   pull_request:
     branches: ['**']
-    paths-ignore: ['packages/broker-login/**', 'packages/contract-notes/**']
+    paths-ignore: ['packages/broker-login/**', 'packages/contract-notes/**', 'packages/notify/**']
   schedule:
     - cron: '0 2 * * *'   # nightly at 02:00 UTC
   workflow_dispatch:        # allow manual trigger

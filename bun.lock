@@ -74,6 +74,7 @@
       "name": "@trading/broker-login",
       "version": "1.0.0",
       "dependencies": {
+        "@trading/notify": "workspace:*",
         "playwright": "1.63.0",
       },
       "devDependencies": {
@@ -96,6 +97,14 @@
       },
       "devDependencies": {
         "jest": "^30.4.2",
+      },
+    },
+    "packages/notify": {
+      "name": "@trading/notify",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "^22.10.0",
+        "typescript": "^5.7.0",
       },
     },
   },
@@ -580,6 +589,8 @@
     "@trading/broker-login": ["@trading/broker-login@workspace:packages/broker-login"],
 
     "@trading/contract-notes": ["@trading/contract-notes@workspace:packages/contract-notes"],
+
+    "@trading/notify": ["@trading/notify@workspace:packages/notify"],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.4", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A=="],
 
@@ -1906,6 +1917,8 @@
     "@sinonjs/commons/type-detect": ["type-detect@4.0.8", "", {}, "sha512-0fr/mIH1dlO+x7TlcMy+bIDqKPsw/70tVyeHW787goQjhmqaZe10uwLujubK9q9Lg6Fiho1KUKDYz0Z7k7g5/g=="],
 
     "@trading/broker-login/@types/node": ["@types/node@22.20.4", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA=="],
+
+    "@trading/notify/@types/node": ["@types/node@22.20.4", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA=="],
 
     "@vitest/coverage-v8/@vitest/utils": ["@vitest/utils@4.1.7", "", { "dependencies": { "@vitest/pretty-format": "4.1.7", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-T532WBu791cBxJlCl6SO+J14l81DQx6uQHm1bQbmCDY7nqlEIgkza/UFnSBNaUtSf41unldDFjdOBYEQC4b5Hw=="],
 
