@@ -275,12 +275,30 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`
 - **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `apps/server/src/types/fyers-api-v3.d.ts` covers the SDK surface we use
 - **No default exports:** Use named exports throughout
+- **Dashboard data fetching goes through `usePolledResource<T>`**
+  (`apps/dashboard/src/hooks/usePolledResource.ts`) — never hand-roll another
+  AbortController + in-flight-guard fetch loop. It existed independently in
+  ~10 hooks before being extracted, and two of them (usePersonalities,
+  useRegimeTags) had a real bug from that duplication: calling `refresh()`
+  while a fetch was already in flight aborted it and then skipped starting a
+  replacement, leaving the view stuck on "loading" forever. The shared hook
+  fixes this by construction — `refetch()` (including the initial mount
+  fetch) always cancels and replaces; only a poll tick skips itself when one
+  is already in flight, so a slow endpoint does not pile up overlapping
+  requests. Pass `{ intervalMs }` for a polling hook (e.g. `usePaperTrades`);
+  omit it for fetch-once-with-manual-refresh (most of the others)
 
 ## Testing
 
 - **Unit tests (Vitest):** Peak detection algorithm, decision engine filter stages (each stage independently), evolution rule trigger conditions, P&L calculations, parameter clamping, ATM strike rounding, symbol builder correctness
 - **Integration tests (Vitest):** Signal → personality → paper trade full flow; Redis Streams message passing; TimescaleDB continuous aggregate correctness. Require Docker services to be running
 - **E2E tests (Playwright):** Dashboard renders live data; trade log updates in real-time; retrospection results display
+- **Dashboard hook tests (Vitest + `@testing-library/react` + `happy-dom`):**
+  `apps/dashboard/src/hooks/__tests__/usePolledResource.test.tsx` — the only
+  hook test file so far, and the only one needing a DOM. It opts in per-file
+  via a `// @vitest-environment happy-dom` pragma rather than changing
+  `vitest.config.ts`'s shared `'node'` default, so the two existing
+  pure-logic test files are unaffected
 - **No coverage threshold set yet** — will be added when Sprint 2 test suite stabilises
 - **Backtesting requirement:** Before any production deployment, run against minimum 6 months of historical tick data with separate training and test periods
 
