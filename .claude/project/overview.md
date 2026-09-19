@@ -23,6 +23,11 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - Payment routes — `POST /payment/create-order`, `POST /payment/webhook`, `GET /payment/balance`; access-gate middleware for subscription + credit checks
 - Docker Compose — development infrastructure (TimescaleDB + Redis)
 - Simulation mode (`SIMULATE=true`) — fully self-contained, no broker credentials needed
+- **`packages/broker-login`** — daily Playwright job that logs the brokers into
+  AlgoTest (08:35 IST weekdays). Schedule currently disabled pending cutover
+- **`packages/contract-notes`** — daily job turning broker contract-note emails
+  into realised F&O P&L in a Google Sheet. Schedule currently disabled pending
+  cutover; the `trade-analytics` repo still owns the live cron
 
 ## Implementation Phases
 
@@ -37,6 +42,30 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - **Phase 2:** S/R signal detection engine, Levelhead personality, BankNifty/Sensex expansion, Bayesian optimisation
 - **Phase 3:** Strategies 2 & 3, genetic algorithms, microstructure-aware slippage
 - **Phase 4:** Reinforcement learning, live trading readiness assessment
+
+## Work in flight — AlgoTest execution loop
+
+The repo was consolidated into a Bun-workspace monorepo (2026-09-19):
+`algo-automation` → `packages/broker-login` and `trade-analytics` →
+`packages/contract-notes`, both via `git subtree` with history preserved.
+
+The goal is to close the loop: a signal from this agent triggers a real
+strategy on AlgoTest, and the resulting contract note comes back as realised
+P&L to measure the signal against. Execution runs through Playwright behind a
+Telegram approval gate — the paid AlgoTest Signals API (₹1,299/mo) was
+evaluated and declined.
+
+**Start here — these three documents carry the state:**
+
+| Document | What it holds |
+|---|---|
+| `docs/algotest-execution-plan.md` | Phases, the verified AlgoTest API contract, and the decision log with rationale |
+| `docs/pending-actions.md` | Everything blocked on the repo owner — secrets, cutover steps, open decisions |
+| `docs/runbooks/contract-notes-handover.md` | Ordered cutover for the daily sheet pipeline, with rollback |
+
+Nothing trades live yet, and nothing should until the backtest runner (T-51)
+and the M4 retrospection engine exist — probability scores are still
+uncalibrated, so the signal's edge is unmeasured.
 
 ## Project File Maintenance
 

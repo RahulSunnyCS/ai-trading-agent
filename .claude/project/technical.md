@@ -21,8 +21,15 @@
 
 ## Package Manager & Runtime
 
+- **Monorepo:** Bun workspaces (`workspaces: ["packages/*"]`). One `bun.lock` at
+  the root covers the root app and every package
 - **Package manager:** Bun — single lockfile (`bun.lock`). Do not use `npm` or `yarn`; they will create a second lockfile and conflict
-- **Runtime:** Bun (latest) — `bun run <script>` for everything. Node.js is NOT used directly
+- **Runtime:** Bun for the root app. **`packages/contract-notes` runs on Node 20**
+  — it is CommonJS and its scripts shell out to `node`. Bun owns the install;
+  Node is the runtime there
+- **CI pins bun `1.2.x`**, which *hoists*; bun 1.3+ uses an *isolated* layout for
+  workspaces. Both read the same lockfile — verified — but they produce different
+  `node_modules` trees. See the hoisting gotcha below
 - **TypeScript:** Compiled and executed natively by Bun — no `tsc` build step for running. `tsc --noEmit` is used only for type-checking
 
 ## Essential Commands
@@ -48,6 +55,11 @@ bun start                   # production-style start
 # Type-check only (no emit)
 bun run --bun tsc --noEmit
 
+# Workspace-wide
+bun run --filter '*' typecheck     # packages only — NOT the root app
+(cd packages/broker-login   && bun run typecheck)
+(cd packages/contract-notes && bun run test)   # Jest; needs Node 20 on PATH
+
 # Tests
 bun test                    # all tests
 bun run test:unit           # unit tests only
@@ -60,8 +72,18 @@ docker compose down -v      # stop + destroy data volumes (full reset)
 
 ## Repository Structure
 
+Three workspaces. The root app is not itself a workspace member — it lives at
+the root, so `bun run --filter '*'` reaches the packages but not the app.
+
 ```
 ai-trading-agent/
+├── packages/
+│   ├── broker-login/               # Node 20 + Playwright. Daily AlgoTest broker
+│   │                               # login (Angel One, Finvasia/Shoonya) via TOTP.
+│   │                               # Was the algo-automation repo.
+│   └── contract-notes/             # Node 20 + CJS + Jest. Gmail IMAP → qpdf →
+│                                   # PDF parse → Google Sheet. Was trade-analytics.
+│                                   # Has its own CLAUDE.md.
 ├── src/
 │   ├── db/
 │   │   ├── client.ts               # PostgreSQL pool + query helpers
@@ -184,4 +206,9 @@ Critical variables whose misconfiguration causes real pain:
 - **Comparison integrity drift** — if Precision, Adjuster, or Reducer `min_probability` thresholds drift more than 8 percentage points apart, the management comparison is invalidated. The `checkComparisonIntegrity()` function must run before any threshold evolution rule is applied
 - **Simulation is not a mock** — `SIMULATE=true` runs the full production pipeline with synthetic data. It writes to the real database and Redis. Use `docker compose down -v` to reset state between test runs if needed
 - **Port conflicts** — PostgreSQL default port 5432, Redis default 6379. If either is in use locally, edit the port mapping in `docker-compose.yml` and update the corresponding `_URL` env var
+- **Hoisting differs by bun version** — 1.2 hoists, 1.3 isolates. A transitive
+  dependency that resolves by accident under 1.2 will fail under 1.3. Four such
+  latent bugs were found during the monorepo merge (`fastify-plugin`, `ws`,
+  `google-auth-library`, and the `bun-types` types reference). **Always declare
+  what you import**; never rely on a transitive copy being reachable
 - **Bun-only repo** — do not run `npm install` or `yarn install`. They generate a `package-lock.json` or `yarn.lock` that will conflict with `bun.lock`
