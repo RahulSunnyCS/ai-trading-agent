@@ -139,23 +139,26 @@ what `src/trading/paper-trade-executor.ts` simulates. Mapping from
       only ever resolved through hoisting: `fastify-plugin`, `ws` (root),
       `google-auth-library` (contract-notes), and `tsconfig` types `bun-types` → `bun`
 
-#### ⚠️ contract-notes handover — do this before enabling the cron
+#### Handover before either cron is enabled
 
-The `row-tracker` GitHub Actions artifact is scoped to the **trade-analytics**
-repo and does **not** migrate. `contract-notes-daily.yml` therefore ships with
-its schedule commented out — two live copies would write the same Google Sheet
-on the same night, duplicating rows and corrupting `row_tracker.json`.
+Both daily workflows ship with their `schedule:` commented out, and GitHub only
+fires schedules from the default branch (`main-demo`), so nothing runs twice
+today. The cutover sequence, the 15 repository secrets that do **not** migrate,
+and the rollback path are in
+**[`docs/runbooks/contract-notes-handover.md`](../runbooks/contract-notes-handover.md)**.
 
-- [ ] Disable the cron in the `trade-analytics` repo
-- [ ] Run `Daily Trading Data Processing` here once via `workflow_dispatch`
-- [ ] Check the row it picks against the sheet. With no artifact present,
-      `updateSheet.js` falls back to reading the sheet for the next empty row —
-      verify it did not skip or overwrite a real trading day
-- [ ] Confirm the run uploaded a fresh `row-tracker` artifact
-- [ ] Only then uncomment the `schedule:` block
+#### Toolchain: bun pin verified ✅
 
-Note: `contract-notes-row-tracker.yml` **cannot bootstrap this** — it exits 1
-when no artifact exists. The first dispatch run is the only way to seed it.
+CI pins bun `1.2.x`; the lockfile was generated with `1.3.11`. Tested directly
+by installing 1.2.21 from npm and running CI's exact sequence:
+`bun install --frozen-lockfile` succeeds, leaves `bun.lock` untouched (so
+`git diff --exit-code bun.lock` passes), and typecheck, the 956 root unit tests
+and the 113 contract-notes Jest tests all pass under it. **No pin change needed.**
+
+Worth knowing: 1.2 hoists and 1.3 isolates, so the two produce different
+`node_modules` layouts from the same lockfile. The repo works under both now
+only because the four previously-undeclared dependencies were made explicit —
+under 1.2's hoisting they would still be silently resolving by accident.
 
 ### Phase 2 — Telegram approval gate  ← NEXT
 The human decides; the machine executes. No unattended trading yet.
