@@ -30,21 +30,43 @@ export const shoonya: Broker = {
     const popup = await popupPromise;
     const target = popup ?? page;
 
-    await step(target, 'shoonya-fill-form', async () => {
-      const userId = shoonyaForm.userId(target);
-      await userId.waitFor({ state: 'visible', timeout: 30_000 });
-      await userId.fill(config.shoonya.clientId);
-      await shoonyaForm.password(target).fill(config.shoonya.password);
-      // Generated last so as little of the 30-second window as possible is spent.
-      await shoonyaForm.totp(target).fill(await freshTotp(config.shoonya.totpSecret));
+    // Either the login form, or - if this browser already holds a Finvasia session -
+    // the OAuth consent screen with no form at all.
+    await step(target, 'shoonya-await-login-page', async () => {
+      await shoonyaForm
+        .userId(target)
+        .or(shoonyaForm.authorize(target))
+        .first()
+        .waitFor({ state: 'visible', timeout: 30_000 });
     });
 
-    await step(target, 'shoonya-submit', async () => {
-      await shoonyaForm.submit(target).click();
-    });
+    if (await shoonyaForm.authorize(target).isVisible().catch(() => false)) {
+      await step(target, 'shoonya-authorize', async () => {
+        await shoonyaForm.authorize(target).click();
+      });
+    } else {
+      await step(target, 'shoonya-fill-form', async () => {
+        await shoonyaForm.userId(target).fill(config.shoonya.clientId);
+        await shoonyaForm.password(target).fill(config.shoonya.password);
+        // Generated last so as little of the 30-second window as possible is spent.
+        await shoonyaForm.totp(target).fill(await freshTotp(config.shoonya.totpSecret));
+      });
+
+      await step(target, 'shoonya-submit', async () => {
+        await shoonyaForm.submit(target).click();
+      });
+    }
 
     await target.waitForTimeout(3_000);
     if (!target.isClosed()) await safeScreenshot(target, 'shoonya-after-submit');
+
+    // Some sessions get the consent screen after the credentials are accepted instead.
+    if (!target.isClosed() && (await shoonyaForm.authorize(target).isVisible().catch(() => false))) {
+      await step(target, 'shoonya-authorize', async () => {
+        await shoonyaForm.authorize(target).click();
+      });
+      await target.waitForTimeout(3_000);
+    }
 
     // Only scan for errors while the login form is still showing - after a successful
     // login the tab is back on AlgoTest, where the scan could false-positive.

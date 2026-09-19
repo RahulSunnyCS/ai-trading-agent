@@ -76,7 +76,7 @@ async function waitForLoginWindow(config: Config): Promise<void> {
  * unrelated word on the page can't masquerade as a rejection.
  */
 async function lookForRejection(page: Page, broker: Broker): Promise<string> {
-  for (let i = 0; i < 6; i += 1) {
+  for (let i = 0; i < 15; i += 1) {
     if ((await readBrokerState(page, broker)) === 'logged_in') return '';
     const text = await visibleErrorText(page);
     if (text && classifyError(text) !== 'UNKNOWN') return text;
@@ -126,7 +126,10 @@ async function attemptBroker(page: Page, broker: Broker, config: Config): Promis
         const seconds = Math.round((Date.now() - started) / 1000);
         return result('OK', `logged in (${seconds}s)`);
       }
-      lastDetail = `submitted but row still shows ${state}`;
+      // login() returned without error, so the credentials went in. Resubmitting them
+      // would only risk a lockout and can't fix a callback that didn't register.
+      await safeScreenshot(page, `${broker.key}-row-not-updated`);
+      return result('FAIL', `submitted but row still shows ${state} - NOT retried`);
     } catch (error) {
       kind = error instanceof BrokerLoginError ? error.kind : 'UNKNOWN';
       lastDetail = describe(error);

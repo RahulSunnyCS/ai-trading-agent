@@ -106,6 +106,13 @@ export const shoonyaForm = {
   totp: (page: Page): Locator => page.locator('#lgnotp'),
 
   submit: (page: Page): Locator => page.locator('button.lgnBtnClss'),
+
+  /**
+   * OAuth consent screen ("wants to access your account"). Finvasia shows it instead of
+   * the login form whenever the browser already holds a Finvasia session - seen on a
+   * GitHub runner when a second attempt followed a first one that had logged in.
+   */
+  authorize: (page: Page): Locator => page.getByRole('button', { name: /^\s*authorize\s*$/i }),
 };
 
 /**
