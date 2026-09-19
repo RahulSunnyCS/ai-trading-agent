@@ -8,7 +8,7 @@ same night, writing duplicate rows to the Google Sheet and advancing
 
 **Current state: safe.** The monorepo copy has its `schedule:` block commented
 out, and it sits on a feature branch — GitHub only fires `schedule` triggers
-from a repository's **default branch** (`main-demo` here). `trade-analytics`
+from a repository's **default branch** (`main` here). `trade-analytics`
 still owns the cron and keeps running unchanged.
 
 ---
@@ -73,7 +73,7 @@ Do these in order. Steps 2 and 3 are the ones that touch the sheet.
 
 - [ ] **4. Re-enable the schedule here.** Uncomment the `schedule:` block in
       `.github/workflows/contract-notes-daily.yml`, then merge this branch into
-      `main-demo`. The cron will not fire until it is on the default branch.
+      `main`. The cron will not fire until it is on the default branch.
 
 - [ ] **5. Watch one real overnight run** before considering the migration done.
 
@@ -105,4 +105,4 @@ there is nothing to stop in `algo-automation`. Before enabling it here:
 - [ ] One successful `workflow_dispatch` run inside the 08:15–15:40 IST window —
       this is also the first test that `setup-bun` works inside the Playwright
       container, which replaced `npm ci`
-- [ ] Then uncomment its `schedule:` block and merge to `main-demo`
+- [ ] Then uncomment its `schedule:` block and merge to `main`

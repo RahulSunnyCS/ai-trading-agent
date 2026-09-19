@@ -142,7 +142,7 @@ what `src/trading/paper-trade-executor.ts` simulates. Mapping from
 #### Handover before either cron is enabled
 
 Both daily workflows ship with their `schedule:` commented out, and GitHub only
-fires schedules from the default branch (`main-demo`), so nothing runs twice
+fires schedules from the default branch (`main`), so nothing runs twice
 today. The cutover sequence, the 15 repository secrets that do **not** migrate,
 and the rollback path are in
 **[`docs/runbooks/contract-notes-handover.md`](../runbooks/contract-notes-handover.md)**.

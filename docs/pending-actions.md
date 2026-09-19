@@ -77,7 +77,7 @@ Ordered — step 3 is the one that can damage the sheet.
       With no artifact, `updateSheet.js` falls back to reading the sheet, and
       this is the only moment that fallback is unverified.
 - [ ] **Uncomment `schedule:`** in `.github/workflows/contract-notes-daily.yml`
-      and merge to `main-demo`. Crons only fire from the default branch.
+      and merge to `main`. Crons only fire from the default branch.
 - [ ] **Watch one real overnight run** before calling it done.
 
 ---
@@ -88,7 +88,7 @@ Ordered — step 3 is the one that can damage the sheet.
       08:15–15:40 IST window. This is also the first live test that
       `setup-bun` works inside the Playwright container — it replaced `npm ci`
       and has not run for real yet.
-- [ ] **Uncomment its `schedule:`** and merge to `main-demo` once that passes.
+- [ ] **Uncomment its `schedule:`** and merge to `main` once that passes.
 
 ---
 
@@ -106,10 +106,6 @@ Ordered — step 3 is the one that can damage the sheet.
 
 ## 5. Open decisions
 
-- [ ] **Default branch: `main-demo` or `main`?** `main-demo` is currently the
-      default and carries the work; `main` is still at the initial commit. If
-      `main` is meant to be canonical, switch the default in GitHub settings and
-      I will fast-forward it.
 - [ ] **CODEOWNERS on `packages/broker-login/`** so execution changes always
       get a review.
 - [ ] **Archive `trade-analytics` and `algo-automation`** once both cutovers
