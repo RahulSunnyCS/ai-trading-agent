@@ -1,0 +1,25 @@
+{
+  "name": "algotest-login",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Daily automated broker login on AlgoTest",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "login": "tsx src/main.ts",
+    "test-login": "tsx scripts/test-login.ts",
+    "check": "tsx scripts/check.ts",
+    "record": "tsx scripts/record.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}

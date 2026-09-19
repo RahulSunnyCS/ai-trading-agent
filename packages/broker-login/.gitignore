@@ -1,0 +1,12 @@
+node_modules/
+
+# Local secrets
+.env
+
+# Run output: screenshots, HTML dumps, traces. May contain session data.
+artifacts/
+
+# Discovery-phase recordings. Treat as live credentials.
+_rec/
+*.har
+*state.json
