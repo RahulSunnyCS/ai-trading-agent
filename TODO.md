@@ -20,7 +20,7 @@ per-task acceptance detail. They no longer carry status or open items.
 - Status lives here. `.claude/project/overview.md` holds *what is built*; this
   file holds *what is left*.
 
-Last updated: 2026-09-19
+Last updated: 2026-09-20
 
 **Closed while consolidating** (they were still listed as open somewhere, but
 are done): the stray `yarn.lock` and `package-lock.json` are both gone; T-51
@@ -40,8 +40,9 @@ Code is merged and typechecks; nothing has run for real from this repo yet.
 | 1.2 | Decide where those ten live | owner | Recommended: a GitHub **Environment** with required reviewers, not plain repo secrets. Merging the repos removed the boundary that kept broker credentials away from the Razorpay keys — an Environment restores it. |
 | 1.3 | One **successful** `workflow_dispatch` run of "Daily broker login" inside 08:15–15:40 IST | owner→claude | ⚠️ **Two runs already failed** — `packages/broker-login/run-log.md` records `failure` for runs `35427092512` and `35427372298` (2026-09-19, 12:10 and 12:16 IST). Both were outside the 08:15–15:40 window only if IST noon counts as inside it — it does, so the window guard is not the explanation. Pull the logs for those two run IDs before dispatching a third: this is also the first real test that `setup-bun` works inside the Playwright container, having replaced `npm ci`. |
 | 1.4 | Uncomment `schedule:` in `.github/workflows/daily-broker-login.yml`, merge to `main` | owner | Crons only fire from the default branch. Do this only after 1.3 passes. |
-| 1.5 | CODEOWNERS on `packages/broker-login/` | claude | So execution-path changes always get a review. |
-| 1.6 | Selector-drift canary | claude | A scheduled run that asserts the AlgoTest login selectors still resolve, so drift is caught before 08:35 on a trading day rather than during it. Case + cost: `docs/roadmap.md` → Ideas #4. |
+| 1.5 | Merge `claude/stock-trading-monorepo-plan-k4zs5t` → `main` in `algo-automation` | owner | A branch was created there on 2026-09-19 carrying one doc-only commit (a new `CLAUDE.md`, since that repo had none, pointing at this monorepo). Nothing breaks if it is never merged — but the repo stays without any orientation file until it is. |
+| 1.6 | CODEOWNERS on `packages/broker-login/` | claude | So execution-path changes always get a review. |
+| 1.7 | Selector-drift canary | claude | A scheduled run that asserts the AlgoTest login selectors still resolve, so drift is caught before 08:35 on a trading day rather than during it. Case + cost: `docs/roadmap.md` → Ideas #4. |
 
 ---
 
