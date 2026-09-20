@@ -32,13 +32,21 @@ though see 3.3.0 for the difference between *present* and *audited*.
 ## Priority 1 — Broker login, live in the monorepo
 
 The daily Playwright job that logs Angel One and Finvasia into AlgoTest.
-Code is merged and typechecks; nothing has run for real from this repo yet.
+Code is merged and typechecks; **nothing has run for real from this repo yet.**
+
+The untested delta vs. the old `algo-automation` workflow, which did run: this
+repo's version replaced `npm ci` with `setup-bun` + `bun install --frozen-lockfile`
+inside the Playwright container. That swap has never executed. One other
+difference worth watching on the first real run — Finvasia failed the Saturday
+test via the row-state path (`submitted but row still shows logged_out`) rather
+than the toast path Angel One took, so the two brokers may not report a genuine
+refusal the same way.
 
 | # | Task | Who | Notes |
 |---|---|---|---|
 | 1.1 | Create the 10 `algo-automation` secrets on `RahulSunnyCS/ai-trading-agent` | owner | `ALGOTEST_PHONE`, `ALGOTEST_PASSWORD`, `ANGELONE_CLIENT_CODE`, `ANGELONE_MPIN`, `ANGELONE_TOTP_SECRET`, `SHOONYA_CLIENT_ID`, `SHOONYA_PASSWORD`, `SHOONYA_TOTP_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`. Values are in the old repo's Settings → Secrets. They do **not** migrate with the code. |
 | 1.2 | Decide where those ten live | owner | Recommended: a GitHub **Environment** with required reviewers, not plain repo secrets. Merging the repos removed the boundary that kept broker credentials away from the Razorpay keys — an Environment restores it. |
-| 1.3 | One **successful** `workflow_dispatch` run of "Daily broker login" inside 08:15–15:40 IST | owner→claude | ⚠️ **Two runs already failed** — `packages/broker-login/run-log.md` records `failure` for runs `35427092512` and `35427372298` (2026-09-19, 12:10 and 12:16 IST). Both were outside the 08:15–15:40 window only if IST noon counts as inside it — it does, so the window guard is not the explanation. Pull the logs for those two run IDs before dispatching a third: this is also the first real test that `setup-bun` works inside the Playwright container, having replaced `npm ci`. |
+| 1.3 | One **successful** `workflow_dispatch` run of "Daily broker login" **on a weekday** inside 08:15–15:40 IST | owner | Dispatch on a **trading day** — that is the whole trick. The two `failure` lines in `packages/broker-login/run-log.md` are *not* this repo's: they came in with the subtree merge and belong to `algo-automation` runs `35427092512`/`35427372298`, both dispatched Sat 2026-09-19. Logs show the automation worked end to end — AlgoTest login OK, My Brokers opened, credentials and TOTP accepted — and AlgoTest refused with *"Broker login is only possible between 08:15 IST - 15:40 IST **on trading days**"*. Saturday, so a refusal was guaranteed. Nothing to fix. |
 | 1.4 | Uncomment `schedule:` in `.github/workflows/daily-broker-login.yml`, merge to `main` | owner | Crons only fire from the default branch. Do this only after 1.3 passes. |
 | 1.5 | Merge `claude/stock-trading-monorepo-plan-k4zs5t` → `main` in `algo-automation` | owner | A branch was created there on 2026-09-19 carrying one doc-only commit (a new `CLAUDE.md`, since that repo had none, pointing at this monorepo). Nothing breaks if it is never merged — but the repo stays without any orientation file until it is. |
 | 1.6 | CODEOWNERS on `packages/broker-login/` | claude | So execution-path changes always get a review. |
