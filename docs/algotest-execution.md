@@ -237,10 +237,17 @@ may hold the schedule. Two live copies would process the same gap dates on the
 same night, writing duplicate rows to the Google Sheet and advancing
 `row_tracker.json` past dates that then become unreachable.
 
-**Current state: safe.** The monorepo copy has its `schedule:` block commented
-out, and it sits on a feature branch — GitHub only fires `schedule` triggers
-from a repository's **default branch** (`main` here). `trade-analytics`
-still owns the cron and keeps running unchanged.
+**Current state: safe, but on one safeguard instead of two.** The monorepo
+copy has its `schedule:` block commented out. It used to *also* sit on a
+non-default branch, and GitHub only fires `schedule` triggers from a
+repository's default branch — but as of 2026-09-20 everything lives on
+`main`, so that second layer is gone. The commented-out `schedule:` is now
+the only thing preventing two live copies. `trade-analytics` still owns the
+cron and keeps running unchanged.
+
+**Consequence:** uncommenting `schedule:` here takes effect immediately, with
+no merge step standing between the edit and a live cron. Do not uncomment it
+until the step that says to.
 
 ---
 
@@ -289,8 +296,7 @@ backfills them. Do not leave it in this state for more than a few days.
 
 **2. Seed the row-tracker.** The `row-tracker` Actions artifact is scoped to
 `trade-analytics` and does **not** migrate. In this repo, run
-**Daily Trading Data Processing** via `workflow_dispatch` (it runs from any
-branch, so the feature branch is fine).
+**Daily Trading Data Processing** via `workflow_dispatch`.
 
 With no artifact present, `updateSheet.js` falls back to reading the sheet
 for the next empty row. This is the one genuinely risky moment.
@@ -305,8 +311,9 @@ for the next empty row. This is the one genuinely risky moment.
 If any answer is wrong, go to **Rollback** — do not proceed.
 
 **4. Re-enable the schedule here.** Uncomment the `schedule:` block in
-`.github/workflows/contract-notes-daily.yml`, then merge this branch into
-`main`. The cron will not fire until it is on the default branch.
+`.github/workflows/contract-notes-daily.yml` and push to `main`. It is live
+from that moment — there is no longer a branch boundary in between, so do
+this only once step 3 has checked out.
 
 **5. Watch one real overnight run** before considering the migration done.
 
@@ -338,7 +345,8 @@ there is nothing to stop in `algo-automation`. Before enabling it here:
 2. One successful `workflow_dispatch` run inside the 08:15–15:40 IST window —
    this is also the first test that `setup-bun` works inside the Playwright
    container, which replaced `npm ci`.
-3. Then uncomment its `schedule:` block and merge to `main`.
+3. Then uncomment its `schedule:` block and push to `main`. It goes live
+   immediately on push — `main` is the default branch and the only branch.
 
 Tracked in [`/TODO.md`](../TODO.md) → Priority 1.
 
