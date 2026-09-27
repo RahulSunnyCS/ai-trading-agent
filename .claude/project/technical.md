@@ -19,12 +19,13 @@
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
 | Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee), FastAPI service + MCP server, fronted by a Fastify proxy and a React dashboard tab; walk-forward, parameter sweeps, a CSCV/PBO + deflated-Sharpe overfitting guard, a margin model, regime bucketing, and personality export are all built (M-5) — the epic is feature-complete |
+| Momentum Backtesting | Python 3.12 + `uv`, in `packages/momentum-backtesting` — weekly index-rotation research (rank indices on 1/4/13/26/52-week returns, hold the top N until they fall out of the top M). Pulls daily candles from the Fyers history API, public AMFI NAVs (cash) and Yahoo (silver pre-2022). `mbt` CLI plus a local-only web UI (`mbt ui`: FastAPI on 127.0.0.1 serving a static page - deliberately separate from apps/dashboard because it needs no server stack). Two portfolio rules: buffer (default, hold top N until the sell rank, reinvest across top N, per-purchase tax lots, 35% per-ETF cap with a 5-point trim band) and fixed slots |
 
 ## Package Manager & Runtime
 
 - **Monorepo:** Bun workspaces — `workspaces: ["apps/*", "packages/*"]`. One `bun.lock` at the repo root covers every JS workspace. Root scripts fan out via `bun run --filter <pkg> <script>` or `bun run --workspaces <script>`; run them from the repo root unless you deliberately want to scope to one package
 - **Package manager:** Bun — single lockfile (`bun.lock`) at the repo root. Do not use `npm` or `yarn`; they will create a second lockfile and conflict
-- **Runtime:** Bun for `apps/*`. Two exceptions: **`packages/contract-notes` runs on Node 20** (CommonJS; its scripts shell out to `node`), and **`packages/option-backtesting` is Python/uv**, not a Bun workspace member
+- **Runtime:** Bun for `apps/*`. Three exceptions: **`packages/contract-notes` runs on Node 20** (CommonJS; its scripts shell out to `node`), and **`packages/option-backtesting` and `packages/momentum-backtesting` are Python/uv**, not Bun workspace members
 - **CI pins bun `1.2.x`**, which *hoists*; bun 1.3+ uses an *isolated* layout for workspaces. Both read the same lockfile — verified — but they produce different `node_modules` trees. See the hoisting gotcha below
 - **TypeScript:** Compiled and executed natively by Bun — no `tsc` build step for running. `tsc --noEmit` is used only for type-checking
 
@@ -89,6 +90,17 @@ bun run py:api               # equivalent to: cd packages/option-backtesting && 
 # The Fastify proxy (BACKTEST_API_URL, default http://127.0.0.1:8000) is the only
 # public-facing surface in front of it — see apps/server/src/server/routes/backtest.ts.
 
+# momentum-backtesting (Python) — run from packages/momentum-backtesting/
+cd packages/momentum-backtesting
+uv sync
+uv run pytest
+uv run mbt login            # browser login; caches today's Fyers token in data/ (never printed)
+uv run mbt token-status     # where the token would come from and when it expires
+uv run mbt fetch            # daily history from 2016 -> data/weekly_closes.csv + .xlsx
+uv run mbt fetch --no-fyers # only the public sources (cash NAV, silver)
+uv run mbt compare         # rank-and-rotate backtest, off/ranked/filter modes -> data/backtests/
+uv run mbt ui              # local web UI on 127.0.0.1:8765 (FastAPI + static page; Plotly cached in data/vendor/)
+
 # option-backtesting MCP server (stdio) — registered in root .mcp.json as "option-backtesting";
 # a Claude Code session picks it up automatically, no manual start needed.
 
@@ -99,7 +111,7 @@ docker compose down -v      # stop + destroy data volumes (full reset)
 
 ## Repository Structure
 
-A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (React/Vite frontend) — and six packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The sixth, `packages/option-backtesting`, is Python/uv and not a Bun workspace member. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
+A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (React/Vite frontend) — and seven packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The other two, `packages/option-backtesting` and `packages/momentum-backtesting`, are Python/uv and not Bun workspace members. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
 
 ```
 ai-trading-agent/
@@ -182,6 +194,14 @@ ai-trading-agent/
     │                                 # cutover — the trade-analytics repo still owns the live cron.
     │                                 # All money math (brokers/*.js, updateSheet.js) uses decimal.js —
     │                                 # see the decimal.js convention under Key Patterns & Conventions.
+    ├── momentum-backtesting/        # Python 3.12 / uv — weekly momentum rotation across ~21 NSE sector/
+    │                                 # broad indices plus gold, silver, Nasdaq 100, Hang Seng and a
+    │                                 # defensive cash/gilt pair. Own pyproject.toml/uv.lock; `mbt` CLI.
+    │                                 # Fyers token: FYERS_ACCESS_TOKEN env > `mbt login` cache
+    │                                 # (data/.fyers_token.json, 0600) > broker_tokens via DATABASE_URL —
+    │                                 # same precedence as fyers-historical.ts plus the cache. Instrument
+    │                                 # list + trade ETFs in src/momentum_backtesting/universe.csv.
+    │                                 # data/ is gitignored and regenerated by `mbt fetch`.
     └── option-backtesting/          # Python 3.12 / uv — strategy-research workbench over AlgoTest option
                                       # bars, answering "is this strategy worth becoming a personality?"
                                       # (a different question from apps/server's `bun run backtest`, which

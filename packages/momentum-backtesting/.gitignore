@@ -1,0 +1,9 @@
+# Downloaded / derived price data - regenerate with `mbt fetch`.
+data/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/

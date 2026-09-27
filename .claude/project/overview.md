@@ -29,6 +29,9 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - **`packages/contract-notes`** — daily job turning broker contract-note emails
   into realised F&O P&L in a Google Sheet. Schedule currently disabled pending
   cutover; the `trade-analytics` repo still owns the live cron
+- **`packages/momentum-backtesting`** — Python/uv research tool for weekly
+  momentum rotation across Indian indices, commodities and international ETFs,
+  from 2017. Data layer (`mbt fetch`), backtest engine and a local web UI (`mbt ui`) built
 
 ## Implementation Phases
 

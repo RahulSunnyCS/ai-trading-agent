@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Momentum Backtest</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/vendor/plotly.min.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <header class="brand">
+      <h1>Momentum backtest</h1>
+      <p class="muted" id="data-range">Loading data…</p>
+    </header>
+
+    <section class="panel">
+      <h2>ETFs <span class="count" id="universe-count"></span></h2>
+      <div class="chips">
+        <button type="button" data-preset="core">Core</button>
+        <button type="button" data-preset="all">All</button>
+        <button type="button" data-preset="equity">Equity only</button>
+        <button type="button" data-preset="none">None</button>
+      </div>
+      <div id="universe"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Period</h2>
+      <div class="row">
+        <label>From <input type="date" id="start"></label>
+        <label>To <input type="date" id="end"></label>
+      </div>
+      <div class="chips" id="period-presets">
+        <button type="button" data-period="full">Full</button>
+        <button type="button" data-period="5y">Last 5y</button>
+        <button type="button" data-period="3y">Last 3y</button>
+        <button type="button" data-period="2017-2021">2017–21</button>
+        <button type="button" data-period="2022-now">2022–now</button>
+      </div>
+      <p class="hint" id="period-hint"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Ranking rule</h2>
+      <p class="hint">Each lookback's return is ranked (1 = best); score = Σ rank × weight. Lowest score wins.</p>
+      <table class="lookbacks">
+        <thead><tr><th>Weeks</th><th>Weight</th><th></th></tr></thead>
+        <tbody id="lookbacks"></tbody>
+      </table>
+      <div class="chips">
+        <button type="button" id="add-lookback">+ lookback</button>
+        <button type="button" data-lb="equal">Equal 1·4·13·26·52</button>
+        <button type="button" data-lb="recency">Recency tilt</button>
+        <button type="button" data-lb="long">4·13·26·52</button>
+        <button type="button" data-lb="short">1·4·13</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Portfolio rule</h2>
+      <label class="radio"><input type="radio" name="portfolio" value="buffer" checked>
+        <span><b>Buffer</b> — buy the top N, hold until rank passes the exit rank, reinvest sales equally across the top N</span></label>
+      <label class="radio"><input type="radio" name="portfolio" value="slots">
+        <span><b>Fixed slots</b> — exactly N positions; a sale's money buys the best name not held</span></label>
+      <div id="entry-options">
+        <p class="sub">New top-N name when nothing was sold</p>
+        <label class="radio"><input type="radio" name="entry" value="wait" checked>
+          <span><b>Wait</b> for the next sale to fund it</span></label>
+        <label class="radio"><input type="radio" name="entry" value="make_room">
+          <span><b>Make room</b> — buy now, trimming every holding equally</span></label>
+      </div>
+      <div class="row" id="cap-options">
+        <label>Max per ETF % <input type="number" id="max_position" min="0" max="100" step="5" value="35"></label>
+        <label>Trim when above by (pts) <input type="number" id="cap_band" min="0" max="50" step="1" value="5"></label>
+      </div>
+      <div class="row">
+        <label>Top N <input type="number" id="top_n" min="1" max="20" value="5"></label>
+        <label>Sell when rank &gt; <input type="number" id="exit_rank" min="1" max="40" value="10"></label>
+      </div>
+      <p class="hint" id="rule-hint"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Crash protection</h2>
+      <label class="radio"><input type="radio" name="defensive" value="off" checked><span><b>Off</b> — always invested</span></label>
+      <label class="radio"><input type="radio" name="defensive" value="ranked"><span><b>Debt in ranking</b> — selected Debt rows compete like any ETF</span></label>
+      <label class="radio"><input type="radio" name="defensive" value="filter"><span><b>Cash filter</b> — only hold ETFs beating cash over</span></label>
+      <label class="inline" id="filter-weeks">
+        <input type="number" id="filter_lookback" min="1" max="104" value="13"> weeks</label>
+    </section>
+
+    <section class="panel">
+      <h2>Execution &amp; tax</h2>
+      <div class="row">
+        <label>Cost per side % <input type="number" id="cost_pct" min="0" max="5" step="0.05" value="0.10"></label>
+        <label>Trade
+          <select id="signal_delay">
+            <option value="0">at the signal close</option>
+            <option value="1">1 week later</option>
+            <option value="2">2 weeks later</option>
+          </select></label>
+      </div>
+      <div class="row">
+        <label class="inline"><input type="checkbox" id="tax"> Apply capital-gains tax</label>
+        <label>Slab
+          <select id="slab_rate">
+            <option value="0">0%</option><option value="0.05">5%</option><option value="0.1">10%</option>
+            <option value="0.2">20%</option><option value="0.3" selected>30%</option>
+          </select></label>
+      </div>
+      <label>Benchmark <select id="benchmark"></select></label>
+    </section>
+
+    <div class="run-bar">
+      <p class="error" id="form-error"></p>
+      <button type="button" class="primary" id="run">Run backtest <kbd>Ctrl ↵</kbd></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="status" id="status">Choose settings and run a backtest.</div>
+    <div id="results" hidden>
+      <h2 class="run-title" id="run-title"></h2>
+      <div class="kpis" id="kpis"></div>
+      <div class="card chart-card">
+        <div class="chart-tools">
+          <span class="legend-note">Dots mark rotation weeks — hover for what went out and came in.</span>
+          <label class="inline"><input type="checkbox" id="log-scale"> Log scale</label>
+        </div>
+        <div id="main-chart"></div>
+      </div>
+      <nav class="tabs" id="tabs">
+        <button type="button" data-tab="signal" class="active">This week</button>
+        <button type="button" data-tab="trades">Trades</button>
+        <button type="button" data-tab="timeline">Holdings timeline</button>
+        <button type="button" data-tab="etfs">ETFs</button>
+        <button type="button" data-tab="yearly">Yearly</button>
+        <button type="button" data-tab="crashes">Crashes</button>
+        <button type="button" data-tab="runs">Run history <span class="count" id="runs-count"></span></button>
+      </nav>
+      <section class="card tab" data-panel="signal"></section>
+      <section class="card tab" data-panel="trades" hidden></section>
+      <section class="card tab" data-panel="timeline" hidden><div id="timeline-chart"></div></section>
+      <section class="card tab" data-panel="etfs" hidden></section>
+      <section class="card tab" data-panel="yearly" hidden><div id="yearly-chart"></div><div id="yearly-table"></div></section>
+      <section class="card tab" data-panel="crashes" hidden></section>
+      <section class="card tab" data-panel="runs" hidden></section>
+    </div>
+  </main>
+</div>
+<div class="tooltip" id="tooltip" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
