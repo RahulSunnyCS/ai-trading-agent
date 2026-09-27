@@ -12,7 +12,9 @@
     "test-login": "tsx scripts/test-login.ts",
     "check": "tsx scripts/check.ts",
     "record": "tsx scripts/record.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "fyers-token": "tsx src/fyers.ts",
+    "test": "tsx --test src/*.test.ts"
   },
   "dependencies": {
     "playwright": "1.63.0",

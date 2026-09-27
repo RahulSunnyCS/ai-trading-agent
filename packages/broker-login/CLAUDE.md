@@ -45,6 +45,8 @@ npm run login         # tsx src/main.ts — the real daily job (needs live crede
 npm run test-login     # tsx scripts/test-login.ts — connectivity + selector health check, any time of day, no broker secrets needed
 npm run check         # tsx scripts/check.ts — RFC 6238 vectors, error classification, redaction, live TOTP codes + Telegram preflight (refuses to run in CI)
 npm run record        # tsx scripts/record.ts — interactive flow recorder for capturing new selectors
+npm run fyers-token   # tsx src/fyers.ts — headless Fyers login for the momentum weekly job; writes a 0600 token file (FYERS_TOKEN_FILE), never prints it
+npm run test          # node:test unit tests for the browser-free Fyers auth helpers
 npm run typecheck
 ```
 
@@ -58,4 +60,6 @@ npm run typecheck
 - `src/totp.ts` — thin re-export of `@trading/broker-identity`
 - `src/secrets.ts` — thin re-export of `@trading/notify`
 - `src/diagnose.ts` — screenshot/HTML dump helpers used on failure
+- `src/fyers.ts` — Fyers OAuth login (client ID → TOTP → PIN) → access token file; separate from the AlgoTest flow, used by `.github/workflows/momentum-weekly.yml`. Its locators (`fyersLogin` in `src/selectors.ts`) are PROVISIONAL until a real run's diagnostics confirm them
+- `src/fyers-auth.ts` — the browser-free half: auth URL, redirect parsing (state-checked), token exchange, error classification (only a TOTP rejection is retried; a wrong PIN never is)
 - `src/notify.ts` — `formatReport()`, the broker-specific Telegram report formatter (transport itself is `@trading/notify`)

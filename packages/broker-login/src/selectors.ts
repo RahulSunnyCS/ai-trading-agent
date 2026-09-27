@@ -166,3 +166,48 @@ export const dataBrokerKeys = {
   angelone: 'AngelOne',
   finvasia: 'Finvasia',
 };
+
+/**
+ * Fyers' own OAuth login (api-t1.fyers.in/api/v3/generate-authcode -> login.fyers.in),
+ * used by src/fyers.ts to mint a data token for the weekly momentum job.
+ *
+ * PROVISIONAL - written without a recording. The flow is: client ID -> 6-digit TOTP
+ * -> 4-digit PIN -> (first time only) authorise the app -> redirect with auth_code.
+ * The OTP and PIN are rows of single-character boxes that auto-advance, so they are
+ * typed into the first visible box rather than filled one by one. If a step fails,
+ * the run's diagnostics artifact holds a screenshot (inputs blanked) and redacted HTML
+ * of the page - tighten these from that.
+ */
+export const fyersLogin = {
+  /** Some layouts open on mobile-number login with a switch to client ID. */
+  useClientId: (page: Page): Locator =>
+    page.getByText(/(login|continue) (with|using) client id/i).first(),
+
+  clientId: (page: Page): Locator =>
+    page
+      .locator('input#fy_client_id:visible')
+      .or(page.getByPlaceholder(/client id/i).locator('visible=true'))
+      .first(),
+
+  submit: (page: Page): Locator =>
+    page.getByRole('button', { name: /^(continue|proceed|next|verify|submit|login)\b/i }).first(),
+
+  /** The first box of the TOTP or PIN row currently on screen. */
+  firstDigitBox: (page: Page): Locator =>
+    page.locator('input[maxlength="1"]:visible, input[inputmode="numeric"]:visible').first(),
+
+  /** Headings that tell the TOTP step and the PIN step apart. */
+  totpStep: (page: Page): Locator =>
+    page.getByText(/(enter|verify).*(totp|authenticator|otp)/i).first(),
+  pinStep: (page: Page): Locator => page.getByText(/(enter|verify).*pin/i).first(),
+
+  /** First-time consent for the API app. */
+  authorize: (page: Page): Locator =>
+    page.getByRole('button', { name: /authori[sz]e|allow|accept/i }).first(),
+
+  error: (page: Page): Locator =>
+    page
+      .getByText(/invalid|incorrect|wrong|expired|blocked|locked|too many attempts/i)
+      .locator('visible=true')
+      .first(),
+};

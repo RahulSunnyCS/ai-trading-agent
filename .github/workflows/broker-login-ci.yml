@@ -65,6 +65,8 @@ jobs:
           bun run test
         working-directory: packages/broker-identity
 
-      - name: Typecheck broker-login
-        run: bun run typecheck
+      - name: Typecheck + test broker-login
+        run: |
+          bun run typecheck
+          bun run test
         working-directory: packages/broker-login
