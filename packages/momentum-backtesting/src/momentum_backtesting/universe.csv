@@ -1,27 +1,27 @@
-include,group,index,trade_etf,etf_turnover_cr_day,tax_class,price_source,backfill,note
-core,Broad,Nifty 50,NIFTYBEES,141.3,equity,NSE:NIFTY50-INDEX,,Benchmark as well
-core,Broad,Nifty Next 50,JUNIORBEES,23.27,equity,NSE:NIFTYNXT50-INDEX,,
-core,Broad,Nifty Midcap 150,MID150BEES,11.55,equity,NSE:NIFTYMIDCAP150-INDEX,NIFTYINDICES:NIFTY MIDCAP 150,Fyers history starts late; NSE backfill
-core,Broad,Nifty Smallcap 250,HDFCSML250,29.45,equity,NSE:NIFTYSMLCAP250-INDEX,NIFTYINDICES:NIFTY SMALLCAP 250,Fyers history starts late; NSE backfill
-core,Sector,Nifty Bank,BANKBEES,31.02,equity,NSE:NIFTYBANK-INDEX,,
-core,Sector,Nifty IT,ITBEES,32.95,equity,NSE:NIFTYIT-INDEX,,
-core,Sector,Nifty PSU Bank,PSUBNKBEES,12.13,equity,NSE:NIFTYPSUBANK-INDEX,,
-core,Sector,Nifty Pharma,PHARMABEES,11.42,equity,NSE:NIFTYPHARMA-INDEX,,
-core,Sector,Nifty Metal,METALIETF,10.98,equity,NSE:NIFTYMETAL-INDEX,,
-core,Sector,Nifty Infrastructure,INFRAIETF,8.32,equity,NSE:NIFTYINFRA-INDEX,,
-core,Sector,Nifty CPSE,CPSEETF,8.22,equity,NSE:NIFTYCPSE-INDEX,,
-core,Sector,Nifty Realty,MOREALTY,8.14,equity,NSE:NIFTYREALTY-INDEX,,
-core,Sector,Nifty FMCG,FMCGIETF,7.8,equity,NSE:NIFTYFMCG-INDEX,,
-core,Sector,Nifty Capital Markets,MOCAPITAL,6.79,equity,NSE:NIFTYCAPITALMKT-INDEX,,Index history starts Apr 2019 (NSE base date) - nothing earlier exists
-core,Sector,Nifty Auto,AUTOBEES,5.09,equity,NSE:NIFTYAUTO-INDEX,,
-core,Sector,Nifty Chemicals,GROWWCHEM,4.6,equity,NSE:NIFTYCHEMICALS-INDEX,NIFTYINDICES:NIFTY CHEMICALS,Fyers from Nov 2025; NSE history back to 2016
-core,Thematic,Nifty India Defence,MODEFENCE,16.55,equity,NSE:NIFTYINDDEFENCE-INDEX,NIFTYINDICES:NIFTY INDIA DEFENCE,NSE history starts Apr 2018 (base date)
-core,Commodity,Gold,GOLDBEES,309.86,gold_silver,NSE:GOLDBEES-EQ,,ETF price (since 2009)
-core,Commodity,Silver,SILVERBEES,417.16,gold_silver,SILVER,,"COMEX silver x USD/INR before Feb 2022, SILVERBEES after"
-core,International,Nasdaq 100,MON100,23.39,international,INDEXFX:^NDX:INR=X:prev,,Nasdaq-100 x USD/INR (previous US close); MON100 trades at a varying premium to NAV
-core,International,Hang Seng,HNGSNGBEES,3.39,international,INDEXFX:^HSI:HKDINR=X:same,,Hang Seng x HKD/INR; HNGSNGBEES trades at a varying premium to NAV
-optional,Sector,Nifty Energy,ENERGY,1.54,equity,NSE:NIFTYENERGY-INDEX,,Optional: ETF turnover below 2 cr/day
-optional,Sector,Nifty Private Bank,PVTBANIETF,5.28,equity,NSE:NIFTYPVTBANK-INDEX,NIFTYINDICES:NIFTY PRIVATE BANK,Optional: overlaps heavily with Nifty Bank
-optional,Sector,Nifty Healthcare,HEALTHIETF,1.65,equity,NSE:NIFTYHEALTHCARE-INDEX,NIFTYINDICES:NIFTY HEALTHCARE,"Optional: overlaps with Pharma, thin ETF"
-defensive,Debt,Cash (liquid fund),LIQUIDBEES,332.76,debt,AMFI:120304,,UTI Liquid Direct Growth NAV; LIQUIDBEES price is flat so not usable as a price series
-defensive,Debt,Gilt 8-13 yr,LTGILTBEES,5.04,debt,NSE:NIFTYGS813YR-INDEX,,"NIFTY 8-13 yr G-Sec index (includes interest, from May 2017); trade LTGILTBEES"
+include,group,index,trade_etf,etf_turnover_cr_day,tax_class,price_source,backfill,etf_source,amfi_code,ter_pct,note
+core,Broad,Nifty 50,NIFTYBEES,141.3,equity,NSE:NIFTY50-INDEX,,NSE:NIFTYBEES-EQ,,,Benchmark as well
+core,Broad,Nifty Next 50,JUNIORBEES,23.27,equity,NSE:NIFTYNXT50-INDEX,,NSE:JUNIORBEES-EQ,,,
+core,Broad,Nifty Midcap 150,MID150BEES,11.55,equity,NSE:NIFTYMIDCAP150-INDEX,NIFTYINDICES:NIFTY MIDCAP 150,NSE:MID150BEES-EQ,,,Fyers history starts late; NSE backfill
+core,Broad,Nifty Smallcap 250,HDFCSML250,29.45,equity,NSE:NIFTYSMLCAP250-INDEX,NIFTYINDICES:NIFTY SMALLCAP 250,NSE:HDFCSML250-EQ,,,Fyers history starts late; NSE backfill
+core,Sector,Nifty Bank,BANKBEES,31.02,equity,NSE:NIFTYBANK-INDEX,,NSE:BANKBEES-EQ,,,
+core,Sector,Nifty IT,ITBEES,32.95,equity,NSE:NIFTYIT-INDEX,,NSE:ITBEES-EQ,,,
+core,Sector,Nifty PSU Bank,PSUBNKBEES,12.13,equity,NSE:NIFTYPSUBANK-INDEX,,NSE:PSUBNKBEES-EQ,,,
+core,Sector,Nifty Pharma,PHARMABEES,11.42,equity,NSE:NIFTYPHARMA-INDEX,,NSE:PHARMABEES-EQ,,,
+core,Sector,Nifty Metal,METALIETF,10.98,equity,NSE:NIFTYMETAL-INDEX,,NSE:METALIETF-EQ,,,
+core,Sector,Nifty Infrastructure,INFRAIETF,8.32,equity,NSE:NIFTYINFRA-INDEX,,NSE:INFRAIETF-EQ,,,
+core,Sector,Nifty CPSE,CPSEETF,8.22,equity,NSE:NIFTYCPSE-INDEX,,NSE:CPSEETF-EQ,,,
+core,Sector,Nifty Realty,MOREALTY,8.14,equity,NSE:NIFTYREALTY-INDEX,,NSE:MOREALTY-EQ,,,
+core,Sector,Nifty FMCG,FMCGIETF,7.8,equity,NSE:NIFTYFMCG-INDEX,,NSE:FMCGIETF-EQ,,,
+core,Sector,Nifty Capital Markets,MOCAPITAL,6.79,equity,NSE:NIFTYCAPITALMKT-INDEX,,NSE:MOCAPITAL-EQ,,,Index history starts Apr 2019 (NSE base date) - nothing earlier exists
+core,Sector,Nifty Auto,AUTOBEES,5.09,equity,NSE:NIFTYAUTO-INDEX,,NSE:AUTOBEES-EQ,,,
+core,Sector,Nifty Chemicals,GROWWCHEM,4.6,equity,NSE:NIFTYCHEMICALS-INDEX,NIFTYINDICES:NIFTY CHEMICALS,NSE:GROWWCHEM-EQ,,,Fyers from Nov 2025; NSE history back to 2016
+core,Thematic,Nifty India Defence,MODEFENCE,16.55,equity,NSE:NIFTYINDDEFENCE-INDEX,NIFTYINDICES:NIFTY INDIA DEFENCE,NSE:MODEFENCE-EQ,,,NSE history starts Apr 2018 (base date)
+core,Commodity,Gold,GOLDBEES,309.86,gold_silver,NSE:GOLDBEES-EQ,,SAME,,,ETF price (since 2009)
+core,Commodity,Silver,SILVERBEES,417.16,gold_silver,SILVER,,SAME,,,"COMEX silver x USD/INR before Feb 2022, SILVERBEES after"
+core,International,Nasdaq 100,MON100,23.39,international,INDEXFX:^NDX:INR=X:prev,,NSE:MON100-EQ,,,Nasdaq-100 x USD/INR (previous US close); MON100 trades at a varying premium to NAV
+core,International,Hang Seng,HNGSNGBEES,3.39,international,INDEXFX:^HSI:HKDINR=X:same,,NSE:HNGSNGBEES-EQ,,,Hang Seng x HKD/INR; HNGSNGBEES trades at a varying premium to NAV
+optional,Sector,Nifty Energy,ENERGY,1.54,equity,NSE:NIFTYENERGY-INDEX,,NSE:ENERGY-EQ,,,Optional: ETF turnover below 2 cr/day
+optional,Sector,Nifty Private Bank,PVTBANIETF,5.28,equity,NSE:NIFTYPVTBANK-INDEX,NIFTYINDICES:NIFTY PRIVATE BANK,NSE:PVTBANIETF-EQ,,,Optional: overlaps heavily with Nifty Bank
+optional,Sector,Nifty Healthcare,HEALTHIETF,1.65,equity,NSE:NIFTYHEALTHCARE-INDEX,NIFTYINDICES:NIFTY HEALTHCARE,NSE:HEALTHIETF-EQ,,,"Optional: overlaps with Pharma, thin ETF"
+defensive,Debt,Cash (liquid fund),LIQUIDBEES,332.76,debt,AMFI:120304,,SAME,,,UTI Liquid Direct Growth NAV; LIQUIDBEES price is flat so not usable as a price series
+defensive,Debt,Gilt 8-13 yr,LTGILTBEES,5.04,debt,NSE:NIFTYGS813YR-INDEX,,NSE:LTGILTBEES-EQ,,,"NIFTY 8-13 yr G-Sec index (includes interest, from May 2017); trade LTGILTBEES"

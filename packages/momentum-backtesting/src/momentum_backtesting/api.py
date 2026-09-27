@@ -17,6 +17,7 @@ from .config import DATA_DIR
 from .engine import BENCHMARK, CASH, Config, run_backtest
 from .fetch import load_universe
 from .tax import TaxRules
+from .trade_prices import build_trade_prices
 
 STATIC = Path(__file__).with_name("static")
 PLOTLY_URL = "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"
@@ -30,6 +31,7 @@ class _Data:
         self._mtime = None
         self.prices: pd.DataFrame | None = None
         self.rank_cache: OrderedDict = OrderedDict()
+        self.fill_tables: dict = {}
 
     def get(self) -> pd.DataFrame:
         path = DATA_DIR / "weekly_closes.csv"
@@ -41,7 +43,23 @@ class _Data:
                 self.prices = pd.read_csv(path, index_col=0, parse_dates=True)
                 self._mtime = mtime
                 self.rank_cache.clear()
+                self.fill_tables.clear()
             return self.prices
+
+    def fills(self, track: str, execution: str):
+        """Trade-price table for this track/execution (None = index at Friday close), built
+        once per data refresh - it reads a few dozen daily CSVs."""
+        prices = self.get()
+        key = (track, execution)
+        with self._lock:
+            if key not in self.fill_tables:
+                try:
+                    self.fill_tables[key] = build_trade_prices(
+                        prices, track, execution, data_dir=DATA_DIR
+                    )
+                except ValueError as error:
+                    raise HTTPException(409, str(error)) from None
+            return self.fill_tables[key]
 
     def trim_cache(self, limit: int = 24) -> None:
         while len(self.rank_cache) > limit:
@@ -70,6 +88,8 @@ class BacktestRequest(BaseModel):
     entry: Literal["wait", "make_room"] = "wait"
     max_position: float | None = Field(0.35, gt=0, le=1)  # None = no cap
     cap_band: float = Field(0.05, ge=0, le=0.5)
+    track: Literal["index", "etf"] = "index"
+    execution: Literal["fri_close", "mon_open", "mon_10am"] = "fri_close"
 
 
 def create_app() -> FastAPI:
@@ -121,6 +141,8 @@ def create_app() -> FastAPI:
                 "entry": defaults.entry,
                 "max_position": defaults.max_position,
                 "cap_band": defaults.cap_band,
+                "track": defaults.track,
+                "execution": defaults.execution,
             },
         }
 
@@ -152,6 +174,8 @@ def create_app() -> FastAPI:
                 entry=req.entry,
                 max_position=req.max_position,
                 cap_band=req.cap_band,
+                track=req.track,
+                execution=req.execution,
             )
             ranked = [n for n in req.universe if includes.get(n) != "defensive"]
             if config.defensive == "ranked":
@@ -162,12 +186,27 @@ def create_app() -> FastAPI:
                     f"top N ({config.top_n})."
                 )
             classes = {name: inst.tax_class for name, inst in universe.items()}
-            result = run_backtest(prices, includes, config, classes, DATA.rank_cache)
+            fills = DATA.fills(req.track, req.execution)
+            result = run_backtest(
+                prices,
+                includes,
+                config,
+                classes,
+                DATA.rank_cache,
+                fills.prices if fills is not None else None,
+            )
             DATA.trim_cache()
         except ValueError as error:
             raise HTTPException(422, str(error)) from None
         groups = {name: inst.group for name, inst in universe.items()}
-        return analysis.payload(result, prices, config, groups)
+        return analysis.payload(
+            result,
+            prices,
+            config,
+            groups,
+            fills.proxy if fills is not None else None,
+            fills.warnings if fills is not None else None,
+        )
 
     @app.get("/vendor/plotly.min.js")
     def plotly() -> FileResponse:

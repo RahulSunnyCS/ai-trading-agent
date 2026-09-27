@@ -118,3 +118,62 @@ def test_the_page_is_served(client):
     assert res.status_code == 200
     assert "Momentum backtest" in res.text
     assert client.get("/static/app.js").status_code == 200
+
+
+def _daily_files(tmp_path, etf_names=("Nifty 50", "Nifty IT")):
+    """Daily files from the weekly table (one row per week is enough for fills), plus ETFs
+    for a couple of instruments that 'listed' part-way through at a small premium."""
+    weekly = pd.read_csv(tmp_path / "weekly_closes.csv", index_col=0, parse_dates=True)
+    (tmp_path / "daily").mkdir()
+    (tmp_path / "daily_etf").mkdir()
+    for name in weekly:
+        closes = weekly[name].dropna()
+        monday = closes.copy()
+        monday.index = monday.index + pd.Timedelta(days=3)
+        daily = pd.concat([closes, monday * 1.001]).sort_index().to_frame("close")
+        daily["open"] = daily["close"]
+        daily.to_csv(tmp_path / "daily" / f"{name}.csv", index_label="date")
+        if name in etf_names:
+            listed = daily[daily.index >= "2019-01-01"] * 1.01
+            listed.to_csv(tmp_path / "daily_etf" / f"{name}.csv", index_label="date")
+
+
+@pytest.mark.parametrize("execution", ["fri_close", "mon_open", "mon_10am"])
+def test_backtest_on_etf_prices_marks_proxy_trades(client, tmp_path, execution):
+    _daily_files(tmp_path)
+    res = client.post(
+        "/api/backtest",
+        json={
+            "universe": core(client),
+            "start": "2017-01-06",
+            "track": "etf",
+            "execution": execution,
+        },
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["fills"]["track"] == "etf" and body["fills"]["execution"] == execution
+    assert all("proxy" in t for t in body["trades"])
+    if execution == "mon_10am":  # no intraday files: every 10:00 fill fell back to the open
+        assert body["fills"]["warnings"]
+
+
+def test_etf_track_without_daily_files_says_to_refetch(client):
+    res = client.post(
+        "/api/backtest", json={"universe": core(client), "start": "2017-01-06", "track": "etf"}
+    )
+    assert res.status_code == 409 and "mbt fetch" in res.json()["detail"]
+
+
+def test_tracking_command_writes_its_report(client, tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from momentum_backtesting import cli, trade_prices
+
+    _daily_files(tmp_path)
+    monkeypatch.setattr(cli, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(trade_prices, "DATA_DIR", tmp_path)
+    out = CliRunner().invoke(cli.app, ["tracking", "--start", "2017-01-06"])
+    assert out.exit_code == 0, out.output
+    assert "track x execution" in out.output and "No premium data" in out.output
+    assert (tmp_path / "backtests" / "tracking.xlsx").exists()

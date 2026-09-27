@@ -203,16 +203,16 @@ def _get(params: dict[str, str | int], creds: Credentials) -> dict:
     return {"s": "error", "message": "rate limited"}
 
 
-def daily_closes(symbol: str, start: date, end: date, creds: Credentials) -> pd.Series:
-    """Daily closes indexed by IST trading date, fetched in <=366-day chunks."""
-    closes: dict[date, float] = {}
+def _candles(symbol: str, resolution: str, start: date, end: date, max_days: int, creds) -> list:
+    """Raw [epoch, open, high, low, close, volume] rows, fetched in <= max_days chunks."""
+    rows: list = []
     chunk_start = start
     while chunk_start <= end:
-        chunk_end = min(chunk_start + timedelta(days=DAILY_MAX_DAYS - 1), end)
+        chunk_end = min(chunk_start + timedelta(days=max_days - 1), end)
         body = _get(
             {
                 "symbol": symbol,
-                "resolution": "D",
+                "resolution": resolution,
                 "date_format": 1,
                 "range_from": chunk_start.isoformat(),
                 "range_to": chunk_end.isoformat(),
@@ -226,12 +226,51 @@ def daily_closes(symbol: str, start: date, end: date, creds: Credentials) -> pd.
             if any(word in message.lower() for word in ("token", "auth", "unauthor")):
                 raise FyersCredentialsError(f"Fyers rejected the token: {message}")
             raise RuntimeError(f"{symbol} {chunk_start}..{chunk_end}: {message}")
-        for epoch, _open, _high, _low, close, _volume in body.get("candles") or []:
-            day = pd.Timestamp(epoch, unit="s", tz="UTC").tz_convert("Asia/Kolkata").date()
-            closes[day] = float(close)
+        rows += body.get("candles") or []
         chunk_start = chunk_end + timedelta(days=1)
         time.sleep(PAUSE_S)
+    return rows
 
-    series = pd.Series(closes, dtype=float).sort_index()
+
+def _ist(epoch: int) -> pd.Timestamp:
+    return pd.Timestamp(epoch, unit="s", tz="UTC").tz_convert("Asia/Kolkata")
+
+
+def daily_candles(symbol: str, start: date, end: date, creds: Credentials) -> pd.DataFrame:
+    """Daily open and close indexed by IST trading date."""
+    by_day = {
+        _ist(epoch).date(): (float(open_), float(close))
+        for epoch, open_, _high, _low, close, _volume in _candles(
+            symbol, "D", start, end, DAILY_MAX_DAYS, creds
+        )
+    }
+    frame = pd.DataFrame.from_dict(by_day, orient="index", columns=["open", "close"]).sort_index()
+    frame.index = pd.to_datetime(frame.index)
+    return frame
+
+
+def daily_closes(symbol: str, start: date, end: date, creds: Credentials) -> pd.Series:
+    """Daily closes indexed by IST trading date, fetched in <=366-day chunks."""
+    return daily_candles(symbol, start, end, creds)["close"]
+
+
+INTRADAY_MAX_DAYS = 100  # Fyers caps minute-resolution requests at 100 days
+
+
+def price_at(
+    symbol: str, start: date, end: date, creds: Credentials, at: str = "10:00"
+) -> pd.Series:
+    """The traded price at `at` IST on each day: the close of the 15-minute candle that ends
+    then (the 09:45 candle for 10:00). Days without that candle are left out."""
+    hour, minute = map(int, at.split(":"))
+    candle_start = (hour * 60 + minute - 15) % (24 * 60)
+    prices = {}
+    for epoch, _open, _high, _low, close, _volume in _candles(
+        symbol, "15", start, end, INTRADAY_MAX_DAYS, creds
+    ):
+        stamp = _ist(epoch)
+        if stamp.hour * 60 + stamp.minute == candle_start:
+            prices[stamp.date()] = float(close)
+    series = pd.Series(prices, dtype=float).sort_index()
     series.index = pd.to_datetime(series.index)
     return series

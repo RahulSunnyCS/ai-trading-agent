@@ -10,6 +10,12 @@ Each Friday close:
 Trades execute at that same Friday close (or `signal_delay` weeks after the signal), paying
 `cost_pct` on each side.
 
+Signal vs fill prices: ranks and the defensive filter always use `prices` (the underlying
+index). `trade_prices`, when given, is what every buy, sell and holding is valued at - the ETF
+actually traded (`track="etf"`), and/or the price at the chosen `execution` time (Friday close,
+next Monday's open, or ~10:00 on Monday). trade_prices is indexed by *signal* week: row W holds
+the price a trade decided on at W's close fills at. See trade_prices.py for how it's built.
+
 Portfolio rules:
   buffer  (default) Hold everything bought until its rank passes `exit_rank`, so the number
           of holdings floats between `top_n` and `exit_rank`. Sale proceeds are split equally
@@ -51,6 +57,8 @@ MIN_TRADE = 0.005  # don't move parked cash for less than 0.5% of the portfolio
 DefensiveMode = Literal["off", "ranked", "filter"]
 PortfolioRule = Literal["buffer", "slots"]
 EntryRule = Literal["wait", "make_room"]
+Track = Literal["index", "etf"]
+Execution = Literal["fri_close", "mon_open", "mon_10am"]
 
 
 @dataclass(frozen=True)
@@ -81,6 +89,11 @@ class Config:
     # above the cap don't cause a trade (and a tax bill) every week.
     max_position: float | None = 0.35
     cap_band: float = 0.05
+    # What P&L is measured on (the ranking always uses the index): the index itself, or the ETF
+    # you'd actually trade. And when the trade fills. Anything but index + fri_close needs
+    # `trade_prices` passed to run_backtest.
+    track: Track = "index"
+    execution: Execution = "fri_close"
 
     def __post_init__(self) -> None:
         if self.weights is not None and len(self.weights) != len(self.lookbacks):
@@ -99,14 +112,23 @@ class Config:
             raise ValueError("max_position must be between 0 and 1 (e.g. 0.35 for 35%)")
         if self.cap_band < 0:
             raise ValueError("cap_band can't be negative")
+        if self.track not in ("index", "etf"):
+            raise ValueError(f"unknown track {self.track!r}")
+        if self.execution not in ("fri_close", "mon_open", "mon_10am"):
+            raise ValueError(f"unknown execution {self.execution!r}")
+
+    @property
+    def needs_trade_prices(self) -> bool:
+        return self.track != "index" or self.execution != "fri_close"
 
     @property
     def label(self) -> str:
         cap = f"-cap{round(self.max_position * 100)}" if self.max_position else ""
         rule = f"buffer-{self.entry}{cap}" if self.portfolio == "buffer" else "slots"
+        fills = f"_{self.track}-{self.execution}" if self.needs_trade_prices else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
-            f"lb{'-'.join(map(str, self.lookbacks))}"
+            f"lb{'-'.join(map(str, self.lookbacks))}{fills}"
         )
 
 
@@ -265,12 +287,24 @@ def run_backtest(
     config: Config,
     tax_classes: dict[str, str] | None = None,
     rank_cache: RankCache | None = None,
+    trade_prices: pd.DataFrame | None = None,
 ) -> Result:
-    """`rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ."""
+    """`rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ.
+    `trade_prices` (signal week x instrument) is what trades fill at and holdings are valued
+    at; None means the signal prices themselves (index, Friday close)."""
     names = ranked_universe(includes, config)
     missing = [n for n in [*names, CASH, config.benchmark] if n not in prices]
     if missing:
         raise ValueError(f"weekly closes are missing {missing}")
+    if config.needs_trade_prices and trade_prices is None:
+        raise ValueError(
+            f"track={config.track} / execution={config.execution} needs trade prices "
+            "(see trade_prices.build_trade_prices)"
+        )
+    fills = prices if trade_prices is None else trade_prices.reindex(prices.index)
+    missing = [n for n in [*names, CASH, config.benchmark] if n not in fills]
+    if missing:
+        raise ValueError(f"trade prices are missing {missing}")
     if config.tax is not None and tax_classes is None:
         raise ValueError("tax needs tax_classes (instrument -> equity/gold_silver/...)")
 
@@ -292,11 +326,15 @@ def run_backtest(
         in_window &= ranks.index <= pd.Timestamp(config.end)
     enough = ranks.notna().sum(axis=1).to_numpy() >= config.top_n
     weeks = list(ranks.index[in_window & enough])
+    if trade_prices is not None:
+        # The newest signal week may not have a fill yet (e.g. Monday hasn't happened).
+        filled = fills[CASH].notna()
+        weeks = [w for w in weeks if filled.at[w]]
     if len(weeks) < 2:
         raise ValueError("not enough history to run from the chosen start date")
 
     sim = _Sim(
-        prices=prices,
+        prices=fills,
         ranks=ranks,
         filter_ret=filter_ret,
         config=config,
@@ -320,8 +358,8 @@ def run_backtest(
     return Result(
         config=config,
         equity=equity_series,
-        benchmark=normalised(prices[config.benchmark], config.benchmark),
-        cash=normalised(prices[CASH], CASH),
+        benchmark=normalised(fills[config.benchmark], config.benchmark),
+        cash=normalised(fills[CASH], CASH),
         weights=weights,
         holdings=outcome.holdings,
         trades=trades,

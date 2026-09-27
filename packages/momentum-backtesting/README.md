@@ -43,6 +43,59 @@ token cached by `mbt login`, or the dashboard's stored token (`broker_tokens`, v
 - **Weekly close** is the last trading day's close of each Mon-Fri week, labelled Friday.
 - `data/` is gitignored; delete it and re-run `mbt fetch` to rebuild.
 
+## Signal prices vs trade prices
+
+The ranking always uses the **index** (the columns above). What you actually earn is the
+**ETF's** price, at the time you actually trade, and that differs in three ways:
+
+- **Expense ratio and tracking error.** The ETF lags its index by its fees, give or take.
+- **Premium or discount to NAV.** Thin sector ETFs, and the international ETFs whenever the
+  RBI's overseas-investment limit stops new units, trade above or below NAV. Momentum tends to
+  buy when inflows have pushed the premium up and to sell after it has shrunk, so this is a
+  steady drag, not noise.
+- **Dividends.** Fyers' `-INDEX` series are price-return; ETFs keep dividends in their NAV.
+
+Two switches, on every backtest command (`--track`, `--execution`) and in the UI ("P&L on",
+"Fill at"):
+
+| | |
+|---|---|
+| `--track index` (default) | P&L on the index - the original assumption |
+| `--track etf` | P&L on the ETF. Before it listed, the index stands in, scaled to meet the ETF and slowed by `ter_pct` a year; those trades are marked "index proxy" in the UI |
+| `--execution fri_close` (default) | fill at the signal's own Friday close |
+| `--execution mon_open` | fill at the next trading day's open |
+| `--execution mon_10am` | fill at ~10:00 on that day (needs `mbt fetch --intraday`; otherwise falls back to the open, with a warning) |
+
+```bash
+uv run mbt amfi-codes        # once: pick each ETF's AMFI scheme (for premium to NAV) -> universe.csv
+uv run mbt fetch             # now also fetches the ETFs, their NAVs and premiums
+uv run mbt fetch --intraday  # + 10:00 prices from Fyers 15-minute candles (slow, ~10 min)
+uv run mbt tracking          # data/backtests/tracking.xlsx
+```
+
+`mbt tracking` runs the same strategy six ways (index/ETF x Friday close/Monday open/Monday
+10:00). The ranks, and so the trades, are identical in every run; only the fills differ. It
+reports:
+
+- per ETF, over the weeks it existed: its tracking difference and tracking error, and its
+  premium to NAV (mean, 5th and 95th percentile, max);
+- the average premium the strategy paid on buys vs received on sells;
+- P&L per instrument, index vs ETF;
+- a verdict. **Decision rule:** if the ETF run's CAGR is within 0.5 points a year of the index
+  run and the premium lost per round trip is under 0.5%, index P&L was a fair approximation.
+  Otherwise use `--track etf`.
+
+New columns in `universe.csv`:
+
+- `etf_source`: `NSE:<ETF>-EQ`, fetched from Fyers with Yahoo `<ETF>.NS` as a fallback, or
+  `SAME` when the ranked series already is what you'd hold (gold, silver, the liquid fund).
+- `amfi_code`: filled by `mbt amfi-codes`.
+- `ter_pct`: the expense ratio from the AMC factsheet. Blank means no drag on the pre-listing
+  proxy.
+
+ETF unit splits are detected against the index (a day's move more than about 45% away from the
+index's) and undone.
+
 ## UI
 
 ```bash

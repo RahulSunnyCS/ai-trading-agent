@@ -69,12 +69,18 @@ def token_status() -> None:
 @app.command()
 def fetch(
     no_fyers: bool = typer.Option(False, help="Only pull the public sources (cash, silver)."),
+    etfs: bool = typer.Option(True, help="Also fetch the traded ETFs and their premium to NAV."),
+    intraday: bool = typer.Option(
+        False, help="Also fetch 10:00 prices (Fyers 15-min candles) for --execution mon_10am."
+    ),
 ) -> None:
     """Download history and write data/weekly_closes.csv + .xlsx."""
     from .fetch import fetch_all
 
     try:
-        table, coverage = fetch_all(use_fyers=not no_fyers, log=typer.echo)
+        table, coverage = fetch_all(
+            use_fyers=not no_fyers, log=typer.echo, etfs=etfs, intraday=intraday
+        )
     except fyers.FyersCredentialsError as error:
         typer.echo(f"\n{error}")
         raise typer.Exit(1) from None
@@ -95,6 +101,22 @@ def _load_inputs():
     prices = pd.read_csv(path, index_col=0, parse_dates=True)
     includes = {inst.name: inst.include for inst in load_universe()}
     return prices, includes
+
+
+def _fills(prices: pd.DataFrame, track: str, execution: str) -> pd.DataFrame | None:
+    """The trade-price table for --track/--execution (None = the index at Friday close)."""
+    from .trade_prices import build_trade_prices
+
+    try:
+        table = build_trade_prices(prices, track, execution)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(1) from None
+    if table is None:
+        return None
+    for warning in table.warnings:
+        typer.echo(f"warning: {warning}")
+    return table.prices
 
 
 def _config(**options):
@@ -125,6 +147,14 @@ _PORTFOLIO = typer.Option(
 )
 _ENTRY = typer.Option("wait", help="Buffer rule, new top-N name with no sale: wait | make_room")
 _CAP = typer.Option(35.0, help="Buffer rule: max % of the portfolio in one ETF (0 = no cap).")
+_TRACK = typer.Option(
+    "index",
+    help="P&L on: index (the underlying) | etf (the ETF you'd trade). Ranking is "
+    "always on the index.",
+)
+_EXECUTION = typer.Option(
+    "fri_close", help="Trades fill at: fri_close | mon_open | mon_10am (after the signal)."
+)
 
 
 def _print_summary(summary: dict) -> None:
@@ -149,6 +179,8 @@ def backtest(
     portfolio: str = _PORTFOLIO,
     entry: str = _ENTRY,
     max_position: float = _CAP,
+    track: str = _TRACK,
+    execution: str = _EXECUTION,
 ) -> None:
     """Run one backtest and write data/backtests/<label>.xlsx."""
     from . import metrics
@@ -170,8 +202,11 @@ def backtest(
         portfolio=portfolio,
         entry=entry,
         max_position=max_position / 100 or None,
+        track=track,
+        execution=execution,
     )
-    result = run_backtest(prices, includes, config)
+    fills = _fills(prices, track, execution)
+    result = run_backtest(prices, includes, config, trade_prices=fills)
     path = DATA_DIR / "backtests" / f"{config.label}.xlsx"
     write_result(result, path)
     _print_summary(metrics.summary(result))
@@ -192,12 +227,15 @@ def compare(
     portfolio: str = _PORTFOLIO,
     entry: str = _ENTRY,
     max_position: float = _CAP,
+    track: str = _TRACK,
+    execution: str = _EXECUTION,
 ) -> None:
     """Run the three defensive modes side by side and write data/backtests/compare.xlsx."""
     from .engine import run_backtest
     from .report import write_comparison, write_result
 
     prices, includes = _load_inputs()
+    fills = _fills(prices, track, execution)
     results = {}
     for mode in ("off", "ranked", "filter"):
         config = _config(
@@ -214,8 +252,10 @@ def compare(
             portfolio=portfolio,
             entry=entry,
             max_position=max_position / 100 or None,
+            track=track,
+            execution=execution,
         )
-        results[mode] = run_backtest(prices, includes, config)
+        results[mode] = run_backtest(prices, includes, config, trade_prices=fills)
         write_result(results[mode], DATA_DIR / "backtests" / f"{config.label}.xlsx")
     path = DATA_DIR / "backtests" / "compare.xlsx"
     table = write_comparison(results, path)
@@ -228,6 +268,8 @@ def sweep(
     start: str = _START,
     cost_pct: float = _COST,
     signal_delay: int = _DELAY,
+    track: str = _TRACK,
+    execution: str = _EXECUTION,
 ) -> None:
     """Run ~500 nearby settings and show how sensitive the result is (data/backtests/sweep.xlsx)."""
     from . import sweep as sw
@@ -235,10 +277,17 @@ def sweep(
     from .report import write_tables
 
     prices, includes = _load_inputs()
-    base = Config(start=start, cost_pct=cost_pct, signal_delay=signal_delay)
+    fills = _fills(prices, track, execution)
+    base = Config(
+        start=start,
+        cost_pct=cost_pct,
+        signal_delay=signal_delay,
+        track=track,
+        execution=execution,
+    )
     configs = sw.grid(base)
     typer.echo(f"running {len(configs)} configurations ...")
-    full = sw.run_grid(prices, includes, configs)
+    full = sw.run_grid(prices, includes, configs, trade_prices=fills)
     tables = {"all runs": full, **sw.plateau_summary(full, base)}
     write_tables(tables, DATA_DIR / "backtests" / "sweep.xlsx")
 
@@ -263,6 +312,8 @@ def walkforward(
     select_by: str = typer.Option("Sharpe", help="Sharpe or CAGR - what 'best' means."),
     cost_pct: float = _COST,
     signal_delay: int = _DELAY,
+    track: str = _TRACK,
+    execution: str = _EXECUTION,
 ) -> None:
     """Pick settings on the earlier period, then measure them on the later one - and reverse."""
     from . import sweep as sw
@@ -270,7 +321,8 @@ def walkforward(
     from .report import write_tables
 
     prices, includes = _load_inputs()
-    base = Config(cost_pct=cost_pct, signal_delay=signal_delay)
+    fills = _fills(prices, track, execution)
+    base = Config(cost_pct=cost_pct, signal_delay=signal_delay, track=track, execution=execution)
     configs = sw.grid(base)
     last = prices.index[-1].strftime("%Y-%m-%d")
     before = (pd.Timestamp(split) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
@@ -284,6 +336,7 @@ def walkforward(
         (split, last),
         cache=cache,
         select_by=select_by,
+        trade_prices=fills,
     )
     reverse = sw.walk_forward(
         prices,
@@ -293,6 +346,7 @@ def walkforward(
         ("2017-01-01", before),
         cache=cache,
         select_by=select_by,
+        trade_prices=fills,
     )
     summary = pd.DataFrame(
         {
@@ -329,6 +383,8 @@ def tax(
     exit_rank: int = _EXIT,
     cost_pct: float = _COST,
     signal_delay: int = _DELAY,
+    track: str = _TRACK,
+    execution: str = _EXECUTION,
 ) -> None:
     """After-tax results: tax is charged on every sale, so paid tax stops compounding."""
     from . import metrics
@@ -338,6 +394,7 @@ def tax(
     from .tax import TaxRules, benchmark_after_tax, cash_after_tax
 
     prices, includes = _load_inputs()
+    fills = _fills(prices, track, execution)
     classes = {i.name: i.tax_class for i in load_universe()}
     rows = {}
     for slab in slab_rate:
@@ -349,9 +406,13 @@ def tax(
                 exit_rank=exit_rank,
                 cost_pct=cost_pct,
                 signal_delay=signal_delay,
+                track=track,
+                execution=execution,
             )
-            pre = run_backtest(prices, includes, Config(**base), classes)
-            post = run_backtest(prices, includes, Config(**base, tax=rules), classes)
+            pre = run_backtest(prices, includes, Config(**base), classes, trade_prices=fills)
+            post = run_backtest(
+                prices, includes, Config(**base, tax=rules), classes, trade_prices=fills
+            )
             ledger = post.tax_ledger
             years = (post.equity.index[-1] - post.equity.index[0]).days / 365.25
             bench = benchmark_after_tax(post.benchmark.iloc[-1] - 1, rules) + 1
@@ -374,6 +435,142 @@ def tax(
     pd.options.display.float_format = "{:.3f}".format
     typer.echo(table.to_string())
     typer.echo(f"\nwrote {DATA_DIR / 'backtests' / 'after_tax.xlsx'}")
+
+
+@app.command()
+def tracking(
+    top_n: int = _TOP,
+    exit_rank: int = _EXIT,
+    cost_pct: float = _COST,
+    start: str = _START,
+    defensive: str = typer.Option("off", help="off | ranked | filter"),
+) -> None:
+    """How far index P&L is from trading the ETFs: tracking, premiums, fill timing."""
+    from .engine import Config
+    from .report import write_tables
+    from .tracking import (
+        all_tables,
+        attribution,
+        etf_tracking,
+        fill_matrix,
+        premium_on_trades,
+        verdict,
+    )
+    from .trade_prices import load_premiums
+
+    prices, includes = _load_inputs()
+    try:
+        tables = all_tables(prices)
+    except ValueError as error:
+        typer.echo(str(error))
+        raise typer.Exit(1) from None
+    warnings = {w for table in tables.values() if table is not None for w in table.warnings}
+    for warning in sorted(warnings):
+        typer.echo(f"warning: {warning}")
+    base = Config(
+        top_n=top_n, exit_rank=exit_rank, cost_pct=cost_pct, start=start, defensive=defensive
+    )
+    premiums = load_premiums()
+    matrix, results = fill_matrix(prices, includes, base, tables)
+    per_etf = etf_tracking(prices, tables[("etf", "fri_close")], premiums)
+    on_trades = premium_on_trades(results[("etf", "fri_close")], premiums)
+    blame = attribution(results[("index", "fri_close")], results[("etf", "fri_close")])
+    lines = verdict(matrix, on_trades)
+
+    path = DATA_DIR / "backtests" / "tracking.xlsx"
+    write_tables(
+        {
+            "verdict": pd.DataFrame({"reading": lines}),
+            "track x execution": matrix,
+            "per ETF": per_etf,
+            "premium on trades": on_trades,
+            "P&L by instrument": blame,
+            "ETF price sources": tables[("etf", "fri_close")].notes,
+        },
+        path,
+    )
+    pd.options.display.float_format = "{:.4f}".format
+    typer.echo("\ntrack x execution (same signals, different fills):\n")
+    typer.echo(matrix.to_string())
+    if not per_etf.empty:
+        cols = [
+            c
+            for c in ("weeks", "tracking difference / yr", "tracking error / yr", "premium mean")
+            if c in per_etf
+        ]
+        typer.echo("\nper ETF, over the weeks it existed:\n")
+        typer.echo(per_etf[cols].to_string())
+    typer.echo("\n" + "\n".join(f"- {line}" for line in lines))
+    typer.echo(f"\nwrote {path}")
+
+
+# Scheme-name searches for `mbt amfi-codes` - AMFI names differ from the NSE symbols.
+AMFI_HINTS = {
+    "NIFTYBEES": "Nippon India ETF Nifty 50 BeES",
+    "JUNIORBEES": "Nippon India ETF Nifty Next 50 Junior BeES",
+    "MID150BEES": "Nippon India ETF Nifty Midcap 150",
+    "HDFCSML250": "HDFC NIFTY Smallcap 250 ETF",
+    "BANKBEES": "Nippon India ETF Nifty Bank BeES",
+    "ITBEES": "Nippon India ETF Nifty IT",
+    "PSUBNKBEES": "Nippon India ETF Nifty PSU Bank BeES",
+    "PHARMABEES": "Nippon India Nifty Pharma ETF",
+    "METALIETF": "ICICI Prudential Nifty Metal ETF",
+    "INFRAIETF": "ICICI Prudential Nifty Infrastructure ETF",
+    "CPSEETF": "CPSE ETF",
+    "MOREALTY": "Motilal Oswal Nifty Realty ETF",
+    "FMCGIETF": "ICICI Prudential Nifty FMCG ETF",
+    "MOCAPITAL": "Motilal Oswal Nifty Capital Market ETF",
+    "AUTOBEES": "Nippon India Nifty Auto ETF",
+    "GROWWCHEM": "Groww Nifty Chemicals ETF",
+    "MODEFENCE": "Motilal Oswal Nifty India Defence ETF",
+    "GOLDBEES": "Nippon India ETF Gold BeES",
+    "SILVERBEES": "Nippon India Silver ETF",
+    "MON100": "Motilal Oswal Nasdaq 100 ETF",
+    "HNGSNGBEES": "Nippon India ETF Hang Seng BeES",
+    "ENERGY": "Nifty Energy ETF",
+    "PVTBANIETF": "ICICI Prudential Nifty Private Bank ETF",
+    "HEALTHIETF": "ICICI Prudential Nifty Healthcare ETF",
+    "LTGILTBEES": "Nippon India ETF Nifty 8-13 yr G-Sec Long Term Gilt",
+}
+
+
+@app.command()
+def amfi_codes(
+    redo: bool = typer.Option(False, help="Also ask for rows that already have a code."),
+) -> None:
+    """Find each ETF's AMFI scheme code (for premium-to-NAV) and write it into universe.csv."""
+    import csv
+
+    from .config import UNIVERSE_CSV
+    from .sources import amfi_search
+
+    with UNIVERSE_CSV.open() as f:
+        reader = csv.DictReader(f)
+        fields, rows = reader.fieldnames, list(reader)
+    for row in rows:
+        etf = row["trade_etf"]
+        if row["index"] == "Cash (liquid fund)" or (row.get("amfi_code") and not redo):
+            continue
+        query = AMFI_HINTS.get(etf, etf)
+        while True:
+            matches = [m for m in amfi_search(query) if "IDCW" not in m["schemeName"].upper()]
+            typer.echo(f"\n{etf} ({row['index']}) - search '{query}':")
+            for i, match in enumerate(matches[:8], start=1):
+                typer.echo(f"  {i}. {match['schemeCode']}  {match['schemeName']}")
+            answer = typer.prompt(
+                "number, blank to skip, or new search text", default="", show_default=False
+            ).strip()
+            if not answer:
+                break
+            if answer.isdigit() and 1 <= int(answer) <= min(8, len(matches)):
+                row["amfi_code"] = str(matches[int(answer) - 1]["schemeCode"])
+                break
+            query = answer
+    with UNIVERSE_CSV.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+    typer.echo(f"\nwrote {UNIVERSE_CSV} - run `mbt fetch` to pull NAVs and premiums")
 
 
 @app.command()

@@ -292,7 +292,23 @@ def latest_signal(result: Result, prices: pd.DataFrame, config: Config) -> dict:
     return {"week": week, "rows": rows, "explain": explain + delay}
 
 
-def payload(result: Result, prices: pd.DataFrame, config: Config, groups: dict[str, str]) -> dict:
+def _proxied(proxy: pd.DataFrame | None, asset: str, *weeks) -> bool:
+    """True if any of `weeks` priced `asset` on its index because the ETF didn't exist yet."""
+    if proxy is None or asset not in proxy:
+        return False
+    return any(w in proxy.index and bool(proxy.at[w, asset]) for w in weeks if pd.notna(w))
+
+
+def payload(
+    result: Result,
+    prices: pd.DataFrame,
+    config: Config,
+    groups: dict[str, str],
+    proxy: pd.DataFrame | None = None,
+    fill_warnings: list[str] | None = None,
+) -> dict:
+    """`proxy` (week x instrument, from trade_prices) marks fills where an ETF was priced on
+    its index because it hadn't listed yet."""
     closed = closed_trades(result)
     eq, bench, cash = result.equity, result.benchmark, result.cash
     rolling = (eq / eq.shift(52)) - (bench / bench.shift(52))
@@ -323,6 +339,9 @@ def payload(result: Result, prices: pd.DataFrame, config: Config, groups: dict[s
         "reason",
         "tax",
     ]
+    trade_rows = closed[columns].to_dict("records") if len(closed) else []
+    for row in trade_rows:
+        row["proxy"] = _proxied(proxy, row["asset"], row["entry_week"], row["exit_week"])
     open_rows = []
     for r in result.open_positions.itertuples() if len(result.open_positions) else []:
         open_rows.append(
@@ -334,6 +353,7 @@ def payload(result: Result, prices: pd.DataFrame, config: Config, groups: dict[s
                 "position_return": r.position_return,
                 "value": r.value * CAPITAL,
                 "pnl": (r.value - r.entry_value) * CAPITAL,
+                "proxy": _proxied(proxy, r.asset, r.entry_week),
             }
         )
     return _clean(
@@ -342,7 +362,13 @@ def payload(result: Result, prices: pd.DataFrame, config: Config, groups: dict[s
             "kpis": kpis(result, closed),
             "series": series,
             "rotations": rotations(result),
-            "trades": closed[columns].to_dict("records") if len(closed) else [],
+            "trades": trade_rows,
+            "fills": {
+                "track": config.track,
+                "execution": config.execution,
+                "proxy_trades": sum(r["proxy"] for r in trade_rows),
+                "warnings": fill_warnings or [],
+            },
             "open_positions": open_rows,
             "instruments": instrument_table(result, closed, groups),
             "timeline": timeline(result, closed),

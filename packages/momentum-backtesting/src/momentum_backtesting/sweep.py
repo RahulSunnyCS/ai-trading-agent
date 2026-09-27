@@ -69,11 +69,13 @@ def run_grid(
     configs: list[Config],
     tax_classes: dict[str, str] | None = None,
     cache: RankCache | None = None,
+    trade_prices: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     cache = {} if cache is None else cache
     rows = []
     for config in configs:
-        stats = quick_stats(run_backtest(prices, includes, config, tax_classes, cache))
+        result = run_backtest(prices, includes, config, tax_classes, cache, trade_prices)
+        stats = quick_stats(result)
         rows.append(
             {
                 "mode": config.defensive,
@@ -131,6 +133,7 @@ def walk_forward(
     tax_classes: dict[str, str] | None = None,
     cache: RankCache | None = None,
     select_by: str = "Sharpe",
+    trade_prices: pd.DataFrame | None = None,
 ) -> WalkForward:
     """Choose the best configuration in `fit_window`, then measure it in `test_window`."""
     cache = {} if cache is None else cache
@@ -140,6 +143,7 @@ def walk_forward(
         [replace(c, start=fit_window[0], end=fit_window[1]) for c in configs],
         tax_classes,
         cache,
+        trade_prices,
     )
     test = run_grid(
         prices,
@@ -147,6 +151,7 @@ def walk_forward(
         [replace(c, start=test_window[0], end=test_window[1]) for c in configs],
         tax_classes,
         cache,
+        trade_prices,
     )
     joined = fit.merge(test, on=KEY, suffixes=(" (fit)", " (test)"))
     best = joined.sort_values(f"{select_by} (fit)", ascending=False).iloc[0]

@@ -104,6 +104,8 @@ function defaultConfig() {
     filter_lookback: d.filter_lookback,
     cost_pct: d.cost_pct,
     signal_delay: d.signal_delay,
+    track: d.track || "index",
+    execution: d.execution || "fri_close",
     tax: false,
     slab_rate: 0.3,
     benchmark: d.benchmark,
@@ -255,6 +257,8 @@ function readConfig() {
     filter_lookback: Number($("#filter_lookback").value),
     cost_pct: Number($("#cost_pct").value),
     signal_delay: Number($("#signal_delay").value),
+    track: $("#track").value,
+    execution: $("#execution").value,
     tax: $("#tax").checked,
     slab_rate: Number($("#slab_rate").value),
     benchmark: $("#benchmark").value,
@@ -277,6 +281,8 @@ function applyConfig(cfg) {
   $("#filter_lookback").value = cfg.filter_lookback;
   $("#cost_pct").value = cfg.cost_pct;
   $("#signal_delay").value = String(cfg.signal_delay);
+  $("#track").value = cfg.track || "index";
+  $("#execution").value = cfg.execution || "fri_close";
   $("#tax").checked = !!cfg.tax;
   $("#slab_rate").value = String(cfg.slab_rate);
   $("#benchmark").value = cfg.benchmark;
@@ -431,6 +437,8 @@ function describe(cfg) {
   const guard = { off: "always invested", ranked: "debt in ranking", filter: `cash filter ${cfg.filter_lookback}w` }[cfg.defensive];
   return `${rule} · top ${cfg.top_n}, sell when rank > ${cfg.exit_rank} · lookbacks ${lbs}w · ${guard} · ` +
     `${cfg.universe.length} ETFs · cost ${cfg.cost_pct}%${cfg.signal_delay ? ` · ${cfg.signal_delay}w delay` : ""} · ` +
+    `P&L on ${cfg.track === "etf" ? "ETFs" : "index"}` +
+    `${{ fri_close: "", mon_open: ", fill Mon open", mon_10am: ", fill Mon 10:00" }[cfg.execution || "fri_close"]} · ` +
     (cfg.tax ? `after tax (${Math.round(cfg.slab_rate * 100)}% slab)` : "pre-tax");
 }
 
@@ -694,10 +702,21 @@ function renderTrades(r) {
     { key: "pnl", label: "P&L (₹1L start)", num: true, fmt: (v) => `<span class="${signClass(v)}">${rupees(v)}</span>` },
     { key: "reason", label: "Why sold" },
     { key: "tax", label: "Tax", num: true, fmt: (v) => (v ? rupees(v * 100000) : "–") },
+    { key: "proxy", label: "Priced on", fmt: (v) => (v ? `<span class="badge warn" title="The ETF hadn't listed yet, so its index (less the expense ratio) stood in">index proxy</span>` : "") },
   ], r.trades, {
     sortKey: "exit_week", sortDir: -1, search: "Filter by ETF, reason…", csv: "momentum-trades.csv",
-    before: `<p class="explain">Every position fully sold. Return and P&L count all purchases of the position, including top-ups.</p>`,
+    before: `<p class="explain">Every position fully sold. Return and P&L count all purchases of the position, including top-ups.${fillsNote(r.fills)}</p>`,
   });
+}
+
+function fillsNote(f) {
+  if (!f) return "";
+  let note = "";
+  if (f.track === "etf") {
+    note += ` P&L is on the ETFs; ${f.proxy_trades} trade${f.proxy_trades === 1 ? "" : "s"} fell in weeks before the ETF listed and use its index as a proxy.`;
+  }
+  for (const w of f.warnings || []) note += ` <span class="badge warn">${esc(w)}</span>`;
+  return note;
 }
 
 function renderTimeline(r) {
