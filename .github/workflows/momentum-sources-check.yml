@@ -1,0 +1,28 @@
+name: Momentum sources check
+
+# One-off reachability check before enabling "Momentum weekly signal": some data sites
+# (niftyindices.com, Yahoo) block datacenter IPs. Needs no secrets. If a source fails
+# here, the weekly job falls back to the others and says so, but check before relying on it.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/momentum-backtesting
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: '0.8.x'
+
+      - run: uv sync --frozen
+
+      - run: uv run mbt sources-check

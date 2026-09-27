@@ -573,6 +573,142 @@ def amfi_codes(
     typer.echo(f"\nwrote {UNIVERSE_CSV} - run `mbt fetch` to pull NAVs and premiums")
 
 
+db_app = typer.Typer(
+    no_args_is_help=True, help="Price history in Postgres (MOMENTUM_DATABASE_URL)."
+)
+app.add_typer(db_app, name="db")
+
+
+def _db():
+    from . import store
+
+    try:
+        return store.connect()
+    except store.StoreNotConfigured as error:
+        typer.echo(f"{error} - point it at a Postgres (e.g. a free Neon project).")
+        raise typer.Exit(1) from None
+
+
+@db_app.command("init")
+def db_init() -> None:
+    """Create the tables (safe to re-run)."""
+    from . import store
+
+    with _db() as conn:
+        store.init_schema(conn)
+    typer.echo("ok: momentum_prices and momentum_signals exist")
+
+
+@db_app.command("push")
+def db_push(
+    since: str = typer.Option("", help="Only rows on/after this date (default: everything)."),
+) -> None:
+    """Upload data/ (after `mbt fetch`) to the database."""
+    from . import store
+
+    with _db() as conn:
+        store.init_schema(conn)
+        count = store.push_dir(conn, DATA_DIR, pd.Timestamp(since) if since else None)
+    typer.echo(f"ok: {count} rows upserted")
+
+
+@db_app.command("pull")
+def db_pull() -> None:
+    """Rebuild data/ from the database (what the weekly job does before it runs)."""
+    from . import store
+
+    with _db() as conn:
+        count = store.pull_dir(conn, DATA_DIR)
+    typer.echo(f"ok: {count} rows written under {DATA_DIR}")
+
+
+@app.command()
+def weekly(
+    run: str = typer.Option(..., help="preview (~14:40 IST, live prices) | final (after close)"),
+    use_db: bool = typer.Option(True, "--db/--no-db", help="Pull history from and save to the DB."),
+    send: bool = typer.Option(True, help="Send to Telegram (prints when TELEGRAM_* is unset)."),
+) -> None:
+    """The Friday signal: refresh prices, rank, and send the week's trades to Telegram."""
+    from . import notify
+    from .weekly import run_weekly
+
+    if run not in ("preview", "final"):
+        typer.echo("--run must be preview or final")
+        raise typer.Exit(2)
+    try:
+        creds = fyers.resolve_credentials()
+    except fyers.FyersCredentialsError as error:
+        typer.echo(f"Fyers: not used ({error})")
+        creds = None
+    conn = None
+    try:
+        if use_db:
+            from . import store
+
+            conn = _db()
+            store.init_schema(conn)
+            if not (DATA_DIR / "weekly_closes.csv").exists():
+                typer.echo(f"pulled {store.pull_dir(conn, DATA_DIR)} rows from the database")
+        if not (DATA_DIR / "weekly_closes.csv").exists():
+            typer.echo("No history: run `mbt fetch` (and `mbt db push`) first.")
+            raise typer.Exit(1)
+        result = run_weekly(run, DATA_DIR, creds=creds, conn=conn, log=typer.echo)
+    except typer.Exit:
+        raise
+    except Exception as error:
+        note = notify.Notification(
+            "momentum-weekly",
+            "error",
+            f"Momentum {run}: the job failed",
+            notify.redact(f"{type(error).__name__}: {error}"),
+            notify.run_url(),
+        )
+        notify.send(note) if send else typer.echo(notify.render(note))
+        raise
+    finally:
+        if conn is not None:
+            conn.close()
+    result.notification.run_url = notify.run_url()
+    if send:
+        notify.send(result.notification)
+    else:
+        typer.echo(notify.render(result.notification))
+
+
+@app.command()
+def sources_check() -> None:
+    """Can this machine reach every data source? (Run once from GitHub Actions before
+    enabling the weekly schedule - some sites block datacenter IPs.)"""
+    from datetime import date, timedelta
+
+    from . import sources
+
+    start = date.today() - timedelta(days=10)
+    checks = {
+        "Yahoo (ETF candles)": lambda: len(sources.yahoo_candles("NIFTYBEES.NS", start)),
+        "Yahoo (live quote)": lambda: sources.yahoo_quote("NIFTYBEES.NS")[0],
+        "Yahoo (US index)": lambda: len(sources.yahoo_daily("^NDX", start)),
+        "AMFI (mfapi.in)": lambda: len(sources.amfi_nav("120304", start)),
+        "niftyindices.com": lambda: len(
+            sources.niftyindices_candles("NIFTY MIDCAP 150", start, date.today())
+        ),
+    }
+    failed = 0
+    for name, check in checks.items():
+        try:
+            typer.echo(f"  ok    {name}: {check()}")
+        except Exception as error:
+            failed += 1
+            typer.echo(f"  FAIL  {name}: {type(error).__name__}: {str(error)[:120]}")
+    try:
+        creds = fyers.resolve_credentials()
+        closes = fyers.daily_closes("NSE:NIFTY50-INDEX", start, date.today(), creds)
+        typer.echo(f"  ok    Fyers ({creds.source}): {len(closes)} days")
+    except Exception as error:
+        typer.echo(f"  skip  Fyers: {str(error)[:120]}")
+    raise typer.Exit(1 if failed else 0)
+
+
 @app.command()
 def ui(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),

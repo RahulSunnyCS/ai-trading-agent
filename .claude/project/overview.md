@@ -31,7 +31,10 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
   cutover; the `trade-analytics` repo still owns the live cron
 - **`packages/momentum-backtesting`** — Python/uv research tool for weekly
   momentum rotation across Indian indices, commodities and international ETFs,
-  from 2017. Data layer (`mbt fetch`), backtest engine and a local web UI (`mbt ui`) built
+  from 2017. Data layer (`mbt fetch`), backtest engine and a local web UI (`mbt ui`) built.
+  Weekly Friday signal to Telegram (`mbt weekly`, `.github/workflows/momentum-weekly.yml`:
+  14:40 IST live-price preview + 16:45 IST final) with history in Neon Postgres; schedule
+  disabled until a manual dispatch passes
 
 ## Implementation Phases
 

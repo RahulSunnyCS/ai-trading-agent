@@ -3,6 +3,7 @@
 Credentials resolve like apps/server (ingestion/brokers/fyers-historical.ts), with one
 extra source so this works without the server's Postgres running:
   1. FYERS_APP_ID + FYERS_ACCESS_TOKEN from the environment / repo .env
+  1b. FYERS_TOKEN_FILE - the JSON file packages/broker-login's `fyers-token` writes in CI
   2. the token cached by `mbt login` (data/.fyers_token.json), if not expired
   3. the row in broker_tokens (broker = 'fyers'), written by the dashboard's
      "Login with Fyers" flow, read via DATABASE_URL.
@@ -146,6 +147,19 @@ def resolve_credentials() -> Credentials:
     if app_id and token:
         return Credentials(app_id, token, "env")
 
+    token_file = os.environ.get("FYERS_TOKEN_FILE", "").strip()
+    if token_file:
+        from pathlib import Path
+
+        path = Path(token_file)
+        if path.exists():
+            data = json.loads(path.read_text())
+            expires_at = datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
+            if expires_at > datetime.now(UTC):
+                return Credentials(
+                    data["app_id"], data["access_token"], "FYERS_TOKEN_FILE", expires_at
+                )
+
     cached = _cached_token()
     if cached:
         return cached
@@ -252,6 +266,38 @@ def daily_candles(symbol: str, start: date, end: date, creds: Credentials) -> pd
 def daily_closes(symbol: str, start: date, end: date, creds: Credentials) -> pd.Series:
     """Daily closes indexed by IST trading date, fetched in <=366-day chunks."""
     return daily_candles(symbol, start, end, creds)["close"]
+
+
+QUOTES_URL = "https://api-t1.fyers.in/data/quotes"
+
+
+def quotes(symbols: list[str], creds: Credentials) -> dict[str, float]:
+    """Last traded price per symbol (live during market hours), 50 symbols per request."""
+    prices: dict[str, float] = {}
+    for i in range(0, len(symbols), 50):
+        batch = symbols[i : i + 50]
+        request = urllib.request.Request(
+            f"{QUOTES_URL}?{urllib.parse.urlencode({'symbols': ','.join(batch)})}",
+            headers={
+                "Authorization": f"{creds.app_id}:{creds.access_token}",
+                "User-Agent": USER_AGENT,
+            },
+        )
+        try:
+            body = json.load(urllib.request.urlopen(request, timeout=30))
+        except urllib.error.HTTPError as error:
+            body = _error_body(error)
+        if body.get("s") != "ok":
+            message = str(body.get("message") or body.get("s"))
+            if any(word in message.lower() for word in ("token", "auth", "unauthor")):
+                raise FyersCredentialsError(f"Fyers rejected the token: {message}")
+            raise RuntimeError(f"Fyers quotes failed: {message}")
+        for item in body.get("d") or []:
+            ltp = (item.get("v") or {}).get("lp")
+            if item.get("s") == "ok" and ltp:
+                prices[item["n"]] = float(ltp)
+        time.sleep(PAUSE_S)
+    return prices
 
 
 INTRADAY_MAX_DAYS = 100  # Fyers caps minute-resolution requests at 100 days

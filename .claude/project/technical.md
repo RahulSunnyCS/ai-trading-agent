@@ -358,6 +358,8 @@ Critical variables whose misconfiguration causes real pain:
 | `EVOLUTION_REQUIRE_APPROVAL` | Should be `true` in any environment where the retrospection engine runs. Setting `false` allows the system to autonomously modify personality parameters without human review |
 | `TOKEN_VALIDITY_SCHEDULER_ENABLED` | When set to `true`, registers a BullMQ cron job that checks Fyers token expiry at 08:45 IST weekdays. Disabled by default; opt-in via this flag |
 | `BACKTEST_API_URL` | Base URL of the loopback-only Python FastAPI service (default `http://127.0.0.1:8000`). The Fastify proxy validates this resolves to loopback/private address space at startup — a public host throws (safe default-throw), the proxy never starts against it |
+| `MOMENTUM_DATABASE_URL` | Postgres (Neon free tier) holding `packages/momentum-backtesting`'s price history and weekly signals (`momentum_prices`, `momentum_signals`). Deliberately separate from `DATABASE_URL`, which momentum's `fyers.py` reads for `broker_tokens` |
+| `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
 | `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet cache and writes its run registry (`<dir>/cache`, `<dir>/registry.sqlite`). Defaults to `packages/option-backtesting`'s own `data/` when unset |
 
 ## Common Tasks

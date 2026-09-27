@@ -1,0 +1,19 @@
+# The strategy the weekly Friday signal (`mbt weekly`) runs. Edit, commit, and the next run
+# uses it. Any engine.Config field can go here; these are the defaults as first specified.
+top_n = 5
+exit_rank = 10
+lookbacks = [1, 4, 13, 26, 52]
+defensive = "off"
+portfolio = "buffer"
+entry = "wait"
+max_position = 0.35
+cost_pct = 0.10
+start = "2017-01-01"
+
+# What P&L (and so position sizes and cap trims) is measured on. Switch to "etf" if
+# `mbt tracking` shows the ETF gap is material (> 0.5 CAGR points a year).
+track = "index"
+
+# Flag a buy whose ETF trades this far above NAV (needs amfi_code in universe.csv).
+premium_warn_pct = 1.0
+premium_warn_international_pct = 2.0

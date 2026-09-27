@@ -96,6 +96,73 @@ New columns in `universe.csv`:
 ETF unit splits are detected against the index (a day's move more than about 45% away from the
 index's) and undone.
 
+## Weekly Friday signal (Telegram)
+
+`mbt weekly --run preview|final` refreshes prices, ranks, and sends the week's trades to
+Telegram. It runs from `.github/workflows/momentum-weekly.yml`:
+
+| Run | When (IST) | Prices | Purpose |
+|---|---|---|---|
+| `preview` | Fri 14:40 | live: Fyers quotes, or each ETF's Yahoo quote (~15 min delayed) turned into its index level | trade 15:05-15:25, i.e. at (nearly) the Friday close the backtest assumes |
+| `final` | Fri 16:45 | official closes | lists anything the close changed versus the preview |
+
+The message lists SELL / TRIM / BUY and TOP UP / HOLD / WAITING. It flags a buy whose ETF
+trades above NAV (1%, or 2% for international ETFs; see `live_config.toml`), shows the
+biggest rank moves, and ends with a data-health line.
+
+The positions are the backtest's model portfolio under
+`src/momentum_backtesting/live_config.toml`, not your actual holdings.
+
+Guards:
+
+- A market holiday produces a "market closed?" note and no signal.
+- If more than 25% of the ranked series have no close for the day, you get a data-health
+  alert and no signal.
+- A preview that starts after 15:15 says it's too late to trade today.
+- Preview prices are never stored.
+
+**Sources, best first:**
+
+1. Fyers, when a token is available.
+2. niftyindices.com, for indices that have a `backfill` name.
+3. An estimate from the ETF: the last index close x the ETF's move since.
+
+Every estimate is named in the message.
+
+**Storage** is Postgres; the free tier of [Neon](https://neon.tech) is enough (about 10 MB).
+The connection string goes in `MOMENTUM_DATABASE_URL`.
+
+```bash
+uv run mbt db init                        # create momentum_prices + momentum_signals
+uv run mbt fetch && uv run mbt db push    # one-time: full history from your machine
+uv run mbt db pull                        # rebuild data/ from the database
+uv run mbt weekly --run final --no-db --no-send   # try it locally, printed not sent
+uv run mbt sources-check                  # can this machine reach every source?
+```
+
+**Fyers in CI.** `packages/broker-login`'s `bun run fyers-token` logs in headlessly (client
+ID, then TOTP, then PIN) and writes a 0600 token file that `mbt` reads via
+`FYERS_TOKEN_FILE`. The token is never printed and is deleted when the job ends. If the login
+fails, it sends a Telegram alert and the signal uses the public sources.
+
+**Setup checklist.** Add these secrets to a GitHub Environment named `fyers-data`, restricted
+to the default branch:
+
+- `MOMENTUM_DATABASE_URL`
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+- `FYERS_APP_ID`, `FYERS_APP_SECRET`, `FYERS_REDIRECT_URI`
+- `FYERS_CLIENT_ID`, `FYERS_PIN`, `FYERS_TOTP_SECRET`
+
+Use a Fyers API app dedicated to this job. On the Fyers dashboard, either keep order placement
+locked to a static IP or turn order permission off: GitHub runners have no static IP, so a
+leaked token can't place API orders.
+
+Then:
+
+1. Run "Momentum sources check" once.
+2. Run "Momentum weekly signal" by hand for `preview` and for `final`.
+3. Only then uncomment its `schedule:`.
+
 ## UI
 
 ```bash
