@@ -289,6 +289,7 @@ beating something above it.**
 |---|---|
 | Make regime a live strategy-DSL condition (#8) | Look-ahead risk; the bucketing that exists is honest, a live condition may not be |
 | Revisit Turborepo (#10) | Only on stated triggers — build times are not the bottleneck today |
+| Momentum exhaustion exits for `mbt` (silver fell from a ₹293 weekly close to ₹224 in one week, Feb 2026; the signal sold at ₹233). Candidates, each a UI option, threshold picked on 2017–21 and judged on 2022–26: (a) trim half when far above the 26-week average, scaled by the instrument's own volatility; (b) drop the 1-week lookback from ranking; (c) inverse-volatility position sizing; (d) skip new buys into an extreme spike; (e) ETF premium to NAV as a warning — silver/gold only, needs SILVERBEES NAV fetched | ~10 extreme weeks since 2016, nearly all silver 2026 + defence 2024 — easy to overfit, and trims sell real winners early and add tax |
 
 *(Ideas #1–#7 and #9 are already promoted into 3.3 and 3.5 above.)*
 

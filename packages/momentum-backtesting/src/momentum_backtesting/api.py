@@ -141,7 +141,8 @@ def create_app() -> FastAPI:
                 "entry": defaults.entry,
                 "max_position": defaults.max_position,
                 "cap_band": defaults.cap_band,
-                "track": defaults.track,
+                # The UI opens on what you'd actually trade; the engine default stays "index".
+                "track": "etf",
                 "execution": defaults.execution,
             },
         }

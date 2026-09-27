@@ -10,9 +10,9 @@ max_position = 0.35
 cost_pct = 0.10
 start = "2017-01-01"
 
-# What P&L (and so position sizes and cap trims) is measured on. Switch to "etf" if
-# `mbt tracking` shows the ETF gap is material (> 0.5 CAGR points a year).
-track = "index"
+# What P&L (and so position sizes and cap trims) is measured on. "etf" since `mbt tracking`
+# (2026-09-28) put the ETF gap at +0.72 CAGR points a year, past the 0.5 threshold.
+track = "etf"
 
 # Flag a buy whose ETF trades this far above NAV (needs amfi_code in universe.csv).
 premium_warn_pct = 1.0
