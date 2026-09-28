@@ -47,10 +47,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The Playwright image ships without unzip, which setup-bun needs to unpack
-      # the Bun release zip. Container jobs run as root, so no sudo.
-      - name: Install unzip
-        run: apt-get update && apt-get install -y --no-install-recommends unzip
+      # Container-only prep (container jobs run as root, so no sudo):
+      # - the Playwright image ships without unzip, which setup-bun needs to
+      #   unpack the Bun release zip;
+      # - the workspace is owned by the runner user, not root, so git refuses
+      #   to operate on it ("dubious ownership") and the root `prepare` script's
+      #   `lefthook install` fails during bun install. checkout's own
+      #   safe.directory entry is scoped to that step only.
+      - name: Prepare container
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends unzip
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: oven-sh/setup-bun@v2
         with:
