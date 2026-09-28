@@ -1,12 +1,15 @@
 name: Daily broker login
 
 on:
-  # SCHEDULE DISABLED until a manual workflow_dispatch run has passed. To enable,
-  # uncomment the block below. 03:05 UTC = 08:35 IST, weekdays only; the second entry
-  # is a 09:05 IST backstop that is a no-op when the first run already succeeded.
-  # schedule:
-  #   - cron: '5 3 * * 1-5'
-  #   - cron: '35 3 * * 1-5'
+  # 02:45 UTC = 08:15 IST, weekdays only. AlgoTest opens broker logins at 08:15 IST;
+  # if the scheduler fires a minute early, main.ts's window guard waits it out. The
+  # second entry is a 08:45 IST backstop for a dropped or failed first run: a broker
+  # that is already logged in is reported SKIPPED, so it is a no-op otherwise.
+  # Market holidays are not filtered here: AlgoTest refuses the login and the run
+  # fails with a Telegram alert, which is expected on those days.
+  schedule:
+    - cron: '45 2 * * 1-5'
+    - cron: '15 3 * * 1-5'
   workflow_dispatch:
     inputs:
       only:
@@ -104,16 +107,23 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          printf '%s  %s  run %s\n' \
+          line="$(printf '%s  %s  run %s' \
             "$(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M %Z')" \
             "${{ job.status }}" \
-            "${{ github.run_id }}" >> packages/broker-login/run-log.md
-          git add packages/broker-login/run-log.md
-          git diff --cached --quiet && exit 0
-          git commit -m "chore: broker login run log"
+            "${{ github.run_id }}")"
+          # Rebuild the commit on the branch tip each attempt rather than rebasing:
+          # the log is append-only, so a re-run (which checks out the run's original
+          # SHA) or a concurrent push always conflicts on the last line. The workspace
+          # is disposable by now and diagnostics have already been uploaded.
+          # --no-verify skips the repo's lefthook pre-commit (a full typecheck).
           for attempt in 1 2 3; do
-            git pull --rebase --autostash && git push && exit 0
+            git fetch --quiet origin "$GITHUB_REF_NAME" &&
+              git reset --quiet --hard FETCH_HEAD &&
+              printf '%s\n' "$line" >> packages/broker-login/run-log.md &&
+              git add packages/broker-login/run-log.md &&
+              git commit --quiet --no-verify -m "chore: broker login run log" &&
+              git push --quiet origin "HEAD:$GITHUB_REF_NAME" && exit 0
             echo "push attempt $attempt failed, retrying"
             sleep 5
           done
-          echo "could not push run log" >&2
+          echo "::warning::could not push run log"

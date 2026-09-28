@@ -163,7 +163,7 @@ Two different logins. Do not conflate:
 | | Mechanism | Owner | When |
 |---|---|---|---|
 | **A. AlgoTest platform login** | `POST /login`, HTTP | `algotest-client` (this repo) | every process start |
-| **B. Broker OAuth (Finvasia / Angel One)** | Browser handshake on the broker's domain | `algo-automation` (Playwright) | daily, 08:35 IST, **live only** |
+| **B. Broker OAuth (Finvasia / Angel One)** | Browser handshake on the broker's domain | `algo-automation` (Playwright) | daily, 08:15 IST, **live only** |
 
 B stays in Playwright: Angel One requires an OAuth consent redirect against
 AlgoTest's redirect URL, and Finvasia redirects to its own login page. Neither
@@ -347,6 +347,12 @@ there is nothing to stop in `algo-automation`. Before enabling it here:
    container, which replaced `npm ci`.
 3. Then uncomment its `schedule:` block and push to `main`. It goes live
    immediately on push — `main` is the default branch and the only branch.
+
+**Done 2026-09-28.** Run `36373883041` (Mon, 09:06 IST) logged in both brokers;
+the schedule (08:15 IST weekdays + 08:45 backstop) went live with the same
+change. Getting there needed two container fixes in the workflow — `unzip` for
+`setup-bun`, and a global `safe.directory` so the root `prepare` script's
+`lefthook install` can run as root.
 
 Tracked in [`/TODO.md`](../TODO.md) → Priority 1.
 
