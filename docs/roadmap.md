@@ -349,14 +349,14 @@ doubt, `worst_of_bar` is the safer default.
 
 **Observed:** `packages/broker-login/src/brokers/types.ts` documents
 `UNKNOWN` as *"usually a selector that stopped matching"* — selector drift is a
-known, already-experienced failure mode. The login runs at 08:35 IST, inside a
+known, already-experienced failure mode. The login runs at 08:15 IST, inside a
 window that closes at 15:40.
 
 **Idea:** A read-only job that loads the AlgoTest pages an hour earlier and
 asserts every locator in `src/selectors.ts` still resolves. No login, no
 credentials beyond the platform session — just "does the DOM still match".
 
-**Why:** the current failure mode is discovering drift at 08:35, when there is
+**Why:** the current failure mode is discovering drift at 08:15, when there is
 one retry and a closing window. An early canary converts an outage into an
 overnight fix.
 
