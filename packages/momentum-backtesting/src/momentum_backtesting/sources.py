@@ -116,6 +116,34 @@ def index_in_inr(index_symbol: str, fx_symbol: str, start: date, previous_close:
 
 
 NIFTYINDICES_URL = "https://www.niftyindices.com/BackPage/getHistoricaldatatabletoString"
+NIFTYINDICES_TRI_URL = "https://www.niftyindices.com/BackPage/getTotalReturnIndexString"
+
+# niftyindices.com renders dates as "DD Mon YYYY" (e.g. "04 Jan 2016"). Parsing that with
+# pd.to_datetime(..., format="%d %b %Y") asks the C library to match "Jan" against the
+# *process locale's* month abbreviations - it works on an en_US-like box and silently
+# raises (or in the worst case, mis-parses) anywhere else. Match against a fixed English
+# table instead so parsing doesn't depend on the environment it happens to run in.
+_MONTH_ABBR = {
+    "Jan": 1,
+    "Feb": 2,
+    "Mar": 3,
+    "Apr": 4,
+    "May": 5,
+    "Jun": 6,
+    "Jul": 7,
+    "Aug": 8,
+    "Sep": 9,
+    "Oct": 10,
+    "Nov": 11,
+    "Dec": 12,
+}
+
+
+def _parse_nse_date(value: str) -> pd.Timestamp:
+    """Parse niftyindices.com's 'DD Mon YYYY' date string against a fixed English
+    month table (see `_MONTH_ABBR`) rather than the process locale."""
+    day_str, mon_str, year_str = value.split()
+    return pd.Timestamp(year=int(year_str), month=_MONTH_ABBR[mon_str], day=int(day_str))
 
 
 def parse_niftyindices(rows: list[dict]) -> pd.Series:
@@ -128,7 +156,7 @@ def _number(value) -> float:
 
 def parse_niftyindices_candles(rows: list[dict]) -> pd.DataFrame:
     by_day = {
-        pd.to_datetime(r["HistoricalDate"], format="%d %b %Y"): (
+        _parse_nse_date(r["HistoricalDate"]): (
             _number(r.get("OPEN")),
             float(r["CLOSE"]),
         )
@@ -139,13 +167,29 @@ def parse_niftyindices_candles(rows: list[dict]) -> pd.DataFrame:
     return frame.sort_index()
 
 
-def niftyindices_daily(name: str, start: date, end: date) -> pd.Series:
-    return niftyindices_candles(name, start, end)["close"]
+def parse_niftyindices_tri(rows: list[dict]) -> pd.Series:
+    """Parse getTotalReturnIndexString rows: {"Date": "30 Dec 2011",
+    "TotalReturnsIndex": "5865.49", "NTR_Value": "-" | <net-of-tax value>}.
+    `NTR_Value` (net total return, tax-adjusted) is not used here - `TotalReturnsIndex`
+    (gross total return) is the series every other TRI-consuming task expects."""
+    closes = {
+        _parse_nse_date(r["Date"]): float(r["TotalReturnsIndex"])
+        for r in rows
+        if r.get("TotalReturnsIndex") not in (None, "", "-")
+    }
+    return pd.Series(closes, dtype=float).sort_index()
 
 
-def niftyindices_candles(name: str, start: date, end: date) -> pd.DataFrame:
-    """Official NSE index closes from niftyindices.com, including NSE's back-calculated
-    history before an index launched. The site allows at most a year per request."""
+def _niftyindices_history(url: str, name: str, start: date, end: date, parse_rows):
+    """Shared POST-chunked fetch against a niftyindices.com BackPage endpoint (at most a
+    year per request per the site's own limit). `niftyindices_candles` (price/close
+    candles, via getHistoricaldatatabletoString) and `niftyindices_tri_daily`
+    (total-return index, via getTotalReturnIndexString) send an identical `cinfo` body
+    shape and only differ in which endpoint they hit and how they parse the response
+    rows. `parse_rows` may return either a Series or a DataFrame - whichever it is, the
+    per-chunk results are concatenated and de-duplicated on the index the same way, and
+    an empty result (no chunks, e.g. start > end) is produced by calling `parse_rows([])`
+    so the caller gets back the right empty type."""
     parts = []
     chunk_start = start
     while chunk_start <= end:
@@ -159,7 +203,7 @@ def niftyindices_candles(name: str, start: date, end: date) -> pd.DataFrame:
             }
         )
         request = urllib.request.Request(
-            NIFTYINDICES_URL,
+            url,
             data=json.dumps({"cinfo": cinfo}).encode(),
             headers={
                 **_UA,
@@ -171,13 +215,13 @@ def niftyindices_candles(name: str, start: date, end: date) -> pd.DataFrame:
         body = json.load(urllib.request.urlopen(request, timeout=60))
         payload = body.get("d", body) if isinstance(body, dict) else body
         rows = json.loads(payload) if isinstance(payload, str) else payload
-        parts.append(parse_niftyindices_candles(rows or []))
+        parts.append(parse_rows(rows or []))
         chunk_start = chunk_end + timedelta(days=1)
         time.sleep(0.5)
     if not parts:
-        return pd.DataFrame(columns=["open", "close"], dtype=float)
-    frame = pd.concat(parts).sort_index()
-    return frame[~frame.index.duplicated()]
+        return parse_rows([])
+    combined = pd.concat(parts).sort_index()
+    return combined[~combined.index.duplicated()]
 
 
 def silver_daily(start: date) -> pd.Series:
@@ -191,6 +235,23 @@ def silver_daily(start: date) -> pd.Series:
     join = synthetic.asof(first_real)
     head = synthetic[synthetic.index < first_real] * (silverbees[first_real] / join)
     return pd.concat([head, silverbees[silverbees.index >= first_real]])
+
+
+def niftyindices_daily(name: str, start: date, end: date) -> pd.Series:
+    return niftyindices_candles(name, start, end)["close"]
+
+
+def niftyindices_candles(name: str, start: date, end: date) -> pd.DataFrame:
+    """Official NSE index closes from niftyindices.com, including NSE's back-calculated
+    history before an index launched. The site allows at most a year per request."""
+    return _niftyindices_history(NIFTYINDICES_URL, name, start, end, parse_niftyindices_candles)
+
+
+def niftyindices_tri_daily(name: str, start: date, end: date) -> pd.Series:
+    """Official NSE total-return index (dividends reinvested) closes from
+    niftyindices.com, including back-calculated history before an index launched.
+    Same request shape as `niftyindices_candles`, different endpoint/response parser."""
+    return _niftyindices_history(NIFTYINDICES_TRI_URL, name, start, end, parse_niftyindices_tri)
 
 
 def silver_weekly(start: date) -> tuple[pd.Series, pd.Series]:
