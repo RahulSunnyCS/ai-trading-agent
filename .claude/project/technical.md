@@ -185,7 +185,7 @@ ai-trading-agent/
     │                                 # Finvasia into AlgoTest each morning via TOTP; the broker
     │                                 # OAuth handshake happens on the broker's own domain, so it cannot
     │                                 # be done over HTTP. Every locator lives in src/selectors.ts.
-    │                                 # Daily workflow is scheduled (08:15 IST weekdays, 08:45 IST
+    │                                 # Daily workflow is scheduled (08:00 IST weekdays, 08:30 IST
     │                                 # backstop) since 2026-09-28 — see docs/algotest-execution.md
     ├── contract-notes/              # Node 20 + CommonJS + Jest. Was the trade-analytics repo, merged via
     │                                 # git subtree. Gmail IMAP → qpdf decrypt → PDF parse → Google Sheet,

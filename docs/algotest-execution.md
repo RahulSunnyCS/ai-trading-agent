@@ -354,5 +354,13 @@ change. Getting there needed two container fixes in the workflow — `unzip` for
 `setup-bun`, and a global `safe.directory` so the root `prepare` script's
 `lefthook install` can run as root.
 
+**Changed 2026-09-29.** Neither cron fired on the first live weekday (the
+schedule-enabling commit landed after both of Monday's cron slots had
+already passed, and the very first scheduled firing after that is exactly
+the case GitHub Actions is known to delay or drop). Moved the schedule 15
+minutes earlier — 08:00 IST primary, 08:30 IST backstop — so the earlier
+trigger gives `main.ts`'s window guard more room to absorb GitHub's own
+scheduling jitter before AlgoTest's 08:15 IST window opens.
+
 Tracked in [`/TODO.md`](../TODO.md) → Priority 1.
 

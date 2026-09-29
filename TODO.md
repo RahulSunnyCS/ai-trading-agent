@@ -32,8 +32,9 @@ though see 3.3.0 for the difference between *present* and *audited*.
 ## Priority 1 — Broker login, live in the monorepo
 
 The daily Playwright job that logs Angel One and Finvasia into AlgoTest.
-**Live since 2026-09-28:** scheduled 08:15 IST weekdays with an 08:45 IST
-backstop, after dispatch run `36373883041` logged both brokers in.
+**Live since 2026-09-28:** scheduled weekdays, after dispatch run
+`36373883041` logged both brokers in. **Changed 2026-09-29:** 08:00 IST
+primary with an 08:30 IST backstop (previously 08:15/08:45).
 
 **Closed 2026-09-28:** 1.1 (secrets created), 1.3 (weekday dispatch passed —
 after two container fixes: `unzip` for `setup-bun`, and `safe.directory` for the

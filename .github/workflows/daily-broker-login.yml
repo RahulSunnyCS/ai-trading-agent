@@ -1,15 +1,16 @@
 name: Daily broker login
 
 on:
-  # 02:45 UTC = 08:15 IST, weekdays only. AlgoTest opens broker logins at 08:15 IST;
-  # if the scheduler fires a minute early, main.ts's window guard waits it out. The
-  # second entry is a 08:45 IST backstop for a dropped or failed first run: a broker
-  # that is already logged in is reported SKIPPED, so it is a no-op otherwise.
+  # 02:30 UTC = 08:00 IST, weekdays only. AlgoTest opens broker logins at 08:15 IST;
+  # firing 15 minutes early gives main.ts's window guard room to wait out both that
+  # gap and GitHub's own scheduling jitter. The second entry is a 08:30 IST backstop
+  # for a dropped or failed first run: a broker that is already logged in is reported
+  # SKIPPED, so it is a no-op otherwise.
   # Market holidays are not filtered here: AlgoTest refuses the login and the run
   # fails with a Telegram alert, which is expected on those days.
   schedule:
-    - cron: '45 2 * * 1-5'
-    - cron: '15 3 * * 1-5'
+    - cron: '30 2 * * 1-5'
+    - cron: '0 3 * * 1-5'
   workflow_dispatch:
     inputs:
       only:
