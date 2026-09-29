@@ -404,7 +404,12 @@ def _collect(
     unknown = [u for u in names if u not in UNDERLYINGS]
     if unknown:
         raise typer.BadParameter(f"unknown underlyings {unknown}; known: {sorted(UNDERLYINGS)}")
-    if trading_day < date.today():
+    # Only worth saying when something will actually be downloaded: a re-run over an
+    # already-collected day (the usual after-midnight case) fetches nothing.
+    to_fetch = force or any(
+        not (data_dir() / "1m" / "opt" / u / f"{trading_day}.parquet").exists() for u in names
+    )
+    if trading_day < date.today() and to_fetch:
         typer.echo(
             "warning: the symbol master only lists live contracts - anything that expired "
             f"between {trading_day} and today is missing from this run."

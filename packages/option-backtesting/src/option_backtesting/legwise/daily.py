@@ -106,6 +106,10 @@ def run_day(
     return saved
 
 
+def _trades(n: int) -> str:
+    return f"{n} trade{'' if n == 1 else 's'}"
+
+
 def load_history(root: Path) -> list[dict]:
     return [json.loads(p.read_text()) for p in sorted(results_dir(root).glob("*/*.json"))]
 
@@ -128,7 +132,7 @@ def summary(day: date, today: list[dict], history: list[dict], files: list[Strat
             lines.append(f"  today: skipped — {rec['skipped']}")
         else:
             stop = f"  ({rec['stopped_by']})" if rec["stopped_by"] else ""
-            lines.append(f"  today: {rec['net']:+,.0f}  over {len(rec['trades'])} trades{stop}")
+            lines.append(f"  today: {rec['net']:+,.0f}  over {_trades(len(rec['trades']))}{stop}")
             for t in rec["trades"]:
                 lines.append(
                     f"    {t['leg']:<3} {t['contract']:<22} {t['entry']} @ {t['entry_price']:.2f}"
@@ -173,8 +177,7 @@ def telegram_summary(
             lines.append(f"• {sid}: skipped — {rec['skipped'] if rec else 'not run'}")
             continue
         day_total += rec["net"]
-        n_trades = len(rec["trades"])
-        detail = f"{n_trades} trade{'' if n_trades == 1 else 's'}"
+        detail = _trades(len(rec["trades"]))
         if rec["stopped_by"]:
             detail += f", {rec['stopped_by']}"
         lines.append(

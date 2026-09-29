@@ -88,3 +88,28 @@ def test_render_never_leaks_the_bot_token(monkeypatch):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123456:secret-token")
     text = render(Notification("src", "error", "boom", "token was 123456:secret-token"))
     assert "secret-token" not in text and "***REDACTED***" in text
+
+
+def test_terminal_summary_says_1_trade_not_1_trades(tmp_path):
+    [file] = _files(tmp_path)
+    rec = {
+        "strategy_id": "s1",
+        "strategy_sha": file.sha,
+        "net": 5.0,
+        "notes": [],
+        "stopped_by": None,
+        "trades": [
+            {
+                "leg": "ce",
+                "contract": "X",
+                "entry": "09:20",
+                "entry_price": 1.0,
+                "exit": "15:00",
+                "exit_price": 1.0,
+                "reason": "EXIT_TIME",
+                "pnl": 5.0,
+            }
+        ],
+    }
+    text = summary(date(2026, 9, 29), [rec], [rec], [file])
+    assert "over 1 trade" in text and "1 trades" not in text
