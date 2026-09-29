@@ -63,6 +63,7 @@ category, just at the 755-name Total Market scale instead of a ~20-name category
 from __future__ import annotations
 
 import csv
+import dataclasses
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -108,6 +109,13 @@ DEFAULT_COVERAGE_FLOOR = 0.40
 DEFAULT_CATEGORY_TOP_N = 4
 DEFAULT_CATEGORY_EXIT_RANK = 8
 DEFAULT_PICKS_PER_CATEGORY = 2
+#: Concentration caps for the UI's Broad Momentum defaults (see `run_broad_backtest`). Not the
+#: engine's own 35% default, which was tuned for ~5 ETF positions. 15% per stock and 30% per
+#: category leave room to be fully invested with the default 4 fresh categories x 2 stocks.
+DEFAULT_MAX_POSITION = 0.15
+DEFAULT_MAX_CATEGORY = 0.30
+#: Rupees per share above which a stock is skipped (one share of MRF alone is over a lakh).
+DEFAULT_MAX_STOCK_PRICE = 20_000.0
 
 
 class TotalMarketDataNotFoundError(Exception):
@@ -668,6 +676,9 @@ class EffectiveRanks:
     scores: pd.DataFrame
     top_n: int  # the EFFECTIVE engine.Config.top_n this rank table was built for
     exit_rank: int  # the EFFECTIVE engine.Config.exit_rank this rank table was built for
+    # week x column: the category (or atomic) each ranked stock was picked through - what
+    # `engine.Config.max_group` caps against. None for category_mode="off" (no category layer).
+    groups: pd.DataFrame | None = None
 
 
 def category_picks(
@@ -720,6 +731,7 @@ def build_effective_stock_ranks(
     `exit_rank` are exactly the two boundary numbers the caller must set on `engine.Config` for
     this to work as intended."""
     ranks = pd.DataFrame(index=weeks, columns=columns, dtype=float)
+    groups = pd.DataFrame(index=weeks, columns=columns, dtype=object)
     top_n = category_top_n * picks_per_category
     exit_rank = category_exit_rank * picks_per_category
 
@@ -737,9 +749,12 @@ def build_effective_stock_ranks(
                 if name not in ranks.columns:
                     continue
                 ranks.at[w, name] = base + (bucket_pos - 1) * picks_per_category + slot
+                groups.at[w, name] = cid
 
     scores = -ranks  # informational only (analysis.py's "next actions" panel) -- see engine.py
-    return EffectiveRanks(ranks=ranks, scores=scores, top_n=top_n, exit_rank=exit_rank)
+    return EffectiveRanks(
+        ranks=ranks, scores=scores, top_n=top_n, exit_rank=exit_rank, groups=groups
+    )
 
 
 def build_off_mode_ranks(
@@ -751,6 +766,34 @@ def build_off_mode_ranks(
     return EffectiveRanks(
         ranks=stock_pool_ranks, scores=-stock_pool_ranks, top_n=top_n, exit_rank=exit_rank
     )
+
+
+def price_ceiling_mask(
+    prices: pd.DataFrame,
+    max_stock_price: float | None,
+    atomic_names: tuple[str, ...] = ATOMIC_NAMES,
+) -> pd.DataFrame | None:
+    """week x column booleans, True where a STOCK is priced above `max_stock_price` that week.
+    None when no ceiling is set (`None` or <= 0), so callers can skip the whole step.
+
+    These are the raw traded closes (`categories/prices.py` builds each column from unadjusted
+    bhavcopy closes, splitting the series at every corporate action), so the comparison is
+    against what one share actually cost at the time - the affordability question the ceiling
+    exists to answer. Gold/Silver/Nasdaq 100/Hang Seng are exempt: they're index-level
+    instruments, not shares you buy one of, so their level says nothing about affordability."""
+    if max_stock_price is None or max_stock_price <= 0:
+        return None
+    stock_cols = [c for c in prices.columns if c not in atomic_names]
+    over = pd.DataFrame(False, index=prices.index, columns=prices.columns)
+    over[stock_cols] = prices[stock_cols] > max_stock_price
+    return over
+
+
+def _without_over_ceiling(ranks: pd.DataFrame, over: pd.DataFrame) -> pd.DataFrame:
+    """`ranks` with over-ceiling names dropped and the rest re-ranked densely (1..N), so a
+    category's top-K picks and the pool's top-N cut both slide down to the next affordable
+    name instead of leaving a gap."""
+    return _dense_rank(ranks.where(~over.reindex(index=ranks.index, columns=ranks.columns)))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -800,6 +843,8 @@ def run_broad_backtest(
     rebalance: Literal["weekly", "monthly"] = "weekly",
     benchmark: str = engine.BENCHMARK,
     max_position: float | None = 0.35,
+    max_category: float | None = None,
+    max_stock_price: float | None = None,
     cap_band: float = 0.05,
     entry: Literal["wait", "make_room"] = "wait",
     momentum_sizing: bool = False,
@@ -831,6 +876,22 @@ def run_broad_backtest(
     equity/gold_silver classification for the ~755-name Total Market universe (`stock.tax_classes`
     has no equivalent here) -- out of scope for a same-mechanism pass-through.
 
+    `max_position` caps ONE stock's share of the portfolio; `max_category` caps everything held
+    through ONE category (its up-to-`picks_per_category` stocks together) - category mode ON
+    only, since OFF has no categories. Both are the buffer rule's usual trim-past-cap-plus-band
+    mechanic (`engine.Config.max_position`/`max_group`). Sensible values keep
+    `max_position * category_top_n * picks_per_category >= 1` and
+    `max_category * category_top_n >= 1`, or the caps hold cash back by design.
+
+    `max_stock_price` (rupees per share; None or 0 = off): stocks priced above it are treated as
+    not there at all - they can't enter the pool's rank table, can't be a category's pick, and
+    aren't counted toward a category's coverage - so the next-best affordable stock fills the
+    slot. Atomics are exempt (see `price_ceiling_mask`). Applied on top of the cached
+    `UniverseRanking` (the pool itself is still chosen before the ceiling, so it can hold a few
+    fewer than `pool_top_n` investable names), and returned on `BroadBacktestResult.ranking`.
+    Known trade-off: the ceiling is a plain eligibility rule, so a stock ALREADY held that later
+    rises past it is sold at the next rebalance like any other ineligible name.
+
     `mass_exit_response`/`mass_exit_threshold`/`mass_exit_throttle_fraction` (TODO.md 3.9.20):
     `category_mode="on"` only -- raises ValueError if combined with `category_mode="off"`, since
     the trigger is inherently a category-layer concept (see
@@ -841,6 +902,8 @@ def run_broad_backtest(
     """
     if category_mode == "off" and mass_exit_response != "off":
         raise ValueError("mass_exit_response needs category_mode='on'")
+    if category_mode == "off" and max_category is not None:
+        raise ValueError("max_category needs category_mode='on' (there are no categories in off)")
     if ranking is None:
         ranking = compute_universe_ranking(
             outer_prices=outer_prices,
@@ -852,6 +915,14 @@ def run_broad_backtest(
             voladj_skip_recent_month=voladj_skip_recent_month,
             pool_top_n=pool_top_n,
             pool_exit_rank=pool_exit_rank,
+        )
+
+    over_ceiling = price_ceiling_mask(ranking.prices, max_stock_price)
+    if over_ceiling is not None:
+        ranking = dataclasses.replace(
+            ranking,
+            combined_pool_ranks=_without_over_ceiling(ranking.combined_pool_ranks, over_ceiling),
+            stock_pool_ranks=_without_over_ceiling(ranking.stock_pool_ranks, over_ceiling),
         )
 
     prices = ranking.prices.copy()
@@ -908,6 +979,7 @@ def run_broad_backtest(
         portfolio=portfolio,
         entry=entry,
         max_position=max_position,
+        max_group=max_category,
         cap_band=cap_band,
         momentum_sizing=momentum_sizing,
         momentum_sizing_window=momentum_sizing_window,
@@ -925,6 +997,11 @@ def run_broad_backtest(
         config,
         external_ranks=(ranks_full, scores_full),
         mass_exit_weeks=mass_exit_weeks if mass_exit_response == "throttle" else None,
+        groups=(
+            effective.groups.reindex(prices.index)
+            if max_category is not None and effective.groups is not None
+            else None
+        ),
     )
     return BroadBacktestResult(
         result=result,

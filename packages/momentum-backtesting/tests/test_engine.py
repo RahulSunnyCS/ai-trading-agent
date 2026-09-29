@@ -461,6 +461,114 @@ def test_invalid_caps_are_rejected():
         Config(max_position=1.5)
 
 
+# --- group cap (max_group): several positions counting as one bet, e.g. a category's 2 stocks ---
+def two_pairs():
+    # A and B (group G1) both rocket; C and D (group G2) drift. Left alone, G1 takes over.
+    return frame(
+        A=path((29, 0.06)),
+        B=path((29, 0.05)),
+        C=path((29, 0.004)),
+        D=path((29, 0.003)),
+        Nifty_50=path((29, 0.0)),
+    )
+
+
+def pair_groups(prices: pd.DataFrame) -> pd.DataFrame:
+    labels = {"A": "G1", "B": "G1", "C": "G2", "D": "G2"}
+    return pd.DataFrame({n: g for n, g in labels.items()}, index=prices.index)
+
+
+def group_share(result, members) -> pd.Series:
+    return result.weights[members].sum(axis=1)
+
+
+def test_a_group_is_trimmed_back_to_its_cap_once_past_the_band():
+    prices = two_pairs()
+    kw = dict(top_n=4, exit_rank=6, max_position=None)
+    free = run_backtest(prices, includes(prices), bcfg(**kw), groups=pair_groups(prices))
+    assert group_share(free, ["A", "B"]).max() > 0.6  # no group cap: G1 takes over
+
+    capped = run_backtest(
+        prices, includes(prices), bcfg(**kw, max_group=0.5), groups=pair_groups(prices)
+    )
+    assert group_share(capped, ["A", "B"]).max() <= 0.5 + 0.05 + 1e-9
+    trims = capped.trades.query("action == 'TRIM'")
+    assert len(trims) and set(trims["asset"]) == {"A", "B"}
+    assert trims["reason"].str.contains("G1 above the 50% group cap").all()
+    week = trims["week"].iloc[0]  # both members are cut by the same fraction, back to the cap
+    assert group_share(capped, ["A", "B"]).at[week] == pytest.approx(0.5, abs=1e-6)
+
+
+def test_group_room_is_shared_by_the_names_in_it_when_money_is_first_deployed():
+    # Top 4 would each get 25% - 50% per pair. With a 30% group cap each pair takes 30%, and
+    # the remaining 40% has nowhere to go, so it waits in cash.
+    prices = two_pairs()
+    result = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(top_n=4, exit_rank=6, max_group=0.3),
+        groups=pair_groups(prices),
+    )
+    first = result.weights.iloc[0]
+    assert first["A"] + first["B"] == pytest.approx(0.30, abs=1e-6)
+    assert first["C"] + first["D"] == pytest.approx(0.30, abs=1e-6)
+    assert first[IDLE] == pytest.approx(0.40, abs=1e-6)
+    parks = result.trades.query("action == 'PARK'")
+    assert parks["reason"].str.contains("position/group cap").any()
+
+
+def test_a_group_cap_can_spread_money_to_a_group_with_room():
+    # Only G1 is capped; the money it can't take goes to C and D instead of sitting idle.
+    prices = two_pairs()
+    groups = pair_groups(prices)
+    groups[["C", "D"]] = "G2"
+    result = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(top_n=4, exit_rank=6, max_group=0.6),
+        groups=groups,
+    )
+    first = result.weights.iloc[0]
+    assert first["A"] + first["B"] == pytest.approx(0.5, abs=1e-6)  # under 60%: not binding
+    assert first.get(IDLE, 0.0) == pytest.approx(0.0, abs=1e-6)  # fully invested
+
+
+def test_groups_do_nothing_unless_max_group_is_set():
+    prices = two_pairs()
+    kw = dict(top_n=4, exit_rank=6, max_position=0.35)
+    with_groups = run_backtest(prices, includes(prices), bcfg(**kw), groups=pair_groups(prices))
+    without = run_backtest(prices, includes(prices), bcfg(**kw))
+    pd.testing.assert_series_equal(with_groups.equity, without.equity)
+
+
+def test_a_group_cap_without_a_groups_table_is_inert():
+    prices = two_pairs()
+    kw = dict(top_n=4, exit_rank=6, max_position=None)
+    a = run_backtest(prices, includes(prices), bcfg(**kw, max_group=0.3))
+    b = run_backtest(prices, includes(prices), bcfg(**kw))
+    pd.testing.assert_series_equal(a.equity, b.equity)
+
+
+def test_a_group_cap_and_a_position_cap_work_together():
+    prices = two_pairs()
+    result = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(top_n=4, exit_rank=6, max_position=0.30, max_group=0.5),
+        groups=pair_groups(prices),
+    )
+    positions = result.weights.drop(columns=[IDLE], errors="ignore")
+    assert positions.max().max() <= 0.30 + 0.05 + 1e-9
+    assert group_share(result, ["A", "B"]).max() <= 0.5 + 0.05 + 1e-9
+
+
+def test_invalid_group_caps_are_rejected():
+    with pytest.raises(ValueError, match="max_group"):
+        Config(max_group=0)
+    with pytest.raises(ValueError, match="max_group"):
+        Config(max_group=1.5)
+
+
 # --- momentum sizing (win-rate position-size multiplier, buffer rule only) ---------------------
 # _win_rate_multiplier is tested directly on hand-built trade_rows first (no backtest needed to
 # pin down the weighting/normalisation arithmetic exactly), then _run_buffer's wiring is checked

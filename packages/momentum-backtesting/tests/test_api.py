@@ -1030,3 +1030,192 @@ def test_broad_backtest_mismatched_weights_is_a_clear_422(broad_client):
         json=_broad_request(lookbacks=[1, 4, 13], weights=[1, 1]),
     )
     assert res.status_code == 422
+
+
+# ---------------------------------------------------------------------------------------------
+# Concentration caps + share-price ceiling for dataset="broad": max_position (per stock, already
+# existed), max_category (everything held through one category), max_stock_price (skip stocks
+# whose share price is above a rupee ceiling).
+# ---------------------------------------------------------------------------------------------
+
+
+def _run_broad(**overrides):
+    from momentum_backtesting.categories import broad as broad_module
+
+    kwargs = dict(
+        outer_prices=api.DATA.get(),
+        stocks_data_dir=api.DATA_DIR / "stocks",
+        categories_data_dir=api.DATA_DIR / "categories",
+        curated_dir=api.CATEGORIES_CURATED_DIR,
+        start="2017-01-01",
+        pool_top_n=10,
+        pool_exit_rank=10,
+        coverage_floor=0.0,
+        category_top_n=2,
+        category_exit_rank=2,
+        picks_per_category=2,
+    )
+    kwargs.update(overrides)
+    return broad_module.run_broad_backtest(**kwargs)
+
+
+def _traded_stocks(outcome) -> set[str]:
+    from momentum_backtesting.categories import broad as broad_module
+
+    trades = outcome.result.trades
+    return {a for a in trades["asset"] if a not in broad_module.ATOMIC_NAMES and a != api.CASH}
+
+
+def _scale_stock_price(tmp_path, symbol: str, factor: float) -> None:
+    path = tmp_path / "stocks" / "daily.parquet"
+    daily = pd.read_parquet(path)
+    daily.loc[daily["symbol"] == symbol, "close"] *= factor
+    daily.to_parquet(path)
+
+
+def test_broad_meta_defaults_carry_the_caps_and_price_ceiling(broad_client):
+    defaults = broad_client.get("/api/meta?dataset=broad").json()["defaults"]
+    # Tight enough to bind, loose enough to stay fully invested with the default 4 fresh
+    # categories x 2 stocks (see broad.DEFAULT_MAX_*).
+    top = defaults["broad_category_top_n"]
+    picks = defaults["broad_picks_per_category"]
+    assert defaults["max_position"] * top * picks >= 1
+    assert defaults["max_category"] * top >= 1
+    assert defaults["max_position"] < defaults["max_category"] < 1
+    assert defaults["max_stock_price"] == 20_000
+
+
+def test_broad_backtest_category_cap_holds_each_categorys_share_under_the_cap(broad_client):
+    cap, band = 0.35, 0.05
+    outcome = _run_broad(max_position=None, max_category=cap, cap_band=band)
+    groups = outcome.effective.groups.reindex(outcome.result.weights.index)
+    weights = outcome.result.weights.drop(columns=["Idle cash"], errors="ignore")
+    assert len(outcome.result.trades)
+    for week, row in weights.iterrows():
+        shares: dict[str, float] = {}
+        for stock, share in row[row > 1e-9].items():
+            label = groups.at[week, stock] if stock in groups.columns else None
+            if isinstance(label, str):
+                shares[label] = shares.get(label, 0.0) + share
+        assert all(s <= cap + band + 1e-9 for s in shares.values()), (week, shares)
+
+
+def test_broad_backtest_category_cap_changes_the_result_and_is_recorded(broad_client):
+    free = _run_broad(max_position=None, max_category=None)
+    capped = _run_broad(max_position=None, max_category=0.3)
+    assert capped.result.config.max_group == 0.3
+    assert free.result.config.max_group is None
+    assert free.result.equity.iloc[-1] != capped.result.equity.iloc[-1]
+
+
+def test_broad_backtest_category_cap_needs_category_mode_on(broad_client):
+    with pytest.raises(ValueError, match="max_category"):
+        _run_broad(category_mode="off", max_category=0.3)
+    # ...but the API just ignores it in OFF mode rather than failing a request the UI can send.
+    res = broad_client.post(
+        "/api/backtest",
+        json=_broad_request(
+            broad_category_mode="off",
+            broad_off_top_n=3,
+            broad_off_exit_rank=6,
+            broad_pool_top_n=10,
+            broad_pool_exit_rank=10,
+            max_category=0.3,
+        ),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_broad_backtest_price_ceiling_skips_an_unaffordable_stock_in_off_mode(
+    broad_client, tmp_path
+):
+    kw = dict(category_mode="off", off_top_n=3, off_exit_rank=6)
+    control = _run_broad(**kw)
+    stocks = _traded_stocks(control)
+    assert stocks
+    victim = sorted(stocks)[0]
+
+    _scale_stock_price(tmp_path, victim, 1000.0)  # e.g. a Rs 1 lakh share
+    api.DATA.broad_ranking_cache.clear()
+    still_free = _run_broad(**kw)
+    assert victim in _traded_stocks(still_free)  # sanity: scaling alone doesn't change momentum
+
+    ceiling = _run_broad(**kw, max_stock_price=20_000)
+    assert victim not in _traded_stocks(ceiling)
+    assert len(ceiling.result.trades)  # the next-best names filled in; it isn't just empty
+    assert not (ceiling.ranking.stock_pool_ranks[victim].notna()).any()
+
+
+def test_broad_backtest_price_ceiling_moves_a_category_pick_to_the_next_stock(
+    broad_client, tmp_path
+):
+    control = _run_broad()
+    picks_before = {p for row in _held(control) for p in row["picks"]}
+    victim = sorted(p for p in picks_before if p.startswith("B"))[0]
+
+    _scale_stock_price(tmp_path, victim, 1000.0)
+    api.DATA.broad_ranking_cache.clear()
+    ceiling = _run_broad(max_stock_price=20_000)
+    picks_after = {p for row in _held(ceiling) for p in row["picks"]}
+    assert victim not in picks_after
+    assert picks_after  # every category still contributes what it has left
+
+
+def _held(outcome) -> list[dict]:
+    from momentum_backtesting.categories import broad as broad_module
+
+    return broad_module.current_holdings_detail(
+        outcome,
+        broad_module.load_stock_groups(api.CATEGORIES_CURATED_DIR),
+        category_top_n=2,
+        picks_per_category=2,
+    )
+
+
+def test_broad_backtest_price_ceiling_zero_or_absent_is_off(broad_client, tmp_path):
+    _scale_stock_price(tmp_path, "BA1", 1000.0)
+    api.DATA.broad_ranking_cache.clear()
+    none = _run_broad(max_stock_price=None)
+    zero = _run_broad(max_stock_price=0.0)
+    pd.testing.assert_series_equal(none.result.equity, zero.result.equity)
+
+
+def test_broad_api_round_trips_caps_and_ceiling(broad_client):
+    res = broad_client.post(
+        "/api/backtest",
+        json=_broad_request(
+            broad_coverage_floor=0.0,
+            broad_pool_top_n=10,
+            broad_pool_exit_rank=10,
+            max_position=0.2,
+            max_category=0.4,
+            max_stock_price=20000,
+        ),
+    )
+    assert res.status_code == 200, res.text
+    json.dumps(res.json(), allow_nan=False)
+    assert (
+        broad_client.post(
+            "/api/backtest", json=_broad_request(max_category=1.5)
+        ).status_code
+        == 422
+    )
+    assert (
+        broad_client.post(
+            "/api/backtest", json=_broad_request(max_stock_price=-1)
+        ).status_code
+        == 422
+    )
+
+
+def test_broad_payload_carries_share_prices_for_the_trade_split_tab(broad_client):
+    res = broad_client.post(
+        "/api/backtest",
+        json=_broad_request(
+            broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10
+        ),
+    )
+    assert res.status_code == 200, res.text
+    open_positions = res.json()["open_positions"]
+    assert open_positions
+    assert all(p["price"] is not None and p["price"] > 0 for p in open_positions)

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Momentum Backtest</title>
-  <link rel="stylesheet" href="/static/app.css?v=ui9">
+  <link rel="stylesheet" href="/static/app.css?v=ui11">
   <script src="/vendor/plotly.min.js"></script>
 </head>
 <body class="settings-open">
@@ -165,7 +165,9 @@
       </div>
       <div class="row" id="cap-options">
         <label><span id="max-position-label">Max per ETF %</span> <input type="number" id="max_position" min="0" max="100" step="5" value="35"></label>
+        <label id="category-cap-field" hidden title="Everything held through one category (its top stocks together) is limited to this share of the portfolio. 0 = no cap.">Max per category % <input type="number" id="max_category" min="0" max="100" step="5" value="30"></label>
         <label>Trim when above by (pts) <input type="number" id="cap_band" min="0" max="50" step="1" value="5"></label>
+        <label id="price-cap-field" hidden title="Stocks whose share price is above this are skipped, and the next-best stock takes the slot. Uses the price at the time of each rebalance. Gold, Silver and the international ETFs are exempt. 0 = no limit.">Max share price ₹ <input type="number" id="max_stock_price" min="0" step="1000" value="20000"></label>
       </div>
       <div class="row" id="momentum-sizing-row" hidden>
         <label class="inline"><input type="checkbox" id="momentum_sizing"> Win-rate position sizing — shrink new/top-up buys after recent losing trades, ramp back to full size as they recover (sits entirely in cash in the worst case)</label>
@@ -291,21 +293,24 @@
         <button type="button" data-tab="overview" class="active">Overview</button>
         <button type="button" data-tab="holdings">Holdings &amp; signals</button>
         <button type="button" data-tab="trades">Trades</button>
+        <button type="button" data-tab="split">Trade split</button>
         <button type="button" data-tab="risk">Risk</button>
         <button type="button" data-tab="compare">Compare <span class="count" id="runs-count"></span></button>
       </nav>
       <section class="card tab chart-card" data-panel="overview">
         <div class="chart-tools">
-          <span class="legend-note">Dots mark rotation weeks — hover for what went out and came in.</span>
+          <span class="legend-note">Dots mark rotation weeks — hover the chart to see that week's trades below it.</span>
           <label class="inline"><input type="checkbox" id="log-scale"> Log scale</label>
           <label class="inline" id="hover-detail-wrap" hidden title="Custom Index only: also name the stock(s) that moved inside a category, not just the category">
             <input type="checkbox" id="hover-stock-detail"> Show stock-level detail in hover</label>
         </div>
         <div id="main-chart"></div>
+        <div class="chart-detail" id="chart-detail" aria-live="polite"></div>
       </section>
       <section class="card tab" data-panel="signal" hidden></section>
       <section class="card tab" data-panel="categories" hidden></section>
       <section class="card tab" data-panel="trades" hidden></section>
+      <section class="card tab" data-panel="split" hidden></section>
       <section class="card tab" data-panel="timeline" hidden><div id="timeline-chart"></div></section>
       <section class="card tab" data-panel="etfs" hidden></section>
       <section class="card tab" data-panel="yearly" hidden><h3>Year by year</h3><div id="yearly-chart"></div><div id="yearly-table"></div></section>
@@ -334,6 +339,6 @@
 </div>
 <button type="button" class="primary mobile-run" id="mobile-run" hidden>Run backtest</button>
 <div class="tooltip" id="tooltip" hidden></div>
-<script src="/static/app.js?v=ui9"></script>
+<script src="/static/app.js?v=ui11"></script>
 </body>
 </html>

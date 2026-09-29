@@ -508,3 +508,54 @@ def test_load_stock_groups_reads_real_curated_file():
     assert all(members for members in groups.values())
     # Spot check: every id is "parent :: subgroup" shaped.
     assert all(" :: " in cid for cid in groups)
+
+
+# --------------------------------------------------------------------------
+# Share-price ceiling: price_ceiling_mask / _without_over_ceiling (pure).
+# --------------------------------------------------------------------------
+
+
+def _price_frame() -> pd.DataFrame:
+    weeks = pd.date_range("2024-01-05", periods=3, freq="W-FRI")
+    return pd.DataFrame(
+        {
+            "CHEAP": [100.0, 110.0, 120.0],
+            "MRF": [90_000.0, 95_000.0, 130_000.0],
+            "EDGE": [19_000.0, 20_000.0, 21_000.0],
+            "Gold": [70_000.0, 71_000.0, 72_000.0],  # an index level, not a share price
+        },
+        index=weeks,
+    )
+
+
+def test_price_ceiling_mask_is_off_without_a_positive_ceiling():
+    assert broad.price_ceiling_mask(_price_frame(), None) is None
+    assert broad.price_ceiling_mask(_price_frame(), 0) is None
+
+
+def test_price_ceiling_mask_flags_stocks_strictly_above_it_and_exempts_atomics():
+    over = broad.price_ceiling_mask(_price_frame(), 20_000)
+    assert over["CHEAP"].tolist() == [False, False, False]
+    assert over["MRF"].tolist() == [True, True, True]
+    assert over["EDGE"].tolist() == [False, False, True]  # exactly at the ceiling is fine
+    assert over["Gold"].tolist() == [False, False, False]
+
+
+def test_price_ceiling_mask_is_point_in_time_not_a_permanent_label():
+    prices = _price_frame()
+    prices["LATE"] = [500.0, 15_000.0, 60_000.0]
+    over = broad.price_ceiling_mask(prices, 20_000)
+    assert over["LATE"].tolist() == [False, False, True]
+
+
+def test_dropping_over_ceiling_names_reranks_the_rest_densely():
+    weeks = pd.date_range("2024-01-05", periods=2, freq="W-FRI")
+    ranks = pd.DataFrame(
+        {"MRF": [1.0, 3.0], "A": [2.0, 1.0], "B": [3.0, 2.0], "OUT": [None, None]}, index=weeks
+    )
+    over = pd.DataFrame(False, index=weeks, columns=ranks.columns)
+    over["MRF"] = [True, False]
+    result = broad._without_over_ceiling(ranks, over)
+    # Week 1: MRF is out, so A and B slide up to 1 and 2. Week 2: nothing dropped, unchanged.
+    assert result.loc[weeks[0]].dropna().to_dict() == {"A": 1.0, "B": 2.0}
+    assert result.loc[weeks[1]].dropna().to_dict() == {"MRF": 3.0, "A": 1.0, "B": 2.0}

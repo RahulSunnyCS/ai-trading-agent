@@ -314,6 +314,8 @@ function defaultConfig() {
     portfolio: d.portfolio,
     entry: d.entry,
     max_position: d.max_position,
+    max_category: d.max_category ?? null,
+    max_stock_price: d.max_stock_price ?? null,
     cap_band: d.cap_band,
     momentum_sizing: d.momentum_sizing ?? false,
     momentum_sizing_window: d.momentum_sizing_window ?? 10,
@@ -540,6 +542,9 @@ function readConfig() {
     portfolio: radio("portfolio"),
     entry: radio("entry"),
     max_position: Number($("#max_position").value) > 0 ? Number($("#max_position").value) / 100 : null,
+    // Broad Momentum only; the other datasets never show these fields, so they send null (0 = off).
+    max_category: broad && Number($("#max_category").value) > 0 ? Number($("#max_category").value) / 100 : null,
+    max_stock_price: broad && Number($("#max_stock_price").value) > 0 ? Number($("#max_stock_price").value) : null,
     cap_band: Number($("#cap_band").value) / 100,
     momentum_sizing: $("#momentum_sizing").checked,
     momentum_sizing_window: Number($("#momentum_sizing_window").value),
@@ -589,6 +594,8 @@ function applyConfig(cfg) {
   setRadio("portfolio", cfg.portfolio);
   setRadio("entry", cfg.entry);
   $("#max_position").value = cfg.max_position ? Math.round(cfg.max_position * 100) : 0;
+  $("#max_category").value = cfg.max_category ? Math.round(cfg.max_category * 100) : 0;
+  $("#max_stock_price").value = cfg.max_stock_price || 0;
   $("#cap_band").value = Math.round((cfg.cap_band ?? 0.05) * 100);
   $("#momentum_sizing").checked = !!cfg.momentum_sizing;
   $("#momentum_sizing_window").value = cfg.momentum_sizing_window ?? 10;
@@ -629,7 +636,7 @@ function syncDependentFields() {
   const buffer = radio("portfolio") === "buffer";
   $("#entry-options").hidden = !buffer;
   $("#cap-options").style.display = buffer ? "" : "none";
-  $("#cap_band").disabled = !(Number($("#max_position").value) > 0);
+  $("#cap_band").disabled = !(Number($("#max_position").value) > 0 || Number($("#max_category").value) > 0);
   $("#filter-weeks").style.display = radio("defensive") === "filter" ? "" : "none";
   $("#slab_rate").disabled = !$("#tax").checked;
 
@@ -637,7 +644,12 @@ function syncDependentFields() {
   const customIndex = activeDataset === "custom_index";
   const broad = activeDataset === "broad";
   $("#max-position-label").textContent =
-    customIndex ? "Max per category %" : broad ? "Max per position %" : stock ? "Max per stock %" : "Max per ETF %";
+    customIndex ? "Max per category %" : broad ? "Max per stock %" : stock ? "Max per stock %" : "Max per ETF %";
+  // Broad only: a category cap (its stocks together; needs categories, so ON mode) and a share-
+  // price ceiling. Both sit in the same row as the per-stock cap, which is buffer-rule only.
+  const broadOn = broad && radio("broad_category_mode") === "on";
+  $("#category-cap-field").hidden = !broadOn;
+  $("#price-cap-field").hidden = !broad;
   $("#inner-rotation-panel").hidden = !customIndex;
   // Win-rate position sizing (buffer rule only): already backend-generic for every dataset via
   // _config_kwargs (etf/stock/custom_index) and run_broad_backtest's own Config() call (broad,
@@ -705,6 +717,18 @@ function syncDependentFields() {
         `selected, the rest lingering in the buffer), up to ${picks} stock(s) each - up to ` +
         `${catExit * picks} positions.`
       : `Holds between ${offTop} and ${offExit} individual stocks, no category layer.`;
+    const stockCap = Number($("#max_position").value), catCap = Number($("#max_category").value);
+    const priceCap = Number($("#max_stock_price").value);
+    const extra = [];
+    if (radio("portfolio") === "buffer") {
+      if (stockCap > 0) extra.push(`No stock is bought past ${stockCap}%.`);
+      if (catOn && catCap > 0) extra.push(`No category (its stocks together) is bought past ${catCap}%.`);
+      const stocksFresh = catOn ? catTop * picks : offTop;
+      if (stockCap > 0 && stockCap * stocksFresh < 100) extra.push(`With ${stocksFresh} stocks × ${stockCap}%, only ${stockCap * stocksFresh}% can be invested — the rest waits in cash.`);
+      if (catOn && catCap > 0 && catCap * catTop < 100) extra.push(`With ${catTop} categories × ${catCap}%, only ${catCap * catTop}% can be invested — the rest waits in cash.`);
+    }
+    if (priceCap > 0) extra.push(`Stocks priced above ₹${priceCap.toLocaleString("en-IN")} a share are skipped.`);
+    if (extra.length) $("#broad-rule-hint").textContent += ` ${extra.join(" ")}`;
     $("#rule-hint").textContent = "";
   } else {
     const top = Number($("#top_n").value), exit = Number($("#exit_rank").value);
@@ -822,6 +846,8 @@ function validate(cfg) {
   if (cfg.start && cfg.end && cfg.start >= cfg.end) return "The start date must be before the end date.";
   if (cfg.cost_pct < 0) return "Cost can't be negative.";
   if (cfg.max_position != null && !(cfg.max_position > 0 && cfg.max_position <= 1)) return "Max per ETF must be between 1 and 100% (0 = no cap).";
+  if (cfg.max_category != null && !(cfg.max_category > 0 && cfg.max_category <= 1)) return "Max per category must be between 1 and 100% (0 = no cap).";
+  if (cfg.max_stock_price != null && !(cfg.max_stock_price > 0)) return "Max share price must be a positive amount (0 = no limit).";
   if (cfg.cap_band < 0) return "The trim band can't be negative.";
   if (cfg.cost_model === "itemised" && !(cfg.capital > 0)) return "Capital must be a positive amount.";
   if (cfg.slippage_bps < 0) return "Slippage can't be negative.";
@@ -838,6 +864,7 @@ function validationTarget(problem) {
     [/Only .*ETF/i, "#universe-panel"], [/Top N must/i, "#top_n"],
     [/sell rank/i, "#exit_rank"], [/start date/i, "#end"],
     [/Cost can/i, "#cost_pct"], [/Max per ETF/i, "#max_position"],
+    [/Max per category/i, "#max_category"], [/Max share price/i, "#max_stock_price"],
     [/trim band/i, "#cap_band"], [/Capital/i, "#capital"],
     [/Slippage/i, "#slippage_bps"], [/Sizing window/i, "#momentum_sizing_window"],
     [/Min size floor/i, "#momentum_sizing_floor"],
@@ -1158,6 +1185,7 @@ function showTab(name) {
     overview: ["overview", "yearly"],
     holdings: ["signal", "categories", "timeline", "etfs"],
     trades: ["trades"],
+    split: ["split"],
     risk: ["crashes"],
     compare: ["runs"],
   };
@@ -1240,8 +1268,10 @@ async function runBacktest() {
 function describe(cfg) {
   if (cfg.dataset === "broad") {
     const rule = cfg.portfolio === "buffer"
-      ? `Buffer (${cfg.entry === "wait" ? "wait for a sale" : "make room"}${cfg.max_position ? `, max ${Math.round(cfg.max_position * 100)}%/position` : ", no cap"})`
+      ? `Buffer (${cfg.entry === "wait" ? "wait for a sale" : "make room"}${cfg.max_position ? `, max ${Math.round(cfg.max_position * 100)}%/stock` : ", no stock cap"}` +
+        `${cfg.max_category && cfg.broad_category_mode === "on" ? `, ${Math.round(cfg.max_category * 100)}%/category` : ""})`
       : "Fixed slots";
+    const priceText = cfg.max_stock_price ? ` · shares ≤ ₹${cfg.max_stock_price.toLocaleString("en-IN")}` : "";
     const allOne = cfg.weights.every((w) => w === 1);
     const lbs = cfg.lookbacks.map((w, i) => (allOne ? `${w}` : `${w}×${cfg.weights[i]}`)).join("/");
     const scoreText = cfg.score && cfg.score !== "ranksum" ? ` · score ${cfg.score}` : "";
@@ -1257,7 +1287,7 @@ function describe(cfg) {
         `${cfg.broad_category_exit_rank} · ${cfg.broad_picks_per_category} stock(s)/category`
       : `category mode OFF · pool top ${cfg.broad_pool_top_n}/exit ${cfg.broad_pool_exit_rank} · ` +
         `stocks ${cfg.broad_off_top_n}/${cfg.broad_off_exit_rank}`;
-    return `Broad Momentum · ${modeText} · ${rule} · lookbacks ${lbs}w${scoreText}${rebalanceText}${costText}${sizingText}${cfg.signal_delay ? ` · ${cfg.signal_delay}w delay` : ""}`;
+    return `Broad Momentum · ${modeText} · ${rule}${priceText} · lookbacks ${lbs}w${scoreText}${rebalanceText}${costText}${sizingText}${cfg.signal_delay ? ` · ${cfg.signal_delay}w delay` : ""}`;
   }
   const unit = cfg.dataset === "stock" ? "stock" : cfg.dataset === "custom_index" ? "category" : "ETF";
   const capText = cfg.max_position ? `, max ${Math.round(cfg.max_position * 100)}%/${unit}` : ", no cap";
@@ -1320,6 +1350,7 @@ function render(r, cfg) {
   renderSignal(r, cfg);
   renderHeldCategories(r);
   renderTrades(r);
+  renderSplit(r);
   renderTimeline(r);
   renderEtfs(r);
   renderYearly(r);
@@ -1439,8 +1470,10 @@ function innerDetailLine(categoryName, week, actions) {
   return innerEventLine(categoryName, week, actions) || innerHoldingsLine(categoryName, week);
 }
 
-function rotationHover(rot) {
-  const lines = [`<b>${fmtDate(rot.week)} · ${rupees(rot.value)}</b>`];
+// One rotation week's trades as HTML lines. `withHeading` adds the "date · value" title line; the
+// chart's detail panel already shows both in its own header, so it passes false.
+function rotationHover(rot, withHeading = true) {
+  const lines = withHeading ? [`<b>${fmtDate(rot.week)} · ${rupees(rot.value)}</b>`] : [];
   for (const o of rot.outs) {
     lines.push(`<span style="color:${cssVar("--bad")}">OUT</span> ${esc(displayName(o.asset))} — held ${num(o.weeks_held, 0)}w, ` +
       `${pct(o.return, 1, true)} (${esc(o.reason)})`);
@@ -1483,26 +1516,24 @@ function renderMainChart(r) {
       x: s.dates, y: lakh(s.strategy), name: runs.length ? `Strategy (run ${runs[0].n})` : "Strategy",
       type: "scatter", mode: "lines",
       line: { color: accent, width: 2.2 },
-      text: s.strategy.map((v, i) => `${rupees(v)} · ${s.holdings_count[i] ?? "–"} held` +
-        (s.idle_share[i] > 0.001 ? ` · ${pct(s.idle_share[i], 0)} cash` : "")),
-      hovertemplate: "Strategy %{text}<extra></extra>",
+      hoverinfo: "none",
     },
     {
       x: s.dates, y: lakh(s.benchmark), name: r.benchmark_name, type: "scatter", mode: "lines",
       line: { color: cssVar("--benchmark"), width: 1.6 },
-      text: text(s.benchmark, rupees), hovertemplate: `${esc(r.benchmark_name)} %{text}<extra></extra>`,
+      hoverinfo: "none",
     },
     {
       x: s.dates, y: lakh(s.cash), name: "Liquid fund", type: "scatter", mode: "lines",
       line: { color: cssVar("--cash"), width: 1, dash: "dot" },
-      text: text(s.cash, rupees), hovertemplate: "Liquid fund %{text}<extra></extra>",
+      hoverinfo: "none",
     },
   ];
   runs.filter((run) => run.overlay && run.id !== runs[0]?.id).forEach((run) => {
     traces.push({
       x: run.dates, y: lakh(run.strategy), name: `Run ${run.n}`, type: "scatter", mode: "lines",
       line: { color: run.color, width: 1.4, dash: "dash" },
-      text: run.strategy.map(rupees), hovertemplate: `Run ${run.n} %{text}<extra></extra>`,
+      hoverinfo: "none",
     });
   });
   const rots = r.rotations;
@@ -1516,30 +1547,32 @@ function renderMainChart(r) {
         return avg >= 0 ? good : bad;
       }),
     },
-    text: rots.map(rotationHover), hovertemplate: "%{text}<extra></extra>",
+    hoverinfo: "none",
   });
   traces.push(
     {
       x: s.dates, y: s.drawdown_strategy, name: "Strategy drawdown", xaxis: "x", yaxis: "y2", type: "scatter",
       mode: "lines", fill: "tozeroy", line: { color: accent, width: 1 }, showlegend: false,
-      hovertemplate: "Strategy drawdown %{y:.1%}<extra></extra>",
+      hoverinfo: "none",
     },
     {
       x: s.dates, y: s.drawdown_benchmark, name: `${r.benchmark_name} drawdown`, xaxis: "x", yaxis: "y2",
       type: "scatter", mode: "lines", line: { color: cssVar("--benchmark"), width: 1 }, showlegend: false,
-      hovertemplate: `${esc(r.benchmark_name)} drawdown %{y:.1%}<extra></extra>`,
+      hoverinfo: "none",
     },
     {
       x: s.dates, y: s.rolling_52w_excess, name: "52-week edge", xaxis: "x", yaxis: "y3", type: "bar",
       marker: { color: s.rolling_52w_excess.map((v) => (v == null ? "rgba(0,0,0,0)" : v >= 0 ? good : bad)) },
-      showlegend: false, hovertemplate: "Trailing 52w vs benchmark %{y:+.1%}<extra></extra>",
+      showlegend: false, hoverinfo: "none",
     },
   );
   const grid = cssVar("--border"), fg = cssVar("--text"), muted = cssVar("--muted");
   const layout = {
     height: Math.max(380, Math.min(window.innerHeight * 0.62, 560)), margin: { l: 70, r: 20, t: 10, b: 30 },
     paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", font: { color: fg, size: 12 },
-    hovermode: "x unified", hoverlabel: { align: "left" },
+    // No floating label: it covered the chart. hoverinfo "none" on every trace still fires
+    // plotly_hover, which fills the panel under the chart (see showChartDetail).
+    hovermode: "x unified",
     legend: { orientation: "h", y: 1.04, x: 0 },
     xaxis: { gridcolor: grid, anchor: "y3", showspikes: true, spikemode: "across", spikethickness: 1, spikecolor: muted },
     yaxis: { domain: [0.45, 1], gridcolor: grid, tickprefix: "₹", ticksuffix: " L", type: $("#log-scale").checked ? "log" : "linear",
@@ -1548,6 +1581,45 @@ function renderMainChart(r) {
     yaxis3: { domain: [0, 0.19], gridcolor: grid, tickformat: "+.0%", title: { text: "52w edge", font: { size: 11, color: muted } } },
   };
   Plotly.react("main-chart", traces, layout, { responsive: true, displaylogo: false });
+  bindChartDetail(r);
+}
+
+// Hover details for the main chart live in a panel under it (full chart width) instead of a
+// floating tooltip on top of the lines. Everything is computed from the payload on hover, not
+// baked into the traces, so a redraw stays cheap.
+const CHART_DETAIL_HINT = "Hover the chart to see that week's values and trades here.";
+function bindChartDetail(r) {
+  const chart = $("#main-chart"), panel = $("#chart-detail");
+  panel.innerHTML = `<span class="muted">${CHART_DETAIL_HINT}</span>`;
+  // Plotly.react keeps the same element, so drop the previous run's listener before adding ours.
+  chart.removeAllListeners?.("plotly_hover");
+  chart.on?.("plotly_hover", (ev) => {
+    const x = ev.points?.[0]?.x;
+    if (x != null) showChartDetail(r, String(x).slice(0, 10));
+  });
+}
+function showChartDetail(r, date) {
+  const s = r.series;
+  const i = s.dates.findIndex((d) => String(d).slice(0, 10) === date);
+  if (i < 0) return;
+  const idle = s.idle_share[i] ?? 0;
+  const metrics = [
+    `<b>${fmtDate(date)}</b>`,
+    `Strategy <b>${rupees(s.strategy[i])}</b> · ${s.holdings_count[i] ?? "–"} held${idle > 0.001 ? ` · ${pct(idle, 0)} cash` : ""}`,
+    `${esc(r.benchmark_name)} ${rupees(s.benchmark[i])}`,
+    `Liquid fund ${rupees(s.cash[i])}`,
+    `Drawdown <span class="bad">${pct(s.drawdown_strategy[i], 1)}</span> (${esc(r.benchmark_name)} ${pct(s.drawdown_benchmark[i], 1)})`,
+    `52w edge <span class="${signClass(s.rolling_52w_excess[i])}">${pct(s.rolling_52w_excess[i], 1, true)}</span>`,
+  ];
+  for (const run of runs.filter((x) => x.overlay && x.id !== runs[0]?.id)) {
+    const j = run.dates.findIndex((d) => String(d).slice(0, 10) === date);
+    if (j >= 0) metrics.push(`Run ${run.n} ${rupees(run.strategy[j])}`);
+  }
+  const rot = r.rotations.find((x) => String(x.week).slice(0, 10) === date);
+  const trades = rot ? rotationHover(rot, false) : `<span class="muted">No trades this week.</span>`;
+  $("#chart-detail").innerHTML =
+    `<div class="cd-metrics">${metrics.map((m) => `<span>${m}</span>`).join("")}</div>` +
+    `<div class="cd-trades">${trades}</div>`;
 }
 
 // --- generic sortable table -------------------------------------------------------------------
@@ -1781,6 +1853,80 @@ function renderTrades(r) {
   });
 }
 
+// "Trade split": what to actually buy. Takes the portfolio the backtest ends the latest week
+// holding, scales it to a rupee amount typed here, and - only where the payload carries a share
+// price (Broad Momentum's stocks, priced at the raw traded close) - turns each amount into whole
+// shares plus the rounding leftover. Everything after the fetch is client-side, so changing the
+// amount never re-runs the backtest.
+function renderSplit(r) {
+  const panel = $('[data-panel="split"]');
+  const strategy = r.series.strategy;
+  const total = strategy[strategy.length - 1];
+  const open = (r.open_positions || []).filter((p) => p.value > 0);
+  if (!open.length || !(total > 0)) {
+    panel.innerHTML = `<p class="explain">Nothing is held as of the latest week, so there is nothing to split.</p>`;
+    return;
+  }
+  const hasPrice = open.some((p) => p.price != null);
+  const categoryOf = {};
+  for (const row of r.held_categories || []) for (const pick of row.picks) categoryOf[pick] = row.category;
+  const hasCategory = Object.keys(categoryOf).length > 0;
+  let capital = 1000000;
+  try { const saved = Number(localStorage.getItem("mbt.splitCapital")); if (saved >= 1000) capital = saved; } catch { /* storage blocked: default */ }
+  const rows = open.map((p) => ({ ...p, weight: p.value / total })).sort((a, b) => b.weight - a.weight);
+  const idle = Math.max(1 - rows.reduce((t, p) => t + p.weight, 0), 0);
+  const note = hasPrice
+    ? "Whole shares at the latest weekly close; the leftover is what a whole-share buy can't use."
+    : "This strategy ranks an index or a synthetic curve rather than a share you can buy, so only the rupee split is shown.";
+  panel.innerHTML = `<h3>Trade split as of ${fmtDate(r.latest?.week)}</h3>
+    <p class="explain">The portfolio the strategy holds at the latest week, scaled to the capital below. ${note}</p>
+    <div class="row"><label>Capital to invest ₹ <input type="number" id="split-capital" min="1000" step="10000" value="${capital}"></label></div>
+    <div id="split-summary" class="hint"></div><div id="split-table"></div>`;
+
+  const draw = () => {
+    const amount = Number($("#split-capital").value) || 0;
+    const lines = rows.map((p) => {
+      const rupeesFor = p.weight * amount;
+      const shares = hasPrice && p.price > 0 ? Math.floor(rupeesFor / p.price) : null;
+      return { ...p, rupeesFor, shares, cost: shares == null ? null : shares * p.price };
+    });
+    const byCategory = {};
+    for (const l of lines) if (categoryOf[l.asset]) byCategory[categoryOf[l.asset]] = (byCategory[categoryOf[l.asset]] || 0) + l.weight;
+    $("#split-summary").innerHTML = hasCategory
+      ? `By category: ${Object.entries(byCategory).sort((a, b) => b[1] - a[1]).map(([c, w]) => `${esc(c.split(" :: ").pop())} ${pct(w, 0)}`).join(" · ")}`
+      : "";
+    const head = ["Position", ...(hasCategory ? ["Category"] : []), "Weight", "Amount", ...(hasPrice ? ["Price", "Shares", "Cost"] : []), ""];
+    const numeric = new Set(["Weight", "Amount", "Price", "Shares", "Cost"]);
+    const cell = (v, label) => `<td${numeric.has(label) ? ' class="num"' : ""}>${v}</td>`;
+    const body = lines.map((l) => {
+      const flag = l.shares === 0 ? `<span class="badge warn" title="One share costs more than this position's amount">1 share &gt; amount</span>` : "";
+      return `<tr>${[
+        [esc(displayName(l.asset)), "Position"],
+        ...(hasCategory ? [[esc((categoryOf[l.asset] || "—").split(" :: ").pop()), "Category"]] : []),
+        [pct(l.weight, 1), "Weight"], [rupees(l.rupeesFor), "Amount"],
+        ...(hasPrice ? [[l.price == null ? "–" : rupees(l.price), "Price"], [l.shares == null ? "–" : inr.format(l.shares), "Shares"], [l.cost == null ? "–" : rupees(l.cost), "Cost"]] : []),
+        [flag, ""],
+      ].map(([v, label]) => cell(v, label)).join("")}</tr>`;
+    }).join("");
+    const spent = lines.reduce((t, l) => t + (l.cost ?? l.rupeesFor), 0);
+    const planned = lines.reduce((t, l) => t + l.rupeesFor, 0);
+    const cash = idle * amount;
+    const foot = [
+      idle > 0.005 ? `<tr><td>Cash (parked)</td>${hasCategory ? "<td></td>" : ""}<td class="num">${pct(idle, 1)}</td><td class="num">${rupees(cash)}</td>${hasPrice ? "<td></td><td></td><td></td>" : ""}<td></td></tr>` : "",
+      `<tr class="total"><td><b>Total</b></td>${hasCategory ? "<td></td>" : ""}<td class="num"><b>${pct(1, 0)}</b></td><td class="num"><b>${rupees(planned + cash)}</b></td>` +
+        `${hasPrice ? `<td></td><td></td><td class="num"><b>${rupees(spent)}</b></td>` : ""}<td></td></tr>`,
+      hasPrice ? `<tr><td colspan="${head.length}" class="muted">Left over from whole-share rounding: ${rupees(planned - spent)}</td></tr>` : "",
+    ].join("");
+    $("#split-table").innerHTML = `<table class="data"><thead><tr>${head.map((h) => `<th${numeric.has(h) ? ' class="num"' : ""}>${h}</th>`).join("")}</tr></thead><tbody>${body}${foot}</tbody></table>`;
+  };
+  $("#split-capital").addEventListener("input", () => {
+    const value = Number($("#split-capital").value);
+    if (value >= 1000) { try { localStorage.setItem("mbt.splitCapital", String(value)); } catch { /* not persisted */ } }
+    draw();
+  });
+  draw();
+}
+
 function fillsNote(f) {
   if (!f) return "";
   let note = "";
@@ -1903,6 +2049,8 @@ function renderRuns(panel = $('[data-panel="runs"]')) {
     ["Rebalance", "rebalance", (v) => v], ["Portfolio", "portfolio", (v) => v],
     ["Top N / exit rank", "top_n", (_, c) => `${c.top_n} / ${c.exit_rank}`],
     ["Entry", "entry", (v) => v], ["Position cap", "max_position", (v) => v == null ? "None" : pct(v, 0)],
+    ["Category cap", "max_category", (v, c) => c.dataset === "broad" ? (v == null ? "None" : pct(v, 0)) : "—"],
+    ["Max share price", "max_stock_price", (v, c) => c.dataset === "broad" ? (v ? `₹${v.toLocaleString("en-IN")}` : "None") : "—"],
     ["Lookbacks", "lookbacks", (_, c) => `${c.lookbacks?.join("/")} weeks · weights ${c.weights?.join("/")}`],
     ["Crash protection", "defensive", (v, c) => v === "filter" ? `Cash filter, ${c.filter_lookback} weeks` : v],
     ["Cost model", "cost_model", (v, c) => v === "itemised" ? "Itemised" : `${c.cost_pct}% per side`],
