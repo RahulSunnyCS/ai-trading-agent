@@ -857,9 +857,20 @@ def test_broad_backtest_rejects_bad_rank_combinations_before_touching_any_data(c
 def test_broad_meta_reports_no_instrument_picker_and_broad_defaults(broad_client):
     meta = broad_client.get("/api/meta?dataset=broad").json()
     assert meta["instruments"] == []  # no per-instrument sidebar picker for this tab
+    assert meta["membership_quality"]["constant_current_years"] == list(range(2016, 2027))
     assert meta["defaults"]["broad_category_mode"] == "on"
     assert meta["defaults"]["broad_pool_top_n"] > 0
     assert meta["defaults"]["broad_category_top_n"] <= meta["defaults"]["broad_category_exit_rank"]
+
+
+def test_broad_meta_membership_warning_follows_file_provenance(broad_client, tmp_path):
+    path = tmp_path / "categories" / "total_market_membership.csv"
+    membership = pd.read_csv(path)
+    membership.loc[membership["year"] == 2016, "source_tier"] = "historical_snapshot"
+    membership.to_csv(path, index=False)
+
+    meta = broad_client.get("/api/meta?dataset=broad").json()
+    assert meta["membership_quality"]["constant_current_years"] == list(range(2017, 2027))
 
 
 def test_broad_backtest_on_mode_returns_a_complete_payload(broad_client):

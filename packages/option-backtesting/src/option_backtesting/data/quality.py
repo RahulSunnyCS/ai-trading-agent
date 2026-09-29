@@ -81,7 +81,7 @@ def bar_gaps(bars: list[Bar], expected_interval: timedelta) -> list[QualityFlag]
 
 def negative_or_over_underlying(
     bars: list[Bar],
-    underlying_at: dict, # Mapping[datetime, float] — index/futures price at each bar's ts
+    underlying_at: dict,  # Mapping[datetime, float] — index/futures price at each bar's ts
 ) -> list[QualityFlag]:
     """An option premium must never be negative, and (barring a data error)
     must never exceed the underlying's price at the same instant."""

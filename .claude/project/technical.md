@@ -84,6 +84,7 @@ uv run obt registry
 uv run obt walkforward strategies/B_pyramid.yaml --is-from YYYY-MM-DD --is-to YYYY-MM-DD --oos-from YYYY-MM-DD --oos-to YYYY-MM-DD
 uv run obt sweep strategies/B_pyramid.yaml --changes changes.json --from YYYY-MM-DD --to YYYY-MM-DD [--overfit --n-blocks 4]
 uv run obt export-personality <run_id>
+uv run obt fyers fetch [--date YYYY-MM-DD]   # daily 1m Fyers collector — same evening, expiring contracts vanish
 
 # option-backtesting FastAPI service (loopback-only, port 8000) — from repo root
 bun run py:api               # equivalent to: cd packages/option-backtesting && uv run obt-api
@@ -407,6 +408,7 @@ Critical variables whose misconfiguration causes real pain:
 | `BACKTEST_API_URL` | Base URL of the loopback-only Python FastAPI service (default `http://127.0.0.1:8000`). The Fastify proxy validates this resolves to loopback/private address space at startup — a public host throws (safe default-throw), the proxy never starts against it |
 | `MOMENTUM_DATABASE_URL` | Postgres (Neon free tier) holding `packages/momentum-backtesting`'s price history and weekly signals (`momentum_prices`, `momentum_signals`). Deliberately separate from `DATABASE_URL`, which momentum's `fyers.py` reads for `broker_tokens` |
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
+| `FYERS_DATA_DIR` | Where `obt fyers fetch` writes its 1-minute Parquet (default `packages/option-backtesting/data/fyers/`, gitignored). This data cannot be re-downloaded once contracts expire — point it at the backed-up/external disk when that exists |
 | `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet cache and writes its run registry (`<dir>/cache`, `<dir>/registry.sqlite`). Defaults to `packages/option-backtesting`'s own `data/` when unset |
 
 ## Common Tasks

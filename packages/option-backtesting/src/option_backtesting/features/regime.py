@@ -34,9 +34,7 @@ from ..engine.result import SessionResult
 _LOOKBACK_BUFFER_DAYS = 10
 
 
-def regime_bucket_report(
-    sessions: list[SessionResult], underlying: str
-) -> dict[str, float] | None:
+def regime_bucket_report(sessions: list[SessionResult], underlying: str) -> dict[str, float] | None:
     """{regime: summed net_inr} across `sessions`, bucketed by each
     session's lag-1 regime tag. Returns None if regime data isn't
     available (DATABASE_URL unset) or no regime row applies to any session

@@ -1,0 +1,27 @@
+# AlgoTest "Nifty_Widesl_917_closest premium" (export 2026-09-29). Same as
+# Widesl_917_OTM1 but strikes chosen by premium closest to ₹60, out at 15:25.
+strategy:
+  id: nifty_widesl_917_closest_premium
+  underlying: NIFTY
+  entry_time: "09:17"
+  exit_time: "15:25"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: sell
+      option_type: CE
+      expiry: weekly
+      strike: { closest_premium: 60 }
+      stop_loss: { percent: 115 }
+      trail_sl: { points: [15, 10] }
+    - id: pe
+      lots: 1
+      position: sell
+      option_type: PE
+      expiry: weekly
+      strike: { closest_premium: 60 }
+      stop_loss: { percent: 115 }
+      trail_sl: { points: [15, 10] }
+  overall:
+    stop_loss_inr: 2500

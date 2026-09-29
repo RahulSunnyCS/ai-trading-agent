@@ -37,6 +37,8 @@ const RUN_COLORS = ["#8b5cf6", "#10b981", "#ef4444", "#0ea5e9", "#d946ef", "#84c
 const MAX_RUNS = 12;
 
 let activeDataset = "etf";
+let activeView = "backtest";
+let activeResultTab = "overview";
 let metaByDataset = {}; // dataset -> /api/meta response, fetched lazily and cached per tab
 let lastResultByDataset = {}; // dataset -> { result, config } of its last successful run
 let meta = null; // always metaByDataset[activeDataset] - kept as a bare global so the rest of
@@ -44,11 +46,13 @@ let meta = null; // always metaByDataset[activeDataset] - kept as a bare global 
 let lastResult = null;
 let lastConfig = null;
 let runs = []; // run history for the active dataset (see loadRunsFor/saveRuns)
+let compareRunId = null;
 
 // Momentum Scores page (TODO.md 3.9.16): a live/current-state snapshot, not a backtest config+
 // run dataset, so it's fetched once and cached here rather than going through
 // metaByDataset/lastResultByDataset (which key on a backtest's own request/result shape).
 let momentumScoresData = null;
+let scoreDetailTrigger = null;
 
 // Custom Index only: whether the main chart's Rotations hover includes stock-level (inner)
 // detail (`innerEventLine`/`innerHoldingsLine`, below) or stays category-only. A display
@@ -73,7 +77,7 @@ let showStockHover = (() => {
 // sessions). "broad" and "inner-rotation" are deliberately excluded from persistence - both are
 // already dataset-conditionally hidden/shown (see syncDependentFields), and reset to expanded on
 // every hidden->visible reveal rather than remembering a manual collapse across tab switches.
-const PANEL_DEFAULT_COLLAPSED = { ranking: true, crash: true, execution: true };
+const PANEL_DEFAULT_COLLAPSED = { universe: true, ranking: true, crash: true, execution: true };
 let panelCollapsed = (() => {
   try {
     return JSON.parse(localStorage.getItem("mbt.panelCollapsed") || "null") || {};
@@ -183,7 +187,7 @@ async function init() {
   const fromHash = decodeHash();
   activeDataset = fromHash && ["stock", "custom_index", "broad"].includes(fromHash.dataset) ? fromHash.dataset : "etf";
   runs = loadRunsFor(activeDataset);
-  $$("#dataset-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.dataset === activeDataset));
+  $("#strategy-select").value = activeDataset;
 
   try {
     meta = await fetchMeta(activeDataset);
@@ -194,12 +198,19 @@ async function init() {
     return;
   }
   $("#data-range").textContent = dataRangeText();
+  $("#header-data-range").textContent = dataRangeText();
   buildUniverse();
   buildBenchmarks();
   bindEvents();
   initPanelAccordion();
   applyConfig(initialConfig(true));
   renderRuns();
+  updateStrategySummary();
+  if (window.matchMedia("(max-width: 900px)").matches) {
+    document.body.classList.remove("settings-open");
+    $("#settings-toggle").setAttribute("aria-expanded", "false");
+  }
+  syncMobileControls();
   if (typeof Plotly === "undefined") {
     setStatus("The chart library didn't load (it's downloaded once from the internet). Check your connection and reload.", true);
   }
@@ -207,24 +218,10 @@ async function init() {
 
 async function switchDataset(dataset) {
   if (dataset === activeDataset) return;
-  const leavingMomentumScores = activeDataset === "momentum_scores";
   activeDataset = dataset;
-  $$("#dataset-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.dataset === dataset));
-
-  // Momentum Scores replaces the whole .layout (sidebar + results) with its own full-width
-  // view (see index.html) rather than reshaping the backtest config+run form the other four
-  // datasets share - it has no config at all, so there's nothing to reshape.
-  if (dataset === "momentum_scores") {
-    $(".layout").hidden = true;
-    $("#momentum-scores-view").hidden = false;
-    await loadMomentumScores();
-    return;
-  }
-  if (leavingMomentumScores) {
-    $("#momentum-scores-view").hidden = true;
-    $(".layout").hidden = false;
-  }
+  $("#strategy-select").value = dataset;
   runs = loadRunsFor(dataset);
+  compareRunId = null;
 
   if (!metaByDataset[dataset]) {
     setStatus(`Loading ${datasetLabel(dataset)} data…`);
@@ -237,6 +234,7 @@ async function switchDataset(dataset) {
   }
   meta = metaByDataset[dataset];
   $("#data-range").textContent = dataRangeText();
+  $("#header-data-range").textContent = dataRangeText();
   buildUniverse();
   buildBenchmarks();
 
@@ -257,9 +255,34 @@ async function switchDataset(dataset) {
     lastResult = null;
     lastConfig = null;
     $("#results").hidden = true;
-    setStatus("Choose settings and run a backtest.");
+    showEmptyState();
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      document.body.classList.add("settings-open");
+      $("#settings-toggle").setAttribute("aria-expanded", "true");
+    }
   }
   renderRuns();
+  updateRunState();
+  if (activeView === "saved_runs") renderRuns($("#saved-runs-content"));
+}
+
+async function showAppView(view) {
+  activeView = view;
+  if (view !== "momentum_scores") $("#score-detail-panel").hidden = true;
+  $$("#app-tabs button").forEach((button) => {
+    const selected = button.dataset.view === view;
+    button.classList.toggle("active", selected);
+    if (selected) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current");
+  });
+  $(".layout").hidden = view !== "backtest";
+  $("#momentum-scores-view").hidden = view !== "momentum_scores";
+  $("#saved-runs-view").hidden = view !== "saved_runs";
+  $("#context-bar").hidden = view === "momentum_scores";
+  $("#settings-toggle").hidden = view !== "backtest";
+  if (view === "momentum_scores") await loadMomentumScores();
+  if (view === "saved_runs") renderRuns($("#saved-runs-content"));
+  if (view === "backtest" && lastResult) showTab(activeResultTab);
+  syncMobileControls();
 }
 
 function defaultConfig() {
@@ -373,6 +396,7 @@ function buildUniverse() {
   buildUniversePresetChips();
   const root = $("#universe");
   root.innerHTML = "";
+  $("#universe-search").value = "";
   const order = GROUP_ORDER[activeDataset];
   const groups = order.filter((g) => meta.instruments.some((i) => i.group === g));
   for (const group of groups) {
@@ -431,6 +455,18 @@ function syncUniverseState() {
   const total = meta.instruments.filter((i) => i.has_data).length;
   $("#universe-count").textContent = `${chosen.length} of ${total}`;
   validateLive();
+}
+
+function filterUniverse() {
+  const query = $("#universe-search").value.trim().toLowerCase();
+  $$("#universe .group").forEach((group) => {
+    let visible = 0;
+    $$(".etf", group).forEach((row) => {
+      row.hidden = !!query && !row.textContent.toLowerCase().includes(query);
+      if (!row.hidden) visible++;
+    });
+    group.hidden = !!query && !visible;
+  });
 }
 
 function applyUniversePreset(name) {
@@ -629,6 +665,7 @@ function syncDependentFields() {
   }
   $("#rank-rule-row").hidden = broad;
   $("#crash-protection-panel").hidden = broad;
+  $("#protection-group-title").hidden = broad;
   $("#tax-row").hidden = broad;
 
   // Ranking rule: score/voladj_skip_recent_month are backend-generic for every dataset (all four
@@ -664,7 +701,7 @@ function syncDependentFields() {
     const picks = Number($("#broad_picks_per_category").value);
     const offTop = Number($("#broad_off_top_n").value), offExit = Number($("#broad_off_exit_rank").value);
     $("#broad-rule-hint").textContent = catOn
-      ? `Holds between ${catTop} and ${catExit} categories/atomics at once (${catTop} freshly ` +
+      ? `Holds between ${catTop} and ${catExit} categories or standalone assets at once (${catTop} freshly ` +
         `selected, the rest lingering in the buffer), up to ${picks} stock(s) each - up to ` +
         `${catExit * picks} positions.`
       : `Holds between ${offTop} and ${offExit} individual stocks, no category layer.`;
@@ -698,6 +735,32 @@ function syncDependentFields() {
   const innerVisible = customIndex;
   if (innerVisible && !wasInnerRotationVisible) setPanelCollapsed($("#inner-rotation-panel"), false);
   wasInnerRotationVisible = innerVisible;
+  updatePanelSummaries();
+}
+
+function updatePanelSummaries() {
+  const summaries = {
+    universe: `${selectedUniverse().length} selected`,
+    broad: radio("broad_category_mode") === "on" ? "Category mode" : "Direct stocks",
+    period: `${$("#start").value || "Start"} → ${$("#end").value || "End"}`,
+    ranking: $("#score").selectedOptions[0]?.textContent || "",
+    portfolio: `${radio("portfolio") === "buffer" ? "Buffer" : "Fixed slots"} · ${$("#rebalance").value}`,
+    "inner-rotation": `${$("#inner_top_n").value} stocks / category`,
+    crash: ({ off: "Off", ranked: "Debt in ranking", filter: "Cash filter" })[radio("defensive")],
+    execution: `${$("#cost_model").value === "itemised" ? "Itemised" : `${$("#cost_pct").value}% per side`} · ${$("#benchmark").value || "benchmark"}`,
+  };
+  $$(".panel").forEach((section) => {
+    const header = $(".panel-header", section);
+    const key = $(".panel-body", section)?.id.replace(/^panel-body-/, "");
+    if (!header || !key) return;
+    let summary = $(".panel-summary", header);
+    if (!summary) {
+      summary = document.createElement("span");
+      summary.className = "panel-summary";
+      $(".chevron", header).before(summary);
+    }
+    summary.textContent = summaries[key] || "";
+  });
 }
 
 let wasBroadPanelVisible = false;
@@ -745,7 +808,7 @@ function validate(cfg) {
       if (!(cfg.broad_picks_per_category >= 1)) return "Top stocks per category must be at least 1.";
       if (!(cfg.broad_coverage_floor >= 0 && cfg.broad_coverage_floor <= 1)) return "Coverage floor must be between 0 and 100%.";
     } else if (cfg.broad_off_top_n > cfg.broad_off_exit_rank) {
-      return "Top N (SL) can't be greater than the exit rank.";
+      return "Stocks to hold can't be greater than the exit rank.";
     }
   } else {
     if (!(cfg.top_n >= 1)) return "Top N must be at least 1.";
@@ -766,12 +829,113 @@ function validate(cfg) {
   if (cfg.momentum_sizing && !(cfg.momentum_sizing_floor >= 0 && cfg.momentum_sizing_floor <= 1)) return "Min size floor must be between 0 and 100%.";
   return "";
 }
-function validateLive() {
+function validationTarget(problem) {
+  if (!problem) return null;
+  const match = [
+    [/lookback|weight/i, "#lookback-panel"], [/Pool top/i, "#broad_pool_exit_rank"],
+    [/Categories held/i, "#broad_category_exit_rank"], [/Top stocks per category/i, "#broad_picks_per_category"],
+    [/Coverage floor/i, "#broad_coverage_floor"], [/Stocks to hold/i, "#broad_off_exit_rank"],
+    [/Only .*ETF/i, "#universe-panel"], [/Top N must/i, "#top_n"],
+    [/sell rank/i, "#exit_rank"], [/start date/i, "#end"],
+    [/Cost can/i, "#cost_pct"], [/Max per ETF/i, "#max_position"],
+    [/trim band/i, "#cap_band"], [/Capital/i, "#capital"],
+    [/Slippage/i, "#slippage_bps"], [/Sizing window/i, "#momentum_sizing_window"],
+    [/Min size floor/i, "#momentum_sizing_floor"],
+  ].find(([pattern]) => pattern.test(problem));
+  return match ? $(match[1]) : null;
+}
+
+function validateLive(reveal = false) {
   if (!meta) return;
   syncDependentFields();
   const problem = validate(readConfig());
   $("#form-error").textContent = problem;
+  $$(".field-error").forEach((node) => node.remove());
+  $$('[aria-invalid="true"]').forEach((node) => {
+    node.removeAttribute("aria-invalid");
+    node.removeAttribute("aria-describedby");
+  });
+  const target = validationTarget(problem);
+  if (target) {
+    const label = target.closest("label");
+    const holder = label || target;
+    const error = document.createElement("span");
+    error.className = "field-error";
+    error.id = "inline-field-error";
+    error.textContent = problem;
+    holder.insertAdjacentElement("afterend", error);
+    if (target.matches("input,select")) {
+      target.setAttribute("aria-invalid", "true");
+      target.setAttribute("aria-describedby", error.id);
+    }
+    if (reveal === true) {
+      const panel = target.closest(".panel");
+      if (panel) setPanelCollapsed(panel, false);
+      target.scrollIntoView({ block: "nearest" });
+      if (target.matches("input,select")) target.focus();
+    }
+  }
   $("#run").disabled = !!problem;
+  updateRunState();
+}
+
+function comparableConfig(cfg) {
+  return JSON.stringify(Object.fromEntries(Object.entries(cfg).sort(([a], [b]) => a.localeCompare(b))));
+}
+
+function updateRunState() {
+  const state = $("#run-state");
+  if (!state) return;
+  const dirty = !!lastConfig && comparableConfig(readConfig()) !== comparableConfig(lastConfig);
+  state.textContent = dirty ? "Settings changed · run again to update results" : lastConfig ? "Results match these settings" : "Ready to run";
+  state.classList.toggle("dirty", dirty);
+  const badge = $("#result-state");
+  if (badge) {
+    badge.textContent = dirty ? "Results use previous settings" : "Current settings";
+    badge.classList.toggle("dirty", dirty);
+  }
+  updateStrategySummary();
+  syncMobileControls();
+}
+
+function updateStrategySummary() {
+  if (!meta) return;
+  const cfg = readConfig();
+  const label = { etf: "ETF rotation", stock: "Nifty 50 stocks", custom_index: "Custom Index", broad: "Broad Momentum" }[cfg.dataset];
+  const selection = cfg.dataset === "broad"
+    ? (cfg.broad_category_mode === "on" ? `top ${cfg.broad_category_top_n} categories · exit after rank ${cfg.broad_category_exit_rank}` : `top ${cfg.broad_off_top_n} stocks · exit after rank ${cfg.broad_off_exit_rank}`)
+    : `top ${cfg.top_n} · exit after rank ${cfg.exit_rank}`;
+  const summary = `${cfg.start || "Start"} → ${cfg.end || "End"} · ${cfg.rebalance} · ${selection} · ${cfg.benchmark}`;
+  $("#strategy-summary").textContent = summary;
+  if ($("#empty-strategy")) $("#empty-strategy").textContent = label;
+  if ($("#empty-summary")) $("#empty-summary").textContent = `Test ${summary}. Review the controls, then run to see performance and signals.`;
+  $("#empty-run")?.toggleAttribute("disabled", $("#run").disabled);
+}
+
+function showEmptyState() {
+  const el = $("#status");
+  el.className = "status empty-state";
+  el.hidden = false;
+  el.innerHTML = '<p class="eyebrow">Ready to explore</p><h2 id="empty-strategy"></h2><p id="empty-summary"></p><button type="button" class="primary" id="empty-run">Run with these settings</button>';
+  $("#empty-run").addEventListener("click", runBacktest);
+  updateStrategySummary();
+}
+
+function syncMobileControls() {
+  const mobile = window.matchMedia("(max-width: 900px)").matches;
+  const open = document.body.classList.contains("settings-open") && activeView === "backtest";
+  $("#drawer-backdrop").hidden = !mobile || !open;
+  $("#mobile-run").hidden = !mobile || activeView !== "backtest" || open;
+  $("#mobile-run").disabled = $("#run").disabled;
+  $("#sidebar").setAttribute("role", mobile ? "dialog" : "complementary");
+  if (mobile) $("#sidebar").setAttribute("aria-modal", "true"); else $("#sidebar").removeAttribute("aria-modal");
+}
+
+function closeSettings() {
+  document.body.classList.remove("settings-open");
+  $("#settings-toggle").setAttribute("aria-expanded", "false");
+  syncMobileControls();
+  $("#settings-toggle").focus();
 }
 
 function setPeriod(kind) {
@@ -792,11 +956,10 @@ function setPeriod(kind) {
 
 // ---------------------------------------------------------------------------------------------
 // Momentum Scores page (TODO.md 3.9.16) -- live/current-state snapshot, own render path (not
-// render()/renderSignal() etc, which are all shaped around a backtest Result). Reuses the
-// generic renderTable() (sortable/searchable/CSV-exportable) unchanged, same as every other
-// data table in this app.
+// render()/renderSignal() etc, which are all shaped around a backtest Result). Shares the
+// sortable table renderer with the backtest views, with stock-specific filters and details.
 // ---------------------------------------------------------------------------------------------
-const LOOKBACK_LABELS = { 4: "1M", 13: "3M", 26: "6M" };
+const LOOKBACK_LABELS = { 4: "4W", 13: "13W", 26: "26W" };
 function lookbackLabel(k) {
   return LOOKBACK_LABELS[k] || `${k}w`;
 }
@@ -841,6 +1004,10 @@ function renderMomentumScores(data) {
   $("#ms-asof").textContent = data.as_of
     ? `as of ${fmtDate(data.as_of)} · ${data.universe_size} stocks in the universe`
     : "";
+  const caveats = membershipCaveats(data.membership_quality, true);
+  if (data.missing_symbols?.length) caveats.push(`${data.missing_symbols.length} universe symbol(s) have no usable price history and are excluded from these scores.`);
+  $("#ms-data-notes").hidden = !caveats.length;
+  $("#ms-data-notes").innerHTML = caveats.map((note) => `<p>${esc(note)}</p>`).join("");
   renderMomentumStocks(data);
   renderMomentumSectors(data);
 }
@@ -864,7 +1031,24 @@ function renderMomentumStocks(data) {
   renderTable($('[data-ms-panel="stocks"]'), columns, rows, {
     sortKey: `score_${lookbacks[lookbacks.length - 1]}`, sortDir: -1,
     search: "Filter by symbol, company or sector…", csv: "momentum-scores-stocks.csv",
+    scoreFilter: { key: `score_${lookbacks[lookbacks.length - 1]}`, sectors: [...new Set(rows.map((row) => row.subgroup).filter(Boolean))].sort() },
+    onOpen: (row, button) => showStockDetail(row, lookbacks, button),
   });
+}
+
+function showStockDetail(row, lookbacks, button) {
+  scoreDetailTrigger = button;
+  $("#score-detail-content").innerHTML = `<p class="eyebrow">Stock detail</p><h3>${esc(row.symbol)} · ${esc(row.company_name)}</h3>
+    <p>${esc(row.parent_group)} · ${esc(row.subgroup)}</p>
+    <div class="stock-detail-summary"><div><span>Last close</span><strong>${rupees(row.last_price)}</strong></div><div><span>1W change</span><strong>${pct(row.change_1w_pct, 2, true)}</strong></div></div>
+    <h4>Momentum windows</h4><div class="stock-window-metrics">${lookbacks.map((k) => `<div><b>${lookbackLabel(k)} <small>(${Math.round(k / 4.33)} mo approx.)</small></b><span>Return ${pct(row.returns[String(k)], 1, true)}</span><span>Relative score ${msScoreCell(row.scores[String(k)])}</span></div>`).join("")}</div>`;
+  $("#score-detail-panel").hidden = false;
+  $("#score-detail-close").focus();
+}
+
+function closeStockDetail() {
+  $("#score-detail-panel").hidden = true;
+  if (scoreDetailTrigger?.isConnected) scoreDetailTrigger.focus();
 }
 
 // Sector-row accordion (TODO.md 3.9.17): the member stocks behind one sector's rolled-up score,
@@ -920,14 +1104,36 @@ function showMsTab(name) {
 }
 
 function bindEvents() {
-  $$("#dataset-tabs button").forEach((b) => b.addEventListener("click", () => switchDataset(b.dataset.dataset)));
+  $("#settings-toggle").addEventListener("click", () => {
+    const open = document.body.classList.toggle("settings-open");
+    $("#settings-toggle").setAttribute("aria-expanded", String(open));
+    syncMobileControls();
+  });
+  $("#drawer-close").addEventListener("click", closeSettings);
+  $("#drawer-backdrop").addEventListener("click", closeSettings);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !$("#score-detail-panel").hidden) { closeStockDetail(); return; }
+    if (event.key === "Escape" && document.body.classList.contains("settings-open") && window.matchMedia("(max-width: 900px)").matches) closeSettings();
+  });
+  window.addEventListener("resize", syncMobileControls);
+  $$("#app-tabs button").forEach((b) => b.addEventListener("click", () => showAppView(b.dataset.view)));
+  $("#strategy-select").addEventListener("change", (e) => switchDataset(e.target.value));
   $$("#ms-tabs button").forEach((b) => b.addEventListener("click", () => showMsTab(b.dataset.msTab)));
   $$("#period-presets [data-period]").forEach((b) => b.addEventListener("click", () => setPeriod(b.dataset.period)));
   $$(".chips [data-lb]").forEach((b) => b.addEventListener("click", () => { setLookbacks(LOOKBACK_PRESETS[b.dataset.lb]); validateLive(); }));
   $("#add-lookback").addEventListener("click", () => { addLookbackRow(); validateLive(); });
   $("#sidebar").addEventListener("input", validateLive);
   $("#sidebar").addEventListener("change", validateLive);
+  $("#universe-search").addEventListener("input", filterUniverse);
+  $("#metric-toggle").addEventListener("click", () => {
+    const expanded = $("#kpis").classList.toggle("show-details");
+    $("#metric-toggle").textContent = expanded ? "Show key metrics" : "Show all metrics";
+    $("#metric-toggle").setAttribute("aria-expanded", String(expanded));
+  });
   $("#run").addEventListener("click", runBacktest);
+  $("#empty-run").addEventListener("click", runBacktest);
+  $("#mobile-run").addEventListener("click", runBacktest);
+  $("#score-detail-close").addEventListener("click", closeStockDetail);
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !$("#run").disabled) runBacktest();
   });
@@ -947,11 +1153,23 @@ function bindEvents() {
 }
 
 function showTab(name) {
+  activeResultTab = name;
+  const groups = {
+    overview: ["overview", "yearly"],
+    holdings: ["signal", "categories", "timeline", "etfs"],
+    trades: ["trades"],
+    risk: ["crashes"],
+    compare: ["runs"],
+  };
   $$("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  $$(".tab").forEach((p) => (p.hidden = p.dataset.panel !== name));
-  // Plotly charts drawn while hidden have zero width; resize once visible.
-  if (name === "timeline") Plotly.Plots.resize("timeline-chart");
-  if (name === "yearly") Plotly.Plots.resize("yearly-chart");
+  $$("#results .tab").forEach((p) => {
+    p.hidden = !groups[name].includes(p.dataset.panel) || (p.dataset.panel === "categories" && !(lastResult?.held_categories || []).length);
+  });
+  if (name === "overview") {
+    Plotly.Plots.resize("main-chart");
+    Plotly.Plots.resize("yearly-chart");
+  }
+  if (name === "holdings") Plotly.Plots.resize("timeline-chart");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -972,11 +1190,13 @@ function saveRuns() {
 }
 
 async function runBacktest() {
+  if ($("#run").disabled) return;
   const cfg = readConfig();
   const problem = validate(cfg);
-  if (problem) { $("#form-error").textContent = problem; return; }
+  if (problem) { validateLive(true); return; }
   const button = $("#run");
   button.disabled = true;
+  syncMobileControls();
   button.textContent = "Running…";
   setStatus(cfg.dataset === "custom_index"
     ? "Running backtest… (first run this session builds ~62 category rotations - can take about a minute; later runs with the same inner settings are fast)"
@@ -1003,12 +1223,17 @@ async function runBacktest() {
     setStatus("");
     $("#results").hidden = false;
     render(body, cfg);
+    updateRunState();
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      closeSettings();
+    }
   } catch (err) {
     setStatus(`Backtest failed: ${err.message}`, true);
   } finally {
     button.textContent = "Run backtest";
     button.innerHTML = 'Run backtest <kbd>Ctrl ↵</kbd>';
     validateLive();
+    syncMobileControls();
   }
 }
 
@@ -1069,10 +1294,30 @@ function describe(cfg) {
 // ---------------------------------------------------------------------------------------------
 function render(r, cfg) {
   const s = r.series;
-  $("#run-title").textContent = `${describe(cfg)} · ${fmtDate(s.dates[0])} → ${fmtDate(s.dates[s.dates.length - 1])}`;
+  const strategyName = { etf: "ETF rotation", stock: "Nifty 50 stocks", custom_index: "Custom Index", broad: "Broad Momentum" }[cfg.dataset] || datasetLabel(cfg.dataset);
+  $("#run-title").textContent = `${runs[0]?.name || strategyName} · ${fmtDate(s.dates[0])} → ${fmtDate(s.dates[s.dates.length - 1])}`;
+  const assumptions = [cfg.rebalance === "monthly" ? "Monthly rebalance" : "Weekly rebalance",
+    cfg.portfolio === "buffer" ? "Buffer rule" : "Fixed slots",
+    cfg.cost_model === "itemised" ? "Itemised costs" : `${cfg.cost_pct}% cost per side`,
+    cfg.dataset === "etf" ? (cfg.track === "etf" ? "ETF prices" : "Index prices") : null,
+    cfg.dataset === "etf" ? ({ fri_close: "Friday close", mon_open: "Monday open", mon_10am: "Monday 10:00" })[cfg.execution] : null,
+    cfg.tax ? "After tax" : "Pre-tax"].filter(Boolean);
+  $("#assumptions").innerHTML = assumptions.map((item) => `<span>${esc(item)}</span>`).join("") +
+    `<details><summary>Full settings</summary><p>${esc(describe(cfg))}</p></details>`;
+  const notes = [];
+  if (cfg.dataset === "broad") notes.push(...membershipCaveats(meta.membership_quality));
+  if (cfg.dataset === "etf") {
+    const late = meta.instruments.filter((inst) => selectedUniverse().includes(inst.name) && inst.first_week > cfg.start);
+    if (late.length) notes.push(`${late.length} selected instrument(s) start after the test period begins; each can enter the ranking only after enough price history accumulates.`);
+  }
+  if (r.fills?.proxy_trades) notes.push(`${r.fills.proxy_trades} trade(s) used an index price before the ETF existed.`);
+  notes.push(...(r.fills?.warnings || []));
+  if (r.skipped_categories?.length) notes.push(`${r.skipped_categories.length} category series were excluded from this run because their data was insufficient.`);
+  if (r.missing_symbols?.length) notes.push(`${r.missing_symbols.length} universe symbol(s) lacked usable price history and were excluded.`);
+  if (notes.length) $("#assumptions").insertAdjacentHTML("beforeend", `<details class="data-notes" open><summary>Data notes · ${notes.length}</summary>${notes.map((note) => `<p>${esc(note)}</p>`).join("")}</details>`);
   renderKpis(r, cfg);
   renderMainChart(r);
-  renderSignal(r);
+  renderSignal(r, cfg);
   renderHeldCategories(r);
   renderTrades(r);
   renderTimeline(r);
@@ -1080,6 +1325,7 @@ function render(r, cfg) {
   renderYearly(r);
   renderCrashes(r);
   renderRuns();
+  showTab(activeResultTab);
 }
 
 // "Broad Momentum", category mode ON only (`r.held_categories`, see api._broad_backtest /
@@ -1089,16 +1335,10 @@ function render(r, cfg) {
 // entirely (tab + panel) for every other dataset, and for category mode OFF (`held_categories`
 // is always present but empty in that case - see api.py's own docstring).
 function renderHeldCategories(r) {
-  const tab = $("#categories-tab");
   const panel = $('[data-panel="categories"]');
   const held = r.held_categories || [];
-  tab.hidden = !held.length;
   if (!held.length) {
     panel.innerHTML = "";
-    // If "Held categories" was the active tab (e.g. left over from a previous ON-mode run) and
-    // this run has nothing to show there (OFF mode, or a different dataset entirely), fall back
-    // to "This week" so a tab click isn't needed to see anything at all.
-    if (tab.classList.contains("active")) showTab("signal");
     return;
   }
   const rows = held
@@ -1113,11 +1353,11 @@ function renderHeldCategories(r) {
     })
     .join("");
   panel.innerHTML = `
-    <p class="hint">What the backtest holds as of its own last week - "fresh" categories/atomics
+    <h3>Held categories and standalone assets</h3><p class="hint">What the backtest holds as of its own last week - "fresh" entries
       are within the top N this period; "lingering" ones are held only because they haven't yet
-      fallen past the exit rank (the hysteresis buffer).</p>
+      fallen past the exit rank (the holding buffer).</p>
     <table class="data">
-      <thead><tr><th>#</th><th>Status</th><th>Category / atomic</th><th>Picks</th></tr></thead>
+      <thead><tr><th>#</th><th>Status</th><th>Category or asset</th><th>Picks</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
 }
@@ -1131,19 +1371,19 @@ function renderKpis(r, cfg) {
   const cards = [
     kpiCard("₹1 lakh became", rupeesShort(k.final_value), `${b}: ${rupeesShort(k.benchmark_final_value)}`),
     kpiCard("CAGR", pct(k.cagr), `${b} ${pct(k.benchmark_cagr)} · cash ${pct(k.cash_cagr)}`),
-    kpiCard("Edge vs benchmark", pct(k.excess_cagr, 1, true), `a year · beat it ${k.years_beating_benchmark} of ${k.years} yrs`, signClass(k.excess_cagr)),
+    kpiCard("Edge vs benchmark", `${k.excess_cagr > 0 ? "+" : ""}${num(k.excess_cagr * 100, 1)} pp`, `a year · beat it ${k.years_beating_benchmark} of ${k.years} yrs`, signClass(k.excess_cagr)),
     kpiCard("Max drawdown", pct(k.max_drawdown), `${b} ${pct(k.benchmark_max_drawdown)} · ${fmtDate(k.max_drawdown_trough)}`, "bad"),
     kpiCard("Sharpe / Sortino", `${num(k.sharpe, 2)} / ${num(k.sortino, 2)}`, `volatility ${pct(k.volatility)}`),
     kpiCard("Churn", pct(k.turnover_per_year, 0), "of portfolio sold per year"),
     kpiCard("Exits / year", num(k.exits_per_year), `${num(k.new_buys_per_year)} new buys · ${num(k.top_ups_per_year)} top-ups`),
-    kpiCard("Avg holding", `${num(k.avg_weeks_held, 0)} wks`, `${num(k.avg_holdings)} ETFs held on average`),
+    kpiCard("Avg holding", `${num(k.avg_weeks_held, 0)} wks`, `${num(k.avg_holdings)} positions held on average`),
     kpiCard("Win rate", pct(k.win_rate, 0), `avg win ${pct(k.avg_win, 1, true)} · avg loss ${pct(k.avg_loss)}`),
     kpiCard("Best / worst exit", `${pct(k.best_trade, 0, true)} / ${pct(k.worst_trade, 0)}`, "position return, entry to exit"),
     kpiCard("Largest position", pct(k.max_position_share, 0), "peak share of the portfolio"),
     kpiCard("Time in cash/debt", pct(k.time_in_cash, 0), `ahead over 52w ${pct(k.pct_rolling_52w_ahead, 0)} of the time`),
   ];
   if (cfg.tax) cards.push(kpiCard("Tax paid", rupeesShort(k.tax_paid), "on ₹1 lakh start, incl. final sale"));
-  $("#kpis").innerHTML = cards.join("");
+  $("#kpis").innerHTML = cards.map((card, i) => `<div class="kpi-wrap ${[0, 1, 2, 3, 4].includes(i) ? "key" : "detail"}">${card}</div>`).join("");
 }
 
 // Custom Index only: what a category's OWN inner stock rotation did the same week it was
@@ -1297,7 +1537,7 @@ function renderMainChart(r) {
   );
   const grid = cssVar("--border"), fg = cssVar("--text"), muted = cssVar("--muted");
   const layout = {
-    height: 720, margin: { l: 70, r: 20, t: 10, b: 30 },
+    height: Math.max(380, Math.min(window.innerHeight * 0.62, 560)), margin: { l: 70, r: 20, t: 10, b: 30 },
     paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", font: { color: fg, size: 12 },
     hovermode: "x unified", hoverlabel: { align: "left" },
     legend: { orientation: "h", y: 1.04, x: 0 },
@@ -1315,18 +1555,22 @@ function renderTable(container, columns, rows, opts = {}) {
   let sortKey = opts.sortKey ?? null;
   let sortDir = opts.sortDir ?? -1;
   let query = "";
+  let minimumScore = 0;
+  let selectedSector = "";
   // Expandable rows (TODO.md 3.9.17): opt-in via opts.expand = { rowId(row), render(row) } -
   // render() returns the inner HTML of a nested detail <tr> inserted right after the clicked
   // row. `expanded` is a plain Set of rowId()s kept in this closure, so it (and the DOM it
   // produces) survives sort/search re-draws instead of being wiped by tbody.innerHTML like a
   // one-off DOM mutation would be - draw() itself re-renders expanded rows every time.
   const expanded = new Set();
-  const tools = opts.search || opts.csv
+  const tools = opts.search || opts.csv || opts.scoreFilter
     ? `<div class="table-tools">${opts.search ? `<input type="search" placeholder="${esc(opts.search)}">` : ""}
+       ${opts.scoreFilter ? `<label>Sector <select class="sector-filter"><option value="">All sectors</option>${opts.scoreFilter.sectors.map((sector) => `<option value="${esc(sector)}">${esc(sector)}</option>`).join("")}</select></label>
+       <label>${esc(columns.find((col) => col.key === opts.scoreFilter.key)?.label || "Score")} <select class="score-filter"><option value="0">Any score</option><option value="60">60+</option><option value="80">80+</option><option value="90">90+</option></select></label>` : ""}
        ${opts.csv ? `<button type="button" class="csv">Download CSV</button>` : ""}
        <span class="muted count-note"></span></div>` : "";
   container.innerHTML = `${opts.before || ""}${tools}<table class="data"><thead><tr>${columns
-    .map((c) => `<th class="${c.num ? "num" : ""} ${opts.sortable === false ? "" : "sortable"}" data-key="${c.key}">${c.label}</th>`)
+    .map((c) => `<th class="${c.num ? "num" : ""} ${opts.sortable === false ? "" : "sortable"}" data-key="${c.key}">${opts.sortable === false ? c.label : `<button type="button" class="sort-button">${c.label}</button>`}</th>`)
     .join("")}</tr></thead><tbody></tbody></table>`;
   const tbody = $("tbody", container);
 
@@ -1335,9 +1579,10 @@ function renderTable(container, columns, rows, opts = {}) {
   }
   function draw() {
     let view = rows;
+    if (opts.scoreFilter) view = view.filter((row) => (!selectedSector || row.subgroup === selectedSector) && Number(row[opts.scoreFilter.key]) >= minimumScore);
     if (query) {
       const q = query.toLowerCase();
-      view = rows.filter((row) => columns.some((c) => String(row[c.key] ?? "").toLowerCase().includes(q)));
+      view = view.filter((row) => columns.some((c) => String(row[c.key] ?? "").toLowerCase().includes(q)));
     }
     if (sortKey) {
       const col = columns.find((c) => c.key === sortKey);
@@ -1348,12 +1593,12 @@ function renderTable(container, columns, rows, opts = {}) {
         return (va > vb ? 1 : va < vb ? -1 : 0) * sortDir;
       });
     }
-    tbody.innerHTML = view.map((row) => {
+    tbody.innerHTML = view.map((row, rowIndex) => {
       const id = opts.expand ? opts.expand.rowId(row) : null;
       const isOpen = id != null && expanded.has(id);
-      const chevron = opts.expand ? `<span class="row-chevron ${isOpen ? "open" : ""}">▸</span>` : "";
+      const chevron = opts.expand ? `<button type="button" class="row-expand" aria-expanded="${isOpen}" aria-label="${isOpen ? "Hide" : "Show"} details for ${esc(row[columns[0].key])}"><span class="row-chevron ${isOpen ? "open" : ""}">▸</span></button>` : "";
       const mainRow = `<tr class="${opts.rowClass ? opts.rowClass(row) : ""} ${opts.expand ? "expandable-row" : ""}" ${id != null ? `data-row-id="${esc(id)}"` : ""}>${columns
-        .map((c, i) => `<td class="${c.num ? "num" : ""} ${c.cls ? c.cls(row) : ""}">${i === 0 ? chevron : ""}${c.fmt ? c.fmt(row[c.key], row) : esc(row[c.key])}</td>`)
+        .map((c, i) => `<td class="${c.num ? "num" : ""} ${c.cls ? c.cls(row) : ""}">${i === 0 ? chevron + (opts.onOpen ? `<button type="button" class="detail-open" data-detail-index="${rowIndex}" aria-label="View details for ${esc(row[columns[0].key])}">Details</button>` : "") : ""}${c.fmt ? c.fmt(row[c.key], row) : esc(row[c.key])}</td>`)
         .join("")}</tr>`;
       const detailRow = isOpen
         ? `<tr class="expanded-detail"><td colspan="${columns.length}">${opts.expand.render(row)}</td></tr>`
@@ -1367,21 +1612,26 @@ function renderTable(container, columns, rows, opts = {}) {
         draw();
       }));
     }
+    if (opts.onOpen) $$("[data-detail-index]", tbody).forEach((button) => button.addEventListener("click", () => opts.onOpen(view[Number(button.dataset.detailIndex)], button)));
     $$("th", container).forEach((th) => {
       th.classList.toggle("sorted-asc", th.dataset.key === sortKey && sortDir === 1);
       th.classList.toggle("sorted-desc", th.dataset.key === sortKey && sortDir === -1);
+      th.setAttribute("aria-sort", th.dataset.key === sortKey ? sortDir === 1 ? "ascending" : "descending" : "none");
     });
     const note = $(".count-note", container);
     if (note) note.textContent = `${view.length} of ${rows.length}`;
   }
   if (opts.sortable !== false) {
-    $$("th", container).forEach((th) => th.addEventListener("click", () => {
+    $$("th .sort-button", container).forEach((button) => button.addEventListener("click", () => {
+      const th = button.closest("th");
       if (sortKey === th.dataset.key) sortDir = -sortDir; else { sortKey = th.dataset.key; sortDir = -1; }
       draw();
     }));
   }
   const search = $("input[type=search]", container);
   if (search) search.addEventListener("input", () => { query = search.value; draw(); });
+  $(".sector-filter", container)?.addEventListener("change", (event) => { selectedSector = event.target.value; draw(); });
+  $(".score-filter", container)?.addEventListener("change", (event) => { minimumScore = Number(event.target.value); draw(); });
   const csv = $(".csv", container);
   if (csv) csv.addEventListener("click", () => downloadCsv(opts.csv, columns, rows));
   draw();
@@ -1418,33 +1668,67 @@ function signalAssetCell(name, row) {
   return holdings ? `${label}<div class="inner-detail">holding: ${esc(holdings)}</div>` : label;
 }
 
-function renderSignal(r) {
+function membershipCaveats(quality, currentSnapshot = false) {
+  const years = quality?.constant_current_years || [];
+  if (!years.length) return [];
+  const range = years.length === 1 ? String(years[0]) : `${years[0]}–${years[years.length - 1]}`;
+  return [`Total Market membership for ${range} uses the current constituent list in place of historical snapshots. ${currentSnapshot ? "Current scores use the latest list; historical comparisons may have survivorship bias." : "Older backtest results may have survivorship bias."}`];
+}
+
+function signalReason(row, cfg) {
+  const action = row.action || "";
+  const rank = Number(row.rank);
+  const top = cfg.dataset === "broad"
+    ? (cfg.broad_category_mode === "on" ? cfg.broad_category_top_n : cfg.broad_off_top_n)
+    : cfg.top_n;
+  const exit = cfg.dataset === "broad"
+    ? (cfg.broad_category_mode === "on" ? cfg.broad_category_exit_rank : cfg.broad_off_exit_rank)
+    : cfg.exit_rank;
+  if (action === "NOT A MEMBER") return "Outside this week's eligible universe.";
+  if (action.startsWith("BUY")) return action.includes("make room")
+    ? `Rank ${rank} is within the top ${top}; existing holdings are trimmed to fund it.`
+    : `New position; rank ${rank} is within the top ${top}.`;
+  if (action === "ADD") return "Existing position received more capital under the portfolio rule.";
+  if (action === "WAIT") return `Ranked in the top ${top}; entry waits for cash or a sale.`;
+  if (action === "AT CAP") return "Position is at its configured size limit.";
+  if (action.startsWith("TRIM")) return "Position exceeded its configured size limit.";
+  if (action === "SELL") return rank > exit
+    ? `Rank ${rank} fell past the exit rank ${exit}.`
+    : "Exit triggered by the portfolio or protection rule.";
+  if (action === "HOLD") return rank > top && rank <= exit
+    ? `Held in the rank buffer (${top + 1}–${exit}).`
+    : "Position remains open under the portfolio rule.";
+  return row.held ? "Position remains open." : "Not selected for a position this week.";
+}
+
+function renderSignal(r, cfg) {
   const latest = r.latest;
   const lookbacks = latest.rows.length ? Object.keys(latest.rows[0].returns) : [];
   const columns = [
     { key: "rank", label: "Rank", num: true, fmt: (v) => num(v, 0) },
-    { key: "asset", label: "ETF", fmt: r.inner_categories ? signalAssetCell : assetCell },
+    { key: "asset", label: ({ etf: "ETF", stock: "Stock", custom_index: "Category", broad: "Asset" })[cfg.dataset] || "Asset", fmt: r.inner_categories ? signalAssetCell : assetCell },
     { key: "action", label: "Action", fmt: (v) => (v ? `<span class="action ${esc(v.split(" ")[0])}">${esc(v)}</span>` : "") },
+    { key: "reason", label: "Why", fmt: (v) => `<span class="signal-reason">${esc(v)}</span>` },
     { key: "score", label: "Score", num: true, fmt: (v) => num(v, 2) },
     ...lookbacks.map((k) => ({
       key: `r${k}`, label: `${k}w`, num: true, fmt: pctCell(1, true), sortValue: (row) => row[`r${k}`],
     })),
     { key: "held", label: "Held", fmt: (v) => (v ? "●" : "") },
   ];
-  const rows = latest.rows.map((row) => ({ ...row, ...Object.fromEntries(lookbacks.map((k) => [`r${k}`, row.returns[k]])) }));
+  const rows = latest.rows.map((row) => ({ ...row, reason: signalReason(row, cfg), ...Object.fromEntries(lookbacks.map((k) => [`r${k}`, row.returns[k]])) }));
   const panel = $('[data-panel="signal"]');
   const openRows = r.open_positions;
   const openTable = openRows.length
     ? `<h2 style="margin-top:18px">Open positions</h2><div id="open-positions"></div>` : "";
   renderTable(panel, columns, rows, {
     sortKey: "rank", sortDir: 1, sortable: true,
-    before: `<p class="explain"><b>As of ${fmtDate(latest.week)}.</b> ${esc(latest.explain)}</p>`,
+    before: `<h3>Signals as of ${fmtDate(latest.week)}</h3><p class="explain">${esc(latest.explain)}</p>`,
     rowClass: (row) => (row.held ? "held" : ""),
   });
   panel.insertAdjacentHTML("beforeend", openTable);
   if (openRows.length) {
     renderTable($("#open-positions"), [
-      { key: "asset", label: "ETF", fmt: assetCell },
+      { key: "asset", label: ({ etf: "ETF", stock: "Stock", custom_index: "Category", broad: "Asset" })[cfg.dataset] || "Asset", fmt: assetCell },
       { key: "entry_week", label: "Since", fmt: fmtDate },
       { key: "weeks_held", label: "Weeks", num: true, fmt: (v) => num(v, 0) },
       { key: "rank", label: "Rank now", num: true, fmt: (v) => num(v, 0) },
@@ -1603,21 +1887,55 @@ function addRun(cfg, r) {
   runs = runs.slice(0, MAX_RUNS);
   saveRuns();
 }
-function renderRuns() {
+function renderRuns(panel = $('[data-panel="runs"]')) {
   $("#runs-count").textContent = runs.length ? `(${runs.length})` : "";
-  const panel = $('[data-panel="runs"]');
   if (!runs.length) { panel.innerHTML = `<p class="explain">Runs you make appear here.</p>`; return; }
-  panel.innerHTML = `<p class="explain">Tick <b>Overlay</b> to draw an earlier run on the main chart (dashed). The newest run is always drawn.</p>
+  const current = runs[0];
+  const comparison = runs.find((run) => run.id === compareRunId && run.id !== current.id) || runs[1];
+  const metrics = [
+    ["CAGR", "cagr", (v) => pct(v)], ["Edge vs benchmark", "excess", (v) => `${v > 0 ? "+" : ""}${num(v * 100, 1)} pp`],
+    ["Max drawdown", "max_drawdown", (v) => pct(v)], ["Sharpe", "sharpe", (v) => num(v, 2)],
+    ["Annual turnover", "turnover", (v) => pct(v, 0)],
+  ];
+  const settings = [
+    ["Universe", "universe", (v) => `${v?.length ?? 0} instruments${v?.length ? ` (${v.slice(0, 3).join(", ")}${v.length > 3 ? ", …" : ""})` : ""}`],
+    ["Period", "start", (_, c) => `${c.start} → ${c.end}`],
+    ["Rebalance", "rebalance", (v) => v], ["Portfolio", "portfolio", (v) => v],
+    ["Top N / exit rank", "top_n", (_, c) => `${c.top_n} / ${c.exit_rank}`],
+    ["Entry", "entry", (v) => v], ["Position cap", "max_position", (v) => v == null ? "None" : pct(v, 0)],
+    ["Lookbacks", "lookbacks", (_, c) => `${c.lookbacks?.join("/")} weeks · weights ${c.weights?.join("/")}`],
+    ["Crash protection", "defensive", (v, c) => v === "filter" ? `Cash filter, ${c.filter_lookback} weeks` : v],
+    ["Cost model", "cost_model", (v, c) => v === "itemised" ? "Itemised" : `${c.cost_pct}% per side`],
+    ["Ranking score", "score", (v) => v || "ranksum"],
+    ["Price basis", "track", (v, c) => c.dataset === "etf" ? `${v} · ${c.execution}` : "Direct price"],
+    ["Tax", "tax", (v, c) => v ? `After tax, ${Math.round(c.slab_rate * 100)}% slab` : "Pre-tax"],
+    ["Category mode", "broad_category_mode", (v, c) => c.dataset === "broad" ? v : "—"],
+    ["Broad pool", "broad_pool_top_n", (_, c) => c.dataset === "broad" ? `${c.broad_pool_top_n} / ${c.broad_pool_exit_rank}` : "—"],
+    ["Broad category rule", "broad_category_top_n", (_, c) => c.dataset === "broad" ? `${c.broad_category_top_n} / ${c.broad_category_exit_rank} · ${c.broad_picks_per_category} stocks each` : "—"],
+    ["Broad direct stocks", "broad_off_top_n", (_, c) => c.dataset === "broad" ? `${c.broad_off_top_n} / ${c.broad_off_exit_rank}` : "—"],
+  ];
+  const comparisonHtml = comparison ? `<div class="compare-controls"><label>Compare current run with
+      <select id="compare-run">${runs.slice(1).map((run) => `<option value="${esc(run.id)}" ${run.id === comparison.id ? "selected" : ""}>${esc(run.name || `Run ${run.n}`)}</option>`).join("")}</select></label></div>
+    <div class="compare-table-wrap"><table class="data compare-table"><thead><tr><th>Metric</th><th>${esc(current.name || `Run ${current.n}`)}</th><th>${esc(comparison.name || `Run ${comparison.n}`)}</th></tr></thead>
+    <tbody>${metrics.map(([label, key, format]) => `<tr><th>${label}</th><td class="num">${format(current.kpis[key])}</td><td class="num">${format(comparison.kpis[key])}</td></tr>`).join("")}</tbody></table></div>
+    <h3>Settings that differ</h3><div class="setting-diffs">${settings.filter(([, key, format]) => key === "universe" ? JSON.stringify(current.config.universe) !== JSON.stringify(comparison.config.universe) : format(current.config[key], current.config) !== format(comparison.config[key], comparison.config))
+      .map(([label, key, format]) => `<p><b>${label}</b><span>${esc(format(current.config[key], current.config))} → ${esc(format(comparison.config[key], comparison.config))}</span></p>`).join("") || "<p>Key settings match.</p>"}</div>` : "<p class=\"explain\">Run another configuration to compare performance and settings.</p>";
+  panel.innerHTML = `${comparisonHtml}<h3>Saved runs</h3><p class="explain">Name a run to find it later. Select Overlay to draw it on the Overview chart.</p>
     <div class="runs">${runs.map((run, i) => `
       <div class="run-row">
-        <input type="checkbox" data-overlay="${run.id}" ${run.overlay ? "checked" : ""} ${i === 0 ? "disabled title=\"The current run\"" : "title=\"Overlay\""}>
-        <div><span class="swatch" style="background:${run.color}"></span><b>Run ${run.n}</b>${i === 0 ? " (current)" : ""}
+        <label class="overlay-control"><input type="checkbox" data-overlay="${run.id}" ${run.overlay ? "checked" : ""} ${i === 0 ? "disabled" : ""}> Overlay</label>
+        <div><span class="swatch" style="background:${run.color}"></span><input class="run-name" type="text" aria-label="Name for run ${run.n}" data-name="${run.id}" value="${esc(run.name || `Run ${run.n}`)}" maxlength="64">${i === 0 ? " (current)" : ""}
           <div class="stats">${esc(run.title)}</div>
           <div class="stats">CAGR <b>${pct(run.kpis.cagr)}</b> · edge ${pct(run.kpis.excess, 1, true)} · max DD ${pct(run.kpis.max_drawdown)} ·
             Sharpe ${num(run.kpis.sharpe, 2)} · churn ${pct(run.kpis.turnover, 0)} · ${num(run.kpis.holdings)} held</div></div>
         <div><button type="button" class="ghost" data-load="${run.id}">Load settings</button>
           <button type="button" class="ghost" data-remove="${run.id}">Remove</button></div>
       </div>`).join("")}</div>`;
+  $("#compare-run", panel)?.addEventListener("change", (e) => { compareRunId = e.target.value; renderRuns(panel); });
+  $$("[data-name]", panel).forEach((input) => input.addEventListener("change", () => {
+    const run = runs.find((item) => item.id === input.dataset.name);
+    if (run) { run.name = input.value.trim() || `Run ${run.n}`; saveRuns(); renderRuns(panel); }
+  }));
   $$("[data-overlay]", panel).forEach((c) => c.addEventListener("change", () => {
     const run = runs.find((x) => x.id === c.dataset.overlay);
     run.overlay = c.checked;
@@ -1626,12 +1944,13 @@ function renderRuns() {
   }));
   $$("[data-load]", panel).forEach((b) => b.addEventListener("click", () => {
     applyConfig({ ...defaultConfig(), ...runs.find((x) => x.id === b.dataset.load).config });
+    showAppView("backtest");
     window.scrollTo({ top: 0 });
   }));
   $$("[data-remove]", panel).forEach((b) => b.addEventListener("click", () => {
     runs = runs.filter((x) => x.id !== b.dataset.remove);
     saveRuns();
-    renderRuns();
+    renderRuns(panel);
     if (lastResult) renderMainChart(lastResult);
   }));
 }

@@ -63,6 +63,59 @@ grants for fresh sessions — at that point, `create_trigger` with `create_new_s
 and `connectors=["AlgoTest"]` is the design to switch to; no ingest logic changes, only how the
 Routine is registered.
 
+## Fyers collector is forward-only, concrete-contract, 1-minute — 2026-09-29
+
+`fyers/` (`obt fyers fetch`) is a second data source alongside AlgoTest, added for daily
+1-minute backtests across NIFTY, BANKNIFTY, MIDCPNIFTY, FINNIFTY and SENSEX with India VIX.
+Verified live on 2026-09-29 before building anything on it:
+
+- **Expired contracts are gone.** A NIFTY weekly that expired 2026-09-22 returns
+  "Invalid symbol provided" for any date; the public symbol master stops listing it too. A
+  contract must therefore be captured **on its expiry day, the same evening** — a missed expiry
+  day is unrecoverable. Collected data is the only copy; back it up.
+- **Live contracts have history.** A still-listed contract returns 1m bars for earlier days
+  (the 2026-10-06 NIFTY weekly served 2026-09-25), so a missed *non*-expiry day can be caught up
+  with `--date`, minus whatever expired in between.
+- **Index symbols return every minute twice** (identical rows) — de-duplicated by epoch in
+  `fyers/client.py`. Option bars run 09:15-15:39 (the master lists the F&O session as 0915-1540);
+  stored as-is, the engine should restrict itself to 09:15-15:29.
+- Unlike AlgoTest (strike-relative only, see "Phase-1 deviation" above), Fyers serves exact
+  contracts, so this data is concrete-contract by construction — the gap that section says to
+  revisit "when a REST transport is wired".
+
+Expiries collected (owner's choice): NIFTY and SENSEX current + next weekly; BANKNIFTY,
+MIDCPNIFTY, FINNIFTY current monthly, plus the next monthly on the monthly expiry day itself.
+
+Width is data-driven, not a fixed ±N: every strike inside the day's index low-high, then walk
+outward until the OTM leg's intraday high stays under `--premium-floor` (₹2) for two strikes in
+a row, capped at `--max-extra` (60) per side. The per-side widths land in
+`manifest/<date>.json` so the floor can be tuned once the real strategies are written.
+
+Storage is Parquet under `FYERS_DATA_DIR` (default `data/fyers/`, gitignored) rather than a
+database server — the owner wants it local now and on an external disk later, which is then a
+one-env-var move, and DuckDB already reads this layout for the AlgoTest cache.
+
+## Leg-wise engine is separate from `engine/`, schema mirrors AlgoTest — 2026-09-29
+
+The owner's four daily strategies are AlgoTest strategies: per-leg SL/target/trail SL, per-leg
+re-entry (RE COST), a per-leg range-breakout entry on the option's own premium, closest-premium
+strikes, mixed buy/sell, and an overall MTM stop. `engine/loop.py` sums every leg into ONE
+premium series with ONE side and is pinned to the golden fixture to the rupee, so none of that
+fits without rewriting it. `legwise/` is a separate minute-by-minute state machine over the Fyers
+1-minute concrete-contract data instead; the golden-fixture engine is untouched.
+
+The YAML schema (`legwise/schema.py`) mirrors AlgoTest's strategy page field for field so a PDF or
+screen transcribes directly, and `extra="forbid"` rejects any AlgoTest setting not implemented
+yet (simple momentum, overall re-entry/trailing, RE MOMENTUM, trail SL to break-even, BTST) rather
+than silently ignoring it. `range_breakout.source`, not `on` — YAML 1.1 parses a bare `on` key as
+the boolean `true`.
+
+Every intrabar-ordering assumption (entry at the open of the entry minute, SL before trail within
+a bar, no SL check on an intrabar-entry bar, overall MTM at bar closes including realised P&L,
+closest-premium tie to the lower premium) is listed in `legwise/engine.py`'s docstring. They are
+best guesses from AlgoTest's docs, not verified: comparing trade logs against AlgoTest's own
+backtest of the same strategies over the same days (TODO 3.10.7) is what settles them.
+
 ## Other boring choices
 
 - **CSV, not JSON, for reference tables.** Matches the original design (`reference/*.csv`) and

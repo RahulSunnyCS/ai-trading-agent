@@ -977,6 +977,17 @@ def _custom_index_backtest(req: BacktestRequest) -> dict:
     return payload
 
 
+def _membership_quality() -> dict:
+    """Report years using the current constituent list in place of historical membership."""
+    path = DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME
+    try:
+        membership = pd.read_csv(path, usecols=["year", "source_tier"])
+    except (OSError, ValueError):
+        return {"constant_current_years": []}
+    years = membership.loc[membership["source_tier"] == "constant_current", "year"]
+    return {"constant_current_years": sorted(int(year) for year in years.unique())}
+
+
 def _broad_meta() -> dict:
     """"Broad Momentum" tab (TODO.md 3.9.13): no per-instrument sidebar picker the way the other
     three datasets have (there are 755 stocks + 113 categories + 4 atomics -- which of them are
@@ -994,6 +1005,7 @@ def _broad_meta() -> dict:
         "last_week": prices.index[-1].strftime("%Y-%m-%d"),
         "cash": CASH,
         "benchmarks": [BENCHMARK],
+        "membership_quality": _membership_quality(),
         "defaults": {
             "start": "2017-01-01",
             "benchmark": BENCHMARK,
@@ -1066,6 +1078,7 @@ def _momentum_scores_payload() -> dict:
         "lookbacks": list(stock_snapshot.lookbacks),
         "universe_size": stock_snapshot.universe_size,
         "missing_symbols": universe.missing_symbols,
+        "membership_quality": _membership_quality(),
         "stocks": [
             {
                 "symbol": r.symbol,

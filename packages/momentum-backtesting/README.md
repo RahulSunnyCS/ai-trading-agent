@@ -169,15 +169,20 @@ Then:
 uv run mbt ui        # opens http://127.0.0.1:8765 - local only, reads data/weekly_closes.csv
 ```
 
-Pick which ETFs to rank, the date range, the lookbacks and their weights (e.g. the "recency
-tilt" preset 1.5/1.25/1/1/0.8), top N and sell rank, the portfolio rule, crash protection,
-costs, signal delay, tax and the benchmark. Results: KPI cards (CAGR, edge, drawdown, Sharpe,
-churn, exits, holding time, win rate, largest position), a growth chart with a dot on every
-rotation week - hover it to see what was sold (weeks held, return, why), what was bought or
-topped up, and what's held after - plus drawdown and trailing 52-week edge, and tabs for this
-week's signal, trades (CSV), a holdings timeline, per-ETF attribution, yearly returns and the
-benchmark's worst falls. Recent runs are kept and can be overlaid on the chart. The charting
-library is downloaded once into `data/vendor/`, after which the UI works offline.
+The header keeps Backtest, Momentum Scores, and Saved runs available on every screen. The
+Backtest strategy selector switches between ETF, Nifty 50 stock, Custom Index, and Broad Momentum.
+Backtest settings are grouped by decision, with summaries on collapsed
+panels and validation beside the affected control. They include the universe, period, lookbacks
+and weights, portfolio rule, protection, execution, costs, tax, and benchmark. The results first show value,
+CAGR, benchmark edge, drawdown, and Sharpe; the other metrics are expandable. Results retain
+their original settings and warn when the form has changed. Overview shows growth, drawdown,
+and trailing 52-week edge; focused result views cover overview and yearly returns, holdings and
+signals with per-asset reasons, trades (CSV), risk, and comparison. Saved runs can be named, compared side by
+side, and overlaid on the chart. Momentum Scores has searchable stock and sector tables,
+sector and score filters, a score guide, and a stock detail panel. Data notes disclose incomplete history,
+proxy fills, excluded symbols, and current-constituent fallbacks when applicable. On narrow screens, settings open in
+a drawer while a Run button stays accessible. The charting library is downloaded once into `data/vendor/`, after which the UI
+works offline.
 
 ## Portfolio rules
 

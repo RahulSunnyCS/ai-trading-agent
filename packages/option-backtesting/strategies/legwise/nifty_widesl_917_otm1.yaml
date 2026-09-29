@@ -1,0 +1,28 @@
+# AlgoTest "Nifty_Widesl_917_OTM1" — transcribed from the owner's AlgoTest export
+# (algotest_strategy_Nifty_Widesl_917_OTM1_2026-09-22). Short OTM1 strangle at
+# 09:17, wide 115% SL per leg trailed 15/10, ₹2,500 overall max loss.
+strategy:
+  id: nifty_widesl_917_otm1
+  underlying: NIFTY
+  entry_time: "09:17"
+  exit_time: "15:28"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: sell
+      option_type: CE
+      expiry: weekly
+      strike: { strike_type: OTM1 }
+      stop_loss: { percent: 115 }
+      trail_sl: { points: [15, 10] }
+    - id: pe
+      lots: 1
+      position: sell
+      option_type: PE
+      expiry: weekly
+      strike: { strike_type: OTM1 }
+      stop_loss: { percent: 115 }
+      trail_sl: { points: [15, 10] }
+  overall:
+    stop_loss_inr: 2500

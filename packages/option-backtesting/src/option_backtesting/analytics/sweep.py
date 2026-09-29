@@ -62,9 +62,7 @@ def run_sweep(
     date_to: date,
 ) -> SweepReport:
     if not changes_list:
-        raise ValueError(
-            "run_sweep needs at least one change-dict — an empty sweep tests nothing."
-        )
+        raise ValueError("run_sweep needs at least one change-dict — an empty sweep tests nothing.")
 
     base_data = yaml.safe_load(base_yaml_text)
     configs: list[SweepConfigResult] = []

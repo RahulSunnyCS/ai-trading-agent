@@ -11,3 +11,7 @@ __pycache__/
 
 # uv
 uv.lock.bak
+
+# Fyers 1-minute collector output — cannot be re-downloaded once contracts expire.
+# Lives outside git; back it up (FYERS_DATA_DIR can point at an external disk).
+data/fyers/

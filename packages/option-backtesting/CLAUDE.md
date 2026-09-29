@@ -67,6 +67,11 @@ Otherwise:
 - `export/personality.py` — `StrategySpec` → `PersonalityConfigM2`
   candidate; unrepresentable DSL constructs go under `manual_review`, never
   guessed, and this never writes to any database.
+- `fyers/` — the daily 1-minute Fyers collector (`obt fyers status|fetch`): `auth.py`
+  (token resolution — env, `FYERS_TOKEN_FILE`, then **reads `packages/momentum-backtesting`'s
+  `mbt login` token file off disk**, same JSON shape, no code import), `client.py` (throttled
+  history client), `symbols.py` (public symbol master), `daily.py` (range + adaptive-width
+  collection → Parquet under `FYERS_DATA_DIR`). Forward-only — see `DECISIONS.md`.
 - `analytics/regime_source.py` — reads `daily_regime_tags` from Postgres,
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`
@@ -81,4 +86,6 @@ uv sync
 ./scripts/build-cache.sh   # REQUIRED on a fresh clone before pytest
 uv run pytest
 uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
+uv run obt fyers status                 # token source + data dir
+uv run obt fyers fetch                  # today's 1m data — run the SAME evening
 ```

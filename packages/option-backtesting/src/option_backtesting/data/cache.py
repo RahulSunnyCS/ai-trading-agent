@@ -35,12 +35,7 @@ class Cache:
         rule_part = strike_rule or "na"
         leg_part = leg or "na"
         return (
-            self._dir
-            / underlying
-            / timeframe
-            / data_kind
-            / f"{rule_part}_{leg_part}"
-            / "*.parquet"
+            self._dir / underlying / timeframe / data_kind / f"{rule_part}_{leg_part}" / "*.parquet"
         ).as_posix()
 
     def get_opt_bars(

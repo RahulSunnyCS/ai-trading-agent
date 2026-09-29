@@ -108,8 +108,7 @@ def run_backtest(
         return {
             "error": "no_data",
             "message": (
-                f"No cached sessions for {loaded.strategy.universe.underlying} "
-                f"in [{start}, {end}]"
+                f"No cached sessions for {loaded.strategy.universe.underlying} in [{start}, {end}]"
             ),
         }
 
@@ -142,9 +141,7 @@ def run_backtest(
         ],
     }
     if bootstrap:
-        ci = bootstrap_ci(
-            [s.net for s in sessions], [s.lot_days for s in sessions], seed=seed
-        )
+        ci = bootstrap_ci([s.net for s in sessions], [s.lot_days for s in sessions], seed=seed)
         out["bootstrap"] = {
             "net_lo": ci.net_lo,
             "net_hi": ci.net_hi,

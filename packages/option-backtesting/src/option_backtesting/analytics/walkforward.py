@@ -80,8 +80,7 @@ def render_walkforward(result: WalkForwardResult) -> str:
         f"{result.out_of_sample_to}] ===",
         render_report(result.out_of_sample),
         "",
-        f"--- in-sample (reference only) [{result.in_sample_from} .. "
-        f"{result.in_sample_to}] ---",
+        f"--- in-sample (reference only) [{result.in_sample_from} .. {result.in_sample_to}] ---",
         render_report(result.in_sample),
     ]
     return "\n".join(lines)

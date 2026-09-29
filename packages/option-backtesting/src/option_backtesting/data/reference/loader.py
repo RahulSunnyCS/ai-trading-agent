@@ -199,9 +199,7 @@ class ReferenceData:
             candidate = _last_weekday_of_month(as_of.year, as_of.month, row.weekday)
             if candidate < as_of:
                 year, month = (
-                    (as_of.year, as_of.month + 1)
-                    if as_of.month < 12
-                    else (as_of.year + 1, 1)
+                    (as_of.year, as_of.month + 1) if as_of.month < 12 else (as_of.year + 1, 1)
                 )
                 candidate = _last_weekday_of_month(year, month, row.weekday)
             return candidate

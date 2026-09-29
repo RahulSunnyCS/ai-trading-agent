@@ -3,7 +3,9 @@
 
 M-1 implements `ingest plan` and `ingest`. M-2 implements `validate`. M-3
 implements `run` and `registry`. M-5 adds `walkforward`, `sweep` (with
-`--overfit`), and `export-personality`.
+`--overfit`), and `export-personality`. `fyers status|fetch` is the daily
+1-minute Fyers collector (see `fyers/daily.py`); `legwise run` backtests
+AlgoTest-style strategies over that data (see `legwise/`).
 """
 
 from __future__ import annotations
@@ -22,6 +24,10 @@ from .engine.registry import DEFAULT_REGISTRY_DB
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 ingest_app = typer.Typer(no_args_is_help=True)
 app.add_typer(ingest_app, name="ingest")
+fyers_app = typer.Typer(no_args_is_help=True, help="Daily 1-minute Fyers collector.")
+app.add_typer(fyers_app, name="fyers")
+legwise_app = typer.Typer(no_args_is_help=True, help="AlgoTest-style leg-wise backtests.")
+app.add_typer(legwise_app, name="legwise")
 
 
 def _underlyings(value: str) -> list[str]:
@@ -339,6 +345,95 @@ def export_personality_cmd(
         "manual_review": export.manual_review,
     }
     typer.echo(json.dumps(output, indent=2))
+
+
+@fyers_app.command("status")
+def fyers_status() -> None:
+    """Where today's Fyers token comes from and where data is written (never prints the token)."""
+    from .fyers.auth import FyersCredentialsError, resolve_credentials
+    from .fyers.daily import data_dir
+
+    typer.echo(f"data dir: {data_dir()}")
+    try:
+        creds = resolve_credentials()
+    except FyersCredentialsError as error:
+        typer.echo(f"token: not ready - {error}")
+        raise typer.Exit(1) from None
+    expiry = f", expires {creds.expires_at:%Y-%m-%d %H:%M %Z}" if creds.expires_at else ""
+    typer.echo(f"token: ok, from {creds.source}{expiry}")
+
+
+@fyers_app.command("fetch")
+def fyers_fetch(
+    day: str = typer.Option(date.today().isoformat(), "--date", help="Trading day, YYYY-MM-DD."),
+    underlyings: str = typer.Option(
+        "NIFTY,BANKNIFTY,MIDCPNIFTY,FINNIFTY,SENSEX", help="Comma-separated underlyings."
+    ),
+    premium_floor: float = typer.Option(
+        2.0, help="Keep walking outward while the OTM leg's intraday high is at least this (Rs)."
+    ),
+    max_extra: int = typer.Option(
+        60, help="Cap on strikes fetched beyond the day's range, per side."
+    ),
+    force: bool = typer.Option(False, help="Re-fetch underlyings already collected for this day."),
+) -> None:
+    """Collect one day's 1-minute index, VIX, future and option candles. Run it the same
+    evening: contracts expiring that day cannot be fetched once they have expired."""
+    from .fyers.auth import FyersCredentialsError, resolve_credentials
+    from .fyers.client import FyersClient
+    from .fyers.daily import UNDERLYINGS, collect_day, data_dir
+
+    names = _underlyings(underlyings)
+    unknown = [u for u in names if u not in UNDERLYINGS]
+    if unknown:
+        raise typer.BadParameter(f"unknown underlyings {unknown}; known: {sorted(UNDERLYINGS)}")
+    trading_day = date.fromisoformat(day)
+    if trading_day < date.today():
+        typer.echo(
+            "warning: the symbol master only lists live contracts - anything that expired "
+            f"between {trading_day} and today is missing from this run."
+        )
+    try:
+        client = FyersClient(resolve_credentials())
+        manifest = collect_day(
+            client,
+            trading_day,
+            names,
+            data_dir(),
+            premium_floor=premium_floor,
+            max_extra=max_extra,
+            force=force,
+            log=typer.echo,
+        )
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    errors = sum(len(v.get("errors", [])) for v in manifest.values() if isinstance(v, dict))
+    typer.echo(f"done: {client.calls} requests, {errors} errors -> {data_dir()}")
+    if errors:
+        raise typer.Exit(2)
+
+
+@legwise_app.command("run")
+def legwise_run(
+    strategies: list[Path] = typer.Argument(..., help="Leg-wise strategy YAML file(s)."),
+    from_: str | None = typer.Option(None, "--from", help="First day, YYYY-MM-DD."),
+    to: str | None = typer.Option(None, "--to", help="Last day, YYYY-MM-DD."),
+    trades: bool = typer.Option(False, "--trades", help="List every trade."),
+) -> None:
+    """Backtest leg-wise strategies over the collected Fyers 1-minute days."""
+    from .fyers.daily import data_dir
+    from .legwise.engine import run_legwise
+    from .legwise.report import day_table
+    from .legwise.schema import load_legwise
+
+    start = date.fromisoformat(from_) if from_ else None
+    end = date.fromisoformat(to) if to else None
+    for path in strategies:
+        strategy = load_legwise(path)
+        days = run_legwise(strategy, data_dir(), start, end)
+        typer.echo(day_table(strategy.id, days, show_trades=trades))
+        typer.echo("")
 
 
 def main() -> None:

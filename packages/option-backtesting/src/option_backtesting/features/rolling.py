@@ -22,9 +22,7 @@ from datetime import date
 from ..features.registry import EwmaFeature, RollingMeanFeature, RollingPctileFeature
 
 
-def _window(
-    days: int, lag: int, ordered_dates: list[date], i: int
-) -> list[date] | None:
+def _window(days: int, lag: int, ordered_dates: list[date], i: int) -> list[date] | None:
     end_inclusive = i - lag
     start_inclusive = end_inclusive - days + 1
     if start_inclusive < 0:
