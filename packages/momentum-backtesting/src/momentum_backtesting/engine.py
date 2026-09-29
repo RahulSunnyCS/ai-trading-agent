@@ -59,6 +59,19 @@ PortfolioRule = Literal["buffer", "slots"]
 EntryRule = Literal["wait", "make_room"]
 Track = Literal["index", "etf"]
 Execution = Literal["fri_close", "mon_open", "mon_10am"]
+Score = Literal["ranksum", "voladj", "blend"]
+Rebalance = Literal["weekly", "monthly"]
+CostModel = Literal["flat", "itemised"]
+
+# Itemised cost model (cost_model="itemised"): NSE cash-market equity-delivery rates, India, as
+# best I could verify (SEBI/NSE schedules + broker rate cards) - "settings, not facts", same
+# caveat as tax.py's rates. Every rate is a fraction of trade value except the DP charge, which
+# is a flat per-sell rupee amount converted to a fraction via `config.capital`.
+STT_RATE = 0.001  # Securities Transaction Tax, 0.1% each side on equity delivery
+STAMP_DUTY_BUY_RATE = 0.00015  # stamp duty, 0.015%, buy side only
+EXCHANGE_FEES_RATE = 0.00004  # exchange transaction charge + SEBI fee + GST, ~0.004% each side
+DP_CHARGE_RS = 16.0  # flat depository participant charge per SELL (approx.; varies by DP)
+DP_CHARGE_FRACTION_CAP = 0.05  # cap so a dust-sized sell doesn't get an absurd cost fraction
 
 
 @dataclass(frozen=True)
@@ -89,11 +102,54 @@ class Config:
     # above the cap don't cause a trade (and a tax bill) every week.
     max_position: float | None = 0.35
     cap_band: float = 0.05
+    # Buffer rule only. Shrinks how much of each week's freshly available cash goes into new/
+    # top-up buys when recent closed trades have mostly lost, ramping back to full size as they
+    # recover. See _win_rate_multiplier. Off by default - opt-in.
+    momentum_sizing: bool = False
+    # momentum_sizing only. How many of the most-recent closed trades feed the weighted win-rate
+    # score (weights count down from `momentum_sizing_window` to 1 - see _win_rate_multiplier).
+    # A shorter window reacts faster to a fresh streak but is noisier; a longer one is steadier
+    # but slower to recover after a bad patch.
+    momentum_sizing_window: int = 10
+    # momentum_sizing only. Floor on the multiplier - 0.0 means an all-loss recent streak can
+    # deploy nothing (full cash); a higher floor (e.g. 0.3) keeps at least that fraction invested
+    # even at the worst recent win rate, for a less aggressive de-risking curve.
+    momentum_sizing_floor: float = 0.0
+    # Buffer rule only (TODO.md 3.9.20). A SEPARATE, independently-toggled de-risking response
+    # from momentum_sizing above: instead of a rolling win/loss tally (found to be a diluted,
+    # noisy signal across many idiosyncratic per-position closes - see momentum_sizing's own
+    # rejection note in TODO.md 3.9.8), this reacts to a synchronized MASS exit - more than half
+    # of what was held coming into a week dropping out in that same week's own ranking, a
+    # coherent portfolio-wide breadth signal. The set of weeks this fired on is per-run computed
+    # data, not a setting - it's passed to `run_backtest`'s own `mass_exit_weeks` argument (same
+    # reasoning as `external_ranks`/`trade_prices`/`membership`), never stored on `Config`. Off
+    # by default - opt-in, like momentum_sizing. See categories/broad.py's
+    # `compute_category_selection_mass_exit` for how the trigger itself is detected (that same
+    # function also implements the OTHER response variant, "halve_top_n", entirely outside
+    # engine.py - see its own docstring for why that needs no Config field at all).
+    mass_exit_throttle: bool = False
+    # mass_exit_throttle only. Fraction of that week's fresh capital withheld into cash on a
+    # flagged week (0.5 = deploy half, park the rest - the brief's own "under-deploy fresh
+    # capital" example). Stacks with momentum_sizing if both happen to be on: applied to whatever
+    # is left after momentum_sizing's own reservation, not to the original `proceeds`.
+    mass_exit_throttle_fraction: float = 0.5
     # What P&L is measured on (the ranking always uses the index): the index itself, or the ETF
     # you'd actually trade. And when the trade fills. Anything but index + fri_close needs
     # `trade_prices` passed to run_backtest.
     track: Track = "index"
     execution: Execution = "fri_close"
+    # Ranking method: ranksum (today's weighted-rank-sum of return lookbacks), voladj (NSE-style
+    # risk-adjusted 6m/12m z-score composite), or blend (average of the two ranks, re-ranked).
+    score: Score = "ranksum"
+    voladj_skip_recent_month: bool = True  # voladj/blend only
+    # Trade only on the last week-in-`weeks` of each calendar month (rebalance="monthly"); the
+    # weekly mark-to-market/hold step always runs regardless of this setting.
+    rebalance: Rebalance = "weekly"
+    # flat = cost_pct on both sides (today's model, unchanged). itemised = STT/stamp duty/
+    # exchange fees/slippage/DP charge - see the rate constants above `Config`.
+    cost_model: CostModel = "flat"
+    capital: float = 1_000_000.0  # itemised cost_model only: sizes the flat per-sell DP charge
+    slippage_bps: float = 5.0  # itemised cost_model only
 
     def __post_init__(self) -> None:
         if self.weights is not None and len(self.weights) != len(self.lookbacks):
@@ -116,6 +172,22 @@ class Config:
             raise ValueError(f"unknown track {self.track!r}")
         if self.execution not in ("fri_close", "mon_open", "mon_10am"):
             raise ValueError(f"unknown execution {self.execution!r}")
+        if self.score not in ("ranksum", "voladj", "blend"):
+            raise ValueError(f"unknown score {self.score!r}")
+        if self.rebalance not in ("weekly", "monthly"):
+            raise ValueError(f"unknown rebalance {self.rebalance!r}")
+        if self.cost_model not in ("flat", "itemised"):
+            raise ValueError(f"unknown cost_model {self.cost_model!r}")
+        if self.capital <= 0:
+            raise ValueError("capital must be positive")
+        if self.slippage_bps < 0:
+            raise ValueError("slippage_bps can't be negative")
+        if self.momentum_sizing_window < 1:
+            raise ValueError("momentum_sizing_window must be at least 1")
+        if not 0 <= self.momentum_sizing_floor <= 1:
+            raise ValueError("momentum_sizing_floor must be between 0 and 1")
+        if not 0 <= self.mass_exit_throttle_fraction <= 1:
+            raise ValueError("mass_exit_throttle_fraction must be between 0 and 1")
 
     @property
     def needs_trade_prices(self) -> bool:
@@ -126,9 +198,12 @@ class Config:
         cap = f"-cap{round(self.max_position * 100)}" if self.max_position else ""
         rule = f"buffer-{self.entry}{cap}" if self.portfolio == "buffer" else "slots"
         fills = f"_{self.track}-{self.execution}" if self.needs_trade_prices else ""
+        score = f"_{self.score}" if self.score != "ranksum" else ""
+        rebalance = f"_{self.rebalance}" if self.rebalance != "weekly" else ""
+        cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
-            f"lb{'-'.join(map(str, self.lookbacks))}{fills}"
+            f"lb{'-'.join(map(str, self.lookbacks))}{fills}{score}{rebalance}{cost_model}"
         )
 
 
@@ -169,7 +244,36 @@ def ranked_universe(names: dict[str, str], config: Config) -> list[str]:
 
 
 def compute_ranks(prices: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """(final rank, composite score) per instrument per week. Only uses prices up to each week."""
+    """(final rank, composite score) per instrument per week. Only uses prices up to each week.
+    Dispatches on `config.score`; see _compute_ranks_{ranksum,voladj,blend} below."""
+    if config.score == "ranksum":
+        return _compute_ranks_ranksum(prices, config)
+    if config.score == "voladj":
+        return _compute_ranks_voladj(prices, config)
+    return _compute_ranks_blend(prices, config)
+
+
+def _rank_from_score(
+    score: pd.DataFrame, tie_break: pd.DataFrame | None, higher_is_better: bool
+) -> pd.DataFrame:
+    """Convert a per-week score into ascending ranks 1..N (1 = best), skipping instruments whose
+    score is NaN that week. Ties are broken by `tie_break` (higher wins) if given, then by name."""
+    sign = -1 if higher_is_better else 1
+    final = pd.DataFrame(index=score.index, columns=score.columns, dtype=float)
+    for week in score.index:
+        row = score.loc[week].dropna()
+        if tie_break is None:
+            order = sorted(row.index, key=lambda n: (sign * row[n], n))
+        else:
+            order = sorted(row.index, key=lambda n: (sign * row[n], -tie_break.at[week, n], n))
+        final.loc[week, order] = range(1, len(order) + 1)
+    return final
+
+
+def _compute_ranks_ranksum(
+    prices: pd.DataFrame, config: Config
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Today's default: weighted sum of per-lookback ranks (1 = best return); lowest score wins."""
     weights = config.weights or tuple(1.0 for _ in config.lookbacks)
     returns = {k: prices / prices.shift(k) - 1 for k in config.lookbacks}
     eligible = functools.reduce(operator.and_, (r.notna() for r in returns.values()))
@@ -183,12 +287,50 @@ def compute_ranks(prices: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, p
     # Ties on score are broken by the middle lookback's return, then by name, so a run is
     # reproducible regardless of column order.
     tie_break = returns[config.lookbacks[len(config.lookbacks) // 2]]
-    final = pd.DataFrame(index=prices.index, columns=prices.columns, dtype=float)
-    for week in prices.index:
-        row = score.loc[week].dropna()
-        order = sorted(row.index, key=lambda n: (row[n], -tie_break.at[week, n], n))
-        final.loc[week, order] = range(1, len(order) + 1)
+    final = _rank_from_score(score, tie_break, higher_is_better=False)
     return final, score
+
+
+def _compute_ranks_voladj(
+    prices: pd.DataFrame, config: Config
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """NSE-style volatility-adjusted momentum: 6m and 12m returns each divided by trailing 26-week
+    return volatility, cross-sectionally z-scored, then summed. Higher composite = stronger
+    momentum. `voladj_skip_recent_month` computes the returns as of 4 weeks ago (skip-the-most-
+    recent-month convention); vol itself is always the latest trailing 26-week window."""
+    s = 4 if config.voladj_skip_recent_month else 0
+    ret_6m = prices / prices.shift(s + 26) - 1
+    ret_12m = prices / prices.shift(s + 52) - 1
+    vol = prices.pct_change().rolling(26).std()
+    # Eligibility needs 52+s weeks of price history (the longer of the two lookbacks), the same
+    # idea as the ranksum path's `eligible` mask.
+    eligible = functools.reduce(operator.and_, (r.notna() for r in (ret_6m, ret_12m, vol)))
+
+    safe_vol = vol.where(vol > 0)  # 0 or NaN vol -> NaN component, never a divide-by-zero
+    comp_6m = (ret_6m / safe_vol).where(eligible)
+    comp_12m = (ret_12m / safe_vol).where(eligible)
+
+    def zscore(component: pd.DataFrame) -> pd.DataFrame:
+        # mean/std are per-week, across whatever instruments have a value that week - NaN
+        # (ineligible, or a zero-vol guard hit) is excluded automatically by pandas' skipna.
+        mean = component.mean(axis=1)
+        std = component.std(axis=1)
+        return component.sub(mean, axis=0).div(std, axis=0)
+
+    score = (zscore(comp_6m) + zscore(comp_12m)).where(eligible)
+    final = _rank_from_score(score, tie_break=ret_6m, higher_is_better=True)
+    return final, score
+
+
+def _compute_ranks_blend(prices: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Average of the ranksum and voladj final ranks (lower = better in both), re-ranked to a
+    fresh 1..N ordering. Only instruments eligible in both sub-rankings get a blended rank."""
+    ranksum_final, _ = _compute_ranks_ranksum(prices, config)
+    voladj_final, _ = _compute_ranks_voladj(prices, config)
+    both_eligible = ranksum_final.notna() & voladj_final.notna()
+    avg_rank = ((ranksum_final + voladj_final) / 2).where(both_eligible)
+    final = _rank_from_score(avg_rank, tie_break=None, higher_is_better=False)
+    return final, avg_rank
 
 
 RankCache = dict[tuple, tuple[pd.DataFrame, pd.DataFrame]]
@@ -204,11 +346,42 @@ class _Sim:
     config: Config
     ledger: TaxLedger | None
     tax_classes: dict[str, str]
+    # week x company_id booleans; an instrument absent from its columns (e.g. an ETF/benchmark)
+    # is always eligible to buy. None (default) disables the gate entirely.
+    membership: pd.DataFrame | None = None
+    # Weeks on which sells/buys may happen (rebalance="monthly" restricts this to month-end
+    # weeks; the default "weekly" is every processed week).
+    trade_weeks: frozenset[pd.Timestamp] = field(default_factory=frozenset)
     trade_rows: list[dict] = field(default_factory=list)
+    # mass_exit_throttle only (TODO.md 3.9.20) - the weeks an external, per-run computation (see
+    # categories/broad.py) flagged as a synchronized mass exit. None (default) means no such
+    # computation was supplied - `config.mass_exit_throttle` has nothing to key off and is
+    # effectively inert even if turned on, same as `membership=None` disabling that gate.
+    mass_exit_weeks: frozenset[pd.Timestamp] | None = None
 
-    @property
-    def cost(self) -> float:
-        return self.config.cost_pct / 100
+    def buy_cost(self, value_fraction: float) -> float:
+        """Cost fraction charged on a buy of size `value_fraction` of the 1.0-normalised
+        portfolio."""
+        if self.config.cost_model == "flat":
+            return self.config.cost_pct / 100
+        slippage = self.config.slippage_bps / 10000
+        return STT_RATE + STAMP_DUTY_BUY_RATE + EXCHANGE_FEES_RATE + slippage
+
+    def sell_cost(self, value_fraction: float) -> float:
+        """Cost fraction charged on a sell of size `value_fraction` of the 1.0-normalised
+        portfolio."""
+        if self.config.cost_model == "flat":
+            return self.config.cost_pct / 100
+        slippage = self.config.slippage_bps / 10000
+        return STT_RATE + EXCHANGE_FEES_RATE + slippage + self._dp_charge_fraction(value_fraction)
+
+    def _dp_charge_fraction(self, value_fraction: float) -> float:
+        """The flat per-sell DP charge, expressed as a fraction of the sold value (capped so a
+        dust-sized sell doesn't produce an absurd cost fraction)."""
+        if value_fraction <= 0:
+            return 0.0
+        fraction = DP_CHARGE_RS / (value_fraction * self.config.capital)
+        return min(fraction, DP_CHARGE_FRACTION_CAP)
 
     def price(self, asset: str, week: pd.Timestamp) -> float:
         return self.prices.at[week, CASH if asset in (_POOL, IDLE) else asset]
@@ -234,10 +407,20 @@ class _Sim:
         return None
 
     def top_names(self, week: pd.Timestamp) -> list[str]:
-        """The current top N that may be bought, best first."""
+        """The current top N that may be bought, best first. Membership-gated: an instrument
+        that's dropped out of the index this week (present in `membership`'s columns but False
+        that week) isn't offered as a new buy. An instrument absent from `membership` altogether
+        (an ETF/benchmark, or when membership tracking is off) is always eligible."""
         ranks = self.ranks.loc[week].dropna().sort_values()
-        return [
+        names = [
             n for n in ranks.index if ranks[n] <= self.config.top_n and self.passes_filter(n, week)
+        ]
+        if self.membership is None:
+            return names
+        return [
+            n
+            for n in names
+            if n not in self.membership.columns or bool(self.membership.at[week, n])
         ]
 
     def tax(self, asset: str, gain: float, held_days: int) -> float:
@@ -281,6 +464,17 @@ class _Outcome:
     idle_value: float = 0.0
 
 
+def _month_end_weeks(weeks: list[pd.Timestamp]) -> frozenset[pd.Timestamp]:
+    """Weeks that are the last-in-`weeks` for their calendar month: the next week in the list
+    falls in a different month (or year), or there is no next week."""
+    out = [
+        w
+        for i, w in enumerate(weeks)
+        if i == len(weeks) - 1 or (weeks[i + 1].year, weeks[i + 1].month) != (w.year, w.month)
+    ]
+    return frozenset(out)
+
+
 def run_backtest(
     prices: pd.DataFrame,
     includes: dict[str, str],
@@ -288,10 +482,35 @@ def run_backtest(
     tax_classes: dict[str, str] | None = None,
     rank_cache: RankCache | None = None,
     trade_prices: pd.DataFrame | None = None,
+    membership: pd.DataFrame | None = None,
+    external_ranks: tuple[pd.DataFrame, pd.DataFrame] | None = None,
+    mass_exit_weeks: frozenset[pd.Timestamp] | None = None,
 ) -> Result:
     """`rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ.
     `trade_prices` (signal week x instrument) is what trades fill at and holdings are valued
-    at; None means the signal prices themselves (index, Friday close)."""
+    at; None means the signal prices themselves (index, Friday close). `membership` (week x
+    company_id booleans) gates new buys to instruments that are actually in the index that week
+    (see _Sim.top_names); None (default) disables the gate - every ranked-eligible name may be
+    bought, as today.
+
+    `external_ranks` (final rank, composite score) - both shaped week x instrument, same as
+    `compute_ranks`'s own return - lets a caller supply a rank table computed OUTSIDE this
+    module's own ranksum/voladj/blend scoring entirely, bypassing both `rank_cache` and
+    `compute_ranks`. Added for `categories/broad.py`'s "Broad Momentum" mode: a per-week rank
+    derived from a category-selection/hysteresis layer built on top of ordinary per-stock
+    momentum ranks (see that module's own docstring) isn't expressible as any `Config.score`
+    variant, but every downstream mechanic here - `_Sim.rank`/`exit_reason`/`top_names`, the
+    buffer/slots portfolio rules, `_rank_from_score`-based ties, the `enough`-history start-date
+    gate below - only ever reads the resulting (ranks, scores) DataFrames, never how they were
+    produced, so no other engine.py change is needed to support an externally-computed ranking.
+    Takes priority over `rank_cache` when both are given (an external rank table is never cached
+    or looked up by the `(names, lookbacks, weights, score, ...)` key `rank_cache` uses - it isn't
+    keyed on any of those Config fields to begin with).
+
+    `mass_exit_weeks` (TODO.md 3.9.20) - weeks flagged by an external, per-run computation (see
+    categories/broad.py's `compute_category_selection_mass_exit`) as a synchronized mass exit;
+    only consulted when `config.mass_exit_throttle` is True, same "data, not a Config field"
+    reasoning as `external_ranks`/`trade_prices`/`membership` above."""
     names = ranked_universe(includes, config)
     missing = [n for n in [*names, CASH, config.benchmark] if n not in prices]
     if missing:
@@ -308,13 +527,24 @@ def run_backtest(
     if config.tax is not None and tax_classes is None:
         raise ValueError("tax needs tax_classes (instrument -> equity/gold_silver/...)")
 
-    key = (tuple(names), config.lookbacks, config.weights)
-    if rank_cache is not None and key in rank_cache:
-        ranks, scores = rank_cache[key]
+    if external_ranks is not None:
+        ranks, scores = external_ranks
     else:
-        ranks, scores = compute_ranks(prices[names], config)
-        if rank_cache is not None:
-            rank_cache[key] = (ranks, scores)
+        # score/voladj_skip_recent_month are in the key too: two configs that differ only in
+        # ranking method must never share a cached rank table.
+        key = (
+            tuple(names),
+            config.lookbacks,
+            config.weights,
+            config.score,
+            config.voladj_skip_recent_month,
+        )
+        if rank_cache is not None and key in rank_cache:
+            ranks, scores = rank_cache[key]
+        else:
+            ranks, scores = compute_ranks(prices[names], config)
+            if rank_cache is not None:
+                rank_cache[key] = (ranks, scores)
     filter_ret = prices / prices.shift(config.filter_lookback) - 1
     if config.signal_delay:
         ranks = ranks.shift(config.signal_delay)
@@ -333,6 +563,11 @@ def run_backtest(
     if len(weeks) < 2:
         raise ValueError("not enough history to run from the chosen start date")
 
+    if config.rebalance == "weekly":
+        trade_weeks = frozenset(weeks[:-1])
+    else:
+        trade_weeks = _month_end_weeks(weeks) & frozenset(weeks[:-1])
+
     sim = _Sim(
         prices=fills,
         ranks=ranks,
@@ -340,6 +575,9 @@ def run_backtest(
         config=config,
         ledger=TaxLedger(config.tax) if config.tax is not None else None,
         tax_classes=tax_classes or {},
+        membership=membership,
+        trade_weeks=trade_weeks,
+        mass_exit_weeks=mass_exit_weeks,
     )
     outcome = _run_slots(sim, weeks) if config.portfolio == "slots" else _run_buffer(sim, weeks)
 
@@ -373,7 +611,7 @@ def run_backtest(
 
 
 def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
-    config, cost = sim.config, sim.cost
+    config = sim.config
     # Each slot: asset (None = money not yet invested), value, "held" | "parked", `since` (when
     # the current position began) and `basis` (what it cost, after buying costs) for tax.
     slots = [
@@ -385,7 +623,7 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
 
     def realise(slot, week) -> float:
         """Sell the slot's position: costs, then tax on the gain. Returns the tax paid."""
-        slot["value"] *= 1 - cost
+        slot["value"] *= 1 - sim.sell_cost(slot["value"])
         if slot["since"] is None:
             return 0.0
         tax = sim.tax(slot["asset"], slot["value"] - slot["basis"], (week - slot["since"]).days)
@@ -393,47 +631,50 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         return tax
 
     for i, week in enumerate(weeks[:-1]):
-        # 1. Sells.
-        for slot_no, slot in enumerate(slots, start=1):
-            asset = slot["asset"]
-            if slot["kind"] != "held":
-                continue
-            reason = sim.exit_reason(asset, week)
-            if reason is None:
-                continue
-            value_before = slot["value"]
-            details = sim.exit_details(asset, week, slot["since"], slot["basis"], value_before)
-            if asset == CASH:
-                # A ranked-mode cash holding dropping out stays in the same liquid fund - it's
-                # only relabelled as parked, so there's no trade, no cost and no tax.
-                sim.record(week, "SELL", asset, reason, value_before, slot_no, 0.0, **details)
-                slot["kind"] = "parked"
-                continue
-            tax = realise(slot, week)
-            sim.record(week, "SELL", asset, reason, value_before, slot_no, tax, **details)
-            slot["value"] *= 1 - cost  # park the proceeds in the liquid fund
-            slot.update(asset=CASH, kind="parked", since=week, basis=slot["value"])
-
-        # 2. Buys: best-ranked names within the top N that aren't already held.
-        held = {s["asset"] for s in slots if s["kind"] == "held"}
-        candidates = [n for n in sim.top_names(week) if n not in held]
-        for slot_no, slot in enumerate(slots, start=1):
-            if slot["kind"] == "held":
-                continue
-            if candidates:
-                name = candidates.pop(0)
-                if slot["asset"] == name:  # cash already parked in the liquid fund
-                    slot["kind"] = "held"
-                else:
-                    if slot["asset"] is not None:  # leaving the liquid fund
-                        realise(slot, week)
-                    slot["value"] *= 1 - cost
-                    slot.update(asset=name, kind="held", since=week, basis=slot["value"])
-                rank = int(sim.rank(week, name))
-                sim.record(week, "BUY", name, f"rank {rank}", slot["value"], slot_no)
-            elif slot["asset"] is None:
-                slot["value"] *= 1 - cost
+        if week in sim.trade_weeks:
+            # 1. Sells.
+            for slot_no, slot in enumerate(slots, start=1):
+                asset = slot["asset"]
+                if slot["kind"] != "held":
+                    continue
+                reason = sim.exit_reason(asset, week)
+                if reason is None:
+                    continue
+                value_before = slot["value"]
+                details = sim.exit_details(
+                    asset, week, slot["since"], slot["basis"], value_before
+                )
+                if asset == CASH:
+                    # A ranked-mode cash holding dropping out stays in the same liquid fund -
+                    # it's only relabelled as parked, so there's no trade, no cost and no tax.
+                    sim.record(week, "SELL", asset, reason, value_before, slot_no, 0.0, **details)
+                    slot["kind"] = "parked"
+                    continue
+                tax = realise(slot, week)
+                sim.record(week, "SELL", asset, reason, value_before, slot_no, tax, **details)
+                slot["value"] *= 1 - sim.buy_cost(slot["value"])  # park proceeds in the liquid fund
                 slot.update(asset=CASH, kind="parked", since=week, basis=slot["value"])
+
+            # 2. Buys: best-ranked names within the top N that aren't already held.
+            held = {s["asset"] for s in slots if s["kind"] == "held"}
+            candidates = [n for n in sim.top_names(week) if n not in held]
+            for slot_no, slot in enumerate(slots, start=1):
+                if slot["kind"] == "held":
+                    continue
+                if candidates:
+                    name = candidates.pop(0)
+                    if slot["asset"] == name:  # cash already parked in the liquid fund
+                        slot["kind"] = "held"
+                    else:
+                        if slot["asset"] is not None:  # leaving the liquid fund
+                            realise(slot, week)
+                        slot["value"] *= 1 - sim.buy_cost(slot["value"])
+                        slot.update(asset=name, kind="held", since=week, basis=slot["value"])
+                    rank = int(sim.rank(week, name))
+                    sim.record(week, "BUY", name, f"rank {rank}", slot["value"], slot_no)
+                elif slot["asset"] is None:
+                    slot["value"] *= 1 - sim.buy_cost(slot["value"])
+                    slot.update(asset=CASH, kind="parked", since=week, basis=slot["value"])
 
         total = sum(s["value"] for s in slots)
         row: dict[str, float] = {}
@@ -452,11 +693,13 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             }
         )
 
-        # 3. Hold for the week.
+        # 3. Hold for the week. A slot whose asset is still None (rebalance="monthly": no trade
+        #    week has happened yet) hasn't been priced into anything - its value just sits idle.
         nxt = weeks[i + 1]
         for slot in slots:
             asset = slot["asset"]
-            slot["value"] *= sim.price(asset, nxt) / sim.price(asset, week)
+            if asset is not None:
+                slot["value"] *= sim.price(asset, nxt) / sim.price(asset, week)
         equity[nxt] = sum(s["value"] for s in slots)
 
     last = weeks[-1]
@@ -483,7 +726,7 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         closing = copy.deepcopy(ledger)
         total = 0.0
         for slot in slots:
-            proceeds = slot["value"] * (1 - cost)
+            proceeds = slot["value"] * (1 - sim.sell_cost(slot["value"]))
             if slot["since"] is not None and slot["asset"] is not None:
                 tax_class = sim.tax_classes.get(slot["asset"], DEBT)
                 days = (last - slot["since"]).days
@@ -497,10 +740,45 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
     )
 
 
+def _win_rate_multiplier(
+    trade_rows: list[dict], week: pd.Timestamp, window: int = 10, floor: float = 0.0
+) -> float:
+    """Position-size multiplier in [floor, 1.0] from the recent record of CLOSED trades (SELL
+    rows with a `position_return`, see `_Sim.exit_details`/`record`) that closed strictly before
+    `week` - no lookahead, so a SELL recorded on `week` itself doesn't count yet.
+
+    Weight the most recent closed trade `window`, the next `window - 1`, ... down to 1 for the
+    `window`-th-most-recent (fewer than `window` available: weights still start at `window` and
+    count down, e.g. window=10 with 3 trades -> 10/9/8, never padded/truncated to a fixed
+    `window`-slot scheme). Each trade contributes `weight * (+1 if it was a win else -1)`
+    (win/loss only, not magnitude-weighted); summing gives a score in
+    `[-sum(weights_used), +sum(weights_used)]`, normalised to a 0-100 "weighted win rate" (0
+    contribution, i.e. an even recent split, is exactly 50%). The multiplier is
+    `win_rate_pct / 50`, clamped to `[floor, 1]`: 50% (neutral, or no history yet) -> 1.0 (full
+    size), 0% (an all-loss recent streak) -> `floor` (0.0 = deploy nothing this week, i.e. sit
+    entirely in cash; a higher floor keeps at least that much invested even at the worst recent
+    win rate), linear in between.
+    """
+    closed = [
+        row
+        for row in trade_rows
+        if row["action"] == "SELL" and row["week"] < week and pd.notna(row.get("position_return"))
+    ]
+    if not closed:
+        return 1.0
+    closed.sort(key=lambda row: row["week"])
+    recent = closed[-window:]  # oldest-to-newest; at most the last `window` closes before `week`
+    weighted = list(zip(reversed(recent), range(window, window - len(recent), -1), strict=True))
+    score = sum(weight * (1 if row["position_return"] > 0 else -1) for row, weight in weighted)
+    weights_used = sum(weight for _, weight in weighted)
+    win_rate_pct = (score / weights_used + 1) / 2 * 100
+    return max(floor, min(1.0, win_rate_pct / 50))
+
+
 def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
     """Positions are lists of lots - one per purchase - so each top-up keeps its own date and
     cost for tax. A lot is {units, since, basis}; basis is the rupee cost after buying costs."""
-    config, cost = sim.config, sim.cost
+    config = sim.config
     lots: dict[str, list[dict]] = {}
     uninvested = 1.0  # starting money, not yet in anything
     equity = {weeks[0]: 1.0}
@@ -510,7 +788,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         return sum(lot["units"] for lot in lots.get(asset, [])) * sim.price(asset, week)
 
     def buy(asset: str, amount: float, week) -> None:
-        net = amount * (1 - cost)
+        net = amount * (1 - sim.buy_cost(amount))
         lots.setdefault(asset, []).append(
             {"units": net / sim.price(asset, week), "since": week, "basis": net}
         )
@@ -529,104 +807,153 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
     def sell(asset: str, fraction: float, week) -> tuple[float, float, float]:
         """Sell `fraction` of every lot. Returns (gross value, net proceeds, tax)."""
         price = sim.price(asset, week)
-        gross = tax = 0.0
+        # Gross first, so the itemised cost's DP-charge fraction (which depends on the total
+        # value_fraction sold) is computed once and applied consistently across every lot.
+        gross = sum(lot["units"] * fraction * price for lot in lots[asset])
+        sell_frac = sim.sell_cost(gross)
+        tax = 0.0
         for lot in lots[asset]:
             units, basis = lot["units"] * fraction, lot["basis"] * fraction
             lot_gross = units * price
-            gross += lot_gross
-            tax += sim.tax(asset, lot_gross * (1 - cost) - basis, (week - lot["since"]).days)
+            tax += sim.tax(asset, lot_gross * (1 - sell_frac) - basis, (week - lot["since"]).days)
             lot["units"] -= units
             lot["basis"] -= basis
         if fraction >= 1 - 1e-12:
             del lots[asset]
-        return gross, gross * (1 - cost) - tax, tax
+        return gross, gross * (1 - sell_frac) - tax, tax
 
     for i, week in enumerate(weeks[:-1]):
         proceeds, uninvested = uninvested, 0.0
 
-        # 1. Sell whatever has dropped out.
-        for asset in [a for a in lots if a != _POOL]:
-            reason = sim.exit_reason(asset, week)
-            if reason is None:
-                continue
-            position = lots[asset]
-            since = min(lot["since"] for lot in position)
-            basis = sum(lot["basis"] for lot in position)
-            value_before = value(asset, week)
-            details = sim.exit_details(asset, week, since, basis, value_before)
-            _, net, tax = sell(asset, 1.0, week)
-            sim.record(week, "SELL", asset, reason, value_before, tax=tax, **details)
-            proceeds += net
-
-        # 2. Trim anything that has grown past the cap by more than the band, back to the cap.
-        if cap is not None:
-            total = portfolio_value(week) + proceeds
+        if week in sim.trade_weeks:
+            # 1. Sell whatever has dropped out.
             for asset in [a for a in lots if a != _POOL]:
-                share = value(asset, week) / total
-                if share > cap + config.cap_band:
-                    gross, net, tax = sell(asset, 1 - cap / share, week)
-                    reason = f"above the {cap:.0%} cap ({share:.0%})"
-                    sim.record(week, "TRIM", asset, reason, gross, tax=tax)
-                    proceeds += net
-
-        # 3. Split the money equally across the current top N, but never past the cap. Parked
-        #    cash joins in as soon as there's room for it.
-        tops = sim.top_names(week)
-        total = portfolio_value(week) + proceeds
-        if tops and _POOL in lots:
-            need = sum(room(name, total, week) for name in tops) - proceeds
-            if need > MIN_TRADE * total:
-                gross, net, tax = sell(_POOL, min(1.0, need / value(_POOL, week)), week)
-                sim.record(week, "UNPARK", CASH, "back into the top N", gross, tax=tax)
-                proceeds += net
-        if proceeds > 1e-12:
-            left = proceeds
-            if tops:
-                total = portfolio_value(week) + proceeds
-                rooms = {name: room(name, total, week) for name in tops}
-                given = dict.fromkeys(tops, 0.0)
-                active = [name for name in tops if rooms[name] > 1e-12]
-                while left > 1e-12 and active:  # equal shares; a capped name's excess spreads on
-                    share = left / len(active)
-                    still = []
-                    for name in active:
-                        give = min(share, rooms[name] - given[name])
-                        given[name] += give
-                        left -= give
-                        if rooms[name] - given[name] > 1e-12:
-                            still.append(name)
-                    active = still
-                for name in tops:
-                    if given[name] > 1e-12:
-                        action = "ADD" if name in lots else "BUY"
-                        buy(name, given[name], week)
-                        rank = int(sim.rank(week, name))
-                        sim.record(week, action, name, f"rank {rank}", given[name])
-            if left > 1e-12:
-                buy(_POOL, left, week)
-                reason = (
-                    f"top N all at the {cap:.0%} cap" if tops else "nothing in the top N qualifies"
-                )
-                sim.record(week, "PARK", CASH, reason, left)
-
-        # 4. Make room: a top-N name still not held is bought now, funded by trimming every
-        #    holding by the same percentage, sized as an equal share of the portfolio (capped).
-        if config.entry == "make_room":
-            for name in tops:
-                if name in lots:
+                reason = sim.exit_reason(asset, week)
+                if reason is None:
                     continue
-                holders = list(lots)
-                count = sum(1 for a in holders if a != _POOL)
-                fraction = 1 / (count + 1) if cap is None else min(1 / (count + 1), cap)
-                raised = 0.0
-                for asset in holders:
-                    gross, net, tax = sell(asset, fraction, week)
-                    shown = CASH if asset == _POOL else asset
-                    sim.record(week, "TRIM", shown, f"make room for {name}", gross, tax=tax)
-                    raised += net
-                buy(name, raised, week)
-                rank = int(sim.rank(week, name))
-                sim.record(week, "BUY", name, f"rank {rank} (made room)", raised)
+                position = lots[asset]
+                since = min(lot["since"] for lot in position)
+                basis = sum(lot["basis"] for lot in position)
+                value_before = value(asset, week)
+                details = sim.exit_details(asset, week, since, basis, value_before)
+                _, net, tax = sell(asset, 1.0, week)
+                sim.record(week, "SELL", asset, reason, value_before, tax=tax, **details)
+                proceeds += net
+
+            # 2. Trim anything that has grown past the cap by more than the band, back to the cap.
+            if cap is not None:
+                total = portfolio_value(week) + proceeds
+                for asset in [a for a in lots if a != _POOL]:
+                    share = value(asset, week) / total
+                    if share > cap + config.cap_band:
+                        gross, net, tax = sell(asset, 1 - cap / share, week)
+                        reason = f"above the {cap:.0%} cap ({share:.0%})"
+                        sim.record(week, "TRIM", asset, reason, gross, tax=tax)
+                        proceeds += net
+
+            # 3. Split the money equally across the current top N, but never past the cap. Parked
+            #    cash joins in as soon as there's room for it.
+            tops = sim.top_names(week)
+            total = portfolio_value(week) + proceeds
+            if tops and _POOL in lots:
+                need = sum(room(name, total, week) for name in tops) - proceeds
+                if need > MIN_TRADE * total:
+                    gross, net, tax = sell(_POOL, min(1.0, need / value(_POOL, week)), week)
+                    sim.record(week, "UNPARK", CASH, "back into the top N", gross, tax=tax)
+                    proceeds += net
+            if proceeds > 1e-12:
+                # Momentum sizing: reduce what's available to the split loop BEFORE it runs (not
+                # inside it) - the multiplier is computed off closed trades only, once, from
+                # `proceeds`, the full amount that would otherwise be deployed this week.
+                reserved = 0.0
+                momentum_reserved = 0.0
+                if config.momentum_sizing and tops:
+                    multiplier = _win_rate_multiplier(
+                        sim.trade_rows,
+                        week,
+                        window=config.momentum_sizing_window,
+                        floor=config.momentum_sizing_floor,
+                    )
+                    momentum_reserved = proceeds * (1 - multiplier)
+                    reserved += momentum_reserved
+                # Mass-exit throttle (TODO.md 3.9.20): a second, independently-toggled
+                # reservation applied to whatever's left after momentum sizing's own cut (not to
+                # the original `proceeds`) on a week `sim.mass_exit_weeks` flags - computed
+                # entirely outside this simulation, before it ever runs.
+                mass_exit_reserved = 0.0
+                if (
+                    config.mass_exit_throttle
+                    and tops
+                    and sim.mass_exit_weeks is not None
+                    and week in sim.mass_exit_weeks
+                ):
+                    mass_exit_reserved = (proceeds - reserved) * config.mass_exit_throttle_fraction
+                    reserved += mass_exit_reserved
+                left = proceeds - reserved
+                if tops:
+                    total = portfolio_value(week) + proceeds
+                    rooms = {name: room(name, total, week) for name in tops}
+                    given = dict.fromkeys(tops, 0.0)
+                    active = [name for name in tops if rooms[name] > 1e-12]
+                    while left > 1e-12 and active:  # equal shares; a capped name's excess spreads
+                        share = left / len(active)
+                        still = []
+                        for name in active:
+                            give = min(share, rooms[name] - given[name])
+                            given[name] += give
+                            left -= give
+                            if rooms[name] - given[name] > 1e-12:
+                                still.append(name)
+                        active = still
+                    for name in tops:
+                        if given[name] > 1e-12:
+                            action = "ADD" if name in lots else "BUY"
+                            buy(name, given[name], week)
+                            rank = int(sim.rank(week, name))
+                            sim.record(week, action, name, f"rank {rank}", given[name])
+                if left > 1e-12:
+                    buy(_POOL, left, week)
+                    reason = (
+                        f"top N all at the {cap:.0%} cap"
+                        if tops
+                        else "nothing in the top N qualifies"
+                    )
+                    sim.record(week, "PARK", CASH, reason, left)
+                if momentum_reserved > 1e-12:
+                    buy(_POOL, momentum_reserved, week)
+                    reason = f"momentum sizing: recent win rate -> {multiplier:.0%} size deployed"
+                    sim.record(week, "PARK", CASH, reason, momentum_reserved)
+                if mass_exit_reserved > 1e-12:
+                    buy(_POOL, mass_exit_reserved, week)
+                    reason = (
+                        "mass exit: over half of last week's held names exited -> "
+                        f"{1 - config.mass_exit_throttle_fraction:.0%} of fresh capital deployed"
+                    )
+                    sim.record(week, "PARK", CASH, reason, mass_exit_reserved)
+
+            # 4. Make room: a top-N name still not held is bought now, funded by trimming every
+            #    holding by the same percentage, sized as an equal share of the portfolio (capped).
+            if config.entry == "make_room":
+                for name in tops:
+                    if name in lots:
+                        continue
+                    holders = list(lots)
+                    count = sum(1 for a in holders if a != _POOL)
+                    fraction = 1 / (count + 1) if cap is None else min(1 / (count + 1), cap)
+                    raised = 0.0
+                    for asset in holders:
+                        gross, net, tax = sell(asset, fraction, week)
+                        shown = CASH if asset == _POOL else asset
+                        sim.record(week, "TRIM", shown, f"make room for {name}", gross, tax=tax)
+                        raised += net
+                    buy(name, raised, week)
+                    rank = int(sim.rank(week, name))
+                    sim.record(week, "BUY", name, f"rank {rank} (made room)", raised)
+        else:
+            # Not a trade week (rebalance="monthly"): nothing sold or bought. Whatever wasn't yet
+            # invested (only ever nonzero before the very first trade week) stays idle rather
+            # than vanishing - it's added back into equity below until it's first put to work.
+            uninvested = proceeds
 
         total = sum(value(a, week) for a in lots)
         weights[week] = {(IDLE if a == _POOL else a): value(a, week) / total for a in lots}
@@ -641,7 +968,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         )
 
         nxt = weeks[i + 1]
-        equity[nxt] = sum(value(a, nxt) for a in lots)
+        equity[nxt] = sum(value(a, nxt) for a in lots) + uninvested
 
     last = weeks[-1]
     rows = []
@@ -672,7 +999,8 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             price = sim.price(asset, last)
             tax_class = sim.tax_classes.get(CASH if asset == _POOL else asset, DEBT)
             for lot in position:
-                net = lot["units"] * price * (1 - cost)
+                gross = lot["units"] * price
+                net = gross * (1 - sim.sell_cost(gross))
                 total += net - closing.sale(
                     tax_class, net - lot["basis"], (last - lot["since"]).days
                 )

@@ -5,7 +5,16 @@ import pandas as pd
 import pytest
 
 from momentum_backtesting import metrics
-from momentum_backtesting.engine import BENCHMARK, CASH, GILT, Config, compute_ranks, run_backtest
+from momentum_backtesting.engine import (
+    BENCHMARK,
+    CASH,
+    GILT,
+    IDLE,
+    Config,
+    _win_rate_multiplier,
+    compute_ranks,
+    run_backtest,
+)
 
 WEEKS = pd.date_range("2020-01-03", periods=30, freq="W-FRI")
 
@@ -450,3 +459,336 @@ def test_invalid_caps_are_rejected():
         Config(max_position=0)
     with pytest.raises(ValueError, match="max_position"):
         Config(max_position=1.5)
+
+
+# --- momentum sizing (win-rate position-size multiplier, buffer rule only) ---------------------
+# _win_rate_multiplier is tested directly on hand-built trade_rows first (no backtest needed to
+# pin down the weighting/normalisation arithmetic exactly), then _run_buffer's wiring is checked
+# end to end on a synthetic losing streak, then the momentum_sizing=False default is checked for
+# byte-identical output against an existing buffer fixture (regression safety - _run_buffer is
+# shared by every dataset).
+
+
+def test_win_rate_multiplier_is_1_with_no_closed_trades_yet():
+    week = pd.Timestamp("2021-01-01")
+    assert _win_rate_multiplier([], week) == pytest.approx(1.0)
+
+
+def test_win_rate_multiplier_excludes_a_sell_on_the_same_week_being_sized():
+    weeks = pd.date_range("2021-01-01", periods=2, freq="W-FRI")
+    # A loss recorded ON the sizing week itself hasn't "closed before" that week - no lookahead.
+    rows = [{"action": "SELL", "week": weeks[1], "position_return": -0.5}]
+    assert _win_rate_multiplier(rows, weeks[1]) == pytest.approx(1.0)
+    # The same trade, sized a week later, DOES count.
+    assert _win_rate_multiplier(rows, weeks[1] + pd.Timedelta(weeks=1)) == pytest.approx(0.0)
+
+
+def test_win_rate_multiplier_is_1_when_the_last_10_closes_were_all_wins():
+    weeks = pd.date_range("2021-01-01", periods=11, freq="W-FRI")
+    rows = [{"action": "SELL", "week": weeks[i], "position_return": 0.02} for i in range(10)]
+    assert _win_rate_multiplier(rows, weeks[10]) == pytest.approx(1.0)  # capped, not > 1.0
+
+
+def test_win_rate_multiplier_is_0_when_the_last_10_closes_were_all_losses():
+    weeks = pd.date_range("2021-01-01", periods=11, freq="W-FRI")
+    rows = [{"action": "SELL", "week": weeks[i], "position_return": -0.02} for i in range(10)]
+    assert _win_rate_multiplier(rows, weeks[10]) == pytest.approx(0.0)
+
+
+def test_win_rate_multiplier_only_looks_at_the_most_recent_10_closes():
+    # 2 old losses, then 10 wins: if the old losses leaked in, the multiplier would be < 1.0.
+    weeks = pd.date_range("2021-01-01", periods=13, freq="W-FRI")
+    rows = [{"action": "SELL", "week": weeks[i], "position_return": -0.5} for i in range(2)]
+    rows += [{"action": "SELL", "week": weeks[i], "position_return": 0.02} for i in range(2, 12)]
+    assert _win_rate_multiplier(rows, weeks[12]) == pytest.approx(1.0)
+
+
+def test_win_rate_multiplier_weights_fewer_than_10_trades_starting_at_10_not_3_2_1():
+    # 3 closed trades, oldest -> newest: win, loss, loss. Weights are anchored at 10 for the
+    # MOST RECENT and count down - 8, 9, 10 here - never a fixed 10-n-slot scheme (which would
+    # give 1, 2, 3 for these three).
+    weeks = pd.date_range("2021-01-01", periods=4, freq="W-FRI")
+    rows = [
+        {"action": "SELL", "week": weeks[0], "position_return": 0.05},  # oldest -> weight 8, win
+        {"action": "SELL", "week": weeks[1], "position_return": -0.05},  # weight 9, loss
+        {"action": "SELL", "week": weeks[2], "position_return": -0.05},  # newest -> weight 10, loss
+    ]
+    # Hand-computed, independent of the implementation: score = 8 - 9 - 10 = -11, weights_used
+    # = 8 + 9 + 10 = 27, win_rate_pct = (-11/27 + 1) / 2 * 100 = 800/27 = 29.629...%,
+    # multiplier = win_rate_pct / 50 = 16/27.
+    score, weights_used = 8 - 9 - 10, 8 + 9 + 10
+    win_rate_pct = (score / weights_used + 1) / 2 * 100
+    expected = win_rate_pct / 50
+    assert expected == pytest.approx(16 / 27)
+    assert _win_rate_multiplier(rows, weeks[3]) == pytest.approx(expected)
+
+
+def test_win_rate_multiplier_reproduces_the_35_percent_to_0_70_worked_example():
+    # 5 closed trades (fewer than 10 -> weights still anchored at 10, counting down: 10,9,8,7,6),
+    # oldest -> newest: win, loss, win, loss, loss. Losses carry weight {10, 9, 7} (the newest,
+    # 2nd-newest and 4th-newest), wins carry weight {8, 6}.
+    weeks = pd.date_range("2021-01-01", periods=6, freq="W-FRI")
+    outcomes = [True, False, True, False, False]  # oldest -> newest; True = win
+    rows = [
+        {"action": "SELL", "week": weeks[i], "position_return": 0.05 if win else -0.05}
+        for i, win in enumerate(outcomes)
+    ]
+    # Hand-computed: score = -10 - 9 + 8 - 7 + 6 = -12, weights_used = 10+9+8+7+6 = 40,
+    # win_rate_pct = (-12/40 + 1) / 2 * 100 = 35%, multiplier = 35 / 50 = 0.70 - the task brief's
+    # own "50k -> 35k" example (a 30% cut), reproduced from first principles.
+    score, weights_used = -10 - 9 + 8 - 7 + 6, 10 + 9 + 8 + 7 + 6
+    win_rate_pct = (score / weights_used + 1) / 2 * 100
+    assert win_rate_pct == pytest.approx(35.0)
+    expected = win_rate_pct / 50
+    assert expected == pytest.approx(0.70)
+    assert _win_rate_multiplier(rows, weeks[5]) == pytest.approx(expected)
+
+
+def test_win_rate_multiplier_window_is_configurable():
+    # Same 3-trade setup as the "fewer than 10" test above, but with window=5: weights anchor at
+    # 5 instead of 10 - oldest -> newest: win(weight 3), loss(weight 4), loss(weight 5).
+    weeks = pd.date_range("2021-01-01", periods=4, freq="W-FRI")
+    rows = [
+        {"action": "SELL", "week": weeks[0], "position_return": 0.05},
+        {"action": "SELL", "week": weeks[1], "position_return": -0.05},
+        {"action": "SELL", "week": weeks[2], "position_return": -0.05},
+    ]
+    score, weights_used = 3 - 4 - 5, 3 + 4 + 5
+    win_rate_pct = (score / weights_used + 1) / 2 * 100
+    expected = win_rate_pct / 50
+    assert _win_rate_multiplier(rows, weeks[3], window=5) == pytest.approx(expected)
+    # A shorter window also changes how many closes are even looked at: with window=1, only the
+    # single most-recent close (a loss) matters -> multiplier 0.0, not the 3-trade blend above.
+    assert _win_rate_multiplier(rows, weeks[3], window=1) == pytest.approx(0.0)
+
+
+def test_win_rate_multiplier_floor_raises_the_worst_case_multiplier():
+    weeks = pd.date_range("2021-01-01", periods=11, freq="W-FRI")
+    rows = [{"action": "SELL", "week": weeks[i], "position_return": -0.02} for i in range(10)]
+    # All-loss streak: 0.0 with the default floor, clamped up to the floor when one is set.
+    assert _win_rate_multiplier(rows, weeks[10]) == pytest.approx(0.0)
+    assert _win_rate_multiplier(rows, weeks[10], floor=0.3) == pytest.approx(0.3)
+    # The floor never raises a multiplier that's already above it (only clamps the low end).
+    win_rows = [{"action": "SELL", "week": weeks[i], "position_return": 0.02} for i in range(10)]
+    assert _win_rate_multiplier(win_rows, weeks[10], floor=0.3) == pytest.approx(1.0)
+
+
+def test_config_rejects_invalid_momentum_sizing_window_or_floor():
+    with pytest.raises(ValueError, match="momentum_sizing_window"):
+        Config(momentum_sizing_window=0)
+    with pytest.raises(ValueError, match="momentum_sizing_floor"):
+        Config(momentum_sizing_floor=1.5)
+    with pytest.raises(ValueError, match="momentum_sizing_floor"):
+        Config(momentum_sizing_floor=-0.1)
+
+
+def test_momentum_sizing_off_leaves_existing_buffer_behaviour_unchanged():
+    """momentum_sizing defaults to False. Reruns an existing buffer-rule fixture (the position-cap
+    test above) with the field passed explicitly False and checks the Result is byte-identical -
+    regression safety for code shared by every dataset (_run_buffer backs ETF, stock and Custom
+    Index alike)."""
+    assert Config().momentum_sizing is False
+    prices = runaway_winner()
+    a = run_backtest(prices, includes(prices), bcfg(top_n=3, exit_rank=5, max_position=0.35))
+    b = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(top_n=3, exit_rank=5, max_position=0.35, momentum_sizing=False),
+    )
+    pd.testing.assert_series_equal(a.equity, b.equity)
+    pd.testing.assert_frame_equal(a.weights, b.weights)
+    pd.testing.assert_frame_equal(a.trades, b.trades)
+
+
+def _pulse_crash_prices(n_assets: int, weeks: pd.DatetimeIndex) -> pd.DataFrame:
+    """n_assets, each flat at 100 until its own turn, then +7%/week for 2 weeks, then -15%/week
+    forever after - scheduled back to back (asset i's turn is weeks [2i, 2i+1]) so leadership
+    hands off from one to the next with no overlap. Under top_n=1/exit_rank=1 the engine buys
+    whichever asset is currently pulsing and sells it once the NEXT asset's pulse overtakes it -
+    which happens either right at, or one week into, its own crash. The crash is steep enough
+    (-15%) that BOTH possible buy points (first or second pulse week) net a loss by the time
+    that happens - 1.07 * 0.85 - 1 = -9.05% even from the earlier, more generous entry - so this
+    doesn't rely on hitting the engine's exact rotation timing to produce a real losing streak.
+    """
+    data = {}
+    for i in range(n_assets):
+        pulse_start = 2 * i
+        levels, price = [], 100.0
+        for w in range(len(weeks)):
+            if w >= pulse_start:
+                price *= 1.07 if w - pulse_start < 2 else 0.85
+            levels.append(price)
+        data[f"P{i}"] = pd.Series(levels, index=weeks)
+    prices = pd.DataFrame(data)
+    prices[CASH] = pd.Series(100 * 1.0005 ** np.arange(len(weeks)), index=weeks)
+    prices[BENCHMARK] = pd.Series(100 * 1.001 ** np.arange(len(weeks)), index=weeks)
+    return prices
+
+
+def test_momentum_sizing_deploys_less_capital_after_a_realistic_losing_streak():
+    weeks = pd.date_range("2020-01-03", periods=42, freq="W-FRI")
+    prices = _pulse_crash_prices(18, weeks)
+    base = dict(
+        lookbacks=(1, 2),
+        top_n=1,
+        exit_rank=1,
+        cost_pct=0.0,
+        start="2020-01-01",
+        portfolio="buffer",
+        max_position=None,  # isolate the sizing effect from cap-driven parking
+    )
+    unsized = run_backtest(prices, includes(prices), Config(**base, momentum_sizing=False))
+    sized = run_backtest(prices, includes(prices), Config(**base, momentum_sizing=True))
+
+    # Confirm the fixture actually produced a real losing streak (a meaningful number of the
+    # trades are closed at a loss) before trusting comparisons built on top of it.
+    sells = unsized.trades.query("action == 'SELL'")
+    assert len(sells) >= 10
+    assert (sells["position_return"] < 0).sum() >= 8
+
+    idle_unsized = unsized.weights.get(IDLE, pd.Series(0.0, index=unsized.weights.index))
+    idle_sized = sized.weights.get(IDLE, pd.Series(0.0, index=sized.weights.index))
+    # With no position cap, every trade week's proceeds are fully deployed to the single top-
+    # ranked name when sizing is off - nothing is ever parked.
+    assert idle_unsized.max() == pytest.approx(0.0, abs=1e-9)
+    # With sizing on, the losing streak above pushes the multiplier well below 1.0, so a real
+    # share of the portfolio sits in cash instead.
+    assert idle_sized.max() > 0.10
+    # Directly: less capital ends up deployed into the ranked holding once sizing is on.
+    checkpoint = weeks[35]
+    invested_unsized = unsized.weights.drop(columns=[IDLE], errors="ignore").loc[checkpoint].sum()
+    invested_sized = sized.weights.drop(columns=[IDLE], errors="ignore").loc[checkpoint].sum()
+    assert invested_sized < invested_unsized
+
+    # And this isn't simply proportional de-risking that preserves relative drawdown for free -
+    # a fair read also checks whether it actually cut into the loss: over this losing stretch the
+    # sized run's equity should have fallen by less than the unsized run's.
+    drawdown_unsized = unsized.equity.loc[checkpoint] / unsized.equity.cummax().loc[checkpoint] - 1
+    drawdown_sized = sized.equity.loc[checkpoint] / sized.equity.cummax().loc[checkpoint] - 1
+    assert drawdown_sized > drawdown_unsized  # smaller (less negative) drawdown
+
+
+# --------------------------------------------------------------------------
+# mass_exit_throttle (TODO.md 3.9.20, response variant A -- "capital throttle"): the "on/off +
+# how much" setting lives on Config, but WHICH weeks are flagged is per-run computed data passed
+# to run_backtest's own `mass_exit_weeks` argument (see categories/broad.py's
+# compute_category_selection_mass_exit for how a real caller derives that set) -- these tests
+# drive it directly with a hand-picked frozenset, the same way membership/trade_prices tests do.
+# --------------------------------------------------------------------------
+
+
+def test_config_rejects_invalid_mass_exit_throttle_fraction():
+    with pytest.raises(ValueError, match="mass_exit_throttle_fraction"):
+        Config(mass_exit_throttle_fraction=1.5)
+    with pytest.raises(ValueError, match="mass_exit_throttle_fraction"):
+        Config(mass_exit_throttle_fraction=-0.1)
+
+
+def test_mass_exit_throttle_off_leaves_existing_buffer_behaviour_unchanged():
+    assert Config().mass_exit_throttle is False
+    prices = runaway_winner()
+    a = run_backtest(prices, includes(prices), bcfg(top_n=3, exit_rank=5, max_position=0.35))
+    b = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(top_n=3, exit_rank=5, max_position=0.35, mass_exit_throttle=False),
+    )
+    pd.testing.assert_series_equal(a.equity, b.equity)
+    pd.testing.assert_frame_equal(a.weights, b.weights)
+    pd.testing.assert_frame_equal(a.trades, b.trades)
+
+
+def test_mass_exit_weeks_argument_is_inert_without_mass_exit_throttle_on():
+    """Passing mass_exit_weeks to run_backtest does nothing unless config.mass_exit_throttle is
+    also True - mirrors membership=None/momentum_sizing=False's own inertness elsewhere."""
+    prices = frame(A=path((29, 0.03)), B=path((29, 0.01)))
+    config = bcfg(top_n=1, exit_rank=2)
+    baseline = run_backtest(prices, includes(prices), config)
+    flagged_week = baseline.trades["week"].iloc[0]
+
+    still = run_backtest(
+        prices, includes(prices), config, mass_exit_weeks=frozenset({flagged_week})
+    )
+    pd.testing.assert_series_equal(baseline.equity, still.equity)
+    pd.testing.assert_frame_equal(baseline.trades, still.trades)
+
+
+def test_mass_exit_throttle_withholds_capital_on_a_flagged_week():
+    prices = frame(A=path((29, 0.03)), B=path((29, 0.01)))
+    baseline = run_backtest(prices, includes(prices), bcfg(top_n=1, exit_rank=2))
+    flagged_week = baseline.trades["week"].iloc[0]
+
+    throttled = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(top_n=1, exit_rank=2, mass_exit_throttle=True, mass_exit_throttle_fraction=0.5),
+        mass_exit_weeks=frozenset({flagged_week}),
+    )
+
+    invested_baseline = (
+        baseline.weights.drop(columns=[IDLE], errors="ignore").loc[flagged_week].sum()
+    )
+    invested_throttled = (
+        throttled.weights.drop(columns=[IDLE], errors="ignore").loc[flagged_week].sum()
+    )
+    assert invested_baseline == pytest.approx(1.0)
+    # Half of that week's fresh capital is withheld into cash instead of being deployed.
+    assert invested_throttled == pytest.approx(0.5, abs=1e-6)
+    assert throttled.weights.loc[flagged_week, IDLE] == pytest.approx(0.5, abs=1e-6)
+
+    park_reasons = throttled.trades.query("week == @flagged_week and action == 'PARK'")["reason"]
+    assert any("mass exit" in r for r in park_reasons)
+
+    # A later, unflagged week is unaffected - the throttle never recurs on its own.
+    later_park_reasons = throttled.trades.query("week != @flagged_week and action == 'PARK'")[
+        "reason"
+    ]
+    assert not any("mass exit" in r for r in later_park_reasons)
+
+
+def test_mass_exit_throttle_fraction_controls_how_much_is_withheld():
+    prices = frame(A=path((29, 0.03)), B=path((29, 0.01)))
+    baseline = run_backtest(prices, includes(prices), bcfg(top_n=1, exit_rank=2))
+    flagged_week = baseline.trades["week"].iloc[0]
+
+    throttled = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(top_n=1, exit_rank=2, mass_exit_throttle=True, mass_exit_throttle_fraction=0.25),
+        mass_exit_weeks=frozenset({flagged_week}),
+    )
+    assert throttled.weights.loc[flagged_week, IDLE] == pytest.approx(0.25, abs=1e-6)
+
+
+def test_mass_exit_throttle_stacks_with_momentum_sizing_on_the_same_week():
+    """Both mechanisms are independently toggled and, per engine.py's own comment on the
+    reservation order, mass_exit_throttle's cut is taken from what's LEFT after momentum_sizing's
+    own reservation - not from the original proceeds. Confirmed here: turning both on withholds
+    strictly more than momentum_sizing alone."""
+    prices = frame(A=path((29, 0.03)), B=path((29, 0.01)))
+    baseline = run_backtest(prices, includes(prices), bcfg(top_n=1, exit_rank=2))
+    flagged_week = baseline.trades["week"].iloc[0]
+
+    sizing_only = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(top_n=1, exit_rank=2, momentum_sizing=True),  # no closed trades yet -> multiplier 1.0
+    )
+    both = run_backtest(
+        prices,
+        includes(prices),
+        bcfg(
+            top_n=1,
+            exit_rank=2,
+            momentum_sizing=True,
+            mass_exit_throttle=True,
+            mass_exit_throttle_fraction=0.5,
+        ),
+        mass_exit_weeks=frozenset({flagged_week}),
+    )
+    idle_sizing_only = (
+        sizing_only.weights.loc[flagged_week, IDLE] if IDLE in sizing_only.weights else 0.0
+    )
+    idle_both = both.weights.loc[flagged_week, IDLE]
+    assert idle_both > idle_sizing_only
+    assert idle_both == pytest.approx(0.5, abs=1e-6)  # no closed trades yet: sizing itself is inert

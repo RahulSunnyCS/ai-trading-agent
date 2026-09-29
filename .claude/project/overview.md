@@ -32,6 +32,15 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - **`packages/momentum-backtesting`** — Python/uv research tool for weekly
   momentum rotation across Indian indices, commodities and international ETFs,
   from 2017. Data layer (`mbt fetch`), backtest engine and a local web UI (`mbt ui`) built.
+  Also has a separate, from-scratch survivorship-free Nifty 50 stock-level data layer
+  (`stocks/`, `mbt stocks fetch`/`pin-manifest`/`validate`) — corporate-action-adjusted
+  daily/weekly price and total-return history for every ever-member company, including
+  delisted/merged/renamed ones; wired into the ranking engine and the UI (a stock-mode
+  tab in `mbt ui`, gold/silver/debt ranked alongside the 95 stocks). A further, separate
+  "category momentum" layer (`categories/`, `mbt categories fetch|resolve|backtest`) ranks
+  sector/thematic categories exactly as the existing ETF engine does, but substitutes the
+  top-K individual stocks currently tagged to an investable category for its ETF via an
+  inner backtest — built and tested, not yet wired into the UI (TODO.md §3.9).
   Weekly Friday signal to Telegram (`mbt weekly`, `.github/workflows/momentum-weekly.yml`:
   14:40 IST live-price preview + 16:45 IST final) with history in Neon Postgres; schedule
   disabled until a manual dispatch passes

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import typer
 
@@ -620,6 +622,574 @@ def db_pull() -> None:
     with _db() as conn:
         count = store.pull_dir(conn, DATA_DIR)
     typer.echo(f"ok: {count} rows written under {DATA_DIR}")
+
+
+stocks_app = typer.Typer(
+    no_args_is_help=True, help="Nifty 50 survivorship-free stock data layer (plan.md, stocks/)."
+)
+app.add_typer(stocks_app, name="stocks")
+
+
+def _stocks_data_dir() -> Path:
+    return DATA_DIR / "stocks"
+
+
+def _stocks_curated_dir() -> Path:
+    # The package's own committed curated/ dir (src/momentum_backtesting/stocks/curated),
+    # not a data/ path -- these files are package data, checked into git (plan.md §6).
+    return Path(__file__).parent / "stocks" / "curated"
+
+
+#: niftyindices.com index name -> raw TRI snapshot filename (matches the names
+#: adjust.load_tri_local / build_benchmarks_weekly already read).
+_BENCHMARK_TRI_FILES = {
+    "NIFTY_50_TRI.json": "NIFTY 50",
+    "NIFTY200_MOMENTUM_30_TRI.json": "NIFTY200 MOMENTUM 30",
+    "NIFTY50_EQUAL_WEIGHT_TRI.json": "NIFTY50 EQUAL WEIGHT",
+}
+
+
+def _fetch_niftyindices_tri_raw(name: str, start, end) -> list[dict]:
+    """Fetch the raw getTotalReturnIndexString rows for `name` across
+    yearly-or-smaller chunks (niftyindices.com allows at most ~1 year per
+    request) and return them unparsed.
+
+    Deliberately separate from sources.niftyindices_tri_daily: that function
+    (the ETF path's, T4's) parses straight to a pd.Series and never touches
+    disk, but adjust.load_tri_local needs the *raw* JSON rows written under
+    raw/benchmarks/ (plan.md's out-of-band snapshot shape) so this replicates
+    sources._niftyindices_history's request shape locally rather than editing
+    sources.py (out of T8's scope) to add a raw-row-returning mode.
+    """
+    import json
+    import time
+    import urllib.request
+    from datetime import timedelta
+
+    from .sources import NIFTYINDICES_TRI_URL
+
+    rows: list[dict] = []
+    chunk_start = start
+    while chunk_start <= end:
+        chunk_end = min(chunk_start + timedelta(days=364), end)
+        cinfo = str(
+            {
+                "name": name,
+                "startDate": f"{chunk_start:%d-%b-%Y}",
+                "endDate": f"{chunk_end:%d-%b-%Y}",
+                "indexName": name,
+            }
+        )
+        request = urllib.request.Request(
+            NIFTYINDICES_TRI_URL,
+            data=json.dumps({"cinfo": cinfo}).encode(),
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Content-Type": "application/json; charset=UTF-8",
+                "Referer": "https://www.niftyindices.com/reports/historical-data",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        )
+        body = json.load(urllib.request.urlopen(request, timeout=60))  # noqa: S310
+        payload = body.get("d", body) if isinstance(body, dict) else body
+        chunk_rows = json.loads(payload) if isinstance(payload, str) else payload
+        rows.extend(chunk_rows or [])
+        chunk_start = chunk_end + timedelta(days=1)
+        time.sleep(0.5)
+    return rows
+
+
+def _refresh_benchmark_raw_files(raw_dir: Path, start, end) -> None:
+    """Refresh raw/benchmarks/*.json (TRI x3) + NIFTY50_EQUAL_WEIGHT_PRICE.csv.
+
+    The three TRI snapshots are written as raw JSON rows (adjust.load_tri_local's
+    expected shape). The EW *price* file is written already-parsed as a plain
+    date,close CSV -- matching the shape of the out-of-band file it replaces
+    (see benchmarks.fetch_equal_weight_price / adjust.load_ew_price_local's
+    docstrings: this is a parsed CSV, not a JSON row dump, because
+    load_ew_price_local reads it straight with pd.read_csv).
+    """
+    import json
+
+    from .stocks import benchmarks
+    from .stocks.nse import atomic_write_bytes
+
+    bench_dir = raw_dir / "benchmarks"
+    bench_dir.mkdir(parents=True, exist_ok=True)
+
+    for filename, index_name in _BENCHMARK_TRI_FILES.items():
+        rows = _fetch_niftyindices_tri_raw(index_name, start, end)
+        atomic_write_bytes(bench_dir / filename, json.dumps(rows).encode("utf-8"))
+
+    price = benchmarks.fetch_equal_weight_price(start, end)
+    price_df = price.rename("close").rename_axis("date").reset_index()
+    price_df.to_csv(bench_dir / "NIFTY50_EQUAL_WEIGHT_PRICE.csv", index=False)
+
+
+def _print_fetch_summary(report, div_report: pd.DataFrame | None) -> None:
+    from .stocks.schemas import GuardSeverity
+
+    n_f = sum(1 for g in report.guard_results if g.severity == GuardSeverity.F)
+    n_g = len(report.guard_results) - n_f
+    typer.echo(f"\nguards: {n_f} F (failing), {n_g} G (flagged), {report.elapsed_seconds:.1f}s")
+    if report.event_counts:
+        typer.echo("events by kind/source:")
+        for key, n in sorted(report.event_counts.items()):
+            typer.echo(f"  {key:<40} {n}")
+    if not report.ca_diff.empty:
+        typer.echo(f"CA event diff: {len(report.ca_diff)} row(s) vs the committed baseline")
+    if report.baseline_created:
+        typer.echo("events_baseline.csv.gz created (first run)")
+    if report.cash_weekly_skipped:
+        typer.echo(f"cash_weekly skipped: {report.cash_weekly_skipped}")
+    if div_report is not None:
+        n_flags = int((div_report["verdict"] == "flag").sum())
+        typer.echo(f"dividend verifier: {n_flags} flagged day(s) of {len(div_report)}")
+    typer.echo("\nwrote:")
+    for path in report.outputs_written:
+        typer.echo(f"  {path}")
+    if n_f:
+        typer.echo(f"\n{n_f} guard failure(s) -- see fetch_report.csv")
+
+
+@stocks_app.command("fetch")
+def stocks_fetch(
+    from_: str = typer.Option(
+        "2011-01-01", "--from", help="Start date (YYYY-MM-DD) for CA history / bhavcopy download."
+    ),
+    skip_download: bool = typer.Option(
+        False,
+        "--skip-download",
+        help="No network -- rebuild from the already-downloaded raw cache.",
+    ),
+    accept_ca_diff: Path | None = typer.Option(
+        None,
+        "--accept-ca-diff",
+        help="CSV of previously reviewed (company_id, ex_date, subject_sha1) rows -- accepts a "
+        ">30-day-old CA event diff for these keys and advances the baseline.",
+    ),
+) -> None:
+    """Fetch/refresh the raw cache and rebuild daily.parquet, events.parquet and
+    every data/stocks/ output (plan.md §7 T8). Exits non-zero if any guard fails.
+    """
+    from datetime import date as date_cls
+
+    from .stocks import adjust, bhavcopy, corporate_actions, validate
+    from .stocks.nse import NseClient
+
+    start = date_cls.fromisoformat(from_)
+    data_dir = _stocks_data_dir()
+    curated_dir = _stocks_curated_dir()
+    raw_dir = data_dir / "raw"
+
+    if not skip_download:
+        client = NseClient()
+        typer.echo("refreshing benchmark raw files (TRI x3 + EW price)...")
+        _refresh_benchmark_raw_files(raw_dir, start, date_cls.today())
+
+        typer.echo("fetching the corporate-actions history (quarterly snapshots)...")
+        try:
+            corporate_actions.fetch_history(raw_dir, client, start=start)
+        except ValueError as error:
+            typer.echo(f"CA fetch guard failed: {error}")
+            raise typer.Exit(1) from None
+
+        typer.echo("downloading bhavcopies for the TRI session calendar...")
+        tri_dates = adjust.load_tri_local(raw_dir, "NIFTY_50_TRI.json").index
+        sessions = [ts.date() for ts in tri_dates]
+        bhavcopy.download(sessions, raw_dir, client)
+
+        typer.echo("rebuilding daily.parquet from the raw bhavcopy cache...")
+        stats = bhavcopy.build_daily_parquet(raw_dir, data_dir / "daily.parquet")
+        typer.echo(
+            f"  {stats.rows} rows, {stats.n_symbols} symbols, "
+            f"{stats.date_min}..{stats.date_max}"
+        )
+
+    if not (data_dir / "daily.parquet").exists():
+        typer.echo("No data/stocks/daily.parquet yet -- run without --skip-download first.")
+        raise typer.Exit(1)
+
+    typer.echo("\nrunning adjust.build_all (company resolution, guards, outputs)...")
+    report = adjust.build_all(data_dir, curated_dir, accept_ca_diff=accept_ca_diff)
+
+    div_report = None
+    try:
+        typer.echo("running the dividend verifier...")
+        curated = adjust.load_curated(curated_dir)
+        events = pd.read_parquet(data_dir / "events.parquet")
+        daily = pd.read_parquet(data_dir / "daily.parquet")
+        tri = adjust.load_tri_local(raw_dir, "NIFTY50_EQUAL_WEIGHT_TRI.json")
+        price = adjust.load_ew_price_local(raw_dir)
+        div_report = validate.dividend_check(
+            tri, price, events, curated["nifty50_membership.csv"], daily
+        )
+        div_report.to_csv(data_dir / "dividend_check.csv", index=False)
+    except FileNotFoundError as error:
+        typer.echo(f"dividend verifier skipped: {error}")
+
+    _print_fetch_summary(report, div_report)
+
+    if report.n_failures() > 0:
+        raise typer.Exit(1)
+
+
+@stocks_app.command("pin-manifest")
+def stocks_pin_manifest() -> None:
+    """Pin the current raw cache as the reproducibility baseline: copy
+    data/stocks/raw_manifest.csv into curated/raw_manifest.pinned.csv, and
+    advance curated/events_baseline.csv.gz to this run's events (plan.md §2 --
+    "the accepted state moves forward"). No network; re-derives events from the
+    already-downloaded raw cache the same way adjust.build_all's steps 2-4 do.
+    """
+    import shutil
+
+    from .stocks import adjust
+
+    data_dir = _stocks_data_dir()
+    curated_dir = _stocks_curated_dir()
+    manifest_path = data_dir / "raw_manifest.csv"
+
+    if not manifest_path.exists():
+        typer.echo("No data/stocks/raw_manifest.csv yet -- run `mbt stocks fetch` first.")
+        raise typer.Exit(1)
+
+    pinned_path = curated_dir / "raw_manifest.pinned.csv"
+    shutil.copyfile(manifest_path, pinned_path)
+    typer.echo(f"wrote {pinned_path}")
+
+    curated = adjust.load_curated(curated_dir)
+    aliases = curated["aliases.csv"]
+    membership = curated["nifty50_membership.csv"]
+    actions_manual = curated["actions_manual.csv"]
+
+    daily = pd.read_parquet(data_dir / "daily.parquet")
+    daily["company_id"] = adjust.resolve_daily_companies(daily, aliases)
+    isin_to_company, symbol_to_company_latest = adjust.build_ca_lookups(daily, aliases)
+    ca_raw = adjust.load_ca_feed_local(data_dir / "raw")
+    feed_result = adjust.build_feed_events(
+        ca_raw, isin_to_company, symbol_to_company_latest, aliases
+    )
+    manual_events = adjust.build_manual_events(actions_manual)
+    combined_events = adjust.combine_manual_over_feed(feed_result.events, manual_events, aliases)
+    attached_events, _failures = adjust.attach_events_tolerant(combined_events, daily)
+
+    # _write_events_baseline is adjust.py's private helper (underscore-prefixed);
+    # called directly here rather than adding a new public wrapper to adjust.py,
+    # since the T8 task contract permits only the one CA-snapshot edit there.
+    adjust._write_events_baseline(curated_dir, attached_events, membership)  # noqa: SLF001
+    typer.echo(f"wrote {curated_dir / 'events_baseline.csv.gz'} (advanced to current events)")
+
+
+@stocks_app.command("validate")
+def stocks_validate() -> None:
+    """Re-run the dividend verifier (plan.md §4.1) against the existing
+    data/stocks/ outputs -- no fetch, no guards, just validate.py's check."""
+    from .stocks import adjust, validate
+
+    data_dir = _stocks_data_dir()
+    curated_dir = _stocks_curated_dir()
+    raw_dir = data_dir / "raw"
+
+    for name in ("daily.parquet", "events.parquet"):
+        if not (data_dir / name).exists():
+            typer.echo(f"No data/stocks/{name} yet -- run `mbt stocks fetch` first.")
+            raise typer.Exit(1)
+
+    curated = adjust.load_curated(curated_dir)
+    events = pd.read_parquet(data_dir / "events.parquet")
+    daily = pd.read_parquet(data_dir / "daily.parquet")
+    tri = adjust.load_tri_local(raw_dir, "NIFTY50_EQUAL_WEIGHT_TRI.json")
+    price = adjust.load_ew_price_local(raw_dir)
+    report = validate.dividend_check(tri, price, events, curated["nifty50_membership.csv"], daily)
+    report.to_csv(data_dir / "dividend_check.csv", index=False)
+
+    n_flags = int((report["verdict"] == "flag").sum())
+    typer.echo(f"dividend verifier: {n_flags} flagged day(s) of {len(report)}")
+    typer.echo(f"wrote {data_dir / 'dividend_check.csv'}")
+
+
+categories_app = typer.Typer(
+    no_args_is_help=True,
+    help="Category-momentum stock-tag data layer (categories/) -- which stocks "
+    "belong to which sector/thematic category, by year.",
+)
+app.add_typer(categories_app, name="categories")
+
+
+def _categories_data_dir() -> Path:
+    return DATA_DIR / "categories"
+
+
+def _categories_curated_dir() -> Path:
+    # The package's own committed curated/ dir (src/momentum_backtesting/categories/curated),
+    # not a data/ path -- category_extras.csv is package data, checked into git.
+    return Path(__file__).parent / "categories" / "curated"
+
+
+@categories_app.command("fetch")
+def categories_fetch(
+    from_year: int = typer.Option(
+        2016, "--from-year", help="First year to resolve category membership for."
+    ),
+    to_year: int | None = typer.Option(
+        None, "--to-year", help="Last year, inclusive (default: the current year)."
+    ),
+) -> None:
+    """Fetch/refresh data/categories/category_membership.csv and
+    fetch_report.csv for every mapped Sector/Thematic category in
+    universe.csv (see categories/sources.py's CATEGORY_SLUGS). Never fails
+    the run for one category's missing/thin data -- see
+    categories/snapshots.py's module docstring for the three source tiers.
+    """
+    from datetime import date as date_cls
+
+    from .categories import snapshots
+    from .stocks.nse import NseClient
+
+    years = list(range(from_year, (to_year or date_cls.today().year) + 1))
+    data_dir = _categories_data_dir()
+    client = NseClient()
+
+    typer.echo(f"resolving {len(years)} year(s) ({years[0]}-{years[-1]}) per category...")
+    summary = snapshots.run_fetch(data_dir, client, years)
+
+    n_fetched = len(summary.categories_fetched)
+    unit = "category" if n_fetched == 1 else "categories"
+    n_skipped = len(summary.categories_skipped)
+    skipped_list = ", ".join(summary.categories_skipped) or "none"
+    typer.echo(f"\nfetched {n_fetched} {unit}, skipped {n_skipped}: {skipped_list}")
+    if summary.tier_counts:
+        typer.echo("source tiers (row count):")
+        for tier, n in sorted(summary.tier_counts.items()):
+            typer.echo(f"  {tier:<22} {n}")
+    typer.echo(f"\nwrote {summary.rows_written} row(s) in {summary.elapsed_seconds:.1f}s:")
+    typer.echo(f"  {data_dir / snapshots.MEMBERSHIP_FILENAME}")
+    typer.echo(f"  {data_dir / snapshots.FETCH_REPORT_FILENAME}")
+
+
+@categories_app.command("resolve")
+def categories_resolve(
+    category: str = typer.Argument(..., help='e.g. "Nifty Bank" (see universe.csv index column).'),
+    year: int = typer.Argument(..., help="Resolve membership as of this year."),
+    mode: str = typer.Option(
+        "narrow", help='"narrow" (official snapshot only) or "broad" (+ category_extras.csv).'
+    ),
+) -> None:
+    """Print the resolved member symbols for one category/year -- a quick
+    manual check against `category_membership.csv` without writing Python."""
+    from .categories.resolve import CategoryDataNotFoundError, resolve_category_members
+
+    if mode not in ("narrow", "broad"):
+        typer.echo('--mode must be "narrow" or "broad"')
+        raise typer.Exit(2)
+    try:
+        symbols = resolve_category_members(
+            category,
+            year,
+            mode,  # type: ignore[arg-type]
+            data_dir=_categories_data_dir(),
+            curated_dir=_categories_curated_dir(),
+        )
+    except CategoryDataNotFoundError as error:
+        typer.echo(str(error))
+        raise typer.Exit(1) from None
+
+    if not symbols:
+        typer.echo(f"0 symbols for {category!r} in {year} ({mode}) -- check fetch_report.csv")
+        return
+    typer.echo(f"{len(symbols)} symbol(s) for {category!r} in {year} ({mode}):")
+    for symbol in sorted(symbols):
+        typer.echo(f"  {symbol}")
+
+
+@categories_app.command("backtest")
+def categories_backtest(
+    category: str = typer.Argument(..., help='e.g. "Nifty PSU Bank" (see universe.csv index).'),
+    start: str = _START,
+    end: str | None = typer.Option(None, help="Last week (default: latest outer price data)."),
+    mode: str = typer.Option(
+        "narrow", help='"narrow" (official snapshot only) or "broad" (+ category_extras.csv).'
+    ),
+    top_n: int = typer.Option(2, help="Individual stocks held per in-favour category."),
+    exit_rank: int = typer.Option(8, help="Inner rotation threshold (sell once rank passes this)."),
+) -> None:
+    """Run the category-momentum composition end to end: resolve `category`'s
+    member stocks, run the inner top-K stock rotation (categories/compose.py),
+    splice its equity curve in as `category`'s price in the outer engine, and
+    run the existing, unmodified outer backtest over universe.csv. Prints a
+    quick CAGR comparison plus any detected corporate-action-like splits
+    (categories/prices.py) -- a full report needs `report.write_result`,
+    not wired up here.
+    """
+    from . import metrics
+    from .categories.compose import run_inner_category_backtest, splice_category_into_outer_prices
+    from .categories.resolve import CategoryDataNotFoundError
+    from .engine import run_backtest
+
+    prices, includes = _load_inputs()
+    if category not in prices.columns:
+        typer.echo(f"{category!r} is not a column of weekly_closes.csv -- check universe.csv")
+        raise typer.Exit(2)
+
+    try:
+        inner = run_inner_category_backtest(
+            category,
+            mode=mode,  # type: ignore[arg-type]
+            top_n=top_n,
+            exit_rank=exit_rank,
+            start=start,
+            end=end,
+            outer_prices=prices,
+            data_dir=_categories_data_dir(),
+            curated_dir=_categories_curated_dir(),
+            stocks_data_dir=DATA_DIR / "stocks",
+        )
+    except (CategoryDataNotFoundError, ValueError, FileNotFoundError) as error:
+        typer.echo(str(error))
+        raise typer.Exit(1) from None
+
+    typer.echo(
+        f"inner universe ({len(inner.universe_symbols)} symbols): "
+        + ", ".join(inner.universe_symbols)
+    )
+    if inner.events.empty:
+        typer.echo("no corporate-action-like events detected")
+    else:
+        typer.echo(f"{len(inner.events)} corporate-action-like event(s) detected:")
+        typer.echo(inner.events.to_string(index=False))
+    no_event_stale = {
+        col: week
+        for col, week in inner.stale_columns.items()
+        if col not in set(inner.events["symbol"]) | set(inner.events["new_column"])
+    }
+    if no_event_stale:
+        typer.echo(
+            f"{len(no_event_stale)} column(s) went stale with no detected event (e.g. a "
+            "plain symbol rename -- see prices.py's module docstring):"
+        )
+        for col, week in sorted(no_event_stale.items()):
+            typer.echo(f"  {col}: last real data {week.date()}")
+    typer.echo(f"\ninner CAGR: {metrics.cagr(inner.result.equity):+.2%}")
+
+    spliced = splice_category_into_outer_prices(prices, category, inner.result.equity)
+    outer_config = _config(
+        defensive="off",
+        lookbacks="1,4,13,26,52",
+        weights="",
+        top_n=5,
+        exit_rank=10,
+        cost_pct=0.10,
+        filter_lookback=13,
+        start=start,
+        include_optional=False,
+        signal_delay=0,
+        portfolio="buffer",
+        entry="wait",
+        max_position=0.35,
+        track="index",
+        execution="fri_close",
+        end=end,
+    )
+    outer_result = run_backtest(spliced, includes, outer_config)
+    typer.echo(f"outer CAGR (with {category!r} replaced by the inner rotation): "
+               f"{metrics.cagr(outer_result.equity):+.2%}")
+
+
+@categories_app.command("fetch-universe")
+def categories_fetch_universe(
+    from_year: int = typer.Option(2016, "--from-year", help="First year to resolve for."),
+    to_year: int | None = typer.Option(None, "--to-year", help="Last year (default: this year)."),
+) -> None:
+    """Fetch/refresh data/categories/total_market_membership.csv -- point-in-time membership of
+    NSE's own Nifty Total Market index (Nifty 500 + Microcap 250, ~755 names), the "Broad
+    Momentum" feature's base universe (TODO.md 3.9.13 Step 1). Same three-tier Wayback
+    resolution as `categories fetch`, generalised to this one (label, slug) pair.
+    """
+    from datetime import date as date_cls
+
+    from .categories import broad
+    from .stocks.nse import NseClient
+
+    years = list(range(from_year, (to_year or date_cls.today().year) + 1))
+    data_dir = _categories_data_dir()
+    client = NseClient()
+
+    typer.echo(f"resolving {len(years)} year(s) ({years[0]}-{years[-1]}) for Total Market...")
+    summary = broad.run_fetch_total_market(data_dir, client, years)
+
+    typer.echo(f"\nwrote {summary.rows_written} row(s) in {summary.elapsed_seconds:.1f}s:")
+    if summary.tier_counts:
+        typer.echo("source tiers (report-row count):")
+        for tier, n in sorted(summary.tier_counts.items()):
+            typer.echo(f"  {tier:<22} {n}")
+    typer.echo(f"  {data_dir / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME}")
+    typer.echo(f"  {data_dir / broad.TOTAL_MARKET_FETCH_REPORT_FILENAME}")
+
+
+@categories_app.command("broad-backtest")
+def categories_broad_backtest(
+    mode: str = typer.Option(
+        "on", "--mode", help='Category mode: "on" (funnel) | "off" (direct top-N).'
+    ),
+    start: str = _START,
+    end: str | None = typer.Option(None, help="Last week (default: latest data)."),
+    pool_top_n: int = typer.Option(200, help="Qualifying pool size."),
+    pool_exit_rank: int = typer.Option(250, help="Pool exit buffer."),
+    coverage_floor: float = typer.Option(0.40, help="Min qualifying-member share for a category."),
+    category_top_n: int = typer.Option(4, help="Categories/atomics freshly held (ON mode)."),
+    category_exit_rank: int = typer.Option(8, help="Category exit buffer (ON mode)."),
+    picks_per_category: int = typer.Option(2, help="Top-K stocks per held category (ON mode)."),
+    off_top_n: int = typer.Option(10, help="Individual stocks held (OFF mode, \"SL\")."),
+    off_exit_rank: int = typer.Option(20, help="Individual-stock exit buffer (OFF mode)."),
+    rebalance: str = typer.Option("weekly", help="Trading cadence: weekly | monthly."),
+    cost_pct: float = _COST,
+) -> None:
+    """Run the full Broad Momentum backtest end to end (TODO.md 3.9.13 Steps 2-4) and print a
+    quick CAGR/max-drawdown/turnover summary -- the fast manual-verification path used while
+    building/sweeping this feature, ahead of the `mbt ui` "Broad Momentum" tab.
+    """
+    from . import metrics
+    from .categories import broad
+
+    if mode not in ("on", "off"):
+        typer.echo('--mode must be "on" or "off"')
+        raise typer.Exit(2)
+
+    prices, _includes = _load_inputs()
+    try:
+        outcome = broad.run_broad_backtest(
+            outer_prices=prices,
+            stocks_data_dir=DATA_DIR / "stocks",
+            categories_data_dir=_categories_data_dir(),
+            curated_dir=_categories_curated_dir(),
+            category_mode=mode,  # type: ignore[arg-type]
+            start=start,
+            end=end,
+            pool_top_n=pool_top_n,
+            pool_exit_rank=pool_exit_rank,
+            coverage_floor=coverage_floor,
+            category_top_n=category_top_n,
+            category_exit_rank=category_exit_rank,
+            picks_per_category=picks_per_category,
+            off_top_n=off_top_n,
+            off_exit_rank=off_exit_rank,
+            rebalance=rebalance,  # type: ignore[arg-type]
+            cost_pct=cost_pct,
+        )
+    except (broad.TotalMarketDataNotFoundError, ValueError) as error:
+        typer.echo(str(error))
+        raise typer.Exit(1) from None
+
+    result = outcome.result
+    typer.echo(f"mode: {mode}")
+    typer.echo(f"CAGR: {metrics.cagr(result.equity):+.2%}")
+    typer.echo(f"max drawdown: {metrics.max_drawdown(result.equity)[0]:+.2%}")
+    typer.echo(f"benchmark CAGR: {metrics.cagr(result.benchmark):+.2%}")
+    typer.echo(f"trades: {len(result.trades)}")
+    if outcome.held_by_week:
+        last_week = max(outcome.held_by_week)
+        typer.echo(f"held as of {last_week.date()}: {outcome.held_by_week[last_week]}")
 
 
 @app.command()

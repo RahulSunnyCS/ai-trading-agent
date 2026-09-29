@@ -1,0 +1,52 @@
+[
+  {
+    "symbol": "SIMBHSUGAR",
+    "series": "EQ",
+    "isin": "INE270C01017",
+    "faceVal": "10",
+    "exDate": "03-Jan-2011",
+    "recDate": "-",
+    "comp": "Simbhaoli Sugars Limited",
+    "subject": "Annual General Meeting"
+  },
+  {
+    "symbol": "OIL",
+    "series": "EQ",
+    "isin": "INE274J01014",
+    "faceVal": "10",
+    "exDate": "03-Jan-2011",
+    "recDate": "04-Jan-2011",
+    "comp": "Oil India Limited",
+    "subject": "Interim Dividend-Rs.18/- Per Share"
+  },
+  {
+    "symbol": "OIL",
+    "series": "EQ",
+    "isin": "INE274J01014",
+    "faceVal": "10",
+    "exDate": "03-Jan-2011",
+    "recDate": "04-Jan-2011",
+    "comp": "Oil India Limited",
+    "subject": "Interim Dividend-Rs.18/- Per Share"
+  },
+  {
+    "symbol": "TESTCO",
+    "series": "EQ",
+    "isin": "INE000T01011",
+    "faceVal": "10",
+    "exDate": "15-Feb-2011",
+    "recDate": "-",
+    "comp": "Test Company Limited",
+    "subject": "Bonus 1:1"
+  },
+  {
+    "symbol": "TESTCO",
+    "series": "EQ",
+    "isin": "INE000T01011",
+    "faceVal": "10",
+    "exDate": "20-Mar-2011",
+    "recDate": "-",
+    "comp": "Test Company Limited",
+    "subject": "Rights 1:15 @ Premium Rs 1247"
+  }
+]

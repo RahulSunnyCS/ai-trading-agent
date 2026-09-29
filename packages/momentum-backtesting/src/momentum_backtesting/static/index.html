@@ -10,24 +10,85 @@
 <body>
 <div class="layout">
   <aside class="sidebar" id="sidebar">
+    <nav class="tabs" id="dataset-tabs">
+      <button type="button" data-dataset="etf" class="active">ETFs</button>
+      <button type="button" data-dataset="stock">Nifty 50 Stocks</button>
+      <button type="button" data-dataset="custom_index">Custom Index</button>
+      <button type="button" data-dataset="broad">Broad Momentum</button>
+      <button type="button" data-dataset="momentum_scores">Momentum Scores</button>
+    </nav>
     <header class="brand">
       <h1>Momentum backtest</h1>
       <p class="muted" id="data-range">Loading data…</p>
     </header>
 
-    <section class="panel">
-      <h2>ETFs <span class="count" id="universe-count"></span></h2>
-      <div class="chips">
-        <button type="button" data-preset="core">Core</button>
-        <button type="button" data-preset="all">All</button>
-        <button type="button" data-preset="equity">Equity only</button>
-        <button type="button" data-preset="none">None</button>
+    <section class="panel" id="universe-panel">
+      <button type="button" class="panel-header" aria-expanded="true" aria-controls="panel-body-universe">
+        <span id="universe-heading">ETFs <span class="count" id="universe-count"></span></span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-universe">
+        <div class="chips" id="universe-presets"></div>
+        <div id="universe"></div>
       </div>
-      <div id="universe"></div>
+    </section>
+
+    <section class="panel" id="broad-panel" hidden>
+      <button type="button" class="panel-header" aria-expanded="true" aria-controls="panel-body-broad">
+        <span>Broad Momentum universe</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-broad">
+      <p class="hint">Every stock ever in NSE's own Nifty Total Market index (~755 names),
+        gated by point-in-time membership and a quarterly-refreshed top-N momentum pool - see
+        TODO.md 3.9.13. No per-instrument picker: what's eligible changes every quarter.</p>
+      <label class="radio"><input type="radio" name="broad_category_mode" value="on" checked>
+        <span><b>Category mode ON</b> — categories are re-ranked from the pool's survivors (average
+        member rank, coverage-floor gated), each held category contributes its top stocks; Gold/
+        Silver/Nasdaq 100/Hang Seng compete alongside categories</span></label>
+      <label class="radio"><input type="radio" name="broad_category_mode" value="off">
+        <span><b>Category mode OFF</b> — skip the category layer entirely; rank individual stocks
+        directly off the pool, same mechanism as the Nifty 50 Stock tab, just over the 755-name
+        universe</span></label>
+
+      <div class="row">
+        <label title="How many of the top-momentum, currently-qualifying stocks form the pool.">Pool top N
+          <input type="number" id="broad_pool_top_n" min="10" max="500" value="200"></label>
+        <label title="A pool stock is only dropped once its rank falls past this (hysteresis).">Pool exit rank
+          <input type="number" id="broad_pool_exit_rank" min="10" max="700" value="300"></label>
+      </div>
+      <p class="hint">The pool refreshes quarterly (fixed for the quarter); each pool member's own
+        rank still updates weekly.</p>
+
+      <div id="broad-on-options">
+        <div class="row">
+          <label title="A category needs at least this share of its members in the pool to be scored at all.">Coverage floor %
+            <input type="number" id="broad_coverage_floor" min="0" max="100" step="5" value="40"></label>
+        </div>
+        <div class="row">
+          <label>Categories held (fresh) <input type="number" id="broad_category_top_n" min="1" max="20" value="4"></label>
+          <label>Sell a category when rank &gt; <input type="number" id="broad_category_exit_rank" min="1" max="40" value="8"></label>
+        </div>
+        <div class="row">
+          <label>Top stocks per category <input type="number" id="broad_picks_per_category" min="1" max="5" value="2"></label>
+        </div>
+        <p class="hint" id="broad-rule-hint"></p>
+      </div>
+      <div id="broad-off-options" hidden>
+        <div class="row">
+          <label>Top N (SL) <input type="number" id="broad_off_top_n" min="1" max="50" value="10"></label>
+          <label>Sell when rank &gt; <input type="number" id="broad_off_exit_rank" min="1" max="100" value="20"></label>
+        </div>
+      </div>
+      </div>
     </section>
 
     <section class="panel">
-      <h2>Period</h2>
+      <button type="button" class="panel-header" aria-expanded="true" aria-controls="panel-body-period">
+        <span>Period</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-period">
       <div class="row">
         <label>From <input type="date" id="start"></label>
         <label>To <input type="date" id="end"></label>
@@ -40,26 +101,48 @@
         <button type="button" data-period="2022-now">2022–now</button>
       </div>
       <p class="hint" id="period-hint"></p>
-    </section>
-
-    <section class="panel">
-      <h2>Ranking rule</h2>
-      <p class="hint">Each lookback's return is ranked (1 = best); score = Σ rank × weight. Lowest score wins.</p>
-      <table class="lookbacks">
-        <thead><tr><th>Weeks</th><th>Weight</th><th></th></tr></thead>
-        <tbody id="lookbacks"></tbody>
-      </table>
-      <div class="chips">
-        <button type="button" id="add-lookback">+ lookback</button>
-        <button type="button" data-lb="equal">Equal 1·4·13·26·52</button>
-        <button type="button" data-lb="recency">Recency tilt</button>
-        <button type="button" data-lb="long">4·13·26·52</button>
-        <button type="button" data-lb="short">1·4·13</button>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Portfolio rule</h2>
+      <button type="button" class="panel-header" aria-expanded="false" aria-controls="panel-body-ranking">
+        <span>Ranking rule</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-ranking">
+      <div class="row" id="score-row" hidden>
+        <label>Score
+          <select id="score">
+            <option value="ranksum">Rank-sum (default)</option>
+            <option value="voladj">Volatility-adjusted</option>
+            <option value="blend">Blend (rank-sum + vol-adj)</option>
+          </select></label>
+      </div>
+      <label class="inline" id="voladj-skip-row" hidden>
+        <input type="checkbox" id="voladj_skip_recent_month" checked> Skip most recent month</label>
+      <div id="lookback-panel">
+        <p class="hint">Each lookback's return is ranked (1 = best); score = Σ rank × weight. Lowest score wins.</p>
+        <table class="lookbacks">
+          <thead><tr><th>Weeks</th><th>Weight</th><th></th></tr></thead>
+          <tbody id="lookbacks"></tbody>
+        </table>
+        <div class="chips">
+          <button type="button" id="add-lookback">+ lookback</button>
+          <button type="button" data-lb="equal">Equal 1·4·13·26·52</button>
+          <button type="button" data-lb="recency">Recency tilt</button>
+          <button type="button" data-lb="long">4·13·26·52</button>
+          <button type="button" data-lb="short">1·4·13</button>
+        </div>
+      </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <button type="button" class="panel-header" aria-expanded="true" aria-controls="panel-body-portfolio">
+        <span>Portfolio rule</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-portfolio">
       <label class="radio"><input type="radio" name="portfolio" value="buffer" checked>
         <span><b>Buffer</b> — buy the top N, hold until rank passes the exit rank, reinvest sales equally across the top N</span></label>
       <label class="radio"><input type="radio" name="portfolio" value="slots">
@@ -72,29 +155,81 @@
           <span><b>Make room</b> — buy now, trimming every holding equally</span></label>
       </div>
       <div class="row" id="cap-options">
-        <label>Max per ETF % <input type="number" id="max_position" min="0" max="100" step="5" value="35"></label>
+        <label><span id="max-position-label">Max per ETF %</span> <input type="number" id="max_position" min="0" max="100" step="5" value="35"></label>
         <label>Trim when above by (pts) <input type="number" id="cap_band" min="0" max="50" step="1" value="5"></label>
       </div>
+      <div class="row" id="momentum-sizing-row" hidden>
+        <label class="inline"><input type="checkbox" id="momentum_sizing"> Win-rate position sizing — shrink new/top-up buys after recent losing trades, ramp back to full size as they recover (sits entirely in cash in the worst case)</label>
+      </div>
+      <div class="row" id="momentum-sizing-options" hidden>
+        <label title="How many of the most-recent closed trades feed the weighted win-rate score. Shorter reacts faster to a fresh streak but is noisier; longer is steadier but slower to recover.">Sizing window (trades) <input type="number" id="momentum_sizing_window" min="1" max="52" value="10"></label>
+        <label title="Floor on the multiplier — 0% means an all-loss streak can deploy nothing (full cash); a higher floor keeps at least that much invested even at the worst recent win rate.">Min size floor % <input type="number" id="momentum_sizing_floor" min="0" max="100" step="5" value="0"></label>
+      </div>
       <div class="row">
+        <label>Rebalance
+          <select id="rebalance">
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly (month-end only)</option>
+          </select></label>
+      </div>
+      <div class="row" id="rank-rule-row">
         <label>Top N <input type="number" id="top_n" min="1" max="20" value="5"></label>
         <label>Sell when rank &gt; <input type="number" id="exit_rank" min="1" max="40" value="10"></label>
       </div>
       <p class="hint" id="rule-hint"></p>
+      </div>
     </section>
 
-    <section class="panel">
-      <h2>Crash protection</h2>
+    <section class="panel" id="inner-rotation-panel" hidden>
+      <button type="button" class="panel-header" aria-expanded="true" aria-controls="panel-body-inner-rotation">
+        <span>Inner rotation (stocks within each category)</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-inner-rotation">
+      <p class="hint">Each held category is itself a rotation: the top-K individual stocks currently tagged to that category, rotated on their own tighter threshold. This is separate from the category-vs-category rule above.</p>
+      <div class="row">
+        <label>Stocks held per category <input type="number" id="inner_top_n" min="1" max="10" value="2"></label>
+        <label>Sell from a category when its inner rank &gt; <input type="number" id="inner_exit_rank" min="1" max="40" value="8"></label>
+      </div>
+      <p class="hint">Gold/Silver and Cash/Gilt can each occupy more than one ranked slot at once when their own momentum is strong enough (tied duplicate entries win adjacent ranks) &mdash; 1 = ordinary single-instrument behaviour.</p>
+      <div class="row">
+        <label>Gold/Silver slots (max each) <input type="number" id="commodity_copies" min="1" max="10" value="1"></label>
+        <label>Cash/Gilt slots (max each) <input type="number" id="debt_copies" min="1" max="10" value="1"></label>
+      </div>
+      </div>
+    </section>
+
+    <section class="panel" id="crash-protection-panel">
+      <button type="button" class="panel-header" aria-expanded="false" aria-controls="panel-body-crash">
+        <span>Crash protection</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-crash">
       <label class="radio"><input type="radio" name="defensive" value="off" checked><span><b>Off</b> — always invested</span></label>
       <label class="radio"><input type="radio" name="defensive" value="ranked"><span><b>Debt in ranking</b> — selected Debt rows compete like any ETF</span></label>
       <label class="radio"><input type="radio" name="defensive" value="filter"><span><b>Cash filter</b> — only hold ETFs beating cash over</span></label>
       <label class="inline" id="filter-weeks">
         <input type="number" id="filter_lookback" min="1" max="104" value="13"> weeks</label>
+      </div>
     </section>
 
     <section class="panel">
-      <h2>Execution &amp; tax</h2>
+      <button type="button" class="panel-header" aria-expanded="false" aria-controls="panel-body-execution">
+        <span>Execution &amp; tax</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-execution">
+      <div class="row" id="cost-model-row" hidden>
+        <label>Cost model
+          <select id="cost_model">
+            <option value="flat">Flat % per side</option>
+            <option value="itemised">Itemised (STT, stamp duty, fees, slippage, DP)</option>
+          </select></label>
+      </div>
       <div class="row">
-        <label>Cost per side % <input type="number" id="cost_pct" min="0" max="5" step="0.05" value="0.10"></label>
+        <label id="cost-pct-field">Cost per side % <input type="number" id="cost_pct" min="0" max="5" step="0.05" value="0.10"></label>
+        <label id="capital-field" hidden>Capital ₹ <input type="number" id="capital" min="1" step="1000" value="1000000"></label>
+        <label id="slippage-field" hidden>Slippage (bps) <input type="number" id="slippage_bps" min="0" step="0.5" value="5"></label>
         <label>Trade
           <select id="signal_delay">
             <option value="0">at the signal close</option>
@@ -102,7 +237,7 @@
             <option value="2">2 weeks later</option>
           </select></label>
       </div>
-      <div class="row">
+      <div class="row" id="trackfill-row">
         <label title="The ranking always uses the index. This picks what the P&amp;L is measured on.">P&amp;L on
           <select id="track">
             <option value="index">the index (underlying)</option>
@@ -115,7 +250,7 @@
             <option value="mon_10am">Monday 10:00</option>
           </select></label>
       </div>
-      <div class="row">
+      <div class="row" id="tax-row">
         <label class="inline"><input type="checkbox" id="tax"> Apply capital-gains tax</label>
         <label>Slab
           <select id="slab_rate">
@@ -124,6 +259,7 @@
           </select></label>
       </div>
       <label>Benchmark <select id="benchmark"></select></label>
+      </div>
     </section>
 
     <div class="run-bar">
@@ -141,11 +277,14 @@
         <div class="chart-tools">
           <span class="legend-note">Dots mark rotation weeks — hover for what went out and came in.</span>
           <label class="inline"><input type="checkbox" id="log-scale"> Log scale</label>
+          <label class="inline" id="hover-detail-wrap" hidden title="Custom Index only: also name the stock(s) that moved inside a category, not just the category">
+            <input type="checkbox" id="hover-stock-detail"> Show stock-level detail in hover</label>
         </div>
         <div id="main-chart"></div>
       </div>
       <nav class="tabs" id="tabs">
         <button type="button" data-tab="signal" class="active">This week</button>
+        <button type="button" data-tab="categories" id="categories-tab" hidden>Held categories</button>
         <button type="button" data-tab="trades">Trades</button>
         <button type="button" data-tab="timeline">Holdings timeline</button>
         <button type="button" data-tab="etfs">ETFs</button>
@@ -154,6 +293,7 @@
         <button type="button" data-tab="runs">Run history <span class="count" id="runs-count"></span></button>
       </nav>
       <section class="card tab" data-panel="signal"></section>
+      <section class="card tab" data-panel="categories" hidden></section>
       <section class="card tab" data-panel="trades" hidden></section>
       <section class="card tab" data-panel="timeline" hidden><div id="timeline-chart"></div></section>
       <section class="card tab" data-panel="etfs" hidden></section>
@@ -162,6 +302,25 @@
       <section class="card tab" data-panel="runs" hidden></section>
     </div>
   </main>
+</div>
+<div class="momentum-scores-view" id="momentum-scores-view" hidden>
+  <div class="status" id="ms-status">Loading momentum scores…</div>
+  <div id="ms-content" hidden>
+    <div class="ms-header">
+      <h2 class="run-title">Momentum Scores <span class="muted" id="ms-asof"></span></h2>
+      <nav class="tabs" id="ms-tabs">
+        <button type="button" data-ms-tab="stocks" class="active">Stocks</button>
+        <button type="button" data-ms-tab="sectors">Sectors</button>
+      </nav>
+    </div>
+    <p class="ms-note">Percentile rank within the ~755-name Nifty Total Market universe, as of
+      the latest available week (4/13/26-week lookbacks standing in for 1M/3M/6M — weekly-close
+      data, not exact calendar months). 100 = best in the universe over that window, 0 = worst.
+      No market-cap data exists in this repo, so last price and its 1-week change stand in for
+      it rather than an invented figure.</p>
+    <section class="card tab" data-ms-panel="stocks"></section>
+    <section class="card tab" data-ms-panel="sectors" hidden></section>
+  </div>
 </div>
 <div class="tooltip" id="tooltip" hidden></div>
 <script src="/static/app.js"></script>

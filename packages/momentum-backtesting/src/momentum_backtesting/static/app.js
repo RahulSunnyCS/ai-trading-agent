@@ -3,7 +3,30 @@
 // ---------------------------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------------------------
-const GROUP_ORDER = ["Broad", "Sector", "Thematic", "Commodity", "International", "Debt"];
+const GROUP_ORDER = {
+  etf: ["Broad", "Sector", "Thematic", "Commodity", "International", "Debt"],
+  stock: ["Current member", "Former member", "Commodity", "Debt"],
+  custom_index: ["Official (NSE)", "Custom", "Commodity", "International", "Debt"],
+};
+const UNIVERSE_PRESETS = {
+  etf: [
+    ["core", "Core"],
+    ["all", "All"],
+    ["equity", "Equity only"],
+    ["none", "None"],
+  ],
+  stock: [
+    ["core", "Current members"],
+    ["all", "All ever-members (recommended)"],
+    ["none", "None"],
+  ],
+  custom_index: [
+    ["all", "All (recommended)"],
+    ["official", "Official (NSE) only"],
+    ["custom", "Custom only"],
+    ["none", "None"],
+  ],
+};
 const LOOKBACK_PRESETS = {
   equal: [[1, 1], [4, 1], [13, 1], [26, 1], [52, 1]],
   recency: [[1, 1.5], [4, 1.25], [13, 1], [26, 1], [52, 0.8]],
@@ -13,10 +36,51 @@ const LOOKBACK_PRESETS = {
 const RUN_COLORS = ["#8b5cf6", "#10b981", "#ef4444", "#0ea5e9", "#d946ef", "#84cc16", "#f97316", "#64748b"];
 const MAX_RUNS = 12;
 
-let meta = null;
+let activeDataset = "etf";
+let metaByDataset = {}; // dataset -> /api/meta response, fetched lazily and cached per tab
+let lastResultByDataset = {}; // dataset -> { result, config } of its last successful run
+let meta = null; // always metaByDataset[activeDataset] - kept as a bare global so the rest of
+                  // this file (largely dataset-agnostic) can keep reading `meta` directly
 let lastResult = null;
 let lastConfig = null;
-let runs = loadRuns();
+let runs = []; // run history for the active dataset (see loadRunsFor/saveRuns)
+
+// Momentum Scores page (TODO.md 3.9.16): a live/current-state snapshot, not a backtest config+
+// run dataset, so it's fetched once and cached here rather than going through
+// metaByDataset/lastResultByDataset (which key on a backtest's own request/result shape).
+let momentumScoresData = null;
+
+// Custom Index only: whether the main chart's Rotations hover includes stock-level (inner)
+// detail (`innerEventLine`/`innerHoldingsLine`, below) or stays category-only. A display
+// preference, not a backtest parameter - it never goes into `mbt.config.*` (readConfig/
+// applyConfig) or the request body, so it survives dataset switches and doesn't get bundled
+// into a saved run's config. Defaults ON: 3.9.7 already shipped the coincident-trade version of
+// this unconditionally, so ON preserves that behaviour and this toggle is purely the requested
+// escape hatch for when the now-denser tooltip (see innerHoldingsLine) gets in the way.
+let showStockHover = (() => {
+  try {
+    const saved = localStorage.getItem("mbt.showStockHover");
+    return saved === null ? true : JSON.parse(saved);
+  } catch {
+    return true;
+  }
+})();
+
+// Sidebar accordion (TODO.md 3.9.14): a per-viewer display preference, same storage pattern as
+// showStockHover above - persisted collapse state per panel id, never folded into mbt.config.*.
+// Default open: universe, period, portfolio (the most-tuned controls this session's own use of
+// the tool bears out). Default collapsed: ranking, crash, execution (set-and-forget for most
+// sessions). "broad" and "inner-rotation" are deliberately excluded from persistence - both are
+// already dataset-conditionally hidden/shown (see syncDependentFields), and reset to expanded on
+// every hidden->visible reveal rather than remembering a manual collapse across tab switches.
+const PANEL_DEFAULT_COLLAPSED = { ranking: true, crash: true, execution: true };
+let panelCollapsed = (() => {
+  try {
+    return JSON.parse(localStorage.getItem("mbt.panelCollapsed") || "null") || {};
+  } catch {
+    return {};
+  }
+})();
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -60,36 +124,164 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+// Trades/timeline/rotations/instruments identify a stock by its raw company_id (e.g. "C0042") -
+// the same id the engine ranks and trades on. `lastResult.companies` (present only for
+// dataset="stock") maps that id to the real company name; ETF results carry no `companies` map,
+// so this falls back to the id unchanged (ETF names are already human-readable). Use this ONLY
+// for what's rendered on screen - the raw id stays the CSV/sort/search/chart-series key.
+function displayName(id) {
+  return (lastResult && lastResult.companies && lastResult.companies[id]) || id;
+}
+
+// Custom Index only: `lastResult.inner_categories[categoryName]` (present only for
+// dataset="custom_index", see api.py's _inner_category_detail) is that category's own
+// within-category stock rotation - `trades` (raw BUY/SELL/... rows, same shape the outer
+// chart's Rotations hover already reads) and `holdings_now` (what it holds as of the backtest's
+// own latest week). Inner trades identify a stock by its raw NSE ticker (e.g. "DIVISLAB") - this
+// dataset has no company_id-style id/name split the way stock mode does (see api.py's
+// _inner_category_detail docstring), so `lastResult.companies` never has an entry for one and
+// displayName() already falls back to the raw ticker unchanged - same convention stock mode
+// itself falls back to when a name isn't known.
+function innerDetailFor(categoryName) {
+  return (lastResult && lastResult.inner_categories && lastResult.inner_categories[categoryName]) || null;
+}
+function innerHoldingsText(categoryName) {
+  const inner = innerDetailFor(categoryName);
+  if (!inner || !inner.holdings_now.length) return "";
+  return inner.holdings_now.map((h) => `${displayName(h.asset)} ${pct(h.share, 0)}`).join(", ");
+}
+function innerTradesOnWeek(categoryName, week) {
+  const inner = innerDetailFor(categoryName);
+  if (!inner || !week) return [];
+  return inner.trades.filter((t) => t.week === week);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------------------------
+function datasetLabel(dataset) {
+  return { etf: "ETF", stock: "Nifty 50 stock", custom_index: "category", broad: "Broad Momentum" }[dataset] || dataset;
+}
+
+function dataRangeText() {
+  const range = `Data ${fmtDate(meta.first_week)} → ${fmtDate(meta.last_week)}`;
+  // "broad" has no fixed instrument count to report (see _broad_meta's docstring - what's
+  // eligible changes every quarter) - showing "0 instruments" would read as a bug, not a design.
+  return activeDataset === "broad" ? range : `${range} · ${meta.instruments.length} instruments`;
+}
+
+async function fetchMeta(dataset) {
+  const res = await fetch(`/api/meta?dataset=${dataset}`);
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.detail || res.statusText);
+  return body;
+}
+
 async function init() {
+  // The URL hash (if any) carries the full config of the run that produced it, including which
+  // dataset was active - restore that tab rather than always booting on ETFs.
+  const fromHash = decodeHash();
+  activeDataset = fromHash && ["stock", "custom_index", "broad"].includes(fromHash.dataset) ? fromHash.dataset : "etf";
+  runs = loadRunsFor(activeDataset);
+  $$("#dataset-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.dataset === activeDataset));
+
   try {
-    const res = await fetch("/api/meta");
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.detail || res.statusText);
-    meta = body;
+    meta = await fetchMeta(activeDataset);
+    metaByDataset[activeDataset] = meta;
   } catch (err) {
     setStatus(`Couldn't load data: ${err.message}`, true);
     $("#data-range").textContent = "No data";
     return;
   }
-  $("#data-range").textContent =
-    `Data ${fmtDate(meta.first_week)} → ${fmtDate(meta.last_week)} · ${meta.instruments.length} instruments`;
+  $("#data-range").textContent = dataRangeText();
   buildUniverse();
   buildBenchmarks();
   bindEvents();
-  applyConfig(initialConfig());
+  initPanelAccordion();
+  applyConfig(initialConfig(true));
   renderRuns();
   if (typeof Plotly === "undefined") {
     setStatus("The chart library didn't load (it's downloaded once from the internet). Check your connection and reload.", true);
   }
 }
 
+async function switchDataset(dataset) {
+  if (dataset === activeDataset) return;
+  const leavingMomentumScores = activeDataset === "momentum_scores";
+  activeDataset = dataset;
+  $$("#dataset-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.dataset === dataset));
+
+  // Momentum Scores replaces the whole .layout (sidebar + results) with its own full-width
+  // view (see index.html) rather than reshaping the backtest config+run form the other four
+  // datasets share - it has no config at all, so there's nothing to reshape.
+  if (dataset === "momentum_scores") {
+    $(".layout").hidden = true;
+    $("#momentum-scores-view").hidden = false;
+    await loadMomentumScores();
+    return;
+  }
+  if (leavingMomentumScores) {
+    $("#momentum-scores-view").hidden = true;
+    $(".layout").hidden = false;
+  }
+  runs = loadRunsFor(dataset);
+
+  if (!metaByDataset[dataset]) {
+    setStatus(`Loading ${datasetLabel(dataset)} data…`);
+    try {
+      metaByDataset[dataset] = await fetchMeta(dataset);
+    } catch (err) {
+      setStatus(`Couldn't load data: ${err.message}`, true);
+      return;
+    }
+  }
+  meta = metaByDataset[dataset];
+  $("#data-range").textContent = dataRangeText();
+  buildUniverse();
+  buildBenchmarks();
+
+  // Reshape the same one-screen form and reuse the same results area: if this tab already has a
+  // run from earlier in the session, bring it straight back (form + results together, so they
+  // never show a mismatched pair); otherwise reset to that dataset's own defaults/last-saved
+  // config and wait for a new run, exactly like a fresh page load for it.
+  const saved = lastResultByDataset[dataset];
+  if (saved) {
+    applyConfig(saved.config);
+    lastResult = saved.result;
+    lastConfig = saved.config;
+    $("#results").hidden = false;
+    render(saved.result, saved.config);
+    setStatus("");
+  } else {
+    applyConfig(initialConfig(false));
+    lastResult = null;
+    lastConfig = null;
+    $("#results").hidden = true;
+    setStatus("Choose settings and run a backtest.");
+  }
+  renderRuns();
+}
+
 function defaultConfig() {
   const d = meta.defaults;
+  // The whole point of the stock dataset is to avoid survivorship bias, so it must default to
+  // EVERY company that has ever been a Nifty 50 member (has_data is always true for stocks) -
+  // not just today's constituents. Defaulting to only-current would silently defeat that.
+  // Custom Index defaults to every resolvable category too - the diversification this tab
+  // exists for comes from the outer top_n cap holding only N of them at once, not from the user
+  // pre-narrowing the ranked pool (see the "Custom Index" design note at the top of
+  // categories/compose.py).
+  // "broad" has no per-instrument picker at all (see buildUniverse) - the backend still
+  // requires a non-empty `universe` list, so a fixed sentinel is sent and simply ignored
+  // server-side (see api._broad_backtest).
+  const universe = activeDataset === "broad"
+    ? ["*"]
+    : activeDataset === "stock" || activeDataset === "custom_index"
+    ? meta.instruments.filter((i) => i.has_data).map((i) => i.name)
+    : meta.instruments.filter((i) => i.include === "core" && i.has_data).map((i) => i.name);
   return {
-    universe: meta.instruments.filter((i) => i.include === "core" && i.has_data).map((i) => i.name),
+    dataset: activeDataset,
+    universe,
     start: d.start,
     end: meta.last_week,
     lookbacks: d.lookbacks,
@@ -100,6 +292,9 @@ function defaultConfig() {
     entry: d.entry,
     max_position: d.max_position,
     cap_band: d.cap_band,
+    momentum_sizing: d.momentum_sizing ?? false,
+    momentum_sizing_window: d.momentum_sizing_window ?? 10,
+    momentum_sizing_floor: d.momentum_sizing_floor ?? 0,
     defensive: d.defensive,
     filter_lookback: d.filter_lookback,
     cost_pct: d.cost_pct,
@@ -109,14 +304,39 @@ function defaultConfig() {
     tax: false,
     slab_rate: 0.3,
     benchmark: d.benchmark,
+    score: d.score || "ranksum",
+    voladj_skip_recent_month: d.voladj_skip_recent_month ?? true,
+    rebalance: d.rebalance || "weekly",
+    cost_model: d.cost_model || "flat",
+    capital: d.capital || 1000000,
+    slippage_bps: d.slippage_bps ?? 5,
+    inner_top_n: d.inner_top_n ?? 2,
+    inner_exit_rank: d.inner_exit_rank ?? 8,
+    commodity_copies: d.commodity_copies ?? 1,
+    debt_copies: d.debt_copies ?? 1,
+    broad_category_mode: d.broad_category_mode ?? "on",
+    broad_pool_top_n: d.broad_pool_top_n ?? 200,
+    broad_pool_exit_rank: d.broad_pool_exit_rank ?? 300,
+    broad_coverage_floor: d.broad_coverage_floor ?? 0.4,
+    broad_category_top_n: d.broad_category_top_n ?? 4,
+    broad_category_exit_rank: d.broad_category_exit_rank ?? 8,
+    broad_picks_per_category: d.broad_picks_per_category ?? 2,
+    broad_off_top_n: d.broad_off_top_n ?? 10,
+    broad_off_exit_rank: d.broad_off_exit_rank ?? 20,
   };
 }
 
-function initialConfig() {
-  const fromHash = decodeHash();
-  if (fromHash) return { ...defaultConfig(), ...fromHash };
+// `preferHash`: only the very first page load should adopt a #cfg= hash from the URL - once the
+// user has switched tabs, re-reading a stale hash (still describing whichever dataset was active
+// when that hash was written) would splice one dataset's universe/instrument names onto the
+// other. Tab switches always fall back to that dataset's own last-saved config instead.
+function initialConfig(preferHash) {
+  if (preferHash) {
+    const fromHash = decodeHash();
+    if (fromHash) return { ...defaultConfig(), ...fromHash };
+  }
   try {
-    const saved = JSON.parse(localStorage.getItem("mbt.config") || "null");
+    const saved = JSON.parse(localStorage.getItem(`mbt.config.${activeDataset}`) || "null");
     if (saved) return { ...defaultConfig(), ...saved };
   } catch { /* ignore */ }
   return defaultConfig();
@@ -134,18 +354,41 @@ function encodeHash(cfg) {
 // ---------------------------------------------------------------------------------------------
 // Sidebar: universe
 // ---------------------------------------------------------------------------------------------
+function buildUniversePresetChips() {
+  const box = $("#universe-presets");
+  box.innerHTML = UNIVERSE_PRESETS[activeDataset]
+    .map(([key, label]) => `<button type="button" data-preset="${key}">${esc(label)}</button>`)
+    .join("");
+  $$("[data-preset]", box).forEach((b) => b.addEventListener("click", () => applyUniversePreset(b.dataset.preset)));
+}
+
 function buildUniverse() {
+  // "broad": no per-instrument sidebar picker at all (see api._broad_meta's docstring) - the
+  // whole universe section is hidden and #broad-panel (its own settings) is shown instead, see
+  // syncDependentFields.
+  $("#universe-panel").hidden = activeDataset === "broad";
+  if (activeDataset === "broad") return;
+  const heading = { etf: "ETFs", stock: "Nifty 50 Stocks", custom_index: "Categories" }[activeDataset];
+  $("#universe-heading").innerHTML = `${heading} <span class="count" id="universe-count"></span>`;
+  buildUniversePresetChips();
   const root = $("#universe");
   root.innerHTML = "";
-  const groups = GROUP_ORDER.filter((g) => meta.instruments.some((i) => i.group === g));
+  const order = GROUP_ORDER[activeDataset];
+  const groups = order.filter((g) => meta.instruments.some((i) => i.group === g));
   for (const group of groups) {
     const items = meta.instruments.filter((i) => i.group === group);
     const box = document.createElement("div");
     box.className = "group";
     const note = group === "Debt"
-      ? `<span class="group-note">— ranked only in "Debt in ranking" mode</span>` : "";
+      ? `<span class="group-note">— ranked only in "Debt in ranking" mode</span>`
+      : group === "Former member"
+      ? `<span class="group-note">— include these too, or you're only testing survivorship-biased winners</span>`
+      : group === "Custom"
+      ? `<span class="group-note">— hand-curated theme, no official NSE index (see category_extras.csv)</span>`
+      : "";
     box.innerHTML = `<label class="group-head"><input type="checkbox" data-group="${esc(group)}"> ${esc(group)} ${note}</label>`;
     for (const inst of items) {
+      const label = inst.display_name || inst.name;
       const year = inst.first_week ? Number(inst.first_week.slice(0, 4)) : null;
       const late = year && year > 2016 ? `<span class="badge warn" title="Price history starts ${fmtDate(inst.first_week)}">from ${year}</span>` : "";
       const optional = inst.include === "optional" ? `<span class="badge">optional</span>` : "";
@@ -154,7 +397,7 @@ function buildUniverse() {
       row.className = "etf";
       row.title = inst.note || "";
       row.innerHTML = `<input type="checkbox" value="${esc(inst.name)}" data-member="${esc(group)}" ${inst.has_data ? "" : "disabled"}>
-        <span>${esc(inst.name)} <small>${esc(inst.trade_etf)}</small>${late}${optional}</span>
+        <span>${esc(label)} ${inst.trade_etf ? `<small>${esc(inst.trade_etf)}</small>` : ""}${late}${optional}</span>
         <span class="meta">${turnover}</span>`;
       box.appendChild(row);
     }
@@ -195,6 +438,8 @@ function applyUniversePreset(name) {
     core: (i) => i.include === "core",
     all: () => true,
     equity: (i) => ["Broad", "Sector", "Thematic"].includes(i.group),
+    official: (i) => i.group === "Official (NSE)",
+    custom: (i) => i.group === "Custom",
     none: () => false,
   }[name];
   setUniverse(meta.instruments.filter(pick).map((i) => i.name));
@@ -202,10 +447,15 @@ function applyUniversePreset(name) {
 
 function buildBenchmarks() {
   const sel = $("#benchmark");
-  sel.innerHTML = meta.instruments
-    .filter((i) => i.has_data)
-    .map((i) => `<option value="${esc(i.name)}">${esc(i.name)}</option>`)
-    .join("");
+  // ETF mode: benchmarks are just the tradeable instruments themselves. Stock and Custom Index
+  // modes have no "instrument" benchmarks - a stock TRI column or a category rotation isn't a
+  // sensible thing to benchmark other categories/stocks against, so the API hands back an
+  // explicit `benchmarks` list instead (Custom Index's is just ["Nifty 50"] - see api.py's
+  // _custom_index_meta).
+  const names = activeDataset === "stock" || activeDataset === "custom_index" || activeDataset === "broad"
+    ? meta.benchmarks
+    : meta.instruments.filter((i) => i.has_data).map((i) => i.name);
+  sel.innerHTML = names.map((name) => `<option value="${esc(name)}">${esc(name)}</option>`).join("");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -241,8 +491,10 @@ function setRadio(name, value) {
 
 function readConfig() {
   const lb = readLookbacks();
+  const broad = activeDataset === "broad";
   return {
-    universe: selectedUniverse(),
+    dataset: activeDataset,
+    universe: broad ? ["*"] : selectedUniverse(),
     start: $("#start").value,
     end: $("#end").value || null,
     lookbacks: lb.map((r) => r[0]),
@@ -253,6 +505,9 @@ function readConfig() {
     entry: radio("entry"),
     max_position: Number($("#max_position").value) > 0 ? Number($("#max_position").value) / 100 : null,
     cap_band: Number($("#cap_band").value) / 100,
+    momentum_sizing: $("#momentum_sizing").checked,
+    momentum_sizing_window: Number($("#momentum_sizing_window").value),
+    momentum_sizing_floor: Number($("#momentum_sizing_floor").value) / 100,
     defensive: radio("defensive"),
     filter_lookback: Number($("#filter_lookback").value),
     cost_pct: Number($("#cost_pct").value),
@@ -262,6 +517,28 @@ function readConfig() {
     tax: $("#tax").checked,
     slab_rate: Number($("#slab_rate").value),
     benchmark: $("#benchmark").value,
+    // score/cost_model: the selectors are now shown for every dataset (TODO.md 3.9.15 - all
+    // four already thread these through server-side), so the DOM value is read directly instead
+    // of being forced to the "off" default for a subset of datasets.
+    score: $("#score").value,
+    voladj_skip_recent_month: $("#voladj_skip_recent_month").checked,
+    rebalance: $("#rebalance").value,
+    cost_model: $("#cost_model").value,
+    capital: Number($("#capital").value) || 1000000,
+    slippage_bps: Number($("#slippage_bps").value),
+    inner_top_n: Number($("#inner_top_n").value),
+    inner_exit_rank: Number($("#inner_exit_rank").value),
+    commodity_copies: Number($("#commodity_copies").value) || 1,
+    debt_copies: Number($("#debt_copies").value) || 1,
+    broad_category_mode: broad ? radio("broad_category_mode") : "on",
+    broad_pool_top_n: Number($("#broad_pool_top_n").value) || 200,
+    broad_pool_exit_rank: Number($("#broad_pool_exit_rank").value) || 300,
+    broad_coverage_floor: Number($("#broad_coverage_floor").value) / 100,
+    broad_category_top_n: Number($("#broad_category_top_n").value) || 4,
+    broad_category_exit_rank: Number($("#broad_category_exit_rank").value) || 8,
+    broad_picks_per_category: Number($("#broad_picks_per_category").value) || 2,
+    broad_off_top_n: Number($("#broad_off_top_n").value) || 10,
+    broad_off_exit_rank: Number($("#broad_off_exit_rank").value) || 20,
   };
 }
 
@@ -277,6 +554,9 @@ function applyConfig(cfg) {
   setRadio("entry", cfg.entry);
   $("#max_position").value = cfg.max_position ? Math.round(cfg.max_position * 100) : 0;
   $("#cap_band").value = Math.round((cfg.cap_band ?? 0.05) * 100);
+  $("#momentum_sizing").checked = !!cfg.momentum_sizing;
+  $("#momentum_sizing_window").value = cfg.momentum_sizing_window ?? 10;
+  $("#momentum_sizing_floor").value = Math.round((cfg.momentum_sizing_floor ?? 0) * 100);
   setRadio("defensive", cfg.defensive);
   $("#filter_lookback").value = cfg.filter_lookback;
   $("#cost_pct").value = cfg.cost_pct;
@@ -286,6 +566,25 @@ function applyConfig(cfg) {
   $("#tax").checked = !!cfg.tax;
   $("#slab_rate").value = String(cfg.slab_rate);
   $("#benchmark").value = cfg.benchmark;
+  $("#score").value = cfg.score || "ranksum";
+  $("#voladj_skip_recent_month").checked = cfg.voladj_skip_recent_month ?? true;
+  $("#rebalance").value = cfg.rebalance || "weekly";
+  $("#cost_model").value = cfg.cost_model || "flat";
+  $("#capital").value = cfg.capital || 1000000;
+  $("#slippage_bps").value = cfg.slippage_bps ?? 5;
+  $("#inner_top_n").value = cfg.inner_top_n ?? 2;
+  $("#inner_exit_rank").value = cfg.inner_exit_rank ?? 8;
+  $("#commodity_copies").value = cfg.commodity_copies ?? 1;
+  $("#debt_copies").value = cfg.debt_copies ?? 1;
+  setRadio("broad_category_mode", cfg.broad_category_mode ?? "on");
+  $("#broad_pool_top_n").value = cfg.broad_pool_top_n ?? 200;
+  $("#broad_pool_exit_rank").value = cfg.broad_pool_exit_rank ?? 300;
+  $("#broad_coverage_floor").value = Math.round((cfg.broad_coverage_floor ?? 0.4) * 100);
+  $("#broad_category_top_n").value = cfg.broad_category_top_n ?? 4;
+  $("#broad_category_exit_rank").value = cfg.broad_category_exit_rank ?? 8;
+  $("#broad_picks_per_category").value = cfg.broad_picks_per_category ?? 2;
+  $("#broad_off_top_n").value = cfg.broad_off_top_n ?? 10;
+  $("#broad_off_exit_rank").value = cfg.broad_off_exit_rank ?? 20;
   syncDependentFields();
   validateLive();
 }
@@ -297,20 +596,140 @@ function syncDependentFields() {
   $("#cap_band").disabled = !(Number($("#max_position").value) > 0);
   $("#filter-weeks").style.display = radio("defensive") === "filter" ? "" : "none";
   $("#slab_rate").disabled = !$("#tax").checked;
-  const top = Number($("#top_n").value), exit = Number($("#exit_rank").value);
-  const cap = Number($("#max_position").value), band = Number($("#cap_band").value);
-  let hint = buffer
-    ? `Holds between ${top} and ${exit} ETFs: anything bought is kept until its rank passes ${exit}.`
-    : `Always ${top} positions; ranks ${top + 1}–${exit} are kept but block a new buy until sold.`;
-  if (buffer && cap > 0) {
-    hint += ` No ETF is bought past ${cap}%; one that grows past ${cap + band}% is trimmed back to ${cap}%.`;
-    if (top * cap < 100) hint += ` With top ${top} × ${cap}%, only ${top * cap}% can be invested — the rest waits in cash.`;
+
+  const stock = activeDataset === "stock";
+  const customIndex = activeDataset === "custom_index";
+  const broad = activeDataset === "broad";
+  $("#max-position-label").textContent =
+    customIndex ? "Max per category %" : broad ? "Max per position %" : stock ? "Max per stock %" : "Max per ETF %";
+  $("#inner-rotation-panel").hidden = !customIndex;
+  // Win-rate position sizing (buffer rule only): already backend-generic for every dataset via
+  // _config_kwargs (etf/stock/custom_index) and run_broad_backtest's own Config() call (broad,
+  // wired TODO.md 3.9.15) - was arbitrarily UI-gated to Custom Index only. Shown for all four now.
+  $("#momentum-sizing-row").hidden = false;
+  $("#momentum-sizing-options").hidden = false;
+  const sizingOn = $("#momentum_sizing").checked;
+  $("#momentum_sizing_window").disabled = !sizingOn;
+  $("#momentum_sizing_floor").disabled = !sizingOn;
+
+  // "Broad Momentum" settings panel: its own universe/rank-table section, category-mode ON/OFF
+  // sub-panels, and the generic Top N/exit-rank row (superseded by the broad panel's own
+  // top_n/exit_rank equivalents - see api._broad_backtest, which ignores req.top_n/exit_rank
+  // entirely for this dataset) hidden instead of left as dead controls. Crash protection/tax
+  // stay hidden too (TODO.md 3.9.15 audit, bucket (c) - see run_broad_backtest's own docstring:
+  // CASH never enters this dataset's external rank table, so "Debt in ranking" would silently
+  // do nothing, and tax has no equivalent stock/gold_silver classification for the 755-name
+  // Total Market universe) - genuinely dataset-specific, not the same arbitrary gating as the
+  // fields above.
+  $("#broad-panel").hidden = !broad;
+  if (broad) {
+    const on = radio("broad_category_mode") === "on";
+    $("#broad-on-options").hidden = !on;
+    $("#broad-off-options").hidden = on;
   }
-  $("#rule-hint").textContent = hint;
+  $("#rank-rule-row").hidden = broad;
+  $("#crash-protection-panel").hidden = broad;
+  $("#tax-row").hidden = broad;
+
+  // Ranking rule: score/voladj_skip_recent_month are backend-generic for every dataset (all four
+  // already thread `score` through _config_kwargs or run_broad_backtest's own Config() call) -
+  // was arbitrarily UI-gated to stock/broad only (ETF/Custom Index were forced to "ranksum" in
+  // readConfig). voladj AND blend both feed through _compute_ranks_voladj internally (see
+  // engine.py), so voladj_skip_recent_month affects both - shown for either, not just voladj.
+  $("#score-row").hidden = false;
+  const score = $("#score").value;
+  $("#lookback-panel").hidden = score !== "ranksum";
+  $("#voladj-skip-row").hidden = !(score === "voladj" || score === "blend");
+
+  // Execution & tax: cost model (flat % vs itemised STT/stamp duty/fees/slippage/DP) is
+  // backend-generic for every dataset the same way (_config_kwargs for etf/stock/custom_index,
+  // run_broad_backtest's own Config() call for broad, wired TODO.md 3.9.15) - was arbitrarily
+  // UI-gated to stock only. Itemised swaps cost_pct for capital/slippage inputs regardless of
+  // dataset.
+  $("#cost-model-row").hidden = false;
+  const costModel = $("#cost_model").value;
+  const itemised = costModel === "itemised";
+  $("#cost-pct-field").hidden = itemised;
+  $("#capital-field").hidden = !itemised;
+  $("#slippage-field").hidden = !itemised;
+
+  // Stock, Custom Index and Broad Momentum backtests have no ETF-vs-index track/fill-time
+  // concept at all - each ranked column already IS the traded thing (a stock, a category's own
+  // inner-rotation equity curve, or - for broad - a stock/atomic).
+  $("#trackfill-row").hidden = stock || customIndex || broad;
+
+  if (broad) {
+    const catOn = radio("broad_category_mode") === "on";
+    const catTop = Number($("#broad_category_top_n").value), catExit = Number($("#broad_category_exit_rank").value);
+    const picks = Number($("#broad_picks_per_category").value);
+    const offTop = Number($("#broad_off_top_n").value), offExit = Number($("#broad_off_exit_rank").value);
+    $("#broad-rule-hint").textContent = catOn
+      ? `Holds between ${catTop} and ${catExit} categories/atomics at once (${catTop} freshly ` +
+        `selected, the rest lingering in the buffer), up to ${picks} stock(s) each - up to ` +
+        `${catExit * picks} positions.`
+      : `Holds between ${offTop} and ${offExit} individual stocks, no category layer.`;
+    $("#rule-hint").textContent = "";
+  } else {
+    const top = Number($("#top_n").value), exit = Number($("#exit_rank").value);
+    const cap = Number($("#max_position").value), band = Number($("#cap_band").value);
+    const unit = customIndex ? "categories" : stock ? "stocks" : "ETFs";
+    const unitOne = customIndex ? "category" : stock ? "stock" : "ETF";
+    let hint = buffer
+      ? `Holds between ${top} and ${exit} ${unit}: anything bought is kept until its rank passes ${exit}.`
+      : `Always ${top} positions; ranks ${top + 1}–${exit} are kept but block a new buy until sold.`;
+    if (buffer && cap > 0) {
+      hint += ` No ${unitOne} is bought past ${cap}%; one that grows past ${cap + band}% is trimmed back to ${cap}%.`;
+      if (top * cap < 100) hint += ` With top ${top} × ${cap}%, only ${top * cap}% can be invested — the rest waits in cash.`;
+    }
+    $("#rule-hint").textContent = hint;
+  }
+  const unitOne = customIndex ? "category" : broad ? "stock" : stock ? "stock" : "ETF";
   const maxLb = Math.max(...readLookbacks().map((r) => r[0]).filter((x) => x > 0), 0);
   $("#period-hint").textContent = maxLb
-    ? `Ranking needs ${maxLb} weeks of history, so an ETF joins ${maxLb} weeks after its data starts.`
+    ? `Ranking needs ${maxLb} weeks of history, so a ${unitOne} joins ${maxLb} weeks after its data starts.`
     : "";
+
+  // Sidebar accordion (TODO.md 3.9.14): "broad" and "inner-rotation" are dataset-conditionally
+  // hidden/shown above - reset each to expanded on every hidden->visible reveal (guarded on that
+  // specific edge, not re-fired every syncDependentFields() call, so a manual collapse made while
+  // staying on the same tab isn't fought on the next keystroke).
+  if (broad && !wasBroadPanelVisible) setPanelCollapsed($("#broad-panel"), false);
+  wasBroadPanelVisible = broad;
+  const innerVisible = customIndex;
+  if (innerVisible && !wasInnerRotationVisible) setPanelCollapsed($("#inner-rotation-panel"), false);
+  wasInnerRotationVisible = innerVisible;
+}
+
+let wasBroadPanelVisible = false;
+let wasInnerRotationVisible = false;
+
+function setPanelCollapsed(section, collapsed) {
+  section.classList.toggle("collapsed", collapsed);
+  const header = $(".panel-header", section);
+  if (header) header.setAttribute("aria-expanded", String(!collapsed));
+}
+
+function initPanelAccordion() {
+  $$(".panel").forEach((section) => {
+    const body = $(".panel-body", section);
+    const header = $(".panel-header", section);
+    if (!body || !header) return; // e.g. run-bar isn't a .panel; every real .panel has both
+    const id = body.id.replace(/^panel-body-/, "");
+    // "broad"/"inner-rotation" are session-only (see syncDependentFields) - never read/write
+    // their persisted state, always start expanded, matching their own reveal-reset behaviour.
+    const sessionOnly = id === "broad" || id === "inner-rotation";
+    const collapsed = sessionOnly ? false : (panelCollapsed[id] ?? PANEL_DEFAULT_COLLAPSED[id] ?? false);
+    setPanelCollapsed(section, collapsed);
+    header.addEventListener("click", () => {
+      const nowCollapsed = !section.classList.contains("collapsed");
+      setPanelCollapsed(section, nowCollapsed);
+      if (!sessionOnly) {
+        panelCollapsed[id] = nowCollapsed;
+        try { localStorage.setItem("mbt.panelCollapsed", JSON.stringify(panelCollapsed)); }
+        catch { /* storage full/blocked: keep in memory for this session */ }
+      }
+    });
+  });
 }
 
 function validate(cfg) {
@@ -319,17 +738,32 @@ function validate(cfg) {
   if (new Set(cfg.lookbacks).size !== cfg.lookbacks.length) return "Each lookback can appear only once.";
   if (cfg.weights.some((w) => Number.isNaN(w) || w < 0)) return "Weights can't be negative.";
   if (cfg.weights.every((w) => w === 0)) return "At least one weight must be above 0.";
-  if (!(cfg.top_n >= 1)) return "Top N must be at least 1.";
-  if (cfg.exit_rank < cfg.top_n) return `The sell rank must be at least top N (${cfg.top_n}), or new buys would be sold at once.`;
-  const includeOf = Object.fromEntries(meta.instruments.map((i) => [i.name, i.include]));
-  const ranked = cfg.universe.filter((n) => cfg.defensive === "ranked" || includeOf[n] !== "defensive");
-  if (ranked.length < cfg.top_n) {
-    return `Only ${ranked.length} ETF(s) will be ranked but top N is ${cfg.top_n}. Select more ETFs or lower top N.`;
+  if (cfg.dataset === "broad") {
+    if (cfg.broad_pool_top_n > cfg.broad_pool_exit_rank) return "Pool top N can't be greater than the pool exit rank.";
+    if (cfg.broad_category_mode === "on") {
+      if (cfg.broad_category_top_n > cfg.broad_category_exit_rank) return "Categories held (fresh) can't be greater than the category exit rank.";
+      if (!(cfg.broad_picks_per_category >= 1)) return "Top stocks per category must be at least 1.";
+      if (!(cfg.broad_coverage_floor >= 0 && cfg.broad_coverage_floor <= 1)) return "Coverage floor must be between 0 and 100%.";
+    } else if (cfg.broad_off_top_n > cfg.broad_off_exit_rank) {
+      return "Top N (SL) can't be greater than the exit rank.";
+    }
+  } else {
+    if (!(cfg.top_n >= 1)) return "Top N must be at least 1.";
+    if (cfg.exit_rank < cfg.top_n) return `The sell rank must be at least top N (${cfg.top_n}), or new buys would be sold at once.`;
+    const includeOf = Object.fromEntries(meta.instruments.map((i) => [i.name, i.include]));
+    const ranked = cfg.universe.filter((n) => cfg.defensive === "ranked" || includeOf[n] !== "defensive");
+    if (ranked.length < cfg.top_n) {
+      return `Only ${ranked.length} ETF(s) will be ranked but top N is ${cfg.top_n}. Select more ETFs or lower top N.`;
+    }
   }
   if (cfg.start && cfg.end && cfg.start >= cfg.end) return "The start date must be before the end date.";
   if (cfg.cost_pct < 0) return "Cost can't be negative.";
   if (cfg.max_position != null && !(cfg.max_position > 0 && cfg.max_position <= 1)) return "Max per ETF must be between 1 and 100% (0 = no cap).";
   if (cfg.cap_band < 0) return "The trim band can't be negative.";
+  if (cfg.cost_model === "itemised" && !(cfg.capital > 0)) return "Capital must be a positive amount.";
+  if (cfg.slippage_bps < 0) return "Slippage can't be negative.";
+  if (cfg.momentum_sizing && !(cfg.momentum_sizing_window >= 1)) return "Sizing window must be at least 1 trade.";
+  if (cfg.momentum_sizing && !(cfg.momentum_sizing_floor >= 0 && cfg.momentum_sizing_floor <= 1)) return "Min size floor must be between 0 and 100%.";
   return "";
 }
 function validateLive() {
@@ -356,8 +790,138 @@ function setPeriod(kind) {
   validateLive();
 }
 
+// ---------------------------------------------------------------------------------------------
+// Momentum Scores page (TODO.md 3.9.16) -- live/current-state snapshot, own render path (not
+// render()/renderSignal() etc, which are all shaped around a backtest Result). Reuses the
+// generic renderTable() (sortable/searchable/CSV-exportable) unchanged, same as every other
+// data table in this app.
+// ---------------------------------------------------------------------------------------------
+const LOOKBACK_LABELS = { 4: "1M", 13: "3M", 26: "6M" };
+function lookbackLabel(k) {
+  return LOOKBACK_LABELS[k] || `${k}w`;
+}
+function msBand(score) {
+  if (score == null || Number.isNaN(score)) return "";
+  return score <= 40 ? "band-red" : score <= 60 ? "band-yellow" : "band-green";
+}
+function msScoreCell(v) {
+  if (v == null || Number.isNaN(v)) return "–";
+  return `<span class="ms-score ${msBand(v)}">${Math.round(v)}</span>`;
+}
+function withScoreColumns(lookbacks) {
+  return lookbacks.map((k) => ({
+    key: `score_${k}`, label: `${lookbackLabel(k)} Score`, num: true, fmt: (v) => msScoreCell(v),
+  }));
+}
+
+async function loadMomentumScores() {
+  if (momentumScoresData) {
+    renderMomentumScores(momentumScoresData);
+    return;
+  }
+  $("#ms-status").hidden = false;
+  $("#ms-status").classList.remove("error");
+  $("#ms-status").textContent = "Loading momentum scores…";
+  $("#ms-content").hidden = true;
+  try {
+    const res = await fetch("/api/momentum-scores");
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || res.statusText);
+    momentumScoresData = body;
+    renderMomentumScores(body);
+  } catch (err) {
+    $("#ms-status").textContent = `Couldn't load momentum scores: ${err.message}`;
+    $("#ms-status").classList.add("error");
+  }
+}
+
+function renderMomentumScores(data) {
+  $("#ms-status").hidden = true;
+  $("#ms-content").hidden = false;
+  $("#ms-asof").textContent = data.as_of
+    ? `as of ${fmtDate(data.as_of)} · ${data.universe_size} stocks in the universe`
+    : "";
+  renderMomentumStocks(data);
+  renderMomentumSectors(data);
+}
+
+function renderMomentumStocks(data) {
+  const lookbacks = data.lookbacks;
+  const columns = [
+    {
+      key: "symbol", label: "Symbol",
+      fmt: (v, row) => `<span class="ms-symbol">${esc(v)}</span><span class="ms-company">${esc(row.company_name)}</span>`,
+    },
+    { key: "subgroup", label: "Sector" },
+    { key: "last_price", label: "Last Price", num: true, fmt: (v) => rupees(v) },
+    { key: "change_1w_pct", label: "1W Chg", num: true, fmt: pctCell(2, true) },
+    ...withScoreColumns(lookbacks),
+  ];
+  const rows = data.stocks.map((s) => {
+    const scores = Object.fromEntries(lookbacks.map((k) => [`score_${k}`, s.scores[String(k)]]));
+    return { ...s, ...scores };
+  });
+  renderTable($('[data-ms-panel="stocks"]'), columns, rows, {
+    sortKey: `score_${lookbacks[lookbacks.length - 1]}`, sortDir: -1,
+    search: "Filter by symbol, company or sector…", csv: "momentum-scores-stocks.csv",
+  });
+}
+
+// Sector-row accordion (TODO.md 3.9.17): the member stocks behind one sector's rolled-up score,
+// shown inline rather than only ever seeing the aggregate. No new backend computation - every
+// stock already carries its own parent_group/subgroup (see api._momentum_scores_payload), so
+// this is a client-side filter of the SAME `data.stocks` array renderMomentumStocks already has,
+// not a second fetch. A small static table (not a nested renderTable - sort/search/CSV on a
+// handful of rows would be noise, and renderTable itself expects to own a container element, not
+// return an HTML string to embed inside another row).
+function sectorMemberStocksTable(data, sectorRow) {
+  const lookbacks = data.lookbacks;
+  const members = data.stocks.filter(
+    (s) => s.parent_group === sectorRow.parent_group && s.subgroup === sectorRow.subgroup
+  );
+  if (!members.length) return `<p class="ms-note">No qualifying members right now.</p>`;
+  const head = `<tr><th>Symbol</th><th class="num">Last Price</th><th class="num">1W Chg</th>${lookbacks
+    .map((k) => `<th class="num">${lookbackLabel(k)} Score</th>`).join("")}</tr>`;
+  const body = members
+    .map((s) => `<tr><td><span class="ms-symbol">${esc(s.symbol)}</span><span class="ms-company">${esc(s.company_name)}</span></td>` +
+      `<td class="num">${rupees(s.last_price)}</td><td class="num">${pctCell(2, true)(s.change_1w_pct)}</td>` +
+      lookbacks.map((k) => `<td class="num">${msScoreCell(s.scores[String(k)])}</td>`).join("") + `</tr>`)
+    .join("");
+  return `<table class="data ms-nested"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+function renderMomentumSectors(data) {
+  const lookbacks = data.lookbacks;
+  const columns = [
+    {
+      key: "subgroup", label: "Sector",
+      fmt: (v, row) => `<span class="ms-symbol">${esc(v)}</span><span class="ms-company">${esc(row.parent_group)}</span>`,
+    },
+    {
+      key: "qualifying_count", label: "Members", num: true,
+      fmt: (v, row) => `${v} / ${row.member_count}`,
+    },
+    ...withScoreColumns(lookbacks),
+  ];
+  const rows = data.sectors.map((s) => {
+    const scores = Object.fromEntries(lookbacks.map((k) => [`score_${k}`, s.scores[String(k)]]));
+    return { ...s, ...scores };
+  });
+  renderTable($('[data-ms-panel="sectors"]'), columns, rows, {
+    expand: { rowId: (row) => row.cid, render: (row) => sectorMemberStocksTable(data, row) },
+    sortKey: `score_${lookbacks[lookbacks.length - 1]}`, sortDir: -1,
+    search: "Filter by sector…", csv: "momentum-scores-sectors.csv",
+  });
+}
+
+function showMsTab(name) {
+  $$("#ms-tabs button").forEach((b) => b.classList.toggle("active", b.dataset.msTab === name));
+  $$("#momentum-scores-view .tab").forEach((p) => (p.hidden = p.dataset.msPanel !== name));
+}
+
 function bindEvents() {
-  $$(".chips [data-preset]").forEach((b) => b.addEventListener("click", () => applyUniversePreset(b.dataset.preset)));
+  $$("#dataset-tabs button").forEach((b) => b.addEventListener("click", () => switchDataset(b.dataset.dataset)));
+  $$("#ms-tabs button").forEach((b) => b.addEventListener("click", () => showMsTab(b.dataset.msTab)));
   $$("#period-presets [data-period]").forEach((b) => b.addEventListener("click", () => setPeriod(b.dataset.period)));
   $$(".chips [data-lb]").forEach((b) => b.addEventListener("click", () => { setLookbacks(LOOKBACK_PRESETS[b.dataset.lb]); validateLive(); }));
   $("#add-lookback").addEventListener("click", () => { addLookbackRow(); validateLive(); });
@@ -369,6 +933,15 @@ function bindEvents() {
   });
   $("#log-scale").addEventListener("change", () => {
     if (lastResult) Plotly.relayout("main-chart", { "yaxis.type": $("#log-scale").checked ? "log" : "linear" });
+  });
+  $("#hover-stock-detail").checked = showStockHover;
+  $("#hover-stock-detail").addEventListener("change", () => {
+    showStockHover = $("#hover-stock-detail").checked;
+    try { localStorage.setItem("mbt.showStockHover", JSON.stringify(showStockHover)); } catch { /* storage full/blocked: keep in memory for this session */ }
+    // Hover text is precomputed per point (`rots.map(rotationHover)`, see renderMainChart) rather
+    // than built lazily on hover, so the toggle needs a redraw to take effect - a relayout alone
+    // (as log-scale does) wouldn't touch the `text` arrays already baked into the trace.
+    if (lastResult) renderMainChart(lastResult);
   });
   $$("#tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 }
@@ -391,6 +964,13 @@ function setStatus(text, isError = false) {
   el.hidden = !text;
 }
 
+function loadRunsFor(dataset) {
+  try { return JSON.parse(localStorage.getItem(`mbt.runs.${dataset}`) || "[]"); } catch { return []; }
+}
+function saveRuns() {
+  try { localStorage.setItem(`mbt.runs.${activeDataset}`, JSON.stringify(runs)); } catch { /* storage full: keep in memory */ }
+}
+
 async function runBacktest() {
   const cfg = readConfig();
   const problem = validate(cfg);
@@ -398,7 +978,11 @@ async function runBacktest() {
   const button = $("#run");
   button.disabled = true;
   button.textContent = "Running…";
-  setStatus("Running backtest…");
+  setStatus(cfg.dataset === "custom_index"
+    ? "Running backtest… (first run this session builds ~62 category rotations - can take about a minute; later runs with the same inner settings are fast)"
+    : cfg.dataset === "broad"
+    ? "Running backtest… (first run this session ranks the ~755-name universe - can take ~20-30s; later runs with the same pool settings are fast)"
+    : "Running backtest…");
   try {
     const res = await fetch("/api/backtest", {
       method: "POST",
@@ -412,7 +996,8 @@ async function runBacktest() {
     }
     lastResult = body;
     lastConfig = cfg;
-    localStorage.setItem("mbt.config", JSON.stringify(cfg));
+    lastResultByDataset[cfg.dataset] = { result: body, config: cfg };
+    localStorage.setItem(`mbt.config.${cfg.dataset}`, JSON.stringify(cfg));
     history.replaceState(null, "", "#" + encodeHash(cfg));
     addRun(cfg, body);
     setStatus("");
@@ -428,17 +1013,54 @@ async function runBacktest() {
 }
 
 function describe(cfg) {
-  const capText = cfg.max_position ? `, max ${Math.round(cfg.max_position * 100)}%/ETF` : ", no cap";
+  if (cfg.dataset === "broad") {
+    const rule = cfg.portfolio === "buffer"
+      ? `Buffer (${cfg.entry === "wait" ? "wait for a sale" : "make room"}${cfg.max_position ? `, max ${Math.round(cfg.max_position * 100)}%/position` : ", no cap"})`
+      : "Fixed slots";
+    const allOne = cfg.weights.every((w) => w === 1);
+    const lbs = cfg.lookbacks.map((w, i) => (allOne ? `${w}` : `${w}×${cfg.weights[i]}`)).join("/");
+    const scoreText = cfg.score && cfg.score !== "ranksum" ? ` · score ${cfg.score}` : "";
+    const rebalanceText = cfg.rebalance === "monthly" ? " · monthly rebalance" : "";
+    const costText = cfg.cost_model === "itemised" ? " · itemised costs" : ` · cost ${cfg.cost_pct}%`;
+    const sizingText = cfg.momentum_sizing
+      ? ` · win-rate sizing (${cfg.momentum_sizing_window ?? 10}-trade window` +
+        `${cfg.momentum_sizing_floor ? `, ${Math.round(cfg.momentum_sizing_floor * 100)}% floor` : ""})`
+      : "";
+    const modeText = cfg.broad_category_mode === "on"
+      ? `category mode ON · pool top ${cfg.broad_pool_top_n}/exit ${cfg.broad_pool_exit_rank} · ` +
+        `coverage floor ${Math.round(cfg.broad_coverage_floor * 100)}% · categories ${cfg.broad_category_top_n}/` +
+        `${cfg.broad_category_exit_rank} · ${cfg.broad_picks_per_category} stock(s)/category`
+      : `category mode OFF · pool top ${cfg.broad_pool_top_n}/exit ${cfg.broad_pool_exit_rank} · ` +
+        `stocks ${cfg.broad_off_top_n}/${cfg.broad_off_exit_rank}`;
+    return `Broad Momentum · ${modeText} · ${rule} · lookbacks ${lbs}w${scoreText}${rebalanceText}${costText}${sizingText}${cfg.signal_delay ? ` · ${cfg.signal_delay}w delay` : ""}`;
+  }
+  const unit = cfg.dataset === "stock" ? "stock" : cfg.dataset === "custom_index" ? "category" : "ETF";
+  const capText = cfg.max_position ? `, max ${Math.round(cfg.max_position * 100)}%/${unit}` : ", no cap";
   const rule = cfg.portfolio === "buffer"
     ? `Buffer (${cfg.entry === "wait" ? "wait for a sale" : "make room"}${capText})`
     : "Fixed slots";
   const allOne = cfg.weights.every((w) => w === 1);
   const lbs = cfg.lookbacks.map((w, i) => (allOne ? `${w}` : `${w}×${cfg.weights[i]}`)).join("/");
   const guard = { off: "always invested", ranked: "debt in ranking", filter: `cash filter ${cfg.filter_lookback}w` }[cfg.defensive];
-  return `${rule} · top ${cfg.top_n}, sell when rank > ${cfg.exit_rank} · lookbacks ${lbs}w · ${guard} · ` +
-    `${cfg.universe.length} ETFs · cost ${cfg.cost_pct}%${cfg.signal_delay ? ` · ${cfg.signal_delay}w delay` : ""} · ` +
-    `P&L on ${cfg.track === "etf" ? "ETFs" : "index"}` +
-    `${{ fri_close: "", mon_open: ", fill Mon open", mon_10am: ", fill Mon 10:00" }[cfg.execution || "fri_close"]} · ` +
+  const scoreText = cfg.score && cfg.score !== "ranksum" ? ` · score ${cfg.score}` : "";
+  const rebalanceText = cfg.rebalance === "monthly" ? " · monthly rebalance" : "";
+  const costText = cfg.cost_model === "itemised" ? " · itemised costs" : ` · cost ${cfg.cost_pct}%`;
+  const fillsText = cfg.dataset !== "etf" ? "" :
+    ` · P&L on ${cfg.track === "etf" ? "ETFs" : "index"}` +
+    `${{ fri_close: "", mon_open: ", fill Mon open", mon_10am: ", fill Mon 10:00" }[cfg.execution || "fri_close"]}`;
+  const copiesText = (cfg.commodity_copies > 1 || cfg.debt_copies > 1)
+    ? ` · up to ${cfg.commodity_copies}x gold/silver, ${cfg.debt_copies}x cash/gilt slots`
+    : "";
+  const innerText = cfg.dataset === "custom_index"
+    ? ` · inner: top ${cfg.inner_top_n} stocks/category, sell rank > ${cfg.inner_exit_rank}${copiesText}`
+    : "";
+  const sizingText = cfg.momentum_sizing
+    ? ` · win-rate sizing (${cfg.momentum_sizing_window ?? 10}-trade window` +
+      `${cfg.momentum_sizing_floor ? `, ${Math.round(cfg.momentum_sizing_floor * 100)}% floor` : ""})`
+    : "";
+  const label = { stock: "Nifty 50 stocks", custom_index: "Custom Index categories" }[cfg.dataset] || "ETFs";
+  return `${label} · ${rule} · top ${cfg.top_n}, sell when rank > ${cfg.exit_rank} · lookbacks ${lbs}w · ${guard} · ` +
+    `${cfg.universe.length} instruments${innerText}${sizingText}${scoreText}${rebalanceText}${costText}${cfg.signal_delay ? ` · ${cfg.signal_delay}w delay` : ""}${fillsText} · ` +
     (cfg.tax ? `after tax (${Math.round(cfg.slab_rate * 100)}% slab)` : "pre-tax");
 }
 
@@ -451,12 +1073,53 @@ function render(r, cfg) {
   renderKpis(r, cfg);
   renderMainChart(r);
   renderSignal(r);
+  renderHeldCategories(r);
   renderTrades(r);
   renderTimeline(r);
   renderEtfs(r);
   renderYearly(r);
   renderCrashes(r);
   renderRuns();
+}
+
+// "Broad Momentum", category mode ON only (`r.held_categories`, see api._broad_backtest /
+// categories/broad.py's current_holdings_detail): what's held as of the backtest's own last
+// week, distinguishing freshly-selected categories/atomics (top `broad_category_top_n`) from
+// ones lingering in the buffer - the Step 5 display TODO.md 3.9.13's plan asks for. Hidden
+// entirely (tab + panel) for every other dataset, and for category mode OFF (`held_categories`
+// is always present but empty in that case - see api.py's own docstring).
+function renderHeldCategories(r) {
+  const tab = $("#categories-tab");
+  const panel = $('[data-panel="categories"]');
+  const held = r.held_categories || [];
+  tab.hidden = !held.length;
+  if (!held.length) {
+    panel.innerHTML = "";
+    // If "Held categories" was the active tab (e.g. left over from a previous ON-mode run) and
+    // this run has nothing to show there (OFF mode, or a different dataset entirely), fall back
+    // to "This week" so a tab click isn't needed to see anything at all.
+    if (tab.classList.contains("active")) showTab("signal");
+    return;
+  }
+  const rows = held
+    .map((row) => {
+      const picks = row.picks.length ? row.picks.map((p) => displayName(p)).join(", ") : "—";
+      return `<tr class="${row.status === "fresh" ? "good" : ""}">
+        <td>${row.position}</td>
+        <td><span class="badge ${row.status === "fresh" ? "" : "warn"}">${esc(row.status)}</span></td>
+        <td>${esc(row.category)}</td>
+        <td>${esc(picks)}</td>
+      </tr>`;
+    })
+    .join("");
+  panel.innerHTML = `
+    <p class="hint">What the backtest holds as of its own last week - "fresh" categories/atomics
+      are within the top N this period; "lingering" ones are held only because they haven't yet
+      fallen past the exit rank (the hysteresis buffer).</p>
+    <table class="data">
+      <thead><tr><th>#</th><th>Status</th><th>Category / atomic</th><th>Picks</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function kpiCard(label, value, note = "", cls = "") {
@@ -483,21 +1146,82 @@ function renderKpis(r, cfg) {
   $("#kpis").innerHTML = cards.join("");
 }
 
+// Custom Index only: what a category's OWN inner stock rotation did the same week it was
+// bought/sold/trimmed at the outer (category-vs-category) level - e.g. "bought CDMO this week,
+// and inside CDMO it happened to buy DIVISLAB and hold SYNGENE". `actions` narrows to the side of
+// the inner rotation that corresponds to the outer event (a fresh outer BUY only cares what the
+// inner rotation bought/topped up that week, not an unrelated inner SELL that happened to land on
+// the same week for its own reasons, and vice versa for an outer SELL).
+function innerEventLine(categoryName, week, actions) {
+  const events = innerTradesOnWeek(categoryName, week).filter((t) => actions.includes(t.action));
+  if (!events.length) return "";
+  const text = events.map((t) => `${t.action} ${esc(displayName(t.asset))}`).join(", ");
+  return `&nbsp;&nbsp;<i>inside ${esc(categoryName)}: ${text}</i>`;
+}
+
+// Custom Index only: what a category's inner rotation is holding as of a given week, reconstructed
+// by replaying its own `trades` (BUY/SELL, chronological) up to and including that week - NOT a
+// new backend computation, just a client-side fold over data `inner_categories` already ships.
+// This exists because `innerEventLine` above only fires when an inner trade lands on the EXACT
+// same week as the outer rotation event, and a live check of a real backtest found that's the
+// minority case: the inner rotation runs continuously regardless of whether the outer level
+// currently holds the category, so by the time the outer level buys/drops a category, its inner
+// position is usually just sitting unchanged from a trade weeks or months earlier (measured ~66%
+// coincidence on OUT, ~25% on IN across a real 2018-2026 run) - `innerEventLine` alone left most
+// IN/OUT events with no stock name at all, which is the gap the user's complaint was pointing at.
+function innerHoldingsAsOf(categoryName, week) {
+  const inner = innerDetailFor(categoryName);
+  if (!inner || !week) return [];
+  const held = new Set();
+  for (const t of [...inner.trades].sort((a, b) => (a.week < b.week ? -1 : a.week > b.week ? 1 : 0))) {
+    if (t.week > week) break;
+    // engine.py's buffer portfolio rule can also emit ADD/TRIM (a top-up / a partial reduction
+    // to make room) - those change weight, not membership, so only BUY/SELL open or close a
+    // position here.
+    if (t.action === "BUY" || t.action === "ADD") held.add(t.asset);
+    else if (t.action === "SELL") held.delete(t.asset);
+  }
+  return [...held];
+}
+function innerHoldingsLine(categoryName, week) {
+  const held = innerHoldingsAsOf(categoryName, week);
+  if (!held.length) return "";
+  const text = held.map((a) => esc(displayName(a))).join(", ");
+  return `&nbsp;&nbsp;<i>holding inside ${esc(categoryName)}: ${text}</i>`;
+}
+// Stock-level line for one outer IN/OUT event: prefer an exact same-week inner trade
+// (innerEventLine - the more specific "this is what just happened" signal); when there isn't
+// one, fall back to what the inner rotation is holding as of this week (innerHoldingsLine) so
+// the tooltip still names a stock rather than going silent, which is what the majority case
+// above requires. Gated on `showStockHover` by the one caller (rotationHover) so turning the
+// toggle off skips computing either.
+function innerDetailLine(categoryName, week, actions) {
+  return innerEventLine(categoryName, week, actions) || innerHoldingsLine(categoryName, week);
+}
+
 function rotationHover(rot) {
   const lines = [`<b>${fmtDate(rot.week)} · ${rupees(rot.value)}</b>`];
   for (const o of rot.outs) {
-    lines.push(`<span style="color:${cssVar("--bad")}">OUT</span> ${esc(o.asset)} — held ${num(o.weeks_held, 0)}w, ` +
+    lines.push(`<span style="color:${cssVar("--bad")}">OUT</span> ${esc(displayName(o.asset))} — held ${num(o.weeks_held, 0)}w, ` +
       `${pct(o.return, 1, true)} (${esc(o.reason)})`);
+    if (showStockHover) {
+      const inside = innerDetailLine(o.asset, rot.week, ["SELL"]);
+      if (inside) lines.push(inside);
+    }
   }
   for (const i of rot.ins) {
-    lines.push(`<span style="color:${cssVar("--good")}">${i.top_up ? "ADD" : "IN"}</span> ${esc(i.asset)} (rank ${num(i.rank, 0)})`);
+    lines.push(`<span style="color:${cssVar("--good")}">${i.top_up ? "ADD" : "IN"}</span> ${esc(displayName(i.asset))} (rank ${num(i.rank, 0)})`);
+    if (showStockHover) {
+      const inside = innerDetailLine(i.asset, rot.week, ["BUY", "ADD"]);
+      if (inside) lines.push(inside);
+    }
   }
   for (const t of rot.trims) {
-    lines.push(`<span style="color:${cssVar("--warn")}">TRIM</span> ${esc(t.asset)} (${esc(t.reason)})`);
+    lines.push(`<span style="color:${cssVar("--warn")}">TRIM</span> ${esc(displayName(t.asset))} (${esc(t.reason)})`);
   }
   if (rot.parked) lines.push("PARK — nothing qualified, money to cash");
   if (rot.holdings.length) {
-    const top = rot.holdings.slice(0, 9).map((h) => `${esc(h.asset)} ${pct(h.share, 0)}`).join(", ");
+    const top = rot.holdings.slice(0, 9).map((h) => `${esc(displayName(h.asset))} ${pct(h.share, 0)}`).join(", ");
     lines.push(`<i>Holding ${rot.holdings.length}: ${top}${rot.holdings.length > 9 ? ", …" : ""}</i>`);
   }
   return lines.join("<br>");
@@ -505,6 +1229,12 @@ function rotationHover(rot) {
 
 function renderMainChart(r) {
   const s = r.series;
+  // The stock-level hover toggle only means anything on Custom Index runs that actually shipped
+  // `inner_categories` (see `_inner_category_detail` - never present for etf/stock, and can be
+  // absent even on custom_index if nothing was ever held) - hide it otherwise, same pattern the
+  // Trades tab's "Bought inside"/"Sold inside" columns already use (`hasInner` in renderTrades).
+  const hoverToggle = $("#hover-detail-wrap");
+  if (hoverToggle) hoverToggle.hidden = !r.inner_categories;
   const lakh = (arr) => arr.map((v) => (v == null ? null : v / 1e5));  // plotted in rupees lakh
   const text = (arr, fmt) => arr.map(fmt);
   const good = cssVar("--good"), bad = cssVar("--bad"), accent = cssVar("--strategy");
@@ -585,6 +1315,12 @@ function renderTable(container, columns, rows, opts = {}) {
   let sortKey = opts.sortKey ?? null;
   let sortDir = opts.sortDir ?? -1;
   let query = "";
+  // Expandable rows (TODO.md 3.9.17): opt-in via opts.expand = { rowId(row), render(row) } -
+  // render() returns the inner HTML of a nested detail <tr> inserted right after the clicked
+  // row. `expanded` is a plain Set of rowId()s kept in this closure, so it (and the DOM it
+  // produces) survives sort/search re-draws instead of being wiped by tbody.innerHTML like a
+  // one-off DOM mutation would be - draw() itself re-renders expanded rows every time.
+  const expanded = new Set();
   const tools = opts.search || opts.csv
     ? `<div class="table-tools">${opts.search ? `<input type="search" placeholder="${esc(opts.search)}">` : ""}
        ${opts.csv ? `<button type="button" class="csv">Download CSV</button>` : ""}
@@ -612,9 +1348,25 @@ function renderTable(container, columns, rows, opts = {}) {
         return (va > vb ? 1 : va < vb ? -1 : 0) * sortDir;
       });
     }
-    tbody.innerHTML = view.map((row) => `<tr class="${opts.rowClass ? opts.rowClass(row) : ""}">${columns
-      .map((c) => `<td class="${c.num ? "num" : ""} ${c.cls ? c.cls(row) : ""}">${c.fmt ? c.fmt(row[c.key], row) : esc(row[c.key])}</td>`)
-      .join("")}</tr>`).join("");
+    tbody.innerHTML = view.map((row) => {
+      const id = opts.expand ? opts.expand.rowId(row) : null;
+      const isOpen = id != null && expanded.has(id);
+      const chevron = opts.expand ? `<span class="row-chevron ${isOpen ? "open" : ""}">▸</span>` : "";
+      const mainRow = `<tr class="${opts.rowClass ? opts.rowClass(row) : ""} ${opts.expand ? "expandable-row" : ""}" ${id != null ? `data-row-id="${esc(id)}"` : ""}>${columns
+        .map((c, i) => `<td class="${c.num ? "num" : ""} ${c.cls ? c.cls(row) : ""}">${i === 0 ? chevron : ""}${c.fmt ? c.fmt(row[c.key], row) : esc(row[c.key])}</td>`)
+        .join("")}</tr>`;
+      const detailRow = isOpen
+        ? `<tr class="expanded-detail"><td colspan="${columns.length}">${opts.expand.render(row)}</td></tr>`
+        : "";
+      return mainRow + detailRow;
+    }).join("");
+    if (opts.expand) {
+      $$("tr.expandable-row", tbody).forEach((tr) => tr.addEventListener("click", () => {
+        const id = tr.dataset.rowId;
+        if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+        draw();
+      }));
+    }
     $$("th", container).forEach((th) => {
       th.classList.toggle("sorted-asc", th.dataset.key === sortKey && sortDir === 1);
       th.classList.toggle("sorted-desc", th.dataset.key === sortKey && sortDir === -1);
@@ -651,14 +1403,27 @@ function downloadCsv(filename, columns, rows) {
 }
 
 const pctCell = (digits = 1, sign = true) => (v) => `<span class="${signClass(v)}">${pct(v, digits, sign)}</span>`;
+const assetCell = (v) => esc(displayName(v));
 
 // --- tabs --------------------------------------------------------------------------------------
+// Custom Index only: under a currently-held category's name, show which stock(s) its own inner
+// rotation actually holds right now (e.g. "holding: DIVISLAB 55%, SYNGENE 45%") - otherwise the
+// "This week" panel only ever shows the category-level ● and gives no way to see what's really
+// been bought inside it. Non-held rows, and every other dataset (no `inner_categories` on the
+// payload at all), fall back to the plain asset cell unchanged.
+function signalAssetCell(name, row) {
+  const label = esc(displayName(name));
+  if (!row.held) return label;
+  const holdings = innerHoldingsText(name);
+  return holdings ? `${label}<div class="inner-detail">holding: ${esc(holdings)}</div>` : label;
+}
+
 function renderSignal(r) {
   const latest = r.latest;
   const lookbacks = latest.rows.length ? Object.keys(latest.rows[0].returns) : [];
   const columns = [
     { key: "rank", label: "Rank", num: true, fmt: (v) => num(v, 0) },
-    { key: "asset", label: "ETF" },
+    { key: "asset", label: "ETF", fmt: r.inner_categories ? signalAssetCell : assetCell },
     { key: "action", label: "Action", fmt: (v) => (v ? `<span class="action ${esc(v.split(" ")[0])}">${esc(v)}</span>` : "") },
     { key: "score", label: "Score", num: true, fmt: (v) => num(v, 2) },
     ...lookbacks.map((k) => ({
@@ -679,7 +1444,7 @@ function renderSignal(r) {
   panel.insertAdjacentHTML("beforeend", openTable);
   if (openRows.length) {
     renderTable($("#open-positions"), [
-      { key: "asset", label: "ETF" },
+      { key: "asset", label: "ETF", fmt: assetCell },
       { key: "entry_week", label: "Since", fmt: fmtDate },
       { key: "weeks_held", label: "Weeks", num: true, fmt: (v) => num(v, 0) },
       { key: "rank", label: "Rank now", num: true, fmt: (v) => num(v, 0) },
@@ -690,11 +1455,33 @@ function renderSignal(r) {
   }
 }
 
+// Custom Index only: what a category's own inner rotation bought/sold the same week the OUTER
+// (closed) trade's entry/exit happened - plain "ACTION ticker" text (sortable/searchable/CSV-
+// exportable like every other trades-table column, unlike a hover-only tooltip) so a user can
+// see, for e.g. a CDMO position entered 2024-03-01 and exited 2024-06-14, that entry bought
+// DIVISLAB and SYNGENE and that exit sold them both - without needing the main chart open.
+function innerTradesText(categoryName, week, actions) {
+  return innerTradesOnWeek(categoryName, week)
+    .filter((t) => actions.includes(t.action))
+    .map((t) => `${t.action} ${displayName(t.asset)}`)
+    .join(", ");
+}
+
 function renderTrades(r) {
-  renderTable($('[data-panel="trades"]'), [
-    { key: "asset", label: "ETF" },
+  const hasInner = !!r.inner_categories;
+  const rows = hasInner
+    ? r.trades.map((t) => ({
+        ...t,
+        inner_entry: innerTradesText(t.asset, t.entry_week, ["BUY", "ADD"]),
+        inner_exit: innerTradesText(t.asset, t.exit_week, ["SELL"]),
+      }))
+    : r.trades;
+  const columns = [
+    { key: "asset", label: hasInner ? "Category" : "ETF", fmt: assetCell },
     { key: "entry_week", label: "Entry", fmt: fmtDate },
+    ...(hasInner ? [{ key: "inner_entry", label: "Bought inside" }] : []),
     { key: "exit_week", label: "Exit", fmt: fmtDate },
+    ...(hasInner ? [{ key: "inner_exit", label: "Sold inside" }] : []),
     { key: "weeks_held", label: "Weeks", num: true, fmt: (v) => num(v, 0) },
     { key: "entry_rank", label: "Entry rank", num: true, fmt: (v) => num(v, 0) },
     { key: "exit_rank", label: "Exit rank", num: true, fmt: (v) => num(v, 0) },
@@ -703,8 +1490,9 @@ function renderTrades(r) {
     { key: "reason", label: "Why sold" },
     { key: "tax", label: "Tax", num: true, fmt: (v) => (v ? rupees(v * 100000) : "–") },
     { key: "proxy", label: "Priced on", fmt: (v) => (v ? `<span class="badge warn" title="The ETF hadn't listed yet, so its index (less the expense ratio) stood in">index proxy</span>` : "") },
-  ], r.trades, {
-    sortKey: "exit_week", sortDir: -1, search: "Filter by ETF, reason…", csv: "momentum-trades.csv",
+  ];
+  renderTable($('[data-panel="trades"]'), columns, rows, {
+    sortKey: "exit_week", sortDir: -1, search: hasInner ? "Filter by category, stock, reason…" : "Filter by ETF, reason…", csv: "momentum-trades.csv",
     before: `<p class="explain">Every position fully sold. Return and P&L count all purchases of the position, including top-ups.${fillsNote(r.fills)}</p>`,
   });
 }
@@ -721,16 +1509,16 @@ function fillsNote(f) {
 
 function renderTimeline(r) {
   const segs = r.timeline;
-  const assets = [...new Set(segs.map((s) => s.asset))].sort();
+  const assets = [...new Set(segs.map((s) => displayName(s.asset)))].sort();
   const good = cssVar("--good"), bad = cssVar("--bad");
   const day = 86400000;
   const trace = {
     type: "bar", orientation: "h",
-    y: segs.map((s) => s.asset),
+    y: segs.map((s) => displayName(s.asset)),
     base: segs.map((s) => s.start),
     x: segs.map((s) => Math.max((new Date(s.end) - new Date(s.start)), 7 * day)),
     marker: { color: segs.map((s) => ((s.return ?? 0) >= 0 ? good : bad)), opacity: segs.map((s) => (s.open ? 0.95 : 0.7)) },
-    text: segs.map((s) => `<b>${esc(s.asset)}</b><br>${fmtDate(s.start)} → ${s.open ? "now (held)" : fmtDate(s.end)}` +
+    text: segs.map((s) => `<b>${esc(displayName(s.asset))}</b><br>${fmtDate(s.start)} → ${s.open ? "now (held)" : fmtDate(s.end)}` +
       `<br>${num(s.weeks, 0)} weeks · ${pct(s.return, 1, true)}`),
     hovertemplate: "%{text}<extra></extra>", textposition: "none",
   };
@@ -745,7 +1533,7 @@ function renderTimeline(r) {
 
 function renderEtfs(r) {
   renderTable($('[data-panel="etfs"]'), [
-    { key: "asset", label: "ETF" },
+    { key: "asset", label: "ETF", fmt: assetCell },
     { key: "group", label: "Group" },
     { key: "positions", label: "Positions", num: true },
     { key: "top_ups", label: "Top-ups", num: true },
@@ -798,12 +1586,6 @@ function renderCrashes(r) {
 }
 
 // --- run history ------------------------------------------------------------------------------
-function loadRuns() {
-  try { return JSON.parse(localStorage.getItem("mbt.runs") || "[]"); } catch { return []; }
-}
-function saveRuns() {
-  try { localStorage.setItem("mbt.runs", JSON.stringify(runs)); } catch { /* storage full: keep in memory */ }
-}
 function addRun(cfg, r) {
   const n = (runs[0]?.n ?? 0) + 1;
   runs.unshift({

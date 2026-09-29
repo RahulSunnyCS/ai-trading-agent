@@ -1,0 +1,111 @@
+company_id,symbol,from,to,source
+C0001,ACC,2011-01-03,,auto: single symbol in daily.parquet
+C0002,ADANIENT,2011-01-03,,auto: single symbol in daily.parquet
+C0003,MUNDRAPORT,2011-01-03,2012-01-16,auto: prevclose+isin match
+C0003,ADANIPORTS,2012-01-17,,auto: prevclose+isin match
+C0004,AMBUJACEM,2011-01-03,,auto: single symbol in daily.parquet
+C0005,APOLLOHOSP,2011-01-03,,auto: single symbol in daily.parquet
+C0006,ASIANPAINT,2011-01-03,,auto: single symbol in daily.parquet
+C0007,AUROPHARMA,2011-01-03,,auto: single symbol in daily.parquet
+C0008,AXISBANK,2011-01-03,,auto: single symbol in daily.parquet
+C0009,BAJAJ-AUTO,2011-01-03,,auto: single symbol in daily.parquet
+C0010,BAJFINANCE,2011-01-03,,auto: single symbol in daily.parquet
+C0011,BAJAJFINSV,2011-01-03,,auto: single symbol in daily.parquet
+C0012,BANKBARODA,2011-01-03,,auto: single symbol in daily.parquet
+C0013,BEL,2011-01-03,,auto: single symbol in daily.parquet
+C0014,BHEL,2011-01-03,,auto: single symbol in daily.parquet
+C0015,BPCL,2011-01-03,,auto: single symbol in daily.parquet
+C0016,BHARTIARTL,2011-01-03,,auto: single symbol in daily.parquet
+C0017,BOSCHLTD,2011-01-03,,auto: single symbol in daily.parquet
+C0018,BRITANNIA,2011-01-03,,auto: single symbol in daily.parquet
+C0019,CAIRN,2011-01-03,2017-04-25,auto: single symbol in daily.parquet
+C0020,CIPLA,2011-01-03,,auto: single symbol in daily.parquet
+C0021,COALINDIA,2011-01-03,,auto: single symbol in daily.parquet
+C0022,DIVISLAB,2011-01-03,,auto: single symbol in daily.parquet
+C0023,DLF,2011-01-03,,auto: single symbol in daily.parquet
+C0024,DRREDDY,2011-01-03,,auto: single symbol in daily.parquet
+C0025,EICHERMOT,2011-01-03,,auto: single symbol in daily.parquet
+C0026,ZOMATO,2021-07-23,2025-04-08,auto: prevclose+isin match
+C0026,ETERNAL,2025-04-09,,auto: prevclose+isin match
+C0027,GAIL,2011-01-03,,auto: single symbol in daily.parquet
+C0028,GRASIM,2011-01-03,,auto: single symbol in daily.parquet
+C0029,HCLTECH,2011-01-03,,auto: single symbol in daily.parquet
+C0030,HDFCBANK,2011-01-03,,auto: single symbol in daily.parquet
+C0031,HDFCLIFE,2017-11-17,,auto: single symbol in daily.parquet
+C0032,HEROHONDA,2011-01-03,2011-08-05,auto: prevclose+isin match
+C0032,HEROMOTOCO,2011-08-08,,auto: prevclose+isin match
+C0033,HINDALCO,2011-01-03,,auto: single symbol in daily.parquet
+C0034,HINDPETRO,2011-01-03,,auto: single symbol in daily.parquet
+C0035,HINDUNILVR,2011-01-03,,auto: single symbol in daily.parquet
+C0036,HDFC,2011-01-03,2023-07-12,auto: single symbol in daily.parquet
+C0037,ICICIBANK,2011-01-03,,auto: single symbol in daily.parquet
+C0038,IDEA,2011-01-03,,auto: single symbol in daily.parquet
+C0039,IOC,2011-01-03,,auto: single symbol in daily.parquet
+C0040,INFRATEL,2012-12-28,2020-12-17,auto: prevclose+isin match
+C0040,INDUSTOWER,2020-12-18,,auto: prevclose+isin match
+C0041,INDUSINDBK,2011-01-03,,auto: single symbol in daily.parquet
+C0042,INFOSYSTCH,2011-01-03,2011-06-28,auto: prevclose+isin match
+C0042,INFY,2011-06-29,,auto: prevclose+isin match
+C0043,IDFC,2011-01-03,2024-10-09,auto: single symbol in daily.parquet
+C0044,INDIGO,2015-11-10,,auto: single symbol in daily.parquet
+C0045,ITCHOTELS,2025-01-29,,auto: single symbol in daily.parquet
+C0046,ITC,2011-01-03,,auto: single symbol in daily.parquet
+C0047,JPASSOCIAT,2011-01-03,2026-03-17,auto: single symbol in daily.parquet
+C0048,JINDALSTEL,2011-01-03,,auto: single symbol in daily.parquet
+C0049,JIOFIN,2023-08-21,,auto: single symbol in daily.parquet
+C0050,JSWSTEEL,2011-01-03,,auto: single symbol in daily.parquet
+C0051,KOTAKBANK,2011-01-03,,auto: single symbol in daily.parquet
+C0052,LT,2011-01-03,,auto: single symbol in daily.parquet
+C0053,LTI,2016-07-21,2022-12-02,auto: prevclose+isin match
+C0053,LTIM,2022-12-05,2026-02-26,auto: prevclose+isin match
+C0053,LTM,2026-02-27,,auto: prevclose+isin match
+C0054,LUPIN,2011-01-03,,auto: single symbol in daily.parquet
+C0055,M&M,2011-01-03,,auto: single symbol in daily.parquet
+C0056,MARUTI,2011-01-03,,auto: single symbol in daily.parquet
+C0057,MAXHEALTH,2020-08-21,,auto: single symbol in daily.parquet
+C0058,NESTLEIND,2011-01-03,,auto: single symbol in daily.parquet
+C0059,NMDC,2011-01-03,,auto: single symbol in daily.parquet
+C0060,NTPC,2011-01-03,,auto: single symbol in daily.parquet
+C0061,ONGC,2011-01-03,,auto: single symbol in daily.parquet
+C0062,POWERGRID,2011-01-03,,auto: single symbol in daily.parquet
+C0063,PNB,2011-01-03,,auto: single symbol in daily.parquet
+C0064,RANBAXY,2011-01-03,2015-04-01,auto: single symbol in daily.parquet
+C0065,RELCAPITAL,2011-01-03,2024-02-26,auto: single symbol in daily.parquet
+C0066,RCOM,2011-01-03,,auto: single symbol in daily.parquet
+C0067,RELIANCE,2011-01-03,,auto: single symbol in daily.parquet
+C0068,RELINFRA,2011-01-03,,auto: single symbol in daily.parquet
+C0069,RPOWER,2011-01-03,,auto: single symbol in daily.parquet
+C0070,IBULHSGFIN,2013-07-23,2024-07-25,auto: prevclose+isin match
+C0070,SAMMAANCAP,2024-07-26,,auto: prevclose+isin match
+C0071,SBILIFE,2017-10-03,,auto: single symbol in daily.parquet
+C0072,SHREECEM,2011-01-03,,auto: single symbol in daily.parquet
+C0073,SRTRANSFIN,2011-01-03,2022-12-19,auto: prevclose+isin match
+C0073,SHRIRAMFIN,2022-12-20,,auto: prevclose+isin match
+C0074,SIEMENS,2011-01-03,,auto: single symbol in daily.parquet
+C0075,SBIN,2011-01-03,,auto: single symbol in daily.parquet
+C0076,SAIL,2011-01-03,,auto: single symbol in daily.parquet
+C0077,STER,2011-01-03,2013-08-26,auto: single symbol in daily.parquet
+C0078,SUNPHARMA,2011-01-03,,auto: single symbol in daily.parquet
+C0079,SUZLON,2011-01-03,,auto: single symbol in daily.parquet
+C0080,TCS,2011-01-03,,auto: single symbol in daily.parquet
+C0081,TATAGLOBAL,2011-01-03,2020-02-26,auto: prevclose+isin match
+C0081,TATACONSUM,2020-02-27,,auto: prevclose+isin match
+C0082,TMCV,2025-11-12,,auto: single symbol in daily.parquet
+C0083,TATAMOTORS,2011-01-03,2025-10-23,auto: prevclose+isin match
+C0083,TMPV,2025-10-24,,auto: prevclose+isin match
+C0084,TATAPOWER,2011-01-03,,auto: single symbol in daily.parquet
+C0085,TATASTEEL,2011-01-03,,auto: single symbol in daily.parquet
+C0086,TECHM,2011-01-03,,auto: single symbol in daily.parquet
+C0087,TITAN,2011-01-03,,auto: single symbol in daily.parquet
+C0088,TRENT,2011-01-03,,auto: single symbol in daily.parquet
+C0089,ULTRACEMCO,2011-01-03,,auto: single symbol in daily.parquet
+C0090,MCDOWELL-N,2011-01-03,2024-06-06,auto: prevclose+isin match
+C0090,UNITDSPR,2024-06-07,,auto: prevclose+isin match
+C0091,UNIPHOS,2011-01-03,2013-10-22,auto: prevclose+isin match
+C0091,UPL,2013-10-23,,auto: prevclose+isin match
+C0092,SESAGOA,2011-01-03,2013-10-03,auto: prevclose+isin match
+C0092,SSLT,2013-10-04,2015-05-06,auto: prevclose+isin match
+C0092,VEDL,2015-05-07,,auto: prevclose+isin match
+C0093,WIPRO,2011-01-03,,auto: single symbol in daily.parquet
+C0094,YESBANK,2011-01-03,,auto: single symbol in daily.parquet
+C0095,ZEEL,2011-01-03,,auto: single symbol in daily.parquet

@@ -13,6 +13,9 @@ dependencies = [
     # Local UI (`mbt ui`), same versions as packages/option-backtesting.
     "fastapi>=0.115",
     "uvicorn>=0.32",
+    # Nifty 50 stock data layer (stocks/): daily.parquet / events.parquet I/O.
+    # >=14.0.1 for CVE-2023-47248 (see stocks/ plan.md §5).
+    "pyarrow>=14.0.1",
 ]
 
 [project.scripts]

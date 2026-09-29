@@ -37,6 +37,12 @@
 }
 
 * { box-sizing: border-box; }
+/* Several elements toggled via JS `.hidden = true` (e.g. #score-row, #cost-model-row,
+   #voladj-skip-row) also carry .row/.inline, which set `display: flex` directly - an author
+   rule that silently overrides the browser's own `[hidden] { display: none }` default, since UA
+   styles always lose to any author rule regardless of specificity. Without this, setting
+   `.hidden = true` on such an element does nothing and it stays visible. */
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--text); }
 h1 { font-size: 17px; margin: 0; }
 h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
@@ -45,6 +51,7 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .muted, .hint { color: var(--muted); }
 .hint { font-size: 12px; margin: 6px 0 0; }
 .sub { font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+.inner-detail { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 400; }
 .count { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--accent); }
 
 .layout { display: grid; grid-template-columns: 360px 1fr; min-height: 100vh; }
@@ -53,6 +60,15 @@ kbd { font-size: 11px; opacity: .7; margin-left: 6px; }
 .brand { padding: 16px 16px 8px; }
 .brand p { margin: 4px 0 0; font-size: 12px; }
 .panel { padding: 12px 16px; border-top: 1px solid var(--border); }
+.panel-header { display: flex; align-items: center; justify-content: space-between; width: 100%;
+  background: none; border: none; padding: 0; margin: 0 0 8px; cursor: pointer; text-align: left;
+  font: inherit; color: inherit; }
+.panel-header h2, .panel-header span:first-child { font-size: 13px; margin: 0; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--muted); }
+.panel-header .chevron { font-size: 11px; color: var(--muted); transition: transform .15s ease; flex: none; margin-left: 8px; }
+.panel-header[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
+.panel-header:focus-visible { outline: 2px solid var(--accent, #4a7dfc); outline-offset: 2px; }
+.panel.collapsed .panel-body { display: none; }
 .row { display: flex; gap: 10px; margin-top: 8px; }
 .row > label { flex: 1; }
 label { display: block; font-size: 12px; color: var(--muted); }
@@ -124,6 +140,18 @@ table.lookbacks button { border: none; background: none; cursor: pointer; color:
 .tabs button.active { background: var(--panel); border-color: var(--border); color: var(--text); font-weight: 600; }
 .tab { border-top-left-radius: 0; overflow-x: auto; }
 
+/* Sidebar dataset switch: same .tabs/.tab look, but it sits above .brand rather than a bordered
+   panel, so the -1px overlap trick doesn't apply and the active state needs its own bottom edge. */
+/* .sidebar is a flex column with a fixed height (100vh) and internal scrolling. A flex item
+   whose own overflow isn't 'visible' (true here: .tabs sets overflow-x: auto, which forces
+   overflow-y to 'auto' too, per spec) gets an automatic minimum size of 0 in the flex spec -
+   so on a tall viewport, once the sidebar's total content exceeds 100vh, flexbox shrinks this
+   one item toward zero before the sidebar starts scrolling, instead of just scrolling with it
+   at full size like every other panel. flex-shrink: 0 opts it out of that shrink entirely. */
+#dataset-tabs { margin: 0; padding: 10px 16px 0; flex-shrink: 0; }
+#dataset-tabs button { font-size: 12px; font-weight: 600; }
+#dataset-tabs button.active { border-bottom: 2px solid var(--accent); border-radius: 8px 8px 0 0; }
+
 .table-tools { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .table-tools input[type=search] { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--bg); min-width: 220px; }
@@ -144,6 +172,10 @@ table.data tr.held td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .action.HOLD { background: var(--accent-soft); color: var(--accent); }
 .action.TRIM, .action.AT { background: color-mix(in srgb, var(--benchmark) 18%, transparent); color: var(--warn); }
 .action.WAIT { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+/* Stock mode only: a top-ranked name the index doesn't actually hold this week, so the engine
+   would refuse to buy it even though it ranks well - muted, not a warning colour, since it's
+   expected behaviour rather than something to worry about. */
+.action.NOT { background: var(--accent-soft); color: var(--muted); }
 .explain { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
 
 .runs .run-row { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: center; padding: 8px 0;
@@ -155,3 +187,35 @@ table.data tr.held td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; }
 }
+
+/* Momentum Scores page (TODO.md 3.9.16): a live/current-state snapshot, not a backtest
+   config+run tab, so it replaces the whole .layout (sidebar + results) rather than living
+   inside it -- see static/app.js's switchDataset. Reuses .card/.tabs/table.data/.good/.bad
+   throughout, so it reads as the same app, not a bolted-on second design language. */
+.momentum-scores-view { padding: 20px 24px 40px; max-width: 1400px; margin: 0 auto; }
+.ms-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 10px; }
+.ms-header .run-title { margin-bottom: 0; }
+.ms-note { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+/* Score heatmap cell (0-40 red/bearish, 41-60 yellow/neutral, 61-100 green/bullish) -- same
+   tinted-pill look .action already uses (color-mix over the CSS var), so a score reads as the
+   same kind of signal as a BUY/SELL action badge elsewhere in this app. */
+.ms-score { display: inline-block; min-width: 46px; text-align: center; padding: 2px 7px;
+  border-radius: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ms-score.band-red { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.ms-score.band-yellow { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+.ms-score.band-green { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+table.data td.ms-symbol { font-weight: 600; }
+table.data td .ms-company { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+
+/* Expandable rows (TODO.md 3.9.17: sector -> member stocks) -- same chevron-rotation idea as the
+   sidebar accordion (app.css's .panel-header .chevron), applied per-row instead of per-panel. */
+tr.expandable-row { cursor: pointer; }
+tr.expandable-row:hover { background: color-mix(in srgb, var(--muted) 8%, transparent); }
+.row-chevron { display: inline-block; font-size: 10px; color: var(--muted); margin-right: 6px;
+  transition: transform .15s ease; }
+.row-chevron.open { transform: rotate(90deg); }
+tr.expanded-detail td { padding: 0 8px 10px 28px; border-bottom: 1px solid var(--border); }
+table.ms-nested { font-size: 12px; margin-top: 2px; }
+table.ms-nested th { font-size: 10px; padding: 4px 6px; }
+table.ms-nested td { padding: 4px 6px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }

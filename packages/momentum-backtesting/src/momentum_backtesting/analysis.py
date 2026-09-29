@@ -17,6 +17,18 @@ def _clean(value):
         return {k: _clean(v) for k, v in value.items()}
     if isinstance(value, list | tuple):
         return [_clean(v) for v in value]
+    if value is pd.NaT:
+        # A missing timestamp in an otherwise-datetime64 column (e.g. `entry_week` on a raw BUY
+        # trade row mixed with SELL rows that do have one, dtype-inferred datetime64 by
+        # `pd.DataFrame(list_of_dicts)`) - `NaT` is its own singleton type, not a `pd.Timestamp`
+        # instance and not float-NaN, so neither branch below catches it and it would otherwise
+        # reach the JSON encoder unconverted. Confirmed live (2026-09) against a real Custom
+        # Index backtest: FastAPI/pydantic-core's serializer failed on it with a
+        # `TypeError: 'float' object cannot be interpreted as an integer` - every prior caller of
+        # `_clean` only ever fed it fully-populated timestamp columns (e.g. `closed_trades()`
+        # narrows to SELL rows, whose `entry_week` is always set), so this gap was real but
+        # latent until inner-category trade rows (BUY and SELL mixed in one column) exercised it.
+        return None
     if isinstance(value, pd.Timestamp):
         return value.strftime("%Y-%m-%d")
     if hasattr(value, "item"):  # numpy scalars
@@ -206,8 +218,21 @@ def timeline(result: Result, closed: pd.DataFrame) -> list[dict]:
     return segments
 
 
-def latest_signal(result: Result, prices: pd.DataFrame, config: Config) -> dict:
-    """What the rules say to do at the most recent week's close."""
+def latest_signal(
+    result: Result,
+    prices: pd.DataFrame,
+    config: Config,
+    membership: pd.DataFrame | None = None,
+) -> dict:
+    """What the rules say to do at the most recent week's close.
+
+    `membership` (week x instrument booleans, stock backtests only) mirrors the engine's own
+    `_Sim.top_names` gate: an instrument absent from `membership.columns` (an ETF, benchmark or
+    CASH) is always eligible; one tracked but not a member this week can't be freshly bought,
+    even if it ranks well - only the engine's real trading loop enforces this during a backtest,
+    so this advisory panel has to apply the same rule itself or it would recommend a trade the
+    engine would refuse.
+    """
     week = result.ranks.index[-1]
     ranks = result.ranks.loc[week]
     scores = result.scores.loc[week]
@@ -241,15 +266,25 @@ def latest_signal(result: Result, prices: pd.DataFrame, config: Config) -> dict:
     def at_cap(name: str) -> bool:
         return cap is not None and name not in trims and shares.get(name, 0) >= cap - 1e-6
 
+    def eligible_to_buy(name: str) -> bool:
+        return (
+            membership is None
+            or name not in membership.columns
+            or bool(membership.at[week, name])
+        )
+
     tops = [n for n in ranks.dropna().sort_values().index if ranks[n] <= config.top_n and passes(n)]
+    not_a_member = {n for n in tops if n not in held and not eligible_to_buy(n)}
     actions: dict[str, str] = {n: "SELL" for n in sells}
+    actions.update(dict.fromkeys(not_a_member, "NOT A MEMBER"))
     if config.portfolio == "slots":
         open_slots = config.top_n - (len(held) - len(sells))
-        for name in [n for n in tops if n not in held][: max(open_slots, 0)]:
+        candidates = [n for n in tops if n not in held and eligible_to_buy(n)]
+        for name in candidates[: max(open_slots, 0)]:
             actions[name] = "BUY"
         explain = "Fixed slots: each sale's money buys the best-ranked name not already held."
     else:
-        new = [n for n in tops if n not in held]
+        new = [n for n in tops if n not in held and eligible_to_buy(n)]
         for name in trims:
             actions[name] = f"TRIM to {cap:.0%}"
         if sells or trims:
@@ -306,9 +341,13 @@ def payload(
     groups: dict[str, str],
     proxy: pd.DataFrame | None = None,
     fill_warnings: list[str] | None = None,
+    membership: pd.DataFrame | None = None,
 ) -> dict:
     """`proxy` (week x instrument, from trade_prices) marks fills where an ETF was priced on
-    its index because it hadn't listed yet."""
+    its index because it hadn't listed yet. `membership` is passed straight through to
+    `latest_signal` (see its docstring) - it never affects the historical `result` itself, which
+    the engine has already computed correctly; it only stops the "This week" advisory panel from
+    recommending a trade the engine's own rules wouldn't have allowed."""
     closed = closed_trades(result)
     eq, bench, cash = result.equity, result.benchmark, result.cash
     rolling = (eq / eq.shift(52)) - (bench / bench.shift(52))
@@ -374,7 +413,7 @@ def payload(
             "timeline": timeline(result, closed),
             "yearly": yearly.to_dict("records"),
             "crashes": metrics.crash_table(result).to_dict("records"),
-            "latest": latest_signal(result, prices, config),
+            "latest": latest_signal(result, prices, config, membership),
             "universe": result.ranked_names,
         }
     )

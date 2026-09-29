@@ -143,6 +143,48 @@ def test_niftyindices_rows_parse_and_skip_blank_closes():
     assert series.iloc[-1] == 4541.30
 
 
+def test_niftyindices_month_parsing_matches_every_english_abbreviation():
+    """T4 regression test (QA F04): the ETF path's `%b` parsing used to ask the C
+    library to match "Jan"/"Feb"/... against the *process locale's* month names,
+    which works by accident on an en_US-like box and breaks silently anywhere else.
+    `parse_niftyindices` now matches a fixed English table instead - this pins the
+    exact ISO date every month abbreviation must resolve to, independent of the
+    machine's locale."""
+    from momentum_backtesting.sources import parse_niftyindices
+
+    month_abbrs = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ]
+    rows = [{"HistoricalDate": f"15 {abbr} 2016", "CLOSE": "100.00"} for abbr in month_abbrs]
+
+    series = parse_niftyindices(rows)
+
+    assert list(series.index.strftime("%Y-%m-%d")) == [f"2016-{m:02d}-15" for m in range(1, 13)]
+
+
+def test_niftyindices_month_parsing_is_unaffected_by_the_process_locale():
+    """Same regression as above, proven against an actual non-English LC_TIME so a
+    future re-introduction of locale-dependent parsing (e.g. reverting to
+    `pd.to_datetime(..., format="%d %b %Y")`) is caught even on a machine whose
+    default locale happens to be English."""
+    import locale
+
+    from momentum_backtesting.sources import parse_niftyindices
+
+    original = locale.setlocale(locale.LC_TIME)
+    try:
+        locale.setlocale(locale.LC_TIME, "de_DE.UTF-8")
+    except locale.Error:
+        pytest.skip("de_DE.UTF-8 locale is not installed on this machine")
+    try:
+        rows = [{"HistoricalDate": "04 Jan 2016", "CLOSE": "4541.30"}]
+        series = parse_niftyindices(rows)
+    finally:
+        locale.setlocale(locale.LC_TIME, original)
+
+    assert series.index[0] == pd.Timestamp("2016-01-04")
+
+
 def test_backfill_prepends_older_history_scaled_to_join_without_a_jump():
     from momentum_backtesting.fetch import backfill
 

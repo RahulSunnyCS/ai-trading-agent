@@ -221,3 +221,112 @@ Defensive modes: `off` always invested; `ranked` cash and the gilt are ranked li
 Workbook sheets: summary, settings, yearly, crashes (strategy vs Nifty 50's three worst falls),
 equity, holdings (what each slot held each week), trades (with the rank that triggered each),
 ranks, scores. No parameters have been tuned - the defaults are the rules as first specified.
+
+## Stocks data (Nifty 50, survivorship-free)
+
+`src/momentum_backtesting/stocks/` builds a from-scratch, corporate-action-adjusted daily and
+weekly price/total-return history for every company that has ever been a Nifty 50 member,
+including the ones that delisted, merged or renamed - so a future stock-level strategy can be
+backtested without survivorship bias. It is a **data layer only**: nothing in the ranking
+engine (`engine.py`) or the CLI's `backtest`/`compare`/`weekly` commands reads it yet. That
+wiring, and the `--score`/`--rebalance` engine changes it would need, are deferred - see
+`docs/roadmap.md` for the case for and against.
+
+### Commands
+
+```bash
+uv run mbt stocks fetch                          # full run: download + rebuild everything
+uv run mbt stocks fetch --skip-download           # no network - rebuild from the raw cache only
+uv run mbt stocks fetch --from 2015-01-01         # shorter CA-history / bhavcopy window
+uv run mbt stocks fetch --accept-ca-diff reviewed.csv  # accept a reviewed >30-day-old CA diff
+uv run mbt stocks pin-manifest                    # commit the current raw cache as the baseline
+uv run mbt stocks validate                        # re-run just the dividend verifier
+```
+
+`fetch` (unless `--skip-download`) refreshes the benchmark raw files, downloads any missing
+bhavcopy sessions, fetches a fresh corporate-actions snapshot, rebuilds `daily.parquet`, then
+always runs the full guard pipeline and the dividend verifier from the raw cache - so
+`--skip-download` and a full fetch produce the same outputs given the same raw cache. It exits
+non-zero if any guard fails (a 🔴 in the table below), and prints a summary: session/company
+counts, events by kind and source, guard F/G counts, dividend-verifier flags, and every file
+written.
+
+### Data sources
+
+| Source | What | Politeness |
+|---|---|---|
+| NSE bhavcopy (`nsearchives.nseindia.com`) | Daily EQ/BE/BZ OHLC per symbol, 2011-. Old CM format until 2024-07-05, UDiFF format from 2024-07-08 | Cookie warm-up, ≥0.35s throttle, bounded retries |
+| NSE corporate actions API (`nseindia.com/api/corporates-corporateActions`) | Whole-market bonus/split/dividend/rights/demerger/... feed, fetched by calendar quarter | Same client, same throttle |
+| niftyindices.com (`getTotalReturnIndexString` / `getHistoricaldatatabletoString`) | Nifty 50 TRI, Nifty200 Momentum 30 TRI, Nifty50 Equal Weight TRI and price index | ≤1 year per request (the site's own limit) |
+| AMFI (`mfapi.in`) | UTI Liquid Fund NAV (Direct + Regular plan), spliced for the cash backfill to 2011 | via `fetch.backfill` |
+
+Raw responses are cached under `data/stocks/raw/` (gitignored, ~3,900 bhavcopy zips +
+corporate-action snapshots + benchmark JSON); every run reproduces its outputs from that cache,
+so a re-run with `--skip-download` never touches the network.
+
+### Outputs (`data/stocks/`)
+
+- `daily.parquet` - every EQ/BE/BZ symbol's OHLC, 2011-
+- `events.parquet` - every resolved corporate-action event, attached to a session
+- `nifty50_weekly_tr.csv` / `nifty50_weekly_price.csv` - week x company, total-return and
+  price-only factor series
+- `nifty50_membership_weekly.csv`, `last_trade.csv`, `benchmarks_weekly.csv`
+- `cash_weekly.csv`, `raw_manifest.csv`, `fetch_report.csv`, `dividend_check.csv`
+
+### Guard / warning model
+
+Every run's `fetch_report.csv` carries a severity per finding:
+
+- 🔴 **F (fail)** - the run exits non-zero. Session-calendar gaps, broken price continuity, an
+  unresolved corporate-action row for an ever-member, an unparsed/manual-only subject with no
+  `actions_manual.csv` row, membership-count invariants, an unexplained >20% move with no cited
+  allowlist entry, and a corporate-action event diff older than 30 days (unless
+  `--accept-ca-diff`) are all F.
+- 🟡 **G (flag)** - logged in `fetch_report.csv` but doesn't fail the run: a synthetic-close
+  fill for a single missing session, a suspension (>3 sessions with no trade), a dividend yield
+  outside 0-15%, an `unverifiable` factor-vs-move check, and a re-key-only corporate-action diff
+  (symbol/ISIN changed, value didn't).
+- The dividend verifier (`validate.dividend_check`, `dividend_check.csv`) and the Yahoo
+  `adjclose` cross-check are always review-only flags, never run-failing.
+
+`mbt stocks pin-manifest` is how a reviewed state becomes the new baseline: it copies the raw
+cache's content-hash manifest into `curated/raw_manifest.pinned.csv` and advances
+`curated/events_baseline.csv.gz` to the current events, so the next run (and CI) compares
+against what was just reviewed rather than re-flagging it.
+
+### Curated files (`src/momentum_backtesting/stocks/curated/`, committed to git)
+
+These are the hand-curated, cited facts the pipeline can't derive from NSE's feeds alone:
+company identity (`companies.csv`, `aliases.csv`), Nifty 50 membership history
+(`nifty50_membership.csv`), corporate actions the automatic parser can't handle
+(`actions_manual.csv` - rights, demergers, schemes, bonus debentures/preference shares, a
+handful of amount-less dividends), and cited exceptions to the guards
+(`crash_allowlist.csv`, `continuity_exceptions.csv`, `no_ca_rows.csv`, `yahoo_exceptions.csv`).
+`raw_manifest.pinned.csv` and `events_baseline.csv.gz` are the reproducibility baseline (see
+above) rather than hand-curated facts. Maintaining them means: adding a row (with a source URL)
+when a guard flags something genuinely new, then running `mbt stocks fetch` again to confirm it
+resolves the flag, and `mbt stocks pin-manifest` once the new state is reviewed.
+
+### Known limitations
+
+- Membership effective dates come from one source per change (a second source is optional);
+  a date with no press release is snapped to the scheduled review's effective date, so it may
+  be off by a few days. Four membership rows are single-source and unverified.
+- Symbol renames are derived automatically (same ISIN + the new symbol's PREVCLOSE matching the
+  old symbol's last CLOSE), not researched by hand.
+- A delisted or merged company that never reappears under a new symbol exits the series at its
+  last traded close - a merger's swap value is not modelled, so the true swap-ratio value isn't
+  captured.
+- Demergers, rights issues and schemes of arrangement use a **neutral ex-day rule**: that day's
+  return is set to zero instead of a researched factor, costing roughly one ordinary day's market
+  move (~1-2%) per event, a handful of times across 15 years.
+- Three `actions_manual.csv` dividend rows use a `dividend_basis` of `pre_bonus` by assumption
+  (the formula's native basis), not independently verified against the original filing.
+- The Tata Motors DVR (a separate, thinly-traded share class) is not modelled - only the
+  ordinary shares are.
+- The dividend verifier routinely flags large/special dividends: NSE divisor-adjusts the index
+  for those, so a day where our reconstructed spread diverges from the index's is often expected
+  and reviewed, not a bug.
+- The Yahoo `adjclose` cross-check is flag-only and not independent of survivorship (Yahoo has no
+  delisted tickers), and is best-effort - a blocked or rate-limited Yahoo request is skipped, not
+  retried.
