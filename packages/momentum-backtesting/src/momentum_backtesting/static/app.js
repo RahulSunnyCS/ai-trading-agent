@@ -635,8 +635,11 @@ function applyConfig(cfg) {
 function syncDependentFields() {
   const buffer = radio("portfolio") === "buffer";
   $("#entry-options").hidden = !buffer;
-  $("#cap-options").style.display = buffer ? "" : "none";
-  $("#cap_band").disabled = !(Number($("#max_position").value) > 0 || Number($("#max_category").value) > 0);
+  // Limits are buffer-rule only. Disabled + explained rather than hidden, so they stay findable.
+  $("#limits-note").hidden = buffer;
+  // (The share-price ceiling is a rank filter, so it works under either rule and stays enabled.)
+  $$("#cap-options input:not(#max_stock_price)").forEach((el) => { el.disabled = !buffer; });
+  if (buffer) $("#cap_band").disabled = !(Number($("#max_position").value) > 0 || Number($("#max_category").value) > 0);
   $("#filter-weeks").style.display = radio("defensive") === "filter" ? "" : "none";
   $("#slab_rate").disabled = !$("#tax").checked;
 

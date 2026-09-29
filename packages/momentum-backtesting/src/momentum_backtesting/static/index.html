@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Momentum Backtest</title>
-  <link rel="stylesheet" href="/static/app.css?v=ui11">
+  <link rel="stylesheet" href="/static/app.css?v=ui12">
   <script src="/vendor/plotly.min.js"></script>
 </head>
 <body class="settings-open">
@@ -163,12 +163,6 @@
         <label class="radio"><input type="radio" name="entry" value="make_room">
           <span><b>Make room</b> — buy now, trimming every holding equally</span></label>
       </div>
-      <div class="row" id="cap-options">
-        <label><span id="max-position-label">Max per ETF %</span> <input type="number" id="max_position" min="0" max="100" step="5" value="35"></label>
-        <label id="category-cap-field" hidden title="Everything held through one category (its top stocks together) is limited to this share of the portfolio. 0 = no cap.">Max per category % <input type="number" id="max_category" min="0" max="100" step="5" value="30"></label>
-        <label>Trim when above by (pts) <input type="number" id="cap_band" min="0" max="50" step="1" value="5"></label>
-        <label id="price-cap-field" hidden title="Stocks whose share price is above this are skipped, and the next-best stock takes the slot. Uses the price at the time of each rebalance. Gold, Silver and the international ETFs are exempt. 0 = no limit.">Max share price ₹ <input type="number" id="max_stock_price" min="0" step="1000" value="20000"></label>
-      </div>
       <div class="row" id="momentum-sizing-row" hidden>
         <label class="inline"><input type="checkbox" id="momentum_sizing"> Win-rate position sizing — shrink new/top-up buys after recent losing trades, ramp back to full size as they recover (sits entirely in cash in the worst case)</label>
       </div>
@@ -188,6 +182,23 @@
         <label>Sell when rank &gt; <input type="number" id="exit_rank" min="1" max="40" value="10"></label>
       </div>
       <p class="hint" id="rule-hint"></p>
+      </div>
+    </section>
+
+    <section class="panel" id="limits-panel">
+      <button type="button" class="panel-header" aria-expanded="true" aria-controls="panel-body-limits">
+        <span>Position limits</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="panel-body" id="panel-body-limits">
+      <p class="hint" id="limits-note" hidden>The position and category limits apply to the Buffer rule only — switch "Portfolio rule" to Buffer to use them. The share-price limit works with either.</p>
+      <div class="row" id="cap-options">
+        <label><span id="max-position-label">Max per ETF %</span> <input type="number" id="max_position" min="0" max="100" step="5" value="35"></label>
+        <label id="category-cap-field" hidden title="Everything held through one category (its top stocks together) is limited to this share of the portfolio. 0 = no cap.">Max per category % <input type="number" id="max_category" min="0" max="100" step="5" value="30"></label>
+        <label>Trim when above by (pts) <input type="number" id="cap_band" min="0" max="50" step="1" value="5"></label>
+        <label id="price-cap-field" hidden title="Stocks whose share price is above this are skipped, and the next-best stock takes the slot. Uses the price at the time of each rebalance. Gold, Silver and the international ETFs are exempt. 0 = no limit.">Max share price ₹ <input type="number" id="max_stock_price" min="0" step="1000" value="20000"></label>
+      </div>
+      <p class="hint">0 = no limit. A position or category is trimmed back to its limit only once it passes it by the trim band.</p>
       </div>
     </section>
 
@@ -339,6 +350,6 @@
 </div>
 <button type="button" class="primary mobile-run" id="mobile-run" hidden>Run backtest</button>
 <div class="tooltip" id="tooltip" hidden></div>
-<script src="/static/app.js?v=ui11"></script>
+<script src="/static/app.js?v=ui12"></script>
 </body>
 </html>
