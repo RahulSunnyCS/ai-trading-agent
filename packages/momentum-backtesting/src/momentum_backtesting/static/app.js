@@ -637,7 +637,7 @@ function syncDependentFields() {
   $("#entry-options").hidden = !buffer;
   // Limits are buffer-rule only. Disabled + explained rather than hidden, so they stay findable.
   $("#limits-note").hidden = buffer;
-  // (The share-price ceiling is a rank filter, so it works under either rule and stays enabled.)
+  // (The buy-price ceiling only gates new purchases, so it works under either rule and stays enabled.)
   $$("#cap-options input:not(#max_stock_price)").forEach((el) => { el.disabled = !buffer; });
   if (buffer) $("#cap_band").disabled = !(Number($("#max_position").value) > 0 || Number($("#max_category").value) > 0);
   $("#filter-weeks").style.display = radio("defensive") === "filter" ? "" : "none";
@@ -730,7 +730,7 @@ function syncDependentFields() {
       if (stockCap > 0 && stockCap * stocksFresh < 100) extra.push(`With ${stocksFresh} stocks × ${stockCap}%, only ${stockCap * stocksFresh}% can be invested — the rest waits in cash.`);
       if (catOn && catCap > 0 && catCap * catTop < 100) extra.push(`With ${catTop} categories × ${catCap}%, only ${catCap * catTop}% can be invested — the rest waits in cash.`);
     }
-    if (priceCap > 0) extra.push(`Stocks priced above ₹${priceCap.toLocaleString("en-IN")} a share are skipped.`);
+    if (priceCap > 0) extra.push(`Stocks priced above ₹${priceCap.toLocaleString("en-IN")} a share are never newly bought (the next-best stock takes the slot); one you already hold is kept.`);
     if (extra.length) $("#broad-rule-hint").textContent += ` ${extra.join(" ")}`;
     $("#rule-hint").textContent = "";
   } else {
@@ -850,7 +850,7 @@ function validate(cfg) {
   if (cfg.cost_pct < 0) return "Cost can't be negative.";
   if (cfg.max_position != null && !(cfg.max_position > 0 && cfg.max_position <= 1)) return "Max per ETF must be between 1 and 100% (0 = no cap).";
   if (cfg.max_category != null && !(cfg.max_category > 0 && cfg.max_category <= 1)) return "Max per category must be between 1 and 100% (0 = no cap).";
-  if (cfg.max_stock_price != null && !(cfg.max_stock_price > 0)) return "Max share price must be a positive amount (0 = no limit).";
+  if (cfg.max_stock_price != null && !(cfg.max_stock_price > 0)) return "Max price to buy must be a positive amount (0 = no limit).";
   if (cfg.cap_band < 0) return "The trim band can't be negative.";
   if (cfg.cost_model === "itemised" && !(cfg.capital > 0)) return "Capital must be a positive amount.";
   if (cfg.slippage_bps < 0) return "Slippage can't be negative.";
@@ -867,7 +867,7 @@ function validationTarget(problem) {
     [/Only .*ETF/i, "#universe-panel"], [/Top N must/i, "#top_n"],
     [/sell rank/i, "#exit_rank"], [/start date/i, "#end"],
     [/Cost can/i, "#cost_pct"], [/Max per ETF/i, "#max_position"],
-    [/Max per category/i, "#max_category"], [/Max share price/i, "#max_stock_price"],
+    [/Max per category/i, "#max_category"], [/Max price to buy/i, "#max_stock_price"],
     [/trim band/i, "#cap_band"], [/Capital/i, "#capital"],
     [/Slippage/i, "#slippage_bps"], [/Sizing window/i, "#momentum_sizing_window"],
     [/Min size floor/i, "#momentum_sizing_floor"],
@@ -1186,9 +1186,9 @@ function showTab(name) {
   activeResultTab = name;
   const groups = {
     overview: ["overview", "yearly"],
-    holdings: ["signal", "categories", "timeline", "etfs"],
+    holdings: ["signal", "categories", "etfs"],
     trades: ["trades"],
-    split: ["split"],
+    split: ["timeline", "split"],
     risk: ["crashes"],
     compare: ["runs"],
   };
@@ -1200,7 +1200,7 @@ function showTab(name) {
     Plotly.Plots.resize("main-chart");
     Plotly.Plots.resize("yearly-chart");
   }
-  if (name === "holdings") Plotly.Plots.resize("timeline-chart");
+  if (name === "split") Plotly.Plots.resize("timeline-chart");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1274,7 +1274,7 @@ function describe(cfg) {
       ? `Buffer (${cfg.entry === "wait" ? "wait for a sale" : "make room"}${cfg.max_position ? `, max ${Math.round(cfg.max_position * 100)}%/stock` : ", no stock cap"}` +
         `${cfg.max_category && cfg.broad_category_mode === "on" ? `, ${Math.round(cfg.max_category * 100)}%/category` : ""})`
       : "Fixed slots";
-    const priceText = cfg.max_stock_price ? ` · shares ≤ ₹${cfg.max_stock_price.toLocaleString("en-IN")}` : "";
+    const priceText = cfg.max_stock_price ? ` · buys ≤ ₹${cfg.max_stock_price.toLocaleString("en-IN")}` : "";
     const allOne = cfg.weights.every((w) => w === 1);
     const lbs = cfg.lookbacks.map((w, i) => (allOne ? `${w}` : `${w}×${cfg.weights[i]}`)).join("/");
     const scoreText = cfg.score && cfg.score !== "ranksum" ? ` · score ${cfg.score}` : "";
@@ -2053,7 +2053,7 @@ function renderRuns(panel = $('[data-panel="runs"]')) {
     ["Top N / exit rank", "top_n", (_, c) => `${c.top_n} / ${c.exit_rank}`],
     ["Entry", "entry", (v) => v], ["Position cap", "max_position", (v) => v == null ? "None" : pct(v, 0)],
     ["Category cap", "max_category", (v, c) => c.dataset === "broad" ? (v == null ? "None" : pct(v, 0)) : "—"],
-    ["Max share price", "max_stock_price", (v, c) => c.dataset === "broad" ? (v ? `₹${v.toLocaleString("en-IN")}` : "None") : "—"],
+    ["Max price to buy", "max_stock_price", (v, c) => c.dataset === "broad" ? (v ? `₹${v.toLocaleString("en-IN")}` : "None") : "—"],
     ["Lookbacks", "lookbacks", (_, c) => `${c.lookbacks?.join("/")} weeks · weights ${c.weights?.join("/")}`],
     ["Crash protection", "defensive", (v, c) => v === "filter" ? `Cash filter, ${c.filter_lookback} weeks` : v],
     ["Cost model", "cost_model", (v, c) => v === "itemised" ? "Itemised" : `${c.cost_pct}% per side`],

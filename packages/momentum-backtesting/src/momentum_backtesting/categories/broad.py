@@ -63,7 +63,6 @@ category, just at the 755-name Total Market scale instead of a ~20-name category
 from __future__ import annotations
 
 import csv
-import dataclasses
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -789,13 +788,6 @@ def price_ceiling_mask(
     return over
 
 
-def _without_over_ceiling(ranks: pd.DataFrame, over: pd.DataFrame) -> pd.DataFrame:
-    """`ranks` with over-ceiling names dropped and the rest re-ranked densely (1..N), so a
-    category's top-K picks and the pool's top-N cut both slide down to the next affordable
-    name instead of leaving a gap."""
-    return _dense_rank(ranks.where(~over.reindex(index=ranks.index, columns=ranks.columns)))
-
-
 # ---------------------------------------------------------------------------------------------
 # End-to-end orchestration -- Steps 2-4 (ON) or Steps 2+OFF (skip 3-4), wired the way
 # `api.py`'s `_stock_backtest`/`_custom_index_backtest` are: one function both the CLI and the
@@ -883,14 +875,11 @@ def run_broad_backtest(
     `max_position * category_top_n * picks_per_category >= 1` and
     `max_category * category_top_n >= 1`, or the caps hold cash back by design.
 
-    `max_stock_price` (rupees per share; None or 0 = off): stocks priced above it are treated as
-    not there at all - they can't enter the pool's rank table, can't be a category's pick, and
-    aren't counted toward a category's coverage - so the next-best affordable stock fills the
-    slot. Atomics are exempt (see `price_ceiling_mask`). Applied on top of the cached
-    `UniverseRanking` (the pool itself is still chosen before the ceiling, so it can hold a few
-    fewer than `pool_top_n` investable names), and returned on `BroadBacktestResult.ranking`.
-    Known trade-off: the ceiling is a plain eligibility rule, so a stock ALREADY held that later
-    rises past it is sold at the next rebalance like any other ineligible name.
+    `max_stock_price` (rupees per share; None or 0 = off): an ENTRY-only affordability rule. A
+    stock priced above it that week cannot be newly bought (`engine.run_backtest(no_buy=...)`);
+    the freed slot goes to the next-best-ranked buyable name. A stock already held is never sold
+    for crossing it and may be topped up, so it is held through until its rank says sell. Atomics
+    are exempt (see `price_ceiling_mask`).
 
     `mass_exit_response`/`mass_exit_threshold`/`mass_exit_throttle_fraction` (TODO.md 3.9.20):
     `category_mode="on"` only -- raises ValueError if combined with `category_mode="off"`, since
@@ -918,12 +907,6 @@ def run_broad_backtest(
         )
 
     over_ceiling = price_ceiling_mask(ranking.prices, max_stock_price)
-    if over_ceiling is not None:
-        ranking = dataclasses.replace(
-            ranking,
-            combined_pool_ranks=_without_over_ceiling(ranking.combined_pool_ranks, over_ceiling),
-            stock_pool_ranks=_without_over_ceiling(ranking.stock_pool_ranks, over_ceiling),
-        )
 
     prices = ranking.prices.copy()
     prices[CASH] = outer_prices.reindex(prices.index)[CASH]
@@ -1002,6 +985,7 @@ def run_broad_backtest(
             if max_category is not None and effective.groups is not None
             else None
         ),
+        no_buy=over_ceiling.reindex(prices.index) if over_ceiling is not None else None,
     )
     return BroadBacktestResult(
         result=result,

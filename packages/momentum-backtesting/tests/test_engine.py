@@ -900,3 +900,36 @@ def test_mass_exit_throttle_stacks_with_momentum_sizing_on_the_same_week():
     idle_both = both.weights.loc[flagged_week, IDLE]
     assert idle_both > idle_sizing_only
     assert idle_both == pytest.approx(0.5, abs=1e-6)  # no closed trades yet: sizing itself is inert
+
+
+# --- no_buy: an entry-only gate (e.g. a share-price ceiling); holdings are never sold for it ---
+def test_a_no_buy_name_is_skipped_and_the_next_best_fills_its_slot():
+    prices = two_pairs()
+    blocked = pd.DataFrame(False, index=prices.index, columns=prices.columns)
+    blocked["A"] = True
+    kw = dict(top_n=2, exit_rank=4, max_position=None)
+    free = run_backtest(prices, includes(prices), bcfg(**kw))
+    gated = run_backtest(prices, includes(prices), bcfg(**kw), no_buy=blocked)
+    assert "A" in set(free.trades.query("action == 'BUY'")["asset"])
+    assert set(gated.trades.query("action in ['BUY', 'ADD']")["asset"]) == {"B", "C"}
+    assert "A" not in gated.weights.columns or gated.weights["A"].fillna(0).max() == 0
+
+
+def test_a_no_buy_name_already_held_is_held_through_not_sold():
+    prices = two_pairs()
+    blocked = pd.DataFrame(False, index=prices.index, columns=prices.columns)
+    blocked.loc[prices.index[8:], "A"] = True  # A becomes unbuyable after it was bought
+    kw = dict(top_n=2, exit_rank=4, max_position=None)
+    result = run_backtest(prices, includes(prices), bcfg(**kw), no_buy=blocked)
+    assert "A" in set(result.trades.query("action == 'BUY'")["asset"])
+    assert "A" not in set(result.trades.query("action == 'SELL'")["asset"])
+    assert result.weights["A"].iloc[-1] > 0
+
+
+def test_no_buy_of_all_false_changes_nothing():
+    prices = two_pairs()
+    none = pd.DataFrame(False, index=prices.index, columns=prices.columns)
+    kw = dict(top_n=2, exit_rank=4, max_position=None)
+    a = run_backtest(prices, includes(prices), bcfg(**kw))
+    b = run_backtest(prices, includes(prices), bcfg(**kw), no_buy=none)
+    pd.testing.assert_series_equal(a.equity, b.equity)

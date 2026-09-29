@@ -1143,10 +1143,9 @@ def test_broad_backtest_price_ceiling_skips_an_unaffordable_stock_in_off_mode(
     ceiling = _run_broad(**kw, max_stock_price=20_000)
     assert victim not in _traded_stocks(ceiling)
     assert len(ceiling.result.trades)  # the next-best names filled in; it isn't just empty
-    assert not (ceiling.ranking.stock_pool_ranks[victim].notna()).any()
 
 
-def test_broad_backtest_price_ceiling_moves_a_category_pick_to_the_next_stock(
+def test_broad_backtest_price_ceiling_never_buys_an_unaffordable_category_pick(
     broad_client, tmp_path
 ):
     control = _run_broad()
@@ -1156,9 +1155,8 @@ def test_broad_backtest_price_ceiling_moves_a_category_pick_to_the_next_stock(
     _scale_stock_price(tmp_path, victim, 1000.0)
     api.DATA.broad_ranking_cache.clear()
     ceiling = _run_broad(max_stock_price=20_000)
-    picks_after = {p for row in _held(ceiling) for p in row["picks"]}
-    assert victim not in picks_after
-    assert picks_after  # every category still contributes what it has left
+    assert victim not in _traded_stocks(ceiling)
+    assert _traded_stocks(ceiling)  # the next-best stocks filled in
 
 
 def _held(outcome) -> list[dict]:

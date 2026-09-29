@@ -372,6 +372,10 @@ class _Sim:
     # that week). Per-week because a stock's group is whichever held category it was picked
     # through, which changes as categories rotate.
     groups: pd.DataFrame | None = None
+    # week x instrument booleans; True = may not be BOUGHT that week (e.g. share price above the
+    # affordability ceiling). Never forces a sale: a holding stays until its rank says sell, and
+    # may still be topped up, so a stock that grows past the ceiling is simply held through.
+    no_buy: pd.DataFrame | None = None
 
     def group(self, week: pd.Timestamp, asset: str) -> str | None:
         """The group `asset` counts toward that week, or None (ungrouped / no table supplied)."""
@@ -427,22 +431,51 @@ class _Sim:
             return f"{self.config.filter_lookback}w return below cash"
         return None
 
-    def top_names(self, week: pd.Timestamp) -> list[str]:
+    def top_names(
+        self, week: pd.Timestamp, held: frozenset[str] | set[str] = frozenset()
+    ) -> list[str]:
         """The current top N that may be bought, best first. Membership-gated: an instrument
         that's dropped out of the index this week (present in `membership`'s columns but False
         that week) isn't offered as a new buy. An instrument absent from `membership` altogether
-        (an ETF/benchmark, or when membership tracking is off) is always eligible."""
+        (an ETF/benchmark, or when membership tracking is off) is always eligible.
+
+        `no_buy` gate: a name flagged that week and not in `held` is skipped, and the list is
+        refilled from the next-best-ranked names (those flagged are never used as fillers) so
+        the top-N slot goes to the best name that can actually be bought."""
         ranks = self.ranks.loc[week].dropna().sort_values()
         names = [
             n for n in ranks.index if ranks[n] <= self.config.top_n and self.passes_filter(n, week)
         ]
-        if self.membership is None:
+        if self.membership is not None:
+            names = [
+                n
+                for n in names
+                if n not in self.membership.columns or bool(self.membership.at[week, n])
+            ]
+        if self.no_buy is None:
             return names
-        return [
-            n
-            for n in names
-            if n not in self.membership.columns or bool(self.membership.at[week, n])
-        ]
+
+        def blocked(n: str) -> bool:
+            return n in self.no_buy.columns and bool(self.no_buy.at[week, n])
+
+        out = [n for n in names if n in held or not blocked(n)]
+        if len(out) >= self.config.top_n:
+            return out
+        for n in ranks.index:
+            if len(out) >= self.config.top_n:
+                break
+            if n in out or blocked(n) or not self.passes_filter(n, week):
+                continue
+            if (
+                self.membership is not None
+                and n in self.membership.columns
+                and not bool(self.membership.at[week, n])
+            ):
+                continue
+            if ranks[n] > self.config.exit_rank:
+                break
+            out.append(n)
+        return out
 
     def tax(self, asset: str, gain: float, held_days: int) -> float:
         if self.ledger is None:
@@ -507,6 +540,7 @@ def run_backtest(
     external_ranks: tuple[pd.DataFrame, pd.DataFrame] | None = None,
     mass_exit_weeks: frozenset[pd.Timestamp] | None = None,
     groups: pd.DataFrame | None = None,
+    no_buy: pd.DataFrame | None = None,
 ) -> Result:
     """`rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ.
     `trade_prices` (signal week x instrument) is what trades fill at and holdings are valued
@@ -537,7 +571,11 @@ def run_backtest(
     `groups` (week x instrument group labels, same shape as `ranks`) is what `config.max_group`
     caps against - see `_Sim.group`. It is shifted by `signal_delay` together with the ranks it
     was built alongside, so a delayed signal keeps its own week's grouping. Ignored by the
-    fixed-slots rule, which is always equal-weight."""
+    fixed-slots rule, which is always equal-weight.
+
+    `no_buy` (week x instrument booleans, True = not buyable that week) blocks NEW purchases only
+    - see `_Sim.no_buy`. Shifted by `signal_delay` with the ranks. Broad Momentum uses it for the
+    share-price ceiling, which is about whether a small budget can afford a first share."""
     names = ranked_universe(includes, config)
     missing = [n for n in [*names, CASH, config.benchmark] if n not in prices]
     if missing:
@@ -579,6 +617,10 @@ def run_backtest(
         filter_ret = filter_ret.shift(config.signal_delay)
         if groups is not None:
             groups = groups.shift(config.signal_delay)
+        if no_buy is not None:
+            no_buy = no_buy.shift(config.signal_delay)
+    if no_buy is not None:
+        no_buy = no_buy.reindex(ranks.index).fillna(False).astype(bool)
     if groups is not None:
         groups = groups.reindex(ranks.index)
 
@@ -610,6 +652,7 @@ def run_backtest(
         trade_weeks=trade_weeks,
         mass_exit_weeks=mass_exit_weeks,
         groups=groups,
+        no_buy=no_buy,
     )
     outcome = _run_slots(sim, weeks) if config.portfolio == "slots" else _run_buffer(sim, weeks)
 
@@ -689,7 +732,7 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
 
             # 2. Buys: best-ranked names within the top N that aren't already held.
             held = {s["asset"] for s in slots if s["kind"] == "held"}
-            candidates = [n for n in sim.top_names(week) if n not in held]
+            candidates = [n for n in sim.top_names(week, held) if n not in held]
             for slot_no, slot in enumerate(slots, start=1):
                 if slot["kind"] == "held":
                     continue
@@ -943,7 +986,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
 
             # 3. Split the money equally across the current top N, but never past the cap. Parked
             #    cash joins in as soon as there's room for it.
-            tops = sim.top_names(week)
+            tops = sim.top_names(week, frozenset(a for a in lots if a != _POOL))
             total = portfolio_value(week) + proceeds
             if tops and _POOL in lots:
                 need = absorbable(tops, total, week) - proceeds

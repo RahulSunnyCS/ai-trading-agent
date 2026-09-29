@@ -511,7 +511,7 @@ def test_load_stock_groups_reads_real_curated_file():
 
 
 # --------------------------------------------------------------------------
-# Share-price ceiling: price_ceiling_mask / _without_over_ceiling (pure).
+# Share-price ceiling: price_ceiling_mask (pure).
 # --------------------------------------------------------------------------
 
 
@@ -546,16 +546,3 @@ def test_price_ceiling_mask_is_point_in_time_not_a_permanent_label():
     prices["LATE"] = [500.0, 15_000.0, 60_000.0]
     over = broad.price_ceiling_mask(prices, 20_000)
     assert over["LATE"].tolist() == [False, False, True]
-
-
-def test_dropping_over_ceiling_names_reranks_the_rest_densely():
-    weeks = pd.date_range("2024-01-05", periods=2, freq="W-FRI")
-    ranks = pd.DataFrame(
-        {"MRF": [1.0, 3.0], "A": [2.0, 1.0], "B": [3.0, 2.0], "OUT": [None, None]}, index=weeks
-    )
-    over = pd.DataFrame(False, index=weeks, columns=ranks.columns)
-    over["MRF"] = [True, False]
-    result = broad._without_over_ceiling(ranks, over)
-    # Week 1: MRF is out, so A and B slide up to 1 and 2. Week 2: nothing dropped, unchanged.
-    assert result.loc[weeks[0]].dropna().to_dict() == {"A": 1.0, "B": 2.0}
-    assert result.loc[weeks[1]].dropna().to_dict() == {"MRF": 3.0, "A": 1.0, "B": 2.0}

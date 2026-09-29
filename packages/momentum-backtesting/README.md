@@ -196,11 +196,13 @@ works offline.
 
 **Broad Momentum concentration controls.** Broad holds up to 16 stocks, so the ETF-tuned 35% cap
 rarely binds; its UI defaults are 15% per stock and 30% per category (everything held through one
-category, `Config.max_group`, category mode ON only). It also has a share-price ceiling (default
-Rs 20,000, 0 = off) that skips stocks a share of which costs more than that, comparing against the
-raw traded price each week; the next-best stock takes the slot. A held stock that later rises past
-the ceiling is sold at the next rebalance. The result's "Trade split" tab scales the latest
-holdings to a capital you type, in whole shares for Broad.
+category, `Config.max_group`, category mode ON only). It also has a buy-price ceiling (default
+Rs 20,000, 0 = off) so a small budget is never asked to buy one very expensive share (MRF): a stock
+priced above it that week cannot be newly bought and the next-best stock takes the slot. It only
+gates entry - a stock already held is kept, and topped up, even after it rises past the ceiling.
+The result's "Trade split" tab is the per-stock timeline (green bar = a holding that made money, red
+= one that lost), followed by the latest holdings scaled to a capital you type, in whole shares for
+Broad. `mbt categories broad-sweep-caps` sweeps the caps and trim band across several windows.
 
 **Position cap (buffer rule, default 35%).** No ETF is bought or topped up past the cap; money
 that doesn't fit goes to the other top-N names, or waits in the liquid fund if they're all full.
