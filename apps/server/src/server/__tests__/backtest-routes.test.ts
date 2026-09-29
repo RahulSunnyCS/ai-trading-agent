@@ -374,3 +374,82 @@ describe('GET /api/backtest/runs/:id', () => {
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8000/runs/abc123', expect.anything());
   });
 });
+
+// ---------------------------------------------------------------------------
+// Leg-wise "Options Lab"
+// ---------------------------------------------------------------------------
+
+describe('leg-wise routes', () => {
+  const strategy = { id: 's', underlying: 'NIFTY' };
+
+  it('PUT strategies/:name rejects an unsafe name before ever calling fetch', async () => {
+    server = await buildTestServer();
+    for (const name of ['..%2Fevil', 'Bad-Name', 'a.b']) {
+      const res = await server.inject({
+        method: 'PUT',
+        url: `/api/backtest/legwise/strategies/${name}`,
+        payload: { strategy },
+      });
+      expect(res.statusCode).toBe(400);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('PUT strategies/:name forwards a slug name and the body', async () => {
+    server = await buildTestServer();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { name: 'my_one', sha: 'abc' }));
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/api/backtest/legwise/strategies/my_one',
+      payload: { strategy },
+    });
+    expect(res.statusCode).toBe(200);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://127.0.0.1:8000/legwise/strategies/my_one');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body as string)).toEqual({ strategy });
+  });
+
+  it('POST validate needs no access gate', async () => {
+    server = await buildTestServer();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { valid: true, errors: [] }));
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/backtest/legwise/validate',
+      payload: { strategy },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(requireAccess).not.toHaveBeenCalled();
+  });
+
+  it('POST backtest with payment enabled and no credit is a 402 that never reaches Python', async () => {
+    (isPaymentEnabled as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (consumeCredit as ReturnType<typeof vi.fn>).mockResolvedValue({ success: false });
+    server = await buildTestServer();
+    const res = await server.inject({
+      method: 'POST',
+      url: '/api/backtest/legwise/backtest',
+      payload: { strategy, from: '2026-09-23', to: '2026-09-29' },
+    });
+    expect(res.statusCode).toBe(402);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('POST daily rejects a malformed date and forwards a good one', async () => {
+    server = await buildTestServer();
+    const bad = await server.inject({
+      method: 'POST',
+      url: '/api/backtest/legwise/daily',
+      payload: { date: '29-09-2026' },
+    });
+    expect(bad.statusCode).toBe(400);
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { state: 'running', day: '2026-09-29' }));
+    const ok = await server.inject({
+      method: 'POST',
+      url: '/api/backtest/legwise/daily',
+      payload: { date: '2026-09-29', fetch: false },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(requireAccess).toHaveBeenCalled();
+  });
+});

@@ -10,6 +10,19 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // OBT_DIRECT=1 (dev only): send the Options Lab's calls straight to the
+      // loopback option-backtesting service (`bun run py:api`, :8000), for
+      // working on that tab without Postgres/Redis/apps/server running. Off by
+      // default, so normal dev still goes through the Fastify proxy and its
+      // access gate — which is the only path in production.
+      ...(process.env.OBT_DIRECT === '1'
+        ? {
+            '/api/backtest/legwise': {
+              target: 'http://127.0.0.1:8000',
+              rewrite: (path: string) => path.replace(/^\/api\/backtest/, ''),
+            },
+          }
+        : {}),
       '/api': 'http://localhost:3000',
       // The retrospection plugin is fastify-plugin-wrapped and currently mounts
       // its routes at /retrospection/* (the {prefix:'/api'} option passed to

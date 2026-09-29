@@ -4,6 +4,7 @@ import {
   CreditCard,
   Database,
   FlaskConical,
+  Layers,
   type LucideIcon,
   Repeat,
   Tag,
@@ -12,7 +13,7 @@ import {
   Wallet,
 } from 'lucide-react';
 
-/** The nine dashboard views. */
+/** The dashboard views. */
 export type Tab =
   | 'live'
   | 'trades'
@@ -22,6 +23,7 @@ export type Tab =
   | 'backfill'
   | 'replay'
   | 'backtest'
+  | 'optionslab'
   | 'pricing';
 
 export interface NavItem {
@@ -53,6 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'backfill', label: 'Backfill', icon: Database },
       { id: 'replay', label: 'Replay', icon: CalendarClock },
       { id: 'backtest', label: 'Backtest', icon: FlaskConical },
+      { id: 'optionslab', label: 'Options Lab', icon: Layers },
     ],
   },
   {

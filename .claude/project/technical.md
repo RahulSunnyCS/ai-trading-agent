@@ -85,6 +85,8 @@ uv run obt walkforward strategies/B_pyramid.yaml --is-from YYYY-MM-DD --is-to YY
 uv run obt sweep strategies/B_pyramid.yaml --changes changes.json --from YYYY-MM-DD --to YYYY-MM-DD [--overfit --n-blocks 4]
 uv run obt export-personality <run_id>
 uv run obt fyers fetch [--date YYYY-MM-DD]   # daily 1m Fyers collector — same evening, expiring contracts vanish
+uv run obt legwise run strategies/legwise/*.yaml [--trades]   # AlgoTest-style leg-wise backtests over that data
+uv run obt daily            # the evening routine: fetch the last closed session, run every strategies/legwise/*.yaml, save, summarise + Telegram (--no-telegram)
 
 # option-backtesting FastAPI service (loopback-only, port 8000) — from repo root
 bun run py:api               # equivalent to: cd packages/option-backtesting && uv run obt-api

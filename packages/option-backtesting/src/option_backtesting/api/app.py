@@ -14,6 +14,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from ..config import resolve_cache_dir, resolve_registry_db
+from .legwise_routes import router as legwise_router
 from .routes import router
 
 
@@ -27,6 +28,7 @@ def create_app(cache_dir: Path | None = None, registry_db: Path | None = None) -
     app.state.cache_dir = cache_dir or resolve_cache_dir()
     app.state.registry_db = registry_db or resolve_registry_db()
     app.include_router(router)
+    app.include_router(legwise_router)
     return app
 
 

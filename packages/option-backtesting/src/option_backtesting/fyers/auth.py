@@ -38,7 +38,7 @@ class Credentials:
         return f"Credentials(app_id={self.app_id!r}, source={self.source!r})"
 
 
-def _load_dotenv() -> None:
+def load_dotenv() -> None:
     """Fill unset env vars from the repo-root .env (the one both apps read)."""
     path = REPO_ROOT / ".env"
     if not path.exists():
@@ -62,7 +62,7 @@ def _from_file(path: Path, source: str) -> Credentials | None:
 
 
 def resolve_credentials() -> Credentials:
-    _load_dotenv()
+    load_dotenv()
     app_id = os.environ.get("FYERS_APP_ID", "").strip()
     token = os.environ.get("FYERS_ACCESS_TOKEN", "").strip()
     if app_id and token:

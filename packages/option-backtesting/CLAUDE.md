@@ -72,6 +72,19 @@ Otherwise:
   `mbt login` token file off disk**, same JSON shape, no code import), `client.py` (throttled
   history client), `symbols.py` (public symbol master), `daily.py` (range + adaptive-width
   collection → Parquet under `FYERS_DATA_DIR`). Forward-only — see `DECISIONS.md`.
+- `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
+  strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
+  (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
+  1-minute-bar assumption), `report.py`, `daily.py` (the `obt daily` runner + saved-results
+  history). Separate from `engine/` on purpose — see `DECISIONS.md`.
+- `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
+  `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
+  redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
+  `load_dotenv()` would otherwise pick up the real bot token from the repo `.env`.
+- `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: list/
+  validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
+  raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
+  the evening run as a background job. Errors are `{"error": ...}` (what the dashboard reads).
 - `analytics/regime_source.py` — reads `daily_regime_tags` from Postgres,
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`
@@ -88,4 +101,6 @@ uv run pytest
 uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
 uv run obt fyers status                 # token source + data dir
 uv run obt fyers fetch                  # today's 1m data — run the SAME evening
+uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades]
+uv run obt daily                        # evening routine: fetch + run strategies/legwise + summary
 ```

@@ -50,6 +50,12 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Render replay results in the UI',
     'Add one-click dry-run from a coverage row',
   ],
+  optionslab: [
+    'Check the engine intrabar rules against a few real trades (optional)',
+    'Telegram summary after the evening run',
+    'Brokerage/taxes presets instead of a flat per-order cost',
+    'Strategy features not built yet: simple momentum, overall trailing/re-entry',
+  ],
   backtest: [
     'Add weekday and regime buckets alongside the DTE breakdown (M-5)',
     'Add walk-forward / sweep reporting and overfitting guard (M-5)',

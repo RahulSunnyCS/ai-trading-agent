@@ -11,7 +11,7 @@ AlgoTest-style strategies over that data (see `legwise/`).
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 import typer
@@ -379,7 +379,24 @@ def fyers_fetch(
 ) -> None:
     """Collect one day's 1-minute index, VIX, future and option candles. Run it the same
     evening: contracts expiring that day cannot be fetched once they have expired."""
-    from .fyers.auth import FyersCredentialsError, resolve_credentials
+
+    from .fyers.auth import FyersCredentialsError
+
+    try:
+        errors = _collect(date.fromisoformat(day), underlyings, premium_floor, max_extra, force)
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    if errors:
+        raise typer.Exit(2)
+
+
+def _collect(
+    trading_day: date, underlyings: str, premium_floor: float, max_extra: int, force: bool
+) -> int:
+    """Shared by `fyers fetch` and `daily`: collect one day, return the per-symbol error
+    count. A token problem raises FyersCredentialsError for the caller to report."""
+    from .fyers.auth import resolve_credentials
     from .fyers.client import FyersClient
     from .fyers.daily import UNDERLYINGS, collect_day, data_dir
 
@@ -387,31 +404,25 @@ def fyers_fetch(
     unknown = [u for u in names if u not in UNDERLYINGS]
     if unknown:
         raise typer.BadParameter(f"unknown underlyings {unknown}; known: {sorted(UNDERLYINGS)}")
-    trading_day = date.fromisoformat(day)
     if trading_day < date.today():
         typer.echo(
             "warning: the symbol master only lists live contracts - anything that expired "
             f"between {trading_day} and today is missing from this run."
         )
-    try:
-        client = FyersClient(resolve_credentials())
-        manifest = collect_day(
-            client,
-            trading_day,
-            names,
-            data_dir(),
-            premium_floor=premium_floor,
-            max_extra=max_extra,
-            force=force,
-            log=typer.echo,
-        )
-    except FyersCredentialsError as error:
-        typer.echo(f"stopped: {error}")
-        raise typer.Exit(1) from None
+    client = FyersClient(resolve_credentials())
+    manifest = collect_day(
+        client,
+        trading_day,
+        names,
+        data_dir(),
+        premium_floor=premium_floor,
+        max_extra=max_extra,
+        force=force,
+        log=typer.echo,
+    )
     errors = sum(len(v.get("errors", [])) for v in manifest.values() if isinstance(v, dict))
     typer.echo(f"done: {client.calls} requests, {errors} errors -> {data_dir()}")
-    if errors:
-        raise typer.Exit(2)
+    return errors
 
 
 @legwise_app.command("run")
@@ -434,6 +445,71 @@ def legwise_run(
         days = run_legwise(strategy, data_dir(), start, end)
         typer.echo(day_table(strategy.id, days, show_trades=trades))
         typer.echo("")
+
+
+def _last_closed_session(now: datetime) -> date:
+    """The latest trading day whose session (and Fyers' 15:40 F&O close) has ended, in IST."""
+    from .data.reference.loader import default_reference_data
+
+    reference = default_reference_data()
+    day = now.date() if now.time() >= time(15, 45) else now.date() - timedelta(days=1)
+    while not reference.is_trading_day(day):
+        day -= timedelta(days=1)
+    return day
+
+
+@app.command()
+def daily(
+    day: str | None = typer.Option(
+        None, "--date", help="Trading day (default: the last session that has closed, IST)."
+    ),
+    fetch: bool = typer.Option(True, "--fetch/--no-fetch", help="Collect the day's data first."),
+    strategies_dir: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "strategies" / "legwise",
+        help="Folder of leg-wise strategy YAMLs to run.",
+    ),
+    underlyings: str = typer.Option(
+        "NIFTY,BANKNIFTY,MIDCPNIFTY,FINNIFTY,SENSEX", help="Underlyings to collect."
+    ),
+    telegram: bool = typer.Option(
+        True, "--telegram/--no-telegram", help="Send the summary to Telegram (TELEGRAM_* in .env)."
+    ),
+) -> None:
+    """The evening routine: collect the day's 1-minute data, run every leg-wise strategy on
+    it, save the results, print the day's P&L with running totals and send it to Telegram."""
+    from .fyers.auth import FyersCredentialsError
+    from .fyers.daily import data_dir
+    from .legwise.daily import (
+        load_history,
+        load_strategy_files,
+        run_day,
+        summary,
+        telegram_failure,
+        telegram_summary,
+    )
+    from .notify import send
+
+    ist = timezone(timedelta(hours=5, minutes=30))
+    trading_day = date.fromisoformat(day) if day else _last_closed_session(datetime.now(ist))
+    files = load_strategy_files(strategies_dir)
+    typer.echo(f"{trading_day}: {len(files)} strategies from {strategies_dir}")
+    errors = 0
+    if fetch:
+        try:
+            errors = _collect(trading_day, underlyings, 2.0, 60, force=False)
+        except FyersCredentialsError as error:
+            typer.echo(f"stopped: {error}")
+            if telegram:
+                send(telegram_failure(trading_day, str(error)))
+            raise typer.Exit(1) from None
+    root = data_dir()
+    today = run_day(trading_day, root, files)
+    history = load_history(root)
+    typer.echo("")
+    typer.echo(summary(trading_day, today, history, files))
+    if telegram:
+        delivered, _ = send(telegram_summary(trading_day, today, history, files, errors))
+        typer.echo("telegram: sent" if delivered else "telegram: not sent")
 
 
 def main() -> None:

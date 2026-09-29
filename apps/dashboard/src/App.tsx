@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BackfillView } from './components/BackfillView';
 import { BacktestView } from './components/BacktestView';
 import { LiveView } from './components/LiveView';
+import { OptionsLabView } from './components/OptionsLabView';
 import { PaymentTestModeBanner } from './components/PaymentTestModeBanner';
 import { PersonalitiesView } from './components/PersonalitiesView';
 import { PnlView } from './components/PnlView';
@@ -26,6 +27,7 @@ const SUBTITLES: Record<Tab, string> = {
   backfill: 'Historical tick-data ingestion coverage',
   replay: 'Deterministic replay of historical sessions',
   backtest: 'Options strategy backtesting research workbench',
+  optionslab: 'Daily 1-minute Fyers data · build, backtest and track leg-wise option strategies',
   pricing: 'Subscription access and feature credits',
 };
 
@@ -47,6 +49,8 @@ function renderView(tab: Tab) {
       return <ReplayView />;
     case 'backtest':
       return <BacktestView />;
+    case 'optionslab':
+      return <OptionsLabView />;
     case 'pricing':
       return <PricingPage />;
   }

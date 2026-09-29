@@ -18,6 +18,25 @@
         "cd packages/momentum-backtesting && uv run mbt ui --no-open-browser"
       ],
       "port": 8765
+    },
+    {
+      "name": "obt-api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd packages/option-backtesting && uv run obt-api"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "dashboard-options-lab",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/dashboard && OBT_DIRECT=1 bun x vite --port ${PORT:-5180} --strictPort"
+      ],
+      "port": 5180,
+      "autoPort": true
     }
   ]
 }

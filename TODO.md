@@ -394,14 +394,14 @@ collector is forward-only".
 |---|---|---|---|
 | 3.10.0 | F-0: verify Fyers limits | claude | **Done 2026-09-29.** Expired contracts are not served; live contracts serve past days; index minutes arrive duplicated |
 | 3.10.1 | F-1: daily collector `obt fyers fetch` | claude | **Built 2026-09-29**, first real run the same evening. Open: a backup/external-disk location (owner: local for now) |
-| 3.10.2 | Run `obt fyers fetch` every trading evening | owner | Needs a fresh `mbt login` each day. **A missed expiry day is lost for good** (NSE: Tuesdays, SENSEX: Thursdays) |
-| 3.10.3 | Describe the 3-4 daily strategies (plain words or AlgoTest screenshots), and ORB specifics: breakout on index or premium, close vs touch, what trades on a break, no-entry-after time, fill convention, costs | owner | Blocks 3.10.5 |
-| 3.10.4 | F-2: engine reads the concrete-contract 1m data, ATM picked from spot at entry time, strikes beyond ITM2/OTM2, universe adds MIDCPNIFTY/FINNIFTY; AlgoTest golden tests unchanged | claude | |
-| 3.10.5 | F-3: DSL — event-triggered range-breakout entry, per-leg SL/target/trailing, re-entry, strike by premium, day-of-week/DTE/VIX filters | claude | Scope set by 3.10.3 |
-| 3.10.6 | F-4: `obt daily` (collect + run the strategy set + summary), `obt-api` endpoint and dashboard button | claude | |
-| 3.10.7 | F-5: cross-check a few days' P&L against AlgoTest's own backtest of the same strategy | owner→claude | |
+| 3.10.2 | Run `obt daily` every trading evening | owner | Needs a fresh `mbt login` each day. **A missed expiry day is lost for good** (NSE: Tuesdays, SENSEX: Thursdays) |
+| 3.10.3 | Describe the daily strategies | owner | **Done 2026-09-29** — four AlgoTest exports, transcribed to `packages/option-backtesting/strategies/legwise/*.yaml` |
+| 3.10.4 | F-2: engine over the concrete-contract 1m data | claude | **Built 2026-09-29** as the separate `legwise/` engine (DECISIONS "Leg-wise engine"); strike picked from spot at entry time; the golden-fixture engine is untouched |
+| 3.10.5 | F-3: the AlgoTest settings the four strategies use | claude | **Built 2026-09-29:** strike type / closest premium, SL and target (points or %), trail SL, RE COST / RE ASAP with count, range breakout (instrument or underlying), overall max loss/profit, partial/complete square-off, no-re-entry-after. Not built (the schema rejects them): simple momentum, overall re-entry/trailing/lock, RE MOMENTUM, trail SL to break-even, BTST/positional, futures as underlying. MIDCPNIFTY/FINNIFTY need strike_step and lot_size CSV rows before any strategy on them |
+| 3.10.6 | F-4: one evening command + dashboard | claude | **Built 2026-09-30.** `obt daily` (collects the last closed session, runs every `strategies/legwise/*.yaml`, saves per-strategy JSON under `<FYERS_DATA_DIR>/results/legwise/<date>/`, prints trades + running totals; older-version results reported, not counted) **and** the dashboard's Options Lab tab: daily results/chart/trade logs, a Run button (background job with live log), and an AlgoTest-style strategy builder (validate / backtest over collected days / save) — via `obt-api` `/legwise/*` behind the Fastify proxy. Both send a Telegram summary (one line per strategy + running totals; `warn` on skips/download errors, `action_required` on a Fyers login problem) — `--no-telegram` / the dashboard checkbox turn it off |
+| 3.10.7 | Optional: sanity-check the engine's intrabar rules against AlgoTest's own result for a few days | owner→claude | **Optional, not a blocker** (owner, 2026-09-30: the pipeline must not depend on AlgoTest — data comes from Fyers, backtests run on our own engine). Only useful as a one-off check of the assumptions in `legwise/engine.py`'s docstring |
 | 3.10.8 | Tune the collector's width (`--premium-floor`/`--max-extra`) from the manifests once the strategies exist | claude | |
-| 3.10.9 | Optional backfill: live (not yet expired) contracts' earlier days via `--date` | claude | Only the not-yet-expired series; see DECISIONS |
+| 3.10.9 | Backfill live contracts' earlier days | claude | **Done 2026-09-29** for 23-28 Sep (NIFTY/BANKNIFTY/MIDCPNIFTY/FINNIFTY; SENSEX 25 and 28 Sep only — its 24 Sep weekly had already expired), taken the evening the 29 Sep contracts expired |
 
 ---
 

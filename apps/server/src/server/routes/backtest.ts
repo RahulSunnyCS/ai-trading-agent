@@ -14,6 +14,18 @@
  *  GET  /api/backtest/runs          — list past runs. requireAccess (viewing paid results), no new charge.
  *  GET  /api/backtest/runs/:id      — one past run. requireAccess, no new charge.
  *
+ * Leg-wise "Options Lab" (packages/option-backtesting api/legwise_routes.py):
+ *  GET  /api/backtest/legwise/strategies        — saved strategies. requireAccess
+ *  PUT  /api/backtest/legwise/strategies/:name  — save one (slug-checked here AND in Python). requireAccess
+ *  POST /api/backtest/legwise/validate          — validate a strategy (no gate, like /validate)
+ *  POST /api/backtest/legwise/backtest          — run one over collected days. requireAccess +
+ *                                                 consumeCredit('backtest_run'), same as /runs
+ *  GET  /api/backtest/legwise/data              — collected days + Fyers token status. requireAccess
+ *  GET  /api/backtest/legwise/results           — saved daily results. requireAccess
+ *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
+ *                                                 summary unless telegram:false). requireAccess
+ *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
+ *
  * Security decisions:
  *
  * 1. HOST ALLOW-LIST (no SSRF) — BACKTEST_API_URL is validated at plugin-
@@ -274,4 +286,135 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
       await forwardToBacktestApi(reply, `/runs/${encodeURIComponent(id)}`);
     },
   );
+  // ── Leg-wise "Options Lab" ─────────────────────────────────────────────────
+  // The strategy body is an opaque object here: the Python side validates it
+  // field by field (pydantic, extra="forbid"), so duplicating that schema in
+  // two languages would only let them drift. The body cap still applies.
+
+  const strategyBody = {
+    type: 'object',
+    properties: { strategy: { type: 'object' } },
+    required: ['strategy'],
+    additionalProperties: false,
+  } as const;
+
+  fastify.get(
+    '/api/backtest/legwise/strategies',
+    { preHandler: requireAccess },
+    async (_req, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/strategies');
+    },
+  );
+
+  fastify.put(
+    '/api/backtest/legwise/strategies/:name',
+    {
+      preHandler: requireAccess,
+      bodyLimit: BODY_LIMIT_BYTES,
+      schema: {
+        params: {
+          type: 'object',
+          properties: { name: { type: 'string', pattern: '^[a-z0-9_]{1,64}$' } },
+          required: ['name'],
+          additionalProperties: false,
+        },
+        body: strategyBody,
+      },
+    },
+    async (request, reply) => {
+      const { name } = request.params as { name: string };
+      await forwardToBacktestApi(reply, `/legwise/strategies/${encodeURIComponent(name)}`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.post(
+    '/api/backtest/legwise/validate',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: strategyBody } },
+    async (request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/validate', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.post(
+    '/api/backtest/legwise/backtest',
+    {
+      preHandler: requireAccess,
+      bodyLimit: BODY_LIMIT_BYTES,
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            strategy: { type: 'object' },
+            from: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+            to: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          },
+          required: ['strategy'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      if (isPaymentEnabled()) {
+        const { success } = await consumeCredit(request.server.db, 'backtest_run');
+        if (!success) {
+          await reply.status(402).send({ error: 'insufficient_credits' });
+          return;
+        }
+      }
+      await forwardToBacktestApi(reply, '/legwise/backtest', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.get('/api/backtest/legwise/data', { preHandler: requireAccess }, async (_req, reply) => {
+    await forwardToBacktestApi(reply, '/legwise/data');
+  });
+
+  fastify.get(
+    '/api/backtest/legwise/results',
+    { preHandler: requireAccess },
+    async (_req, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/results');
+    },
+  );
+
+  fastify.post(
+    '/api/backtest/legwise/daily',
+    {
+      preHandler: requireAccess,
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+            fetch: { type: 'boolean' },
+            telegram: { type: 'boolean' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      await forwardToBacktestApi(reply, '/legwise/daily', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(request.body ?? {}),
+      });
+    },
+  );
+
+  fastify.get('/api/backtest/legwise/daily', { preHandler: requireAccess }, async (_req, reply) => {
+    await forwardToBacktestApi(reply, '/legwise/daily');
+  });
 });
