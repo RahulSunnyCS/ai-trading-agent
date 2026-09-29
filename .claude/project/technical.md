@@ -111,6 +111,38 @@ docker compose down         # stop services, keep data volumes
 docker compose down -v      # stop + destroy data volumes (full reset)
 ```
 
+## Package Index — cross-package links & shared utilities
+
+Every app/package below now has its own `CLAUDE.md` (deep, package-local context — commands,
+source layout, gotchas) and a thin `AGENTS.md` that just points at it, so any coding agent
+lands in the right file regardless of which convention it reads by default. This table is the
+one place that shows the **whole** dependency graph at a glance; each package's own `CLAUDE.md`
+only documents its own edges (what it imports, what imports it) per the "one fact, one file"
+rule below.
+
+| Package/App | Purpose | Exports other code uses | Used by |
+|---|---|---|---|
+| `packages/notify` (`@trading/notify`) | Outbound Telegram notifications + the never-emit secret registry | `send`, `sendText`, `istTimestamp`, `registerSecret`, `redact` | `packages/broker-identity`, `packages/broker-login` (Node/Bun only — Python callers reimplement the `Notification` shape rather than importing an ESM package) |
+| `packages/market-reference` (`@trading/market-reference`) | Effective-dated NSE/BSE lot-size / strike-step lookups | `lotSize`, `strikeStep` | `apps/server` (`trading/paper-trade-executor.ts`, `trading/portfolio-risk.ts`) |
+| `packages/broker-identity` (`@trading/broker-identity`) | Canonical `BrokerId` type + the one RFC 6238 TOTP generator | `BrokerId`, `generateTotp`, `freshTotp`, `waitForNextWindow` | `apps/server` (`ingestion/brokers/angelone.ts`), `packages/broker-login` |
+| `packages/broker-login` | Daily Playwright job — logs brokers into AlgoTest via TOTP | — (leaf; nothing in-repo imports it) | depends on `broker-identity` + `notify` |
+| `packages/contract-notes` | Daily Gmail → PDF → Google Sheet F&O P&L pipeline | — (leaf; Node 20/CommonJS, reimplements the `Notification` shape itself instead of importing the ESM `@trading/notify`) | none |
+| `packages/momentum-backtesting` | Python weekly momentum-rotation research tool (`mbt` CLI) | — | none — fully independent of every other package, including `option-backtesting` (own `pyproject.toml`/`uv.lock`, zero shared code; only pins the same library *versions* for its local UI) |
+| `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below) | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
+| `apps/server` (`@ata/server`) | Fastify/Bun trading backend | — | `apps/dashboard` (HTTP only) |
+| `apps/dashboard` (`@ata/dashboard`) | React/Vite SPA | — | none — leaf; talks to `apps/server` over HTTP only, imports no internal package |
+
+**The one filesystem-level (non-import) cross-package link, easy to miss:**
+`packages/market-reference/src/loader.ts` does not carry its own copy of the NSE lot-size/
+strike-step CSVs — it reads them straight out of
+`packages/option-backtesting/src/option_backtesting/data/reference/` by relative path at
+runtime, specifically so the TypeScript live engine and the Python backtest engine can never
+disagree about a lot size the way they did for months (`apps/server` once hard-coded NIFTY at
+50 while these CSVs said 65 — see the NIFTY lot-size gotcha below). Because of this, changing
+`option-backtesting`'s reference CSVs changes what `market-reference` returns with no code
+change or version bump on either side — always check both packages' tests together when editing
+those CSVs.
+
 ## Repository Structure
 
 A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (React/Vite frontend) — and seven packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The other two, `packages/option-backtesting` and `packages/momentum-backtesting`, are Python/uv and not Bun workspace members. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
@@ -400,6 +432,13 @@ Critical variables whose misconfiguration causes real pain:
 
 ## Gotchas
 
+- **NIFTY lot-size gotcha** — `apps/server` once hard-coded NIFTY's lot size at 50; the real,
+  effective-dated reference data (`packages/option-backtesting/src/option_backtesting/data/
+  reference/lot_sizes.csv`, also read by `packages/market-reference`) said 65. Every paper P&L
+  was ~30% out for months because nothing compared the two. Never hard-code a lot size or
+  strike interval anywhere — always call `lotSize()`/`strikeStep()` from `@trading/market-reference`
+  (TypeScript) or read the CSVs directly (Python); see that package's `CLAUDE.md` for the
+  filesystem-level link between it and `option-backtesting`'s reference data.
 - **Fyers token expires daily** — there is no automatic refresh yet (deferred to Phase B). The system detects AUTH_FAILURE mid-session and sets the `authDegraded` flag in broker-status state, surfaced to the frontend via /api/meta and /api/auth/fyers/status. A pre-market token-validity check job runs at 08:45 IST on weekdays (opt-in via TOKEN_VALIDITY_SCHEDULER_ENABLED env). Operators must manually regenerate the token before market open when the status endpoint shows `needsReauth=true`
 - **TimescaleDB is not optional** — the standard `postgres:16-alpine` image does NOT have TimescaleDB. The Docker Compose uses `timescale/timescaledb:latest-pg16`. Pointing the app at a vanilla PostgreSQL instance will fail on migration
 - **Hypertable full-table scans** — a query on `market_ticks` or `straddle_snapshots` without a `WHERE time > ...` filter will scan years of data. Always filter by time range
