@@ -11,8 +11,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from trading_data.db import connect
 
-from . import analysis
+from . import analysis, db_read, runs_store
 from .categories import broad
 from .categories import momentum_scores as momentum_scores_mod
 from .categories.compose import (
@@ -101,29 +102,44 @@ class _Data:
         self.momentum_universe_cache: broad.StockUniverseFrame | None = None
 
     def get(self) -> pd.DataFrame:
+        """Prefers the shared local database (`packages/trading-data`, populated by `mbt
+        local migrate`) over weekly_closes.csv once it has data — see db_read.py's module
+        docstring. Falls back to the CSV on a fresh checkout, or a test fixture that only
+        wrote the file, so this stays correct either way. Cache key is whichever source
+        was actually used last time, so a write to EITHER invalidates it."""
         path = DATA_DIR / "weekly_closes.csv"
-        if not path.exists():
+        db_mtime = db_read.catalog_mtime()
+        csv_mtime = path.stat().st_mtime if path.exists() else None
+        if db_mtime is None and csv_mtime is None:
             raise HTTPException(409, "No data yet - run `mbt login` then `mbt fetch`.")
         with self._lock:
-            mtime = path.stat().st_mtime
+            mtime = (db_mtime, csv_mtime)
             if mtime != self._mtime:
-                self.prices = pd.read_csv(path, index_col=0, parse_dates=True)
+                from_db = db_read.weekly_closes_from_db_or_none() if db_mtime is not None else None
+                self.prices = (
+                    from_db
+                    if from_db is not None
+                    else pd.read_csv(path, index_col=0, parse_dates=True)
+                )
                 self._mtime = mtime
                 self.rank_cache.clear()
                 self.fill_tables.clear()
             return self.prices
 
     def get_stock(self) -> StockDataset:
-        """The Nifty 50 stock-momentum dataset (data/stocks/*.csv, built by `mbt stocks
-        fetch`), reloaded when its files change - same mtime-check pattern as `get()`, watched
-        on nifty50_weekly_tr.csv since that's the file every other stocks/ series is reindexed
-        onto (see ui_data.load_stock_dataset)."""
+        """The Nifty 50 stock-momentum dataset. `ui_data.load_stock_dataset` itself prefers
+        the shared database over data/stocks/*.csv (see db_read.py); this method's job is
+        only the reload-when-stale cache gate, so it must check BOTH sources — same mtime-
+        check pattern as `get()`, watched on nifty50_weekly_tr.csv since that's the file
+        every other stocks/ series is reindexed onto."""
         base = DATA_DIR / "stocks"
         path = base / "nifty50_weekly_tr.csv"
-        if not path.exists():
+        db_mtime = db_read.catalog_mtime()
+        csv_mtime = path.stat().st_mtime if path.exists() else None
+        if db_mtime is None and csv_mtime is None:
             raise HTTPException(409, "No stock data yet - run `mbt stocks fetch`.")
         with self._lock:
-            mtime = path.stat().st_mtime
+            mtime = (db_mtime, csv_mtime)
             if mtime != self._stock_mtime:
                 try:
                     self.stock = ui_data.load_stock_dataset(base)
@@ -381,6 +397,29 @@ class BacktestRequest(BaseModel):
     # OFF mode only: the direct individual-stock top_n/exit_rank ("SL").
     broad_off_top_n: int = Field(10, ge=1, le=50)
     broad_off_exit_rank: int = Field(20, ge=1, le=100)
+
+
+class SavedRunBody(BaseModel):
+    """What the frontend already builds client-side after a backtest (previously kept
+    only in `localStorage`) - see `runs_store.save_run`."""
+
+    dataset: Literal["etf", "stock", "custom_index", "broad"]
+    name: str = Field(min_length=1, max_length=64)
+    config: dict
+    kpis: dict
+    dates: list[str]
+    strategy: list[float | None]
+    overlay: bool = False
+
+
+class SavedRunUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=64)
+    overlay: bool | None = None
+
+
+class WeeklyRunBody(BaseModel):
+    run: Literal["preview", "final"]
+    send: bool = True
 
 
 def _stock_classification(stock: StockDataset) -> dict[str, tuple[str, str]]:
@@ -686,7 +725,7 @@ def _stock_backtest(req: BacktestRequest) -> dict:
 
 
 def _custom_index_meta() -> dict:
-    """"Custom Index" tab: one "instrument" per category (16 official NSE Sector/Thematic
+    """ "Custom Index" tab: one "instrument" per category (16 official NSE Sector/Thematic
     indices + the category_extras.csv custom ones, 62 total as of 2026-09-29), each of which is
     itself an inner top-K-stock rotation - see categories/compose.py's module docstring - plus
     the `ATOMIC_INSTRUMENTS` (Gold/Silver/Cash/Gilt/Nasdaq 100/Hang Seng, no inner rotation,
@@ -699,7 +738,10 @@ def _custom_index_meta() -> dict:
     payload) rather than pre-checked here at meta time, which would mean running ~60 backtests
     just to answer "what categories exist" (see get_categories_universe's own cost note).
     """
-    if not (DATA_DIR / "categories" / "category_membership.csv").exists():
+    if not (
+        db_read.has_category_data()
+        or (DATA_DIR / "categories" / "category_membership.csv").exists()
+    ):
         raise HTTPException(409, "No category data yet - run `mbt categories fetch` first.")
     prices = DATA.get()
     instruments = [
@@ -839,14 +881,10 @@ def _inner_holdings_now(inner: Result) -> list[dict]:
     total = inner.open_positions["value"].sum() + inner.idle_value
     if not total:
         return []
-    return [
-        {"asset": r.asset, "share": r.value / total} for r in inner.open_positions.itertuples()
-    ]
+    return [{"asset": r.asset, "share": r.value / total} for r in inner.open_positions.itertuples()]
 
 
-def _inner_category_detail(
-    universe_result: AllCategoriesResult, result: Result
-) -> dict[str, dict]:
+def _inner_category_detail(universe_result: AllCategoriesResult, result: Result) -> dict[str, dict]:
     """Per-category inner (within-category stock) detail, keyed by category name - the data
     behind "which stocks did this category actually buy/sell/hold", threaded through from each
     category's own `InnerBacktestResult.result` (already computed in full by
@@ -887,14 +925,15 @@ def _inner_category_detail(
             if col not in trades.columns:
                 trades[col] = None
         rows = trades[list(_INNER_TRADE_FIELDS)].to_dict("records") if len(trades) else []
-        detail[name] = analysis._clean(
-            {"trades": rows, "holdings_now": _inner_holdings_now(inner)}
-        )
+        detail[name] = analysis._clean({"trades": rows, "holdings_now": _inner_holdings_now(inner)})
     return detail
 
 
 def _custom_index_backtest(req: BacktestRequest) -> dict:
-    if not (DATA_DIR / "categories" / "category_membership.csv").exists():
+    if not (
+        db_read.has_category_data()
+        or (DATA_DIR / "categories" / "category_membership.csv").exists()
+    ):
         raise HTTPException(409, "No category data yet - run `mbt categories fetch` first.")
     if req.weights is not None and len(req.weights) != len(req.lookbacks):
         raise HTTPException(422, "Give one weight per lookback.")
@@ -955,9 +994,7 @@ def _custom_index_backtest(req: BacktestRequest) -> dict:
                 f"Only {len(ranked)} categories selected for ranking - need at least "
                 f"top N ({config.top_n})."
             )
-        result = run_backtest(
-            prices, includes, config, rank_cache=DATA.custom_index_rank_cache
-        )
+        result = run_backtest(prices, includes, config, rank_cache=DATA.custom_index_rank_cache)
         DATA.trim_cache()
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
@@ -978,7 +1015,11 @@ def _custom_index_backtest(req: BacktestRequest) -> dict:
 
 
 def _membership_quality() -> dict:
-    """Report years using the current constituent list in place of historical membership."""
+    """Report years using the current constituent list in place of historical membership.
+    Prefers the shared local database over the file, same pattern as everywhere else here."""
+    from_db = db_read.constant_current_total_market_years_from_db_or_none()
+    if from_db is not None:
+        return {"constant_current_years": from_db}
     path = DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME
     try:
         membership = pd.read_csv(path, usecols=["year", "source_tier"])
@@ -989,13 +1030,16 @@ def _membership_quality() -> dict:
 
 
 def _broad_meta() -> dict:
-    """"Broad Momentum" tab (TODO.md 3.9.13): no per-instrument sidebar picker the way the other
+    """ "Broad Momentum" tab (TODO.md 3.9.13): no per-instrument sidebar picker the way the other
     three datasets have (there are 755 stocks + 113 categories + 4 atomics -- which of them are
     even eligible changes every quarter, so a fixed checkbox list doesn't make sense the way it
     does for a static universe.csv/companies.csv list) -- `instruments` is deliberately empty;
     static/app.js skips building a universe section for this dataset entirely.
     """
-    if not (DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME).exists():
+    if not (
+        db_read.has_total_market_data()
+        or (DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME).exists()
+    ):
         raise HTTPException(409, "No Total Market data yet - run `mbt categories fetch-universe`.")
     prices = DATA.get()
     defaults = Config()
@@ -1050,11 +1094,14 @@ def _broad_meta() -> dict:
 
 
 def _momentum_scores_payload() -> dict:
-    """"Momentum Scores" page (TODO.md 3.9.16) - a live/current-state snapshot, not a backtest
+    """ "Momentum Scores" page (TODO.md 3.9.16) - a live/current-state snapshot, not a backtest
     dataset, so it doesn't go through `/api/meta` + `/api/backtest` the way the four config+run
     tabs do; it's its own single GET. Reuses the same Total Market membership file Broad Momentum
     needs, so the same "not fetched yet" guard applies."""
-    if not (DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME).exists():
+    if not (
+        db_read.has_total_market_data()
+        or (DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME).exists()
+    ):
         raise HTTPException(409, "No Total Market data yet - run `mbt categories fetch-universe`.")
     try:
         universe = DATA.get_momentum_universe()
@@ -1116,7 +1163,10 @@ def _broad_backtest(req: BacktestRequest) -> dict:
         raise HTTPException(422, "Pool top N can't be greater than the pool exit rank.")
     if req.weights is not None and len(req.weights) != len(req.lookbacks):
         raise HTTPException(422, "Give one weight per lookback.")
-    if not (DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME).exists():
+    if not (
+        db_read.has_total_market_data()
+        or (DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME).exists()
+    ):
         raise HTTPException(409, "No Total Market data yet - run `mbt categories fetch-universe`.")
 
     weights = tuple(req.weights) if req.weights else None
@@ -1215,6 +1265,71 @@ def create_app() -> FastAPI:
         if req.dataset == "custom_index":
             return _custom_index_backtest(req)
         return _etf_backtest(req)
+
+    @app.get("/api/saved-runs")
+    def saved_runs(dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf") -> list[dict]:
+        with connect() as con:
+            return runs_store.list_runs(con, dataset)
+
+    @app.post("/api/saved-runs")
+    def create_saved_run(body: SavedRunBody) -> dict:
+        with connect() as con:
+            return runs_store.save_run(
+                con,
+                body.dataset,
+                name=body.name,
+                config=body.config,
+                kpis=body.kpis,
+                dates=body.dates,
+                strategy=body.strategy,
+                overlay=body.overlay,
+            )
+
+    @app.patch("/api/saved-runs/{run_id}")
+    def patch_saved_run(run_id: str, body: SavedRunUpdate) -> dict:
+        with connect() as con:
+            record = runs_store.update_run(con, run_id, name=body.name, overlay=body.overlay)
+        if record is None:
+            raise HTTPException(404, "saved run not found")
+        return record
+
+    @app.delete("/api/saved-runs/{run_id}")
+    def remove_saved_run(run_id: str) -> dict:
+        with connect() as con:
+            found = runs_store.delete_run(con, run_id)
+        if not found:
+            raise HTTPException(404, "saved run not found")
+        return {"ok": True}
+
+    @app.post("/api/weekly/run")
+    def weekly_run(body: WeeklyRunBody) -> dict:
+        """Manual trigger for the Friday signal (TODO.md 3.11.5) — the same `run_weekly()`
+        the launchd-scheduled `mbt weekly` CLI calls, so a manual run and a scheduled run
+        are identical in every way but who started them. Synchronous: a cold run can take
+        tens of seconds (live network sources), same as a cold Custom Index backtest — the
+        Fastify proxy's timeout already accounts for this."""
+        from . import fyers, notify
+        from .weekly import run_weekly
+
+        try:
+            creds = fyers.resolve_credentials()
+        except fyers.FyersCredentialsError:
+            creds = None
+        try:
+            with connect() as con:
+                result = run_weekly(body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None)
+        except Exception as error:
+            raise HTTPException(500, f"{type(error).__name__}: {error}") from None
+        result.notification.run_url = notify.run_url()
+        if body.send:
+            notify.send(result.notification)
+        return {
+            "title": result.notification.title,
+            "body": result.notification.body,
+            "severity": result.notification.severity,
+            "sent_to_telegram": body.send,
+            "signal": result.signal,
+        }
 
     @app.get("/vendor/plotly.min.js")
     def plotly() -> FileResponse:

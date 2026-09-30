@@ -90,8 +90,18 @@ def test_parse_ca_date_is_locale_independent():
     """
     assert parse_ca_date("15-Feb-2011") == date(2011, 2, 15)
     for abbr, month in [
-        ("Jan", 1), ("Feb", 2), ("Mar", 3), ("Apr", 4), ("May", 5), ("Jun", 6),
-        ("Jul", 7), ("Aug", 8), ("Sep", 9), ("Oct", 10), ("Nov", 11), ("Dec", 12),
+        ("Jan", 1),
+        ("Feb", 2),
+        ("Mar", 3),
+        ("Apr", 4),
+        ("May", 5),
+        ("Jun", 6),
+        ("Jul", 7),
+        ("Aug", 8),
+        ("Sep", 9),
+        ("Oct", 10),
+        ("Nov", 11),
+        ("Dec", 12),
     ]:
         assert parse_ca_date(f"01-{abbr}-2020") == date(2020, month, 1)
 

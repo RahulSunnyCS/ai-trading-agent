@@ -63,13 +63,11 @@ def _dispatching_client(rules: list[tuple[str, bytes]]) -> NseClient:
 
 
 def test_build_category_year_membership_constant_current_works_for_an_unmapped_slug():
-    """"Total Market" is not in sources.CATEGORY_SLUGS at all -- the CONSTANT_CURRENT fallback
+    """ "Total Market" is not in sources.CATEGORY_SLUGS at all -- the CONSTANT_CURRENT fallback
     (zero Wayback history) must still resolve it via the SLUG this function was given, not via
     a CATEGORY_SLUGS lookup keyed on the category label."""
     empty_cdx = json.dumps([]).encode("utf-8")
-    client = _dispatching_client(
-        [(snapshots.CDX_URL, empty_cdx), (_TOTAL_MARKET_URL, _CSV_BODY)]
-    )
+    client = _dispatching_client([(snapshots.CDX_URL, empty_cdx), (_TOTAL_MARKET_URL, _CSV_BODY)])
 
     rows, reports = snapshots.build_category_year_membership(
         "Total Market", sources.TOTAL_MARKET_SLUG, [2020, 2021], client
@@ -84,9 +82,7 @@ def test_build_category_year_membership_constant_current_works_for_an_unmapped_s
 
 def test_run_fetch_total_market_writes_both_csvs(tmp_path):
     empty_cdx = json.dumps([]).encode("utf-8")
-    client = _dispatching_client(
-        [(snapshots.CDX_URL, empty_cdx), (_TOTAL_MARKET_URL, _CSV_BODY)]
-    )
+    client = _dispatching_client([(snapshots.CDX_URL, empty_cdx), (_TOTAL_MARKET_URL, _CSV_BODY)])
 
     summary = broad.run_fetch_total_market(tmp_path, client, [2019])
 
@@ -334,8 +330,13 @@ def test_mass_exit_trigger_never_fires_on_the_first_week():
     combined_pool_ranks = pd.DataFrame([row], index=weeks)
 
     selection = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=_ATOMICS_4, coverage_floor=0.0,
-        top_n=4, exit_rank=4,
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=_ATOMICS_4,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=4,
     )
     assert selection.mass_exit_weeks == frozenset()
     assert selection.held_by_week[weeks[0]] == ["C1", "C2", "C3", "C4"]
@@ -355,8 +356,13 @@ def test_mass_exit_trigger_does_not_fire_at_exactly_half():
     combined_pool_ranks = pd.DataFrame(rows).T
 
     selection = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=_ATOMICS_4, coverage_floor=0.0,
-        top_n=4, exit_rank=4,
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=_ATOMICS_4,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=4,
     )
     assert selection.mass_exit_weeks == frozenset()  # 2/4 = 50%, not > 50%
     assert selection.held_by_week[weeks[1]] == ["C1", "C2"]
@@ -372,8 +378,13 @@ def test_mass_exit_trigger_fires_just_over_half():
     combined_pool_ranks = pd.DataFrame(rows).T
 
     selection = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=_ATOMICS_4, coverage_floor=0.0,
-        top_n=4, exit_rank=4,
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=_ATOMICS_4,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=4,
     )
     assert selection.mass_exit_weeks == frozenset({weeks[1]})
     assert weeks[0] not in selection.mass_exit_weeks
@@ -390,8 +401,14 @@ def test_mass_exit_trigger_threshold_is_configurable():
     combined_pool_ranks = pd.DataFrame(rows).T
 
     selection = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=_ATOMICS_4, coverage_floor=0.0,
-        top_n=4, exit_rank=4, mass_exit_threshold=0.75,
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=_ATOMICS_4,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=4,
+        mass_exit_threshold=0.75,
     )
     assert selection.mass_exit_weeks == frozenset()
 
@@ -414,7 +431,7 @@ def test_mass_exit_trigger_rejects_invalid_threshold_or_response():
 
 
 def test_mass_exit_off_and_throttle_response_see_identical_held_sets():
-    """"throttle" never changes which categories are admitted (only how much fresh capital
+    """ "throttle" never changes which categories are admitted (only how much fresh capital
     engine.py later deploys) - "off" and "throttle" must produce byte-identical held_by_week and
     an identical trigger-week set."""
     weeks = [pd.Timestamp("2023-01-06"), pd.Timestamp("2023-01-13")]
@@ -425,12 +442,24 @@ def test_mass_exit_off_and_throttle_response_see_identical_held_sets():
     combined_pool_ranks = pd.DataFrame(rows).T
 
     off = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=_ATOMICS_4, coverage_floor=0.0,
-        top_n=4, exit_rank=4, mass_exit_response="off",
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=_ATOMICS_4,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=4,
+        mass_exit_response="off",
     )
     throttle = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=_ATOMICS_4, coverage_floor=0.0,
-        top_n=4, exit_rank=4, mass_exit_response="throttle",
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=_ATOMICS_4,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=4,
+        mass_exit_response="throttle",
     )
     assert off.held_by_week == throttle.held_by_week
     assert off.mass_exit_weeks == throttle.mass_exit_weeks == frozenset({weeks[1]})
@@ -453,12 +482,24 @@ def test_mass_exit_halve_top_n_admits_fewer_fresh_names_on_a_triggered_week():
     combined_pool_ranks = pd.DataFrame(rows).T
 
     off = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=atomic_names, coverage_floor=0.0,
-        top_n=4, exit_rank=8, mass_exit_response="off",
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=atomic_names,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=8,
+        mass_exit_response="off",
     )
     halved = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=atomic_names, coverage_floor=0.0,
-        top_n=4, exit_rank=8, mass_exit_response="halve_top_n",
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=atomic_names,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=8,
+        mass_exit_response="halve_top_n",
     )
 
     # Identical up to the point of divergence (week 0, and the trigger detection itself).
@@ -483,8 +524,14 @@ def test_mass_exit_halve_top_n_never_forces_out_an_existing_holding_early():
     }
     combined_pool_ranks = pd.DataFrame(rows).T
     halved = broad.compute_category_selection_mass_exit(
-        combined_pool_ranks, {}, weeks, atomic_names=atomic_names, coverage_floor=0.0,
-        top_n=4, exit_rank=8, mass_exit_response="halve_top_n",
+        combined_pool_ranks,
+        {},
+        weeks,
+        atomic_names=atomic_names,
+        coverage_floor=0.0,
+        top_n=4,
+        exit_rank=8,
+        mass_exit_response="halve_top_n",
     )
     assert halved.mass_exit_weeks == frozenset()  # 1/4 = 25%, no trigger
     assert set(halved.held_by_week[weeks[1]]) == {"C2", "C3", "C4"}

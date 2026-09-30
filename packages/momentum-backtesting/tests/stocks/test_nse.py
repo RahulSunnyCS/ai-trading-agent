@@ -211,8 +211,22 @@ def test_warm_up_populates_cookie_jar_in_memory_only(tmp_path):
         import http.cookiejar
 
         cookie = http.cookiejar.Cookie(
-            0, "nsit", "abc123", None, False, "example", False, False, "/", False,
-            False, None, False, None, None, {},
+            0,
+            "nsit",
+            "abc123",
+            None,
+            False,
+            "example",
+            False,
+            False,
+            "/",
+            False,
+            False,
+            None,
+            False,
+            None,
+            None,
+            {},
         )
         client.cookie_jar.set_cookie(cookie)
         return _FakeResponse(b"<html></html>")

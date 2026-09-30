@@ -641,9 +641,7 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                 if reason is None:
                     continue
                 value_before = slot["value"]
-                details = sim.exit_details(
-                    asset, week, slot["since"], slot["basis"], value_before
-                )
+                details = sim.exit_details(asset, week, slot["since"], slot["basis"], value_before)
                 if asset == CASH:
                     # A ranked-mode cash holding dropping out stays in the same liquid fund -
                     # it's only relabelled as parked, so there's no trade, no cost and no tax.

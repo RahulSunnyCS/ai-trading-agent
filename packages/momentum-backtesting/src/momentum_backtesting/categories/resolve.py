@@ -27,6 +27,15 @@ class CategoryDataNotFoundError(Exception):
 
 
 def _load_membership(data_dir: Path) -> pd.DataFrame:
+    """Prefers the shared local database (`category_membership` table, populated by
+    `mbt local migrate`) over category_membership.csv once it has rows — see
+    db_read.py's module docstring — falling back to the file otherwise."""
+    from momentum_backtesting import db_read
+
+    from_db = db_read.category_membership_from_db_or_none()
+    if from_db is not None:
+        return from_db
+
     path = data_dir / MEMBERSHIP_FILENAME
     if not path.exists():
         raise CategoryDataNotFoundError(

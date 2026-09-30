@@ -142,6 +142,7 @@ def atomic_copy_names(name: str, count: int = MAX_ATOMIC_COPIES) -> list[str]:
     """
     return [name] + [f"{name} #{i}" for i in range(2, count + 1)]
 
+
 #: Default top-K individual stocks held per in-favour category (brief default).
 DEFAULT_TOP_N = 2
 
@@ -177,12 +178,16 @@ def _category_available_years(category: str, data_dir: Path) -> list[int]:
     for `category` -- read directly rather than through resolve.py's private
     loader, since this is the "what years exist at all" question, not "give me
     one year's members" (resolve_category_members answers that one)."""
-    path = data_dir / snapshots.MEMBERSHIP_FILENAME
-    if not path.exists():
-        raise CategoryDataNotFoundError(
-            f"{path} does not exist -- run `mbt categories fetch` first"
-        )
-    membership = pd.read_csv(path, usecols=["category", "year"], dtype={"category": str})
+    from momentum_backtesting import db_read
+
+    membership = db_read.category_membership_from_db_or_none()
+    if membership is None:
+        path = data_dir / snapshots.MEMBERSHIP_FILENAME
+        if not path.exists():
+            raise CategoryDataNotFoundError(
+                f"{path} does not exist -- run `mbt categories fetch` first"
+            )
+        membership = pd.read_csv(path, usecols=["category", "year"], dtype={"category": str})
     own_years = membership.loc[membership["category"] == category, "year"].unique()
     return sorted(int(y) for y in own_years)
 
@@ -301,11 +306,7 @@ def _segment_live_windows(
             continue
         start, existing_end = windows[col]
         candidate_end = pd.Timestamp(last_real_week) + pd.Timedelta(days=1)
-        tighter_end = (
-            candidate_end
-            if existing_end is None
-            else min(existing_end, candidate_end)
-        )
+        tighter_end = candidate_end if existing_end is None else min(existing_end, candidate_end)
         windows[col] = (start, tighter_end)
 
     return windows

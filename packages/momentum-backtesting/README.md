@@ -99,7 +99,10 @@ index's) and undone.
 ## Weekly Friday signal (Telegram)
 
 `mbt weekly --run preview|final` refreshes prices, ranks, and sends the week's trades to
-Telegram. It runs from `.github/workflows/momentum-weekly.yml`:
+Telegram. It runs from a `launchd` job on the owner's own laptop (`scripts/install-
+launchd.sh`; see "Scheduling" below) — it used to run from GitHub Actions
+(`MOMENTUM_DATABASE_URL`/Neon), retired 2026-09-30. It can also be triggered manually any
+time from the dashboard's Momentum tab ("Weekly signal") or the CLI directly:
 
 | Run | When (IST) | Prices | Purpose |
 |---|---|---|---|
@@ -129,29 +132,31 @@ Guards:
 
 Every estimate is named in the message.
 
-**Storage** is Postgres; the free tier of [Neon](https://neon.tech) is enough (about 10 MB).
-The connection string goes in `MOMENTUM_DATABASE_URL`.
+**Storage** is the shared local database (`packages/trading-data`, `TRADING_DATA_ROOT`) — the
+`momentum_prices`/`momentum_signals` tables it already has (see that package's own docs). No
+separate setup: the first `mbt weekly` run creates the catalog if it doesn't exist yet.
 
 ```bash
-uv run mbt db init                        # create momentum_prices + momentum_signals
-uv run mbt fetch && uv run mbt db push    # one-time: full history from your machine
-uv run mbt db pull                        # rebuild data/ from the database
 uv run mbt weekly --run final --no-db --no-send   # try it locally, printed not sent
 uv run mbt sources-check                  # can this machine reach every source?
 ```
 
-**Fyers in CI.** `packages/broker-login`'s `bun run fyers-token` logs in headlessly (client
-ID, then TOTP, then PIN) and writes a 0600 token file that `mbt` reads via
-`FYERS_TOKEN_FILE`. The token is never printed and is deleted when the job ends. If the login
-fails, it sends a Telegram alert and the signal uses the public sources.
+**Scheduling.** `scripts/install-launchd.sh` installs two `launchd` LaunchAgents (Friday
+14:40 preview, 16:45 final IST — assumes the Mac's clock is set to IST; see the plists'
+own comments) into `~/Library/LaunchAgents` and loads them. `scripts/uninstall-launchd.sh`
+removes them. `launchd` only fires while the machine is awake — a missed run (laptop
+asleep) has no catch-up; re-run manually via the dashboard's Momentum tab ("Weekly signal")
+or `mbt weekly --run <preview|final>` on the CLI. Logs land in
+`data/launchd-weekly-<preview|final>.log`.
 
-**Setup checklist.** Add these secrets to a GitHub Environment named `fyers-data`, restricted
-to the default branch:
+**Fyers.** `mbt login` (browser) or `FYERS_ACCESS_TOKEN` resolves a token; the job falls
+back to public sources (niftyindices.com, Yahoo) if none is available or it's rejected —
+see "Sources, best first" above. No CI secrets needed any more; this all runs locally.
 
-- `MOMENTUM_DATABASE_URL`
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
-- `FYERS_APP_ID`, `FYERS_APP_SECRET`, `FYERS_REDIRECT_URI`
-- `FYERS_CLIENT_ID`, `FYERS_PIN`, `FYERS_TOTP_SECRET`
+**Telegram.** Set `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` in the environment `mbt weekly`
+runs in (e.g. your shell profile, or the plist's own `EnvironmentVariables` if launchd's
+inherited environment doesn't already have them) — unset, it prints the message instead of
+sending it.
 
 Use a Fyers API app dedicated to this job. On the Fyers dashboard, either keep order placement
 locked to a static IP or turn order permission off: GitHub runners have no static IP, so a

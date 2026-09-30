@@ -109,23 +109,33 @@ def _read_weekly(path: Path) -> pd.DataFrame:
 def load_stock_dataset(data_dir: Path | None = None) -> StockDataset:
     """Read data/stocks/ (built by `mbt stocks fetch`) into the shape the API/UI layer consumes.
 
-    `data_dir` defaults to config.DATA_DIR / "stocks". Raises StockDataUnavailable (a
-    FileNotFoundError) with guidance to run `mbt stocks fetch` if the data hasn't been built yet
-    - callers that want an HTTP 409 (mirroring api.py's "no data yet" pattern) should catch this
-    and wrap it themselves; this module doesn't depend on FastAPI.
-    """
-    base = data_dir if data_dir is not None else DATA_DIR / "stocks"
-    missing = [name for name in _REQUIRED_FILES if not (base / name).exists()]
-    if missing:
-        raise StockDataUnavailable(
-            f"stock data not found in {base} (missing {missing}) - run `mbt stocks fetch` first"
-        )
+    Prefers the shared local database (`stock_weekly_prices`/`stock_membership_weekly`/
+    `momentum_prices`, populated by `mbt local migrate`) over these five files once it has
+    data — see `db_read.py`'s module docstring — falling back to the files on a fresh
+    checkout or when the catalog has none of this dataset's rows yet.
 
-    tr = _read_weekly(base / "nifty50_weekly_tr.csv")
-    price = _read_weekly(base / "nifty50_weekly_price.csv")
-    membership = _read_weekly(base / "nifty50_membership_weekly.csv")
-    benchmarks = _read_weekly(base / "benchmarks_weekly.csv")
-    cash = pd.read_csv(base / "cash_weekly.csv", index_col="date", parse_dates=True)["close"]
+    `data_dir` defaults to config.DATA_DIR / "stocks". Raises StockDataUnavailable (a
+    FileNotFoundError) with guidance to run `mbt stocks fetch` if NEITHER source has the
+    data yet - callers that want an HTTP 409 (mirroring api.py's "no data yet" pattern)
+    should catch this and wrap it themselves; this module doesn't depend on FastAPI.
+    """
+    from .. import db_read  # noqa: PLC0415 (avoid a hard import cycle at module load)
+
+    base = data_dir if data_dir is not None else DATA_DIR / "stocks"
+    from_db = db_read.stock_dataset_from_db_or_none()
+    if from_db is not None:
+        tr, price, membership, benchmarks, cash = from_db
+    else:
+        missing = [name for name in _REQUIRED_FILES if not (base / name).exists()]
+        if missing:
+            raise StockDataUnavailable(
+                f"stock data not found in {base} (missing {missing}) - run `mbt stocks fetch` first"
+            )
+        tr = _read_weekly(base / "nifty50_weekly_tr.csv")
+        price = _read_weekly(base / "nifty50_weekly_price.csv")
+        membership = _read_weekly(base / "nifty50_membership_weekly.csv")
+        benchmarks = _read_weekly(base / "benchmarks_weekly.csv")
+        cash = pd.read_csv(base / "cash_weekly.csv", index_col="date", parse_dates=True)["close"]
 
     # The stock weekly-close calendar (tr's index) is the canonical week list: cash_weekly.csv
     # can run a week ahead of the stock data (a liquid-fund NAV needs no market session), and
@@ -176,10 +186,14 @@ def _load_extra_instruments(
     load; CASH still becomes rankable (it needs no weekly_closes.csv column), but Gold/Silver/Gilt
     are simply absent from `extra_instruments` until `mbt fetch` has run.
     """
+    from .. import db_read  # noqa: PLC0415 (avoid a hard import cycle at module load)
+
     weekly_closes_path = base.parent / "weekly_closes.csv"
-    available_price_cols: list[str] = []
-    if weekly_closes_path.exists():
+    weekly_closes = db_read.weekly_closes_from_db_or_none()
+    if weekly_closes is None and weekly_closes_path.exists():
         weekly_closes = _read_weekly(weekly_closes_path)
+    available_price_cols: list[str] = []
+    if weekly_closes is not None:
         available_price_cols = [c for c in _EXTRA_PRICE_COLUMNS if c in weekly_closes.columns]
 
     extra_price_cols = (

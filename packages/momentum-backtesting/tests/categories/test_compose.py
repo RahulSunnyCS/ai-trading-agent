@@ -101,9 +101,7 @@ def test_resolve_members_by_year_raises_for_extras_only_category_in_narrow_mode(
     data_dir, curated_dir = tmp_path / "data", tmp_path / "curated"
     _write_membership(data_dir, [_membership_row("Nifty IT", 2020, "INFY")])
     curated_dir.mkdir(parents=True)
-    (curated_dir / "category_extras.csv").write_text(
-        "symbol,category,note\nACC,CDMO,test\n"
-    )
+    (curated_dir / "category_extras.csv").write_text("symbol,category,note\nACC,CDMO,test\n")
     with pytest.raises(CategoryDataNotFoundError):
         resolve_members_by_year(
             "CDMO", [2020], "narrow", data_dir=data_dir, curated_dir=curated_dir

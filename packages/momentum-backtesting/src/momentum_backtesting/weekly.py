@@ -480,7 +480,7 @@ def run_weekly(
     until = today if run == "final" else today - timedelta(days=1)
     health = refresh(data_dir, today, creds, log, universe, until)
     if conn is not None:
-        from . import store
+        from . import local_store as store
 
         store.push_dir(conn, data_dir, pd.Timestamp(today - timedelta(days=REFRESH_DAYS)))
 
@@ -497,7 +497,7 @@ def run_weekly(
         signal = compute_signal(data_dir, settings)
         previous = None
         if conn is not None:
-            from . import store
+            from . import local_store as store
 
             previous = store.load_signal(conn, signal["week"], "preview", signal["label"])
         changed = changes(previous, signal) if previous is not None else None
@@ -518,7 +518,7 @@ def run_weekly(
         signal = compute_signal(scratch_dir, settings)
     note = format_message(signal, "preview", health, settings, now, how)
     if conn is not None:
-        from . import store
+        from . import local_store as store
 
         store.save_signal(conn, signal["week"], "preview", signal["label"], signal)
     return RunResult(note, copy.deepcopy(signal))

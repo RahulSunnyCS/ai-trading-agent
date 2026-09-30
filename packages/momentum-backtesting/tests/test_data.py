@@ -153,7 +153,18 @@ def test_niftyindices_month_parsing_matches_every_english_abbreviation():
     from momentum_backtesting.sources import parse_niftyindices
 
     month_abbrs = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     ]
     rows = [{"HistoricalDate": f"15 {abbr} 2016", "CLOSE": "100.00"} for abbr in month_abbrs]
 

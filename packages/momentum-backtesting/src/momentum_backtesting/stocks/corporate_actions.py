@@ -251,9 +251,7 @@ def parse_subject(subject: str, face_value: float) -> list[ParsedEvent]:
         if not amounts:
             pct = _PERCENT_RE.search(s)
             basis = f"{pct.group(1)}%" if pct else None
-            return [
-                _manual("dividend amount not stated - manual only", dividend_basis=basis)
-            ]
+            return [_manual("dividend amount not stated - manual only", dividend_basis=basis)]
         return [ParsedEvent(kind=EventKind.DIVIDEND, factor=None, dividend=round(sum(amounts), 6))]
 
     return []
@@ -447,11 +445,7 @@ def fetch_history(
         fetch_quarter_checked(quarter_start, quarter_end, raw_dir, client)
         for quarter_start, quarter_end in iter_quarters(start, end)
     ]
-    full = (
-        pd.concat(frames, ignore_index=True)
-        if frames
-        else pd.DataFrame(columns=OUTPUT_COLUMNS)
-    )
+    full = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=OUTPUT_COLUMNS)
     full = full.drop_duplicates(ignore_index=True)
 
     problems = check_dividend_year_counts(full)

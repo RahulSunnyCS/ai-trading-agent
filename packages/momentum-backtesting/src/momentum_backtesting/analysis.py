@@ -268,9 +268,7 @@ def latest_signal(
 
     def eligible_to_buy(name: str) -> bool:
         return (
-            membership is None
-            or name not in membership.columns
-            or bool(membership.at[week, name])
+            membership is None or name not in membership.columns or bool(membership.at[week, name])
         )
 
     tops = [n for n in ranks.dropna().sort_values().index if ranks[n] <= config.top_n and passes(n)]

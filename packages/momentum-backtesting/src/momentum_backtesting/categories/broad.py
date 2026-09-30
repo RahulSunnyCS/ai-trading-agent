@@ -175,10 +175,17 @@ def run_fetch_total_market(data_dir: Path, client: NseClient, years: list[int]) 
 
 
 def total_market_members_by_year(data_dir: Path) -> dict[int, set[str]]:
-    """year -> Total Market member symbols, read straight from
-    data_dir/total_market_membership.csv (Step 1's own output) -- no narrow/broad mode concept
-    the way `resolve.py`'s per-sector-category reader has (there is no `category_extras.csv`-
-    style manual overlay for the Total Market universe itself)."""
+    """year -> Total Market member symbols. Prefers the shared local database (`category_
+    membership` table, category='Total Market', populated by `mbt local migrate`) over
+    data_dir/total_market_membership.csv once it has rows — see db_read.py's module
+    docstring — falling back to the file on a fresh checkout or before that migration
+    has run."""
+    from .. import db_read  # noqa: PLC0415 (avoid a hard import cycle at module load)
+
+    from_db = db_read.total_market_members_by_year_from_db_or_none()
+    if from_db is not None:
+        return from_db
+
     path = data_dir / TOTAL_MARKET_MEMBERSHIP_FILENAME
     if not path.exists():
         raise TotalMarketDataNotFoundError(
@@ -383,9 +390,7 @@ def _compute_pool_membership(
             stock_membership.loc[qw] if qw in stock_membership.index else pd.Series(dtype=bool)
         )
         candidates = [
-            n
-            for n in symbols
-            if bool(row_member.get(n, False)) and pd.notna(row_rank.get(n))
+            n for n in symbols if bool(row_member.get(n, False)) and pd.notna(row_rank.get(n))
         ]
         candidates.sort(key=lambda n: (row_rank[n], n))
         held = apply_hysteresis(held, candidates, top_n, exit_rank)

@@ -172,15 +172,25 @@ EVENT_COLUMNS = ("symbol", "event_date", "drop_pct", "turnover_ratio", "new_colu
 
 
 def load_daily_prices(symbols: Iterable[str], *, stocks_data_dir: Path) -> pd.DataFrame:
-    """Load `stocks_data_dir/daily.parquet` rows for `symbols` only (columns:
-    date, symbol, close, turnover), via pyarrow predicate pushdown so the full
-    ~4,300-symbol, multi-million-row file is never fully materialised in memory
-    for a modest category universe. Raises FileNotFoundError if the parquet
-    file itself doesn't exist (it is a pre-built cache -- this module never
-    fetches/builds it, per the task brief). Returns an empty frame (not an
-    error) if none of `symbols` appear in the file at all.
+    """Load daily rows for `symbols` only (columns: date, symbol, close, turnover).
+
+    Prefers the shared local database (`bars_1d_stock`, populated by `mbt local
+    migrate`) over `stocks_data_dir/daily.parquet` — see db_read.py's module
+    docstring — via the same predicate-pushdown idea (a SQL WHERE, so the full
+    ~4,300-symbol, multi-million-row lake is never fully scanned for a modest
+    category universe). Falls back to the parquet file (pyarrow predicate
+    pushdown) only when there is no catalog at all. Raises FileNotFoundError if
+    NEITHER source has the data (the parquet file is a pre-built cache -- this
+    module never fetches/builds it, per the task brief). Returns an empty frame
+    (not an error) if none of `symbols` appear in whichever source answered.
     """
+    from momentum_backtesting import db_read
+
     unique_symbols = sorted(set(symbols))
+    from_db = db_read.daily_prices_from_db_or_none(unique_symbols)
+    if from_db is not None:
+        return from_db.sort_values(["symbol", "date"]).reset_index(drop=True)
+
     path = stocks_data_dir / DAILY_PARQUET_FILENAME
     if not path.exists():
         raise FileNotFoundError(f"{path} does not exist -- no cached daily stock prices")

@@ -110,9 +110,7 @@ def test_blend_only_ranks_instruments_eligible_in_both_sub_rankings():
     # voladj's default 56 weeks (52 + the 4-week skip-recent-month offset) - so it must be
     # eligible for the ranksum sub-ranking but not voladj, and blend must exclude it either way.
     late = pd.Series(100.0, index=LONG_WEEKS).where(LONG_WEEKS[6] <= LONG_WEEKS)
-    prices = pd.DataFrame(
-        {"A": alt_path(0.02, 0.0, 59), "B": alt_path(0.10, -0.06, 59), "C": late}
-    )
+    prices = pd.DataFrame({"A": alt_path(0.02, 0.0, 59), "B": alt_path(0.10, -0.06, 59), "C": late})
     last = LONG_WEEKS[-1]
     ranksum_ranks, _ = compute_ranks(prices, Config(score="ranksum", start="2020-01-01"))
     assert pd.notna(ranksum_ranks.at[last, "C"])  # confirms the scenario actually diverges

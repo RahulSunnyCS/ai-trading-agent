@@ -5,6 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from momentum_backtesting import api
@@ -28,6 +29,46 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "DATA_DIR", tmp_path)
     monkeypatch.setattr(api, "DATA", api._Data())
     return TestClient(api.create_app())
+
+
+def test_data_get_prefers_the_database_over_the_csv_once_populated(tmp_path, monkeypatch):
+    """_Data.get() (the ETF/index dataset _custom_index_backtest etc. all build on) should
+    prefer momentum_prices once `mbt local migrate` has populated it, over weekly_closes.csv -
+    and must still fall back to the CSV untouched on a fresh checkout (every other fixture in
+    this file relies on exactly that fallback)."""
+    from trading_data.db import connect
+
+    monkeypatch.setattr(api, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(api, "DATA", api._Data())
+
+    # No catalog, no CSV yet: a clear 409, not a crash.
+    with pytest.raises(HTTPException):
+        api.DATA.get()
+
+    # CSV only (no catalog) - the existing fallback path every other test fixture uses.
+    weeks = pd.date_range("2020-01-03", periods=5, freq="W-FRI")
+    csv_frame = pd.DataFrame({"A": [1.0, 2.0, 3.0, 4.0, 5.0]}, index=weeks)
+    csv_frame.index.name = "week_ending"
+    csv_frame.to_csv(tmp_path / "weekly_closes.csv")
+    monkeypatch.setattr(api, "DATA", api._Data())
+    from_csv = api.DATA.get()
+    assert list(from_csv["A"]) == [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert list(from_csv.index) == list(csv_frame.index)
+
+    # Now populate the database with DIFFERENT values under the same instrument name - if
+    # the DB is truly preferred, .get() must return these, not the CSV's [1..5].
+    db_root = tmp_path / "tdroot"
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(db_root))
+    db_frame = pd.DataFrame({"A": [10.0, 20.0, 30.0, 40.0, 50.0]}, index=weeks)
+    with connect(db_root) as con:
+        con.executemany(
+            "INSERT INTO momentum_prices VALUES ('A', 'weekly', ?, NULL, ?)",
+            [[week.date(), value] for week, value in db_frame["A"].items()],
+        )
+    monkeypatch.setattr(api, "DATA", api._Data())
+    got = api.DATA.get()
+    assert list(got["A"]) == [10.0, 20.0, 30.0, 40.0, 50.0]
+    assert list(got["A"]) != list(csv_frame["A"])  # proves it did NOT read the CSV
 
 
 # Real company_ids from stocks/curated/companies.csv - ui_data._load_companies() always reads
@@ -75,9 +116,7 @@ def stock_client(tmp_path, monkeypatch):
     benchmarks.index.name = "week_ending"
     benchmarks.to_csv(stocks_dir / "benchmarks_weekly.csv")
 
-    cash = pd.DataFrame(
-        {"date": weeks, "close": 100 * np.cumprod(np.full(len(weeks), 1.0008))}
-    )
+    cash = pd.DataFrame({"date": weeks, "close": 100 * np.cumprod(np.full(len(weeks), 1.0008))})
     cash.to_csv(stocks_dir / "cash_weekly.csv", index=False)
 
     # weekly_closes.csv - the ETF pipeline's own output (a sibling of stocks_dir, not under it;
@@ -140,9 +179,9 @@ def custom_index_client(tmp_path, monkeypatch):
 
     categories_dir = tmp_path / "categories"
     categories_dir.mkdir()
-    pd.DataFrame(
-        columns=["category", "year", "symbol", "source_tier", "wayback_timestamp"]
-    ).to_csv(categories_dir / "category_membership.csv", index=False)
+    pd.DataFrame(columns=["category", "year", "symbol", "source_tier", "wayback_timestamp"]).to_csv(
+        categories_dir / "category_membership.csv", index=False
+    )
 
     curated_dir = tmp_path / "curated"
     curated_dir.mkdir()
@@ -604,9 +643,7 @@ def test_custom_index_backtest_accepts_momentum_sizing(custom_index_client):
     off = custom_index_client.post(
         "/api/backtest", json=_custom_index_request(momentum_sizing=False)
     )
-    on = custom_index_client.post(
-        "/api/backtest", json=_custom_index_request(momentum_sizing=True)
-    )
+    on = custom_index_client.post("/api/backtest", json=_custom_index_request(momentum_sizing=True))
     assert off.status_code == 200, off.text
     assert on.status_code == 200, on.text
     json.dumps(off.json(), allow_nan=False)
@@ -702,7 +739,8 @@ def test_custom_index_backtest_rejects_too_few_categories_for_top_n(custom_index
 
 def test_custom_index_backtest_rejects_mismatched_weights(custom_index_client):
     res = custom_index_client.post(
-        "/api/backtest", json=_custom_index_request(weights=[1, 1])  # 5 default lookbacks
+        "/api/backtest",
+        json=_custom_index_request(weights=[1, 1]),  # 5 default lookbacks
     )
     assert res.status_code == 422
 

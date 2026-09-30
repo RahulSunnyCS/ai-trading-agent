@@ -27,9 +27,7 @@ _CSV_BODY = (
 def _cdx_body(rows: list[tuple[str, str]]) -> bytes:
     """rows: (timestamp, original_url) pairs -> a CDX JSON response body."""
     header = ["urlkey", "timestamp", "original", "mimetype", "statuscode", "digest", "length"]
-    payload = [header] + [
-        ["x", ts, url, "text/csv", "200", "DIGEST", "100"] for ts, url in rows
-    ]
+    payload = [header] + [["x", ts, url, "text/csv", "200", "DIGEST", "100"] for ts, url in rows]
     return json.dumps(payload).encode("utf-8")
 
 

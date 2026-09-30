@@ -575,53 +575,42 @@ def amfi_codes(
     typer.echo(f"\nwrote {UNIVERSE_CSV} - run `mbt fetch` to pull NAVs and premiums")
 
 
-db_app = typer.Typer(
-    no_args_is_help=True, help="Price history in Postgres (MOMENTUM_DATABASE_URL)."
+local_app = typer.Typer(
+    no_args_is_help=True,
+    help="The shared local research database (packages/trading-data, TRADING_DATA_ROOT).",
 )
-app.add_typer(db_app, name="db")
+app.add_typer(local_app, name="local")
 
 
-def _db():
-    from . import store
+@local_app.command("migrate")
+def local_migrate() -> None:
+    """Copy companies/renames/corporate-actions/membership, stock daily bars, and the
+    index/ETF/premium/weekly price series into the shared local database. The curated
+    CSVs and data/ stay the master copies — safe to re-run; every table/partition this
+    touches is replaced wholesale, never appended to."""
+    from trading_data.db import connect, data_root
 
-    try:
-        return store.connect()
-    except store.StoreNotConfigured as error:
-        typer.echo(f"{error} - point it at a Postgres (e.g. a free Neon project).")
-        raise typer.Exit(1) from None
+    from . import db_migrate
 
-
-@db_app.command("init")
-def db_init() -> None:
-    """Create the tables (safe to re-run)."""
-    from . import store
-
-    with _db() as conn:
-        store.init_schema(conn)
-    typer.echo("ok: momentum_prices and momentum_signals exist")
-
-
-@db_app.command("push")
-def db_push(
-    since: str = typer.Option("", help="Only rows on/after this date (default: everything)."),
-) -> None:
-    """Upload data/ (after `mbt fetch`) to the database."""
-    from . import store
-
-    with _db() as conn:
-        store.init_schema(conn)
-        count = store.push_dir(conn, DATA_DIR, pd.Timestamp(since) if since else None)
-    typer.echo(f"ok: {count} rows upserted")
-
-
-@db_app.command("pull")
-def db_pull() -> None:
-    """Rebuild data/ from the database (what the weekly job does before it runs)."""
-    from . import store
-
-    with _db() as conn:
-        count = store.pull_dir(conn, DATA_DIR)
-    typer.echo(f"ok: {count} rows written under {DATA_DIR}")
+    root = data_root()
+    with connect(root) as con:
+        report = db_migrate.migrate(con, root)
+    typer.echo(
+        f"companies {report.companies}, renames {report.company_symbols}, "
+        f"corporate actions {report.corporate_actions}, "
+        f"NIFTY50 membership rows {report.index_membership}, "
+        f"category membership rows {report.category_membership} "
+        f"(of which Total Market: {report.total_market_membership})"
+    )
+    typer.echo(
+        f"stock instruments {report.stock_instruments}, bars {report.stock_bars:,} "
+        f"over {report.stock_years} year(s), momentum_prices rows {report.momentum_prices:,}"
+    )
+    typer.echo(
+        f"stock weekly prices {report.stock_weekly_prices:,}, "
+        f"stock weekly membership {report.stock_membership_weekly:,}"
+    )
+    typer.echo(f"catalog: {root}  (see `tdata status` for the full picture)")
 
 
 stocks_app = typer.Typer(
@@ -802,8 +791,7 @@ def stocks_fetch(
         typer.echo("rebuilding daily.parquet from the raw bhavcopy cache...")
         stats = bhavcopy.build_daily_parquet(raw_dir, data_dir / "daily.parquet")
         typer.echo(
-            f"  {stats.rows} rows, {stats.n_symbols} symbols, "
-            f"{stats.date_min}..{stats.date_max}"
+            f"  {stats.rows} rows, {stats.n_symbols} symbols, {stats.date_min}..{stats.date_max}"
         )
 
     if not (data_dir / "daily.parquet").exists():
@@ -1092,8 +1080,10 @@ def categories_backtest(
         end=end,
     )
     outer_result = run_backtest(spliced, includes, outer_config)
-    typer.echo(f"outer CAGR (with {category!r} replaced by the inner rotation): "
-               f"{metrics.cagr(outer_result.equity):+.2%}")
+    typer.echo(
+        f"outer CAGR (with {category!r} replaced by the inner rotation): "
+        f"{metrics.cagr(outer_result.equity):+.2%}"
+    )
 
 
 @categories_app.command("fetch-universe")
@@ -1140,7 +1130,7 @@ def categories_broad_backtest(
     category_top_n: int = typer.Option(4, help="Categories/atomics freshly held (ON mode)."),
     category_exit_rank: int = typer.Option(8, help="Category exit buffer (ON mode)."),
     picks_per_category: int = typer.Option(2, help="Top-K stocks per held category (ON mode)."),
-    off_top_n: int = typer.Option(10, help="Individual stocks held (OFF mode, \"SL\")."),
+    off_top_n: int = typer.Option(10, help='Individual stocks held (OFF mode, "SL").'),
     off_exit_rank: int = typer.Option(20, help="Individual-stock exit buffer (OFF mode)."),
     rebalance: str = typer.Option("weekly", help="Trading cadence: weekly | monthly."),
     cost_pct: float = _COST,
@@ -1195,11 +1185,20 @@ def categories_broad_backtest(
 @app.command()
 def weekly(
     run: str = typer.Option(..., help="preview (~14:40 IST, live prices) | final (after close)"),
-    use_db: bool = typer.Option(True, "--db/--no-db", help="Pull history from and save to the DB."),
+    use_db: bool = typer.Option(
+        True, "--db/--no-db", help="Pull history from and save to the shared local database."
+    ),
     send: bool = typer.Option(True, help="Send to Telegram (prints when TELEGRAM_* is unset)."),
 ) -> None:
-    """The Friday signal: refresh prices, rank, and send the week's trades to Telegram."""
-    from . import notify
+    """The Friday signal: refresh prices, rank, and send the week's trades to Telegram.
+    Since 2026-09-30 this reads/writes the shared local database (TRADING_DATA_ROOT) instead
+    of Neon (`MOMENTUM_DATABASE_URL`, retired — see TODO.md 3.11.5); a fresh laptop with no
+    `data/` yet gets it rebuilt from the database's `momentum_prices`, same as before."""
+    from contextlib import nullcontext
+
+    from trading_data.db import connect
+
+    from . import local_store, notify
     from .weekly import run_weekly
 
     if run not in ("preview", "final"):
@@ -1210,19 +1209,14 @@ def weekly(
     except fyers.FyersCredentialsError as error:
         typer.echo(f"Fyers: not used ({error})")
         creds = None
-    conn = None
     try:
-        if use_db:
-            from . import store
-
-            conn = _db()
-            store.init_schema(conn)
+        with connect() if use_db else nullcontext() as conn:
+            if use_db and not (DATA_DIR / "weekly_closes.csv").exists():
+                typer.echo(f"pulled {local_store.pull_dir(conn, DATA_DIR)} rows from the database")
             if not (DATA_DIR / "weekly_closes.csv").exists():
-                typer.echo(f"pulled {store.pull_dir(conn, DATA_DIR)} rows from the database")
-        if not (DATA_DIR / "weekly_closes.csv").exists():
-            typer.echo("No history: run `mbt fetch` (and `mbt db push`) first.")
-            raise typer.Exit(1)
-        result = run_weekly(run, DATA_DIR, creds=creds, conn=conn, log=typer.echo)
+                typer.echo("No history: run `mbt fetch` first.")
+                raise typer.Exit(1)
+            result = run_weekly(run, DATA_DIR, creds=creds, conn=conn, log=typer.echo)
     except typer.Exit:
         raise
     except Exception as error:
@@ -1235,9 +1229,6 @@ def weekly(
         )
         notify.send(note) if send else typer.echo(notify.render(note))
         raise
-    finally:
-        if conn is not None:
-            conn.close()
     result.notification.run_url = notify.run_url()
     if send:
         notify.send(result.notification)

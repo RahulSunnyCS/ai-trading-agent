@@ -1,14 +1,13 @@
 """The weekly Friday job end to end, on generated prices with every network source faked."""
 
 import json
-import os
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from momentum_backtesting import notify, store, weekly
+from momentum_backtesting import local_store, notify, store, weekly
 from momentum_backtesting.fetch import load_universe
 from momentum_backtesting.notify import IST, Notification
 from momentum_backtesting.sources import weekly as to_weekly
@@ -289,24 +288,22 @@ def test_a_data_folder_survives_a_round_trip_through_rows(data_dir, tmp_path):
         )
 
 
-@pytest.mark.skipif(
-    not os.environ.get("MOMENTUM_TEST_DATABASE_URL"),
-    reason="set MOMENTUM_TEST_DATABASE_URL to a scratch Postgres to run",
-)
-def test_postgres_upserts_are_idempotent_and_pull_matches(data_dir, tmp_path):
-    with store.connect(os.environ["MOMENTUM_TEST_DATABASE_URL"]) as conn:
-        conn.execute("DROP TABLE IF EXISTS momentum_prices, momentum_signals")
-        store.init_schema(conn)
-        first = store.push_dir(conn, data_dir)
-        store.push_dir(conn, data_dir)  # again: no duplicates
+def test_local_db_push_pull_and_signals_round_trip(data_dir, tmp_path):
+    """The local-database equivalent of the old Postgres integration test above
+    (TODO.md 3.11.5 - Neon retired in favour of the shared trading-data catalog)."""
+    from trading_data.db import connect
+
+    with connect() as conn:
+        first = local_store.push_dir(conn, data_dir)
+        local_store.push_dir(conn, data_dir)  # again: no duplicates
         count = conn.execute("SELECT count(*) FROM momentum_prices").fetchone()[0]
         assert count == first
         out = tmp_path / "pulled"
-        store.pull_dir(conn, out)
+        local_store.pull_dir(conn, out)
         a = pd.read_csv(data_dir / "weekly_closes.csv", index_col=0, parse_dates=True)
         b = pd.read_csv(out / "weekly_closes.csv", index_col=0, parse_dates=True)
         pd.testing.assert_frame_equal(a[sorted(a.columns)], b[sorted(b.columns)], check_freq=False)
-        store.save_signal(conn, "2026-09-25", "preview", "lbl", {"rows": [1]})
-        store.save_signal(conn, "2026-09-25", "preview", "lbl", {"rows": [2]})
-        assert store.load_signal(conn, "2026-09-25", "preview", "lbl") == {"rows": [2]}
-        assert store.load_signal(conn, "2026-09-25", "final", "lbl") is None
+        local_store.save_signal(conn, "2026-09-25", "preview", "lbl", {"rows": [1]})
+        local_store.save_signal(conn, "2026-09-25", "preview", "lbl", {"rows": [2]})
+        assert local_store.load_signal(conn, "2026-09-25", "preview", "lbl") == {"rows": [2]}
+        assert local_store.load_signal(conn, "2026-09-25", "final", "lbl") is None

@@ -16,7 +16,12 @@ dependencies = [
     # Nifty 50 stock data layer (stocks/): daily.parquet / events.parquet I/O.
     # >=14.0.1 for CVE-2023-47248 (see stocks/ plan.md §5).
     "pyarrow>=14.0.1",
+    "trading-data",
 ]
+
+[tool.uv.sources]
+# The shared local research database (TRADING_DATA_ROOT) — a sibling package, editable.
+trading-data = { path = "../trading-data", editable = true }
 
 [project.scripts]
 mbt = "momentum_backtesting.cli:app"

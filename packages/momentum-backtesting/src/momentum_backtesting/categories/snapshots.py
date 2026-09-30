@@ -225,9 +225,7 @@ def build_category_year_membership(
         if current is None:
             note = "no Wayback history and the live fetch also failed -- 0 rows"
             logger.warning("category %r: %s", category, note)
-            return [], [
-                CategoryYearReport(category, year, "", "", 0, note=note) for year in years
-            ]
+            return [], [CategoryYearReport(category, year, "", "", 0, note=note) for year in years]
         rows = [
             {
                 "category": category,

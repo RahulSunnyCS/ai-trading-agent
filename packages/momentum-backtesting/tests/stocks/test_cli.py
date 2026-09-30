@@ -263,9 +263,7 @@ def test_pin_manifest_writes_pinned_csv_and_baseline(stocks_dirs: tuple[Path, Pa
     assert baseline_path.exists()
     with gzip.open(baseline_path, "rt", encoding="utf-8") as f:
         header = f.readline().strip()
-    assert header == (
-        "company_id,ex_date,kind,factor,dividend,source,subject_sha1,symbol_at_ex"
-    )
+    assert header == ("company_id,ex_date,kind,factor,dividend,source,subject_sha1,symbol_at_ex")
 
 
 def test_pin_manifest_without_prior_fetch_fails_cleanly(stocks_dirs: tuple[Path, Path]) -> None:

@@ -1,11 +1,11 @@
-"""Price history and weekly signals in Postgres (Neon free tier), so the weekly job in CI
-starts from the full history instead of re-downloading it, and every signal is kept.
+"""File <-> rows conversion for a momentum `data/` folder.
 
-Connection: MOMENTUM_DATABASE_URL - deliberately not DATABASE_URL, which fyers.py already
-reads for the trading database's broker_tokens.
-
-The tables mirror the files in data/ one to one (see fetch.py), so `mbt db push` / `mbt db
-pull` move a data folder in and out losslessly:
+Was also the Postgres (Neon) price/signal store until 2026-09-30 (TODO.md 3.11.5, `mbt db
+init/push/pull`, `MOMENTUM_DATABASE_URL`) — retired in favour of the shared local database
+(`local_store.py`, `packages/trading-data`). `rows_from_dir`/`write_dir` are the one piece
+still used, by `db_migrate.import_momentum_prices` (the local database's own writer) and by
+`local_store.pull_dir` (the inverse, rebuilding `data/` from the database) — kept here rather
+than duplicated, since both directions belong together as a pair.
 
   momentum_prices   (instrument, kind, date) -> open, close
       kind: signal     data/daily/<name>.csv
@@ -14,39 +14,12 @@ pull` move a data folder in and out losslessly:
             at10_etf   data/intraday/etf/<name>.csv
             premium    data/etf_premium.csv             (close = close / NAV - 1)
             weekly     data/weekly_closes.csv           (date = the week's Friday)
-  momentum_signals  (week, run_kind, config_label) -> the signal JSON sent to Telegram
-
-Writes are upserts, so re-running a week is harmless.
 """
 
-import json
-import os
 from collections.abc import Iterator
 from pathlib import Path
 
 import pandas as pd
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS momentum_prices (
-    instrument  text             NOT NULL,
-    kind        text             NOT NULL CHECK (
-        kind IN ('signal', 'etf', 'at10_index', 'at10_etf', 'premium', 'weekly')
-    ),
-    date        date             NOT NULL,
-    open        double precision,
-    close       double precision NOT NULL,
-    updated_at  timestamptz      NOT NULL DEFAULT now(),
-    PRIMARY KEY (instrument, kind, date)
-);
-CREATE TABLE IF NOT EXISTS momentum_signals (
-    week          date        NOT NULL,
-    run_kind      text        NOT NULL CHECK (run_kind IN ('preview', 'final')),
-    config_label  text        NOT NULL,
-    generated_at  timestamptz NOT NULL DEFAULT now(),
-    payload       jsonb       NOT NULL,
-    PRIMARY KEY (week, run_kind, config_label)
-);
-"""
 
 # kind -> (folder under data/, value column in the file)
 FOLDERS = {
@@ -57,28 +30,6 @@ FOLDERS = {
 }
 
 Row = tuple[str, str, pd.Timestamp, float | None, float]
-
-
-class StoreNotConfigured(RuntimeError):
-    pass
-
-
-def database_url() -> str:
-    url = os.environ.get("MOMENTUM_DATABASE_URL", "").strip()
-    if not url:
-        raise StoreNotConfigured("MOMENTUM_DATABASE_URL is not set")
-    return url
-
-
-def connect(url: str | None = None):
-    import psycopg
-
-    return psycopg.connect(url or database_url(), connect_timeout=20)
-
-
-def init_schema(conn) -> None:
-    conn.execute(SCHEMA)
-    conn.commit()
 
 
 def _num(value) -> float | None:
@@ -142,65 +93,3 @@ def write_dir(rows: list[Row], data_dir: Path) -> None:
         wide.columns.name = None
         data_dir.mkdir(parents=True, exist_ok=True)
         wide.to_csv(data_dir / file)
-
-
-def upsert(conn, rows: list[Row]) -> int:
-    """Insert or update price rows in one COPY + one INSERT ... ON CONFLICT."""
-    if not rows:
-        return 0
-    with conn.cursor() as cur:
-        cur.execute(
-            "CREATE TEMP TABLE incoming (LIKE momentum_prices INCLUDING DEFAULTS) ON COMMIT DROP"
-        )
-        with cur.copy("COPY incoming (instrument, kind, date, open, close) FROM STDIN") as copy:
-            for name, kind, day, opened, close in rows:
-                copy.write_row((name, kind, pd.Timestamp(day).date(), opened, close))
-        cur.execute(
-            """
-            INSERT INTO momentum_prices (instrument, kind, date, open, close)
-            SELECT DISTINCT ON (instrument, kind, date) instrument, kind, date, open, close
-            FROM incoming
-            ON CONFLICT (instrument, kind, date) DO UPDATE
-               SET open = EXCLUDED.open, close = EXCLUDED.close, updated_at = now()
-            """
-        )
-    conn.commit()
-    return len(rows)
-
-
-def fetch_rows(conn) -> list[Row]:
-    with conn.cursor() as cur:
-        cur.execute("SELECT instrument, kind, date, open, close FROM momentum_prices")
-        return list(cur.fetchall())
-
-
-def push_dir(conn, data_dir: Path, since: pd.Timestamp | None = None) -> int:
-    return upsert(conn, list(rows_from_dir(data_dir, since)))
-
-
-def pull_dir(conn, data_dir: Path) -> int:
-    rows = fetch_rows(conn)
-    write_dir(rows, data_dir)
-    return len(rows)
-
-
-def save_signal(conn, week: str, run_kind: str, label: str, payload: dict) -> None:
-    conn.execute(
-        """
-        INSERT INTO momentum_signals (week, run_kind, config_label, payload)
-        VALUES (%s, %s, %s, %s::jsonb)
-        ON CONFLICT (week, run_kind, config_label) DO UPDATE
-           SET payload = EXCLUDED.payload, generated_at = now()
-        """,
-        (week, run_kind, label, json.dumps(payload)),
-    )
-    conn.commit()
-
-
-def load_signal(conn, week: str, run_kind: str, label: str) -> dict | None:
-    row = conn.execute(
-        "SELECT payload FROM momentum_signals WHERE week = %s AND run_kind = %s"
-        " AND config_label = %s",
-        (week, run_kind, label),
-    ).fetchone()
-    return row[0] if row else None

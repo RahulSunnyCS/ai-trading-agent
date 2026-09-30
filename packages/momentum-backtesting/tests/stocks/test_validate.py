@@ -71,9 +71,9 @@ def _flat_two_company_daily(overrides: dict[tuple[str, int], float] | None = Non
     return _daily(closes)
 
 
-def _weighted_indices(daily: pd.DataFrame, dividend_day_idx: int, dividend: float) -> tuple[
-    pd.Series, pd.Series
-]:
+def _weighted_indices(
+    daily: pd.DataFrame, dividend_day_idx: int, dividend: float
+) -> tuple[pd.Series, pd.Series]:
     """Build tri_index/price_index for the two-company 50/50 basket directly from
     `daily`'s close/prevclose, so the expected spread is known exactly: on the
     dividend day, price return reflects the raw close drop, tri_index instead
@@ -92,9 +92,9 @@ def _weighted_indices(daily: pd.DataFrame, dividend_day_idx: int, dividend: floa
     tr_growth = price_growth.copy()
     div_day = _SESSIONS[dividend_day_idx]
     if dividend:
-        tr_growth.loc[div_day, "SYM1"] = (
-            piv_close.loc[div_day, "SYM1"] + dividend
-        ) / piv_prev.loc[div_day, "SYM1"]
+        tr_growth.loc[div_day, "SYM1"] = (piv_close.loc[div_day, "SYM1"] + dividend) / piv_prev.loc[
+            div_day, "SYM1"
+        ]
 
     price_index = (0.5 * price_growth).sum(axis=1).cumprod() * 100.0
     tri_index = (0.5 * tr_growth).sum(axis=1).cumprod() * 100.0

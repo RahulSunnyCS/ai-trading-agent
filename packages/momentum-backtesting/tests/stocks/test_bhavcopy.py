@@ -58,8 +58,7 @@ def test_bhavcopy_url_old_format_before_cutover():
 def test_bhavcopy_url_udiff_from_cutover():
     url = bhavcopy.bhavcopy_url(date(2024, 7, 8))
     assert url == (
-        "https://nsearchives.nseindia.com/content/cm/"
-        "BhavCopy_NSE_CM_0_0_0_20240708_F_0000.csv.zip"
+        "https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_20240708_F_0000.csv.zip"
     )
 
 
@@ -80,8 +79,17 @@ def test_bhavcopy_url_old_format_2011_no_isin_header_date():
 def test_parse_old_format_2011_no_isin_column():
     df = bhavcopy.parse_file(OLD_2011)
     assert list(df.columns) == [
-        "date", "symbol", "series", "isin", "open", "high", "low", "close",
-        "prevclose", "volume", "turnover",
+        "date",
+        "symbol",
+        "series",
+        "isin",
+        "open",
+        "high",
+        "low",
+        "close",
+        "prevclose",
+        "volume",
+        "turnover",
     ]
     assert len(df) == 6
     assert df["isin"].isna().all()

@@ -61,9 +61,9 @@ _DAY_COLUMNS = ["date", "observed_spread_bp", "expected_spread_bp", "verdict", "
 # --------------------------------------------------------------------------
 
 
-def _member_close_pivot(daily: pd.DataFrame, m: pd.DataFrame, sessions: pd.DatetimeIndex) -> tuple[
-    list[str], np.ndarray
-]:
+def _member_close_pivot(
+    daily: pd.DataFrame, m: pd.DataFrame, sessions: pd.DatetimeIndex
+) -> tuple[list[str], np.ndarray]:
     """Close price per company, aligned to `sessions`, stitched across a company's
     dated symbol rows in `m` (membership_check._normalise_membership's output) the
     same way membership_check._growth_by_company stitches its close/prevclose
