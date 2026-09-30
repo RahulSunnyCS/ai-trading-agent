@@ -94,6 +94,14 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
     return reply.code(302).header('Location', login.url).header('Cache-Control', 'no-store').send();
   });
 
+  // Some existing Fyers app registrations point at /callback rather than the
+  // newer namespaced path. Keep those registrations working without requiring
+  // the operator to change the redirect URI in the Fyers console.
+  server.get('/callback', async (request, reply) => {
+    const query = request.raw.url?.split('?', 2)[1];
+    return reply.redirect(`/api/auth/fyers/callback${query ? `?${query}` : ''}`, 302);
+  });
+
   server.get('/api/auth/fyers/callback', async (request, reply) => {
     const cfg = loadFyersOAuthConfig();
     if (!cfg) {

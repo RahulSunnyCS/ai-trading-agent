@@ -29,6 +29,14 @@ stays in server environment configuration, never browser storage. The preview
 never submits orders. Keep `mbt stocks fetch` and, for Broad,
 `mbt categories fetch-universe` data current before using it.
 
+For a local dashboard preview without Fastify/Postgres, set `MOMENTUM_DIRECT=1`
+and `MOMENTUM_DIRECT_API_URL=http://127.0.0.1:3000` when starting Next, then run
+`uv run mbt ui --port 3000 --no-open-browser`. The Fyers app's registered
+`FYERS_REDIRECT_URI` must point to the local service on port 3000 (either
+`/callback` or `/api/auth/fyers/callback`) for this setup. In direct mode,
+the local API stores the access token in `data/.fyers_token.json` with file mode
+`0600` until Fyers expiry; the app secret still stays in the server-side `.env`.
+
 For CLI use, save strategy settings (the same JSON shape accepted by `/api/backtest`)
 and actual holdings percentages in two files, for example:
 

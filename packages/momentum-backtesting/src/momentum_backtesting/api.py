@@ -3,13 +3,13 @@
 import threading
 import urllib.request
 from collections import OrderedDict
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Literal
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from trading_data.db import connect
@@ -66,6 +66,8 @@ _CATEGORY_LABEL_INFO = {
 
 STATIC = Path(__file__).with_name("static")
 PLOTLY_URL = "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"
+_LOCAL_OAUTH_STATES: dict[str, datetime] = {}
+_LOCAL_OAUTH_LOCK = threading.Lock()
 
 
 class _Data:
@@ -1387,6 +1389,66 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Momentum backtest", docs_url="/api/docs")
+
+    # Local standalone dashboard preview: the normal Fastify OAuth flow stores
+    # its token in broker_tokens. `mbt ui` has no Postgres dependency, so it
+    # uses the existing 0600 mbt token cache and the same Fyers auth-code flow.
+    @app.get("/api/auth/fyers/status")
+    def local_fyers_status() -> dict:
+        load_repo_env()
+        try:
+            fyers._oauth_config()
+            configured = True
+        except fyers.FyersCredentialsError:
+            configured = False
+        cached = fyers._cached_token() if configured else None
+        connected = cached is not None
+        return {
+            "configured": configured,
+            "connected": connected,
+            "degraded": not connected,
+            "needsReauth": not connected,
+            "expiresAt": cached.expires_at.isoformat() if cached else None,
+            "appId": cached.app_id if cached else None,
+        }
+
+    @app.get("/api/auth/fyers/start")
+    def local_fyers_start() -> RedirectResponse:
+        load_repo_env()
+        try:
+            url, state = fyers.build_auth_url()
+        except fyers.FyersCredentialsError as error:
+            raise HTTPException(503, str(error)) from None
+        now = datetime.now(IST)
+        with _LOCAL_OAUTH_LOCK:
+            for old_state, expiry in list(_LOCAL_OAUTH_STATES.items()):
+                if expiry <= now:
+                    del _LOCAL_OAUTH_STATES[old_state]
+            _LOCAL_OAUTH_STATES[state] = now + timedelta(minutes=10)
+        return RedirectResponse(url, status_code=302, headers={"Cache-Control": "no-store"})
+
+    @app.get("/callback")
+    @app.get("/api/auth/fyers/callback")
+    def local_fyers_callback(state: str = "", auth_code: str = "", code: str = "") -> HTMLResponse:
+        now = datetime.now(IST)
+        with _LOCAL_OAUTH_LOCK:
+            expiry = _LOCAL_OAUTH_STATES.pop(state, None)
+        if not state or expiry is None or expiry <= now:
+            raise HTTPException(400, "Fyers login state is missing, expired or already used.")
+        actual_code = auth_code or code
+        if not actual_code:
+            raise HTTPException(400, "Fyers did not return an authorization code.")
+        load_repo_env()
+        try:
+            fyers.save_token(fyers.exchange_auth_code(actual_code))
+        except fyers.FyersCredentialsError as error:
+            raise HTTPException(502, str(error)) from None
+        return HTMLResponse(
+            "<!doctype html><title>Fyers connected</title>"
+            "<p>Fyers connected. You can return to the dashboard.</p>"
+            "<script>setTimeout(() => window.close(), 1200)</script>",
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.get("/api/meta")
     def meta(dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf") -> dict:

@@ -175,8 +175,21 @@ def _dashboard_credentials() -> Credentials:
 
 def resolve_credentials(*, prefer_dashboard: bool = False) -> Credentials:
     """Resolve a valid token; UI previews prefer the dashboard login over stale env tokens."""
-    if prefer_dashboard and os.environ.get("DATABASE_URL", "").strip():
-        return _dashboard_credentials()
+    if prefer_dashboard:
+        if os.environ.get("DATABASE_URL", "").strip():
+            try:
+                return _dashboard_credentials()
+            except FyersCredentialsError:
+                # Standalone `mbt ui` may share the repo .env with Fastify while
+                # Postgres is stopped. Its browser OAuth callback writes the
+                # short-lived token to the local 0600 cache instead.
+                cached = _cached_token()
+                if cached:
+                    return cached
+                raise
+        cached = _cached_token()
+        if cached:
+            return cached
     app_id = os.environ.get("FYERS_APP_ID", "").strip()
     token = os.environ.get("FYERS_ACCESS_TOKEN", "").strip()
     if app_id and token:

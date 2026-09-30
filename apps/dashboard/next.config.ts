@@ -7,6 +7,7 @@ import type { NextConfig } from 'next';
  * useLiveTicks), because Next rewrites only cover HTTP requests.
  */
 const apiOrigin = process.env.DASHBOARD_API_URL ?? 'http://localhost:3000';
+const momentumDirectOrigin = process.env.MOMENTUM_DIRECT_API_URL ?? 'http://127.0.0.1:8765';
 
 const nextConfig: NextConfig = {
   async rewrites() {
@@ -29,30 +30,33 @@ const nextConfig: NextConfig = {
       // different upstream names, so each needs its own rule).
       ...(process.env.MOMENTUM_DIRECT === '1'
         ? [
-            { source: '/api/momentum/meta', destination: 'http://127.0.0.1:8765/api/meta' },
+            { source: '/api/auth/fyers/status', destination: `${momentumDirectOrigin}/api/auth/fyers/status` },
+            { source: '/api/auth/fyers/start', destination: `${momentumDirectOrigin}/api/auth/fyers/start` },
+            { source: '/api/auth/fyers/callback', destination: `${momentumDirectOrigin}/api/auth/fyers/callback` },
+            { source: '/api/momentum/meta', destination: `${momentumDirectOrigin}/api/meta` },
             {
               source: '/api/momentum/scores',
-              destination: 'http://127.0.0.1:8765/api/momentum-scores',
+              destination: `${momentumDirectOrigin}/api/momentum-scores`,
             },
             {
               source: '/api/momentum/backtest',
-              destination: 'http://127.0.0.1:8765/api/backtest',
+              destination: `${momentumDirectOrigin}/api/backtest`,
             },
             {
               source: '/api/momentum/saved-runs',
-              destination: 'http://127.0.0.1:8765/api/saved-runs',
+              destination: `${momentumDirectOrigin}/api/saved-runs`,
             },
             {
               source: '/api/momentum/saved-runs/:runId',
-              destination: 'http://127.0.0.1:8765/api/saved-runs/:runId',
+              destination: `${momentumDirectOrigin}/api/saved-runs/:runId`,
             },
             {
               source: '/api/momentum/weekly/run',
-              destination: 'http://127.0.0.1:8765/api/weekly/run',
+              destination: `${momentumDirectOrigin}/api/weekly/run`,
             },
             {
               source: '/api/momentum/rebalance-preview',
-              destination: 'http://127.0.0.1:8765/api/rebalance-preview',
+              destination: `${momentumDirectOrigin}/api/rebalance-preview`,
             },
           ]
         : []),

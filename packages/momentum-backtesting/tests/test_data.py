@@ -65,6 +65,22 @@ def test_dashboard_preview_prefers_cached_oauth_token_over_env(monkeypatch):
     assert (creds.access_token, creds.source) == ("fresh-dashboard", "broker_tokens")
 
 
+def test_standalone_preview_uses_local_oauth_cache_when_dashboard_db_is_down(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgres://offline")
+    monkeypatch.setenv("FYERS_APP_ID", "APP-100")
+    monkeypatch.setenv("FYERS_ACCESS_TOKEN", "stale-env")
+    monkeypatch.setattr(
+        fyers,
+        "_dashboard_credentials",
+        lambda: (_ for _ in ()).throw(fyers.FyersCredentialsError("database offline")),
+    )
+    cached = fyers.Credentials(
+        "APP-100", "fresh-local", "mbt login cache", datetime.now(UTC) + timedelta(hours=1)
+    )
+    monkeypatch.setattr(fyers, "_cached_token", lambda: cached)
+    assert fyers.resolve_credentials(prefer_dashboard=True).access_token == "fresh-local"
+
+
 def test_no_token_anywhere_points_to_mbt_login(monkeypatch, tmp_path):
     monkeypatch.setenv("FYERS_APP_ID", "APP-100")
     monkeypatch.delenv("FYERS_ACCESS_TOKEN", raising=False)

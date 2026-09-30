@@ -7,8 +7,9 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
-from momentum_backtesting import rebalance
+from momentum_backtesting import api, fyers, rebalance
 from momentum_backtesting.api import RebalanceRequest, rebalance_preview
 from momentum_backtesting.engine import IDLE, Config, Result
 from momentum_backtesting.rebalance import broad_quote_symbols, build_plan, model_holdings
@@ -103,3 +104,29 @@ def test_preview_rejects_outside_market_hours_before_fyers():
     )
     with pytest.raises(HTTPException, match="market hours"):
         rebalance_preview(request, now=datetime(2026, 9, 30, 8, 0, tzinfo=ZoneInfo("Asia/Kolkata")))
+
+
+def test_local_browser_oauth_caches_token_only_after_valid_state(monkeypatch):
+    monkeypatch.setattr(api, "load_repo_env", lambda: None)
+    monkeypatch.setattr(fyers, "_oauth_config", lambda: ("APP-100", "secret", "callback"))
+    monkeypatch.setattr(fyers, "_cached_token", lambda: None)
+    monkeypatch.setattr(
+        fyers,
+        "build_auth_url",
+        lambda: ("https://api-t1.fyers.in/login?state=test-state", "test-state"),
+    )
+    saved = []
+    monkeypatch.setattr(fyers, "exchange_auth_code", lambda code: ("token", code))
+    monkeypatch.setattr(fyers, "save_token", lambda token: saved.append(token))
+    client = TestClient(api.create_app())
+
+    assert client.get("/api/auth/fyers/status").json()["connected"] is False
+    started = client.get("/api/auth/fyers/start", follow_redirects=False)
+    assert started.status_code == 302
+    assert started.headers["cache-control"] == "no-store"
+    assert client.get("/api/auth/fyers/callback?state=wrong&auth_code=A").status_code == 400
+    assert saved == []
+    accepted = client.get("/callback?state=test-state&auth_code=A")
+    assert accepted.status_code == 200
+    assert saved == [("token", "A")]
+    assert client.get("/api/auth/fyers/callback?state=test-state&auth_code=A").status_code == 400
