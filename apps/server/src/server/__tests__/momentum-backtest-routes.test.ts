@@ -60,6 +60,25 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards the read-only rebalance preview to Python', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { rows: [] }));
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/momentum/rebalance-preview',
+      payload: { dataset: 'stock', universe: ['C0001'], holdings_pct: { C0001: 30 }, portfolio_value: 100000 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/rebalance-preview',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    await server.close();
+  });
+
   it('forwards saved-runs listing for a requested dataset', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);
