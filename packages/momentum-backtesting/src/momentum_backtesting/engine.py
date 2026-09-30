@@ -102,6 +102,13 @@ class Config:
     # above the cap don't cause a trade (and a tax bill) every week.
     max_position: float | None = 0.35
     cap_band: float = 0.05
+    # Buffer rule only. Largest share of the portfolio one GROUP of positions may hold together
+    # (None = no cap). Needs `run_backtest`'s `groups` table to say which group each position
+    # belongs to that week - without it there is nothing to cap and this is inert. Broad Momentum
+    # uses it so two stocks picked from the same category can't add up to a bigger bet than one
+    # category is meant to be. Same trim mechanic as `max_position`: a group is trimmed back to
+    # the cap only once it passes cap + `cap_band`.
+    max_group: float | None = None
     # Buffer rule only. Shrinks how much of each week's freshly available cash goes into new/
     # top-up buys when recent closed trades have mostly lost, ramping back to full size as they
     # recover. See _win_rate_multiplier. Off by default - opt-in.
@@ -166,6 +173,8 @@ class Config:
             raise ValueError(f"unknown entry rule {self.entry!r}")
         if self.max_position is not None and not 0 < self.max_position <= 1:
             raise ValueError("max_position must be between 0 and 1 (e.g. 0.35 for 35%)")
+        if self.max_group is not None and not 0 < self.max_group <= 1:
+            raise ValueError("max_group must be between 0 and 1 (e.g. 0.30 for 30%)")
         if self.cap_band < 0:
             raise ValueError("cap_band can't be negative")
         if self.track not in ("index", "etf"):
@@ -196,6 +205,7 @@ class Config:
     @property
     def label(self) -> str:
         cap = f"-cap{round(self.max_position * 100)}" if self.max_position else ""
+        cap += f"-gcap{round(self.max_group * 100)}" if self.max_group else ""
         rule = f"buffer-{self.entry}{cap}" if self.portfolio == "buffer" else "slots"
         fills = f"_{self.track}-{self.execution}" if self.needs_trade_prices else ""
         score = f"_{self.score}" if self.score != "ranksum" else ""
@@ -358,6 +368,21 @@ class _Sim:
     # computation was supplied - `config.mass_exit_throttle` has nothing to key off and is
     # effectively inert even if turned on, same as `membership=None` disabling that gate.
     mass_exit_weeks: frozenset[pd.Timestamp] | None = None
+    # max_group only: week x instrument table of group labels (a NaN/None cell = not in any group
+    # that week). Per-week because a stock's group is whichever held category it was picked
+    # through, which changes as categories rotate.
+    groups: pd.DataFrame | None = None
+    # week x instrument booleans; True = may not be BOUGHT that week (e.g. share price above the
+    # affordability ceiling). Never forces a sale: a holding stays until its rank says sell, and
+    # may still be topped up, so a stock that grows past the ceiling is simply held through.
+    no_buy: pd.DataFrame | None = None
+
+    def group(self, week: pd.Timestamp, asset: str) -> str | None:
+        """The group `asset` counts toward that week, or None (ungrouped / no table supplied)."""
+        if self.groups is None or asset not in self.groups.columns:
+            return None
+        label = self.groups.at[week, asset]
+        return label if isinstance(label, str) else None
 
     def buy_cost(self, value_fraction: float) -> float:
         """Cost fraction charged on a buy of size `value_fraction` of the 1.0-normalised
@@ -406,22 +431,51 @@ class _Sim:
             return f"{self.config.filter_lookback}w return below cash"
         return None
 
-    def top_names(self, week: pd.Timestamp) -> list[str]:
+    def top_names(
+        self, week: pd.Timestamp, held: frozenset[str] | set[str] = frozenset()
+    ) -> list[str]:
         """The current top N that may be bought, best first. Membership-gated: an instrument
         that's dropped out of the index this week (present in `membership`'s columns but False
         that week) isn't offered as a new buy. An instrument absent from `membership` altogether
-        (an ETF/benchmark, or when membership tracking is off) is always eligible."""
+        (an ETF/benchmark, or when membership tracking is off) is always eligible.
+
+        `no_buy` gate: a name flagged that week and not in `held` is skipped, and the list is
+        refilled from the next-best-ranked names (those flagged are never used as fillers) so
+        the top-N slot goes to the best name that can actually be bought."""
         ranks = self.ranks.loc[week].dropna().sort_values()
         names = [
             n for n in ranks.index if ranks[n] <= self.config.top_n and self.passes_filter(n, week)
         ]
-        if self.membership is None:
+        if self.membership is not None:
+            names = [
+                n
+                for n in names
+                if n not in self.membership.columns or bool(self.membership.at[week, n])
+            ]
+        if self.no_buy is None:
             return names
-        return [
-            n
-            for n in names
-            if n not in self.membership.columns or bool(self.membership.at[week, n])
-        ]
+
+        def blocked(n: str) -> bool:
+            return n in self.no_buy.columns and bool(self.no_buy.at[week, n])
+
+        out = [n for n in names if n in held or not blocked(n)]
+        if len(out) >= self.config.top_n:
+            return out
+        for n in ranks.index:
+            if len(out) >= self.config.top_n:
+                break
+            if n in out or blocked(n) or not self.passes_filter(n, week):
+                continue
+            if (
+                self.membership is not None
+                and n in self.membership.columns
+                and not bool(self.membership.at[week, n])
+            ):
+                continue
+            if ranks[n] > self.config.exit_rank:
+                break
+            out.append(n)
+        return out
 
     def tax(self, asset: str, gain: float, held_days: int) -> float:
         if self.ledger is None:
@@ -485,6 +539,8 @@ def run_backtest(
     membership: pd.DataFrame | None = None,
     external_ranks: tuple[pd.DataFrame, pd.DataFrame] | None = None,
     mass_exit_weeks: frozenset[pd.Timestamp] | None = None,
+    groups: pd.DataFrame | None = None,
+    no_buy: pd.DataFrame | None = None,
 ) -> Result:
     """`rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ.
     `trade_prices` (signal week x instrument) is what trades fill at and holdings are valued
@@ -510,7 +566,16 @@ def run_backtest(
     `mass_exit_weeks` (TODO.md 3.9.20) - weeks flagged by an external, per-run computation (see
     categories/broad.py's `compute_category_selection_mass_exit`) as a synchronized mass exit;
     only consulted when `config.mass_exit_throttle` is True, same "data, not a Config field"
-    reasoning as `external_ranks`/`trade_prices`/`membership` above."""
+    reasoning as `external_ranks`/`trade_prices`/`membership` above.
+
+    `groups` (week x instrument group labels, same shape as `ranks`) is what `config.max_group`
+    caps against - see `_Sim.group`. It is shifted by `signal_delay` together with the ranks it
+    was built alongside, so a delayed signal keeps its own week's grouping. Ignored by the
+    fixed-slots rule, which is always equal-weight.
+
+    `no_buy` (week x instrument booleans, True = not buyable that week) blocks NEW purchases only
+    - see `_Sim.no_buy`. Shifted by `signal_delay` with the ranks. Broad Momentum uses it for the
+    share-price ceiling, which is about whether a small budget can afford a first share."""
     names = ranked_universe(includes, config)
     missing = [n for n in [*names, CASH, config.benchmark] if n not in prices]
     if missing:
@@ -550,6 +615,14 @@ def run_backtest(
         ranks = ranks.shift(config.signal_delay)
         scores = scores.shift(config.signal_delay)
         filter_ret = filter_ret.shift(config.signal_delay)
+        if groups is not None:
+            groups = groups.shift(config.signal_delay)
+        if no_buy is not None:
+            no_buy = no_buy.shift(config.signal_delay)
+    if no_buy is not None:
+        no_buy = no_buy.reindex(ranks.index).fillna(False).astype(bool)
+    if groups is not None:
+        groups = groups.reindex(ranks.index)
 
     in_window = ranks.index >= pd.Timestamp(config.start)
     if config.end:
@@ -578,6 +651,8 @@ def run_backtest(
         membership=membership,
         trade_weeks=trade_weeks,
         mass_exit_weeks=mass_exit_weeks,
+        groups=groups,
+        no_buy=no_buy,
     )
     outcome = _run_slots(sim, weeks) if config.portfolio == "slots" else _run_buffer(sim, weeks)
 
@@ -657,7 +732,7 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
 
             # 2. Buys: best-ranked names within the top N that aren't already held.
             held = {s["asset"] for s in slots if s["kind"] == "held"}
-            candidates = [n for n in sim.top_names(week) if n not in held]
+            candidates = [n for n in sim.top_names(week, held) if n not in held]
             for slot_no, slot in enumerate(slots, start=1):
                 if slot["kind"] == "held":
                     continue
@@ -775,6 +850,19 @@ def _win_rate_multiplier(
     return max(floor, min(1.0, win_rate_pct / 50))
 
 
+def _has_room(
+    name: str,
+    rooms: dict[str, float],
+    given: dict[str, float],
+    label_of: dict[str, str | None],
+    group_left: dict[str, float],
+) -> bool:
+    """Whether `name` can still take money this week: under its own position cap and, if it sits
+    in a group, that group's shared room isn't used up either."""
+    label = label_of[name]
+    return rooms[name] - given[name] > 1e-12 and (label is None or group_left[label] > 1e-12)
+
+
 def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
     """Positions are lists of lots - one per purchase - so each top-up keeps its own date and
     cost for tax. A lot is {units, since, basis}; basis is the rupee cost after buying costs."""
@@ -803,6 +891,38 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         if cap is None:
             return math.inf
         return max(cap * total - value(name, week), 0.0)
+
+    gcap = config.max_group
+
+    def members_by_group(week) -> dict[str, list[str]]:
+        """Currently held (non-cash) positions, bucketed by the group they count toward."""
+        out: dict[str, list[str]] = {}
+        for asset in lots:
+            label = None if asset == _POOL else sim.group(week, asset)
+            if label is not None:
+                out.setdefault(label, []).append(asset)
+        return out
+
+    def group_room(label: str, total: float, week) -> float:
+        """How much more the group `label` can take before it reaches the group cap."""
+        if gcap is None:
+            return math.inf
+        held = sum(value(a, week) for a in members_by_group(week).get(label, []))
+        return max(gcap * total - held, 0.0)
+
+    def absorbable(names: list[str], total: float, week) -> float:
+        """The most `names` can take together, honouring the position cap and - since names in
+        one group share that group's room - the group cap. math.inf when neither cap is set."""
+        free, by_group = 0.0, {}
+        for name in names:
+            label = sim.group(week, name) if gcap is not None else None
+            if label is None:
+                free += room(name, total, week)
+            else:
+                by_group[label] = by_group.get(label, 0.0) + room(name, total, week)
+        return free + sum(
+            min(taken, group_room(label, total, week)) for label, taken in by_group.items()
+        )
 
     def sell(asset: str, fraction: float, week) -> tuple[float, float, float]:
         """Sell `fraction` of every lot. Returns (gross value, net proceeds, tax)."""
@@ -851,12 +971,25 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                         sim.record(week, "TRIM", asset, reason, gross, tax=tax)
                         proceeds += net
 
+            # 2b. Same for a whole group (e.g. a category holding two stocks): once the group
+            #     is over cap + band, every member is trimmed by the same fraction.
+            if gcap is not None:
+                total = portfolio_value(week) + proceeds
+                for label, members in members_by_group(week).items():
+                    share = sum(value(a, week) for a in members) / total
+                    if share > gcap + config.cap_band:
+                        for asset in members:
+                            gross, net, tax = sell(asset, 1 - gcap / share, week)
+                            reason = f"{label} above the {gcap:.0%} group cap ({share:.0%})"
+                            sim.record(week, "TRIM", asset, reason, gross, tax=tax)
+                            proceeds += net
+
             # 3. Split the money equally across the current top N, but never past the cap. Parked
             #    cash joins in as soon as there's room for it.
-            tops = sim.top_names(week)
+            tops = sim.top_names(week, frozenset(a for a in lots if a != _POOL))
             total = portfolio_value(week) + proceeds
             if tops and _POOL in lots:
-                need = sum(room(name, total, week) for name in tops) - proceeds
+                need = absorbable(tops, total, week) - proceeds
                 if need > MIN_TRADE * total:
                     gross, net, tax = sell(_POOL, min(1.0, need / value(_POOL, week)), week)
                     sim.record(week, "UNPARK", CASH, "back into the top N", gross, tax=tax)
@@ -894,15 +1027,32 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     total = portfolio_value(week) + proceeds
                     rooms = {name: room(name, total, week) for name in tops}
                     given = dict.fromkeys(tops, 0.0)
-                    active = [name for name in tops if rooms[name] > 1e-12]
+                    # Names in one group draw on that group's single remaining room.
+                    label_of = {n: sim.group(week, n) if gcap is not None else None for n in tops}
+                    group_left = {
+                        label: group_room(label, total, week)
+                        for label in {v for v in label_of.values() if v is not None}
+                    }
+
+                    active = [
+                        name
+                        for name in tops
+                        if _has_room(name, rooms, given, label_of, group_left)
+                    ]
                     while left > 1e-12 and active:  # equal shares; a capped name's excess spreads
                         share = left / len(active)
                         still = []
                         for name in active:
-                            give = min(share, rooms[name] - given[name])
+                            label = label_of[name]
+                            allowed = rooms[name] - given[name]
+                            if label is not None:
+                                allowed = min(allowed, group_left[label])
+                            give = max(min(share, allowed), 0.0)
                             given[name] += give
                             left -= give
-                            if rooms[name] - given[name] > 1e-12:
+                            if label is not None:
+                                group_left[label] -= give
+                            if _has_room(name, rooms, given, label_of, group_left):
                                 still.append(name)
                         active = still
                     for name in tops:
@@ -913,11 +1063,12 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                             sim.record(week, action, name, f"rank {rank}", given[name])
                 if left > 1e-12:
                     buy(_POOL, left, week)
-                    reason = (
-                        f"top N all at the {cap:.0%} cap"
-                        if tops
-                        else "nothing in the top N qualifies"
-                    )
+                    if not tops:
+                        reason = "nothing in the top N qualifies"
+                    elif gcap is None:
+                        reason = f"top N all at the {cap:.0%} cap"
+                    else:
+                        reason = "top N all at the position/group cap"
                     sim.record(week, "PARK", CASH, reason, left)
                 if momentum_reserved > 1e-12:
                     buy(_POOL, momentum_reserved, week)
@@ -940,6 +1091,13 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     holders = list(lots)
                     count = sum(1 for a in holders if a != _POOL)
                     fraction = 1 / (count + 1) if cap is None else min(1 / (count + 1), cap)
+                    label = sim.group(week, name) if gcap is not None else None
+                    if label is not None:
+                        total = portfolio_value(week)
+                        held = sum(value(a, week) for a in members_by_group(week).get(label, []))
+                        fraction = min(fraction, max(gcap - held / total, 0.0))
+                        if fraction <= 1e-12:
+                            continue
                     raised = 0.0
                     for asset in holders:
                         gross, net, tax = sell(asset, fraction, week)
