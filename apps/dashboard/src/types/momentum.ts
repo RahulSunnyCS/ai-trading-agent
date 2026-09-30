@@ -49,3 +49,11 @@ export interface MomentumSavedRun {
   strategy: Array<number | null>;
   overlay: boolean;
 }
+
+export interface MomentumWeeklyRunResult {
+  title: string;
+  body: string;
+  severity: string;
+  sent_to_telegram: boolean;
+  signal: Record<string, unknown> | null;
+}

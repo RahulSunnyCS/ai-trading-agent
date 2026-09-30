@@ -9,9 +9,12 @@ import { THead, TRow, Table, Td, Th } from '../ui/Table';
 
 const PERCENT_METRICS = new Set(['cagr', 'excess_cagr', 'max_drawdown', 'turnover_per_year']);
 const METRICS: Array<[string, string]> = [
-  ['cagr', 'CAGR'], ['excess_cagr', 'Edge vs benchmark'],
-  ['max_drawdown', 'Max drawdown'], ['sharpe', 'Sharpe'],
-  ['turnover_per_year', 'Annual turnover'], ['avg_holdings', 'Average holdings'],
+  ['cagr', 'CAGR'],
+  ['excess_cagr', 'Edge vs benchmark'],
+  ['max_drawdown', 'Max drawdown'],
+  ['sharpe', 'Sharpe'],
+  ['turnover_per_year', 'Annual turnover'],
+  ['avg_holdings', 'Average holdings'],
 ];
 
 function metric(run: MomentumSavedRun | undefined, key: string): string {
@@ -22,11 +25,15 @@ function metric(run: MomentumSavedRun | undefined, key: string): string {
 
 export function MomentumSavedRunsView({
   runs,
-  onChange,
+  onRename,
+  onToggleOverlay,
+  onRemove,
   onLoad,
 }: {
   runs: MomentumSavedRun[];
-  onChange: (runs: MomentumSavedRun[]) => void;
+  onRename: (id: string, name: string) => void;
+  onToggleOverlay: (id: string, overlay: boolean) => void;
+  onRemove: (id: string) => void;
   onLoad: (run: MomentumSavedRun) => void;
 }) {
   const [compareId, setCompareId] = useState('');
@@ -36,42 +43,99 @@ export function MomentumSavedRunsView({
   return (
     <div className="space-y-5">
       <Card>
-        <CardHeader title="Saved runs" description="Named results and settings are saved in this browser, grouped by dataset." />
-        {runs.length === 0 ? <p className="text-sm text-muted">Run a backtest to start a comparison.</p> : null}
+        <CardHeader
+          title="Saved runs"
+          description="Named results and settings are saved, grouped by dataset."
+        />
+        {runs.length === 0 ? (
+          <p className="text-sm text-muted">Run a backtest to start a comparison.</p>
+        ) : null}
         {runs.map((run, index) => (
-          <div key={run.id} className="flex flex-wrap items-center gap-3 border-t border-border py-3">
+          <div
+            key={run.id}
+            className="flex flex-wrap items-center gap-3 border-t border-border py-3"
+          >
             <label className="flex items-center gap-1.5 text-xs text-muted">
-              <input type="checkbox" aria-label={`Overlay ${run.name}`} checked={run.overlay} disabled={index === 0} onChange={(event) => onChange(runs.map((item) => item.id === run.id ? { ...item, overlay: event.target.checked } : item))} />
+              <input
+                type="checkbox"
+                aria-label={`Overlay ${run.name}`}
+                checked={run.overlay}
+                disabled={index === 0}
+                onChange={(event) => onToggleOverlay(run.id, event.target.checked)}
+              />
               Overlay
             </label>
             <input
               aria-label={`Name for run ${run.n}`}
               value={run.name}
               maxLength={64}
-              onChange={(event) => onChange(runs.map((item) => item.id === run.id ? { ...item, name: event.target.value } : item))}
+              onChange={(event) => onRename(run.id, event.target.value)}
               className="min-w-48 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
             />
-            <span className="text-xs text-muted">CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Sharpe {metric(run, 'sharpe')}</span>
-            <div className="ml-auto flex gap-2"><Button size="sm" onClick={() => onLoad(run)}>Load settings</Button><Button size="sm" variant="ghost" onClick={() => onChange(runs.filter((item) => item.id !== run.id))}>Remove</Button></div>
+            <span className="text-xs text-muted">
+              CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Sharpe{' '}
+              {metric(run, 'sharpe')}
+            </span>
+            <div className="ml-auto flex gap-2">
+              <Button size="sm" onClick={() => onLoad(run)}>
+                Load settings
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onRemove(run.id)}>
+                Remove
+              </Button>
+            </div>
           </div>
         ))}
       </Card>
 
       {current && comparison ? (
         <Card>
-          <CardHeader title="Compare runs" actions={
-            <select aria-label="Compare current run with" value={comparison.id} onChange={(event) => setCompareId(event.target.value)} className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground">
-              {runs.slice(1).map((run) => <option key={run.id} value={run.id}>{run.name}</option>)}
-            </select>
-          } />
-          <Table><THead><Th>Metric</Th><Th>{current.name}</Th><Th>{comparison.name}</Th></THead><tbody>
-            {METRICS.map(([key, label]) => <TRow key={key}><Td>{label}</Td><Td numeric>{metric(current, key)}</Td><Td numeric>{metric(comparison, key)}</Td></TRow>)}
-          </tbody></Table>
+          <CardHeader
+            title="Compare runs"
+            actions={
+              <select
+                aria-label="Compare current run with"
+                value={comparison.id}
+                onChange={(event) => setCompareId(event.target.value)}
+                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+              >
+                {runs.slice(1).map((run) => (
+                  <option key={run.id} value={run.id}>
+                    {run.name}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+          <Table>
+            <THead>
+              <Th>Metric</Th>
+              <Th>{current.name}</Th>
+              <Th>{comparison.name}</Th>
+            </THead>
+            <tbody>
+              {METRICS.map(([key, label]) => (
+                <TRow key={key}>
+                  <Td>{label}</Td>
+                  <Td numeric>{metric(current, key)}</Td>
+                  <Td numeric>{metric(comparison, key)}</Td>
+                </TRow>
+              ))}
+            </tbody>
+          </Table>
           <h3 className="mb-2 mt-5 text-sm font-semibold">Settings that differ</h3>
           <div className="space-y-1 text-xs text-muted">
-            {Object.keys(current.config).filter((key) => JSON.stringify(current.config[key]) !== JSON.stringify(comparison.config[key])).map((key) => (
-              <p key={key}><span className="font-semibold text-foreground">{key.replaceAll('_', ' ')}:</span> {JSON.stringify(current.config[key])} → {JSON.stringify(comparison.config[key])}</p>
-            ))}
+            {Object.keys(current.config)
+              .filter(
+                (key) =>
+                  JSON.stringify(current.config[key]) !== JSON.stringify(comparison.config[key]),
+              )
+              .map((key) => (
+                <p key={key}>
+                  <span className="font-semibold text-foreground">{key.replaceAll('_', ' ')}:</span>{' '}
+                  {JSON.stringify(current.config[key])} → {JSON.stringify(comparison.config[key])}
+                </p>
+              ))}
           </div>
         </Card>
       ) : null}

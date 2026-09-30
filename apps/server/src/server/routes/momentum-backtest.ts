@@ -57,7 +57,9 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
       schema: {
         querystring: {
           type: 'object',
-          properties: { dataset: { type: 'string', enum: ['etf', 'stock', 'custom_index', 'broad'] } },
+          properties: {
+            dataset: { type: 'string', enum: ['etf', 'stock', 'custom_index', 'broad'] },
+          },
           additionalProperties: false,
         },
       },
@@ -80,6 +82,87 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
     async (request, reply) => {
       await forward(reply, '/api/backtest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  // Saved runs (P4): previously kept only in the browser's localStorage, now
+  // persisted server-side in the shared trading-data catalog — see
+  // packages/momentum-backtesting/src/momentum_backtesting/runs_store.py.
+  fastify.get(
+    '/api/momentum/saved-runs',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            dataset: { type: 'string', enum: ['etf', 'stock', 'custom_index', 'broad'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { dataset = 'etf' } = request.query as { dataset?: string };
+      await forward(reply, `/api/saved-runs?dataset=${encodeURIComponent(dataset)}`);
+    },
+  );
+
+  fastify.post(
+    '/api/momentum/saved-runs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/saved-runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.patch(
+    '/api/momentum/saved-runs/:runId',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      await forward(reply, `/api/saved-runs/${encodeURIComponent(runId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.delete('/api/momentum/saved-runs/:runId', async (request, reply) => {
+    const { runId } = request.params as { runId: string };
+    await forward(reply, `/api/saved-runs/${encodeURIComponent(runId)}`, { method: 'DELETE' });
+  });
+
+  // Manual trigger for the Friday weekly signal (TODO.md 3.11.5) — the same code path the
+  // launchd-scheduled `mbt weekly` CLI runs. Can take tens of seconds (live network price
+  // sources), same as a cold Custom Index backtest, hence the shared PROXY_TIMEOUT_MS. A
+  // real trigger (send=true, the default) posts to the same Telegram chat the schedule does.
+  fastify.post(
+    '/api/momentum/weekly/run',
+    {
+      bodyLimit: BODY_LIMIT_BYTES,
+      schema: {
+        body: {
+          type: 'object',
+          required: ['run'],
+          properties: {
+            run: { type: 'string', enum: ['preview', 'final'] },
+            send: { type: 'boolean' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      await forward(reply, '/api/weekly/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request.body),

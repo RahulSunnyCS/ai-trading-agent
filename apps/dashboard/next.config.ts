@@ -38,6 +38,18 @@ const nextConfig: NextConfig = {
               source: '/api/momentum/backtest',
               destination: 'http://127.0.0.1:8765/api/backtest',
             },
+            {
+              source: '/api/momentum/saved-runs',
+              destination: 'http://127.0.0.1:8765/api/saved-runs',
+            },
+            {
+              source: '/api/momentum/saved-runs/:runId',
+              destination: 'http://127.0.0.1:8765/api/saved-runs/:runId',
+            },
+            {
+              source: '/api/momentum/weekly/run',
+              destination: 'http://127.0.0.1:8765/api/weekly/run',
+            },
           ]
         : []),
       { source: '/api/:path*', destination: `${apiOrigin}/api/:path*` },

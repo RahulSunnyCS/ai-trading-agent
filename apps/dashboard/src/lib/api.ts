@@ -33,7 +33,7 @@ function responseError(body: unknown, fallback: string): string {
   if (typeof payload.detail === 'string') return payload.detail;
   if (Array.isArray(payload.detail)) {
     const messages = payload.detail
-      .map((item) => item && typeof item === 'object' && 'msg' in item ? String(item.msg) : '')
+      .map((item) => (item && typeof item === 'object' && 'msg' in item ? String(item.msg) : ''))
       .filter(Boolean);
     if (messages.length) return messages.join('; ');
   }
@@ -68,7 +68,7 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<Api
     // from a 200 with an empty data array.
     if (!response.ok) {
       const fallback = `HTTP ${response.status} ${response.statusText}`;
-      const body = await response.json().catch(() => null) as unknown;
+      const body = (await response.json().catch(() => null)) as unknown;
       return {
         ok: false,
         error: responseError(body, fallback),
@@ -116,6 +116,31 @@ export async function apiPut<T>(path: string, body: unknown): Promise<ApiResult<
   return apiJsonBody<T>('PUT', path, body);
 }
 
+/** PATCH counterpart — same error-shape contract as apiGet/apiPost. */
+export async function apiPatch<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  return apiJsonBody<T>('PATCH', path, body);
+}
+
+/** DELETE helper — no request body, same `{ ok, ... }` result shape as apiGet. */
+export async function apiDelete<T>(path: string): Promise<ApiResult<T>> {
+  try {
+    const response = await fetch(path, { method: 'DELETE' });
+    if (!response.ok) {
+      const fallback = `HTTP ${response.status} ${response.statusText}`;
+      const body = (await response.json().catch(() => null)) as unknown;
+      return { ok: false, error: responseError(body, fallback), status: response.status };
+    }
+    const data = (await response.json()) as T;
+    return { ok: true, data };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return { ok: false, error: 'AbortError' };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message };
+  }
+}
+
 /**
  * Shared body-fetcher for POST/PUT/PATCH — keeps error handling in one place
  * so apiPost / apiPut / future apiPatch all return the same { ok, ... } shape.
@@ -134,7 +159,7 @@ async function apiJsonBody<T>(
     if (!response.ok) {
       let errMsg = `HTTP ${response.status} ${response.statusText}`;
       try {
-        errMsg = responseError(await response.json() as unknown, errMsg);
+        errMsg = responseError((await response.json()) as unknown, errMsg);
       } catch {
         // JSON parse failed — use the HTTP status message
       }
