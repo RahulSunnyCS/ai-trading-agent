@@ -128,6 +128,43 @@ crashes such as April 2020. Price-only turnaround screens usually underperform m
 earnings-inflection screen needs fundamentals and this repo has none. Do not fabricate a
 fundamentals proxy.
 
+### Step 3. Final step, after everything above: document every parameter, with a real dry run
+
+The owner wants this at the end, for future reference: what every parameter is, why it is set
+that way, and how it helps. Two audiences, two documents (both already drafted in `docs/`):
+
+- `docs/momentum-parameters-plain-english.md`: layman wording, analogies, a hand-worked example.
+- `docs/momentum-parameters-reference.md`: precise wording, default and source file, mechanism,
+  rationale, evidence grade, and a row per parameter including any new lever you built.
+
+Drafted from code and the logged results in TODO 3.9. Every "benefit" cites a logged
+measurement (grade M) or is marked reasoned (R) or pending (D). Your job is to turn every D into
+an M with real numbers, and never to invent a benefit that was not measured.
+
+Build a dry-run script (suggested path `packages/momentum-backtesting/scripts/param_dry_run.py`,
+run with `uv run`). It must:
+
+1. Load the real local data through the same path `mbt ui` uses. Use `rank_cache` so ranking is
+   computed once per lever variant.
+2. Fix a baseline: the `Live` config (`top_n=5`, `exit_rank=10`, lookbacks 1/4/13/26/52, equal
+   weights, buffer, wait, `max_position=0.35`, `cost_pct=0.10`), run on the ETF dataset, and
+   separately on Broad Momentum defaults.
+3. Change ONE parameter at a time across the documented range (for example `top_n` 3/5/8,
+   `exit_rank` 6/10/16, `max_position` 0.25/0.35/0.50, `entry`, `cost_model`, `signal_delay`
+   0/1, `rebalance`, each new lever). Run each over three windows: full, last 5 years, last 3
+   years. Then over rolling 3-year windows once Step 0d exists.
+4. Print and save (CSV in `data/backtests/`) per run: CAGR, Sharpe, max drawdown, buys per year,
+   average weeks held, time in cash, and excess CAGR over Nifty 50 TRI and Nifty200 Momentum 30
+   TRI.
+5. Print one real Friday end to end, like the worked example in the plain-English document: the
+   full ranks table with returns per window, each score, which names are bought, held and sold,
+   and the reason string from the trade log.
+6. Report honestly. Flag any comparison hit by the cold-start fork caveat.
+
+Then edit both documents: fill the dry-run sections, change D to M with the TODO row, update the
+plain-English "what has and has not been proven" section, and add a TODO.md row in the same
+commit as the script.
+
 ## Correction to the earlier chat analysis
 
 The chat said the tranche wrapper needs no engine change. That was wrong. Under `monthly`, the
