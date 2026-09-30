@@ -1,30 +1,28 @@
 'use client';
 
-import { Play, RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, Link as LinkIcon, Play, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
+import { cn } from '../lib/cn';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
-import { MomentumAdvancedSettings, advancedDefaults } from './momentum/MomentumAdvancedSettings';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
 import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
 import { MomentumResultDetails } from './momentum/MomentumResultDetails';
 import { MomentumSavedRunsView } from './momentum/MomentumSavedRunsView';
 import { MomentumScoresView } from './momentum/MomentumScoresView';
+import {
+  type CoreSettings,
+  type Instrument,
+  type LookbackRow,
+  MomentumSettingsPanel,
+  momentumSettingsDefaults,
+} from './momentum/MomentumSettingsPanel';
 import { MomentumWeeklyView } from './momentum/MomentumWeeklyView';
 import { Button } from './ui/Button';
-import { Card, CardHeader } from './ui/Card';
 import { StateMessage } from './ui/StateMessage';
 
 type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
-
-interface Instrument {
-  name: string;
-  display_name?: string | null;
-  include: string;
-  group: string;
-  has_data: boolean;
-}
 
 interface MomentumMeta {
   instruments: Instrument[];
@@ -73,65 +71,83 @@ function selectedByDefault(meta: MomentumMeta): string[] {
     .map((instrument) => instrument.name);
 }
 
-/**
- * Saved runs are persisted server-side (P4 — see
- * packages/momentum-backtesting/src/momentum_backtesting/runs_store.py),
- * grouped by dataset just like the localStorage keys they replaced. A failed
- * fetch (service down, fresh catalog) degrades to an empty list rather than
- * blocking the backtest UI — saved runs are a convenience, not the golden path.
- */
+function lookbacksFromConfig(config: Record<string, unknown>): LookbackRow[] {
+  const weeks = Array.isArray(config.lookbacks)
+    ? config.lookbacks.filter((v): v is number => typeof v === 'number')
+    : [1, 4, 13, 26, 52];
+  const weights = Array.isArray(config.weights)
+    ? config.weights.filter((v): v is number => typeof v === 'number')
+    : null;
+  return weeks.map((w, i) => ({ weeks: w, weight: weights?.[i] ?? 1 }));
+}
+
+function comparableConfig(config: Record<string, unknown>): string {
+  return JSON.stringify(
+    Object.fromEntries(Object.entries(config).sort(([a], [b]) => a.localeCompare(b))),
+  );
+}
+
+/** Saved runs are persisted server-side, grouped by dataset. */
 async function fetchSavedRuns(dataset: Dataset): Promise<MomentumSavedRun[]> {
   const response = await apiGet<MomentumSavedRun[]>(`/api/momentum/saved-runs?dataset=${dataset}`);
   return response.ok ? response.data : [];
 }
 
-/**
- * First React slice of Momentum Backtesting. It deliberately talks only to the
- * Fastify proxy; the legacy Python UI remains available during parity work.
- */
 export function MomentumBacktestingView() {
-  const [section, setSection] = useState<'backtest' | 'scores' | 'saved' | 'weekly' | 'rebalance'>('backtest');
+  const [section, setSection] = useState<'backtest' | 'scores' | 'saved' | 'weekly' | 'rebalance'>(
+    'backtest',
+  );
   const [dataset, setDataset] = useState<Dataset>('etf');
   const [meta, setMeta] = useState<MomentumMeta | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
-  const [topN, setTopN] = useState(5);
-  const [exitRank, setExitRank] = useState(10);
-  const [lookbacks, setLookbacks] = useState('1, 4, 13, 26, 52');
-  const [weights, setWeights] = useState('');
-  const [advanced, setAdvanced] = useState<Record<string, unknown>>({});
+  const [core, setCore] = useState<CoreSettings>({
+    start: '',
+    end: '',
+    topN: 5,
+    exitRank: 10,
+    lookbacks: [],
+    selected: [],
+  });
+  const [values, setValues] = useState<Record<string, unknown>>({});
+  const [settingsOpen, setSettingsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MomentumResult | null>(null);
+  const [lastRunConfig, setLastRunConfig] = useState<Record<string, unknown> | null>(null);
   const [savedRuns, setSavedRuns] = useState<MomentumSavedRun[]>([]);
+  const [copied, setCopied] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedSet = useMemo(() => new Set(selected), [selected]);
   const overlays = useMemo(
     () => savedRuns.filter((run, index) => index > 0 && run.overlay),
     [savedRuns],
   );
 
+  function onCoreChange(patch: Partial<CoreSettings>): void {
+    setCore((current) => ({ ...current, ...patch }));
+  }
+  function onValueChange(key: string, value: unknown): void {
+    setValues((current) => ({ ...current, [key]: value }));
+  }
+
   async function renameRun(id: string, name: string): Promise<void> {
     setSavedRuns((runs) => runs.map((run) => (run.id === id ? { ...run, name } : run)));
     await apiPatch(`/api/momentum/saved-runs/${id}`, { name });
   }
-
   async function toggleOverlay(id: string, overlay: boolean): Promise<void> {
     setSavedRuns((runs) => runs.map((run) => (run.id === id ? { ...run, overlay } : run)));
     await apiPatch(`/api/momentum/saved-runs/${id}`, { overlay });
   }
-
   async function removeRun(id: string): Promise<void> {
     setSavedRuns((runs) => runs.filter((run) => run.id !== id));
     await apiDelete(`/api/momentum/saved-runs/${id}`);
   }
 
-  async function loadMeta(nextDataset: Dataset): Promise<void> {
+  async function loadMeta(nextDataset: Dataset, seed?: Record<string, unknown>): Promise<void> {
     setLoading(true);
     setError(null);
     setResult(null);
+    setLastRunConfig(null);
     const response = await apiGet<MomentumMeta>(`/api/momentum/meta?dataset=${nextDataset}`);
     setLoading(false);
     if (!response.ok) {
@@ -141,19 +157,30 @@ export function MomentumBacktestingView() {
     }
     const nextMeta = response.data;
     setMeta(nextMeta);
-    setSelected(selectedByDefault(nextMeta));
-    setStart(stringDefault(nextMeta.defaults, 'start', nextMeta.first_week));
-    setEnd(nextMeta.last_week);
-    setTopN(numberDefault(nextMeta.defaults, 'top_n', 5));
-    setExitRank(numberDefault(nextMeta.defaults, 'exit_rank', 10));
-    const defaults = nextMeta.defaults.lookbacks;
-    setLookbacks(Array.isArray(defaults) ? defaults.join(', ') : '1, 4, 13, 26, 52');
-    setWeights(
-      Array.isArray(nextMeta.defaults.weights) ? nextMeta.defaults.weights.join(', ') : '',
+    const base = seed ?? nextMeta.defaults;
+    setCore({
+      selected: Array.isArray(seed?.universe)
+        ? (seed.universe as unknown[]).filter((v): v is string => typeof v === 'string')
+        : selectedByDefault(nextMeta),
+      start: stringDefault(base, 'start', nextMeta.first_week),
+      end: stringDefault(base, 'end', nextMeta.last_week),
+      topN: numberDefault(base, 'top_n', 5),
+      exitRank: numberDefault(base, 'exit_rank', 10),
+      lookbacks: lookbacksFromConfig({
+        lookbacks: base.lookbacks ?? nextMeta.defaults.lookbacks,
+        weights: base.weights,
+      }),
+    });
+    setValues(
+      momentumSettingsDefaults({
+        ...nextMeta.defaults,
+        ...(seed ?? {}),
+        benchmark: stringDefault(base, 'benchmark', nextMeta.benchmarks?.[0] ?? ''),
+      }),
     );
-    setAdvanced(advancedDefaults(nextMeta.defaults));
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loadMeta is redefined every render; it should only re-run when the dataset itself changes
   useEffect(() => {
     setSavedRuns([]);
     void fetchSavedRuns(dataset).then(setSavedRuns);
@@ -162,66 +189,66 @@ export function MomentumBacktestingView() {
 
   function loadSettings(run: MomentumSavedRun): void {
     const config = run.config;
-    setSelected(
-      Array.isArray(config.universe)
-        ? config.universe.filter((value): value is string => typeof value === 'string')
+    setCore({
+      selected: Array.isArray(config.universe)
+        ? config.universe.filter((v): v is string => typeof v === 'string')
         : [],
-    );
-    setStart(stringDefault(config, 'start', ''));
-    setEnd(stringDefault(config, 'end', ''));
-    setTopN(numberDefault(config, 'top_n', 5));
-    setExitRank(numberDefault(config, 'exit_rank', 10));
-    setLookbacks(
-      Array.isArray(config.lookbacks) ? config.lookbacks.join(', ') : '1, 4, 13, 26, 52',
-    );
-    setWeights(Array.isArray(config.weights) ? config.weights.join(', ') : '');
-    setAdvanced(advancedDefaults(config));
+      start: stringDefault(config, 'start', ''),
+      end: stringDefault(config, 'end', ''),
+      topN: numberDefault(config, 'top_n', 5),
+      exitRank: numberDefault(config, 'exit_rank', 10),
+      lookbacks: lookbacksFromConfig(config),
+    });
+    setValues((current) => momentumSettingsDefaults({ ...current, ...config }));
     setSection('backtest');
-  }
-
-  function toggleInstrument(name: string): void {
-    setSelected((previous) =>
-      previous.includes(name) ? previous.filter((value) => value !== name) : [...previous, name],
-    );
+    setSettingsOpen(true);
   }
 
   function buildConfig(): Record<string, unknown> {
     if (!meta) throw new Error('Strategy settings are still loading.');
-    const parsedLookbacks = lookbacks
-      .split(',')
-      .map((value) => Number(value.trim()))
+    const parsedLookbacks = core.lookbacks
+      .map((row) => row.weeks)
       .filter((value) => Number.isInteger(value) && value > 0);
     if (parsedLookbacks.length === 0) {
-      throw new Error('Enter one or more positive whole-number lookback windows.');
+      throw new Error('Add at least one positive whole-number lookback window.');
     }
-    const parsedWeights = weights.trim()
-      ? weights.split(',').map((value) => Number(value.trim()))
-      : null;
+    const parsedWeights = core.lookbacks.map((row) => row.weight);
     if (
-      parsedWeights &&
-      (parsedWeights.length !== parsedLookbacks.length ||
-        parsedWeights.some((value) => !Number.isFinite(value)) ||
-        parsedWeights.every((value) => value === 0))
+      parsedWeights.some((value) => !Number.isFinite(value)) ||
+      parsedWeights.every((value) => value === 0)
     ) {
       throw new Error(
-        'Give one finite weight per lookback window (negative is allowed, for a reversal signal — not all zero), or leave weights blank.',
+        'Give one finite weight per lookback window (negative is allowed, for a reversal signal — not all zero).',
       );
     }
-    if (dataset !== 'broad' && selected.length === 0) {
+    if (dataset !== 'broad' && core.selected.length === 0) {
       throw new Error('Select at least one instrument before running the strategy.');
     }
+    if (core.exitRank < core.topN) {
+      throw new Error('Sell-when-rank-exceeds must be at least Top N.');
+    }
     return {
-      ...meta.defaults, ...advanced, dataset,
-      universe: dataset === 'broad' ? ['broad_momentum'] : selected,
-      start, end, top_n: topN, exit_rank: exitRank,
-      lookbacks: parsedLookbacks, weights: parsedWeights,
+      ...meta.defaults,
+      ...values,
+      dataset,
+      universe: dataset === 'broad' ? ['broad_momentum'] : core.selected,
+      start: core.start,
+      end: core.end,
+      top_n: core.topN,
+      exit_rank: core.exitRank,
+      lookbacks: parsedLookbacks,
+      weights: parsedWeights,
     };
   }
 
   async function runBacktest(): Promise<void> {
     let config: Record<string, unknown>;
-    try { config = buildConfig(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); return; }
+    try {
+      config = buildConfig();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      return;
+    }
     setRunning(true);
     setError(null);
     const response = await apiPost<MomentumResult>('/api/momentum/backtest', config);
@@ -231,6 +258,8 @@ export function MomentumBacktestingView() {
       return;
     }
     setResult(response.data);
+    setLastRunConfig(config);
+    setSettingsOpen(false);
     const kpis = response.data.kpis;
     const sequence = Math.max(0, ...savedRuns.map((run) => run.n)) + 1;
     const saved = await apiPost<MomentumSavedRun>('/api/momentum/saved-runs', {
@@ -250,14 +279,78 @@ export function MomentumBacktestingView() {
       strategy: response.data.series.strategy,
       overlay: false,
     });
-    // Best-effort: a save failure (service hiccup) shouldn't block showing the result
-    // that already rendered above — the run just won't appear under Saved runs.
     if (saved.ok) setSavedRuns((runs) => [saved.data, ...runs].slice(0, 10));
   }
 
+  // Ctrl/Cmd+Enter runs the backtest from anywhere in the settings panel. A ref keeps the
+  // handler reading the latest run() without re-attaching the listener on every keystroke.
+  const runStateRef = useRef({ running, meta, run: runBacktest });
+  runStateRef.current = { running, meta, run: runBacktest };
+
+  useEffect(() => {
+    if (section !== 'backtest') return;
+    function onKeyDown(event: KeyboardEvent): void {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        const { running: isRunning, meta: currentMeta, run } = runStateRef.current;
+        if (!isRunning && currentMeta) void run();
+      }
+    }
+    const node = containerRef.current;
+    node?.addEventListener('keydown', onKeyDown);
+    return () => node?.removeEventListener('keydown', onKeyDown);
+  }, [section]);
+
+  const currentConfig = meta
+    ? (() => {
+        try {
+          return buildConfig();
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+  const dirty =
+    lastRunConfig !== null &&
+    currentConfig !== null &&
+    comparableConfig(currentConfig) !== comparableConfig(lastRunConfig);
+
+  function shareLink(): void {
+    if (!currentConfig) return;
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(currentConfig))));
+    const url = `${window.location.origin}${window.location.pathname}#momentum-cfg=${encoded}`;
+    void navigator.clipboard?.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs once on mount only, to seed state from a shared link
+  useEffect(() => {
+    const hash = window.location.hash;
+    const marker = '#momentum-cfg=';
+    if (!hash.startsWith(marker)) return;
+    try {
+      const decoded = JSON.parse(
+        decodeURIComponent(escape(atob(hash.slice(marker.length)))),
+      ) as Record<string, unknown>;
+      const sharedDataset = (
+        typeof decoded.dataset === 'string' ? decoded.dataset : 'etf'
+      ) as Dataset;
+      setDataset(sharedDataset);
+      void loadMeta(sharedDataset, decoded);
+    } catch {
+      // Malformed/old link — ignore and fall back to defaults.
+    }
+  }, []);
+
+  const summary = meta
+    ? `${core.start || 'Start'} → ${core.end || 'End'} · ${values.rebalance ?? 'weekly'} · top ${core.topN} / exit >${core.exitRank} · ${values.benchmark ?? ''}`
+    : '';
+
   return (
-    <div className="space-y-5">
-      <div className="inline-flex rounded-lg border border-border bg-surface p-1">
+    <div ref={containerRef} className="space-y-5">
+      <div className="inline-flex flex-wrap rounded-lg border border-border bg-surface p-1">
         <Button
           size="sm"
           variant={section === 'backtest' ? 'primary' : 'ghost'}
@@ -294,6 +387,7 @@ export function MomentumBacktestingView() {
           Rebalance now
         </Button>
       </div>
+
       {section === 'scores' ? (
         <MomentumScoresView />
       ) : section === 'weekly' ? (
@@ -304,189 +398,135 @@ export function MomentumBacktestingView() {
           buildConfig={buildConfig}
           onChooseDataset={setDataset}
         />
+      ) : section === 'saved' ? (
+        <MomentumSavedRunsView
+          runs={savedRuns}
+          onRename={renameRun}
+          onToggleOverlay={toggleOverlay}
+          onRemove={removeRun}
+          onLoad={loadSettings}
+        />
       ) : (
         <>
-          {section === 'saved' ? (
-            <MomentumSavedRunsView
-              runs={savedRuns}
-              onRename={renameRun}
-              onToggleOverlay={toggleOverlay}
-              onRemove={removeRun}
-              onLoad={loadSettings}
+          <div className="rounded-xl border border-border bg-surface p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                {DATASETS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setDataset(item.id)}
+                    title={item.description}
+                    className={cn(
+                      'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      dataset === item.id
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-surface-2/30 text-muted hover:border-border-strong hover:text-foreground',
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <Button size="sm" onClick={() => void loadMeta(dataset)} disabled={loading}>
+                <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
+                Refresh data
+              </Button>
+            </div>
+          </div>
+
+          {error ? (
+            <StateMessage
+              variant="error"
+              title="Momentum backtest unavailable"
+              description={error}
             />
-          ) : (
-            <>
-              <Card>
-                <CardHeader
-                  title="Momentum Backtesting"
-                  description="Weekly rotation research, now being migrated into the shared dashboard."
-                  actions={
-                    <Button size="sm" onClick={() => void loadMeta(dataset)} disabled={loading}>
-                      <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
-                      Refresh data
-                    </Button>
-                  }
-                />
-                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                  {DATASETS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setDataset(item.id)}
-                      className={`rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                        dataset === item.id
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border bg-surface-2/30 hover:border-border-strong'
-                      }`}
-                    >
-                      <p className="text-sm font-medium text-foreground">{item.label}</p>
-                      <p className="mt-1 text-xs text-muted">{item.description}</p>
-                    </button>
-                  ))}
+          ) : null}
+
+          {loading || !meta ? null : (
+            <div className="rounded-xl border border-border bg-surface">
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((open) => !open)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Strategy settings</p>
+                  {!settingsOpen ? <p className="truncate text-xs text-muted">{summary}</p> : null}
                 </div>
-              </Card>
-
-              {error ? (
-                <StateMessage
-                  variant="error"
-                  title="Momentum backtest unavailable"
-                  description={error}
-                />
-              ) : null}
-
-              {loading || !meta ? null : (
-                <>
-                  <Card>
-                    <CardHeader
-                      title="Backtest settings"
-                      description={`Data coverage: ${meta.first_week} to ${meta.last_week}`}
-                    />
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                      <label className="text-xs text-muted">
-                        Start
-                        <input
-                          className="mt-1 w-full rounded-lg border bg-surface px-2 py-1.5 text-sm text-foreground"
-                          type="date"
-                          value={start}
-                          onChange={(event) => setStart(event.target.value)}
-                        />
-                      </label>
-                      <label className="text-xs text-muted">
-                        End
-                        <input
-                          className="mt-1 w-full rounded-lg border bg-surface px-2 py-1.5 text-sm text-foreground"
-                          type="date"
-                          value={end}
-                          onChange={(event) => setEnd(event.target.value)}
-                        />
-                      </label>
-                      <label className="text-xs text-muted">
-                        Top N
-                        <input
-                          className="mt-1 w-full rounded-lg border bg-surface px-2 py-1.5 text-sm text-foreground"
-                          type="number"
-                          min="1"
-                          value={topN}
-                          onChange={(event) => setTopN(Number(event.target.value))}
-                        />
-                      </label>
-                      <label className="text-xs text-muted">
-                        Exit rank
-                        <input
-                          className="mt-1 w-full rounded-lg border bg-surface px-2 py-1.5 text-sm text-foreground"
-                          type="number"
-                          min="1"
-                          value={exitRank}
-                          onChange={(event) => setExitRank(Number(event.target.value))}
-                        />
-                      </label>
-                      <label className="text-xs text-muted">
-                        Lookbacks (weeks)
-                        <input
-                          className="mt-1 w-full rounded-lg border bg-surface px-2 py-1.5 text-sm text-foreground"
-                          value={lookbacks}
-                          onChange={(event) => setLookbacks(event.target.value)}
-                        />
-                      </label>
-                      <label className="text-xs text-muted">
-                        Weights (optional)
-                        <input
-                          className="mt-1 w-full rounded-lg border bg-surface px-2 py-1.5 text-sm text-foreground"
-                          value={weights}
-                          onChange={(event) => setWeights(event.target.value)}
-                          placeholder="One per lookback"
-                        />
-                      </label>
-                    </div>
-                  </Card>
-
-                  <MomentumAdvancedSettings
+                <div className="flex shrink-0 items-center gap-2">
+                  {dirty ? (
+                    <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                      Changed since last run
+                    </span>
+                  ) : null}
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 text-faint transition-transform',
+                      settingsOpen && 'rotate-180',
+                    )}
+                  />
+                </div>
+              </button>
+              {settingsOpen ? (
+                <div className="space-y-4 border-t border-border p-4">
+                  <MomentumSettingsPanel
                     dataset={dataset}
-                    values={advanced}
+                    instruments={meta.instruments}
+                    firstWeek={meta.first_week}
+                    lastWeek={meta.last_week}
                     benchmarks={
                       meta.benchmarks ??
-                      meta.instruments
-                        .filter((instrument) => instrument.has_data)
-                        .map((instrument) => instrument.name)
+                      meta.instruments.filter((i) => i.has_data).map((i) => i.name)
                     }
-                    onChange={(key, value) =>
-                      setAdvanced((current) => ({ ...current, [key]: value }))
-                    }
+                    core={core}
+                    onCoreChange={onCoreChange}
+                    values={values}
+                    onChange={onValueChange}
                   />
-
-                  {dataset !== 'broad' ? (
-                    <Card>
-                      <CardHeader
-                        title="Universe"
-                        description={`${selected.length} instruments selected`}
-                      />
-                      <div className="max-h-80 columns-1 overflow-y-auto sm:columns-2 xl:columns-3">
-                        {meta.instruments.map((instrument) => (
-                          <label
-                            key={instrument.name}
-                            className="mb-2 flex break-inside-avoid items-center gap-2 text-sm text-foreground"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedSet.has(instrument.name)}
-                              disabled={!instrument.has_data}
-                              onChange={() => toggleInstrument(instrument.name)}
-                            />
-                            <span>{instrument.display_name ?? instrument.name}</span>
-                            <span className="text-xs text-faint">{instrument.group}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </Card>
-                  ) : (
-                    <Card>
-                      <p className="text-sm text-muted">
-                        Broad Momentum derives its eligible universe from the Total Market data and
-                        refreshes its pool quarterly; it has no fixed instrument checklist.
-                      </p>
-                    </Card>
-                  )}
-
-                  <Button variant="primary" onClick={() => void runBacktest()} disabled={running}>
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                    <Button variant="primary" onClick={() => void runBacktest()} disabled={running}>
+                      <Play className="h-3.5 w-3.5" />
+                      {running ? 'Running momentum backtest…' : 'Run momentum backtest'}
+                    </Button>
+                    <span className="hidden text-xs text-faint sm:inline">Ctrl/Cmd + Enter</span>
+                    <Button size="sm" onClick={shareLink}>
+                      <LinkIcon className="h-3.5 w-3.5" />{' '}
+                      {copied ? 'Link copied' : 'Copy shareable link'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => void runBacktest()}
+                    disabled={running}
+                  >
                     <Play className="h-3.5 w-3.5" />
-                    {running ? 'Running momentum backtest…' : 'Run momentum backtest'}
+                    {running ? 'Running…' : dirty ? 'Run again' : 'Run momentum backtest'}
                   </Button>
-                </>
+                </div>
               )}
-
-              {result ? (
-                <>
-                  <MomentumEquityChart
-                    series={result.series}
-                    benchmarkName={result.benchmark_name}
-                    rotationWeeks={result.rotations.map((rotation) => rotation.week)}
-                    overlays={overlays}
-                  />
-                  <MomentumResultDetails result={result} />
-                </>
-              ) : null}
-            </>
+            </div>
           )}
+
+          {result ? (
+            <>
+              <MomentumEquityChart
+                series={result.series}
+                benchmarkName={result.benchmark_name}
+                rotations={result.rotations}
+                overlays={overlays}
+              />
+              <MomentumResultDetails
+                result={result}
+                config={lastRunConfig ?? {}}
+                savedRuns={savedRuns}
+              />
+            </>
+          ) : null}
         </>
       )}
     </div>

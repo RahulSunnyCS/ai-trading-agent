@@ -10,11 +10,45 @@ export interface MomentumSeries {
   holdings_count: Array<number | null>;
 }
 
+export interface MomentumRotationOut {
+  asset: string;
+  rank: number | null;
+  reason: string;
+  weeks_held: number | null;
+  return: number | null;
+}
+
+export interface MomentumRotationIn {
+  asset: string;
+  rank: number | null;
+  top_up: boolean;
+}
+
+export interface MomentumRotationTrim {
+  asset: string;
+  reason: string;
+}
+
+export interface MomentumRotationHolding {
+  asset: string;
+  share: number;
+}
+
+export interface MomentumRotation {
+  week: string;
+  value: number;
+  outs: MomentumRotationOut[];
+  ins: MomentumRotationIn[];
+  trims: MomentumRotationTrim[];
+  parked: boolean;
+  holdings: MomentumRotationHolding[];
+}
+
 export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
   series: MomentumSeries;
-  rotations: Array<{ week: string }>;
+  rotations: MomentumRotation[];
   latest: {
     week: string;
     explain: string;

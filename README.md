@@ -33,6 +33,36 @@ Day-to-day commands live in
 [`.claude/project/technical.md`](.claude/project/technical.md), which is
 auto-loaded into every Claude Code session.
 
+### Momentum & Options Lab (local dev, no Docker)
+
+Both research tabs can run standalone against their own Python service,
+bypassing Fastify/Postgres/Redis entirely — dev-only, never used in
+production.
+
+**Momentum tab:**
+```bash
+cd packages/momentum-backtesting && uv sync
+uv run mbt ui --no-open-browser        # terminal 1 — Python backend on :8765
+```
+```bash
+cd apps/dashboard && MOMENTUM_DIRECT=1 bun run dev -- --port 5190   # terminal 2
+```
+Open `http://localhost:5190` → **Momentum**.
+
+**Options Lab tab:**
+```bash
+cd packages/option-backtesting && uv sync
+./scripts/build-cache.sh               # first run only, or after data/raw/ changes
+uv run obt-api                         # terminal 1 — Python backend on :8000
+```
+```bash
+cd apps/dashboard && OBT_DIRECT=1 bun run dev -- --port 5180   # terminal 2
+```
+Open `http://localhost:5180` → **Options Lab**.
+
+Both pairs can run at once on their different ports. See
+[`.claude/launch.json`](.claude/launch.json) for the exact configs.
+
 ## Documentation
 
 | Document | What it holds |
