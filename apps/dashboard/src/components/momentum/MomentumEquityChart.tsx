@@ -12,10 +12,10 @@ type PlotlyBasic = typeof import('plotly.js-basic-dist-min').default;
 /** Plotly.react() attaches event-emitter methods to the div at runtime; not in the DOM lib types. */
 type PlotlyHTMLElement = HTMLDivElement & {
   on?: (
-    event: 'plotly_hover',
+    event: 'plotly_hover' | 'plotly_unhover',
     handler: (event: { points?: Array<{ x?: unknown }> }) => void,
   ) => void;
-  removeAllListeners?: (event: 'plotly_hover') => void;
+  removeAllListeners?: (event: 'plotly_hover' | 'plotly_unhover') => void;
 };
 
 const lakh = (value: number | null) => (value === null ? null : value / 100_000);
@@ -307,10 +307,12 @@ export function MomentumEquityChart({
       });
       const plotlyElement = element as PlotlyHTMLElement;
       plotlyElement.removeAllListeners?.('plotly_hover');
+      plotlyElement.removeAllListeners?.('plotly_unhover');
       plotlyElement.on?.('plotly_hover', (event) => {
         const x = event.points?.[0]?.x;
         if (x != null) setHoverDate(String(x).slice(0, 10));
       });
+      plotlyElement.on?.('plotly_unhover', () => setHoverDate(null));
     }
 
     void render();
@@ -324,7 +326,7 @@ export function MomentumEquityChart({
     <Card>
       <CardHeader
         title="Portfolio value and risk"
-        description="₹1 lakh starting value · drag to pan · use the chart toolbar to zoom or reset"
+        description="₹1 lakh starting value · hover for that week's trades · drag to pan"
         actions={
           <div className="flex gap-2">
             <Button
@@ -346,23 +348,23 @@ export function MomentumEquityChart({
           </div>
         }
       />
-      <div
-        ref={chartRef}
-        role="img"
-        aria-label="Strategy, benchmark and cash values with drawdown and trailing excess return"
-        className="w-full"
-      />
-      <div className="mt-3 min-h-[5.5rem] rounded-lg border border-border bg-surface-2/40 px-3 py-2.5">
+      <div className="relative">
+        <div
+          ref={chartRef}
+          role="img"
+          aria-label="Strategy, benchmark and cash values with drawdown and trailing excess return"
+          className="w-full"
+        />
         {hoverDate ? (
-          <WeekDetail
-            date={hoverDate}
-            series={series}
-            rotation={rotationByWeek.get(hoverDate)}
-            benchmarkName={benchmarkName}
-          />
-        ) : (
-          <span className="text-xs text-muted">{HOVER_HINT}</span>
-        )}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[40%] animate-fade-in overflow-y-auto rounded-b-lg border-t border-border bg-surface px-3 py-2.5 shadow-elevated">
+            <WeekDetail
+              date={hoverDate}
+              series={series}
+              rotation={rotationByWeek.get(hoverDate)}
+              benchmarkName={benchmarkName}
+            />
+          </div>
+        ) : null}
       </div>
     </Card>
   );
