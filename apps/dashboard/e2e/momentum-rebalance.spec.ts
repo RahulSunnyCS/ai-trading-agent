@@ -1,5 +1,24 @@
 import { expect, test } from '@playwright/test';
 
+test('standalone momentum metadata does not crash the default Live tab', async ({ page }) => {
+  await page.route('**/api/meta', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ instruments: [], defaults: {} }),
+  }));
+
+  await Promise.all([
+    page.waitForResponse((response) => new URL(response.url()).pathname === '/api/meta'),
+    page.goto('/'),
+  ]);
+  await expect(page.getByRole('heading', { name: 'Live', exact: true })).toBeVisible();
+  if (await page.getByRole('button', { name: 'Open navigation' }).isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+  }
+  await page.getByRole('button', { name: 'Momentum', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Momentum Backtesting' })).toBeVisible();
+});
+
 test('Momentum rebalance shows Fyers login and indicative changes', async ({ page, context }) => {
   await page.route('**/api/momentum/meta?dataset=*', (route) => {
     const dataset = new URL(route.request().url()).searchParams.get('dataset');

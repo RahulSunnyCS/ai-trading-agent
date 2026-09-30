@@ -406,10 +406,12 @@ export function LiveView() {
       inFlight = false;
       if (!result.ok && result.error === 'AbortError') return;
       if (!result.ok) return;
-      if (result.data === null) return;
+      // A standalone momentum preview also exposes /api/meta, but with a
+      // different payload. Ignore it rather than crashing the default tab.
+      if (result.data === null || typeof result.data.simulate !== 'boolean') return;
       setSimulate(result.data.simulate);
-      setBroker(result.data.broker);
-      setAuthDegraded(result.data.authDegraded ?? false);
+      setBroker(typeof result.data.broker === 'string' ? result.data.broker : '');
+      setAuthDegraded(result.data.authDegraded === true);
     }
 
     void fetchMeta();
