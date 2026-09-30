@@ -1,8 +1,11 @@
 name: Momentum sources check
 
-# One-off reachability check before enabling "Momentum weekly signal": some data sites
-# (niftyindices.com, Yahoo) block datacenter IPs. Needs no secrets. If a source fails
-# here, the weekly job falls back to the others and says so, but check before relying on it.
+# Reachability check for the momentum data sources from a GitHub-hosted runner's IP
+# range: some sites (niftyindices.com, Yahoo) block datacenter IPs. Needs no secrets.
+# The weekly signal itself now runs from the owner's own laptop (launchd, TODO.md
+# 3.11.5 — the old GitHub Actions "Momentum weekly signal" workflow this check used to
+# gate is retired), so this diagnostic no longer affects that job; kept as a standalone
+# manual check in case CI-based execution is ever reconsidered.
 on:
   workflow_dispatch:
 

@@ -40,10 +40,16 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
   "category momentum" layer (`categories/`, `mbt categories fetch|resolve|backtest`) ranks
   sector/thematic categories exactly as the existing ETF engine does, but substitutes the
   top-K individual stocks currently tagged to an investable category for its ETF via an
-  inner backtest — built and tested, not yet wired into the UI (TODO.md §3.9).
-  Weekly Friday signal to Telegram (`mbt weekly`, `.github/workflows/momentum-weekly.yml`:
-  14:40 IST live-price preview + 16:45 IST final) with history in Neon Postgres; schedule
-  disabled until a manual dispatch passes
+  inner backtest — wired into the UI as the "Custom Index" tab (outer category-vs-category
+  ranking) and, via `categories/broad.py`, the "Broad Momentum" tab (Total Market pool with
+  optional category selection) and the Momentum Scores page, in both the legacy `mbt ui` and
+  the Next.js dashboard's Momentum tab (TODO.md §3.9, §3.11.8).
+  Weekly Friday signal to Telegram (`mbt weekly`, 14:40 IST live-price preview + 16:45 IST
+  final), scheduled via a `launchd` job on the owner's own laptop since 2026-09-30
+  (`scripts/install-launchd.sh` — TODO 3.11.5, retired the old GitHub Actions workflow and
+  Neon/`MOMENTUM_DATABASE_URL`; history now lives in the shared local database's
+  `momentum_prices`/`momentum_signals` tables). Also triggerable on demand from the
+  dashboard's Momentum tab ("Weekly signal") or the CLI directly
 
 ## Implementation Phases
 

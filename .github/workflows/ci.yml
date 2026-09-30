@@ -118,9 +118,7 @@ jobs:
         id: obt-cache
         uses: actions/cache@v4
         with:
-          path: |
-            packages/option-backtesting/data/cache
-            packages/option-backtesting/data/registry.sqlite
+          path: packages/option-backtesting/data/cache
           key: obt-cache-${{ hashFiles('packages/option-backtesting/data/raw/**') }}
 
       - name: Build Parquet cache from data/raw
@@ -136,20 +134,10 @@ jobs:
     defaults:
       run:
         working-directory: packages/momentum-backtesting
-    # A scratch Postgres so the storage test (momentum_prices / momentum_signals
-    # upserts, pull round-trip) runs against a real database, not a fake.
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: pw
-          POSTGRES_DB: momentum_test
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-    env:
-      MOMENTUM_TEST_DATABASE_URL: postgresql://postgres:pw@127.0.0.1:5432/momentum_test
+    # No Postgres service any more: the storage test (momentum_prices / momentum_signals
+    # upserts, pull round-trip) runs against the shared trading-data DuckDB catalog now
+    # (TRADING_DATA_ROOT, isolated per test by conftest.py's autouse fixture) — Neon/
+    # MOMENTUM_DATABASE_URL retired 2026-09-30, see TODO.md 3.11.5.
     steps:
       - uses: actions/checkout@v4
 

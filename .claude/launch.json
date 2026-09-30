@@ -33,9 +33,19 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "cd apps/dashboard && OBT_DIRECT=1 bun x vite --port ${PORT:-5180} --strictPort"
+        "cd apps/dashboard && OBT_DIRECT=1 bun run dev -- --port ${PORT:-5180}"
       ],
       "port": 5180,
+      "autoPort": true
+    },
+    {
+      "name": "dashboard-momentum",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/dashboard && MOMENTUM_DIRECT=1 bun run dev -- --port ${PORT:-5190}"
+      ],
+      "port": 5190,
       "autoPort": true
     }
   ]

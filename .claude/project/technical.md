@@ -19,13 +19,13 @@
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
 | Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee), FastAPI service + MCP server, fronted by a Fastify proxy and a React dashboard tab; walk-forward, parameter sweeps, a CSCV/PBO + deflated-Sharpe overfitting guard, a margin model, regime bucketing, and personality export are all built (M-5) — the epic is feature-complete |
-| Momentum Backtesting | Python 3.12 + `uv`, in `packages/momentum-backtesting` — weekly index-rotation research (rank indices on 1/4/13/26/52-week returns, hold the top N until they fall out of the top M). Pulls daily candles from the Fyers history API, public AMFI NAVs (cash) and Yahoo (silver pre-2022). `mbt` CLI plus a local-only web UI (`mbt ui`: FastAPI on 127.0.0.1 serving a static page - deliberately separate from apps/dashboard because it needs no server stack). Two portfolio rules: buffer (default, hold top N until the sell rank, reinvest across top N, per-purchase tax lots, 35% per-ETF cap with a 5-point trim band) and fixed slots. Ranks on the index but can book P&L on the traded ETF (`--track etf`, pre-listing weeks proxied by the index less TER) and fill at Friday close / Monday open / Monday 10:00 (`--execution`); `mbt tracking` measures the gap, including premium to NAV from AMFI. `stocks/` (`mbt stocks fetch`/`pin-manifest`/`validate`) is a separate, from-scratch survivorship-free Nifty 50 stock data layer — `pyarrow>=14.0.1` for its `daily.parquet`/`events.parquet` — wired into the ranking engine and the UI (see the package's own README). `categories/` (`mbt categories fetch|resolve|backtest`) is a further, separate "category momentum" layer built on top: the sector/thematic ETF engine (unmodified) ranks categories as today, substituting the top-K individual stocks currently tagged to an investable category for its ETF via an inner backtest — built and tested, not yet wired into the UI (TODO.md §3.9) |
+| Momentum Backtesting | Python 3.12 + `uv`, in `packages/momentum-backtesting` — weekly index-rotation research (rank indices on 1/4/13/26/52-week returns, hold the top N until they fall out of the top M). Pulls daily candles from the Fyers history API, public AMFI NAVs (cash) and Yahoo (silver pre-2022). `mbt` CLI plus a local-only web UI (`mbt ui`: FastAPI on 127.0.0.1 serving a static page - deliberately separate from apps/dashboard because it needs no server stack). Two portfolio rules: buffer (default, hold top N until the sell rank, reinvest across top N, per-purchase tax lots, 35% per-ETF cap with a 5-point trim band) and fixed slots. Ranks on the index but can book P&L on the traded ETF (`--track etf`, pre-listing weeks proxied by the index less TER) and fill at Friday close / Monday open / Monday 10:00 (`--execution`); `mbt tracking` measures the gap, including premium to NAV from AMFI. `stocks/` (`mbt stocks fetch`/`pin-manifest`/`validate`) is a separate, from-scratch survivorship-free Nifty 50 stock data layer — `pyarrow>=14.0.1` for its `daily.parquet`/`events.parquet` — wired into the ranking engine and the UI (see the package's own README). `categories/` (`mbt categories fetch|resolve|backtest`) is a further, separate "category momentum" layer built on top: the sector/thematic ETF engine (unmodified) ranks categories as today, substituting the top-K individual stocks currently tagged to an investable category for its ETF via an inner backtest — wired into the UI as the "Custom Index" tab (outer ranking, `compose.py`) and the "Broad Momentum" tab plus Momentum Scores page (`broad.py`), in both `mbt ui` and the Next.js dashboard's Momentum tab (TODO.md §3.9, §3.11.8) |
 
 ## Package Manager & Runtime
 
 - **Monorepo:** Bun workspaces — `workspaces: ["apps/*", "packages/*"]`. One `bun.lock` at the repo root covers every JS workspace. Root scripts fan out via `bun run --filter <pkg> <script>` or `bun run --workspaces <script>`; run them from the repo root unless you deliberately want to scope to one package
 - **Package manager:** Bun — single lockfile (`bun.lock`) at the repo root. Do not use `npm` or `yarn`; they will create a second lockfile and conflict
-- **Runtime:** Bun for `apps/*`. Three exceptions: **`packages/contract-notes` runs on Node 20** (CommonJS; its scripts shell out to `node`), and **`packages/option-backtesting` and `packages/momentum-backtesting` are Python/uv**, not Bun workspace members
+- **Runtime:** Bun for `apps/*`. Four exceptions: **`packages/contract-notes` runs on Node 20** (CommonJS; its scripts shell out to `node`), and **`packages/option-backtesting`, `packages/momentum-backtesting` and `packages/trading-data` are Python/uv**, not Bun workspace members
 - **CI pins bun `1.2.x`**, which *hoists*; bun 1.3+ uses an *isolated* layout for workspaces. Both read the same lockfile — verified — but they produce different `node_modules` trees. See the hoisting gotcha below
 - **TypeScript:** Compiled and executed natively by Bun — no `tsc` build step for running. `tsc --noEmit` is used only for type-checking
 
@@ -85,7 +85,14 @@ uv run obt walkforward strategies/B_pyramid.yaml --is-from YYYY-MM-DD --is-to YY
 uv run obt sweep strategies/B_pyramid.yaml --changes changes.json --from YYYY-MM-DD --to YYYY-MM-DD [--overfit --n-blocks 4]
 uv run obt export-personality <run_id>
 uv run obt fyers fetch [--date YYYY-MM-DD]   # daily 1m Fyers collector — same evening, expiring contracts vanish
+
+# trading-data (Python) — the shared local database; run from any package that depends on it
+uv run tdata init           # create TRADING_DATA_ROOT (~/TradingData) + catalog, load reference data
+uv run tdata status         # where it lives, rows/days per view, ingest runs, reference-CSV drift
+uv run tdata reference sql "INSERT INTO ref_lot_sizes VALUES ('NIFTY', 75, DATE '2027-01-01')"  # edit + re-export CSVs
+uv run tdata backup --to /Volumes/<disk>/TradingData   # monthly; copies only new lake/raw files
 uv run obt legwise run strategies/legwise/*.yaml [--trades]   # AlgoTest-style leg-wise backtests over that data
+uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
 uv run obt daily            # the evening routine: fetch the last closed session, run every strategies/legwise/*.yaml, save, summarise + Telegram (--no-telegram)
 
 # option-backtesting FastAPI service (loopback-only, port 8000) — from repo root
@@ -131,7 +138,8 @@ rule below.
 | `packages/broker-login` | Daily Playwright job — logs brokers into AlgoTest via TOTP | — (leaf; nothing in-repo imports it) | depends on `broker-identity` + `notify` |
 | `packages/contract-notes` | Daily Gmail → PDF → Google Sheet F&O P&L pipeline | — (leaf; Node 20/CommonJS, reimplements the `Notification` shape itself instead of importing the ESM `@trading/notify`) | none |
 | `packages/momentum-backtesting` | Python weekly momentum-rotation research tool (`mbt` CLI) | — | its legacy `mbt ui` remains local-only while `apps/dashboard` migrates it through Fastify's `/api/momentum/*` proxy; still no code imports from `option-backtesting` |
-| `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below) | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
+| `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below); since 2026-09-30 those CSVs are EXPORTED from `trading-data`'s catalog (`tdata reference export`), which is the master | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
+| `packages/trading-data` | Python/uv: the local research database — DuckDB catalog (instruments, reference data, ingest runs, strategies, backtest results, companies/corporate actions/index+category membership, momentum's cross-instrument price series) + Parquet lake (`bars_1m_*`, `bars_1d_stock`) + raw vendor copies under `TRADING_DATA_ROOT`; `tdata init/status/backup/reference` | `db.connect`, `lake.*` paths/writers, `instruments.register`, `ingest.start_run/finish_run`, `reference.export_csvs/check` | `packages/option-backtesting` and `packages/momentum-backtesting` (both editable path dependencies) |
 | `apps/server` (`@ata/server`) | Fastify/Bun trading backend | — | `apps/dashboard` (HTTP only) |
 | `apps/dashboard` (`@ata/dashboard`) | Next.js/React frontend | — | none — leaf; talks to `apps/server` over HTTP only, imports no internal package |
 
@@ -148,7 +156,7 @@ those CSVs.
 
 ## Repository Structure
 
-A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (Next.js/React frontend) — and seven packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The other two, `packages/option-backtesting` and `packages/momentum-backtesting`, are Python/uv and not Bun workspace members. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
+A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (Next.js/React frontend) — and eight packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The other three, `packages/option-backtesting`, `packages/momentum-backtesting` and `packages/trading-data` (the shared local research database both backtesting packages use), are Python/uv and not Bun workspace members. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
 
 ```
 ai-trading-agent/
@@ -250,8 +258,9 @@ ai-trading-agent/
     │                                 # sector/thematic ETF engine (unmodified) ranks categories as
     │                                 # today, and when one is investable an inner backtest substitutes
     │                                 # the top-K individual stocks currently tagged to it instead of the
-    │                                 # ETF (`mbt categories fetch|resolve|backtest`). Built, tested, not
-    │                                 # yet wired into the UI — TODO.md §3.9.
+    │                                 # ETF (`mbt categories fetch|resolve|backtest`). Wired into the UI
+    │                                 # as the Custom Index tab (compose.py) and the Broad Momentum tab
+    │                                 # plus Momentum Scores page (broad.py) — TODO.md §3.9, §3.11.8.
     └── option-backtesting/          # Python 3.12 / uv — strategy-research workbench over AlgoTest option
                                       # bars, answering "is this strategy worth becoming a personality?"
                                       # (a different question from apps/server's `bun run backtest`, which
@@ -265,8 +274,9 @@ ai-trading-agent/
                                       # export, and a nightly ingest Routine (M-5).
         ├── pyproject.toml · uv.lock · .python-version · DECISIONS.md
         ├── src/option_backtesting/
-        │   ├── config.py                 # BACKTEST_DATA_DIR-derived cache/registry path resolution — shared
-        │   │                              # by api/app.py and mcp/server.py
+        │   ├── config.py                 # BACKTEST_DATA_DIR-derived Parquet bar cache path resolution —
+        │   │                              # shared by api/app.py and mcp/server.py (the run registry has
+        │   │                              # no path to resolve any more — see engine/registry.py)
         │   ├── presets.py                # preset_names()/STRATEGIES_DIR — the allow-list both the API and
         │   │                              # the MCP server check BEFORE building a filesystem path (no traversal)
         │   ├── data/
@@ -297,9 +307,10 @@ ai-trading-agent/
         │   │   ├── ledger.py · state.py  # Fill/SessionLedger; per-session running-anchor/last-fill state
         │   │   ├── result.py           # SessionResult/AggregateResult, bootstrap_ci (R1a), render_report
         │   │   ├── margin.py           # M-5, R1: classify_strategy_type + return on peak margin
-        │   │   └── registry.py         # SQLite run history (data/registry.sqlite, gitignored) — the
-        │   │                           # `strategy_yaml` column (M-5) lets export-personality reconstruct
-        │   │                           # a run's exact strategy from just its run_id
+        │   │   └── registry.py         # Run history in the shared trading-data catalog (package=
+        │   │                           # 'options_dsl', since 2026-09-30 — was data/registry.sqlite).
+        │   │                           # The `strategy_yaml` column (M-5) lets export-personality
+        │   │                           # reconstruct a run's exact strategy from just its run_id
         │   ├── analytics/                 # M-5: research tools that consume the engine's output, not part
         │   │   │                          # of a single backtest run
         │   │   ├── walkforward.py      # same-strategy in-sample/out-of-sample split (no re-fitting)
@@ -409,10 +420,10 @@ Critical variables whose misconfiguration causes real pain:
 | `TOKEN_VALIDITY_SCHEDULER_ENABLED` | When set to `true`, registers a BullMQ cron job that checks Fyers token expiry at 08:45 IST weekdays. Disabled by default; opt-in via this flag |
 | `BACKTEST_API_URL` | Base URL of the loopback-only Python FastAPI service (default `http://127.0.0.1:8000`). The Fastify proxy validates this resolves to loopback/private address space at startup — a public host throws (safe default-throw), the proxy never starts against it |
 | `MOMENTUM_API_URL` | Base URL of the loopback-only Momentum FastAPI service (default `http://127.0.0.1:8765`). The Fastify `/api/momentum/*` proxy applies the same loopback/private-host guard as options backtesting |
-| `MOMENTUM_DATABASE_URL` | Postgres (Neon free tier) holding `packages/momentum-backtesting`'s price history and weekly signals (`momentum_prices`, `momentum_signals`). Deliberately separate from `DATABASE_URL`, which momentum's `fyers.py` reads for `broker_tokens` |
+| ~~`MOMENTUM_DATABASE_URL`~~ | **Retired 2026-09-30** (TODO 3.11.5) — `packages/momentum-backtesting`'s price history and weekly signals now live in the shared `momentum_prices`/`momentum_signals` tables (`TRADING_DATA_ROOT`), not a separate Neon Postgres. `DATABASE_URL` (unrelated, still live) is what momentum's `fyers.py` reads for `broker_tokens` |
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
-| `FYERS_DATA_DIR` | Where `obt fyers fetch` writes its 1-minute Parquet (default `packages/option-backtesting/data/fyers/`, gitignored). This data cannot be re-downloaded once contracts expire — point it at the backed-up/external disk when that exists |
-| `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet cache and writes its run registry (`<dir>/cache`, `<dir>/registry.sqlite`). Defaults to `packages/option-backtesting`'s own `data/` when unset |
+| `TRADING_DATA_ROOT` | The local research database (`packages/trading-data`): `catalog.duckdb` + the Parquet `lake/` + gzipped `raw/` vendor responses. Default `~/TradingData`; point it at the external disk to move everything. Replaced `FYERS_DATA_DIR` (2026-09-30). The Fyers 1-minute data in it cannot be re-downloaded once contracts expire — back it up monthly with `tdata backup --to <disk>` |
+| `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet bar cache (`<dir>/cache`). Defaults to `packages/option-backtesting`'s own `data/` when unset. The run registry no longer lives under this — it's in the shared `trading_data` catalog, rooted at `TRADING_DATA_ROOT` |
 
 ## Common Tasks
 
