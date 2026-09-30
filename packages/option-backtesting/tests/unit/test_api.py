@@ -1,7 +1,10 @@
 """
-FastAPI service tests — each test builds a fresh `create_app(cache_dir=...,
-registry_db=...)` pointed at an isolated tmp_path, never the real committed
-cache/registry, via `fastapi.testclient.TestClient`.
+FastAPI service tests — each test builds a fresh `create_app(cache_dir=...)`
+pointed at an isolated tmp_path cache, never the real committed one, via
+`fastapi.testclient.TestClient`. The run registry needs no such isolation
+argument any more — it lives in the shared trading_data catalog, and
+tests/conftest.py's autouse fixture already roots TRADING_DATA_ROOT at a
+fresh tmp_path per test.
 """
 
 from pathlib import Path
@@ -16,23 +19,19 @@ STRATEGIES_DIR = Path(__file__).parent.parent.parent / "strategies"
 
 @pytest.fixture
 def client(tmp_path: Path) -> TestClient:
-    app = create_app(cache_dir=tmp_path / "cache", registry_db=tmp_path / "registry.sqlite")
+    app = create_app(cache_dir=tmp_path / "cache")
     return TestClient(app)
 
 
 @pytest.fixture
 def real_cache_client() -> TestClient:
     """Points at the real, already-committed M-1 ingested Parquet cache
-    (read-only from this test's perspective) but an isolated tmp registry —
-    needed for /runs and /coverage, which have nothing to query against an
-    empty cache_dir."""
-    import tempfile
-
+    (read-only from this test's perspective) — needed for /runs and
+    /coverage, which have nothing to query against an empty cache_dir."""
     from option_backtesting.data.ingest import DEFAULT_CACHE_DIR
 
-    with tempfile.TemporaryDirectory() as tmp:
-        app = create_app(cache_dir=DEFAULT_CACHE_DIR, registry_db=Path(tmp) / "registry.sqlite")
-        yield TestClient(app)
+    app = create_app(cache_dir=DEFAULT_CACHE_DIR)
+    yield TestClient(app)
 
 
 class TestHealth:

@@ -91,6 +91,9 @@ outward until the OTM leg's intraday high stays under `--premium-floor` (₹2) f
 a row, capped at `--max-extra` (60) per side. The per-side widths land in
 `manifest/<date>.json` so the floor can be tuned once the real strategies are written.
 
+**Superseded 2026-09-30:** storage moved to `packages/trading-data` (see its DECISIONS.md) — the
+paragraph below records the original choice.
+
 Storage is Parquet under `FYERS_DATA_DIR` (default `data/fyers/`, gitignored) rather than a
 database server — the owner wants it local now and on an external disk later, which is then a
 one-env-var move, and DuckDB already reads this layout for the AlgoTest cache.

@@ -1,48 +1,40 @@
 """
-SQLite run registry — plain stdlib `sqlite3`, no new dependency (per the
-plan: numpy was already needed for bootstrap_ci, sqlite3 needs nothing).
-Each `obt run` records one row; `obt registry` lists past runs.
+DSL engine run history, in the shared trading-data catalog
+(strategies / strategy_versions / backtest_runs — the same tables
+`legwise/store.py` uses with `package='options_legwise'` and
+`momentum_backtesting/runs_store.py` uses with `package='momentum'`).
+
+Superseded 2026-09-30: this used to be a standalone `data/registry.sqlite`
+(plain stdlib `sqlite3`). See `packages/trading-data/DECISIONS.md` for why —
+`RunRecord`'s shape and `strategy_hash()` are unchanged, so every caller
+(cli.py, api/routes.py, mcp/server.py) only had to swap a `Path` for a
+`duckdb.DuckDBPyConnection`.
+
+`strategies.strategy_id` is prefixed `dsl:` (`_strategy_key`) because that
+column is a global primary key across every package sharing this catalog —
+without a prefix, a DSL strategy id could collide with a legwise or momentum
+one that happens to reuse the same string.
+
+The DSL engine's Parquet bar cache (`data/cache/`, AlgoTest-sourced,
+strike-rule-resolved) is a **separate, deliberately untouched** concern —
+see `packages/trading-data/DECISIONS.md`'s entry on why only the run
+registry moved, not the bar cache.
 """
 
 from __future__ import annotations
 
 import hashlib
-import sqlite3
+import json
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime
-from pathlib import Path
+from datetime import date
+
+import duckdb
 
 from ..strategy.schema import StrategySpec
 from .result import AggregateResult
 
-DEFAULT_REGISTRY_DB = Path(__file__).parent.parent.parent.parent / "data" / "registry.sqlite"
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS runs (
-    run_id TEXT PRIMARY KEY,
-    strategy_id TEXT NOT NULL,
-    strategy_version INTEGER NOT NULL,
-    strategy_hash TEXT NOT NULL,
-    strategy_yaml TEXT,
-    date_from TEXT NOT NULL,
-    date_to TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    net_inr REAL,
-    win_days INTEGER,
-    worst_day REAL,
-    sum_peak_loss REAL,
-    lot_days REAL,
-    inr_per_lot_day REAL,
-    n_sessions INTEGER
-)
-"""
-
-_COLUMNS = (
-    "run_id, strategy_id, strategy_version, strategy_hash, strategy_yaml, date_from, date_to, "
-    "created_at, net_inr, win_days, worst_day, sum_peak_loss, lot_days, "
-    "inr_per_lot_day, n_sessions"
-)
+PACKAGE = "options_dsl"
 
 
 @dataclass(frozen=True)
@@ -51,7 +43,7 @@ class RunRecord:
     strategy_id: str
     strategy_version: int
     strategy_hash: str
-    # None only for rows written before this column existed (pre-M-5).
+    # None only for rows written before this field existed (pre-M-5, sqlite era).
     strategy_yaml: str | None
     date_from: str
     date_to: str
@@ -73,28 +65,36 @@ def strategy_hash(strategy: StrategySpec) -> str:
     return hashlib.sha256(payload).hexdigest()[:16]
 
 
-def _connect(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(db_path)
-    con.execute(_SCHEMA)
-    _migrate(con)
-    return con
+def _strategy_key(strategy_id: str) -> str:
+    return f"dsl:{strategy_id}"
 
 
-def _migrate(con: sqlite3.Connection) -> None:
-    """`CREATE TABLE IF NOT EXISTS` is a no-op against a pre-existing
-    database from an earlier milestone — a column added since then (e.g.
-    `strategy_yaml`, M-5) would silently never appear, and every INSERT/
-    SELECT referencing it would fail with "no such column". Add any
-    missing column by hand, once, idempotently."""
-    existing = {row[1] for row in con.execute("PRAGMA table_info(runs)").fetchall()}
-    if "strategy_yaml" not in existing:
-        con.execute("ALTER TABLE runs ADD COLUMN strategy_yaml TEXT")
-        con.commit()
+def _ensure_version(
+    con: duckdb.DuckDBPyConnection, strategy: StrategySpec, strategy_yaml: str | None
+) -> str:
+    key = _strategy_key(strategy.id)
+    h = strategy_hash(strategy)
+    version_id = f"{key}:{h}"
+    con.execute(
+        "INSERT INTO strategies (strategy_id, package, name) VALUES (?, ?, ?) "
+        "ON CONFLICT DO NOTHING",
+        [key, PACKAGE, strategy.id],
+    )
+    spec = {
+        "strategy": json.loads(strategy.model_dump_json()),
+        "version": strategy.version,
+        "yaml": strategy_yaml,
+    }
+    con.execute(
+        "INSERT INTO strategy_versions (version_id, strategy_id, spec_hash, spec) "
+        "VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING",
+        [version_id, key, h, json.dumps(spec)],
+    )
+    return version_id
 
 
 def record_run(
-    db_path: Path,
+    con: duckdb.DuckDBPyConnection,
     strategy: StrategySpec,
     date_from: date,
     date_to: date,
@@ -108,54 +108,64 @@ def record_run(
     the definition. Optional (defaults to None) so existing callers that
     don't have the source text handy keep working; a run recorded without
     it simply can't be exported later."""
+    version_id = _ensure_version(con, strategy, strategy_yaml)
     run_id = uuid.uuid4().hex[:12]
-    con = _connect(db_path)
-    try:
-        con.execute(
-            f"INSERT INTO runs ({_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (
-                run_id,
-                strategy.id,
-                strategy.version,
-                strategy_hash(strategy),
-                strategy_yaml,
-                date_from.isoformat(),
-                date_to.isoformat(),
-                datetime.now().isoformat(),
-                result.net_inr,
-                result.win_days,
-                result.worst_day,
-                result.sum_peak_loss,
-                result.lot_days,
-                result.inr_per_lot_day,
-                len(result.sessions),
-            ),
-        )
-        con.commit()
-    finally:
-        con.close()
+    summary = {
+        "net_inr": result.net_inr,
+        "win_days": result.win_days,
+        "worst_day": result.worst_day,
+        "sum_peak_loss": result.sum_peak_loss,
+        "lot_days": result.lot_days,
+        "inr_per_lot_day": result.inr_per_lot_day,
+        "n_sessions": len(result.sessions),
+    }
+    con.execute(
+        "INSERT INTO backtest_runs (run_id, version_id, kind, date_from, date_to, summary) "
+        "VALUES (?, ?, 'dsl', ?, ?, ?)",
+        [run_id, version_id, date_from, date_to, json.dumps(summary)],
+    )
     return run_id
 
 
-def get_run(db_path: Path, run_id: str) -> RunRecord | None:
-    if not db_path.exists():
-        return None
-    con = _connect(db_path)
-    try:
-        row = con.execute(f"SELECT {_COLUMNS} FROM runs WHERE run_id = ?", (run_id,)).fetchone()
-    finally:
-        con.close()
-    return RunRecord(*row) if row is not None else None
+# CAST(created_at AS VARCHAR) rather than selecting the TIMESTAMPTZ column directly —
+# DuckDB's python binding needs the optional `pytz` package to materialise a TIMESTAMPTZ
+# value into a python object, which this package does not depend on. A text cast sidesteps
+# that entirely; RunRecord.created_at is a string anyway (it was ISO text under sqlite too).
+_SELECT = (
+    "SELECT r.run_id, v.spec, v.spec_hash, r.summary, CAST(r.created_at AS VARCHAR), "
+    "r.date_from, r.date_to "
+    "FROM backtest_runs r JOIN strategy_versions v USING (version_id) WHERE r.kind = 'dsl'"
+)
 
 
-def list_runs(db_path: Path, limit: int = 20) -> list[RunRecord]:
-    if not db_path.exists():
-        return []
-    con = _connect(db_path)
-    try:
-        rows = con.execute(
-            f"SELECT {_COLUMNS} FROM runs ORDER BY created_at DESC LIMIT ?", (limit,)
-        ).fetchall()
-    finally:
-        con.close()
-    return [RunRecord(*row) for row in rows]
+def _to_record(row: tuple) -> RunRecord:
+    run_id, spec_json, spec_hash_value, summary_json, created_at, date_from, date_to = row
+    spec = json.loads(spec_json)
+    summary = json.loads(summary_json)
+    return RunRecord(
+        run_id=run_id,
+        strategy_id=spec["strategy"]["id"],
+        strategy_version=spec["version"],
+        strategy_hash=spec_hash_value,
+        strategy_yaml=spec["yaml"],
+        date_from=date_from.isoformat(),
+        date_to=date_to.isoformat(),
+        created_at=str(created_at),
+        net_inr=summary["net_inr"],
+        win_days=summary["win_days"],
+        worst_day=summary["worst_day"],
+        sum_peak_loss=summary["sum_peak_loss"],
+        lot_days=summary["lot_days"],
+        inr_per_lot_day=summary["inr_per_lot_day"],
+        n_sessions=summary["n_sessions"],
+    )
+
+
+def get_run(con: duckdb.DuckDBPyConnection, run_id: str) -> RunRecord | None:
+    row = con.execute(f"{_SELECT} AND r.run_id = ?", [run_id]).fetchone()
+    return _to_record(row) if row is not None else None
+
+
+def list_runs(con: duckdb.DuckDBPyConnection, limit: int = 20) -> list[RunRecord]:
+    rows = con.execute(f"{_SELECT} ORDER BY r.created_at DESC LIMIT ?", [limit]).fetchall()
+    return [_to_record(row) for row in rows]

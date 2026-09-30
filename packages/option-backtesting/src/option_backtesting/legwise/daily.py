@@ -1,28 +1,27 @@
 """
 The evening routine behind `obt daily`: run every leg-wise strategy in a
-folder over one collected day, save each result as JSON, and summarise the day
-against everything saved so far.
+folder over one collected day, save each result in the trading-data catalog
+(legwise/store.py), and summarise the day against everything saved so far.
 
-Results live next to the market data, under `<FYERS_DATA_DIR>/results/legwise/
-<date>/<strategy_id>.json`, each stamped with a hash of the strategy file that
-produced it. The running totals only add up results whose hash matches the
-strategy file as it is now — after a strategy edit, the old days are reported
-as stale (re-run them with `obt daily --date ...` or `obt legwise run`), never
-silently mixed with the new version's numbers.
+Each result is tied to the strategy VERSION that produced it (a hash of the
+validated spec). The running totals only add up results from the version each
+file has now — after a strategy edit, older days are reported as stale (re-run
+them with `obt legwise rerun`), never silently mixed with the new numbers.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from trading_data.db import connect
+
 from ..data.reference.loader import ReferenceData, default_reference_data
 from ..notify import Notification
-from .engine import DayResult, simulate_day
-from .market import load_day, minute_label
+from . import store
+from .engine import simulate_day
+from .market import load_day
 from .schema import LegwiseStrategy, load_legwise
 
 
@@ -30,47 +29,15 @@ from .schema import LegwiseStrategy, load_legwise
 class StrategyFile:
     path: Path
     strategy: LegwiseStrategy
-    sha: str
+    sha: str  # store.spec_hash of the validated strategy
 
 
 def load_strategy_files(folder: Path) -> list[StrategyFile]:
     files = []
     for path in sorted(folder.glob("*.yaml")):
-        sha = hashlib.sha256(path.read_bytes()).hexdigest()[:12]
-        files.append(StrategyFile(path, load_legwise(path), sha))
+        strategy = load_legwise(path)
+        files.append(StrategyFile(path, strategy, store.spec_hash(strategy)))
     return files
-
-
-def results_dir(root: Path) -> Path:
-    return root / "results" / "legwise"
-
-
-def _to_json(result: DayResult, file: StrategyFile) -> dict:
-    return {
-        "strategy_id": file.strategy.id,
-        "strategy_sha": file.sha,
-        "day": result.day.isoformat(),
-        "gross": round(result.gross, 2),
-        "costs": round(result.costs, 2),
-        "net": round(result.net, 2),
-        "worst_mtm": round(result.worst_mtm, 2),
-        "best_mtm": round(result.best_mtm, 2),
-        "stopped_by": result.stopped_by,
-        "notes": result.notes,
-        "trades": [
-            {
-                "leg": t.leg_id,
-                "contract": t.describe(),
-                "entry": minute_label(t.entry_min),
-                "entry_price": round(t.entry_price, 2),
-                "exit": minute_label(t.exit_min) if t.exit_min is not None else None,
-                "exit_price": round(t.exit_price, 2) if t.exit_price is not None else None,
-                "reason": t.exit_reason,
-                "pnl": round(t.pnl, 2),
-            }
-            for t in result.trades
-        ],
-    }
 
 
 def run_day(
@@ -79,13 +46,13 @@ def run_day(
     files: list[StrategyFile],
     reference: ReferenceData | None = None,
 ) -> list[dict]:
-    """Simulate every strategy on `day` and save one JSON per strategy.
-    A strategy whose underlying was not collected that day is skipped with a
-    note rather than failing the whole evening."""
+    """Simulate every strategy on `day` and save each result to the catalog (replacing
+    any earlier result for the same version and day). A strategy whose underlying was
+    not collected that day is skipped with a note rather than failing the evening."""
     reference = reference or default_reference_data()
-    out_dir = results_dir(root) / day.isoformat()
     loaded: dict[str, object] = {}
-    saved = []
+    records: list[dict] = []
+    results = []
     for file in files:
         underlying = file.strategy.underlying
         if underlying not in loaded:
@@ -95,23 +62,30 @@ def run_day(
                 loaded[underlying] = error
         data = loaded[underlying]
         if isinstance(data, FileNotFoundError):
-            saved.append(
+            records.append(
                 {"strategy_id": file.strategy.id, "day": day.isoformat(), "skipped": str(data)}
             )
             continue
-        record = _to_json(simulate_day(file.strategy, data, reference), file)  # type: ignore[arg-type]
-        out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / f"{file.strategy.id}.json").write_text(json.dumps(record, indent=2))
-        saved.append(record)
-    return saved
+        result = simulate_day(file.strategy, data, reference)  # type: ignore[arg-type]
+        results.append((file.strategy, result))
+        records.append(store.record(result, file.strategy))
+    if results:
+        with connect(root) as con:
+            for strategy, result in results:
+                store.save_daily(con, strategy, result)
+    return records
+
+
+def load_history(root: Path) -> list[dict]:
+    try:
+        with connect(root, read_only=True) as con:
+            return store.load_daily(con)
+    except FileNotFoundError:  # no catalog yet
+        return []
 
 
 def _trades(n: int) -> str:
     return f"{n} trade{'' if n == 1 else 's'}"
-
-
-def load_history(root: Path) -> list[dict]:
-    return [json.loads(p.read_text()) for p in sorted(results_dir(root).glob("*/*.json"))]
 
 
 def summary(day: date, today: list[dict], history: list[dict], files: list[StrategyFile]) -> str:

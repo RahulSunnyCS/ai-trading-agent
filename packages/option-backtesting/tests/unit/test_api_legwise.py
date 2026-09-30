@@ -30,8 +30,8 @@ STRATEGY = {
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(legwise_routes, "LEGWISE_DIR", tmp_path / "strategies")
-    monkeypatch.setenv("FYERS_DATA_DIR", str(tmp_path / "data"))
-    return TestClient(create_app(tmp_path / "cache", tmp_path / "reg.sqlite"))
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path / "data"))
+    return TestClient(create_app(tmp_path / "cache"))
 
 
 def test_save_writes_validated_yaml_and_lists_it(client, tmp_path):

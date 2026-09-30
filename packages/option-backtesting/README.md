@@ -31,7 +31,8 @@ See `.claude/project/technical.md` for the full monorepo layout. Within this pac
 - `src/option_backtesting/api/`, `mcp/` — FastAPI service and MCP server (later milestones)
 - `strategies/` — example strategy YAML
 - `data/raw/algotest/` — tracked raw AlgoTest responses (source of truth; see "Data ingestion")
-- `data/cache/`, `data/registry.sqlite` — gitignored, derived from `data/raw/`
+- `data/cache/` — gitignored, derived from `data/raw/`. The run registry no longer lives
+  under `data/` — it's in the shared `trading_data` catalog (`TRADING_DATA_ROOT`)
 
 ## Data ingestion
 

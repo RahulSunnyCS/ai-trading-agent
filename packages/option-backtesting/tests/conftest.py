@@ -12,3 +12,10 @@ import pytest
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def _isolated_trading_data_root(tmp_path_factory, monkeypatch):
+    """No test may read or write the real ~/TradingData (TRADING_DATA_ROOT). A test that
+    wants a specific root still sets its own; this is only the safe default underneath."""
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path_factory.mktemp("trading_data_root")))

@@ -46,9 +46,20 @@ Otherwise:
 
 ## Utility functions / key modules worth knowing before you duplicate one
 
-- `config.py` — `BACKTEST_DATA_DIR`-derived cache/registry path resolution,
-  shared by `api/app.py` and `mcp/server.py`. Route any new path resolution
-  through this rather than hand-building one.
+- `config.py` — `BACKTEST_DATA_DIR`-derived Parquet bar cache path
+  resolution, shared by `api/app.py` and `mcp/server.py`. Route any new
+  cache-path resolution through this rather than hand-building one. The
+  run registry has no path to resolve here any more — see `engine/registry.py`.
+- `engine/registry.py` — the DSL engine's run history, in the shared
+  `trading_data` catalog since 2026-09-30 (`package='options_dsl'`,
+  `kind='dsl'`) — the same tables `legwise/store.py` and
+  `momentum_backtesting/runs_store.py` use with their own package names.
+  `RunRecord`/`strategy_hash()` are unchanged from the old
+  `data/registry.sqlite` era; every caller (`cli.py`, `api/routes.py`,
+  `mcp/server.py`) just passes a `trading_data.db.connect()` connection
+  instead of a sqlite path now — no `--registry-db` flag any more, matching
+  `legwise`'s env-var-only (`TRADING_DATA_ROOT`) convention. The bar cache
+  below stays file-based on purpose — see `trading-data/DECISIONS.md`.
 - `presets.py` — `preset_names()`/`STRATEGIES_DIR`, the allow-list both the
   API and the MCP server check **before** building a filesystem path (no
   traversal). Any new strategy-loading path must go through this.
@@ -71,12 +82,14 @@ Otherwise:
   (token resolution — env, `FYERS_TOKEN_FILE`, then **reads `packages/momentum-backtesting`'s
   `mbt login` token file off disk**, same JSON shape, no code import), `client.py` (throttled
   history client), `symbols.py` (public symbol master), `daily.py` (range + adaptive-width
-  collection → Parquet under `FYERS_DATA_DIR`). Forward-only — see `DECISIONS.md`.
+  collection into `packages/trading-data`'s store — instruments registered, bars in the Parquet
+  lake, raw responses in `raw/fyers/`, one `ingest_runs` row per call; `obt fyers migrate` moved
+  the old `data/fyers/` layout in). Forward-only — see `DECISIONS.md`.
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
-  1-minute-bar assumption), `report.py`, `daily.py` (the `obt daily` runner + saved-results
-  history). Separate from `engine/` on purpose — see `DECISIONS.md`.
+  1-minute-bar assumption), `report.py`, `daily.py` (the `obt daily` runner), `store.py` (strategies, versions and
+  results in the trading-data catalog — a version is a hash of the validated spec). Separate from `engine/` on purpose — see `DECISIONS.md`.
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
@@ -103,4 +116,5 @@ uv run obt fyers status                 # token source + data dir
 uv run obt fyers fetch                  # today's 1m data — run the SAME evening
 uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades]
 uv run obt daily                        # evening routine: fetch + run strategies/legwise + summary
+uv run obt legwise rerun                # re-run every strategy over every collected day (after an edit)
 ```

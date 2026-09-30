@@ -19,7 +19,6 @@ import typer
 from .data.ingest import DEFAULT_CACHE_DIR, ingest_date
 from .data.providers.algotest import plan_requests
 from .data.raw import DEFAULT_RAW_DIR
-from .engine.registry import DEFAULT_REGISTRY_DB
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 ingest_app = typer.Typer(no_args_is_help=True)
@@ -109,12 +108,13 @@ def run(
     from_: str = typer.Option(..., "--from"),
     to: str = typer.Option(..., "--to"),
     cache_dir: Path = typer.Option(DEFAULT_CACHE_DIR, "--cache-dir"),
-    registry_db: Path = typer.Option(DEFAULT_REGISTRY_DB, "--registry-db"),
     bootstrap: bool = typer.Option(False, "--bootstrap", help="Print a session-level bootstrap CI"),
     bootstrap_resamples: int = typer.Option(2000, "--bootstrap-resamples"),
     seed: int = typer.Option(0, "--seed"),
 ) -> None:
     """Run a backtest over the cached window and record it in the run registry."""
+    from trading_data.db import connect
+
     from .data.cache import Cache
     from .data.reference.loader import default_reference_data
     from .engine.loop import run_backtest
@@ -165,8 +165,9 @@ def run(
         for regime_name in sorted(regime_buckets):
             typer.echo(f"  {regime_name}: {regime_buckets[regime_name]:.0f}")
 
-    run_id = record_run(registry_db, loaded.strategy, start, end, result, strategy_path.read_text())
-    typer.echo(f"\nRecorded as run {run_id} in {registry_db}")
+    with connect() as con:
+        run_id = record_run(con, loaded.strategy, start, end, result, strategy_path.read_text())
+    typer.echo(f"\nRecorded as run {run_id} in the shared catalog.")
 
     if bootstrap:
         ci = bootstrap_ci(
@@ -181,15 +182,20 @@ def run(
 
 @app.command()
 def registry(
-    registry_db: Path = typer.Option(DEFAULT_REGISTRY_DB, "--registry-db"),
     limit: int = typer.Option(20, "--limit"),
 ) -> None:
     """List past backtest runs."""
+    from trading_data.db import catalog_path, connect, data_root
+
     from .engine.registry import list_runs
 
-    runs = list_runs(registry_db, limit=limit)
+    if not catalog_path(data_root()).exists():
+        typer.echo("No runs recorded yet — no catalog at that path (run `tdata init` first).")
+        return
+    with connect(read_only=True) as con:
+        runs = list_runs(con, limit=limit)
     if not runs:
-        typer.echo(f"No runs recorded yet in {registry_db}.")
+        typer.echo("No runs recorded yet in the shared catalog.")
         return
     for r in runs:
         typer.echo(
@@ -303,21 +309,23 @@ def sweep(
 
 
 @app.command(name="export-personality")
-def export_personality_cmd(
-    run_id: str,
-    registry_db: Path = typer.Option(DEFAULT_REGISTRY_DB, "--registry-db"),
-) -> None:
+def export_personality_cmd(run_id: str) -> None:
     """Export a recorded run's strategy as a personality_configs candidate
     ({entryType, managementStyle, params}), with anything the DSL expresses
     that PersonalityConfigM2 has no field for listed under manual_review.
     Never writes to any database — prints JSON for a human to review."""
+    from trading_data.db import catalog_path, connect, data_root
+
     from .engine.registry import get_run
     from .export.personality import export_personality
     from .strategy.loader import StrategyValidationError, load_strategy_from_source
 
-    record = get_run(registry_db, run_id)
+    record = None
+    if catalog_path(data_root()).exists():
+        with connect(read_only=True) as con:
+            record = get_run(con, run_id)
     if record is None:
-        typer.echo(f"Unknown run_id {run_id!r} in {registry_db}.")
+        typer.echo(f"Unknown run_id {run_id!r} in the shared catalog.")
         raise typer.Exit(code=1)
     if record.strategy_yaml is None:
         typer.echo(
@@ -396,6 +404,8 @@ def _collect(
 ) -> int:
     """Shared by `fyers fetch` and `daily`: collect one day, return the per-symbol error
     count. A token problem raises FyersCredentialsError for the caller to report."""
+    from trading_data import lake
+
     from .fyers.auth import resolve_credentials
     from .fyers.client import FyersClient
     from .fyers.daily import UNDERLYINGS, collect_day, data_dir
@@ -407,7 +417,7 @@ def _collect(
     # Only worth saying when something will actually be downloaded: a re-run over an
     # already-collected day (the usual after-midnight case) fetches nothing.
     to_fetch = force or any(
-        not (data_dir() / "1m" / "opt" / u / f"{trading_day}.parquet").exists() for u in names
+        not lake.bars_1m_path(data_dir(), "option", u, trading_day).exists() for u in names
     )
     if trading_day < date.today() and to_fetch:
         typer.echo(
@@ -430,6 +440,24 @@ def _collect(
     return errors
 
 
+@fyers_app.command("migrate")
+def fyers_migrate(
+    from_: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "data" / "fyers",
+        "--from",
+        help="The old FYERS_DATA_DIR layout (1m/, symbols/, manifest/, results/).",
+    ),
+) -> None:
+    """One-off: copy the pre-database Fyers data into TRADING_DATA_ROOT (lake + catalog).
+    Copies, never deletes — remove the old folder yourself once `tdata status` looks right."""
+    from .fyers.daily import data_dir, migrate_legacy
+
+    if not from_.exists():
+        raise typer.BadParameter(f"{from_} does not exist")
+    n = migrate_legacy(from_, data_dir(), log=typer.echo)
+    typer.echo(f"done: {n} day(s) migrated into {data_dir()}")
+
+
 @legwise_app.command("run")
 def legwise_run(
     strategies: list[Path] = typer.Argument(..., help="Leg-wise strategy YAML file(s)."),
@@ -450,6 +478,34 @@ def legwise_run(
         days = run_legwise(strategy, data_dir(), start, end)
         typer.echo(day_table(strategy.id, days, show_trades=trades))
         typer.echo("")
+
+
+@legwise_app.command("rerun")
+def legwise_rerun(
+    from_: str | None = typer.Option(None, "--from", help="First day, YYYY-MM-DD."),
+    to: str | None = typer.Option(None, "--to", help="Last day, YYYY-MM-DD."),
+    strategies_dir: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "strategies" / "legwise",
+        help="Folder of leg-wise strategy YAMLs.",
+    ),
+) -> None:
+    """Re-run every strategy over every collected day and save the daily results — after
+    editing a strategy (its old days show as stale until re-run), or to rebuild results."""
+    from .fyers.daily import data_dir
+    from .legwise.daily import load_strategy_files, run_day
+    from .legwise.market import available_days
+
+    root = data_dir()
+    files = load_strategy_files(strategies_dir)
+    days = sorted({d for f in files for d in available_days(root, f.strategy.underlying)})
+    start = date.fromisoformat(from_) if from_ else None
+    end = date.fromisoformat(to) if to else None
+    days = [d for d in days if not ((start and d < start) or (end and d > end))]
+    for d in days:
+        records = run_day(d, root, files)
+        done = sum(1 for r in records if "skipped" not in r)
+        typer.echo(f"{d}: {done}/{len(files)} strategies saved")
+    typer.echo(f"done: {len(days)} day(s)")
 
 
 def _last_closed_session(now: datetime) -> date:

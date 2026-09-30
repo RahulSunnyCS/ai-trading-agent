@@ -27,12 +27,13 @@ import yaml
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
+from trading_data.db import connect
 
 from ..fyers.daily import UNDERLYINGS, data_dir
+from ..legwise import store
 from ..legwise.daily import (
     load_history,
     load_strategy_files,
-    results_dir,
     run_day,
     telegram_failure,
     telegram_summary,
@@ -158,7 +159,7 @@ def data_status() -> dict[str, Any]:
     except FyersCredentialsError as error:
         token = {"ok": False, "message": str(error)}
     return {
-        "data_dir": str(root),
+        "data_dir": str(root),  # TRADING_DATA_ROOT
         "days": {u: [d.isoformat() for d in available_days(root, u)] for u in UNDERLYINGS},
         "token": token,
     }
@@ -179,14 +180,18 @@ def backtest(body: BacktestBody) -> Any:
     start = date.fromisoformat(body.from_) if body.from_ else None
     end = date.fromisoformat(body.to) if body.to else None
     root = data_dir()
-    days = []
-    for day in available_days(root, strategy.underlying):
-        if (start and day < start) or (end and day > end):
-            continue
-        days.append(_day_json(simulate_day(strategy, load_day(root, strategy.underlying, day))))
-    if not days:
+    results = [
+        simulate_day(strategy, load_day(root, strategy.underlying, day))
+        for day in available_days(root, strategy.underlying)
+        if not ((start and day < start) or (end and day > end))
+    ]
+    if not results:
         return _error(404, f"no collected {strategy.underlying} days in that range")
-    return {"strategy_id": strategy.id, "days": days}
+    # Kept as an `adhoc` run: every builder experiment stays queryable with the exact
+    # settings that produced it.
+    with connect(root) as con:
+        run_id = store.save_adhoc(con, strategy, results, {"from": body.from_, "to": body.to})
+    return {"strategy_id": strategy.id, "run_id": run_id, "days": [_day_json(r) for r in results]}
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +210,7 @@ def results() -> dict[str, Any]:
     return {
         "strategies": [{"id": f.strategy.id, "name": f.path.stem, "sha": f.sha} for f in files],
         "results": rows,
-        "results_dir": str(results_dir(data_dir())),
+        "results_dir": f"{data_dir()}/catalog.duckdb",
     }
 
 

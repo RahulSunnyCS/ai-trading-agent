@@ -15,6 +15,7 @@ disk.
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
+from trading_data.db import catalog_path, connect, data_root
 
 from ..data.cache import Cache
 from ..data.reference.loader import default_reference_data
@@ -102,9 +103,8 @@ def create_run(body: RunRequest, request: Request) -> RunResponse:
         )
 
     result = aggregate(sessions)
-    run_id = record_run(
-        request.app.state.registry_db, loaded.strategy, body.from_, body.to, result, body.yaml
-    )
+    with connect() as con:
+        run_id = record_run(con, loaded.strategy, body.from_, body.to, result, body.yaml)
 
     bootstrap_out = None
     if body.bootstrap:
@@ -169,14 +169,23 @@ def create_run(body: RunRequest, request: Request) -> RunResponse:
 
 
 @router.get("/runs", response_model=list[RunSummaryOut])
-def get_runs(request: Request, limit: int = 20) -> list[RunSummaryOut]:
-    runs = list_runs(request.app.state.registry_db, limit=limit)
+def get_runs(limit: int = 20) -> list[RunSummaryOut]:
+    # No `tdata init` yet (fresh checkout) means no catalog file at all — a
+    # read_only connect() would raise; mirror the old sqlite behaviour of
+    # just returning no runs, rather than a 500.
+    if not catalog_path(data_root()).exists():
+        return []
+    with connect(read_only=True) as con:
+        runs = list_runs(con, limit=limit)
     return [_to_summary(r) for r in runs]
 
 
 @router.get("/runs/{run_id}", response_model=RunSummaryOut)
-def get_run_detail(run_id: str, request: Request) -> RunSummaryOut:
-    record = get_run(request.app.state.registry_db, run_id)
+def get_run_detail(run_id: str) -> RunSummaryOut:
+    record = None
+    if catalog_path(data_root()).exists():
+        with connect(read_only=True) as con:
+            record = get_run(con, run_id)
     if record is None:
         raise HTTPException(status_code=404, detail=f"Unknown run_id {run_id!r}")
     return _to_summary(record)

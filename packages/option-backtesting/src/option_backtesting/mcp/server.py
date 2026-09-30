@@ -24,12 +24,13 @@ from datetime import date
 
 import yaml
 from mcp.server.mcpserver import MCPServer
+from trading_data.db import catalog_path, connect, data_root
 
 from ..analytics.overfit import run_cscv as _run_cscv
 from ..analytics.overfit import run_deflated_sharpe as _run_deflated_sharpe
 from ..analytics.sweep import run_sweep as _run_sweep
 from ..analytics.walkforward import run_walkforward as _run_walkforward
-from ..config import resolve_cache_dir, resolve_registry_db
+from ..config import resolve_cache_dir
 from ..data.cache import Cache
 from ..data.providers.algotest import plan_requests as _plan_requests
 from ..data.reference.loader import default_reference_data
@@ -45,6 +46,15 @@ from ..strategy.loader import StrategyValidationError, load_strategy_from_source
 from ..strategy.mutate import deep_merge
 
 mcp = MCPServer("option-backtesting")
+
+
+def _get_run(run_id: str):
+    """`get_run` behind the same "no catalog yet" guard `list_runs` above uses —
+    a read_only connect() would raise on a fresh checkout with no `tdata init` run."""
+    if not catalog_path(data_root()).exists():
+        return None
+    with connect(read_only=True) as con:
+        return get_run(con, run_id)
 
 
 @mcp.tool()
@@ -113,7 +123,9 @@ def run_backtest(
         }
 
     result = aggregate(sessions)
-    run_id = record_run(resolve_registry_db(), loaded.strategy, start, end, result, yaml_text)
+    with connect() as con:
+        run_id = record_run(con, loaded.strategy, start, end, result, yaml_text)
+
 
     out: dict = {
         "run_id": run_id,
@@ -334,7 +346,10 @@ def check_overfit(
 @mcp.tool()
 def list_runs(limit: int = 20) -> list[dict]:
     """List past backtest runs from the run registry, most recent first."""
-    return [asdict(r) for r in _list_runs(resolve_registry_db(), limit=limit)]
+    if not catalog_path(data_root()).exists():
+        return []
+    with connect(read_only=True) as con:
+        return [asdict(r) for r in _list_runs(con, limit=limit)]
 
 
 @mcp.tool()
@@ -345,7 +360,7 @@ def critique_result(run_id: str) -> dict:
     computed headline row (no new computation) — it is NOT a substitute for
     the overfitting-guard analytics (CSCV / deflated Sharpe — see
     check_overfit)."""
-    record = get_run(resolve_registry_db(), run_id)
+    record = _get_run(run_id)
     if record is None:
         return {"error": f"Unknown run_id {run_id!r}"}
 
@@ -388,7 +403,7 @@ def export_personality(run_id: str) -> dict:
     on a human's behalf) decides whether and how to create the row.
     Returns {"error": ...} for an unknown run_id, or a run recorded before
     strategy_yaml was tracked (pre-M-5)."""
-    record = get_run(resolve_registry_db(), run_id)
+    record = _get_run(run_id)
     if record is None:
         return {"error": f"Unknown run_id {run_id!r}"}
     if record.strategy_yaml is None:

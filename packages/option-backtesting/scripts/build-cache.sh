@@ -17,9 +17,12 @@ echo "building cache for $from .. $to"
 d="$from"; n=0
 while [[ "$d" < "$to" || "$d" == "$to" ]]; do
   # Weekdays only; a market holiday simply ingests nothing and is skipped.
-  if [ "$(date -d "$d" +%u)" -le 5 ]; then
+  # `date -d` is GNU-only (no `gdate` on a bare macOS install either) — python3's
+  # stdlib does both the weekday check and the +1 day increment portably.
+  weekday=$(python3 -c "from datetime import date; print(date.fromisoformat('$d').isoweekday())")
+  if [ "$weekday" -le 5 ]; then
     uv run obt ingest --date "$d" --underlying NIFTY >/dev/null 2>&1 && n=$((n + 1)) || true
   fi
-  d=$(date -d "$d + 1 day" +%Y-%m-%d)
+  d=$(python3 -c "from datetime import date, timedelta; print(date.fromisoformat('$d') + timedelta(days=1))")
 done
 echo "ingested $n day(s); $(find data/cache -type f | wc -l) cache file(s)"

@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 
@@ -42,6 +43,9 @@ class FyersClient:
         self._min_interval_s = min_interval_s
         self._last_call = 0.0
         self.calls = 0
+        #: Optional hook given (symbol, params, raw response body) for every history
+        #: call — collect_day uses it to keep the verbatim responses (raw/fyers/).
+        self.on_response: Callable[[str, dict, dict], None] | None = None
 
     def _throttle(self) -> None:
         wait = self._last_call + self._min_interval_s - time.monotonic()
@@ -80,17 +84,18 @@ class FyersClient:
 
     def minute_candles(self, symbol: str, day: date) -> list[Candle]:
         """1-minute candles for one trading day. Empty list on `no_data`."""
-        body = self._get(
-            {
-                "symbol": symbol,
-                "resolution": "1",
-                "date_format": 1,
-                "range_from": day.isoformat(),
-                "range_to": day.isoformat(),
-                "cont_flag": 1,
-                "oi_flag": 1,
-            }
-        )
+        params: dict[str, str | int] = {
+            "symbol": symbol,
+            "resolution": "1",
+            "date_format": 1,
+            "range_from": day.isoformat(),
+            "range_to": day.isoformat(),
+            "cont_flag": 1,
+            "oi_flag": 1,
+        }
+        body = self._get(params)
+        if self.on_response is not None:
+            self.on_response(symbol, params, body)
         status = body.get("s")
         if status == "no_data":
             return []

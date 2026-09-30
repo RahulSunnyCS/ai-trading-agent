@@ -1,14 +1,9 @@
-import sqlite3
 from datetime import date
 from pathlib import Path
 
-from option_backtesting.engine.registry import (
-    _SCHEMA,
-    get_run,
-    list_runs,
-    record_run,
-    strategy_hash,
-)
+from trading_data.db import connect
+
+from option_backtesting.engine.registry import get_run, list_runs, record_run, strategy_hash
 from option_backtesting.engine.result import AggregateResult
 from option_backtesting.strategy.loader import load_strategy
 
@@ -30,14 +25,13 @@ def _aggregate_result() -> AggregateResult:
     )
 
 
-def test_record_and_list_a_run(tmp_path) -> None:
+def test_record_and_list_a_run() -> None:
     loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
-    db_path = tmp_path / "registry.sqlite"
-    run_id = record_run(
-        db_path, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result()
-    )
-
-    runs = list_runs(db_path)
+    with connect() as con:
+        run_id = record_run(
+            con, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result()
+        )
+        runs = list_runs(con)
     assert len(runs) == 1
     assert runs[0].run_id == run_id
     assert runs[0].strategy_id == "nifty_flat_A"
@@ -45,25 +39,26 @@ def test_record_and_list_a_run(tmp_path) -> None:
     assert runs[0].win_days == 3
 
 
-def test_list_runs_on_nonexistent_db_returns_empty(tmp_path) -> None:
-    assert list_runs(tmp_path / "does_not_exist.sqlite") == []
+def test_list_runs_on_a_fresh_catalog_returns_empty() -> None:
+    with connect() as con:
+        assert list_runs(con) == []
 
 
-def test_multiple_runs_ordered_most_recent_first(tmp_path) -> None:
+def test_multiple_runs_ordered_most_recent_first() -> None:
     loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
-    db_path = tmp_path / "registry.sqlite"
-    first_id = record_run(
-        db_path, loaded.strategy, date(2026, 8, 17), date(2026, 8, 20), _aggregate_result()
-    )
-    second_id = record_run(
-        db_path, loaded.strategy, date(2026, 8, 21), date(2026, 9, 4), _aggregate_result()
-    )
-    runs = list_runs(db_path)
+    with connect() as con:
+        first_id = record_run(
+            con, loaded.strategy, date(2026, 8, 17), date(2026, 8, 20), _aggregate_result()
+        )
+        second_id = record_run(
+            con, loaded.strategy, date(2026, 8, 21), date(2026, 9, 4), _aggregate_result()
+        )
+        runs = list_runs(con)
     assert [r.run_id for r in runs] in ([second_id, first_id], [first_id, second_id])
     assert len(runs) == 2
 
 
-def test_strategy_hash_changes_when_strategy_changes(tmp_path) -> None:
+def test_strategy_hash_changes_when_strategy_changes() -> None:
     a = load_strategy(STRATEGIES_DIR / "A_flat.yaml").strategy
     b = load_strategy(STRATEGIES_DIR / "B_pyramid.yaml").strategy
     assert strategy_hash(a) != strategy_hash(b)
@@ -75,95 +70,90 @@ def test_strategy_hash_is_stable_for_the_same_strategy() -> None:
     assert strategy_hash(a1) == strategy_hash(a2)
 
 
-def test_get_run_returns_the_matching_record(tmp_path) -> None:
+def test_get_run_returns_the_matching_record() -> None:
     loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
-    db_path = tmp_path / "registry.sqlite"
-    run_id = record_run(
-        db_path, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result()
-    )
-    record = get_run(db_path, run_id)
+    with connect() as con:
+        run_id = record_run(
+            con, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result()
+        )
+        record = get_run(con, run_id)
     assert record is not None
     assert record.run_id == run_id
     assert record.strategy_id == "nifty_flat_A"
 
 
-def test_get_run_returns_none_for_unknown_id(tmp_path) -> None:
+def test_get_run_returns_none_for_unknown_id() -> None:
     loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
-    db_path = tmp_path / "registry.sqlite"
-    record_run(db_path, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result())
-    assert get_run(db_path, "does-not-exist") is None
+    with connect() as con:
+        record_run(con, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result())
+        assert get_run(con, "does-not-exist") is None
 
 
-def test_get_run_on_nonexistent_db_returns_none(tmp_path) -> None:
-    assert get_run(tmp_path / "does_not_exist.sqlite", "any-id") is None
+def test_get_run_on_a_fresh_catalog_returns_none() -> None:
+    with connect() as con:
+        assert get_run(con, "any-id") is None
 
 
-def test_strategy_yaml_round_trips_through_record_and_get(tmp_path) -> None:
+def test_strategy_yaml_round_trips_through_record_and_get() -> None:
     loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
     source = (STRATEGIES_DIR / "A_flat.yaml").read_text()
-    db_path = tmp_path / "registry.sqlite"
-    run_id = record_run(
-        db_path,
-        loaded.strategy,
-        date(2026, 8, 17),
-        date(2026, 9, 4),
-        _aggregate_result(),
-        source,
-    )
-    record = get_run(db_path, run_id)
-    assert record is not None
-    assert record.strategy_yaml == source
+    with connect() as con:
+        run_id = record_run(
+            con,
+            loaded.strategy,
+            date(2026, 8, 17),
+            date(2026, 9, 4),
+            _aggregate_result(),
+            source,
+        )
+        record = get_run(con, run_id)
+        assert record is not None
+        assert record.strategy_yaml == source
 
-    listed = list_runs(db_path)
+        listed = list_runs(con)
     assert listed[0].strategy_yaml == source
 
 
-def test_strategy_yaml_defaults_to_none_when_not_provided(tmp_path) -> None:
+def test_strategy_yaml_defaults_to_none_when_not_provided() -> None:
     loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
-    db_path = tmp_path / "registry.sqlite"
-    run_id = record_run(
-        db_path, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result()
-    )
-    record = get_run(db_path, run_id)
+    with connect() as con:
+        run_id = record_run(
+            con, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result()
+        )
+        record = get_run(con, run_id)
     assert record is not None
     assert record.strategy_yaml is None
 
 
-def test_migrate_adds_strategy_yaml_column_to_a_pre_m5_database(tmp_path) -> None:
-    """Simulates a real pre-existing registry.sqlite from before M-5: a `runs`
-    table created without the `strategy_yaml` column. `_connect()` (used by
-    every public function) must add it on the fly rather than failing every
-    subsequent INSERT/SELECT with "no such column"."""
-    db_path = tmp_path / "pre_m5_registry.sqlite"
-    pre_m5_schema = _SCHEMA.replace("    strategy_yaml TEXT,\n", "")
-    assert "strategy_yaml" not in pre_m5_schema
-
-    con = sqlite3.connect(db_path)
-    try:
-        con.execute(pre_m5_schema)
-        con.commit()
-        columns_before = {row[1] for row in con.execute("PRAGMA table_info(runs)").fetchall()}
-        assert "strategy_yaml" not in columns_before
-    finally:
-        con.close()
-
+def test_rerunning_the_same_strategy_reuses_the_strategy_version() -> None:
+    """A version is `strategy_id:spec_hash` — re-running the exact same validated spec
+    (even with different result numbers) must not create a second strategy_versions row,
+    mirroring the same behaviour already relied on by legwise/store.py and
+    momentum_backtesting/runs_store.py."""
     loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
-    run_id = record_run(
-        db_path,
-        loaded.strategy,
-        date(2026, 8, 17),
-        date(2026, 9, 4),
-        _aggregate_result(),
-        "id: nifty_flat_A\n",
-    )
+    with connect() as con:
+        first = record_run(
+            con, loaded.strategy, date(2026, 8, 17), date(2026, 8, 20), _aggregate_result()
+        )
+        second = record_run(
+            con, loaded.strategy, date(2026, 8, 21), date(2026, 9, 4), _aggregate_result()
+        )
+        rows = con.execute(
+            "SELECT version_id FROM backtest_runs WHERE run_id IN (?, ?)", [first, second]
+        ).fetchall()
+    assert rows[0][0] == rows[1][0]
 
-    record = get_run(db_path, run_id)
-    assert record is not None
-    assert record.strategy_yaml == "id: nifty_flat_A\n"
 
-    con = sqlite3.connect(db_path)
-    try:
-        columns_after = {row[1] for row in con.execute("PRAGMA table_info(runs)").fetchall()}
-        assert "strategy_yaml" in columns_after
-    finally:
-        con.close()
+def test_strategy_id_is_namespaced_in_the_shared_catalog() -> None:
+    """`strategies.strategy_id` is a global primary key shared with legwise
+    (`options_legwise`) and momentum (`momentum`) — the DSL engine's own ids must not
+    collide with either, hence the `dsl:` prefix (see registry.py's module docstring)."""
+    loaded = load_strategy(STRATEGIES_DIR / "A_flat.yaml")
+    with connect() as con:
+        record_run(con, loaded.strategy, date(2026, 8, 17), date(2026, 9, 4), _aggregate_result())
+        row = con.execute(
+            "SELECT strategy_id, package FROM strategies WHERE package = 'options_dsl'"
+        ).fetchone()
+    assert row is not None
+    assert row[0] == "dsl:nifty_flat_A"
+    assert row[1] == "options_dsl"

@@ -5,8 +5,10 @@ the real, already-committed M-1 ingested Parquet cache — the same
 `real_cache_client`-style approach test_api.py uses for FastAPI. Every
 prior milestone verified its CLI commands via a real end-to-end manual
 invocation rather than an automated CliRunner test; these close that gap
-for the M-5 commands specifically, using an isolated tmp registry_db so
-nothing here touches the real committed `data/registry.sqlite`.
+for the M-5 commands specifically. The run registry lives in the shared
+trading_data catalog now; tests/conftest.py's autouse fixture roots
+TRADING_DATA_ROOT at a fresh tmp_path per test, so nothing here touches
+the real ~/TradingData.
 """
 
 import json
@@ -152,8 +154,7 @@ class TestSweepCommand:
 
 
 class TestExportPersonalityCommand:
-    def test_export_after_a_recorded_run(self, tmp_path: Path) -> None:
-        registry_db = tmp_path / "registry.sqlite"
+    def test_export_after_a_recorded_run(self) -> None:
         run_result = runner.invoke(
             app,
             [
@@ -165,8 +166,6 @@ class TestExportPersonalityCommand:
                 "2026-09-04",
                 "--cache-dir",
                 str(DEFAULT_CACHE_DIR),
-                "--registry-db",
-                str(registry_db),
             ],
         )
         assert run_result.exit_code == 0
@@ -175,9 +174,7 @@ class TestExportPersonalityCommand:
         )
         run_id = run_id_line.split()[3]
 
-        export_result = runner.invoke(
-            app, ["export-personality", run_id, "--registry-db", str(registry_db)]
-        )
+        export_result = runner.invoke(app, ["export-personality", run_id])
         assert export_result.exit_code == 0
         payload = json.loads(export_result.stdout)
         assert payload["source_run_id"] == run_id
@@ -185,10 +182,7 @@ class TestExportPersonalityCommand:
         assert payload["managementStyle"] == "roll"
         assert len(payload["manual_review"]) > 0
 
-    def test_unknown_run_id_exits_nonzero(self, tmp_path: Path) -> None:
-        registry_db = tmp_path / "registry.sqlite"
-        result = runner.invoke(
-            app, ["export-personality", "does-not-exist", "--registry-db", str(registry_db)]
-        )
+    def test_unknown_run_id_exits_nonzero(self) -> None:
+        result = runner.invoke(app, ["export-personality", "does-not-exist"])
         assert result.exit_code == 1
         assert "Unknown run_id" in result.stdout

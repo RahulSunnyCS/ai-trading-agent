@@ -13,20 +13,22 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI
 
-from ..config import resolve_cache_dir, resolve_registry_db
+from ..config import resolve_cache_dir
 from .legwise_routes import router as legwise_router
 from .routes import router
 
 
-def create_app(cache_dir: Path | None = None, registry_db: Path | None = None) -> FastAPI:
+def create_app(cache_dir: Path | None = None) -> FastAPI:
     """Factory rather than a bare module-level app so tests can point a
-    fresh instance at a temp cache/registry without touching real data.
-    `cache_dir`/`registry_db` default to `BACKTEST_DATA_DIR`-derived paths
-    (or the package's own defaults) read at call time, matching the CLI's
-    own env-driven defaults."""
+    fresh instance at a temp cache without touching the real committed one.
+    `cache_dir` defaults to the `BACKTEST_DATA_DIR`-derived path (or the
+    package's own default) read at call time, matching the CLI's own
+    env-driven default. The run registry has no path to inject here any
+    more — it lives in the shared `trading_data` catalog, rooted at
+    `TRADING_DATA_ROOT` (tests isolate this via an autouse fixture, see
+    tests/conftest.py)."""
     app = FastAPI(title="option-backtesting", version="0.1.0")
     app.state.cache_dir = cache_dir or resolve_cache_dir()
-    app.state.registry_db = registry_db or resolve_registry_db()
     app.include_router(router)
     app.include_router(legwise_router)
     return app

@@ -83,12 +83,12 @@ def test_parse_master_reads_options_and_futures_only_for_requested_underlyings()
 
 def test_options_table_flattens_contract_columns():
     contract = Contract("NSE:X", "NIFTY", TUE, 22700.0, "PE", 65)
-    table = options_table([(contract, [Candle(1790653500, 1, 2, 0.5, 1.5, 10, 99)])])
+    table = options_table([(contract, 42, [Candle(1790653500, 1, 2, 0.5, 1.5, 10, 99)])])
     row = table.to_pylist()[0]
-    assert (row["symbol"], row["strike"], row["option_type"], row["oi"]) == (
+    assert (row["instrument_id"], row["vendor_symbol"], row["strike"], row["option_type"]) == (
+        42,
         "NSE:X",
         22700.0,
         "PE",
-        99,
     )
-    assert row["expiry"] == TUE
+    assert (row["oi"], row["expiry"]) == (99, TUE)

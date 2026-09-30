@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+from trading_data import lake
 
 SESSION_START_MIN = 9 * 60 + 15
 N_MINUTES = 375
@@ -106,13 +107,12 @@ def _load_bars(path: Path) -> Series | None:
 
 
 def available_days(root: Path, underlying: str) -> list[date]:
-    folder = root / "1m" / "opt" / underlying
-    return sorted(date.fromisoformat(p.stem) for p in folder.glob("*.parquet"))
+    return lake.available_days(root, "option", underlying)
 
 
 def load_day(root: Path, underlying: str, day: date) -> DayData:
-    spot = _load_bars(root / "1m" / "index" / underlying / f"{day}.parquet")
-    opt_path = root / "1m" / "opt" / underlying / f"{day}.parquet"
+    spot = _load_bars(lake.bars_1m_path(root, "index", underlying, day))
+    opt_path = lake.bars_1m_path(root, "option", underlying, day)
     if spot is None or not opt_path.exists():
         raise FileNotFoundError(f"no Fyers data for {underlying} on {day} under {root}")
 
@@ -133,7 +133,7 @@ def load_day(root: Path, underlying: str, day: date) -> DayData:
 
     listed: list[date] = []
     lot: int | None = None
-    symbols_path = root / "symbols" / f"{day}.parquet"
+    symbols_path = lake.symbol_master_path(root, "fyers", day)
     if symbols_path.exists():
         symbols = pq.read_table(symbols_path).to_pylist()
         mine = [s for s in symbols if s["underlying"] == underlying and s["option_type"] != "FUT"]
@@ -147,7 +147,7 @@ def load_day(root: Path, underlying: str, day: date) -> DayData:
         chain=chain,
         listed_expiries=listed or sorted({k[0] for k in chain}),
         master_lot_size=lot,
-        vix=_load_bars(root / "1m" / "index" / "INDIAVIX" / f"{day}.parquet"),
+        vix=_load_bars(lake.bars_1m_path(root, "index", "INDIAVIX", day)),
     )
 
 
