@@ -2,7 +2,7 @@
 
 import { cn } from '../../lib/cn';
 import type { MomentumSavedRun } from '../../types/momentum';
-import { Card, CardHeader } from '../ui/Card';
+import { ResultSection } from './ResultSection';
 
 interface MetricDef {
   key: keyof MomentumSavedRun['kpis'];
@@ -44,13 +44,12 @@ const METRICS: MetricDef[] = [
 export function MomentumCompare({ runs }: { runs: MomentumSavedRun[] }) {
   if (runs.length === 0) {
     return (
-      <Card>
-        <CardHeader
-          title="Compare runs"
-          description="Save a few backtests, then compare them here"
-        />
+      <ResultSection
+        title="Compare runs"
+        description="Save a few backtests, then compare them here"
+      >
         <p className="text-sm text-muted">No saved runs yet for this strategy.</p>
-      </Card>
+      </ResultSection>
     );
   }
 
@@ -65,11 +64,11 @@ export function MomentumCompare({ runs }: { runs: MomentumSavedRun[] }) {
   }
 
   return (
-    <Card flush>
-      <div className="p-5 pb-0">
-        <CardHeader title="Compare runs" description="Best value in each row is highlighted" />
-      </div>
-      <div className="overflow-x-auto px-5 pb-5">
+    <ResultSection
+      title="Compare runs"
+      description="Saved runs for this strategy, side by side — the best value in each row is highlighted"
+    >
+      <div className="overflow-x-auto">
         <table className="w-full min-w-[480px] text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted">
@@ -109,6 +108,6 @@ export function MomentumCompare({ runs }: { runs: MomentumSavedRun[] }) {
           </tbody>
         </table>
       </div>
-    </Card>
+    </ResultSection>
   );
 }

@@ -1,10 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-
 import type { MomentumResult } from '../../types/momentum';
-import { Button } from '../ui/Button';
-import { Card, CardHeader } from '../ui/Card';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { StatCard } from '../ui/StatCard';
 
@@ -130,8 +126,12 @@ const DETAIL: KpiDef[] = [
   },
 ];
 
-export function MomentumKpiCards({ result, tax }: { result: MomentumResult; tax: boolean }) {
-  const [expanded, setExpanded] = useState(false);
+/** Headline KPI tiles, plus the full metric set when `expanded`. Header/toggle live in the caller. */
+export function MomentumKpiCards({
+  result,
+  tax,
+  expanded,
+}: { result: MomentumResult; tax: boolean; expanded: boolean }) {
   const k = result.kpis;
   const b = result.benchmark_name;
   const detail = tax
@@ -147,15 +147,7 @@ export function MomentumKpiCards({ result, tax }: { result: MomentumResult; tax:
     : DETAIL;
 
   return (
-    <Card>
-      <CardHeader
-        title="Performance"
-        actions={
-          <Button size="sm" onClick={() => setExpanded((v) => !v)}>
-            {expanded ? 'Hide detail metrics' : 'Show all metrics'}
-          </Button>
-        }
-      />
+    <>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {HEADLINE.map((def) => (
           <StatCard
@@ -173,7 +165,7 @@ export function MomentumKpiCards({ result, tax }: { result: MomentumResult; tax:
         ))}
       </div>
       {expanded ? (
-        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3 lg:grid-cols-4">
           {detail.map((def) => (
             <StatCard
               key={def.label}
@@ -190,6 +182,6 @@ export function MomentumKpiCards({ result, tax }: { result: MomentumResult; tax:
           ))}
         </div>
       ) : null}
-    </Card>
+    </>
   );
 }

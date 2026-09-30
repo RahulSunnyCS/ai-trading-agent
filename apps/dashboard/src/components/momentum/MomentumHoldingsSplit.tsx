@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 
 import { getChartTheme } from '../../lib/chartTheme';
 import { useThemeStore } from '../../store/theme';
-import { Card, CardHeader } from '../ui/Card';
+import { ResultSection } from './ResultSection';
 
 type PlotlyBasic = typeof import('plotly.js-basic-dist-min').default;
 
@@ -67,18 +67,17 @@ export function MomentumHoldingsSplit({
     };
   }, [rows, theme]);
 
-  if (rows.length === 0) {
-    return (
-      <Card>
-        <CardHeader title="Current holdings" description="As of the latest week in this run" />
-        <p className="text-sm text-muted">Nothing held as of the latest week.</p>
-      </Card>
-    );
-  }
   return (
-    <Card>
-      <CardHeader title="Current holdings" description="As of the latest week in this run" />
-      <div ref={ref} className="w-full" />
-    </Card>
+    <ResultSection
+      title="Current holdings"
+      description="As of the latest week in this run"
+      padded={false}
+    >
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">Nothing held as of the latest week.</p>
+      ) : (
+        <div ref={ref} className="w-full" />
+      )}
+    </ResultSection>
   );
 }

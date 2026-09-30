@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 
 import { getChartTheme } from '../../lib/chartTheme';
 import { useThemeStore } from '../../store/theme';
-import { Card, CardHeader } from '../ui/Card';
 
 type PlotlyBasic = typeof import('plotly.js-basic-dist-min').default;
 
@@ -85,13 +84,5 @@ export function MomentumYearlyChart({
   }, [rows, benchmarkName, theme]);
 
   if (rows.length === 0) return null;
-  return (
-    <Card>
-      <CardHeader
-        title="Year by year"
-        description="Green bars beat the benchmark that calendar year, red trailed it"
-      />
-      <div ref={ref} className="w-full" />
-    </Card>
-  );
+  return <div ref={ref} className="w-full" />;
 }

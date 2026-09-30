@@ -71,9 +71,19 @@ export default {
           from: { opacity: '0', transform: 'translateY(2px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        shimmer: {
+          from: { backgroundPosition: '200% 0' },
+          to: { backgroundPosition: '-200% 0' },
+        },
+        'result-flash': {
+          '0%': { boxShadow: '0 0 0 0 hsl(var(--primary) / 0.5)' },
+          '100%': { boxShadow: '0 0 0 14px hsl(var(--primary) / 0)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.18s ease-out both',
+        shimmer: 'shimmer 1.8s linear infinite',
+        'result-flash': 'result-flash 1.1s ease-out 2',
       },
     },
   },

@@ -1,7 +1,6 @@
 import { Sparkles } from 'lucide-react';
 
 import type { MomentumResult } from '../../types/momentum';
-import { Card } from '../ui/Card';
 
 function num(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -71,18 +70,16 @@ export function MomentumInsights({ result }: { result: MomentumResult }) {
   if (sentences.length === 0) return null;
 
   return (
-    <Card className="border-primary/25 bg-gradient-to-br from-primary/10 via-surface to-surface">
-      <div className="flex items-start gap-2.5">
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <p className="text-sm leading-relaxed text-foreground">
-          {sentences.map((sentence, index) => (
-            <span key={sentence}>
-              {index === 0 ? sentence.charAt(0).toUpperCase() + sentence.slice(1) : sentence}
-              {index < sentences.length - 1 ? ' · ' : '.'}
-            </span>
-          ))}
-        </p>
-      </div>
-    </Card>
+    <div className="flex items-start gap-2.5 rounded-lg border border-primary/20 bg-gradient-to-r from-primary/10 to-transparent px-3 py-2.5">
+      <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+      <p className="text-sm leading-relaxed text-foreground">
+        {sentences.map((sentence, index) => (
+          <span key={sentence}>
+            {index === 0 ? sentence.charAt(0).toUpperCase() + sentence.slice(1) : sentence}
+            {index < sentences.length - 1 ? ' · ' : '.'}
+          </span>
+        ))}
+      </p>
+    </div>
   );
 }

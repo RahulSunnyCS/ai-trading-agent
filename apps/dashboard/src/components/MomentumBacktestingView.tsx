@@ -1,14 +1,27 @@
 'use client';
 
-import { ChevronDown, Link as LinkIcon, Play, RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowUp,
+  CheckCircle2,
+  ChevronDown,
+  Link as LinkIcon,
+  Loader2,
+  Play,
+  RefreshCw,
+} from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { cn } from '../lib/cn';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
 import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
-import { MomentumResultDetails } from './momentum/MomentumResultDetails';
+import {
+  MomentumPerformanceCard,
+  MomentumResultDetails,
+  type MomentumRunInfo,
+} from './momentum/MomentumResultDetails';
+import { MomentumResultsSkeleton, MomentumRunBanner } from './momentum/MomentumRunProgress';
 import { MomentumSavedRunsView } from './momentum/MomentumSavedRunsView';
 import { MomentumScoresView } from './momentum/MomentumScoresView';
 import {
@@ -111,6 +124,11 @@ export function MomentumBacktestingView() {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [runInfo, setRunInfo] = useState<MomentumRunInfo | null>(null);
+  const [doneNoticeAt, setDoneNoticeAt] = useState<number | null>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MomentumResult | null>(null);
   const [lastRunConfig, setLastRunConfig] = useState<Record<string, unknown> | null>(null);
@@ -148,6 +166,7 @@ export function MomentumBacktestingView() {
     setError(null);
     setResult(null);
     setLastRunConfig(null);
+    setRunInfo(null);
     const response = await apiGet<MomentumMeta>(`/api/momentum/meta?dataset=${nextDataset}`);
     setLoading(false);
     if (!response.ok) {
@@ -249,16 +268,22 @@ export function MomentumBacktestingView() {
       setError(cause instanceof Error ? cause.message : String(cause));
       return;
     }
+    const startedAt = Date.now();
+    setRunStartedAt(startedAt);
+    setNow(startedAt);
     setRunning(true);
     setError(null);
     const response = await apiPost<MomentumResult>('/api/momentum/backtest', config);
     setRunning(false);
+    setRunStartedAt(null);
     if (!response.ok) {
       setError(response.error);
       return;
     }
+    const finishedAt = Date.now();
     setResult(response.data);
     setLastRunConfig(config);
+    setRunInfo({ finishedAt, durationMs: finishedAt - startedAt, savedAs: null });
     setSettingsOpen(false);
     const kpis = response.data.kpis;
     const sequence = Math.max(0, ...savedRuns.map((run) => run.n)) + 1;
@@ -279,8 +304,41 @@ export function MomentumBacktestingView() {
       strategy: response.data.series.strategy,
       overlay: false,
     });
-    if (saved.ok) setSavedRuns((runs) => [saved.data, ...runs].slice(0, 10));
+    if (saved.ok) {
+      setSavedRuns((runs) => [saved.data, ...runs].slice(0, 10));
+      setRunInfo((info) =>
+        info?.finishedAt === finishedAt ? { ...info, savedAs: saved.data.name } : info,
+      );
+    }
   }
+
+  // Ticks the elapsed-time readout while a run is in flight.
+  useEffect(() => {
+    if (runStartedAt === null) return;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [runStartedAt]);
+  const elapsedMs = runStartedAt === null ? 0 : Math.max(0, now - runStartedAt);
+
+  // When a run lands while the summary is scrolled out of view (e.g. you were reading the
+  // chart), say so where you are looking, with a way back up — nothing if it's already on screen.
+  const finishedAt = runInfo?.finishedAt ?? null;
+  // Layout effect, not requestAnimationFrame: it measures the freshly committed layout
+  // immediately, even in a background tab where animation frames are paused.
+  useLayoutEffect(() => {
+    if (finishedAt === null) return;
+    const rect = summaryRef.current?.getBoundingClientRect();
+    // The header + headline numbers sit at the card's top edge; a sliver of its bottom
+    // peeking into view doesn't count as "seen".
+    const visible = rect !== undefined && rect.top > 56 && rect.top < window.innerHeight - 120;
+    setDoneNoticeAt(visible ? null : finishedAt);
+  }, [finishedAt]);
+  useEffect(() => {
+    if (doneNoticeAt === null) return;
+    const timer = setTimeout(() => setDoneNoticeAt(null), 6000);
+    return () => clearTimeout(timer);
+  }, [doneNoticeAt]);
+  const elapsedLabel = `${Math.floor(elapsedMs / 1000)}s`;
 
   // Ctrl/Cmd+Enter runs the backtest from anywhere in the settings panel. A ref keeps the
   // handler reading the latest run() without re-attaching the listener on every keystroke.
@@ -486,8 +544,12 @@ export function MomentumBacktestingView() {
                   />
                   <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
                     <Button variant="primary" onClick={() => void runBacktest()} disabled={running}>
-                      <Play className="h-3.5 w-3.5" />
-                      {running ? 'Running momentum backtest…' : 'Run momentum backtest'}
+                      {running ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" />
+                      )}
+                      {running ? `Running… ${elapsedLabel}` : 'Run momentum backtest'}
                     </Button>
                     <span className="hidden text-xs text-faint sm:inline">Ctrl/Cmd + Enter</span>
                     <Button size="sm" onClick={shareLink}>
@@ -504,28 +566,88 @@ export function MomentumBacktestingView() {
                     onClick={() => void runBacktest()}
                     disabled={running}
                   >
-                    <Play className="h-3.5 w-3.5" />
-                    {running ? 'Running…' : dirty ? 'Run again' : 'Run momentum backtest'}
+                    {running ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
+                    {running
+                      ? `Running… ${elapsedLabel}`
+                      : dirty
+                        ? 'Run again'
+                        : 'Run momentum backtest'}
                   </Button>
                 </div>
               )}
             </div>
           )}
 
+          {running ? (
+            // Pinned under the app top bar, so the timer stays visible while you scroll.
+            <div className="sticky top-[4.5rem] z-20">
+              <MomentumRunBanner
+                elapsedMs={elapsedMs}
+                dataset={dataset}
+                datasetLabel={DATASETS.find((item) => item.id === dataset)?.label ?? 'momentum'}
+                hasPreviousResult={result !== null}
+              />
+            </div>
+          ) : null}
+
+          {doneNoticeAt !== null && runInfo ? (
+            // Zero-height sticky slot: the pill floats over the page without shifting content.
+            <div className="sticky top-[4.5rem] z-20 h-0">
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setDoneNoticeAt(null);
+                  }}
+                  className="inline-flex animate-fade-in items-center gap-2 rounded-full border border-positive/30 bg-surface px-4 py-2 text-sm text-foreground shadow-elevated transition-colors hover:border-positive/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <CheckCircle2 className="h-4 w-4 text-positive" />
+                  Results updated · took {(runInfo.durationMs / 1000).toFixed(1)}s
+                  <span className="inline-flex items-center gap-1 font-medium text-primary">
+                    View summary <ArrowUp className="h-3.5 w-3.5" />
+                  </span>
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {running && !result ? <MomentumResultsSkeleton /> : null}
+
           {result ? (
-            <>
+            <div
+              className={cn(
+                'space-y-5 transition-opacity duration-300',
+                running && 'pointer-events-none select-none opacity-40',
+              )}
+              aria-busy={running}
+            >
+              <div ref={summaryRef} className="scroll-mt-20">
+                <MomentumPerformanceCard
+                  result={result}
+                  config={lastRunConfig ?? {}}
+                  stale={dirty && !running}
+                  runInfo={runInfo}
+                />
+              </div>
               <MomentumEquityChart
                 series={result.series}
                 benchmarkName={result.benchmark_name}
                 rotations={result.rotations}
                 overlays={overlays}
+                flashKey={finishedAt}
               />
               <MomentumResultDetails
                 result={result}
                 config={lastRunConfig ?? {}}
                 savedRuns={savedRuns}
+                flashKey={finishedAt}
               />
-            </>
+            </div>
           ) : null}
         </>
       )}

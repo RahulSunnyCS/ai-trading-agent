@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import { getChartTheme } from '../../lib/chartTheme';
 import { useThemeStore } from '../../store/theme';
-import { Card, CardHeader } from '../ui/Card';
+import { ResultSection } from './ResultSection';
 
 type PlotlyBasic = typeof import('plotly.js-basic-dist-min').default;
 
@@ -93,14 +93,17 @@ export function MomentumTimelineChart({ rows }: { rows: Array<Record<string, unk
     };
   }, [rows, assetOrder, theme]);
 
-  if (rows.length === 0) return <p className="text-sm text-muted">No trades for this run.</p>;
   return (
-    <Card>
-      <CardHeader
-        title="Trade split"
-        description="One bar per position held — green closed a winner, red a loser, purple still open. Hover for dates and return."
-      />
-      <div ref={ref} className="w-full" />
-    </Card>
+    <ResultSection
+      title="Trade timeline"
+      description="One bar per position held — green closed a winner, red a loser, orange still open. Hover for dates and return."
+      padded={false}
+    >
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted">No trades for this run.</p>
+      ) : (
+        <div ref={ref} className="w-full" />
+      )}
+    </ResultSection>
   );
 }

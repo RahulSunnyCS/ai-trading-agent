@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 
 import { cn } from '../../lib/cn';
 import type { MomentumSeries } from '../../types/momentum';
-import { Card, CardHeader } from '../ui/Card';
 
 const MONTH_LABELS = [
   'Jan',
@@ -63,46 +62,38 @@ export function MomentumMonthlyHeatmap({ series }: { series: MomentumSeries }) {
   if (years.length === 0) return null;
 
   return (
-    <Card flush>
-      <div className="p-5 pb-0">
-        <CardHeader title="Monthly returns" description="Strategy return by calendar month" />
-      </div>
-      <div className="overflow-x-auto px-5 pb-5">
-        <table className="w-full min-w-[640px] border-separate border-spacing-1 text-xs">
-          <thead>
-            <tr>
-              <th className="w-12 text-left font-medium text-muted">Year</th>
-              {MONTH_LABELS.map((label) => (
-                <th key={label} className="font-medium text-muted">
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {years.map((year) => (
-              <tr key={year}>
-                <td className="font-semibold text-foreground">{year}</td>
-                {MONTH_LABELS.map((_, monthIndex) => {
-                  const key = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
-                  const value = returns.get(key);
-                  return (
-                    <td
-                      key={key}
-                      className={cn(
-                        'rounded px-1.5 py-2 text-center tabular-nums',
-                        cellTone(value),
-                      )}
-                    >
-                      {value === undefined ? '' : `${(value * 100).toFixed(1)}`}
-                    </td>
-                  );
-                })}
-              </tr>
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] border-separate border-spacing-1 text-xs">
+        <thead>
+          <tr>
+            <th className="w-12 text-left font-medium text-muted">Year</th>
+            {MONTH_LABELS.map((label) => (
+              <th key={label} className="font-medium text-muted">
+                {label}
+              </th>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+          </tr>
+        </thead>
+        <tbody>
+          {years.map((year) => (
+            <tr key={year}>
+              <td className="font-semibold text-foreground">{year}</td>
+              {MONTH_LABELS.map((_, monthIndex) => {
+                const key = `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+                const value = returns.get(key);
+                return (
+                  <td
+                    key={key}
+                    className={cn('rounded px-1.5 py-2 text-center tabular-nums', cellTone(value))}
+                  >
+                    {value === undefined ? '' : `${(value * 100).toFixed(1)}`}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

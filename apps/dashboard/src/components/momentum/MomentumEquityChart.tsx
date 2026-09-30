@@ -7,6 +7,7 @@ import { useThemeStore } from '../../store/theme';
 import type { MomentumRotation, MomentumSavedRun, MomentumSeries } from '../../types/momentum';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { useResultFlash } from './MomentumRunProgress';
 
 type PlotlyBasic = typeof import('plotly.js-basic-dist-min').default;
 /** Plotly.react() attaches event-emitter methods to the div at runtime; not in the DOM lib types. */
@@ -98,11 +99,7 @@ function WeekDetail({
           {rotation.holdings.length ? (
             <p className="italic text-muted">
               Holding {rotation.holdings.length}:{' '}
-              {rotation.holdings
-                .slice(0, 9)
-                .map((h) => `${h.asset} ${asPct(h.share, false)}`)
-                .join(', ')}
-              {rotation.holdings.length > 9 ? ', …' : ''}
+              {rotation.holdings.map((h) => `${h.asset} ${asPct(h.share, false)}`).join(', ')}
             </p>
           ) : null}
         </div>
@@ -118,12 +115,15 @@ export function MomentumEquityChart({
   benchmarkName,
   rotations,
   overlays = [],
+  flashKey = null,
 }: {
   series: MomentumSeries;
   benchmarkName: string;
   rotations: MomentumRotation[];
   overlays?: MomentumSavedRun[];
+  flashKey?: number | null;
 }) {
+  const flashing = useResultFlash(flashKey);
   const chartRef = useRef<HTMLDivElement>(null);
   const [scrollZoom, setScrollZoom] = useState(false);
   const [logScale, setLogScale] = useState(false);
@@ -323,7 +323,7 @@ export function MomentumEquityChart({
   }, [series, benchmarkName, rotationPoints, overlays, scrollZoom, logScale, theme]);
 
   return (
-    <Card>
+    <Card className={flashing ? 'animate-result-flash' : ''}>
       <CardHeader
         title="Portfolio value and risk"
         description="₹1 lakh starting value · hover for that week's trades · drag to pan"
@@ -356,7 +356,7 @@ export function MomentumEquityChart({
           className="w-full"
         />
         {hoverDate ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[40%] animate-fade-in overflow-y-auto rounded-b-lg border-t border-border bg-surface px-3 py-2.5 shadow-elevated">
+          <div className="pointer-events-none absolute inset-x-0 top-[40%] z-10 min-h-[60%] animate-fade-in rounded-lg border-t border-border bg-surface px-3 py-2.5 shadow-elevated">
             <WeekDetail
               date={hoverDate}
               series={series}
