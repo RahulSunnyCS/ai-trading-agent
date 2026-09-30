@@ -203,7 +203,9 @@ export function MomentumBacktestingView() {
         parsedWeights.some((value) => !Number.isFinite(value)) ||
         parsedWeights.every((value) => value === 0))
     ) {
-      throw new Error('Give one finite weight per lookback window (negative is allowed, for a reversal signal — not all zero), or leave weights blank.');
+      throw new Error(
+        'Give one finite weight per lookback window (negative is allowed, for a reversal signal — not all zero), or leave weights blank.',
+      );
     }
     if (dataset !== 'broad' && selected.length === 0) {
       throw new Error('Select at least one instrument before running the strategy.');

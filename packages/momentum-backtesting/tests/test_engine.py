@@ -59,6 +59,30 @@ def test_best_recent_performer_ranks_first():
     assert ranks.iloc[-1].to_dict() == {"A": 1.0, "B": 2.0, "C": 3.0}
 
 
+def test_negative_weight_rewards_the_worst_performer_on_that_lookback():
+    # Same last-week return for all three (1-week lookback ties), but a differing
+    # second-to-last week's return (28 weeks of flat baseline first, so both lookbacks stay
+    # eligible) drives the 2-week return apart: A best, C worst. With weight -1 on the
+    # 2-week lookback, C (worst 2-week performer) should rank first, A last.
+    prices = frame(
+        A=path((27, 0.0), (1, 0.03), (1, 0.01)),
+        B=path((27, 0.0), (1, 0.0), (1, 0.01)),
+        C=path((27, 0.0), (1, -0.03), (1, 0.01)),
+    )
+    ranks, _ = compute_ranks(prices[["A", "B", "C"]], cfg(weights=(1.0, -1.0)))
+    assert ranks.iloc[-1].to_dict() == {"C": 1.0, "B": 2.0, "A": 3.0}
+
+
+def test_all_zero_weights_are_rejected():
+    with pytest.raises(ValueError, match="non-zero"):
+        cfg(weights=(0.0, 0.0))
+
+
+def test_non_finite_weight_is_rejected():
+    with pytest.raises(ValueError, match="finite"):
+        cfg(weights=(1.0, float("nan")))
+
+
 def test_instrument_joins_ranking_only_once_it_has_the_longest_lookback():
     late = path((29, 0.05)).where(WEEKS[10] <= WEEKS)
     prices = frame(A=path((29, 0.01)), Late=late)

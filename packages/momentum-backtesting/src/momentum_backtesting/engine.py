@@ -161,8 +161,17 @@ class Config:
     def __post_init__(self) -> None:
         if self.weights is not None and len(self.weights) != len(self.lookbacks):
             raise ValueError("weights must have one value per lookback")
-        if self.weights is not None and any(w < 0 for w in self.weights):
-            raise ValueError("weights can't be negative")
+        if self.weights is not None and any(not math.isfinite(w) for w in self.weights):
+            raise ValueError("weights must be finite numbers")
+        # Negative weights are allowed on purpose: `score = score + weight * rank_k` in
+        # _compute_ranks_ranksum means a negative weight on a lookback rewards instruments
+        # that ranked WORST on it (rank_k close to N) instead of best - e.g. weight -1 on the
+        # 26/52-week lookbacks alongside positive weight on 1/4-week lookbacks hunts for
+        # longer-term laggards that are turning up recently (a reversal signal), rather than
+        # pure momentum. Only an all-zero weight vector is rejected - every score would be 0
+        # and the ranking would be entirely tie-break-driven.
+        if self.weights is not None and all(w == 0 for w in self.weights):
+            raise ValueError("at least one weight must be non-zero")
         if self.exit_rank < self.top_n:
             raise ValueError("exit_rank must be >= top_n, or a new buy would be sold at once")
         if self.defensive not in ("off", "ranked", "filter"):
