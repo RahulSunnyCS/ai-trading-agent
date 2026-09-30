@@ -1259,6 +1259,70 @@ def categories_broad_sweep_caps(
 
 
 @app.command()
+def rebalance(
+    config: Path = typer.Option(
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        help="Backtest configuration JSON (Stock or Broad Momentum).",
+    ),
+    holdings: Path = typer.Option(
+        ...,
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        help="JSON object of asset identifiers to current percentage weights.",
+    ),
+    portfolio_value: float = typer.Option(
+        ..., min=0.01, help="Current total portfolio value in INR."
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Print the complete JSON response."),
+) -> None:
+    """Fetch Fyers LTPs and preview the buys/sells needed to reach the model target."""
+    import json
+
+    from fastapi import HTTPException
+
+    from .api import RebalanceRequest, rebalance_preview
+
+    try:
+        settings = json.loads(config.read_text())
+        actual = json.loads(holdings.read_text())
+        if not isinstance(settings, dict) or not isinstance(actual, dict):
+            raise ValueError("Config and holdings files must each contain a JSON object.")
+        request = RebalanceRequest(
+            **settings,
+            holdings_pct=actual,
+            portfolio_value=portfolio_value,
+        )
+        plan = rebalance_preview(request)
+    except (ValueError, HTTPException) as error:
+        typer.echo(str(error.detail) if isinstance(error, HTTPException) else str(error), err=True)
+        raise typer.Exit(1) from None
+
+    if json_output:
+        typer.echo(json.dumps(plan, indent=2))
+        return
+    typer.echo(f"{plan['dataset']} rebalance preview at {plan['as_of']}")
+    typer.echo(f"Portfolio: ₹{portfolio_value:,.2f}; signal week {plan['signal_week']}")
+    if not plan["rows"]:
+        typer.echo("No weight changes are indicated.")
+    for row in plan["rows"]:
+        quantity = (
+            f"~{row['indicative_quantity']} shares @ ₹{row['ltp']:,.2f}"
+            if row["indicative_quantity"] is not None
+            else "cash allocation"
+        )
+        typer.echo(
+            f"{row['action']:4} {row['asset']:25} "
+            f"{row['current_pct']:6.2f}% → {row['target_pct']:6.2f}% "
+            f"({row['delta_pct']:+6.2f} pp), {quantity}"
+        )
+    typer.echo(plan["note"])
+
+
+@app.command()
 def weekly(
     run: str = typer.Option(..., help="preview (~14:40 IST, live prices) | final (after close)"),
     use_db: bool = typer.Option(

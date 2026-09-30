@@ -169,4 +169,16 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
       });
     },
   );
+
+  fastify.post(
+    '/api/momentum/rebalance-preview',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/rebalance-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
 });

@@ -3,6 +3,7 @@
 import threading
 import urllib.request
 from collections import OrderedDict
+from datetime import datetime, time
 from pathlib import Path
 from typing import Literal
 
@@ -13,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from trading_data.db import connect
 
-from . import analysis, db_read, runs_store
+from . import analysis, db_read, fyers, rebalance, runs_store
 from .categories import broad
 from .categories import momentum_scores as momentum_scores_mod
 from .categories.compose import (
@@ -31,9 +32,10 @@ from .categories.compose import (
 from .categories.compose import (
     DEFAULT_TOP_N as CATEGORY_DEFAULT_TOP_N,
 )
-from .config import DATA_DIR
-from .engine import BENCHMARK, CASH, Config, Result, run_backtest
+from .config import DATA_DIR, load_repo_env
+from .engine import BENCHMARK, CASH, IDLE, Config, Result, run_backtest
 from .fetch import load_universe
+from .notify import IST
 from .stocks import ui_data
 from .stocks.ui_data import (
     NIFTY50_EQUAL_WEIGHT_TRI,
@@ -425,6 +427,14 @@ class SavedRunUpdate(BaseModel):
 class WeeklyRunBody(BaseModel):
     run: Literal["preview", "final"]
     send: bool = True
+
+
+class RebalanceRequest(BacktestRequest):
+    """Actual portfolio weights are percentages, e.g. 12.5 means 12.5%."""
+
+    holdings_pct: dict[str, float] = Field(default_factory=dict)
+    portfolio_value: float = Field(gt=0)
+    auth_source: Literal["auto", "dashboard"] = "auto"
 
 
 def _stock_classification(stock: StockDataset) -> dict[str, tuple[str, str]]:
@@ -1163,6 +1173,52 @@ def _momentum_scores_payload() -> dict:
     }
 
 
+def _run_broad(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outer_prices: pd.DataFrame,
+) -> broad.BroadBacktestResult:
+    weights = tuple(req.weights) if req.weights else None
+    return broad.run_broad_backtest(
+        outer_prices=outer_prices,
+        stocks_data_dir=DATA_DIR / "stocks",
+        categories_data_dir=DATA_DIR / "categories",
+        curated_dir=CATEGORIES_CURATED_DIR,
+        category_mode=req.broad_category_mode,
+        start=req.start,
+        end=req.end or None,
+        lookbacks=tuple(req.lookbacks),
+        weights=weights,
+        score=req.score,
+        voladj_skip_recent_month=req.voladj_skip_recent_month,
+        pool_top_n=req.broad_pool_top_n,
+        pool_exit_rank=req.broad_pool_exit_rank,
+        coverage_floor=req.broad_coverage_floor,
+        category_top_n=req.broad_category_top_n,
+        category_exit_rank=req.broad_category_exit_rank,
+        picks_per_category=req.broad_picks_per_category,
+        off_top_n=req.broad_off_top_n,
+        off_exit_rank=req.broad_off_exit_rank,
+        cost_pct=req.cost_pct,
+        signal_delay=req.signal_delay,
+        portfolio=req.portfolio,
+        rebalance=req.rebalance,
+        benchmark=req.benchmark,
+        max_position=req.max_position,
+        max_category=req.max_category if req.broad_category_mode == "on" else None,
+        max_stock_price=req.max_stock_price or None,
+        cap_band=req.cap_band,
+        entry=req.entry,
+        momentum_sizing=req.momentum_sizing,
+        momentum_sizing_window=req.momentum_sizing_window,
+        momentum_sizing_floor=req.momentum_sizing_floor,
+        cost_model=req.cost_model,
+        capital=req.capital,
+        slippage_bps=req.slippage_bps,
+        ranking=ranking,
+    )
+
+
 def _broad_backtest(req: BacktestRequest) -> dict:
     on = req.broad_category_mode == "on"
     if on and req.broad_category_top_n > req.broad_category_exit_rank:
@@ -1189,44 +1245,7 @@ def _broad_backtest(req: BacktestRequest) -> dict:
             pool_top_n=req.broad_pool_top_n,
             pool_exit_rank=req.broad_pool_exit_rank,
         )
-        outcome = broad.run_broad_backtest(
-            outer_prices=DATA.get(),
-            stocks_data_dir=DATA_DIR / "stocks",
-            categories_data_dir=DATA_DIR / "categories",
-            curated_dir=CATEGORIES_CURATED_DIR,
-            category_mode=req.broad_category_mode,
-            start=req.start,
-            end=req.end or None,
-            lookbacks=tuple(req.lookbacks),
-            weights=weights,
-            score=req.score,
-            voladj_skip_recent_month=req.voladj_skip_recent_month,
-            pool_top_n=req.broad_pool_top_n,
-            pool_exit_rank=req.broad_pool_exit_rank,
-            coverage_floor=req.broad_coverage_floor,
-            category_top_n=req.broad_category_top_n,
-            category_exit_rank=req.broad_category_exit_rank,
-            picks_per_category=req.broad_picks_per_category,
-            off_top_n=req.broad_off_top_n,
-            off_exit_rank=req.broad_off_exit_rank,
-            cost_pct=req.cost_pct,
-            signal_delay=req.signal_delay,
-            portfolio=req.portfolio,
-            rebalance=req.rebalance,
-            benchmark=req.benchmark,
-            max_position=req.max_position,
-            max_category=req.max_category if req.broad_category_mode == "on" else None,
-            max_stock_price=req.max_stock_price or None,
-            cap_band=req.cap_band,
-            entry=req.entry,
-            momentum_sizing=req.momentum_sizing,
-            momentum_sizing_window=req.momentum_sizing_window,
-            momentum_sizing_floor=req.momentum_sizing_floor,
-            cost_model=req.cost_model,
-            capital=req.capital,
-            slippage_bps=req.slippage_bps,
-            ranking=ranking,
-        )
+        outcome = _run_broad(req, ranking, DATA.get())
         DATA.trim_cache()
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
@@ -1249,6 +1268,121 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     )
     payload["missing_symbols"] = outcome.ranking.missing_symbols
     return payload
+
+
+def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> dict:
+    """Live, read-only target versus user holdings. Also called by `mbt rebalance`."""
+    now = (now or datetime.now(IST)).astimezone(IST)
+    if now.weekday() >= 5 or not time(9, 15) <= now.time() <= time(15, 30):
+        raise HTTPException(
+            422, "Live preview is available during NSE market hours (09:15–15:30 IST)."
+        )
+    if req.dataset not in ("stock", "broad"):
+        raise HTTPException(422, "Live stock rebalance preview supports Stock and Broad Momentum.")
+    if req.weights is not None and len(req.weights) != len(req.lookbacks):
+        raise HTTPException(422, "Give one weight per lookback.")
+    if any(value < 0 or value > 100 for value in req.holdings_pct.values()):
+        raise HTTPException(422, "Holding weights must be percentages between 0 and 100.")
+    if sum(req.holdings_pct.values()) > 100.0001:
+        raise HTTPException(422, "Current holding percentages total more than 100%.")
+
+    load_repo_env()
+    try:
+        creds = fyers.resolve_credentials(prefer_dashboard=req.auth_source == "dashboard")
+    except fyers.FyersCredentialsError as error:
+        raise HTTPException(401, f"Fyers login required: {error}") from None
+
+    week = rebalance.signal_week(now.date())
+    settlement_week = week + pd.Timedelta(days=7)
+    # The engine decides trades for weeks[:-1]. A flat, in-memory sentinel week
+    # lets it decide on today's LTP row without inventing a future price move.
+    model_req = req.model_copy(update={"end": settlement_week.strftime("%Y-%m-%d")})
+    try:
+        if req.dataset == "stock":
+            stock = DATA.get_stock()
+            unknown = (
+                set(req.holdings_pct) - set(stock.companies) - set(stock.extra_instruments) - {IDLE}
+            )
+            if unknown:
+                raise ValueError(f"Unknown holding identifiers: {', '.join(sorted(unknown))}.")
+            quotes = rebalance.quote_stock_universe(
+                stock, req.universe, req.holdings_pct, now.date(), creds
+            )
+            prices, membership, ltp, symbols = rebalance.live_stock_prices(
+                stock, req.universe, req.holdings_pct, quotes, now.date()
+            )
+            prices.loc[settlement_week] = prices.loc[week]
+            membership.loc[settlement_week] = membership.loc[week]
+            config = Config(**_config_kwargs(model_req))
+            outcome = rebalance.stock_target(stock, prices, membership, config)
+            target = rebalance.model_holdings(outcome, week)
+        else:
+            if (
+                req.broad_category_mode == "on"
+                and req.broad_category_top_n > req.broad_category_exit_rank
+            ):
+                raise ValueError("Category top N can't exceed category exit rank.")
+            ranking = DATA.get_broad_ranking(
+                lookbacks=tuple(req.lookbacks),
+                weights=tuple(req.weights) if req.weights else None,
+                score=req.score,
+                voladj_skip_recent_month=req.voladj_skip_recent_month,
+                pool_top_n=req.broad_pool_top_n,
+                pool_exit_rank=req.broad_pool_exit_rank,
+            )
+            symbol_map = rebalance.broad_quote_symbols(ranking)
+            unknown = set(req.holdings_pct) - set(symbol_map) - {IDLE}
+            if unknown:
+                raise ValueError(f"Unknown or inactive holdings: {', '.join(sorted(unknown))}.")
+            quotes = fyers.quotes(sorted(set(symbol_map.values())), creds)
+            config = Config(
+                lookbacks=tuple(req.lookbacks),
+                weights=tuple(req.weights) if req.weights else None,
+                score=req.score,
+                voladj_skip_recent_month=req.voladj_skip_recent_month,
+            )
+            live_ranking, ltp, symbols = rebalance.live_broad_ranking(
+                ranking,
+                quotes,
+                now.date(),
+                config,
+                pool_top_n=req.broad_pool_top_n,
+                pool_exit_rank=req.broad_pool_exit_rank,
+            )
+            outer = DATA.get().copy()
+            if week > outer.index[-1]:
+                outer.loc[week] = outer.iloc[-1]
+            outer.loc[settlement_week] = outer.loc[week]
+            outcome = _run_broad(model_req, live_ranking, outer).result
+            target = rebalance.model_holdings(outcome, week)
+        current = dict(req.holdings_pct)
+        current[IDLE] = current.get(IDLE, 0.0) + max(0.0, 100 - sum(current.values()))
+        rows = rebalance.build_plan(current, target, ltp, symbols, req.portfolio_value)
+    except fyers.FyersCredentialsError as error:
+        raise HTTPException(401, f"Fyers login required: {error}") from None
+    except (ValueError, KeyError, broad.TotalMarketDataNotFoundError) as error:
+        raise HTTPException(422, str(error)) from None
+    except FileNotFoundError as error:
+        raise HTTPException(409, str(error)) from None
+    except RuntimeError as error:
+        raise HTTPException(502, f"Fyers quote request failed: {error}") from None
+
+    return {
+        "dataset": req.dataset,
+        "as_of": now.isoformat(timespec="seconds"),
+        "signal_week": week.strftime("%Y-%m-%d"),
+        "price_source": "Fyers last traded price",
+        "portfolio_value": req.portfolio_value,
+        "current_pct": current,
+        "target_pct": {name: round(weight * 100, 4) for name, weight in target.items()},
+        "rows": rows,
+        "note": (
+            "Model target uses the strategy's simulated historical holdings. "
+            "Your supplied weights determine the difference. "
+            "Quantities are indicative whole shares; "
+            "fees, taxes and live order-book liquidity are not included. No orders were placed."
+        ),
+    }
 
 
 def create_app() -> FastAPI:
@@ -1342,6 +1476,10 @@ def create_app() -> FastAPI:
             "sent_to_telegram": body.send,
             "signal": result.signal,
         }
+
+    @app.post("/api/rebalance-preview")
+    def preview(req: RebalanceRequest) -> dict:
+        return rebalance_preview(req)
 
     @app.get("/vendor/plotly.min.js")
     def plotly() -> FileResponse:

@@ -2,10 +2,11 @@
  * Fyers OAuth routes — in-dashboard login flow.
  *
  *   GET  /api/auth/fyers/login    → returns the Fyers authorization URL
+ *   GET  /api/auth/fyers/start    → redirects a browser to Fyers login
  *   GET  /api/auth/fyers/callback → exchanges auth_code for access_token, stores it
  *   GET  /api/auth/fyers/status   → reports whether a non-expired token is stored
  *
- * The frontend opens /login in a new tab. After approving on fyers.in the user
+ * The frontend opens /start in a new tab. After approving on fyers.in the user
  * is redirected to /callback, which writes the token to the broker_tokens
  * table and returns a small HTML page that closes itself.
  *
@@ -58,23 +59,39 @@ function pruneExpiredStates(): void {
   }
 }
 
+function createLoginUrl(): { url: string; state: string } | null {
+  const cfg = loadFyersOAuthConfig();
+  if (!cfg) return null;
+  pruneExpiredStates();
+  const state = randomBytes(16).toString('hex');
+  pendingStates.set(state, Date.now() + STATE_TTL_MS);
+  return { url: buildAuthUrl(cfg, state), state };
+}
+
 export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
   server.get('/api/auth/fyers/login', async (_request, reply) => {
-    const cfg = loadFyersOAuthConfig();
-    if (!cfg) {
+    const login = createLoginUrl();
+    if (!login) {
       return reply.code(503).send({
         error: 'fyers_oauth_not_configured',
         message: 'Set FYERS_APP_ID and FYERS_APP_SECRET in the server environment.',
       });
     }
+    return reply.header('Cache-Control', 'no-store').send(login);
+  });
 
-    // Prune stale entries before inserting a new one.
-    pruneExpiredStates();
-
-    const state = randomBytes(16).toString('hex');
-    pendingStates.set(state, Date.now() + STATE_TTL_MS);
-
-    return reply.send({ url: buildAuthUrl(cfg, state), state });
+  // A direct browser navigation keeps the OAuth popup tied to the original
+  // click. Fetching a URL first and then calling window.open is popup-blocked
+  // in some browsers because the user activation has already ended.
+  server.get('/api/auth/fyers/start', async (_request, reply) => {
+    const login = createLoginUrl();
+    if (!login) {
+      return reply.code(503).send({
+        error: 'fyers_oauth_not_configured',
+        message: 'Set FYERS_APP_ID and FYERS_APP_SECRET in the server environment.',
+      });
+    }
+    return reply.code(302).header('Location', login.url).header('Cache-Control', 'no-store').send();
   });
 
   server.get('/api/auth/fyers/callback', async (request, reply) => {
@@ -162,6 +179,7 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
   });
 
   server.get('/api/auth/fyers/status', async (_request, reply) => {
+    reply.header('Cache-Control', 'no-store');
     const cfg = loadFyersOAuthConfig();
     if (!cfg) {
       // No OAuth config → cannot be connected. Degraded/needsReauth are also

@@ -57,3 +57,25 @@ export interface MomentumWeeklyRunResult {
   sent_to_telegram: boolean;
   signal: Record<string, unknown> | null;
 }
+
+export interface MomentumRebalanceResult {
+  dataset: 'stock' | 'broad';
+  as_of: string;
+  signal_week: string;
+  price_source: string;
+  portfolio_value: number;
+  current_pct: Record<string, number>;
+  target_pct: Record<string, number>;
+  rows: Array<{
+    asset: string;
+    symbol: string | null;
+    action: 'BUY' | 'SELL';
+    current_pct: number;
+    target_pct: number;
+    delta_pct: number;
+    ltp: number | null;
+    indicative_value: number;
+    indicative_quantity: number | null;
+  }>;
+  note: string;
+}

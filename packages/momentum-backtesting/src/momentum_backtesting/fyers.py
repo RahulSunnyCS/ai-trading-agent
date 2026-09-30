@@ -141,7 +141,42 @@ def _cached_token() -> Credentials | None:
     return Credentials(data["app_id"], data["access_token"], "mbt login cache", expires_at)
 
 
-def resolve_credentials() -> Credentials:
+def _dashboard_credentials() -> Credentials:
+    """Read the dashboard's server-side token cache, enforcing broker expiry."""
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if not database_url:
+        raise FyersCredentialsError("The dashboard token database is not configured.")
+
+    import psycopg
+
+    try:
+        with psycopg.connect(database_url, connect_timeout=10) as conn:
+            row = conn.execute(
+                "SELECT app_id, access_token, expires_at FROM broker_tokens"
+                " WHERE broker = 'fyers' LIMIT 1"
+            ).fetchone()
+    except psycopg.OperationalError as error:
+        reason = str(error).strip().splitlines()[-1]
+        raise FyersCredentialsError(
+            f"The dashboard's Fyers token database isn't reachable ({reason})."
+        ) from None
+    if row is None:
+        raise FyersCredentialsError(
+            "No Fyers token stored yet - log in with the dashboard's 'Login with Fyers' button."
+        )
+    stored_app_id, stored_token, expires_at = row
+    if expires_at <= datetime.now(UTC):
+        raise FyersCredentialsError(
+            f"The stored Fyers token expired at {expires_at:%Y-%m-%d %H:%M %Z} - "
+            "log in with the dashboard's 'Login with Fyers' button again."
+        )
+    return Credentials(stored_app_id, stored_token, "broker_tokens", expires_at)
+
+
+def resolve_credentials(*, prefer_dashboard: bool = False) -> Credentials:
+    """Resolve a valid token; UI previews prefer the dashboard login over stale env tokens."""
+    if prefer_dashboard and os.environ.get("DATABASE_URL", "").strip():
+        return _dashboard_credentials()
     app_id = os.environ.get("FYERS_APP_ID", "").strip()
     token = os.environ.get("FYERS_ACCESS_TOKEN", "").strip()
     if app_id and token:
@@ -164,37 +199,11 @@ def resolve_credentials() -> Credentials:
     if cached:
         return cached
 
-    database_url = os.environ.get("DATABASE_URL", "").strip()
-    if not database_url:
+    if not os.environ.get("DATABASE_URL", "").strip():
         raise FyersCredentialsError(
             "No Fyers token: run `mbt login`, or set FYERS_ACCESS_TOKEN in .env."
         )
-
-    import psycopg
-
-    try:
-        with psycopg.connect(database_url, connect_timeout=10) as conn:
-            row = conn.execute(
-                "SELECT app_id, access_token, expires_at FROM broker_tokens"
-                " WHERE broker = 'fyers' LIMIT 1"
-            ).fetchone()
-    except psycopg.OperationalError as error:
-        reason = str(error).strip().splitlines()[-1]
-        raise FyersCredentialsError(
-            f"No Fyers token: `mbt login` hasn't been run today, and the database holding "
-            f"the dashboard's token isn't reachable ({reason}). Run `mbt login`."
-        ) from None
-    if row is None:
-        raise FyersCredentialsError(
-            "No Fyers token stored yet - log in with the dashboard's 'Login with Fyers' button."
-        )
-    stored_app_id, stored_token, expires_at = row
-    if expires_at <= datetime.now(UTC):
-        raise FyersCredentialsError(
-            f"The stored Fyers token expired at {expires_at:%Y-%m-%d %H:%M %Z} - "
-            "log in with the dashboard's 'Login with Fyers' button again."
-        )
-    return Credentials(stored_app_id, stored_token, "broker_tokens", expires_at)
+    return _dashboard_credentials()
 
 
 def _get(params: dict[str, str | int], creds: Credentials) -> dict:

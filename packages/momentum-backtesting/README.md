@@ -17,6 +17,41 @@ uv run mbt fetch     # ~5 minutes; writes data/weekly_closes.csv and .xlsx
 token cached by `mbt login`, or the dashboard's stored token (`broker_tokens`, via
 `DATABASE_URL`). `uv run mbt token-status` shows which one will be used.
 
+## On-demand rebalance preview
+
+The shared dashboard's **Momentum Backtesting → Rebalance now** tab and the CLI use
+the same read-only calculation. They support Nifty 50 Stocks and Broad Momentum,
+collect Fyers LTPs during NSE market hours, and compare the model's live-week target
+with your actual holdings in percentages. The dashboard includes the existing Fyers
+login card; clicking it starts Fyers OAuth in a new tab. The access token is held
+server-side in `broker_tokens` until the expiry Fyers reports, and the app secret
+stays in server environment configuration, never browser storage. The preview
+never submits orders. Keep `mbt stocks fetch` and, for Broad,
+`mbt categories fetch-universe` data current before using it.
+
+For CLI use, save strategy settings (the same JSON shape accepted by `/api/backtest`)
+and actual holdings percentages in two files, for example:
+
+```json
+{"dataset":"stock","universe":["C0001","C0002","Gold"],"start":"2017-01-01","top_n":2,"exit_rank":4}
+```
+
+```json
+{"C0001":40,"C0002":30,"Gold":10}
+```
+
+The remaining 20% is assumed to be idle cash. Then run:
+
+```bash
+uv run mbt rebalance --config strategy.json --holdings holdings.json --portfolio-value 100000
+```
+
+`--json` emits the full response. Whole-share counts are indicative, exclude fees,
+taxes and order-book liquidity, and the target is based on the strategy's simulated
+historical holdings rather than a broker portfolio sync. For Broad Momentum, use
+`"dataset":"broad","universe":["broad_momentum"]` and asset identifiers from
+the Broad model (including `#N` suffixes where a split segment is active).
+
 ## Data
 
 - **Universe** — `src/momentum_backtesting/universe.csv`: the index, the ETF you would

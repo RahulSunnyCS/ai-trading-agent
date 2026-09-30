@@ -39,6 +39,32 @@ def test_env_token_wins_over_database(monkeypatch):
     assert (creds.app_id, creds.access_token, creds.source) == ("APP-100", "tok", "env")
 
 
+def test_dashboard_preview_prefers_cached_oauth_token_over_env(monkeypatch):
+    monkeypatch.setenv("FYERS_APP_ID", "APP-100")
+    monkeypatch.setenv("FYERS_ACCESS_TOKEN", "stale-env")
+    monkeypatch.setenv("DATABASE_URL", "postgres://fake")
+    expires = datetime.now(UTC) + timedelta(hours=2)
+
+    class FakeConn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, _sql):
+            return self
+
+        def fetchone(self):
+            return ("APP-100", "fresh-dashboard", expires)
+
+    import psycopg
+
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: FakeConn())
+    creds = fyers.resolve_credentials(prefer_dashboard=True)
+    assert (creds.access_token, creds.source) == ("fresh-dashboard", "broker_tokens")
+
+
 def test_no_token_anywhere_points_to_mbt_login(monkeypatch, tmp_path):
     monkeypatch.setenv("FYERS_APP_ID", "APP-100")
     monkeypatch.delenv("FYERS_ACCESS_TOKEN", raising=False)

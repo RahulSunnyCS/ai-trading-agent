@@ -7,6 +7,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
 import { MomentumAdvancedSettings, advancedDefaults } from './momentum/MomentumAdvancedSettings';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
+import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
 import { MomentumResultDetails } from './momentum/MomentumResultDetails';
 import { MomentumSavedRunsView } from './momentum/MomentumSavedRunsView';
 import { MomentumScoresView } from './momentum/MomentumScoresView';
@@ -89,7 +90,7 @@ async function fetchSavedRuns(dataset: Dataset): Promise<MomentumSavedRun[]> {
  * Fastify proxy; the legacy Python UI remains available during parity work.
  */
 export function MomentumBacktestingView() {
-  const [section, setSection] = useState<'backtest' | 'scores' | 'saved' | 'weekly'>('backtest');
+  const [section, setSection] = useState<'backtest' | 'scores' | 'saved' | 'weekly' | 'rebalance'>('backtest');
   const [dataset, setDataset] = useState<Dataset>('etf');
   const [meta, setMeta] = useState<MomentumMeta | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -184,15 +185,14 @@ export function MomentumBacktestingView() {
     );
   }
 
-  async function runBacktest(): Promise<void> {
-    if (!meta) return;
+  function buildConfig(): Record<string, unknown> {
+    if (!meta) throw new Error('Strategy settings are still loading.');
     const parsedLookbacks = lookbacks
       .split(',')
       .map((value) => Number(value.trim()))
       .filter((value) => Number.isInteger(value) && value > 0);
     if (parsedLookbacks.length === 0) {
-      setError('Enter one or more positive whole-number lookback windows.');
-      return;
+      throw new Error('Enter one or more positive whole-number lookback windows.');
     }
     const parsedWeights = weights.trim()
       ? weights.split(',').map((value) => Number(value.trim()))
@@ -200,31 +200,28 @@ export function MomentumBacktestingView() {
     if (
       parsedWeights &&
       (parsedWeights.length !== parsedLookbacks.length ||
-        parsedWeights.some((value) => !Number.isFinite(value) || value <= 0))
+        parsedWeights.some((value) => !Number.isFinite(value)) ||
+        parsedWeights.every((value) => value === 0))
     ) {
-      setError('Give one positive weight per lookback window, or leave weights blank.');
-      return;
+      throw new Error('Give one finite weight per lookback window (negative is allowed, for a reversal signal — not all zero), or leave weights blank.');
     }
     if (dataset !== 'broad' && selected.length === 0) {
-      setError('Select at least one instrument before running the backtest.');
-      return;
+      throw new Error('Select at least one instrument before running the strategy.');
     }
+    return {
+      ...meta.defaults, ...advanced, dataset,
+      universe: dataset === 'broad' ? ['broad_momentum'] : selected,
+      start, end, top_n: topN, exit_rank: exitRank,
+      lookbacks: parsedLookbacks, weights: parsedWeights,
+    };
+  }
+
+  async function runBacktest(): Promise<void> {
+    let config: Record<string, unknown>;
+    try { config = buildConfig(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); return; }
     setRunning(true);
     setError(null);
-    const config = {
-      ...meta.defaults,
-      ...advanced,
-      dataset,
-      // Broad Momentum does not consume a fixed universe but the existing
-      // Pydantic contract requires this field to be non-empty.
-      universe: dataset === 'broad' ? ['broad_momentum'] : selected,
-      start,
-      end,
-      top_n: topN,
-      exit_rank: exitRank,
-      lookbacks: parsedLookbacks,
-      weights: parsedWeights,
-    };
     const response = await apiPost<MomentumResult>('/api/momentum/backtest', config);
     setRunning(false);
     if (!response.ok) {
@@ -287,11 +284,24 @@ export function MomentumBacktestingView() {
         >
           Weekly signal
         </Button>
+        <Button
+          size="sm"
+          variant={section === 'rebalance' ? 'primary' : 'ghost'}
+          onClick={() => setSection('rebalance')}
+        >
+          Rebalance now
+        </Button>
       </div>
       {section === 'scores' ? (
         <MomentumScoresView />
       ) : section === 'weekly' ? (
         <MomentumWeeklyView />
+      ) : section === 'rebalance' ? (
+        <MomentumRebalanceView
+          dataset={dataset}
+          buildConfig={buildConfig}
+          onChooseDataset={setDataset}
+        />
       ) : (
         <>
           {section === 'saved' ? (

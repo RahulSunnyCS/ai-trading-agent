@@ -15,7 +15,7 @@
 import { AlertCircle, CheckCircle2, ExternalLink, LogIn } from 'lucide-react';
 
 import { useFyersAuthStatus } from '../hooks/useFyersAuthStatus';
-import { apiGet } from '../lib/api';
+import { startFyersLogin } from '../lib/fyers-login';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
@@ -40,28 +40,11 @@ function formatExpiry(iso: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Login action — fetches the OAuth URL and opens it in a new tab
-// ---------------------------------------------------------------------------
-
-async function openFyersLogin(): Promise<void> {
-  const result = await apiGet<{ url: string; state: string }>('/api/auth/fyers/login');
-  if (!result.ok) {
-    // Surface error to the console; the UI re-polls on focus so the user can
-    // retry by clicking the button again after the issue resolves.
-    console.error(`[FyersAuthCard] Failed to get login URL: ${result.error}`);
-    return;
-  }
-  // noopener,noreferrer: prevents the new tab from accessing window.opener,
-  // closing the tab reference leak from OAuth redirect pages.
-  window.open(result.data.url, '_blank', 'noopener,noreferrer');
-}
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function FyersAuthCard() {
-  const { status, loading } = useFyersAuthStatus();
+  const { status, loading, error } = useFyersAuthStatus();
 
   const isConnected = Boolean(status?.connected && !status.needsReauth);
   const isConfigured = Boolean(status?.configured);
@@ -87,7 +70,7 @@ export function FyersAuthCard() {
                 <Button
                   size="sm"
                   variant={isConnected ? 'secondary' : 'primary'}
-                  onClick={() => void openFyersLogin()}
+                  onClick={startFyersLogin}
                 >
                   <LogIn className="h-3.5 w-3.5" />
                   {isConnected ? 'Re-login' : 'Login with Fyers'}
@@ -103,6 +86,8 @@ export function FyersAuthCard() {
       <div className="flex flex-wrap items-center gap-3">
         {loading && <span className="text-sm text-muted">Checking connection…</span>}
 
+        {!loading && error && <p className="text-sm text-negative">Could not check Fyers status: {error}</p>}
+
         {!loading && status === null && <Badge tone="neutral">Unknown</Badge>}
 
         {!loading && status !== null && !isConfigured && (
@@ -115,9 +100,9 @@ export function FyersAuthCard() {
               </code>{' '}
               and{' '}
               <code className="rounded bg-surface-2 px-1 py-0.5 text-xs font-mono text-faint">
-                FYERS_ACCESS_TOKEN
+                FYERS_APP_SECRET
               </code>{' '}
-              in your environment to enable Fyers integration.
+              on the server to enable Fyers login. The secret is never stored in this browser.
             </p>
           </>
         )}

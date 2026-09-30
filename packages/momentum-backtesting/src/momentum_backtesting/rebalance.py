@@ -1,0 +1,331 @@
+"""Read-only intraday rebalance preview for stock momentum portfolios.
+
+The live quote row exists only in memory. Holdings are the user's current portfolio
+weights, while the target is produced by the existing backtest engine and rules.
+"""
+
+import csv
+import math
+from dataclasses import replace
+from datetime import date, timedelta
+from pathlib import Path
+
+import pandas as pd
+
+from . import engine, fyers
+from .categories import broad
+from .config import DATA_DIR
+from .engine import CASH, IDLE, Config, Result, run_backtest
+from .fetch import load_universe
+from .stocks.ui_data import StockDataset
+
+
+def signal_week(today: date) -> pd.Timestamp:
+    """Friday label for the current trading week, including a weekday preview."""
+    return pd.Timestamp(today + timedelta(days=(4 - today.weekday()) % 7))
+
+
+def active_aliases(today: date, path: Path | None = None) -> dict[str, str]:
+    path = path or Path(__file__).parent / "stocks" / "curated" / "aliases.csv"
+    with path.open(newline="") as source:
+        return {
+            row["company_id"]: row["symbol"]
+            for row in csv.DictReader(source)
+            if date.fromisoformat(row["from"]) <= today
+            and (not row["to"] or today <= date.fromisoformat(row["to"]))
+        }
+
+
+def last_raw_closes(data_dir: Path = DATA_DIR) -> dict[str, float]:
+    path = data_dir / "stocks" / "last_trade.csv"
+    if not path.exists():
+        raise ValueError("No stock trade-price reference; run `mbt stocks fetch` first.")
+    with path.open(newline="") as source:
+        return {row["company_id"]: float(row["last_close"]) for row in csv.DictReader(source)}
+
+
+def extra_symbols(names: set[str]) -> dict[str, str]:
+    by_name = {item.name: item for item in load_universe()}
+    return {
+        name: f"NSE:{by_name[name].trade_etf}-EQ"
+        for name in names
+        if name != CASH and name in by_name
+    }
+
+
+def live_stock_prices(
+    stock: StockDataset,
+    universe: list[str],
+    holdings: dict[str, float],
+    quotes: dict[str, float],
+    today: date,
+    *,
+    data_dir: Path = DATA_DIR,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, float], dict[str, str]]:
+    """Extend the stock frame with Fyers LTPs, scaled to total-return series units.
+
+    The raw Fyers share price and the total-return history use different units.
+    Scaling by the most recent raw close preserves the history's return basis.
+    Every currently eligible selected stock must have a quote; silent stale
+    substitutions could change the recommended buys and are rejected.
+    """
+    if stock.prices.empty:
+        raise ValueError("No stock history is available.")
+    week = signal_week(today)
+    last = stock.prices.index[-1]
+    if week < last:
+        raise ValueError("Historical data is newer than the preview date.")
+    if (today - last.date()).days > 10:
+        raise ValueError("Stock history is more than 10 days old; refresh it before previewing.")
+
+    aliases = active_aliases(today)
+    raw = last_raw_closes(data_dir)
+    membership = stock.membership.copy()
+    member_row = membership.iloc[-1]
+    selected = {
+        name for name in universe if name in stock.companies and bool(member_row.get(name, False))
+    }
+    selected.update(name for name in holdings if name in stock.companies)
+    symbols = {name: f"NSE:{aliases[name]}-EQ" for name in selected if name in aliases}
+    extras = (set(universe) | set(holdings)) & set(stock.extra_instruments)
+    symbols.update(extra_symbols(extras))
+    missing_aliases = selected - symbols.keys()
+    if missing_aliases:
+        raise ValueError(f"No current exchange symbol for: {', '.join(sorted(missing_aliases))}.")
+    missing = sorted(name for name, symbol in symbols.items() if symbol not in quotes)
+    if missing:
+        raise ValueError(f"Fyers returned no LTP for: {', '.join(missing)}. Preview cancelled.")
+
+    prices = stock.prices.copy()
+    live = prices.loc[last].copy()
+    ltp: dict[str, float] = {}
+    trade_symbols: dict[str, str] = {}
+    for name, symbol in symbols.items():
+        price = quotes[symbol]
+        historical = prices.at[last, name] if name in prices else float("nan")
+        if name in stock.extra_instruments:
+            reference = historical
+            if name == "Gilt 8-13 yr":
+                etf_path = data_dir / "daily_etf" / f"{name}.csv"
+                if not etf_path.exists():
+                    raise ValueError("No Gilt ETF reference; run `mbt fetch --etfs` first.")
+                reference = float(pd.read_csv(etf_path)["close"].iloc[-1])
+        else:
+            reference = raw.get(name)
+        if not (price > 0 and reference and reference > 0 and pd.notna(historical)):
+            raise ValueError(f"No valid price reference for {name}; preview cancelled.")
+        ratio = price / reference
+        if ratio < 0.5 or ratio > 1.5:
+            raise ValueError(
+                f"{name} LTP differs by more than 50% from its last raw close; "
+                "refresh corporate actions before previewing."
+            )
+        live[name] = float(historical) * ratio
+        ltp[name] = price
+        trade_symbols[name] = symbol
+
+    if week > last:
+        prices.loc[week] = live
+        membership.loc[week] = member_row
+    else:
+        prices.loc[week] = live
+    return prices.sort_index(), membership.sort_index(), ltp, trade_symbols
+
+
+def stock_target(
+    stock: StockDataset,
+    prices: pd.DataFrame,
+    membership: pd.DataFrame,
+    config: Config,
+) -> Result:
+    includes = {name: "core" for name in stock.companies}
+    includes.update({name: extra["tag"] for name, extra in stock.extra_instruments.items()})
+    return run_backtest(
+        prices,
+        includes,
+        config,
+        stock.tax_classes,
+        membership=membership,
+    )
+
+
+def model_holdings(result: Result, week: pd.Timestamp) -> dict[str, float]:
+    """Weights decided on the live signal week, not the previous week's row."""
+    if week not in result.weights.index:
+        raise ValueError("The strategy did not produce a live-week target.")
+    row = result.weights.loc[week]
+    return {name: float(value) for name, value in row.items() if pd.notna(value) and value > 1e-6}
+
+
+def build_plan(
+    current_percent: dict[str, float],
+    target_weights: dict[str, float],
+    ltp: dict[str, float],
+    trade_symbols: dict[str, str],
+    capital: float,
+) -> list[dict]:
+    """Translate model target versus actual percentages into indicative trade quantities."""
+    if not math.isfinite(capital) or capital <= 0:
+        raise ValueError("Portfolio value must be positive.")
+    if any(
+        not math.isfinite(value) or value < 0 or value > 100 for value in current_percent.values()
+    ):
+        raise ValueError("Each holding must be a percentage between 0 and 100.")
+    if sum(current_percent.values()) > 100.0001:
+        raise ValueError("Current holding percentages total more than 100%.")
+    if any(not math.isfinite(value) or value < 0 for value in target_weights.values()):
+        raise ValueError("Model target contains an invalid weight.")
+    names = sorted(set(current_percent) | set(target_weights))
+    rows = []
+    for name in names:
+        current = current_percent.get(name, 0.0)
+        target = target_weights.get(name, 0.0) * 100
+        delta = target - current
+        if abs(delta) < 0.01:
+            continue
+        price = ltp.get(name)
+        if name != IDLE and name != CASH and (price is None or price <= 0):
+            raise ValueError(f"No tradeable LTP for {name}; preview cancelled.")
+        notional = abs(delta) / 100 * capital
+        rows.append(
+            {
+                "asset": name,
+                "symbol": trade_symbols.get(name),
+                "action": "BUY" if delta > 0 else "SELL",
+                "current_pct": round(current, 4),
+                "target_pct": round(target, 4),
+                "delta_pct": round(delta, 4),
+                "ltp": price,
+                "indicative_value": round(notional, 2),
+                "indicative_quantity": math.floor(notional / price) if price else None,
+            }
+        )
+    return sorted(rows, key=lambda row: (row["action"] != "SELL", -abs(row["delta_pct"])))
+
+
+def quote_stock_universe(
+    stock: StockDataset,
+    universe: list[str],
+    holdings: dict[str, float],
+    today: date,
+    creds: fyers.Credentials,
+) -> dict[str, float]:
+    aliases = active_aliases(today)
+    member_row = stock.membership.iloc[-1]
+    names = {
+        name for name in universe if name in stock.companies and bool(member_row.get(name, False))
+    }
+    names.update(name for name in holdings if name in stock.companies)
+    missing = names - aliases.keys()
+    if missing:
+        raise ValueError(f"No current exchange symbol for: {', '.join(sorted(missing))}.")
+    symbols = {f"NSE:{aliases[name]}-EQ" for name in names}
+    extras = (set(universe) | set(holdings)) & set(stock.extra_instruments)
+    symbols.update(extra_symbols(extras).values())
+    return fyers.quotes(sorted(symbols), creds)
+
+
+def broad_quote_symbols(ranking: broad.UniverseRanking) -> dict[str, str]:
+    """All currently priceable stocks, including potential new pool entrants."""
+    latest = ranking.prices.iloc[-1]
+    return {
+        name: f"NSE:{base}-EQ"
+        for name, base in ranking.column_to_base_symbol.items()
+        if name not in ranking.stale_columns
+        and pd.notna(latest.get(name))
+        and pd.notna(ranking.global_ranks.iloc[-1].get(name))
+    } | extra_symbols(set(broad.ATOMIC_NAMES))
+
+
+def live_broad_ranking(
+    ranking: broad.UniverseRanking,
+    quotes: dict[str, float],
+    today: date,
+    config: Config,
+    *,
+    pool_top_n: int,
+    pool_exit_rank: int,
+    data_dir: Path = DATA_DIR,
+) -> tuple[broad.UniverseRanking, dict[str, float], dict[str, str]]:
+    """Recompute the Broad funnel on a temporary LTP week; never write history."""
+    last = ranking.prices.index[-1]
+    week = signal_week(today)
+    settlement_week = week + pd.Timedelta(days=7)
+    if week < last or (today - last.date()).days > 10:
+        raise ValueError("Broad Momentum history is stale; refresh it before previewing.")
+    symbols = broad_quote_symbols(ranking)
+    missing = sorted(name for name, symbol in symbols.items() if symbol not in quotes)
+    if missing:
+        raise ValueError(
+            f"Fyers returned no LTP for {len(missing)} Broad instruments "
+            f"({', '.join(missing[:8])}); preview cancelled."
+        )
+
+    prices = ranking.prices.copy()
+    live = prices.loc[last].copy()
+    ltp: dict[str, float] = {}
+    for name, symbol in symbols.items():
+        price = quotes[symbol]
+        if not math.isfinite(price) or price <= 0:
+            raise ValueError(f"Invalid Fyers LTP for {name}.")
+        if name in broad.ATOMIC_NAMES:
+            reference = float(prices.at[last, name])
+            if name in ("Nasdaq 100", "Hang Seng"):
+                etf_path = data_dir / "daily_etf" / f"{name}.csv"
+                if not etf_path.exists():
+                    raise ValueError(f"No {name} ETF reference; run `mbt fetch --etfs` first.")
+                reference = float(pd.read_csv(etf_path)["close"].iloc[-1])
+            live[name] = float(prices.at[last, name]) * price / reference
+        else:
+            reference = float(prices.at[last, name])
+            if price / reference < 0.5 or price / reference > 1.5:
+                raise ValueError(
+                    f"{name} LTP differs by more than 50% from its last close; "
+                    "refresh corporate actions before previewing."
+                )
+            live[name] = price
+        ltp[name] = price
+
+    if week > last:
+        prices.loc[week] = live
+    else:
+        prices.loc[week] = live
+    # Include the flat engine sentinel before deriving quarter-end membership.
+    # Otherwise a mid-quarter live week looks like the final quarter week and
+    # forces an unscheduled Broad pool refresh.
+    prices.loc[settlement_week] = live
+    prices = prices.sort_index()
+    ranks, _ = engine.compute_ranks(prices, config)
+    stock_columns = list(ranking.column_to_base_symbol)
+    universe = broad.load_stock_universe_frame(
+        stocks_data_dir=data_dir / "stocks",
+        categories_data_dir=data_dir / "categories",
+    )
+    membership = universe.stock_membership.copy()
+    if week > last:
+        membership.loc[week] = membership.iloc[-1]
+    membership.loc[settlement_week] = membership.loc[week]
+    membership = membership.reindex(prices.index, fill_value=False)
+    pool = broad._compute_pool_membership(
+        ranks[stock_columns],
+        membership[stock_columns],
+        list(prices.index),
+        top_n=pool_top_n,
+        exit_rank=pool_exit_rank,
+    )
+    stock_pool = broad._dense_rank(ranks[stock_columns].where(pool))
+    eligible = pd.DataFrame(False, index=prices.index, columns=prices.columns)
+    eligible[stock_columns] = pool
+    for name in broad.ATOMIC_NAMES:
+        eligible[name] = prices[name].notna()
+    combined_pool = broad._dense_rank(ranks.where(eligible))
+    updated = replace(
+        ranking,
+        prices=prices,
+        weeks=list(prices.index),
+        global_ranks=ranks,
+        pool_membership=pool,
+        stock_pool_ranks=stock_pool,
+        combined_pool_ranks=combined_pool,
+    )
+    return updated, ltp, symbols

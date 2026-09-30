@@ -46,6 +46,7 @@ export function useFyersAuthStatus(): FyersAuthState {
     setLoading(false);
     if (!result.ok) {
       setError(result.error);
+      setStatus(null);
       return;
     }
     setError(null);

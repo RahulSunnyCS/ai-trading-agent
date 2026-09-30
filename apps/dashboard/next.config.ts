@@ -50,6 +50,10 @@ const nextConfig: NextConfig = {
               source: '/api/momentum/weekly/run',
               destination: 'http://127.0.0.1:8765/api/weekly/run',
             },
+            {
+              source: '/api/momentum/rebalance-preview',
+              destination: 'http://127.0.0.1:8765/api/rebalance-preview',
+            },
           ]
         : []),
       { source: '/api/:path*', destination: `${apiOrigin}/api/:path*` },
