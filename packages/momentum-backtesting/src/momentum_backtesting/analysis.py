@@ -340,8 +340,15 @@ def payload(
     proxy: pd.DataFrame | None = None,
     fill_warnings: list[str] | None = None,
     membership: pd.DataFrame | None = None,
+    share_prices: bool = False,
 ) -> dict:
-    """`proxy` (week x instrument, from trade_prices) marks fills where an ETF was priced on
+    """`share_prices` adds each open position's last-week price (`open_positions[].price`) so the
+    UI's "Trade split" tab can turn a rupee amount into whole shares. Off by default: only pass
+    True where the frame's columns are the raw traded prices of what you'd actually buy (Broad
+    Momentum's stocks) - an ETF ranked on its index, or a category's synthetic equity curve, has
+    no share price to divide by.
+
+    `proxy` (week x instrument, from trade_prices) marks fills where an ETF was priced on
     its index because it hadn't listed yet. `membership` is passed straight through to
     `latest_signal` (see its docstring) - it never affects the historical `result` itself, which
     the engine has already computed correctly; it only stops the "This week" advisory panel from
@@ -380,10 +387,13 @@ def payload(
     for row in trade_rows:
         row["proxy"] = _proxied(proxy, row["asset"], row["entry_week"], row["exit_week"])
     open_rows = []
+    last_week = result.equity.index[-1]
     for r in result.open_positions.itertuples() if len(result.open_positions) else []:
+        price = prices.at[last_week, r.asset] if share_prices and r.asset in prices else None
         open_rows.append(
             {
                 "asset": r.asset,
+                "price": None if price is None or pd.isna(price) else float(price),
                 "entry_week": r.entry_week,
                 "weeks_held": r.weeks_held,
                 "rank": r.rank,

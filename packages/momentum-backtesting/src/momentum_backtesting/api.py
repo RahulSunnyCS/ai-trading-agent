@@ -345,6 +345,11 @@ class BacktestRequest(BaseModel):
     entry: Literal["wait", "make_room"] = "wait"
     max_position: float | None = Field(0.35, gt=0, le=1)  # None = no cap
     cap_band: float = Field(0.05, ge=0, le=0.5)
+    # Broad Momentum only (category mode ON for max_category). max_category caps everything held
+    # through ONE category (its stocks together); max_stock_price skips stocks whose share price
+    # is above it (rupees; None/0 = off). Both ignored by the other three datasets.
+    max_category: float | None = Field(None, gt=0, le=1)
+    max_stock_price: float | None = Field(None, ge=0)
     # Buffer rule only (engine.py Config.momentum_sizing): shrinks new/top-up buys after a
     # recent losing streak, ramps back to full size as it recovers. Opt-in try-it toggle, not a
     # new default (see TODO.md 3.9.8) - harmless (never read) for portfolio="slots".
@@ -1057,7 +1062,12 @@ def _broad_meta() -> dict:
             "cost_pct": defaults.cost_pct,
             "portfolio": defaults.portfolio,
             "entry": defaults.entry,
-            "max_position": defaults.max_position,
+            # Broad holds up to 16 stocks across up to 8 categories, so the ETF-tuned 35% cap
+            # almost never binds. These bind on a concentrated week without holding cash back on
+            # a normal one (4 fresh categories x 30% and 8 fresh stocks x 15% both exceed 100%).
+            "max_position": broad.DEFAULT_MAX_POSITION,
+            "max_category": broad.DEFAULT_MAX_CATEGORY,
+            "max_stock_price": broad.DEFAULT_MAX_STOCK_PRICE,
             "cap_band": defaults.cap_band,
             "rebalance": defaults.rebalance,
             "score": defaults.score,
@@ -1205,6 +1215,8 @@ def _broad_backtest(req: BacktestRequest) -> dict:
             rebalance=req.rebalance,
             benchmark=req.benchmark,
             max_position=req.max_position,
+            max_category=req.max_category if req.broad_category_mode == "on" else None,
+            max_stock_price=req.max_stock_price or None,
             cap_band=req.cap_band,
             entry=req.entry,
             momentum_sizing=req.momentum_sizing,
@@ -1225,7 +1237,7 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
-    payload = analysis.payload(result, prices, result.config, groups)
+    payload = analysis.payload(result, prices, result.config, groups, share_prices=True)
     # Always present (empty list for category_mode="off", where there is no category layer at
     # all) - a consistent response shape the frontend can rely on regardless of mode.
     group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR) if on else {}

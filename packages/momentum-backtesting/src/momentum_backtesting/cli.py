@@ -1182,6 +1182,82 @@ def categories_broad_backtest(
         typer.echo(f"held as of {last_week.date()}: {outcome.held_by_week[last_week]}")
 
 
+@categories_app.command("broad-sweep-caps")
+def categories_broad_sweep_caps(
+    mode: str = typer.Option("on", "--mode", help='Category mode: "on" | "off".'),
+    positions: str = typer.Option("0.10,0.15,0.20,0.25,0.35", help="Per-stock caps (fractions)."),
+    categories: str = typer.Option("0.20,0.30,0.40,0", help="Per-category caps; 0 = none."),
+    bands: str = typer.Option("0.05", help="Trim bands: trim once this far over a cap."),
+    windows: str = typer.Option(
+        "2017-01-01:2021-12-31,2019-01-01:2023-12-31,2021-01-01:", help="start:end windows."
+    ),
+    max_stock_price: float = typer.Option(20_000.0, help="Buy-price ceiling; 0 = off."),
+    cost_pct: float = _COST,
+) -> None:
+    """Sweep the concentration caps and trim band across several time windows, so a cap is judged
+    by whether it helps in EVERY window rather than in one lucky one. The universe ranking is
+    computed once and reused. Prints one row per (window, caps) with CAGR / Sharpe / max drawdown
+    and the average idle-cash share (caps that are too tight hold cash back by design)."""
+    from itertools import product
+
+    import pandas as pd
+
+    from . import sweep
+    from .categories import broad
+
+    if mode not in ("on", "off"):
+        typer.echo('--mode must be "on" or "off"')
+        raise typer.Exit(2)
+
+    def floats(text: str) -> list[float]:
+        return [float(x) for x in text.split(",") if x.strip()]
+
+    spans = [tuple((part.split(":") + [""])[:2]) for part in windows.split(",") if part.strip()]
+    prices, _includes = _load_inputs()
+    common = dict(
+        outer_prices=prices,
+        stocks_data_dir=DATA_DIR / "stocks",
+        categories_data_dir=_categories_data_dir(),
+    )
+    try:
+        ranking = broad.compute_universe_ranking(**common)
+        rows = []
+        for (start, end), pos, cat, band in product(
+            spans, floats(positions), floats(categories) if mode == "on" else [0.0], floats(bands)
+        ):
+            outcome = broad.run_broad_backtest(
+                **common,
+                curated_dir=_categories_curated_dir(),
+                ranking=ranking,
+                category_mode=mode,  # type: ignore[arg-type]
+                start=start,
+                end=end or None,
+                max_position=pos or None,
+                max_category=(cat or None) if mode == "on" else None,
+                cap_band=band,
+                max_stock_price=max_stock_price or None,
+                cost_pct=cost_pct,
+            )
+            stats = sweep.quick_stats(outcome.result)
+            idle = outcome.result.weights.get("Idle cash", pd.Series(dtype=float)).fillna(0).mean()
+            rows.append(
+                {
+                    "window": f"{start[:4]}-{(end or 'now')[:4]}",
+                    "stock cap": f"{pos:.0%}" if pos else "none",
+                    "cat cap": f"{cat:.0%}" if cat else "none",
+                    "band": f"{band:.0%}",
+                    "CAGR": f"{stats['CAGR']:+.1%}",
+                    "Sharpe": f"{stats['Sharpe']:.2f}",
+                    "max DD": f"{stats['max drawdown']:+.1%}",
+                    "idle cash": f"{idle:.0%}",
+                }
+            )
+    except (broad.TotalMarketDataNotFoundError, ValueError) as error:
+        typer.echo(str(error))
+        raise typer.Exit(1) from None
+    typer.echo(pd.DataFrame(rows).to_string(index=False))
+
+
 @app.command()
 def weekly(
     run: str = typer.Option(..., help="preview (~14:40 IST, live prices) | final (after close)"),
