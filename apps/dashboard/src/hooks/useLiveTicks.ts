@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TickMessage, WsStraddleMessage } from '../types/trading.js';
+import type { TickMessage, WsStraddleMessage } from '../types/trading';
 
 // ---------------------------------------------------------------------------
 // Public API types
@@ -98,9 +98,13 @@ function backoffMs(attempt: number): number {
  *
  * We derive the scheme (ws/wss) from window.location.protocol rather than
  * hardcoding it so the hook works in both http (dev) and https (prod) contexts.
- * The Vite dev server proxies /ws to localhost:3000 with `ws: true`.
+ * In development, NEXT_PUBLIC_WS_URL can point directly to Fastify because
+ * Next's rewrite layer does not proxy WebSocket upgrades. Production can keep
+ * the same-origin default when its reverse proxy forwards `/ws` to Fastify.
  */
 function buildWsUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_WS_URL;
+  if (configured) return configured;
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return `${scheme}://${window.location.host}/ws/ticks`;
 }
@@ -201,7 +205,7 @@ export function useLiveTicks(): UseLiveTicksResult {
         // Cast to the concrete straddle type — the discriminated union already
         // narrowed `type` to 'straddle', so this is safe and avoids importing
         // WsStraddleMessage into the component layer.
-        const s = typed as import('../types/trading.js').WsStraddleMessage;
+        const s = typed as import('../types/trading').WsStraddleMessage;
         setLatestStraddle({
           straddleValue: s.straddleValue,
           atmStrike: s.atmStrike,

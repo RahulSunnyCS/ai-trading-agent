@@ -403,6 +403,18 @@ collector is forward-only".
 | 3.10.8 | Tune the collector's width (`--premium-floor`/`--max-extra`) from the manifests once the strategies exist | claude | |
 | 3.10.9 | Backfill live contracts' earlier days | claude | **Done 2026-09-29** for 23-28 Sep (NIFTY/BANKNIFTY/MIDCPNIFTY/FINNIFTY; SENSEX 25 and 28 Sep only — its 24 Sep weekly had already expired), taken the evening the 29 Sep contracts expired |
 
+### 3.12 Consolidate research frontend in `apps/dashboard`
+
+The existing dashboard is the one shared frontend package. Its Vite shell is being migrated in
+place to Next.js; `packages/momentum-backtesting` keeps its Python engine and legacy local UI
+until the new shared surface reaches feature parity. Do not create a competing frontend package.
+
+| # | Item | Who | Notes |
+|---|---|---|---|
+| 3.12.1 | Next.js shell + Fastify Momentum proxy | claude | **Built 2026-09-30.** `apps/dashboard` now runs Next.js; `/api/momentum/*` forwards only to a loopback/private Momentum API. The legacy files remain. |
+| 3.12.2 | Feature-parity Momentum UI | claude | **In progress:** React backtest controls for all four datasets, a lazy Plotly portfolio/risk chart (optional touchpad zoom), detailed result tables, Momentum Scores stock/sector drill-down, and saved-run comparison/overlays are built. Browser tests cover the chart, zoom switch and Scores. Still verify all four modes on real data and port the remaining legacy details: graphical holdings timeline, annual chart, CSV exports, shareable URL configuration, universe presets, and richer Custom Index inner trades. Keep `mbt ui` available throughout. |
+| 3.12.3 | User-configurable dashboard navigation | codex | **Built 2026-09-30.** A pinned Settings tab lets each browser hide/show every other dashboard tab and drag to reorder tabs within their navigation section. Arrow controls provide the same priority control for touch/keyboard use; preferences are normalized across future tab additions and persisted locally. |
+
 ---
 
 ## Reference — where detail lives

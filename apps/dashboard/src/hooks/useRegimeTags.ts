@@ -13,8 +13,8 @@
  * which always cancels and replaces instead of skipping.
  */
 
-import type { ApiEnvelope, RegimeTag } from '../types/trading.js';
-import { usePolledResource } from './usePolledResource.js';
+import type { ApiEnvelope, RegimeTag } from '../types/trading';
+import { usePolledResource } from './usePolledResource';
 
 export interface RegimeTagsState {
   tags: RegimeTag[];

@@ -14,8 +14,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { PaperTrade } from '../../types/trading.js';
-import { computePnlSummary } from '../pnl.js';
+import type { PaperTrade } from '../../types/trading';
+import { computePnlSummary } from '../pnl';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -17,13 +17,13 @@ import type { IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { Clock, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { useLiveTicks } from '../hooks/useLiveTicks.js';
-import type { StraddleSnapshot } from '../hooks/useLiveTicks.js';
-import { apiGet, unwrapData } from '../lib/api.js';
+import { useLiveTicks } from '../hooks/useLiveTicks';
+import type { StraddleSnapshot } from '../hooks/useLiveTicks';
+import { apiGet, unwrapData } from '../lib/api';
 import { getChartTheme } from '../lib/chartTheme';
-import { formatIstDateTime } from '../lib/format.js';
+import { formatIstDateTime } from '../lib/format';
 import { useThemeStore } from '../store/theme';
-import type { ApiEnvelope } from '../types/trading.js';
+import type { ApiEnvelope } from '../types/trading';
 import { Badge, type Tone } from './ui/Badge';
 import { Card } from './ui/Card';
 import { StatusDot } from './ui/StatusDot';

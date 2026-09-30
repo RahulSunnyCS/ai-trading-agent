@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { apiGet } from '../lib/api.js';
+import { apiGet } from '../lib/api';
 
 // ---------------------------------------------------------------------------
 // Types

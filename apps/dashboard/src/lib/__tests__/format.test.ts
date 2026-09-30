@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { formatIstDateTime, formatPnl, istToday, toNumberOrNull } from '../format.js';
+import { formatIstDateTime, formatPnl, istToday, toNumberOrNull } from '../format';
 
 // ---------------------------------------------------------------------------
 // toNumberOrNull

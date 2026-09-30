@@ -7,9 +7,9 @@
 
 import { useMemo } from 'react';
 
-import { usePaperTrades } from '../hooks/usePaperTrades.js';
-import { formatIstDateTime, formatPnl, toNumberOrNull } from '../lib/format.js';
-import type { PaperTrade } from '../types/trading.js';
+import { usePaperTrades } from '../hooks/usePaperTrades';
+import { formatIstDateTime, formatPnl, toNumberOrNull } from '../lib/format';
+import type { PaperTrade } from '../types/trading';
 import { Badge } from './ui/Badge';
 import { Card, CardHeader } from './ui/Card';
 import { SkeletonRows } from './ui/Skeleton';

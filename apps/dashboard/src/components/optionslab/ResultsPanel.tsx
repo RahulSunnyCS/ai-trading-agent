@@ -16,10 +16,10 @@ import {
   useDailyJob,
   useLegwiseData,
   useLegwiseResults,
-} from '../../hooks/useLegwise.js';
-import { apiPost } from '../../lib/api.js';
-import { formatPnl } from '../../lib/format.js';
-import type { DailyJob, SavedResult } from '../../types/legwise.js';
+} from '../../hooks/useLegwise';
+import { apiPost } from '../../lib/api';
+import { formatPnl } from '../../lib/format';
+import type { DailyJob, SavedResult } from '../../types/legwise';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';

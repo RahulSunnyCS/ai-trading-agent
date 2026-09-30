@@ -11,10 +11,10 @@
 import { Play, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
-import { useBackfillStatus } from '../hooks/useBackfillStatus.js';
-import { apiPost } from '../lib/api.js';
-import type { BackfillRangeRow } from '../types/trading.js';
-import { FyersAuthCard } from './FyersAuthCard.js';
+import { useBackfillStatus } from '../hooks/useBackfillStatus';
+import { apiPost } from '../lib/api';
+import type { BackfillRangeRow } from '../types/trading';
+import { FyersAuthCard } from './FyersAuthCard';
 import { Badge, type Tone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';

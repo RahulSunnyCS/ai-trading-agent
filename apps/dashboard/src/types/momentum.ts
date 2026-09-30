@@ -1,0 +1,51 @@
+export interface MomentumSeries {
+  dates: string[];
+  strategy: Array<number | null>;
+  benchmark: Array<number | null>;
+  cash: Array<number | null>;
+  drawdown_strategy: Array<number | null>;
+  drawdown_benchmark: Array<number | null>;
+  rolling_52w_excess: Array<number | null>;
+  idle_share: Array<number | null>;
+  holdings_count: Array<number | null>;
+}
+
+export interface MomentumResult {
+  benchmark_name: string;
+  kpis: Record<string, number | string | null>;
+  series: MomentumSeries;
+  rotations: Array<{ week: string }>;
+  latest: {
+    week: string;
+    explain: string;
+    rows: Array<{
+      asset: string;
+      rank: number | null;
+      score: number | null;
+      action: string;
+      held: boolean;
+      returns: Record<string, number | null>;
+    }>;
+  };
+  open_positions: Array<Record<string, unknown>>;
+  trades: Array<Record<string, unknown>>;
+  instruments: Array<Record<string, unknown>>;
+  timeline: Array<Record<string, unknown>>;
+  yearly: Array<Record<string, unknown>>;
+  crashes: Array<Record<string, unknown>>;
+  held_categories?: Array<{ position: number; status: string; category: string; picks: string[] }>;
+  missing_symbols?: string[];
+  skipped_categories?: string[];
+  fills?: { proxy_trades: number; warnings: string[] };
+}
+
+export interface MomentumSavedRun {
+  id: string;
+  n: number;
+  name: string;
+  config: Record<string, unknown>;
+  kpis: Record<string, number | null>;
+  dates: string[];
+  strategy: Array<number | null>;
+  overlay: boolean;
+}

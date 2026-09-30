@@ -55,6 +55,7 @@ import {
 } from '../jobs/eod-retrospection-job.js';
 import { isAuthDegraded } from '../state/broker-status.js';
 import { backtestRoutes } from './routes/backtest';
+import { momentumBacktestRoutes } from './routes/momentum-backtest';
 import { fyersAuthRoutes } from './routes/fyers-auth.js';
 import { paymentRoutes } from './routes/payment';
 
@@ -879,6 +880,7 @@ export async function buildServer(
   await server.register(paymentRoutes);
   await server.register(fyersAuthRoutes);
   await server.register(backtestRoutes);
+  await server.register(momentumBacktestRoutes);
 
   // Register retrospection routes under /api prefix so all four endpoints are
   // reachable at /api/retrospection/*, matching the REST path convention used

@@ -9,7 +9,7 @@ import { usePaymentTestMode } from '../hooks/usePaymentTestMode';
  *
  * Usage:
  *   <PaymentTestModeBanner />
- *   (no props needed — auto-detects from VITE_RAZORPAY_KEY_ID)
+ *   (no props needed — auto-detects from NEXT_PUBLIC_RAZORPAY_KEY_ID)
  */
 export function PaymentTestModeBanner() {
   const isTest = usePaymentTestMode();

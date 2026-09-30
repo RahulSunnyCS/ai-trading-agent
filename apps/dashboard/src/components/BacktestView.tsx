@@ -13,11 +13,11 @@
 import { AlertCircle, CheckCircle2, Play, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { useBacktestPresets } from '../hooks/useBacktestPresets.js';
-import { useBacktestRuns } from '../hooks/useBacktestRuns.js';
-import { useBacktestValidate } from '../hooks/useBacktestValidate.js';
-import { apiGet, apiPost } from '../lib/api.js';
-import type { CoverageResponse, RunResult } from '../types/backtest.js';
+import { useBacktestPresets } from '../hooks/useBacktestPresets';
+import { useBacktestRuns } from '../hooks/useBacktestRuns';
+import { useBacktestValidate } from '../hooks/useBacktestValidate';
+import { apiGet, apiPost } from '../lib/api';
+import type { CoverageResponse, RunResult } from '../types/backtest';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';

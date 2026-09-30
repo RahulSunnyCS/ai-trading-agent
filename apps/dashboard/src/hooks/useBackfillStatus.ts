@@ -9,8 +9,8 @@
  * nothing about its behavior, only where the plumbing lives.
  */
 
-import type { ApiEnvelope, BackfillRangeRow } from '../types/trading.js';
-import { usePolledResource } from './usePolledResource.js';
+import type { ApiEnvelope, BackfillRangeRow } from '../types/trading';
+import { usePolledResource } from './usePolledResource';
 
 export interface BackfillStatusState {
   ranges: BackfillRangeRow[];

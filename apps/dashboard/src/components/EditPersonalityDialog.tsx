@@ -17,8 +17,8 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 
-import { apiPut } from '../lib/api.js';
-import type { Personality } from '../types/trading.js';
+import { apiPut } from '../lib/api';
+import type { Personality } from '../types/trading';
 import { Button } from './ui/Button';
 
 interface EditPersonalityDialogProps {

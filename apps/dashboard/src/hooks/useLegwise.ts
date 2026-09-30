@@ -3,8 +3,8 @@
  * behind the Fastify proxy (/api/backtest/legwise/*).
  */
 
-import type { DailyJob, DataStatus, ResultsResponse, SavedStrategy } from '../types/legwise.js';
-import { usePolledResource } from './usePolledResource.js';
+import type { DailyJob, DataStatus, ResultsResponse, SavedStrategy } from '../types/legwise';
+import { usePolledResource } from './usePolledResource';
 
 const BASE = '/api/backtest/legwise';
 

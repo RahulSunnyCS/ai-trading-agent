@@ -6,8 +6,8 @@
  * usePolledResource.
  */
 
-import type { PresetSummary } from '../types/backtest.js';
-import { usePolledResource } from './usePolledResource.js';
+import type { PresetSummary } from '../types/backtest';
+import { usePolledResource } from './usePolledResource';
 
 export interface BacktestPresetsState {
   presets: PresetSummary[];

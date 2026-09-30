@@ -14,8 +14,8 @@
 
 import { AlertCircle, CheckCircle2, ExternalLink, LogIn } from 'lucide-react';
 
-import { useFyersAuthStatus } from '../hooks/useFyersAuthStatus.js';
-import { apiGet } from '../lib/api.js';
+import { useFyersAuthStatus } from '../hooks/useFyersAuthStatus';
+import { apiGet } from '../lib/api';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
@@ -63,8 +63,8 @@ async function openFyersLogin(): Promise<void> {
 export function FyersAuthCard() {
   const { status, loading } = useFyersAuthStatus();
 
-  const isConnected = status?.connected && !status.needsReauth;
-  const isConfigured = status?.configured;
+  const isConnected = Boolean(status?.connected && !status.needsReauth);
+  const isConfigured = Boolean(status?.configured);
 
   return (
     <Card>

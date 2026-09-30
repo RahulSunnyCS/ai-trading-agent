@@ -12,7 +12,7 @@
 | Message Queue / Event Bus | Redis 7 Streams — topics: `market.ticks`, `straddle.values`, `signals.generated` |
 | Background Jobs | BullMQ (Redis-backed) — EOD retrospection batch |
 | Cache | Redis 7 — sub-ms reads for price cache and personality state |
-| Frontend | React 18 + Vite + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts |
+| Frontend | Next.js 15 + React 18 + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts |
 | Testing | Vitest (unit + integration) + Playwright (E2E) |
 | Market Data | Fyers WebSocket via `fyers-api-v3` SDK (untyped — TypeScript shim in `apps/server/src/types/`) |
 | Paper Trading | Quantiply API (paper trade execution tracking) |
@@ -51,7 +51,7 @@ bun run sim                 # equivalent to SIMULATE=true bun run dev
 bun run dev                 # watch mode with auto-reload (apps/server)
 bun run start                # production-style start (apps/server)
 
-# Dashboard dev server (Vite, proxies /api to the server on :3000)
+# Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)
 bun run --filter @ata/dashboard dev
 
 # Type-check the server (root script is scoped to @ata/server only — the
@@ -69,7 +69,7 @@ bun run --filter '*' typecheck     # packages only — NOT the root app
 bun run test                # unit tests in every workspace package
 bun run test:unit           # server unit tests only
 bun run test:integration    # server integration tests (requires Docker services running)
-bun run test:e2e            # dashboard Playwright suite (start the Vite dev server first)
+bun run test:e2e            # dashboard Playwright suite (start the Next dev server first)
 
 # option-backtesting (Python) — run from packages/option-backtesting/
 cd packages/option-backtesting
@@ -130,10 +130,10 @@ rule below.
 | `packages/broker-identity` (`@trading/broker-identity`) | Canonical `BrokerId` type + the one RFC 6238 TOTP generator | `BrokerId`, `generateTotp`, `freshTotp`, `waitForNextWindow` | `apps/server` (`ingestion/brokers/angelone.ts`), `packages/broker-login` |
 | `packages/broker-login` | Daily Playwright job — logs brokers into AlgoTest via TOTP | — (leaf; nothing in-repo imports it) | depends on `broker-identity` + `notify` |
 | `packages/contract-notes` | Daily Gmail → PDF → Google Sheet F&O P&L pipeline | — (leaf; Node 20/CommonJS, reimplements the `Notification` shape itself instead of importing the ESM `@trading/notify`) | none |
-| `packages/momentum-backtesting` | Python weekly momentum-rotation research tool (`mbt` CLI) | — | none — fully independent of every other package, including `option-backtesting` (own `pyproject.toml`/`uv.lock`, zero shared code; only pins the same library *versions* for its local UI) |
+| `packages/momentum-backtesting` | Python weekly momentum-rotation research tool (`mbt` CLI) | — | its legacy `mbt ui` remains local-only while `apps/dashboard` migrates it through Fastify's `/api/momentum/*` proxy; still no code imports from `option-backtesting` |
 | `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below) | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
 | `apps/server` (`@ata/server`) | Fastify/Bun trading backend | — | `apps/dashboard` (HTTP only) |
-| `apps/dashboard` (`@ata/dashboard`) | React/Vite SPA | — | none — leaf; talks to `apps/server` over HTTP only, imports no internal package |
+| `apps/dashboard` (`@ata/dashboard`) | Next.js/React frontend | — | none — leaf; talks to `apps/server` over HTTP only, imports no internal package |
 
 **The one filesystem-level (non-import) cross-package link, easy to miss:**
 `packages/market-reference/src/loader.ts` does not carry its own copy of the NSE lot-size/
@@ -148,7 +148,7 @@ those CSVs.
 
 ## Repository Structure
 
-A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (React/Vite frontend) — and seven packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The other two, `packages/option-backtesting` and `packages/momentum-backtesting`, are Python/uv and not Bun workspace members. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
+A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (Next.js/React frontend) — and seven packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The other two, `packages/option-backtesting` and `packages/momentum-backtesting`, are Python/uv and not Bun workspace members. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
 
 ```
 ai-trading-agent/
@@ -190,7 +190,7 @@ ai-trading-agent/
 │   │       ├── types/
 │   │       │   └── fyers-api-v3.d.ts       # TypeScript declaration shim for untyped Fyers SDK
 │   │       └── index.ts                    # Main entry point (branches on SIMULATE env var)
-│   └── dashboard/                   # @ata/dashboard — the React/Vite SPA
+│   └── dashboard/                   # @ata/dashboard — the Next.js/React frontend
 │       ├── package.json · tsconfig.json · vite.config.ts · vitest.config.ts · playwright.config.ts
 │       ├── index.html · tailwind.config.ts · postcss.config.js
 │       ├── e2e/                     # Playwright specs
@@ -408,6 +408,7 @@ Critical variables whose misconfiguration causes real pain:
 | `EVOLUTION_REQUIRE_APPROVAL` | Should be `true` in any environment where the retrospection engine runs. Setting `false` allows the system to autonomously modify personality parameters without human review |
 | `TOKEN_VALIDITY_SCHEDULER_ENABLED` | When set to `true`, registers a BullMQ cron job that checks Fyers token expiry at 08:45 IST weekdays. Disabled by default; opt-in via this flag |
 | `BACKTEST_API_URL` | Base URL of the loopback-only Python FastAPI service (default `http://127.0.0.1:8000`). The Fastify proxy validates this resolves to loopback/private address space at startup — a public host throws (safe default-throw), the proxy never starts against it |
+| `MOMENTUM_API_URL` | Base URL of the loopback-only Momentum FastAPI service (default `http://127.0.0.1:8765`). The Fastify `/api/momentum/*` proxy applies the same loopback/private-host guard as options backtesting |
 | `MOMENTUM_DATABASE_URL` | Postgres (Neon free tier) holding `packages/momentum-backtesting`'s price history and weekly signals (`momentum_prices`, `momentum_signals`). Deliberately separate from `DATABASE_URL`, which momentum's `fyers.py` reads for `broker_tokens` |
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
 | `FYERS_DATA_DIR` | Where `obt fyers fetch` writes its 1-minute Parquet (default `packages/option-backtesting/data/fyers/`, gitignored). This data cannot be re-downloaded once contracts expire — point it at the backed-up/external disk when that exists |

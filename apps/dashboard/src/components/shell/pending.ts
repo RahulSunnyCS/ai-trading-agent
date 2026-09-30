@@ -63,10 +63,16 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Add a compare view across multiple past runs',
     'Add an export-to-personality action once a run looks promising (M-5)',
   ],
+  momentum: [
+    'Verify every migrated dataset against real Python backtest results',
+    'Add the annual and holdings timeline charts, CSV exports and shareable settings URL',
+    'Finish Custom Index inner trade details before declaring parity with the local UI',
+  ],
   pricing: [
     'Show the current subscription / credit balance',
     'Add purchase history and receipts',
     'Add GST display and invoicing (Phase 2)',
     'Add international payments via Stripe (Phase 2)',
   ],
+  settings: [],
 };

@@ -10,8 +10,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { apiPost } from '../lib/api.js';
-import type { ValidateResponse } from '../types/backtest.js';
+import { apiPost } from '../lib/api';
+import type { ValidateResponse } from '../types/backtest';
 
 const DEBOUNCE_MS = 500;
 

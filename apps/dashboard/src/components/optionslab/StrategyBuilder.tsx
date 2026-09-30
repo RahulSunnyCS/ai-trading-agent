@@ -13,9 +13,9 @@
 import { CheckCircle2, Copy, FlaskConical, Plus, Save, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { LEGWISE_API, useLegwiseStrategies } from '../../hooks/useLegwise.js';
-import { apiPost, apiPut } from '../../lib/api.js';
-import { formatPnl } from '../../lib/format.js';
+import { LEGWISE_API, useLegwiseStrategies } from '../../hooks/useLegwise';
+import { apiPost, apiPut } from '../../lib/api';
+import { formatPnl } from '../../lib/format';
 import type {
   Amount,
   BacktestResponse,
@@ -24,7 +24,7 @@ import type {
   LegwiseStrategy,
   ReEntry,
   Underlying,
-} from '../../types/legwise.js';
+} from '../../types/legwise';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { StatCard } from '../ui/StatCard';

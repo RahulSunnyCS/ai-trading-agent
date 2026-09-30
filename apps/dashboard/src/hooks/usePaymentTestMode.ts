@@ -1,10 +1,10 @@
 /**
  * Returns true when the Razorpay public key is a test key (prefix `rzp_test_`).
- * The Vite build injects VITE_RAZORPAY_KEY_ID at compile time via import.meta.env.
- * VITE_RAZORPAY_KEY_ID must equal RAZORPAY_KEY_ID — it is the public key ID, safe
+ * Next exposes NEXT_PUBLIC_RAZORPAY_KEY_ID to client components at build time.
+ * It must equal RAZORPAY_KEY_ID — it is the public key ID, safe
  * to expose to the browser (never the secret).
  */
 export function usePaymentTestMode(): boolean {
-  const keyId = import.meta.env.VITE_RAZORPAY_KEY_ID as string | undefined;
+  const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
   return keyId?.startsWith('rzp_test_') ?? false;
 }

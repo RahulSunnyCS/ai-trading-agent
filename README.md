@@ -25,7 +25,7 @@ bun run sim                   # simulation mode, no broker credentials needed
 ```
 
 Server on `http://localhost:3000`. For the dashboard:
-`bun run --filter @ata/dashboard dev` (Vite on `:5173`, proxies `/api` and `/ws`).
+`bun run --filter @ata/dashboard dev` (Next.js on `:5173`, rewrites `/api` to Fastify).
 
 Local install paths beyond Docker Compose — native, hosted, corporate proxy —
 and production deployment: **[`docs/architecture.md`](docs/architecture.md)**.
@@ -55,7 +55,7 @@ truth for what they cover — nothing here repeats them.
 | Path | Runtime | Purpose |
 |---|---|---|
 | `apps/server` | Bun | Fastify backend — ingestion, signals, personalities, paper execution |
-| `apps/dashboard` | Bun / Vite | React dashboard |
+| `apps/dashboard` | Bun / Next.js | React dashboard |
 | `packages/broker-login` | Node 20 | Daily AlgoTest broker login via Playwright + TOTP |
 | `packages/contract-notes` | Node 20 | Contract-note emails → realised F&O P&L in a Google Sheet |
 | `packages/option-backtesting` | Python 3.12 / uv | Strategy-research workbench — DSL, bar-by-bar engine, walk-forward, sweeps |

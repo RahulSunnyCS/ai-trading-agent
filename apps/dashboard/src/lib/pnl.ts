@@ -19,8 +19,8 @@
  *    relying on wall-clock time.
  */
 
-import type { PaperTrade } from '../types/trading.js';
-import { istToday, toNumberOrNull } from './format.js';
+import type { PaperTrade } from '../types/trading';
+import { istToday, toNumberOrNull } from './format';
 
 // ---------------------------------------------------------------------------
 // Types

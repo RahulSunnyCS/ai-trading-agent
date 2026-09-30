@@ -8,9 +8,9 @@ import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { type ReactNode, useEffect, useRef } from 'react';
 
 import { getChartTheme } from '../../lib/chartTheme';
-import { formatPnl } from '../../lib/format.js';
+import { formatPnl } from '../../lib/format';
 import { useThemeStore } from '../../store/theme';
-import type { DayRow, TradeRow } from '../../types/legwise.js';
+import type { DayRow, TradeRow } from '../../types/legwise';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 
 export const SERIES_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];

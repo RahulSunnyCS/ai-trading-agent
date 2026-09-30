@@ -14,10 +14,10 @@ import { createChart } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { useEffect, useMemo, useRef } from 'react';
 
-import { usePaperTrades } from '../hooks/usePaperTrades.js';
+import { usePaperTrades } from '../hooks/usePaperTrades';
 import { getChartTheme } from '../lib/chartTheme';
-import { formatPnl } from '../lib/format.js';
-import { type PnlSeriesPoint, computePnlSummary } from '../lib/pnl.js';
+import { formatPnl } from '../lib/format';
+import { type PnlSeriesPoint, computePnlSummary } from '../lib/pnl';
 import { useThemeStore } from '../store/theme';
 import { Card, CardHeader } from './ui/Card';
 import { SkeletonRows } from './ui/Skeleton';

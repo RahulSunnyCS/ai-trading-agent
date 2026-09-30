@@ -5,6 +5,8 @@ import {
   Database,
   FlaskConical,
   Layers,
+  LineChart,
+  Settings,
   type LucideIcon,
   Repeat,
   Tag,
@@ -24,7 +26,9 @@ export type Tab =
   | 'replay'
   | 'backtest'
   | 'optionslab'
-  | 'pricing';
+  | 'momentum'
+  | 'pricing'
+  | 'settings';
 
 export interface NavItem {
   id: Tab;
@@ -56,13 +60,22 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'replay', label: 'Replay', icon: CalendarClock },
       { id: 'backtest', label: 'Backtest', icon: FlaskConical },
       { id: 'optionslab', label: 'Options Lab', icon: Layers },
+      { id: 'momentum', label: 'Momentum', icon: LineChart },
     ],
   },
   {
     heading: 'Account',
-    items: [{ id: 'pricing', label: 'Pricing', icon: CreditCard }],
+    items: [
+      { id: 'pricing', label: 'Pricing', icon: CreditCard },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ],
   },
 ];
+
+/** Settings is pinned so users can always restore tabs they have hidden. */
+export const CONFIGURABLE_TABS = NAV_GROUPS.flatMap((group) => group.items).filter(
+  (item) => item.id !== 'settings',
+);
 
 export const BrandIcon = TrendingUp;
 

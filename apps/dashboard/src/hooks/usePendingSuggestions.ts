@@ -11,8 +11,8 @@
  * usePolledResource.
  */
 
-import type { ApiEnvelope, PendingSuggestion } from '../types/trading.js';
-import { usePolledResource } from './usePolledResource.js';
+import type { ApiEnvelope, PendingSuggestion } from '../types/trading';
+import { usePolledResource } from './usePolledResource';
 
 export interface PendingSuggestionsState {
   suggestions: PendingSuggestion[];

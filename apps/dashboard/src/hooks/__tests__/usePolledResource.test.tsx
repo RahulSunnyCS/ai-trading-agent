@@ -13,7 +13,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePolledResource } from '../usePolledResource.js';
+import { usePolledResource } from '../usePolledResource';
 
 interface PendingCall {
   url: string;

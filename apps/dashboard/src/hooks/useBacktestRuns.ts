@@ -6,8 +6,8 @@
  * page reload. Built on usePolledResource.
  */
 
-import type { RunSummary } from '../types/backtest.js';
-import { usePolledResource } from './usePolledResource.js';
+import type { RunSummary } from '../types/backtest';
+import { usePolledResource } from './usePolledResource';
 
 export interface BacktestRunsState {
   runs: RunSummary[];

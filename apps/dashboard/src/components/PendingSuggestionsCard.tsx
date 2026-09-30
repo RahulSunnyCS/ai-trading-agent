@@ -14,9 +14,9 @@
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
-import { usePendingSuggestions } from '../hooks/usePendingSuggestions.js';
-import { apiPost } from '../lib/api.js';
-import type { PendingSuggestion, Personality } from '../types/trading.js';
+import { usePendingSuggestions } from '../hooks/usePendingSuggestions';
+import { apiPost } from '../lib/api';
+import type { PendingSuggestion, Personality } from '../types/trading';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { StateMessage } from './ui/StateMessage';

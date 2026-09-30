@@ -12,8 +12,8 @@
 
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
-import { useBackfillStatus } from '../hooks/useBackfillStatus.js';
-import type { BackfillRangeRow } from '../types/trading.js';
+import { useBackfillStatus } from '../hooks/useBackfillStatus';
+import type { BackfillRangeRow } from '../types/trading';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
 import { CodeBlock } from './ui/CodeBlock';

@@ -1,9 +1,12 @@
 import { cn } from '../../lib/cn';
-import { BrandIcon, NAV_GROUPS, type Tab } from './nav';
+import type { NavigationPreferences } from '../../store/navigation';
+import { visibleNavigationGroups } from '../../store/navigation';
+import { BrandIcon, type Tab } from './nav';
 
 interface SidebarProps {
   activeTab: Tab;
   onSelect: (tab: Tab) => void;
+  preferences: NavigationPreferences;
   /** Called after a selection so the mobile drawer can close itself. */
   onNavigate?: () => void;
 }
@@ -13,7 +16,8 @@ interface SidebarProps {
  * drawer. Purely presentational — the active tab + selection handler are owned
  * by App.
  */
-export function Sidebar({ activeTab, onSelect, onNavigate }: SidebarProps) {
+export function Sidebar({ activeTab, onSelect, preferences, onNavigate }: SidebarProps) {
+  const groups = visibleNavigationGroups(preferences);
   return (
     <div className="flex h-full flex-col gap-6 px-3 py-5">
       <div className="flex items-center gap-2.5 px-2">
@@ -29,7 +33,7 @@ export function Sidebar({ activeTab, onSelect, onNavigate }: SidebarProps) {
       </div>
 
       <nav className="flex flex-1 flex-col gap-5">
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.heading} className="flex flex-col gap-1">
             <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">
               {group.heading}

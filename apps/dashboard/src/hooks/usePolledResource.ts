@@ -35,7 +35,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { apiGet } from '../lib/api.js';
+import { apiGet } from '../lib/api';
 
 export interface PolledResourceState<T> {
   data: T | null;

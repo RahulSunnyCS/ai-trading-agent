@@ -16,8 +16,8 @@
  *    refetch always cancels and replaces).
  */
 
-import type { ApiEnvelope, PaperTrade } from '../types/trading.js';
-import { usePolledResource } from './usePolledResource.js';
+import type { ApiEnvelope, PaperTrade } from '../types/trading';
+import { usePolledResource } from './usePolledResource';
 
 export interface PaperTradesState {
   trades: PaperTrade[];

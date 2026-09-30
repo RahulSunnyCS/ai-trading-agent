@@ -8,7 +8,7 @@ orientation pointer rather than duplicating that.
 
 ## What this app does
 
-`@ata/dashboard` (React 18 + Vite + Zustand + Tailwind) is the SPA: live
+`@ata/dashboard` (Next.js + React 18 + Zustand + Tailwind) is the frontend: live
 straddle/momentum charts (Lightweight Charts), active signals, per-personality
 running P&L, EOD retrospection charts, pricing/payment UI, a "Backtest"
 tab for `packages/option-backtesting`'s results, and an "Options Lab" tab
@@ -16,6 +16,9 @@ tab for `packages/option-backtesting`'s results, and an "Options Lab" tab
 strategies on the Fyers 1-minute data: saved `obt daily` results, the evening
 run button, and an AlgoTest-style strategy builder that validates, backtests
 and saves `strategies/legwise/*.yaml`, all via `/api/backtest/legwise/*`.
+The Momentum view is being migrated here from the Python package's local UI;
+its research chart uses a lazy-loaded Plotly basic bundle with optional wheel/
+touchpad zoom and the shared CSS theme tokens.
 
 ## Cross-package links
 
@@ -54,8 +57,9 @@ needs to be shared with the server, it is currently hand-duplicated in
   `shell/` (layout chrome) and `ui/` (generic primitives)
 - `src/pages/` — top-level routed pages
 - `src/hooks/` — one hook per data resource, all built on `usePolledResource`
-- `src/store/theme.ts` — Zustand store (currently just theme; personality/live
-  state is fetched via hooks, not centralized in a store)
+- `src/store/theme.ts` — Zustand theme store; `src/store/navigation.ts` owns the
+  locally persisted tab visibility/order preferences. Personality/live state is
+  fetched via hooks, not centralized in a store.
 - `src/types/` — `backtest.ts` etc. — hand-kept in sync with `apps/server`'s
   API response shapes (see Cross-package links above)
 - `e2e/` — Playwright specs
@@ -64,11 +68,11 @@ needs to be shared with the server, it is currently hand-duplicated in
 
 Run from the repo root unless noted:
 ```bash
-bun run --filter @ata/dashboard dev         # Vite dev server, proxies /api to :3000
+bun run --filter @ata/dashboard dev         # Next dev server (:5173), rewrites /api to :3000
 # Options Lab without Postgres/Redis/apps/server: start `bun run py:api`, then
 # OBT_DIRECT=1 routes ONLY /api/backtest/legwise/* straight to it (dev-only,
 # off by default — the Fastify proxy stays the only production path)
-(cd apps/dashboard && OBT_DIRECT=1 bun x vite)
+(cd apps/dashboard && OBT_DIRECT=1 bun run dev)
 bun run --filter @ata/dashboard typecheck   # NOT part of the root `bun run typecheck` — has one pre-existing error, run explicitly
-bun run test:e2e                            # Playwright suite — start the Vite dev server first
+bun run test:e2e                            # Playwright suite — start the Next dev server first
 ```

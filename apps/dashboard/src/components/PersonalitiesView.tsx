@@ -8,10 +8,10 @@
 import { Pencil, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
-import { usePersonalities } from '../hooks/usePersonalities.js';
-import type { Personality } from '../types/trading.js';
-import { EditPersonalityDialog } from './EditPersonalityDialog.js';
-import { PendingSuggestionsCard } from './PendingSuggestionsCard.js';
+import { usePersonalities } from '../hooks/usePersonalities';
+import type { Personality } from '../types/trading';
+import { EditPersonalityDialog } from './EditPersonalityDialog';
+import { PendingSuggestionsCard } from './PendingSuggestionsCard';
 import { Badge, type Tone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';

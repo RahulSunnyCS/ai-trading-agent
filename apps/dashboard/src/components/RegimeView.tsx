@@ -7,8 +7,8 @@
 
 import { RefreshCw } from 'lucide-react';
 
-import { useRegimeTags } from '../hooks/useRegimeTags.js';
-import type { RegimeTag } from '../types/trading.js';
+import { useRegimeTags } from '../hooks/useRegimeTags';
+import type { RegimeTag } from '../types/trading';
 import { Badge, type Tone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';

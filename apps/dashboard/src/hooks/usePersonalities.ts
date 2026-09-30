@@ -18,8 +18,8 @@
  *   Defaults to false (active only).
  */
 
-import type { ApiEnvelope, Personality } from '../types/trading.js';
-import { usePolledResource } from './usePolledResource.js';
+import type { ApiEnvelope, Personality } from '../types/trading';
+import { usePolledResource } from './usePolledResource';
 
 export interface PersonalitiesState {
   personalities: Personality[];
