@@ -8,7 +8,7 @@ Two runs each Friday (IST):
            last close. Estimates are never stored.
   final    ~16:45 - official closes; reports anything the close changed versus the preview.
 
-Sources, best first: Fyers (when `FYERS_TOKEN_FILE`/`FYERS_ACCESS_TOKEN` gives a token),
+Sources, best first: Fyers (dashboard token or standalone env/file token),
 niftyindices.com (NSE's official closes, for indices with a `backfill` name), then the same
 ETF-implied estimate. Every series' freshness is checked; when too many are stale, the run
 sends a data-health alert instead of a signal.

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { BackfillView } from './components/BackfillView';
 import { BacktestView } from './components/BacktestView';
+import { BrokerLoginsView } from './components/BrokerLoginsView';
 import { LiveView } from './components/LiveView';
 import { MomentumBacktestingView } from './components/MomentumBacktestingView';
 import { OptionsLabView } from './components/OptionsLabView';
@@ -40,6 +41,7 @@ const SUBTITLES: Record<Tab, string> = {
   backtest: 'Options strategy backtesting research workbench',
   optionslab: 'Daily 1-minute Fyers data · build, backtest and track leg-wise option strategies',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
+  brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',
   pricing: 'Subscription access and feature credits',
   settings: 'Choose which tabs appear and arrange their navigation priority',
 };
@@ -70,6 +72,8 @@ function renderView(
       return <OptionsLabView />;
     case 'momentum':
       return <MomentumBacktestingView />;
+    case 'brokerLogins':
+      return <BrokerLoginsView />;
     case 'pricing':
       return <PricingPage />;
     case 'settings':

@@ -60,4 +60,20 @@ describe('Fyers browser login start', () => {
     expect(response.headers.location).toBe('/api/auth/fyers/callback?state=abc&auth_code=xyz');
     await server.close();
   });
+
+  it('does not echo callback query parameters when the authorization code is missing', async () => {
+    const server = Fastify();
+    await server.register(fyersAuthRoutes);
+    const start = await server.inject({ method: 'GET', url: '/api/auth/fyers/start' });
+    const state = new URL(String(start.headers.location)).searchParams.get('state');
+    const response = await server.inject({
+      method: 'GET',
+      url: `/api/auth/fyers/callback?state=${state}&error_description=sensitive-upstream-value`,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: 'missing_auth_code' });
+    expect(response.body).not.toContain('sensitive-upstream-value');
+    await server.close();
+  });
 });

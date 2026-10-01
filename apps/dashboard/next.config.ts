@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
             },
           ]
         : []),
-      // Same idea for the Momentum tab: talk to `mbt ui`'s FastAPI service
+      // Same idea for the Momentum tab: talk to its private FastAPI service
       // directly, bypassing Fastify/Postgres/Redis, for local work without the
       // full stack running. Never enabled by default or in production. Mirrors
       // momentum-backtest.ts's own path translation (meta/scores/backtest have

@@ -79,8 +79,9 @@ Otherwise:
   candidate; unrepresentable DSL constructs go under `manual_review`, never
   guessed, and this never writes to any database.
 - `fyers/` — the daily 1-minute Fyers collector (`obt fyers status|fetch`): `auth.py`
-  (token resolution — env, `FYERS_TOKEN_FILE`, then **reads `packages/momentum-backtesting`'s
-  `mbt login` token file off disk**, same JSON shape, no code import), `client.py` (throttled
+  (token resolution — dashboard `broker_tokens` when `DATABASE_URL` is set, then env,
+  `FYERS_TOKEN_FILE`, then **reads `packages/momentum-backtesting`'s `mbt login` token
+  file off disk**, same JSON shape, no code import), `client.py` (throttled
   history client), `symbols.py` (public symbol master), `daily.py` (range + adaptive-width
   collection into `packages/trading-data`'s store — instruments registered, bars in the Parquet
   lake, raw responses in `raw/fyers/`, one `ingest_runs` row per call; `obt fyers migrate` moved

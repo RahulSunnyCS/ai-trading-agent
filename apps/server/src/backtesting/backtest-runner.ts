@@ -465,10 +465,7 @@ export function createBacktestRunner(pool: Pool) {
       const allDays = calendarDaysBetween(config.fromDate, config.toDate);
       const split = computeSplit(allDays, holdoutDays, trainFraction);
 
-      // Build a fast lookup: date → split label
-      // trainSet is constructed for symmetry but only holdoutSet and testSet are
-      // queried directly; getSplitLabel returns 'train' as the default fallback.
-      const _trainSet = new Set(calendarDaysBetween(split.train.from, split.train.to));
+      // Dates outside holdout and test belong to the training split.
       const testSet = new Set(calendarDaysBetween(split.test.from, split.test.to));
       const holdoutSet = new Set(calendarDaysBetween(split.holdout.from, split.holdout.to));
 

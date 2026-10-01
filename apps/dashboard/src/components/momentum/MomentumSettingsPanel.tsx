@@ -543,7 +543,7 @@ export function momentumSettingsDefaults(metaDefaults: Values): Values {
 
 /**
  * Settings panel for the Momentum backtest, grouped and explained the way
- * the legacy `mbt ui` page was: numbered groups, collapsible panels, and
+ * the retired standalone Momentum page was: numbered groups, collapsible panels, and
  * every non-obvious choice described in place rather than as a bare
  * dropdown label.
  */

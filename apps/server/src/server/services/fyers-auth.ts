@@ -8,8 +8,8 @@
  *      receive { access_token, refresh_token, expires_in }.
  *
  * Tokens are stored in the broker_tokens table (one row per broker). The
- * ingestion process reads from this table at startup when FYERS_ACCESS_TOKEN
- * is not set in the env.
+ * ingestion process prefers a valid stored token at startup and on reconnect,
+ * falling back to configured environment credentials if necessary.
  */
 
 import { createHash } from 'node:crypto';
@@ -155,4 +155,42 @@ export async function loadStoredToken(db: Pool): Promise<StoredToken | null> {
     refreshToken: row.refresh_token,
     expiresAt: new Date(row.expires_at),
   };
+}
+
+export interface FyersCredentialResolution {
+  credentials: { appId: string; accessToken: string } | null;
+  source: 'broker_tokens' | 'env' | null;
+  databaseUnavailable: boolean;
+}
+
+export async function resolveFyersCredentials(
+  db: Pool,
+  fallback: { appId: string | undefined; accessToken: string | undefined },
+): Promise<FyersCredentialResolution> {
+  let databaseUnavailable = false;
+  let expiredStoredToken: string | null = null;
+  try {
+    const stored = await loadStoredToken(db);
+    if (stored && stored.expiresAt.getTime() > Date.now()) {
+      return {
+        credentials: { appId: stored.appId, accessToken: stored.accessToken },
+        source: 'broker_tokens',
+        databaseUnavailable: false,
+      };
+    }
+    expiredStoredToken = stored?.accessToken ?? null;
+  } catch {
+    databaseUnavailable = true;
+  }
+
+  const appId = fallback.appId?.trim();
+  const accessToken = fallback.accessToken?.trim();
+  if (appId && accessToken && accessToken !== expiredStoredToken) {
+    return {
+      credentials: { appId, accessToken },
+      source: 'env',
+      databaseUnavailable,
+    };
+  }
+  return { credentials: null, source: null, databaseUnavailable };
 }

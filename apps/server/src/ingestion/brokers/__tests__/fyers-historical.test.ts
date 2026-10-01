@@ -2,8 +2,8 @@
  * Unit tests for fyers-historical.ts
  *
  * All tests use an injected fetchFn and sleepFn — no live network calls,
- * no DB connections. The db parameter is always null in these tests (env-var
- * credential path is exercised directly).
+ * no DB connections. Most calls use the env path; one mock Pool verifies
+ * dashboard-token precedence for the historical client.
  *
  * Coverage:
  *   1. chunkDateRange — chunking math for various resolutions and ranges
@@ -16,6 +16,7 @@
  *   8. Malformed candle tuple — skipped gracefully, no crash
  */
 
+import type { Pool } from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type FetchFn,
@@ -653,6 +654,41 @@ describe('fetchHistoricalCandles — no credentials loud failure', () => {
 
     expect(threw).toBe(true);
     expect(result).toBeUndefined();
+  });
+});
+
+describe('fetchHistoricalCandles — dashboard credential precedence', () => {
+  it('uses the stored token even when env credentials are set', async () => {
+    const cleanupEnv = setFyersEnv();
+    try {
+      const db = {
+        query: async () => ({
+          rows: [{
+            app_id: 'dashboard-app',
+            access_token: 'dashboard-token',
+            refresh_token: null,
+            expires_at: new Date(Date.now() + 3_600_000),
+          }],
+        }),
+      } as unknown as Pool;
+      const rawMock = vi.fn().mockResolvedValue(okResponse([candle(toEpochSec('2024-01-01'))]));
+
+      await fetchHistoricalCandles(db, {
+        symbol: 'NSE:NIFTY50-INDEX',
+        resolution: 'D',
+        from: new Date('2024-01-01T00:00:00Z'),
+        to: new Date('2024-01-01T00:00:00Z'),
+        fetchFn: asFetchFn(rawMock),
+        sleepFn: noopSleep,
+      });
+
+      const requestInit = rawMock.mock.calls[0]?.[1] as RequestInit;
+      expect(requestInit.headers).toMatchObject({
+        Authorization: 'dashboard-app:dashboard-token',
+      });
+    } finally {
+      cleanupEnv();
+    }
   });
 });
 

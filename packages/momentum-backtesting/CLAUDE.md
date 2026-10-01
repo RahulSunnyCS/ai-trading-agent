@@ -19,7 +19,7 @@ fall out of the top M (hysteresis). Three additional layers build on the
 same ranking mechanics: `stocks/` (a from-scratch, survivorship-free Nifty
 50 stock data layer), `categories/` (sector/category momentum, including the
 Broad Momentum three-layer funnel and per-stock/sector Momentum Scores page),
-and a local-only web UI (`mbt ui`). See `README.md` and `TODO.md` §3.9 for
+and a private FastAPI service (`mbt serve`) used by the shared Next.js dashboard. See `README.md` and `TODO.md` §3.9 for
 what's built vs. still open.
 
 ## Cross-package links
@@ -27,7 +27,7 @@ what's built vs. still open.
 **Shares no code directly with `packages/option-backtesting`** — still true,
 and do not add a cross-import between them. They are both Python/uv with
 entirely separate `pyproject.toml`/`uv.lock` files; the pinned-same-library-
-versions comment for the local UI (Plotly etc.) remains cosmetic, not
+versions comment for the FastAPI service remains cosmetic, not
 functional.
 
 **Since 2026-09-30, both depend on `packages/trading-data`** (an editable
@@ -167,7 +167,7 @@ See `README.md` for the full walkthrough. From `packages/momentum-backtesting/`:
 ```bash
 uv sync
 uv run pytest
-uv run mbt ui              # local web UI on 127.0.0.1:8765
+uv run mbt serve           # private API on 127.0.0.1:8765
 uv run mbt fetch            # refresh price history
 uv run mbt categories backtest   # Custom Index mode
 uv run mbt local migrate    # copy companies/actions/membership/stock bars/price series

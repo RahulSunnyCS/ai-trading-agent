@@ -8,22 +8,24 @@ Hang Seng and a defensive cash/gilt pair, from 2017.
 ```bash
 cd packages/momentum-backtesting
 uv sync
-uv run mbt login     # once per day - Fyers tokens expire daily
+uv run mbt login     # standalone login if not using the dashboard
 uv run mbt fetch     # ~5 minutes; writes data/weekly_closes.csv and .xlsx
 ```
 
 `mbt` reads `FYERS_APP_ID`, `FYERS_APP_SECRET` and `FYERS_REDIRECT_URI` from the repo-root
-`.env`. The Fyers access token comes from, in order: `FYERS_ACCESS_TOKEN` in `.env`, the
-token cached by `mbt login`, or the dashboard's stored token (`broker_tokens`, via
-`DATABASE_URL`). `uv run mbt token-status` shows which one will be used.
+`.env`. When `DATABASE_URL` is configured, a valid dashboard token in `broker_tokens`
+takes priority for CLI, scheduled and API runs. If it is missing, expired or the database
+is unavailable, the resolver falls back to `FYERS_ACCESS_TOKEN`, `FYERS_TOKEN_FILE`, then
+the local `mbt login` cache. Without a database, these standalone sources work as before.
+`uv run mbt token-status` shows which source will be used.
 
 ## On-demand rebalance preview
 
 The shared dashboard's **Momentum Backtesting → Rebalance now** tab and the CLI use
 the same read-only calculation. They support Nifty 50 Stocks and Broad Momentum,
 collect Fyers LTPs during NSE market hours, and compare the model's live-week target
-with your actual holdings in percentages. The dashboard includes the existing Fyers
-login card; clicking it starts Fyers OAuth in a new tab. The access token is held
+with your actual holdings in percentages. Fyers login is managed from the shared
+dashboard's Broker logins tab. The access token is held
 server-side in `broker_tokens` until the expiry Fyers reports, and the app secret
 stays in server environment configuration, never browser storage. The preview
 never submits orders. Keep `mbt stocks fetch` and, for Broad,
@@ -31,7 +33,7 @@ never submits orders. Keep `mbt stocks fetch` and, for Broad,
 
 For a local dashboard preview without Fastify/Postgres, set `MOMENTUM_DIRECT=1`
 and `MOMENTUM_DIRECT_API_URL=http://127.0.0.1:3000` when starting Next, then run
-`uv run mbt ui --port 3000 --no-open-browser`. The Fyers app's registered
+`uv run mbt serve --port 3000`. The Fyers app's registered
 `FYERS_REDIRECT_URI` must point to the local service on port 3000 (either
 `/callback` or `/api/auth/fyers/callback`) for this setup. In direct mode,
 the local API stores the access token in `data/.fyers_token.json` with file mode
@@ -192,7 +194,8 @@ asleep) has no catch-up; re-run manually via the dashboard's Momentum tab ("Week
 or `mbt weekly --run <preview|final>` on the CLI. Logs land in
 `data/launchd-weekly-<preview|final>.log`.
 
-**Fyers.** `mbt login` (browser) or `FYERS_ACCESS_TOKEN` resolves a token; the job falls
+**Fyers.** The dashboard login is preferred when available; `mbt login` (browser) or
+`FYERS_ACCESS_TOKEN` remains a standalone fallback. The job falls
 back to public sources (niftyindices.com, Yahoo) if none is available or it's rejected —
 see "Sources, best first" above. No CI secrets needed any more; this all runs locally.
 
@@ -211,26 +214,18 @@ Then:
 2. Run "Momentum weekly signal" by hand for `preview` and for `final`.
 3. Only then uncomment its `schedule:`.
 
-## UI
+## Dashboard and API
 
 ```bash
-uv run mbt ui        # opens http://127.0.0.1:8765 - local only, reads data/weekly_closes.csv
+uv run mbt serve     # private FastAPI service on 127.0.0.1:8765
 ```
 
-The header keeps Backtest, Momentum Scores, and Saved runs available on every screen. The
-Backtest strategy selector switches between ETF, Nifty 50 stock, Custom Index, and Broad Momentum.
-Backtest settings are grouped by decision, with summaries on collapsed
-panels and validation beside the affected control. They include the universe, period, lookbacks
-and weights, portfolio rule, protection, execution, costs, tax, and benchmark. The results first show value,
-CAGR, benchmark edge, drawdown, and Sharpe; the other metrics are expandable. Results retain
-their original settings and warn when the form has changed. Overview shows growth, drawdown,
-and trailing 52-week edge; focused result views cover overview and yearly returns, holdings and
-signals with per-asset reasons, trades (CSV), risk, and comparison. Saved runs can be named, compared side by
-side, and overlaid on the chart. Momentum Scores has searchable stock and sector tables,
-sector and score filters, a score guide, and a stock detail panel. Data notes disclose incomplete history,
-proxy fills, excluded symbols, and current-constituent fallbacks when applicable. On narrow screens, settings open in
-a drawer while a Run button stays accessible. The charting library is downloaded once into `data/vendor/`, after which the UI
-works offline.
+Open the shared Next.js dashboard (`apps/dashboard`) and select Momentum. The
+FastAPI service exposes `/api/meta`, `/api/backtest`, `/api/momentum-scores`,
+saved runs, weekly signals, and rebalance preview through Fastify's
+`/api/momentum/*` proxy. `MOMENTUM_DIRECT=1` in Next.js development connects
+directly to this private service. The retired local HTML/JavaScript UI and its
+Plotly download endpoint are no longer served.
 
 ## Portfolio rules
 

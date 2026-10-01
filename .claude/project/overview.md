@@ -10,7 +10,7 @@
 - **Paper Trade Execution** — Simulated straddle entries and exits recorded to PostgreSQL; Quantiply API integration for paper trade tracking; 3 management styles: Hold, Roll (Adjuster), Cut + Re-enter (Reducer)
 - **EOD Retrospection Engine** — BullMQ batch job computes per-personality daily metrics, Beat-Clockwork deltas, signal calibration scores, management effectiveness, and queues rule-based parameter suggestions; all results are regime-tagged (RANGING / TRENDING_STRONG / VOLATILE_REVERTING / EVENT_DAY)
 - **Parameter Evolution** — Phase 1: rule-based adjustments with minimum sample sizes, cooldown periods, and approval gates; Phase 2: Bayesian optimization; Phase 3: genetic algorithms; Phase 4: RL (if data warrants)
-- **React Dashboard** — Real-time straddle value + momentum indicators, active signals, per-personality running P&L, EOD retrospection charts; served via Vite; uses Lightweight Charts and Zustand
+- **React Dashboard** — Real-time straddle value + momentum indicators, active signals, per-personality running P&L, EOD retrospection charts, and a central Broker logins surface (currently Fyers); served via Next.js; uses Lightweight Charts and Zustand
 
 ## Target Users
 
@@ -31,19 +31,19 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
   cutover; the `trade-analytics` repo still owns the live cron
 - **`packages/momentum-backtesting`** — Python/uv research tool for weekly
   momentum rotation across Indian indices, commodities and international ETFs,
-  from 2017. Data layer (`mbt fetch`), backtest engine and a local web UI (`mbt ui`) built.
+  from 2017. Data layer (`mbt fetch`), backtest engine and a private API (`mbt serve`) built.
   Also has a separate, from-scratch survivorship-free Nifty 50 stock-level data layer
   (`stocks/`, `mbt stocks fetch`/`pin-manifest`/`validate`) — corporate-action-adjusted
   daily/weekly price and total-return history for every ever-member company, including
-  delisted/merged/renamed ones; wired into the ranking engine and the UI (a stock-mode
-  tab in `mbt ui`, gold/silver/debt ranked alongside the 95 stocks). A further, separate
+  delisted/merged/renamed ones; wired into the ranking engine and the dashboard's
+  stock mode, with gold/silver/debt ranked alongside the 95 stocks. A further, separate
   "category momentum" layer (`categories/`, `mbt categories fetch|resolve|backtest`) ranks
   sector/thematic categories exactly as the existing ETF engine does, but substitutes the
   top-K individual stocks currently tagged to an investable category for its ETF via an
   inner backtest — wired into the UI as the "Custom Index" tab (outer category-vs-category
   ranking) and, via `categories/broad.py`, the "Broad Momentum" tab (Total Market pool with
-  optional category selection) and the Momentum Scores page, in both the legacy `mbt ui` and
-  the Next.js dashboard's Momentum tab (TODO.md §3.9, §3.11.8).
+  optional category selection) and the Momentum Scores page in the Next.js
+  dashboard's Momentum tab (TODO.md §3.9, §3.11.8).
   Weekly Friday signal to Telegram (`mbt weekly`, 14:40 IST live-price preview + 16:45 IST
   final), scheduled via a `launchd` job on the owner's own laptop since 2026-09-30
   (`scripts/install-launchd.sh` — TODO 3.11.5, retired the old GitHub Actions workflow and

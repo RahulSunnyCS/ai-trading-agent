@@ -108,7 +108,6 @@ function makeOptions(overrides: Partial<ClassifyDayOptions> = {}): ClassifyDayOp
 
 // UTC times for 2024-01-25 at key IST hours
 const T_0915 = '2024-01-25T03:45:00.000Z'; // 09:15 IST — market open
-const _T_1000 = '2024-01-25T04:30:00.000Z'; // 10:00 IST
 const T_1200 = '2024-01-25T06:30:00.000Z'; // 12:00 IST
 const T_1400 = '2024-01-25T08:30:00.000Z'; // 14:00 IST
 const T_1430 = '2024-01-25T09:00:00.000Z'; // 14:30 IST — exactly at cutoff

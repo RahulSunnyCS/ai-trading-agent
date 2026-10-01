@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
@@ -31,12 +32,86 @@ def test_real_nav_moves_are_not_mistaken_for_splits():
     pd.testing.assert_series_equal(adjust_nav_splits(nav), nav)
 
 
-def test_env_token_wins_over_database(monkeypatch):
+def test_dashboard_token_wins_over_environment_for_regular_jobs(monkeypatch):
     monkeypatch.setenv("FYERS_APP_ID", "APP-100")
-    monkeypatch.setenv("FYERS_ACCESS_TOKEN", "tok")
-    monkeypatch.setenv("DATABASE_URL", "postgres://should-not-be-used")
+    monkeypatch.setenv("FYERS_ACCESS_TOKEN", "stale-env")
+    monkeypatch.setenv("DATABASE_URL", "postgres://fake")
+    expires = datetime.now(UTC) + timedelta(hours=2)
+
+    class FakeConn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, _sql):
+            return self
+
+        def fetchone(self):
+            return ("DASHBOARD-100", "fresh-dashboard", expires)
+
+    import psycopg
+
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: FakeConn())
     creds = fyers.resolve_credentials()
-    assert (creds.app_id, creds.access_token, creds.source) == ("APP-100", "tok", "env")
+    assert (creds.app_id, creds.access_token, creds.source) == (
+        "DASHBOARD-100",
+        "fresh-dashboard",
+        "broker_tokens",
+    )
+    assert "fresh-dashboard" not in repr(creds)
+
+
+def test_expired_dashboard_token_falls_back_to_environment(monkeypatch):
+    monkeypatch.setenv("FYERS_APP_ID", "APP-100")
+    monkeypatch.setenv("FYERS_ACCESS_TOKEN", "env-token")
+    monkeypatch.setenv("DATABASE_URL", "postgres://fake")
+    monkeypatch.setattr(
+        fyers,
+        "_dashboard_credentials",
+        lambda: (_ for _ in ()).throw(fyers.FyersCredentialsError("stored token expired")),
+    )
+
+    creds = fyers.resolve_credentials()
+    assert (creds.access_token, creds.source) == ("env-token", "env")
+
+
+def test_unavailable_dashboard_database_falls_back_to_environment(monkeypatch):
+    monkeypatch.setenv("FYERS_APP_ID", "APP-100")
+    monkeypatch.setenv("FYERS_ACCESS_TOKEN", "env-token")
+    monkeypatch.setenv("DATABASE_URL", "postgres://offline")
+    monkeypatch.setattr(
+        fyers,
+        "_dashboard_credentials",
+        lambda: (_ for _ in ()).throw(fyers.FyersCredentialsError("database unavailable")),
+    )
+
+    assert fyers.resolve_credentials().access_token == "env-token"
+
+
+def test_unavailable_dashboard_database_falls_back_to_token_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("DATABASE_URL", "postgres://offline")
+    monkeypatch.delenv("FYERS_ACCESS_TOKEN", raising=False)
+    monkeypatch.setattr(
+        fyers,
+        "_dashboard_credentials",
+        lambda: (_ for _ in ()).throw(fyers.FyersCredentialsError("database unavailable")),
+    )
+    token_file = tmp_path / "fyers-token.json"
+    token_file.write_text(
+        json.dumps(
+            {
+                "app_id": "FILE-100",
+                "access_token": "file-token",
+                "expires_at": (datetime.now(UTC) + timedelta(hours=2)).isoformat(),
+            }
+        )
+    )
+    monkeypatch.setenv("FYERS_TOKEN_FILE", str(token_file))
+
+    creds = fyers.resolve_credentials()
+    assert (creds.access_token, creds.source) == ("file-token", "FYERS_TOKEN_FILE")
 
 
 def test_dashboard_preview_prefers_cached_oauth_token_over_env(monkeypatch):

@@ -1148,7 +1148,7 @@ def categories_broad_backtest(
 ) -> None:
     """Run the full Broad Momentum backtest end to end (TODO.md 3.9.13 Steps 2-4) and print a
     quick CAGR/max-drawdown/turnover summary -- the fast manual-verification path used while
-    building/sweeping this feature, ahead of the `mbt ui` "Broad Momentum" tab.
+    building/sweeping this feature, ahead of the dashboard's "Broad Momentum" tab.
     """
     from . import metrics
     from .categories import broad
@@ -1427,20 +1427,13 @@ def sources_check() -> None:
 
 
 @app.command()
-def ui(
+def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),
-    open_browser: bool = typer.Option(True, help="Open the page in your browser."),
 ) -> None:
-    """Open the local web UI (only reachable from this machine)."""
-    import threading
-    import webbrowser
-
+    """Serve the private API for the shared dashboard."""
     import uvicorn
 
-    url = f"http://127.0.0.1:{port}/"
-    if open_browser:
-        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    typer.echo(f"Momentum backtest UI at {url}  (Ctrl-C to stop)")
+    typer.echo(f"Momentum API at http://127.0.0.1:{port}/api/docs  (Ctrl-C to stop)")
     uvicorn.run("momentum_backtesting.api:app", host="127.0.0.1", port=port, log_level="warning")
 
 

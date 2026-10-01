@@ -20,9 +20,9 @@
     "test:e2e": "bun run --filter @ata/dashboard test:e2e",
     "py:api": "cd packages/option-backtesting && uv run obt-api",
     "typecheck": "bun run --filter @ata/server typecheck",
-    "lint": "[ -f ./tools/biome ] && ./tools/biome check . || echo 'biome not installed \u2014 run: bash scripts/install-biome.sh'",
-    "lint:fix": "[ -f ./tools/biome ] && ./tools/biome check --write . || echo 'biome not installed \u2014 run: bash scripts/install-biome.sh'",
-    "format": "[ -f ./tools/biome ] && ./tools/biome format --write . || echo 'biome not installed \u2014 run: bash scripts/install-biome.sh'",
+    "lint": "biome lint . --vcs-enabled=true --vcs-client-kind=git --vcs-use-ignore-file=true",
+    "lint:fix": "biome lint --write . --vcs-enabled=true --vcs-client-kind=git --vcs-use-ignore-file=true",
+    "format": "biome format --write . --vcs-enabled=true --vcs-client-kind=git --vcs-use-ignore-file=true",
     "prepare": "lefthook install"
   },
   "devDependencies": {

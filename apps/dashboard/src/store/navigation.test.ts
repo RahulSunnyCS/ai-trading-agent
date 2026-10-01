@@ -18,6 +18,7 @@ describe('navigation preferences', () => {
     expect(result.hidden).toEqual(['live']);
     expect(result.order.slice(0, 2)).toEqual(['momentum', 'live']);
     expect(new Set(result.order)).toEqual(new Set(DEFAULT_NAVIGATION_PREFERENCES.order));
+    expect(result.order).toContain('brokerLogins');
   });
 
   it('keeps Settings visible and pinned while hiding optional tabs', () => {

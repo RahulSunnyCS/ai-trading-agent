@@ -10,7 +10,7 @@ dependencies = [
     # Reads the day's Fyers token from the broker_tokens table (the dashboard's
     # "Login with Fyers" flow) when FYERS_ACCESS_TOKEN isn't set in .env.
     "psycopg[binary]>=3.2",
-    # Local UI (`mbt ui`), same versions as packages/option-backtesting.
+    # Private API (`mbt serve`), same versions as packages/option-backtesting.
     "fastapi>=0.115",
     "uvicorn>=0.32",
     # Nifty 50 stock data layer (stocks/): daily.parquet / events.parquet I/O.

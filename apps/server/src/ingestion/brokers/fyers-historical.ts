@@ -10,7 +10,7 @@
  * Security notes:
  *   - Outbound requests go ONLY to FYERS_HISTORY_HOST — no caller-supplied
  *     URLs to avoid SSRF.
- *   - Credentials are sourced exclusively from loadStoredToken(db) or the
+ *   - Credentials are sourced exclusively from broker_tokens or the
  *     FYERS_ACCESS_TOKEN / FYERS_APP_ID env vars; they are never logged in
  *     full (only the first 4 chars are emitted in log lines).
  *   - The HTTP layer is injectable (fetchFn param) so unit tests can mock it
@@ -40,7 +40,7 @@
  */
 
 import type { Pool } from 'pg';
-import { loadStoredToken } from '../../server/services/fyers-auth.js';
+import { resolveFyersCredentials } from '../../server/services/fyers-auth.js';
 
 // ---------------------------------------------------------------------------
 // Fixed host — never allow caller-supplied URLs (SSRF guard)
@@ -255,9 +255,8 @@ export interface FetchHistoricalOptions {
 /**
  * Thrown when no Fyers credentials are available.
  *
- * Both possible credential sources are checked:
- *   1. FYERS_ACCESS_TOKEN + FYERS_APP_ID environment variables
- *   2. The broker_tokens table via loadStoredToken(db)
+ * Both possible credential sources are checked: a valid broker_tokens row
+ * first when a DB is available, then FYERS_ACCESS_TOKEN + FYERS_APP_ID.
  *
  * If neither source provides credentials, this error is thrown immediately
  * (never silently, never zero-data). Callers must ensure credentials exist
@@ -353,16 +352,10 @@ type FyersHistoryResponse = FyersHistorySuccessResponse | FyersHistoryErrorRespo
 interface ResolvedCredentials {
   appId: string;
   accessToken: string;
-  refreshToken: string | null;
 }
 
 /**
- * Resolve Fyers credentials from env vars first, then from the DB.
- *
- * Priority:
- *   1. FYERS_ACCESS_TOKEN + FYERS_APP_ID env vars (fast path for dev / CI)
- *   2. broker_tokens table via loadStoredToken(db) (production path)
- *
+ * Prefer a valid broker_tokens row; use env credentials for standalone calls.
  * If db is null, only env vars are tried.
  * Throws FyersNoCredentialsError if neither source provides both fields.
  *
@@ -370,26 +363,17 @@ interface ResolvedCredentials {
  * written to any log output.
  */
 async function resolveCredentials(db: Pool | null): Promise<ResolvedCredentials> {
-  const envAccessToken = process.env.FYERS_ACCESS_TOKEN;
-  const envAppId = process.env.FYERS_APP_ID;
-
-  if (envAccessToken && envAppId) {
-    return {
-      appId: envAppId,
-      accessToken: envAccessToken,
-      refreshToken: process.env.FYERS_REFRESH_TOKEN ?? null,
-    };
-  }
-
   if (db !== null) {
-    const stored = await loadStoredToken(db);
-    if (stored) {
-      return {
-        appId: stored.appId,
-        accessToken: stored.accessToken,
-        refreshToken: stored.refreshToken,
-      };
-    }
+    const resolved = await resolveFyersCredentials(db, {
+      appId: process.env.FYERS_APP_ID,
+      accessToken: process.env.FYERS_ACCESS_TOKEN,
+    });
+    if (resolved.credentials) return resolved.credentials;
+  } else if (process.env.FYERS_APP_ID && process.env.FYERS_ACCESS_TOKEN) {
+    return {
+      appId: process.env.FYERS_APP_ID,
+      accessToken: process.env.FYERS_ACCESS_TOKEN,
+    };
   }
 
   // Neither source had credentials — fail loud.
@@ -721,8 +705,8 @@ function detectGap(chunk: DateChunk, candlesInChunk: FyersCandle[]): FyersCandle
  *
  * Authentication:
  *   Credentials are resolved from (in priority order):
- *   1. FYERS_ACCESS_TOKEN + FYERS_APP_ID env vars
- *   2. broker_tokens table via loadStoredToken(db)
+ *   1. A valid broker_tokens row, when db is provided
+ *   2. FYERS_ACCESS_TOKEN + FYERS_APP_ID env vars
  *   If neither is available, throws FyersNoCredentialsError immediately.
  *
  * If db is null, only env vars are used. Pass the pg Pool for production.
