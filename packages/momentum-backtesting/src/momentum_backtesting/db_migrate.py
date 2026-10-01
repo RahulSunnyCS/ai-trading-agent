@@ -16,6 +16,14 @@ What moves where, and why:
                                           schema's (instrument, kind, date) shape exactly,
                                           via the SAME rows_from_dir() this package already
                                           used to push to Neon — see store.py)
+  data/stocks/nifty50_weekly_*.csv,
+  data/stocks/nifty50_membership_weekly.csv
+                                       -> stock_weekly_prices, stock_membership_weekly
+  data/stocks/benchmarks_weekly.csv,
+  data/stocks/cash_weekly.csv         -> stock_weekly_series (NOT momentum_prices: that
+                                          table is wholesale-replaced by every `mbt weekly`
+                                          run, and its cash column shares the stock cash
+                                          series' name — see 004_stock_weekly_series.sql)
 
 The curated CSVs and the raw parquet stay the master copies (git-tracked research, most
 of it built from Wayback Machine archaeology — flipping mastery to the DB the way
@@ -74,6 +82,7 @@ class MigrationReport:
     momentum_prices: int = 0
     stock_weekly_prices: int = 0
     stock_membership_weekly: int = 0
+    stock_weekly_series: int = 0
     total_market_membership: int = 0
 
 
@@ -255,7 +264,8 @@ def _melt_weekly(frame: pd.DataFrame, value_name: str) -> pd.DataFrame:
 
 
 def import_stock_weekly(con: duckdb.DuckDBPyConnection, stocks_dir: Path) -> tuple[int, int, int]:
-    """Returns (price rows, membership rows, cash/benchmark rows written to momentum_prices)."""
+    """Returns (price rows, membership rows, cash/benchmark rows written to
+    stock_weekly_series)."""
     tr = _read_weekly(stocks_dir / "nifty50_weekly_tr.csv")
     price = _read_weekly(stocks_dir / "nifty50_weekly_price.csv")
     membership = _read_weekly(stocks_dir / "nifty50_membership_weekly.csv")
@@ -289,8 +299,8 @@ def import_stock_weekly(con: duckdb.DuckDBPyConnection, stocks_dir: Path) -> tup
         )
         n_membership = len(long)
 
-    # Renamed to ui_data.py's own output column names — momentum_prices' instrument names
-    # must match exactly what api.py/the engine expect to see, same rule as the ETF dataset.
+    # Renamed to ui_data.py's own output column names, which db_read translates back.
+    con.execute("DELETE FROM stock_weekly_series")
     n_extra = 0
     if benchmarks is not None:
         from .stocks.ui_data import _BENCHMARK_COLUMNS  # noqa: PLC0415 (avoid a hard import cycle)
@@ -298,25 +308,19 @@ def import_stock_weekly(con: duckdb.DuckDBPyConnection, stocks_dir: Path) -> tup
         renamed = benchmarks[[c for c in _BENCHMARK_COLUMNS if c in benchmarks.columns]].rename(
             columns=_BENCHMARK_COLUMNS
         )
-        n_extra += _insert_weekly_kind(con, renamed, "weekly")
+        n_extra += _insert_series(con, renamed)
     if cash is not None:
         from .engine import CASH  # noqa: PLC0415
 
-        n_extra += _insert_weekly_kind(con, cash.rename(columns={"close": CASH}), "weekly")
+        n_extra += _insert_series(con, cash.rename(columns={"close": CASH}))
     return n_prices, n_membership, n_extra
 
 
-def _insert_weekly_kind(con: duckdb.DuckDBPyConnection, frame: pd.DataFrame, kind: str) -> int:
-    con.executemany(
-        f"DELETE FROM momentum_prices WHERE kind = '{kind}' AND instrument = ?",
-        [[c] for c in frame.columns],
-    )
+def _insert_series(con: duckdb.DuckDBPyConnection, frame: pd.DataFrame) -> int:
     long = _melt_weekly(frame, "close")
-    if long.empty:
-        return 0
     con.executemany(
-        "INSERT INTO momentum_prices VALUES (?, ?, ?, NULL, ?)",
-        list(zip(long["company_id"], [kind] * len(long), long["week"], long["close"], strict=True)),
+        "INSERT INTO stock_weekly_series VALUES (?, ?, ?)",
+        list(zip(long["company_id"], long["week"], long["close"], strict=True)),
     )
     return len(long)
 
@@ -354,8 +358,9 @@ def migrate(
         stock_instruments=n_symbols,
         stock_bars=n_bars,
         stock_years=n_years,
-        momentum_prices=n_prices + n_extra,
+        momentum_prices=n_prices,
         stock_weekly_prices=n_stock_prices,
         stock_membership_weekly=n_stock_membership,
+        stock_weekly_series=n_extra,
         total_market_membership=n_total_market,
     )

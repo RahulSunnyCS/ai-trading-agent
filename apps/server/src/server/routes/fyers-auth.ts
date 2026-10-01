@@ -202,16 +202,21 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
     // computation lives in exactly one place — the status route and the
     // scheduled job share identical logic with no duplication.
     const state = checkTokenValidity(token?.expiresAt ?? null);
-    const { degraded, needsReauth } = deriveStatusFlags(state);
+    const flags = deriveStatusFlags(state);
 
     if (!token) {
       return reply.send({
         configured: true,
         connected: false,
-        degraded,
-        needsReauth,
+        degraded: flags.degraded,
+        needsReauth: flags.needsReauth,
       });
     }
+
+    // A token minted for a different Fyers app must never appear connected,
+    // even when its timestamp is still in the future.
+    const appMismatch = token.appId !== cfg.appId;
+    const needsReauth = flags.needsReauth || appMismatch;
 
     return reply.send({
       configured: true,
@@ -221,7 +226,7 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
       connected: !needsReauth,
       expiresAt: token.expiresAt.toISOString(),
       appId: token.appId,
-      degraded,
+      degraded: flags.degraded || appMismatch,
       needsReauth,
     });
   });

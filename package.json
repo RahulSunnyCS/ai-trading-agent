@@ -8,7 +8,11 @@
   "scripts": {
     "dev": "bun run --filter @ata/server dev",
     "sim": "bun run --filter @ata/server sim",
-    "start": "bun run --filter @ata/server start",
+    "start": "bun scripts/dev-stack.mjs research",
+    "start:backend": "bun scripts/dev-stack.mjs backends",
+    "start:frontend": "bun scripts/dev-stack.mjs frontend",
+    "stop:research": "bun scripts/dev-stack.mjs stop",
+    "start:server": "bun run --filter @ata/server start",
     "migrate": "bun run --filter @ata/server migrate",
     "replay": "bun run --filter @ata/server replay",
     "backtest": "bun run --filter @ata/server backtest",
@@ -27,6 +31,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
+    "concurrently": "^10.0.5",
     "lefthook": "^2.1.6"
   },
   "trustedDependencies": ["esbuild", "msgpackr-extract", "playwright"]

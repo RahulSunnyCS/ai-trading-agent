@@ -91,9 +91,15 @@ and plain price per company, weekly membership, three benchmark TRIs, cash) that
 fetch` computes from raw daily bars + corporate actions via real logic in `stocks/adjust.py`.
 Recomputing that adjustment from `bars_1d_stock`/`corporate_actions` here would duplicate that
 logic for no benefit — `003_stock_weekly.sql` stores the CACHED weekly output instead
-(`stock_weekly_prices`, `stock_membership_weekly`; benchmarks/cash reuse `momentum_prices`,
-kind='weekly', same table the ETF dataset already uses), matching the choice `002_momentum.sql`
+(`stock_weekly_prices`, `stock_membership_weekly`, and — since `004_stock_weekly_series.sql` —
+`stock_weekly_series` for the three benchmark TRIs and cash), matching the choice `002_momentum.sql`
 already made for `weekly_closes.csv`.
+
+003 first put the benchmarks/cash into `momentum_prices` (kind='weekly'). That broke on
+2026-10-01: `momentum_prices` is wholesale-replaced from the ETF pipeline's files on every
+`mbt weekly` run, which deleted the TRIs, and the stock cash series shared the name
+`Cash (liquid fund)` with the ETF dataset's shorter cash column, so the two imports overwrote
+each other. A table has to have one writer; 004 gives the stock series their own.
 
 `db_read.py`'s `stock_dataset_from_db_or_none()` reconstructs the RAW (pre-rename) shapes
 `load_stock_dataset` expects — including translating the DB's canonical benchmark names back to

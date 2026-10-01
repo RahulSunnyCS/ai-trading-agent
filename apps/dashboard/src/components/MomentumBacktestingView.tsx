@@ -68,6 +68,12 @@ const DATASETS: Array<{ id: Dataset; label: string; description: string }> = [
   },
 ];
 
+// Owner, 2026-10-01: only ETF Rotation and Broad Momentum are offered in the tab. The Nifty 50
+// Stocks and Custom Index datasets stay in DATASETS (labels, saved runs, the API) and can be
+// re-shown by adding their ids back here.
+const VISIBLE_DATASET_IDS: ReadonlySet<Dataset> = new Set<Dataset>(['etf', 'broad']);
+const VISIBLE_DATASETS = DATASETS.filter((item) => VISIBLE_DATASET_IDS.has(item.id));
+
 function numberDefault(defaults: Record<string, unknown>, key: string, fallback: number): number {
   const value = defaults[key];
   return typeof value === 'number' ? value : fallback;
@@ -155,6 +161,18 @@ export function MomentumBacktestingView() {
   async function toggleOverlay(id: string, overlay: boolean): Promise<void> {
     setSavedRuns((runs) => runs.map((run) => (run.id === id ? { ...run, overlay } : run)));
     await apiPatch(`/api/momentum/saved-runs/${id}`, { overlay });
+  }
+  async function toggleFavorite(id: string, favorite: boolean): Promise<void> {
+    setSavedRuns((runs) =>
+      runs.map((run) => (run.id === id ? { ...run, favorite, active: favorite ? run.active : false } : run)),
+    );
+    await apiPatch(`/api/momentum/saved-runs/${id}`, { favorite });
+  }
+  async function setActive(id: string): Promise<void> {
+    setSavedRuns((runs) =>
+      runs.map((run) => ({ ...run, favorite: run.id === id ? true : run.favorite, active: run.id === id })),
+    );
+    await apiPatch(`/api/momentum/saved-runs/${id}`, { active: true });
   }
   async function removeRun(id: string): Promise<void> {
     setSavedRuns((runs) => runs.filter((run) => run.id !== id));
@@ -392,9 +410,11 @@ export function MomentumBacktestingView() {
       const decoded = JSON.parse(
         decodeURIComponent(escape(atob(hash.slice(marker.length)))),
       ) as Record<string, unknown>;
-      const sharedDataset = (
+      const requested = (
         typeof decoded.dataset === 'string' ? decoded.dataset : 'etf'
       ) as Dataset;
+      // A link to a hidden dataset opens ETF Rotation instead of an unreachable tab.
+      const sharedDataset: Dataset = VISIBLE_DATASET_IDS.has(requested) ? requested : 'etf';
       setDataset(sharedDataset);
       void loadMeta(sharedDataset, decoded);
     } catch {
@@ -461,6 +481,8 @@ export function MomentumBacktestingView() {
           runs={savedRuns}
           onRename={renameRun}
           onToggleOverlay={toggleOverlay}
+          onToggleFavorite={toggleFavorite}
+          onSetActive={setActive}
           onRemove={removeRun}
           onLoad={loadSettings}
         />
@@ -469,7 +491,7 @@ export function MomentumBacktestingView() {
           <div className="rounded-xl border border-border bg-surface p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
-                {DATASETS.map((item) => (
+                {VISIBLE_DATASETS.map((item) => (
                   <button
                     key={item.id}
                     type="button"

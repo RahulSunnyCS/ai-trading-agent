@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { resolveFyersCredentials } from '../services/fyers-auth.js';
+import { resolveFyersCredentials, saveToken } from '../services/fyers-auth.js';
 
 function tokenPool(row: Record<string, unknown> | null): Pool {
   return {
@@ -10,7 +10,7 @@ function tokenPool(row: Record<string, unknown> | null): Pool {
 }
 
 describe('Fyers credential precedence', () => {
-  const fallback = { appId: 'env-app', accessToken: 'env-token' };
+  const fallback = { appId: 'dashboard-app', accessToken: 'env-token' };
 
   it('uses a valid dashboard token and its app ID before env credentials', async () => {
     const result = await resolveFyersCredentials(
@@ -46,6 +46,21 @@ describe('Fyers credential precedence', () => {
     expect(expired.credentials).toEqual(fallback);
     expect(missing.source).toBe('env');
     expect(missing.credentials).toEqual(fallback);
+  });
+
+  it('rejects a non-expired token minted for a different configured app', async () => {
+    const result = await resolveFyersCredentials(
+      tokenPool({
+        app_id: 'old-app',
+        access_token: 'old-token',
+        refresh_token: null,
+        expires_at: new Date(Date.now() + 3_600_000),
+      }),
+      fallback,
+    );
+
+    expect(result.source).toBe('env');
+    expect(result.credentials).toEqual(fallback);
   });
 
   it('falls back to env if the token database cannot be read', async () => {
@@ -85,5 +100,37 @@ describe('Fyers credential precedence', () => {
     );
 
     expect(result.credentials).toBeNull();
+  });
+});
+
+describe('Fyers token persistence', () => {
+  it('encrypts access and refresh tokens in PostgreSQL using the server-only app secret', async () => {
+    const previous = process.env.FYERS_APP_SECRET;
+    process.env.FYERS_APP_SECRET = 'server-only-secret';
+    const query = vi.fn(async (_sql: string, _params: unknown[]) => ({ rows: [] }));
+    const db = { query } as unknown as Pool;
+
+    await saveToken(db, {
+      appId: 'APP-100',
+      accessToken: 'access-secret',
+      refreshToken: 'refresh-secret',
+      expiresAt: new Date('2026-10-02T00:00:00Z'),
+    });
+
+    const call = query.mock.calls[0];
+    expect(call).toBeDefined();
+    const sql = String(call?.[0]);
+    const params = call?.[1] as unknown[];
+    expect(sql).toContain('pgp_sym_encrypt');
+    expect(sql).toContain('token_encrypted');
+    expect(params).toEqual([
+      'APP-100',
+      'access-secret',
+      'refresh-secret',
+      new Date('2026-10-02T00:00:00Z'),
+      'server-only-secret',
+    ]);
+    if (previous === undefined) delete process.env.FYERS_APP_SECRET;
+    else process.env.FYERS_APP_SECRET = previous;
   });
 });

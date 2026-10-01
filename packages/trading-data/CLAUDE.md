@@ -17,6 +17,9 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `002_momentum.sql`: companies + renames (`company_symbols`), corporate actions,
     index/category membership, `momentum_prices` (index/ETF/commodity/premium/weekly
     series, mirroring momentum-backtesting's retired Neon schema), `momentum_signals`
+  - `003_stock_weekly.sql` / `004_stock_weekly_series.sql`: the Nifty 50 stock dataset's
+    cached weekly series (`stock_weekly_prices`, `stock_membership_weekly`,
+    `stock_weekly_series` for its benchmark TRIs and cash)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`)
 - `raw/` — gzipped verbatim vendor responses

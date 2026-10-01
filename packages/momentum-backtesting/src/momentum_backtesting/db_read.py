@@ -10,7 +10,7 @@ against the real file, and verified that `engine.run_backtest` produces an ident
 equity curve, benchmark, weights and trade log fed either source (see TODO 3.11.4).
 
 `stock_dataset_from_db_or_none()` is the same idea for `stocks/ui_data.py`'s five
-inputs (`003_stock_weekly.sql` + `momentum_prices`), reconstructed in the exact RAW
+inputs (`003_stock_weekly.sql` + `004_stock_weekly_series.sql`), reconstructed in the exact RAW
 shapes (lowercase benchmark column names, a "close"-named cash Series) the file-based
 path produces, so `load_stock_dataset`'s own rename/reindex/concat logic downstream
 runs completely unchanged regardless of source.
@@ -66,13 +66,12 @@ def _pivot_weekly(rows: list, value_col: str) -> pd.DataFrame:
     return wide
 
 
-def _momentum_prices_frame(con, instruments: tuple[str, ...]) -> pd.DataFrame:
-    rows = con.execute(
-        "SELECT date, instrument, close FROM momentum_prices WHERE kind = 'weekly' "
-        "AND instrument IN (SELECT unnest(?)) ORDER BY date",
-        [list(instruments)],
-    ).fetchall()
-    return _pivot_weekly(rows, "close") if rows else pd.DataFrame()
+def _has_table(con, name: str) -> bool:
+    return bool(
+        con.execute(
+            "SELECT count(*) FROM information_schema.tables WHERE table_name = ?", [name]
+        ).fetchone()[0]
+    )
 
 
 #: `stocks/ui_data.py`'s five inputs, in RAW (pre-rename) shape.
@@ -80,14 +79,21 @@ StockDatasetRaw = tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
 
 
 def stock_dataset_from_db_or_none(root: Path | None = None) -> StockDatasetRaw | None:
-    """None (never raises) when the catalog is missing, or has none of `stock_weekly_prices`
-    yet (`mbt local migrate` not run) — the caller's cue to read the files instead."""
+    """None (never raises) when the catalog is missing, or is missing any of the five inputs
+    — no `stock_weekly_prices` yet, or not all three benchmark TRIs plus cash in
+    `stock_weekly_series` (`mbt local migrate` not run since 004, or `mbt stocks fetch`
+    never ran) — the caller's cue to read the files instead. All-or-nothing, so the two
+    sources are never mixed in one dataset."""
     from .engine import CASH
     from .stocks.ui_data import NIFTY50_EQUAL_WEIGHT_TRI, NIFTY50_TRI, NIFTY200_MOMENTUM30_TRI
 
     if catalog_mtime(root) is None:
         return None
     with connect(root or data_root(), read_only=True) as con:
+        # A read-only connect never migrates, so a catalog last opened for writing
+        # before 004 has no stock_weekly_series table yet.
+        if not _has_table(con, "stock_weekly_series"):
+            return None
         tr = _pivot_weekly(
             con.execute(
                 "SELECT week, company_id, close FROM stock_weekly_prices WHERE kind = 'tr'"
@@ -115,11 +121,16 @@ def stock_dataset_from_db_or_none(root: Path | None = None) -> StockDatasetRaw |
             "nifty200_momentum30_tri": NIFTY200_MOMENTUM30_TRI,
             "nifty50_ew_tri": NIFTY50_EQUAL_WEIGHT_TRI,
         }
-        benchmarks = _momentum_prices_frame(con, tuple(raw_to_canonical.values())).rename(
-            columns={v: k for k, v in raw_to_canonical.items()}
+        series = _pivot_weekly(
+            con.execute("SELECT week, series, close FROM stock_weekly_series").fetchall(),
+            "close",
         )
-        cash_frame = _momentum_prices_frame(con, (CASH,))
-        cash = (cash_frame[CASH] if CASH in cash_frame else pd.Series(dtype=float)).rename("close")
+    if not set(raw_to_canonical.values()) | {CASH} <= set(series.columns):
+        return None
+    benchmarks = series[list(raw_to_canonical.values())].rename(
+        columns={v: k for k, v in raw_to_canonical.items()}
+    )
+    cash = series[CASH].dropna().rename("close")
     return tr, price, membership, benchmarks, cash
 
 

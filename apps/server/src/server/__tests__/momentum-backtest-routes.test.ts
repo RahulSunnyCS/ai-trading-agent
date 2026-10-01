@@ -155,6 +155,24 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards the cross-dataset favourite strategy list', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, []));
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/favorite-strategies',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/favorite-strategies',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+    await server.close();
+  });
+
   it('forwards a manual weekly-signal trigger', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

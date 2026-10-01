@@ -45,7 +45,7 @@ def test_dashboard_token_wins_over_environment_for_regular_jobs(monkeypatch):
         def __exit__(self, *exc):
             return False
 
-        def execute(self, _sql):
+        def execute(self, _sql, _params=None):
             return self
 
         def fetchone(self):
@@ -127,7 +127,7 @@ def test_dashboard_preview_prefers_cached_oauth_token_over_env(monkeypatch):
         def __exit__(self, *exc):
             return False
 
-        def execute(self, _sql):
+        def execute(self, _sql, _params=None):
             return self
 
         def fetchone(self):
@@ -178,7 +178,7 @@ def test_expired_database_token_is_rejected(monkeypatch, tmp_path):
         def __exit__(self, *exc):
             return False
 
-        def execute(self, _sql):
+        def execute(self, _sql, _params=None):
             return self
 
         def fetchone(self):

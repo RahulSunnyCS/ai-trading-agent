@@ -135,11 +135,11 @@ export function FyersAuthCard() {
           <>
             <Badge tone="negative" dot>
               <AlertCircle className="h-3 w-3" />
-              {status.needsReauth ? 'Token expired' : 'Disconnected'}
+              No API token
             </Badge>
             <p className="text-sm text-muted">
               {status.degraded
-                ? 'Auth failure detected — token may have expired. Click Login to re-authenticate.'
+                ? 'The token is missing, expired, or belongs to a different app. Re-login with Fyers.'
                 : 'Click "Login with Fyers" to authorise this app and store a fresh token.'}
             </p>
           </>

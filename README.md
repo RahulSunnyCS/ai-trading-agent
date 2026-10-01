@@ -35,33 +35,24 @@ auto-loaded into every Claude Code session.
 
 ### Momentum & Options Lab (local dev, no Docker)
 
-Both research tabs can run standalone against their own Python service,
-bypassing Fastify/Postgres/Redis entirely — dev-only, never used in
-production.
+From the repo root, with Bun, `uv`, and `lsof` installed:
 
-**Momentum tab:**
 ```bash
-cd packages/momentum-backtesting && uv sync
-uv run mbt serve                        # terminal 1 — Python backend on :8765
+npm start                 # or bun run start: restart both Python APIs and one dashboard
+bun run start:backend     # restart only Momentum (:8765) and Options (:8000)
+bun run start:frontend    # restart only the dashboard (:5190)
+bun run stop:research     # stop the research services started from this checkout
 ```
-```bash
-cd apps/dashboard && MOMENTUM_DIRECT=1 bun run dev -- --port 5190   # terminal 2
-```
-Open `http://localhost:5190` → **Momentum**.
 
-**Options Lab tab:**
-```bash
-cd packages/option-backtesting && uv sync
-./scripts/build-cache.sh               # first run only, or after data/raw/ changes
-uv run obt-api                         # terminal 1 — Python backend on :8000
-```
-```bash
-cd apps/dashboard && OBT_DIRECT=1 bun run dev -- --port 5180   # terminal 2
-```
-Open `http://localhost:5180` → **Options Lab**.
-
-Both pairs can run at once on their different ports. See
-[`.claude/launch.json`](.claude/launch.json) for the exact configs.
+Open `http://localhost:5190` and choose **Momentum** or **Options Lab**. The
+launcher sets both direct-mode flags, so these tabs bypass Fastify/Postgres/Redis;
+other dashboard tabs still need the Fastify stack. It restarts only matching
+processes from this checkout and refuses to take a port held by another app.
+`uv run` syncs the Python environments automatically. On a fresh checkout, the
+Options Lab cache is built from `data/raw/` if available; after changing raw
+data, rebuild it with `cd packages/option-backtesting && ./scripts/build-cache.sh`.
+These direct-mode routes are for local development, not production. For separate
+manual launch configurations, see [`.claude/launch.json`](.claude/launch.json).
 
 ## Documentation
 

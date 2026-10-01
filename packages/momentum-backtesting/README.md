@@ -25,9 +25,9 @@ The shared dashboard's **Momentum Backtesting → Rebalance now** tab and the CL
 the same read-only calculation. They support Nifty 50 Stocks and Broad Momentum,
 collect Fyers LTPs during NSE market hours, and compare the model's live-week target
 with your actual holdings in percentages. Fyers login is managed from the shared
-dashboard's Broker logins tab. The access token is held
-server-side in `broker_tokens` until the expiry Fyers reports, and the app secret
-stays in server environment configuration, never browser storage. The preview
+dashboard's Broker logins tab. The access token is AES-256 encrypted server-side in
+`broker_tokens` until the expiry Fyers reports, and the app secret stays in server
+environment configuration, never browser storage. The preview
 never submits orders. Keep `mbt stocks fetch` and, for Broad,
 `mbt categories fetch-universe` data current before using it.
 
@@ -143,8 +143,10 @@ index's) and undone.
 
 ## Weekly Friday signal (Telegram)
 
-`mbt weekly --run preview|final` refreshes prices, ranks, and sends the week's trades to
-Telegram. It runs from a `launchd` job on the owner's own laptop (`scripts/install-
+`mbt weekly --run preview|final` refreshes prices and evaluates every favourited strategy from
+one shared snapshot. The dashboard shows every result; only the one globally active favourite
+is sent to Telegram. Until a favourite exists, the checked-in `live_config.toml` strategy is
+the fallback. It runs from a `launchd` job on the owner's own laptop (`scripts/install-
 launchd.sh`; see "Scheduling" below) — it used to run from GitHub Actions
 (`MOMENTUM_DATABASE_URL`/Neon), retired 2026-09-30. It can also be triggered manually any
 time from the dashboard's Momentum tab ("Weekly signal") or the CLI directly:
@@ -158,12 +160,17 @@ The message lists SELL / TRIM / BUY and TOP UP / HOLD / WAITING. It flags a buy 
 trades above NAV (1%, or 2% for international ETFs; see `live_config.toml`), shows the
 biggest rank moves, and ends with a data-health line.
 
-The positions are the backtest's model portfolio under
-`src/momentum_backtesting/live_config.toml`, not your actual holdings.
+The positions are each saved strategy's model portfolio, not your actual holdings. Every saved
+strategy retains its initial start date. `live_config.toml` supplies only the no-favourites
+fallback.
 
 Guards:
 
-- A market holiday produces a "market closed?" note and no signal.
+- A Friday market holiday uses Thursday's official close (or walks back to the latest NSE
+  session for consecutive holidays) while keeping the normal Friday week label.
+- Stock, Custom Index and Broad favourites run only when the processed bhavcopy-backed stock
+  dataset reaches that Friday-labelled week. Otherwise they are shown as blocked in the UI;
+  the weekly trigger does not download or partially rebuild bhavcopy data.
 - If more than 25% of the ranked series have no close for the day, you get a data-health
   alert and no signal.
 - A preview that starts after 15:15 says it's too late to trade today.

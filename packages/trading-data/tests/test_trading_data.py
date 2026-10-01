@@ -22,10 +22,38 @@ def root(tmp_path):
 def test_fresh_catalog_migrates_once_and_loads_reference(root):
     with connect(root) as con:
         applied = con.execute("SELECT version FROM schema_migrations ORDER BY 1").fetchall()
-        assert applied == [("001_core",), ("002_momentum",), ("003_stock_weekly",)]
+        assert applied == [
+            ("001_core",),
+            ("002_momentum",),
+            ("003_stock_weekly",),
+            ("004_stock_weekly_series",),
+        ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 3
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 4
+
+
+def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):
+    """A catalog written under 003 kept the stock dataset's TRIs in momentum_prices;
+    004 moves them to stock_weekly_series and leaves everything else (incl. the
+    ambiguous shared cash rows) where it was."""
+    with connect(root) as con:  # simulate a pre-004 catalog
+        con.execute("DROP TABLE stock_weekly_series")
+        con.execute("DELETE FROM schema_migrations WHERE version = '004_stock_weekly_series'")
+        con.execute(
+            "INSERT INTO momentum_prices VALUES "
+            "('Nifty 50 TRI', 'weekly', DATE '2020-01-03', NULL, 1000.0), "
+            "('Cash (liquid fund)', 'weekly', DATE '2020-01-03', NULL, 10.0), "
+            "('Nifty 50', 'weekly', DATE '2020-01-03', NULL, 12000.0)"
+        )
+    with connect(root) as con:
+        assert con.execute("SELECT * FROM stock_weekly_series").fetchall() == [
+            ("Nifty 50 TRI", date(2020, 1, 3), 1000.0)
+        ]
+        assert con.execute("SELECT instrument FROM momentum_prices ORDER BY 1").fetchall() == [
+            ("Cash (liquid fund)",),
+            ("Nifty 50",),
+        ]
 
 
 def test_a_concurrent_read_only_connect_does_not_fail_while_a_write_connection_is_open(root):

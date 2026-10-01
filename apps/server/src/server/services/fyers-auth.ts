@@ -122,30 +122,51 @@ export async function exchangeAuthCode(
 }
 
 export async function saveToken(db: Pool, token: StoredToken): Promise<void> {
+  const passphrase = process.env.FYERS_APP_SECRET;
+  if (!passphrase) {
+    throw new Error('FYERS_APP_SECRET is required to encrypt the Fyers token.');
+  }
   await db.query(
-    `INSERT INTO broker_tokens (broker, app_id, access_token, refresh_token, expires_at, updated_at)
-     VALUES ('fyers', $1, $2, $3, $4, NOW())
+    `INSERT INTO broker_tokens
+       (broker, app_id, access_token, refresh_token, expires_at, updated_at, token_encrypted)
+     VALUES (
+       'fyers', $1,
+       armor(pgp_sym_encrypt($2, $5, 'cipher-algo=aes256')),
+       CASE WHEN $3::text IS NULL THEN NULL
+            ELSE armor(pgp_sym_encrypt($3, $5, 'cipher-algo=aes256')) END,
+       $4, NOW(), TRUE
+     )
      ON CONFLICT (broker) DO UPDATE
        SET app_id = EXCLUDED.app_id,
            access_token = EXCLUDED.access_token,
            refresh_token = EXCLUDED.refresh_token,
            expires_at = EXCLUDED.expires_at,
+           token_encrypted = TRUE,
            updated_at = NOW()`,
-    [token.appId, token.accessToken, token.refreshToken, token.expiresAt],
+    [token.appId, token.accessToken, token.refreshToken, token.expiresAt, passphrase],
   );
 }
 
 export async function loadStoredToken(db: Pool): Promise<StoredToken | null> {
+  const passphrase = process.env.FYERS_APP_SECRET ?? '';
   const result = await db.query<{
     app_id: string;
     access_token: string;
     refresh_token: string | null;
     expires_at: Date;
   }>(
-    `SELECT app_id, access_token, refresh_token, expires_at
+    `SELECT app_id,
+            CASE WHEN token_encrypted
+                 THEN pgp_sym_decrypt(dearmor(access_token), $1)
+                 ELSE access_token END AS access_token,
+            CASE WHEN refresh_token IS NULL THEN NULL
+                 WHEN token_encrypted THEN pgp_sym_decrypt(dearmor(refresh_token), $1)
+                 ELSE refresh_token END AS refresh_token,
+            expires_at
        FROM broker_tokens
       WHERE broker = 'fyers'
       LIMIT 1`,
+    [passphrase],
   );
   const row = result.rows[0];
   if (!row) return null;
@@ -171,7 +192,12 @@ export async function resolveFyersCredentials(
   let expiredStoredToken: string | null = null;
   try {
     const stored = await loadStoredToken(db);
-    if (stored && stored.expiresAt.getTime() > Date.now()) {
+    const configuredAppId = fallback.appId?.trim();
+    if (
+      stored &&
+      stored.expiresAt.getTime() > Date.now() &&
+      (!configuredAppId || stored.appId === configuredAppId)
+    ) {
       return {
         credentials: { appId: stored.appId, accessToken: stored.accessToken },
         source: 'broker_tokens',

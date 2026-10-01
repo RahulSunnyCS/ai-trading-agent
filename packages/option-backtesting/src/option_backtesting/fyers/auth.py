@@ -66,10 +66,14 @@ def _from_file(path: Path, source: str) -> Credentials | None:
 
 def _from_dashboard(database_url: str) -> Credentials | None:
     """Read the same expiring token used by the dashboard and Momentum API."""
+    passphrase = os.environ.get("FYERS_APP_SECRET", "")
     with psycopg.connect(database_url, connect_timeout=10) as conn:
         row = conn.execute(
-            "SELECT app_id, access_token, expires_at FROM broker_tokens "
-            "WHERE broker = 'fyers' LIMIT 1"
+            "SELECT app_id, CASE WHEN token_encrypted "
+            "THEN pgp_sym_decrypt(dearmor(access_token), %s) "
+            "ELSE access_token END AS access_token, expires_at FROM broker_tokens "
+            "WHERE broker = 'fyers' LIMIT 1",
+            (passphrase,),
         ).fetchone()
     if row is None:
         return None

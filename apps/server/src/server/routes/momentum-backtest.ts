@@ -140,6 +140,13 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, `/api/saved-runs/${encodeURIComponent(runId)}`, { method: 'DELETE' });
   });
 
+  // Favourites are intentionally not scoped to the currently selected dataset:
+  // the weekly scheduler evaluates the complete set and has one global active
+  // strategy whose result may be sent to Telegram.
+  fastify.get('/api/momentum/favorite-strategies', async (_request, reply) => {
+    await forward(reply, '/api/favorite-strategies');
+  });
+
   // Manual trigger for the Friday weekly signal (TODO.md 3.11.5) — the same code path the
   // launchd-scheduled `mbt weekly` CLI runs. Can take tens of seconds (live network price
   // sources), same as a cold Custom Index backtest, hence the shared PROXY_TIMEOUT_MS. A

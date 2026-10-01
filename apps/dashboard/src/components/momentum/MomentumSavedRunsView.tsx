@@ -1,5 +1,6 @@
 'use client';
 
+import { Star } from 'lucide-react';
 import { useState } from 'react';
 
 import type { MomentumSavedRun } from '../../types/momentum';
@@ -27,12 +28,16 @@ export function MomentumSavedRunsView({
   runs,
   onRename,
   onToggleOverlay,
+  onToggleFavorite,
+  onSetActive,
   onRemove,
   onLoad,
 }: {
   runs: MomentumSavedRun[];
   onRename: (id: string, name: string) => void;
   onToggleOverlay: (id: string, overlay: boolean) => void;
+  onToggleFavorite: (id: string, favorite: boolean) => void;
+  onSetActive: (id: string) => void;
   onRemove: (id: string) => void;
   onLoad: (run: MomentumSavedRun) => void;
 }) {
@@ -44,8 +49,8 @@ export function MomentumSavedRunsView({
     <div className="space-y-5">
       <Card>
         <CardHeader
-          title="Saved runs"
-          description="Named results and settings are saved, grouped by dataset."
+          title="Saved strategies"
+          description="Favourite strategies run every weekly cycle. Only the active favourite is sent to Telegram."
         />
         {runs.length === 0 ? (
           <p className="text-sm text-muted">Run a backtest to start a comparison.</p>
@@ -65,6 +70,28 @@ export function MomentumSavedRunsView({
               />
               Overlay
             </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              <input
+                type="checkbox"
+                aria-label={`Favourite ${run.name}`}
+                checked={run.favorite}
+                onChange={(event) => onToggleFavorite(run.id, event.target.checked)}
+              />
+              <Star className="h-3.5 w-3.5" aria-hidden />
+              Favourite
+            </label>
+            {run.favorite ? (
+              <label className="flex items-center gap-1.5 text-xs text-muted">
+                <input
+                  type="radio"
+                  name="active-weekly-strategy"
+                  aria-label={`Use ${run.name} for Telegram`}
+                  checked={run.active}
+                  onChange={() => onSetActive(run.id)}
+                />
+                Telegram active
+              </label>
+            ) : null}
             <input
               aria-label={`Name for run ${run.n}`}
               value={run.name}
@@ -75,6 +102,7 @@ export function MomentumSavedRunsView({
             <span className="text-xs text-muted">
               CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Sharpe{' '}
               {metric(run, 'sharpe')}
+              {typeof run.config.start === 'string' ? ` · Start ${run.config.start}` : ''}
             </span>
             <div className="ml-auto flex gap-2">
               <Button size="sm" onClick={() => onLoad(run)}>

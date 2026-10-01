@@ -21,7 +21,7 @@ import copy
 import shutil
 import tempfile
 import tomllib
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -81,6 +81,44 @@ class Health:
 
     def stale(self, names: list[str], as_of: date) -> list[str]:
         return [n for n in names if (self.last_day.get(n) or date.min) < as_of]
+
+
+@dataclass(frozen=True)
+class WeeklySnapshot:
+    """One refreshed source snapshot shared by every favourited strategy.
+
+    Running multiple strategies must not fetch the same market data repeatedly:
+    aside from wasting quota, that would let later strategies see a different
+    source state from the active strategy that is sent to Telegram.
+    """
+
+    health: Health
+    universe: list[Instrument]
+    today: date
+    week_ending: date
+
+
+def week_ending_on_or_before(day: date) -> date:
+    """Return the Friday labelling the most recent completed NSE week."""
+    return day - timedelta(days=(day.weekday() - 4) % 7)
+
+
+def last_nse_session(health: Health, names: list[str], week_ending: date) -> date | None:
+    """Latest observed NSE session in the Monday-Friday week ending ``week_ending``.
+
+    NSE does not trade every Friday. The weekly series deliberately labels a
+    Thursday holiday-week close as Friday, so this chooses Thursday (or an
+    earlier session for consecutive holidays) without changing the established
+    weekly index convention.
+    """
+    week_start = week_ending - timedelta(days=4)
+    dates = [
+        observed
+        for name in names
+        if (observed := health.last_day.get(name)) is not None
+        and week_start <= observed <= week_ending
+    ]
+    return max(dates, default=None)
 
 
 def _read(path: Path) -> pd.DataFrame | None:
@@ -459,6 +497,44 @@ class RunResult:
     signal: dict | None
 
 
+def refresh_weekly_snapshot(
+    run: str,
+    data_dir: Path,
+    now: datetime,
+    creds,
+    conn=None,
+    log=print,
+) -> WeeklySnapshot:
+    """Refresh once, then let every weekly strategy read identical closes."""
+    today = now.date()
+    universe = load_universe()
+    week_ending = week_ending_on_or_before(today)
+    # A final run on Saturday/Monday must still close the preceding completed
+    # week, never accidentally incorporate an incomplete new week.
+    until = week_ending if run == "final" else today - timedelta(days=1)
+    health = refresh(data_dir, today, creds, log, universe, until)
+    if conn is not None:
+        from . import local_store as store
+
+        store.push_dir(conn, data_dir, pd.Timestamp(today - timedelta(days=REFRESH_DAYS)))
+    return WeeklySnapshot(health=health, universe=universe, today=today, week_ending=week_ending)
+
+
+def settings_from_saved_config(config: dict) -> LiveSettings:
+    """Convert a dashboard ETF configuration into the weekly engine's settings.
+
+    Dashboard requests include transport/UI-only keys such as ``dataset``;
+    accepting only actual ``Config`` fields prevents a saved UI shape from
+    silently changing the scheduled strategy contract.
+    """
+    allowed = {item.name for item in fields(Config)}
+    engine_config = {key: value for key, value in config.items() if key in allowed}
+    for key in ("lookbacks", "weights", "universe"):
+        if isinstance(engine_config.get(key), list):
+            engine_config[key] = tuple(engine_config[key])
+    return LiveSettings(Config(**engine_config))
+
+
 def run_weekly(
     run: str,
     data_dir: Path = DATA_DIR,
@@ -467,33 +543,32 @@ def run_weekly(
     settings: LiveSettings | None = None,
     conn=None,
     log=print,
+    snapshot: WeeklySnapshot | None = None,
 ) -> RunResult:
     """Refresh data_dir, compute the signal, and return the Telegram message to send.
     `conn` (optional) stores fresh official prices and the signal; `creds` is Fyers."""
     now = (now or datetime.now(IST)).astimezone(IST)
-    today = now.date()
     settings = settings or load_live_config()
-    universe = load_universe()
+    today = now.date()
     if today.weekday() != 4:
         log(f"note: today is {today:%A}, not Friday - running anyway")
 
-    until = today if run == "final" else today - timedelta(days=1)
-    health = refresh(data_dir, today, creds, log, universe, until)
-    if conn is not None:
-        from . import local_store as store
-
-        store.push_dir(conn, data_dir, pd.Timestamp(today - timedelta(days=REFRESH_DAYS)))
+    if snapshot is None:
+        snapshot = refresh_weekly_snapshot(run, data_dir, now, creds, conn, log)
+    elif snapshot.today != today:
+        raise ValueError("weekly snapshot date does not match the requested run")
+    health, universe = snapshot.health, snapshot.universe
 
     ranked = [i.name for i in universe if i.include == "core"]
     nse = [i.name for i in universe if i.price_source.startswith("NSE:") and i.name in ranked]
 
     if run == "final":
-        traded_today = [n for n in nse if health.last_day.get(n) == today]
-        if not traded_today:
-            return RunResult(_closed(today, health), None)
-        stale = health.stale(ranked, today)
+        session = last_nse_session(health, nse, snapshot.week_ending)
+        if session is None:
+            return RunResult(_closed(snapshot.week_ending, health), None)
+        stale = health.stale(ranked, session)
         if len(stale) > STALE_LIMIT * len(ranked):
-            return RunResult(_stale_alert(today, stale, health), None)
+            return RunResult(_stale_alert(session, stale, health), None)
         signal = compute_signal(data_dir, settings)
         previous = None
         if conn is not None:
@@ -502,6 +577,11 @@ def run_weekly(
             previous = store.load_signal(conn, signal["week"], "preview", signal["label"])
         changed = changes(previous, signal) if previous is not None else None
         note = format_message(signal, "final", health, settings, now, None, changed)
+        if session != snapshot.week_ending:
+            note.body += (
+                f"\n\nOfficial close: {session:%a %d %b} "
+                f"(Friday {snapshot.week_ending:%d %b} was a market holiday)."
+            )
         if conn is not None:
             store.save_signal(conn, signal["week"], "final", signal["label"], signal)
         return RunResult(note, signal)
@@ -522,6 +602,86 @@ def run_weekly(
 
         store.save_signal(conn, signal["week"], "preview", signal["label"], signal)
     return RunResult(note, copy.deepcopy(signal))
+
+
+def run_favorite_strategies(
+    run: str,
+    data_dir: Path = DATA_DIR,
+    now: datetime | None = None,
+    creds=None,
+    conn=None,
+    log=print,
+) -> list[dict]:
+    """Evaluate every eligible favourite against one shared weekly snapshot.
+
+    The ETF rotation is the only strategy family with a completed weekly
+    refresh path today. Stock/Custom/Broad favourites are deliberately
+    returned as blocked rather than evaluated on stale daily data; the
+    source-aware stock ingest planner promotes them once its bhavcopy gate is
+    satisfied. This prevents a misleading Telegram recommendation.
+    """
+    from . import runs_store
+
+    now = (now or datetime.now(IST)).astimezone(IST)
+    favorites = runs_store.list_favorites(conn) if conn is not None else []
+    if not favorites:
+        # Preserve the existing scheduled-job behaviour until the user has
+        # saved and favourited a strategy.
+        result = run_weekly(run, data_dir, now, creds, conn=conn, log=log)
+        return [
+            {
+                "id": None,
+                "name": "Default live strategy",
+                "dataset": "etf",
+                "active": True,
+                "result": result,
+                "blocked": None,
+            }
+        ]
+
+    snapshot = refresh_weekly_snapshot(run, data_dir, now, creds, conn, log)
+    outcomes = []
+    for favorite in favorites:
+        config = favorite["config"]
+        dataset = config.get("dataset", "etf")
+        if dataset != "etf":
+            outcomes.append(
+                {
+                    "id": favorite["id"],
+                    "name": favorite["name"],
+                    "dataset": dataset,
+                    "active": favorite["active"],
+                    "result": None,
+                    "blocked": "Weekly ingest is not yet available for this dataset.",
+                }
+            )
+            continue
+        try:
+            result = run_weekly(
+                run,
+                data_dir,
+                now,
+                creds,
+                settings=settings_from_saved_config(config),
+                conn=conn,
+                log=log,
+                snapshot=snapshot,
+            )
+            blocked = None
+        except (ValueError, KeyError) as error:
+            result = None
+            blocked = str(error)
+        outcomes.append(
+            {
+                "id": favorite["id"],
+                "name": favorite["name"],
+                "dataset": dataset,
+                "active": favorite["active"],
+                "result": result,
+                "blocked": blocked,
+            }
+        )
+    return outcomes
 
 
 def _closed(today: date, health: Health, preview: bool = False) -> Notification:

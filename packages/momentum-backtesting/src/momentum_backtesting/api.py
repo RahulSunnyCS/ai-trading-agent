@@ -1,6 +1,8 @@
 """Private Momentum API consumed by the shared dashboard."""
 
+import os
 import threading
+import urllib.parse
 from collections import OrderedDict
 from datetime import datetime, time, timedelta
 from pathlib import Path
@@ -33,7 +35,7 @@ from .categories.compose import (
 from .config import DATA_DIR, load_repo_env
 from .engine import BENCHMARK, CASH, IDLE, Config, Result, ranked_universe, run_backtest
 from .fetch import load_universe
-from .notify import IST
+from .notify import IST, Notification
 from .stocks import ui_data
 from .stocks.ui_data import (
     NIFTY50_EQUAL_WEIGHT_TRI,
@@ -491,6 +493,8 @@ class SavedRunBody(BaseModel):
 class SavedRunUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=64)
     overlay: bool | None = None
+    favorite: bool | None = None
+    active: bool | None = None
 
 
 class WeeklyRunBody(BaseModel):
@@ -1529,6 +1533,60 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
     }
 
 
+def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
+    """Evaluate one bhavcopy-backed favourite after its processed-week gate passes."""
+    from .weekly import RunResult
+
+    config = dict(favorite["config"])
+    req = BacktestRequest.model_validate(config)
+    stock = DATA.get_stock()
+    if stock.last_week.normalize() < target_week.normalize():
+        return None, (
+            f"NSE bhavcopy-backed data is complete through {stock.last_week:%d %b %Y}; "
+            f"the week ending {target_week:%d %b %Y} is not processed yet."
+        )
+
+    if req.dataset == "stock":
+        payload = _stock_backtest(req)
+    elif req.dataset == "custom_index":
+        payload = _custom_index_backtest(req)
+    elif req.dataset == "broad":
+        payload = _broad_backtest(req)
+    else:
+        return None, f"Unsupported weekly dataset {req.dataset!r}."
+
+    latest = payload.get("latest", {})
+    rows = latest.get("rows", [])
+    actionable = [
+        row
+        for row in rows
+        if row.get("action")
+        and str(row.get("action", "")).upper() not in {"HOLD", "AT CAP", "WAIT"}
+    ]
+    lines = [f"Strategy: {favorite['name']} · dataset: {req.dataset}"]
+    if actionable:
+        lines.extend(
+            f"• {row.get('asset', 'Unknown')} — {row.get('action')} · rank {row.get('rank', '-')}"
+            for row in actionable
+        )
+    else:
+        lines.append("No trades this week.")
+    lines.append(f"Data complete through {stock.last_week:%d %b %Y} (NSE bhavcopy).")
+    signal = {
+        "week": latest.get("week", target_week.strftime("%Y-%m-%d")),
+        "label": favorite["name"],
+        "rows": rows,
+        "config": config,
+    }
+    note = Notification(
+        "momentum-weekly",
+        "action_required" if actionable else "info",
+        f"Momentum FINAL — {favorite['name']} — week of {target_week:%d %b %Y}",
+        "\n".join(lines),
+    )
+    return RunResult(note, signal), None
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Momentum backtest", docs_url="/api/docs")
 
@@ -1543,24 +1601,41 @@ def create_app() -> FastAPI:
             configured = True
         except fyers.FyersCredentialsError:
             configured = False
-        cached = fyers._cached_token() if configured else None
-        connected = cached is not None
+        credentials = None
+        if configured:
+            try:
+                # Direct-mode dashboards still share the encrypted broker_tokens
+                # row whenever Postgres is available; the local 0600 cache remains
+                # only as the documented no-database fallback.
+                credentials = fyers.resolve_credentials(prefer_dashboard=True)
+            except fyers.FyersCredentialsError:
+                credentials = None
+        connected = credentials is not None
         return {
             "configured": configured,
             "connected": connected,
             "degraded": not connected,
             "needsReauth": not connected,
-            "expiresAt": cached.expires_at.isoformat() if cached else None,
-            "appId": cached.app_id if cached else None,
+            "expiresAt": credentials.expires_at.isoformat() if credentials else None,
+            "appId": credentials.app_id if credentials else None,
         }
 
     @app.get("/api/auth/fyers/start")
     def local_fyers_start() -> RedirectResponse:
         load_repo_env()
         try:
-            url, state = fyers.build_auth_url()
+            _app_id, _secret, redirect_uri = fyers._oauth_config()
         except fyers.FyersCredentialsError as error:
             raise HTTPException(503, str(error)) from None
+        if os.environ.get("DATABASE_URL", "").strip():
+            callback = urllib.parse.urlparse(redirect_uri)
+            central_start = urllib.parse.urlunparse(
+                (callback.scheme, callback.netloc, "/api/auth/fyers/start", "", "", "")
+            )
+            return RedirectResponse(
+                central_start, status_code=302, headers={"Cache-Control": "no-store"}
+            )
+        url, state = fyers.build_auth_url()
         now = datetime.now(IST)
         with _LOCAL_OAUTH_LOCK:
             for old_state, expiry in list(_LOCAL_OAUTH_STATES.items()):
@@ -1638,10 +1713,23 @@ def create_app() -> FastAPI:
     @app.patch("/api/saved-runs/{run_id}")
     def patch_saved_run(run_id: str, body: SavedRunUpdate) -> dict:
         with connect() as con:
-            record = runs_store.update_run(con, run_id, name=body.name, overlay=body.overlay)
+            record = runs_store.update_run(
+                con,
+                run_id,
+                name=body.name,
+                overlay=body.overlay,
+                favorite=body.favorite,
+                active=body.active,
+            )
         if record is None:
             raise HTTPException(404, "saved run not found")
         return record
+
+    @app.get("/api/favorite-strategies")
+    def favorite_strategies() -> list[dict]:
+        """The persisted candidates for the weekly scheduler and dashboard."""
+        with connect() as con:
+            return runs_store.list_favorites(con)
 
     @app.delete("/api/saved-runs/{run_id}")
     def remove_saved_run(run_id: str) -> dict:
@@ -1659,7 +1747,7 @@ def create_app() -> FastAPI:
         tens of seconds (live network sources), same as a cold Custom Index backtest — the
         Fastify proxy's timeout already accounts for this."""
         from . import fyers, notify
-        from .weekly import run_weekly
+        from .weekly import run_favorite_strategies, week_ending_on_or_before
 
         try:
             creds = fyers.resolve_credentials()
@@ -1667,18 +1755,54 @@ def create_app() -> FastAPI:
             creds = None
         try:
             with connect() as con:
-                result = run_weekly(body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None)
+                favorites_by_id = {item["id"]: item for item in runs_store.list_favorites(con)}
+                outcomes = run_favorite_strategies(
+                    body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None
+                )
+            if body.run == "final":
+                target_week = pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date()))
+                for outcome in outcomes:
+                    if outcome["result"] is not None or outcome["dataset"] == "etf":
+                        continue
+                    favorite = favorites_by_id[outcome["id"]]
+                    try:
+                        outcome["result"], outcome["blocked"] = _research_weekly_result(
+                            favorite, target_week
+                        )
+                    except (HTTPException, ValueError, KeyError, FileNotFoundError) as error:
+                        outcome["result"] = None
+                        outcome["blocked"] = str(getattr(error, "detail", error))
         except Exception as error:
             raise HTTPException(500, f"{type(error).__name__}: {error}") from None
-        result.notification.run_url = notify.run_url()
-        if body.send:
-            notify.send(result.notification)
+        active = next((outcome for outcome in outcomes if outcome["active"]), None)
+        active_result = active["result"] if active is not None else None
+        if active_result is not None:
+            active_result.notification.run_url = notify.run_url()
+            if body.send:
+                notify.send(active_result.notification)
         return {
-            "title": result.notification.title,
-            "body": result.notification.body,
-            "severity": result.notification.severity,
-            "sent_to_telegram": body.send,
-            "signal": result.signal,
+            "title": (
+                active_result.notification.title if active_result else "Weekly strategies evaluated"
+            ),
+            "body": (
+                active_result.notification.body if active_result else "No eligible active strategy."
+            ),
+            "severity": active_result.notification.severity if active_result else "warning",
+            "sent_to_telegram": body.send and active_result is not None,
+            "signal": active_result.signal if active_result else None,
+            "strategies": [
+                {
+                    "id": outcome["id"],
+                    "name": outcome["name"],
+                    "dataset": outcome["dataset"],
+                    "active": outcome["active"],
+                    "blocked": outcome["blocked"],
+                    "title": outcome["result"].notification.title if outcome["result"] else None,
+                    "body": outcome["result"].notification.body if outcome["result"] else None,
+                    "signal": outcome["result"].signal if outcome["result"] else None,
+                }
+                for outcome in outcomes
+            ],
         }
 
     @app.post("/api/rebalance-preview")

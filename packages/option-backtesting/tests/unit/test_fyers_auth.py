@@ -24,7 +24,7 @@ def test_dashboard_token_takes_precedence_over_environment(monkeypatch):
         def __exit__(self, *_args):
             pass
 
-        def execute(self, query):
+        def execute(self, query, _params=None):
             assert "FROM broker_tokens" in query
             return self
 

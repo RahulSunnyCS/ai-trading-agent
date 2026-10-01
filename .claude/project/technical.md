@@ -49,7 +49,13 @@ bun run sim                 # equivalent to SIMULATE=true bun run dev
 
 # Development — live mode (Fyers credentials required)
 bun run dev                 # watch mode with auto-reload (apps/server)
-bun run start                # production-style start (apps/server)
+bun run start:server         # production-style start (apps/server)
+
+# Standalone research stack (no Docker): both Python APIs + one dashboard
+bun run start                # restart Momentum :8765, Options :8000, dashboard :5190
+bun run start:backend        # restart the two Python APIs only
+bun run start:frontend       # restart the dashboard only
+bun run stop:research        # stop this checkout's research processes
 
 # Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)
 bun run --filter @ata/dashboard dev
@@ -411,7 +417,8 @@ Critical variables whose misconfiguration causes real pain:
 | `DATABASE_URL` | Must point at PostgreSQL 16 with TimescaleDB extension installed. Missing extension → migration fails with `type "timestamptz" does not exist in hypertable` or similar |
 | `REDIS_URL` | Must be Redis 7+. BullMQ uses Redis Streams features not in Redis 6 |
 | `FYERS_ACCESS_TOKEN` | **Expires daily.** Fallback when no valid dashboard `broker_tokens` row is available; a fresh Broker logins token takes precedence. AUTH_FAILURE on stale token is detected and surfaced to the frontend via /api/meta `authDegraded=true` and /api/auth/fyers/status `needsReauth=true` |
-| `FYERS_APP_ID` | Format is `XXXXXXXXXXXX-100` (app ID + `-100` suffix). Wrong format → Fyers SDK auth failure |
+| `FYERS_APP_ID` | Format is `XXXXXXXXXXXX-100` (app ID + `-100` suffix). Wrong format → Fyers SDK auth failure. A stored token minted for a different app ID is rejected and the UI requires re-login |
+| `FYERS_APP_SECRET` | Server-only OAuth secret. Also supplies pgcrypto's passphrase for AES-256 encryption of new `broker_tokens` rows; never returned to or stored by the browser. Existing plaintext rows remain readable only until the next login rewrites them encrypted |
 | `QUANTIPLY_API_KEY` | Required in live mode. Missing → paper trade writes fail silently if error handling isn't tight |
 | `BROKER` | Selects the adapter: `fyers` (default), `angelone`, or `sim`. Omitting this AND omitting `SIMULATE=true` → safe default-throw error at startup (no silent fallback) |
 | `SIMULATE` | Set to `true` for credential-free development mode. When set, MarketDataSimulator is selected regardless of `BROKER` value |
@@ -455,7 +462,7 @@ Critical variables whose misconfiguration causes real pain:
   strike interval anywhere — always call `lotSize()`/`strikeStep()` from `@trading/market-reference`
   (TypeScript) or read the CSVs directly (Python); see that package's `CLAUDE.md` for the
   filesystem-level link between it and `option-backtesting`'s reference data.
-- **Fyers token expires daily** — there is no automatic refresh yet (deferred to Phase B). The system detects AUTH_FAILURE mid-session and sets the `authDegraded` flag in broker-status state, surfaced to the frontend via /api/meta and /api/auth/fyers/status. A pre-market token-validity check job runs at 08:45 IST on weekdays (opt-in via TOKEN_VALIDITY_SCHEDULER_ENABLED env). Operators must manually regenerate the token before market open when the status endpoint shows `needsReauth=true`
+- **Fyers token expires daily** — there is no automatic refresh yet (deferred to Phase B). New dashboard-login tokens are AES-256 encrypted at rest in `broker_tokens` through PostgreSQL pgcrypto; the browser receives only app ID/status/expiry. Missing, expired, or app-ID-mismatched tokens surface as “No API token” and require re-login. A pre-market token-validity check job runs at 08:45 IST on weekdays (opt-in via TOKEN_VALIDITY_SCHEDULER_ENABLED).
 - **TimescaleDB is not optional** — the standard `postgres:16-alpine` image does NOT have TimescaleDB. The Docker Compose uses `timescale/timescaledb:latest-pg16`. Pointing the app at a vanilla PostgreSQL instance will fail on migration
 - **Hypertable full-table scans** — a query on `market_ticks` or `straddle_snapshots` without a `WHERE time > ...` filter will scan years of data. Always filter by time range
 - **Two test commands** — `bun run test:integration` requires Docker services running. Running it without them produces confusing connection errors, not a test-not-found error

@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -608,7 +609,8 @@ def local_migrate() -> None:
     )
     typer.echo(
         f"stock weekly prices {report.stock_weekly_prices:,}, "
-        f"stock weekly membership {report.stock_membership_weekly:,}"
+        f"stock weekly membership {report.stock_membership_weekly:,}, "
+        f"stock benchmark/cash rows {report.stock_weekly_series:,}"
     )
     typer.echo(f"catalog: {root}  (see `tdata status` for the full picture)")
 
@@ -1354,8 +1356,9 @@ def weekly(
 
     from trading_data.db import connect
 
-    from . import local_store, notify
-    from .weekly import run_weekly
+    from . import api as api_module
+    from . import local_store, notify, runs_store
+    from .weekly import run_favorite_strategies, week_ending_on_or_before
 
     if run not in ("preview", "final"):
         typer.echo("--run must be preview or final")
@@ -1372,7 +1375,25 @@ def weekly(
             if not (DATA_DIR / "weekly_closes.csv").exists():
                 typer.echo("No history: run `mbt fetch` first.")
                 raise typer.Exit(1)
-            result = run_weekly(run, DATA_DIR, creds=creds, conn=conn, log=typer.echo)
+            favorites_by_id = (
+                {item["id"]: item for item in runs_store.list_favorites(conn)}
+                if conn is not None
+                else {}
+            )
+            outcomes = run_favorite_strategies(
+                run, DATA_DIR, creds=creds, conn=conn, log=typer.echo
+            )
+        if run == "final":
+            target = pd.Timestamp(week_ending_on_or_before(date.today()))
+            for outcome in outcomes:
+                if outcome["result"] is not None or outcome["dataset"] == "etf":
+                    continue
+                try:
+                    outcome["result"], outcome["blocked"] = api_module._research_weekly_result(
+                        favorites_by_id[outcome["id"]], target
+                    )
+                except Exception as error:
+                    outcome["blocked"] = str(getattr(error, "detail", error))
     except typer.Exit:
         raise
     except Exception as error:
@@ -1385,11 +1406,18 @@ def weekly(
         )
         notify.send(note) if send else typer.echo(notify.render(note))
         raise
-    result.notification.run_url = notify.run_url()
+    active = next((outcome for outcome in outcomes if outcome["active"]), None)
+    for outcome in outcomes:
+        if outcome["result"] is not None:
+            typer.echo(f"\n[{outcome['name']}]\n{notify.render(outcome['result'].notification)}")
+        else:
+            typer.echo(f"\n[{outcome['name']}] blocked: {outcome['blocked']}")
+    if active is None or active["result"] is None:
+        typer.echo("No eligible active favourite; Telegram was not sent.")
+        return
+    active["result"].notification.run_url = notify.run_url()
     if send:
-        notify.send(result.notification)
-    else:
-        typer.echo(notify.render(result.notification))
+        notify.send(active["result"].notification)
 
 
 @app.command()
