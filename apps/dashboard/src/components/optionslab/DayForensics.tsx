@@ -261,7 +261,7 @@ function Anatomy({ f }: { f: Forensics }) {
                 move {s.ret_pct >= 0 ? '+' : ''}
                 {s.ret_pct.toFixed(2)}% · range ×
                 {s.range_over_implied === null ? 'n/a' : s.range_over_implied.toFixed(2)} implied ·
-                ER {s.er.toFixed(2)}
+                strength {s.strength.toFixed(1)}×
               </div>
             </div>
           ) : null,

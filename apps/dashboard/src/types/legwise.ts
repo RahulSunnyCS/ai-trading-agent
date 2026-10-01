@@ -138,6 +138,8 @@ export interface AnatomySegment {
   ret_pct: number;
   range_pct: number;
   er: number;
+  /** er × √bars: times more directional than a random walk (chance ≈ 1). */
+  strength: number;
   rv_ann_pct: number | null;
   implied_pct: number | null;
   range_over_implied: number | null;
@@ -159,7 +161,7 @@ export interface DayAnatomy {
 export interface AnatomyResponse {
   underlying: string;
   cuts: string[];
-  thresholds: { quiet_range_over_implied: number; trend_er: number };
+  thresholds: { quiet_range_over_implied: number; trend_strength: number };
   dte_reliable_from: string;
   days: DayAnatomy[];
 }

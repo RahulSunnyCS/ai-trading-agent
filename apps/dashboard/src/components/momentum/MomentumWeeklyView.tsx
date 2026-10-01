@@ -86,18 +86,20 @@ export function MomentumWeeklyView() {
 
       {result ? (
         <div className="space-y-3">
-          {(result.strategies ?? [
-            {
-              id: null,
-              name: 'Default live strategy',
-              dataset: 'etf' as const,
-              active: true,
-              blocked: null,
-              title: result.title,
-              body: result.body,
-              signal: result.signal,
-            },
-          ]).map((strategy) => (
+          {(
+            result.strategies ?? [
+              {
+                id: null,
+                name: 'Default live strategy',
+                dataset: 'etf' as const,
+                active: true,
+                blocked: null,
+                title: result.title,
+                body: result.body,
+                signal: result.signal,
+              },
+            ]
+          ).map((strategy) => (
             <Card key={strategy.id ?? strategy.name}>
               <CardHeader
                 title={strategy.title ?? strategy.name}

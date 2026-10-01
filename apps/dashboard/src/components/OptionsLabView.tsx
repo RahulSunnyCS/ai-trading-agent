@@ -4,19 +4,22 @@
  * Fastify proxy at /api/backtest/legwise/*.
  *
  *  - Results: saved `obt daily` results, the evening run button, trade logs.
+ *  - Market regimes: does the index come in persistent periods? (index + VIX history)
  *  - Strategy builder: create/edit/backtest/save AlgoTest-style strategies.
  */
 
 import { useState } from 'react';
 
 import { cn } from '../lib/cn';
+import { RegimesPanel } from './optionslab/RegimesPanel';
 import { ResultsPanel } from './optionslab/ResultsPanel';
 import { StrategyBuilder } from './optionslab/StrategyBuilder';
 
-type Section = 'results' | 'builder';
+type Section = 'results' | 'regimes' | 'builder';
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'results', label: 'Daily results' },
+  { id: 'regimes', label: 'Market regimes' },
   { id: 'builder', label: 'Strategy builder' },
 ];
 
@@ -41,7 +44,9 @@ export function OptionsLabView() {
           </button>
         ))}
       </div>
-      {section === 'results' ? <ResultsPanel /> : <StrategyBuilder />}
+      {section === 'results' && <ResultsPanel />}
+      {section === 'regimes' && <RegimesPanel />}
+      {section === 'builder' && <StrategyBuilder />}
     </div>
   );
 }

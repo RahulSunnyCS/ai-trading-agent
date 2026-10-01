@@ -164,13 +164,19 @@ export function MomentumBacktestingView() {
   }
   async function toggleFavorite(id: string, favorite: boolean): Promise<void> {
     setSavedRuns((runs) =>
-      runs.map((run) => (run.id === id ? { ...run, favorite, active: favorite ? run.active : false } : run)),
+      runs.map((run) =>
+        run.id === id ? { ...run, favorite, active: favorite ? run.active : false } : run,
+      ),
     );
     await apiPatch(`/api/momentum/saved-runs/${id}`, { favorite });
   }
   async function setActive(id: string): Promise<void> {
     setSavedRuns((runs) =>
-      runs.map((run) => ({ ...run, favorite: run.id === id ? true : run.favorite, active: run.id === id })),
+      runs.map((run) => ({
+        ...run,
+        favorite: run.id === id ? true : run.favorite,
+        active: run.id === id,
+      })),
     );
     await apiPatch(`/api/momentum/saved-runs/${id}`, { active: true });
   }
@@ -410,9 +416,7 @@ export function MomentumBacktestingView() {
       const decoded = JSON.parse(
         decodeURIComponent(escape(atob(hash.slice(marker.length)))),
       ) as Record<string, unknown>;
-      const requested = (
-        typeof decoded.dataset === 'string' ? decoded.dataset : 'etf'
-      ) as Dataset;
+      const requested = (typeof decoded.dataset === 'string' ? decoded.dataset : 'etf') as Dataset;
       // A link to a hidden dataset opens ETF Rotation instead of an unreachable tab.
       const sharedDataset: Dataset = VISIBLE_DATASET_IDS.has(requested) ? requested : 'etf';
       setDataset(sharedDataset);

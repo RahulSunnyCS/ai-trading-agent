@@ -90,3 +90,33 @@ def test_realised_equal_to_implied_vol_reads_about_one():
         seg = anatomy.segment_metrics(series(closes), flat(vix), 0, 180)
         ratios.append(seg.range_over_implied)
     assert sum(ratios) / len(ratios) == pytest.approx(1.0, abs=0.12)
+
+
+@pytest.mark.parametrize("bars", [30, 75, 180, 375])
+def test_random_walks_are_rarely_trends_at_any_segment_length(bars):
+    """The reason `strength` exists: a fixed ER threshold flagged 29% of random 75-minute
+    segments (and 2% of random days) as trends. Scaled by sqrt(bars), the false-trend rate
+    is ~4.5% whatever the length, so labels mean the same thing for every cut the user picks."""
+    import random
+
+    rng = random.Random(bars)
+    sigma = 15.0 / 100 / math.sqrt(252 * 375)
+    trends = 0
+    runs = 400
+    for _ in range(runs):
+        s, closes = 20000.0, []
+        for _ in range(N_MINUTES):
+            s *= 1 + rng.gauss(0, sigma)
+            closes.append(s)
+        seg = anatomy.segment_metrics(series(closes), flat(15.0), 0, bars)
+        trends += seg.label in ("TREND_UP", "TREND_DOWN")
+        assert seg.strength >= 0  # er * sqrt(n), non-negative
+    # QUIET steals a few segments before the trend test, so the rate can only be lower
+    assert trends / runs < 0.09
+
+
+def test_a_real_drift_is_a_trend_at_every_length():
+    for bars in (75, 375):
+        drift = series([20000 + i * 2 for i in range(N_MINUTES)])
+        seg = anatomy.segment_metrics(drift, flat(14.0), 0, bars)
+        assert seg.label == "TREND_UP" and seg.strength > anatomy.TREND_STRENGTH

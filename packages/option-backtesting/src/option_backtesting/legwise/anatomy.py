@@ -8,9 +8,14 @@ bars and India VIX alone:
 - ret_pct            net move over the segment
 - range_pct          high-low range over the segment
 - er                 Kaufman efficiency ratio: |net move| / sum of |1-minute moves|.
-                     ~1 is a straight line, ~0 is churn. (A pure random walk
-                     scores about sqrt(2 / (pi * n_bars)) — roughly 0.06-0.09 for
-                     these segments — which is why TREND_ER below is well above it.)
+                     1 is a straight line, 0 is churn.
+- strength           er * sqrt(n_bars). A pure random walk's ER is ~1/sqrt(n_bars),
+                     so strength is "how many times more directional than a random
+                     walk" and averages ~1.0 at EVERY segment length (measured; a
+                     random walk exceeds 2.5 about 4.5% of the time at 30, 75, 180
+                     and 375 bars alike). The raw ER cannot carry one threshold: a
+                     fixed ER >= 0.15 flags 29% of random 75-minute segments as
+                     trends but only 2% of random full days.
 - implied_pct        the 1-sigma move VIX implies for a segment that long:
                      VIX/100 * sqrt(minutes / (252 * 375)) * 100
 - range_over_implied range_pct / (implied_pct * sqrt(8/pi)) — the segment's
@@ -52,9 +57,13 @@ DEFAULT_CUTS: tuple[str, ...] = ("10:30", "13:30")
 #: (i.e. realised vol well under what was priced in) is QUIET. A first-guess constant:
 #: calibrate it against the label shares over the backfilled history before trusting it.
 QUIET_RANGE_OVER_IMPLIED = 0.6
-#: Above QUIET, an efficiency ratio at/above this is a TREND, below it is CHOP.
-TREND_ER = 0.15
-THRESHOLDS = {"quiet_range_over_implied": QUIET_RANGE_OVER_IMPLIED, "trend_er": TREND_ER}
+#: Above QUIET, a strength (see module docstring) at/above this is a TREND, below it
+#: CHOP. 2.5 flags ~4.5% of pure random-walk segments, at any length.
+TREND_STRENGTH = 2.5
+THRESHOLDS = {
+    "quiet_range_over_implied": QUIET_RANGE_OVER_IMPLIED,
+    "trend_strength": TREND_STRENGTH,
+}
 
 #: NSE moved NIFTY's weekly expiry to Tuesdays on 1 Sep 2025. The reference
 #: expiry_calendar.csv carries the CURRENT weekday back to 2018, so a days-to-
@@ -96,6 +105,7 @@ class Segment:
     ret_pct: float
     range_pct: float
     er: float
+    strength: float
     rv_ann_pct: float | None
     implied_pct: float | None
     range_over_implied: float | None
@@ -108,6 +118,7 @@ class Segment:
             "ret_pct": _r(self.ret_pct),
             "range_pct": _r(self.range_pct),
             "er": _r(self.er),
+            "strength": _r(self.strength, 2),
             "rv_ann_pct": _r(self.rv_ann_pct),
             "implied_pct": _r(self.implied_pct),
             "range_over_implied": _r(self.range_over_implied),
@@ -119,12 +130,12 @@ def _r(value: float | None, digits: int = 3) -> float | None:
     return None if value is None else round(value, digits)
 
 
-def label_segment(er: float, ret_pct: float, range_over_implied: float | None) -> str:
+def label_segment(strength: float, ret_pct: float, range_over_implied: float | None) -> str:
     if range_over_implied is None:
         return "UNKNOWN"  # no VIX that day: refuse to guess a threshold
     if range_over_implied < QUIET_RANGE_OVER_IMPLIED:
         return "QUIET"
-    if er >= TREND_ER:
+    if strength >= TREND_STRENGTH:
         return "TREND_UP" if ret_pct > 0 else "TREND_DOWN"
     return "CHOP"
 
@@ -153,6 +164,7 @@ def segment_metrics(spot: Series, vix: Series | None, start: int, end: int) -> S
         prev = c
     net = last - first
     er = abs(net) / path if path > 0 else 0.0
+    strength = er * math.sqrt(end - start)
 
     ret_pct = net / first * 100
     range_pct = (hi - lo) / first * 100
@@ -173,10 +185,11 @@ def segment_metrics(spot: Series, vix: Series | None, start: int, end: int) -> S
         ret_pct=ret_pct,
         range_pct=range_pct,
         er=er,
+        strength=strength,
         rv_ann_pct=rv,
         implied_pct=implied,
         range_over_implied=ratio,
-        label=label_segment(er, ret_pct, ratio),
+        label=label_segment(strength, ret_pct, ratio),
     )
 
 

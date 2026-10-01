@@ -163,7 +163,7 @@ def test_anatomy_route_honours_custom_cuts_and_range(client, root):
     assert all(len(d["segments"]) == 2 for d in out["days"])
     assert out["days"][0]["gap_pct"] is None  # first day in the history has nothing to gap from
     assert out["days"][1]["segments"][0]["label"] == "TREND_UP"
-    assert set(out["thresholds"]) == {"quiet_range_over_implied", "trend_er"}
+    assert set(out["thresholds"]) == {"quiet_range_over_implied", "trend_strength"}
     narrowed = client.get("/legwise/anatomy", params={"from": "2026-09-28"}).json()
     assert [d["day"] for d in narrowed["days"]] == ["2026-09-28"]
     assert narrowed["days"][0]["gap_pct"] is not None  # gap still measured from the prior day

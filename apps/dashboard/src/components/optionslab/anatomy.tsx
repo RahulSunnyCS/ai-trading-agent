@@ -34,7 +34,7 @@ export const LABEL_GLYPH: Record<SegmentLabel, string> = {
 
 export function describeSegment(s: AnatomySegment): string {
   const ratio = s.range_over_implied === null ? 'n/a' : `${s.range_over_implied.toFixed(2)}×`;
-  return `${s.start}–${s.end}: ${LABEL_TEXT[s.label]} · move ${s.ret_pct >= 0 ? '+' : ''}${s.ret_pct.toFixed(2)}% · range ${s.range_pct.toFixed(2)}% (${ratio} of VIX-implied) · efficiency ${s.er.toFixed(2)}`;
+  return `${s.start}–${s.end}: ${LABEL_TEXT[s.label]} · move ${s.ret_pct >= 0 ? '+' : ''}${s.ret_pct.toFixed(2)}% · range ${s.range_pct.toFixed(2)}% (${ratio} of VIX-implied) · directional strength ${s.strength.toFixed(1)}× a random walk`;
 }
 
 /** One small chip per segment, in session order. The tooltip carries the numbers. */

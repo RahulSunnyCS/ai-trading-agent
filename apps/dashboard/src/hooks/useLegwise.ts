@@ -62,7 +62,7 @@ export function useDayForensics(
 export function useAnatomy(
   underlying = 'NIFTY',
   cuts: readonly string[] = DEFAULT_CUTS,
-  range: { from?: string; to?: string } = {},
+  range: { from?: string | undefined; to?: string | undefined } = {},
 ) {
   return usePolledResource<AnatomyResponse>(
     `${BASE}/anatomy${query({ underlying, cuts: cuts.join(','), ...range })}`,
