@@ -96,7 +96,7 @@ d. Rolling-window evaluation. Extend `sweep.py` to score each lever over many ro
 | 2 | Portfolio vol-targeting | Momentum crashes follow rebounds. Scale exposure by trailing realised strategy vol, park the excess in the liquid fund | First pass as a post-hoc scaling of `Result.equity`; note it ignores rebalance cost and tax |
 | 3 | 52-week-high proximity as score or entry gate | Price / 52w high predicts continuation with less turnover | New score through `external_ranks`, or a `no_buy` mask below about 85% of the high |
 | 4 | Path smoothness tie-break | Many small up-days continue better than one jump | Stocks only (needs daily data). R-squared of log price on time, or fraction of up-days |
-| 5 | Breadth / regime gate on fresh buys | Percent of universe above its 200-day average, or Nifty vs 40-week average. Differs from the rejected per-instrument filter | `no_buy` mask, holdings unaffected |
+| 5 | Breadth / regime gate (now specified in `docs/momentum-breadth-regime-tests.md`; run that first) | Percent of universe above its 200-day average, or Nifty vs 40-week average. Differs from the rejected per-instrument filter | `no_buy` mask, holdings unaffected |
 | 6 | Tax-aware exit hysteresis | A lot near 365 days with a marginal rank should wait (STCG 20% vs LTCG 12.5%) | Needs lot age from `tax.py` inside the sell decision, so a real engine change |
 | 7 | Flip the default to `entry="make_room"` | Already a clean win in 3.9.18 | One-line default plus test updates, after confirming on rolling windows |
 | 8 | Volatility exclusion, score-weighted sizing, dispersion timing | Cheap secondary ideas | After 1 to 3 |
