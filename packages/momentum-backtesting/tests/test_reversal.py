@@ -107,3 +107,10 @@ def test_blend_curves():
     mixed = blend_curves(m, r, 0.2, rebalance=True)
     assert mixed.iloc[1] == pytest.approx(0.8 * 1.1 + 0.2 * 0.9)
     assert mixed.iloc[2] == pytest.approx(mixed.iloc[1] * (1 + 0.8 * 0.1 + 0.2 * 0.0))
+
+
+def test_rank_on_momentum_is_an_option_and_bad_values_fail():
+    plain = reversal_signals(universe(), params=ReversalParams(rank_on="momentum"))
+    assert plain.ranks["Turn"].iloc[-1] == 1.0
+    with pytest.raises(ValueError):
+        reversal_signals(universe(), params=ReversalParams(rank_on="nope"))

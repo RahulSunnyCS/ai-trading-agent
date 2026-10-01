@@ -14,7 +14,7 @@ so the engine is unchanged.
    name ineligible, so a held name is sold - the "fell back below its old low" exit, using the
    rolling 52-week low as a stand-in for the pre-entry low).
 3. Rank the gated, turned names on acceleration: the latest 13-week return minus the 13 weeks
-   before it (lower rank = better).
+   before it (lower rank = better), or on the plain 13-week return (`rank_on="momentum"`).
 4. Entry confirmation, `no_buy` only (so a holding is not sold the moment it recovers): the
    26-week return is still negative, the close is above its `confirm_ma_weeks`-week average,
    and, when volume is supplied, up-week volume beat down-week volume over `volume_weeks`.
@@ -46,6 +46,9 @@ class ReversalParams:
     sticky_weeks: int = 52
     confirm_ma_weeks: int = 10  # ~50 trading days
     volume_weeks: int = 8
+    # "acceleration": latest 13-week return minus the 13 weeks before it; "momentum": the plain
+    # 13-week return. The handover allowed either; both were measured (TODO 3.9.23).
+    rank_on: str = "acceleration"
 
 
 @dataclass
@@ -95,7 +98,10 @@ def reversal_signals(
     turned = (r13 > 0) & (prices > low52)
     eligible = sticky & turned & live & prices.notna()
 
-    acceleration = (r13 - r13.shift(13)).where(eligible)
+    if p.rank_on not in ("acceleration", "momentum"):
+        raise ValueError(f"unknown rank_on {p.rank_on!r}")
+    signal = r13 - r13.shift(13) if p.rank_on == "acceleration" else r13
+    acceleration = signal.where(eligible)
     # Tradeable names that are not eligible get a far-away rank instead of NaN: the engine drops
     # any week with fewer than top_n ranked names, and a sparse sleeve must still run (holding
     # fewer names plus cash). FAR is beyond any exit_rank, so they are sold and never bought.
