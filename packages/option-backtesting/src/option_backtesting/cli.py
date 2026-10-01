@@ -399,6 +399,50 @@ def fyers_fetch(
         raise typer.Exit(2)
 
 
+@fyers_app.command("history")
+def fyers_history(
+    underlying: str = typer.Option(
+        "NIFTY", help="Underlying whose index (and India VIX) to backfill."
+    ),
+    from_: str = typer.Option(
+        "", "--from", help="Oldest day to fetch, YYYY-MM-DD. Blank = as far back as Fyers serves."
+    ),
+    to: str = typer.Option("", "--to", help="Newest day, YYYY-MM-DD. Blank = yesterday."),
+    force: bool = typer.Option(False, help="Rewrite days already in the lake."),
+) -> None:
+    """Backfill the index + India VIX 1-minute history (walks back from yesterday in
+    95-day chunks until Fyers has no more). Index bars never expire, so unlike option
+    contracts this can be done any time, and re-running only fills what is missing.
+    Feeds the Options Lab's market-regime study."""
+
+    from .fyers.auth import FyersCredentialsError, resolve_credentials
+    from .fyers.client import FyersClient
+    from .fyers.daily import UNDERLYINGS, data_dir
+    from .fyers.history import backfill_index
+
+    if underlying not in UNDERLYINGS:
+        raise typer.BadParameter(f"unknown underlying {underlying}; known: {sorted(UNDERLYINGS)}")
+    try:
+        client = FyersClient(resolve_credentials())
+        result = backfill_index(
+            client,
+            data_dir(),
+            underlying,
+            start=date.fromisoformat(from_) if from_ else None,
+            end=date.fromisoformat(to) if to else None,
+            force=force,
+            log=typer.echo,
+        )
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        raise typer.Exit(1) from None
+    typer.echo(
+        f"done: {client.calls} requests; wrote {result['written_days']} days"
+        f"{f', oldest {result['oldest']}' if result['oldest'] else ''}; "
+        f"{len(result['short_days'])} short days skipped -> {data_dir()}"
+    )
+
+
 def _collect(
     trading_day: date, underlyings: str, premium_floor: float, max_extra: int, force: bool
 ) -> int:

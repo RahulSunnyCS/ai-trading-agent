@@ -91,11 +91,12 @@ Otherwise:
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
   1-minute-bar assumption), `report.py`, `daily.py` (the `obt daily` runner), `store.py` (strategies, versions and
   results in the trading-data catalog — a version is a hash of the validated spec). Separate from `engine/` on purpose — see `DECISIONS.md`.
+  Also `anatomy.py` (per-day, per-segment index shape — QUIET/CHOP/TREND from spot + India VIX, descriptive only: lag it a day before using it for anything actionable; `DTE_RELIABLE_FROM` guards a wrong pre-Sep-2025 expiry calendar) and `forensics.py` (one saved day re-simulated for the dashboard; `DayResult.mtm` is the per-minute curve, never persisted). `fyers/history.py` backfills index + VIX history (`obt fyers history`).
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of
   `momentum-backtesting`'s notify.py mirroring `@trading/notify`'s contract (never `parse_mode`,
   redacts known secrets, never raises; prints when unconfigured). Tests must stub `send` —
   `load_dotenv()` would otherwise pick up the real bot token from the repo `.env`.
-- `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: list/
+- `api/legwise_routes.py` — `/legwise/*` on `obt-api` for the dashboard's Options Lab: `/day` and `/anatomy` (see above), list/
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
   the evening run as a background job. Errors are `{"error": ...}` (what the dashboard reads).
@@ -115,6 +116,7 @@ uv run pytest
 uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
 uv run obt fyers status                 # token source + data dir
 uv run obt fyers fetch                  # today's 1m data — run the SAME evening
+uv run obt fyers history                # backfill NIFTY + VIX index history (any time)
 uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades]
 uv run obt daily                        # evening routine: fetch + run strategies/legwise + summary
 uv run obt legwise rerun                # re-run every strategy over every collected day (after an edit)

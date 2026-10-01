@@ -102,6 +102,10 @@ class DayResult:
     best_mtm: float
     stopped_by: str | None
     notes: list[str] = field(default_factory=list)
+    #: (minute index, MTM in INR) at each simulated minute — the curve behind
+    #: worst/best_mtm. Not persisted (store.py ignores it): the engine is
+    #: deterministic, so the dashboard re-simulates a day to get it back.
+    mtm: list[tuple[int, float]] = field(default_factory=list)
 
     @property
     def net(self) -> float:
@@ -371,6 +375,7 @@ class _DaySim:
         start = minute_index(self.s.entry_time)
         end = minute_index(self.s.exit_time)
         worst = best = 0.0
+        curve: list[tuple[int, float]] = []
         for minute in range(start, end):
             for run in self.legs:
                 if minute == start:
@@ -390,6 +395,7 @@ class _DaySim:
                     elif hit:
                         self._arm_reentry(run, minute, hit)
             mtm = self._mtm(minute)
+            curve.append((minute, mtm))
             worst, best = min(worst, mtm), max(best, mtm)
             overall = self.s.overall
             if overall.stop_loss_inr is not None and mtm <= -overall.stop_loss_inr:
@@ -415,6 +421,7 @@ class _DaySim:
             best_mtm=max(best, gross),
             stopped_by=self.stopped_by,
             notes=self.data.notes + self.notes,
+            mtm=curve,
         )
 
 

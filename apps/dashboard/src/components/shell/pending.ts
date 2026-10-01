@@ -51,6 +51,9 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Add one-click dry-run from a coverage row',
   ],
   optionslab: [
+    'Run `obt fyers history` once (live Fyers token needed) to unlock the market-regime study',
+    'Calibrate the anatomy thresholds (QUIET / TREND) against the backfilled history',
+    'Fix the pre-Sep-2025 NIFTY expiry calendar so days-to-expiry works on older history',
     'Check the engine intrabar rules against a few real trades (optional)',
     'Telegram summary after the evening run',
     'Brokerage/taxes presets instead of a flat per-order cost',

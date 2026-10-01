@@ -84,12 +84,17 @@ class FyersClient:
 
     def minute_candles(self, symbol: str, day: date) -> list[Candle]:
         """1-minute candles for one trading day. Empty list on `no_data`."""
+        return self.minute_candles_range(symbol, day, day)
+
+    def minute_candles_range(self, symbol: str, start: date, end: date) -> list[Candle]:
+        """1-minute candles for [start, end] inclusive (Fyers allows ~100 calendar
+        days per request at this resolution). Empty list on `no_data`."""
         params: dict[str, str | int] = {
             "symbol": symbol,
             "resolution": "1",
             "date_format": 1,
-            "range_from": day.isoformat(),
-            "range_to": day.isoformat(),
+            "range_from": start.isoformat(),
+            "range_to": end.isoformat(),
             "cont_flag": 1,
             "oi_flag": 1,
         }
@@ -103,7 +108,7 @@ class FyersClient:
             message = str(body.get("message") or body)
             if any(word in message.lower() for word in ("token", "auth", "unauthor", "login")):
                 raise FyersCredentialsError(f"Fyers rejected the token: {message}")
-            raise RuntimeError(f"{symbol} {day}: {message}")
+            raise RuntimeError(f"{symbol} {start}..{end}: {message}")
         # Index symbols come back with every minute duplicated (observed
         # 2026-09-29: 750 rows, 375 distinct identical pairs) — key by epoch.
         by_epoch = {

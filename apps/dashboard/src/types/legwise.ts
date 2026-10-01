@@ -118,3 +118,93 @@ export interface DailyJob {
   finished: string | null;
   log: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Day forensics + anatomy — mirror legwise/forensics.py and legwise/anatomy.py
+// ---------------------------------------------------------------------------
+
+/** `ts` is the IST wall-clock read as UTC seconds, so a UTC chart axis shows 09:15..15:29. */
+export interface TimedValue {
+  ts: number;
+  t: string;
+  v: number;
+}
+
+export type SegmentLabel = 'QUIET' | 'CHOP' | 'TREND_UP' | 'TREND_DOWN' | 'UNKNOWN';
+
+export interface AnatomySegment {
+  start: string;
+  end: string;
+  ret_pct: number;
+  range_pct: number;
+  er: number;
+  rv_ann_pct: number | null;
+  implied_pct: number | null;
+  range_over_implied: number | null;
+  label: SegmentLabel;
+}
+
+export interface DayAnatomy {
+  day: string;
+  weekday: string;
+  gap_pct: number | null;
+  vix_open: number | null;
+  /** null before 2025-09-01: the reference expiry calendar is not trustworthy earlier. */
+  dte: number | null;
+  is_expiry: boolean | null;
+  whole: AnatomySegment | null;
+  segments: (AnatomySegment | null)[];
+}
+
+export interface AnatomyResponse {
+  underlying: string;
+  cuts: string[];
+  thresholds: { quiet_range_over_implied: number; trend_er: number };
+  dte_reliable_from: string;
+  days: DayAnatomy[];
+}
+
+export interface ForensicsMarker {
+  ts: number;
+  kind: 'entry' | 'exit';
+  leg: string;
+  price: number;
+  position?: 'buy' | 'sell';
+  reason?: string;
+}
+
+export interface LegAttribution {
+  leg: string;
+  trades: number;
+  gross: number;
+  costs: number;
+  net: number;
+  sl_hits: number;
+  target_hits: number;
+  reentries: number;
+}
+
+export interface DayForensics {
+  strategy_id: string;
+  sha: string;
+  day: string;
+  underlying: string;
+  gross: number;
+  costs: number;
+  net: number;
+  worst_mtm: number;
+  best_mtm: number;
+  stopped_by: string | null;
+  notes: string[];
+  lots: number;
+  net_per_lot: number;
+  window: { start: string; end: string };
+  mtm: TimedValue[];
+  spot: TimedValue[];
+  legs: { leg: string; contract: string; entry: string; exit: string; premium: TimedValue[] }[];
+  markers: ForensicsMarker[];
+  attribution: LegAttribution[];
+  trades: TradeRow[];
+  cuts: { ts: number; t: string }[];
+  anatomy: DayAnatomy | null;
+}

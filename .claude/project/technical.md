@@ -91,6 +91,7 @@ uv run obt walkforward strategies/B_pyramid.yaml --is-from YYYY-MM-DD --is-to YY
 uv run obt sweep strategies/B_pyramid.yaml --changes changes.json --from YYYY-MM-DD --to YYYY-MM-DD [--overfit --n-blocks 4]
 uv run obt export-personality <run_id>
 uv run obt fyers fetch [--date YYYY-MM-DD]   # daily 1m Fyers collector — same evening, expiring contracts vanish
+uv run obt fyers history [--underlying NIFTY] [--from D] # backfill index + India VIX 1m history (resumable; any time — indexes never expire)
 
 # trading-data (Python) — the shared local database; run from any package that depends on it
 uv run tdata init           # create TRADING_DATA_ROOT (~/TradingData) + catalog, load reference data

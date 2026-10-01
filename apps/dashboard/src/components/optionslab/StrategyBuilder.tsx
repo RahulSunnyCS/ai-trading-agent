@@ -16,6 +16,7 @@ import { useMemo, useState } from 'react';
 import { LEGWISE_API, useLegwiseStrategies } from '../../hooks/useLegwise';
 import { apiPost, apiPut } from '../../lib/api';
 import { formatPnl } from '../../lib/format';
+import { lotsOf, statsOf } from '../../lib/legwiseStats';
 import type {
   Amount,
   BacktestResponse,
@@ -37,7 +38,6 @@ import {
   TextInput,
   TradeLog,
   pnlClass,
-  statsOf,
 } from './shared';
 
 const UNDERLYINGS: readonly Underlying[] = [
@@ -362,23 +362,40 @@ function LegEditor(props: {
   );
 }
 
-function BacktestResult({ result }: { result: BacktestResponse }) {
+function BacktestResult({ result, lots }: { result: BacktestResponse; lots: number }) {
   const [open, setOpen] = useState<string | null>(null);
-  const st = statsOf(result.days);
+  const st = statsOf(result.days, lots);
   return (
     <Card>
       <CardHeader
         title="Backtest result"
-        description={`${result.strategy_id} over ${st.days} collected days`}
+        description={`${result.strategy_id} over ${st.days} collected days · ₹ per lot${
+          st.thin ? ' · fewer than 20 days: ratios are noise' : ''
+        }`}
       />
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
-          label="Net"
+          label="Net / lot"
           value={formatPnl(st.total)}
           tone={st.total >= 0 ? 'positive' : 'negative'}
         />
         <StatCard label="Up days" value={`${st.up} / ${st.days}`} />
-        <StatCard label="Avg / day" value={formatPnl(st.days ? st.total / st.days : 0)} />
+        <StatCard
+          label="Expectancy"
+          value={st.expectancy === null ? '—' : formatPnl(st.expectancy)}
+          note="avg ₹ / day"
+        />
+        <StatCard
+          label="Profit factor"
+          value={st.profitFactor === null ? '—' : st.profitFactor.toFixed(2)}
+          note={st.avgLoss === null ? 'no losing day' : `avg loss ${formatPnl(st.avgLoss)}`}
+        />
+        <StatCard
+          label="Worst day"
+          value={st.worst === null ? '—' : formatPnl(st.worst)}
+          tone="negative"
+          note={`losing streak ${st.longestLosingStreak}`}
+        />
         <StatCard label="Max drawdown" value={formatPnl(st.maxDrawdown)} tone="negative" />
       </div>
       <CumulativeLines lines={[{ id: result.strategy_id, points: st.cumulative }]} />
@@ -661,7 +678,7 @@ export function StrategyBuilder() {
         )}
       </Card>
 
-      {result && <BacktestResult result={result} />}
+      {result && <BacktestResult result={result} lots={lotsOf(payload as LegwiseStrategy)} />}
     </div>
   );
 }

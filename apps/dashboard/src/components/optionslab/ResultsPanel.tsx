@@ -13,28 +13,41 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   LEGWISE_API,
+  useAnatomy,
   useDailyJob,
   useLegwiseData,
   useLegwiseResults,
+  useLegwiseStrategies,
 } from '../../hooks/useLegwise';
 import { apiPost } from '../../lib/api';
 import { formatPnl } from '../../lib/format';
-import type { DailyJob, SavedResult } from '../../types/legwise';
+import { lotsOf, statsOf } from '../../lib/legwiseStats';
+import type { DailyJob, DayAnatomy, SavedResult } from '../../types/legwise';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
-import {
-  CumulativeLines,
-  Field,
-  SERIES_COLORS,
-  TextInput,
-  TradeLog,
-  pnlClass,
-  statsOf,
-} from './shared';
+import { DayForensics } from './DayForensics';
+import { SegmentChips } from './anatomy';
+import { CumulativeLines, Field, SERIES_COLORS, TextInput, TradeLog, pnlClass } from './shared';
+
+/** Cell shading by |₹ per lot| relative to the biggest cell: 3 literal buckets so
+ * Tailwind's JIT sees every class name. */
+function shade(value: number, max: number): string {
+  if (max <= 0 || value === 0) return '';
+  const r = Math.abs(value) / max;
+  const tone = value > 0 ? 'positive' : 'negative';
+  const step = r > 0.66 ? 3 : r > 0.33 ? 2 : 1;
+  return {
+    positive: ['bg-positive/10', 'bg-positive/20', 'bg-positive/30'],
+    negative: ['bg-negative/10', 'bg-negative/20', 'bg-negative/30'],
+  }[tone][step - 1] as string;
+}
+
+const fmtPct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(0)}%`);
+const fmtPnl = (v: number | null) => (v === null ? '—' : formatPnl(v));
 
 function RunDailyCard({ onFinished }: { onFinished: () => void }) {
   const data = useLegwiseData();
@@ -119,6 +132,8 @@ function RunDailyCard({ onFinished }: { onFinished: () => void }) {
 
 export function ResultsPanel() {
   const results = useLegwiseResults();
+  const saved = useLegwiseStrategies();
+  const anatomy = useAnatomy('NIFTY');
   const [selected, setSelected] = useState<{ strategy: string; day: string } | null>(null);
 
   const strategies = results.data?.strategies ?? [];
@@ -137,10 +152,34 @@ export function ResultsPanel() {
     () => [...new Set(rows.map((r) => r.day))].sort((a, b) => b.localeCompare(a)),
     [rows],
   );
-  const lines = useMemo(
+  const lotsById = useMemo(
+    () => new Map((saved.data ?? []).map((s) => [s.strategy.id, lotsOf(s.strategy)])),
+    [saved.data],
+  );
+  const statsById = useMemo(
     () =>
-      strategies.map((s) => ({ id: s.id, points: statsOf(byStrategy.get(s.id) ?? []).cumulative })),
-    [strategies, byStrategy],
+      new Map(
+        strategies.map((s) => [s.id, statsOf(byStrategy.get(s.id) ?? [], lotsById.get(s.id) ?? 1)]),
+      ),
+    [strategies, byStrategy, lotsById],
+  );
+  const lines = useMemo(
+    () => strategies.map((s) => ({ id: s.id, points: statsById.get(s.id)?.cumulative ?? [] })),
+    [strategies, statsById],
+  );
+  const anatomyByDay = useMemo(
+    () => new Map<string, DayAnatomy>((anatomy.data?.days ?? []).map((d) => [d.day, d])),
+    [anatomy.data],
+  );
+  const maxCell = useMemo(
+    () =>
+      Math.max(
+        0,
+        ...rows
+          .filter((r) => r.current)
+          .map((r) => Math.abs(r.net / (lotsById.get(r.strategy_id) ?? 1))),
+      ),
+    [rows, lotsById],
   );
   const cell = (strategy: string, day: string) =>
     rows.find((r) => r.strategy_id === strategy && r.day === day);
@@ -166,7 +205,8 @@ export function ResultsPanel() {
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {strategies.map((s, i) => {
-              const st = statsOf(byStrategy.get(s.id) ?? []);
+              const st = statsById.get(s.id);
+              if (!st) return null;
               return (
                 <StatCard
                   key={s.id}
@@ -181,7 +221,27 @@ export function ResultsPanel() {
                   }
                   value={formatPnl(st.total)}
                   tone={st.total > 0 ? 'positive' : st.total < 0 ? 'negative' : 'muted'}
-                  note={`${st.days} days · ${st.up} up · max DD ${formatPnl(st.maxDrawdown)}`}
+                  note={
+                    <span className="block space-y-0.5">
+                      <span className="block">
+                        n={st.days} · {st.up} up · max DD {formatPnl(st.maxDrawdown)}
+                      </span>
+                      <span className={st.thin ? 'block text-faint' : 'block'}>
+                        win {fmtPct(st.winRate)} · avg win {fmtPnl(st.avgWin)} · avg loss{' '}
+                        {fmtPnl(st.avgLoss)}
+                      </span>
+                      <span className={st.thin ? 'block text-faint' : 'block'}>
+                        expectancy {fmtPnl(st.expectancy)} · PF{' '}
+                        {st.profitFactor === null ? '—' : st.profitFactor.toFixed(2)} · worst day{' '}
+                        {fmtPnl(st.worst)} · losing streak {st.longestLosingStreak}
+                      </span>
+                      {st.thin && (
+                        <span className="block text-faint">
+                          fewer than 20 days — ratios are noise, read the days instead
+                        </span>
+                      )}
+                    </span>
+                  }
                 />
               );
             })}
@@ -190,7 +250,7 @@ export function ResultsPanel() {
           <Card>
             <CardHeader
               title="Cumulative net P&L"
-              description="1 lot per leg as configured, costs as set in each strategy"
+              description="₹ per lot (net of each strategy's costs; a strategy's lot = its smallest leg)"
               actions={
                 <Button size="sm" variant="ghost" onClick={results.refetch}>
                   <RefreshCw className="h-3.5 w-3.5" />
@@ -202,12 +262,16 @@ export function ResultsPanel() {
           </Card>
 
           <Card>
-            <CardHeader title="Day by day" description="Click a cell to see that day's trades" />
+            <CardHeader
+              title="Day by day"
+              description="₹ per lot. Click a cell to replay the day · NIFTY shape = open / mid / close segments (↑ trend up · ↓ trend down · ≈ chop · · quiet)"
+            />
             <Table>
               <THead>
                 <Th>Day</Th>
+                <Th>NIFTY shape</Th>
                 {strategies.map((s) => (
-                  <Th key={s.id} align="right">
+                  <Th key={s.id} align="right" title={s.id} className="max-w-[9rem] truncate">
                     {s.id}
                   </Th>
                 ))}
@@ -218,8 +282,12 @@ export function ResultsPanel() {
                     <Td numeric className="whitespace-nowrap">
                       {day}
                     </Td>
+                    <Td>
+                      <SegmentChips anatomy={anatomyByDay.get(day)} />
+                    </Td>
                     {strategies.map((s) => {
                       const r = cell(s.id, day);
+                      const perLot = r ? r.net / (lotsById.get(s.id) ?? 1) : 0;
                       const active = selected?.strategy === s.id && selected.day === day;
                       return (
                         <Td key={s.id} align="right" numeric>
@@ -232,11 +300,13 @@ export function ResultsPanel() {
                                   ? (r.stopped_by ?? '')
                                   : 'ran an older version of this strategy'
                               }
-                              className={`rounded px-1.5 py-0.5 ${active ? 'bg-surface-2 ring-1 ring-border-strong' : ''} ${
-                                r.current ? pnlClass(r.net) : 'text-faint line-through'
+                              className={`rounded px-1.5 py-0.5 ${active ? 'ring-1 ring-border-strong' : ''} ${
+                                r.current
+                                  ? `${pnlClass(r.net)} ${shade(perLot, maxCell)}`
+                                  : 'text-faint line-through'
                               }`}
                             >
-                              {formatPnl(r.net)}
+                              {formatPnl(perLot)}
                             </button>
                           ) : (
                             <span className="text-faint">—</span>
@@ -251,25 +321,15 @@ export function ResultsPanel() {
           </Card>
 
           {picked && (
-            <Card>
-              <CardHeader
-                title={`${picked.strategy_id} · ${picked.day}`}
-                description={[
-                  `net ${formatPnl(picked.net)}`,
-                  `worst MTM ${formatPnl(picked.worst_mtm)}`,
-                  picked.stopped_by,
-                  picked.current ? null : 'stale: older version of the strategy',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              />
-              <TradeLog trades={picked.trades} />
-              {picked.notes.map((n) => (
-                <p key={n} className="mt-2 text-xs text-muted">
-                  note: {n}
-                </p>
-              ))}
-            </Card>
+            <DayForensics
+              key={`${picked.strategy_id}:${picked.day}:${picked.strategy_sha}`}
+              strategy={picked.strategy_id}
+              day={picked.day}
+              sha={picked.strategy_sha}
+              stale={!picked.current}
+              onClose={() => setSelected(null)}
+              fallback={<TradeLog trades={picked.trades} />}
+            />
           )}
         </>
       )}
