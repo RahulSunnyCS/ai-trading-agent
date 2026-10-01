@@ -131,6 +131,14 @@ contract, not a shared service).
 - `tranches.py` — overlapping tranches (K sub-portfolios on staggered `rebalance_every`
   phases, averaged) to remove start-date luck from a comparison; works with any dataset via a
   `run_one(config) -> Result` closure (TODO 3.9.23).
+- `levers.py` / `reversal.py` — research levers from the 2026-10-01 alpha study (rank tables,
+  `no_buy` masks, post-hoc overlays; the turnaround sleeve). `scripts/alpha_experiments.py`,
+  `scripts/reversal_experiment.py` and `scripts/param_dry_run.py` reproduce every number in
+  `docs/momentum-parameters-reference.md`. Score any new lever over `sweep.rolling_windows`
+  with `sweep.rerun_windows` + `compare_rolling`, never on the full sample alone.
+- Broad Momentum gotcha: `engine.run_backtest` skips weeks with fewer than `top_n` ranked
+  names unless `Config.min_ranked` is set; Broad needs `min_ranked=1` (API
+  `broad_every_week`) or about 190 of 508 weeks silently vanish (TODO 3.9.23).
 - `notify.py` — the Python-side mirror of `@trading/notify`'s `Notification`
   shape, used by the weekly Telegram signal job.
 - `local_store.py` — the weekly job's price/signal storage, since 2026-09-30
