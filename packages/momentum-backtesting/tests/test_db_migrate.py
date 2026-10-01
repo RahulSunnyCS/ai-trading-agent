@@ -380,3 +380,54 @@ def test_import_momentum_prices_bulk_load_keeps_nulls_and_is_idempotent(tmp_path
     assert len(rows) == 5
     assert rows[0] == ("Gold", "weekly", date(2026, 9, 4), None, 50.0)
     assert (nulls, nans) == (5, 0)
+
+
+def test_daily_prices_from_db_matches_the_row_by_row_read(tmp_path, monkeypatch):
+    """`daily_prices_from_db_or_none` reads through DuckDB's native `.df()` (the old
+    `fetchall()` + `pd.DataFrame(rows)` was ~10x slower and ~2 GB on the real ~3M-row universe).
+    Same frame either way: columns/order/dtypes, symbol-then-date sort, only the asked symbols,
+    and an empty frame (not None, not an error) for symbols with no bars."""
+    from momentum_backtesting import db_read
+
+    root = tmp_path / "td"
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    from trading_data import lake
+
+    with connect(root) as con:
+        con.execute(
+            "INSERT INTO instruments (instrument_key, asset_class, exchange, symbol) VALUES "
+            "('NSE:stock:AAA', 'stock', 'NSE', 'AAA'), ('NSE:stock:BBB', 'stock', 'NSE', 'BBB'), "
+            "('NSE:stock:CCC', 'stock', 'NSE', 'CCC')"
+        )
+        ids = dict(con.execute("SELECT symbol, instrument_id FROM instruments").fetchall())
+    for year, rows in {
+        2024: [("BBB", date(2024, 1, 2), 20.0, 5.0), ("AAA", date(2024, 1, 3), 11.0, 7.0)],
+        2025: [("AAA", date(2025, 1, 1), 12.5, 9.0), ("CCC", date(2025, 1, 1), 1.0, 1.0)],
+    }.items():
+        path = lake.bars_1d_stock_path(root, year)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(
+            pa.table(
+                {
+                    "instrument_id": pa.array([ids[s] for s, *_ in rows], pa.int64()),
+                    "date": pa.array([d for _, d, *_ in rows], pa.date32()),
+                    "close": pa.array([c for _, _, c, _ in rows], pa.float64()),
+                    "turnover": pa.array([t for *_, t in rows], pa.float64()),
+                }
+            ),
+            path,
+        )
+
+    got = db_read.daily_prices_from_db_or_none(["BBB", "AAA", "NOPE"])
+    assert list(got.columns) == ["date", "symbol", "close", "turnover"]
+    assert got["symbol"].tolist() == ["AAA", "AAA", "BBB"]  # sorted by symbol, then date
+    assert got["date"].tolist() == [
+        pd.Timestamp(d) for d in ("2024-01-03", "2025-01-01", "2024-01-02")
+    ]
+    assert got["close"].tolist() == [11.0, 12.5, 20.0]
+    assert str(got["date"].dtype).startswith("datetime64")
+    assert got["close"].dtype == "float64"
+
+    none_found = db_read.daily_prices_from_db_or_none(["NOPE"])
+    assert none_found is not None and none_found.empty
+    assert list(none_found.columns) == ["date", "symbol", "close", "turnover"]

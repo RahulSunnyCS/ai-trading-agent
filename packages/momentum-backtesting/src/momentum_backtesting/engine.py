@@ -43,6 +43,7 @@ import operator
 from dataclasses import dataclass, field
 from typing import Literal
 
+import numpy as np
 import pandas as pd
 
 from .tax import DEBT, TaxLedger, TaxRules
@@ -321,17 +322,31 @@ def _rank_from_score(
     score: pd.DataFrame, tie_break: pd.DataFrame | None, higher_is_better: bool
 ) -> pd.DataFrame:
     """Convert a per-week score into ascending ranks 1..N (1 = best), skipping instruments whose
-    score is NaN that week. Ties are broken by `tie_break` (higher wins) if given, then by name."""
-    sign = -1 if higher_is_better else 1
-    final = pd.DataFrame(index=score.index, columns=score.columns, dtype=float)
-    for week in score.index:
-        row = score.loc[week].dropna()
-        if tie_break is None:
-            order = sorted(row.index, key=lambda n: (sign * row[n], n))
-        else:
-            order = sorted(row.index, key=lambda n: (sign * row[n], -tie_break.at[week, n], n))
-        final.loc[week, order] = range(1, len(order) + 1)
-    return final
+    score is NaN that week. Ties are broken by `tie_break` (higher wins) if given, then by name.
+
+    One `np.lexsort` per week over (score, -tie_break, name). This used to be a Python `sorted()`
+    with a pandas `.loc` lookup per instrument per comparison — ~640k lookups for Broad Momentum's
+    755 stocks × 820 weeks, about half the whole request (~45 s). Same strict total order, so the
+    ranks are identical (pinned against the old implementation in tests/test_engine.py)."""
+    sign = -1.0 if higher_is_better else 1.0
+    values = score.to_numpy(dtype=float)
+    tie = None if tie_break is None else tie_break.reindex_like(score).to_numpy(dtype=float)
+    # Names compare as strings (code-point order), exactly as the old tuple key did.
+    name_order = np.argsort(np.asarray(score.columns, dtype=str), kind="stable")
+    name_rank = np.empty(len(name_order), dtype=np.int64)
+    name_rank[name_order] = np.arange(len(name_order))
+
+    out = np.full(values.shape, np.nan)
+    for i in range(values.shape[0]):
+        present = np.flatnonzero(~np.isnan(values[i]))
+        if present.size == 0:
+            continue
+        keys = [name_rank[present]]  # lexsort: the LAST key is the primary one
+        if tie is not None:
+            keys.append(-tie[i, present])
+        keys.append(sign * values[i, present])
+        out[i, present[np.lexsort(keys)]] = np.arange(1, present.size + 1)
+    return pd.DataFrame(out, index=score.index, columns=score.columns)
 
 
 def _compute_ranks_ranksum(

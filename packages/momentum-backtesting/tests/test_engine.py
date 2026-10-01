@@ -11,6 +11,7 @@ from momentum_backtesting.engine import (
     GILT,
     IDLE,
     Config,
+    _rank_from_score,
     _win_rate_multiplier,
     compute_ranks,
     run_backtest,
@@ -957,3 +958,65 @@ def test_no_buy_of_all_false_changes_nothing():
     a = run_backtest(prices, includes(prices), bcfg(**kw))
     b = run_backtest(prices, includes(prices), bcfg(**kw), no_buy=none)
     pd.testing.assert_series_equal(a.equity, b.equity)
+
+
+def _rank_from_score_reference(score, tie_break, higher_is_better):
+    """The pre-2026-10 implementation, kept verbatim as the oracle: a Python sorted() with a
+    pandas lookup per instrument. Correct but ~640k slow lookups on Broad Momentum."""
+    sign = -1 if higher_is_better else 1
+    final = pd.DataFrame(index=score.index, columns=score.columns, dtype=float)
+    for week in score.index:
+        row = score.loc[week].dropna()
+        if tie_break is None:
+            order = sorted(row.index, key=lambda n: (sign * row[n], n))
+        else:
+            order = sorted(row.index, key=lambda n: (sign * row[n], -tie_break.at[week, n], n))
+        final.loc[week, order] = range(1, len(order) + 1)
+    return final
+
+
+@pytest.mark.parametrize("higher_is_better", [True, False])
+@pytest.mark.parametrize("with_tie_break", [True, False])
+def test_rank_from_score_matches_the_original_on_ties_nans_and_unsorted_names(
+    higher_is_better, with_tie_break
+):
+    """The vectorised lexsort must give the SAME rank for every cell as the sorted() it
+    replaced: heavy score ties (small integer scores), a second-level tie on the tie-break,
+    NaN scores, an all-NaN week, columns deliberately not in name order, mixed-case and
+    punctuated names (code-point order), and a single-instrument week."""
+    rng = np.random.default_rng(7)
+    weeks = pd.date_range("2024-01-05", periods=40, freq="W-FRI")
+    names = ["zeta", "Alpha", "beta", "A#2", "alpha", "C", "10", "9", "x y", "Q"]
+    score = pd.DataFrame(
+        rng.integers(0, 4, (len(weeks), len(names))).astype(float), index=weeks, columns=names
+    )
+    score = score.mask(rng.random(score.shape) < 0.25)  # ~25% NaN
+    score.iloc[5] = np.nan  # an all-NaN week
+    score.iloc[6] = np.nan
+    score.iloc[6, 2] = 1.0  # a single-instrument week
+    tie_break = pd.DataFrame(
+        rng.integers(0, 3, score.shape).astype(float) / 10, index=weeks, columns=names
+    )
+
+    tb = tie_break if with_tie_break else None
+    expected = _rank_from_score_reference(score, tb, higher_is_better)
+    actual = _rank_from_score(score, tb, higher_is_better)
+
+    pd.testing.assert_frame_equal(actual, expected, check_exact=True)
+    assert actual.notna().to_numpy().sum() == score.notna().to_numpy().sum()
+
+
+def test_compute_ranks_ranksum_is_unchanged_on_a_random_price_panel():
+    """End to end through the real ranksum path, not just the helper."""
+    rng = np.random.default_rng(11)
+    weeks = pd.date_range("2018-01-05", periods=120, freq="W-FRI")
+    prices = pd.DataFrame(
+        100 * np.cumprod(1 + rng.normal(0.001, 0.02, (len(weeks), 25)), axis=0),
+        index=weeks,
+        columns=[f"S{i:02d}" for i in rng.permutation(25)],
+    )
+    config = Config(lookbacks=(1, 4, 13, 26, 52), universe=tuple(prices.columns))
+    final, score = compute_ranks(prices, config)
+    returns = {k: prices / prices.shift(k) - 1 for k in config.lookbacks}
+    expected = _rank_from_score_reference(score, returns[13], higher_is_better=False)
+    pd.testing.assert_frame_equal(final, expected, check_exact=True)
