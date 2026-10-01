@@ -355,3 +355,28 @@ def test_stock_dataset_falls_back_to_files_when_db_series_are_missing(
     ds = ui_data.load_stock_dataset(data_dir / "stocks")
     assert ds.prices.loc["2020-01-17", ui_data.NIFTY50_EQUAL_WEIGHT_TRI] == 714.0
     assert ds.prices.loc["2020-01-10", "C0001"] == 101.0  # the file's value, not the DB's
+
+
+def test_import_momentum_prices_bulk_load_keeps_nulls_and_is_idempotent(tmp_path):
+    """`import_momentum_prices` is a single bulk INSERT (not executemany, which was ~1 ms per
+    row and made the ~140k-row load take minutes). It must still store a missing `open` as SQL
+    NULL — not NaN, which would poison any AVG/compare downstream — and replace, not append."""
+    pd.DataFrame(
+        {"Nifty 50": [100.0, 101.5, None], "Gold": [50.0, 51.0, 52.0]},
+        index=pd.to_datetime(["2026-09-04", "2026-09-11", "2026-09-18"]),
+    ).to_csv(tmp_path / "weekly_closes.csv")
+
+    with connect() as con:
+        assert db_migrate.import_momentum_prices(con, tmp_path) == 5  # the NaN close is skipped
+        assert db_migrate.import_momentum_prices(con, tmp_path) == 5  # again: replaced
+        rows = con.execute(
+            "SELECT instrument, kind, date, open, close FROM momentum_prices ORDER BY 1, 3"
+        ).fetchall()
+        nulls, nans = con.execute(
+            "SELECT count(*) FILTER (WHERE open IS NULL), "
+            "count(*) FILTER (WHERE isnan(open)) FROM momentum_prices"
+        ).fetchone()
+
+    assert len(rows) == 5
+    assert rows[0] == ("Gold", "weekly", date(2026, 9, 4), None, 50.0)
+    assert (nulls, nans) == (5, 0)

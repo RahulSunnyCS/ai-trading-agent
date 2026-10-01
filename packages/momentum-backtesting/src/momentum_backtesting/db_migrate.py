@@ -60,6 +60,20 @@ CURATED_DIR = Path(__file__).with_name("stocks") / "curated"
 NIFTY50_INDEX_NAME = "NIFTY50"
 
 
+def _bulk_insert(con: duckdb.DuckDBPyConnection, table: str, frame: pd.DataFrame) -> None:
+    """One bulk `INSERT ... SELECT` from a DataFrame whose columns are in `table`'s column
+    order. NOT `executemany`: DuckDB runs that as one statement per row (~1 ms each against
+    the on-disk catalog), so the ~140k-row momentum_prices load took minutes where this takes
+    about a second. pandas NaN in a float column becomes SQL NULL, same as `_insert_many`."""
+    if frame.empty:
+        return
+    con.register("_bulk_frame", frame)
+    try:
+        con.execute(f"INSERT INTO {table} SELECT * FROM _bulk_frame")  # noqa: S608 (internal names)
+    finally:
+        con.unregister("_bulk_frame")
+
+
 def _insert_many(con: duckdb.DuckDBPyConnection, sql: str, frame: pd.DataFrame) -> None:
     """`executemany` with pandas NaN turned into SQL NULL, and a no-op on an empty
     frame (DuckDB's executemany rejects an empty parameter list outright)."""
@@ -232,14 +246,17 @@ def migrate_stock_bars(
 def import_momentum_prices(con: duckdb.DuckDBPyConnection, data_dir: Path = DATA_DIR) -> int:
     rows = list(store.rows_from_dir(data_dir))
     con.execute("DELETE FROM momentum_prices")
-    if rows:
-        con.executemany(
-            "INSERT INTO momentum_prices VALUES (?, ?, ?, ?, ?)",
+    _bulk_insert(
+        con,
+        "momentum_prices",
+        pd.DataFrame(
             [
-                [instrument, kind, day.date(), opened, close]
+                (instrument, kind, day.date(), opened, close)
                 for instrument, kind, day, opened, close in rows
             ],
-        )
+            columns=["instrument", "kind", "date", "open", "close"],
+        ).astype({"open": "float64", "close": "float64"}),
+    )
     return len(rows)
 
 
@@ -278,14 +295,17 @@ def import_stock_weekly(con: duckdb.DuckDBPyConnection, stocks_dir: Path) -> tup
         if frame is None:
             continue
         long = _melt_weekly(frame, "close")
-        con.executemany(
-            "INSERT INTO stock_weekly_prices VALUES (?, ?, ?, ?)",
-            [
-                [cid, kind, week, close]
-                for cid, week, close in zip(
-                    long["company_id"], long["week"], long["close"], strict=True
-                )
-            ],
+        _bulk_insert(
+            con,
+            "stock_weekly_prices",
+            pd.DataFrame(
+                {
+                    "company_id": long["company_id"].to_numpy(),
+                    "kind": kind,
+                    "week": long["week"].to_numpy(),
+                    "close": long["close"].astype("float64").to_numpy(),
+                }
+            ),
         )
         n_prices += len(long)
 
@@ -293,9 +313,16 @@ def import_stock_weekly(con: duckdb.DuckDBPyConnection, stocks_dir: Path) -> tup
     n_membership = 0
     if membership is not None:
         long = _melt_weekly(membership.astype(bool), "is_member")
-        con.executemany(
-            "INSERT INTO stock_membership_weekly VALUES (?, ?, ?)",
-            list(zip(long["company_id"], long["week"], long["is_member"], strict=True)),
+        _bulk_insert(
+            con,
+            "stock_membership_weekly",
+            pd.DataFrame(
+                {
+                    "company_id": long["company_id"].to_numpy(),
+                    "week": long["week"].to_numpy(),
+                    "is_member": long["is_member"].astype(bool).to_numpy(),
+                }
+            ),
         )
         n_membership = len(long)
 
@@ -318,9 +345,16 @@ def import_stock_weekly(con: duckdb.DuckDBPyConnection, stocks_dir: Path) -> tup
 
 def _insert_series(con: duckdb.DuckDBPyConnection, frame: pd.DataFrame) -> int:
     long = _melt_weekly(frame, "close")
-    con.executemany(
-        "INSERT INTO stock_weekly_series VALUES (?, ?, ?)",
-        list(zip(long["company_id"], long["week"], long["close"], strict=True)),
+    _bulk_insert(
+        con,
+        "stock_weekly_series",
+        pd.DataFrame(
+            {
+                "company_id": long["company_id"].to_numpy(),
+                "week": long["week"].to_numpy(),
+                "close": long["close"].astype("float64").to_numpy(),
+            }
+        ),
     )
     return len(long)
 
