@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from trading_data.db import connect
 
-from . import analysis, db_read, fyers, rebalance, runs_store
+from . import analysis, db_read, fyers, rebalance, reference_benchmarks, runs_store
 from .categories import broad
 from .categories import momentum_scores as momentum_scores_mod
 from .categories.compose import (
@@ -104,6 +104,8 @@ class _Data:
         # OrderedDict keyed cache the way broad_ranking_cache needs to be.
         self._momentum_universe_mtimes: tuple | None = None
         self.momentum_universe_cache: broad.StockUniverseFrame | None = None
+        self._references_mtimes: tuple | None = None
+        self.references_cache: pd.DataFrame | None = None
 
     def get(self) -> pd.DataFrame:
         """Prefers the shared local database (`packages/trading-data`, populated by `mbt
@@ -167,6 +169,17 @@ class _Data:
                 except ValueError as error:
                     raise HTTPException(409, str(error)) from None
             return self.fill_tables[key]
+
+    def references(self) -> pd.DataFrame:
+        """Nifty 50 TRI / Nifty200 Momentum 30 TRI comparison lines (reference_benchmarks),
+        reloaded when either source changes. Empty, never an error, when neither has them."""
+        path = DATA_DIR / "stocks" / "benchmarks_weekly.csv"
+        mtimes = (db_read.catalog_mtime(), path.stat().st_mtime if path.exists() else None)
+        with self._lock:
+            if mtimes != self._references_mtimes or self.references_cache is None:
+                self.references_cache = reference_benchmarks.load_references(DATA_DIR)
+                self._references_mtimes = mtimes
+            return self.references_cache
 
     def trim_cache(self, limit: int = 24) -> None:
         for cache in (self.rank_cache, self.stock_rank_cache, self.custom_index_rank_cache):
@@ -691,6 +704,7 @@ def _etf_backtest(req: BacktestRequest) -> dict:
         groups,
         fills.proxy if fills is not None else None,
         fills.warnings if fills is not None else None,
+        references=DATA.references(),
     )
 
 
@@ -736,7 +750,14 @@ def _stock_backtest(req: BacktestRequest) -> dict:
         raise HTTPException(422, str(error)) from None
     groups = dict.fromkeys(stock.companies, "Nifty 50")
     groups.update({name: extra["group"] for name, extra in stock.extra_instruments.items()})
-    payload = analysis.payload(result, stock.prices, config, groups, membership=stock.membership)
+    payload = analysis.payload(
+        result,
+        stock.prices,
+        config,
+        groups,
+        membership=stock.membership,
+        references=DATA.references(),
+    )
     payload["companies"] = stock.companies
     return payload
 
@@ -1019,7 +1040,7 @@ def _custom_index_backtest(req: BacktestRequest) -> dict:
         name: _CATEGORY_LABEL_INFO.get(label, ("core", "Custom"))[1]
         for name, label in universe_result.labels.items()
     }
-    payload = analysis.payload(result, prices, config, groups)
+    payload = analysis.payload(result, prices, config, groups, references=DATA.references())
     if universe_result.skipped:
         # Surfaced for transparency (e.g. so the UI/report can note "N categories excluded this
         # run and why") - never fatal on its own, matching every other module in categories/'s
@@ -1258,7 +1279,14 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
-    payload = analysis.payload(result, prices, result.config, groups, share_prices=True)
+    payload = analysis.payload(
+        result,
+        prices,
+        result.config,
+        groups,
+        share_prices=True,
+        references=DATA.references(),
+    )
     # Always present (empty list for category_mode="off", where there is no category layer at
     # all) - a consistent response shape the frontend can rely on regardless of mode.
     group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR) if on else {}

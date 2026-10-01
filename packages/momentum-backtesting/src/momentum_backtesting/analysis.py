@@ -6,7 +6,7 @@ import math
 
 import pandas as pd
 
-from . import metrics
+from . import metrics, reference_benchmarks
 from .engine import CASH, IDLE, Config, Result
 
 CAPITAL = 100_000  # rupee figures are shown for Rs 1 lakh invested at the start
@@ -341,6 +341,7 @@ def payload(
     fill_warnings: list[str] | None = None,
     membership: pd.DataFrame | None = None,
     share_prices: bool = False,
+    references: pd.DataFrame | None = None,
 ) -> dict:
     """`share_prices` adds each open position's last-week price (`open_positions[].price`) so the
     UI's "Trade split" tab can turn a rupee amount into whole shares. Off by default: only pass
@@ -352,7 +353,10 @@ def payload(
     its index because it hadn't listed yet. `membership` is passed straight through to
     `latest_signal` (see its docstring) - it never affects the historical `result` itself, which
     the engine has already computed correctly; it only stops the "This week" advisory panel from
-    recommending a trade the engine's own rules wouldn't have allowed."""
+    recommending a trade the engine's own rules wouldn't have allowed.
+
+    `references` (reference_benchmarks.load_references) adds `comparisons`: dividend-inclusive
+    lines the strategy is also measured against, whatever the dataset's own benchmark is."""
     closed = closed_trades(result)
     eq, bench, cash = result.equity, result.benchmark, result.cash
     rolling = (eq / eq.shift(52)) - (bench / bench.shift(52))
@@ -407,6 +411,17 @@ def payload(
         {
             "benchmark_name": config.benchmark,
             "kpis": kpis(result, closed),
+            "comparisons": [
+                {
+                    "name": c["name"],
+                    "cagr": c["cagr"],
+                    "excess_cagr": c["excess_cagr"],
+                    "max_drawdown": c["max_drawdown"],
+                    "note": c["note"],
+                    "series": (c["curve"] * CAPITAL).tolist(),
+                }
+                for c in reference_benchmarks.compare(eq, references)
+            ],
             "series": series,
             "rotations": rotations(result),
             "trades": trade_rows,

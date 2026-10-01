@@ -639,6 +639,7 @@ export function MomentumBacktestingView() {
                 benchmarkName={result.benchmark_name}
                 rotations={result.rotations}
                 overlays={overlays}
+                comparisons={result.comparisons ?? []}
                 flashKey={finishedAt}
               />
               <MomentumResultDetails

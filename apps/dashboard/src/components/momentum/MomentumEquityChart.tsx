@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { getChartTheme } from '../../lib/chartTheme';
 import { useThemeStore } from '../../store/theme';
-import type { MomentumRotation, MomentumSavedRun, MomentumSeries } from '../../types/momentum';
+import type {
+  MomentumComparison,
+  MomentumRotation,
+  MomentumSavedRun,
+  MomentumSeries,
+} from '../../types/momentum';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { useResultFlash } from './MomentumRunProgress';
@@ -115,12 +120,14 @@ export function MomentumEquityChart({
   benchmarkName,
   rotations,
   overlays = [],
+  comparisons = [],
   flashKey = null,
 }: {
   series: MomentumSeries;
   benchmarkName: string;
   rotations: MomentumRotation[];
   overlays?: MomentumSavedRun[];
+  comparisons?: MomentumComparison[];
   flashKey?: number | null;
 }) {
   const flashing = useResultFlash(flashKey);
@@ -188,6 +195,15 @@ export function MomentumEquityChart({
           line: { color: colors.border, width: 1.4, dash: 'dot' },
           hoverinfo: 'none',
         },
+        ...comparisons.map((line, index) => ({
+          x: series.dates,
+          y: line.series.map(lakh),
+          name: line.name,
+          type: 'scatter',
+          mode: 'lines',
+          line: { color: index === 0 ? colors.info : colors.warning, width: 1.3, dash: 'dashdot' },
+          hoverinfo: 'none',
+        })),
         {
           x: rotationPoints.map((item) => item.date),
           y: rotationPoints.map((item) => item.value),
@@ -320,7 +336,7 @@ export function MomentumEquityChart({
       mounted = false;
       if (plotly && element) plotly.purge(element);
     };
-  }, [series, benchmarkName, rotationPoints, overlays, scrollZoom, logScale, theme]);
+  }, [series, benchmarkName, rotationPoints, overlays, comparisons, scrollZoom, logScale, theme]);
 
   return (
     <Card className={flashing ? 'animate-result-flash' : ''}>

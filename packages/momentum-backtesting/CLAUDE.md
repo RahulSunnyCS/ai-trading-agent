@@ -124,6 +124,10 @@ contract, not a shared service).
   P&L on the traded ETF instead of the ranked index).
 - `sweep.py` — the parameter-sweep harness used for every "is this lever
   worth it" investigation (see `TODO.md` §3.9.18 for the most recent one).
+- `reference_benchmarks.py` — Nifty 50 TRI and Nifty200 Momentum 30 TRI comparison lines
+  (`load_references`, `compare`), added to every backtest payload as `comparisons`. Use it,
+  not the dataset's own `benchmark`, when judging edge: index-mode benchmarks are price-only
+  (TODO 3.9.23).
 - `notify.py` — the Python-side mirror of `@trading/notify`'s `Notification`
   shape, used by the weekly Telegram signal job.
 - `local_store.py` — the weekly job's price/signal storage, since 2026-09-30

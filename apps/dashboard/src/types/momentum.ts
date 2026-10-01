@@ -44,9 +44,20 @@ export interface MomentumRotation {
   holdings: MomentumRotationHolding[];
 }
 
+/** A dividend-inclusive reference line (Nifty 50 TRI, Nifty200 Momentum 30 TRI). */
+export interface MomentumComparison {
+  name: string;
+  cagr: number | null;
+  excess_cagr: number | null;
+  max_drawdown: number | null;
+  note: string | null;
+  series: Array<number | null>;
+}
+
 export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
+  comparisons?: MomentumComparison[];
   series: MomentumSeries;
   rotations: MomentumRotation[];
   latest: {
