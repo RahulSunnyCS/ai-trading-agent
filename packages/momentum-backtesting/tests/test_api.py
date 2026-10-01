@@ -1231,15 +1231,10 @@ def test_broad_api_round_trips_caps_and_ceiling(broad_client):
     assert res.status_code == 200, res.text
     json.dumps(res.json(), allow_nan=False)
     assert (
-        broad_client.post(
-            "/api/backtest", json=_broad_request(max_category=1.5)
-        ).status_code
-        == 422
+        broad_client.post("/api/backtest", json=_broad_request(max_category=1.5)).status_code == 422
     )
     assert (
-        broad_client.post(
-            "/api/backtest", json=_broad_request(max_stock_price=-1)
-        ).status_code
+        broad_client.post("/api/backtest", json=_broad_request(max_stock_price=-1)).status_code
         == 422
     )
 
@@ -1247,11 +1242,22 @@ def test_broad_api_round_trips_caps_and_ceiling(broad_client):
 def test_broad_payload_carries_share_prices_for_the_trade_split_tab(broad_client):
     res = broad_client.post(
         "/api/backtest",
-        json=_broad_request(
-            broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10
-        ),
+        json=_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10),
     )
     assert res.status_code == 200, res.text
     open_positions = res.json()["open_positions"]
     assert open_positions
     assert all(p["price"] is not None and p["price"] > 0 for p in open_positions)
+
+
+def test_broad_every_week_never_skips_a_week(broad_client):
+    """TODO 3.9.23: with broad_every_week the curve has one point per week; the default keeps
+    the engine's original rule (thin weeks skipped), so it can only have as many or fewer."""
+    request = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    default = broad_client.post("/api/backtest", json=request).json()
+    every = broad_client.post("/api/backtest", json={**request, "broad_every_week": True}).json()
+    weeks = pd.to_datetime(every["series"]["dates"])
+    assert (weeks[1:] - weeks[:-1]).days.max() == 7
+    assert len(every["series"]["dates"]) >= len(default["series"]["dates"])
+    meta = broad_client.get("/api/meta?dataset=broad").json()
+    assert meta["defaults"]["broad_every_week"] is False

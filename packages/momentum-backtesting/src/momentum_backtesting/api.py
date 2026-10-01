@@ -388,6 +388,10 @@ class BacktestRequest(BaseModel):
     # ranked instruments (26-week weekly volatility, levers.high_vol_mask); holdings are
     # untouched. 0 = off. Measured to help ETF mode and to hurt stocks, so ETF only.
     exclude_high_vol: float = Field(0.0, ge=0, lt=1)
+    # dataset="broad" only (TODO 3.9.23): simulate every week. False keeps the engine default,
+    # which skips weeks with fewer than category_top_n x picks ranked stocks (~190 of 508 since
+    # 2017) and so overstates Broad's CAGR and Sharpe.
+    broad_every_week: bool = False
     cost_model: Literal["flat", "itemised"] = "flat"
     capital: float = Field(1_000_000.0, gt=0)
     slippage_bps: float = Field(5.0, ge=0)
@@ -1157,6 +1161,7 @@ def _broad_meta() -> dict:
             "broad_picks_per_category": broad.DEFAULT_PICKS_PER_CATEGORY,
             "broad_off_top_n": 10,
             "broad_off_exit_rank": 20,
+            "broad_every_week": False,
         },
     }
 
@@ -1266,6 +1271,7 @@ def _run_broad(
         capital=req.capital,
         slippage_bps=req.slippage_bps,
         ranking=ranking,
+        min_ranked=1 if req.broad_every_week else 0,
     )
 
 

@@ -165,6 +165,12 @@ class Config:
     # 0 (default) = off.
     tax_hold_band: int = 0
     tax_hold_weeks: int = 0
+    # A week is only simulated when at least this many names are ranked; 0 (default) means
+    # `top_n`, the original rule, which is right for ETF/stock history warm-up. A derived rank
+    # table that is legitimately thin some weeks (Broad Momentum ranks only the picks of the
+    # categories held) needs 1: with the default, those weeks are silently skipped - nothing is
+    # sold or bought and the curve jumps several weeks at once (TODO 3.9.23).
+    min_ranked: int = 0
     # flat = cost_pct on both sides (today's model, unchanged). itemised = STT/stamp duty/
     # exchange fees/slippage/DP charge - see the rate constants above `Config`.
     cost_model: CostModel = "flat"
@@ -213,6 +219,8 @@ class Config:
             raise ValueError("rebalance_every only applies to rebalance='weekly'")
         if not 0 <= self.rebalance_offset < self.rebalance_every:
             raise ValueError("rebalance_offset must be between 0 and rebalance_every - 1")
+        if self.min_ranked < 0:
+            raise ValueError("min_ranked can't be negative")
         if self.tax_hold_band < 0 or self.tax_hold_weeks < 0:
             raise ValueError("tax_hold_band and tax_hold_weeks can't be negative")
         if self.cost_model not in ("flat", "itemised"):
@@ -244,6 +252,8 @@ class Config:
             rebalance += f"_every{self.rebalance_every}o{self.rebalance_offset}"
         if self.tax_hold_band:
             rebalance += f"_taxhold{self.tax_hold_band}w{self.tax_hold_weeks}"
+        if self.min_ranked:
+            rebalance += f"_minranked{self.min_ranked}"
         cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
@@ -673,7 +683,7 @@ def run_backtest(
     in_window = ranks.index >= pd.Timestamp(config.start)
     if config.end:
         in_window &= ranks.index <= pd.Timestamp(config.end)
-    enough = ranks.notna().sum(axis=1).to_numpy() >= config.top_n
+    enough = ranks.notna().sum(axis=1).to_numpy() >= (config.min_ranked or config.top_n)
     weeks = list(ranks.index[in_window & enough])
     if trade_prices is not None:
         # The newest signal week may not have a fill yet (e.g. Monday hasn't happened).

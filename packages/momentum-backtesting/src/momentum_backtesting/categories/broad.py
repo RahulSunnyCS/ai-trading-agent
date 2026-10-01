@@ -857,6 +857,7 @@ def run_broad_backtest(
     mass_exit_throttle_fraction: float = DEFAULT_MASS_EXIT_THROTTLE_FRACTION,
     ranking: UniverseRanking | None = None,
     extra_no_buy: pd.DataFrame | None = None,
+    min_ranked: int = 0,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -987,6 +988,7 @@ def run_broad_backtest(
         cost_model=cost_model,
         capital=capital,
         slippage_bps=slippage_bps,
+        min_ranked=min_ranked,
         mass_exit_throttle=(mass_exit_response == "throttle"),
         mass_exit_throttle_fraction=mass_exit_throttle_fraction,
     )

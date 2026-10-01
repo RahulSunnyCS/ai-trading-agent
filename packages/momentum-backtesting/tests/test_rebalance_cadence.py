@@ -172,3 +172,39 @@ def test_api_accepts_an_every_k_weeks_cadence(client):
     assert bad.status_code == 422
     meta = http.get("/api/meta").json()
     assert meta["defaults"]["rebalance_every"] == 1
+
+
+# --- min_ranked: thin weeks (TODO 3.9.23) --------------------------------------------------------
+
+
+def thin_case(**overrides):
+    weeks = pd.date_range("2017-01-06", periods=12, freq="W-FRI")
+    names = ["A", "B", "C"]
+    prices = pd.DataFrame({n: 100 * 1.01 ** np.arange(12) for n in names}, weeks)
+    prices[CASH] = 100 * 1.001 ** np.arange(12)
+    prices[BENCHMARK] = prices[CASH]
+    ranks = pd.DataFrame({"A": 1.0, "B": 2.0, "C": 3.0}, index=weeks)
+    ranks.iloc[5:8] = [[np.nan, 1.0, np.nan]] * 3  # three thin weeks: only B is ranked
+    includes = {n: "core" for n in names} | {CASH: "defensive", BENCHMARK: "defensive"}
+    config = Config(start="2017-01-06", top_n=2, exit_rank=2, cost_pct=0.0, **overrides)
+    return run_backtest(prices, includes, config, external_ranks=(ranks, ranks)), weeks
+
+
+def test_default_skips_weeks_with_fewer_than_top_n_ranked():
+    result, weeks = thin_case()
+    assert not set(weeks[5:8]) & set(result.equity.index)
+    assert "A" not in set(result.trades.loc[result.trades["action"] == "SELL", "asset"])
+
+
+def test_min_ranked_simulates_thin_weeks_and_sells_what_dropped_out():
+    result, weeks = thin_case(min_ranked=1)
+    assert set(weeks[5:8]) <= set(result.equity.index)
+    sells = result.trades[result.trades["action"] == "SELL"]
+    assert (sells["asset"] == "A").any()
+    assert sells.loc[sells["asset"] == "A", "week"].iloc[0] == weeks[5]
+
+
+def test_min_ranked_validation_and_label():
+    with pytest.raises(ValueError):
+        Config(min_ranked=-1)
+    assert Config(min_ranked=1).label.endswith("_minranked1")

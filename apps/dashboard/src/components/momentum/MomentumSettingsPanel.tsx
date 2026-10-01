@@ -524,6 +524,7 @@ export const SETTINGS_FALLBACKS: Values = {
   broad_pool_top_n: 200,
   broad_pool_exit_rank: 250,
   broad_coverage_floor: 0.4,
+  broad_every_week: false,
   broad_category_top_n: 4,
   broad_category_exit_rank: 8,
   broad_picks_per_category: 2,
@@ -665,6 +666,12 @@ export function MomentumSettingsPanel({
               onChange={(value) => onChange('broad_pool_exit_rank', value)}
             />
           </div>
+          <Toggle
+            label="Simulate every week (recommended)"
+            help="Off reproduces the original engine rule: a week with fewer ranked stocks than categories × picks is skipped entirely, so nothing is sold or bought and the chart jumps several weeks. That hit about 190 of 508 weeks since 2017 and overstated CAGR by about 6 points and Sharpe by about 0.6. On trades every week, holding fewer names plus cash when few categories qualify."
+            checked={bool('broad_every_week')}
+            onChange={(value) => onChange('broad_every_week', value)}
+          />
           {broadOn ? (
             <div className="grid grid-cols-2 gap-3">
               <PercentField

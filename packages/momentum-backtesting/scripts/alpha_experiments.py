@@ -11,7 +11,8 @@ Baselines:
 - etf: the live job's strategy (`live_config.toml`: top 5 / exit 10, equal-weight 1/4/13/26/52,
   buffer + wait, 35% cap, 0.10% cost, ETF prices, Friday close).
 - broad: Broad Momentum with the dashboard's defaults (pool 200/250, coverage 0.40, categories
-  4/8, 2 picks, 15% stock cap, 30% category cap, Rs 20,000 price ceiling, buffer + wait, 0.10%).
+  4/8, 2 picks, 15% stock cap, 30% category cap, Rs 20,000 price ceiling, buffer + wait, 0.10%),
+  simulated every week (`min_ranked=1`; see BROAD_DEFAULTS).
 
 Run from packages/momentum-backtesting:
     uv run python scripts/alpha_experiments.py [--dataset etf|broad|both] [--only LABEL,...]
@@ -220,6 +221,10 @@ BROAD_DEFAULTS = dict(
     max_category=broad.DEFAULT_MAX_CATEGORY,
     max_stock_price=broad.DEFAULT_MAX_STOCK_PRICE,
     cost_pct=0.10,
+    # Simulate every week. The engine default (min_ranked = top_n) silently skips weeks when
+    # fewer than category_top_n x picks stocks are ranked, about 190 of 508 weeks since 2017,
+    # which overstated Broad's CAGR by ~6 points and Sharpe by ~0.6 (TODO 3.9.23).
+    min_ranked=1,
 )
 
 
