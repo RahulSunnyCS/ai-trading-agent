@@ -159,6 +159,12 @@ class Config:
     # (tranches.py) and rolling windows compare like with like. 1 = every week (the default).
     rebalance_every: int = 1
     rebalance_offset: int = 0
+    # Buffer rule with `tax` only (TODO 3.9.23, experiment 6). A holding whose oldest lot is in
+    # gain and turns long-term within `tax_hold_weeks` weeks is kept while its rank is at most
+    # `exit_rank + tax_hold_band`, instead of being sold short-term for a marginal rank slip.
+    # 0 (default) = off.
+    tax_hold_band: int = 0
+    tax_hold_weeks: int = 0
     # flat = cost_pct on both sides (today's model, unchanged). itemised = STT/stamp duty/
     # exchange fees/slippage/DP charge - see the rate constants above `Config`.
     cost_model: CostModel = "flat"
@@ -207,6 +213,8 @@ class Config:
             raise ValueError("rebalance_every only applies to rebalance='weekly'")
         if not 0 <= self.rebalance_offset < self.rebalance_every:
             raise ValueError("rebalance_offset must be between 0 and rebalance_every - 1")
+        if self.tax_hold_band < 0 or self.tax_hold_weeks < 0:
+            raise ValueError("tax_hold_band and tax_hold_weeks can't be negative")
         if self.cost_model not in ("flat", "itemised"):
             raise ValueError(f"unknown cost_model {self.cost_model!r}")
         if self.capital <= 0:
@@ -234,6 +242,8 @@ class Config:
         rebalance = f"_{self.rebalance}" if self.rebalance != "weekly" else ""
         if self.rebalance_every > 1:
             rebalance += f"_every{self.rebalance_every}o{self.rebalance_offset}"
+        if self.tax_hold_band:
+            rebalance += f"_taxhold{self.tax_hold_band}w{self.tax_hold_weeks}"
         cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
@@ -444,13 +454,14 @@ class _Sim:
         mine, cash = self.filter_ret.at[week, name], self.filter_ret.at[week, CASH]
         return pd.notna(mine) and pd.notna(cash) and mine > cash
 
-    def exit_reason(self, asset: str, week: pd.Timestamp) -> str | None:
-        """Why a holding must be sold this week, or None to keep it."""
+    def exit_reason(self, asset: str, week: pd.Timestamp, slack: int = 0) -> str | None:
+        """Why a holding must be sold this week, or None to keep it. `slack` widens the exit
+        rank for this one holding (see `tax_hold_band`)."""
         rank = self.rank(week, asset)
         if pd.isna(rank):
             return "ineligible"
-        if rank > self.config.exit_rank:
-            return f"rank {int(rank)} > {self.config.exit_rank}"
+        if rank > self.config.exit_rank + slack:
+            return f"rank {int(rank)} > {self.config.exit_rank + slack}"
         if not self.passes_filter(asset, week):
             return f"{self.config.filter_lookback}w return below cash"
         return None
@@ -961,6 +972,21 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             min(taken, group_room(label, total, week)) for label, taken in by_group.items()
         )
 
+    def tax_slack(asset: str, week) -> int:
+        """`tax_hold_band` when the oldest lot is in gain and turns long-term within
+        `tax_hold_weeks` weeks, else 0. Inert without `tax` or for debt (never long-term)."""
+        if not config.tax_hold_band or sim.ledger is None:
+            return 0
+        if sim.tax_classes.get(asset, DEBT) == DEBT:
+            return 0
+        oldest = min(lots[asset], key=lambda lot: lot["since"])
+        age = (week - oldest["since"]).days
+        threshold = sim.ledger.rules.long_term_days
+        if not threshold - 7 * config.tax_hold_weeks < age <= threshold:
+            return 0
+        in_gain = oldest["units"] * sim.price(asset, week) > oldest["basis"]
+        return config.tax_hold_band if in_gain else 0
+
     def sell(asset: str, fraction: float, week) -> tuple[float, float, float]:
         """Sell `fraction` of every lot. Returns (gross value, net proceeds, tax)."""
         price = sim.price(asset, week)
@@ -985,7 +1011,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         if week in sim.trade_weeks:
             # 1. Sell whatever has dropped out.
             for asset in [a for a in lots if a != _POOL]:
-                reason = sim.exit_reason(asset, week)
+                reason = sim.exit_reason(asset, week, tax_slack(asset, week))
                 if reason is None:
                     continue
                 position = lots[asset]

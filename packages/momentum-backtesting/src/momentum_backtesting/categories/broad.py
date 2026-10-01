@@ -856,6 +856,7 @@ def run_broad_backtest(
     mass_exit_threshold: float = DEFAULT_MASS_EXIT_THRESHOLD,
     mass_exit_throttle_fraction: float = DEFAULT_MASS_EXIT_THROTTLE_FRACTION,
     ranking: UniverseRanking | None = None,
+    extra_no_buy: pd.DataFrame | None = None,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -914,6 +915,12 @@ def run_broad_backtest(
         )
 
     over_ceiling = price_ceiling_mask(ranking.prices, max_stock_price)
+    if extra_no_buy is not None:
+        # Research gates (levers.py, TODO 3.9.23): OR-ed with the price ceiling, same entry-only
+        # semantics - they block new buys, never force a sale.
+        extra = extra_no_buy.reindex(index=ranking.prices.index, columns=ranking.prices.columns)
+        extra = extra.fillna(False).astype(bool)
+        over_ceiling = extra if over_ceiling is None else (over_ceiling.astype(bool) | extra)
 
     prices = ranking.prices.copy()
     prices[CASH] = outer_prices.reindex(prices.index)[CASH]

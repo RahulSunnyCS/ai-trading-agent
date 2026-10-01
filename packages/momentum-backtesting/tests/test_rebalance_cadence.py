@@ -64,6 +64,20 @@ def test_default_cadence_is_byte_identical_to_before(overrides, expected):
     assert digest(run(**overrides, rebalance_every=1, rebalance_offset=0)) == expected
 
 
+# Same idea for tax-on runs: captured before tax_hold_band existed (TODO 3.9.23 experiment 6).
+@pytest.mark.parametrize(
+    ("overrides", "expected"),
+    [({}, "c97f97c6d231e274"), ({"entry": "make_room"}, "a21768c897a8e618")],
+)
+def test_tax_on_default_is_byte_identical_to_before(overrides, expected):
+    from momentum_backtesting.tax import TaxRules
+
+    includes = {n: "core" for n in NAMES} | {CASH: "defensive", BENCHMARK: "core"}
+    classes = {n: "equity" for n in NAMES} | {CASH: "debt", BENCHMARK: "equity"}
+    config = Config(start="2017-01-06", top_n=3, exit_rank=6, tax=TaxRules(), **overrides)
+    assert digest(run_backtest(market(), includes, config, classes)) == expected
+
+
 def phase(week: pd.Timestamp, every: int) -> int:
     return ((week - CADENCE_EPOCH).days // 7) % every
 
