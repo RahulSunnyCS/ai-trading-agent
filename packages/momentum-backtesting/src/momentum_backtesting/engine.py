@@ -152,6 +152,13 @@ class Config:
     # Trade only on the last week-in-`weeks` of each calendar month (rebalance="monthly"); the
     # weekly mark-to-market/hold step always runs regardless of this setting.
     rebalance: Rebalance = "weekly"
+    # rebalance="weekly" only: trade every `rebalance_every` weeks instead of every week, on the
+    # weeks whose calendar week number (Fridays since CADENCE_EPOCH) is `rebalance_offset` mod
+    # `rebalance_every`. Anchored to the calendar, not the run's first week, so one offset always
+    # trades on the same Fridays whatever `start` is - which is what lets overlapping tranches
+    # (tranches.py) and rolling windows compare like with like. 1 = every week (the default).
+    rebalance_every: int = 1
+    rebalance_offset: int = 0
     # flat = cost_pct on both sides (today's model, unchanged). itemised = STT/stamp duty/
     # exchange fees/slippage/DP charge - see the rate constants above `Config`.
     cost_model: CostModel = "flat"
@@ -194,6 +201,12 @@ class Config:
             raise ValueError(f"unknown score {self.score!r}")
         if self.rebalance not in ("weekly", "monthly"):
             raise ValueError(f"unknown rebalance {self.rebalance!r}")
+        if self.rebalance_every < 1:
+            raise ValueError("rebalance_every must be at least 1")
+        if self.rebalance_every > 1 and self.rebalance != "weekly":
+            raise ValueError("rebalance_every only applies to rebalance='weekly'")
+        if not 0 <= self.rebalance_offset < self.rebalance_every:
+            raise ValueError("rebalance_offset must be between 0 and rebalance_every - 1")
         if self.cost_model not in ("flat", "itemised"):
             raise ValueError(f"unknown cost_model {self.cost_model!r}")
         if self.capital <= 0:
@@ -219,6 +232,8 @@ class Config:
         fills = f"_{self.track}-{self.execution}" if self.needs_trade_prices else ""
         score = f"_{self.score}" if self.score != "ranksum" else ""
         rebalance = f"_{self.rebalance}" if self.rebalance != "weekly" else ""
+        if self.rebalance_every > 1:
+            rebalance += f"_every{self.rebalance_every}o{self.rebalance_offset}"
         cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
@@ -538,6 +553,17 @@ def _month_end_weeks(weeks: list[pd.Timestamp]) -> frozenset[pd.Timestamp]:
     return frozenset(out)
 
 
+#: Week 0 of the `rebalance_every` calendar (the first Friday of the price history).
+CADENCE_EPOCH = pd.Timestamp("2016-01-01")
+
+
+def cadence_weeks(weeks: list[pd.Timestamp], every: int, offset: int) -> frozenset[pd.Timestamp]:
+    """Weeks whose calendar week number since CADENCE_EPOCH is `offset` mod `every`. Weekly
+    frames are Friday-labelled, so the day gap is a whole number of weeks; rounding guards a
+    frame labelled on another weekday."""
+    return frozenset(w for w in weeks if round((w - CADENCE_EPOCH).days / 7) % every == offset)
+
+
 def run_backtest(
     prices: pd.DataFrame,
     includes: dict[str, str],
@@ -645,8 +671,12 @@ def run_backtest(
     if len(weeks) < 2:
         raise ValueError("not enough history to run from the chosen start date")
 
-    if config.rebalance == "weekly":
+    if config.rebalance == "weekly" and config.rebalance_every == 1:
         trade_weeks = frozenset(weeks[:-1])
+    elif config.rebalance == "weekly":
+        trade_weeks = cadence_weeks(
+            weeks, config.rebalance_every, config.rebalance_offset
+        ) & frozenset(weeks[:-1])
     else:
         trade_weeks = _month_end_weeks(weeks) & frozenset(weeks[:-1])
 

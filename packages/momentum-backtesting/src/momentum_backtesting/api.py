@@ -380,6 +380,10 @@ class BacktestRequest(BaseModel):
     score: Literal["ranksum", "voladj", "blend"] = "ranksum"
     voladj_skip_recent_month: bool = True
     rebalance: Literal["weekly", "monthly"] = "weekly"
+    # rebalance="weekly" only: trade every K weeks, on calendar phase `rebalance_offset`
+    # (engine.Config.rebalance_every). 1 = every week.
+    rebalance_every: int = Field(1, ge=1, le=13)
+    rebalance_offset: int = Field(0, ge=0, le=12)
     cost_model: Literal["flat", "itemised"] = "flat"
     capital: float = Field(1_000_000.0, gt=0)
     slippage_bps: float = Field(5.0, ge=0)
@@ -502,6 +506,8 @@ def _config_kwargs(req: BacktestRequest) -> dict:
         score=req.score,
         voladj_skip_recent_month=req.voladj_skip_recent_month,
         rebalance=req.rebalance,
+        rebalance_every=req.rebalance_every,
+        rebalance_offset=req.rebalance_offset,
         cost_model=req.cost_model,
         capital=req.capital,
         slippage_bps=req.slippage_bps,
@@ -559,6 +565,8 @@ def _etf_meta() -> dict:
             "score": defaults.score,
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
             "rebalance": defaults.rebalance,
+            "rebalance_every": defaults.rebalance_every,
+            "rebalance_offset": defaults.rebalance_offset,
             "cost_model": defaults.cost_model,
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
@@ -658,6 +666,8 @@ def _stock_meta() -> dict:
             "score": defaults.score,
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
             "rebalance": defaults.rebalance,
+            "rebalance_every": defaults.rebalance_every,
+            "rebalance_offset": defaults.rebalance_offset,
             "cost_model": defaults.cost_model,
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
@@ -861,6 +871,8 @@ def _custom_index_meta() -> dict:
             "score": "ranksum",
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
             "rebalance": defaults.rebalance,
+            "rebalance_every": defaults.rebalance_every,
+            "rebalance_offset": defaults.rebalance_offset,
             "cost_model": "flat",
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
@@ -1103,6 +1115,8 @@ def _broad_meta() -> dict:
             "max_stock_price": broad.DEFAULT_MAX_STOCK_PRICE,
             "cap_band": defaults.cap_band,
             "rebalance": defaults.rebalance,
+            "rebalance_every": defaults.rebalance_every,
+            "rebalance_offset": defaults.rebalance_offset,
             "score": defaults.score,
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
             # top_n/exit_rank/defensive/filter_lookback: NOT used for this dataset (their panels
@@ -1226,6 +1240,8 @@ def _run_broad(
         signal_delay=req.signal_delay,
         portfolio=req.portfolio,
         rebalance=req.rebalance,
+        rebalance_every=req.rebalance_every,
+        rebalance_offset=req.rebalance_offset,
         benchmark=req.benchmark,
         max_position=req.max_position,
         max_category=req.max_category if req.broad_category_mode == "on" else None,

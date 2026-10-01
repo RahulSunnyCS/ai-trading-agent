@@ -499,6 +499,8 @@ export const SETTINGS_FALLBACKS: Values = {
   score: 'ranksum',
   voladj_skip_recent_month: true,
   rebalance: 'weekly',
+  rebalance_every: 1,
+  rebalance_offset: 0,
   cost_model: 'flat',
   cost_pct: 0.1,
   capital: 1_000_000,
@@ -907,19 +909,50 @@ export function MomentumSettingsPanel({
             ) : null}
           </>
         )}
-        <Field
-          label="Rebalance"
-          help="Weekly acts on every Friday's ranking. Monthly only trades in the last week of each month — less churn, slower to react."
-        >
-          <select
-            className={inputClass}
-            value={str('rebalance', 'weekly')}
-            onChange={(event) => onChange('rebalance', event.target.value)}
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            label="Rebalance"
+            help="Weekly acts on every Friday's ranking. Every 2 or 4 weeks trades only on those Fridays (the ranking is still recomputed weekly). Monthly only trades in the last week of each month. Slower cadences churn less but react later."
           >
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly (month-end only)</option>
-          </select>
-        </Field>
+            <select
+              className={inputClass}
+              value={
+                str('rebalance', 'weekly') === 'monthly'
+                  ? 'monthly'
+                  : `every${num('rebalance_every', 1)}`
+              }
+              onChange={(event) => {
+                const choice = event.target.value;
+                onChange('rebalance', choice === 'monthly' ? 'monthly' : 'weekly');
+                onChange('rebalance_every', choice === 'monthly' ? 1 : Number(choice.slice(5)));
+                onChange('rebalance_offset', 0);
+              }}
+            >
+              <option value="every1">Weekly</option>
+              <option value="every2">Every 2 weeks</option>
+              <option value="every4">Every 4 weeks</option>
+              <option value="monthly">Monthly (month-end only)</option>
+            </select>
+          </Field>
+          {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' ? (
+            <Field
+              label="Which Fridays"
+              help="Trading weeks are fixed on the calendar (counted from 1 Jan 2016), so each choice is a different set of Fridays. Comparing them shows how much of a result is down to lucky timing."
+            >
+              <select
+                className={inputClass}
+                value={num('rebalance_offset', 0)}
+                onChange={(event) => onChange('rebalance_offset', Number(event.target.value))}
+              >
+                {Array.from({ length: num('rebalance_every', 1) }, (_, i) => i).map((phase) => (
+                  <option key={phase} value={phase}>
+                    Phase {phase + 1} of {num('rebalance_every', 1)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+        </div>
         <Toggle
           label="Win-rate position sizing"
           help="Shrink new and top-up buys after a run of losing trades, ramping back to full size as wins return. In the worst case it sits entirely in cash. Buffer rule only."

@@ -1133,6 +1133,8 @@ def categories_broad_backtest(
     off_top_n: int = typer.Option(10, help='Individual stocks held (OFF mode, "SL").'),
     off_exit_rank: int = typer.Option(20, help="Individual-stock exit buffer (OFF mode)."),
     rebalance: str = typer.Option("weekly", help="Trading cadence: weekly | monthly."),
+    rebalance_every: int = typer.Option(1, help="Weekly cadence only: trade every K weeks."),
+    rebalance_offset: int = typer.Option(0, help="Calendar phase 0..K-1 for --rebalance-every."),
     cost_pct: float = _COST,
 ) -> None:
     """Run the full Broad Momentum backtest end to end (TODO.md 3.9.13 Steps 2-4) and print a
@@ -1165,6 +1167,8 @@ def categories_broad_backtest(
             off_top_n=off_top_n,
             off_exit_rank=off_exit_rank,
             rebalance=rebalance,  # type: ignore[arg-type]
+            rebalance_every=rebalance_every,
+            rebalance_offset=rebalance_offset,
             cost_pct=cost_pct,
         )
     except (broad.TotalMarketDataNotFoundError, ValueError) as error:
