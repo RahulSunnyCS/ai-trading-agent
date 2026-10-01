@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from trading_data.db import connect
 
-from . import analysis, db_read, fyers, rebalance, reference_benchmarks, runs_store
+from . import analysis, db_read, fyers, levers, rebalance, reference_benchmarks, runs_store
 from .categories import broad
 from .categories import momentum_scores as momentum_scores_mod
 from .categories.compose import (
@@ -33,7 +33,7 @@ from .categories.compose import (
     DEFAULT_TOP_N as CATEGORY_DEFAULT_TOP_N,
 )
 from .config import DATA_DIR, load_repo_env
-from .engine import BENCHMARK, CASH, IDLE, Config, Result, run_backtest
+from .engine import BENCHMARK, CASH, IDLE, Config, Result, ranked_universe, run_backtest
 from .fetch import load_universe
 from .notify import IST
 from .stocks import ui_data
@@ -384,6 +384,10 @@ class BacktestRequest(BaseModel):
     # (engine.Config.rebalance_every). 1 = every week.
     rebalance_every: int = Field(1, ge=1, le=13)
     rebalance_offset: int = Field(0, ge=0, le=12)
+    # dataset="etf" only (TODO 3.9.23): never freshly BUY the most volatile fraction of the
+    # ranked instruments (26-week weekly volatility, levers.high_vol_mask); holdings are
+    # untouched. 0 = off. Measured to help ETF mode and to hurt stocks, so ETF only.
+    exclude_high_vol: float = Field(0.0, ge=0, lt=1)
     cost_model: Literal["flat", "itemised"] = "flat"
     capital: float = Field(1_000_000.0, gt=0)
     slippage_bps: float = Field(5.0, ge=0)
@@ -567,6 +571,7 @@ def _etf_meta() -> dict:
             "rebalance": defaults.rebalance,
             "rebalance_every": defaults.rebalance_every,
             "rebalance_offset": defaults.rebalance_offset,
+            "exclude_high_vol": 0.0,
             "cost_model": defaults.cost_model,
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
@@ -695,6 +700,10 @@ def _etf_backtest(req: BacktestRequest) -> dict:
             )
         classes = {name: inst.tax_class for name, inst in universe.items()}
         fills = DATA.fills(req.track, req.execution)
+        no_buy = None
+        if req.exclude_high_vol > 0:
+            names = ranked_universe(includes, config)
+            no_buy = levers.high_vol_mask(prices[names], quantile=1 - req.exclude_high_vol)
         result = run_backtest(
             prices,
             includes,
@@ -702,6 +711,7 @@ def _etf_backtest(req: BacktestRequest) -> dict:
             classes,
             DATA.rank_cache,
             fills.prices if fills is not None else None,
+            no_buy=no_buy,
         )
         DATA.trim_cache()
     except ValueError as error:
@@ -715,6 +725,7 @@ def _etf_backtest(req: BacktestRequest) -> dict:
         fills.proxy if fills is not None else None,
         fills.warnings if fills is not None else None,
         references=DATA.references(),
+        no_buy=no_buy,
     )
 
 

@@ -246,6 +246,9 @@ function assumptionChips(result: MomentumResult, config: Record<string, unknown>
         ? `Every ${config.rebalance_every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
         : 'Weekly rebalance',
     config.portfolio === 'buffer' ? 'Buffer rule' : 'Fixed slots',
+    dataset === 'etf' && Number(config.exclude_high_vol ?? 0) > 0
+      ? `Skips most volatile ${Math.round(Number(config.exclude_high_vol) * 100)}%`
+      : null,
     config.cost_model === 'itemised' ? 'Itemised costs' : `${config.cost_pct}% cost per side`,
     dataset === 'etf' ? (config.track === 'etf' ? 'ETF prices' : 'Index prices') : null,
     dataset === 'etf' ? (execLabel[String(config.execution)] ?? null) : null,

@@ -150,3 +150,44 @@ def test_tax_hold_validation_and_label():
     with pytest.raises(ValueError):
         Config(tax_hold_band=-1)
     assert Config(tax_hold_band=3, tax_hold_weeks=8).label.endswith("_taxhold3w8")
+
+
+def test_etf_api_can_skip_the_most_volatile_instruments_for_new_buys(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from momentum_backtesting import api
+    from momentum_backtesting.fetch import load_universe
+
+    weeks = pd.date_range("2016-01-01", periods=180, freq="W-FRI")
+    rng = np.random.default_rng(7)
+    insts = load_universe()
+    prices = pd.DataFrame(
+        {
+            inst.name: 100 * np.cumprod(1 + rng.normal(0.004, 0.01 + 0.004 * k, len(weeks)))
+            for k, inst in enumerate(insts)
+        },
+        index=weeks,
+    )
+    prices[CASH] = 100 * np.cumprod(np.full(len(weeks), 1.0012))
+    prices.index.name = "week_ending"
+    prices.to_csv(tmp_path / "weekly_closes.csv")
+    monkeypatch.setattr(api, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(api, "DATA", api._Data())
+    client = TestClient(api.create_app())
+    universe = [i.name for i in insts if i.include == "core"]
+    body = {"universe": universe, "start": "2017-01-06"}
+    plain = client.post("/api/backtest", json=body).json()
+    gated = client.post("/api/backtest", json={**body, "exclude_high_vol": 0.3}).json()
+    assert client.get("/api/meta").json()["defaults"]["exclude_high_vol"] == 0.0
+    signal = prices[universe]
+    mask = levers.high_vol_mask(signal, quantile=0.7)
+    for trade in gated["trades"]:
+        week = pd.Timestamp(trade["entry_week"])
+        assert not mask.at[week, trade["asset"]]  # never bought while flagged
+    assert gated["kpis"] != plain["kpis"]
+    flagged_now = set(mask.columns[mask.iloc[-1]])
+    for row in gated["latest"]["rows"]:
+        if row["action"].startswith(("BUY", "WAIT")) and not row["held"]:
+            assert row["asset"] not in flagged_now  # the panel never recommends a blocked buy
+        if row["action"] == "SKIP (no new buy)":
+            assert row["asset"] in flagged_now
