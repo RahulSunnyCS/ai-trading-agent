@@ -92,8 +92,8 @@ all-weeks average, say so plainly. That means the overlays below are unlikely to
 | S4 | Comparator | 1 if `T[t]`, else 0.5 | none |
 | S5 | Comparator | Volatility target: `min(1, median trailing 26-week vol / current 26-week vol)` | none |
 
-Run every case in the grid and report all of them, not only the best. That is 2 + 4 + 8 + 4 + 2
-+ 1 + 1 = 22 overlay runs per strategy. Overlays are arithmetic on one equity series, so this
+Run every case in the grid and report all of them, not only the best. That is 1 + 4 + 8 + 4 + 2
++ 1 + 1 = 21 overlay runs per strategy. Overlays are arithmetic on one equity series, so this
 takes seconds.
 
 Hysteresis: any rule that switches must hold its new state at least 2 weeks before switching
