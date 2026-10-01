@@ -191,3 +191,137 @@ def test_etf_api_can_skip_the_most_volatile_instruments_for_new_buys(tmp_path, m
             assert row["asset"] not in flagged_now  # the panel never recommends a blocked buy
         if row["action"] == "SKIP (no new buy)":
             assert row["asset"] in flagged_now
+
+
+# --- grouped_momentum_ranks / fresh_52w_low_mask (owner's "separate the rank-sums" idea) --------
+
+GROUPED_WEEKS = pd.date_range("2016-01-01", periods=70, freq="W-FRI")
+
+
+def _grouped_segments(*parts: tuple[int, float]) -> np.ndarray:
+    rets = [r for n, r in parts for _ in range(n)]
+    return 100 * np.cumprod([1.0, *(1 + r for r in rets)])[: len(GROUPED_WEEKS)]
+
+
+def grouped_universe() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "Winner": _grouped_segments((69, 0.01)),  # strong on every window
+            # down ~55% over 65 weeks, then a 4-week bounce: negative 26w/52w, positive 1w/4w/13w
+            "Turned": _grouped_segments((65, -0.012), (4, 0.03)),
+            "Falling": _grouped_segments((69, -0.006)),  # weak everywhere, new low every week
+            "Flat1": _grouped_segments((69, 0.002)),
+            "Flat2": _grouped_segments((69, 0.003)),
+        },
+        index=GROUPED_WEEKS,
+    )
+
+
+def test_tilt_zero_is_exactly_short_only_momentum():
+    prices = grouped_universe()
+    config = Config(top_n=1, exit_rank=2)
+    ranks, _ = levers.grouped_momentum_ranks(prices, config, tilt=0.0)
+    short_only, _ = compute_ranks(prices, Config(lookbacks=(1, 4, 13), weights=None))
+    pd.testing.assert_series_equal(ranks.iloc[-1], short_only.iloc[-1])
+
+
+def test_a_moderate_tilt_leaves_the_order_unchanged():
+    prices = grouped_universe()
+    config = Config(top_n=1, exit_rank=2)
+    ranks, _ = levers.grouped_momentum_ranks(prices, config, tilt=0.3)
+    assert ranks.iloc[-1][["Winner", "Turned"]].tolist() == [1.0, 2.0]
+
+
+def test_a_strong_tilt_moves_the_recovering_laggard_ahead_of_the_steady_winner():
+    prices = grouped_universe()
+    config = Config(top_n=1, exit_rank=2)
+    ranks, _ = levers.grouped_momentum_ranks(prices, config, tilt=0.5)
+    last = ranks.iloc[-1]
+    assert last["Turned"] < last["Winner"]  # Turned now ranks first
+    # Falling is beaten down too, but its short-term momentum is still the worst of the five -
+    # the tilt never lets a stock that's STILL falling overtake a genuine recovery.
+    assert last["Falling"] > last["Turned"]
+
+
+def test_screen_keeps_only_the_top_short_term_names_whatever_the_tilt():
+    prices = grouped_universe()
+    config = Config(top_n=1, exit_rank=2)
+    for tilt in (0.0, 1.0):
+        ranks, _ = levers.grouped_momentum_ranks(prices, config, tilt=tilt, screen_top_pct=0.4)
+        last = ranks.iloc[-1]
+        assert set(last.dropna().index) == {"Winner", "Turned"}  # top 2 of 5 by short momentum
+        assert last[["Falling", "Flat1", "Flat2"]].isna().all()
+
+
+@pytest.mark.parametrize(
+    "config",
+    [Config(lookbacks=(1, 4, 13)), Config(lookbacks=(26, 52))],
+)
+def test_grouped_ranks_needs_both_a_short_and_a_long_lookback(config):
+    with pytest.raises(ValueError, match="short and.*long"):
+        levers.grouped_momentum_ranks(grouped_universe(), config)
+
+
+def test_fresh_52w_low_mask_flags_only_names_at_their_actual_low():
+    prices = grouped_universe()
+    mask = levers.fresh_52w_low_mask(prices)
+    last = mask.iloc[-1]
+    assert last["Falling"] and not last[["Winner", "Turned", "Flat1", "Flat2"]].any()
+    # Turned's own trough, 4 weeks before the bounce started, was a genuine new 52-week low.
+    assert bool(mask.iloc[-5]["Turned"])
+
+
+def test_grouped_ranks_pairs_with_the_low_mask_to_avoid_a_falling_knife():
+    """A no_buy gate blocks a fresh buy but never forces a sale - matching `reversal.py`'s own
+    falling-knife reasoning, now reused for this lever."""
+    prices = grouped_universe()
+    mask = levers.fresh_52w_low_mask(prices)
+    assert bool(mask.loc[GROUPED_WEEKS[-5], "Turned"])
+    assert not bool(mask.loc[GROUPED_WEEKS[-1], "Turned"])  # bounced off the low: buyable again
+
+
+def test_etf_api_can_turn_on_the_grouped_momentum_tilt(tmp_path, monkeypatch):
+    """TODO 3.9.23 follow-up: BacktestRequest.reversal_tilt replaces the ranking entirely, so
+    this checks it end to end - including that latest_signal's panel honours the fresh-52w-low
+    no_buy gate the lever adds, same shape as the exclude_high_vol test above."""
+    from fastapi.testclient import TestClient
+
+    from momentum_backtesting import api
+    from momentum_backtesting.fetch import load_universe
+
+    weeks = pd.date_range("2016-01-01", periods=180, freq="W-FRI")
+    rng = np.random.default_rng(11)
+    insts = load_universe()
+    prices = pd.DataFrame(
+        {inst.name: 100 * np.cumprod(1 + rng.normal(0.002, 0.03, len(weeks))) for inst in insts},
+        index=weeks,
+    )
+    prices[CASH] = 100 * np.cumprod(np.full(len(weeks), 1.0012))
+    prices.index.name = "week_ending"
+    prices.to_csv(tmp_path / "weekly_closes.csv")
+    monkeypatch.setattr(api, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(api, "DATA", api._Data())
+    client = TestClient(api.create_app())
+    universe = [i.name for i in insts if i.include == "core"]
+    body = {"universe": universe, "start": "2017-01-06"}
+
+    plain = client.post("/api/backtest", json=body).json()
+    tilted = client.post("/api/backtest", json={**body, "reversal_tilt": 0.5}).json()
+    screened = client.post(
+        "/api/backtest", json={**body, "reversal_tilt": 0.5, "reversal_screen_pct": 0.4}
+    ).json()
+    assert tilted["kpis"] != plain["kpis"]
+    assert screened["kpis"] != tilted["kpis"]
+
+    signal = prices[universe]
+    low = levers.fresh_52w_low_mask(signal)
+    for trade in tilted["trades"]:
+        week = pd.Timestamp(trade["entry_week"])
+        assert not low.at[week, trade["asset"]]  # never bought while at a fresh 52w low
+
+    meta = client.get("/api/meta").json()
+    assert meta["defaults"]["reversal_tilt"] == 0.0
+    assert meta["defaults"]["reversal_screen_pct"] == 0.0
+
+    bad = client.post("/api/backtest", json={**body, "reversal_tilt": 3.0})
+    assert bad.status_code == 422

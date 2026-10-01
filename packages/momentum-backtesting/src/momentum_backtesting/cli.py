@@ -1135,6 +1135,15 @@ def categories_broad_backtest(
     rebalance: str = typer.Option("weekly", help="Trading cadence: weekly | monthly."),
     rebalance_every: int = typer.Option(1, help="Weekly cadence only: trade every K weeks."),
     rebalance_offset: int = typer.Option(0, help="Calendar phase 0..K-1 for --rebalance-every."),
+    sell_every_week: bool = typer.Option(
+        False, help="Sell a dropped-rank holding every week; buys still wait for the cadence."
+    ),
+    stock_tilt: float = typer.Option(
+        0.0, help="Re-rank the current selection by the short/long beaten-down blend (0 = off)."
+    ),
+    stock_tilt_screen_pct: float = typer.Option(
+        0.0, help="stock_tilt only: keep just the top share by short-term momentum (0 = off)."
+    ),
     cost_pct: float = _COST,
 ) -> None:
     """Run the full Broad Momentum backtest end to end (TODO.md 3.9.13 Steps 2-4) and print a
@@ -1169,6 +1178,9 @@ def categories_broad_backtest(
             rebalance=rebalance,  # type: ignore[arg-type]
             rebalance_every=rebalance_every,
             rebalance_offset=rebalance_offset,
+            sell_every_week=sell_every_week,
+            stock_tilt=stock_tilt,
+            stock_tilt_screen_pct=stock_tilt_screen_pct,
             cost_pct=cost_pct,
         )
     except (broad.TotalMarketDataNotFoundError, ValueError) as error:

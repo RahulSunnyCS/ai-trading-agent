@@ -96,6 +96,10 @@ class _Data:
         # itself takes as input.
         self._broad_mtimes: tuple | None = None
         self.broad_ranking_cache: OrderedDict = OrderedDict()
+        # grouped_momentum_ranks (TODO 3.9.23) isn't free - two compute_ranks passes over the
+        # ~755-name universe, ~30s cold. Keyed on the ranking object's identity (it's itself
+        # cache-held above) plus tilt/screen, so a repeat request with the same settings is fast.
+        self.broad_tilt_cache: OrderedDict = OrderedDict()
         # "Momentum Scores" page (TODO.md 3.9.16): the 755-name price frame + point-in-time
         # membership gate (categories/momentum_scores.py's shared Step 1 with Broad Momentum's
         # Step 2, `broad.load_stock_universe_frame`) - ~7s cold, same two watch paths as
@@ -180,6 +184,30 @@ class _Data:
                 self.references_cache = reference_benchmarks.load_references(DATA_DIR)
                 self._references_mtimes = mtimes
             return self.references_cache
+
+    def get_broad_tilt_ranks(
+        self,
+        ranking: broad.UniverseRanking,
+        lookbacks: tuple[int, ...],
+        tilt: float,
+        screen_top_pct: float,
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        key = (id(ranking), tuple(lookbacks), tilt, screen_top_pct)
+        with self._lock:
+            cached = self.broad_tilt_cache.get(key)
+        if cached is not None:
+            return cached
+        ranks = levers.grouped_momentum_ranks(
+            ranking.prices,
+            Config(lookbacks=tuple(lookbacks)),
+            tilt=tilt,
+            screen_top_pct=screen_top_pct,
+        )
+        with self._lock:
+            self.broad_tilt_cache[key] = ranks
+            while len(self.broad_tilt_cache) > 8:
+                self.broad_tilt_cache.popitem(last=False)
+        return ranks
 
     def trim_cache(self, limit: int = 24) -> None:
         for cache in (self.rank_cache, self.stock_rank_cache, self.custom_index_rank_cache):
@@ -384,6 +412,24 @@ class BacktestRequest(BaseModel):
     # (engine.Config.rebalance_every). 1 = every week.
     rebalance_every: int = Field(1, ge=1, le=13)
     rebalance_offset: int = Field(0, ge=0, le=12)
+    # Buffer rule only. With rebalance_every > 1, sell a dropped-rank holding every week instead
+    # of waiting for the next cadence week; new buys and cap trims still wait (engine.Config's
+    # own field of the same name). Harmless no-op when rebalance_every == 1.
+    sell_every_week: bool = False
+    # dataset="etf" only (TODO 3.9.23, owner follow-up): rank on the usual short lookbacks
+    # (1/4/13w) blended with a separate "most beaten-down over 26/52w" preference
+    # (levers.grouped_momentum_ranks), instead of the config's own ranking method. 0 (default)
+    # leaves ranking untouched. A fresh 52-week low is never bought (levers.fresh_52w_low_mask),
+    # same falling-knife guard as the reversal sleeve.
+    reversal_tilt: float = Field(0.0, ge=0, le=2)
+    # grouped_momentum_ranks only: 0 (default) ranks every eligible name; > 0 first keeps only
+    # the top share by short-term momentum (e.g. 0.3 = top 30%), the tilt then orders within it.
+    reversal_screen_pct: float = Field(0.0, ge=0, lt=1)
+    # dataset="broad" only (TODO 3.9.23 owner follow-up): same idea, applied WITHIN whatever
+    # category/pool selection the funnel already made - re-orders those stocks by the tilted
+    # score instead of plain momentum; it never changes which categories or pool stocks qualify.
+    broad_reversal_tilt: float = Field(0.0, ge=0, le=2)
+    broad_reversal_screen_pct: float = Field(0.0, ge=0, lt=1)
     # dataset="etf" only (TODO 3.9.23): never freshly BUY the most volatile fraction of the
     # ranked instruments (26-week weekly volatility, levers.high_vol_mask); holdings are
     # untouched. 0 = off. Measured to help ETF mode and to hurt stocks, so ETF only.
@@ -516,6 +562,7 @@ def _config_kwargs(req: BacktestRequest) -> dict:
         rebalance=req.rebalance,
         rebalance_every=req.rebalance_every,
         rebalance_offset=req.rebalance_offset,
+        sell_every_week=req.sell_every_week,
         cost_model=req.cost_model,
         capital=req.capital,
         slippage_bps=req.slippage_bps,
@@ -575,6 +622,11 @@ def _etf_meta() -> dict:
             "rebalance": defaults.rebalance,
             "rebalance_every": defaults.rebalance_every,
             "rebalance_offset": defaults.rebalance_offset,
+            "sell_every_week": defaults.sell_every_week,
+            "broad_reversal_tilt": 0.0,
+            "broad_reversal_screen_pct": 0.0,
+            "reversal_tilt": 0.0,
+            "reversal_screen_pct": 0.0,
             "exclude_high_vol": 0.0,
             "cost_model": defaults.cost_model,
             "capital": defaults.capital,
@@ -677,6 +729,9 @@ def _stock_meta() -> dict:
             "rebalance": defaults.rebalance,
             "rebalance_every": defaults.rebalance_every,
             "rebalance_offset": defaults.rebalance_offset,
+            "sell_every_week": defaults.sell_every_week,
+            "broad_reversal_tilt": 0.0,
+            "broad_reversal_screen_pct": 0.0,
             "cost_model": defaults.cost_model,
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
@@ -704,10 +759,24 @@ def _etf_backtest(req: BacktestRequest) -> dict:
             )
         classes = {name: inst.tax_class for name, inst in universe.items()}
         fills = DATA.fills(req.track, req.execution)
-        no_buy = None
+        names = ranked_universe(includes, config)
+        masks = []
         if req.exclude_high_vol > 0:
-            names = ranked_universe(includes, config)
-            no_buy = levers.high_vol_mask(prices[names], quantile=1 - req.exclude_high_vol)
+            masks.append(levers.high_vol_mask(prices[names], quantile=1 - req.exclude_high_vol))
+        external_ranks = None
+        if req.reversal_tilt > 0:
+            external_ranks = levers.grouped_momentum_ranks(
+                prices[names],
+                config,
+                tilt=req.reversal_tilt,
+                screen_top_pct=req.reversal_screen_pct,
+            )
+            masks.append(levers.fresh_52w_low_mask(prices[names]))
+        no_buy = None
+        if masks:
+            no_buy = masks[0]
+            for extra in masks[1:]:
+                no_buy = no_buy.reindex_like(extra).fillna(False) | extra
         result = run_backtest(
             prices,
             includes,
@@ -716,6 +785,7 @@ def _etf_backtest(req: BacktestRequest) -> dict:
             DATA.rank_cache,
             fills.prices if fills is not None else None,
             no_buy=no_buy,
+            external_ranks=external_ranks,
         )
         DATA.trim_cache()
     except ValueError as error:
@@ -888,6 +958,9 @@ def _custom_index_meta() -> dict:
             "rebalance": defaults.rebalance,
             "rebalance_every": defaults.rebalance_every,
             "rebalance_offset": defaults.rebalance_offset,
+            "sell_every_week": defaults.sell_every_week,
+            "broad_reversal_tilt": 0.0,
+            "broad_reversal_screen_pct": 0.0,
             "cost_model": "flat",
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
@@ -1132,6 +1205,9 @@ def _broad_meta() -> dict:
             "rebalance": defaults.rebalance,
             "rebalance_every": defaults.rebalance_every,
             "rebalance_offset": defaults.rebalance_offset,
+            "sell_every_week": defaults.sell_every_week,
+            "broad_reversal_tilt": 0.0,
+            "broad_reversal_screen_pct": 0.0,
             "score": defaults.score,
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
             # top_n/exit_rank/defensive/filter_lookback: NOT used for this dataset (their panels
@@ -1232,6 +1308,11 @@ def _run_broad(
     outer_prices: pd.DataFrame,
 ) -> broad.BroadBacktestResult:
     weights = tuple(req.weights) if req.weights else None
+    stock_tilt_ranks = None
+    if req.broad_reversal_tilt > 0:
+        stock_tilt_ranks = DATA.get_broad_tilt_ranks(
+            ranking, tuple(req.lookbacks), req.broad_reversal_tilt, req.broad_reversal_screen_pct
+        )
     return broad.run_broad_backtest(
         outer_prices=outer_prices,
         stocks_data_dir=DATA_DIR / "stocks",
@@ -1258,6 +1339,7 @@ def _run_broad(
         rebalance=req.rebalance,
         rebalance_every=req.rebalance_every,
         rebalance_offset=req.rebalance_offset,
+        sell_every_week=req.sell_every_week,
         benchmark=req.benchmark,
         max_position=req.max_position,
         max_category=req.max_category if req.broad_category_mode == "on" else None,
@@ -1272,6 +1354,9 @@ def _run_broad(
         slippage_bps=req.slippage_bps,
         ranking=ranking,
         min_ranked=1 if req.broad_every_week else 0,
+        stock_tilt=req.broad_reversal_tilt,
+        stock_tilt_screen_pct=req.broad_reversal_screen_pct,
+        stock_tilt_ranks=stock_tilt_ranks,
     )
 
 

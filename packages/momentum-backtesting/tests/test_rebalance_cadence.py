@@ -208,3 +208,97 @@ def test_min_ranked_validation_and_label():
     with pytest.raises(ValueError):
         Config(min_ranked=-1)
     assert Config(min_ranked=1).label.endswith("_minranked1")
+
+
+# --- sell_every_week: exits move faster than new buys on a slow cadence (owner idea) ------------
+
+CADENCE_WEEKS = pd.date_range("2016-01-01", periods=30, freq="W-FRI")
+
+
+def cadence_case(**overrides):
+    """3 names, top_n=1/exit_rank=2, every 2 weeks. A holds rank 1 until `flip_week` (a
+    non-buy, phase-1 week), where ranks flip so A drops to rank 3 (must exit) and B takes
+    rank 1. Flat, zero-cost prices - only trade timing is under test."""
+    names = ["A", "B", "C"]
+    flip_week = CADENCE_WEEKS[5]
+    assert phase(flip_week, 2) == 1  # a non-buy week under rebalance_offset=0
+    prices = pd.DataFrame({n: 100.0 for n in names}, index=CADENCE_WEEKS)
+    prices[CASH] = 100.0
+    prices[BENCHMARK] = 100.0
+    ranks = pd.DataFrame({"A": 1.0, "B": 2.0, "C": 3.0}, index=CADENCE_WEEKS)
+    ranks.loc[flip_week:, ["A", "B", "C"]] = [3.0, 1.0, 2.0]
+    includes = {n: "core" for n in names} | {CASH: "defensive", BENCHMARK: "defensive"}
+    config = Config(
+        start="2016-01-01",
+        top_n=1,
+        exit_rank=2,
+        cost_pct=0.0,
+        max_position=None,  # top_n=1 would otherwise hit the 35% default cap
+        rebalance_every=2,
+        rebalance_offset=0,
+        **overrides,
+    )
+    result = run_backtest(prices, includes, config, external_ranks=(ranks, ranks))
+    return result, flip_week
+
+
+def sell_week_of(result, asset: str) -> pd.Timestamp:
+    sells = result.trades[(result.trades["action"] == "SELL") & (result.trades["asset"] == asset)]
+    return sells["week"].iloc[0]
+
+
+def test_default_defers_the_exit_to_the_next_buy_week():
+    result, flip_week = cadence_case()
+    assert sell_week_of(result, "A") == CADENCE_WEEKS[6]  # next phase-0 week, not flip_week
+
+
+def test_sell_every_week_exits_immediately_on_a_non_buy_week():
+    result, flip_week = cadence_case(sell_every_week=True)
+    assert sell_week_of(result, "A") == flip_week
+
+
+def test_sell_every_week_still_waits_for_the_cadence_to_buy():
+    """Only the sell moves; the vacated slot is filled on the usual cadence either way."""
+    deferred, flip_week = cadence_case()
+    immediate, _ = cadence_case(sell_every_week=True)
+    for result in (deferred, immediate):
+        buys = result.trades[(result.trades["action"] == "BUY") & (result.trades["asset"] == "B")]
+        assert buys["week"].iloc[0] == CADENCE_WEEKS[6]
+    at_flip = immediate.trades[immediate.trades["week"] == flip_week]
+    assert set(at_flip["action"]) == {"SELL"}  # no BUY yet at the non-buy week itself
+
+
+def test_sell_every_week_parks_the_proceeds_as_idle_until_the_buy_week():
+    """A fully-idle week (nothing held, nothing invested) has an empty `weights` row, which
+    pandas drops entirely - a pre-existing display quirk (the same thing happens before the
+    very first trade under rebalance="monthly"). `holdings` is built from a plain list of
+    per-week dicts instead, so it always has a row and shows the 0 holdings directly."""
+    result, flip_week = cadence_case(sell_every_week=True)
+    assert flip_week not in result.weights.index
+    assert result.holdings.loc[flip_week, "count"] == 0
+    assert result.weights.loc[CADENCE_WEEKS[6], "B"] > 0.99
+    assert result.holdings.loc[CADENCE_WEEKS[6], "holdings"] == "B"
+
+
+def test_sell_every_week_needs_the_buffer_rule():
+    with pytest.raises(ValueError, match="buffer"):
+        Config(sell_every_week=True, portfolio="slots")
+
+
+def test_sell_every_week_label():
+    assert Config(sell_every_week=True).label.endswith("_sellweekly")
+    assert "sellweekly" not in Config().label
+
+
+def test_api_accepts_sell_every_week_and_rejects_it_without_the_buffer_rule(client):
+    http, universe = client
+    body = {"universe": universe, "start": "2017-01-06", "rebalance_every": 2}
+    res = http.post("/api/backtest", json={**body, "sell_every_week": True})
+    assert res.status_code == 200, res.text
+    bad = http.post(
+        "/api/backtest",
+        json={**body, "sell_every_week": True, "portfolio": "slots"},
+    )
+    assert bad.status_code == 422
+    meta = http.get("/api/meta").json()
+    assert meta["defaults"]["sell_every_week"] is False

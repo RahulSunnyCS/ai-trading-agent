@@ -840,6 +840,7 @@ def run_broad_backtest(
     rebalance: Literal["weekly", "monthly"] = "weekly",
     rebalance_every: int = 1,
     rebalance_offset: int = 0,
+    sell_every_week: bool = False,
     benchmark: str = engine.BENCHMARK,
     max_position: float | None = 0.35,
     max_category: float | None = None,
@@ -858,6 +859,17 @@ def run_broad_backtest(
     ranking: UniverseRanking | None = None,
     extra_no_buy: pd.DataFrame | None = None,
     min_ranked: int = 0,
+    # TODO 3.9.23 owner follow-up: re-order the stocks category/pool selection ALREADY picked
+    # (held categories in "on" mode, the pool in "off" mode - selection itself is untouched) by
+    # grouped_momentum_ranks's short-vs-long-lookback blend instead of plain momentum. 0 (off) is
+    # byte-identical to today. See that function's own docstring for the mechanism.
+    stock_tilt: float = 0.0,
+    stock_tilt_screen_pct: float = 0.0,
+    # A caller (api.py) that already has the rank table cached (grouped_momentum_ranks is not
+    # free - two compute_ranks passes over ~755 names) passes it here directly; stock_tilt/
+    # stock_tilt_screen_pct are then used only to decide WHETHER to apply it, not recomputed.
+    # Script/CLI callers that don't bother caching just set stock_tilt > 0 and leave this None.
+    stock_tilt_ranks: tuple[pd.DataFrame, pd.DataFrame] | None = None,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -960,6 +972,28 @@ def run_broad_backtest(
 
     ranks_full = effective.ranks.reindex(prices.index)
     scores_full = effective.scores.reindex(prices.index)
+    if stock_tilt > 0:
+        from ..levers import fresh_52w_low_mask, grouped_momentum_ranks, rerank
+
+        if stock_tilt_ranks is not None:
+            _, tilt_scores = stock_tilt_ranks
+        else:
+            _, tilt_scores = grouped_momentum_ranks(
+                ranking.prices,
+                Config(lookbacks=lookbacks),
+                tilt=stock_tilt,
+                screen_top_pct=stock_tilt_screen_pct,
+            )
+        eligible = effective.ranks.notna()
+        masked = tilt_scores.reindex(index=eligible.index, columns=eligible.columns).where(
+            eligible
+        )
+        ranks_full = rerank(-masked).reindex(prices.index)
+        scores_full = masked.reindex(prices.index)
+        low = fresh_52w_low_mask(ranking.prices).reindex(
+            index=eligible.index, columns=eligible.columns, fill_value=False
+        )
+        over_ceiling = low if over_ceiling is None else (over_ceiling.astype(bool) | low)
     includes = {c: "core" for c in prices.columns}
     config = Config(
         lookbacks=lookbacks,
@@ -985,6 +1019,7 @@ def run_broad_backtest(
         rebalance=rebalance,
         rebalance_every=rebalance_every,
         rebalance_offset=rebalance_offset,
+        sell_every_week=sell_every_week,
         cost_model=cost_model,
         capital=capital,
         slippage_bps=slippage_bps,

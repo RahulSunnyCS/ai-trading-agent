@@ -159,6 +159,12 @@ class Config:
     # (tranches.py) and rolling windows compare like with like. 1 = every week (the default).
     rebalance_every: int = 1
     rebalance_offset: int = 0
+    # Buffer rule only (TODO 3.9.23 follow-up). With `rebalance_every > 1`, sell a holding that
+    # dropped past `exit_rank` EVERY week instead of waiting for the next cadence week; new buys,
+    # cap trims and make_room still wait for the cadence - only exits move faster. Proceeds from
+    # an off-cadence sell sit idle (the liquid fund) until the next buy week. False (default)
+    # keeps everything, sells included, on the cadence.
+    sell_every_week: bool = False
     # Buffer rule with `tax` only (TODO 3.9.23, experiment 6). A holding whose oldest lot is in
     # gain and turns long-term within `tax_hold_weeks` weeks is kept while its rank is at most
     # `exit_rank + tax_hold_band`, instead of being sold short-term for a marginal rank slip.
@@ -219,6 +225,8 @@ class Config:
             raise ValueError("rebalance_every only applies to rebalance='weekly'")
         if not 0 <= self.rebalance_offset < self.rebalance_every:
             raise ValueError("rebalance_offset must be between 0 and rebalance_every - 1")
+        if self.sell_every_week and self.portfolio != "buffer":
+            raise ValueError("sell_every_week needs portfolio='buffer'")
         if self.min_ranked < 0:
             raise ValueError("min_ranked can't be negative")
         if self.tax_hold_band < 0 or self.tax_hold_weeks < 0:
@@ -250,6 +258,8 @@ class Config:
         rebalance = f"_{self.rebalance}" if self.rebalance != "weekly" else ""
         if self.rebalance_every > 1:
             rebalance += f"_every{self.rebalance_every}o{self.rebalance_offset}"
+        if self.sell_every_week:
+            rebalance += "_sellweekly"
         if self.tax_hold_band:
             rebalance += f"_taxhold{self.tax_hold_band}w{self.tax_hold_weeks}"
         if self.min_ranked:
@@ -1018,8 +1028,11 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
     for i, week in enumerate(weeks[:-1]):
         proceeds, uninvested = uninvested, 0.0
 
-        if week in sim.trade_weeks:
-            # 1. Sell whatever has dropped out.
+        is_buy_week = week in sim.trade_weeks
+        if is_buy_week or config.sell_every_week:
+            # 1. Sell whatever has dropped out. Gated on `is_buy_week` alone when
+            #    `sell_every_week` is off (the original, unchanged behaviour); with it on, this
+            #    also runs on a non-cadence week - only steps 2-4 below wait for the cadence.
             for asset in [a for a in lots if a != _POOL]:
                 reason = sim.exit_reason(asset, week, tax_slack(asset, week))
                 if reason is None:
@@ -1033,6 +1046,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                 sim.record(week, "SELL", asset, reason, value_before, tax=tax, **details)
                 proceeds += net
 
+        if is_buy_week:
             # 2. Trim anything that has grown past the cap by more than the band, back to the cap.
             if cap is not None:
                 total = portfolio_value(week) + proceeds
@@ -1181,9 +1195,10 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     rank = int(sim.rank(week, name))
                     sim.record(week, "BUY", name, f"rank {rank} (made room)", raised)
         else:
-            # Not a trade week (rebalance="monthly"): nothing sold or bought. Whatever wasn't yet
-            # invested (only ever nonzero before the very first trade week) stays idle rather
-            # than vanishing - it's added back into equity below until it's first put to work.
+            # Not a buy week (rebalance="monthly", rebalance_every > 1, or a plain non-cadence
+            # week): no new buys, cap trims or make_room. Whatever wasn't yet deployed - either
+            # never invested, or just sold this week under `sell_every_week` - stays idle rather
+            # than vanishing; it's added back into equity below until the next buy week.
             uninvested = proceeds
 
         total = sum(value(a, week) for a in lots)

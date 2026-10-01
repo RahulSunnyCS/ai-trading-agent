@@ -60,6 +60,76 @@ def high52_ranks(prices: pd.DataFrame, config: Config):
     return ranks, ranks.astype(float)
 
 
+def grouped_momentum_ranks(
+    prices: pd.DataFrame,
+    config: Config,
+    long_lookbacks: tuple[int, ...] = (26, 52),
+    tilt: float = 0.3,
+    screen_top_pct: float = 0.0,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Owner's turnaround idea (TODO 3.9.23 follow-up), done as two SEPARATE rank-sums instead
+    of one mixed-sign one. The original failure mode: a single rank-sum with a negative weight
+    on the 26/52-week lookbacks lets that lookback's rank (which can be in the hundreds) swamp
+    the short lookbacks, so the result is just "worst 52-week losers", most of which are still
+    falling - not a turnaround screen at all.
+
+    Here the short lookbacks (`config.lookbacks` minus `long_lookbacks`, e.g. 1/4/13) are
+    ranked on their own, ranksum, equal weights - call that rank R_short (1 = best). The long
+    lookbacks are ALSO ranked on their own, ranksum, with weight -1 on each - this reuses the
+    negative-weight-rewards-the-worst-performer mechanism
+    (`test_negative_weight_rewards_the_worst_performer_on_that_lookback`), but scoped to only
+    the long group, so "how beaten-down over 6-12 months" never gets to dominate the short-term
+    read. Call that rank R_long (1 = most beaten-down). Both are converted to a 0-1 percentile
+    WITHIN THAT WEEK'S eligible names (1.0 = best/most-beaten-down) before combining, so neither
+    group's raw rank range can swamp the other - percentiles are what actually fixes the
+    original bug, not merely separating the sums.
+
+    Final score = short_pct + `tilt` * long_pct, re-ranked (ascending score = better). `tilt=0`
+    is plain short-only momentum (the control any tilt > 0 must beat); the handover's own
+    "sort by short, prefer beaten-down as a second preference" reading is `screen_top_pct > 0`:
+    only names in the top `screen_top_pct` share by short-term momentum are ranked at all (a
+    hard qualifier), and the long-term tilt only orders WITHIN that qualifying group. 0 (default)
+    skips the screen - every eligible name is ranked, ordered by the blended score.
+
+    Pair with `fresh_52w_low_mask` as a `no_buy` gate: this function ranks a stock that just
+    made a new 52-week low just as well as one that bottomed months ago and has started to
+    recover - the falling-knife guard needs a separate mask, same reasoning as the reversal
+    sleeve's own "not at a new 52-week low" turned condition in `reversal.py`.
+    """
+    short_lookbacks = tuple(lb for lb in config.lookbacks if lb not in long_lookbacks)
+    kept_long = tuple(lb for lb in config.lookbacks if lb in long_lookbacks)
+    if not short_lookbacks or not kept_long:
+        raise ValueError("need at least one short and one long lookback")
+    short_cfg = replace(config, lookbacks=short_lookbacks, weights=None, score="ranksum")
+    long_cfg = replace(
+        config,
+        lookbacks=kept_long,
+        weights=tuple(-1.0 for _ in kept_long),
+        score="ranksum",
+    )
+    short_rank, _ = compute_ranks(prices, short_cfg)
+    long_rank, _ = compute_ranks(prices, long_cfg)
+    eligible = short_rank.notna() & long_rank.notna()
+
+    def to_pct(ranks: pd.DataFrame) -> pd.DataFrame:
+        n = ranks.notna().sum(axis=1).clip(lower=2) - 1
+        return 1 - (ranks.sub(1).div(n, axis=0))
+
+    short_pct, long_pct = to_pct(short_rank), to_pct(long_rank)
+    combined = (short_pct + tilt * long_pct).where(eligible)
+    if screen_top_pct > 0:
+        cut = short_pct.where(eligible).quantile(1 - screen_top_pct, axis=1)
+        combined = combined.where(short_pct.ge(cut, axis=0))
+    return rerank(-combined), combined
+
+
+def fresh_52w_low_mask(prices: pd.DataFrame, weeks: int = 52) -> pd.DataFrame:
+    """Block a fresh buy of a name making a new `weeks`-week low this week - the falling-knife
+    guard a beaten-down screen needs (see `grouped_momentum_ranks`)."""
+    low = prices.rolling(weeks, min_periods=weeks).min()
+    return prices.le(low).fillna(False)
+
+
 # --- no_buy masks -------------------------------------------------------------------------------
 
 
