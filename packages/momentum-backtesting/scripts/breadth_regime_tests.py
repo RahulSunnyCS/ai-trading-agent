@@ -254,20 +254,34 @@ def run_etf_base():
 
 
 def run_broad_base():
+    """Shipped Broad Momentum defaults: (result, rerun function, valuation prices)."""
+    outcome, run, prices, _ = run_broad_outcome()
+    return outcome.result, run, prices
+
+
+def run_broad_outcome(**overrides):
+    """Broad Momentum with the shipped UI defaults plus `overrides` (any `run_broad_backtest`
+    keyword). Returns (outcome, rerun function, valuation prices, over-price-ceiling mask)."""
     from momentum_backtesting import engine
     from momentum_backtesting.categories import broad
     from momentum_backtesting.config import DATA_DIR
 
     outer = load_outer_prices()
     curated = Path(broad.__file__).parent / "curated"
+    kwargs = {
+        "max_position": broad.DEFAULT_MAX_POSITION,
+        "max_category": broad.DEFAULT_MAX_CATEGORY,
+        "max_stock_price": broad.DEFAULT_MAX_STOCK_PRICE,
+        **overrides,
+    }
+    if kwargs.get("category_mode", "on") == "off":
+        kwargs["max_category"] = None  # api.py passes no category cap in OFF mode
     outcome = broad.run_broad_backtest(
         outer_prices=outer,
         stocks_data_dir=DATA_DIR / "stocks",
         categories_data_dir=DATA_DIR / "categories",
         curated_dir=curated,
-        max_position=broad.DEFAULT_MAX_POSITION,
-        max_category=broad.DEFAULT_MAX_CATEGORY,
-        max_stock_price=broad.DEFAULT_MAX_STOCK_PRICE,
+        **kwargs,
     )
     base = outcome.result
     # Rebuild exactly the inputs run_broad_backtest handed the engine, so T2 can rerun the same
@@ -278,7 +292,7 @@ def run_broad_base():
     prices[base.config.benchmark] = outer.reindex(prices.index)[base.config.benchmark]
     effective = outcome.effective
     groups = effective.groups.reindex(prices.index) if effective.groups is not None else None
-    over = broad.price_ceiling_mask(outcome.ranking.prices, broad.DEFAULT_MAX_STOCK_PRICE)
+    over = broad.price_ceiling_mask(outcome.ranking.prices, kwargs["max_stock_price"])
     includes = {c: "core" for c in prices.columns}
     ranks = (effective.ranks.reindex(prices.index), effective.scores.reindex(prices.index))
 
@@ -293,7 +307,7 @@ def run_broad_base():
             no_buy=over.reindex(prices.index) if over is not None else None,
         )
 
-    return base, run, prices
+    return outcome, run, prices, over
 
 
 STRATEGIES = {"etf": "ETF (live_config.toml)", "broad": "Broad Momentum (shipped defaults)"}
