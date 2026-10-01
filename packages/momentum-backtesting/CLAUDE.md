@@ -128,6 +128,9 @@ contract, not a shared service).
   (`load_references`, `compare`), added to every backtest payload as `comparisons`. Use it,
   not the dataset's own `benchmark`, when judging edge: index-mode benchmarks are price-only
   (TODO 3.9.23).
+- `tranches.py` — overlapping tranches (K sub-portfolios on staggered `rebalance_every`
+  phases, averaged) to remove start-date luck from a comparison; works with any dataset via a
+  `run_one(config) -> Result` closure (TODO 3.9.23).
 - `notify.py` — the Python-side mirror of `@trading/notify`'s `Notification`
   shape, used by the weekly Telegram signal job.
 - `local_store.py` — the weekly job's price/signal storage, since 2026-09-30
