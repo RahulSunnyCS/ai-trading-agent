@@ -251,9 +251,7 @@ function FeedModeBanner({
           <TriangleAlert className="h-3.5 w-3.5" />
           {brokerLabel} token expired / connection degraded — re-login required
         </p>
-        <p className="text-xs text-negative">
-          Reconnect {brokerLabel} from Broker logins.
-        </p>
+        <p className="text-xs text-negative">Reconnect {brokerLabel} from Broker logins.</p>
       </div>
     );
   }

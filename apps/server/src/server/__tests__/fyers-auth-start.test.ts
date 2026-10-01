@@ -55,7 +55,10 @@ describe('Fyers browser login start', () => {
   it('accepts the legacy registered /callback redirect URI', async () => {
     const server = Fastify();
     await server.register(fyersAuthRoutes);
-    const response = await server.inject({ method: 'GET', url: '/callback?state=abc&auth_code=xyz' });
+    const response = await server.inject({
+      method: 'GET',
+      url: '/callback?state=abc&auth_code=xyz',
+    });
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe('/api/auth/fyers/callback?state=abc&auth_code=xyz');
     await server.close();

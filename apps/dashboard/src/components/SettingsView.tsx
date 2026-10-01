@@ -1,13 +1,13 @@
 import { ArrowDown, ArrowUp, Eye, EyeOff, GripVertical, RotateCcw } from 'lucide-react';
-import { useState, type DragEvent } from 'react';
+import { type DragEvent, useState } from 'react';
 
+import { cn } from '../lib/cn';
 import type { NavigationPreferences } from '../store/navigation';
 import { DEFAULT_NAVIGATION_PREFERENCES, moveTabBefore } from '../store/navigation';
-import { Button } from './ui/Button';
-import { Card, CardHeader } from './ui/Card';
 import { NAV_GROUPS, type Tab } from './shell/nav';
 import { PENDING_BY_TAB } from './shell/pending';
-import { cn } from '../lib/cn';
+import { Button } from './ui/Button';
+import { Card, CardHeader } from './ui/Card';
 
 interface SettingsViewProps {
   preferences: NavigationPreferences;
@@ -56,7 +56,11 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
         title="Navigation settings"
         description={`${visibleCount} of ${preferences.order.length} optional tabs shown. Settings stays pinned so you can always restore hidden tabs.`}
         actions={
-          <Button variant="secondary" size="sm" onClick={() => onChange(DEFAULT_NAVIGATION_PREFERENCES)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onChange(DEFAULT_NAVIGATION_PREFERENCES)}
+          >
             <RotateCcw className="h-3.5 w-3.5" /> Reset
           </Button>
         }
@@ -72,7 +76,9 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
           <Card key={group.heading} flush>
             <div className="border-b border-border px-5 py-4">
               <h2 className="text-sm font-semibold text-foreground">{group.heading}</h2>
-              <p className="mt-0.5 text-xs text-muted">Drag tabs to set their priority within this section.</p>
+              <p className="mt-0.5 text-xs text-muted">
+                Drag tabs to set their priority within this section.
+              </p>
             </div>
             <div className="divide-y divide-border">
               {items.map((item, index) => {
@@ -106,11 +112,18 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
                       <Icon className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className={cn('text-sm font-medium', isHidden ? 'text-faint' : 'text-foreground')}>
+                      <div
+                        className={cn(
+                          'text-sm font-medium',
+                          isHidden ? 'text-faint' : 'text-foreground',
+                        )}
+                      >
                         {item.label}
                       </div>
                       <div className="text-xs text-faint">
-                        {pending > 0 ? `${pending} pending ${pending === 1 ? 'item' : 'items'}` : 'Ready'}
+                        {pending > 0
+                          ? `${pending} pending ${pending === 1 ? 'item' : 'items'}`
+                          : 'Ready'}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -144,7 +157,11 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
                             : 'border-primary/25 bg-primary/10 text-primary hover:bg-primary/15',
                         )}
                       >
-                        {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        {isHidden ? (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
                         {isHidden ? 'Hidden' : 'Shown'}
                       </button>
                     </div>
@@ -158,7 +175,8 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
 
       <Card className="border-dashed">
         <p className="text-sm text-muted">
-          Settings is always visible and pinned last under Account. Visibility and order are saved only in this browser.
+          Settings is always visible and pinned last under Account. Visibility and order are saved
+          only in this browser.
         </p>
       </Card>
     </div>

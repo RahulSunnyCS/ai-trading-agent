@@ -176,10 +176,7 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
     } catch {
       // Broker errors may include the authorization code or token. Neither
       // the response nor the log should repeat that upstream payload.
-      request.log.error(
-        { authCode: redactToken(authCode) },
-        '[fyers-auth] token exchange failed',
-      );
+      request.log.error({ authCode: redactToken(authCode) }, '[fyers-auth] token exchange failed');
       return reply.code(502).send({ error: 'token_exchange_failed' });
     }
   });

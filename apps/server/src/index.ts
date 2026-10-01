@@ -99,10 +99,7 @@ async function main(): Promise<void> {
   // in simulation mode. When SIMULATE=true the broker-factory will use the
   // simulator path regardless of what BROKER is set to — so we must not
   // attempt Fyers credential resolution (it would throw for missing tokens).
-  if (
-    !simulate &&
-    (process.env.BROKER ?? '').toLowerCase().trim() === 'fyers'
-  ) {
+  if (!simulate && (process.env.BROKER ?? '').toLowerCase().trim() === 'fyers') {
     const resolved = await resolveFyersCredentials(pool, fallbackFyersCredentials);
     if (resolved.credentials) {
       process.env.FYERS_APP_ID = resolved.credentials.appId;

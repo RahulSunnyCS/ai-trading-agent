@@ -19,15 +19,15 @@ import { Sidebar } from './components/shell/Sidebar';
 import { Topbar } from './components/shell/Topbar';
 import { type Tab, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
-import { hydrateThemeFromStorage } from './store/theme';
 import {
   DEFAULT_NAVIGATION_PREFERENCES,
+  type NavigationPreferences,
   firstVisibleTab,
   loadNavigationPreferences,
   normalizeNavigationPreferences,
   saveNavigationPreferences,
-  type NavigationPreferences,
 } from './store/navigation';
+import { hydrateThemeFromStorage } from './store/theme';
 
 /** One-line subtitle shown under each view's title in the top bar. */
 const SUBTITLES: Record<Tab, string> = {
@@ -114,7 +114,11 @@ export function App() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-surface/50 lg:block">
-        <Sidebar activeTab={activeTab} onSelect={setActiveTab} preferences={navigationPreferences} />
+        <Sidebar
+          activeTab={activeTab}
+          onSelect={setActiveTab}
+          preferences={navigationPreferences}
+        />
       </aside>
 
       {/* Mobile nav drawer */}
