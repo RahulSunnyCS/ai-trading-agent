@@ -985,9 +985,7 @@ def run_broad_backtest(
                 screen_top_pct=stock_tilt_screen_pct,
             )
         eligible = effective.ranks.notna()
-        masked = tilt_scores.reindex(index=eligible.index, columns=eligible.columns).where(
-            eligible
-        )
+        masked = tilt_scores.reindex(index=eligible.index, columns=eligible.columns).where(eligible)
         ranks_full = rerank(-masked).reindex(prices.index)
         scores_full = masked.reindex(prices.index)
         low = fresh_52w_low_mask(ranking.prices).reindex(

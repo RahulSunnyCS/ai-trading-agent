@@ -1122,9 +1122,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     }
 
                     active = [
-                        name
-                        for name in tops
-                        if _has_room(name, rooms, given, label_of, group_left)
+                        name for name in tops if _has_room(name, rooms, given, label_of, group_left)
                     ]
                     while left > 1e-12 and active:  # equal shares; a capped name's excess spreads
                         share = left / len(active)

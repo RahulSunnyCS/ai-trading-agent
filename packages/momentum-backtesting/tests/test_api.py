@@ -1287,9 +1287,7 @@ def test_broad_reversal_tilt_changes_the_result_and_avoids_fresh_lows(broad_clie
 
     request = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
     plain = broad_client.post("/api/backtest", json=request).json()
-    tilted = broad_client.post(
-        "/api/backtest", json={**request, "broad_reversal_tilt": 0.5}
-    ).json()
+    tilted = broad_client.post("/api/backtest", json={**request, "broad_reversal_tilt": 0.5}).json()
     assert tilted["kpis"] != plain["kpis"]
 
     off_request = _broad_request(
