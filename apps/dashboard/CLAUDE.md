@@ -16,7 +16,7 @@ tab for `packages/option-backtesting`'s results, and an "Options Lab" tab
 strategies on the Fyers 1-minute data: saved `obt daily` results, the evening
 run button, and an AlgoTest-style strategy builder that validates, backtests
 and saves `strategies/legwise/*.yaml`, all via `/api/backtest/legwise/*`.
-The Momentum view is being migrated here from the Python package's local UI;
+The Momentum view is the sole Momentum frontend; the Python package serves its API;
 its research chart uses a lazy-loaded Plotly basic bundle with optional wheel/
 touchpad zoom and the shared CSS theme tokens.
 

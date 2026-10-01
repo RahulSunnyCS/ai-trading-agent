@@ -4,7 +4,6 @@ import { useState } from 'react';
 
 import { apiPost } from '../../lib/api';
 import type { MomentumRebalanceResult } from '../../types/momentum';
-import { FyersAuthCard } from '../FyersAuthCard';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { StateMessage } from '../ui/StateMessage';
@@ -62,14 +61,13 @@ export function MomentumRebalanceView({ dataset, buildConfig, onChooseDataset }:
 
   return (
     <div className="space-y-5">
-      <FyersAuthCard />
       <Card>
         <CardHeader title="Rebalance now" description="Compare your actual holdings with a model target using live Fyers last traded prices. This is a read-only preview; it never places orders." />
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant={dataset === 'stock' ? 'primary' : 'ghost'} onClick={() => onChooseDataset('stock')}>Nifty 50 Stocks</Button>
           <Button size="sm" variant={dataset === 'broad' ? 'primary' : 'ghost'} onClick={() => onChooseDataset('broad')}>Broad Momentum</Button>
         </div>
-        <p className="mt-3 text-xs text-muted">Uses the strategy settings selected in Backtest. Available during NSE market hours (09:15–15:30 IST). Authenticate with Fyers in the dashboard first if your session has expired.</p>
+        <p className="mt-3 text-xs text-muted">Uses the strategy settings selected in Backtest. Available during NSE market hours (09:15–15:30 IST). If needed, reconnect Fyers from Broker logins.</p>
       </Card>
       <Card>
         <CardHeader title="Current portfolio" description="Enter each holding as an asset identifier and its current percentage, one per line. Any remainder is treated as idle cash." />

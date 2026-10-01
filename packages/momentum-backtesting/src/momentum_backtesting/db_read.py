@@ -15,10 +15,10 @@ shapes (lowercase benchmark column names, a "close"-named cash Series) the file-
 path produces, so `load_stock_dataset`'s own rename/reindex/concat logic downstream
 runs completely unchanged regardless of source.
 
-Both callers (`api.py`'s `_Data.get()`, `ui_data.load_stock_dataset()`) prefer the
-database once `mbt local migrate` has populated it, falling back to files on a fresh
-checkout or a test fixture that only wrote CSVs — see each `*_or_none()` function.
-Custom Index and Broad Momentum still read files only; see TODO 3.11.8.
+Callers prefer the database once `mbt local migrate` has populated it, falling
+back to files on a fresh checkout or a test fixture that only wrote CSVs. ETF,
+Stock, Custom Index, Broad Momentum, and Momentum Scores now share this
+database-first read path; see TODO 3.11.8.
 """
 
 from __future__ import annotations

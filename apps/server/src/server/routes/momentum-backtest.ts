@@ -3,8 +3,7 @@
  *
  * The Python Momentum service stays loopback/private just like the options
  * backtesting service. This route is its only browser-facing boundary and
- * deliberately preserves the Python API's payloads while the old static UI is
- * migrated into the shared Next dashboard.
+ * deliberately preserves the Python API's payloads for the shared dashboard.
  */
 
 import type { FastifyInstance, FastifyReply } from 'fastify';

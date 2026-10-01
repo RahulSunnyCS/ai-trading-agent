@@ -1,4 +1,4 @@
-"""The local UI's API, on generated prices so it doesn't depend on downloaded data."""
+"""The Momentum API, on generated prices so it doesn't depend on downloaded data."""
 
 import json
 
@@ -300,11 +300,11 @@ def test_bad_rule_combinations_are_rejected(client):
     )
 
 
-def test_the_page_is_served(client):
-    res = client.get("/")
-    assert res.status_code == 200
-    assert "Momentum backtest" in res.text
-    assert client.get("/static/app.js").status_code == 200
+def test_legacy_ui_is_not_served(client):
+    assert client.get("/").status_code == 404
+    assert client.get("/static/app.js").status_code == 404
+    assert client.get("/vendor/plotly.min.js").status_code == 404
+    assert client.get("/api/docs").status_code == 200
 
 
 def _daily_files(tmp_path, etf_names=("Nifty 50", "Nifty IT")):
@@ -509,7 +509,7 @@ def test_stock_backtest_runs_end_to_end_with_raw_ids_and_display_names(stock_cli
     for key in ("kpis", "series", "rotations", "trades", "instruments", "timeline", "latest"):
         assert key in body
     # The API's job: trades/timeline carry the engine's raw company_id. Display-name
-    # substitution for people to read is the frontend's job (see static/app.js's displayName()).
+    # substitution for people to read is the dashboard's job.
     assert "companies" in body
     assert body["companies"]["C0001"] == "ACC Ltd."
     assert all(t["asset"] in STOCK_IDS for t in body["trades"])

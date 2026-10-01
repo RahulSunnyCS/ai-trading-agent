@@ -13,7 +13,7 @@
  * We use 2026-05-19 (a Monday) as the base date and 2026-05-20 as "the next day".
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Clock } from '../../utils/clock.js';
 import {
   type FallbackSignalConfig,
@@ -41,7 +41,6 @@ const IST_0800_MAY19 = new Date('2026-05-19T02:30:00.000Z').getTime();
 const IST_0917_MAY20 = new Date('2026-05-20T03:47:00.000Z').getTime();
 
 /** 2026-05-20 10:00 IST = 2026-05-20T04:30:00.000Z (next day, market hours) */
-const _IST_1000_MAY20 = new Date('2026-05-20T04:30:00.000Z').getTime();
 
 // ---------------------------------------------------------------------------
 // Stubs and helpers

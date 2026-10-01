@@ -79,7 +79,7 @@ Buy nothing until Stage 1 is done and the ETF results justify Stage 2.
 - **Research:** `packages/momentum-backtesting` gets a **market** dimension
   (`IN` | `US`). It picks the universe file, the calendar, the currency, the
   tax rules and the benchmark. The engine (`engine.py`) shouldn't need to know.
-- **UI:** a market toggle in `mbt ui`, not a second app.
+- **UI:** a market toggle in the dashboard's Momentum tab, not a second app.
 
 ---
 

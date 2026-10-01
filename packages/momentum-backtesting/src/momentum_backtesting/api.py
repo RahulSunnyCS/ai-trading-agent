@@ -1,7 +1,6 @@
-"""Local web UI: `mbt ui` serves this on 127.0.0.1 only. Not meant to be exposed."""
+"""Private Momentum API consumed by the shared dashboard."""
 
 import threading
-import urllib.request
 from collections import OrderedDict
 from datetime import datetime, time, timedelta
 from pathlib import Path
@@ -9,8 +8,7 @@ from typing import Literal
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from trading_data.db import connect
 
@@ -64,8 +62,6 @@ _CATEGORY_LABEL_INFO = {
     "international": ("core", "International"),
 }
 
-STATIC = Path(__file__).with_name("static")
-PLOTLY_URL = "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"
 _LOCAL_OAUTH_STATES: dict[str, datetime] = {}
 _LOCAL_OAUTH_LOCK = threading.Lock()
 
@@ -576,7 +572,7 @@ def _stock_meta() -> dict:
     # Gold/Silver/Cash (liquid fund)/Gilt 8-13 yr (see ui_data.StockDataset.extra_instruments) -
     # these use their own real name as `name` directly (no company_id-style code), so there is no
     # separate display_name to translate from; the frontend already falls back to `name` when
-    # `display_name` is falsy (see static/app.js's displayName()/buildUniverse()).
+    # `display_name` is falsy; the dashboard displays `name` in that case.
     for extra_name, extra in stock.extra_instruments.items():
         instruments.append(
             {
@@ -843,7 +839,7 @@ def _custom_index_meta() -> dict:
             "cost_model": "flat",
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
-            # Custom-Index-only, read by the frontend's inner-rotation panel (see static/app.js).
+            # Custom-Index-only, read by the dashboard's inner-rotation controls.
             "inner_top_n": CATEGORY_DEFAULT_TOP_N,
             "inner_exit_rank": CATEGORY_DEFAULT_EXIT_RANK,
             # Custom-Index-only: how many ranked slots Gold/Silver and Cash/Gilt may each
@@ -1051,7 +1047,7 @@ def _broad_meta() -> dict:
     three datasets have (there are 755 stocks + 113 categories + 4 atomics -- which of them are
     even eligible changes every quarter, so a fixed checkbox list doesn't make sense the way it
     does for a static universe.csv/companies.csv list) -- `instruments` is deliberately empty;
-    static/app.js skips building a universe section for this dataset entirely.
+    the dashboard skips the per-instrument picker for this dataset.
     """
     if not (
         db_read.has_total_market_data()
@@ -1084,11 +1080,11 @@ def _broad_meta() -> dict:
             "rebalance": defaults.rebalance,
             "score": defaults.score,
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
-            # top_n/exit_rank/defensive/filter_lookback: NOT used for this dataset (their panels
-            # stay hidden by static/app.js's syncDependentFields - see run_broad_backtest's own
+            # top_n/exit_rank/defensive/filter_lookback: NOT used for this dataset.
+            # See run_broad_backtest's own
             # docstring for why `defensive`/`filter_lookback` genuinely don't apply here: CASH
             # never enters this dataset's external rank table). Included only so
-            # defaultConfig()'s generic field reads never hit `undefined` on a hidden control.
+            # the dashboard's generic field reads still receive defined defaults.
             # signal_delay/momentum_sizing*/cost_model/capital/slippage_bps ARE now used (TODO.md
             # 3.9.15 - see _broad_backtest/run_broad_backtest) and their controls are shown.
             "top_n": defaults.top_n,
@@ -1390,8 +1386,8 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
 def create_app() -> FastAPI:
     app = FastAPI(title="Momentum backtest", docs_url="/api/docs")
 
-    # Local standalone dashboard preview: the normal Fastify OAuth flow stores
-    # its token in broker_tokens. `mbt ui` has no Postgres dependency, so it
+    # Local direct-mode dashboard preview: the normal Fastify OAuth flow stores
+    # its token in broker_tokens. This API can run without Postgres, so it
     # uses the existing 0600 mbt token cache and the same Fyers auth-code flow.
     @app.get("/api/auth/fyers/status")
     def local_fyers_status() -> dict:
@@ -1542,26 +1538,6 @@ def create_app() -> FastAPI:
     @app.post("/api/rebalance-preview")
     def preview(req: RebalanceRequest) -> dict:
         return rebalance_preview(req)
-
-    @app.get("/vendor/plotly.min.js")
-    def plotly() -> FileResponse:
-        """Charting library, downloaded once and kept in data/ so the UI then works offline."""
-        path = DATA_DIR / "vendor" / "plotly-2.35.2.min.js"
-        if not path.exists():
-            try:
-                request = urllib.request.Request(PLOTLY_URL, headers={"User-Agent": "Mozilla/5.0"})
-                body = urllib.request.urlopen(request, timeout=60).read()
-            except OSError as error:
-                raise HTTPException(503, f"Couldn't download the chart library: {error}") from None
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(body)
-        return FileResponse(path, media_type="text/javascript")
-
-    app.mount("/static", StaticFiles(directory=STATIC), name="static")
-
-    @app.get("/")
-    def index() -> FileResponse:
-        return FileResponse(STATIC / "index.html")
 
     return app
 

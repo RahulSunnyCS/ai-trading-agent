@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TickMessage, WsStraddleMessage } from '../types/trading';
+import type { TickMessage } from '../types/trading';
 
 // ---------------------------------------------------------------------------
 // Public API types

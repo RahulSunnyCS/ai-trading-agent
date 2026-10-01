@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { FixedClock, RealClock, VirtualClock } from '../clock';
 
 // IST = UTC+5:30.

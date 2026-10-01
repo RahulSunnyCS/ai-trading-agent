@@ -149,13 +149,13 @@ export function TradeLog({ trades }: { trades: TradeRow[] }) {
 const INPUT =
   'rounded-lg border border-border bg-surface-2/50 px-2.5 py-1.5 text-sm text-foreground disabled:opacity-50';
 
-/** A captioned group — a group, not a <label>, because several fields hold two controls. */
+/** A captioned group that can contain multiple controls. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div role="group" aria-label={label} className="flex flex-col gap-1 text-xs text-muted">
-      <span>{label}</span>
+    <fieldset className="flex min-w-0 flex-col gap-1 text-xs text-muted">
+      <legend>{label}</legend>
       {children}
-    </div>
+    </fieldset>
   );
 }
 

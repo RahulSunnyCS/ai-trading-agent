@@ -51,14 +51,7 @@ import { evaluateTriggers } from '../../trigger-engine.js';
  */
 const IST_1000_MAY18_EPOCH = new Date('2026-05-18T04:30:00.000Z').getTime();
 
-/**
- * IST 10:00:00 on 2026-05-19 — the next trading day.
- * UTC equivalent: 2026-05-19T04:30:00.000Z
- */
-const IST_1000_MAY19_EPOCH = new Date('2026-05-19T04:30:00.000Z').getTime();
-
 const clock18 = new FixedClock(IST_1000_MAY18_EPOCH);
-const _clock19 = new FixedClock(IST_1000_MAY19_EPOCH);
 
 /** An open position that entered when NIFTY spot was at 22 000. */
 const POSITION_ID = 'aaaaaaaa-0000-0000-0000-000000000001';

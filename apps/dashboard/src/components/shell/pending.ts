@@ -66,8 +66,9 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
   momentum: [
     'Verify every migrated dataset against real Python backtest results',
     'Add the annual and holdings timeline charts, CSV exports and shareable settings URL',
-    'Finish Custom Index inner trade details before declaring parity with the local UI',
+    'Finish Custom Index inner trade details before declaring Momentum UI parity',
   ],
+  brokerLogins: [],
   pricing: [
     'Show the current subscription / credit balance',
     'Add purchase history and receipts',

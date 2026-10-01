@@ -1,5 +1,6 @@
 import {
   Activity,
+  Building2,
   CalendarClock,
   CreditCard,
   Database,
@@ -27,6 +28,7 @@ export type Tab =
   | 'backtest'
   | 'optionslab'
   | 'momentum'
+  | 'brokerLogins'
   | 'pricing'
   | 'settings';
 
@@ -66,6 +68,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     heading: 'Account',
     items: [
+      { id: 'brokerLogins', label: 'Broker logins', icon: Building2 },
       { id: 'pricing', label: 'Pricing', icon: CreditCard },
       { id: 'settings', label: 'Settings', icon: Settings },
     ],

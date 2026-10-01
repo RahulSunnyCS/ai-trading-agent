@@ -23,20 +23,15 @@
  *   - Because we are testing the writer (not the fetcher), fetchFn always returns
  *     pre-built candle arrays. sleepFn is stubbed to a no-op.
  *   - createTestDb() runs all migrations so migration 007 is applied before tests.
- *   - cleanTestDb() is called in afterEach to prevent state leakage between tests.
+ *   - The backfill tables are truncated in afterEach to prevent state leakage.
  *   - All DB reads after runBackfill() are time-range bounded (hypertable discipline).
  */
 
 import type { Pool } from 'pg';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
-import { cleanTestDb, createTestDb } from '../../../test/integration/helpers.js';
-import {
-  type FetchFn,
-  FyersAuthError,
-  type FyersCandle,
-  type FyersHistoricalResult,
-} from '../../brokers/fyers-historical.js';
+import { createTestDb } from '../../../test/integration/helpers.js';
+import type { FetchFn, FyersCandle } from '../../brokers/fyers-historical.js';
 import {
   BackfillResumeError,
   reconcileCalendarGaps,
@@ -131,7 +126,7 @@ describe.skipIf(SKIP)('backfill writer integration', () => {
 
   afterEach(async () => {
     // Truncate all data tables between tests to prevent state leakage.
-    // We also truncate backfill_ranges since cleanTestDb does not cover it.
+    // Truncate backfill_ranges along with the written market data.
     await db.query(`
       TRUNCATE market_ticks, option_ticks, backfill_ranges
       RESTART IDENTITY CASCADE

@@ -42,7 +42,7 @@ production.
 **Momentum tab:**
 ```bash
 cd packages/momentum-backtesting && uv sync
-uv run mbt ui --no-open-browser        # terminal 1 — Python backend on :8765
+uv run mbt serve                        # terminal 1 — Python backend on :8765
 ```
 ```bash
 cd apps/dashboard && MOMENTUM_DIRECT=1 bun run dev -- --port 5190   # terminal 2

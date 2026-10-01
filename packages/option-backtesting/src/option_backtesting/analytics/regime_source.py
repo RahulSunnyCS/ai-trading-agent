@@ -2,10 +2,8 @@
 Regime data source (M-5, R2). Reads apps/server's `daily_regime_tags`
 table (see apps/server/src/db/migrations/008_regime_tagging.sql) from the
 live trading PostgreSQL database — read-only, parameterized, time-bounded
-— but ONLY when `DATABASE_URL` is set. `psycopg` is an optional dependency
-(pyproject.toml's "regime" extra) and is imported lazily, inside
-`fetch_regimes`, so an environment that never sets `DATABASE_URL` never
-needs psycopg installed at all.
+— but ONLY when `DATABASE_URL` is set. `psycopg` is imported lazily inside
+`fetch_regimes`, so no database connection is opened without that setting.
 
 When `DATABASE_URL` is unset, regime data is simply unavailable — this
 module returns an empty result rather than raising, so callers (analytics/
@@ -37,7 +35,7 @@ def fetch_regimes(underlying: str, date_from: date, date_to: date) -> dict[date,
     if not database_url:
         return {}
 
-    import psycopg  # optional dependency ("regime" extra) — lazy on purpose
+    import psycopg
 
     with psycopg.connect(database_url) as conn, conn.cursor() as cur:
         cur.execute(_QUERY, (underlying, date_from, date_to))

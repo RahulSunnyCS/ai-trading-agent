@@ -8,7 +8,7 @@
  *   4. Non-India region gate
  *   5. Plan cards with Buy Now buttons
  *
- * The Razorpay Checkout SDK is loaded via a <script> tag in index.html and
+ * The Razorpay Checkout SDK is loaded by Next.js when this page mounts and
  * accessed through the typed `window.Razorpay` global. We guard against it
  * being absent and show an error rather than crashing.
  *
@@ -22,6 +22,7 @@
  * is unchanged.
  */
 
+import Script from 'next/script';
 import { useState } from 'react';
 
 import { type Plan, usePricingPlans } from '../hooks/usePricingPlans';
@@ -198,6 +199,9 @@ export function PricingPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      {paymentEnabled && region === 'IN' && (
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
+      )}
       <div>
         <h2 className="font-serif text-2xl font-semibold tracking-tight text-foreground">
           Pricing

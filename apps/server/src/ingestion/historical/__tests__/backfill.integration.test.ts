@@ -48,7 +48,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Pool } from 'pg';
 import { createTestDb } from '../../../test/integration/helpers.js';
-import { type FetchFn, FyersAuthError, type FyersCandle } from '../../brokers/fyers-historical.js';
+import type { FetchFn, FyersCandle } from '../../brokers/fyers-historical.js';
 import { BackfillResumeError, runBackfill } from '../backfill.js';
 
 // ---------------------------------------------------------------------------

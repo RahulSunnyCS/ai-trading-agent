@@ -1,8 +1,7 @@
 /**
- * BackfillView — three stacked sections:
- *  1. FyersAuthCard — OAuth token status and login flow
- *  2. Trigger Backfill card — queue a new historical data fetch job
- *  3. Backfill Status table — history from GET /api/backfill
+ * BackfillView — two stacked sections:
+ *  1. Trigger Backfill card — queue a new historical data fetch job
+ *  2. Backfill Status table — history from GET /api/backfill
  *
  * Status (normalised by the API to three buckets): completed → positive ·
  * in_progress → info · failed → negative.
@@ -14,7 +13,6 @@ import { useState } from 'react';
 import { useBackfillStatus } from '../hooks/useBackfillStatus';
 import { apiPost } from '../lib/api';
 import type { BackfillRangeRow } from '../types/trading';
-import { FyersAuthCard } from './FyersAuthCard';
 import { Badge, type Tone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
@@ -307,13 +305,10 @@ export function BackfillView() {
 
   return (
     <div className="space-y-4">
-      {/* Section 1: Fyers OAuth token status */}
-      <FyersAuthCard />
-
-      {/* Section 2: Trigger a new backfill job */}
+      {/* Section 1: Trigger a new backfill job */}
       <TriggerBackfillCard onQueued={refresh} />
 
-      {/* Section 3: Backfill job history table */}
+      {/* Section 2: Backfill job history table */}
       <Card flush>
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>

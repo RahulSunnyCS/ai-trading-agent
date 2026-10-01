@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import { apiGet } from '../../lib/api';
+import { usePolledResource } from '../../hooks/usePolledResource';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { StateMessage } from '../ui/StateMessage';
@@ -46,24 +46,11 @@ function percent(value: number | null | undefined, digits = 1): string {
 }
 
 export function MomentumScoresView() {
-  const [data, setData] = useState<MomentumScores | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, refetch } = usePolledResource<MomentumScores>('/api/momentum/scores');
   const [kind, setKind] = useState<'stocks' | 'sectors'>('stocks');
   const [query, setQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [selectedStock, setSelectedStock] = useState<StockScore | null>(null);
-
-  async function load(): Promise<void> {
-    setLoading(true);
-    setError(null);
-    const response = await apiGet<MomentumScores>('/api/momentum/scores');
-    setLoading(false);
-    if (response.ok) setData(response.data);
-    else setError(response.error);
-  }
-
-  useEffect(() => { void load(); }, []);
 
   const latestLookback = data?.lookbacks.at(-1);
   const stocks = useMemo(() => {
@@ -87,7 +74,7 @@ export function MomentumScoresView() {
         <CardHeader
           title="Momentum Scores"
           description={data ? `As of ${data.as_of ?? 'latest data'} · ${data.universe_size} stocks in the universe` : 'Current stock and sector momentum'}
-          actions={<Button size="sm" onClick={() => void load()} disabled={loading}>Refresh</Button>}
+          actions={<Button size="sm" onClick={refetch} disabled={loading}>Refresh</Button>}
         />
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant={kind === 'stocks' ? 'primary' : 'secondary'} onClick={() => { setKind('stocks'); setSelectedSector(null); }}>Stocks</Button>

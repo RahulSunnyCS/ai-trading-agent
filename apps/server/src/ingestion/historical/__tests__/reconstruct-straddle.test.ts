@@ -31,13 +31,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { computeAcceleration, computeRoc } from '../../straddle-math';
-import {
-  MissingLegError,
-  type ReconstructResult,
-  type ReconstructedSnapshot,
-  reconstructStraddle,
-} from '../reconstruct-straddle';
-import type { ReconstructOptions } from '../reconstruct-straddle';
+import { type ReconstructedSnapshot, reconstructStraddle } from '../reconstruct-straddle';
 
 // ---------------------------------------------------------------------------
 // Mock Pool helpers
@@ -237,7 +231,6 @@ describe('LOOK-AHEAD AUDIT', () => {
       ltps: typeof originalLtps,
       collector: ReconstructedSnapshot[],
     ): Promise<void> {
-      const _capturingPool = makeMockPool(makeHandler(ltps)) as unknown as import('pg').Pool;
       // We need to intercept the write call. Since persist=false, the reconstructor
       // does not call pool.query for INSERT. So we can capture via a wrapper that
       // intercepts the result object.
@@ -510,104 +503,19 @@ describe('FAIL LOUD — missing leg', () => {
 // ---------------------------------------------------------------------------
 
 describe('RESOLUTION PROPAGATION', () => {
-  it('propagates the CE resolution tag onto the snapshot', async () => {
+  it('persists the CE resolution when the legs disagree', async () => {
+    const insertedResolutions: string[] = [];
     const pool = makeMockPool(async (sql, params) => {
+      if (sql.includes('INSERT INTO straddle_snapshots')) {
+        insertedResolutions.push(params[10] as string);
+        return [];
+      }
       if (sql.includes('market_ticks')) return [makeIndexRow(22400)];
-      if (sql.includes('INSERT')) return [];
       const symbol = params[0] as string;
-      // CE gets '5' (5-minute candles); PE gets '1' (1-minute candles)
-      const resolution = symbol.includes('CE') ? '5' : '1';
-      return [makeOptionRow(150, resolution)];
+      return [makeOptionRow(150, symbol.includes('CE') ? '5' : '1')];
     }) as unknown as import('pg').Pool;
 
-    const insertedResolutions: string[] = [];
-    const _interceptingPool: MockPool = {
-      query: async (sql: string, params: unknown[]) => {
-        if (sql.includes('INSERT INTO straddle_snapshots')) {
-          // resolution is NOT written to straddle_snapshots — it is on the snapshot object
-          // We check it via the ReconstructedSnapshot in a dry-run instead.
-          insertedResolutions.push('captured');
-          return { rows: [] };
-        }
-        return pool.query(sql, params as unknown[]);
-      },
-    };
-
-    // Use persist=false and capture via a different approach: run the real
-    // reconstructor in dry-run mode and verify the resolution in the return
-    // values. Since reconstructStraddle doesn't expose per-snapshot data in
-    // its result, we verify via a write-intercepting pool.
-    const _snapshots: ReconstructedSnapshot[] = [];
-    const _capturePool: MockPool = {
-      query: async (sql: string, params: unknown[]) => {
-        if (sql.includes('INSERT INTO straddle_snapshots')) {
-          // We can't directly capture the snapshot object from the INSERT params
-          // because resolution is not in the INSERT (it's a derived field on
-          // ReconstructedSnapshot but NOT stored in straddle_snapshots column set).
-          // Instead we verify that the CE resolution was used.
-          // The test verifies propagation by checking the snapshot object fields
-          // via a capturing mechanism below.
-          return { rows: [] };
-        }
-        if (sql.includes('market_ticks')) return { rows: [makeIndexRow(22400)] };
-        const symbol = params[0] as string;
-        const resolution = symbol.includes('CE') ? '5' : '1';
-        return { rows: [makeOptionRow(150, resolution)] };
-      },
-    };
-
-    // Run with persist=false — resolution is stored on the snapshot object
-    // but not in the DB. We verify it via the result object.
-    // Since we can't intercept snapshots directly via the public API,
-    // we verify the resolution propagation by re-checking the logic:
-    // the resolution field on ReconstructedSnapshot is set to CE's resolution.
-
-    // To properly test this, we wrap the pool.query to intercept INSERT calls
-    // and reconstruct the snapshot from params. But resolution is NOT an INSERT param.
-    // So we use a slightly different approach: run with persist=true on a mock
-    // that captures what would be written. Since resolution is a field on the
-    // ReconstructedSnapshot object (returned by the internal compute step),
-    // we trust the resolution-selection logic in the source code and test it
-    // via the INSERT path by verifying which resolution was selected.
-
-    // Simplest correct test: verify that CE resolution (not PE) is used.
-    // We do this by checking that the reconstructor picks CE's '5' not PE's '1'.
-    // We run with a pool that returns resolution='D' for CE and 'null' for PE.
-    const capturedResolutions: string[] = [];
-    const resPool: MockPool = {
-      query: async (sql: string, params: unknown[]) => {
-        if (sql.includes('market_ticks')) return { rows: [makeIndexRow(22400)] };
-        if (sql.includes('INSERT INTO straddle_snapshots')) {
-          return { rows: [] }; // no-op
-        }
-        const symbol = params[0] as string;
-        // CE: resolution='D', PE: resolution=null
-        if (symbol.includes('CE')) {
-          return { rows: [{ ltp: '150.00', resolution: 'D' }] };
-        }
-        return { rows: [{ ltp: '145.00', resolution: null }] };
-      },
-    };
-
-    // To capture the resolution, use a pool that intercepts INSERT and records
-    // whether the resolution propagation happened correctly. Since resolution
-    // is NOT stored in the DB (only in the ReconstructedSnapshot object), we
-    // test via a slightly different approach: verify that the snapshot returned
-    // has the right resolution by using a write-interception pool.
-    const _resCapture: ReconstructedSnapshot[] = [];
-    const fullPool: MockPool = {
-      query: async (sql: string, params: unknown[]) => {
-        if (sql.includes('INSERT INTO straddle_snapshots')) {
-          // We can NOT get the ReconstructedSnapshot object here — it's internal.
-          // Mark that we entered this path.
-          capturedResolutions.push('insert-called');
-          return { rows: [] };
-        }
-        return resPool.query(sql, params as unknown[]);
-      },
-    };
-
-    const result = await reconstructStraddle(fullPool as unknown as import('pg').Pool, {
+    const result = await reconstructStraddle(pool, {
       underlying: 'NIFTY',
       from: BASE_TIME,
       to: BASE_TIME,
@@ -615,22 +523,19 @@ describe('RESOLUTION PROPAGATION', () => {
       persist: true,
     });
 
-    // The key assertions: 1 snapshot written, no gaps.
-    // Resolution='D' (from CE) is selected over null (from PE).
-    // We verify the logic is correct by checking that the snapshot was produced
-    // with no errors (if resolution propagation failed the test would show a gap).
     expect(result.snapshotsWritten).toBe(1);
     expect(result.gaps).toHaveLength(0);
+    expect(insertedResolutions).toEqual(['5']);
   });
 
-  it('uses "unknown" as fallback when both CE and PE resolution are null', async () => {
-    // We test this via a different approach: intercept the query-response for
-    // option_ticks and return resolution=null for both CE and PE. Then verify
-    // the snapshot is still produced (no crash) and the result shows 1 snapshot.
+  it('persists unknown when both leg resolutions are null', async () => {
+    const insertedResolutions: string[] = [];
     const pool = makeMockPool(async (sql, _params) => {
+      if (sql.includes('INSERT INTO straddle_snapshots')) {
+        insertedResolutions.push(_params[10] as string);
+        return [];
+      }
       if (sql.includes('market_ticks')) return [makeIndexRow(22400)];
-      if (sql.includes('INSERT')) return [];
-      // Both legs return resolution=null
       return [{ ltp: '150.00', resolution: null }];
     }) as unknown as import('pg').Pool;
 
@@ -639,12 +544,12 @@ describe('RESOLUTION PROPAGATION', () => {
       from: BASE_TIME,
       to: BASE_TIME,
       cadenceMs: 15_000,
-      persist: false,
+      persist: true,
     });
 
-    // The reconstructor must not throw — it falls back to 'unknown'.
     expect(result.snapshotsWritten).toBe(1);
     expect(result.gaps).toHaveLength(0);
+    expect(insertedResolutions).toEqual(['unknown']);
   });
 });
 
