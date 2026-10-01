@@ -12,6 +12,7 @@ import { Play, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  DEFAULT_CUTS,
   LEGWISE_API,
   useAnatomy,
   useDailyJob,
@@ -21,6 +22,7 @@ import {
 } from '../../hooks/useLegwise';
 import { apiPost } from '../../lib/api';
 import { formatPnl } from '../../lib/format';
+import type { PnlDay } from '../../lib/legwiseJoin';
 import { lotsOf, statsOf } from '../../lib/legwiseStats';
 import type { DailyJob, DayAnatomy, SavedResult } from '../../types/legwise';
 import { Badge } from '../ui/Badge';
@@ -30,6 +32,7 @@ import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { DayForensics } from './DayForensics';
+import { DayTypeCard } from './DayTypeCard';
 import { SegmentChips } from './anatomy';
 import { CumulativeLines, Field, SERIES_COLORS, TextInput, TradeLog, pnlClass } from './shared';
 
@@ -167,6 +170,7 @@ export function ResultsPanel() {
     () => strategies.map((s) => ({ id: s.id, points: statsById.get(s.id)?.cumulative ?? [] })),
     [strategies, statsById],
   );
+  const anatomyDays = useMemo(() => anatomy.data?.days ?? [], [anatomy.data]);
   const anatomyByDay = useMemo(
     () => new Map<string, DayAnatomy>((anatomy.data?.days ?? []).map((d) => [d.day, d])),
     [anatomy.data],
@@ -181,6 +185,21 @@ export function ResultsPanel() {
       ),
     [rows, lotsById],
   );
+  const pnlById = useMemo(() => {
+    const out = new Map<string, PnlDay[]>();
+    for (const [id, list] of byStrategy) {
+      const lots = lotsById.get(id) ?? 1;
+      out.set(
+        id,
+        list.map((r) => ({ day: r.day, net: r.net / lots })),
+      );
+    }
+    return out;
+  }, [byStrategy, lotsById]);
+  const segmentNames = useMemo(() => {
+    const edges = ['09:15', ...DEFAULT_CUTS, '15:30'];
+    return edges.slice(1).map((e, i) => `${edges[i]}–${e}`);
+  }, []);
   const cell = (strategy: string, day: string) =>
     rows.find((r) => r.strategy_id === strategy && r.day === day);
   const picked = selected ? cell(selected.strategy, selected.day) : undefined;
@@ -319,6 +338,13 @@ export function ResultsPanel() {
               </tbody>
             </Table>
           </Card>
+
+          <DayTypeCard
+            strategies={strategies.map((s) => s.id)}
+            pnl={pnlById}
+            anatomy={anatomyDays}
+            segmentNames={segmentNames}
+          />
 
           {picked && (
             <DayForensics

@@ -156,6 +156,8 @@ export interface DayAnatomy {
   is_expiry: boolean | null;
   whole: AnatomySegment | null;
   segments: (AnatomySegment | null)[];
+  /** apps/server's T-33 whole-day regime tag, when the API process can read Postgres. */
+  t33?: string | null;
 }
 
 export interface AnatomyResponse {
@@ -163,6 +165,7 @@ export interface AnatomyResponse {
   cuts: string[];
   thresholds: { quiet_range_over_implied: number; trend_strength: number };
   dte_reliable_from: string;
+  t33: { status: 'unavailable' | 'empty' | 'ok' | 'error'; message: string | null };
   days: DayAnatomy[];
 }
 

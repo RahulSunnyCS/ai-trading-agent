@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MIN_DAYS_FOR_RATIOS, lotsOf, statsOf } from '../legwiseStats';
+import { MIN_DAYS_FOR_RATIOS, compareToBaseline, lotsOf, statsOf } from '../legwiseStats';
 
 const day = (d: string, net: number) => ({ day: d, net });
 
@@ -76,5 +76,35 @@ describe('lotsOf', () => {
     expect(lotsOf({ legs: [{ lots: 1 }] })).toBe(1);
     expect(lotsOf({ legs: [] })).toBe(1);
     expect(lotsOf(undefined)).toBe(1);
+  });
+});
+
+describe('compareToBaseline', () => {
+  const saved = new Map([
+    ['2026-09-24', 100],
+    ['2026-09-25', -50],
+  ]);
+
+  it('reports the per-lot delta on shared days and totals only those', () => {
+    const c = compareToBaseline(
+      [day('2026-09-24', 160), day('2026-09-25', -50), day('2026-09-26', 999)],
+      1,
+      saved,
+    );
+    expect(c.byDay.get('2026-09-24')).toEqual({ saved: 100, delta: 60 });
+    expect(c.byDay.get('2026-09-25')).toEqual({ saved: -50, delta: 0 });
+    expect(c.shared).toBe(2);
+    expect(c.deltaTotal).toBe(60);
+    expect(c.uncovered).toBe(1); // 09-26 has no saved result: excluded, not treated as 0
+  });
+
+  it('normalises the edit to ₹ per lot before comparing', () => {
+    const c = compareToBaseline([day('2026-09-24', 240)], 2, saved);
+    expect(c.byDay.get('2026-09-24')?.delta).toBe(20); // 240 / 2 = 120 vs saved 100
+  });
+
+  it('is empty, not NaN, when nothing overlaps', () => {
+    const c = compareToBaseline([day('2027-01-01', 5)], 1, saved);
+    expect(c).toMatchObject({ shared: 0, deltaTotal: 0, uncovered: 1 });
   });
 });

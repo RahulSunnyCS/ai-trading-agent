@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { DEFAULT_CUTS, useAnatomy } from '../../hooks/useLegwise';
+import { styleProxies, zscore } from '../../lib/legwiseJoin';
 import {
   type Label,
   associationTest,
@@ -165,6 +166,36 @@ export function RegimesPanel() {
       { id: 'realised < implied %', points: rollingShare(calm, 20) },
     ];
   }, [days, series]);
+
+  const proxies = useMemo(() => {
+    const p = styleProxies(days, series, 10);
+    return [
+      {
+        id: 'short-premium proxy',
+        points: p.premium.map((x) => ({ time: x.time, value: x.value })),
+      },
+      {
+        id: 'directional proxy',
+        points: p.directional.map((x) => ({ time: x.time, value: x.value })),
+      },
+    ];
+  }, [days, series]);
+
+  const t33Tab = useMemo(() => {
+    const tagged = days.filter((d) => d.t33);
+    if (tagged.length === 0) return null;
+    const t33States = [...new Set(tagged.map((d) => d.t33 as string))].sort();
+    return {
+      n: tagged.length,
+      states: t33States,
+      table: crossTab(
+        labelsFor(tagged, -1),
+        tagged.map((d) => d.t33 ?? null),
+        STATES,
+        t33States,
+      ),
+    };
+  }, [days]);
 
   const within = useMemo(() => {
     if (names.length < 2) return null;
@@ -330,6 +361,37 @@ export function RegimesPanel() {
             />
             <CumulativeLines lines={rolling} />
           </Card>
+
+          <Card>
+            <CardHeader
+              title="Which style suited the period?"
+              description="Rolling 10-day sums over the full index history, each line standardised against its own history (above 0 = better than that style's usual). PROXIES, not P&L: short-premium = VIX-implied move − realised move (a straddle seller's payoff shape); directional = efficiency × realised move (a big move that stayed clean). Compare with the calendar: do the two take turns?"
+            />
+            <CumulativeLines lines={proxies} />
+          </Card>
+
+          {data && data.t33.status !== 'ok' && data.t33.status !== 'empty' && (
+            <p className="text-xs text-muted">
+              T-33 cross-check unavailable
+              {data.t33.status === 'unavailable'
+                ? ': export DATABASE_URL in the process running obt-api to compare with the live regime tagger.'
+                : `: ${data.t33.message ?? 'unknown error'}`}
+            </p>
+          )}
+          {t33Tab && (
+            <Card>
+              <CardHeader
+                title="Cross-check vs the live regime tagger (T-33)"
+                description={`How this tab's whole-day label lines up with apps/server's daily_regime_tags on ${t33Tab.n} days. Different inputs (straddle snapshots to 14:30 vs index + VIX all day), so expect partial agreement — a TRENDING_STRONG tag that never lands on Trend days would mean one of the two is off.`}
+              />
+              <CrossTabTable
+                t={t33Tab.table}
+                aName="This tab"
+                bName="T-33"
+                colLabel={(c) => c.replaceAll('_', ' ').toLowerCase()}
+              />
+            </Card>
+          )}
 
           {within && (
             <Card>

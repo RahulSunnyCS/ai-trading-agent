@@ -53,6 +53,8 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
   optionslab: [
     'Run `obt fyers history` once (live Fyers token needed) to unlock the market-regime study',
     'Calibrate the anatomy thresholds (QUIET / TREND) against the backfilled history',
+    'Join the AlgoTest-history (DSL) sessions to day types — ~63 sessions vs 7 (TODO 3.10.14)',
+    'Export DATABASE_URL for obt-api to light up the T-33 cross-check in Market regimes',
     'Fix the pre-Sep-2025 NIFTY expiry calendar so days-to-expiry works on older history',
     'Check the engine intrabar rules against a few real trades (optional)',
     'Telegram summary after the evening run',

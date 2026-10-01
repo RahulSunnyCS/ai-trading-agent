@@ -13,10 +13,15 @@
 import { CheckCircle2, Copy, FlaskConical, Plus, Save, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { LEGWISE_API, useLegwiseStrategies } from '../../hooks/useLegwise';
+import { LEGWISE_API, useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise';
 import { apiPost, apiPut } from '../../lib/api';
 import { formatPnl } from '../../lib/format';
-import { lotsOf, statsOf } from '../../lib/legwiseStats';
+import {
+  type BaselineComparison,
+  compareToBaseline,
+  lotsOf,
+  statsOf,
+} from '../../lib/legwiseStats';
 import type {
   Amount,
   BacktestResponse,
@@ -362,9 +367,21 @@ function LegEditor(props: {
   );
 }
 
-function BacktestResult({ result, lots }: { result: BacktestResponse; lots: number }) {
+function BacktestResult({
+  result,
+  lots,
+  baseline,
+}: {
+  result: BacktestResponse;
+  lots: number;
+  /** The saved version's stored ₹/lot per day, when one is loaded and has results. */
+  baseline: Map<string, number> | null;
+}) {
   const [open, setOpen] = useState<string | null>(null);
   const st = statsOf(result.days, lots);
+  const cmp: BaselineComparison | null = baseline
+    ? compareToBaseline(result.days, lots, baseline)
+    : null;
   return (
     <Card>
       <CardHeader
@@ -398,12 +415,32 @@ function BacktestResult({ result, lots }: { result: BacktestResponse; lots: numb
         />
         <StatCard label="Max drawdown" value={formatPnl(st.maxDrawdown)} tone="negative" />
       </div>
+      {cmp && cmp.shared > 0 && (
+        <p className="mb-3 text-sm">
+          <span className="text-muted">
+            Versus the saved version over {cmp.shared} shared days:{' '}
+          </span>
+          <span className={pnlClass(cmp.deltaTotal)}>
+            {formatPnl(cmp.deltaTotal)} per lot (
+            {cmp.deltaTotal >= 0 ? 'edit did better' : 'edit did worse'})
+          </span>
+          {cmp.uncovered > 0 && (
+            <span className="text-faint">
+              {' '}
+              · {cmp.uncovered} days have no stored result for the saved version and are not
+              compared
+            </span>
+          )}
+        </p>
+      )}
       <CumulativeLines lines={[{ id: result.strategy_id, points: st.cumulative }]} />
       <Table>
         <THead>
           <Th>Day</Th>
           <Th align="right">Trades</Th>
           <Th align="right">Net</Th>
+          {cmp && cmp.shared > 0 && <Th align="right">Saved (₹/lot)</Th>}
+          {cmp && cmp.shared > 0 && <Th align="right">Δ / lot</Th>}
           <Th align="right">Worst MTM</Th>
           <Th>Note</Th>
         </THead>
@@ -423,6 +460,16 @@ function BacktestResult({ result, lots }: { result: BacktestResponse; lots: numb
               <Td align="right" numeric className={pnlClass(d.net)}>
                 {formatPnl(d.net)}
               </Td>
+              {cmp && cmp.shared > 0 && (
+                <Td align="right" numeric className="text-muted">
+                  {cmp.byDay.has(d.day) ? formatPnl(cmp.byDay.get(d.day)?.saved ?? 0) : '—'}
+                </Td>
+              )}
+              {cmp && cmp.shared > 0 && (
+                <Td align="right" numeric className={pnlClass(cmp.byDay.get(d.day)?.delta ?? 0)}>
+                  {cmp.byDay.has(d.day) ? formatPnl(cmp.byDay.get(d.day)?.delta ?? 0) : '—'}
+                </Td>
+              )}
               <Td align="right" numeric>
                 {formatPnl(d.worst_mtm)}
               </Td>
@@ -445,6 +492,7 @@ function BacktestResult({ result, lots }: { result: BacktestResponse; lots: numb
 
 export function StrategyBuilder() {
   const saved = useLegwiseStrategies();
+  const stored = useLegwiseResults();
   const [name, setName] = useState('my_strategy');
   const [s, setS] = useState<LegwiseStrategy>(newStrategy);
   const [from, setFrom] = useState('');
@@ -464,6 +512,18 @@ export function StrategyBuilder() {
     () => clean({ ...s, no_reentry_after: s.no_reentry_after || undefined }),
     [s],
   );
+
+  // The saved version's results are already stored (keyed by version hash), so comparing
+  // an edit against them is free — a second backtest call would spend a credit.
+  const baseline = useMemo(() => {
+    const version = saved.data?.find((x) => x.name === name);
+    if (!version) return null;
+    const lots = lotsOf(version.strategy);
+    const mine = (stored.data?.results ?? []).filter(
+      (r) => r.strategy_id === version.strategy.id && r.strategy_sha === version.sha,
+    );
+    return mine.length ? new Map(mine.map((r) => [r.day, r.net / lots])) : null;
+  }, [saved.data, stored.data, name]);
 
   function load(n: string) {
     const found = saved.data?.find((x) => x.name === n);
@@ -678,7 +738,13 @@ export function StrategyBuilder() {
         )}
       </Card>
 
-      {result && <BacktestResult result={result} lots={lotsOf(payload as LegwiseStrategy)} />}
+      {result && (
+        <BacktestResult
+          result={result}
+          lots={lotsOf(payload as LegwiseStrategy)}
+          baseline={baseline}
+        />
+      )}
     </div>
   );
 }

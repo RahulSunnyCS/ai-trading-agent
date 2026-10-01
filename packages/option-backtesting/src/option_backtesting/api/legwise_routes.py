@@ -29,6 +29,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 from trading_data.db import connect
 
+from ..analytics import regime_source
 from ..fyers.daily import UNDERLYINGS, data_dir
 from ..legwise import anatomy, forensics, store
 from ..legwise.daily import (
@@ -307,8 +308,31 @@ def market_anatomy(
         "cuts": [minute_label(c) for c in parsed],
         "thresholds": anatomy.THRESHOLDS,
         "dte_reliable_from": anatomy.DTE_RELIABLE_FROM.isoformat(),
+        "t33": _overlay_t33(underlying, days),
         "days": days,
     }
+
+
+def _overlay_t33(underlying: str, days: list[dict]) -> dict[str, str | None]:
+    """Attach apps/server's T-33 whole-day regime tag (`daily_regime_tags`) to each day as
+    `t33`, so the dashboard can show how the two classifiers agree. Optional enrichment:
+    reported as a status, never silently dropped — `unavailable` (no DATABASE_URL in THIS
+    process), `empty` (connected, nothing tagged in range), `ok`, or `error` with the message."""
+    for d in days:
+        d["t33"] = None
+    if not regime_source.regime_data_available():
+        return {"status": "unavailable", "message": "DATABASE_URL is not set for this API process"}
+    if not days:
+        return {"status": "empty", "message": None}
+    try:
+        tags = regime_source.fetch_regimes(
+            underlying, date.fromisoformat(days[0]["day"]), date.fromisoformat(days[-1]["day"])
+        )
+    except Exception as error:  # a real DB problem must be visible, but must not break the page
+        return {"status": "error", "message": f"{type(error).__name__}: {error}"}
+    for d in days:
+        d["t33"] = tags.get(date.fromisoformat(d["day"]))
+    return {"status": "ok" if tags else "empty", "message": None}
 
 
 # ---------------------------------------------------------------------------

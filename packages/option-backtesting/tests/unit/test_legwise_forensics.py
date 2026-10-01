@@ -169,3 +169,30 @@ def test_anatomy_route_honours_custom_cuts_and_range(client, root):
     assert narrowed["days"][0]["gap_pct"] is not None  # gap still measured from the prior day
     assert client.get("/legwise/anatomy", params={"underlying": "XYZ"}).status_code == 422
     assert client.get("/legwise/anatomy", params={"cuts": "10:30,zz"}).status_code == 422
+
+
+def test_anatomy_overlays_t33_tags_and_reports_why_when_it_cannot(client, root, monkeypatch):
+    for d in (PREV, DAY):
+        write_index(root, d, "NIFTY", lambda i: 22000.0 + i)
+        write_index(root, d, "INDIAVIX", lambda i: 14.0)
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    off = client.get("/legwise/anatomy").json()
+    assert off["t33"]["status"] == "unavailable" and all(d["t33"] is None for d in off["days"])
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example/none")
+    monkeypatch.setattr(
+        legwise_routes.regime_source, "fetch_regimes", lambda u, a, b: {DAY: "TRENDING_STRONG"}
+    )
+    on = client.get("/legwise/anatomy").json()
+    assert on["t33"]["status"] == "ok"
+    assert [d["t33"] for d in on["days"]] == [None, "TRENDING_STRONG"]  # untagged day stays None
+
+    def boom(*_a):
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(legwise_routes.regime_source, "fetch_regimes", boom)
+    broken = client.get("/legwise/anatomy")
+    assert broken.status_code == 200  # the page still loads...
+    assert broken.json()["t33"]["status"] == "error"  # ...and says why
+    assert "connection refused" in broken.json()["t33"]["message"]

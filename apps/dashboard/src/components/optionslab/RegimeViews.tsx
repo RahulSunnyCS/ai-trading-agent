@@ -228,7 +228,18 @@ export function TransitionMatrix({
 // Within-day cross-tab: P(segment B label | segment A label), same day.
 // ---------------------------------------------------------------------------
 
-export function CrossTabTable({ t, aName, bName }: { t: CrossTab; aName: string; bName: string }) {
+export function CrossTabTable({
+  t,
+  aName,
+  bName,
+  colLabel,
+}: {
+  t: CrossTab;
+  aName: string;
+  bName: string;
+  /** Override the column header text (e.g. for non-anatomy states such as T-33 tags). */
+  colLabel?: (c: string) => string;
+}) {
   return (
     <Table>
       <THead>
@@ -238,7 +249,7 @@ export function CrossTabTable({ t, aName, bName }: { t: CrossTab; aName: string;
         <Th align="right">n</Th>
         {t.cols.map((c) => (
           <Th key={c} align="right">
-            {LABEL_TEXT[c as SegmentLabel]}
+            {colLabel ? colLabel(c) : LABEL_TEXT[c as SegmentLabel]}
           </Th>
         ))}
       </THead>

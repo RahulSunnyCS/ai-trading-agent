@@ -81,3 +81,40 @@ export function lotsOf(strategy: { legs: { lots: number }[] } | undefined): numb
   if (!strategy || strategy.legs.length === 0) return 1;
   return Math.max(1, Math.min(...strategy.legs.map((l) => l.lots)));
 }
+
+export interface BaselineComparison {
+  /** Per day in BOTH sets: the saved version's ₹/lot and the edit's minus the saved one. */
+  byDay: Map<string, { saved: number; delta: number }>;
+  shared: number;
+  /** Sum of deltas over the shared days only (₹ per lot); positive = the edit did better. */
+  deltaTotal: number;
+  /** Days the edit covers that the saved version has no stored result for — not compared. */
+  uncovered: number;
+}
+
+/**
+ * "What did my edit change?" — the edited strategy's days against the saved version's
+ * stored results, ₹ per lot, over the days both have. A day only one side has is excluded
+ * (and counted in `uncovered`) rather than treated as zero, which would fake a delta.
+ */
+export function compareToBaseline(
+  edit: Pick<DayRow, 'day' | 'net'>[],
+  editLots: number,
+  baseline: Map<string, number>,
+): BaselineComparison {
+  const lots = editLots > 0 ? editLots : 1;
+  const byDay = new Map<string, { saved: number; delta: number }>();
+  let deltaTotal = 0;
+  let uncovered = 0;
+  for (const d of edit) {
+    const saved = baseline.get(d.day);
+    if (saved === undefined) {
+      uncovered++;
+      continue;
+    }
+    const delta = d.net / lots - saved;
+    byDay.set(d.day, { saved, delta });
+    deltaTotal += delta;
+  }
+  return { byDay, shared: byDay.size, deltaTotal, uncovered };
+}
