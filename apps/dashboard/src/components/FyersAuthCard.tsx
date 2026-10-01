@@ -86,7 +86,9 @@ export function FyersAuthCard() {
       <div className="flex flex-wrap items-center gap-3">
         {loading && <span className="text-sm text-muted">Checking connection…</span>}
 
-        {!loading && error && <p className="text-sm text-negative">Could not check Fyers status: {error}</p>}
+        {!loading && error && (
+          <p className="text-sm text-negative">Could not check Fyers status: {error}</p>
+        )}
 
         {!loading && status === null && <Badge tone="neutral">Unknown</Badge>}
 

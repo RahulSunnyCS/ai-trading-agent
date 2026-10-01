@@ -240,8 +240,22 @@ function assumptionChips(result: MomentumResult, config: Record<string, unknown>
     mon_10am: 'Monday 10:00',
   };
   return [
-    config.rebalance === 'monthly' ? 'Monthly rebalance' : 'Weekly rebalance',
+    config.rebalance === 'monthly'
+      ? 'Monthly rebalance'
+      : Number(config.rebalance_every ?? 1) > 1
+        ? `Every ${config.rebalance_every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
+        : 'Weekly rebalance',
+    config.sell_every_week ? 'Exits sold weekly' : null,
     config.portfolio === 'buffer' ? 'Buffer rule' : 'Fixed slots',
+    dataset === 'etf' && Number(config.exclude_high_vol ?? 0) > 0
+      ? `Skips most volatile ${Math.round(Number(config.exclude_high_vol) * 100)}%`
+      : null,
+    dataset === 'etf' && Number(config.reversal_tilt ?? 0) > 0
+      ? `Beaten-down tilt ${Math.round(Number(config.reversal_tilt) * 100)}%`
+      : null,
+    dataset === 'broad' && Number(config.broad_reversal_tilt ?? 0) > 0
+      ? `Beaten-down tilt ${Math.round(Number(config.broad_reversal_tilt) * 100)}%`
+      : null,
     config.cost_model === 'itemised' ? 'Itemised costs' : `${config.cost_pct}% cost per side`,
     dataset === 'etf' ? (config.track === 'etf' ? 'ETF prices' : 'Index prices') : null,
     dataset === 'etf' ? (execLabel[String(config.execution)] ?? null) : null,

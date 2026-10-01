@@ -57,10 +57,7 @@
 
 import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
-import type {
-  OpenPosition,
-  PersonalityConfigM2 as PersonalityConfig,
-} from '../db/schema.js';
+import type { OpenPosition, PersonalityConfigM2 as PersonalityConfig } from '../db/schema.js';
 import { STREAM_STRADDLE, recoverPending, streamConsume } from '../redis/client.js';
 import type { ClockWithTick } from '../utils/clock.js';
 import type { EntryIntent } from './entry-engine.js';

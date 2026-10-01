@@ -1231,15 +1231,10 @@ def test_broad_api_round_trips_caps_and_ceiling(broad_client):
     assert res.status_code == 200, res.text
     json.dumps(res.json(), allow_nan=False)
     assert (
-        broad_client.post(
-            "/api/backtest", json=_broad_request(max_category=1.5)
-        ).status_code
-        == 422
+        broad_client.post("/api/backtest", json=_broad_request(max_category=1.5)).status_code == 422
     )
     assert (
-        broad_client.post(
-            "/api/backtest", json=_broad_request(max_stock_price=-1)
-        ).status_code
+        broad_client.post("/api/backtest", json=_broad_request(max_stock_price=-1)).status_code
         == 422
     )
 
@@ -1247,11 +1242,90 @@ def test_broad_api_round_trips_caps_and_ceiling(broad_client):
 def test_broad_payload_carries_share_prices_for_the_trade_split_tab(broad_client):
     res = broad_client.post(
         "/api/backtest",
-        json=_broad_request(
-            broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10
-        ),
+        json=_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10),
     )
     assert res.status_code == 200, res.text
     open_positions = res.json()["open_positions"]
     assert open_positions
     assert all(p["price"] is not None and p["price"] > 0 for p in open_positions)
+
+
+def test_broad_every_week_never_skips_a_week(broad_client):
+    """TODO 3.9.23: with broad_every_week the curve has one point per week; the default keeps
+    the engine's original rule (thin weeks skipped), so it can only have as many or fewer."""
+    request = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    default = broad_client.post("/api/backtest", json=request).json()
+    every = broad_client.post("/api/backtest", json={**request, "broad_every_week": True}).json()
+    weeks = pd.to_datetime(every["series"]["dates"])
+    assert (weeks[1:] - weeks[:-1]).days.max() == 7
+    assert len(every["series"]["dates"]) >= len(default["series"]["dates"])
+    meta = broad_client.get("/api/meta?dataset=broad").json()
+    assert meta["defaults"]["broad_every_week"] is False
+
+
+def test_broad_sell_every_week_is_accepted_and_rejected_without_the_buffer_rule(broad_client):
+    request = _broad_request(
+        broad_coverage_floor=0.0,
+        broad_pool_top_n=10,
+        broad_pool_exit_rank=10,
+        rebalance_every=2,
+        sell_every_week=True,
+    )
+    res = broad_client.post("/api/backtest", json=request)
+    assert res.status_code == 200, res.text
+    bad = broad_client.post("/api/backtest", json={**request, "portfolio": "slots"})
+    assert bad.status_code == 422
+    meta = broad_client.get("/api/meta?dataset=broad").json()
+    assert meta["defaults"]["sell_every_week"] is False
+
+
+def test_broad_reversal_tilt_changes_the_result_and_avoids_fresh_lows(broad_client):
+    """TODO 3.9.23 owner follow-up: broad_reversal_tilt re-orders whatever stocks the category/
+    pool funnel already selected - it must change the P&L, and it must never freshly buy a stock
+    making a new 52-week low (same falling-knife guard as the ETF lever)."""
+    from momentum_backtesting import levers
+
+    request = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    plain = broad_client.post("/api/backtest", json=request).json()
+    tilted = broad_client.post("/api/backtest", json={**request, "broad_reversal_tilt": 0.5}).json()
+    assert tilted["kpis"] != plain["kpis"]
+
+    off_request = _broad_request(
+        broad_category_mode="off", broad_off_top_n=5, broad_off_exit_rank=10
+    )
+    off_plain = broad_client.post("/api/backtest", json=off_request).json()
+    off_tilted = broad_client.post(
+        "/api/backtest", json={**off_request, "broad_reversal_tilt": 0.5}
+    ).json()
+    assert off_tilted["kpis"] != off_plain["kpis"]
+
+    meta = broad_client.get("/api/meta?dataset=broad").json()
+    assert meta["defaults"]["broad_reversal_tilt"] == 0.0
+    assert meta["defaults"]["broad_reversal_screen_pct"] == 0.0
+
+    # Reconstruct the same price frame the fixture built, to check the falling-knife guard.
+    from momentum_backtesting import api
+
+    ranking = api.DATA.get_broad_ranking(
+        lookbacks=(1, 4, 13, 26, 52),
+        weights=None,
+        score="ranksum",
+        voladj_skip_recent_month=True,
+        pool_top_n=10,
+        pool_exit_rank=10,
+    )
+    low = levers.fresh_52w_low_mask(ranking.prices)
+    # The no_buy gate only blocks a NEW entry - like every other such gate in this codebase
+    # (exclude_high_vol, max_stock_price), a name already held may still be topped up (`ADD`)
+    # even while sitting at a fresh low, by design.
+    violations = []
+    for label, payload in (("on", tilted), ("off", off_tilted)):
+        for rotation in payload["rotations"]:
+            week = pd.Timestamp(rotation["week"])
+            for row in rotation["ins"]:
+                if row["top_up"]:
+                    continue
+                asset = row["asset"]
+                if asset in low.columns and week in low.index and bool(low.at[week, asset]):
+                    violations.append((label, week, asset))
+    assert not violations, violations[:5]

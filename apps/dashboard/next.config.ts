@@ -30,9 +30,18 @@ const nextConfig: NextConfig = {
       // different upstream names, so each needs its own rule).
       ...(process.env.MOMENTUM_DIRECT === '1'
         ? [
-            { source: '/api/auth/fyers/status', destination: `${momentumDirectOrigin}/api/auth/fyers/status` },
-            { source: '/api/auth/fyers/start', destination: `${momentumDirectOrigin}/api/auth/fyers/start` },
-            { source: '/api/auth/fyers/callback', destination: `${momentumDirectOrigin}/api/auth/fyers/callback` },
+            {
+              source: '/api/auth/fyers/status',
+              destination: `${momentumDirectOrigin}/api/auth/fyers/status`,
+            },
+            {
+              source: '/api/auth/fyers/start',
+              destination: `${momentumDirectOrigin}/api/auth/fyers/start`,
+            },
+            {
+              source: '/api/auth/fyers/callback',
+              destination: `${momentumDirectOrigin}/api/auth/fyers/callback`,
+            },
             { source: '/api/momentum/meta', destination: `${momentumDirectOrigin}/api/meta` },
             {
               source: '/api/momentum/scores',

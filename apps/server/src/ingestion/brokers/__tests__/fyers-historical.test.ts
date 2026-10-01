@@ -663,12 +663,14 @@ describe('fetchHistoricalCandles — dashboard credential precedence', () => {
     try {
       const db = {
         query: async () => ({
-          rows: [{
-            app_id: 'dashboard-app',
-            access_token: 'dashboard-token',
-            refresh_token: null,
-            expires_at: new Date(Date.now() + 3_600_000),
-          }],
+          rows: [
+            {
+              app_id: 'dashboard-app',
+              access_token: 'dashboard-token',
+              refresh_token: null,
+              expires_at: new Date(Date.now() + 3_600_000),
+            },
+          ],
         }),
       } as unknown as Pool;
       const rawMock = vi.fn().mockResolvedValue(okResponse([candle(toEpochSec('2024-01-01'))]));

@@ -403,7 +403,7 @@ export function MomentumBacktestingView() {
   }, []);
 
   const summary = meta
-    ? `${core.start || 'Start'} → ${core.end || 'End'} · ${values.rebalance ?? 'weekly'} · top ${core.topN} / exit >${core.exitRank} · ${values.benchmark ?? ''}`
+    ? `${core.start || 'Start'} → ${core.end || 'End'} · ${values.rebalance === 'monthly' ? 'monthly' : Number(values.rebalance_every ?? 1) > 1 ? `every ${values.rebalance_every} weeks` : 'weekly'} · top ${core.topN} / exit >${core.exitRank} · ${values.benchmark ?? ''}`
     : '';
 
   return (
@@ -639,6 +639,7 @@ export function MomentumBacktestingView() {
                 benchmarkName={result.benchmark_name}
                 rotations={result.rotations}
                 overlays={overlays}
+                comparisons={result.comparisons ?? []}
                 flashKey={finishedAt}
               />
               <MomentumResultDetails

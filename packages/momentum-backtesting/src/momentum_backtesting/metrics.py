@@ -29,6 +29,22 @@ def max_drawdown(series: pd.Series) -> tuple[float, pd.Timestamp, pd.Timestamp]:
     return dd.min(), peak, trough
 
 
+def curve_stats(equity: pd.Series, cash: pd.Series) -> dict[str, float]:
+    """CAGR, volatility, Sharpe (vs cash, same definition as `summary`) and max drawdown of a
+    bare equity curve - for curves that are not a single Result (tranche blends, windows)."""
+    weekly = equity.pct_change().dropna()
+    excess = weekly - cash.reindex(equity.index).pct_change().dropna()
+    spread = excess.std()
+    depth, _, trough = max_drawdown(equity)
+    return {
+        "CAGR": cagr(equity),
+        "volatility": weekly.std() * math.sqrt(WEEKS_PER_YEAR),
+        "Sharpe": excess.mean() / spread * math.sqrt(WEEKS_PER_YEAR) if spread > 0 else math.nan,
+        "max drawdown": depth,
+        "max drawdown trough": f"{trough:%Y-%m-%d}",
+    }
+
+
 def worst_episodes(series: pd.Series, count: int = 3) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
     """The `count` deepest peak-to-trough falls that don't overlap each other."""
     dd = drawdown(series)

@@ -164,6 +164,29 @@ export function MomentumKpiCards({
           />
         ))}
       </div>
+      {result.comparisons?.length ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-surface-2/50 px-3 py-2 text-xs text-muted">
+          <span className="flex items-center gap-1 font-medium text-foreground">
+            Edge vs dividend-inclusive indices
+            <InfoTooltip text="Total-return (TRI) indices reinvest dividends, so they are the honest passive alternative. Nifty200 Momentum 30 is a buyable momentum index: beating it is what makes running this strategy worth the effort." />
+          </span>
+          {result.comparisons.map((line) => (
+            <span key={line.name} title={line.note ?? undefined}>
+              {line.name} {pct(line.cagr)} →{' '}
+              <b
+                className={
+                  tone(line.excess_cagr) === 'negative' ? 'text-negative' : 'text-positive'
+                }
+              >
+                {n(line.excess_cagr) === null
+                  ? '—'
+                  : `${(line.excess_cagr ?? 0) >= 0 ? '+' : ''}${((line.excess_cagr ?? 0) * 100).toFixed(1)} pp`}
+              </b>
+              {line.note ? ' *' : ''}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {expanded ? (
         <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-3 lg:grid-cols-4">
           {detail.map((def) => (

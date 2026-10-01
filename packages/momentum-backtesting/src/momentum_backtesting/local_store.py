@@ -40,9 +40,7 @@ def pull_dir(con: duckdb.DuckDBPyConnection, data_dir: Path = DATA_DIR) -> int:
     through — same file layout, so this and `push_dir` round-trip losslessly."""
     from . import store
 
-    rows = con.execute(
-        "SELECT instrument, kind, date, open, close FROM momentum_prices"
-    ).fetchall()
+    rows = con.execute("SELECT instrument, kind, date, open, close FROM momentum_prices").fetchall()
     store.write_dir(rows, data_dir)
     return len(rows)
 
@@ -55,8 +53,7 @@ def save_signal(
         [week, run_kind, label],
     )
     con.execute(
-        "INSERT INTO momentum_signals (week, run_kind, config_label, payload) "
-        "VALUES (?, ?, ?, ?)",
+        "INSERT INTO momentum_signals (week, run_kind, config_label, payload) VALUES (?, ?, ?, ?)",
         [week, run_kind, label, json.dumps(payload)],
     )
 
@@ -65,8 +62,7 @@ def load_signal(
     con: duckdb.DuckDBPyConnection, week: str, run_kind: str, label: str
 ) -> dict | None:
     row = con.execute(
-        "SELECT payload FROM momentum_signals WHERE week = ? AND run_kind = ? "
-        "AND config_label = ?",
+        "SELECT payload FROM momentum_signals WHERE week = ? AND run_kind = ? AND config_label = ?",
         [week, run_kind, label],
     ).fetchone()
     return json.loads(row[0]) if row is not None else None

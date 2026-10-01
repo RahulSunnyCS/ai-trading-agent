@@ -68,7 +68,12 @@ describe('momentum backtest proxy routes', () => {
     const response = await server.inject({
       method: 'POST',
       url: '/api/momentum/rebalance-preview',
-      payload: { dataset: 'stock', universe: ['C0001'], holdings_pct: { C0001: 30 }, portfolio_value: 100000 },
+      payload: {
+        dataset: 'stock',
+        universe: ['C0001'],
+        holdings_pct: { C0001: 30 },
+        portfolio_value: 100000,
+      },
     });
 
     expect(response.statusCode).toBe(200);

@@ -45,6 +45,8 @@ export interface ChartTheme {
   primary: string;
   positive: string;
   negative: string;
+  info: string;
+  warning: string;
 }
 
 // The `theme` argument is intentionally unused at runtime — it exists so callers
@@ -59,5 +61,7 @@ export function getChartTheme(theme: Theme): ChartTheme {
     primary: cssHsl('--primary'),
     positive: cssHsl('--positive'),
     negative: cssHsl('--negative'),
+    info: cssHsl('--info'),
+    warning: cssHsl('--warning'),
   };
 }

@@ -499,6 +499,10 @@ export const SETTINGS_FALLBACKS: Values = {
   score: 'ranksum',
   voladj_skip_recent_month: true,
   rebalance: 'weekly',
+  rebalance_every: 1,
+  rebalance_offset: 0,
+  sell_every_week: false,
+  exclude_high_vol: 0,
   cost_model: 'flat',
   cost_pct: 0.1,
   capital: 1_000_000,
@@ -515,12 +519,17 @@ export const SETTINGS_FALLBACKS: Values = {
   execution: 'fri_close',
   inner_top_n: 2,
   inner_exit_rank: 8,
+  reversal_tilt: 0,
+  reversal_screen_pct: 0,
+  broad_reversal_tilt: 0,
+  broad_reversal_screen_pct: 0,
   commodity_copies: 1,
   debt_copies: 1,
   broad_category_mode: 'on',
   broad_pool_top_n: 200,
   broad_pool_exit_rank: 250,
   broad_coverage_floor: 0.4,
+  broad_every_week: false,
   broad_category_top_n: 4,
   broad_category_exit_rank: 8,
   broad_picks_per_category: 2,
@@ -662,6 +671,12 @@ export function MomentumSettingsPanel({
               onChange={(value) => onChange('broad_pool_exit_rank', value)}
             />
           </div>
+          <Toggle
+            label="Simulate every week (recommended)"
+            help="Off reproduces the original engine rule: a week with fewer ranked stocks than categories × picks is skipped entirely, so nothing is sold or bought and the chart jumps several weeks. That hit about 190 of 508 weeks since 2017 and overstated CAGR by about 6 points and Sharpe by about 0.6. On trades every week, holding fewer names plus cash when few categories qualify."
+            checked={bool('broad_every_week')}
+            onChange={(value) => onChange('broad_every_week', value)}
+          />
           {broadOn ? (
             <div className="grid grid-cols-2 gap-3">
               <PercentField
@@ -829,6 +844,74 @@ export function MomentumSettingsPanel({
             ) : null}
           </>
         )}
+        {dataset === 'etf' ? (
+          <div className="space-y-2 border-t border-border pt-3">
+            <SubHeading>Beaten-down tilt (new, ETF only)</SubHeading>
+            <Hint>
+              Replaces the ranking above with: rank the short lookbacks (1/4/13w) on their own, rank
+              the long lookbacks (26/52w) on their own with the worst performer first, turn both
+              into a 0-100% score within that week's names, then add them — tilt is how much the
+              long-term beaten-down score counts. 0% is plain short-term momentum. Measured: around
+              30% tilt beats both plain short-term momentum and the shipped 5-lookback strategy on
+              CAGR, Sharpe and drawdown in most rolling 3-year windows — the strongest result of
+              this whole study; much above that (100%+) overshoots and gets worse. A stock making a
+              fresh 52-week low is never freshly bought, whatever the tilt.
+            </Hint>
+            <div className="grid grid-cols-2 gap-3">
+              <PercentField
+                label="Tilt"
+                help="0% ranks purely on 1/4/13-week momentum. 100% weighs the beaten-down score as much as the momentum score; above 100% starts to favour it."
+                values={values}
+                name="reversal_tilt"
+                onChange={onChange}
+                max={200}
+              />
+              <PercentField
+                label="Screen: top % by short-term momentum"
+                help="Optional hard filter applied before the tilt: only names in this top share by 1/4/13-week momentum are ranked at all. 0% = no filter, rank everyone."
+                values={values}
+                name="reversal_screen_pct"
+                onChange={onChange}
+                max={90}
+              />
+            </div>
+          </div>
+        ) : null}
+        {dataset === 'broad' ? (
+          <div className="space-y-2 border-t border-border pt-3">
+            <SubHeading>Beaten-down tilt (new)</SubHeading>
+            <Hint>
+              Does not change which categories or pool stocks qualify — it only re-orders the stocks
+              the funnel already picked: rank the short lookbacks (1/4/13w) on their own, rank the
+              long lookbacks (26/52w) on their own with the worst performer first, turn both into a
+              0-100% score, then add them — tilt is how much the long-term beaten-down score counts.
+              0% leaves today's plain-momentum order untouched. Measured: unlike the ETF version, it
+              does NOT help here — every tilt setting loses to plain momentum on both return and
+              risk-adjusted return in almost every rolling window. On individual stocks the momentum
+              leaders, not the beaten-down names, are what drives the return. Left at 0% by default
+              for this reason. A stock making a fresh 52-week low is never freshly bought, whatever
+              the tilt (an already-held stock may still be topped up).
+            </Hint>
+            <div className="grid grid-cols-2 gap-3">
+              <PercentField
+                label="Tilt"
+                help="0% keeps today's plain-momentum order within the current selection. 100% weighs the beaten-down score as much as the momentum score; above 100% starts to favour it."
+                values={values}
+                name="broad_reversal_tilt"
+                onChange={onChange}
+                max={200}
+              />
+              <PercentField
+                label="Screen: top % by short-term momentum"
+                help="Optional hard filter applied before the tilt, within the funnel's own selection: only names in this top share by 1/4/13-week momentum are ranked at all. 0% = no filter."
+                values={values}
+                name="broad_reversal_screen_pct"
+                onChange={onChange}
+                max={90}
+              />
+            </div>
+          </div>
+        ) : null}
       </Accordion>
 
       <Accordion title="Portfolio rule" description={buffer ? 'Buffer' : 'Fixed slots'}>
@@ -907,19 +990,58 @@ export function MomentumSettingsPanel({
             ) : null}
           </>
         )}
-        <Field
-          label="Rebalance"
-          help="Weekly acts on every Friday's ranking. Monthly only trades in the last week of each month — less churn, slower to react."
-        >
-          <select
-            className={inputClass}
-            value={str('rebalance', 'weekly')}
-            onChange={(event) => onChange('rebalance', event.target.value)}
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            label="Rebalance"
+            help="Weekly acts on every Friday's ranking. Every 2 or 4 weeks trades only on those Fridays (the ranking is still recomputed weekly). Monthly only trades in the last week of each month. Slower cadences churn less but react later."
           >
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly (month-end only)</option>
-          </select>
-        </Field>
+            <select
+              className={inputClass}
+              value={
+                str('rebalance', 'weekly') === 'monthly'
+                  ? 'monthly'
+                  : `every${num('rebalance_every', 1)}`
+              }
+              onChange={(event) => {
+                const choice = event.target.value;
+                onChange('rebalance', choice === 'monthly' ? 'monthly' : 'weekly');
+                onChange('rebalance_every', choice === 'monthly' ? 1 : Number(choice.slice(5)));
+                onChange('rebalance_offset', 0);
+              }}
+            >
+              <option value="every1">Weekly</option>
+              <option value="every2">Every 2 weeks</option>
+              <option value="every4">Every 4 weeks</option>
+              <option value="monthly">Monthly (month-end only)</option>
+            </select>
+          </Field>
+          {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' ? (
+            <Field
+              label="Which Fridays"
+              help="Trading weeks are fixed on the calendar (counted from 1 Jan 2016), so each choice is a different set of Fridays. Comparing them shows how much of a result is down to lucky timing."
+            >
+              <select
+                className={inputClass}
+                value={num('rebalance_offset', 0)}
+                onChange={(event) => onChange('rebalance_offset', Number(event.target.value))}
+              >
+                {Array.from({ length: num('rebalance_every', 1) }, (_, i) => i).map((phase) => (
+                  <option key={phase} value={phase}>
+                    Phase {phase + 1} of {num('rebalance_every', 1)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+        </div>
+        {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' && buffer ? (
+          <Toggle
+            label="Sell exits weekly, buy only on the cadence"
+            help="Normally a dropped-rank holding waits for the next cadence Friday to be sold, same as a new buy. Switch this on and exits happen the week they're due - only new buys and cap trims still wait. Measured: it mostly reverses the cadence's own edge (every 4 weeks on Broad: +5.2 points a year became -10.3) in exchange for a shallower drawdown more often - not recommended."
+            checked={bool('sell_every_week')}
+            onChange={(value) => onChange('sell_every_week', value)}
+          />
+        ) : null}
         <Toggle
           label="Win-rate position sizing"
           help="Shrink new and top-up buys after a run of losing trades, ramping back to full size as wins return. In the worst case it sits entirely in cash. Buffer rule only."
@@ -992,6 +1114,16 @@ export function MomentumSettingsPanel({
               min={0}
               step={1000}
               onChange={(value) => onChange('max_stock_price', value > 0 ? value : null)}
+            />
+          ) : null}
+          {dataset === 'etf' ? (
+            <PercentField
+              label="Skip most volatile % (new buys)"
+              help="Never freshly buy the instruments in the most volatile X% of the ranked list that week (26-week weekly volatility); the next-best name takes the slot and holdings stay until their rank says sell. Measured 2017–2026 on the live ETF strategy: skipping the top 20% lifted CAGR 25.8% → 27.9% and Sharpe 0.99 → 1.12, better in about 9 of 10 rolling 3-year windows. It mostly keeps out Realty and PSU Bank. It hurt stock strategies, so it is ETF only. 0 = off."
+              values={values}
+              name="exclude_high_vol"
+              onChange={onChange}
+              max={50}
             />
           ) : null}
         </div>
