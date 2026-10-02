@@ -287,6 +287,8 @@ export interface MomentumRunInfo {
   finishedAt: number;
   durationMs: number;
   savedAs: string | null;
+  /** True when the server dropped its caches and recomputed (the re-run-from-scratch icon). */
+  fresh?: boolean;
 }
 
 function formatDuration(ms: number): string {
@@ -330,8 +332,9 @@ export function MomentumPerformanceCard({
                 second: '2-digit',
               })}{' '}
               · took {formatDuration(runInfo.durationMs)}
+              {runInfo.fresh ? ' · recomputed from scratch' : ''}
               {runInfo.savedAs ? ` · saved as ${runInfo.savedAs}` : ''}
-              <InfoTooltip text="Every run recomputes the backtest for exactly the settings shown. A run that finishes in a second or two just means the server already had this strategy's price data and rankings cached — the numbers are still fresh for these settings." />
+              <InfoTooltip text="Every run recomputes the backtest for exactly the settings shown. A run that finishes in a second or two just means the server already had this strategy's price data and rankings cached — the numbers are still fresh for these settings. To drop the caches and recompute everything anyway, use the ↻ icon beside Strategy settings." />
             </p>
           ) : null}
         </div>

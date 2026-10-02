@@ -109,6 +109,31 @@ class _Data:
         self._references_mtimes: tuple | None = None
         self.references_cache: pd.DataFrame | None = None
 
+    def reset(self) -> None:
+        """Drop EVERYTHING this process has cached - rankings, trade-price tables, the loaded
+        datasets, the reference benchmarks - and forget every file/database timestamp, so the next
+        request reloads from the catalog or files and recomputes from scratch. This is what the
+        dashboard's "re-run from scratch" icon asks for (`fresh: true`). A normal run keeps the
+        caches: they are keyed on the settings, so they are correct as well as fast."""
+        with self._lock:
+            self._mtime = None
+            self.prices = None
+            self.rank_cache.clear()
+            self.fill_tables.clear()
+            self._stock_mtime = None
+            self.stock = None
+            self.stock_rank_cache.clear()
+            self._categories_mtimes = None
+            self.custom_index_cache.clear()
+            self.custom_index_rank_cache.clear()
+            self._broad_mtimes = None
+            self.broad_ranking_cache.clear()
+            self.broad_tilt_cache.clear()
+            self._momentum_universe_mtimes = None
+            self.momentum_universe_cache = None
+            self._references_mtimes = None
+            self.references_cache = None
+
     def get(self) -> pd.DataFrame:
         """Prefers the shared local database (`packages/trading-data`, populated by `mbt
         local migrate`) over weekly_closes.csv once it has data — see db_read.py's module
@@ -378,6 +403,9 @@ DATA = _Data()
 
 class BacktestRequest(BaseModel):
     dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf"
+    #: Not a strategy setting: true makes the server drop all its caches and reload the data
+    #: before running (the dashboard's "re-run from scratch"). Never part of a saved config.
+    fresh: bool = False
     universe: list[str] = Field(min_length=1)
     start: str = "2017-01-01"
     end: str | None = None
@@ -1691,6 +1719,8 @@ def create_app() -> FastAPI:
 
     @app.post("/api/backtest")
     def backtest(req: BacktestRequest) -> dict:
+        if req.fresh:
+            DATA.reset()
         if req.dataset == "stock":
             return _stock_backtest(req)
         if req.dataset == "broad":

@@ -8,6 +8,7 @@ import {
   Loader2,
   Play,
   RefreshCw,
+  RotateCw,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -140,6 +141,7 @@ export function MomentumBacktestingView() {
   // Kept apart from `error` (data failed to load) on purpose: after a failed run the previous
   // results stay on screen, and the reason must be visible right where Run was clicked.
   const [runError, setRunError] = useState<string | null>(null);
+  const [runningFresh, setRunningFresh] = useState(false);
   const runErrorRef = useRef<HTMLDivElement>(null);
   const [result, setResult] = useState<MomentumResult | null>(null);
   const [lastRunConfig, setLastRunConfig] = useState<Record<string, unknown> | null>(null);
@@ -290,7 +292,12 @@ export function MomentumBacktestingView() {
     };
   }
 
-  async function runBacktest(): Promise<void> {
+  /**
+   * `fresh` is the "re-run from scratch" icon: the server drops its cached rankings and data and
+   * reloads before computing. It is sent alongside the config but is NOT part of it, so it never
+   * enters `lastRunConfig`, a saved run, or the "changed since last run" comparison.
+   */
+  async function runBacktest({ fresh = false }: { fresh?: boolean } = {}): Promise<void> {
     let config: Record<string, unknown>;
     setRunError(null);
     try {
@@ -303,9 +310,14 @@ export function MomentumBacktestingView() {
     setRunStartedAt(startedAt);
     setNow(startedAt);
     setRunning(true);
+    setRunningFresh(fresh);
     setError(null);
-    const response = await apiPost<MomentumResult>('/api/momentum/backtest', config);
+    const response = await apiPost<MomentumResult>(
+      '/api/momentum/backtest',
+      fresh ? { ...config, fresh: true } : config,
+    );
     setRunning(false);
+    setRunningFresh(false);
     setRunStartedAt(null);
     if (!response.ok) {
       setRunError(response.error);
@@ -314,7 +326,7 @@ export function MomentumBacktestingView() {
     const finishedAt = Date.now();
     setResult(response.data);
     setLastRunConfig(config);
-    setRunInfo({ finishedAt, durationMs: finishedAt - startedAt, savedAs: null });
+    setRunInfo({ finishedAt, durationMs: finishedAt - startedAt, savedAs: null, fresh });
     setSettingsOpen(false);
     const kpis = response.data.kpis;
     const sequence = Math.max(0, ...savedRuns.map((run) => run.n)) + 1;
@@ -542,29 +554,49 @@ export function MomentumBacktestingView() {
 
           {loading || !meta ? null : (
             <div className="rounded-xl border border-border bg-surface">
-              <button
-                type="button"
-                onClick={() => setSettingsOpen((open) => !open)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-              >
-                <div className="min-w-0">
+              <div className="flex items-center gap-3 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen((open) => !open)}
+                  aria-expanded={settingsOpen}
+                  className="min-w-0 flex-1 text-left"
+                >
                   <p className="text-sm font-semibold text-foreground">Strategy settings</p>
                   {!settingsOpen ? <p className="truncate text-xs text-muted">{summary}</p> : null}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
+                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
                   {dirty ? (
                     <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
                       Changed since last run
                     </span>
                   ) : null}
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 text-faint transition-transform',
-                      settingsOpen && 'rotate-180',
-                    )}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => void runBacktest({ fresh: true })}
+                    disabled={running}
+                    title="Re-run from scratch: drops the server's cached rankings and data, reloads them, then recomputes"
+                    aria-label="Re-run from scratch"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RotateCw
+                      className={cn(
+                        'h-3.5 w-3.5 shrink-0',
+                        running && runningFresh && 'animate-spin',
+                      )}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen((open) => !open)}
+                    aria-label={settingsOpen ? 'Collapse settings' : 'Expand settings'}
+                    className="rounded p-1 text-faint hover:text-foreground"
+                  >
+                    <ChevronDown
+                      className={cn('h-4 w-4 transition-transform', settingsOpen && 'rotate-180')}
+                    />
+                  </button>
                 </div>
-              </button>
+              </div>
               {settingsOpen ? (
                 <div className="space-y-4 border-t border-border p-4">
                   <MomentumSettingsPanel

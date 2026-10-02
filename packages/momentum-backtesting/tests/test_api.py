@@ -1347,3 +1347,50 @@ def test_meta_with_an_empty_catalog_and_no_csv_is_a_clear_409_not_a_500(tmp_path
 
     assert res.status_code == 409, res.text
     assert "mbt" in res.json()["detail"]
+
+
+def test_fresh_run_drops_every_server_cache_and_a_normal_run_keeps_them(client):
+    """The dashboard's "re-run from scratch" icon sends `fresh: true`. The server caches rankings,
+    trade-price tables and the loaded datasets (keyed on the settings, so a normal run is correct
+    AND fast); `fresh` must drop all of it and recompute - and a normal run must not."""
+    universe = core(client)
+    body = {"universe": universe, "start": "2017-01-06"}
+    assert client.post("/api/backtest", json=body).status_code == 200
+    assert len(api.DATA.rank_cache) == 1  # the ranking was cached
+
+    # Plant sentinels in every cache `_Data` owns - none may survive a fresh run
+    api.DATA.rank_cache["sentinel"] = "x"
+    api.DATA.stock_rank_cache["sentinel"] = "x"
+    api.DATA.custom_index_cache["sentinel"] = "x"
+    api.DATA.custom_index_rank_cache["sentinel"] = "x"
+    api.DATA.broad_ranking_cache["sentinel"] = "x"
+    api.DATA.broad_tilt_cache["sentinel"] = "x"
+    api.DATA.fill_tables["sentinel"] = "x"
+    sentinel_refs = pd.DataFrame()  # a real frame: a normal run reads it (`.empty`)
+    api.DATA.references_cache = sentinel_refs
+
+    assert client.post("/api/backtest", json=body).status_code == 200  # a normal run: kept
+    assert "sentinel" in api.DATA.rank_cache and api.DATA.references_cache is sentinel_refs
+
+    res = client.post("/api/backtest", json={**body, "fresh": True})
+    assert res.status_code == 200, res.text
+    for cache in (
+        api.DATA.stock_rank_cache,
+        api.DATA.custom_index_cache,
+        api.DATA.custom_index_rank_cache,
+        api.DATA.broad_ranking_cache,
+        api.DATA.broad_tilt_cache,
+        api.DATA.fill_tables,
+    ):
+        assert "sentinel" not in cache
+    assert "sentinel" not in api.DATA.rank_cache
+    assert len(api.DATA.rank_cache) == 1  # ...and the ranking was recomputed and cached again
+    assert api.DATA.references_cache is not sentinel_refs  # reloaded
+
+
+def test_fresh_run_gives_the_same_numbers_as_a_cached_one(client):
+    """ "From scratch" must change how the answer is computed, never what it is."""
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    cached = client.post("/api/backtest", json=body).json()["kpis"]
+    fresh = client.post("/api/backtest", json={**body, "fresh": True}).json()["kpis"]
+    assert fresh == cached
