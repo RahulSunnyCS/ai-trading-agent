@@ -108,3 +108,52 @@ def test_payload_without_reference_data_has_an_empty_list(tmp_path):
     weeks = pd.date_range("2020-01-03", periods=3, freq="W-FRI")
     assert compare(pd.Series([1.0, 1.1, 1.2], index=weeks), pd.DataFrame()) == []
     assert reference_benchmarks.load_references(tmp_path).empty
+
+
+def _seed_series(rows):
+    from trading_data.db import connect
+
+    with connect() as con:  # the conftest-isolated TRADING_DATA_ROOT
+        con.executemany("INSERT INTO stock_weekly_series VALUES (?, ?, ?)", rows)
+
+
+def test_load_references_reads_the_database_when_a_catalog_exists():
+    """The reference TRIs live in `stock_weekly_series` since migration 004 (they used to share
+    `momentum_prices`). `_from_db` kept calling a helper that 004's commit deleted, so with a
+    catalog present EVERY backtest endpoint (all four call `DATA.references()`) crashed with an
+    AttributeError - after doing all the work. No test had a catalog, so none ran this branch."""
+    weeks = pd.date_range("2024-01-05", periods=3, freq="W-FRI")
+    _seed_series(
+        [(NIFTY50_TRI, w.date(), v) for w, v in zip(weeks, [10.0, 11.0, 12.0], strict=True)]
+        + [
+            (NIFTY200_MOMENTUM30_TRI, w.date(), v)
+            for w, v in zip(weeks, [20.0, 22.0, 24.0], strict=True)
+        ]
+        # series that share the table but are NOT references must not leak in
+        + [
+            ("Cash (liquid fund)", weeks[0].date(), 1.0),
+            ("Nifty50 Equal Weight TRI", weeks[0].date(), 5.0),
+        ]
+    )
+
+    refs = load_references()
+
+    assert list(refs.columns) == [NIFTY50_TRI, NIFTY200_MOMENTUM30_TRI]
+    assert list(refs[NIFTY50_TRI]) == [10.0, 11.0, 12.0]
+    assert list(refs[NIFTY200_MOMENTUM30_TRI]) == [20.0, 22.0, 24.0]
+    assert isinstance(refs.index, pd.DatetimeIndex)  # same index type the CSV path produces
+
+
+def test_load_references_falls_back_to_the_csv_when_the_catalog_has_no_series(tmp_path):
+    """A catalog that exists but hasn't been migrated (the dashboard's saved-runs call creates
+    one on first use) must not hide the CSV - and must not crash."""
+    from trading_data.db import connect
+
+    with connect():
+        pass  # creates the empty catalog
+    weeks = pd.date_range("2016-01-01", periods=4, freq="W-FRI")
+    _write_csv(tmp_path, weeks, [1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0])
+
+    refs = load_references(tmp_path)
+
+    assert list(refs[NIFTY50_TRI]) == [1.0, 2.0, 3.0, 4.0]

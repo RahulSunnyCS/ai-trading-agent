@@ -42,8 +42,17 @@ def _from_db() -> pd.DataFrame | None:
     from trading_data.db import connect, data_root  # noqa: PLC0415
 
     with connect(data_root(), read_only=True) as con:
-        frame = db_read._momentum_prices_frame(con, REFERENCES)
-    return frame if not frame.empty else None
+        # Migration 004 moved these TRIs from `momentum_prices` to `stock_weekly_series`. A
+        # read-only connect never migrates, so a catalog last opened for writing before 004 has
+        # no such table: that, or no matching rows, means "not in the database" -> the CSV.
+        if not db_read._has_table(con, "stock_weekly_series"):
+            return None
+        rows = con.execute(
+            "SELECT week, series, close FROM stock_weekly_series "
+            "WHERE series IN (SELECT unnest(?)) ORDER BY week",
+            [list(REFERENCES)],
+        ).fetchall()
+    return db_read._pivot_weekly(rows, "close") if rows else None
 
 
 def load_references(data_dir: Path | None = None) -> pd.DataFrame:
