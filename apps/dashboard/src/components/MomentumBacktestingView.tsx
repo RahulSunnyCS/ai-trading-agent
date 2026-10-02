@@ -136,6 +136,11 @@ export function MomentumBacktestingView() {
   const [doneNoticeAt, setDoneNoticeAt] = useState<number | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // Why the LAST Run click produced no new results (a validation message, or the server's 4xx/5xx).
+  // Kept apart from `error` (data failed to load) on purpose: after a failed run the previous
+  // results stay on screen, and the reason must be visible right where Run was clicked.
+  const [runError, setRunError] = useState<string | null>(null);
+  const runErrorRef = useRef<HTMLDivElement>(null);
   const [result, setResult] = useState<MomentumResult | null>(null);
   const [lastRunConfig, setLastRunConfig] = useState<Record<string, unknown> | null>(null);
   const [savedRuns, setSavedRuns] = useState<MomentumSavedRun[]>([]);
@@ -188,6 +193,7 @@ export function MomentumBacktestingView() {
   async function loadMeta(nextDataset: Dataset, seed?: Record<string, unknown>): Promise<void> {
     setLoading(true);
     setError(null);
+    setRunError(null);
     setResult(null);
     setLastRunConfig(null);
     setRunInfo(null);
@@ -286,10 +292,11 @@ export function MomentumBacktestingView() {
 
   async function runBacktest(): Promise<void> {
     let config: Record<string, unknown>;
+    setRunError(null);
     try {
       config = buildConfig();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setRunError(cause instanceof Error ? cause.message : String(cause));
       return;
     }
     const startedAt = Date.now();
@@ -301,7 +308,7 @@ export function MomentumBacktestingView() {
     setRunning(false);
     setRunStartedAt(null);
     if (!response.ok) {
-      setError(response.error);
+      setRunError(response.error);
       return;
     }
     const finishedAt = Date.now();
@@ -335,6 +342,12 @@ export function MomentumBacktestingView() {
       );
     }
   }
+
+  // A failed run leaves the previous results on screen, so bring the reason into view: the Run
+  // button sits at the bottom of a long form and the user would otherwise see nothing happen.
+  useEffect(() => {
+    if (runError) runErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [runError]);
 
   // Ticks the elapsed-time readout while a run is in flight.
   useEffect(() => {
@@ -605,6 +618,21 @@ export function MomentumBacktestingView() {
                   </Button>
                 </div>
               )}
+              {runError ? (
+                <div
+                  ref={runErrorRef}
+                  role="alert"
+                  className="mx-4 mb-4 rounded-lg border border-negative/30 bg-negative/10 px-3 py-2.5 text-sm text-negative"
+                >
+                  <p className="font-medium">The run didn&apos;t finish — nothing was updated</p>
+                  <p className="mt-0.5 text-foreground/80">{runError}</p>
+                  {result ? (
+                    <p className="mt-0.5 text-xs text-muted">
+                      The results below are from your previous run.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -657,6 +685,7 @@ export function MomentumBacktestingView() {
                   result={result}
                   config={lastRunConfig ?? {}}
                   stale={dirty && !running}
+                  lastRunFailed={runError !== null && !running}
                   runInfo={runInfo}
                 />
               </div>

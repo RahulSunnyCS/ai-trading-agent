@@ -297,11 +297,14 @@ export function MomentumPerformanceCard({
   result,
   config,
   stale = false,
+  lastRunFailed = false,
   runInfo = null,
 }: {
   result: MomentumResult;
   config: Record<string, unknown>;
   stale?: boolean;
+  /** The last Run click failed, so these are the PREVIOUS run's results. */
+  lastRunFailed?: boolean;
   runInfo?: MomentumRunInfo | null;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -333,7 +336,11 @@ export function MomentumPerformanceCard({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {stale ? <Badge tone="warning">Results use previous settings</Badge> : null}
+          {lastRunFailed ? (
+            <Badge tone="negative">Last run failed — these are the previous results</Badge>
+          ) : stale ? (
+            <Badge tone="warning">Results use previous settings</Badge>
+          ) : null}
           <Button size="sm" onClick={() => setExpanded((value) => !value)}>
             {expanded ? 'Hide detail metrics' : 'Show all metrics'}
           </Button>
