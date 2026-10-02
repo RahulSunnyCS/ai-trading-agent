@@ -91,8 +91,8 @@ same sign in both halves, in C3 and at least one of C4 or C5.
 
 ### V2. Predictive test (H1, H4, H5)
 
-Universe each week: Broad's qualifying pool (top 200 by momentum, point-in-time gate as the
-engine uses it). Repeat within held names only.
+Universe each week: Broad's qualifying pool (top 200 by momentum, with the same membership gate
+the engine uses, which is not yet point-in-time). Repeat within held names only.
 
 1. Within each week, remove the part of each feature explained by momentum rank and 2-week
    return: rank-regress the feature on those two and keep the residual.
