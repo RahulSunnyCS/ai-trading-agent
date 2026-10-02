@@ -8,6 +8,8 @@ Run from packages/momentum-backtesting:
 
     uv run python scripts/volume_turnover_tests.py v0   # data checks, redundancy count, stages
     uv run python scripts/volume_turnover_tests.py v1   # spike split on the 3.9.26 events (H2)
+    uv run python scripts/volume_turnover_tests.py v2   # predictive test (H1, H4-H7)
+    uv run python scripts/volume_turnover_tests.py v3   # liquidity floor reruns (H3)
 
 `v0` builds the weekly feature table and saves it; later stages reuse it (rerun `v0` after a
 data refresh). Output goes to data/backtests/volume/ (gitignored).
@@ -35,6 +37,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import breadth_regime_tests as brt  # noqa: E402
 import overextension_trim_tests as ott  # noqa: E402
 
 RECENT2 = 10  # sessions, VR2
@@ -54,6 +57,17 @@ CRORE = 1e7
 START = ott.START
 FIRST_HALF_END = ott.FIRST_HALF_END
 MIN_EVENT_WEEKS = 10  # V1 pass rule
+V2_HORIZONS = (1, 4, 13, 26, 52)
+PASS_HORIZONS = (4, 13)
+CONTINUOUS = ("VR2", "VR4", "ACC13", "DIST10")  # residual IC + tercile spread
+FLAGS = ("RISE2", "ABOVE10", "STAGE3", "EARLY2")  # one regression per week
+CROSS_CHECK = ("DIST10",)  # reported, never a pass (owner, after V0)
+H7_FEATURES = ("STAGE3", "EARLY2")
+H7_BANDS = (0.01, 0.02)
+VOLUME_FEATURES = ("VR2", "VR4", "RISE2", "ACC13")  # H5 life cycle
+MIN_NAMES = 8  # per week, for a residual IC / spread / flag regression
+MIN_FLAG_EACH = 3  # per week, flagged and unflagged names a flag regression needs
+LIQ_FLOORS_CR = (1, 5, 10)
 
 FEATURES = (
     "VR2",
@@ -359,6 +373,73 @@ def run_lengths(stage: pd.Series) -> list[tuple[pd.Timestamp, pd.Timestamp, str,
     if start is not None:
         runs.append((first, labels.index[-1], current, len(labels) - start))
     return runs
+
+
+def forward_returns(
+    prices: pd.DataFrame, horizon: int, stale: dict[str, pd.Timestamp] | None = None
+) -> pd.DataFrame:
+    """P[t + h] / P[t] - 1 on the weekly frame, NaN when the column's real prices stop before
+    t + h (a stale column is forward-filled flat after its last real week, which would otherwise
+    read as a 0% return)."""
+    fwd = prices.shift(-horizon) / prices - 1
+    pos = np.arange(len(prices.index))
+    for col, cutoff in (stale or {}).items():
+        if col not in fwd.columns:
+            continue
+        last = prices.index.searchsorted(pd.Timestamp(cutoff), side="right") - 1
+        j = fwd.columns.get_loc(col)
+        fwd.iloc[pos + horizon > last, j] = np.nan
+    return fwd
+
+
+def flag_coefficient(y: pd.Series, controls: pd.DataFrame, flag: pd.Series) -> float:
+    """One week's cross-section: OLS of the forward return `y` on a constant, the controls'
+    percentile ranks and the 0/1 `flag`; returns the flag's coefficient (the return gap between
+    flagged and unflagged names with similar controls). NaN with too few names of either kind."""
+    frame = pd.concat([y.rename("_y"), controls, flag.rename("_f")], axis=1).dropna()
+    on = int((frame["_f"] == 1).sum())
+    if len(frame) < MIN_NAMES or on < MIN_FLAG_EACH or len(frame) - on < MIN_FLAG_EACH:
+        return np.nan
+    x = np.column_stack(
+        [
+            np.ones(len(frame)),
+            frame[controls.columns].rank(pct=True).to_numpy(),
+            frame["_f"].to_numpy(dtype=float),
+        ]
+    )
+    beta, *_ = np.linalg.lstsq(x, frame["_y"].to_numpy(), rcond=None)
+    return float(beta[-1])
+
+
+def tercile_spread(score: pd.Series, y: pd.Series) -> float:
+    """Mean `y` of the top third by `score` minus the bottom third (NaN under MIN_NAMES)."""
+    both = pd.concat([score, y], axis=1).dropna()
+    k = len(both) // 3
+    if len(both) < MIN_NAMES or k == 0:
+        return np.nan
+    ordered = both.sort_values(both.columns[0])
+    return float(ordered.iloc[-k:, 1].mean() - ordered.iloc[:k, 1].mean())
+
+
+def position_pnl(
+    weights: pd.DataFrame, equity: pd.Series, prices: pd.DataFrame, cash_col: str, idle_col: str
+) -> pd.DataFrame:
+    """Profit per (week, asset) in equity units, before costs. The post-trade weights of each
+    engine week become units (weight x equity / price), carried unchanged through the weeks the
+    engine skipped; week t's profit is units[t] x (P[t+1] - P[t]). The idle column is priced as
+    `cash_col`. `prices` sets the calendar (the `weekly_marks` index)."""
+    cal = prices.index
+    px = prices.ffill()
+    cols = [c for c in weights.columns if (cash_col if c == idle_col else c) in px.columns]
+    price_cols = [cash_col if c == idle_col else c for c in cols]
+    engine_px = px.reindex(weights.index)[price_cols].to_numpy()
+    units = weights[cols].fillna(0.0).to_numpy() * equity.reindex(weights.index).to_numpy()[:, None]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        units = np.where(engine_px > 0, units / engine_px, 0.0)
+    units = pd.DataFrame(units, index=weights.index, columns=cols).reindex(cal).ffill()
+    step = px[price_cols].shift(-1) - px[price_cols]
+    step.columns = cols
+    return units.fillna(0.0) * step.fillna(0.0)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -922,11 +1003,348 @@ def stage_v1() -> None:
     print(f"\nwritten to {folder}")
 
 
+# ---------------------------------------------------------------------------------------------
+# V2
+# ---------------------------------------------------------------------------------------------
+
+
+def v2_feature_frames(u: Universe, feats: dict[str, pd.DataFrame]) -> dict[tuple, pd.DataFrame]:
+    """(feature, band) -> week x column frame. Stage features carry their slope band; the rest
+    use None. STAGE3 is 1 for Stage 3, 0 for Stage 2, NaN otherwise (Stage 3 vs Stage 2). EARLY2
+    is only defined inside Stage 2 (early vs late Stage 2), NaN for a censored spell."""
+    out = {(k, None): feats[k] for k in ("VR2", "VR4", "ACC13", "DIST10", "RISE2", "ABOVE10")}
+    ok = history_ok(u.prices, u.ranking.stale_columns)
+    for band in H7_BANDS:
+        if band == STAGE_BAND:
+            st, wk = feats["STAGE"], feats["WEEKS_IN_STAGE"]
+        else:
+            st, wk = stages(u.prices, ok, band)
+        out[("STAGE3", band)] = (st == 3).astype(float).where(st.isin([2, 3]))
+        out[("EARLY2", band)] = early2(st, wk).where(st == 2)
+    return out
+
+
+def v2_weekly(
+    feature: pd.DataFrame,
+    universe: pd.DataFrame,
+    controls: dict[str, pd.DataFrame],
+    fwd: dict[int, pd.DataFrame],
+    kind: str,
+) -> pd.DataFrame:
+    """Per week: residual IC and tercile spread per horizon (kind "continuous"), or the flag's
+    regression coefficient per horizon (kind "flag"), plus the number of names used."""
+    rows = {}
+    weeks = universe.index
+    for week in weeks:
+        names = universe.columns[universe.loc[week].to_numpy(dtype=bool)]
+        if len(names) < MIN_NAMES:
+            continue
+        x = feature.loc[week, names]
+        ctrl = pd.DataFrame({k: v.loc[week, names] for k, v in controls.items()})
+        row = {}
+        if kind == "continuous":
+            resid = rank_residual(x, ctrl).dropna()
+            row["n"] = len(resid)
+            if len(resid) < MIN_NAMES:
+                continue
+            for h, f in fwd.items():
+                y = f.loc[week, resid.index]
+                row[f"ic_{h}"] = spearman(resid, y)
+                row[f"spread_{h}"] = tercile_spread(resid, y)
+        else:
+            row["n"] = int(pd.concat([x, ctrl], axis=1).dropna().shape[0])
+            for h, f in fwd.items():
+                row[f"coef_{h}"] = flag_coefficient(f.loc[week, names], ctrl, x)
+        rows[week] = row
+    return pd.DataFrame.from_dict(rows, orient="index")
+
+
+def bootstrap_ci(series: pd.Series, mask: np.ndarray, block: int) -> tuple[float, float]:
+    values = series.fillna(0.0).to_numpy()
+    m = mask & series.notna().to_numpy()
+    if m.sum() < ott.MIN_CI_WEEKS:
+        return np.nan, np.nan
+    boot = brt.block_bootstrap_means(values, {"m": m}, block=block)["m"]
+    lo, hi = np.nanpercentile(boot, [2.5, 97.5])
+    return float(lo), float(hi)
+
+
+def v2_summary(weekly: pd.DataFrame, calendar: pd.DatetimeIndex) -> list[dict]:
+    """Mean, 4-week block CI (the spec's), an h-week block CI (robustness for overlapping
+    horizons), share of positive weeks, halves, and the same with 2020 excluded."""
+    w = weekly.reindex(calendar)
+    years = calendar.year
+    first = calendar <= FIRST_HALF_END
+    rows = []
+    stat = "ic" if any(c.startswith("ic_") for c in w.columns) else "coef"
+    for h in V2_HORIZONS:
+        col = f"{stat}_{h}"
+        if col not in w.columns:
+            continue
+        x = w[col]
+        for variant, mask in (("all years", np.ones(len(x), bool)), ("ex 2020", years != 2020)):
+            sel = x[mask]
+            lo, hi = bootstrap_ci(x, mask, brt.BOOTSTRAP_BLOCK)
+            lo_h, hi_h = bootstrap_ci(x, mask, max(brt.BOOTSTRAP_BLOCK, h))
+            row = {
+                "variant": variant,
+                "horizon": h,
+                "stat": stat,
+                "weeks": int(sel.notna().sum()),
+                "mean": float(sel.mean()),
+                "lo": lo,
+                "hi": hi,
+                "lo_hblock": lo_h,
+                "hi_hblock": hi_h,
+                "pos_share": float((sel.dropna() > 0).mean()) if sel.notna().any() else np.nan,
+                "2017-2021": float(x[mask & first].mean()),
+                "2022+": float(x[mask & ~first].mean()),
+                "names_per_week": float(w["n"][mask].mean()),
+            }
+            if stat == "ic":
+                sp = w[f"spread_{h}"]
+                row["spread"] = float(sp[mask].mean())
+                row["spread_lo"], row["spread_hi"] = bootstrap_ci(sp, mask, brt.BOOTSTRAP_BLOCK)
+            rows.append(row)
+    return rows
+
+
+def v2_pass(table: pd.DataFrame) -> pd.DataFrame:
+    """Spec rule per (universe, feature, band): the all-years interval excludes zero at 4 and 13
+    weeks with one sign, both halves share it, the spread (continuous features) points the same
+    way, and the 2020-excluded mean keeps the sign. H7 also needs the 2% band to agree in sign.
+    DIST10 is a cross-check and never passes."""
+    rows = []
+    for (uni, feat), sub in table.groupby(["universe", "feature"], sort=False):
+        keep = (sub["band"] == STAGE_BAND) if feat in H7_FEATURES else sub["band"].isna()
+        primary = sub[keep]
+        allyrs = primary[primary["variant"] == "all years"].set_index("horizon")
+        ex = primary[primary["variant"] == "ex 2020"].set_index("horizon")
+        signs = []
+        ok = True
+        for h in PASS_HORIZONS:
+            r = allyrs.loc[h]
+            sign = 1 if r["lo"] > 0 else -1 if r["hi"] < 0 else 0
+            signs.append(sign)
+            ok &= sign != 0
+            ok &= np.sign(r["2017-2021"]) == sign and np.sign(r["2022+"]) == sign
+            if "spread" in r and not pd.isna(r.get("spread", np.nan)):
+                ok &= np.sign(r["spread"]) == sign
+            ok &= np.sign(ex.loc[h, "mean"]) == sign
+        ok &= len(set(signs)) == 1
+        robust = None
+        if feat in H7_FEATURES:
+            alt = sub[(sub["band"] == 0.02) & (sub["variant"] == "all years")].set_index("horizon")
+            robust = all(np.sign(alt.loc[h, "mean"]) == signs[0] for h in PASS_HORIZONS)
+            ok &= robust
+        rows.append(
+            {
+                "universe": uni,
+                "feature": feat,
+                "direction": "+" if signs[0] > 0 else "-" if signs[0] < 0 else "none",
+                "2% band agrees": robust,
+                "cross-check only": feat in CROSS_CHECK,
+                "passes": bool(ok) and feat not in CROSS_CHECK,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def stage_v2() -> None:
+    from momentum_backtesting.engine import IDLE
+
+    folder = out_dir()
+    strategies, u = build_strategies(("C4",))
+    feats = load_features(folder / "features.parquet", u)
+    frames = v2_feature_frames(u, feats)
+    weeks = u.prices.index[u.prices.index >= START]
+    pool = (u.pool & u.membership).loc[weeks]
+    c4 = strategies["C4"]
+    held = ott.held_matrix(c4.result.weights, c4.marked.index, IDLE)
+    held = held.reindex(index=weeks, columns=u.stocks).fillna(False).astype(bool) & pool
+    universes = {"pool": pool, "C4 held": held}
+    controls = {
+        "momentum": -u.ranking.stock_pool_ranks.reindex(index=weeks, columns=u.stocks),
+        "r2": (u.prices / u.prices.shift(2) - 1).loc[weeks],
+    }
+    fwd = {h: forward_returns(u.prices, h, u.ranking.stale_columns).loc[weeks] for h in V2_HORIZONS}
+    rows = []
+    for uni, mask in universes.items():
+        for (feat, band), frame in frames.items():
+            print(f"V2 {uni}: {feat}{'' if band is None else f' @{band:.0%}'} ...", flush=True)
+            kind = "continuous" if feat in CONTINUOUS else "flag"
+            f = frame.loc[weeks]
+            weekly = v2_weekly(f, mask & f.notna(), controls, fwd, kind)
+            for r in v2_summary(weekly, weeks):
+                rows.append({"universe": uni, "feature": feat, "band": band, **r})
+    table = pd.DataFrame(rows)
+    verdict = v2_pass(table)
+    table.to_csv(folder / "v2_predictive.csv", index=False)
+    verdict.to_csv(folder / "v2_pass.csv", index=False)
+    print_v2(table, verdict)
+    print(f"\nwritten to {folder}")
+
+
+def print_v2(table: pd.DataFrame, verdict: pd.DataFrame) -> None:
+    def cell(r) -> str:
+        star = "*" if (r["lo"] > 0 or r["hi"] < 0) else " "
+        hstar = "h" if (r["lo_hblock"] > 0 or r["hi_hblock"] < 0) else " "
+        scale = 100 if r["stat"] == "coef" else 1
+        fmt = "{:+.2f}" if r["stat"] == "coef" else "{:+.3f}"
+        return (
+            f"{fmt.format(scale * r['mean'])} [{fmt.format(scale * r['lo'])},"
+            f"{fmt.format(scale * r['hi'])}]{star}{hstar}"
+        )
+
+    for uni, sub in table.groupby("universe", sort=False):
+        print(f"\n=== V2 {uni}: residual IC (continuous) / flag coefficient in % (flags) ===")
+        for variant in ("all years", "ex 2020"):
+            print(f"\n-- {variant} --")
+            print(
+                f"{'feature':16} {'names':>5}  "
+                + "  ".join(f"{f'{h}w':>27}" for h in V2_HORIZONS)
+                + f"  {'13w halves':>15}  {'4w / 13w spread':>17}"
+            )
+            v = sub[sub["variant"] == variant]
+            for (feat, band), g in v.groupby(["feature", "band"], sort=False, dropna=False):
+                g = g.set_index("horizon")
+                label = feat if pd.isna(band) else f"{feat} @{band:.0%}"
+                if feat in CROSS_CHECK:
+                    label += " (x)"
+                halves = g.loc[13]
+                scale = 100 if halves["stat"] == "coef" else 1
+                hv = f"{scale * halves['2017-2021']:+.2f}/{scale * halves['2022+']:+.2f}"
+                spread = (
+                    f"{100 * g.loc[4, 'spread']:+.2f}%/{100 * g.loc[13, 'spread']:+.2f}%"
+                    if "spread" in g.columns and not pd.isna(g.loc[4].get("spread", np.nan))
+                    else ""
+                )
+                print(
+                    f"{label:16} {g['names_per_week'].iloc[0]:5.0f}  "
+                    + "  ".join(f"{cell(g.loc[h]):>27}" for h in V2_HORIZONS)
+                    + f"  {hv:>15}  {spread:>17}"
+                )
+    print(
+        "\n* = 4-week block 95% interval excludes zero (the spec's); h = also with blocks as long"
+        " as the horizon. (x) = cross-check, never a pass. Flags in % return per horizon."
+    )
+    print("\n=== V2 pass rule ===")
+    print(verdict.to_string(index=False))
+
+
+# ---------------------------------------------------------------------------------------------
+# V3
+# ---------------------------------------------------------------------------------------------
+
+
+def run_metrics(s: ott.Strategy) -> dict:
+    m = s.marked
+    stats = brt.metrics_from_returns(
+        m["equity"].pct_change().iloc[1:], m["cash"].pct_change().iloc[1:]
+    )
+    years = (m.index[-1] - m.index[0]).days / 365.25
+    trades = s.result.trades
+    stock_rows = trades[trades["asset"].isin(s.positions)]
+    return {
+        "CAGR": stats["CAGR"],
+        "Sharpe": stats["Sharpe"],
+        "max_dd": stats["max_dd"],
+        "fresh buys/yr": float((stock_rows["action"] == "BUY").sum() / years),
+        "trade rows/yr": float(len(stock_rows) / years),
+    }
+
+
+def profit_by_entry_liquidity(s: ott.Strategy, liq: pd.DataFrame) -> pd.DataFrame:
+    """Each stock holding spell's profit (equity units, before costs) with LIQ13 at its entry
+    week, plus the whole portfolio's profit for the denominator."""
+    from momentum_backtesting.engine import CASH, IDLE
+
+    pnl = position_pnl(
+        s.result.weights, s.result.equity, s.prices.reindex(s.marked.index), CASH, IDLE
+    )
+    stocks = [c for c in s.positions if c in pnl.columns]
+    held = ott.held_matrix(s.result.weights, s.marked.index, IDLE).reindex(columns=stocks)
+    held = held.fillna(False).astype(bool)
+    spells = ott.spell_ids(held)
+    rows = []
+    for col in stocks:
+        sp = spells[col]
+        for sid in np.unique(sp[sp > 0]):
+            weeks = sp.index[sp == sid]
+            rows.append(
+                {
+                    "asset": col,
+                    "entry_week": weeks[0],
+                    "weeks": len(weeks),
+                    "pnl": float(pnl.loc[weeks, col].sum()),
+                    "LIQ13_entry": lookup(liq, [weeks[0]], [col])[0],
+                }
+            )
+    out = pd.DataFrame(rows)
+    out.attrs["total_pnl"] = float(pnl.sum().sum())
+    out.attrs["equity_gain"] = float(s.marked["equity"].iloc[-1] / s.marked["equity"].iloc[0] - 1)
+    return out
+
+
+def stage_v3() -> None:
+    folder = out_dir()
+    strategies, u = build_strategies(("C3", "C4"))
+    feats = load_features(folder / "features.parquet", u)
+    liq = feats["LIQ13"]
+    rows, attribution = [], []
+    for key in ("C3", "C4"):
+        base = strategies[key]
+        label, overrides = BROAD[key]
+        spells = profit_by_entry_liquidity(base, liq)
+        total = spells.attrs["total_pnl"]
+        print(
+            f"{key}: attributed profit {total:.3f} vs equity gain {spells.attrs['equity_gain']:.3f}"
+            " (difference = costs)",
+            flush=True,
+        )
+        spells.insert(0, "strategy", key)
+        attribution.append(spells)
+        rows.append({"strategy": key, "floor_cr": 0, **run_metrics(base)})
+        for floor in LIQ_FLOORS_CR:
+            below = (liq < floor * CRORE).fillna(False)
+            print(f"running {key} with a {floor} Cr floor ...", flush=True)
+            s, _ = ott.build_broad(key, label, ranking=u.ranking, extra_no_buy=below, **overrides)
+            row = {"strategy": key, "floor_cr": floor, **run_metrics(s)}
+            known = spells["LIQ13_entry"].notna()
+            under = spells["LIQ13_entry"] < floor * CRORE
+            row["unfloored: share of profit from spells entered below"] = float(
+                spells.loc[under, "pnl"].sum() / total
+            )
+            row["unfloored: share of stock spells entered below"] = float(under.mean())
+            row["unfloored: spells with LIQ13 unknown at entry"] = int((~known).sum())
+            rows.append(row)
+    table = pd.DataFrame(rows)
+    table.to_csv(folder / "v3_liquidity_floor.csv", index=False)
+    pd.concat(attribution, ignore_index=True).to_csv(folder / "v3_spell_profit.csv", index=False)
+    with pd.option_context("display.width", 250, "display.max_columns", 20):
+        print("\n=== V3 liquidity floor (no_buy below median 65-session turnover; never sells) ===")
+        print(
+            table.to_string(
+                index=False,
+                formatters={
+                    "CAGR": "{:.1%}".format,
+                    "Sharpe": "{:.2f}".format,
+                    "max_dd": "{:.1%}".format,
+                    "fresh buys/yr": "{:.1f}".format,
+                    "trade rows/yr": "{:.1f}".format,
+                    "unfloored: share of profit from spells entered below": "{:.1%}".format,
+                    "unfloored: share of stock spells entered below": "{:.1%}".format,
+                },
+            )
+        )
+    print(f"\nwritten to {folder}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("stage", choices=["v0", "v1"])
+    parser.add_argument("stage", choices=["v0", "v1", "v2", "v3"])
     args = parser.parse_args()
-    {"v0": stage_v0, "v1": stage_v1}[args.stage]()
+    {"v0": stage_v0, "v1": stage_v1, "v2": stage_v2, "v3": stage_v3}[args.stage]()
 
 
 if __name__ == "__main__":

@@ -105,6 +105,18 @@ is the point of using five windows: one hot week is not enough.
   buy things that rose smoothly. All measured, none helped (TODO 3.9.23). Scaling the whole
   portfolio down when it gets bumpy (volatility targeting) does make falls shallower, but costs
   return about one for one: it is a comfort dial, not extra profit.
+- **Volume, the 50-day average and trend stages (not built).** Three popular trading ideas:
+  prefer stocks whose trading volume is surging or which trade more on up days; only buy stocks
+  above their 50-day average; skip stocks whose trend is topping out (Weinstein "Stage 3") and
+  prefer ones just starting a new uptrend. All measured on Broad Momentum, none helped once you
+  allow for the momentum score itself (TODO 3.9.27). Two even pointed slightly the wrong way:
+  stocks above their average, and stocks early in a new uptrend, did a little worse than
+  similar stocks that were not. Volume also does not tell a blow-off spike from a healthy one.
+- **How much of the profit could really be traded.** About a quarter of Broad Momentum's profit
+  came from stocks that trade less than ₹5 crore a day. Refusing to buy anything under ₹1 crore a
+  day costs about 3 points a year. With ₹10 lakh invested this does not matter (a position is a
+  tiny slice of a day's trading); for a much bigger account the headline return is optimistic
+  (TODO 3.9.27, 3.9.29).
 
 ### Costs and tax
 
@@ -185,8 +197,9 @@ buffer, caps as a risk dial, itemised costs still profitable, and (TODO 3.9.23):
 
 Tried and dropped: sizing by recent wins, mass-exit throttle, the cash filter, trend and breadth
 filters, 52-week-high and smooth-path filters, skipping the last month, volatility timing of
-the whole portfolio (a comfort dial only), waiting for long-term tax, and "make room" as a
-default.
+the whole portfolio (a comfort dial only), waiting for long-term tax, "make room" as a
+default, and (TODO 3.9.27) volume surges, accumulation, the 50-day average and trend-stage
+filters.
 
 Turnaround stocks: the beaten-down-and-recovering screen (`reversal.py`) is a little better than
 keeping 20% of the money in a liquid fund, but costs about 4 points a year against plain

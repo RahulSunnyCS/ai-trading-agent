@@ -248,3 +248,41 @@ def test_run_lengths():
     idx = pd.date_range("2021-01-01", periods=5, freq="W-FRI")
     runs = vtt.run_lengths(pd.Series([NAN, 2.0, 2.0, 3.0, 3.0], index=idx))
     assert [(lab, n) for _, _, lab, n in runs] == [("?", 1), ("S2", 2), ("S3", 2)]
+
+
+def test_forward_returns_stop_at_a_stale_cutoff():
+    idx = pd.date_range("2021-01-01", periods=6, freq="W-FRI")
+    prices = pd.DataFrame({"A": [1.0, 2, 4, 8, 8, 8], "B": [1.0, 2, 4, 8, 16, 32]}, index=idx)
+    fwd = vtt.forward_returns(prices, 1, {"A": idx[3]})
+    # A's real prices end at week 4; the flat ffilled tail must not read as a 0% return.
+    assert fwd["A"].iloc[:3].tolist() == [1.0, 1.0, 1.0]
+    assert fwd["A"].iloc[3:].isna().all()
+    assert fwd["B"].iloc[:5].tolist() == [1.0] * 5
+    assert math.isnan(fwd["B"].iloc[5])
+
+
+def test_flag_coefficient_recovers_the_gap_after_controls():
+    m = pd.Series(np.arange(12, dtype=float))
+    flag = pd.Series([1.0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0])
+    y = 0.02 * m.rank(pct=True) + 0.05 * flag
+    assert vtt.flag_coefficient(y, pd.DataFrame({"m": m}), flag) == pytest.approx(0.05)
+    too_few = pd.Series([1.0, 1] + [0.0] * 10)
+    assert math.isnan(vtt.flag_coefficient(y, pd.DataFrame({"m": m}), too_few))
+
+
+def test_tercile_spread():
+    score = pd.Series(np.arange(1.0, 10.0))
+    assert vtt.tercile_spread(score, score * 2) == pytest.approx(2 * (8 - 2))
+    assert math.isnan(vtt.tercile_spread(score.iloc[:5], score.iloc[:5]))
+
+
+def test_position_pnl_carries_units_through_a_skipped_week():
+    idx = pd.date_range("2021-01-01", periods=4, freq="W-FRI")
+    prices = pd.DataFrame({"A": [10.0, 11, 12, 12], "CASH": [1.0, 1, 1, 1.01]}, index=idx)
+    # Engine weeks 1 and 3 (week 2 skipped): all in A, then half in A and half idle.
+    weights = pd.DataFrame({"A": [1.0, 0.5], "IDLE": [0.0, 0.5]}, index=idx[[0, 2]])
+    equity = pd.Series([1.0, 1.2], index=idx[[0, 2]])
+    pnl = vtt.position_pnl(weights, equity, prices, "CASH", "IDLE")
+    assert pnl["A"].tolist() == pytest.approx([0.1, 0.1, 0.0, 0.0])
+    assert pnl["IDLE"].tolist() == pytest.approx([0.0, 0.0, 0.006, 0.0])
+    assert pnl.to_numpy().sum() == pytest.approx(0.206)

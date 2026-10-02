@@ -398,3 +398,154 @@ is not evidence on its own.
 
 **H2: fails.** Volume does not identify the spikes that reverse. The close-strength half cannot
 be tested as written (decision 1).
+
+### V2. Predictive test (H1, H4, H5, H6, H7)
+
+Run after merging `origin/main` (fdae5ca); V0 reproduced exactly after the merge. Universes: the
+qualifying pool (top 200 with the membership gate, from 2017; about 224 names a week) and C4's
+post-trade holdings (about 11 names). The held universe uses C4 because C3 holds about 8 names
+and skips 193 weeks. Controls each week: momentum (minus the pool rank) and the 2-week return.
+Volume rows: mean weekly rank IC of the residual with the forward return, and the top-minus-bottom
+third spread. Flag rows: the flag's weekly regression coefficient, in % of forward return (Stage
+3 vs Stage 2 among names in either; early vs late Stage 2 among Stage 2 names with a known start).
+Forward returns stop where a price segment goes stale, so a flat forward-filled tail never reads
+as 0%. A week needs at least 8 names, and a flag regression at least 3 names on each side.
+
+Intervals are 4-week block bootstraps (the spec's). \* = the interval excludes zero; h = it also
+does with blocks as long as the horizon, since 13 to 52-week forward returns overlap far beyond
+4 weeks. The h check changes no verdict.
+
+**pool, all years**
+
+| Feature | Weeks (13w) | 1w | 4w | 13w | 26w | 52w | 13w 2017–21 / 2022+ | Spread 4w / 13w |
+|---|---:|---|---|---|---|---|---|---|
+| VR2 | 496 | +0.008 [-0.000, +0.016] | +0.008 [-0.004, +0.020] | +0.011 [-0.003, +0.025] | +0.008 [-0.008, +0.023] | +0.012 [-0.004, +0.029] | +0.03 / -0.01 | +0.30% / +0.83% |
+| VR4 | 496 | +0.006 [-0.002, +0.014] | +0.004 [-0.009, +0.016] | +0.011 [-0.004, +0.026] | +0.007 [-0.011, +0.024] | +0.013 [-0.004, +0.032] | +0.03 / -0.01 | +0.24% / +0.87% |
+| ACC13 | 496 | -0.010 [-0.018, -0.001]\*h | -0.008 [-0.023, +0.005] | -0.005 [-0.020, +0.009] | -0.001 [-0.018, +0.015] | +0.020 [-0.001, +0.040] | +0.01 / -0.02 | +0.24% / +0.92% |
+| DIST10 (cross-check) | 496 | -0.010 [-0.020, -0.001]\*h | -0.018 [-0.032, -0.004]\*h | -0.003 [-0.019, +0.014] | -0.003 [-0.021, +0.016] | +0.023 [+0.002, +0.042]\*h | -0.00 / -0.00 | -0.18% / +0.20% |
+| RISE2 | 496 | -0.10 [-0.20, -0.00]\*h | -0.05 [-0.25, +0.15] | -0.15 [-0.56, +0.29] | -0.08 [-0.77, +0.63] | -0.76 [-2.22, +0.68] | -0.17 / -0.12 | — |
+| ABOVE10 | 493 | +0.05 [-0.06, +0.16] | -0.16 [-0.45, +0.14] | -0.87 [-1.53, -0.23]\*h | -2.31 [-3.62, -1.02]\*h | -3.03 [-5.72, -0.40]\*h | -0.72 / -1.02 | — |
+| Stage 3 vs Stage 2 (1% band) | 486 | -0.07 [-0.19, +0.05] | -0.12 [-0.48, +0.23] | -0.72 [-1.60, +0.19] | -2.33 [-3.77, -0.85]\*h | -4.47 [-7.28, -1.32]\*h | -1.52 / +0.17 | — |
+| Early vs late Stage 2 (1% band) | 495 | -0.11 [-0.24, +0.01] | -0.23 [-0.62, +0.17] | -0.80 [-1.69, +0.07] | -0.87 [-2.39, +0.51] | +3.02 [-0.95, +6.92] | -0.72 / -0.89 | — |
+| Stage 3 vs Stage 2 (2% band) | 495 | -0.14 [-0.25, -0.03]\*h | -0.48 [-0.81, -0.14]\*h | -2.07 [-2.95, -1.23]\*h | -4.57 [-5.97, -3.18]\*h | -8.08 [-11.01, -5.20]\*h | -2.78 / -1.28 | — |
+| Early vs late Stage 2 (2% band) | 496 | -0.14 [-0.27, -0.01]\*h | -0.26 [-0.67, +0.16] | -0.64 [-1.66, +0.42] | -0.58 [-2.65, +1.45] | +2.64 [-2.07, +7.34] | -0.92 / -0.34 | — |
+
+**pool, ex 2020**
+
+| Feature | Weeks (13w) | 1w | 4w | 13w | 26w | 52w | 13w 2017–21 / 2022+ | Spread 4w / 13w |
+|---|---:|---|---|---|---|---|---|---|
+| VR2 | 444 | +0.010 [+0.001, +0.019]\*h | +0.012 [-0.001, +0.025] | +0.015 [-0.001, +0.029] | +0.003 [-0.014, +0.019] | +0.010 [-0.007, +0.027] | +0.04 / -0.01 | +0.39% / +1.04% |
+| VR4 | 444 | +0.009 [+0.001, +0.018]\*h | +0.007 [-0.006, +0.021] | +0.013 [-0.003, +0.029] | -0.000 [-0.018, +0.018] | +0.010 [-0.009, +0.029] | +0.04 / -0.01 | +0.33% / +1.06% |
+| ACC13 | 444 | -0.010 [-0.019, -0.001]\*h | -0.008 [-0.024, +0.006] | -0.009 [-0.025, +0.006] | -0.011 [-0.029, +0.005] | +0.009 [-0.012, +0.030] | +0.01 / -0.02 | +0.29% / +0.87% |
+| DIST10 (cross-check) | 444 | -0.008 [-0.018, +0.001] | -0.019 [-0.033, -0.005]\*h | -0.005 [-0.021, +0.011] | -0.005 [-0.024, +0.013] | +0.019 [-0.000, +0.037] | -0.01 / -0.00 | -0.19% / +0.18% |
+| RISE2 | 444 | -0.14 [-0.23, -0.05]\*h | -0.06 [-0.26, +0.13] | -0.15 [-0.58, +0.28] | -0.15 [-0.84, +0.56] | -0.72 [-2.03, +0.63] | -0.20 / -0.12 | — |
+| ABOVE10 | 442 | +0.05 [-0.06, +0.16] | -0.20 [-0.52, +0.11] | -0.90 [-1.57, -0.24]\*h | -2.28 [-3.66, -1.06]\*h | -3.11 [-5.58, -0.72]\*h | -0.77 / -1.02 | — |
+| Stage 3 vs Stage 2 (1% band) | 434 | -0.02 [-0.14, +0.10] | -0.10 [-0.43, +0.23] | -0.28 [-1.14, +0.64] | -1.73 [-3.20, -0.25]\* | -2.87 [-5.36, -0.27]\*h | -0.79 / +0.17 | — |
+| Early vs late Stage 2 (1% band) | 444 | -0.10 [-0.22, +0.01] | -0.26 [-0.62, +0.14] | -0.98 [-1.80, -0.17]\* | -1.46 [-2.79, -0.13]\* | +0.39 [-2.40, +3.32] | -1.08 / -0.89 | — |
+| Stage 3 vs Stage 2 (2% band) | 443 | -0.12 [-0.23, -0.00]\*h | -0.44 [-0.77, -0.11]\*h | -1.62 [-2.49, -0.80]\*h | -3.73 [-5.03, -2.49]\*h | -7.10 [-9.96, -4.26]\*h | -2.00 / -1.28 | — |
+| Early vs late Stage 2 (2% band) | 444 | -0.14 [-0.26, -0.02]\*h | -0.29 [-0.68, +0.11] | -0.95 [-1.86, -0.01]\* | -1.48 [-3.48, +0.55] | -0.68 [-4.48, +3.32] | -1.63 / -0.34 | — |
+
+**C4 held, all years**
+
+| Feature | Weeks (13w) | 1w | 4w | 13w | 26w | 52w | 13w 2017–21 / 2022+ | Spread 4w / 13w |
+|---|---:|---|---|---|---|---|---|---|
+| VR2 | 494 | -0.012 [-0.041, +0.018] | -0.027 [-0.064, +0.011] | -0.002 [-0.041, +0.035] | +0.000 [-0.037, +0.038] | +0.009 [-0.030, +0.049] | +0.03 / -0.04 | -1.07% / +0.10% |
+| VR4 | 494 | -0.027 [-0.054, -0.002]\*h | -0.020 [-0.057, +0.015] | +0.019 [-0.018, +0.054] | +0.015 [-0.025, +0.052] | +0.010 [-0.036, +0.057] | +0.04 / -0.01 | -0.99% / +1.39% |
+| ACC13 | 494 | +0.006 [-0.023, +0.035] | -0.014 [-0.048, +0.018] | +0.007 [-0.031, +0.043] | -0.021 [-0.063, +0.018] | +0.013 [-0.028, +0.054] | +0.01 / +0.01 | -0.61% / +1.44% |
+| DIST10 (cross-check) | 494 | -0.016 [-0.043, +0.010] | -0.016 [-0.051, +0.017] | -0.000 [-0.035, +0.034] | -0.012 [-0.047, +0.021] | -0.010 [-0.050, +0.034] | -0.02 / +0.02 | -0.28% / +0.21% |
+| RISE2 | 257 | -0.55 [-1.30, +0.15] | -0.72 [-1.93, +0.48] | -0.40 [-3.30, +2.42] | -0.71 [-5.93, +4.62] | +4.03 [-8.66, +16.44] | +0.98 / -2.13 | — |
+| ABOVE10 | 8 | -0.36 [-2.79, +4.49] | -0.96 [-9.10, +5.97] | -4.38 [-24.82, +8.87] | -14.76 [-56.49, +12.27] | -33.74 [-109.69, +17.53] | -8.80 / +8.87 | — |
+| Stage 3 vs Stage 2 (1% band) | 26 | -0.10 [-1.89, +1.67] | -0.38 [-3.80, +2.92] | +1.39 [-4.69, +7.17] | -2.99 [-17.33, +13.49] | -10.36 [-21.98, +1.28] | +5.67 / -2.27 | — |
+| Early vs late Stage 2 (1% band) | 197 | -0.40 [-1.17, +0.30] | -0.51 [-2.15, +1.06] | +1.18 [-1.38, +3.81] | +0.93 [-6.40, +8.49] | +23.70 [-0.26, +53.76] | -0.53 / +3.02 | — |
+| Stage 3 vs Stage 2 (2% band) | 61 | +0.68 [-0.04, +1.44] | -0.43 [-2.70, +1.53] | +1.06 [-3.82, +5.26] | -6.06 [-16.05, +2.93] | -6.64 [-17.51, +3.76] | +1.09 / +1.04 | — |
+| Early vs late Stage 2 (2% band) | 188 | -0.04 [-0.76, +0.70] | +0.28 [-1.29, +1.83] | +1.43 [-1.88, +4.63] | +2.31 [-5.02, +9.59] | +16.20 [-13.51, +50.61] | +0.02 / +2.62 | — |
+
+**C4 held, ex 2020**
+
+| Feature | Weeks (13w) | 1w | 4w | 13w | 26w | 52w | 13w 2017–21 / 2022+ | Spread 4w / 13w |
+|---|---:|---|---|---|---|---|---|---|
+| VR2 | 443 | -0.013 [-0.045, +0.019] | -0.019 [-0.059, +0.022] | +0.006 [-0.035, +0.044] | +0.003 [-0.037, +0.044] | +0.001 [-0.041, +0.043] | +0.06 / -0.04 | -0.84% / +0.53% |
+| VR4 | 443 | -0.026 [-0.055, +0.002] | -0.016 [-0.055, +0.022] | +0.025 [-0.015, +0.061] | +0.015 [-0.028, +0.055] | -0.001 [-0.050, +0.049] | +0.06 / -0.01 | -0.77% / +1.96% |
+| ACC13 | 443 | -0.001 [-0.032, +0.031] | -0.017 [-0.054, +0.018] | -0.002 [-0.043, +0.036] | -0.037 [-0.080, +0.004] | -0.017 [-0.058, +0.023] | -0.01 / +0.01 | -0.78% / +0.20% |
+| DIST10 (cross-check) | 443 | -0.020 [-0.047, +0.006] | -0.018 [-0.055, +0.018] | -0.000 [-0.037, +0.035] | -0.018 [-0.055, +0.019] | -0.023 [-0.066, +0.021] | -0.02 / +0.02 | -0.38% / +0.06% |
+| RISE2 | 233 | -0.73 [-1.56, +0.03] | -1.05 [-2.36, +0.26] | +0.09 [-2.63, +2.77] | -0.12 [-5.64, +5.33] | +9.11 [-3.48, +22.55] | +2.21 / -2.13 | — |
+| ABOVE10 | 6 | -0.76 [-3.21, +7.00] | +2.36 [-4.77, +7.12] | +5.41 [+2.70, +10.87]\*h | +2.21 [-28.88, +19.66] | +0.09 [-46.89, +40.50] | +3.68 / +8.87 | — |
+| Stage 3 vs Stage 2 (1% band) | 26 | -0.10 [-1.89, +1.67] | -0.38 [-3.80, +2.92] | +1.39 [-4.69, +7.17] | -2.99 [-17.33, +13.49] | -10.36 [-21.98, +1.28] | +5.67 / -2.27 | — |
+| Early vs late Stage 2 (1% band) | 169 | -0.20 [-0.99, +0.54] | -0.10 [-1.91, +1.50] | +2.40 [-0.35, +4.98] | +4.03 [-2.96, +11.42] | +16.70 [-5.96, +49.62] | +1.60 / +3.02 | — |
+| Stage 3 vs Stage 2 (2% band) | 61 | +0.68 [-0.04, +1.44] | -0.43 [-2.70, +1.53] | +1.06 [-3.82, +5.26] | -6.06 [-16.05, +2.93] | -6.64 [-17.51, +3.76] | +1.09 / +1.04 | — |
+| Early vs late Stage 2 (2% band) | 163 | +0.09 [-0.72, +0.87] | +0.28 [-1.37, +1.94] | +1.33 [-1.92, +4.45] | +0.79 [-6.09, +8.24] | +0.04 [-26.03, +39.27] | -0.81 / +2.62 | — |
+
+The C4-held flag results are noise: the ABOVE10 regression qualified in only 8 weeks, Stage 3
+(1% band) in 26, because a 10-name book rarely has 3 names on each side of a flag.
+
+**Pass rule: nothing passes, in either universe.** For each feature, the 4 and 13-week pool
+intervals do not both exclude zero with one sign, except DIST10 at 4 weeks, which is a cross-check
+only. The Stage 3 flag at the 2% band does pass every interval check, but under decision 1 the 1%
+band must pass first, and it does not (and its 13-week halves disagree in sign: −1.52% / +0.17%).
+
+### V3. Liquidity floor (H3)
+
+C3 and C4 rerun with `run_broad_backtest(extra_no_buy=...)` (entry-only, never forces a sale):
+no fresh buy where LIQ13 is below the floor. LIQ13 unknown is not blocked (3 spells in C3, 28 in
+C4). The profit share comes from the unfloored run: each holding spell's profit before costs
+(units carried through skipped weeks), grouped by LIQ13 at the spell's entry week, over the whole
+portfolio's profit. Attributed profit exceeds the equity gain by exactly the trading costs (C3
+1.1, C4 6.1 equity units; C4 makes about 334 fresh buys a year).
+
+| Run | CAGR | Sharpe | Max DD | Fresh buys / yr | Unfloored run: profit from spells entered below the floor | Unfloored run: spells entered below |
+|---|---:|---:|---:|---:|---:|---:|
+| C3, no floor | 37.5% | 1.23 | −23.6% | 78.7 | — | — |
+| C3, ₹1 Cr | 34.2% | 1.14 | −23.6% | 75.0 | 5.1% | 6.2% |
+| C3, ₹5 Cr | 25.7% | 0.88 | −21.5% | 64.0 | 23.1% | 23.5% |
+| C3, ₹10 Cr | 23.8% | 0.84 | −20.8% | 55.2 | 37.5% | 36.6% |
+| C4, no floor | 41.5% | 1.18 | −40.4% | 334.3 | — | — |
+| C4, ₹1 Cr | 39.4% | 1.13 | −47.6% | 332.0 | 4.2% | 7.0% |
+| C4, ₹5 Cr | 30.1% | 0.92 | −41.7% | 327.3 | 29.7% | 23.5% |
+| C4, ₹10 Cr | 24.3% | 0.74 | −39.8% | 312.7 | 44.6% | 35.5% |
+
+Read: names trading under ₹5 Cr a day produce about a quarter of the profit, not most of it.
+But a floor costs more CAGR than that share alone suggests (about 3 points at ₹1 Cr, 11 to 12 at
+₹5 Cr), because the names bought instead did worse. Caveats: the floors are nominal rupees, so
+the same floor bites harder in 2017 than in 2026; C3 is the shipped engine default
+(`min_ranked=0`), which skips 193 weeks, so its absolute CAGR is overstated (see the parameter
+reference's "gapped engine" note), though floor-vs-no-floor compares like with like; C4 skips no
+weeks. At the default ₹10 lakh capital a 15% position is ₹1.5 lakh, about 1.5% of a ₹1 Cr day,
+so the ₹1 Cr row is the relevant one at that size.
+
+### V4 and V5: not run
+
+V4 tests ranking variants only for features that pass V2, and V5 needs a volume feature and
+EARLY2 to pass. Nothing passed V2, so neither was run, not even as an exploratory run: choosing
+something to test after seeing V2 would be data mining (owner, 2026-10-03).
+
+### Plain-English answers
+
+- **H1. Does a recent surge in shares traded predict better returns?** No. Once you allow for
+  momentum and the last two weeks' move, a volume surge adds almost nothing (a rank IC of about
+  +0.01, never clearly above zero at 4 or 13 weeks).
+- **H2. Does volume separate blow-off spikes from clean ones?** No. High-volume spikes, if
+  anything, kept rising more than the rest of the portfolio. The close-strength half could not
+  be tested as written (V1).
+- **H3. Does a liquidity floor remove untradeable names?** It is not an alpha question, but the
+  answer matters: about a quarter of Broad's profit came from names trading under ₹5 Cr a day,
+  and a ₹1 Cr floor costs about 3 points of CAGR. At ₹10 lakh capital that floor does not bind
+  on trading; for a larger account the headline CAGR is optimistic.
+- **H4. Does accumulation (more volume on up days) predict continuation?** No. It was slightly
+  negative at 1 week and flat after that.
+- **H5. Do surging-volume winners reverse sooner over 26 to 52 weeks?** No sign of it. The
+  long-horizon volume ICs are small and positive, not negative.
+- **H6. Does being above the 50-day (10-week) average help?** No, and it pointed the other way:
+  among equally ranked stocks, those above their average did slightly worse over 13 to 52 weeks
+  (−0.9% at 13 weeks, −3.0% at 52). It was not significant at 4 weeks, so it does not pass in
+  either direction.
+- **H7. Should we skip Stage 3 and prefer early Stage 2?** Not on this evidence. On the primary
+  1% band, Stage 3 names did worse only over 26 to 52 weeks, not at 4 or 13, and the two halves
+  disagree at 13 weeks. Early Stage 2 did slightly *worse* than late Stage 2, the opposite of the
+  idea. With the wider 2% band, Stage 3 did worse at every horizon, but that band was fixed as a
+  robustness check, not a second chance.
+- **H8. Early Stage 2 on rising volume?** Not tested: it needed H1 and H7 to pass first.
+
+**Nothing passed.** Survivorship bias (3.9.25) flatters rising-volume results and works against a
+Stage 3 gate, and the 2020 false splits (3.9.3) blank about 28% of 2020; the Stage 3 (2% band)
+and negative ABOVE10 findings are recorded in TODO.md as candidate hypotheses to pre-register and
+re-test after those are fixed, not as results to adopt.
