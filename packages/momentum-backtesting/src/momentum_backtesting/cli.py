@@ -596,6 +596,11 @@ def local_migrate() -> None:
     root = data_root()
     with connect(root) as con:
         report = db_migrate.migrate(con, root)
+    # Reopen after the Parquet write: lake views are fixed when connect() opens.
+    from . import stock_actions
+
+    with connect(root) as con:
+        action_report = stock_actions.scan_and_store(con, DATA_DIR / "stocks" / "raw")
     typer.echo(
         f"companies {report.companies}, renames {report.company_symbols}, "
         f"corporate actions {report.corporate_actions}, "
@@ -613,6 +618,11 @@ def local_migrate() -> None:
         f"stock benchmark/cash rows {report.stock_weekly_series:,}"
     )
     typer.echo(f"catalog: {root}  (see `tdata status` for the full picture)")
+    typer.echo(
+        f"large-drop review: {action_report['candidates']} candidates, "
+        f"{action_report['confirmed']} exchange-confirmed, "
+        f"{action_report['review']} need review"
+    )
 
 
 stocks_app = typer.Typer(
@@ -822,6 +832,76 @@ def stocks_fetch(
 
     if report.n_failures() > 0:
         raise typer.Exit(1)
+
+
+@stocks_app.command("sync")
+def stocks_sync(
+    fallback_to_fyers: bool = typer.Option(
+        True,
+        "--fallback-to-fyers/--no-fallback-to-fyers",
+        help="If the NSE fetch fails (e.g. Akamai bot-detection blocking it — see nse.py), "
+        "fill just the missing week with a Fyers plain-price stopgap instead of leaving "
+        "the data stale for another week.",
+    ),
+) -> None:
+    """Incremental weekly refresh for Stock/Custom Index/Broad Momentum: `stocks fetch`
+    (bhavcopy.download already skips already-cached sessions, so this is fast on a normal
+    week) followed by `local migrate` (B4/A6). `stocks fetch` alone is NOT enough — once the
+    shared database has been migrated once, `stock_dataset_from_db_or_none`/
+    `daily_prices_from_db_or_none` keep serving that catalog's rows indefinitely, so a fetch
+    that only touches data/stocks/*.csv never reaches a reader that prefers the database. Used
+    by the Friday ~19:30 IST stock-ingest job (scripts/install-launchd.sh); safe to run by hand.
+    """
+    # Typer only resolves a command's `typer.Option(...)` defaults when invoked through its
+    # CLI runner; calling the function directly (as here) gets the raw OptionInfo sentinel
+    # instead of "2011-01-01" unless every parameter is passed explicitly.
+    from .stocks.nse import NseError
+
+    try:
+        stocks_fetch(from_="2011-01-01", skip_download=False, accept_ca_diff=None)
+        local_migrate()
+        return
+    except NseError as error:
+        # Specifically NSE connectivity/bot-detection failures — never a bare `Exception`
+        # here, so a real data-quality guard failure (dividend check, CA diff guard, a
+        # malformed bhavcopy) still fails loudly as `typer.Exit` instead of being silently
+        # papered over by an unrelated-looking Fyers stopgap.
+        if not fallback_to_fyers:
+            raise
+        typer.echo(f"NSE fetch failed ({error}); trying Fyers fallback…")
+
+    from .stocks.fyers_topup import run_fyers_topup, run_fyers_topup_total_market
+
+    try:
+        creds = fyers.resolve_credentials()
+    except fyers.FyersCredentialsError as cred_error:
+        typer.echo(f"Fyers fallback unavailable: {cred_error}")
+        raise typer.Exit(1) from cred_error
+
+    result = run_fyers_topup(creds)
+    if result is None:
+        typer.echo("Fyers fallback (Nifty 50): data was already current, nothing to do.")
+    else:
+        typer.echo(
+            f"Fyers fallback (Nifty 50): filled week {result.week:%Y-%m-%d} for "
+            f"{result.companies_updated} companies "
+            f"(plain price, not total-return — a stopgap until the next real NSE sync)."
+        )
+        if result.companies_skipped:
+            typer.echo(f"  skipped (no symbol or no fetchable price): {result.companies_skipped}")
+
+    typer.echo("Fyers fallback (Total Market): this can take several minutes…")
+    market_result = run_fyers_topup_total_market(creds, _categories_data_dir())
+    if market_result is None:
+        typer.echo("Fyers fallback (Total Market): data was already current, nothing to do.")
+        return
+    typer.echo(
+        f"Fyers fallback (Total Market): filled through {market_result.through:%Y-%m-%d} for "
+        f"{market_result.symbols_updated} symbols ({market_result.rows_written} rows), "
+        f"tagged synthetic_close — a stopgap until the next real NSE sync."
+    )
+    if market_result.symbols_skipped:
+        typer.echo(f"  skipped (no fetchable price): {len(market_result.symbols_skipped)} symbols")
 
 
 @stocks_app.command("pin-manifest")
@@ -1347,53 +1427,47 @@ def weekly(
         True, "--db/--no-db", help="Pull history from and save to the shared local database."
     ),
     send: bool = typer.Option(True, help="Send to Telegram (prints when TELEGRAM_* is unset)."),
+    only_dataset: list[str] = typer.Option(
+        [],
+        "--only-dataset",
+        help="Only send to Telegram if the active favourite's dataset is one of these "
+        "(repeatable). Used by the Friday stock-ingest job so its rerun doesn't resend an "
+        "ETF favourite's signal; omit for the normal scheduled/manual run.",
+    ),
 ) -> None:
     """The Friday signal: refresh prices, rank, and send the week's trades to Telegram.
     Since 2026-09-30 this reads/writes the shared local database (TRADING_DATA_ROOT) instead
     of Neon (`MOMENTUM_DATABASE_URL`, retired — see TODO.md 3.11.5); a fresh laptop with no
-    `data/` yet gets it rebuilt from the database's `momentum_prices`, same as before."""
-    from contextlib import nullcontext
+    `data/` yet gets it rebuilt from the database's `momentum_prices`, same as before.
 
+    This is a thin wrapper around `api._execute_weekly_run` — the same orchestration the
+    dashboard's manual trigger and the scheduled jobs all share, so the CLI, the API, and
+    launchd can never drift against each other (they used to duplicate this loop)."""
     from trading_data.db import connect
 
     from . import api as api_module
-    from . import local_store, notify, runs_store
-    from .weekly import run_favorite_strategies, week_ending_on_or_before
+    from . import local_store, notify
 
     if run not in ("preview", "final"):
         typer.echo("--run must be preview or final")
         raise typer.Exit(2)
+    if not use_db:
+        typer.echo(
+            "note: --no-db no longer skips the shared database — favourites and signal "
+            "history always live there now. Ignoring --no-db."
+        )
+    with connect() as conn:
+        if not (DATA_DIR / "weekly_closes.csv").exists():
+            typer.echo(f"pulled {local_store.pull_dir(conn, DATA_DIR)} rows from the database")
+    if not (DATA_DIR / "weekly_closes.csv").exists():
+        typer.echo("No history: run `mbt fetch` first.")
+        raise typer.Exit(1)
     try:
-        creds = fyers.resolve_credentials()
-    except fyers.FyersCredentialsError as error:
-        typer.echo(f"Fyers: not used ({error})")
-        creds = None
-    try:
-        with connect() if use_db else nullcontext() as conn:
-            if use_db and not (DATA_DIR / "weekly_closes.csv").exists():
-                typer.echo(f"pulled {local_store.pull_dir(conn, DATA_DIR)} rows from the database")
-            if not (DATA_DIR / "weekly_closes.csv").exists():
-                typer.echo("No history: run `mbt fetch` first.")
-                raise typer.Exit(1)
-            favorites_by_id = (
-                {item["id"]: item for item in runs_store.list_favorites(conn)}
-                if conn is not None
-                else {}
+        result = api_module._execute_weekly_run(
+            api_module.WeeklyRunBody(
+                run=run, send=send, only_if_active_dataset=only_dataset or None
             )
-            outcomes = run_favorite_strategies(
-                run, DATA_DIR, creds=creds, conn=conn, log=typer.echo
-            )
-        if run == "final":
-            target = pd.Timestamp(week_ending_on_or_before(date.today()))
-            for outcome in outcomes:
-                if outcome["result"] is not None or outcome["dataset"] == "etf":
-                    continue
-                try:
-                    outcome["result"], outcome["blocked"] = api_module._research_weekly_result(
-                        favorites_by_id[outcome["id"]], target
-                    )
-                except Exception as error:
-                    outcome["blocked"] = str(getattr(error, "detail", error))
+        )
     except typer.Exit:
         raise
     except Exception as error:
@@ -1406,25 +1480,22 @@ def weekly(
         )
         notify.send(note) if send else typer.echo(notify.render(note))
         raise
-    active = next((outcome for outcome in outcomes if outcome["active"]), None)
-    for outcome in outcomes:
-        if outcome["result"] is not None:
-            typer.echo(f"\n[{outcome['name']}]\n{notify.render(outcome['result'].notification)}")
+    for strategy in result["strategies"]:
+        if strategy["body"] is not None:
+            typer.echo(f"\n[{strategy['name']}]\n{strategy['title']}\n{strategy['body']}")
         else:
-            typer.echo(f"\n[{outcome['name']}] blocked: {outcome['blocked']}")
-    if active is None or active["result"] is None:
-        typer.echo("No eligible active favourite; Telegram was not sent.")
-        return
-    active["result"].notification.run_url = notify.run_url()
-    if send:
-        notify.send(active["result"].notification)
+            typer.echo(f"\n[{strategy['name']}] blocked: {strategy['blocked']}")
+    if not result["sent_to_telegram"]:
+        typer.echo(f"\n{result['title']}: {result['body']}")
+    elif not any(s["active"] and s["body"] is not None for s in result["strategies"]):
+        typer.echo(f"\nSent warning to Telegram: {result['title']}")
 
 
 @app.command()
 def sources_check() -> None:
     """Can this machine reach every data source? (Run once from GitHub Actions before
     enabling the weekly schedule - some sites block datacenter IPs.)"""
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     from . import sources
 

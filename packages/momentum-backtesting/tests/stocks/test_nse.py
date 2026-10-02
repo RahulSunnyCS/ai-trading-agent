@@ -198,45 +198,93 @@ def test_throttle_enforces_minimum_gap_between_requests(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# Cookie jar: in-memory only, populated from warm_up, never persisted
+# Cookie jar: in-memory only, populated from warm_up via a real browser, never persisted.
+#
+# Bug fix (TODO.md 3.11.16): warm_up used to be a single bare urllib GET. NSE's Akamai
+# WAF fingerprints the TLS handshake itself — confirmed live, a curl request with a
+# complete, correct set of real-browser headers still gets an immediate 403 from
+# Akamai's edge, while an actual browser on the same network loads the site normally.
+# No amount of header-tuning in urllib/curl can pass this, so warm_up now gets its
+# cookies from a real browser (`browser_cookies`, Playwright by default) instead of
+# retrying a request that can never succeed. These tests inject a fake `browser_cookies`
+# so no test launches a real browser.
 # --------------------------------------------------------------------------
 
 
-def test_warm_up_populates_cookie_jar_in_memory_only(tmp_path):
-    client = nse.NseClient()
+def test_warm_up_populates_cookie_jar_from_browser_cookies_in_memory_only(tmp_path):
+    client = nse.NseClient(
+        browser_cookies=lambda: [
+            {"name": "nsit", "value": "abc123", "domain": "www.nseindia.com", "path": "/"},
+            {"name": "nseappid", "value": "xyz", "domain": ".nseindia.com", "secure": True},
+        ]
+    )
 
-    def fake_open(req, timeout=None):  # noqa: ARG001
-        # Simulate NSE setting a session cookie on the homepage response by
-        # inserting directly into the jar, exactly as HTTPCookieProcessor would.
-        import http.cookiejar
-
-        cookie = http.cookiejar.Cookie(
-            0,
-            "nsit",
-            "abc123",
-            None,
-            False,
-            "example",
-            False,
-            False,
-            "/",
-            False,
-            False,
-            None,
-            False,
-            None,
-            None,
-            {},
-        )
-        client.cookie_jar.set_cookie(cookie)
-        return _FakeResponse(b"<html></html>")
-
-    client._opener.open = fake_open
     client.warm_up()
 
-    assert len(client.cookie_jar) == 1
+    assert len(client.cookie_jar) == 2
     # Nothing on disk represents the jar — it truly only lives in the process.
     assert list(tmp_path.iterdir()) == []
+
+
+def test_warm_up_strips_the_leading_dot_from_a_domain_cookie():
+    client = nse.NseClient(
+        browser_cookies=lambda: [{"name": "a", "value": "b", "domain": ".nseindia.com"}]
+    )
+
+    client.warm_up()
+
+    (cookie,) = list(client.cookie_jar)
+    assert cookie.domain == "nseindia.com"
+
+
+def test_warm_up_retries_a_flaky_browser_fetch_then_succeeds():
+    """Confirmed live: Akamai's edge intermittently rejects even the browser path
+    (1 failure in 6 back-to-back attempts) — warm_up must retry it like every other
+    NSE call, not fail the whole run on one bad attempt."""
+    attempts = iter([RuntimeError("net::ERR_HTTP2_PROTOCOL_ERROR"), [{"name": "a", "value": "b"}]])
+
+    def flaky():
+        outcome = next(attempts)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    client = nse.NseClient(max_retries=2, browser_cookies=flaky)
+
+    client.warm_up()  # must not raise
+
+    assert len(client.cookie_jar) == 1
+
+
+def test_warm_up_gives_up_after_max_retries_on_a_persistently_flaky_browser():
+    calls = []
+
+    def boom():
+        calls.append(1)
+        raise RuntimeError("no display")
+
+    client = nse.NseClient(max_retries=2, browser_cookies=boom)
+
+    with pytest.raises(nse.NseError):
+        client.warm_up()
+
+    assert len(calls) == 3  # initial attempt + 2 retries
+
+
+def test_warm_up_defaults_to_the_real_browser_fetcher(monkeypatch):
+    """Not launching a real browser — just confirming warm_up calls the production
+    fetcher (not some other path) when `browser_cookies` isn't overridden."""
+    calls = []
+    monkeypatch.setattr(
+        nse,
+        "_fetch_cookies_via_browser",
+        lambda user_agent: (calls.append(user_agent), [])[1],
+    )
+    client = nse.NseClient(user_agent="custom-ua")
+
+    client.warm_up()
+
+    assert calls == ["custom-ua"]
 
 
 # --------------------------------------------------------------------------

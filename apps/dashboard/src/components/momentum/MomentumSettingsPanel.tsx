@@ -529,7 +529,7 @@ export const SETTINGS_FALLBACKS: Values = {
   broad_pool_top_n: 200,
   broad_pool_exit_rank: 250,
   broad_coverage_floor: 0.4,
-  broad_every_week: false,
+  broad_every_week: true,
   broad_category_top_n: 4,
   broad_category_exit_rank: 8,
   broad_picks_per_category: 2,

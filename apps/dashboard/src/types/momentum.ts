@@ -117,6 +117,77 @@ export interface MomentumWeeklyRunResult {
   }>;
 }
 
+/** A manual weekly run, executed in the background by the Momentum service. */
+export interface MomentumWeeklyJob {
+  id: string;
+  run: 'preview' | 'final';
+  send: boolean;
+  status: 'running' | 'done' | 'failed';
+  started_at: string;
+  finished_at: string | null;
+  result: MomentumWeeklyRunResult | null;
+  error: string | null;
+}
+
+/** How far each weekly input is ingested, plus recent signals and scheduled runs. */
+export interface MomentumWeeklyStatus {
+  today: string;
+  /** The Friday-labelled week a final run would produce a signal for. */
+  target_week: string;
+  datasets: Array<{
+    key: 'etf' | 'stock';
+    label: string;
+    through: string | null;
+    ready: boolean;
+    note: string;
+    error: string | null;
+  }>;
+  signals: Array<{ week: string; run: 'preview' | 'final'; label: string; generated_at: string }>;
+  schedule: Array<{
+    run: 'preview' | 'final' | 'stock-ingest';
+    when: string;
+    last_ran_at: string | null;
+    last_line: string | null;
+    /** Set when the job fired more than ~10 minutes after its scheduled time — typically
+     * the laptop was asleep; launchd runs it on wake with no catch-up marker of its own. */
+    ran_late_by_minutes: number | null;
+  }>;
+}
+
+/** A background `mbt stocks sync` run (bhavcopy fetch + shared-DB migrate), triggered from
+ * the Data panel's "Refresh stock data" button. */
+export interface MomentumStockSyncJob {
+  id: string;
+  status: 'running' | 'done' | 'failed';
+  started_at: string;
+  finished_at: string | null;
+  result: { ok: true } | null;
+  error: string | null;
+}
+
+export interface MomentumStockActionReview {
+  counts: { confirmed: number; crash: number; review: number };
+  manual_review_after: string;
+  pending_count: number;
+  items: Array<{
+    symbol: string;
+    ex_date: string;
+    previous_close: number;
+    close: number;
+    previous_volume: number;
+    volume: number;
+    previous_turnover: number;
+    turnover: number;
+    implied_factor: number | null;
+    suggested_factor: number | null;
+    confirmed_factor: number | null;
+    cumulative_factor: number | null;
+    status: 'review' | 'confirmed' | 'crash';
+    event_kind: string | null;
+    subject: string | null;
+  }>;
+}
+
 export interface MomentumRebalanceResult {
   dataset: 'stock' | 'broad';
   as_of: string;

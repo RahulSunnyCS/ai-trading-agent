@@ -17,6 +17,14 @@ dependencies = [
     # >=14.0.1 for CVE-2023-47248 (see stocks/ plan.md §5).
     "pyarrow>=14.0.1",
     "trading-data",
+    # nse.py's warm_up(): nseindia.com's Akamai WAF blocks by TLS fingerprint, not headers —
+    # urllib/curl are rejected outright even with full browser headers (confirmed live,
+    # TODO.md 3.11.16). A real browser engine does the one-time cookie warm-up; every bulk
+    # zip/JSON download after that still goes through the existing lightweight urllib client
+    # with the cookie jar it handed off. Same version pinned as packages/broker-login's
+    # Playwright (daily-broker-login.yml's Docker image tag) purely for easy upgrade tracking
+    # across the repo — this package's own lockfile is otherwise unrelated to that one.
+    "playwright==1.63.0",
 ]
 
 [tool.uv.sources]

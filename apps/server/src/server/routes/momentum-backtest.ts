@@ -148,9 +148,9 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   });
 
   // Manual trigger for the Friday weekly signal (TODO.md 3.11.5) — the same code path the
-  // launchd-scheduled `mbt weekly` CLI runs. Can take tens of seconds (live network price
-  // sources), same as a cold Custom Index backtest, hence the shared PROXY_TIMEOUT_MS. A
-  // real trigger (send=true, the default) posts to the same Telegram chat the schedule does.
+  // launchd-scheduled `mbt weekly` CLI runs. Returns 202 at once with a background job; the
+  // browser polls /weekly/jobs/latest, so leaving the page does not lose the run. A real
+  // trigger (send=true, the default) posts to the same Telegram chat the schedule does.
   fastify.post(
     '/api/momentum/weekly/run',
     {
@@ -175,6 +175,42 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
       });
     },
   );
+
+  fastify.get('/api/momentum/weekly/jobs/latest', async (_request, reply) => {
+    await forward(reply, '/api/weekly/jobs/latest');
+  });
+
+  // B4: manual "Refresh stock data" trigger (bhavcopy fetch + shared-DB migrate) for the
+  // dashboard's Data panel — same background-job pattern as /weekly/run above.
+  fastify.post('/api/momentum/weekly/stock-sync', async (_request, reply) => {
+    await forward(reply, '/api/weekly/stock-sync', { method: 'POST' });
+  });
+
+  fastify.get('/api/momentum/weekly/stock-sync/jobs/latest', async (_request, reply) => {
+    await forward(reply, '/api/weekly/stock-sync/jobs/latest');
+  });
+
+  fastify.get('/api/momentum/stock-actions', async (_request, reply) => {
+    await forward(reply, '/api/stock-actions');
+  });
+
+  fastify.post(
+    '/api/momentum/stock-actions/review',
+    { schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/stock-actions/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  // How far each weekly input has been ingested, the last saved signals, and the
+  // scheduled jobs' last runs.
+  fastify.get('/api/momentum/weekly/status', async (_request, reply) => {
+    await forward(reply, '/api/weekly/status');
+  });
 
   fastify.post(
     '/api/momentum/rebalance-preview',

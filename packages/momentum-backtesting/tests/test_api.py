@@ -1251,16 +1251,25 @@ def test_broad_payload_carries_share_prices_for_the_trade_split_tab(broad_client
 
 
 def test_broad_every_week_never_skips_a_week(broad_client):
-    """TODO 3.9.23: with broad_every_week the curve has one point per week; the default keeps
-    the engine's original rule (thin weeks skipped), so it can only have as many or fewer."""
+    """TODO 3.9.23/3.11.17: with broad_every_week the curve has one point per week.
+    `broad_every_week=False` keeps the engine's original rule (thin weeks skipped), so it can
+    only have as many or fewer weeks — but it is no longer the default: skipping thin weeks
+    overstates CAGR/Sharpe, and (TODO 3.11.17) it also hid fresh data behind what looked like
+    a stale backtest, since the thin trailing weeks right after an ingest gap are exactly the
+    ones it drops."""
     request = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
-    default = broad_client.post("/api/backtest", json=request).json()
+    skip_thin = broad_client.post(
+        "/api/backtest", json={**request, "broad_every_week": False}
+    ).json()
     every = broad_client.post("/api/backtest", json={**request, "broad_every_week": True}).json()
     weeks = pd.to_datetime(every["series"]["dates"])
     assert (weeks[1:] - weeks[:-1]).days.max() == 7
-    assert len(every["series"]["dates"]) >= len(default["series"]["dates"])
+    assert len(every["series"]["dates"]) >= len(skip_thin["series"]["dates"])
+
+    default = broad_client.post("/api/backtest", json=request).json()
+    assert default["series"]["dates"] == every["series"]["dates"]
     meta = broad_client.get("/api/meta?dataset=broad").json()
-    assert meta["defaults"]["broad_every_week"] is False
+    assert meta["defaults"]["broad_every_week"] is True
 
 
 def test_broad_sell_every_week_is_accepted_and_rejected_without_the_buffer_rule(broad_client):
@@ -1394,3 +1403,32 @@ def test_fresh_run_gives_the_same_numbers_as_a_cached_one(client):
     cached = client.post("/api/backtest", json=body).json()["kpis"]
     fresh = client.post("/api/backtest", json={**body, "fresh": True}).json()["kpis"]
     assert fresh == cached
+
+
+def test_get_momentum_universe_invalidates_when_only_the_catalog_changes(monkeypatch):
+    """Bug fix (TODO.md 3.11.16): a write that only touches the shared catalog/lake (e.g.
+    the Fyers Total Market top-up, which never touches daily.parquet or the membership
+    CSV) must still invalidate this cache — it used to only watch those two files and
+    silently kept serving pre-top-up data forever in a long-running process."""
+    from momentum_backtesting import db_read
+
+    data = api._Data()
+    calls = []
+
+    def fake_load(**kwargs):  # noqa: ARG001
+        calls.append(1)
+        return object()
+
+    monkeypatch.setattr(api.broad, "load_stock_universe_frame", fake_load)
+    monkeypatch.setattr(db_read, "catalog_mtime", lambda: 1.0)
+
+    first = data.get_momentum_universe()
+    assert len(calls) == 1
+
+    # The watched files are unchanged; only the catalog's own mtime moved (a write
+    # elsewhere, e.g. the Fyers top-up) — this must still trigger a rebuild.
+    monkeypatch.setattr(db_read, "catalog_mtime", lambda: 2.0)
+    second = data.get_momentum_universe()
+
+    assert len(calls) == 2
+    assert first is not second

@@ -177,7 +177,7 @@ describe('momentum backtest proxy routes', () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);
     fetchMock.mockResolvedValue(
-      jsonResponse(200, { title: 'Momentum FINAL', body: '', severity: 'info' }),
+      jsonResponse(202, { started: true, job: { id: 'j1', status: 'running' } }),
     );
 
     const response = await server.inject({
@@ -186,9 +186,46 @@ describe('momentum backtest proxy routes', () => {
       payload: { run: 'final', send: false },
     });
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(202);
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:8765/api/weekly/run',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    await server.close();
+  });
+
+  it.each([
+    ['/api/momentum/weekly/jobs/latest', 'http://127.0.0.1:8765/api/weekly/jobs/latest'],
+    ['/api/momentum/weekly/status', 'http://127.0.0.1:8765/api/weekly/status'],
+    [
+      '/api/momentum/weekly/stock-sync/jobs/latest',
+      'http://127.0.0.1:8765/api/weekly/stock-sync/jobs/latest',
+    ],
+  ])('forwards GET %s', async (url, upstream) => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { job: null }));
+
+    const response = await server.inject({ method: 'GET', url });
+
+    expect(response.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(upstream, expect.anything());
+    await server.close();
+  });
+
+  it('forwards a manual stock-sync trigger', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(202, { started: true, job: { id: 'j2' } }));
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/momentum/weekly/stock-sync',
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/weekly/stock-sync',
       expect.objectContaining({ method: 'POST' }),
     );
     await server.close();

@@ -85,18 +85,92 @@ to `DATABASE_URL`'s `broker_tokens` table only as one of several places `fyers.p
 a Fyers access token (see the precedence order in root `technical.md`'s Environment
 Variables table) — that connection is unrelated and still live.
 
-The weekly job (`mbt weekly`) itself now runs from a `launchd` LaunchAgent on the owner's own
-laptop (`scripts/install-launchd.sh`/`uninstall-launchd.sh`, two plists — Friday 14:40
-preview, 16:45 final IST), replacing the retired `.github/workflows/momentum-weekly.yml`. The
-plists explicitly `source` the repo root `.env` before running — launchd's own environment
-does not inherit it the way an interactive shell's profile usually does, and without it the
-job would compute a signal but silently never reach Telegram. Also triggerable any time
-without waiting for the schedule: `POST /api/weekly/run` (`api.py`, proxied at
-`/api/momentum/weekly/run`) backs the dashboard Momentum tab's "Weekly signal" section, and
-runs the same all-favourites orchestration as the CLI and scheduled job: every favourite is
-evaluated, while only the one global active favourite is sent to Telegram. ETF strategies share
-one refreshed Fyers/public-source snapshot. Stock, Custom Index and Broad strategies are gated on
-the processed bhavcopy-backed dataset reaching the completed Friday-labelled week.
+The weekly job (`mbt weekly`) itself now runs from `launchd` LaunchAgents on the owner's own
+laptop (`scripts/install-launchd.sh`/`uninstall-launchd.sh`, three plists — Friday 14:40
+preview, 16:45 final, and since 2026-10-02 19:30 stock-data ingest IST), replacing the retired
+`.github/workflows/momentum-weekly.yml`. The plists explicitly `source` the repo root `.env`
+before running — launchd's own environment does not inherit it the way an interactive shell's
+profile usually does. The CLI's `weekly()` command is a thin wrapper around
+`api._execute_weekly_run` (the same function the API route calls) — there is exactly one
+orchestration, not two copies that can drift.
+
+**A blocked or missing active favourite now sends a Telegram warning** (not silence) —
+previously a favourite that failed (e.g. the tax-config bug below) meant the job computed a
+signal, found no usable active result, and exited 0 with nothing sent and no alert, for every
+run, for over a week, before anyone noticed.
+
+`POST /api/weekly/run` (`api.py`, proxied at `/api/momentum/weekly/run`) backs the dashboard
+Momentum tab's "Weekly signal" section and runs the same all-favourites orchestration as the
+CLI and scheduled job: every favourite is evaluated, while only the one global active
+favourite is sent to Telegram. Since 2026-10-02 this runs as a **background job**
+(`_SingleFlightJob` in `api.py`; `GET /api/weekly/jobs/latest` polls it) so a manual run
+survives the browser tab closing or the user switching sections — the Momentum tab itself
+shows a pulsing dot while one is in flight. `GET /api/weekly/status` reports, per dataset, the
+date it's ingested through vs. the week a final run needs, the last few saved signals, and
+each scheduled job's last-run time (flagging one that fired >10 minutes late — typically the
+laptop was asleep at 14:40/16:45/19:30, and launchd has no catch-up marker of its own when
+that happens).
+
+ETF strategies share one refreshed Fyers/public-source snapshot and are always current. Stock,
+Custom Index and Broad strategies are gated on the processed bhavcopy-backed dataset reaching
+the completed Friday-labelled week — **nothing refreshed that data weekly until the
+2026-10-02 19:30 IST job**: `mbt stocks sync` (`stocks_fetch` + `local_migrate`, in that
+order). `stocks_fetch` alone is not enough once the catalog has been migrated once —
+`stock_dataset_from_db_or_none`/`daily_prices_from_db_or_none` (`db_read.py`) keep serving the
+already-migrated rows regardless of what's on disk, so the migrate step has to run every time
+too, or the "data through" date silently stops moving. A "Refresh stock data" button in the
+dashboard's Data panel runs the same `mbt stocks sync` as a background job. The 19:30 job
+reruns the weekly orchestration with `--only-dataset stock --only-dataset custom_index
+--only-dataset broad` so it only sends to Telegram if the active favourite is one of those —
+otherwise it would resend (or misreport as "blocked") an ETF favourite the 16:45 job already
+handled.
+
+**Gotcha found live, not by a test:** `stocks_fetch`/`local_migrate` are Typer commands whose
+parameters default to `typer.Option(...)` sentinel objects — Typer only resolves those into
+real values (e.g. `"2011-01-01"`) when its own CLI runner invokes the function. Calling them
+directly as plain Python, which `stocks_sync`/`_execute_stock_sync` do, needs every argument
+passed explicitly or the first one crashes with `TypeError: fromisoformat: argument must be
+str`. `mbt stocks sync` and the 19:30 IST job also need real network access to `nseindia.com`
+specifically — `mbt sources-check` does not cover it (only Yahoo/AMFI/niftyindices/Fyers), so
+a machine can look healthy on `sources-check` while this still fails.
+
+**`nseindia.com` itself is frequently unreachable, by design on NSE's side, not an
+environment problem.** Confirmed live (2026-10-02): the last successful fetch was 6 days
+earlier with no code change in between, so NSE's Akamai WAF tightened sometime in that
+window. A `curl`/`urllib` request with a complete, correct real-browser header set still
+gets an instant 403 from Akamai's edge (`errors.edgesuite.net`) while an actual browser on
+the same network loads the site fine — this is TLS/behavioural fingerprinting, not header
+matching, so `nse.py`'s `warm_up()` now gets its session cookie from a real Chromium
+instance (Playwright, pinned `1.63.0`, matching `packages/broker-login`'s) instead of a
+bare `urllib` GET. It specifically launches **headed, not headless** — confirmed live that
+headless Chromium is itself detected and blocked (`net::ERR_HTTP2_PROTOCOL_ERROR` or a flat
+30s hang) while the identical browser launched headed-but-positioned-off-screen
+(`--window-position`) passes. Needs a GUI session to open that window at all, which is why
+this only runs from a `launchd` LaunchAgent (has GUI session access), never a LaunchDaemon
+or headless CI runner. Even that path is intermittently flaky (1 failure in 6 back-to-back
+live attempts), so it retries with the same bounded backoff every other NSE call has — but
+a whole run can still fail if NSE has a bad stretch. **Fyers fallback, both datasets:**
+`mbt stocks sync` (default `--fallback-to-fyers`) catches specifically `nse.NseError`
+(never a bare `Exception` — a real data-quality guard failure, e.g. the dividend check,
+must still fail loudly) and runs TWO stopgaps in `stocks/fyers_topup.py`:
+`run_fyers_topup` fills just the missing week for the ~50 currently-listed Nifty 50
+companies from Fyers daily closes — a plain-price stopgap (Fyers has no corporate-actions
+feed, so no true total-return), written directly into `stock_weekly_prices`/
+`stock_membership_weekly`. `run_fyers_topup_total_market` does the same for Broad
+Momentum/Custom Index's much larger ~755-symbol Total Market pool, writing directly into
+the `bars_1d_stock` **lake parquet** (not a plain table — merged into the current year's
+partition file, reading it back first so older rows survive, never wholesale-overwritten)
+with real daily OHLCV bars (Fyers gives a full bar, not just a close) tagged
+`synthetic_close=True`, the same flag `stocks/adjust.py`'s own archive-gap fill already
+uses, so `stocks/guards.py`'s pipeline already knows not to flag these as suspicious price
+jumps. New symbols get registered into `instruments` on the fly
+(`db_migrate.register_stock_instruments`), same as a real sync would. Both are
+self-healing: everything they touch is wholesale-replaced by the next successful real NSE
+sync (`db_migrate.import_stock_weekly`/`migrate_stock_bars`), so a stopgap row never
+outlives it. Live-verified end to end (2026-10-03): NSE failed, both fallbacks ran, Total
+Market filled 745/755 symbols (2,980 rows) in a few minutes, and a subsequent `mbt weekly`
+produced real BUY/SELL/ADD signals for all three previously-blocked favourites (Stock
+Weekly Core, Broad Weekly Core, Fav 1).
 
 Python callers here do not import `@trading/notify` — `notify.py` mirrors
 the `Notification` shape directly rather than importing the TypeScript
@@ -117,10 +191,14 @@ contract, not a shared service).
   scoring for the Momentum Scores UI page (a cheap single-week snapshot, not
   a full backtest).
 - `stocks/adjust.py` / `stocks/corporate_actions.py` — corporate-action
-  detection and price adjustment for the survivorship-free stock layer; see
-  the "Known limitation" docstring in `categories/prices.py` for a
-  documented gap (a real bonus issue can defeat the mechanical split
-  detector) before assuming this layer's output is bulletproof.
+  detection and price adjustment for the survivorship-free stock layer.
+- `stock_actions.py` — scans daily drops over 20.1%, matches explicit split/
+  bonus ratios in the cached NSE feed, stores candidates and cumulative
+  share factors in the shared catalog, and preserves browser-verified crash
+  classifications. `categories/prices.py` back-adjusts confirmed factors;
+  Broad Momentum's entry price ceiling reads raw closes. New unresolved
+  events after the first-scan baseline appear in the dashboard for review.
+  Demergers and rights are flagged as evidence, not valued as simple splits.
 - `tax.py` — per-purchase tax-lot STCG/LTCG accounting, shared by every
   portfolio rule in `engine.py`.
 - `trade_prices.py` — the `--track etf` price-substitution logic (booking

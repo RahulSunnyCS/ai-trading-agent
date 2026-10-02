@@ -42,6 +42,7 @@ from .sources import (
     yahoo_candles,
     yahoo_quote,
 )
+from .tax import TaxRules
 from .trade_prices import build_trade_prices, load_premiums
 
 LIVE_CONFIG = Path(__file__).with_name("live_config.toml")
@@ -351,8 +352,13 @@ def compute_signal(data_dir: Path, settings: LiveSettings) -> dict:
     # Only the fill *timing* is a backtest question; the live signal is always at this close.
     config = replace(settings.config, execution="fri_close")
     fills = build_trade_prices(prices, config.track, "fri_close", universe, data_dir)
+    tax_classes = {i.name: i.tax_class for i in universe} if config.tax is not None else None
     result = run_backtest(
-        prices, includes, config, trade_prices=fills.prices if fills is not None else None
+        prices,
+        includes,
+        config,
+        tax_classes=tax_classes,
+        trade_prices=fills.prices if fills is not None else None,
     )
     signal = analysis.latest_signal(result, prices, config)
     by_name = {i.name: i for i in universe}
@@ -529,6 +535,14 @@ def settings_from_saved_config(config: dict) -> LiveSettings:
     """
     allowed = {item.name for item in fields(Config)}
     engine_config = {key: value for key, value in config.items() if key in allowed}
+    # The dashboard saves tax as a bool plus a separate slab_rate (the API builds TaxRules from
+    # them); passing the raw bool through made `False is not None` read as "tax on".
+    engine_config["tax"] = (
+        TaxRules(slab_rate=config.get("slab_rate", 0.30)) if config.get("tax") else None
+    )
+    # A saved run's `end` is the date it was saved on; the live signal always runs to the
+    # latest week, or every later Friday would silently repeat that week's signal.
+    engine_config.pop("end", None)
     for key in ("lookbacks", "weights", "universe"):
         if isinstance(engine_config.get(key), list):
             engine_config[key] = tuple(engine_config[key])
@@ -544,9 +558,15 @@ def run_weekly(
     conn=None,
     log=print,
     snapshot: WeeklySnapshot | None = None,
+    display_name: str | None = None,
 ) -> RunResult:
     """Refresh data_dir, compute the signal, and return the Telegram message to send.
-    `conn` (optional) stores fresh official prices and the signal; `creds` is Fyers."""
+    `conn` (optional) stores fresh official prices and the signal; `creds` is Fyers.
+    `display_name` (B6) is the saved favourite's human name — stored alongside the signal
+    so a reader doesn't have to decode the engine's config-derived label (e.g.
+    "buffer-wait-cap35_off_top5_exit10_lb1-4-13-26-52_etf-fri_close") to show which
+    favourite a saved signal came from. The engine label itself is left untouched as the
+    database's config_label key, since `load_signal`'s preview/final lookup depends on it."""
     now = (now or datetime.now(IST)).astimezone(IST)
     settings = settings or load_live_config()
     today = now.date()
@@ -583,6 +603,7 @@ def run_weekly(
                 f"(Friday {snapshot.week_ending:%d %b} was a market holiday)."
             )
         if conn is not None:
+            signal["display_name"] = display_name or signal["label"]
             store.save_signal(conn, signal["week"], "final", signal["label"], signal)
         return RunResult(note, signal)
 
@@ -600,6 +621,7 @@ def run_weekly(
     if conn is not None:
         from . import local_store as store
 
+        signal["display_name"] = display_name or signal["label"]
         store.save_signal(conn, signal["week"], "preview", signal["label"], signal)
     return RunResult(note, copy.deepcopy(signal))
 
@@ -627,7 +649,9 @@ def run_favorite_strategies(
     if not favorites:
         # Preserve the existing scheduled-job behaviour until the user has
         # saved and favourited a strategy.
-        result = run_weekly(run, data_dir, now, creds, conn=conn, log=log)
+        result = run_weekly(
+            run, data_dir, now, creds, conn=conn, log=log, display_name="Default live strategy"
+        )
         return [
             {
                 "id": None,
@@ -666,6 +690,7 @@ def run_favorite_strategies(
                 conn=conn,
                 log=log,
                 snapshot=snapshot,
+                display_name=favorite["name"],
             )
             blocked = None
         except (ValueError, KeyError) as error:

@@ -52,6 +52,14 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/backtest`,
             },
             {
+              source: '/api/momentum/stock-actions',
+              destination: `${momentumDirectOrigin}/api/stock-actions`,
+            },
+            {
+              source: '/api/momentum/stock-actions/review',
+              destination: `${momentumDirectOrigin}/api/stock-actions/review`,
+            },
+            {
               source: '/api/momentum/saved-runs',
               destination: `${momentumDirectOrigin}/api/saved-runs`,
             },
@@ -60,8 +68,9 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/saved-runs/:runId`,
             },
             {
-              source: '/api/momentum/weekly/run',
-              destination: `${momentumDirectOrigin}/api/weekly/run`,
+              // run, jobs/latest and status
+              source: '/api/momentum/weekly/:path*',
+              destination: `${momentumDirectOrigin}/api/weekly/:path*`,
             },
             {
               source: '/api/momentum/rebalance-preview',

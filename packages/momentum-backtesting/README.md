@@ -8,6 +8,7 @@ Hang Seng and a defensive cash/gilt pair, from 2017.
 ```bash
 cd packages/momentum-backtesting
 uv sync
+uv run playwright install chromium  # needed once: nse.py's warm-up uses a real browser
 uv run mbt login     # standalone login if not using the dashboard
 uv run mbt fetch     # ~5 minutes; writes data/weekly_closes.csv and .xlsx
 ```

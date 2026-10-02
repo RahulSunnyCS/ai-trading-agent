@@ -3,12 +3,16 @@ catalog (see runs_store.py). Exercised at both layers: runs_store.py directly ag
 a DuckDB connection, and the /api/saved-runs routes through a TestClient - the isolated
 TRADING_DATA_ROOT from conftest.py means these never touch the real catalog."""
 
+import threading
+import time
+from datetime import date
+
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 from trading_data.db import connect
 
-from momentum_backtesting import api, fyers, notify, runs_store, weekly
+from momentum_backtesting import api, fyers, local_store, notify, runs_store, weekly
 from momentum_backtesting.notify import Notification
 
 
@@ -216,10 +220,253 @@ def test_weekly_endpoint_sends_only_the_active_favorite(client, monkeypatch):
     monkeypatch.setattr(notify, "run_url", lambda: None)
 
     response = client.post("/api/weekly/run", json={"run": "final", "send": True})
-    assert response.status_code == 200
-    assert response.json()["sent_to_telegram"] is True
-    assert [item["title"] for item in response.json()["strategies"]] == [
+    assert response.status_code == 202
+    assert response.json()["started"] is True
+    job = _wait_for_weekly_job(client)
+    assert job["status"] == "done"
+    assert job["result"]["sent_to_telegram"] is True
+    assert [item["title"] for item in job["result"]["strategies"]] == [
         "Active",
         "Dashboard only",
     ]
     assert sent == [active_result.notification]
+
+
+def _wait_for_weekly_job(client) -> dict:
+    for _ in range(200):
+        job = client.get("/api/weekly/jobs/latest").json()["job"]
+        if job["status"] != "running":
+            return job
+        time.sleep(0.02)
+    raise AssertionError("weekly job never finished")
+
+
+def test_a_second_weekly_trigger_attaches_to_the_running_job(client, monkeypatch):
+    release = threading.Event()
+
+    def slow(*args, **kwargs):
+        release.wait(5)
+        return []
+
+    monkeypatch.setattr(weekly, "run_favorite_strategies", slow)
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: None)
+    first = client.post("/api/weekly/run", json={"run": "preview", "send": False}).json()
+    second = client.post("/api/weekly/run", json={"run": "final", "send": True}).json()
+    release.set()
+    assert first["started"] is True and second["started"] is False
+    assert second["job"]["id"] == first["job"]["id"]
+    job = _wait_for_weekly_job(client)
+    assert job["status"] == "done" and job["result"]["sent_to_telegram"] is False
+
+
+def test_a_failing_weekly_job_reports_the_error_instead_of_spinning(client, monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("sources down")
+
+    monkeypatch.setattr(weekly, "run_favorite_strategies", boom)
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: None)
+    client.post("/api/weekly/run", json={"run": "final", "send": False})
+    job = _wait_for_weekly_job(client)
+    assert job["status"] == "failed" and "sources down" in job["error"]
+
+
+def test_a_blocked_active_favorite_sends_a_telegram_warning_instead_of_nothing(client, monkeypatch):
+    """A4 regression: the active favourite failing used to print 'Telegram was not sent'
+    and exit 0 — nobody found out. It must now send a warning explaining why."""
+    active = client.post("/api/saved-runs", json=_payload("Active")).json()
+    client.patch(f"/api/saved-runs/{active['id']}", json={"active": True})
+    monkeypatch.setattr(
+        weekly,
+        "run_favorite_strategies",
+        lambda *args, **kwargs: [
+            {
+                "id": active["id"],
+                "name": "Active",
+                "dataset": "etf",
+                "active": True,
+                "result": None,
+                "blocked": "tax needs tax_classes (instrument -> equity/gold_silver/...)",
+            }
+        ],
+    )
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: None)
+    sent = []
+    monkeypatch.setattr(notify, "send", sent.append)
+    monkeypatch.setattr(notify, "run_url", lambda: None)
+
+    response = client.post("/api/weekly/run", json={"run": "final", "send": True})
+    job = _wait_for_weekly_job(client)
+    assert response.status_code == 202 and job["status"] == "done"
+    assert job["result"]["sent_to_telegram"] is True
+    assert len(sent) == 1
+    assert sent[0].severity == "warning"
+    assert "Active" in sent[0].body
+    assert "tax needs tax_classes" in sent[0].body
+
+
+def test_no_active_favorite_sends_a_telegram_warning_too(client, monkeypatch):
+    client.post("/api/saved-runs", json=_payload("Dashboard only"))
+    monkeypatch.setattr(weekly, "run_favorite_strategies", lambda *args, **kwargs: [])
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: None)
+    sent = []
+    monkeypatch.setattr(notify, "send", sent.append)
+
+    client.post("/api/weekly/run", json={"run": "final", "send": True})
+    job = _wait_for_weekly_job(client)
+    assert job["status"] == "done"
+    assert len(sent) == 1
+    assert "no active favourite" in sent[0].title.lower()
+
+
+def test_an_only_dataset_restriction_skips_telegram_for_an_out_of_scope_active_favorite(
+    client, monkeypatch
+):
+    """B4: the Friday stock-ingest job reruns the orchestration with --only-dataset so it
+    doesn't resend an already-sent ETF favourite's signal."""
+    active = client.post("/api/saved-runs", json=_payload("ETF Core")).json()
+    client.patch(f"/api/saved-runs/{active['id']}", json={"active": True})
+    etf_result = weekly.RunResult(Notification("test", "info", "ETF Core", "A"), {"rows": []})
+    monkeypatch.setattr(
+        weekly,
+        "run_favorite_strategies",
+        lambda *args, **kwargs: [
+            {
+                "id": active["id"],
+                "name": "ETF Core",
+                "dataset": "etf",
+                "active": True,
+                "result": etf_result,
+                "blocked": None,
+            }
+        ],
+    )
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: None)
+    sent = []
+    monkeypatch.setattr(notify, "send", sent.append)
+
+    body = api.WeeklyRunBody(run="final", send=True, only_if_active_dataset=["stock", "broad"])
+    result = api._execute_weekly_run(body)
+    assert result["sent_to_telegram"] is False
+    assert sent == []
+
+
+def test_stocks_sync_calls_stocks_fetch_and_migrate_with_real_arguments(monkeypatch):
+    """Regression: `stocks_fetch`/`local_migrate` are Typer commands whose parameters default
+    to `typer.Option(...)` sentinels, resolved only when Typer's own CLI runner invokes them.
+    `cli.stocks_sync` (and `api._execute_stock_sync`, which calls it) call them directly as
+    plain Python functions — calling `stocks_fetch(skip_download=False)` alone left `from_`
+    as that unresolved sentinel and crashed with `TypeError: fromisoformat: argument must be
+    str` the first time this ran for real, which every mocked test above missed."""
+    from momentum_backtesting import cli
+
+    seen = {}
+    monkeypatch.setattr(cli, "stocks_fetch", lambda **kwargs: seen.setdefault("fetch", kwargs))
+    monkeypatch.setattr(cli, "local_migrate", lambda: seen.setdefault("migrate", True))
+
+    cli.stocks_sync()
+
+    assert isinstance(seen["fetch"]["from_"], str)
+    assert seen["fetch"]["skip_download"] is False
+    assert seen["migrate"] is True
+
+
+def test_stocks_sync_falls_back_to_both_fyers_topups_when_nse_fails(monkeypatch):
+    """When `stocks_fetch` fails with an `NseError`, `stocks_sync` must run BOTH Fyers
+    stopgaps (Nifty 50 + Total Market), not just one — Stock, Broad and Custom Index
+    favourites all share the same underlying blocked-gate symptom."""
+    from momentum_backtesting import cli, fyers
+    from momentum_backtesting.stocks import fyers_topup
+    from momentum_backtesting.stocks.nse import NseError
+
+    def boom(**kwargs):  # noqa: ARG001
+        raise NseError("browser warm-up failed")
+
+    calls = {}
+
+    def fake_nifty50_topup(creds):
+        calls["nifty50"] = creds
+        return None
+
+    def fake_total_market_topup(creds, data_dir):
+        calls["total_market"] = (creds, data_dir)
+        return None
+
+    monkeypatch.setattr(cli, "stocks_fetch", boom)
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: fyers.Credentials("a", "b", "test"))
+    monkeypatch.setattr(fyers_topup, "run_fyers_topup", fake_nifty50_topup)
+    monkeypatch.setattr(fyers_topup, "run_fyers_topup_total_market", fake_total_market_topup)
+
+    cli.stocks_sync()
+
+    assert "nifty50" in calls
+    assert "total_market" in calls
+
+
+def test_stocks_sync_no_fallback_flag_reraises_the_nse_error(monkeypatch):
+    from momentum_backtesting import cli
+    from momentum_backtesting.stocks.nse import NseError
+
+    def boom(**kwargs):  # noqa: ARG001
+        raise NseError("browser warm-up failed")
+
+    monkeypatch.setattr(cli, "stocks_fetch", boom)
+
+    with pytest.raises(NseError):
+        cli.stocks_sync(fallback_to_fyers=False)
+
+
+def test_weekly_stock_sync_endpoint_runs_in_the_background(client, monkeypatch):
+    monkeypatch.setattr(api, "_execute_stock_sync", lambda: {"ok": True})
+    response = client.post("/api/weekly/stock-sync")
+    assert response.status_code == 202
+    assert response.json()["started"] is True
+    for _ in range(200):
+        job = client.get("/api/weekly/stock-sync/jobs/latest").json()["job"]
+        if job["status"] != "running":
+            break
+        time.sleep(0.02)
+    assert job["status"] == "done" and job["result"] == {"ok": True}
+
+
+def test_weekly_status_says_how_far_each_dataset_is_ingested(client, tmp_path, monkeypatch):
+    class Stock:
+        last_week = pd.Timestamp("2026-09-25")
+
+    prices = pd.DataFrame({"x": [1.0]}, index=pd.to_datetime(["2026-10-02"]))
+    monkeypatch.setattr(api.DATA, "get", lambda: prices)
+    monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
+    # Isolate from this checkout's real launchd-weekly-*.log files, whose mtimes reflect
+    # actual past runs (which may themselves have run late) and would make the
+    # ran_late_by_minutes assertion below depend on this machine's history.
+    monkeypatch.setattr(api, "DATA_DIR", tmp_path)
+    with connect() as con:
+        local_store.save_signal(con, "2026-09-25", "final", "Core", {"rows": []})
+    status = api._weekly_status(date(2026, 10, 2))
+    assert [(item["week"], item["run"]) for item in status["signals"]] == [("2026-09-25", "final")]
+    assert status["target_week"] == "2026-10-02"
+    by_key = {item["key"]: item for item in status["datasets"]}
+    assert by_key["etf"]["through"] == "2026-10-02" and by_key["etf"]["ready"] is True
+    assert by_key["stock"]["through"] == "2026-09-25" and by_key["stock"]["ready"] is False
+    assert [item["run"] for item in status["schedule"]] == [
+        "preview",
+        "final",
+        "stock-ingest",
+    ]
+    assert all(item["ran_late_by_minutes"] is None for item in status["schedule"])
+
+
+def test_weekly_status_flags_a_scheduled_run_that_fired_late(client, tmp_path, monkeypatch):
+    """B5: launchd only fires while the Mac is awake, so a missed 14:40 slot runs late on
+    wake with no marker of its own — the status panel must say so, not look normal."""
+    import os
+
+    monkeypatch.setattr(api, "DATA_DIR", tmp_path)
+    log = tmp_path / "launchd-weekly-preview.log"
+    log.write_text("No eligible active favourite; Telegram was not sent.\n")
+    # The scheduled time is 14:40 IST; back-date the log's mtime to simulate a run that
+    # actually fired at 15:22 IST that same day (42 minutes late).
+    ran_at = api.datetime(2026, 10, 2, 15, 22, tzinfo=api.IST)
+    os.utime(log, (ran_at.timestamp(), ran_at.timestamp()))
+    status = api._weekly_status(date(2026, 10, 2))
+    preview = next(item for item in status["schedule"] if item["run"] == "preview")
+    assert preview["ran_late_by_minutes"] == 42

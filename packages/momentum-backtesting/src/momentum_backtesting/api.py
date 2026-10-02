@@ -1,10 +1,12 @@
 """Private Momentum API consumed by the shared dashboard."""
 
+import json
 import os
 import threading
 import urllib.parse
 from collections import OrderedDict
-from datetime import datetime, time, timedelta
+from collections.abc import Callable
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -14,7 +16,16 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from trading_data.db import connect
 
-from . import analysis, db_read, fyers, levers, rebalance, reference_benchmarks, runs_store
+from . import (
+    analysis,
+    db_read,
+    fyers,
+    levers,
+    rebalance,
+    reference_benchmarks,
+    runs_store,
+    stock_actions,
+)
 from .categories import broad
 from .categories import momentum_scores as momentum_scores_mod
 from .categories.compose import (
@@ -279,6 +290,7 @@ class _Data:
             CATEGORIES_CURATED_DIR / "category_extras.csv",
         ]
         mtimes = tuple(p.stat().st_mtime if p.exists() else None for p in watch_paths)
+        mtimes += (db_read.catalog_mtime(),)
         key = (
             inner_top_n,
             inner_exit_rank,
@@ -339,6 +351,7 @@ class _Data:
             DATA_DIR / "stocks" / "daily.parquet",
         ]
         mtimes = tuple(p.stat().st_mtime if p.exists() else None for p in watch_paths)
+        mtimes += (db_read.catalog_mtime(),)
         key = (
             tuple(lookbacks),
             tuple(weights) if weights else None,
@@ -377,12 +390,22 @@ class _Data:
         own comment in __init__. Computed OUTSIDE the lock (same reasoning as
         get_broad_ranking's own ranking build above): it's a ~7s rebuild on a cold cache/changed
         data, and holding the lock across it would stall every other request, including ones for
-        a completely unrelated dataset."""
+        a completely unrelated dataset.
+
+        Bug fix (TODO.md 3.11.16): unlike its two siblings (`get_categories_universe`,
+        `get_broad_ranking`), this watch list was missing `db_read.catalog_mtime()` — a write
+        that only touches the shared catalog/lake (e.g. `stocks/fyers_topup.py`'s Total Market
+        top-up, which never touches `daily.parquet` or the membership CSV) left this cache
+        silently serving pre-top-up data in a long-running `mbt serve` process until either
+        watched file's mtime happened to change or the process restarted. The Momentum Scores
+        page showing a stale "as of" date after a successful top-up was this, not a data
+        problem."""
         watch_paths = [
             DATA_DIR / "categories" / broad.TOTAL_MARKET_MEMBERSHIP_FILENAME,
             DATA_DIR / "stocks" / "daily.parquet",
         ]
         mtimes = tuple(p.stat().st_mtime if p.exists() else None for p in watch_paths)
+        mtimes += (db_read.catalog_mtime(),)
         with self._lock:
             fresh = mtimes == self._momentum_universe_mtimes
             if fresh and self.momentum_universe_cache is not None:
@@ -468,10 +491,13 @@ class BacktestRequest(BaseModel):
     # ranked instruments (26-week weekly volatility, levers.high_vol_mask); holdings are
     # untouched. 0 = off. Measured to help ETF mode and to hurt stocks, so ETF only.
     exclude_high_vol: float = Field(0.0, ge=0, lt=1)
-    # dataset="broad" only (TODO 3.9.23): simulate every week. False keeps the engine default,
-    # which skips weeks with fewer than category_top_n x picks ranked stocks (~190 of 508 since
-    # 2017) and so overstates Broad's CAGR and Sharpe.
-    broad_every_week: bool = False
+    # dataset="broad" only (TODO 3.9.23): simulate every week. Defaults True (TODO 3.11.17) —
+    # False skips weeks with fewer than category_top_n x picks ranked stocks (~190 of 508 since
+    # 2017), which overstates Broad's CAGR and Sharpe; it also silently hid fresh data from a
+    # catalog-only update (e.g. the Fyers Total Market top-up) behind what looked like a stale
+    # backtest, since the thin trailing weeks right after an ingest gap are exactly the ones it
+    # drops. A saved favourite/run that set this explicitly is unaffected either way.
+    broad_every_week: bool = True
     cost_model: Literal["flat", "itemised"] = "flat"
     capital: float = Field(1_000_000.0, gt=0)
     slippage_bps: float = Field(5.0, ge=0)
@@ -536,6 +562,19 @@ class SavedRunUpdate(BaseModel):
 class WeeklyRunBody(BaseModel):
     run: Literal["preview", "final"]
     send: bool = True
+    # CLI/internal use only (the dashboard's manual trigger never sets this): restrict
+    # Telegram sending to a rerun that only matters when the active favourite is one of
+    # these datasets. See _execute_weekly_run's "in_scope" comment.
+    only_if_active_dataset: list[str] | None = None
+
+
+class StockActionReviewBody(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    ex_date: date
+    decision: Literal["split", "bonus", "crash"]
+    factor: float | None = Field(None, gt=1, le=100)
+    source_url: str | None = Field(None, max_length=1000)
+    note: str | None = Field(None, max_length=1000)
 
 
 class RebalanceRequest(BacktestRequest):
@@ -1273,7 +1312,7 @@ def _broad_meta() -> dict:
             "broad_picks_per_category": broad.DEFAULT_PICKS_PER_CATEGORY,
             "broad_off_top_n": 10,
             "broad_off_exit_rank": 20,
-            "broad_every_week": False,
+            "broad_every_week": True,
         },
     }
 
@@ -1569,6 +1608,302 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
     }
 
 
+def _no_active_signal_notification(
+    run: str, outcomes: list[dict], active: dict | None
+) -> Notification:
+    """A4: the active favourite produced no signal — tell someone, instead of the old silent
+    "Telegram was not sent" that only a human reading the log would ever catch."""
+    if active is None:
+        return Notification(
+            "momentum-weekly",
+            "warning",
+            f"Momentum {run}: no active favourite selected",
+            "No saved favourite is marked active, so there is nothing to send to Telegram. "
+            "Mark one active in the dashboard's Saved strategies list.",
+        )
+    reasons = "\n".join(
+        f"• {outcome['name']}: {outcome['blocked']}" for outcome in outcomes if outcome["blocked"]
+    )
+    return Notification(
+        "momentum-weekly",
+        "warning",
+        f"Momentum {run}: active favourite could not produce a signal",
+        f"'{active['name']}' is the active favourite but is blocked this week.\n\n"
+        + (reasons or "No reason was recorded.")
+        + "\n\nNo trade signal was sent to Telegram.",
+    )
+
+
+def _execute_weekly_run(body: WeeklyRunBody) -> dict:
+    """Evaluate every favourite and send the active one; the body of a weekly job."""
+    from . import notify
+    from .weekly import run_favorite_strategies, week_ending_on_or_before
+
+    try:
+        creds = fyers.resolve_credentials()
+    except fyers.FyersCredentialsError:
+        creds = None
+    with connect() as con:
+        favorites_by_id = {item["id"]: item for item in runs_store.list_favorites(con)}
+        outcomes = run_favorite_strategies(
+            body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None
+        )
+    if body.run == "final":
+        target_week = pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date()))
+        for outcome in outcomes:
+            if outcome["result"] is not None or outcome["dataset"] == "etf":
+                continue
+            favorite = favorites_by_id[outcome["id"]]
+            try:
+                outcome["result"], outcome["blocked"] = _research_weekly_result(
+                    favorite, target_week
+                )
+            except (HTTPException, ValueError, KeyError, FileNotFoundError) as error:
+                outcome["result"] = None
+                outcome["blocked"] = str(getattr(error, "detail", error))
+    active = next((outcome for outcome in outcomes if outcome["active"]), None)
+    active_result = active["result"] if active is not None else None
+    # B4: the Friday stock-ingest job re-runs this same orchestration after the regular
+    # 16:45 final run, purely so Stock/Custom Index/Broad favourites get a chance once their
+    # bhavcopy data lands. If the active favourite is an ETF strategy, that rerun has nothing
+    # new to say — restricting it to the datasets it actually cares about avoids a duplicate
+    # Telegram ping (or a spurious "blocked" warning for a favourite that isn't blocked, just
+    # out of scope for this job).
+    in_scope = body.only_if_active_dataset is None or (
+        active is not None and active["dataset"] in body.only_if_active_dataset
+    )
+    blocked_note: Notification | None = None
+    if active_result is not None:
+        active_result.notification.run_url = notify.run_url()
+        if body.send and in_scope:
+            notify.send(active_result.notification)
+    elif in_scope:
+        # The silent-failure bug: previously this branch printed/returned a message but
+        # never actually told anyone — a blocked active favourite meant no Telegram message
+        # at all, scheduled or manual, with nothing to notice until a human went looking.
+        blocked_note = _no_active_signal_notification(body.run, outcomes, active)
+        if body.send:
+            notify.send(blocked_note)
+    return {
+        "title": (
+            active_result.notification.title
+            if active_result
+            else blocked_note.title
+            if blocked_note
+            else "Weekly strategies evaluated"
+        ),
+        "body": (
+            active_result.notification.body
+            if active_result
+            else blocked_note.body
+            if blocked_note
+            else "Out of scope for this job; nothing sent."
+        ),
+        "severity": (
+            active_result.notification.severity
+            if active_result
+            else blocked_note.severity
+            if blocked_note
+            else "info"
+        ),
+        "sent_to_telegram": body.send and in_scope,
+        "signal": active_result.signal if active_result else None,
+        "strategies": [
+            {
+                "id": outcome["id"],
+                "name": outcome["name"],
+                "dataset": outcome["dataset"],
+                "active": outcome["active"],
+                "blocked": outcome["blocked"],
+                "title": outcome["result"].notification.title if outcome["result"] else None,
+                "body": outcome["result"].notification.body if outcome["result"] else None,
+                "signal": outcome["result"].signal if outcome["result"] else None,
+            }
+            for outcome in outcomes
+        ],
+    }
+
+
+class _SingleFlightJob:
+    """One background job at a time, executed off the request thread so the browser can
+    leave the page. A second trigger while one is running attaches to it instead of racing
+    a second job against the same shared files/Telegram chat. Only the latest job is kept, in
+    memory - a service restart forgets it, which is fine for the weekly run (its signal is
+    also saved to `momentum_signals`) and harmless for a stock sync (idempotent; just rerun
+    it)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._latest: dict | None = None
+
+    def latest(self) -> dict | None:
+        with self._lock:
+            return dict(self._latest) if self._latest is not None else None
+
+    def start(self, work: Callable[[], dict], extra_fields: dict) -> tuple[dict, bool]:
+        with self._lock:
+            if self._latest is not None and self._latest["status"] == "running":
+                return dict(self._latest), False
+            job = {
+                "id": os.urandom(8).hex(),
+                "status": "running",
+                "started_at": datetime.now(IST).isoformat(timespec="seconds"),
+                "finished_at": None,
+                "result": None,
+                "error": None,
+                **extra_fields,
+            }
+            self._latest = job
+            snapshot = dict(job)
+        threading.Thread(target=self._execute, args=(job, work), daemon=True).start()
+        return snapshot, True
+
+    def _execute(self, job: dict, work: Callable[[], dict]) -> None:
+        try:
+            result, error = work(), None
+        except Exception as exc:  # the job must always finish, or the UI spins forever
+            result, error = None, f"{type(exc).__name__}: {getattr(exc, 'detail', exc)}"
+        with self._lock:
+            job["status"] = "failed" if error else "done"
+            job["result"], job["error"] = result, error
+            job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
+
+
+WEEKLY_JOBS = _SingleFlightJob()
+STOCK_SYNC_JOBS = _SingleFlightJob()
+
+
+def _execute_stock_sync() -> dict:
+    """B4: incremental bhavcopy fetch + shared-DB migrate, triggerable from the dashboard's
+    Data panel instead of waiting for the Friday 19:30 IST job or a terminal. Calls the CLI's
+    `stocks_sync` directly (same code the `mbt stocks sync` command and the launchd job run)
+    rather than a second implementation."""
+    from .cli import stocks_sync
+
+    stocks_sync()
+    return {"ok": True}
+
+
+_SCHEDULED_RUNS = (
+    # (run, label, scheduled hour, scheduled minute, log filename) — the hour/minute are
+    # launchd's StartCalendarInterval values from the matching plist, used for B5's
+    # "ran late" flag (see _schedule_entry below).
+    ("preview", "Fri 14:40 IST", 14, 40, "launchd-weekly-preview.log"),
+    ("final", "Fri 16:45 IST", 16, 45, "launchd-weekly-final.log"),
+    ("stock-ingest", "Fri 19:30 IST", 19, 30, "launchd-weekly-stock-ingest.log"),
+)
+# A scheduled job fired more than this many minutes after its scheduled time (typically the
+# laptop was asleep, per TODO.md 3.11.5's launchd caveat) is flagged "ran late" rather than
+# silently treated as on time.
+_LATE_THRESHOLD_MINUTES = 10
+
+
+def _weekly_status(today: date | None = None) -> dict:
+    """How far each weekly input has been ingested, the last saved signals, and when the
+    scheduled jobs last ran - what the dashboard needs to explain a blocked strategy."""
+    from .weekly import week_ending_on_or_before
+
+    today = today or datetime.now(IST).date()
+    target = pd.Timestamp(week_ending_on_or_before(today))
+
+    def dataset(key: str, label: str, through, note: str, error: str | None = None) -> dict:
+        return {
+            "key": key,
+            "label": label,
+            "through": through.strftime("%Y-%m-%d") if through is not None else None,
+            "ready": through is not None and through.normalize() >= target,
+            "note": note,
+            "error": error,
+        }
+
+    datasets = []
+    try:
+        datasets.append(
+            dataset(
+                "etf",
+                "Index & ETF prices",
+                DATA.get().index[-1],
+                "Refreshed automatically by every weekly run (Fyers + public sources).",
+            )
+        )
+    except HTTPException as error:
+        datasets.append(
+            dataset("etf", "Index & ETF prices", None, "Run `mbt fetch`.", str(error.detail))
+        )
+    stock_note = (
+        "Used by Stock, Custom Index and Broad strategies. Refreshed automatically Fri "
+        "19:30 IST, or update now with `mbt stocks sync` / the Data panel's refresh button."
+    )
+    try:
+        datasets.append(
+            dataset("stock", "NSE bhavcopy stock data", DATA.get_stock().last_week, stock_note)
+        )
+    except HTTPException as error:
+        datasets.append(
+            dataset("stock", "NSE bhavcopy stock data", None, stock_note, str(error.detail))
+        )
+
+    import duckdb
+
+    try:
+        with connect() as con:
+            # epoch() rather than the TIMESTAMPTZ itself: returning a TIMESTAMPTZ to Python
+            # makes DuckDB import pytz, which this package does not depend on.
+            rows = con.execute(
+                "SELECT week, run_kind, config_label, payload, epoch(generated_at) "
+                "FROM momentum_signals ORDER BY generated_at DESC LIMIT 6"
+            ).fetchall()
+    except duckdb.CatalogException:  # a catalog without the table yet has no signals
+        rows = []
+    signals = [
+        {
+            "week": f"{week:%Y-%m-%d}",
+            "run": run_kind,
+            # B6: prefer the saved favourite's name (display_name, since 2026-10-02) over the
+            # engine's config-derived label; older rows saved before that have no
+            # display_name, so label remains the fallback.
+            "label": json.loads(payload).get("display_name", label),
+            "generated_at": datetime.fromtimestamp(generated, IST).isoformat(timespec="seconds"),
+        }
+        for week, run_kind, label, payload, generated in rows
+    ]
+
+    schedule = []
+    for run, when, hour, minute, log_name in _SCHEDULED_RUNS:
+        log = DATA_DIR / log_name
+        last_ran_at = last_line = None
+        ran_late_by_minutes = None
+        if log.exists():
+            ran_at = datetime.fromtimestamp(log.stat().st_mtime, IST)
+            last_ran_at = ran_at.isoformat(timespec="seconds")
+            lines = [line for line in log.read_text(errors="replace").splitlines() if line.strip()]
+            last_line = lines[-1] if lines else None
+            # B5: launchd only fires while the Mac is awake, so a run the schedule missed
+            # fires late on wake with no catch-up marker of its own — this is the only way
+            # to tell "ran on time" from "ran late because the laptop was asleep".
+            scheduled_at = ran_at.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            delay = (ran_at - scheduled_at).total_seconds() / 60
+            if delay > _LATE_THRESHOLD_MINUTES:
+                ran_late_by_minutes = round(delay)
+        schedule.append(
+            {
+                "run": run,
+                "when": when,
+                "last_ran_at": last_ran_at,
+                "last_line": last_line,
+                "ran_late_by_minutes": ran_late_by_minutes,
+            }
+        )
+
+    return {
+        "today": today.isoformat(),
+        "target_week": target.strftime("%Y-%m-%d"),
+        "datasets": datasets,
+        "signals": signals,
+        "schedule": schedule,
+    }
+
+
 def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     """Evaluate one bhavcopy-backed favourite after its processed-week gate passes."""
     from .weekly import RunResult
@@ -1777,71 +2112,69 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "saved run not found")
         return {"ok": True}
 
-    @app.post("/api/weekly/run")
+    @app.post("/api/weekly/run", status_code=202)
     def weekly_run(body: WeeklyRunBody) -> dict:
-        """Manual trigger for the Friday signal (TODO.md 3.11.5) — the same `run_weekly()`
-        the launchd-scheduled `mbt weekly` CLI calls, so a manual run and a scheduled run
-        are identical in every way but who started them. Synchronous: a cold run can take
-        tens of seconds (live network sources), same as a cold Custom Index backtest — the
-        Fastify proxy's timeout already accounts for this."""
-        from . import fyers, notify
-        from .weekly import run_favorite_strategies, week_ending_on_or_before
+        """Manual trigger for the Friday signal (TODO.md 3.11.5): the same orchestration the
+        launchd-scheduled `mbt weekly` CLI runs. Starts a background job and returns at once;
+        the browser polls `/api/weekly/jobs/latest`, so leaving the page loses nothing. A run
+        already in progress is returned instead of starting a second one (`started: false`)."""
+        job, started = WEEKLY_JOBS.start(
+            lambda: _execute_weekly_run(body), {"run": body.run, "send": body.send}
+        )
+        return {"started": started, "job": job}
 
-        try:
-            creds = fyers.resolve_credentials()
-        except fyers.FyersCredentialsError:
-            creds = None
-        try:
-            with connect() as con:
-                favorites_by_id = {item["id"]: item for item in runs_store.list_favorites(con)}
-                outcomes = run_favorite_strategies(
-                    body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None
+    @app.get("/api/weekly/jobs/latest")
+    def weekly_latest_job() -> dict:
+        """The most recent manual run since this service started (null before the first)."""
+        return {"job": WEEKLY_JOBS.latest()}
+
+    @app.get("/api/weekly/status")
+    def weekly_status() -> dict:
+        return _weekly_status()
+
+    @app.post("/api/weekly/stock-sync", status_code=202)
+    def weekly_stock_sync() -> dict:
+        """B4: manual 'Refresh stock data' trigger (bhavcopy fetch + shared-DB migrate) for
+        the dashboard's Data panel — the same background-job pattern as `/api/weekly/run`."""
+        job, started = STOCK_SYNC_JOBS.start(_execute_stock_sync, {})
+        return {"started": started, "job": job}
+
+    @app.get("/api/weekly/stock-sync/jobs/latest")
+    def weekly_stock_sync_latest_job() -> dict:
+        return {"job": STOCK_SYNC_JOBS.latest()}
+
+    @app.get("/api/stock-actions")
+    def stock_action_suggestions() -> dict:
+        with connect(read_only=True) as con:
+            return stock_actions.review_snapshot(con)
+
+    @app.post("/api/stock-actions/review")
+    def review_stock_action(body: StockActionReviewBody) -> dict:
+        if body.decision != "crash" and body.factor is None:
+            raise HTTPException(422, "Enter the new-share multiplier for a split or bonus.")
+        if body.decision != "crash" and not (body.source_url or body.note):
+            raise HTTPException(422, "Add a source URL or a note for the confirmed factor.")
+        with connect() as con:
+            baseline = con.execute(
+                "SELECT manual_review_after FROM stock_action_scan_state WHERE id=1"
+            ).fetchone()
+            if baseline is None or body.ex_date <= baseline[0]:
+                raise HTTPException(
+                    422, "Dashboard review is for new events after the historical audit."
                 )
-            if body.run == "final":
-                target_week = pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date()))
-                for outcome in outcomes:
-                    if outcome["result"] is not None or outcome["dataset"] == "etf":
-                        continue
-                    favorite = favorites_by_id[outcome["id"]]
-                    try:
-                        outcome["result"], outcome["blocked"] = _research_weekly_result(
-                            favorite, target_week
-                        )
-                    except (HTTPException, ValueError, KeyError, FileNotFoundError) as error:
-                        outcome["result"] = None
-                        outcome["blocked"] = str(getattr(error, "detail", error))
-        except Exception as error:
-            raise HTTPException(500, f"{type(error).__name__}: {error}") from None
-        active = next((outcome for outcome in outcomes if outcome["active"]), None)
-        active_result = active["result"] if active is not None else None
-        if active_result is not None:
-            active_result.notification.run_url = notify.run_url()
-            if body.send:
-                notify.send(active_result.notification)
-        return {
-            "title": (
-                active_result.notification.title if active_result else "Weekly strategies evaluated"
-            ),
-            "body": (
-                active_result.notification.body if active_result else "No eligible active strategy."
-            ),
-            "severity": active_result.notification.severity if active_result else "warning",
-            "sent_to_telegram": body.send and active_result is not None,
-            "signal": active_result.signal if active_result else None,
-            "strategies": [
-                {
-                    "id": outcome["id"],
-                    "name": outcome["name"],
-                    "dataset": outcome["dataset"],
-                    "active": outcome["active"],
-                    "blocked": outcome["blocked"],
-                    "title": outcome["result"].notification.title if outcome["result"] else None,
-                    "body": outcome["result"].notification.body if outcome["result"] else None,
-                    "signal": outcome["result"].signal if outcome["result"] else None,
-                }
-                for outcome in outcomes
-            ],
-        }
+            try:
+                stock_actions.save_review(
+                    con,
+                    symbol=body.symbol.upper().strip(),
+                    ex_date=body.ex_date,
+                    decision=body.decision,
+                    factor=body.factor,
+                    source_url=body.source_url,
+                    note=body.note,
+                )
+            except ValueError as error:
+                raise HTTPException(422, str(error)) from None
+        return {"ok": True}
 
     @app.post("/api/rebalance-preview")
     def preview(req: RebalanceRequest) -> dict:

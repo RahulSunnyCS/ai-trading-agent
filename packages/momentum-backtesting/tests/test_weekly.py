@@ -121,6 +121,18 @@ def test_final_run_ranks_on_todays_closes_and_says_what_to_do(data_dir, sources)
     assert stored.index[-1] == FRIDAY
 
 
+def test_a_final_run_saves_the_favourites_display_name_alongside_the_signal(data_dir, sources):
+    """B6: a reader of momentum_signals shouldn't have to decode the engine's config label
+    to know which favourite produced a saved signal."""
+    from trading_data.db import connect
+
+    with connect() as conn:
+        weekly.run_weekly("final", data_dir, now=FINAL_AT, conn=conn, display_name="ETF Core")
+        label = weekly.load_live_config().config.label
+        saved = local_store.load_signal(conn, "2026-09-25", "final", label)
+        assert saved["display_name"] == "ETF Core"
+
+
 def test_preview_uses_live_prices_but_never_stores_them(data_dir, sources):
     before = {p.name: p.read_bytes() for p in (data_dir / "daily").glob("*.csv")}
     result = weekly.run_weekly("preview", data_dir, now=PREVIEW_AT)
@@ -162,12 +174,14 @@ def test_favorite_strategies_share_one_refresh_and_only_etf_is_eligible(monkeypa
         {"id": "three", "name": "Stocks", "config": {"dataset": "stock"}, "active": False},
     ]
     seen_snapshots = []
+    seen_display_names = []
 
     monkeypatch.setattr(runs_store, "list_favorites", lambda _conn: favorites)
     monkeypatch.setattr(weekly, "refresh_weekly_snapshot", lambda *args: snapshot)
 
     def fake_run_weekly(*args, **kwargs):
         seen_snapshots.append(kwargs["snapshot"])
+        seen_display_names.append(kwargs.get("display_name"))
         return weekly.RunResult(Notification("test", "info", "ok", "body"), {"week": "2026-09-25"})
 
     monkeypatch.setattr(weekly, "run_weekly", fake_run_weekly)
@@ -175,8 +189,26 @@ def test_favorite_strategies_share_one_refresh_and_only_etf_is_eligible(monkeypa
 
     assert [outcome["name"] for outcome in outcomes] == ["ETF A", "ETF B", "Stocks"]
     assert seen_snapshots == [snapshot, snapshot]
+    # B6: the favourite's display name is threaded through so a saved signal's payload can
+    # carry it, instead of only the engine's config-derived label.
+    assert seen_display_names == ["ETF A", "ETF B"]
     assert outcomes[2]["result"] is None
     assert outcomes[2]["blocked"] == "Weekly ingest is not yet available for this dataset."
+
+
+def test_saved_dashboard_config_translates_tax_and_drops_its_saved_end_date():
+    off = weekly.settings_from_saved_config(
+        {"dataset": "etf", "tax": False, "slab_rate": 0.3, "end": "2026-10-02", "top_n": 5}
+    )
+    assert off.config.tax is None  # a raw False here used to read as "tax on" and block the run
+    assert off.config.end is None  # the live signal always runs to the latest week
+    on = weekly.settings_from_saved_config({"tax": True, "slab_rate": 0.2})
+    assert on.config.tax is not None and on.config.tax.slab_rate == pytest.approx(0.2)
+
+
+def test_a_tax_aware_saved_favourite_still_computes_a_signal(data_dir):
+    settings = weekly.settings_from_saved_config({"tax": True, "slab_rate": 0.3})
+    assert weekly.compute_signal(data_dir, settings)["rows"]
 
 
 def test_stale_data_sends_an_alert_instead_of_a_signal(data_dir, sources, monkeypatch):

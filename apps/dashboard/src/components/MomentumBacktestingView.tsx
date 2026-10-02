@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { cn } from '../lib/cn';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
@@ -114,6 +115,9 @@ async function fetchSavedRuns(dataset: Dataset): Promise<MomentumSavedRun[]> {
 }
 
 export function MomentumBacktestingView() {
+  // Lives here, not in the Weekly view, so the section tab can show that a run is still
+  // going after the user has moved to another section.
+  const weekly = useMomentumWeeklyJob();
   const [section, setSection] = useState<'backtest' | 'scores' | 'saved' | 'weekly' | 'rebalance'>(
     'backtest',
   );
@@ -483,8 +487,15 @@ export function MomentumBacktestingView() {
           size="sm"
           variant={section === 'weekly' ? 'primary' : 'ghost'}
           onClick={() => setSection('weekly')}
+          title={weekly.running ? 'Weekly signal is running in the background' : undefined}
         >
           Weekly signal
+          {weekly.running ? (
+            <span className="relative ml-1 flex h-2 w-2" aria-label="running">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+          ) : null}
         </Button>
         <Button
           size="sm"
@@ -498,7 +509,7 @@ export function MomentumBacktestingView() {
       {section === 'scores' ? (
         <MomentumScoresView />
       ) : section === 'weekly' ? (
-        <MomentumWeeklyView />
+        <MomentumWeeklyView weekly={weekly} />
       ) : section === 'rebalance' ? (
         <MomentumRebalanceView
           dataset={dataset}

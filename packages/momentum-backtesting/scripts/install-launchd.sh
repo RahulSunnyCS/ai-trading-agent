@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs the two Friday momentum-weekly LaunchAgents (TODO.md 3.11.5) into
+# Installs the three Friday momentum-weekly LaunchAgents (TODO.md 3.11.5) into
 # ~/Library/LaunchAgents and loads them into the current user's launchd session.
 # Safe to re-run, including after editing a plist: bootout-then-bootstrap so an
 # edit is actually picked up (a bare re-bootstrap over an already-loaded label is a
@@ -11,7 +11,8 @@ DEST="$HOME/Library/LaunchAgents"
 mkdir -p "$DEST"
 
 for plist in com.ai-trading-agent.momentum-weekly-preview.plist \
-             com.ai-trading-agent.momentum-weekly-final.plist; do
+             com.ai-trading-agent.momentum-weekly-final.plist \
+             com.ai-trading-agent.momentum-weekly-stock-ingest.plist; do
   label="${plist%.plist}"
   launchctl bootout "gui/$(id -u)/$label" 2>&1 | grep -v 'Could not find specified service' || true
   cp "$plist" "$DEST/$plist"

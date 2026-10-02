@@ -45,11 +45,14 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
   optional category selection) and the Momentum Scores page in the Next.js
   dashboard's Momentum tab (TODO.md §3.9, §3.11.8).
   Weekly Friday signal to Telegram (`mbt weekly`, 14:40 IST live-price preview + 16:45 IST
-  final), scheduled via a `launchd` job on the owner's own laptop since 2026-09-30
-  (`scripts/install-launchd.sh` — TODO 3.11.5, retired the old GitHub Actions workflow and
-  Neon/`MOMENTUM_DATABASE_URL`; history now lives in the shared local database's
-  `momentum_prices`/`momentum_signals` tables). Also triggerable on demand from the
-  dashboard's Momentum tab ("Weekly signal") or the CLI directly
+  final, + 19:30 IST stock-data ingest since 2026-10-02), scheduled via three `launchd` jobs
+  on the owner's own laptop since 2026-09-30/2026-10-02 (`scripts/install-launchd.sh` — TODO
+  3.11.5/3.11.16, retired the old GitHub Actions workflow and Neon/`MOMENTUM_DATABASE_URL`;
+  history now lives in the shared local database's `momentum_prices`/`momentum_signals`
+  tables). A blocked or missing active favourite now sends a Telegram warning instead of
+  failing silently (TODO 3.11.16). Also triggerable on demand from the dashboard's Momentum
+  tab ("Weekly signal" — runs in the background, with an ingestion-status panel showing how
+  current each dataset is) or the CLI directly
 
 ## Implementation Phases
 

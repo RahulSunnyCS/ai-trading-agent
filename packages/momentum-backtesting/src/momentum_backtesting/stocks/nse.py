@@ -17,8 +17,9 @@ import urllib.parse
 import urllib.request
 import uuid
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from http.cookiejar import CookieJar
+from http.cookiejar import Cookie, CookieJar
 from pathlib import Path
 from typing import IO
 from urllib.request import HTTPCookieProcessor
@@ -98,6 +99,41 @@ def _read_capped(resp: IO[bytes], max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
+def _fetch_cookies_via_browser(user_agent: str) -> list[dict]:
+    """Launch Chromium once, load the NSE homepage, and return its cookies in
+    Playwright's `context.cookies()` shape. This is the only network call in this module
+    that uses a real browser engine — see `NseClient.warm_up`'s docstring for why. The
+    import is local so this module (and every other `get_bytes`/`get_json` call, which
+    never needs a browser) doesn't require Playwright's browser binaries to be installed
+    just to be imported.
+
+    `headless=False`, confirmed live: Akamai's bot detection passes a normal ("headed")
+    browser instantly but rejects Playwright's `headless=True` Chromium outright —
+    `net::ERR_HTTP2_PROTOCOL_ERROR` or a flat 30s hang, every time, with no amount of
+    launch-arg tuning (`--disable-blink-features=AutomationControlled` alone did not
+    help) getting a headless browser through. `--window-position` off-screen keeps the
+    (otherwise real, passing) browser window from actually appearing while this runs —
+    confirmed this still passes the same detection headless does not, so it is not simply
+    "visible vs not," something deeper in headless Chromium's fingerprint is being
+    checked. This needs a GUI session to open a window at all, which is why it only runs
+    from a `launchd` LaunchAgent (has GUI session access) and never from a LaunchDaemon
+    or a headless CI runner."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(
+            headless=False,
+            args=["--window-position=-2400,-2400", "--window-size=1024,768"],
+        )
+        try:
+            context = browser.new_context(user_agent=user_agent)
+            page = context.new_page()
+            page.goto("https://www.nseindia.com/", wait_until="domcontentloaded", timeout=30_000)
+            return context.cookies()
+        finally:
+            browser.close()
+
+
 def atomic_write_bytes(path: Path, data: bytes) -> None:
     """Write `data` to `path` atomically: write to a sibling temp file first,
     then `os.replace` it into place, so a process killed mid-write never
@@ -126,6 +162,11 @@ class NseClient:
     cookie_jar: CookieJar = field(default_factory=CookieJar)
     user_agent: str = USER_AGENT
     max_retries: int = MAX_RETRIES
+    #: Returns NSE's session cookies in Playwright's `context.cookies()` shape
+    #: (dicts with at least "name"/"value", usually "domain"/"path"/"secure" too).
+    #: None (the default) uses a real headless-Chromium fetch; tests inject a fake
+    #: here instead of launching a real browser — the one seam `warm_up` needs.
+    browser_cookies: Callable[[], list[dict]] | None = field(default=None, repr=False)
     _last_request_at: float | None = field(default=None, init=False, repr=False)
     #: Built once in __post_init__. Tests substitute `client._opener.open` with a
     #: fake to avoid any real network access — this is the one seam this module
@@ -143,19 +184,65 @@ class NseClient:
         self._last_request_at = time.monotonic()
 
     def warm_up(self) -> None:
-        """Prime the cookie jar with an initial GET of the NSE homepage.
+        """Prime the cookie jar via a real browser.
 
-        NSE's API/zip endpoints 403 without a same-session cookie from a prior
-        homepage visit. Call this once before the first get_bytes/get_json call
-        of a run.
+        NSE's API/zip endpoints 403 without a same-session cookie from a prior homepage
+        visit. Call this once before the first get_bytes/get_json call of a run.
+
+        Bug fix (TODO.md 3.11.16): this used to be a single bare `urllib` GET. NSE's
+        Akamai WAF fingerprints the TLS handshake itself — confirmed live, a `curl`
+        request with a complete, correct set of real-browser headers still gets an
+        immediate 403 "Access Denied" from Akamai's edge (`errors.edgesuite.net`), while
+        an actual browser on the same network loads the site normally. No amount of
+        header-tuning in `urllib`/`curl` can pass this; only a real browser engine can.
+        `browser_cookies` (constructor field) does that one request via Chromium
+        (`_fetch_cookies_via_browser`, the default — see its docstring for why it runs
+        headed-but-off-screen, not headless) and hands this client its session cookies —
+        every later `get_bytes`/`get_json` call in a run still goes through the existing
+        lightweight `urllib` transport below, using the jar this seeds, not a browser.
+
+        Even the browser path is intermittently flaky (confirmed live: 1 failure in 6
+        back-to-back attempts, Akamai likely load-balancing across edge nodes that don't
+        all behave the same) — retried with the same bounded backoff as every other NSE
+        call, rather than failing the whole run on one bad attempt.
         """
-        self._throttle()
-        req = urllib.request.Request(
-            "https://www.nseindia.com/",
-            headers={"User-Agent": self.user_agent, "Accept": "text/html,application/xhtml+xml"},
-        )
-        with self._opener.open(req, timeout=30.0) as resp:
-            _read_capped(resp, MAX_JSON_RESPONSE_BYTES)
+        last_exc: Exception | None = None
+        fetch = self.browser_cookies or (lambda: _fetch_cookies_via_browser(self.user_agent))
+        for attempt in range(self.max_retries + 1):
+            self._throttle()
+            try:
+                cookies = fetch()
+                break
+            except Exception as e:
+                last_exc = e
+                if attempt < self.max_retries:
+                    time.sleep(_backoff_seconds(attempt))
+                    continue
+                raise NseError(f"browser warm-up failed: {e}") from e
+        else:  # pragma: no cover - unreachable, loop always breaks or raises above
+            raise NseError("browser warm-up failed") from last_exc
+        for cookie in cookies:
+            domain = cookie.get("domain", "nseindia.com").lstrip(".")
+            self.cookie_jar.set_cookie(
+                Cookie(
+                    0,
+                    cookie["name"],
+                    cookie["value"],
+                    None,
+                    False,
+                    domain,
+                    False,
+                    False,
+                    cookie.get("path", "/"),
+                    False,
+                    bool(cookie.get("secure", False)),
+                    None,
+                    False,
+                    None,
+                    None,
+                    {},
+                )
+            )
 
     def _request(self, url: str, *, referer: str | None, timeout: float, max_bytes: int) -> bytes:
         last_exc: Exception | None = None

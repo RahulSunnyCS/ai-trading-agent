@@ -1,12 +1,40 @@
 'use client';
 
-import { Star } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Star } from 'lucide-react';
 import { useState } from 'react';
 
-import type { MomentumSavedRun } from '../../types/momentum';
+import { usePolledResource } from '../../hooks/usePolledResource';
+import type { MomentumSavedRun, MomentumWeeklyStatus } from '../../types/momentum';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+
+/** Custom Index and Broad Momentum price through the same bhavcopy-backed stock layer as
+ * Stock mode (see weekly.py's A5 gate investigation), so they share the "stock" readiness
+ * dataset key from /weekly/status rather than each needing their own. */
+function readinessKey(dataset: unknown): 'etf' | 'stock' {
+  return dataset === 'stock' || dataset === 'custom_index' || dataset === 'broad' ? 'stock' : 'etf';
+}
+
+/** B3: whether a favourite could produce a signal right now, so a blocked active favourite
+ * is visible before Friday rather than discovered from a missed Telegram message. */
+function readiness(
+  run: MomentumSavedRun,
+  status: MomentumWeeklyStatus | null,
+): { ready: boolean; detail: string } | null {
+  if (!run.favorite || !status) return null;
+  const item = status.datasets.find((d) => d.key === readinessKey(run.config.dataset));
+  if (!item) return null;
+  return {
+    ready: item.ready,
+    detail: item.ready
+      ? `Data through ${item.through ?? '—'}`
+      : item.through
+        ? `Data only through ${item.through} — this week's data isn't ingested yet.`
+        : 'No data ingested yet.',
+  };
+}
 
 const PERCENT_METRICS = new Set(['cagr', 'excess_cagr', 'max_drawdown', 'turnover_per_year']);
 const METRICS: Array<[string, string]> = [
@@ -44,6 +72,9 @@ export function MomentumSavedRunsView({
   const [compareId, setCompareId] = useState('');
   const current = runs[0];
   const comparison = runs.find((run) => run.id === compareId && run.id !== current?.id) ?? runs[1];
+  // Shares the Weekly signal tab's endpoint rather than threading its status down through
+  // props — cheap to poll and keeps this view self-contained.
+  const { data: status } = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status');
 
   return (
     <div className="space-y-5">
@@ -55,65 +86,88 @@ export function MomentumSavedRunsView({
         {runs.length === 0 ? (
           <p className="text-sm text-muted">Run a backtest to start a comparison.</p>
         ) : null}
-        {runs.map((run, index) => (
-          <div
-            key={run.id}
-            className="flex flex-wrap items-center gap-3 border-t border-border py-3"
-          >
-            <label className="flex items-center gap-1.5 text-xs text-muted">
-              <input
-                type="checkbox"
-                aria-label={`Overlay ${run.name}`}
-                checked={run.overlay}
-                disabled={index === 0}
-                onChange={(event) => onToggleOverlay(run.id, event.target.checked)}
-              />
-              Overlay
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-muted">
-              <input
-                type="checkbox"
-                aria-label={`Favourite ${run.name}`}
-                checked={run.favorite}
-                onChange={(event) => onToggleFavorite(run.id, event.target.checked)}
-              />
-              <Star className="h-3.5 w-3.5" aria-hidden />
-              Favourite
-            </label>
-            {run.favorite ? (
-              <label className="flex items-center gap-1.5 text-xs text-muted">
+        {runs.map((run, index) => {
+          const ready = readiness(run, status ?? null);
+          return (
+            <div key={run.id} className="border-t border-border py-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  <input
+                    type="checkbox"
+                    aria-label={`Overlay ${run.name}`}
+                    checked={run.overlay}
+                    disabled={index === 0}
+                    onChange={(event) => onToggleOverlay(run.id, event.target.checked)}
+                  />
+                  Overlay
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  <input
+                    type="checkbox"
+                    aria-label={`Favourite ${run.name}`}
+                    checked={run.favorite}
+                    onChange={(event) => onToggleFavorite(run.id, event.target.checked)}
+                  />
+                  <Star className="h-3.5 w-3.5" aria-hidden />
+                  Favourite
+                </label>
+                {run.favorite ? (
+                  <label className="flex items-center gap-1.5 text-xs text-muted">
+                    <input
+                      type="radio"
+                      name="active-weekly-strategy"
+                      aria-label={`Use ${run.name} for Telegram`}
+                      checked={run.active}
+                      onChange={() => onSetActive(run.id)}
+                    />
+                    Telegram active
+                  </label>
+                ) : null}
                 <input
-                  type="radio"
-                  name="active-weekly-strategy"
-                  aria-label={`Use ${run.name} for Telegram`}
-                  checked={run.active}
-                  onChange={() => onSetActive(run.id)}
+                  aria-label={`Name for run ${run.n}`}
+                  value={run.name}
+                  maxLength={64}
+                  onChange={(event) => onRename(run.id, event.target.value)}
+                  className="min-w-48 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
                 />
-                Telegram active
-              </label>
-            ) : null}
-            <input
-              aria-label={`Name for run ${run.n}`}
-              value={run.name}
-              maxLength={64}
-              onChange={(event) => onRename(run.id, event.target.value)}
-              className="min-w-48 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
-            />
-            <span className="text-xs text-muted">
-              CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Sharpe{' '}
-              {metric(run, 'sharpe')}
-              {typeof run.config.start === 'string' ? ` · Start ${run.config.start}` : ''}
-            </span>
-            <div className="ml-auto flex gap-2">
-              <Button size="sm" onClick={() => onLoad(run)}>
-                Load settings
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => onRemove(run.id)}>
-                Remove
-              </Button>
+                <span className="text-xs text-muted">
+                  CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Sharpe{' '}
+                  {metric(run, 'sharpe')}
+                  {typeof run.config.start === 'string' ? ` · Start ${run.config.start}` : ''}
+                </span>
+                <div className="ml-auto flex gap-2">
+                  <Button size="sm" onClick={() => onLoad(run)}>
+                    Load settings
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onRemove(run.id)}>
+                    Remove
+                  </Button>
+                </div>
+              </div>
+              {ready ? (
+                <div className="mt-2 flex items-center gap-1.5 pl-0.5 text-xs">
+                  {ready.ready ? (
+                    <Badge tone="positive" dot>
+                      Ready for this week&apos;s weekly run
+                    </Badge>
+                  ) : (
+                    <Badge tone="warning" dot>
+                      Will be blocked this week
+                    </Badge>
+                  )}
+                  <span className="flex items-center gap-1 text-muted">
+                    {ready.ready ? (
+                      <CheckCircle2 className="h-3 w-3" />
+                    ) : (
+                      <AlertTriangle className="h-3 w-3" />
+                    )}
+                    {ready.detail}
+                  </span>
+                </div>
+              ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </Card>
 
       {current && comparison ? (

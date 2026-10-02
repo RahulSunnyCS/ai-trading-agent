@@ -293,6 +293,24 @@ def daily_closes(symbol: str, start: date, end: date, creds: Credentials) -> pd.
     return daily_candles(symbol, start, end, creds)["close"]
 
 
+def daily_ohlcv(symbol: str, start: date, end: date, creds: Credentials) -> pd.DataFrame:
+    """Daily open/high/low/close/volume indexed by IST trading date. Unlike
+    `daily_candles` (open+close only), this keeps the full bar — used by
+    `stocks/fyers_topup.py`'s Total Market top-up, which writes real `bars_1d_stock`
+    rows (not a flat synthetic bar) when NSE's own bhavcopy is unreachable."""
+    by_day = {
+        _ist(epoch).date(): (float(open_), float(high), float(low), float(close), float(volume))
+        for epoch, open_, high, low, close, volume in _candles(
+            symbol, "D", start, end, DAILY_MAX_DAYS, creds
+        )
+    }
+    frame = pd.DataFrame.from_dict(
+        by_day, orient="index", columns=["open", "high", "low", "close", "volume"]
+    ).sort_index()
+    frame.index = pd.to_datetime(frame.index)
+    return frame
+
+
 QUOTES_URL = "https://api-t1.fyers.in/data/quotes"
 
 
