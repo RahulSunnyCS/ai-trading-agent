@@ -146,6 +146,45 @@ def test_register_is_idempotent_and_links_derivatives_to_their_underlying(root):
         assert con.execute("SELECT count(*) FROM instrument_aliases").fetchone()[0] == 1
 
 
+def test_register_many_aliases_keeps_the_conflict_semantics(root):
+    """Aliases go in with one bulk INSERT (executemany cost ~4 ms/row, so a daily fetch of
+    thousands of contracts took a minute or more). It must keep `ON CONFLICT DO NOTHING`:
+    re-registering is a no-op, and a vendor symbol repeated within ONE call is stored once,
+    pointing at the first instrument - not an error."""
+
+    def option(strike: float, vendor_symbol: str) -> InstrumentSpec:
+        return InstrumentSpec(
+            "option",
+            "NSE",
+            "NIFTY",
+            expiry=date(2026, 10, 6),
+            strike=strike,
+            option_type="CE",
+            lot_size=65,
+            vendor="fyers",
+            vendor_symbol=vendor_symbol,
+        )
+
+    specs = [option(22000.0 + 50 * i, f"NSE:NIFTY26O06{22000 + 50 * i}CE") for i in range(500)]
+    with connect(root) as con:
+        ids = register(con, specs)
+        assert len(ids) == 500
+        count = lambda: con.execute("SELECT count(*) FROM instrument_aliases").fetchone()[0]  # noqa: E731
+        assert count() == 500
+
+        assert register(con, specs) == ids  # again: nothing added, same ids
+        assert count() == 500
+
+        # two DIFFERENT instruments that claim the same vendor symbol, in one call
+        clash = [option(30000.0, "NSE:CLASH"), option(30050.0, "NSE:CLASH")]
+        got = register(con, clash)
+        rows = con.execute(
+            "SELECT instrument_id FROM instrument_aliases WHERE vendor_symbol = 'NSE:CLASH'"
+        ).fetchall()
+        assert rows == [(got[clash[0].key],)]  # one row, the first instrument's
+        assert count() == 501
+
+
 def test_raw_sink_replaces_rather_than_appends(root):
     for _ in range(2):
         sink = lake.RawSink(root, "fyers", DAY)
