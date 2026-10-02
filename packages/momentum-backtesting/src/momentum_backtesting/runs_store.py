@@ -233,8 +233,7 @@ def list_favorites(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
         [PACKAGE],
     ).fetchall()
     return [
-        _record(run_id, json.loads(spec), json.loads(summary))
-        for run_id, spec, summary in rows
+        _record(run_id, json.loads(spec), json.loads(summary)) for run_id, spec, summary in rows
     ]
 
 

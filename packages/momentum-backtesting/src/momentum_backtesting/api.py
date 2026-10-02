@@ -124,6 +124,14 @@ class _Data:
             mtime = (db_mtime, csv_mtime)
             if mtime != self._mtime:
                 from_db = db_read.weekly_closes_from_db_or_none() if db_mtime is not None else None
+                if from_db is None and csv_mtime is None:
+                    # A catalog exists but holds no weekly prices (anything that opens it for
+                    # writing creates it - e.g. the dashboard's first saved-runs call) and there
+                    # is no CSV either: say what to run, instead of a FileNotFoundError -> 500.
+                    raise HTTPException(
+                        409,
+                        "No data yet - run `mbt local migrate` (or `mbt login` then `mbt fetch`).",
+                    )
                 self.prices = (
                     from_db
                     if from_db is not None

@@ -71,15 +71,11 @@ def test_favorites_are_persistent_and_only_one_can_be_active(client):
     first = client.post("/api/saved-runs", json=_payload("First")).json()
     second = client.post("/api/saved-runs", json=_payload("Second")).json()
 
-    activated_first = client.patch(
-        f"/api/saved-runs/{first['id']}", json={"active": True}
-    ).json()
+    activated_first = client.patch(f"/api/saved-runs/{first['id']}", json={"active": True}).json()
     assert activated_first["favorite"] is True
     assert activated_first["active"] is True
 
-    activated_second = client.patch(
-        f"/api/saved-runs/{second['id']}", json={"active": True}
-    ).json()
+    activated_second = client.patch(f"/api/saved-runs/{second['id']}", json={"active": True}).json()
     assert activated_second["favorite"] is True
     assert activated_second["active"] is True
     listed = {item["id"]: item for item in client.get("/api/saved-runs").json()}

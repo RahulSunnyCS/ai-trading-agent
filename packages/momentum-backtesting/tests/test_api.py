@@ -1329,3 +1329,21 @@ def test_broad_reversal_tilt_changes_the_result_and_avoids_fresh_lows(broad_clie
                 if asset in low.columns and week in low.index and bool(low.at[week, asset]):
                     violations.append((label, week, asset))
     assert not violations, violations[:5]
+
+
+def test_meta_with_an_empty_catalog_and_no_csv_is_a_clear_409_not_a_500(tmp_path, monkeypatch):
+    """The dashboard's first call (saved-runs) creates an EMPTY catalog.duckdb. `_Data.get()` saw
+    a catalog, tried it (nothing in it), fell through to `pd.read_csv` on a file that does not
+    exist, and the FileNotFoundError came back as HTTP 500. It should say what to run.
+    (Deliberately not the `client` fixture: that one writes a weekly_closes.csv.)"""
+    from trading_data.db import connect
+
+    with connect():
+        pass  # creates the empty catalog under the conftest-isolated TRADING_DATA_ROOT
+    monkeypatch.setattr(api, "DATA_DIR", tmp_path)  # an empty folder: no weekly_closes.csv
+    monkeypatch.setattr(api, "DATA", api._Data())
+
+    res = TestClient(api.create_app()).get("/api/meta")
+
+    assert res.status_code == 409, res.text
+    assert "mbt" in res.json()["detail"]
