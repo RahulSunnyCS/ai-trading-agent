@@ -6,7 +6,7 @@ import math
 
 import pandas as pd
 
-from . import metrics
+from . import metrics, reference_benchmarks
 from .engine import CASH, IDLE, Config, Result
 
 CAPITAL = 100_000  # rupee figures are shown for Rs 1 lakh invested at the start
@@ -223,6 +223,7 @@ def latest_signal(
     prices: pd.DataFrame,
     config: Config,
     membership: pd.DataFrame | None = None,
+    no_buy: pd.DataFrame | None = None,
 ) -> dict:
     """What the rules say to do at the most recent week's close.
 
@@ -232,6 +233,10 @@ def latest_signal(
     even if it ranks well - only the engine's real trading loop enforces this during a backtest,
     so this advisory panel has to apply the same rule itself or it would recommend a trade the
     engine would refuse.
+
+    `no_buy` (week x instrument booleans, the same table passed to `run_backtest`) does the same
+    for an entry-only gate: a flagged name not already held is skipped and the next-best
+    buyable name within `exit_rank` takes its place, exactly as `_Sim.top_names` refills.
     """
     week = result.ranks.index[-1]
     ranks = result.ranks.loc[week]
@@ -271,10 +276,27 @@ def latest_signal(
             membership is None or name not in membership.columns or bool(membership.at[week, name])
         )
 
-    tops = [n for n in ranks.dropna().sort_values().index if ranks[n] <= config.top_n and passes(n)]
+    ordered = ranks.dropna().sort_values()
+    tops = [n for n in ordered.index if ordered[n] <= config.top_n and passes(n)]
+    skipped: set[str] = set()
+    if no_buy is not None and week in no_buy.index:
+        flagged = no_buy.loc[week]
+
+        def blocked(name: str) -> bool:
+            return name in flagged.index and bool(flagged[name])
+
+        skipped = {n for n in tops if n not in held and blocked(n)}
+        tops = [n for n in tops if n not in skipped]
+        for n in ordered.index:
+            if len(tops) >= config.top_n or ordered[n] > config.exit_rank:
+                break
+            fresh = n not in tops and n not in skipped and not blocked(n)
+            if fresh and passes(n) and eligible_to_buy(n):
+                tops.append(n)
     not_a_member = {n for n in tops if n not in held and not eligible_to_buy(n)}
     actions: dict[str, str] = {n: "SELL" for n in sells}
     actions.update(dict.fromkeys(not_a_member, "NOT A MEMBER"))
+    actions.update(dict.fromkeys(skipped, "SKIP (no new buy)"))
     if config.portfolio == "slots":
         open_slots = config.top_n - (len(held) - len(sells))
         candidates = [n for n in tops if n not in held and eligible_to_buy(n)]
@@ -341,6 +363,8 @@ def payload(
     fill_warnings: list[str] | None = None,
     membership: pd.DataFrame | None = None,
     share_prices: bool = False,
+    references: pd.DataFrame | None = None,
+    no_buy: pd.DataFrame | None = None,
 ) -> dict:
     """`share_prices` adds each open position's last-week price (`open_positions[].price`) so the
     UI's "Trade split" tab can turn a rupee amount into whole shares. Off by default: only pass
@@ -352,7 +376,10 @@ def payload(
     its index because it hadn't listed yet. `membership` is passed straight through to
     `latest_signal` (see its docstring) - it never affects the historical `result` itself, which
     the engine has already computed correctly; it only stops the "This week" advisory panel from
-    recommending a trade the engine's own rules wouldn't have allowed."""
+    recommending a trade the engine's own rules wouldn't have allowed.
+
+    `references` (reference_benchmarks.load_references) adds `comparisons`: dividend-inclusive
+    lines the strategy is also measured against, whatever the dataset's own benchmark is."""
     closed = closed_trades(result)
     eq, bench, cash = result.equity, result.benchmark, result.cash
     rolling = (eq / eq.shift(52)) - (bench / bench.shift(52))
@@ -407,6 +434,17 @@ def payload(
         {
             "benchmark_name": config.benchmark,
             "kpis": kpis(result, closed),
+            "comparisons": [
+                {
+                    "name": c["name"],
+                    "cagr": c["cagr"],
+                    "excess_cagr": c["excess_cagr"],
+                    "max_drawdown": c["max_drawdown"],
+                    "note": c["note"],
+                    "series": (c["curve"] * CAPITAL).tolist(),
+                }
+                for c in reference_benchmarks.compare(eq, references)
+            ],
             "series": series,
             "rotations": rotations(result),
             "trades": trade_rows,
@@ -421,7 +459,7 @@ def payload(
             "timeline": timeline(result, closed),
             "yearly": yearly.to_dict("records"),
             "crashes": metrics.crash_table(result).to_dict("records"),
-            "latest": latest_signal(result, prices, config, membership),
+            "latest": latest_signal(result, prices, config, membership, no_buy),
             "universe": result.ranked_names,
         }
     )

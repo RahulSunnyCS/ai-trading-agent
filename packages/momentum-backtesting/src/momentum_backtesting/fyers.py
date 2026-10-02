@@ -1,12 +1,12 @@
 """Fyers v3 history client for daily candles.
 
-Credentials resolve like apps/server (ingestion/brokers/fyers-historical.ts), with one
-extra source so this works without the server's Postgres running:
-  1. FYERS_APP_ID + FYERS_ACCESS_TOKEN from the environment / repo .env
-  1b. FYERS_TOKEN_FILE - the JSON file packages/broker-login's `fyers-token` writes in CI
-  2. the token cached by `mbt login` (data/.fyers_token.json), if not expired
-  3. the row in broker_tokens (broker = 'fyers'), written by the dashboard's
-     "Login with Fyers" flow, read via DATABASE_URL.
+Credential precedence:
+  1. the valid broker_tokens row written by the dashboard's Fyers login, when
+     DATABASE_URL is configured and reachable
+  2. FYERS_APP_ID + FYERS_ACCESS_TOKEN from the environment / repo .env
+  3. FYERS_TOKEN_FILE - the JSON file packages/broker-login's `fyers-token` writes in CI
+  4. the token cached by `mbt login` (data/.fyers_token.json), if not expired
+Direct-mode dashboard previews prefer the local login cache over env fallbacks.
 Fyers tokens expire daily, so the cache and DB paths check expires_at first.
 """
 
@@ -18,7 +18,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
@@ -54,8 +54,8 @@ class FyersCredentialsError(RuntimeError):
 @dataclass(frozen=True)
 class Credentials:
     app_id: str
-    access_token: str
-    source: str  # "env" or "broker_tokens"
+    access_token: str = field(repr=False)
+    source: str
     expires_at: datetime | None = None
 
 
@@ -149,16 +149,20 @@ def _dashboard_credentials() -> Credentials:
 
     import psycopg
 
+    passphrase = os.environ.get("FYERS_APP_SECRET", "")
     try:
         with psycopg.connect(database_url, connect_timeout=10) as conn:
             row = conn.execute(
-                "SELECT app_id, access_token, expires_at FROM broker_tokens"
-                " WHERE broker = 'fyers' LIMIT 1"
+                "SELECT app_id, "
+                "CASE WHEN token_encrypted "
+                "THEN pgp_sym_decrypt(dearmor(access_token), %s) "
+                "ELSE access_token END AS access_token, expires_at FROM broker_tokens "
+                "WHERE broker = 'fyers' LIMIT 1",
+                (passphrase,),
             ).fetchone()
-    except psycopg.OperationalError as error:
-        reason = str(error).strip().splitlines()[-1]
+    except psycopg.Error:
         raise FyersCredentialsError(
-            f"The dashboard's Fyers token database isn't reachable ({reason})."
+            "The dashboard's Fyers token database is unavailable."
         ) from None
     if row is None:
         raise FyersCredentialsError(
@@ -174,19 +178,17 @@ def _dashboard_credentials() -> Credentials:
 
 
 def resolve_credentials(*, prefer_dashboard: bool = False) -> Credentials:
-    """Resolve a valid token; UI previews prefer the dashboard login over stale env tokens."""
+    """Prefer the dashboard token; preserve standalone env/file/cache fallbacks."""
+    database_error: FyersCredentialsError | None = None
+    if os.environ.get("DATABASE_URL", "").strip():
+        try:
+            return _dashboard_credentials()
+        except FyersCredentialsError as error:
+            database_error = error
+
     if prefer_dashboard:
-        if os.environ.get("DATABASE_URL", "").strip():
-            try:
-                return _dashboard_credentials()
-            except FyersCredentialsError:
-                # Standalone `mbt ui` may share the repo .env with Fastify while
-                # Postgres is stopped. Its browser OAuth callback writes the
-                # short-lived token to the local 0600 cache instead.
-                cached = _cached_token()
-                if cached:
-                    return cached
-                raise
+        # Direct mode writes OAuth tokens to a local 0600 cache when Postgres
+        # is stopped; that fresh login should beat an old env token.
         cached = _cached_token()
         if cached:
             return cached
@@ -212,11 +214,12 @@ def resolve_credentials(*, prefer_dashboard: bool = False) -> Credentials:
     if cached:
         return cached
 
-    if not os.environ.get("DATABASE_URL", "").strip():
-        raise FyersCredentialsError(
-            "No Fyers token: run `mbt login`, or set FYERS_ACCESS_TOKEN in .env."
-        )
-    return _dashboard_credentials()
+    if database_error is not None:
+        raise database_error
+    raise FyersCredentialsError(
+        "No Fyers token: log in from Broker logins, run `mbt login`, "
+        "or set FYERS_ACCESS_TOKEN in .env."
+    )
 
 
 def _get(params: dict[str, str | int], creds: Credentials) -> dict:

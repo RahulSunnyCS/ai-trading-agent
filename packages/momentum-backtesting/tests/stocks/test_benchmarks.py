@@ -24,6 +24,12 @@ from momentum_backtesting.stocks import benchmarks
 
 FIXTURES = Path(__file__).resolve().parents[2] / "data/stocks/raw/benchmarks"
 
+#: `data/` is not tracked in git (it is rebuilt by `mbt stocks fetch`), so a clean checkout - CI
+#: included - has no raw fixtures. The tests that read them skip there instead of failing.
+needs_raw_fixtures = pytest.mark.skipif(
+    not FIXTURES.exists(), reason="data/stocks/raw/benchmarks not present (run `mbt stocks fetch`)"
+)
+
 
 def _fake_urlopen(rows: list[dict], seen: list):
     def urlopen(request, timeout):
@@ -94,8 +100,9 @@ def test_assert_same_session_set_raises_on_mismatch():
         benchmarks.assert_same_session_set(tri, price)
 
 
+@needs_raw_fixtures
 def test_nifty_50_equal_weight_tri_and_price_share_an_identical_date_set():
-    """QA F06, against the real committed raw fixtures (plan.md §1: "3,900 dates,
+    """QA F06, against the real raw fixtures (plan.md §1: "3,900 dates,
     identical date set to its TRI"). No network - both files are already on disk."""
     tri_rows = json.loads((FIXTURES / "NIFTY50_EQUAL_WEIGHT_TRI.json").read_text())
     tri_series = parse_niftyindices_tri(tri_rows)
@@ -108,6 +115,7 @@ def test_nifty_50_equal_weight_tri_and_price_share_an_identical_date_set():
     assert len(price_series) == 3900
 
 
+@needs_raw_fixtures
 def test_nifty_50_tri_and_nifty200_momentum_30_tri_fixtures_share_the_same_session_set():
     """The three TRI feeds (plan.md §1) share one 3,900-date session set."""
     n50 = parse_niftyindices_tri(json.loads((FIXTURES / "NIFTY_50_TRI.json").read_text()))

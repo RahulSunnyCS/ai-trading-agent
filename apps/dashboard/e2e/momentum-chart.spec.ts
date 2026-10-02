@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-test('Momentum backtest renders an interactive chart with optional touchpad zoom', async ({ page }) => {
+test('Momentum backtest renders an interactive chart with optional touchpad zoom', async ({
+  page,
+}) => {
   await page.route('**/api/momentum/meta?dataset=etf', (route) =>
     route.fulfill({
       status: 200,
@@ -54,30 +56,50 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
   const zoom = page.getByRole('button', { name: 'Touchpad zoom off' });
   await expect(zoom).toHaveAttribute('aria-pressed', 'false');
   await zoom.click();
-  await expect(page.getByRole('button', { name: 'Touchpad zoom on' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Touchpad zoom on' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await page.getByRole('button', { name: 'Saved runs (1)' }).click();
   await expect(page.getByRole('heading', { name: 'Saved runs' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Name for run 1' })).toHaveValue('Run 1');
 });
 
 test('Momentum Scores exposes stock and sector details', async ({ page }) => {
-  await page.route('**/api/momentum/scores', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({
-      as_of: '2024-01-19', universe_size: 1, lookbacks: [4, 13, 26], missing_symbols: [],
-      stocks: [{
-        symbol: 'TEST', company_name: 'Test Company', parent_group: 'Industry', subgroup: 'Metals',
-        last_price: 120, change_1w_pct: 0.02,
-        returns: { '4': 0.08, '13': 0.12, '26': 0.20 },
-        scores: { '4': 75, '13': 80, '26': 90 },
-      }],
-      sectors: [{
-        cid: 'metals', parent_group: 'Industry', subgroup: 'Metals',
-        member_count: 2, qualifying_count: 1, scores: { '4': 75, '13': 80, '26': 90 },
-      }],
+  await page.route('**/api/momentum/scores', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        as_of: '2024-01-19',
+        universe_size: 1,
+        lookbacks: [4, 13, 26],
+        missing_symbols: [],
+        stocks: [
+          {
+            symbol: 'TEST',
+            company_name: 'Test Company',
+            parent_group: 'Industry',
+            subgroup: 'Metals',
+            last_price: 120,
+            change_1w_pct: 0.02,
+            returns: { '4': 0.08, '13': 0.12, '26': 0.2 },
+            scores: { '4': 75, '13': 80, '26': 90 },
+          },
+        ],
+        sectors: [
+          {
+            cid: 'metals',
+            parent_group: 'Industry',
+            subgroup: 'Metals',
+            member_count: 2,
+            qualifying_count: 1,
+            scores: { '4': 75, '13': 80, '26': 90 },
+          },
+        ],
+      }),
     }),
-  }));
+  );
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Momentum', exact: true }).click();

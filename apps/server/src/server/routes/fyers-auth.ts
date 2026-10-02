@@ -147,7 +147,7 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
 
     const authCode = query.auth_code ?? query.code;
     if (!authCode) {
-      return reply.code(400).send({ error: 'missing_auth_code', details: query });
+      return reply.code(400).send({ error: 'missing_auth_code' });
     }
 
     try {
@@ -173,16 +173,11 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
 <p>You can close this tab.</p>
 <script>setTimeout(() => window.close(), 1500);</script>
 </body></html>`);
-    } catch (err) {
-      // Log only a redacted token reference (first 4 chars) — never the full
-      // token or secret. The error message from Fyers may embed the auth code,
-      // so we log the safe message string only, not the raw error object.
-      const safeMessage = err instanceof Error ? err.message : String(err);
-      request.log.error(
-        { authCode: redactToken(authCode) },
-        `[fyers-auth] token exchange failed: ${safeMessage}`,
-      );
-      return reply.code(502).send({ error: 'token_exchange_failed', message: safeMessage });
+    } catch {
+      // Broker errors may include the authorization code or token. Neither
+      // the response nor the log should repeat that upstream payload.
+      request.log.error({ authCode: redactToken(authCode) }, '[fyers-auth] token exchange failed');
+      return reply.code(502).send({ error: 'token_exchange_failed' });
     }
   });
 
@@ -207,16 +202,21 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
     // computation lives in exactly one place — the status route and the
     // scheduled job share identical logic with no duplication.
     const state = checkTokenValidity(token?.expiresAt ?? null);
-    const { degraded, needsReauth } = deriveStatusFlags(state);
+    const flags = deriveStatusFlags(state);
 
     if (!token) {
       return reply.send({
         configured: true,
         connected: false,
-        degraded,
-        needsReauth,
+        degraded: flags.degraded,
+        needsReauth: flags.needsReauth,
       });
     }
+
+    // A token minted for a different Fyers app must never appear connected,
+    // even when its timestamp is still in the future.
+    const appMismatch = token.appId !== cfg.appId;
+    const needsReauth = flags.needsReauth || appMismatch;
 
     return reply.send({
       configured: true,
@@ -226,7 +226,7 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
       connected: !needsReauth,
       expiresAt: token.expiresAt.toISOString(),
       appId: token.appId,
-      degraded,
+      degraded: flags.degraded || appMismatch,
       needsReauth,
     });
   });

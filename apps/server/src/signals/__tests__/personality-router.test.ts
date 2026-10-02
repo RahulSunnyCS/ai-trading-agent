@@ -22,7 +22,7 @@ import type { Pool, QueryResult } from 'pg';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PersonalityConfigM2 as PersonalityConfig } from '../../db/schema.js';
 import { FixedClock } from '../../utils/clock.js';
-import { type IncomingSignal, PersonalityRouter } from '../personality-router.js';
+import { PersonalityRouter } from '../personality-router.js';
 
 // ---------------------------------------------------------------------------
 // Module-level mocks

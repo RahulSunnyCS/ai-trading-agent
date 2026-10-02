@@ -24,13 +24,14 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
 from trading_data.db import connect
 
+from ..analytics import regime_source
 from ..fyers.daily import UNDERLYINGS, data_dir
-from ..legwise import store
+from ..legwise import anatomy, forensics, store
 from ..legwise.daily import (
     load_history,
     load_strategy_files,
@@ -212,6 +213,126 @@ def results() -> dict[str, Any]:
         "results": rows,
         "results_dir": f"{data_dir()}/catalog.duckdb",
     }
+
+
+# ---------------------------------------------------------------------------
+# Day forensics and market anatomy
+# ---------------------------------------------------------------------------
+
+_HHMM_RE = re.compile(r"^\d{2}:\d{2}$")
+
+
+def _parse_cuts(raw: str | None) -> list[int] | JSONResponse:
+    parts = [c for c in (raw or ",".join(anatomy.DEFAULT_CUTS)).split(",") if c]
+    if any(not _HHMM_RE.match(p) for p in parts):
+        return _error(422, "cuts must be comma-separated HH:MM times, e.g. 10:30,13:30")
+    try:
+        return anatomy.parse_cuts(parts)
+    except ValueError as error:
+        return _error(422, str(error))
+
+
+def _stored_spec(strategy_id: str, sha: str | None) -> LegwiseStrategy | None:
+    """The spec of the version that produced a saved result (so a result from an older
+    edit of the file is explained with ITS settings), else the file as it is now."""
+    import json
+
+    if sha:
+        try:
+            with connect(data_dir(), read_only=True) as con:
+                row = con.execute(
+                    "SELECT spec FROM strategy_versions WHERE strategy_id = ? AND spec_hash = ?",
+                    [strategy_id, sha],
+                ).fetchone()
+        except FileNotFoundError:
+            row = None
+        if row:
+            return LegwiseStrategy.model_validate(json.loads(row[0]))
+    for f in load_strategy_files(LEGWISE_DIR):
+        if f.strategy.id == strategy_id:
+            return f.strategy
+    return None
+
+
+@router.get("/day")
+def day_forensics(strategy: str, day: str, sha: str | None = None, cuts: str | None = None) -> Any:
+    """Re-simulate one saved day: intraday MTM, spot, each leg's premium, entry/exit
+    markers, per-leg attribution and that day's index anatomy."""
+    parsed = _parse_cuts(cuts)
+    if isinstance(parsed, JSONResponse):
+        return parsed
+    try:
+        the_day = date.fromisoformat(day)
+    except ValueError:
+        return _error(422, "day must be YYYY-MM-DD")
+    spec = _stored_spec(strategy, sha)
+    if spec is None:
+        return _error(404, f"no strategy {strategy!r} (or version {sha})")
+    root = data_dir()
+    try:
+        data = load_day(root, spec.underlying, the_day)
+    except FileNotFoundError:
+        return _error(404, f"no collected {spec.underlying} data for {day}")
+    result = simulate_day(spec, data)
+    return forensics.build_forensics(
+        spec,
+        data,
+        result,
+        parsed,
+        anatomy.anatomy_day(root, spec.underlying, the_day, parsed),
+        sha or store.spec_hash(spec),
+    )
+
+
+@router.get("/anatomy")
+def market_anatomy(
+    underlying: str = "NIFTY",
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = None,
+    cuts: str | None = None,
+) -> Any:
+    """Per-day, per-segment index shape over the collected index history."""
+    if underlying not in UNDERLYINGS:
+        return _error(422, f"unknown underlying {underlying}")
+    parsed = _parse_cuts(cuts)
+    if isinstance(parsed, JSONResponse):
+        return parsed
+    try:
+        start = date.fromisoformat(from_) if isinstance(from_, str) else None
+        end = date.fromisoformat(to) if to else None
+    except ValueError:
+        return _error(422, "from/to must be YYYY-MM-DD")
+    days = anatomy.anatomy_range(data_dir(), underlying, start, end, parsed)
+    return {
+        "underlying": underlying,
+        "cuts": [minute_label(c) for c in parsed],
+        "thresholds": anatomy.THRESHOLDS,
+        "dte_reliable_from": anatomy.DTE_RELIABLE_FROM.isoformat(),
+        "t33": _overlay_t33(underlying, days),
+        "days": days,
+    }
+
+
+def _overlay_t33(underlying: str, days: list[dict]) -> dict[str, str | None]:
+    """Attach apps/server's T-33 whole-day regime tag (`daily_regime_tags`) to each day as
+    `t33`, so the dashboard can show how the two classifiers agree. Optional enrichment:
+    reported as a status, never silently dropped — `unavailable` (no DATABASE_URL in THIS
+    process), `empty` (connected, nothing tagged in range), `ok`, or `error` with the message."""
+    for d in days:
+        d["t33"] = None
+    if not regime_source.regime_data_available():
+        return {"status": "unavailable", "message": "DATABASE_URL is not set for this API process"}
+    if not days:
+        return {"status": "empty", "message": None}
+    try:
+        tags = regime_source.fetch_regimes(
+            underlying, date.fromisoformat(days[0]["day"]), date.fromisoformat(days[-1]["day"])
+        )
+    except Exception as error:  # a real DB problem must be visible, but must not break the page
+        return {"status": "error", "message": f"{type(error).__name__}: {error}"}
+    for d in days:
+        d["t33"] = tags.get(date.fromisoformat(d["day"]))
+    return {"status": "ok" if tags else "empty", "message": None}
 
 
 # ---------------------------------------------------------------------------

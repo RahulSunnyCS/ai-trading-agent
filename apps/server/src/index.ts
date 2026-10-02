@@ -37,7 +37,7 @@ import { createVixFeed } from './ingestion/vix-feed.js';
 import { registerTokenValiditySchedule } from './jobs/token-validity-check.js';
 import { redis } from './redis/client.js';
 import { startServer } from './server/index.js';
-import { loadStoredToken } from './server/services/fyers-auth.js';
+import { resolveFyersCredentials } from './server/services/fyers-auth.js';
 import {
   PeakDetectionEngine,
   readConfigFromEnv as readPeakConfigFromEnv,
@@ -86,48 +86,31 @@ async function main(): Promise<void> {
 
   // Step 3: instantiate all components.
   //
-  // Credential resolution for the Fyers broker must happen BEFORE createBroker()
-  // is called, because _createFyersBroker() (inside broker-factory) validates
-  // FYERS_APP_ID and FYERS_ACCESS_TOKEN at construction time and throws if they
-  // are missing. We centralise the resolution here so the factory stays pure
-  // (env-var reads only; no DB access) and this file owns the DB→env fallback.
-  //
-  // Resolution order:
-  //   1. Env var already set (e.g. .env or shell export) — use as-is.
-  //   2. Not in env → try broker_tokens DB table (written by the dashboard
-  //      OAuth "Login with Fyers" flow). If found and not expired, write to
-  //      process.env so _createFyersBroker() sees them on the same path as
-  //      operators who provide tokens via the environment.
+  // The factory reads process.env. Capture the original environment credentials
+  // before a DB token can replace them, so later reconnects can still fall back
+  // to the operator's values without accidentally reusing an expired DB token.
+  const fallbackFyersCredentials = {
+    appId: process.env.FYERS_APP_ID,
+    accessToken: process.env.FYERS_ACCESS_TOKEN,
+  };
+  // A valid broker_tokens row wins over env credentials, including at startup.
+  // This must happen before createBroker() validates its env-based input.
   // The credential resolution block only runs when BROKER=fyers AND we are not
   // in simulation mode. When SIMULATE=true the broker-factory will use the
   // simulator path regardless of what BROKER is set to — so we must not
   // attempt Fyers credential resolution (it would throw for missing tokens).
-  if (
-    !simulate &&
-    (process.env.BROKER ?? '').toLowerCase().trim() === 'fyers' &&
-    !process.env.FYERS_ACCESS_TOKEN
-  ) {
-    try {
-      const stored = await loadStoredToken(pool);
-      if (stored && stored.expiresAt.getTime() > Date.now()) {
-        process.env.FYERS_ACCESS_TOKEN = stored.accessToken;
-        // APP_ID may already be set via env; only overwrite when absent to avoid
-        // clobbering a deliberately different app ID in a multi-app deployment.
-        if (!process.env.FYERS_APP_ID) process.env.FYERS_APP_ID = stored.appId;
-        console.log(
-          `[index] Loaded Fyers token from DB — expires ${stored.expiresAt.toISOString()}`,
-        );
-      } else if (stored) {
-        console.warn(
-          `[index] Stored Fyers token expired at ${stored.expiresAt.toISOString()} — open the dashboard and re-login.`,
-        );
-      } else {
-        console.warn(
-          "[index] BROKER=fyers but no token in env or DB — open the dashboard and click 'Login with Fyers'.",
-        );
-      }
-    } catch (err) {
-      console.warn('[index] Failed to load Fyers token from DB:', err);
+  if (!simulate && (process.env.BROKER ?? '').toLowerCase().trim() === 'fyers') {
+    const resolved = await resolveFyersCredentials(pool, fallbackFyersCredentials);
+    if (resolved.credentials) {
+      process.env.FYERS_APP_ID = resolved.credentials.appId;
+      process.env.FYERS_ACCESS_TOKEN = resolved.credentials.accessToken;
+      console.log(`[index] Fyers credentials loaded from ${resolved.source}`);
+    } else {
+      process.env.FYERS_ACCESS_TOKEN = '';
+      console.warn('[index] No usable Fyers credentials — login from Broker logins.');
+    }
+    if (resolved.databaseUnavailable) {
+      console.warn('[index] broker_tokens unavailable; using configured fallback if present');
     }
   }
 
@@ -373,31 +356,16 @@ async function main(): Promise<void> {
     }
     reloadInFlight = true;
     try {
-      // Re-resolve the token from the DB so a freshly stored OAuth token is picked up.
-      // We write to process.env here (same as startup) so createBroker() can read
-      // FYERS_ACCESS_TOKEN without a DB param — the factory stays pure.
-      try {
-        const stored = await loadStoredToken(pool);
-        if (stored && stored.expiresAt.getTime() > Date.now()) {
-          process.env.FYERS_ACCESS_TOKEN = stored.accessToken;
-          if (!process.env.FYERS_APP_ID) process.env.FYERS_APP_ID = stored.appId;
-          console.log(
-            `[index] reloadBroker: loaded Fyers token from DB — expires ${stored.expiresAt.toISOString()}`,
-          );
-        } else if (stored) {
-          console.warn(
-            `[index] reloadBroker: stored token expired at ${stored.expiresAt.toISOString()} — open the dashboard and re-login.`,
-          );
-          return; // Cannot proceed without a valid token; leave feed/degraded state unchanged.
-        } else {
-          console.warn(
-            '[index] reloadBroker: no token in DB — cannot reconnect. Open the dashboard and login.',
-          );
-          return; // Same: no usable token, leave degraded state as-is.
-        }
-      } catch (err) {
-        console.warn('[index] reloadBroker: failed to load token from DB:', err);
-        return; // DB error during token load — leave existing feed/state unchanged.
+      const resolved = await resolveFyersCredentials(pool, fallbackFyersCredentials);
+      if (!resolved.credentials) {
+        console.warn('[index] reloadBroker: no usable Fyers credentials; login from Broker logins');
+        return;
+      }
+      process.env.FYERS_APP_ID = resolved.credentials.appId;
+      process.env.FYERS_ACCESS_TOKEN = resolved.credentials.accessToken;
+      console.log(`[index] reloadBroker: Fyers credentials loaded from ${resolved.source}`);
+      if (resolved.databaseUnavailable) {
+        console.warn('[index] reloadBroker: broker_tokens unavailable; using env fallback');
       }
 
       // Disconnect the stale feed if one exists. Guard errors so a socket that
@@ -434,10 +402,9 @@ async function main(): Promise<void> {
   }
 
   // Cold-start: attempt the initial broker connect via the shared reloadBroker()
-  // path. For the non-Fyers or already-in-env case, use the original direct path
-  // so we don't double-attempt a DB token load.
+  // path only when no credential source was usable during startup.
   //
-  // Cold-start degraded boot (Fyers + no token): if loadStoredToken found nothing
+  // Cold-start degraded boot (Fyers + no token): if resolution found nothing
   // reloadBroker() returns early and leaves feed===null. We then set authDegraded
   // and warn — same observable behaviour as before the refactor.
   const liveFyersNoToken =
@@ -446,13 +413,12 @@ async function main(): Promise<void> {
     !process.env.FYERS_ACCESS_TOKEN;
 
   if (liveFyersNoToken) {
-    // Fyers + no token in env — reloadBroker() will try the DB (already done
-    // above in the credential resolution block, but reloadBroker re-checks).
+    // Fyers + no token in env — reloadBroker() re-checks the DB after startup.
     // If the DB also has nothing it will log and leave feed===null. We defer
     // the degraded warning to after the reload attempt so the log is accurate.
   } else if (!simulate) {
-    // Non-Fyers live broker or Fyers with token already in env — create the feed
-    // directly without the DB-reload path (token is already in process.env).
+    // Non-Fyers live broker or Fyers with a resolved token — create the feed
+    // directly; the token is already in process.env for the factory.
     feed = createBroker(clock);
     attachFeedHandlers(feed);
   } else {

@@ -41,7 +41,6 @@ import type { Pool } from 'pg';
 
 import type { BrokerTick } from '../brokers/types';
 import type { Underlying } from '../brokers/types';
-import { UNDERLYING_SYMBOLS } from '../brokers/types';
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -192,8 +191,6 @@ export function createHistoricalFeed(pool: Pool, config: HistoricalFeedConfig): 
       `[HistoricalFeed] from (${from.toISOString()}) must not be after to (${to.toISOString()})`,
     );
   }
-
-  const _indexSymbol = UNDERLYING_SYMBOLS[underlying];
 
   // Registered tick callbacks (BrokerFeed.onTick style).
   const tickCallbacks: Array<(tick: BrokerTick) => void> = [];

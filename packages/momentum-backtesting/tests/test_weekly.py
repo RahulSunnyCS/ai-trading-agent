@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from momentum_backtesting import local_store, notify, store, weekly
+from momentum_backtesting import local_store, notify, runs_store, store, weekly
 from momentum_backtesting.fetch import load_universe
 from momentum_backtesting.notify import IST, Notification
 from momentum_backtesting.sources import weekly as to_weekly
@@ -139,11 +139,44 @@ def test_a_late_preview_warns_there_is_no_time_left(data_dir, sources):
     assert "too late to trade" in notify.render(result.notification, late)
 
 
-def test_holiday_sends_no_signal(data_dir, sources):
-    sources["last"] = FRIDAY - pd.Timedelta(days=1)  # nothing traded on Friday
+def test_friday_holiday_uses_thursdays_close_and_keeps_friday_week_label(data_dir, sources):
+    sources["last"] = FRIDAY - pd.Timedelta(days=1)  # Friday market holiday
     result = weekly.run_weekly("final", data_dir, now=FINAL_AT)
-    assert result.signal is None
-    assert "market closed" in result.notification.title
+    assert result.signal is not None
+    # `sources.weekly()` intentionally labels the last session of this week as Friday.
+    assert result.signal["week"] == "2026-09-25"
+    assert "Official close: Thu 24 Sep" in result.notification.body
+
+
+def test_last_nse_session_walks_back_across_consecutive_holidays():
+    wednesday = (FRIDAY - pd.Timedelta(days=2)).date()
+    health = weekly.Health(FRIDAY.date(), last_day={"A": wednesday})
+    assert weekly.last_nse_session(health, ["A"], FRIDAY.date()) == wednesday
+
+
+def test_favorite_strategies_share_one_refresh_and_only_etf_is_eligible(monkeypatch, tmp_path):
+    snapshot = weekly.WeeklySnapshot(weekly.Health(FRIDAY.date()), [], FRIDAY.date(), FRIDAY.date())
+    favorites = [
+        {"id": "one", "name": "ETF A", "config": {"dataset": "etf"}, "active": True},
+        {"id": "two", "name": "ETF B", "config": {"dataset": "etf"}, "active": False},
+        {"id": "three", "name": "Stocks", "config": {"dataset": "stock"}, "active": False},
+    ]
+    seen_snapshots = []
+
+    monkeypatch.setattr(runs_store, "list_favorites", lambda _conn: favorites)
+    monkeypatch.setattr(weekly, "refresh_weekly_snapshot", lambda *args: snapshot)
+
+    def fake_run_weekly(*args, **kwargs):
+        seen_snapshots.append(kwargs["snapshot"])
+        return weekly.RunResult(Notification("test", "info", "ok", "body"), {"week": "2026-09-25"})
+
+    monkeypatch.setattr(weekly, "run_weekly", fake_run_weekly)
+    outcomes = weekly.run_favorite_strategies("final", tmp_path, now=FINAL_AT, conn=object())
+
+    assert [outcome["name"] for outcome in outcomes] == ["ETF A", "ETF B", "Stocks"]
+    assert seen_snapshots == [snapshot, snapshot]
+    assert outcomes[2]["result"] is None
+    assert outcomes[2]["blocked"] == "Weekly ingest is not yet available for this dataset."
 
 
 def test_stale_data_sends_an_alert_instead_of_a_signal(data_dir, sources, monkeypatch):

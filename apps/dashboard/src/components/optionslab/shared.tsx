@@ -9,8 +9,9 @@ import { type ReactNode, useEffect, useRef } from 'react';
 
 import { getChartTheme } from '../../lib/chartTheme';
 import { formatPnl } from '../../lib/format';
+import type { StrategyStats } from '../../lib/legwiseStats';
 import { useThemeStore } from '../../store/theme';
-import type { DayRow, TradeRow } from '../../types/legwise';
+import type { TradeRow } from '../../types/legwise';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 
 export const SERIES_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -19,34 +20,6 @@ export function pnlClass(value: number): string {
   if (value > 0) return 'text-positive';
   if (value < 0) return 'text-negative';
   return 'text-muted';
-}
-
-export interface StrategyStats {
-  total: number;
-  days: number;
-  up: number;
-  maxDrawdown: number;
-  cumulative: { time: string; value: number }[];
-}
-
-export function statsOf(days: Pick<DayRow, 'day' | 'net'>[]): StrategyStats {
-  const sorted = [...days].sort((a, b) => a.day.localeCompare(b.day));
-  let running = 0;
-  let peak = 0;
-  let maxDrawdown = 0;
-  const cumulative = sorted.map((d) => {
-    running += d.net;
-    peak = Math.max(peak, running);
-    maxDrawdown = Math.min(maxDrawdown, running - peak);
-    return { time: d.day, value: Math.round(running) };
-  });
-  return {
-    total: running,
-    days: sorted.length,
-    up: sorted.filter((d) => d.net > 0).length,
-    maxDrawdown,
-    cumulative,
-  };
 }
 
 /** One line per strategy, theme-aware, keyed by strategy id. */
@@ -149,13 +122,13 @@ export function TradeLog({ trades }: { trades: TradeRow[] }) {
 const INPUT =
   'rounded-lg border border-border bg-surface-2/50 px-2.5 py-1.5 text-sm text-foreground disabled:opacity-50';
 
-/** A captioned group — a group, not a <label>, because several fields hold two controls. */
+/** A captioned group that can contain multiple controls. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div role="group" aria-label={label} className="flex flex-col gap-1 text-xs text-muted">
-      <span>{label}</span>
+    <fieldset className="flex min-w-0 flex-col gap-1 text-xs text-muted">
+      <legend>{label}</legend>
       {children}
-    </div>
+    </fieldset>
   );
 }
 

@@ -452,4 +452,47 @@ describe('leg-wise routes', () => {
     expect(ok.statusCode).toBe(200);
     expect(requireAccess).toHaveBeenCalled();
   });
+  it('GET day validates its query, rebuilds it upstream, and is access-gated', async () => {
+    server = await buildTestServer();
+    for (const url of [
+      '/api/backtest/legwise/day?strategy=t1',
+      '/api/backtest/legwise/day?strategy=..%2Fx&day=2026-09-29',
+      '/api/backtest/legwise/day?strategy=t1&day=2026-09-29&cuts=25:99;rm',
+    ]) {
+      const bad = await server.inject({ method: 'GET', url });
+      expect(bad.statusCode).toBe(400);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { mtm: [] }));
+    const ok = await server.inject({
+      method: 'GET',
+      // `extra` is not in the schema: it is stripped and can never reach the upstream URL
+      url: '/api/backtest/legwise/day?strategy=t1&day=2026-09-29&sha=abc123&cuts=10:30,13:30&extra=1',
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(requireAccess).toHaveBeenCalled();
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe(
+      'http://127.0.0.1:8000/legwise/day?strategy=t1&day=2026-09-29&sha=abc123&cuts=10%3A30%2C13%3A30',
+    );
+  });
+
+  it('GET anatomy forwards only whitelisted, validated params', async () => {
+    server = await buildTestServer();
+    const bad = await server.inject({
+      method: 'GET',
+      url: '/api/backtest/legwise/anatomy?underlying=nifty%3B&from=2026-01-01',
+    });
+    expect(bad.statusCode).toBe(400);
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { days: [] }));
+    const ok = await server.inject({
+      method: 'GET',
+      url: '/api/backtest/legwise/anatomy?underlying=NIFTY&from=2026-01-01&cuts=11:00',
+    });
+    expect(ok.statusCode).toBe(200);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe(
+      'http://127.0.0.1:8000/legwise/anatomy?underlying=NIFTY&from=2026-01-01&cuts=11%3A00',
+    );
+  });
 });

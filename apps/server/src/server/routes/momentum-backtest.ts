@@ -3,8 +3,7 @@
  *
  * The Python Momentum service stays loopback/private just like the options
  * backtesting service. This route is its only browser-facing boundary and
- * deliberately preserves the Python API's payloads while the old static UI is
- * migrated into the shared Next dashboard.
+ * deliberately preserves the Python API's payloads for the shared dashboard.
  */
 
 import type { FastifyInstance, FastifyReply } from 'fastify';
@@ -139,6 +138,13 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
   fastify.delete('/api/momentum/saved-runs/:runId', async (request, reply) => {
     const { runId } = request.params as { runId: string };
     await forward(reply, `/api/saved-runs/${encodeURIComponent(runId)}`, { method: 'DELETE' });
+  });
+
+  // Favourites are intentionally not scoped to the currently selected dataset:
+  // the weekly scheduler evaluates the complete set and has one global active
+  // strategy whose result may be sent to Telegram.
+  fastify.get('/api/momentum/favorite-strategies', async (_request, reply) => {
+    await forward(reply, '/api/favorite-strategies');
   });
 
   // Manual trigger for the Friday weekly signal (TODO.md 3.11.5) — the same code path the

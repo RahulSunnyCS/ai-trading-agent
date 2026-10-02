@@ -43,6 +43,7 @@ import operator
 from dataclasses import dataclass, field
 from typing import Literal
 
+import numpy as np
 import pandas as pd
 
 from .tax import DEBT, TaxLedger, TaxRules
@@ -152,6 +153,31 @@ class Config:
     # Trade only on the last week-in-`weeks` of each calendar month (rebalance="monthly"); the
     # weekly mark-to-market/hold step always runs regardless of this setting.
     rebalance: Rebalance = "weekly"
+    # rebalance="weekly" only: trade every `rebalance_every` weeks instead of every week, on the
+    # weeks whose calendar week number (Fridays since CADENCE_EPOCH) is `rebalance_offset` mod
+    # `rebalance_every`. Anchored to the calendar, not the run's first week, so one offset always
+    # trades on the same Fridays whatever `start` is - which is what lets overlapping tranches
+    # (tranches.py) and rolling windows compare like with like. 1 = every week (the default).
+    rebalance_every: int = 1
+    rebalance_offset: int = 0
+    # Buffer rule only (TODO 3.9.23 follow-up). With `rebalance_every > 1`, sell a holding that
+    # dropped past `exit_rank` EVERY week instead of waiting for the next cadence week; new buys,
+    # cap trims and make_room still wait for the cadence - only exits move faster. Proceeds from
+    # an off-cadence sell sit idle (the liquid fund) until the next buy week. False (default)
+    # keeps everything, sells included, on the cadence.
+    sell_every_week: bool = False
+    # Buffer rule with `tax` only (TODO 3.9.23, experiment 6). A holding whose oldest lot is in
+    # gain and turns long-term within `tax_hold_weeks` weeks is kept while its rank is at most
+    # `exit_rank + tax_hold_band`, instead of being sold short-term for a marginal rank slip.
+    # 0 (default) = off.
+    tax_hold_band: int = 0
+    tax_hold_weeks: int = 0
+    # A week is only simulated when at least this many names are ranked; 0 (default) means
+    # `top_n`, the original rule, which is right for ETF/stock history warm-up. A derived rank
+    # table that is legitimately thin some weeks (Broad Momentum ranks only the picks of the
+    # categories held) needs 1: with the default, those weeks are silently skipped - nothing is
+    # sold or bought and the curve jumps several weeks at once (TODO 3.9.23).
+    min_ranked: int = 0
     # flat = cost_pct on both sides (today's model, unchanged). itemised = STT/stamp duty/
     # exchange fees/slippage/DP charge - see the rate constants above `Config`.
     cost_model: CostModel = "flat"
@@ -194,6 +220,18 @@ class Config:
             raise ValueError(f"unknown score {self.score!r}")
         if self.rebalance not in ("weekly", "monthly"):
             raise ValueError(f"unknown rebalance {self.rebalance!r}")
+        if self.rebalance_every < 1:
+            raise ValueError("rebalance_every must be at least 1")
+        if self.rebalance_every > 1 and self.rebalance != "weekly":
+            raise ValueError("rebalance_every only applies to rebalance='weekly'")
+        if not 0 <= self.rebalance_offset < self.rebalance_every:
+            raise ValueError("rebalance_offset must be between 0 and rebalance_every - 1")
+        if self.sell_every_week and self.portfolio != "buffer":
+            raise ValueError("sell_every_week needs portfolio='buffer'")
+        if self.min_ranked < 0:
+            raise ValueError("min_ranked can't be negative")
+        if self.tax_hold_band < 0 or self.tax_hold_weeks < 0:
+            raise ValueError("tax_hold_band and tax_hold_weeks can't be negative")
         if self.cost_model not in ("flat", "itemised"):
             raise ValueError(f"unknown cost_model {self.cost_model!r}")
         if self.capital <= 0:
@@ -219,6 +257,14 @@ class Config:
         fills = f"_{self.track}-{self.execution}" if self.needs_trade_prices else ""
         score = f"_{self.score}" if self.score != "ranksum" else ""
         rebalance = f"_{self.rebalance}" if self.rebalance != "weekly" else ""
+        if self.rebalance_every > 1:
+            rebalance += f"_every{self.rebalance_every}o{self.rebalance_offset}"
+        if self.sell_every_week:
+            rebalance += "_sellweekly"
+        if self.tax_hold_band:
+            rebalance += f"_taxhold{self.tax_hold_band}w{self.tax_hold_weeks}"
+        if self.min_ranked:
+            rebalance += f"_minranked{self.min_ranked}"
         cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
@@ -276,17 +322,31 @@ def _rank_from_score(
     score: pd.DataFrame, tie_break: pd.DataFrame | None, higher_is_better: bool
 ) -> pd.DataFrame:
     """Convert a per-week score into ascending ranks 1..N (1 = best), skipping instruments whose
-    score is NaN that week. Ties are broken by `tie_break` (higher wins) if given, then by name."""
-    sign = -1 if higher_is_better else 1
-    final = pd.DataFrame(index=score.index, columns=score.columns, dtype=float)
-    for week in score.index:
-        row = score.loc[week].dropna()
-        if tie_break is None:
-            order = sorted(row.index, key=lambda n: (sign * row[n], n))
-        else:
-            order = sorted(row.index, key=lambda n: (sign * row[n], -tie_break.at[week, n], n))
-        final.loc[week, order] = range(1, len(order) + 1)
-    return final
+    score is NaN that week. Ties are broken by `tie_break` (higher wins) if given, then by name.
+
+    One `np.lexsort` per week over (score, -tie_break, name). This used to be a Python `sorted()`
+    with a pandas `.loc` lookup per instrument per comparison — ~640k lookups for Broad Momentum's
+    755 stocks × 820 weeks, about half the whole request (~45 s). Same strict total order, so the
+    ranks are identical (pinned against the old implementation in tests/test_engine.py)."""
+    sign = -1.0 if higher_is_better else 1.0
+    values = score.to_numpy(dtype=float)
+    tie = None if tie_break is None else tie_break.reindex_like(score).to_numpy(dtype=float)
+    # Names compare as strings (code-point order), exactly as the old tuple key did.
+    name_order = np.argsort(np.asarray(score.columns, dtype=str), kind="stable")
+    name_rank = np.empty(len(name_order), dtype=np.int64)
+    name_rank[name_order] = np.arange(len(name_order))
+
+    out = np.full(values.shape, np.nan)
+    for i in range(values.shape[0]):
+        present = np.flatnonzero(~np.isnan(values[i]))
+        if present.size == 0:
+            continue
+        keys = [name_rank[present]]  # lexsort: the LAST key is the primary one
+        if tie is not None:
+            keys.append(-tie[i, present])
+        keys.append(sign * values[i, present])
+        out[i, present[np.lexsort(keys)]] = np.arange(1, present.size + 1)
+    return pd.DataFrame(out, index=score.index, columns=score.columns)
 
 
 def _compute_ranks_ranksum(
@@ -429,13 +489,14 @@ class _Sim:
         mine, cash = self.filter_ret.at[week, name], self.filter_ret.at[week, CASH]
         return pd.notna(mine) and pd.notna(cash) and mine > cash
 
-    def exit_reason(self, asset: str, week: pd.Timestamp) -> str | None:
-        """Why a holding must be sold this week, or None to keep it."""
+    def exit_reason(self, asset: str, week: pd.Timestamp, slack: int = 0) -> str | None:
+        """Why a holding must be sold this week, or None to keep it. `slack` widens the exit
+        rank for this one holding (see `tax_hold_band`)."""
         rank = self.rank(week, asset)
         if pd.isna(rank):
             return "ineligible"
-        if rank > self.config.exit_rank:
-            return f"rank {int(rank)} > {self.config.exit_rank}"
+        if rank > self.config.exit_rank + slack:
+            return f"rank {int(rank)} > {self.config.exit_rank + slack}"
         if not self.passes_filter(asset, week):
             return f"{self.config.filter_lookback}w return below cash"
         return None
@@ -538,6 +599,17 @@ def _month_end_weeks(weeks: list[pd.Timestamp]) -> frozenset[pd.Timestamp]:
     return frozenset(out)
 
 
+#: Week 0 of the `rebalance_every` calendar (the first Friday of the price history).
+CADENCE_EPOCH = pd.Timestamp("2016-01-01")
+
+
+def cadence_weeks(weeks: list[pd.Timestamp], every: int, offset: int) -> frozenset[pd.Timestamp]:
+    """Weeks whose calendar week number since CADENCE_EPOCH is `offset` mod `every`. Weekly
+    frames are Friday-labelled, so the day gap is a whole number of weeks; rounding guards a
+    frame labelled on another weekday."""
+    return frozenset(w for w in weeks if round((w - CADENCE_EPOCH).days / 7) % every == offset)
+
+
 def run_backtest(
     prices: pd.DataFrame,
     includes: dict[str, str],
@@ -636,7 +708,7 @@ def run_backtest(
     in_window = ranks.index >= pd.Timestamp(config.start)
     if config.end:
         in_window &= ranks.index <= pd.Timestamp(config.end)
-    enough = ranks.notna().sum(axis=1).to_numpy() >= config.top_n
+    enough = ranks.notna().sum(axis=1).to_numpy() >= (config.min_ranked or config.top_n)
     weeks = list(ranks.index[in_window & enough])
     if trade_prices is not None:
         # The newest signal week may not have a fill yet (e.g. Monday hasn't happened).
@@ -645,8 +717,12 @@ def run_backtest(
     if len(weeks) < 2:
         raise ValueError("not enough history to run from the chosen start date")
 
-    if config.rebalance == "weekly":
+    if config.rebalance == "weekly" and config.rebalance_every == 1:
         trade_weeks = frozenset(weeks[:-1])
+    elif config.rebalance == "weekly":
+        trade_weeks = cadence_weeks(
+            weeks, config.rebalance_every, config.rebalance_offset
+        ) & frozenset(weeks[:-1])
     else:
         trade_weeks = _month_end_weeks(weeks) & frozenset(weeks[:-1])
 
@@ -931,6 +1007,21 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             min(taken, group_room(label, total, week)) for label, taken in by_group.items()
         )
 
+    def tax_slack(asset: str, week) -> int:
+        """`tax_hold_band` when the oldest lot is in gain and turns long-term within
+        `tax_hold_weeks` weeks, else 0. Inert without `tax` or for debt (never long-term)."""
+        if not config.tax_hold_band or sim.ledger is None:
+            return 0
+        if sim.tax_classes.get(asset, DEBT) == DEBT:
+            return 0
+        oldest = min(lots[asset], key=lambda lot: lot["since"])
+        age = (week - oldest["since"]).days
+        threshold = sim.ledger.rules.long_term_days
+        if not threshold - 7 * config.tax_hold_weeks < age <= threshold:
+            return 0
+        in_gain = oldest["units"] * sim.price(asset, week) > oldest["basis"]
+        return config.tax_hold_band if in_gain else 0
+
     def sell(asset: str, fraction: float, week) -> tuple[float, float, float]:
         """Sell `fraction` of every lot. Returns (gross value, net proceeds, tax)."""
         price = sim.price(asset, week)
@@ -952,10 +1043,13 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
     for i, week in enumerate(weeks[:-1]):
         proceeds, uninvested = uninvested, 0.0
 
-        if week in sim.trade_weeks:
-            # 1. Sell whatever has dropped out.
+        is_buy_week = week in sim.trade_weeks
+        if is_buy_week or config.sell_every_week:
+            # 1. Sell whatever has dropped out. Gated on `is_buy_week` alone when
+            #    `sell_every_week` is off (the original, unchanged behaviour); with it on, this
+            #    also runs on a non-cadence week - only steps 2-4 below wait for the cadence.
             for asset in [a for a in lots if a != _POOL]:
-                reason = sim.exit_reason(asset, week)
+                reason = sim.exit_reason(asset, week, tax_slack(asset, week))
                 if reason is None:
                     continue
                 position = lots[asset]
@@ -967,6 +1061,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                 sim.record(week, "SELL", asset, reason, value_before, tax=tax, **details)
                 proceeds += net
 
+        if is_buy_week:
             # 2. Trim anything that has grown past the cap by more than the band, back to the cap.
             if cap is not None:
                 total = portfolio_value(week) + proceeds
@@ -1042,9 +1137,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     }
 
                     active = [
-                        name
-                        for name in tops
-                        if _has_room(name, rooms, given, label_of, group_left)
+                        name for name in tops if _has_room(name, rooms, given, label_of, group_left)
                     ]
                     while left > 1e-12 and active:  # equal shares; a capped name's excess spreads
                         share = left / len(active)
@@ -1115,9 +1208,10 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     rank = int(sim.rank(week, name))
                     sim.record(week, "BUY", name, f"rank {rank} (made room)", raised)
         else:
-            # Not a trade week (rebalance="monthly"): nothing sold or bought. Whatever wasn't yet
-            # invested (only ever nonzero before the very first trade week) stays idle rather
-            # than vanishing - it's added back into equity below until it's first put to work.
+            # Not a buy week (rebalance="monthly", rebalance_every > 1, or a plain non-cadence
+            # week): no new buys, cap trims or make_room. Whatever wasn't yet deployed - either
+            # never invested, or just sold this week under `sell_every_week` - stays idle rather
+            # than vanishing; it's added back into equity below until the next buy week.
             uninvested = proceeds
 
         total = sum(value(a, week) for a in lots)

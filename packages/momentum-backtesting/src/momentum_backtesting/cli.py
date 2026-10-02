@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -608,7 +609,8 @@ def local_migrate() -> None:
     )
     typer.echo(
         f"stock weekly prices {report.stock_weekly_prices:,}, "
-        f"stock weekly membership {report.stock_membership_weekly:,}"
+        f"stock weekly membership {report.stock_membership_weekly:,}, "
+        f"stock benchmark/cash rows {report.stock_weekly_series:,}"
     )
     typer.echo(f"catalog: {root}  (see `tdata status` for the full picture)")
 
@@ -1133,11 +1135,22 @@ def categories_broad_backtest(
     off_top_n: int = typer.Option(10, help='Individual stocks held (OFF mode, "SL").'),
     off_exit_rank: int = typer.Option(20, help="Individual-stock exit buffer (OFF mode)."),
     rebalance: str = typer.Option("weekly", help="Trading cadence: weekly | monthly."),
+    rebalance_every: int = typer.Option(1, help="Weekly cadence only: trade every K weeks."),
+    rebalance_offset: int = typer.Option(0, help="Calendar phase 0..K-1 for --rebalance-every."),
+    sell_every_week: bool = typer.Option(
+        False, help="Sell a dropped-rank holding every week; buys still wait for the cadence."
+    ),
+    stock_tilt: float = typer.Option(
+        0.0, help="Re-rank the current selection by the short/long beaten-down blend (0 = off)."
+    ),
+    stock_tilt_screen_pct: float = typer.Option(
+        0.0, help="stock_tilt only: keep just the top share by short-term momentum (0 = off)."
+    ),
     cost_pct: float = _COST,
 ) -> None:
     """Run the full Broad Momentum backtest end to end (TODO.md 3.9.13 Steps 2-4) and print a
     quick CAGR/max-drawdown/turnover summary -- the fast manual-verification path used while
-    building/sweeping this feature, ahead of the `mbt ui` "Broad Momentum" tab.
+    building/sweeping this feature, ahead of the dashboard's "Broad Momentum" tab.
     """
     from . import metrics
     from .categories import broad
@@ -1165,6 +1178,11 @@ def categories_broad_backtest(
             off_top_n=off_top_n,
             off_exit_rank=off_exit_rank,
             rebalance=rebalance,  # type: ignore[arg-type]
+            rebalance_every=rebalance_every,
+            rebalance_offset=rebalance_offset,
+            sell_every_week=sell_every_week,
+            stock_tilt=stock_tilt,
+            stock_tilt_screen_pct=stock_tilt_screen_pct,
             cost_pct=cost_pct,
         )
     except (broad.TotalMarketDataNotFoundError, ValueError) as error:
@@ -1338,8 +1356,9 @@ def weekly(
 
     from trading_data.db import connect
 
-    from . import local_store, notify
-    from .weekly import run_weekly
+    from . import api as api_module
+    from . import local_store, notify, runs_store
+    from .weekly import run_favorite_strategies, week_ending_on_or_before
 
     if run not in ("preview", "final"):
         typer.echo("--run must be preview or final")
@@ -1356,7 +1375,25 @@ def weekly(
             if not (DATA_DIR / "weekly_closes.csv").exists():
                 typer.echo("No history: run `mbt fetch` first.")
                 raise typer.Exit(1)
-            result = run_weekly(run, DATA_DIR, creds=creds, conn=conn, log=typer.echo)
+            favorites_by_id = (
+                {item["id"]: item for item in runs_store.list_favorites(conn)}
+                if conn is not None
+                else {}
+            )
+            outcomes = run_favorite_strategies(
+                run, DATA_DIR, creds=creds, conn=conn, log=typer.echo
+            )
+        if run == "final":
+            target = pd.Timestamp(week_ending_on_or_before(date.today()))
+            for outcome in outcomes:
+                if outcome["result"] is not None or outcome["dataset"] == "etf":
+                    continue
+                try:
+                    outcome["result"], outcome["blocked"] = api_module._research_weekly_result(
+                        favorites_by_id[outcome["id"]], target
+                    )
+                except Exception as error:
+                    outcome["blocked"] = str(getattr(error, "detail", error))
     except typer.Exit:
         raise
     except Exception as error:
@@ -1369,11 +1406,18 @@ def weekly(
         )
         notify.send(note) if send else typer.echo(notify.render(note))
         raise
-    result.notification.run_url = notify.run_url()
+    active = next((outcome for outcome in outcomes if outcome["active"]), None)
+    for outcome in outcomes:
+        if outcome["result"] is not None:
+            typer.echo(f"\n[{outcome['name']}]\n{notify.render(outcome['result'].notification)}")
+        else:
+            typer.echo(f"\n[{outcome['name']}] blocked: {outcome['blocked']}")
+    if active is None or active["result"] is None:
+        typer.echo("No eligible active favourite; Telegram was not sent.")
+        return
+    active["result"].notification.run_url = notify.run_url()
     if send:
-        notify.send(result.notification)
-    else:
-        typer.echo(notify.render(result.notification))
+        notify.send(active["result"].notification)
 
 
 @app.command()
@@ -1411,20 +1455,13 @@ def sources_check() -> None:
 
 
 @app.command()
-def ui(
+def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),
-    open_browser: bool = typer.Option(True, help="Open the page in your browser."),
 ) -> None:
-    """Open the local web UI (only reachable from this machine)."""
-    import threading
-    import webbrowser
-
+    """Serve the private API for the shared dashboard."""
     import uvicorn
 
-    url = f"http://127.0.0.1:{port}/"
-    if open_browser:
-        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    typer.echo(f"Momentum backtest UI at {url}  (Ctrl-C to stop)")
+    typer.echo(f"Momentum API at http://127.0.0.1:{port}/api/docs  (Ctrl-C to stop)")
     uvicorn.run("momentum_backtesting.api:app", host="127.0.0.1", port=port, log_level="warning")
 
 

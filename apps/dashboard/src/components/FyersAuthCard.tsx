@@ -86,7 +86,9 @@ export function FyersAuthCard() {
       <div className="flex flex-wrap items-center gap-3">
         {loading && <span className="text-sm text-muted">Checking connection…</span>}
 
-        {!loading && error && <p className="text-sm text-negative">Could not check Fyers status: {error}</p>}
+        {!loading && error && (
+          <p className="text-sm text-negative">Could not check Fyers status: {error}</p>
+        )}
 
         {!loading && status === null && <Badge tone="neutral">Unknown</Badge>}
 
@@ -133,11 +135,11 @@ export function FyersAuthCard() {
           <>
             <Badge tone="negative" dot>
               <AlertCircle className="h-3 w-3" />
-              {status.needsReauth ? 'Token expired' : 'Disconnected'}
+              No API token
             </Badge>
             <p className="text-sm text-muted">
               {status.degraded
-                ? 'Auth failure detected — token may have expired. Click Login to re-authenticate.'
+                ? 'The token is missing, expired, or belongs to a different app. Re-login with Fyers.'
                 : 'Click "Login with Fyers" to authorise this app and store a fresh token.'}
             </p>
           </>

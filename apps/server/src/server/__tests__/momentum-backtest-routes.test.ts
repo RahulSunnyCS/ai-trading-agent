@@ -68,7 +68,12 @@ describe('momentum backtest proxy routes', () => {
     const response = await server.inject({
       method: 'POST',
       url: '/api/momentum/rebalance-preview',
-      payload: { dataset: 'stock', universe: ['C0001'], holdings_pct: { C0001: 30 }, portfolio_value: 100000 },
+      payload: {
+        dataset: 'stock',
+        universe: ['C0001'],
+        holdings_pct: { C0001: 30 },
+        portfolio_value: 100000,
+      },
     });
 
     expect(response.statusCode).toBe(200);
@@ -146,6 +151,24 @@ describe('momentum backtest proxy routes', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:8765/api/saved-runs/abc',
       expect.objectContaining({ method: 'DELETE' }),
+    );
+    await server.close();
+  });
+
+  it('forwards the cross-dataset favourite strategy list', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, []));
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/favorite-strategies',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/favorite-strategies',
+      expect.objectContaining({ signal: expect.anything() }),
     );
     await server.close();
   });

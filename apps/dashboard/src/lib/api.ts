@@ -48,8 +48,7 @@ function responseError(body: unknown, fallback: string): string {
  * Fetch a JSON endpoint with GET and return a typed result.
  *
  * @param path    Absolute path starting with `/` (e.g. `/api/trades`).
- *                In production this hits the same origin; in dev Vite proxies
- *                `/api` and `/ws` to localhost:3000.
+ *                Next.js forwards `/api` to the Fastify server by default.
  * @param signal  Optional AbortSignal for request cancellation (e.g. from
  *                a React useEffect cleanup).
  *

@@ -189,8 +189,10 @@ def test_missing_optional_inputs_are_zero_not_fatal(tmp_path):
     assert report.stock_membership_weekly == 0
 
 
-def test_stock_weekly_series_round_trip(tmp_path, curated_dir):
-    data_dir = tmp_path / "data2"
+def _write_stock_files(data_dir: Path) -> None:
+    """data/stocks/'s five weekly inputs, plus a one-instrument weekly_closes.csv whose
+    cash column shares the stock cash series' name but not its history — the real ETF
+    file's cash starts in 2016, the stock one in 2011."""
     stocks = data_dir / "stocks"
     stocks.mkdir(parents=True)
     (data_dir / "categories").mkdir()
@@ -216,11 +218,20 @@ def test_stock_weekly_series_round_trip(tmp_path, curated_dir):
     pd.DataFrame({"date": weeks, "close": [10.0, 10.1, 10.2]}).to_csv(
         stocks / "cash_weekly.csv", index=False
     )
+    pd.DataFrame(
+        {"week_ending": weeks[1:], "Nifty 50": [1.0, 2.0], "Cash (liquid fund)": [99.0, 99.5]}
+    ).to_csv(data_dir / "weekly_closes.csv", index=False)
+
+
+def test_stock_weekly_series_round_trip(tmp_path, curated_dir):
+    data_dir = tmp_path / "data2"
+    _write_stock_files(data_dir)
 
     root = tmp_path / "root"
     with connect(root) as con:
         report = db_migrate.migrate(con, root, data_dir=data_dir, curated_dir=curated_dir)
         assert (report.stock_weekly_prices, report.stock_membership_weekly) == (11, 6)
+        assert report.stock_weekly_series == 12
         assert con.execute(
             "SELECT close FROM stock_weekly_prices WHERE company_id='C0001' AND kind='tr' "
             "AND week=DATE '2020-01-10'"
@@ -230,13 +241,17 @@ def test_stock_weekly_series_round_trip(tmp_path, curated_dir):
             "AND week=DATE '2020-01-03'"
         ).fetchone() == (False,)
         assert con.execute(
-            "SELECT close FROM momentum_prices WHERE kind='weekly' AND instrument='Nifty 50 TRI' "
-            "AND date=DATE '2020-01-17'"
+            "SELECT close FROM stock_weekly_series WHERE series='Nifty 50 TRI' "
+            "AND week=DATE '2020-01-17'"
         ).fetchone() == (1020.0,)
+        # the stock series stay out of momentum_prices, which is the ETF dataset's alone.
         assert con.execute(
-            "SELECT close FROM momentum_prices WHERE kind='weekly' AND "
-            "instrument='Cash (liquid fund)' AND date=DATE '2020-01-03'"
-        ).fetchone() == (10.0,)
+            "SELECT instrument, date, close FROM momentum_prices WHERE kind='weekly' "
+            "AND instrument != 'Nifty 50' ORDER BY date"
+        ).fetchall() == [
+            ("Cash (liquid fund)", date(2020, 1, 10), 99.0),
+            ("Cash (liquid fund)", date(2020, 1, 17), 99.5),
+        ]
 
     from momentum_backtesting import db_read
 
@@ -291,3 +306,128 @@ def test_total_market_membership_shares_the_category_table_without_colliding(tmp
         assert con.execute(
             "SELECT count(*) FROM category_membership WHERE category = 'Total Market'"
         ).fetchone() == (3,)
+
+
+def test_weekly_price_push_does_not_wipe_the_stock_dataset(tmp_path, curated_dir, monkeypatch):
+    """Regression (2026-10-01): `mbt weekly`'s local_store.push_dir wholesale-replaces
+    momentum_prices, which used to hold the stock dataset's benchmark TRIs and cash too —
+    after one weekly run, load_stock_dataset raised KeyError on the missing TRI columns."""
+    from momentum_backtesting import local_store
+    from momentum_backtesting.engine import CASH
+    from momentum_backtesting.stocks import ui_data
+
+    data_dir = tmp_path / "data"
+    _write_stock_files(data_dir)
+    root = tmp_path / "root"
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    with connect(root) as con:
+        db_migrate.migrate(con, root, data_dir=data_dir, curated_dir=curated_dir)
+    with connect(root) as con:
+        local_store.push_dir(con, data_dir)
+
+    # read from the database only: an empty stocks dir proves no file fallback happened.
+    empty = tmp_path / "empty" / "stocks"
+    empty.mkdir(parents=True)
+    ds = ui_data.load_stock_dataset(empty)
+    assert ds.prices.loc["2020-01-17", ui_data.NIFTY50_TRI] == 1020.0
+    # the stock cash series (from cash_weekly.csv), not the ETF file's same-named column.
+    assert ds.prices[CASH].tolist() == [10.0, 10.1, 10.2]
+
+
+def test_stock_dataset_falls_back_to_files_when_db_series_are_missing(
+    tmp_path, curated_dir, monkeypatch
+):
+    """The state the real catalog was found in: stock_weekly_prices populated, no
+    benchmark TRIs. All-or-nothing fallback to data/stocks/, never a KeyError."""
+    from momentum_backtesting import db_read
+    from momentum_backtesting.stocks import ui_data
+
+    data_dir = tmp_path / "data"
+    _write_stock_files(data_dir)
+    root = tmp_path / "root"
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    with connect(root) as con:
+        db_migrate.migrate(con, root, data_dir=data_dir, curated_dir=curated_dir)
+        con.execute("DELETE FROM stock_weekly_series WHERE series LIKE '%TRI'")
+        con.execute("UPDATE stock_weekly_prices SET close = close + 1000")  # mark DB rows
+
+    assert db_read.stock_dataset_from_db_or_none(root) is None
+    ds = ui_data.load_stock_dataset(data_dir / "stocks")
+    assert ds.prices.loc["2020-01-17", ui_data.NIFTY50_EQUAL_WEIGHT_TRI] == 714.0
+    assert ds.prices.loc["2020-01-10", "C0001"] == 101.0  # the file's value, not the DB's
+
+
+def test_import_momentum_prices_bulk_load_keeps_nulls_and_is_idempotent(tmp_path):
+    """`import_momentum_prices` is a single bulk INSERT (not executemany, which was ~1 ms per
+    row and made the ~140k-row load take minutes). It must still store a missing `open` as SQL
+    NULL — not NaN, which would poison any AVG/compare downstream — and replace, not append."""
+    pd.DataFrame(
+        {"Nifty 50": [100.0, 101.5, None], "Gold": [50.0, 51.0, 52.0]},
+        index=pd.to_datetime(["2026-09-04", "2026-09-11", "2026-09-18"]),
+    ).to_csv(tmp_path / "weekly_closes.csv")
+
+    with connect() as con:
+        assert db_migrate.import_momentum_prices(con, tmp_path) == 5  # the NaN close is skipped
+        assert db_migrate.import_momentum_prices(con, tmp_path) == 5  # again: replaced
+        rows = con.execute(
+            "SELECT instrument, kind, date, open, close FROM momentum_prices ORDER BY 1, 3"
+        ).fetchall()
+        nulls, nans = con.execute(
+            "SELECT count(*) FILTER (WHERE open IS NULL), "
+            "count(*) FILTER (WHERE isnan(open)) FROM momentum_prices"
+        ).fetchone()
+
+    assert len(rows) == 5
+    assert rows[0] == ("Gold", "weekly", date(2026, 9, 4), None, 50.0)
+    assert (nulls, nans) == (5, 0)
+
+
+def test_daily_prices_from_db_matches_the_row_by_row_read(tmp_path, monkeypatch):
+    """`daily_prices_from_db_or_none` reads through DuckDB's native `.df()` (the old
+    `fetchall()` + `pd.DataFrame(rows)` was ~10x slower and ~2 GB on the real ~3M-row universe).
+    Same frame either way: columns/order/dtypes, symbol-then-date sort, only the asked symbols,
+    and an empty frame (not None, not an error) for symbols with no bars."""
+    from momentum_backtesting import db_read
+
+    root = tmp_path / "td"
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    from trading_data import lake
+
+    with connect(root) as con:
+        con.execute(
+            "INSERT INTO instruments (instrument_key, asset_class, exchange, symbol) VALUES "
+            "('NSE:stock:AAA', 'stock', 'NSE', 'AAA'), ('NSE:stock:BBB', 'stock', 'NSE', 'BBB'), "
+            "('NSE:stock:CCC', 'stock', 'NSE', 'CCC')"
+        )
+        ids = dict(con.execute("SELECT symbol, instrument_id FROM instruments").fetchall())
+    for year, rows in {
+        2024: [("BBB", date(2024, 1, 2), 20.0, 5.0), ("AAA", date(2024, 1, 3), 11.0, 7.0)],
+        2025: [("AAA", date(2025, 1, 1), 12.5, 9.0), ("CCC", date(2025, 1, 1), 1.0, 1.0)],
+    }.items():
+        path = lake.bars_1d_stock_path(root, year)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(
+            pa.table(
+                {
+                    "instrument_id": pa.array([ids[s] for s, *_ in rows], pa.int64()),
+                    "date": pa.array([d for _, d, *_ in rows], pa.date32()),
+                    "close": pa.array([c for _, _, c, _ in rows], pa.float64()),
+                    "turnover": pa.array([t for *_, t in rows], pa.float64()),
+                }
+            ),
+            path,
+        )
+
+    got = db_read.daily_prices_from_db_or_none(["BBB", "AAA", "NOPE"])
+    assert list(got.columns) == ["date", "symbol", "close", "turnover"]
+    assert got["symbol"].tolist() == ["AAA", "AAA", "BBB"]  # sorted by symbol, then date
+    assert got["date"].tolist() == [
+        pd.Timestamp(d) for d in ("2024-01-03", "2025-01-01", "2024-01-02")
+    ]
+    assert got["close"].tolist() == [11.0, 12.5, 20.0]
+    assert str(got["date"].dtype).startswith("datetime64")
+    assert got["close"].dtype == "float64"
+
+    none_found = db_read.daily_prices_from_db_or_none(["NOPE"])
+    assert none_found is not None and none_found.empty
+    assert list(none_found.columns) == ["date", "symbol", "close", "turnover"]

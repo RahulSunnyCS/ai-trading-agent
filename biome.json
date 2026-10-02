@@ -32,6 +32,9 @@
   "files": {
     "ignore": [
       "node_modules",
+      "**/.next/**",
+      "**/.venv/**",
+      "packages/momentum-backtesting/data/**",
       "dist",
       "coverage",
       "bun.lock",

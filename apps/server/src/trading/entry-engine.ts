@@ -21,8 +21,7 @@ import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
 // `query` import removed in M2: the global open-position DB query was removed.
 // `Pool` is kept because the constructor signature still accepts `db: Pool`
-// for interface compatibility with existing callers — the field is retained
-// unused rather than breaking the public constructor API.
+// for interface compatibility with existing callers.
 import { STREAM_STRADDLE, streamConsume } from '../redis/client.js';
 import type { Clock } from '../utils/clock.js';
 
@@ -60,7 +59,6 @@ type EntryEngineEvents = {
 // ---------------------------------------------------------------------------
 
 export class EntryEngine {
-  private readonly _db: Pool;
   private readonly _clock: Clock;
 
   // Event handler registry — a lightweight hand-rolled emitter so we avoid
@@ -114,7 +112,6 @@ export class EntryEngine {
   // ---------------------------------------------------------------------------
 
   constructor(deps: { db: Pool; redis: Redis; clock: Clock }) {
-    this._db = deps.db;
     this._clock = deps.clock;
     // redis is passed in for interface compatibility (streamConsume uses the
     // module-level singleton from src/redis/client.ts, not an injected client).

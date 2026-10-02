@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { BackfillView } from './components/BackfillView';
 import { BacktestView } from './components/BacktestView';
+import { BrokerLoginsView } from './components/BrokerLoginsView';
 import { LiveView } from './components/LiveView';
 import { MomentumBacktestingView } from './components/MomentumBacktestingView';
 import { OptionsLabView } from './components/OptionsLabView';
@@ -18,15 +19,15 @@ import { Sidebar } from './components/shell/Sidebar';
 import { Topbar } from './components/shell/Topbar';
 import { type Tab, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
-import { hydrateThemeFromStorage } from './store/theme';
 import {
   DEFAULT_NAVIGATION_PREFERENCES,
+  type NavigationPreferences,
   firstVisibleTab,
   loadNavigationPreferences,
   normalizeNavigationPreferences,
   saveNavigationPreferences,
-  type NavigationPreferences,
 } from './store/navigation';
+import { hydrateThemeFromStorage } from './store/theme';
 
 /** One-line subtitle shown under each view's title in the top bar. */
 const SUBTITLES: Record<Tab, string> = {
@@ -40,6 +41,7 @@ const SUBTITLES: Record<Tab, string> = {
   backtest: 'Options strategy backtesting research workbench',
   optionslab: 'Daily 1-minute Fyers data · build, backtest and track leg-wise option strategies',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
+  brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',
   pricing: 'Subscription access and feature credits',
   settings: 'Choose which tabs appear and arrange their navigation priority',
 };
@@ -70,6 +72,8 @@ function renderView(
       return <OptionsLabView />;
     case 'momentum':
       return <MomentumBacktestingView />;
+    case 'brokerLogins':
+      return <BrokerLoginsView />;
     case 'pricing':
       return <PricingPage />;
     case 'settings':
@@ -110,7 +114,11 @@ export function App() {
     <div className="min-h-screen bg-background text-foreground">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-surface/50 lg:block">
-        <Sidebar activeTab={activeTab} onSelect={setActiveTab} preferences={navigationPreferences} />
+        <Sidebar
+          activeTab={activeTab}
+          onSelect={setActiveTab}
+          preferences={navigationPreferences}
+        />
       </aside>
 
       {/* Mobile nav drawer */}

@@ -85,17 +85,42 @@ export function MomentumWeeklyView() {
       </Card>
 
       {result ? (
-        <Card>
-          <CardHeader
-            title={result.title}
-            description={
-              result.sent_to_telegram ? 'Sent to Telegram.' : 'Not sent to Telegram (unchecked).'
-            }
-          />
-          <pre className="whitespace-pre-wrap rounded-lg border border-border bg-surface-2/30 p-3 text-sm text-foreground">
-            {result.body}
-          </pre>
-        </Card>
+        <div className="space-y-3">
+          {(
+            result.strategies ?? [
+              {
+                id: null,
+                name: 'Default live strategy',
+                dataset: 'etf' as const,
+                active: true,
+                blocked: null,
+                title: result.title,
+                body: result.body,
+                signal: result.signal,
+              },
+            ]
+          ).map((strategy) => (
+            <Card key={strategy.id ?? strategy.name}>
+              <CardHeader
+                title={strategy.title ?? strategy.name}
+                description={
+                  strategy.blocked
+                    ? `${strategy.name}: ${strategy.blocked}`
+                    : strategy.active
+                      ? result.sent_to_telegram
+                        ? `${strategy.name} is active and was sent to Telegram.`
+                        : `${strategy.name} is active; Telegram was not selected.`
+                      : `${strategy.name} was evaluated in the dashboard only.`
+                }
+              />
+              {strategy.body ? (
+                <pre className="whitespace-pre-wrap rounded-lg border border-border bg-surface-2/30 p-3 text-sm text-foreground">
+                  {strategy.body}
+                </pre>
+              ) : null}
+            </Card>
+          ))}
+        </div>
       ) : null}
     </div>
   );

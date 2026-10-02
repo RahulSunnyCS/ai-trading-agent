@@ -44,9 +44,20 @@ export interface MomentumRotation {
   holdings: MomentumRotationHolding[];
 }
 
+/** A dividend-inclusive reference line (Nifty 50 TRI, Nifty200 Momentum 30 TRI). */
+export interface MomentumComparison {
+  name: string;
+  cagr: number | null;
+  excess_cagr: number | null;
+  max_drawdown: number | null;
+  note: string | null;
+  series: Array<number | null>;
+}
+
 export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
+  comparisons?: MomentumComparison[];
   series: MomentumSeries;
   rotations: MomentumRotation[];
   latest: {
@@ -82,6 +93,10 @@ export interface MomentumSavedRun {
   dates: string[];
   strategy: Array<number | null>;
   overlay: boolean;
+  /** Included in every scheduled weekly evaluation. */
+  favorite: boolean;
+  /** The sole favourite whose result is delivered to Telegram. */
+  active: boolean;
 }
 
 export interface MomentumWeeklyRunResult {
@@ -90,6 +105,16 @@ export interface MomentumWeeklyRunResult {
   severity: string;
   sent_to_telegram: boolean;
   signal: Record<string, unknown> | null;
+  strategies?: Array<{
+    id: string | null;
+    name: string;
+    dataset: 'etf' | 'stock' | 'custom_index' | 'broad';
+    active: boolean;
+    blocked: string | null;
+    title: string | null;
+    body: string | null;
+    signal: Record<string, unknown> | null;
+  }>;
 }
 
 export interface MomentumRebalanceResult {

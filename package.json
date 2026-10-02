@@ -8,7 +8,11 @@
   "scripts": {
     "dev": "bun run --filter @ata/server dev",
     "sim": "bun run --filter @ata/server sim",
-    "start": "bun run --filter @ata/server start",
+    "start": "bun scripts/dev-stack.mjs research",
+    "start:backend": "bun scripts/dev-stack.mjs backends",
+    "start:frontend": "bun scripts/dev-stack.mjs frontend",
+    "stop:research": "bun scripts/dev-stack.mjs stop",
+    "start:server": "bun run --filter @ata/server start",
     "migrate": "bun run --filter @ata/server migrate",
     "replay": "bun run --filter @ata/server replay",
     "backtest": "bun run --filter @ata/server backtest",
@@ -20,13 +24,14 @@
     "test:e2e": "bun run --filter @ata/dashboard test:e2e",
     "py:api": "cd packages/option-backtesting && uv run obt-api",
     "typecheck": "bun run --filter @ata/server typecheck",
-    "lint": "[ -f ./tools/biome ] && ./tools/biome check . || echo 'biome not installed \u2014 run: bash scripts/install-biome.sh'",
-    "lint:fix": "[ -f ./tools/biome ] && ./tools/biome check --write . || echo 'biome not installed \u2014 run: bash scripts/install-biome.sh'",
-    "format": "[ -f ./tools/biome ] && ./tools/biome format --write . || echo 'biome not installed \u2014 run: bash scripts/install-biome.sh'",
+    "lint": "biome lint . --vcs-enabled=true --vcs-client-kind=git --vcs-use-ignore-file=true",
+    "lint:fix": "biome lint --write . --vcs-enabled=true --vcs-client-kind=git --vcs-use-ignore-file=true",
+    "format": "biome format --write . --vcs-enabled=true --vcs-client-kind=git --vcs-use-ignore-file=true",
     "prepare": "lefthook install"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
+    "concurrently": "^10.0.5",
     "lefthook": "^2.1.6"
   },
   "trustedDependencies": ["esbuild", "msgpackr-extract", "playwright"]

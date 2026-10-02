@@ -7,7 +7,7 @@
  *  2. GET /api/straddle/latest — polled every ~10 s fallback.
  *
  * /api/meta is polled every 30 s for the feed-mode banner + authDegraded state
- * (Fyers token expires daily; the re-login flow must surface without a reload).
+ * (Fyers token expires daily; the connection state must surface without a reload).
  *
  * Charts use lightweight-charts v4 and are theme-aware (recolor on theme flip).
  */
@@ -43,8 +43,6 @@ interface PolledStraddleSnapshot {
 
 const STRADDLE_POLL_MS = 10_000;
 const META_POLL_MS = 30_000;
-const FYERS_LOGIN_PATH = '/api/auth/fyers/login';
-
 const num2 = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ---------------------------------------------------------------------------
@@ -253,35 +251,7 @@ function FeedModeBanner({
           <TriangleAlert className="h-3.5 w-3.5" />
           {brokerLabel} token expired / connection degraded — re-login required
         </p>
-        <button
-          type="button"
-          onClick={() => {
-            const popup = window.open('', '_blank');
-            void (async () => {
-              try {
-                const res = await fetch(FYERS_LOGIN_PATH);
-                const data = (await res.json()) as { url?: string };
-                if (!data.url) {
-                  console.error('[LiveView] Fyers login URL missing in response', data);
-                  popup?.close();
-                  return;
-                }
-                if (popup) {
-                  popup.location.href = data.url;
-                } else {
-                  window.location.href = data.url;
-                }
-              } catch (err) {
-                console.error('[LiveView] Failed to start Fyers login flow', err);
-                popup?.close();
-              }
-            })();
-          }}
-          className="self-start text-xs font-medium text-negative underline underline-offset-2 hover:opacity-80"
-          aria-label={`Re-login with ${brokerLabel}`}
-        >
-          Re-login with {brokerLabel} →
-        </button>
+        <p className="text-xs text-negative">Reconnect {brokerLabel} from Broker logins.</p>
       </div>
     );
   }

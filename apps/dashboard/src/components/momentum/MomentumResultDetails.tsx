@@ -240,8 +240,22 @@ function assumptionChips(result: MomentumResult, config: Record<string, unknown>
     mon_10am: 'Monday 10:00',
   };
   return [
-    config.rebalance === 'monthly' ? 'Monthly rebalance' : 'Weekly rebalance',
+    config.rebalance === 'monthly'
+      ? 'Monthly rebalance'
+      : Number(config.rebalance_every ?? 1) > 1
+        ? `Every ${config.rebalance_every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
+        : 'Weekly rebalance',
+    config.sell_every_week ? 'Exits sold weekly' : null,
     config.portfolio === 'buffer' ? 'Buffer rule' : 'Fixed slots',
+    dataset === 'etf' && Number(config.exclude_high_vol ?? 0) > 0
+      ? `Skips most volatile ${Math.round(Number(config.exclude_high_vol) * 100)}%`
+      : null,
+    dataset === 'etf' && Number(config.reversal_tilt ?? 0) > 0
+      ? `Beaten-down tilt ${Math.round(Number(config.reversal_tilt) * 100)}%`
+      : null,
+    dataset === 'broad' && Number(config.broad_reversal_tilt ?? 0) > 0
+      ? `Beaten-down tilt ${Math.round(Number(config.broad_reversal_tilt) * 100)}%`
+      : null,
     config.cost_model === 'itemised' ? 'Itemised costs' : `${config.cost_pct}% cost per side`,
     dataset === 'etf' ? (config.track === 'etf' ? 'ETF prices' : 'Index prices') : null,
     dataset === 'etf' ? (execLabel[String(config.execution)] ?? null) : null,
@@ -273,6 +287,8 @@ export interface MomentumRunInfo {
   finishedAt: number;
   durationMs: number;
   savedAs: string | null;
+  /** True when the server dropped its caches and recomputed (the re-run-from-scratch icon). */
+  fresh?: boolean;
 }
 
 function formatDuration(ms: number): string {
@@ -283,11 +299,14 @@ export function MomentumPerformanceCard({
   result,
   config,
   stale = false,
+  lastRunFailed = false,
   runInfo = null,
 }: {
   result: MomentumResult;
   config: Record<string, unknown>;
   stale?: boolean;
+  /** The last Run click failed, so these are the PREVIOUS run's results. */
+  lastRunFailed?: boolean;
   runInfo?: MomentumRunInfo | null;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -313,13 +332,18 @@ export function MomentumPerformanceCard({
                 second: '2-digit',
               })}{' '}
               · took {formatDuration(runInfo.durationMs)}
+              {runInfo.fresh ? ' · recomputed from scratch' : ''}
               {runInfo.savedAs ? ` · saved as ${runInfo.savedAs}` : ''}
-              <InfoTooltip text="Every run recomputes the backtest for exactly the settings shown. A run that finishes in a second or two just means the server already had this strategy's price data and rankings cached — the numbers are still fresh for these settings." />
+              <InfoTooltip text="Every run recomputes the backtest for exactly the settings shown. A run that finishes in a second or two just means the server already had this strategy's price data and rankings cached — the numbers are still fresh for these settings. To drop the caches and recompute everything anyway, use the ↻ icon beside Strategy settings." />
             </p>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {stale ? <Badge tone="warning">Results use previous settings</Badge> : null}
+          {lastRunFailed ? (
+            <Badge tone="negative">Last run failed — these are the previous results</Badge>
+          ) : stale ? (
+            <Badge tone="warning">Results use previous settings</Badge>
+          ) : null}
           <Button size="sm" onClick={() => setExpanded((value) => !value)}>
             {expanded ? 'Hide detail metrics' : 'Show all metrics'}
           </Button>

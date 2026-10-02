@@ -1,4 +1,4 @@
-"""The local UI's API, on generated prices so it doesn't depend on downloaded data."""
+"""The Momentum API, on generated prices so it doesn't depend on downloaded data."""
 
 import json
 
@@ -300,11 +300,11 @@ def test_bad_rule_combinations_are_rejected(client):
     )
 
 
-def test_the_page_is_served(client):
-    res = client.get("/")
-    assert res.status_code == 200
-    assert "Momentum backtest" in res.text
-    assert client.get("/static/app.js").status_code == 200
+def test_legacy_ui_is_not_served(client):
+    assert client.get("/").status_code == 404
+    assert client.get("/static/app.js").status_code == 404
+    assert client.get("/vendor/plotly.min.js").status_code == 404
+    assert client.get("/api/docs").status_code == 200
 
 
 def _daily_files(tmp_path, etf_names=("Nifty 50", "Nifty IT")):
@@ -509,7 +509,7 @@ def test_stock_backtest_runs_end_to_end_with_raw_ids_and_display_names(stock_cli
     for key in ("kpis", "series", "rotations", "trades", "instruments", "timeline", "latest"):
         assert key in body
     # The API's job: trades/timeline carry the engine's raw company_id. Display-name
-    # substitution for people to read is the frontend's job (see static/app.js's displayName()).
+    # substitution for people to read is the dashboard's job.
     assert "companies" in body
     assert body["companies"]["C0001"] == "ACC Ltd."
     assert all(t["asset"] in STOCK_IDS for t in body["trades"])
@@ -1231,15 +1231,10 @@ def test_broad_api_round_trips_caps_and_ceiling(broad_client):
     assert res.status_code == 200, res.text
     json.dumps(res.json(), allow_nan=False)
     assert (
-        broad_client.post(
-            "/api/backtest", json=_broad_request(max_category=1.5)
-        ).status_code
-        == 422
+        broad_client.post("/api/backtest", json=_broad_request(max_category=1.5)).status_code == 422
     )
     assert (
-        broad_client.post(
-            "/api/backtest", json=_broad_request(max_stock_price=-1)
-        ).status_code
+        broad_client.post("/api/backtest", json=_broad_request(max_stock_price=-1)).status_code
         == 422
     )
 
@@ -1247,11 +1242,155 @@ def test_broad_api_round_trips_caps_and_ceiling(broad_client):
 def test_broad_payload_carries_share_prices_for_the_trade_split_tab(broad_client):
     res = broad_client.post(
         "/api/backtest",
-        json=_broad_request(
-            broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10
-        ),
+        json=_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10),
     )
     assert res.status_code == 200, res.text
     open_positions = res.json()["open_positions"]
     assert open_positions
     assert all(p["price"] is not None and p["price"] > 0 for p in open_positions)
+
+
+def test_broad_every_week_never_skips_a_week(broad_client):
+    """TODO 3.9.23: with broad_every_week the curve has one point per week; the default keeps
+    the engine's original rule (thin weeks skipped), so it can only have as many or fewer."""
+    request = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    default = broad_client.post("/api/backtest", json=request).json()
+    every = broad_client.post("/api/backtest", json={**request, "broad_every_week": True}).json()
+    weeks = pd.to_datetime(every["series"]["dates"])
+    assert (weeks[1:] - weeks[:-1]).days.max() == 7
+    assert len(every["series"]["dates"]) >= len(default["series"]["dates"])
+    meta = broad_client.get("/api/meta?dataset=broad").json()
+    assert meta["defaults"]["broad_every_week"] is False
+
+
+def test_broad_sell_every_week_is_accepted_and_rejected_without_the_buffer_rule(broad_client):
+    request = _broad_request(
+        broad_coverage_floor=0.0,
+        broad_pool_top_n=10,
+        broad_pool_exit_rank=10,
+        rebalance_every=2,
+        sell_every_week=True,
+    )
+    res = broad_client.post("/api/backtest", json=request)
+    assert res.status_code == 200, res.text
+    bad = broad_client.post("/api/backtest", json={**request, "portfolio": "slots"})
+    assert bad.status_code == 422
+    meta = broad_client.get("/api/meta?dataset=broad").json()
+    assert meta["defaults"]["sell_every_week"] is False
+
+
+def test_broad_reversal_tilt_changes_the_result_and_avoids_fresh_lows(broad_client):
+    """TODO 3.9.23 owner follow-up: broad_reversal_tilt re-orders whatever stocks the category/
+    pool funnel already selected - it must change the P&L, and it must never freshly buy a stock
+    making a new 52-week low (same falling-knife guard as the ETF lever)."""
+    from momentum_backtesting import levers
+
+    request = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    plain = broad_client.post("/api/backtest", json=request).json()
+    tilted = broad_client.post("/api/backtest", json={**request, "broad_reversal_tilt": 0.5}).json()
+    assert tilted["kpis"] != plain["kpis"]
+
+    off_request = _broad_request(
+        broad_category_mode="off", broad_off_top_n=5, broad_off_exit_rank=10
+    )
+    off_plain = broad_client.post("/api/backtest", json=off_request).json()
+    off_tilted = broad_client.post(
+        "/api/backtest", json={**off_request, "broad_reversal_tilt": 0.5}
+    ).json()
+    assert off_tilted["kpis"] != off_plain["kpis"]
+
+    meta = broad_client.get("/api/meta?dataset=broad").json()
+    assert meta["defaults"]["broad_reversal_tilt"] == 0.0
+    assert meta["defaults"]["broad_reversal_screen_pct"] == 0.0
+
+    # Reconstruct the same price frame the fixture built, to check the falling-knife guard.
+    from momentum_backtesting import api
+
+    ranking = api.DATA.get_broad_ranking(
+        lookbacks=(1, 4, 13, 26, 52),
+        weights=None,
+        score="ranksum",
+        voladj_skip_recent_month=True,
+        pool_top_n=10,
+        pool_exit_rank=10,
+    )
+    low = levers.fresh_52w_low_mask(ranking.prices)
+    # The no_buy gate only blocks a NEW entry - like every other such gate in this codebase
+    # (exclude_high_vol, max_stock_price), a name already held may still be topped up (`ADD`)
+    # even while sitting at a fresh low, by design.
+    violations = []
+    for label, payload in (("on", tilted), ("off", off_tilted)):
+        for rotation in payload["rotations"]:
+            week = pd.Timestamp(rotation["week"])
+            for row in rotation["ins"]:
+                if row["top_up"]:
+                    continue
+                asset = row["asset"]
+                if asset in low.columns and week in low.index and bool(low.at[week, asset]):
+                    violations.append((label, week, asset))
+    assert not violations, violations[:5]
+
+
+def test_meta_with_an_empty_catalog_and_no_csv_is_a_clear_409_not_a_500(tmp_path, monkeypatch):
+    """The dashboard's first call (saved-runs) creates an EMPTY catalog.duckdb. `_Data.get()` saw
+    a catalog, tried it (nothing in it), fell through to `pd.read_csv` on a file that does not
+    exist, and the FileNotFoundError came back as HTTP 500. It should say what to run.
+    (Deliberately not the `client` fixture: that one writes a weekly_closes.csv.)"""
+    from trading_data.db import connect
+
+    with connect():
+        pass  # creates the empty catalog under the conftest-isolated TRADING_DATA_ROOT
+    monkeypatch.setattr(api, "DATA_DIR", tmp_path)  # an empty folder: no weekly_closes.csv
+    monkeypatch.setattr(api, "DATA", api._Data())
+
+    res = TestClient(api.create_app()).get("/api/meta")
+
+    assert res.status_code == 409, res.text
+    assert "mbt" in res.json()["detail"]
+
+
+def test_fresh_run_drops_every_server_cache_and_a_normal_run_keeps_them(client):
+    """The dashboard's "re-run from scratch" icon sends `fresh: true`. The server caches rankings,
+    trade-price tables and the loaded datasets (keyed on the settings, so a normal run is correct
+    AND fast); `fresh` must drop all of it and recompute - and a normal run must not."""
+    universe = core(client)
+    body = {"universe": universe, "start": "2017-01-06"}
+    assert client.post("/api/backtest", json=body).status_code == 200
+    assert len(api.DATA.rank_cache) == 1  # the ranking was cached
+
+    # Plant sentinels in every cache `_Data` owns - none may survive a fresh run
+    api.DATA.rank_cache["sentinel"] = "x"
+    api.DATA.stock_rank_cache["sentinel"] = "x"
+    api.DATA.custom_index_cache["sentinel"] = "x"
+    api.DATA.custom_index_rank_cache["sentinel"] = "x"
+    api.DATA.broad_ranking_cache["sentinel"] = "x"
+    api.DATA.broad_tilt_cache["sentinel"] = "x"
+    api.DATA.fill_tables["sentinel"] = "x"
+    sentinel_refs = pd.DataFrame()  # a real frame: a normal run reads it (`.empty`)
+    api.DATA.references_cache = sentinel_refs
+
+    assert client.post("/api/backtest", json=body).status_code == 200  # a normal run: kept
+    assert "sentinel" in api.DATA.rank_cache and api.DATA.references_cache is sentinel_refs
+
+    res = client.post("/api/backtest", json={**body, "fresh": True})
+    assert res.status_code == 200, res.text
+    for cache in (
+        api.DATA.stock_rank_cache,
+        api.DATA.custom_index_cache,
+        api.DATA.custom_index_rank_cache,
+        api.DATA.broad_ranking_cache,
+        api.DATA.broad_tilt_cache,
+        api.DATA.fill_tables,
+    ):
+        assert "sentinel" not in cache
+    assert "sentinel" not in api.DATA.rank_cache
+    assert len(api.DATA.rank_cache) == 1  # ...and the ranking was recomputed and cached again
+    assert api.DATA.references_cache is not sentinel_refs  # reloaded
+
+
+def test_fresh_run_gives_the_same_numbers_as_a_cached_one(client):
+    """ "From scratch" must change how the answer is computed, never what it is."""
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    cached = client.post("/api/backtest", json=body).json()["kpis"]
+    fresh = client.post("/api/backtest", json={**body, "fresh": True}).json()["kpis"]
+    assert fresh == cached

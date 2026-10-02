@@ -17,8 +17,9 @@ is already documented as free-form JSON. This mirrors what used to be a
 `localStorage` array of `MomentumSavedRun` objects, just moved server-side so
 saved runs survive a browser/device change (see TODO.md's P4 entry).
 
-Capped at 10 runs per dataset, oldest dropped first — the same cap the
-frontend enforced client-side.
+Capped at 10 ordinary runs per dataset, oldest dropped first. Favourited runs
+are retained separately from that disposable comparison history because the
+weekly scheduler must be able to evaluate them even after many ad-hoc runs.
 """
 
 from __future__ import annotations
@@ -91,6 +92,11 @@ def save_run(
         "dates": dates,
         "strategy": strategy,
         "overlay": overlay,
+        # A saved result can later be promoted to a scheduled strategy. Keep
+        # that state with the immutable config snapshot rather than in the
+        # browser, so launchd and the dashboard see the same favourites.
+        "favorite": False,
+        "active": False,
     }
     con.execute("BEGIN")
     try:
@@ -108,10 +114,11 @@ def save_run(
 
 
 def _prune(con: duckdb.DuckDBPyConnection, dataset: str) -> None:
-    """Keep only the newest MAX_RUNS_PER_DATASET runs for this dataset."""
+    """Keep only the newest ordinary runs; never prune scheduled favourites."""
     stale = con.execute(
         "SELECT r.run_id FROM backtest_runs r JOIN strategy_versions v USING (version_id) "
         "WHERE v.strategy_id = ? AND r.kind = 'weekly' "
+        "AND COALESCE((r.summary ->> 'favorite')::BOOLEAN, FALSE) = FALSE "
         "ORDER BY r.created_at DESC OFFSET ?",
         [_strategy_id(dataset), MAX_RUNS_PER_DATASET],
     ).fetchall()
@@ -129,6 +136,8 @@ def _record(run_id: str, config: dict[str, Any], summary: dict[str, Any]) -> dic
         "dates": summary["dates"],
         "strategy": summary["strategy"],
         "overlay": summary["overlay"],
+        "favorite": bool(summary.get("favorite", False)),
+        "active": bool(summary.get("active", False)),
     }
 
 
@@ -137,8 +146,8 @@ def list_runs(con: duckdb.DuckDBPyConnection, dataset: str) -> list[dict[str, An
         "SELECT r.run_id, v.spec, r.summary FROM backtest_runs r "
         "JOIN strategy_versions v USING (version_id) "
         "WHERE v.strategy_id = ? AND r.kind = 'weekly' "
-        "ORDER BY r.created_at DESC LIMIT ?",
-        [_strategy_id(dataset), MAX_RUNS_PER_DATASET],
+        "ORDER BY COALESCE((r.summary ->> 'favorite')::BOOLEAN, FALSE) DESC, r.created_at DESC",
+        [_strategy_id(dataset)],
     ).fetchall()
     return [
         _record(run_id, json.loads(spec), json.loads(summary)) for run_id, spec, summary in rows
@@ -151,6 +160,8 @@ def update_run(
     *,
     name: str | None = None,
     overlay: bool | None = None,
+    favorite: bool | None = None,
+    active: bool | None = None,
 ) -> dict[str, Any] | None:
     row = con.execute(
         "SELECT v.spec, r.summary FROM backtest_runs r JOIN strategy_versions v USING (version_id) "
@@ -165,11 +176,65 @@ def update_run(
         summary["name"] = name
     if overlay is not None:
         summary["overlay"] = overlay
-    con.execute(
-        "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
-        [json.dumps(summary, default=str), run_id],
-    )
+    if favorite is not None:
+        summary["favorite"] = favorite
+        # An inactive favourite is valid; an active non-favourite is not.
+        if not favorite:
+            summary["active"] = False
+    if active is not None:
+        summary["active"] = active
+        if active:
+            summary["favorite"] = True
+
+    con.execute("BEGIN")
+    try:
+        if summary.get("active", False):
+            # The Telegram job has exactly one source. Clear the global active
+            # flag, not merely this dataset's flag, before promoting this run.
+            active_rows = con.execute(
+                "SELECT r.run_id, r.summary FROM backtest_runs r "
+                "JOIN strategy_versions v USING (version_id) "
+                "JOIN strategies s ON s.strategy_id = v.strategy_id "
+                "WHERE s.package = ? AND r.kind = 'weekly' AND r.run_id <> ? "
+                "AND COALESCE((r.summary ->> 'active')::BOOLEAN, FALSE) = TRUE",
+                [PACKAGE, run_id],
+            ).fetchall()
+            for other_id, other_summary_json in active_rows:
+                other_summary = json.loads(other_summary_json)
+                other_summary["active"] = False
+                con.execute(
+                    "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
+                    [json.dumps(other_summary, default=str), other_id],
+                )
+        con.execute(
+            "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
+            [json.dumps(summary, default=str), run_id],
+        )
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
     return _record(run_id, json.loads(spec), summary)
+
+
+def list_favorites(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
+    """Return all scheduled momentum strategies, with the active one first.
+
+    This is intentionally cross-dataset: the weekly orchestrator owns the
+    eligibility decision while the dashboard needs one consolidated list.
+    """
+    rows = con.execute(
+        "SELECT r.run_id, v.spec, r.summary FROM backtest_runs r "
+        "JOIN strategy_versions v USING (version_id) "
+        "JOIN strategies s ON s.strategy_id = v.strategy_id "
+        "WHERE s.package = ? AND r.kind = 'weekly' "
+        "AND COALESCE((r.summary ->> 'favorite')::BOOLEAN, FALSE) = TRUE "
+        "ORDER BY COALESCE((r.summary ->> 'active')::BOOLEAN, FALSE) DESC, r.created_at ASC",
+        [PACKAGE],
+    ).fetchall()
+    return [
+        _record(run_id, json.loads(spec), json.loads(summary)) for run_id, spec, summary in rows
+    ]
 
 
 def delete_run(con: duckdb.DuckDBPyConnection, run_id: str) -> bool:

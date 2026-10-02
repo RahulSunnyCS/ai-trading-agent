@@ -8,6 +8,7 @@ import {
   Loader2,
   Play,
   RefreshCw,
+  RotateCw,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -67,6 +68,12 @@ const DATASETS: Array<{ id: Dataset; label: string; description: string }> = [
     description: 'Total Market pool with optional category selection',
   },
 ];
+
+// Owner, 2026-10-01: only ETF Rotation and Broad Momentum are offered in the tab. The Nifty 50
+// Stocks and Custom Index datasets stay in DATASETS (labels, saved runs, the API) and can be
+// re-shown by adding their ids back here.
+const VISIBLE_DATASET_IDS: ReadonlySet<Dataset> = new Set<Dataset>(['etf', 'broad']);
+const VISIBLE_DATASETS = DATASETS.filter((item) => VISIBLE_DATASET_IDS.has(item.id));
 
 function numberDefault(defaults: Record<string, unknown>, key: string, fallback: number): number {
   const value = defaults[key];
@@ -130,6 +137,12 @@ export function MomentumBacktestingView() {
   const [doneNoticeAt, setDoneNoticeAt] = useState<number | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // Why the LAST Run click produced no new results (a validation message, or the server's 4xx/5xx).
+  // Kept apart from `error` (data failed to load) on purpose: after a failed run the previous
+  // results stay on screen, and the reason must be visible right where Run was clicked.
+  const [runError, setRunError] = useState<string | null>(null);
+  const [runningFresh, setRunningFresh] = useState(false);
+  const runErrorRef = useRef<HTMLDivElement>(null);
   const [result, setResult] = useState<MomentumResult | null>(null);
   const [lastRunConfig, setLastRunConfig] = useState<Record<string, unknown> | null>(null);
   const [savedRuns, setSavedRuns] = useState<MomentumSavedRun[]>([]);
@@ -156,6 +169,24 @@ export function MomentumBacktestingView() {
     setSavedRuns((runs) => runs.map((run) => (run.id === id ? { ...run, overlay } : run)));
     await apiPatch(`/api/momentum/saved-runs/${id}`, { overlay });
   }
+  async function toggleFavorite(id: string, favorite: boolean): Promise<void> {
+    setSavedRuns((runs) =>
+      runs.map((run) =>
+        run.id === id ? { ...run, favorite, active: favorite ? run.active : false } : run,
+      ),
+    );
+    await apiPatch(`/api/momentum/saved-runs/${id}`, { favorite });
+  }
+  async function setActive(id: string): Promise<void> {
+    setSavedRuns((runs) =>
+      runs.map((run) => ({
+        ...run,
+        favorite: run.id === id ? true : run.favorite,
+        active: run.id === id,
+      })),
+    );
+    await apiPatch(`/api/momentum/saved-runs/${id}`, { active: true });
+  }
   async function removeRun(id: string): Promise<void> {
     setSavedRuns((runs) => runs.filter((run) => run.id !== id));
     await apiDelete(`/api/momentum/saved-runs/${id}`);
@@ -164,6 +195,7 @@ export function MomentumBacktestingView() {
   async function loadMeta(nextDataset: Dataset, seed?: Record<string, unknown>): Promise<void> {
     setLoading(true);
     setError(null);
+    setRunError(null);
     setResult(null);
     setLastRunConfig(null);
     setRunInfo(null);
@@ -260,30 +292,41 @@ export function MomentumBacktestingView() {
     };
   }
 
-  async function runBacktest(): Promise<void> {
+  /**
+   * `fresh` is the "re-run from scratch" icon: the server drops its cached rankings and data and
+   * reloads before computing. It is sent alongside the config but is NOT part of it, so it never
+   * enters `lastRunConfig`, a saved run, or the "changed since last run" comparison.
+   */
+  async function runBacktest({ fresh = false }: { fresh?: boolean } = {}): Promise<void> {
     let config: Record<string, unknown>;
+    setRunError(null);
     try {
       config = buildConfig();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setRunError(cause instanceof Error ? cause.message : String(cause));
       return;
     }
     const startedAt = Date.now();
     setRunStartedAt(startedAt);
     setNow(startedAt);
     setRunning(true);
+    setRunningFresh(fresh);
     setError(null);
-    const response = await apiPost<MomentumResult>('/api/momentum/backtest', config);
+    const response = await apiPost<MomentumResult>(
+      '/api/momentum/backtest',
+      fresh ? { ...config, fresh: true } : config,
+    );
     setRunning(false);
+    setRunningFresh(false);
     setRunStartedAt(null);
     if (!response.ok) {
-      setError(response.error);
+      setRunError(response.error);
       return;
     }
     const finishedAt = Date.now();
     setResult(response.data);
     setLastRunConfig(config);
-    setRunInfo({ finishedAt, durationMs: finishedAt - startedAt, savedAs: null });
+    setRunInfo({ finishedAt, durationMs: finishedAt - startedAt, savedAs: null, fresh });
     setSettingsOpen(false);
     const kpis = response.data.kpis;
     const sequence = Math.max(0, ...savedRuns.map((run) => run.n)) + 1;
@@ -311,6 +354,12 @@ export function MomentumBacktestingView() {
       );
     }
   }
+
+  // A failed run leaves the previous results on screen, so bring the reason into view: the Run
+  // button sits at the bottom of a long form and the user would otherwise see nothing happen.
+  useEffect(() => {
+    if (runError) runErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [runError]);
 
   // Ticks the elapsed-time readout while a run is in flight.
   useEffect(() => {
@@ -392,9 +441,9 @@ export function MomentumBacktestingView() {
       const decoded = JSON.parse(
         decodeURIComponent(escape(atob(hash.slice(marker.length)))),
       ) as Record<string, unknown>;
-      const sharedDataset = (
-        typeof decoded.dataset === 'string' ? decoded.dataset : 'etf'
-      ) as Dataset;
+      const requested = (typeof decoded.dataset === 'string' ? decoded.dataset : 'etf') as Dataset;
+      // A link to a hidden dataset opens ETF Rotation instead of an unreachable tab.
+      const sharedDataset: Dataset = VISIBLE_DATASET_IDS.has(requested) ? requested : 'etf';
       setDataset(sharedDataset);
       void loadMeta(sharedDataset, decoded);
     } catch {
@@ -403,7 +452,7 @@ export function MomentumBacktestingView() {
   }, []);
 
   const summary = meta
-    ? `${core.start || 'Start'} → ${core.end || 'End'} · ${values.rebalance ?? 'weekly'} · top ${core.topN} / exit >${core.exitRank} · ${values.benchmark ?? ''}`
+    ? `${core.start || 'Start'} → ${core.end || 'End'} · ${values.rebalance === 'monthly' ? 'monthly' : Number(values.rebalance_every ?? 1) > 1 ? `every ${values.rebalance_every} weeks` : 'weekly'} · top ${core.topN} / exit >${core.exitRank} · ${values.benchmark ?? ''}`
     : '';
 
   return (
@@ -461,6 +510,8 @@ export function MomentumBacktestingView() {
           runs={savedRuns}
           onRename={renameRun}
           onToggleOverlay={toggleOverlay}
+          onToggleFavorite={toggleFavorite}
+          onSetActive={setActive}
           onRemove={removeRun}
           onLoad={loadSettings}
         />
@@ -469,7 +520,7 @@ export function MomentumBacktestingView() {
           <div className="rounded-xl border border-border bg-surface p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2">
-                {DATASETS.map((item) => (
+                {VISIBLE_DATASETS.map((item) => (
                   <button
                     key={item.id}
                     type="button"
@@ -503,29 +554,49 @@ export function MomentumBacktestingView() {
 
           {loading || !meta ? null : (
             <div className="rounded-xl border border-border bg-surface">
-              <button
-                type="button"
-                onClick={() => setSettingsOpen((open) => !open)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-              >
-                <div className="min-w-0">
+              <div className="flex items-center gap-3 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen((open) => !open)}
+                  aria-expanded={settingsOpen}
+                  className="min-w-0 flex-1 text-left"
+                >
                   <p className="text-sm font-semibold text-foreground">Strategy settings</p>
                   {!settingsOpen ? <p className="truncate text-xs text-muted">{summary}</p> : null}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
+                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
                   {dirty ? (
                     <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
                       Changed since last run
                     </span>
                   ) : null}
-                  <ChevronDown
-                    className={cn(
-                      'h-4 w-4 text-faint transition-transform',
-                      settingsOpen && 'rotate-180',
-                    )}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => void runBacktest({ fresh: true })}
+                    disabled={running}
+                    title="Re-run from scratch: drops the server's cached rankings and data, reloads them, then recomputes"
+                    aria-label="Re-run from scratch"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RotateCw
+                      className={cn(
+                        'h-3.5 w-3.5 shrink-0',
+                        running && runningFresh && 'animate-spin',
+                      )}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen((open) => !open)}
+                    aria-label={settingsOpen ? 'Collapse settings' : 'Expand settings'}
+                    className="rounded p-1 text-faint hover:text-foreground"
+                  >
+                    <ChevronDown
+                      className={cn('h-4 w-4 transition-transform', settingsOpen && 'rotate-180')}
+                    />
+                  </button>
                 </div>
-              </button>
+              </div>
               {settingsOpen ? (
                 <div className="space-y-4 border-t border-border p-4">
                   <MomentumSettingsPanel
@@ -579,6 +650,21 @@ export function MomentumBacktestingView() {
                   </Button>
                 </div>
               )}
+              {runError ? (
+                <div
+                  ref={runErrorRef}
+                  role="alert"
+                  className="mx-4 mb-4 rounded-lg border border-negative/30 bg-negative/10 px-3 py-2.5 text-sm text-negative"
+                >
+                  <p className="font-medium">The run didn&apos;t finish — nothing was updated</p>
+                  <p className="mt-0.5 text-foreground/80">{runError}</p>
+                  {result ? (
+                    <p className="mt-0.5 text-xs text-muted">
+                      The results below are from your previous run.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -631,6 +717,7 @@ export function MomentumBacktestingView() {
                   result={result}
                   config={lastRunConfig ?? {}}
                   stale={dirty && !running}
+                  lastRunFailed={runError !== null && !running}
                   runInfo={runInfo}
                 />
               </div>
@@ -639,6 +726,7 @@ export function MomentumBacktestingView() {
                 benchmarkName={result.benchmark_name}
                 rotations={result.rotations}
                 overlays={overlays}
+                comparisons={result.comparisons ?? []}
                 flashKey={finishedAt}
               />
               <MomentumResultDetails

@@ -13,18 +13,13 @@ dependencies = [
     "uvicorn>=0.32",
     "mcp>=1.1",
     "typer>=0.13",
+    "psycopg[binary]>=3.2",
     "trading-data",
 ]
 
 [tool.uv.sources]
 # The shared local research database (TRADING_DATA_ROOT) — a sibling package, editable.
 trading-data = { path = "../trading-data", editable = true }
-
-[project.optional-dependencies]
-# Only needed for R2 (reading daily_regime_tags from the trading DB). Omit
-# entirely if DATABASE_URL is never set — analytics/regime_source.py checks
-# for the env var before importing this.
-regime = ["psycopg[binary]>=3.2"]
 
 [project.scripts]
 obt = "option_backtesting.cli:app"

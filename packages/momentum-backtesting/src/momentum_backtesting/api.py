@@ -1,7 +1,8 @@
-"""Local web UI: `mbt ui` serves this on 127.0.0.1 only. Not meant to be exposed."""
+"""Private Momentum API consumed by the shared dashboard."""
 
+import os
 import threading
-import urllib.request
+import urllib.parse
 from collections import OrderedDict
 from datetime import datetime, time, timedelta
 from pathlib import Path
@@ -9,12 +10,11 @@ from typing import Literal
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from trading_data.db import connect
 
-from . import analysis, db_read, fyers, rebalance, runs_store
+from . import analysis, db_read, fyers, levers, rebalance, reference_benchmarks, runs_store
 from .categories import broad
 from .categories import momentum_scores as momentum_scores_mod
 from .categories.compose import (
@@ -33,9 +33,9 @@ from .categories.compose import (
     DEFAULT_TOP_N as CATEGORY_DEFAULT_TOP_N,
 )
 from .config import DATA_DIR, load_repo_env
-from .engine import BENCHMARK, CASH, IDLE, Config, Result, run_backtest
+from .engine import BENCHMARK, CASH, IDLE, Config, Result, ranked_universe, run_backtest
 from .fetch import load_universe
-from .notify import IST
+from .notify import IST, Notification
 from .stocks import ui_data
 from .stocks.ui_data import (
     NIFTY50_EQUAL_WEIGHT_TRI,
@@ -64,8 +64,6 @@ _CATEGORY_LABEL_INFO = {
     "international": ("core", "International"),
 }
 
-STATIC = Path(__file__).with_name("static")
-PLOTLY_URL = "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"
 _LOCAL_OAUTH_STATES: dict[str, datetime] = {}
 _LOCAL_OAUTH_LOCK = threading.Lock()
 
@@ -96,6 +94,10 @@ class _Data:
         # itself takes as input.
         self._broad_mtimes: tuple | None = None
         self.broad_ranking_cache: OrderedDict = OrderedDict()
+        # grouped_momentum_ranks (TODO 3.9.23) isn't free - two compute_ranks passes over the
+        # ~755-name universe, ~30s cold. Keyed on the ranking object's identity (it's itself
+        # cache-held above) plus tilt/screen, so a repeat request with the same settings is fast.
+        self.broad_tilt_cache: OrderedDict = OrderedDict()
         # "Momentum Scores" page (TODO.md 3.9.16): the 755-name price frame + point-in-time
         # membership gate (categories/momentum_scores.py's shared Step 1 with Broad Momentum's
         # Step 2, `broad.load_stock_universe_frame`) - ~7s cold, same two watch paths as
@@ -104,6 +106,33 @@ class _Data:
         # OrderedDict keyed cache the way broad_ranking_cache needs to be.
         self._momentum_universe_mtimes: tuple | None = None
         self.momentum_universe_cache: broad.StockUniverseFrame | None = None
+        self._references_mtimes: tuple | None = None
+        self.references_cache: pd.DataFrame | None = None
+
+    def reset(self) -> None:
+        """Drop EVERYTHING this process has cached - rankings, trade-price tables, the loaded
+        datasets, the reference benchmarks - and forget every file/database timestamp, so the next
+        request reloads from the catalog or files and recomputes from scratch. This is what the
+        dashboard's "re-run from scratch" icon asks for (`fresh: true`). A normal run keeps the
+        caches: they are keyed on the settings, so they are correct as well as fast."""
+        with self._lock:
+            self._mtime = None
+            self.prices = None
+            self.rank_cache.clear()
+            self.fill_tables.clear()
+            self._stock_mtime = None
+            self.stock = None
+            self.stock_rank_cache.clear()
+            self._categories_mtimes = None
+            self.custom_index_cache.clear()
+            self.custom_index_rank_cache.clear()
+            self._broad_mtimes = None
+            self.broad_ranking_cache.clear()
+            self.broad_tilt_cache.clear()
+            self._momentum_universe_mtimes = None
+            self.momentum_universe_cache = None
+            self._references_mtimes = None
+            self.references_cache = None
 
     def get(self) -> pd.DataFrame:
         """Prefers the shared local database (`packages/trading-data`, populated by `mbt
@@ -120,6 +149,14 @@ class _Data:
             mtime = (db_mtime, csv_mtime)
             if mtime != self._mtime:
                 from_db = db_read.weekly_closes_from_db_or_none() if db_mtime is not None else None
+                if from_db is None and csv_mtime is None:
+                    # A catalog exists but holds no weekly prices (anything that opens it for
+                    # writing creates it - e.g. the dashboard's first saved-runs call) and there
+                    # is no CSV either: say what to run, instead of a FileNotFoundError -> 500.
+                    raise HTTPException(
+                        409,
+                        "No data yet - run `mbt local migrate` (or `mbt login` then `mbt fetch`).",
+                    )
                 self.prices = (
                     from_db
                     if from_db is not None
@@ -167,6 +204,41 @@ class _Data:
                 except ValueError as error:
                     raise HTTPException(409, str(error)) from None
             return self.fill_tables[key]
+
+    def references(self) -> pd.DataFrame:
+        """Nifty 50 TRI / Nifty200 Momentum 30 TRI comparison lines (reference_benchmarks),
+        reloaded when either source changes. Empty, never an error, when neither has them."""
+        path = DATA_DIR / "stocks" / "benchmarks_weekly.csv"
+        mtimes = (db_read.catalog_mtime(), path.stat().st_mtime if path.exists() else None)
+        with self._lock:
+            if mtimes != self._references_mtimes or self.references_cache is None:
+                self.references_cache = reference_benchmarks.load_references(DATA_DIR)
+                self._references_mtimes = mtimes
+            return self.references_cache
+
+    def get_broad_tilt_ranks(
+        self,
+        ranking: broad.UniverseRanking,
+        lookbacks: tuple[int, ...],
+        tilt: float,
+        screen_top_pct: float,
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        key = (id(ranking), tuple(lookbacks), tilt, screen_top_pct)
+        with self._lock:
+            cached = self.broad_tilt_cache.get(key)
+        if cached is not None:
+            return cached
+        ranks = levers.grouped_momentum_ranks(
+            ranking.prices,
+            Config(lookbacks=tuple(lookbacks)),
+            tilt=tilt,
+            screen_top_pct=screen_top_pct,
+        )
+        with self._lock:
+            self.broad_tilt_cache[key] = ranks
+            while len(self.broad_tilt_cache) > 8:
+                self.broad_tilt_cache.popitem(last=False)
+        return ranks
 
     def trim_cache(self, limit: int = 24) -> None:
         for cache in (self.rank_cache, self.stock_rank_cache, self.custom_index_rank_cache):
@@ -331,6 +403,9 @@ DATA = _Data()
 
 class BacktestRequest(BaseModel):
     dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf"
+    #: Not a strategy setting: true makes the server drop all its caches and reload the data
+    #: before running (the dashboard's "re-run from scratch"). Never part of a saved config.
+    fresh: bool = False
     universe: list[str] = Field(min_length=1)
     start: str = "2017-01-01"
     end: str | None = None
@@ -367,6 +442,36 @@ class BacktestRequest(BaseModel):
     score: Literal["ranksum", "voladj", "blend"] = "ranksum"
     voladj_skip_recent_month: bool = True
     rebalance: Literal["weekly", "monthly"] = "weekly"
+    # rebalance="weekly" only: trade every K weeks, on calendar phase `rebalance_offset`
+    # (engine.Config.rebalance_every). 1 = every week.
+    rebalance_every: int = Field(1, ge=1, le=13)
+    rebalance_offset: int = Field(0, ge=0, le=12)
+    # Buffer rule only. With rebalance_every > 1, sell a dropped-rank holding every week instead
+    # of waiting for the next cadence week; new buys and cap trims still wait (engine.Config's
+    # own field of the same name). Harmless no-op when rebalance_every == 1.
+    sell_every_week: bool = False
+    # dataset="etf" only (TODO 3.9.23, owner follow-up): rank on the usual short lookbacks
+    # (1/4/13w) blended with a separate "most beaten-down over 26/52w" preference
+    # (levers.grouped_momentum_ranks), instead of the config's own ranking method. 0 (default)
+    # leaves ranking untouched. A fresh 52-week low is never bought (levers.fresh_52w_low_mask),
+    # same falling-knife guard as the reversal sleeve.
+    reversal_tilt: float = Field(0.0, ge=0, le=2)
+    # grouped_momentum_ranks only: 0 (default) ranks every eligible name; > 0 first keeps only
+    # the top share by short-term momentum (e.g. 0.3 = top 30%), the tilt then orders within it.
+    reversal_screen_pct: float = Field(0.0, ge=0, lt=1)
+    # dataset="broad" only (TODO 3.9.23 owner follow-up): same idea, applied WITHIN whatever
+    # category/pool selection the funnel already made - re-orders those stocks by the tilted
+    # score instead of plain momentum; it never changes which categories or pool stocks qualify.
+    broad_reversal_tilt: float = Field(0.0, ge=0, le=2)
+    broad_reversal_screen_pct: float = Field(0.0, ge=0, lt=1)
+    # dataset="etf" only (TODO 3.9.23): never freshly BUY the most volatile fraction of the
+    # ranked instruments (26-week weekly volatility, levers.high_vol_mask); holdings are
+    # untouched. 0 = off. Measured to help ETF mode and to hurt stocks, so ETF only.
+    exclude_high_vol: float = Field(0.0, ge=0, lt=1)
+    # dataset="broad" only (TODO 3.9.23): simulate every week. False keeps the engine default,
+    # which skips weeks with fewer than category_top_n x picks ranked stocks (~190 of 508 since
+    # 2017) and so overstates Broad's CAGR and Sharpe.
+    broad_every_week: bool = False
     cost_model: Literal["flat", "itemised"] = "flat"
     capital: float = Field(1_000_000.0, gt=0)
     slippage_bps: float = Field(5.0, ge=0)
@@ -424,6 +529,8 @@ class SavedRunBody(BaseModel):
 class SavedRunUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=64)
     overlay: bool | None = None
+    favorite: bool | None = None
+    active: bool | None = None
 
 
 class WeeklyRunBody(BaseModel):
@@ -489,6 +596,9 @@ def _config_kwargs(req: BacktestRequest) -> dict:
         score=req.score,
         voladj_skip_recent_month=req.voladj_skip_recent_month,
         rebalance=req.rebalance,
+        rebalance_every=req.rebalance_every,
+        rebalance_offset=req.rebalance_offset,
+        sell_every_week=req.sell_every_week,
         cost_model=req.cost_model,
         capital=req.capital,
         slippage_bps=req.slippage_bps,
@@ -546,6 +656,14 @@ def _etf_meta() -> dict:
             "score": defaults.score,
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
             "rebalance": defaults.rebalance,
+            "rebalance_every": defaults.rebalance_every,
+            "rebalance_offset": defaults.rebalance_offset,
+            "sell_every_week": defaults.sell_every_week,
+            "broad_reversal_tilt": 0.0,
+            "broad_reversal_screen_pct": 0.0,
+            "reversal_tilt": 0.0,
+            "reversal_screen_pct": 0.0,
+            "exclude_high_vol": 0.0,
             "cost_model": defaults.cost_model,
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
@@ -576,7 +694,7 @@ def _stock_meta() -> dict:
     # Gold/Silver/Cash (liquid fund)/Gilt 8-13 yr (see ui_data.StockDataset.extra_instruments) -
     # these use their own real name as `name` directly (no company_id-style code), so there is no
     # separate display_name to translate from; the frontend already falls back to `name` when
-    # `display_name` is falsy (see static/app.js's displayName()/buildUniverse()).
+    # `display_name` is falsy; the dashboard displays `name` in that case.
     for extra_name, extra in stock.extra_instruments.items():
         instruments.append(
             {
@@ -645,6 +763,11 @@ def _stock_meta() -> dict:
             "score": defaults.score,
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
             "rebalance": defaults.rebalance,
+            "rebalance_every": defaults.rebalance_every,
+            "rebalance_offset": defaults.rebalance_offset,
+            "sell_every_week": defaults.sell_every_week,
+            "broad_reversal_tilt": 0.0,
+            "broad_reversal_screen_pct": 0.0,
             "cost_model": defaults.cost_model,
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
@@ -672,6 +795,24 @@ def _etf_backtest(req: BacktestRequest) -> dict:
             )
         classes = {name: inst.tax_class for name, inst in universe.items()}
         fills = DATA.fills(req.track, req.execution)
+        names = ranked_universe(includes, config)
+        masks = []
+        if req.exclude_high_vol > 0:
+            masks.append(levers.high_vol_mask(prices[names], quantile=1 - req.exclude_high_vol))
+        external_ranks = None
+        if req.reversal_tilt > 0:
+            external_ranks = levers.grouped_momentum_ranks(
+                prices[names],
+                config,
+                tilt=req.reversal_tilt,
+                screen_top_pct=req.reversal_screen_pct,
+            )
+            masks.append(levers.fresh_52w_low_mask(prices[names]))
+        no_buy = None
+        if masks:
+            no_buy = masks[0]
+            for extra in masks[1:]:
+                no_buy = no_buy.reindex_like(extra).fillna(False) | extra
         result = run_backtest(
             prices,
             includes,
@@ -679,6 +820,8 @@ def _etf_backtest(req: BacktestRequest) -> dict:
             classes,
             DATA.rank_cache,
             fills.prices if fills is not None else None,
+            no_buy=no_buy,
+            external_ranks=external_ranks,
         )
         DATA.trim_cache()
     except ValueError as error:
@@ -691,6 +834,8 @@ def _etf_backtest(req: BacktestRequest) -> dict:
         groups,
         fills.proxy if fills is not None else None,
         fills.warnings if fills is not None else None,
+        references=DATA.references(),
+        no_buy=no_buy,
     )
 
 
@@ -736,7 +881,14 @@ def _stock_backtest(req: BacktestRequest) -> dict:
         raise HTTPException(422, str(error)) from None
     groups = dict.fromkeys(stock.companies, "Nifty 50")
     groups.update({name: extra["group"] for name, extra in stock.extra_instruments.items()})
-    payload = analysis.payload(result, stock.prices, config, groups, membership=stock.membership)
+    payload = analysis.payload(
+        result,
+        stock.prices,
+        config,
+        groups,
+        membership=stock.membership,
+        references=DATA.references(),
+    )
     payload["companies"] = stock.companies
     return payload
 
@@ -840,10 +992,15 @@ def _custom_index_meta() -> dict:
             "score": "ranksum",
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
             "rebalance": defaults.rebalance,
+            "rebalance_every": defaults.rebalance_every,
+            "rebalance_offset": defaults.rebalance_offset,
+            "sell_every_week": defaults.sell_every_week,
+            "broad_reversal_tilt": 0.0,
+            "broad_reversal_screen_pct": 0.0,
             "cost_model": "flat",
             "capital": defaults.capital,
             "slippage_bps": defaults.slippage_bps,
-            # Custom-Index-only, read by the frontend's inner-rotation panel (see static/app.js).
+            # Custom-Index-only, read by the dashboard's inner-rotation controls.
             "inner_top_n": CATEGORY_DEFAULT_TOP_N,
             "inner_exit_rank": CATEGORY_DEFAULT_EXIT_RANK,
             # Custom-Index-only: how many ranked slots Gold/Silver and Cash/Gilt may each
@@ -1019,7 +1176,7 @@ def _custom_index_backtest(req: BacktestRequest) -> dict:
         name: _CATEGORY_LABEL_INFO.get(label, ("core", "Custom"))[1]
         for name, label in universe_result.labels.items()
     }
-    payload = analysis.payload(result, prices, config, groups)
+    payload = analysis.payload(result, prices, config, groups, references=DATA.references())
     if universe_result.skipped:
         # Surfaced for transparency (e.g. so the UI/report can note "N categories excluded this
         # run and why") - never fatal on its own, matching every other module in categories/'s
@@ -1051,7 +1208,7 @@ def _broad_meta() -> dict:
     three datasets have (there are 755 stocks + 113 categories + 4 atomics -- which of them are
     even eligible changes every quarter, so a fixed checkbox list doesn't make sense the way it
     does for a static universe.csv/companies.csv list) -- `instruments` is deliberately empty;
-    static/app.js skips building a universe section for this dataset entirely.
+    the dashboard skips the per-instrument picker for this dataset.
     """
     if not (
         db_read.has_total_market_data()
@@ -1082,13 +1239,18 @@ def _broad_meta() -> dict:
             "max_stock_price": broad.DEFAULT_MAX_STOCK_PRICE,
             "cap_band": defaults.cap_band,
             "rebalance": defaults.rebalance,
+            "rebalance_every": defaults.rebalance_every,
+            "rebalance_offset": defaults.rebalance_offset,
+            "sell_every_week": defaults.sell_every_week,
+            "broad_reversal_tilt": 0.0,
+            "broad_reversal_screen_pct": 0.0,
             "score": defaults.score,
             "voladj_skip_recent_month": defaults.voladj_skip_recent_month,
-            # top_n/exit_rank/defensive/filter_lookback: NOT used for this dataset (their panels
-            # stay hidden by static/app.js's syncDependentFields - see run_broad_backtest's own
+            # top_n/exit_rank/defensive/filter_lookback: NOT used for this dataset.
+            # See run_broad_backtest's own
             # docstring for why `defensive`/`filter_lookback` genuinely don't apply here: CASH
             # never enters this dataset's external rank table). Included only so
-            # defaultConfig()'s generic field reads never hit `undefined` on a hidden control.
+            # the dashboard's generic field reads still receive defined defaults.
             # signal_delay/momentum_sizing*/cost_model/capital/slippage_bps ARE now used (TODO.md
             # 3.9.15 - see _broad_backtest/run_broad_backtest) and their controls are shown.
             "top_n": defaults.top_n,
@@ -1111,6 +1273,7 @@ def _broad_meta() -> dict:
             "broad_picks_per_category": broad.DEFAULT_PICKS_PER_CATEGORY,
             "broad_off_top_n": 10,
             "broad_off_exit_rank": 20,
+            "broad_every_week": False,
         },
     }
 
@@ -1181,6 +1344,11 @@ def _run_broad(
     outer_prices: pd.DataFrame,
 ) -> broad.BroadBacktestResult:
     weights = tuple(req.weights) if req.weights else None
+    stock_tilt_ranks = None
+    if req.broad_reversal_tilt > 0:
+        stock_tilt_ranks = DATA.get_broad_tilt_ranks(
+            ranking, tuple(req.lookbacks), req.broad_reversal_tilt, req.broad_reversal_screen_pct
+        )
     return broad.run_broad_backtest(
         outer_prices=outer_prices,
         stocks_data_dir=DATA_DIR / "stocks",
@@ -1205,6 +1373,9 @@ def _run_broad(
         signal_delay=req.signal_delay,
         portfolio=req.portfolio,
         rebalance=req.rebalance,
+        rebalance_every=req.rebalance_every,
+        rebalance_offset=req.rebalance_offset,
+        sell_every_week=req.sell_every_week,
         benchmark=req.benchmark,
         max_position=req.max_position,
         max_category=req.max_category if req.broad_category_mode == "on" else None,
@@ -1218,6 +1389,10 @@ def _run_broad(
         capital=req.capital,
         slippage_bps=req.slippage_bps,
         ranking=ranking,
+        min_ranked=1 if req.broad_every_week else 0,
+        stock_tilt=req.broad_reversal_tilt,
+        stock_tilt_screen_pct=req.broad_reversal_screen_pct,
+        stock_tilt_ranks=stock_tilt_ranks,
     )
 
 
@@ -1258,7 +1433,14 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
-    payload = analysis.payload(result, prices, result.config, groups, share_prices=True)
+    payload = analysis.payload(
+        result,
+        prices,
+        result.config,
+        groups,
+        share_prices=True,
+        references=DATA.references(),
+    )
     # Always present (empty list for category_mode="off", where there is no category layer at
     # all) - a consistent response shape the frontend can rely on regardless of mode.
     group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR) if on else {}
@@ -1387,11 +1569,65 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
     }
 
 
+def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
+    """Evaluate one bhavcopy-backed favourite after its processed-week gate passes."""
+    from .weekly import RunResult
+
+    config = dict(favorite["config"])
+    req = BacktestRequest.model_validate(config)
+    stock = DATA.get_stock()
+    if stock.last_week.normalize() < target_week.normalize():
+        return None, (
+            f"NSE bhavcopy-backed data is complete through {stock.last_week:%d %b %Y}; "
+            f"the week ending {target_week:%d %b %Y} is not processed yet."
+        )
+
+    if req.dataset == "stock":
+        payload = _stock_backtest(req)
+    elif req.dataset == "custom_index":
+        payload = _custom_index_backtest(req)
+    elif req.dataset == "broad":
+        payload = _broad_backtest(req)
+    else:
+        return None, f"Unsupported weekly dataset {req.dataset!r}."
+
+    latest = payload.get("latest", {})
+    rows = latest.get("rows", [])
+    actionable = [
+        row
+        for row in rows
+        if row.get("action")
+        and str(row.get("action", "")).upper() not in {"HOLD", "AT CAP", "WAIT"}
+    ]
+    lines = [f"Strategy: {favorite['name']} · dataset: {req.dataset}"]
+    if actionable:
+        lines.extend(
+            f"• {row.get('asset', 'Unknown')} — {row.get('action')} · rank {row.get('rank', '-')}"
+            for row in actionable
+        )
+    else:
+        lines.append("No trades this week.")
+    lines.append(f"Data complete through {stock.last_week:%d %b %Y} (NSE bhavcopy).")
+    signal = {
+        "week": latest.get("week", target_week.strftime("%Y-%m-%d")),
+        "label": favorite["name"],
+        "rows": rows,
+        "config": config,
+    }
+    note = Notification(
+        "momentum-weekly",
+        "action_required" if actionable else "info",
+        f"Momentum FINAL — {favorite['name']} — week of {target_week:%d %b %Y}",
+        "\n".join(lines),
+    )
+    return RunResult(note, signal), None
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Momentum backtest", docs_url="/api/docs")
 
-    # Local standalone dashboard preview: the normal Fastify OAuth flow stores
-    # its token in broker_tokens. `mbt ui` has no Postgres dependency, so it
+    # Local direct-mode dashboard preview: the normal Fastify OAuth flow stores
+    # its token in broker_tokens. This API can run without Postgres, so it
     # uses the existing 0600 mbt token cache and the same Fyers auth-code flow.
     @app.get("/api/auth/fyers/status")
     def local_fyers_status() -> dict:
@@ -1401,24 +1637,41 @@ def create_app() -> FastAPI:
             configured = True
         except fyers.FyersCredentialsError:
             configured = False
-        cached = fyers._cached_token() if configured else None
-        connected = cached is not None
+        credentials = None
+        if configured:
+            try:
+                # Direct-mode dashboards still share the encrypted broker_tokens
+                # row whenever Postgres is available; the local 0600 cache remains
+                # only as the documented no-database fallback.
+                credentials = fyers.resolve_credentials(prefer_dashboard=True)
+            except fyers.FyersCredentialsError:
+                credentials = None
+        connected = credentials is not None
         return {
             "configured": configured,
             "connected": connected,
             "degraded": not connected,
             "needsReauth": not connected,
-            "expiresAt": cached.expires_at.isoformat() if cached else None,
-            "appId": cached.app_id if cached else None,
+            "expiresAt": credentials.expires_at.isoformat() if credentials else None,
+            "appId": credentials.app_id if credentials else None,
         }
 
     @app.get("/api/auth/fyers/start")
     def local_fyers_start() -> RedirectResponse:
         load_repo_env()
         try:
-            url, state = fyers.build_auth_url()
+            _app_id, _secret, redirect_uri = fyers._oauth_config()
         except fyers.FyersCredentialsError as error:
             raise HTTPException(503, str(error)) from None
+        if os.environ.get("DATABASE_URL", "").strip():
+            callback = urllib.parse.urlparse(redirect_uri)
+            central_start = urllib.parse.urlunparse(
+                (callback.scheme, callback.netloc, "/api/auth/fyers/start", "", "", "")
+            )
+            return RedirectResponse(
+                central_start, status_code=302, headers={"Cache-Control": "no-store"}
+            )
+        url, state = fyers.build_auth_url()
         now = datetime.now(IST)
         with _LOCAL_OAUTH_LOCK:
             for old_state, expiry in list(_LOCAL_OAUTH_STATES.items()):
@@ -1466,6 +1719,8 @@ def create_app() -> FastAPI:
 
     @app.post("/api/backtest")
     def backtest(req: BacktestRequest) -> dict:
+        if req.fresh:
+            DATA.reset()
         if req.dataset == "stock":
             return _stock_backtest(req)
         if req.dataset == "broad":
@@ -1496,10 +1751,23 @@ def create_app() -> FastAPI:
     @app.patch("/api/saved-runs/{run_id}")
     def patch_saved_run(run_id: str, body: SavedRunUpdate) -> dict:
         with connect() as con:
-            record = runs_store.update_run(con, run_id, name=body.name, overlay=body.overlay)
+            record = runs_store.update_run(
+                con,
+                run_id,
+                name=body.name,
+                overlay=body.overlay,
+                favorite=body.favorite,
+                active=body.active,
+            )
         if record is None:
             raise HTTPException(404, "saved run not found")
         return record
+
+    @app.get("/api/favorite-strategies")
+    def favorite_strategies() -> list[dict]:
+        """The persisted candidates for the weekly scheduler and dashboard."""
+        with connect() as con:
+            return runs_store.list_favorites(con)
 
     @app.delete("/api/saved-runs/{run_id}")
     def remove_saved_run(run_id: str) -> dict:
@@ -1517,7 +1785,7 @@ def create_app() -> FastAPI:
         tens of seconds (live network sources), same as a cold Custom Index backtest — the
         Fastify proxy's timeout already accounts for this."""
         from . import fyers, notify
-        from .weekly import run_weekly
+        from .weekly import run_favorite_strategies, week_ending_on_or_before
 
         try:
             creds = fyers.resolve_credentials()
@@ -1525,43 +1793,59 @@ def create_app() -> FastAPI:
             creds = None
         try:
             with connect() as con:
-                result = run_weekly(body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None)
+                favorites_by_id = {item["id"]: item for item in runs_store.list_favorites(con)}
+                outcomes = run_favorite_strategies(
+                    body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None
+                )
+            if body.run == "final":
+                target_week = pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date()))
+                for outcome in outcomes:
+                    if outcome["result"] is not None or outcome["dataset"] == "etf":
+                        continue
+                    favorite = favorites_by_id[outcome["id"]]
+                    try:
+                        outcome["result"], outcome["blocked"] = _research_weekly_result(
+                            favorite, target_week
+                        )
+                    except (HTTPException, ValueError, KeyError, FileNotFoundError) as error:
+                        outcome["result"] = None
+                        outcome["blocked"] = str(getattr(error, "detail", error))
         except Exception as error:
             raise HTTPException(500, f"{type(error).__name__}: {error}") from None
-        result.notification.run_url = notify.run_url()
-        if body.send:
-            notify.send(result.notification)
+        active = next((outcome for outcome in outcomes if outcome["active"]), None)
+        active_result = active["result"] if active is not None else None
+        if active_result is not None:
+            active_result.notification.run_url = notify.run_url()
+            if body.send:
+                notify.send(active_result.notification)
         return {
-            "title": result.notification.title,
-            "body": result.notification.body,
-            "severity": result.notification.severity,
-            "sent_to_telegram": body.send,
-            "signal": result.signal,
+            "title": (
+                active_result.notification.title if active_result else "Weekly strategies evaluated"
+            ),
+            "body": (
+                active_result.notification.body if active_result else "No eligible active strategy."
+            ),
+            "severity": active_result.notification.severity if active_result else "warning",
+            "sent_to_telegram": body.send and active_result is not None,
+            "signal": active_result.signal if active_result else None,
+            "strategies": [
+                {
+                    "id": outcome["id"],
+                    "name": outcome["name"],
+                    "dataset": outcome["dataset"],
+                    "active": outcome["active"],
+                    "blocked": outcome["blocked"],
+                    "title": outcome["result"].notification.title if outcome["result"] else None,
+                    "body": outcome["result"].notification.body if outcome["result"] else None,
+                    "signal": outcome["result"].signal if outcome["result"] else None,
+                }
+                for outcome in outcomes
+            ],
         }
 
     @app.post("/api/rebalance-preview")
     def preview(req: RebalanceRequest) -> dict:
         return rebalance_preview(req)
-
-    @app.get("/vendor/plotly.min.js")
-    def plotly() -> FileResponse:
-        """Charting library, downloaded once and kept in data/ so the UI then works offline."""
-        path = DATA_DIR / "vendor" / "plotly-2.35.2.min.js"
-        if not path.exists():
-            try:
-                request = urllib.request.Request(PLOTLY_URL, headers={"User-Agent": "Mozilla/5.0"})
-                body = urllib.request.urlopen(request, timeout=60).read()
-            except OSError as error:
-                raise HTTPException(503, f"Couldn't download the chart library: {error}") from None
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(body)
-        return FileResponse(path, media_type="text/javascript")
-
-    app.mount("/static", StaticFiles(directory=STATIC), name="static")
-
-    @app.get("/")
-    def index() -> FileResponse:
-        return FileResponse(STATIC / "index.html")
 
     return app
 

@@ -57,11 +57,7 @@
 
 import type { Redis } from 'ioredis';
 import type { Pool } from 'pg';
-import type {
-  OpenPosition,
-  PersonalityConfigM2 as PersonalityConfig,
-  PersonalityConfig as PersonalityConfigSnake,
-} from '../db/schema.js';
+import type { OpenPosition, PersonalityConfigM2 as PersonalityConfig } from '../db/schema.js';
 import { STREAM_STRADDLE, recoverPending, streamConsume } from '../redis/client.js';
 import type { ClockWithTick } from '../utils/clock.js';
 import type { EntryIntent } from './entry-engine.js';
@@ -71,7 +67,6 @@ import type { ManagementHandler } from './management/holder.js';
 import { HolderManager } from './management/holder.js';
 import { ReducerManager } from './management/reducer.js';
 import type { PaperTradeExecutor } from './paper-trade-executor.js';
-import { getOpenTrades } from './paper-trade-executor.js';
 import { updateTrailingStop } from './trigger-engine.js';
 import type { TriggerConfig } from './trigger-engine.js';
 
@@ -128,7 +123,6 @@ type PositionMonitorEvents = {
 export class PositionMonitor {
   private readonly _clock: ClockWithTick;
   private readonly _db: Pool;
-  private readonly _redis: Redis;
   private readonly _executor: PaperTradeExecutor;
   private readonly _triggerConfig: TriggerConfig;
   private readonly _staleThresholdMs: number;
@@ -184,7 +178,6 @@ export class PositionMonitor {
   constructor(opts: PositionMonitorOptions) {
     this._clock = opts.clock;
     this._db = opts.db;
-    this._redis = opts.redis;
     this._executor = opts.executor;
     this._triggerConfig = opts.triggerConfig;
     this._staleThresholdMs = opts.staleThresholdMs ?? 30_000;

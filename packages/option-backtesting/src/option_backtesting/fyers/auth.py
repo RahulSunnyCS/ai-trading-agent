@@ -2,9 +2,10 @@
 Fyers credential resolution. Never prints or logs a token.
 
 Order (first hit wins):
-  1. FYERS_APP_ID + FYERS_ACCESS_TOKEN in the environment
-  2. FYERS_TOKEN_FILE — the 0600 JSON `packages/broker-login`'s `fyers-token` writes
-  3. the token cached by `mbt login` (packages/momentum-backtesting/data/.fyers_token.json),
+  1. the dashboard's broker_tokens row, when DATABASE_URL is configured
+  2. FYERS_APP_ID + FYERS_ACCESS_TOKEN in the environment
+  3. FYERS_TOKEN_FILE — the 0600 JSON `packages/broker-login`'s `fyers-token` writes
+  4. the token cached by `mbt login` (packages/momentum-backtesting/data/.fyers_token.json),
      same JSON shape as (2). Read-only: one browser login each morning serves both
      tools, and this package imports no code from momentum-backtesting.
 
@@ -18,6 +19,8 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+
+import psycopg
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 MBT_TOKEN_CACHE = REPO_ROOT / "packages" / "momentum-backtesting" / "data" / ".fyers_token.json"
@@ -61,8 +64,38 @@ def _from_file(path: Path, source: str) -> Credentials | None:
     return Credentials(data["app_id"], data["access_token"], source, expires_at)
 
 
+def _from_dashboard(database_url: str) -> Credentials | None:
+    """Read the same expiring token used by the dashboard and Momentum API."""
+    passphrase = os.environ.get("FYERS_APP_SECRET", "")
+    with psycopg.connect(database_url, connect_timeout=10) as conn:
+        row = conn.execute(
+            "SELECT app_id, CASE WHEN token_encrypted "
+            "THEN pgp_sym_decrypt(dearmor(access_token), %s) "
+            "ELSE access_token END AS access_token, expires_at FROM broker_tokens "
+            "WHERE broker = 'fyers' LIMIT 1",
+            (passphrase,),
+        ).fetchone()
+    if row is None:
+        return None
+    app_id, access_token, expires_at = row
+    if expires_at <= datetime.now(UTC):
+        return None
+    return Credentials(app_id, access_token, "broker_tokens", expires_at)
+
+
 def resolve_credentials() -> Credentials:
     load_dotenv()
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    database_error = False
+    if database_url:
+        try:
+            if creds := _from_dashboard(database_url):
+                return creds
+        except psycopg.Error:
+            # The standalone collector can still run from a token file while
+            # the dashboard's database is stopped.
+            database_error = True
+
     app_id = os.environ.get("FYERS_APP_ID", "").strip()
     token = os.environ.get("FYERS_ACCESS_TOKEN", "").strip()
     if app_id and token:
@@ -75,7 +108,11 @@ def resolve_credentials() -> Credentials:
     if creds := _from_file(MBT_TOKEN_CACHE, "mbt login cache"):
         return creds
 
+    if database_error:
+        raise FyersCredentialsError(
+            "Fyers token database is unavailable and no fallback token exists."
+        )
     raise FyersCredentialsError(
-        "No valid Fyers token. Log in once for today with:\n"
-        "  cd packages/momentum-backtesting && uv run mbt login"
+        "No valid Fyers token. Log in from the dashboard's Broker logins tab "
+        "or run `mbt login` for standalone use."
     )

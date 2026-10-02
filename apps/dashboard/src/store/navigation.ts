@@ -16,7 +16,8 @@ export const DEFAULT_NAVIGATION_PREFERENCES: NavigationPreferences = {
 
 /** Repair stale/partial browser preferences when tabs are added or removed. */
 export function normalizeNavigationPreferences(value: unknown): NavigationPreferences {
-  const candidate = value && typeof value === 'object' ? value as Partial<NavigationPreferences> : {};
+  const candidate =
+    value && typeof value === 'object' ? (value as Partial<NavigationPreferences>) : {};
   const order = Array.isArray(candidate.order)
     ? candidate.order.filter((id): id is Tab => CONFIGURABLE_SET.has(id as Tab))
     : [];
@@ -43,7 +44,10 @@ export function loadNavigationPreferences(): NavigationPreferences {
 
 export function saveNavigationPreferences(preferences: NavigationPreferences): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeNavigationPreferences(preferences)));
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(normalizeNavigationPreferences(preferences)),
+  );
 }
 
 export function visibleNavigationGroups(preferences: NavigationPreferences): NavGroup[] {
@@ -56,7 +60,9 @@ export function visibleNavigationGroups(preferences: NavigationPreferences): Nav
       .sort((a, b) => {
         if (a.id === 'settings') return 1;
         if (b.id === 'settings') return -1;
-        return (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER);
+        return (
+          (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+        );
       }),
   })).filter((group) => group.items.length > 0);
 }

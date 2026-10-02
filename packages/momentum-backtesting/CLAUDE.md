@@ -19,7 +19,7 @@ fall out of the top M (hysteresis). Three additional layers build on the
 same ranking mechanics: `stocks/` (a from-scratch, survivorship-free Nifty
 50 stock data layer), `categories/` (sector/category momentum, including the
 Broad Momentum three-layer funnel and per-stock/sector Momentum Scores page),
-and a local-only web UI (`mbt ui`). See `README.md` and `TODO.md` §3.9 for
+and a private FastAPI service (`mbt serve`) used by the shared Next.js dashboard. See `README.md` and `TODO.md` §3.9 for
 what's built vs. still open.
 
 ## Cross-package links
@@ -27,7 +27,7 @@ what's built vs. still open.
 **Shares no code directly with `packages/option-backtesting`** — still true,
 and do not add a cross-import between them. They are both Python/uv with
 entirely separate `pyproject.toml`/`uv.lock` files; the pinned-same-library-
-versions comment for the local UI (Plotly etc.) remains cosmetic, not
+versions comment for the FastAPI service remains cosmetic, not
 functional.
 
 **Since 2026-09-30, both depend on `packages/trading-data`** (an editable
@@ -93,7 +93,10 @@ does not inherit it the way an interactive shell's profile usually does, and wit
 job would compute a signal but silently never reach Telegram. Also triggerable any time
 without waiting for the schedule: `POST /api/weekly/run` (`api.py`, proxied at
 `/api/momentum/weekly/run`) backs the dashboard Momentum tab's "Weekly signal" section, and
-runs the exact same `weekly.run_weekly()` the CLI and the scheduled job call.
+runs the same all-favourites orchestration as the CLI and scheduled job: every favourite is
+evaluated, while only the one global active favourite is sent to Telegram. ETF strategies share
+one refreshed Fyers/public-source snapshot. Stock, Custom Index and Broad strategies are gated on
+the processed bhavcopy-backed dataset reaching the completed Friday-labelled week.
 
 Python callers here do not import `@trading/notify` — `notify.py` mirrors
 the `Notification` shape directly rather than importing the TypeScript
@@ -124,6 +127,21 @@ contract, not a shared service).
   P&L on the traded ETF instead of the ranked index).
 - `sweep.py` — the parameter-sweep harness used for every "is this lever
   worth it" investigation (see `TODO.md` §3.9.18 for the most recent one).
+- `reference_benchmarks.py` — Nifty 50 TRI and Nifty200 Momentum 30 TRI comparison lines
+  (`load_references`, `compare`), added to every backtest payload as `comparisons`. Use it,
+  not the dataset's own `benchmark`, when judging edge: index-mode benchmarks are price-only
+  (TODO 3.9.23).
+- `tranches.py` — overlapping tranches (K sub-portfolios on staggered `rebalance_every`
+  phases, averaged) to remove start-date luck from a comparison; works with any dataset via a
+  `run_one(config) -> Result` closure (TODO 3.9.23).
+- `levers.py` / `reversal.py` — research levers from the 2026-10-01 alpha study (rank tables,
+  `no_buy` masks, post-hoc overlays; the turnaround sleeve). `scripts/alpha_experiments.py`,
+  `scripts/reversal_experiment.py` and `scripts/param_dry_run.py` reproduce every number in
+  `docs/momentum-parameters-reference.md`. Score any new lever over `sweep.rolling_windows`
+  with `sweep.rerun_windows` + `compare_rolling`, never on the full sample alone.
+- Broad Momentum gotcha: `engine.run_backtest` skips weeks with fewer than `top_n` ranked
+  names unless `Config.min_ranked` is set; Broad needs `min_ranked=1` (API
+  `broad_every_week`) or about 190 of 508 weeks silently vanish (TODO 3.9.23).
 - `notify.py` — the Python-side mirror of `@trading/notify`'s `Notification`
   shape, used by the weekly Telegram signal job.
 - `local_store.py` — the weekly job's price/signal storage, since 2026-09-30
@@ -132,17 +150,18 @@ contract, not a shared service).
   the retired Neon `store.py` functions of the same names/signatures (a
   drop-in swap for `weekly.py`'s call sites). `store.py` itself still holds
   the pure file<->rows conversion both this and `db_migrate.py` share.
-- `runs_store.py` — the dashboard's "Saved runs" feature, server-side since
+- `runs_store.py` — the dashboard's saved runs and scheduled favourites, server-side since
   2026-09-30 (TODO 3.11.9): `save_run`/`list_runs`/`update_run`/
   `delete_run` against the shared catalog's `strategies`/`strategy_versions`/
   `backtest_runs` tables (`package='momentum'`), the same tables
   `option_backtesting/legwise/store.py` uses with `package='options_legwise'`.
   One `strategies` row per dataset groups its runs (matching the old
   `localStorage` key's scope); the whole record (name, kpis, weekly equity
-  series, overlay flag) lives in `backtest_runs.summary` JSON, not
+  series, overlay/favourite/active flags) lives in `backtest_runs.summary` JSON, not
   `backtest_days`/`backtest_trades` — those are shaped for day-by-day option
-  trades, not a momentum run's weekly curve. Capped at 10 runs/dataset,
-  pruned oldest-first on save. `api.py`'s `/api/saved-runs` routes call this;
+  trades, not a momentum run's weekly curve. Ordinary history is capped at 10 runs/dataset and
+  pruned oldest-first; favourites are never pruned. Exactly one favourite can be globally active
+  for Telegram. `api.py`'s `/api/saved-runs` routes call this;
   the Fastify proxy (`apps/server/src/server/routes/momentum-backtest.ts`)
   forwards `/api/momentum/saved-runs*` to it unchanged.
 
@@ -152,7 +171,7 @@ See `README.md` for the full walkthrough. From `packages/momentum-backtesting/`:
 ```bash
 uv sync
 uv run pytest
-uv run mbt ui              # local web UI on 127.0.0.1:8765
+uv run mbt serve           # private API on 127.0.0.1:8765
 uv run mbt fetch            # refresh price history
 uv run mbt categories backtest   # Custom Index mode
 uv run mbt local migrate    # copy companies/actions/membership/stock bars/price series

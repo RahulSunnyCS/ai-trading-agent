@@ -57,13 +57,6 @@ const noopPool = { query: vi.fn() } as unknown as Pool;
 // Fixtures
 // ---------------------------------------------------------------------------
 
-/** Minimal metrics payload that will pass the totalTrades ≥ 20 guard. */
-const _metricsAboveMinSample = {
-  winRate: 0.55, // in the 40-70% "no change" range
-  totalTrades: 25,
-  totalPnlPct: 10.0,
-};
-
 /** Minimal PersonalityRow returned by the SELECT FOR UPDATE query inside the transaction. */
 function makePersonalityRow(
   overrides: Partial<{

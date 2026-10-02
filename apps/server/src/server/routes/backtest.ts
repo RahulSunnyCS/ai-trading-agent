@@ -22,6 +22,9 @@
  *                                                 consumeCredit('backtest_run'), same as /runs
  *  GET  /api/backtest/legwise/data              — collected days + Fyers token status. requireAccess
  *  GET  /api/backtest/legwise/results           — saved daily results. requireAccess
+ *  GET  /api/backtest/legwise/day               — re-simulate one saved day (MTM curve, markers,
+ *                                                  per-leg attribution). requireAccess
+ *  GET  /api/backtest/legwise/anatomy           — per-day, per-segment index shape. requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -386,6 +389,74 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     { preHandler: requireAccess },
     async (_req, reply) => {
       await forwardToBacktestApi(reply, '/legwise/results');
+    },
+  );
+
+  // The query strings below are schema-validated field by field and the upstream
+  // query is REBUILT from those fields — the raw client string is never forwarded.
+  const DATE_RE = '^\\d{4}-\\d{2}-\\d{2}$';
+  const CUTS_RE = '^\\d{2}:\\d{2}(,\\d{2}:\\d{2}){0,3}$';
+
+  function upstreamQuery(query: Record<string, unknown>, keys: string[]): string {
+    const params = new URLSearchParams();
+    for (const key of keys) {
+      const value = query[key];
+      if (typeof value === 'string' && value !== '') params.set(key, value);
+    }
+    const text = params.toString();
+    return text ? `?${text}` : '';
+  }
+
+  fastify.get(
+    '/api/backtest/legwise/day',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            strategy: { type: 'string', pattern: '^[a-z0-9_]{1,64}$' },
+            day: { type: 'string', pattern: DATE_RE },
+            sha: { type: 'string', pattern: '^[0-9a-f]{1,64}$' },
+            cuts: { type: 'string', pattern: CUTS_RE },
+          },
+          required: ['strategy', 'day'],
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/day${upstreamQuery(q, ['strategy', 'day', 'sha', 'cuts'])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/anatomy',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            underlying: { type: 'string', pattern: '^[A-Z]{3,12}$' },
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+            cuts: { type: 'string', pattern: CUTS_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/anatomy${upstreamQuery(q, ['underlying', 'from', 'to', 'cuts'])}`,
+      );
     },
   );
 
