@@ -325,3 +325,170 @@ def test_etf_api_can_turn_on_the_grouped_momentum_tilt(tmp_path, monkeypatch):
 
     bad = client.post("/api/backtest", json={**body, "reversal_tilt": 3.0})
     assert bad.status_code == 422
+
+
+# --- Pullback-in-uptrend (TODO 3.9.31, docs/momentum-pullback-tests.md) -------------------------
+
+PB_WEEKS = pd.date_range("2016-01-01", periods=90, freq="W-FRI")
+
+
+def _pb_segments(*parts: tuple[int, float]) -> np.ndarray:
+    rets = [r for n, r in parts for _ in range(n)]
+    return 100 * np.cumprod([1.0, *(1 + r for r in rets)])[: len(PB_WEEKS)]
+
+
+def pullback_universe() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "Steady": _pb_segments((89, 0.01)),  # strong throughout, climbing right now - no dip
+            # strong for 85 weeks, a 3-week ~9% dip, then a turn-up last week
+            "Pullback": _pb_segments((85, 0.01), (3, -0.03), (1, 0.02)),
+            # same dip, but still falling last week (no turn)
+            "PullbackNoTurn": _pb_segments((85, 0.01), (3, -0.03), (1, -0.01)),
+            # strong for 85 weeks, then a real ~26% correction (too deep to be "small")
+            "DeepDrop": _pb_segments((85, 0.01), (3, -0.10), (1, 0.02)),
+            "NeverStrong": _pb_segments((89, 0.001)),  # barely positive everywhere
+        },
+        index=PB_WEEKS,
+    )
+
+
+def pullback_stage(prices: pd.DataFrame) -> pd.DataFrame:
+    """Hand-set Stage 2 for every name/week - the gate functions only need `stage == 2`
+    somewhere to check against; `stages()` itself (the real derivation from prices) has its
+    own tests in test_volume_turnover.py, so the trend-intact tests below override a specific
+    column instead of re-deriving a Stage 3/4 price path."""
+    return pd.DataFrame(2.0, index=prices.index, columns=prices.columns)
+
+
+def test_dist_from_high_and_long_term_strength_on_hand_built_paths():
+    prices = pullback_universe()
+    dist13 = levers.dist_from_high(prices)
+    last = dist13.iloc[-1]
+    assert last["Steady"] == pytest.approx(0.0)  # climbing right now: at its own 13w high
+    assert -0.20 < last["Pullback"] < -0.05  # a small pullback, in the PB band
+    assert last["DeepDrop"] < -0.20  # a real correction, deeper than the PB band
+
+    lt = levers.long_term_strength(prices)
+    last_lt = lt.iloc[-1]
+    # Strongest-to-weakest on 13/26/52w returns, exactly the three-week dip's own ranking:
+    assert last_lt["Steady"] > last_lt["Pullback"] > last_lt["PullbackNoTurn"] > last_lt["DeepDrop"]
+    assert last_lt["DeepDrop"] == pytest.approx(0.0)  # the weakest of the five this week
+
+
+def test_long_term_strong_mask_picks_the_top_share():
+    prices = pullback_universe()
+    lt = levers.long_term_strength(prices)
+    strong = levers.long_term_strong_mask(lt, top_pct=0.6)
+    last = strong.iloc[-1]
+    assert last[["Steady", "Pullback", "PullbackNoTurn"]].all()
+    assert not last[["DeepDrop", "NeverStrong"]].any()
+
+
+def test_pullback_flags_identify_a_small_pullback_that_turned_up():
+    prices = pullback_universe()
+    lt = levers.long_term_strength(prices)
+    strong = levers.long_term_strong_mask(lt, top_pct=0.6)
+    pb, pbr = levers.pullback_flags(prices, strong, pullback_stage(prices))
+    assert bool(pb.iloc[-1]["Pullback"])
+    assert bool(pbr.iloc[-1]["Pullback"])
+
+
+def test_pbr_needs_the_turn_pb_alone_does_not_need_it():
+    prices = pullback_universe()
+    lt = levers.long_term_strength(prices)
+    strong = levers.long_term_strong_mask(lt, top_pct=0.6)
+    pb, pbr = levers.pullback_flags(prices, strong, pullback_stage(prices))
+    assert bool(pb.iloc[-1]["PullbackNoTurn"])  # still a qualifying pullback
+    assert not bool(pbr.iloc[-1]["PullbackNoTurn"])  # but it never turned up
+
+
+def test_pullback_flags_exclude_a_steady_climb_with_no_dip():
+    """LT-strong and trend-intact are not enough on their own - PB also needs the 4-week
+    return to have actually turned down."""
+    prices = pullback_universe()
+    lt = levers.long_term_strength(prices)
+    strong = levers.long_term_strong_mask(lt, top_pct=0.6)
+    pb, _ = levers.pullback_flags(prices, strong, pullback_stage(prices))
+    assert not bool(pb.iloc[-1]["Steady"])
+
+
+def test_pullback_flags_exclude_a_drop_deeper_than_the_pb_band():
+    """A correction past 20% below the 13-week high is not a "small" pullback, even for a
+    name that would otherwise qualify - checked with LT-strong forced True so the depth gate
+    is isolated from the (already-failing) LT-strong gate."""
+    prices = pullback_universe()
+    forced_strong = pd.DataFrame(True, index=prices.index, columns=prices.columns)
+    pb, _ = levers.pullback_flags(prices, forced_strong, pullback_stage(prices))
+    assert not bool(pb.iloc[-1]["DeepDrop"])
+
+
+def test_pullback_flags_require_trend_intact():
+    prices = pullback_universe()
+    lt = levers.long_term_strength(prices)
+    strong = levers.long_term_strong_mask(lt, top_pct=0.6)
+    broken_stage = pullback_stage(prices)
+    broken_stage["Pullback"] = 3.0  # topping, not Stage 2, for every week
+    pb, pbr = levers.pullback_flags(prices, strong, broken_stage)
+    assert not bool(pb.iloc[-1]["Pullback"])
+    assert not bool(pbr.iloc[-1]["Pullback"])
+
+
+def test_pullback_no_buy_masks():
+    prices = pullback_universe()
+    stage = pullback_stage(prices)
+    stage["PullbackNoTurn"] = 3.0
+    dist13 = levers.dist_from_high(prices)
+    blocked = levers.pullback_no_buy_mask(stage, dist13)
+    last = blocked.iloc[-1]
+    assert bool(last["PullbackNoTurn"])  # Stage 3: blocked
+    assert bool(last["DeepDrop"])  # more than 20% below the high: blocked
+    assert not bool(last["Pullback"])  # Stage 2, only a small pullback: buyable
+
+    ret1 = prices.pct_change(1)
+    turn_blocked = levers.pullback_turn_no_buy_mask(stage, dist13, ret1)
+    assert bool(turn_blocked.iloc[-1]["Pullback"]) is False  # turned up last week: buyable
+    # A name that qualifies for the plain mask but hasn't turned up yet is blocked only by
+    # the turn variant - simulate that directly on Steady's own (positive) last return by
+    # checking the logic on a fabricated 0-return week instead of relying on real data to
+    # happen to produce one.
+    flat_ret1 = ret1.copy()
+    flat_ret1.iloc[-1] = 0.0
+    turn_blocked_flat = levers.pullback_turn_no_buy_mask(stage, dist13, flat_ret1)
+    assert bool(turn_blocked_flat.iloc[-1]["Pullback"])  # 0% last week: not a turn, blocked
+
+
+def test_pullback_ranks_tilt_zero_is_exactly_lt_only():
+    prices = pullback_universe()
+    lt = levers.long_term_strength(prices)
+    strong = levers.long_term_strong_mask(lt, top_pct=0.6)
+    ranks, _ = levers.pullback_ranks(prices, lt, strong, tilt=0.0)
+    last = ranks.iloc[-1]
+    assert last["Steady"] < last["Pullback"] < last["PullbackNoTurn"]  # plain LT order
+    assert last[["DeepDrop", "NeverStrong"]].isna().all()  # screened out: not LT-strong
+
+
+def test_pullback_ranks_a_strong_tilt_moves_the_dip_ahead_of_the_steady_climb():
+    prices = pullback_universe()
+    lt = levers.long_term_strength(prices)
+    strong = levers.long_term_strong_mask(lt, top_pct=0.6)
+    ranks, _ = levers.pullback_ranks(prices, lt, strong, tilt=1.0)
+    last = ranks.iloc[-1]
+    assert last["Pullback"] < last["Steady"]  # the pulled-back name now ranks ahead
+
+
+def test_cap_rank_during_pullback_floors_only_pb_names_without_improving_them():
+    ranks = pd.DataFrame(
+        {"Held": [15.0], "NotHeld": [40.0], "NotPb": [15.0], "AlreadyBetter": [3.0]},
+        index=[PB_WEEKS[0]],
+    )
+    pb = pd.DataFrame(
+        {"Held": [True], "NotHeld": [True], "NotPb": [False], "AlreadyBetter": [True]},
+        index=[PB_WEEKS[0]],
+    )
+    capped = levers.cap_rank_during_pullback(ranks, pb, exit_rank=10)
+    row = capped.iloc[0]
+    assert row["Held"] == 10.0  # was worse than exit_rank, floored to it
+    assert row["NotHeld"] == 10.0  # same cap, whether or not it is actually held
+    assert row["NotPb"] == 15.0  # not in PB state: untouched
+    assert row["AlreadyBetter"] == 3.0  # already better than exit_rank: unchanged, never improved

@@ -111,11 +111,7 @@ def grouped_momentum_ranks(
     long_rank, _ = compute_ranks(prices, long_cfg)
     eligible = short_rank.notna() & long_rank.notna()
 
-    def to_pct(ranks: pd.DataFrame) -> pd.DataFrame:
-        n = ranks.notna().sum(axis=1).clip(lower=2) - 1
-        return 1 - (ranks.sub(1).div(n, axis=0))
-
-    short_pct, long_pct = to_pct(short_rank), to_pct(long_rank)
+    short_pct, long_pct = rank_to_pct(short_rank), rank_to_pct(long_rank)
     combined = (short_pct + tilt * long_pct).where(eligible)
     if screen_top_pct > 0:
         cut = short_pct.where(eligible).quantile(1 - screen_top_pct, axis=1)
@@ -123,11 +119,137 @@ def grouped_momentum_ranks(
     return rerank(-combined), combined
 
 
+def rank_to_pct(ranks: pd.DataFrame) -> pd.DataFrame:
+    """Dense rank (1 = best) -> 0-1 percentile within that week's non-NaN names (1.0 = best,
+    0.0 = worst). Extracted from `grouped_momentum_ranks`'s own percentile construction (the
+    actual fix for its single-mixed-sign-rank-sum bug - see that function's docstring), reused
+    there and by `long_term_strength` (TODO 3.9.31) so both lever families build a percentile
+    the same way."""
+    n = ranks.notna().sum(axis=1).clip(lower=2) - 1
+    return 1 - (ranks.sub(1).div(n, axis=0))
+
+
 def fresh_52w_low_mask(prices: pd.DataFrame, weeks: int = 52) -> pd.DataFrame:
     """Block a fresh buy of a name making a new `weeks`-week low this week - the falling-knife
     guard a beaten-down screen needs (see `grouped_momentum_ranks`)."""
     low = prices.rolling(weeks, min_periods=weeks).min()
     return prices.le(low).fillna(False)
+
+
+# --- Pullback-in-uptrend levers (TODO 3.9.31, docs/momentum-pullback-tests.md) -------------------
+
+
+def dist_from_high(prices: pd.DataFrame, weeks: int = 13) -> pd.DataFrame:
+    """close / rolling `weeks`-week high - 1 (0 = at a new high, negative = below it). NaN until
+    a full window exists."""
+    high = prices.rolling(weeks, min_periods=weeks).max()
+    return prices / high - 1
+
+
+def long_term_strength(
+    prices: pd.DataFrame,
+    lookbacks: tuple[int, ...] = (13, 26, 52),
+    eligible: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """LT (the spec's definition): the within-`eligible`-set percentile of a plain ranksum over
+    `lookbacks` (1.0 = strongest on those lookbacks, unlike `grouped_momentum_ranks`'s long
+    group, which deliberately inverts to reward the most BEATEN-DOWN - this is the mirror
+    image, so no negative weights here). `eligible` restricts the ranking universe (and so the
+    percentile base) to Broad's qualifying pool that week; None ranks every column with at
+    least one valid lookback return, which is only correct for a universe that is already the
+    full pool (e.g. a hand-built test fixture)."""
+    masked = prices.where(eligible) if eligible is not None else prices
+    config = Config(
+        lookbacks=lookbacks, weights=None, score="ranksum", universe=tuple(prices.columns)
+    )
+    ranks, _ = compute_ranks(masked, config)
+    return rank_to_pct(ranks)
+
+
+def long_term_strong_mask(lt: pd.DataFrame, top_pct: float = 0.20) -> pd.DataFrame:
+    """LT-strong (the spec's definition): LT in the top `top_pct` share of that week's priced
+    names (ties keep the boundary name in, via `ge`)."""
+    cut = lt.quantile(1 - top_pct, axis=1)
+    return lt.ge(cut, axis=0) & lt.notna()
+
+
+def pullback_flags(
+    prices: pd.DataFrame,
+    lt_strong: pd.DataFrame,
+    stage: pd.DataFrame,
+    dist13: pd.DataFrame | None = None,
+    low: float = -0.20,
+    high: float = -0.05,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """PB and PBR (the spec's definitions). PB: LT-strong, trend intact (Weinstein Stage 2 -
+    `scripts/volume_turnover_tests.py::stages`, the 1% slope rule), the 4-week return at or
+    below 0, and `low` <= dist-from-13-week-high <= `high` (so "5% to 20% below the high" is
+    `low=-0.20, high=-0.05`, the default). PBR: PB and last week's own return above 0 - the
+    "turned up" half of the idea. `dist13` defaults to `dist_from_high(prices)` when the caller
+    has not already computed it (the P2/P4 callers reuse one computation across both flags)."""
+    if dist13 is None:
+        dist13 = dist_from_high(prices)
+    ret4 = prices.pct_change(4)
+    ret1 = prices.pct_change(1)
+    trend_intact = stage.eq(2)
+    pb = (lt_strong & trend_intact & ret4.le(0) & dist13.ge(low) & dist13.le(high)).fillna(False)
+    pbr = (pb & ret1.gt(0)).fillna(False)
+    return pb, pbr
+
+
+def pullback_no_buy_mask(
+    stage: pd.DataFrame, dist13: pd.DataFrame, max_drop: float = -0.20
+) -> pd.DataFrame:
+    """P4's no_buy guard for `pullback_ranks`: not in Stage 2 (trend broken), or more than
+    `max_drop` below the 13-week high (not a small pullback any more, a real correction)."""
+    return (~stage.eq(2)) | dist13.lt(max_drop)
+
+
+def pullback_turn_no_buy_mask(
+    stage: pd.DataFrame, dist13: pd.DataFrame, ret1: pd.DataFrame, max_drop: float = -0.20
+) -> pd.DataFrame:
+    """The P4 "turned up" variant: `pullback_no_buy_mask` plus also blocking a fresh buy while
+    last week's own return is at or below 0 - the extra no_buy the spec asks for alongside the
+    plain pullback-ranking variant, mirroring the PB-vs-PBR split on the entry side."""
+    return pullback_no_buy_mask(stage, dist13, max_drop) | ret1.le(0)
+
+
+def pullback_ranks(
+    prices: pd.DataFrame,
+    lt: pd.DataFrame,
+    lt_strong: pd.DataFrame,
+    tilt: float = 0.3,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """P4's new lever, the mirror of `grouped_momentum_ranks`: score = LT percentile + `tilt` *
+    4-week-weakness percentile (the same negative-weight-ranksum-then-percentile mechanism,
+    scoped to the single 4-week lookback rather than a long-lookback group), screened to
+    LT-strong names only - always on here, since the spec's screen is the LT-strong gate
+    itself (unlike `grouped_momentum_ranks`'s optional `screen_top_pct`). Pair with
+    `pullback_no_buy_mask`/`pullback_turn_no_buy_mask` as `no_buy`, not `fresh_52w_low_mask` -
+    this lever's own falling-knife guard is "more than 20% below the 13-week high", which a
+    name already past Stage 2 and screened out of `lt_strong` would usually also fail, but the
+    two guards are not identical and both apply when run through `run_broad_backtest`'s
+    `stock_tilt_ranks` hook (it always also ORs in `fresh_52w_low_mask`)."""
+    weak_rank, _ = compute_ranks(
+        prices,
+        Config(lookbacks=(4,), weights=(-1.0,), score="ranksum", universe=tuple(prices.columns)),
+    )
+    weak_pct = rank_to_pct(weak_rank)
+    combined = (lt + tilt * weak_pct).where(lt_strong)
+    return rerank(-combined), combined
+
+
+def cap_rank_during_pullback(ranks: pd.DataFrame, pb: pd.DataFrame, exit_rank: int) -> pd.DataFrame:
+    """P3's exit-side lever: for a name in PB state, cap its rank at `exit_rank` (never worse),
+    so a held position is not sold purely for crossing the exit rank while a small pullback
+    lasts. Capping can never manufacture a fresh buy - `exit_rank` is always above `top_n` by
+    construction, so a capped name is still never ranked into the buy zone purely by this.
+    Static (depends only on PB state, not on simulation-time holdings), which is why this works
+    as an external rank-table transform at all: capping a NOT-held PB name to `exit_rank` has no
+    effect on it ever being bought, and correctly stops a HELD one from being sold, without the
+    transform needing to know which names are currently held."""
+    capped = ranks.clip(upper=float(exit_rank))
+    return ranks.where(~pb.reindex_like(ranks).fillna(False), capped)
 
 
 # --- no_buy masks -------------------------------------------------------------------------------
