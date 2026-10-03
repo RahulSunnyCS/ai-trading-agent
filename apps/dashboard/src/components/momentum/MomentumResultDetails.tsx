@@ -256,6 +256,16 @@ function assumptionChips(result: MomentumResult, config: Record<string, unknown>
     dataset === 'broad' && Number(config.broad_reversal_tilt ?? 0) > 0
       ? `Beaten-down tilt ${Math.round(Number(config.broad_reversal_tilt) * 100)}%`
       : null,
+    dataset === 'broad' && config.broad_universe === 'all_liquid' ? 'Whole NSE market' : null,
+    dataset === 'broad' && (config.broad_universe === 'all_liquid' || config.broad_liquidity_filter)
+      ? `Tradable: ≥ ₹${Number(config.broad_liq_min_turnover_cr ?? 1)} Cr/day${
+          config.broad_liq_circuit === false ? '' : ', no circuit lock'
+        }${
+          typeof config.broad_liq_max_circuit_days === 'number'
+            ? `, ≤ ${config.broad_liq_max_circuit_days} circuit days/60`
+            : ''
+        }`
+      : null,
     config.cost_model === 'itemised' ? 'Itemised costs' : `${config.cost_pct}% cost per side`,
     dataset === 'etf' ? (config.track === 'etf' ? 'ETF prices' : 'Index prices') : null,
     dataset === 'etf' ? (execLabel[String(config.execution)] ?? null) : null,

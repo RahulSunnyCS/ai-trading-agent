@@ -73,6 +73,37 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, '/api/momentum-scores');
   });
 
+  // Live tradability preview for Broad Momentum's liquidity gate: how many stocks pass the given
+  // thresholds today and why each rejected one failed. Python re-validates every bound.
+  fastify.get(
+    '/api/momentum/liquidity-preview',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            min_turnover_cr: { type: 'number', exclusiveMinimum: 0, maximum: 1000 },
+            floor_ratio: { type: 'number', minimum: 0, maximum: 1 },
+            min_price: { type: 'number', minimum: 0, maximum: 100000 },
+            circuit: { type: 'boolean' },
+            circuit_run: { type: 'integer', minimum: 2, maximum: 20 },
+            max_circuit_days: { type: 'integer', minimum: 0, maximum: 60 },
+            universe: { type: 'string', enum: ['total_market', 'all_liquid'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const query = new URLSearchParams(
+        Object.entries(request.query as Record<string, string | number | boolean>).map(
+          ([key, value]): [string, string] => [key, String(value)],
+        ),
+      );
+      await forward(reply, `/api/liquidity-preview?${query.toString()}`);
+    },
+  );
+
   // Python owns the complete Pydantic schema for this body. Duplicating its
   // dozens of research knobs here would drift, so Fastify limits the payload
   // and lets the authoritative service validate field-by-field.

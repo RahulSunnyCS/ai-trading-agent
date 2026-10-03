@@ -41,6 +41,36 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards the liquidity preview query and rejects out-of-range thresholds', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { eligible: 1 }));
+
+    const ok = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/liquidity-preview?min_turnover_cr=2&circuit=true&max_circuit_days=8&universe=all_liquid',
+    });
+    expect(ok.statusCode).toBe(200);
+    const forwarded = String(fetchMock.mock.calls[0]?.[0]);
+    expect(forwarded.startsWith('http://127.0.0.1:8765/api/liquidity-preview?')).toBe(true);
+    for (const part of [
+      'min_turnover_cr=2',
+      'circuit=true',
+      'max_circuit_days=8',
+      'universe=all_liquid',
+    ]) {
+      expect(forwarded).toContain(part);
+    }
+
+    const bad = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/liquidity-preview?min_turnover_cr=-1',
+    });
+    expect(bad.statusCode).toBe(400);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
   it('forwards a backtest request without reimplementing Python validation', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

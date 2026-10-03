@@ -72,7 +72,9 @@ import pandas as pd
 
 from momentum_backtesting import engine
 from momentum_backtesting.categories import compose, snapshots, sources
+from momentum_backtesting.categories import liquidity as liquidity_mod
 from momentum_backtesting.categories import prices as cat_prices
+from momentum_backtesting.categories.liquidity import LiquidityConfig
 from momentum_backtesting.engine import CASH, Config, Result
 from momentum_backtesting.stocks.nse import NseClient, atomic_write_bytes
 
@@ -291,6 +293,10 @@ class StockUniverseFrame:
     events: pd.DataFrame
     stale_columns: dict[str, pd.Timestamp]
     missing_symbols: list[str]  # Total Market symbols with no daily.parquet rows at all
+    # week x column booleans from categories/liquidity.py; None = no liquidity gate requested.
+    # Already AND-ed into `stock_membership`; kept separately so the quarterly-fixed pool can be
+    # re-gated every week (a held stock that turns illiquid mid-quarter must drop out).
+    liquidity_gate: pd.DataFrame | None = None
 
 
 def load_stock_universe_frame(
@@ -299,11 +305,20 @@ def load_stock_universe_frame(
     categories_data_dir: Path,
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
+    liquidity: LiquidityConfig | None = None,
+    universe: Literal["total_market", "all_liquid"] = "total_market",
 ) -> StockUniverseFrame:
     """The 755-name Total Market weekly price frame + point-in-time membership gate, computed
     over the WHOLE available price history -- no ranking, no atomics, no pool. See
     `StockUniverseFrame`'s own docstring for why this is split out of `compute_universe_ranking`."""
-    members_by_year = total_market_members_by_year(categories_data_dir)
+    if universe == "all_liquid":
+        # Whole NSE market: "listed that year" from the bhavcopy lake itself, and the
+        # tradability gate is what actually narrows it, so it is mandatory here.
+        if liquidity is None:
+            raise ValueError("The whole-market universe needs the tradability filter on.")
+        members_by_year = liquidity_mod.market_members_by_year()
+    else:
+        members_by_year = total_market_members_by_year(categories_data_dir)
     all_symbols = sorted(set().union(*members_by_year.values()))
 
     frame, events, stale_columns = cat_prices.build_stock_weekly_prices(
@@ -326,6 +341,14 @@ def load_stock_universe_frame(
         events=events,
         stale_columns=stale_columns,
     )
+    gate = None
+    if liquidity is not None:
+        base_gate = liquidity_mod.eligibility(liquidity, all_symbols, frame.index)
+        gate = pd.DataFrame(
+            {col: base_gate[base] for col, base in column_to_base_symbol.items()},
+            index=frame.index,
+        )
+        stock_membership = stock_membership & gate.reindex_like(stock_membership).fillna(False)
     return StockUniverseFrame(
         frame=frame,
         weeks=list(frame.index),
@@ -334,6 +357,7 @@ def load_stock_universe_frame(
         events=events,
         stale_columns=stale_columns,
         missing_symbols=missing_symbols,
+        liquidity_gate=gate,
     )
 
 
@@ -427,6 +451,8 @@ def compute_universe_ranking(
     pool_exit_rank: int = DEFAULT_POOL_EXIT_RANK,
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
+    liquidity: LiquidityConfig | None = None,
+    universe_kind: Literal["total_market", "all_liquid"] = "total_market",
 ) -> UniverseRanking:
     """Step 2 end to end: build the 755-name weekly price frame (Piece A, reused unmodified),
     rank it (the existing engine.compute_ranks, unmodified -- just a bigger universe than any
@@ -444,6 +470,8 @@ def compute_universe_ranking(
         categories_data_dir=categories_data_dir,
         min_drop_pct=min_drop_pct,
         turnover_spike_multiple=turnover_spike_multiple,
+        liquidity=liquidity,
+        universe=universe_kind,
     )
     frame = universe.frame
     column_to_base_symbol = universe.column_to_base_symbol
@@ -470,6 +498,12 @@ def compute_universe_ranking(
         top_n=pool_top_n,
         exit_rank=pool_exit_rank,
     )
+    if universe.liquidity_gate is not None:
+        # The pool is only re-decided quarterly; re-gate it every week so a held name that
+        # turns illiquid (or gets pinned at a circuit) stops being eligible immediately.
+        pool_membership = pool_membership & universe.liquidity_gate.reindex_like(
+            pool_membership
+        ).fillna(False)
 
     stock_pool_ranks = _dense_rank(global_ranks[list(frame.columns)].where(pool_membership))
 

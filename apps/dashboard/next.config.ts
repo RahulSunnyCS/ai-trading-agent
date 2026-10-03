@@ -10,6 +10,9 @@ const apiOrigin = process.env.DASHBOARD_API_URL ?? 'http://localhost:3000';
 const momentumDirectOrigin = process.env.MOMENTUM_DIRECT_API_URL ?? 'http://127.0.0.1:8765';
 
 const nextConfig: NextConfig = {
+  // A cold whole-market Broad Momentum run (or Custom Index) takes about a minute; Next's default
+  // 30s rewrite-proxy timeout would drop it as a 500. Matches the Fastify proxy's 180s.
+  experimental: { proxyTimeout: 180_000 },
   async rewrites() {
     return [
       // Local Options Lab work can still bypass the server stack, matching the
@@ -50,6 +53,10 @@ const nextConfig: NextConfig = {
             {
               source: '/api/momentum/backtest',
               destination: `${momentumDirectOrigin}/api/backtest`,
+            },
+            {
+              source: '/api/momentum/liquidity-preview',
+              destination: `${momentumDirectOrigin}/api/liquidity-preview`,
             },
             {
               source: '/api/momentum/stock-actions',

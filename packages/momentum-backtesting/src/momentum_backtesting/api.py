@@ -27,6 +27,8 @@ from . import (
     stock_actions,
 )
 from .categories import broad
+from .categories import circuit_exposure as circuit_exposure_mod
+from .categories import liquidity as liquidity_mod
 from .categories import momentum_scores as momentum_scores_mod
 from .categories.compose import (
     ATOMIC_INSTRUMENTS,
@@ -338,6 +340,8 @@ class _Data:
         voladj_skip_recent_month: bool,
         pool_top_n: int,
         pool_exit_rank: int,
+        liquidity: liquidity_mod.LiquidityConfig | None = None,
+        universe_kind: Literal["total_market", "all_liquid"] = "total_market",
     ) -> broad.UniverseRanking:
         """Step 2 (categories/broad.py) for this exact parameter combination - cached the same
         way get_categories_universe caches AllCategoriesResult (the expensive part is independent
@@ -359,6 +363,8 @@ class _Data:
             voladj_skip_recent_month,
             pool_top_n,
             pool_exit_rank,
+            liquidity,
+            universe_kind,
         )
         with self._lock:
             if mtimes != self._broad_mtimes:
@@ -378,6 +384,8 @@ class _Data:
             voladj_skip_recent_month=voladj_skip_recent_month,
             pool_top_n=pool_top_n,
             pool_exit_rank=pool_exit_rank,
+            liquidity=liquidity,
+            universe_kind=universe_kind,
         )
         with self._lock:
             self.broad_ranking_cache[key] = ranking
@@ -537,6 +545,19 @@ class BacktestRequest(BaseModel):
     # OFF mode only: the direct individual-stock top_n/exit_rank ("SL").
     broad_off_top_n: int = Field(10, ge=1, le=50)
     broad_off_exit_rank: int = Field(20, ge=1, le=100)
+    # Optional point-in-time tradability gate on the pool (categories/liquidity.py, TODO 3.9.24).
+    # Off = exactly the original Total Market pool.
+    # "total_market" = the ~750-name Nifty Total Market pool (default, unchanged); "all_liquid" =
+    # every NSE equity, narrowed week by week by the tradability gate (which is then mandatory).
+    broad_universe: Literal["total_market", "all_liquid"] = "total_market"
+    broad_liquidity_filter: bool = False
+    broad_liq_min_turnover_cr: float = Field(1.0, gt=0, le=1000)
+    broad_liq_floor_ratio: float = Field(0.25, ge=0, le=1)
+    broad_liq_min_price: float = Field(20.0, ge=0, le=100_000)
+    broad_liq_circuit: bool = True
+    broad_liq_circuit_run: int = Field(3, ge=2, le=20)
+    # None = no cap on LC/UC (band-edge) days among the last 60 sessions.
+    broad_liq_max_circuit_days: int | None = Field(None, ge=0, le=60)
 
 
 class SavedRunBody(BaseModel):
@@ -1313,8 +1334,33 @@ def _broad_meta() -> dict:
             "broad_off_top_n": 10,
             "broad_off_exit_rank": 20,
             "broad_every_week": True,
+            "broad_universe": "total_market",
+            "broad_liquidity_filter": False,
+            "broad_liq_min_turnover_cr": 1.0,
+            "broad_liq_floor_ratio": 0.25,
+            "broad_liq_min_price": 20.0,
+            "broad_liq_circuit": True,
+            "broad_liq_circuit_run": 3,
+            "broad_liq_max_circuit_days": None,
         },
     }
+
+
+def _liquidity_preview_payload(
+    cfg: liquidity_mod.LiquidityConfig, universe: str = "total_market"
+) -> dict:
+    try:
+        cfg.validate()
+        members = (
+            liquidity_mod.market_members_by_year()
+            if universe == "all_liquid"
+            else broad.total_market_members_by_year(DATA_DIR / "categories")
+        )
+    except (ValueError, broad.TotalMarketDataNotFoundError) as error:
+        raise HTTPException(422, str(error)) from None
+    latest_year = max(members)
+    symbols = sorted(members[latest_year])
+    return liquidity_mod.preview(cfg, symbols)
 
 
 def _momentum_scores_payload() -> dict:
@@ -1435,6 +1481,20 @@ def _run_broad(
     )
 
 
+def _liquidity_config(req: BacktestRequest) -> liquidity_mod.LiquidityConfig | None:
+    """The request's liquidity gate, or None when it's off (the original, ungated pool)."""
+    if not (req.broad_liquidity_filter or req.broad_universe == "all_liquid"):
+        return None
+    return liquidity_mod.LiquidityConfig(
+        min_turnover_cr=req.broad_liq_min_turnover_cr,
+        floor_ratio=req.broad_liq_floor_ratio,
+        min_price=req.broad_liq_min_price,
+        circuit=req.broad_liq_circuit,
+        circuit_run=req.broad_liq_circuit_run,
+        max_circuit_days=req.broad_liq_max_circuit_days,
+    )
+
+
 def _broad_backtest(req: BacktestRequest) -> dict:
     on = req.broad_category_mode == "on"
     if on and req.broad_category_top_n > req.broad_category_exit_rank:
@@ -1460,6 +1520,8 @@ def _broad_backtest(req: BacktestRequest) -> dict:
             voladj_skip_recent_month=req.voladj_skip_recent_month,
             pool_top_n=req.broad_pool_top_n,
             pool_exit_rank=req.broad_pool_exit_rank,
+            liquidity=_liquidity_config(req),
+            universe_kind=req.broad_universe,
         )
         outcome = _run_broad(req, ranking, DATA.get())
         DATA.trim_cache()
@@ -1490,6 +1552,13 @@ def _broad_backtest(req: BacktestRequest) -> dict:
         picks_per_category=req.broad_picks_per_category,
     )
     payload["missing_symbols"] = outcome.ranking.missing_symbols
+    # Display-only "worst LC/UC you'd have walked into" card; never allowed to fail the run.
+    try:
+        payload["circuit_exposure"] = circuit_exposure_mod.circuit_exposure(
+            result, outcome.ranking.column_to_base_symbol
+        )
+    except Exception:  # noqa: BLE001
+        payload["circuit_exposure"] = None
     return payload
 
 
@@ -1540,6 +1609,11 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
             outcome = rebalance.stock_target(stock, prices, membership, config)
             target = rebalance.model_holdings(outcome, week)
         else:
+            if req.broad_universe == "all_liquid":
+                raise ValueError(
+                    "Live rebalance preview isn't available for the whole-market universe yet "
+                    "(it would need LTPs for thousands of stocks). Use the Total Market pool."
+                )
             if (
                 req.broad_category_mode == "on"
                 and req.broad_category_top_n > req.broad_category_exit_rank
@@ -1552,6 +1626,8 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                 voladj_skip_recent_month=req.voladj_skip_recent_month,
                 pool_top_n=req.broad_pool_top_n,
                 pool_exit_rank=req.broad_pool_exit_rank,
+                liquidity=_liquidity_config(req),
+                universe_kind=req.broad_universe,
             )
             symbol_map = rebalance.broad_quote_symbols(ranking)
             unknown = set(req.holdings_pct) - set(symbol_map) - {IDLE}
@@ -1571,6 +1647,8 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                 config,
                 pool_top_n=req.broad_pool_top_n,
                 pool_exit_rank=req.broad_pool_exit_rank,
+                liquidity=_liquidity_config(req),
+                universe_kind=req.broad_universe,
             )
             outer = DATA.get().copy()
             if week > outer.index[-1]:
@@ -1771,6 +1849,8 @@ class _SingleFlightJob:
 
 WEEKLY_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
+
+
 
 
 def _execute_stock_sync() -> dict:
@@ -2051,6 +2131,31 @@ def create_app() -> FastAPI:
     @app.get("/api/momentum-scores")
     def momentum_scores() -> dict:
         return _momentum_scores_payload()
+
+    @app.get("/api/liquidity-preview")
+    def liquidity_preview(
+        min_turnover_cr: float = 1.0,
+        floor_ratio: float = 0.25,
+        min_price: float = 20.0,
+        circuit: bool = True,
+        circuit_run: int = 3,
+        max_circuit_days: int | None = None,
+        universe: Literal["total_market", "all_liquid"] = "total_market",
+    ) -> dict:
+        """What the Broad Momentum liquidity gate would do *right now* with these thresholds:
+        how many Total Market stocks pass, and why each failing one failed. Cheap enough to call
+        on every slider move (the heavy features are cached per catalog version)."""
+        return _liquidity_preview_payload(
+            liquidity_mod.LiquidityConfig(
+                min_turnover_cr=min_turnover_cr,
+                floor_ratio=floor_ratio,
+                min_price=min_price,
+                circuit=circuit,
+                circuit_run=circuit_run,
+                max_circuit_days=max_circuit_days,
+            ),
+            universe,
+        )
 
     @app.post("/api/backtest")
     def backtest(req: BacktestRequest) -> dict:

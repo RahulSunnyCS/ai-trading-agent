@@ -14,6 +14,7 @@ import pandas as pd
 
 from . import engine, fyers
 from .categories import broad
+from .categories.liquidity import LiquidityConfig
 from .config import DATA_DIR
 from .engine import CASH, IDLE, Config, Result, run_backtest
 from .fetch import load_universe
@@ -246,6 +247,8 @@ def live_broad_ranking(
     pool_top_n: int,
     pool_exit_rank: int,
     data_dir: Path = DATA_DIR,
+    liquidity: LiquidityConfig | None = None,
+    universe_kind: str = "total_market",
 ) -> tuple[broad.UniverseRanking, dict[str, float], dict[str, str]]:
     """Recompute the Broad funnel on a temporary LTP week; never write history."""
     last = ranking.prices.index[-1]
@@ -300,6 +303,8 @@ def live_broad_ranking(
     universe = broad.load_stock_universe_frame(
         stocks_data_dir=data_dir / "stocks",
         categories_data_dir=data_dir / "categories",
+        liquidity=liquidity,
+        universe=universe_kind,  # type: ignore[arg-type]
     )
     membership = universe.stock_membership.copy()
     if week > last:
@@ -313,6 +318,12 @@ def live_broad_ranking(
         top_n=pool_top_n,
         exit_rank=pool_exit_rank,
     )
+    if universe.liquidity_gate is not None:
+        gate = universe.liquidity_gate.copy()
+        if week > last:
+            gate.loc[week] = gate.iloc[-1]
+        gate.loc[settlement_week] = gate.loc[week]
+        pool = pool & gate.reindex(index=prices.index, columns=pool.columns).fillna(False)
     stock_pool = broad._dense_rank(ranks[stock_columns].where(pool))
     eligible = pd.DataFrame(False, index=prices.index, columns=prices.columns)
     eligible[stock_columns] = pool

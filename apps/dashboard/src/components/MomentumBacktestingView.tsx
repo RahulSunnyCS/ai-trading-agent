@@ -16,6 +16,7 @@ import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { cn } from '../lib/cn';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
+import { MomentumCircuitExposureCard } from './momentum/MomentumCircuitExposure';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
 import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
 import {
@@ -746,6 +747,7 @@ export function MomentumBacktestingView() {
                 savedRuns={savedRuns}
                 flashKey={finishedAt}
               />
+              <MomentumCircuitExposureCard exposure={result.circuit_exposure} />
             </div>
           ) : null}
         </>
