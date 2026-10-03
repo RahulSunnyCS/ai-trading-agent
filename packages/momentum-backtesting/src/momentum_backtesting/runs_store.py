@@ -110,7 +110,11 @@ def save_run(
     except Exception:
         con.execute("ROLLBACK")
         raise
-    return _record(run_id, config, summary)
+    created_at = con.execute(
+        "SELECT strftime(created_at, '%Y-%m-%dT%H:%M:%S%z') "
+        "FROM backtest_runs WHERE run_id = ?", [run_id]
+    ).fetchone()[0]
+    return _record(run_id, config, summary, created_at)
 
 
 def _prune(con: duckdb.DuckDBPyConnection, dataset: str) -> None:
@@ -126,9 +130,10 @@ def _prune(con: duckdb.DuckDBPyConnection, dataset: str) -> None:
         con.execute("DELETE FROM backtest_runs WHERE run_id = ?", [run_id])
 
 
-def _record(run_id: str, config: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
+def _record(run_id: str, config: dict[str, Any], summary: dict[str, Any], created_at: str) -> dict[str, Any]:
     return {
         "id": run_id,
+        "created_at": created_at,
         "n": summary["n"],
         "name": summary["name"],
         "config": config,
@@ -143,14 +148,16 @@ def _record(run_id: str, config: dict[str, Any], summary: dict[str, Any]) -> dic
 
 def list_runs(con: duckdb.DuckDBPyConnection, dataset: str) -> list[dict[str, Any]]:
     rows = con.execute(
-        "SELECT r.run_id, v.spec, r.summary FROM backtest_runs r "
+        "SELECT r.run_id, v.spec, r.summary, "
+        "strftime(r.created_at, '%Y-%m-%dT%H:%M:%S%z') FROM backtest_runs r "
         "JOIN strategy_versions v USING (version_id) "
         "WHERE v.strategy_id = ? AND r.kind = 'weekly' "
         "ORDER BY COALESCE((r.summary ->> 'favorite')::BOOLEAN, FALSE) DESC, r.created_at DESC",
         [_strategy_id(dataset)],
     ).fetchall()
     return [
-        _record(run_id, json.loads(spec), json.loads(summary)) for run_id, spec, summary in rows
+        _record(run_id, json.loads(spec), json.loads(summary), created_at)
+        for run_id, spec, summary, created_at in rows
     ]
 
 
@@ -164,13 +171,15 @@ def update_run(
     active: bool | None = None,
 ) -> dict[str, Any] | None:
     row = con.execute(
-        "SELECT v.spec, r.summary FROM backtest_runs r JOIN strategy_versions v USING (version_id) "
+        "SELECT v.spec, r.summary, "
+        "strftime(r.created_at, '%Y-%m-%dT%H:%M:%S%z') "
+        "FROM backtest_runs r JOIN strategy_versions v USING (version_id) "
         "WHERE r.run_id = ? AND r.kind = 'weekly'",
         [run_id],
     ).fetchone()
     if row is None:
         return None
-    spec, summary_json = row
+    spec, summary_json, created_at = row
     summary = json.loads(summary_json)
     if name is not None:
         summary["name"] = name
@@ -214,7 +223,7 @@ def update_run(
     except Exception:
         con.execute("ROLLBACK")
         raise
-    return _record(run_id, json.loads(spec), summary)
+    return _record(run_id, json.loads(spec), summary, created_at)
 
 
 def list_favorites(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
@@ -224,7 +233,8 @@ def list_favorites(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
     eligibility decision while the dashboard needs one consolidated list.
     """
     rows = con.execute(
-        "SELECT r.run_id, v.spec, r.summary FROM backtest_runs r "
+        "SELECT r.run_id, v.spec, r.summary, "
+        "strftime(r.created_at, '%Y-%m-%dT%H:%M:%S%z') FROM backtest_runs r "
         "JOIN strategy_versions v USING (version_id) "
         "JOIN strategies s ON s.strategy_id = v.strategy_id "
         "WHERE s.package = ? AND r.kind = 'weekly' "
@@ -233,7 +243,8 @@ def list_favorites(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
         [PACKAGE],
     ).fetchall()
     return [
-        _record(run_id, json.loads(spec), json.loads(summary)) for run_id, spec, summary in rows
+        _record(run_id, json.loads(spec), json.loads(summary), created_at)
+        for run_id, spec, summary, created_at in rows
     ]
 
 

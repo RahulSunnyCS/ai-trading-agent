@@ -38,6 +38,35 @@ import { Button } from './ui/Button';
 import { StateMessage } from './ui/StateMessage';
 
 type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
+type Section = 'backtest' | 'scores' | 'saved' | 'weekly' | 'rebalance';
+
+const SECTIONS: Array<{ id: Section; label: string; description: string }> = [
+  {
+    id: 'backtest',
+    label: 'Backtest',
+    description: 'Test a momentum strategy against historical data.',
+  },
+  {
+    id: 'scores',
+    label: 'Momentum Scores',
+    description: 'Explore current stock and sector momentum.',
+  },
+  {
+    id: 'saved',
+    label: 'Saved runs',
+    description: 'Review and compare saved backtests for the selected dataset.',
+  },
+  {
+    id: 'weekly',
+    label: 'Weekly signal',
+    description: 'Check the latest signal, schedule, and data readiness.',
+  },
+  {
+    id: 'rebalance',
+    label: 'Rebalance preview',
+    description: 'Compare your holdings with a live model target.',
+  },
+];
 
 interface MomentumMeta {
   instruments: Instrument[];
@@ -118,9 +147,7 @@ export function MomentumBacktestingView() {
   // Lives here, not in the Weekly view, so the section tab can show that a run is still
   // going after the user has moved to another section.
   const weekly = useMomentumWeeklyJob();
-  const [section, setSection] = useState<'backtest' | 'scores' | 'saved' | 'weekly' | 'rebalance'>(
-    'backtest',
-  );
+  const [section, setSection] = useState<Section>('backtest');
   const [dataset, setDataset] = useState<Dataset>('etf');
   const [meta, setMeta] = useState<MomentumMeta | null>(null);
   const [core, setCore] = useState<CoreSettings>({
@@ -150,6 +177,7 @@ export function MomentumBacktestingView() {
   const [result, setResult] = useState<MomentumResult | null>(null);
   const [lastRunConfig, setLastRunConfig] = useState<Record<string, unknown> | null>(null);
   const [savedRuns, setSavedRuns] = useState<MomentumSavedRun[]>([]);
+  const [savedRunError, setSavedRunError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -165,35 +193,35 @@ export function MomentumBacktestingView() {
     setValues((current) => ({ ...current, [key]: value }));
   }
 
+  async function patchRun(id: string, patch: Record<string, unknown>): Promise<void> {
+    setSavedRunError(null);
+    const response = await apiPatch(`/api/momentum/saved-runs/${id}`, patch);
+    if (!response.ok) {
+      setSavedRunError(response.error);
+      return;
+    }
+    setSavedRuns(await fetchSavedRuns(dataset));
+  }
   async function renameRun(id: string, name: string): Promise<void> {
-    setSavedRuns((runs) => runs.map((run) => (run.id === id ? { ...run, name } : run)));
-    await apiPatch(`/api/momentum/saved-runs/${id}`, { name });
+    await patchRun(id, { name });
   }
   async function toggleOverlay(id: string, overlay: boolean): Promise<void> {
-    setSavedRuns((runs) => runs.map((run) => (run.id === id ? { ...run, overlay } : run)));
-    await apiPatch(`/api/momentum/saved-runs/${id}`, { overlay });
+    await patchRun(id, { overlay });
   }
   async function toggleFavorite(id: string, favorite: boolean): Promise<void> {
-    setSavedRuns((runs) =>
-      runs.map((run) =>
-        run.id === id ? { ...run, favorite, active: favorite ? run.active : false } : run,
-      ),
-    );
-    await apiPatch(`/api/momentum/saved-runs/${id}`, { favorite });
+    await patchRun(id, { favorite });
   }
   async function setActive(id: string): Promise<void> {
-    setSavedRuns((runs) =>
-      runs.map((run) => ({
-        ...run,
-        favorite: run.id === id ? true : run.favorite,
-        active: run.id === id,
-      })),
-    );
-    await apiPatch(`/api/momentum/saved-runs/${id}`, { active: true });
+    await patchRun(id, { active: true });
   }
   async function removeRun(id: string): Promise<void> {
-    setSavedRuns((runs) => runs.filter((run) => run.id !== id));
-    await apiDelete(`/api/momentum/saved-runs/${id}`);
+    setSavedRunError(null);
+    const response = await apiDelete(`/api/momentum/saved-runs/${id}`);
+    if (!response.ok) {
+      setSavedRunError(response.error);
+      return;
+    }
+    setSavedRuns(await fetchSavedRuns(dataset));
   }
 
   async function loadMeta(nextDataset: Dataset, seed?: Record<string, unknown>): Promise<void> {
@@ -238,6 +266,7 @@ export function MomentumBacktestingView() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadMeta is redefined every render; it should only re-run when the dataset itself changes
   useEffect(() => {
     setSavedRuns([]);
+    setSavedRunError(null);
     void fetchSavedRuns(dataset).then(setSavedRuns);
     void loadMeta(dataset);
   }, [dataset]);
@@ -352,7 +381,7 @@ export function MomentumBacktestingView() {
       overlay: false,
     });
     if (saved.ok) {
-      setSavedRuns((runs) => [saved.data, ...runs].slice(0, 10));
+      setSavedRuns(await fetchSavedRuns(dataset));
       setRunInfo((info) =>
         info?.finishedAt === finishedAt ? { ...info, savedAs: saved.data.name } : info,
       );
@@ -458,298 +487,340 @@ export function MomentumBacktestingView() {
   const summary = meta
     ? `${core.start || 'Start'} → ${core.end || 'End'} · ${values.rebalance === 'monthly' ? 'monthly' : Number(values.rebalance_every ?? 1) > 1 ? `every ${values.rebalance_every} weeks` : 'weekly'} · top ${core.topN} / exit >${core.exitRank} · ${values.benchmark ?? ''}`
     : '';
+  const resultEnd = result?.series.dates.at(-1);
 
   return (
     <div ref={containerRef} className="space-y-5">
-      <div className="inline-flex flex-wrap rounded-lg border border-border bg-surface p-1">
-        <Button
-          size="sm"
-          variant={section === 'backtest' ? 'primary' : 'ghost'}
-          onClick={() => setSection('backtest')}
+      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+        <div
+          role="tablist"
+          aria-label="Momentum sections"
+          className="inline-flex min-w-max rounded-lg border border-border bg-surface p-1"
+          onKeyDown={(event) => {
+            if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const index = SECTIONS.findIndex((item) => item.id === section);
+            const next =
+              event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? SECTIONS.length - 1
+                  : (index + (event.key === 'ArrowRight' ? 1 : -1) + SECTIONS.length) %
+                    SECTIONS.length;
+            const id = SECTIONS[next]?.id;
+            if (id) {
+              setSection(id);
+              document.getElementById(`momentum-tab-${id}`)?.focus();
+            }
+          }}
         >
-          Backtest
-        </Button>
-        <Button
-          size="sm"
-          variant={section === 'scores' ? 'primary' : 'ghost'}
-          onClick={() => setSection('scores')}
-        >
-          Momentum Scores
-        </Button>
-        <Button
-          size="sm"
-          variant={section === 'saved' ? 'primary' : 'ghost'}
-          onClick={() => setSection('saved')}
-        >
-          Saved runs ({savedRuns.length})
-        </Button>
-        <Button
-          size="sm"
-          variant={section === 'weekly' ? 'primary' : 'ghost'}
-          onClick={() => setSection('weekly')}
-          title={weekly.running ? 'Weekly signal is running in the background' : undefined}
-        >
-          Weekly signal
-          {weekly.running ? (
-            <span className="relative ml-1 flex h-2 w-2" aria-label="running">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-            </span>
-          ) : null}
-        </Button>
-        <Button
-          size="sm"
-          variant={section === 'rebalance' ? 'primary' : 'ghost'}
-          onClick={() => setSection('rebalance')}
-        >
-          Rebalance now
-        </Button>
+          {SECTIONS.map((item) => (
+            <Button
+              key={item.id}
+              id={`momentum-tab-${item.id}`}
+              role="tab"
+              aria-selected={section === item.id}
+              aria-controls="momentum-section-panel"
+              tabIndex={section === item.id ? 0 : -1}
+              size="sm"
+              variant={section === item.id ? 'primary' : 'ghost'}
+              className={cn(
+                'min-h-10 whitespace-nowrap',
+                section !== item.id && 'text-foreground/80',
+              )}
+              onClick={() => setSection(item.id)}
+            >
+              {item.label}
+              {item.id === 'saved' ? ` (${savedRuns.length})` : ''}
+              {item.id === 'weekly' && weekly.running ? (
+                <span className="ml-1 h-2 w-2 rounded-full bg-warning" aria-label="running" />
+              ) : null}
+            </Button>
+          ))}
+        </div>
       </div>
-
-      {section === 'scores' ? (
-        <MomentumScoresView />
-      ) : section === 'weekly' ? (
-        <MomentumWeeklyView weekly={weekly} />
-      ) : section === 'rebalance' ? (
-        <MomentumRebalanceView
-          dataset={dataset}
-          buildConfig={buildConfig}
-          onChooseDataset={setDataset}
-        />
-      ) : section === 'saved' ? (
-        <MomentumSavedRunsView
-          runs={savedRuns}
-          onRename={renameRun}
-          onToggleOverlay={toggleOverlay}
-          onToggleFavorite={toggleFavorite}
-          onSetActive={setActive}
-          onRemove={removeRun}
-          onLoad={loadSettings}
-        />
-      ) : (
-        <>
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2">
-                {VISIBLE_DATASETS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setDataset(item.id)}
-                    title={item.description}
-                    className={cn(
-                      'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      dataset === item.id
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-surface-2/30 text-muted hover:border-border-strong hover:text-foreground',
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              <Button size="sm" onClick={() => void loadMeta(dataset)} disabled={loading}>
-                <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
-                Refresh data
-              </Button>
-            </div>
-          </div>
-
-          {error ? (
-            <StateMessage
-              variant="error"
-              title="Momentum backtest unavailable"
-              description={error}
+      <p className="text-sm text-muted">
+        {SECTIONS.find((item) => item.id === section)?.description}
+      </p>
+      <div
+        id="momentum-section-panel"
+        role="tabpanel"
+        aria-labelledby={`momentum-tab-${section}`}
+        className="space-y-5"
+      >
+        {section === 'scores' ? (
+          <MomentumScoresView />
+        ) : section === 'weekly' ? (
+          <MomentumWeeklyView weekly={weekly} />
+        ) : section === 'rebalance' ? (
+          <MomentumRebalanceView currentBroadConfig={dataset === 'broad' ? currentConfig : null} />
+        ) : section === 'saved' ? (
+          <div className="space-y-3">
+            {savedRunError ? (
+              <StateMessage
+                variant="error"
+                title="Could not update saved run"
+                description={savedRunError}
+              />
+            ) : null}
+            <MomentumSavedRunsView
+              dataset={dataset}
+              runs={savedRuns}
+              onRename={renameRun}
+              onToggleOverlay={toggleOverlay}
+              onToggleFavorite={toggleFavorite}
+              onSetActive={setActive}
+              onRemove={removeRun}
+              onLoad={loadSettings}
             />
-          ) : null}
-
-          {loading || !meta ? null : (
-            <div className="rounded-xl border border-border bg-surface">
-              <div className="flex items-center gap-3 px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen((open) => !open)}
-                  aria-expanded={settingsOpen}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <p className="text-sm font-semibold text-foreground">Strategy settings</p>
-                  {!settingsOpen ? <p className="truncate text-xs text-muted">{summary}</p> : null}
-                </button>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {dirty ? (
-                    <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
-                      Changed since last run
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void runBacktest({ fresh: true })}
-                    disabled={running}
-                    title="Re-run from scratch: drops the server's cached rankings and data, reloads them, then recomputes"
-                    aria-label="Re-run from scratch"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <RotateCw
+          </div>
+        ) : (
+          <>
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {VISIBLE_DATASETS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setDataset(item.id)}
+                      title={item.description}
                       className={cn(
-                        'h-3.5 w-3.5 shrink-0',
-                        running && runningFresh && 'animate-spin',
+                        'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        dataset === item.id
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-surface-2/30 text-muted hover:border-border-strong hover:text-foreground',
                       )}
-                    />
-                  </button>
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+                <Button size="sm" onClick={() => void loadMeta(dataset)} disabled={loading}>
+                  <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
+                  Refresh data
+                </Button>
+              </div>
+            </div>
+
+            {error ? (
+              <StateMessage
+                variant="error"
+                title="Momentum backtest unavailable"
+                description={error}
+              />
+            ) : null}
+
+            {loading || !meta ? null : (
+              <div className="rounded-xl border border-border bg-surface">
+                <div className="border-b border-border px-4 py-3 text-sm text-muted">
+                  <span className="font-medium text-foreground">What this run tests:</span>{' '}
+                  {DATASETS.find((item) => item.id === dataset)?.label} · {core.start} to {core.end}
+                  {' · '}
+                  {values.rebalance === 'monthly' ? 'monthly' : 'weekly'} rebalancing
+                  {' · '}top {core.topN}, exit after rank {core.exitRank}
+                  {' · '}benchmark {String(values.benchmark ?? '—')}
+                  {' · '}prices through {meta.last_week}
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3">
                   <button
                     type="button"
                     onClick={() => setSettingsOpen((open) => !open)}
-                    aria-label={settingsOpen ? 'Collapse settings' : 'Expand settings'}
-                    className="rounded p-1 text-faint hover:text-foreground"
+                    aria-expanded={settingsOpen}
+                    className="min-w-0 flex-1 text-left"
                   >
-                    <ChevronDown
-                      className={cn('h-4 w-4 transition-transform', settingsOpen && 'rotate-180')}
-                    />
+                    <p className="text-sm font-semibold text-foreground">Strategy settings</p>
+                    {!settingsOpen ? (
+                      <p className="truncate text-xs text-muted">{summary}</p>
+                    ) : null}
                   </button>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {dirty ? (
+                      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                        Changed since last run
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => void runBacktest({ fresh: true })}
+                      disabled={running}
+                      title="Re-run from scratch: drops the server's cached rankings and data, reloads them, then recomputes"
+                      aria-label="Re-run from scratch"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RotateCw
+                        className={cn(
+                          'h-3.5 w-3.5 shrink-0',
+                          running && runningFresh && 'animate-spin',
+                        )}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsOpen((open) => !open)}
+                      aria-label={settingsOpen ? 'Collapse settings' : 'Expand settings'}
+                      className="rounded p-1 text-faint hover:text-foreground"
+                    >
+                      <ChevronDown
+                        className={cn('h-4 w-4 transition-transform', settingsOpen && 'rotate-180')}
+                      />
+                    </button>
+                  </div>
                 </div>
-              </div>
-              {settingsOpen ? (
-                <div className="space-y-4 border-t border-border p-4">
-                  <MomentumSettingsPanel
-                    dataset={dataset}
-                    instruments={meta.instruments}
-                    firstWeek={meta.first_week}
-                    lastWeek={meta.last_week}
-                    benchmarks={
-                      meta.benchmarks ??
-                      meta.instruments.filter((i) => i.has_data).map((i) => i.name)
-                    }
-                    core={core}
-                    onCoreChange={onCoreChange}
-                    values={values}
-                    onChange={onValueChange}
-                  />
-                  <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                    <Button variant="primary" onClick={() => void runBacktest()} disabled={running}>
+                {settingsOpen ? (
+                  <div className="space-y-4 border-t border-border p-4">
+                    <MomentumSettingsPanel
+                      dataset={dataset}
+                      instruments={meta.instruments}
+                      firstWeek={meta.first_week}
+                      lastWeek={meta.last_week}
+                      benchmarks={
+                        meta.benchmarks ??
+                        meta.instruments.filter((i) => i.has_data).map((i) => i.name)
+                      }
+                      core={core}
+                      onCoreChange={onCoreChange}
+                      values={values}
+                      onChange={onValueChange}
+                    />
+                    <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                      <Button
+                        variant="primary"
+                        onClick={() => void runBacktest()}
+                        disabled={running}
+                      >
+                        {running ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Play className="h-3.5 w-3.5" />
+                        )}
+                        {running ? `Running… ${elapsedLabel}` : 'Run momentum backtest'}
+                      </Button>
+                      <span className="hidden text-xs text-faint sm:inline">Ctrl/Cmd + Enter</span>
+                      <Button size="sm" onClick={shareLink}>
+                        <LinkIcon className="h-3.5 w-3.5" />{' '}
+                        {copied ? 'Link copied' : 'Copy shareable link'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => void runBacktest()}
+                      disabled={running}
+                    >
                       {running ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Play className="h-3.5 w-3.5" />
                       )}
-                      {running ? `Running… ${elapsedLabel}` : 'Run momentum backtest'}
-                    </Button>
-                    <span className="hidden text-xs text-faint sm:inline">Ctrl/Cmd + Enter</span>
-                    <Button size="sm" onClick={shareLink}>
-                      <LinkIcon className="h-3.5 w-3.5" />{' '}
-                      {copied ? 'Link copied' : 'Copy shareable link'}
+                      {running
+                        ? `Running… ${elapsedLabel}`
+                        : dirty
+                          ? 'Run again'
+                          : 'Run momentum backtest'}
                     </Button>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => void runBacktest()}
-                    disabled={running}
+                )}
+                {runError ? (
+                  <div
+                    ref={runErrorRef}
+                    role="alert"
+                    className="mx-4 mb-4 rounded-lg border border-negative/30 bg-negative/10 px-3 py-2.5 text-sm text-negative"
                   >
-                    {running ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Play className="h-3.5 w-3.5" />
-                    )}
-                    {running
-                      ? `Running… ${elapsedLabel}`
-                      : dirty
-                        ? 'Run again'
-                        : 'Run momentum backtest'}
-                  </Button>
-                </div>
-              )}
-              {runError ? (
-                <div
-                  ref={runErrorRef}
-                  role="alert"
-                  className="mx-4 mb-4 rounded-lg border border-negative/30 bg-negative/10 px-3 py-2.5 text-sm text-negative"
-                >
-                  <p className="font-medium">The run didn&apos;t finish — nothing was updated</p>
-                  <p className="mt-0.5 text-foreground/80">{runError}</p>
-                  {result ? (
-                    <p className="mt-0.5 text-xs text-muted">
-                      The results below are from your previous run.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          {running ? (
-            // Pinned under the app top bar, so the timer stays visible while you scroll.
-            <div className="sticky top-[4.5rem] z-20">
-              <MomentumRunBanner
-                elapsedMs={elapsedMs}
-                dataset={dataset}
-                datasetLabel={DATASETS.find((item) => item.id === dataset)?.label ?? 'momentum'}
-                hasPreviousResult={result !== null}
-              />
-            </div>
-          ) : null}
-
-          {doneNoticeAt !== null && runInfo ? (
-            // Zero-height sticky slot: the pill floats over the page without shifting content.
-            <div className="sticky top-[4.5rem] z-20 h-0">
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    setDoneNoticeAt(null);
-                  }}
-                  className="inline-flex animate-fade-in items-center gap-2 rounded-full border border-positive/30 bg-surface px-4 py-2 text-sm text-foreground shadow-elevated transition-colors hover:border-positive/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <CheckCircle2 className="h-4 w-4 text-positive" />
-                  Results updated · took {(runInfo.durationMs / 1000).toFixed(1)}s
-                  <span className="inline-flex items-center gap-1 font-medium text-primary">
-                    View summary <ArrowUp className="h-3.5 w-3.5" />
-                  </span>
-                </button>
+                    <p className="font-medium">The run didn&apos;t finish — nothing was updated</p>
+                    <p className="mt-0.5 text-foreground/80">{runError}</p>
+                    {result ? (
+                      <p className="mt-0.5 text-xs text-muted">
+                        The results below are from your previous run.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
-            </div>
-          ) : null}
+            )}
 
-          {running && !result ? <MomentumResultsSkeleton /> : null}
-
-          {result ? (
-            <div
-              className={cn(
-                'space-y-5 transition-opacity duration-300',
-                running && 'pointer-events-none select-none opacity-40',
-              )}
-              aria-busy={running}
-            >
-              <div ref={summaryRef} className="scroll-mt-20">
-                <MomentumPerformanceCard
-                  result={result}
-                  config={lastRunConfig ?? {}}
-                  stale={dirty && !running}
-                  lastRunFailed={runError !== null && !running}
-                  runInfo={runInfo}
+            {running ? (
+              // Pinned under the app top bar, so the timer stays visible while you scroll.
+              <div className="sticky top-[4.5rem] z-20">
+                <MomentumRunBanner
+                  elapsedMs={elapsedMs}
+                  dataset={dataset}
+                  datasetLabel={DATASETS.find((item) => item.id === dataset)?.label ?? 'momentum'}
+                  hasPreviousResult={result !== null}
                 />
               </div>
-              <MomentumEquityChart
-                series={result.series}
-                benchmarkName={result.benchmark_name}
-                rotations={result.rotations}
-                overlays={overlays}
-                comparisons={result.comparisons ?? []}
-                flashKey={finishedAt}
-              />
-              <MomentumResultDetails
-                result={result}
-                config={lastRunConfig ?? {}}
-                savedRuns={savedRuns}
-                flashKey={finishedAt}
-              />
-            </div>
-          ) : null}
-        </>
-      )}
+            ) : null}
+
+            {doneNoticeAt !== null && runInfo ? (
+              // Zero-height sticky slot: the pill floats over the page without shifting content.
+              <div className="sticky top-[4.5rem] z-20 h-0">
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      setDoneNoticeAt(null);
+                    }}
+                    className="inline-flex animate-fade-in items-center gap-2 rounded-full border border-positive/30 bg-surface px-4 py-2 text-sm text-foreground shadow-elevated transition-colors hover:border-positive/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-positive" />
+                    Results updated · took {(runInfo.durationMs / 1000).toFixed(1)}s
+                    <span className="inline-flex items-center gap-1 font-medium text-primary">
+                      View summary <ArrowUp className="h-3.5 w-3.5" />
+                    </span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {running && !result ? <MomentumResultsSkeleton /> : null}
+
+            {result ? (
+              <div
+                className={cn(
+                  'space-y-5 transition-opacity duration-300',
+                  running && 'pointer-events-none select-none opacity-40',
+                )}
+                aria-busy={running}
+              >
+                <div ref={summaryRef} className="scroll-mt-20">
+                  {dataset === 'broad' && meta && resultEnd && resultEnd < meta.last_week ? (
+                    <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
+                      Result ends {result.series.dates.at(-1)}, while prices extend to{' '}
+                      {meta.last_week}. Some weeks may have been skipped for insufficient ranked
+                      names. Check “Simulate every week” in Broad Momentum settings.
+                    </div>
+                  ) : null}
+                  <MomentumPerformanceCard
+                    result={result}
+                    config={lastRunConfig ?? {}}
+                    stale={dirty && !running}
+                    lastRunFailed={runError !== null && !running}
+                    runInfo={runInfo}
+                  />
+                </div>
+                <MomentumEquityChart
+                  series={result.series}
+                  benchmarkName={result.benchmark_name}
+                  rotations={result.rotations}
+                  overlays={overlays}
+                  comparisons={result.comparisons ?? []}
+                  flashKey={finishedAt}
+                />
+                <MomentumResultDetails
+                  result={result}
+                  config={lastRunConfig ?? {}}
+                  savedRuns={savedRuns}
+                  flashKey={finishedAt}
+                />
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
     </div>
   );
 }

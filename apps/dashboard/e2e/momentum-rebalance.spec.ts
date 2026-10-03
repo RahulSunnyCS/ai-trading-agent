@@ -23,10 +23,10 @@ test('standalone momentum metadata does not crash the default Live tab', async (
     await page.getByRole('button', { name: 'Open navigation' }).click();
   }
   await page.getByRole('button', { name: 'Momentum', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Momentum Backtesting' })).toBeVisible();
+  await expect(page.getByRole('tablist', { name: 'Momentum sections' })).toBeVisible();
 });
 
-test('Momentum rebalance shows Fyers login and indicative changes', async ({ page, context }) => {
+test('Momentum rebalance previews holdings without changing Backtest dataset', async ({ page }) => {
   await page.route('**/api/momentum/meta?dataset=*', (route) => {
     const dataset = new URL(route.request().url()).searchParams.get('dataset');
     return route.fulfill({
@@ -51,24 +51,8 @@ test('Momentum rebalance shows Fyers login and indicative changes', async ({ pag
       }),
     });
   });
-  await page.route('**/api/auth/fyers/status', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        configured: true,
-        connected: false,
-        degraded: false,
-        needsReauth: true,
-      }),
-    }),
-  );
-  await context.route('**/api/auth/fyers/start', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'text/html',
-      body: '<p>Fyers login started</p>',
-    }),
+  await page.route('**/api/momentum/saved-runs?dataset=*', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
   );
   await page.route('**/api/momentum/rebalance-preview', (route) =>
     route.fulfill({
@@ -102,20 +86,17 @@ test('Momentum rebalance shows Fyers login and indicative changes', async ({ pag
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Momentum', exact: true }).click();
-  await page.getByRole('button', { name: 'Rebalance now' }).click();
-  await expect(page.getByRole('button', { name: 'Login with Fyers' })).toBeVisible();
-
-  const popupPromise = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Login with Fyers' }).click();
-  const popup = await popupPromise;
-  await expect(popup.getByText('Fyers login started')).toBeVisible();
-  await popup.close();
+  await page.getByRole('tab', { name: 'Rebalance preview' }).click();
 
   await page.getByRole('button', { name: 'Nifty 50 Stocks' }).click();
-  await page.getByRole('textbox', { name: 'Holdings (asset, percent)' }).fill('C0001, 40');
+  await page.getByRole('combobox', { name: 'Asset 1' }).fill('C0001');
+  await page.getByRole('spinbutton', { name: 'Weight %' }).fill('40');
+  await expect(page.getByText('Cash remainder 60.00%')).toBeVisible();
   await page.getByRole('button', { name: 'Preview rebalance' }).click();
 
   await expect(page.getByRole('heading', { name: 'Indicative changes' })).toBeVisible();
   await expect(page.getByRole('row', { name: /BUY C0001/ })).toContainText('200');
   await expect(page.getByText('No orders were placed.')).toBeVisible();
+  await page.getByRole('tab', { name: 'Backtest' }).click();
+  await expect(page.getByRole('button', { name: 'ETF Rotation' })).toHaveClass(/border-primary/);
 });

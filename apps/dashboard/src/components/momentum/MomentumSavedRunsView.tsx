@@ -46,6 +46,33 @@ const METRICS: Array<[string, string]> = [
   ['avg_holdings', 'Average holdings'],
 ];
 
+const SETTING_LABELS: Record<string, string> = {
+  start: 'From',
+  end: 'To',
+  universe: 'Universe',
+  top_n: 'Positions held',
+  exit_rank: 'Sell after rank',
+  lookbacks: 'Lookback weeks',
+  weights: 'Lookback weights',
+  benchmark: 'Benchmark',
+  rebalance: 'Rebalance cadence',
+  rebalance_every: 'Weeks between rebalances',
+  min_ranked: 'Minimum ranked names',
+  tax: 'Capital gains tax',
+  slippage_bps: 'Slippage (bps)',
+};
+
+function settingValue(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'boolean') return value ? 'On' : 'Off';
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'object')
+    return Object.entries(value)
+      .map(([key, item]) => `${key}: ${String(item)}`)
+      .join(', ');
+  return String(value);
+}
+
 function metric(run: MomentumSavedRun | undefined, key: string): string {
   const value = run?.kpis[key];
   if (value === null || value === undefined) return '—';
@@ -53,6 +80,7 @@ function metric(run: MomentumSavedRun | undefined, key: string): string {
 }
 
 export function MomentumSavedRunsView({
+  dataset,
   runs,
   onRename,
   onToggleOverlay,
@@ -61,6 +89,7 @@ export function MomentumSavedRunsView({
   onRemove,
   onLoad,
 }: {
+  dataset: 'etf' | 'stock' | 'custom_index' | 'broad';
   runs: MomentumSavedRun[];
   onRename: (id: string, name: string) => void;
   onToggleOverlay: (id: string, overlay: boolean) => void;
@@ -69,9 +98,20 @@ export function MomentumSavedRunsView({
   onRemove: (id: string) => void;
   onLoad: (run: MomentumSavedRun) => void;
 }) {
+  const [baseId, setBaseId] = useState('');
   const [compareId, setCompareId] = useState('');
-  const current = runs[0];
-  const comparison = runs.find((run) => run.id === compareId && run.id !== current?.id) ?? runs[1];
+  const [draftNames, setDraftNames] = useState<Record<string, string>>({});
+  const [removeId, setRemoveId] = useState<string | null>(null);
+  const current = runs.find((run) => run.id === baseId) ?? runs[0];
+  const comparison =
+    runs.find((run) => run.id === compareId && run.id !== current?.id) ??
+    runs.find((run) => run.id !== current?.id);
+  const differences =
+    current && comparison
+      ? Object.keys(current.config).filter(
+          (key) => JSON.stringify(current.config[key]) !== JSON.stringify(comparison.config[key]),
+        )
+      : [];
   // Shares the Weekly signal tab's endpoint rather than threading its status down through
   // props — cheap to poll and keeps this view self-contained.
   const { data: status } = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status');
@@ -80,8 +120,8 @@ export function MomentumSavedRunsView({
     <div className="space-y-5">
       <Card>
         <CardHeader
-          title="Saved strategies"
-          description="Favourite strategies run every weekly cycle. Only the active favourite is sent to Telegram."
+          title={`Saved runs · ${({ etf: 'ETF Rotation', stock: 'Nifty 50 Stocks', custom_index: 'Custom Index', broad: 'Broad Momentum' } as const)[dataset]}`}
+          description={`${runs.length} runs for this dataset. Favourites run every weekly cycle; only the active favourite is sent to Telegram.`}
         />
         {runs.length === 0 ? (
           <p className="text-sm text-muted">Run a backtest to start a comparison.</p>
@@ -125,23 +165,63 @@ export function MomentumSavedRunsView({
                 ) : null}
                 <input
                   aria-label={`Name for run ${run.n}`}
-                  value={run.name}
+                  value={draftNames[run.id] ?? run.name}
                   maxLength={64}
-                  onChange={(event) => onRename(run.id, event.target.value)}
+                  onChange={(event) =>
+                    setDraftNames((names) => ({ ...names, [run.id]: event.target.value }))
+                  }
+                  onBlur={() => {
+                    const name = (draftNames[run.id] ?? run.name).trim();
+                    if (name && name !== run.name) onRename(run.id, name);
+                    setDraftNames((names) => {
+                      const next = { ...names };
+                      delete next[run.id];
+                      return next;
+                    });
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.currentTarget.blur();
+                  }}
                   className="min-w-48 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
                 />
                 <span className="text-xs text-muted">
                   CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Sharpe{' '}
                   {metric(run, 'sharpe')}
-                  {typeof run.config.start === 'string' ? ` · Start ${run.config.start}` : ''}
+                  {typeof run.config.start === 'string'
+                    ? ` · ${run.config.start} → ${String(run.config.end ?? 'latest')}`
+                    : ''}
+                  {' · '}Saved{' '}
+                  {new Date(run.created_at).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
                 </span>
                 <div className="ml-auto flex gap-2">
                   <Button size="sm" onClick={() => onLoad(run)}>
                     Load settings
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => onRemove(run.id)}>
-                    Remove
-                  </Button>
+                  {removeId === run.id ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => {
+                          onRemove(run.id);
+                          setRemoveId(null);
+                        }}
+                      >
+                        Confirm remove
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setRemoveId(null)}>
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => setRemoveId(run.id)}>
+                      Remove
+                    </Button>
+                  )}
                 </div>
               </div>
               {ready ? (
@@ -174,19 +254,36 @@ export function MomentumSavedRunsView({
         <Card>
           <CardHeader
             title="Compare runs"
+            description="Choose any two saved runs from this dataset."
             actions={
-              <select
-                aria-label="Compare current run with"
-                value={comparison.id}
-                onChange={(event) => setCompareId(event.target.value)}
-                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
-              >
-                {runs.slice(1).map((run) => (
-                  <option key={run.id} value={run.id}>
-                    {run.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  aria-label="First run to compare"
+                  value={current.id}
+                  onChange={(event) => setBaseId(event.target.value)}
+                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+                >
+                  {runs.map((run) => (
+                    <option key={run.id} value={run.id}>
+                      {run.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Second run to compare"
+                  value={comparison.id}
+                  onChange={(event) => setCompareId(event.target.value)}
+                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+                >
+                  {runs
+                    .filter((run) => run.id !== current.id)
+                    .map((run) => (
+                      <option key={run.id} value={run.id}>
+                        {run.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
             }
           />
           <Table>
@@ -205,19 +302,22 @@ export function MomentumSavedRunsView({
               ))}
             </tbody>
           </Table>
-          <h3 className="mb-2 mt-5 text-sm font-semibold">Settings that differ</h3>
+          <h3 className="mb-2 mt-5 text-sm font-semibold">
+            Settings that differ ({differences.length})
+          </h3>
           <div className="space-y-1 text-xs text-muted">
-            {Object.keys(current.config)
-              .filter(
-                (key) =>
-                  JSON.stringify(current.config[key]) !== JSON.stringify(comparison.config[key]),
-              )
-              .map((key) => (
+            {differences.length === 0 ? (
+              <p>No settings differ.</p>
+            ) : (
+              differences.map((key) => (
                 <p key={key}>
-                  <span className="font-semibold text-foreground">{key.replaceAll('_', ' ')}:</span>{' '}
-                  {JSON.stringify(current.config[key])} → {JSON.stringify(comparison.config[key])}
+                  <span className="font-semibold text-foreground">
+                    {SETTING_LABELS[key] ?? key.replaceAll('_', ' ')}:
+                  </span>{' '}
+                  {settingValue(current.config[key])} → {settingValue(comparison.config[key])}
                 </p>
-              ))}
+              ))
+            )}
           </div>
         </Card>
       ) : null}

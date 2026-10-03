@@ -17,6 +17,7 @@ import { usePolledResource } from '../../hooks/usePolledResource';
 import { apiPost } from '../../lib/api';
 import { formatIstDateTime } from '../../lib/format';
 import type {
+  MomentumSavedRun,
   MomentumStockActionReview,
   MomentumWeeklyRunResult,
   MomentumWeeklyStatus,
@@ -63,11 +64,18 @@ function useElapsed(startedAt: string | null, active: boolean): number {
  */
 export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   const [runKind, setRunKind] = useState<RunKind>('final');
-  const [send, setSend] = useState(true);
+  const [send, setSend] = useState(false);
   const { job, running, startError, start } = weekly;
   const status = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status');
+  const favorites = usePolledResource<MomentumSavedRun[]>('/api/momentum/favorite-strategies');
   const elapsed = useElapsed(job?.started_at ?? null, running);
   const stockSync = useMomentumStockSync();
+  const active = favorites.data?.find((run) => run.active);
+  const latestFinal = status.data?.signals.find((signal) => signal.run === 'final');
+  const activeDataKey = active?.config.dataset === 'etf' ? 'etf' : 'stock';
+  const activeReady = active
+    ? status.data?.datasets.find((item) => item.key === activeDataKey)
+    : null;
 
   // A finished run may have refreshed prices and saved a signal: re-read the status panel.
   const finishedAt = job?.finished_at ?? null;
@@ -81,9 +89,52 @@ export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState 
     <div className="space-y-5">
       <Card>
         <CardHeader
+          title="This week's status"
+          description={
+            status.data
+              ? `Target week ending ${formatDay(status.data.target_week)}`
+              : 'Checking signal and data status…'
+          }
+        />
+        <div className="grid gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-muted">Latest final signal</p>
+            <p className="font-medium text-foreground">
+              {latestFinal
+                ? `${formatDay(latestFinal.week)} · ${latestFinal.label}`
+                : 'None saved yet'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted">Telegram-active strategy</p>
+            <p className="font-medium text-foreground">{active?.name ?? 'Default live strategy'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted">Readiness</p>
+            <p className="font-medium text-foreground">
+              {activeReady
+                ? activeReady.ready
+                  ? 'Data ready'
+                  : `Blocked · ${activeReady.note}`
+                : active
+                  ? 'Checking data…'
+                  : 'Check default strategy data below'}
+            </p>
+          </div>
+        </div>
+      </Card>
+      <Card>
+        <CardHeader
           title="Weekly signal"
           description="Manually run the Friday momentum signal — the same job the laptop schedule (14:40 preview / 16:45 final IST) runs automatically."
         />
+        <p className="mb-3 text-xs text-muted">
+          Preview uses live prices and may change. Final uses official closes for the completed
+          week.
+          {favorites.data?.length
+            ? ` ${favorites.data.length} favourite strategies will be evaluated.`
+            : ' The default live strategy will be evaluated.'}
+        </p>
         <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex rounded-lg border border-border bg-surface-2/30 p-1">
             <Button
@@ -116,9 +167,14 @@ export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState 
             className="ml-auto"
           >
             <Send className={running ? 'h-3.5 w-3.5 animate-pulse' : 'h-3.5 w-3.5'} />
-            {running ? 'Running…' : 'Run now'}
+            {running ? 'Running…' : send ? 'Run and send to Telegram' : 'Run without sending'}
           </Button>
         </div>
+        <p className="mt-2 text-xs text-muted">
+          {send
+            ? `Telegram will receive the result for ${active?.name ?? 'the default live strategy'}.`
+            : 'No Telegram message will be sent from this manual run.'}
+        </p>
 
         {running ? (
           <output
@@ -165,7 +221,14 @@ export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState 
         loading={status.loading}
         stockSync={stockSync}
       />
-      <StockActionAlerts stockSyncFinishedAt={stockSyncFinishedAt} />
+      <details className="rounded-xl border border-border bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-foreground">
+          Data health · stock action reviews
+        </summary>
+        <div className="mt-3">
+          <StockActionAlerts stockSyncFinishedAt={stockSyncFinishedAt} />
+        </div>
+      </details>
 
       {!running && job?.status === 'done' && job.result ? (
         <div className="space-y-3">
@@ -194,14 +257,20 @@ function StockActionAlerts({ stockSyncFinishedAt }: { stockSyncFinishedAt: strin
         description="After each stock-data refresh, new one-day drops over 20.1% are checked against exchange filings. Unmatched moves need a classification before any share adjustment is applied."
       />
       {actions.error ? (
-        <StateMessage variant="error" title="Could not load stock-action alerts" description={actions.error} />
+        <StateMessage
+          variant="error"
+          title="Could not load stock-action alerts"
+          description={actions.error}
+        />
       ) : actions.loading && !actions.data ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : actions.data?.items.length ? (
         <div className="space-y-3">
           <p className="text-xs text-muted">
-            {actions.data.pending_count} new unresolved move(s) since {formatDay(actions.data.manual_review_after)}.
-            The rounded multiplier comes from volume ÷ rupee turnover. It reflects the price change and needs filing evidence before it can be treated as a split.
+            {actions.data.pending_count} new unresolved move(s) since{' '}
+            {formatDay(actions.data.manual_review_after)}. The rounded multiplier comes from volume
+            ÷ rupee turnover. It reflects the price change and needs filing evidence before it can
+            be treated as a split.
             {actions.data.pending_count > actions.data.items.length
               ? ` Showing the newest ${actions.data.items.length}; more appear as these are resolved.`
               : ''}
@@ -238,10 +307,10 @@ function StockActionAlertRow({
   const [error, setError] = useState<string | null>(null);
   const dropPct = (1 - item.close / item.previous_close) * 100;
   const volumeRatio = item.previous_volume > 0 ? item.volume / item.previous_volume : null;
-  const turnoverRatio =
-    item.previous_turnover > 0 ? item.turnover / item.previous_turnover : null;
+  const turnoverRatio = item.previous_turnover > 0 ? item.turnover / item.previous_turnover : null;
   const needsEntitlement =
-    item.event_kind != null && ['demerger', 'scheme', 'rights', 'dividend'].includes(item.event_kind);
+    item.event_kind != null &&
+    ['demerger', 'scheme', 'rights', 'dividend'].includes(item.event_kind);
 
   async function save() {
     if (!decision) return;
@@ -268,8 +337,8 @@ function StockActionAlertRow({
         <span className="text-muted">{formatDay(item.ex_date)}</span>
         <Badge tone="warning">Price −{dropPct.toFixed(1)}%</Badge>
         <span className="text-muted">
-          Volume {volumeRatio?.toFixed(1) ?? '—'}× · turnover {turnoverRatio?.toFixed(1) ?? '—'}×
-          {' '}· price-implied multiple {item.suggested_factor?.toFixed(1) ?? '—'}×
+          Volume {volumeRatio?.toFixed(1) ?? '—'}× · turnover {turnoverRatio?.toFixed(1) ?? '—'}× ·
+          price-implied multiple {item.suggested_factor?.toFixed(1) ?? '—'}×
         </span>
       </div>
       {item.subject ? (
@@ -283,50 +352,55 @@ function StockActionAlertRow({
       )}
       {needsEntitlement ? (
         <p className="mt-1 text-xs text-warning">
-          This filing needs entitlement or cash payout valuation before the historical return can be corrected.
+          This filing needs entitlement or cash payout valuation before the historical return can be
+          corrected.
         </p>
       ) : null}
-      {!needsEntitlement ? <div className="mt-3 flex flex-wrap items-center gap-2">
-        <select
-          aria-label={`Classify ${item.symbol} move`}
-          value={decision}
-          onChange={(event) => setDecision(event.target.value as typeof decision)}
-          className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
-        >
-          <option value="">Choose classification</option>
-          <option value="split">Split</option>
-          <option value="bonus">Bonus</option>
-          <option value="crash">Genuine price fall</option>
-        </select>
-        {decision === 'split' || decision === 'bonus' ? (
+      {!needsEntitlement ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            aria-label={`Classify ${item.symbol} move`}
+            value={decision}
+            onChange={(event) => setDecision(event.target.value as typeof decision)}
+            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+          >
+            <option value="">Choose classification</option>
+            <option value="split">Split</option>
+            <option value="bonus">Bonus</option>
+            <option value="crash">Genuine price fall</option>
+          </select>
+          {decision === 'split' || decision === 'bonus' ? (
+            <input
+              aria-label="New shares per old share"
+              type="number"
+              min="1.1"
+              max="100"
+              step="0.1"
+              placeholder="New shares / old share"
+              value={factor}
+              onChange={(event) => setFactor(event.target.value)}
+              className="w-44 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            />
+          ) : null}
           <input
-            aria-label="New shares per old share"
-            type="number"
-            min="1.1"
-            max="100"
-            step="0.1"
-            placeholder="New shares / old share"
-            value={factor}
-            onChange={(event) => setFactor(event.target.value)}
-            className="w-44 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            aria-label="Evidence URL or note"
+            type="text"
+            placeholder="Evidence URL or note"
+            value={evidence}
+            onChange={(event) => setEvidence(event.target.value)}
+            className="min-w-48 flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
           />
-        ) : null}
-        <input
-          aria-label="Evidence URL or note"
-          type="text"
-          placeholder="Evidence URL or note"
-          value={evidence}
-          onChange={(event) => setEvidence(event.target.value)}
-          className="min-w-48 flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
-        />
-        <Button
-          size="sm"
-          onClick={() => void save()}
-          disabled={!decision || saving || (decision !== 'crash' && (!factor || !evidence.trim()))}
-        >
-          {saving ? 'Saving…' : 'Save classification'}
-        </Button>
-      </div> : null}
+          <Button
+            size="sm"
+            onClick={() => void save()}
+            disabled={
+              !decision || saving || (decision !== 'crash' && (!factor || !evidence.trim()))
+            }
+          >
+            {saving ? 'Saving…' : 'Save classification'}
+          </Button>
+        </div>
+      ) : null}
       {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
     </div>
   );
@@ -504,27 +578,75 @@ function WeeklyResults({ result }: { result: MomentumWeeklyRunResult }) {
   ];
   return (
     <>
-      {strategies.map((strategy) => (
-        <Card key={strategy.id ?? strategy.name}>
-          <CardHeader
-            title={strategy.title ?? strategy.name}
-            description={
-              strategy.blocked
-                ? `${strategy.name}: ${strategy.blocked}`
-                : strategy.active
-                  ? result.sent_to_telegram
-                    ? `${strategy.name} is active and was sent to Telegram.`
-                    : `${strategy.name} is active; Telegram was not selected.`
-                  : `${strategy.name} was evaluated in the dashboard only.`
-            }
-          />
-          {strategy.body ? (
-            <pre className="whitespace-pre-wrap rounded-lg border border-border bg-surface-2/30 p-3 text-sm text-foreground">
-              {strategy.body}
-            </pre>
-          ) : null}
-        </Card>
-      ))}
+      {strategies.map((strategy) => {
+        const rawRows = strategy.signal?.rows;
+        const rows = Array.isArray(rawRows)
+          ? rawRows.filter(
+              (row): row is { asset: string; action: string; rank?: number | null } =>
+                typeof row === 'object' &&
+                row !== null &&
+                typeof row.asset === 'string' &&
+                typeof row.action === 'string',
+            )
+          : [];
+        const actions = rows.filter((row) => row.action.trim());
+        return (
+          <Card key={strategy.id ?? strategy.name}>
+            <CardHeader
+              title={strategy.title ?? strategy.name}
+              description={
+                strategy.blocked
+                  ? `${strategy.name}: ${strategy.blocked}`
+                  : strategy.active
+                    ? result.sent_to_telegram
+                      ? `${strategy.name} is active and was sent to Telegram.`
+                      : `${strategy.name} is active; Telegram was not selected.`
+                    : `${strategy.name} was evaluated in the dashboard only.`
+              }
+            />
+            {strategy.blocked ? (
+              <Badge tone="warning">Blocked</Badge>
+            ) : strategy.signal ? (
+              <div className="space-y-2 text-sm">
+                <p className="text-muted">
+                  Signal week {String(strategy.signal.week ?? '—')} · {actions.length} indicated
+                  action{actions.length === 1 ? '' : 's'}
+                </p>
+                {actions.length ? (
+                  <ul className="flex flex-wrap gap-2">
+                    {actions.map((row) => (
+                      <li
+                        key={`${row.asset}-${row.action}`}
+                        className="rounded-lg border border-border bg-surface-2/40 px-3 py-2"
+                      >
+                        <span className="font-medium text-foreground">
+                          {row.action} {row.asset}
+                        </span>
+                        {row.rank != null ? (
+                          <span className="ml-1 text-xs text-muted">rank {row.rank}</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted">No portfolio changes indicated.</p>
+                )}
+                {typeof strategy.signal.explain === 'string' ? (
+                  <p className="text-muted">{strategy.signal.explain}</p>
+                ) : null}
+              </div>
+            ) : null}
+            {strategy.body ? (
+              <details className="mt-3 text-sm">
+                <summary className="cursor-pointer text-primary">View full notification</summary>
+                <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-surface-2/30 p-3 text-sm text-foreground">
+                  {strategy.body}
+                </pre>
+              </details>
+            ) : null}
+          </Card>
+        );
+      })}
     </>
   );
 }

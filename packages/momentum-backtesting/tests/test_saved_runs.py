@@ -45,10 +45,12 @@ def test_save_list_and_the_record_shape_matches_the_frontend_type(client):
     assert saved["favorite"] is False
     assert saved["active"] is False
     assert "id" in saved
+    assert "T" in saved["created_at"]
 
     listed = client.get("/api/saved-runs", params={"dataset": "etf"}).json()
     assert len(listed) == 1
     assert listed[0]["id"] == saved["id"]
+    assert listed[0]["created_at"] == saved["created_at"]
 
 
 def test_datasets_are_isolated_from_each_other(client):

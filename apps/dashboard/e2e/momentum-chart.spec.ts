@@ -3,6 +3,37 @@ import { expect, test } from '@playwright/test';
 test('Momentum backtest renders an interactive chart with optional touchpad zoom', async ({
   page,
 }) => {
+  const savedRuns: Array<Record<string, unknown>> = [];
+  await page.route('**/api/momentum/saved-runs*', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      const run = {
+        id: 'run-1',
+        n: 1,
+        created_at: '2024-01-19T12:00:00+05:30',
+        name: body.name,
+        config: body.config,
+        kpis: body.kpis,
+        dates: body.dates,
+        strategy: body.strategy,
+        overlay: false,
+        favorite: false,
+        active: false,
+      };
+      savedRuns.unshift(run);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(run),
+      });
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(savedRuns),
+      });
+    }
+  });
   await page.route('**/api/momentum/meta?dataset=etf', (route) =>
     route.fulfill({
       status: 200,
@@ -22,7 +53,17 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
       body: JSON.stringify({
         benchmark_name: 'Nifty 50',
         kpis: { cagr: 0.12 },
-        rotations: [{ week: '2024-01-12' }],
+        rotations: [
+          {
+            week: '2024-01-12',
+            value: 102000,
+            outs: [],
+            ins: [],
+            trims: [],
+            parked: false,
+            holdings: [{ asset: 'Nifty 50', share: 1 }],
+          },
+        ],
         latest: { week: '2024-01-19', explain: 'Hold current position.', rows: [] },
         open_positions: [],
         trades: [],
@@ -60,8 +101,8 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
     'aria-pressed',
     'true',
   );
-  await page.getByRole('button', { name: 'Saved runs (1)' }).click();
-  await expect(page.getByRole('heading', { name: 'Saved runs' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Saved runs (1)' }).click();
+  await expect(page.getByRole('heading', { name: /Saved runs/ })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Name for run 1' })).toHaveValue('Run 1');
 });
 
@@ -103,11 +144,13 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Momentum', exact: true }).click();
-  await page.getByRole('button', { name: 'Momentum Scores' }).click();
+  await page.getByRole('tab', { name: 'Momentum Scores' }).click();
   await expect(page.getByText('Test Company')).toBeVisible();
-  await page.getByRole('button', { name: 'TEST', exact: true }).click();
-  await expect(page.getByText('Return: 8%')).toBeVisible();
+  await page.getByRole('button', { name: /TEST/ }).click();
+  await expect(page.getByText('8% · relative score 75')).toBeVisible();
   await page.getByRole('button', { name: 'Sectors', exact: true }).click();
-  await page.getByRole('button', { name: 'Metals' }).click();
-  await expect(page.getByText('TEST', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Metals/ }).click();
+  await expect(
+    page.getByRole('row', { name: 'TEST · Test Company ₹120 2% 75 80 90', exact: true }),
+  ).toBeVisible();
 });

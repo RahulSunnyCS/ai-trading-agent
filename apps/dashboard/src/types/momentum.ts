@@ -86,6 +86,7 @@ export interface MomentumResult {
 
 export interface MomentumSavedRun {
   id: string;
+  created_at: string;
   n: number;
   name: string;
   config: Record<string, unknown>;

@@ -798,7 +798,11 @@ export function MomentumSettingsPanel({
 
       <GroupTitle step={2}>Selection &amp; portfolio</GroupTitle>
 
-      <Accordion title="Ranking rule" description="How instruments are scored each week">
+      <Accordion
+        title="Ranking rule"
+        description="Advanced · how instruments are scored"
+        defaultOpen={false}
+      >
         <RadioCards
           name="score"
           value={score}
@@ -1130,7 +1134,11 @@ export function MomentumSettingsPanel({
       </Accordion>
 
       {customIndex ? (
-        <Accordion title="Inner rotation" description="Stocks within each category">
+        <Accordion
+          title="Inner rotation"
+          description="Advanced · stocks within each category"
+          defaultOpen={false}
+        >
           <Hint>
             Each held category is itself a rotation: its top-K tagged stocks, rotated on their own
             tighter threshold — separate from the category-vs-category rule above.
