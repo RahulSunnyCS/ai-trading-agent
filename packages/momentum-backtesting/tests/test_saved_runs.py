@@ -120,6 +120,18 @@ def test_more_than_ten_runs_prunes_the_oldest_per_dataset(client):
     assert set(ids[2:]) == listed_ids
 
 
+def test_favorite_and_overlay_runs_are_never_pruned(client):
+    favorite = client.post("/api/saved-runs", json=_payload(name="Fav")).json()["id"]
+    overlay = client.post("/api/saved-runs", json=_payload(name="Overlay")).json()["id"]
+    client.patch(f"/api/saved-runs/{favorite}", json={"favorite": True})
+    client.patch(f"/api/saved-runs/{overlay}", json={"overlay": True})
+    for i in range(15):
+        client.post("/api/saved-runs", json=_payload(name=f"Run {i}"))
+    listed_ids = {r["id"] for r in client.get("/api/saved-runs", params={"dataset": "etf"}).json()}
+    assert {favorite, overlay} <= listed_ids
+    assert len(listed_ids) == 12  # 10 ordinary + the two kept ones
+
+
 def test_rerunning_the_same_config_reuses_the_strategy_version(tmp_path):
     with connect() as con:
         first = runs_store.save_run(
