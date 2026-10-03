@@ -201,10 +201,11 @@ the whole portfolio (a comfort dial only), waiting for long-term tax, "make room
 default, (TODO 3.9.27) volume surges, accumulation, the 50-day average and trend-stage
 filters, and (TODO 3.9.31) buying or holding a strong stock through a small pullback: being in
 a pullback does not actually predict a better forward return once you control for how strong
-the stock already is, and the one settings tweak and one hold-through-pullback rule that did
-pass a backtest on their own stopped winning on drawdown the moment either was combined with
-the already-adopted every-2-weeks trading cadence — the same effect expressed twice, not two
-effects.
+the stock already is (an exploratory follow-up found weak evidence it even goes the other way at
+13 weeks — more drawdown and volatility ahead, not less), and the one settings tweak and one
+hold-through-pullback rule that did pass a backtest on their own stopped winning on drawdown the
+moment either was combined with the every-2-weeks trading cadence idea from 3.9.23 (itself not
+something the strategy actually does today) — the same effect expressed twice, not two effects.
 
 Turnaround stocks: the beaten-down-and-recovering screen (`reversal.py`) is a little better than
 keeping 20% of the money in a liquid fund, but costs about 4 points a year against plain

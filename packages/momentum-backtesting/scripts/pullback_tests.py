@@ -21,9 +21,15 @@ Reuses, by import, rather than reimplementing:
   intact"), `forward_returns`, `flag_coefficient`, `bootstrap_ci`, `build_universe` (Broad's
   qualifying pool mask).
 
+P2b (`forward_max_drawdown`, `forward_volatility`, `p2b_predictive_weekly`, all local to this
+script, not levers.py - they are measurement helpers for the predictive test, not a trading
+lever) is exploratory, added to the spec after seeing P2 fail: does a PB name still protect on
+the downside (shallower forward drawdown / lower forward volatility) even though it does not
+predict a better forward return? PB only, run as part of `p2`.
+
 Run from packages/momentum-backtesting:
     uv run python scripts/pullback_tests.py p1   # settings-only variants (cheap; checkpoint)
-    uv run python scripts/pullback_tests.py p2   # predictive test (checkpoint; decides p4)
+    uv run python scripts/pullback_tests.py p2   # predictive test + p2b (checkpoint; decides p4)
     uv run python scripts/pullback_tests.py p3   # exit-side hold
     uv run python scripts/pullback_tests.py p4   # entry ranking (only meaningful if p2 passes)
     uv run python scripts/pullback_tests.py p5   # stacking check against the cadence fix
@@ -47,7 +53,7 @@ import breadth_regime_tests as brt  # noqa: E402
 import overextension_trim_tests as ott  # noqa: E402
 import volume_turnover_tests as vtt  # noqa: E402
 
-from momentum_backtesting import levers  # noqa: E402
+from momentum_backtesting import levers, metrics  # noqa: E402
 from momentum_backtesting.categories import broad  # noqa: E402
 from momentum_backtesting.config import DATA_DIR  # noqa: E402
 from momentum_backtesting.engine import Config  # noqa: E402
@@ -63,6 +69,12 @@ PB_LOW, PB_HIGH = -0.20, -0.05  # 5% to 20% below the 13-week high
 PREDICTIVE_HORIZONS = (1, 4, 13, 26)
 PASS_HORIZONS = (4, 13)
 MIN_NAMES_EACH_SIDE = 3  # the spec's "at least 3 names on each side"
+
+# Known full-sample MaxDD of the plain ("base") Broad run per mode, from p1_{mode}_summary.csv -
+# a sanity anchor `run_p5` checks itself against, so building the cadence-alone baseline in the
+# wrong mode (as happened once: "on" built for an "off" variant, understating MaxDD by ~20pt and
+# giving a false 0% MaxDD win share) fails loudly instead of silently.
+_MODE_BASE_MAXDD = {"on": -0.20392, "off": -0.40385}
 
 
 def _ts(value) -> str:
@@ -228,18 +240,14 @@ def p2_flags(prices: pd.DataFrame, pool: pd.DataFrame, lt: pd.DataFrame):
     return strong, pb, pbr
 
 
-def predictive_weekly(
-    prices: pd.DataFrame,
-    pool: pd.DataFrame,
-    lt: pd.DataFrame,
-    flag: pd.DataFrame,
-    stale: dict | None = None,
+def _predictive_weekly(
+    pool: pd.DataFrame, lt: pd.DataFrame, flag: pd.DataFrame, fwd: dict[int, pd.DataFrame]
 ) -> pd.DataFrame:
-    """Per week: `flag_coefficient` of the forward return on LT (percentile-rank control) and
-    the 0/1 `flag`, for each horizon - within LT-strong names (the flag is only ever 1 for a
-    name already in the pool; LT itself is the control for every pool name so the regression
-    has the same control population `flag_coefficient` expects)."""
-    fwd = {h: vtt.forward_returns(prices, h, stale) for h in PREDICTIVE_HORIZONS}
+    """Per week: `flag_coefficient` of each `fwd[h]` on LT (percentile-rank control) and the
+    0/1 `flag`, within LT-strong names (the flag is only ever 1 for a name already in the
+    pool; LT itself is the control for every pool name so the regression has the same control
+    population `flag_coefficient` expects). Shared by `predictive_weekly` (P2, forward return)
+    and `p2b_predictive_weekly` (P2b, forward drawdown/volatility)."""
     rows = {}
     for week in pool.index:
         names = pool.columns[pool.loc[week].to_numpy(dtype=bool)]
@@ -255,6 +263,60 @@ def predictive_weekly(
             row[f"coef_{h}"] = vtt.flag_coefficient(f.loc[week, names], ctrl, x)
         rows[week] = row
     return pd.DataFrame.from_dict(rows, orient="index")
+
+
+def predictive_weekly(
+    prices: pd.DataFrame,
+    pool: pd.DataFrame,
+    lt: pd.DataFrame,
+    flag: pd.DataFrame,
+    stale: dict | None = None,
+) -> pd.DataFrame:
+    """P2: per week, `flag_coefficient` of the forward return on LT and the 0/1 `flag`, for
+    each of `PREDICTIVE_HORIZONS` - within LT-strong names."""
+    fwd = {h: vtt.forward_returns(prices, h, stale) for h in PREDICTIVE_HORIZONS}
+    return _predictive_weekly(pool, lt, flag, fwd)
+
+
+def forward_max_drawdown(prices: pd.DataFrame, horizon: int) -> pd.DataFrame:
+    """Worst peak-to-trough decline over the next `horizon` weeks, anchored forward from t (the
+    running peak starts at P[t] and only ever rises across t+1..t+horizon) - the standard
+    rolling max-drawdown definition, just forward-looking instead of backward. Always <= 0;
+    0 means the price never dipped below today's level anywhere in the window. NaN once the
+    window runs past the end of the series (`prices.shift(-horizon)` has nothing to compare)."""
+    running_max = prices.copy()
+    dd = pd.DataFrame(0.0, index=prices.index, columns=prices.columns)
+    for k in range(1, horizon + 1):
+        shifted = prices.shift(-k)
+        running_max = np.maximum(running_max, shifted)
+        dd = np.minimum(dd, shifted / running_max - 1)
+    incomplete = prices.shift(-horizon).isna() | prices.isna()
+    return dd.mask(incomplete)
+
+
+def forward_volatility(prices: pd.DataFrame, horizon: int) -> pd.DataFrame:
+    """Population stdev of the `horizon` weekly returns from t+1 to t+horizon. NaN if any of
+    those returns is missing (an incomplete window, same cutoff as `forward_max_drawdown`)."""
+    rets = prices.pct_change(1)
+    stacked = np.stack([rets.shift(-k).to_numpy() for k in range(1, horizon + 1)], axis=0)
+    vol = np.nanstd(stacked, axis=0, ddof=0)
+    vol = np.where(np.isnan(stacked).any(axis=0), np.nan, vol)
+    return pd.DataFrame(vol, index=prices.index, columns=prices.columns)
+
+
+P2B_HORIZONS = (4, 13)
+
+
+def p2b_predictive_weekly(
+    pool: pd.DataFrame, lt: pd.DataFrame, pb: pd.DataFrame, fwd: dict[int, pd.DataFrame]
+) -> pd.DataFrame:
+    """P2b (exploratory, added to the spec and run after seeing P2 fail its return test): does
+    PB protect on the downside even though it does not predict a better forward return? `fwd`
+    must already be signed so that positive = "PB names fell less" - `forward_max_drawdown`
+    as-is (less negative is shallower), or the negative of `forward_volatility` (lower raw vol
+    is calmer, so its negative is "positive = fell less" on the same convention). PB only, not
+    PBR - the spec's own choice, since PBR's much smaller sample already failed P2 outright."""
+    return _predictive_weekly(pool, lt, pb, fwd)
 
 
 def summarise_predictive(weekly: pd.DataFrame, calendar: pd.DatetimeIndex) -> pd.DataFrame:
@@ -360,6 +422,24 @@ def run_p2() -> dict:
     cross = nifty50_cross_check()
     print(cross)
     reports["nifty50_cross_check"] = cross
+
+    print("\n--- P2b (exploratory): does PB protect on the downside? ---")
+    strong_pb = pb.where(strong)
+    strong_lt = lt.where(strong)
+    metrics_fwd = {
+        "drawdown": {h: forward_max_drawdown(prices, h) for h in P2B_HORIZONS},
+        "volatility": {h: -forward_volatility(prices, h) for h in P2B_HORIZONS},
+    }
+    for metric, fwd in metrics_fwd.items():
+        weekly = p2b_predictive_weekly(pool, strong_lt, strong_pb, fwd)
+        summary = summarise_predictive(weekly, calendar)
+        summary.to_csv(out_dir() / f"p2b_{metric}_summary.csv", index=False)
+        weekly.to_csv(out_dir() / f"p2b_{metric}_weekly.csv")
+        passed = p2_pass(summary)
+        print(f"\n--- P2b {metric} ---")
+        print(summary.to_string(index=False))
+        print(f"P2b {metric} pass: {passed}")
+        reports[f"p2b_{metric}"] = {"summary": summary, "pass": passed}
     return reports
 
 
@@ -492,19 +572,40 @@ def run_p4(only: set[str] | None = None) -> pd.DataFrame:
 # ---------------------------------------------------------------------------------------------
 
 
-def run_p5(make_run, label: str, every: int = 2) -> dict:
+def run_p5(make_run, label: str, mode: str, every: int = 2) -> dict:
     """For a passing P1/P3/P4 variant, rerun it on the every-`every`-weeks N-tranche blend and
     compare with that blend alone. If the gain disappears, the two levers are the same effect.
+
+    `mode` must be the SAME category mode ("on" or "off") the passing variant itself used -
+    the cadence-alone baseline is built in that mode too, or the comparison is meaningless
+    (mode off always has a much deeper drawdown than mode on; building the wrong mode's
+    baseline previously produced a false 0% MaxDD win share that was actually just the mode
+    gap, not a stacking result). A runtime assertion below checks the baseline's plain
+    full-sample MaxDD against the known value for that mode (`_MODE_BASE_MAXDD`) and fails
+    loudly rather than silently if the wrong mode was built.
 
     `make_run(rebalance_every=..., rebalance_offset=...) -> RunWindow` must accept those two
     keywords and thread them into the same `run_broad_backtest` call its P1/P3/P4 variant
     uses, exactly like `broad_runner(mode, ranking, **extra)` already does - pass e.g.
-    `lambda **kw: broad_runner("on", ranking, weights=(1, 0, 1, 1, 1), **kw)` for a passing P1
-    weights variant, or a closure built the same way over a P3/P4 ranking."""
+    `lambda **kw: broad_runner("off", ranking, weights=(1, 0, 1, 1, 1), **kw)` for a passing P1
+    weights variant, or a closure built the same way over a P3/P4 ranking - always the same
+    `mode` string passed to this function."""
     from momentum_backtesting import tranches
 
-    print(f"\n=== P5: does '{label}' stack with the every-{every}-weeks cadence fix? ===")
+    print(
+        f"\n=== P5: does '{label}' stack with the every-{every}-weeks cadence fix, mode {mode}? ==="
+    )
     ranking = alpha.broad_ranking()
+
+    base_check = broad_runner(mode, ranking)(pd.Timestamp(alpha.FIXED["full"]), pd.Timestamp(END))
+    base_maxdd = metrics.curve_stats(base_check.equity, base_check.cash)["max drawdown"]
+    expected = _MODE_BASE_MAXDD[mode]
+    if abs(base_maxdd - expected) > 0.01:
+        raise AssertionError(
+            f"run_p5(mode={mode!r}): cadence-alone baseline's plain full-sample MaxDD "
+            f"({base_maxdd:.4f}) does not match the known mode-{mode} base ({expected:.4f}) - "
+            "the cadence-alone baseline was probably built in the wrong mode."
+        )
 
     def blend_of(run_window) -> alpha.RunWindow:
         def run(start, end):
@@ -518,7 +619,7 @@ def run_p5(make_run, label: str, every: int = 2) -> dict:
 
         return run
 
-    cadence_alone = alpha.Memo(blend_of(lambda **kw: broad_runner("on", ranking, **kw)))
+    cadence_alone = alpha.Memo(blend_of(lambda **kw: broad_runner(mode, ranking, **kw)))
     stacked = blend_of(make_run)
 
     study = alpha.Study(

@@ -62,6 +62,18 @@ top 30% by LT (the universe is only about 50 names). Report the sign, even if no
 Pass: the PB or PBR coefficient is positive with an interval excluding zero at both 4 and 13
 weeks, in both halves, with and without 2020, and the Nifty 50 cross-check has the same sign.
 
+### P2b. Downside protection (exploratory; added after seeing P2)
+
+Not pre-registered before the run — decided on seeing P2's result, so treat it as exploratory,
+not confirmatory. Within LT-strong names each week, PB only (not PBR): regress each name's
+forward maximum drawdown, and separately its forward volatility, on LT and the PB flag, same
+4-week block-bootstrap, both halves, with and without 2020, horizons 4 and 13 weeks. Forward max
+drawdown is signed so 0 = never dipped below today's level and more negative = a deeper dip
+(less negative = fell less); forward volatility is negated before the regression so the same
+convention applies (positive coefficient = PB names fell less, on either measure). Same pass
+shape as P2: positive with an interval excluding zero at both horizons, in both halves, with and
+without 2020.
+
 ### P3. Exit side: hold through a small pullback
 
 Category mode off, through custom ranks. For a held stock in PB state, set its rank to no worse
@@ -137,8 +149,13 @@ Baseline: mode on 31.66% / 1.057 / -20.39%; mode off 41.81% / 1.182 / -40.39%.
 Only **p1a (drop the 4-week lookback), category mode off**, passes the full rule. It does not
 pass on, and no variant passes in both modes — the fork caveat (changing the ranking changes
 which categories get selected before the window even starts) applies to every row here, so even
-the one pass is provisional, not a clean settings change. Skip-month, run on Broad for the first
-time, is a clear loser once MaxDD and both halves are checked, matching its ETF result in 3.9.23.
+the one pass is provisional, not a clean settings change. It also comes at a real full-sample
+cost the rolling-window pass rule does not see: mode off's own worst single drawdown deepens
+from -40.4% (base) to -52.8% with p1a, even though p1a's worst-window drawdown is shallower
+than base's *more often than not* across the 28 rolling windows (that is what "MaxDD win share
+71%" measures — a robustness count, not a guarantee against a worse single outcome). Skip-month,
+run on Broad for the first time, is a clear loser once MaxDD and both halves are checked,
+matching its ETF result in 3.9.23.
 
 ### P2. Does the pullback state predict returns?
 
@@ -166,10 +183,33 @@ and 13 weeks, 200 eligible weeks), but PBR's disagrees (negative at both, only 3
 weeks). Because the Broad-pool test already fails on its own terms, this cross-check does not
 change the verdict — it is reported per the spec, not folded into the pass/fail.
 
+### P2b. Downside protection (exploratory, added after seeing P2)
+
+PB only, forward max drawdown and forward volatility (both signed so positive = "PB names fell
+less"), LT-controlled, same 4-week block bootstrap:
+
+| Metric | Horizon | Weeks | Mean | 95% CI | 2017-21 | 2022+ | Ex-2020 mean |
+|---|---|---|---|---|---|---|---|
+| Drawdown | 4w | 139 | -0.32pt | [-0.99, +0.29] | -0.29 | -0.37 | -0.51 |
+| Drawdown | 13w | 139 | -0.73pt | [-1.83, +0.34] | -0.40 | -1.47 | -1.14 |
+| Drawdown | 13w, ex 2020 | 123 | -1.14pt | **[-2.31, -0.02]** | -0.98 | -1.47 | — |
+| Volatility | 4w | 139 | -0.19pt | [-0.54, +0.17] | -0.20 | -0.15 | -0.30 |
+| Volatility | 13w | 139 | -0.37pt | **[-0.71, -0.01]** | -0.15 | -0.89 | -0.50 |
+| Volatility | 13w, ex 2020 | 123 | -0.50pt | **[-0.84, -0.14]** | -0.30 | -0.89 | — |
+
+**P2b fails, and at 13 weeks it points the wrong way.** Both metrics are negative on every row
+(the opposite sign from "protects"), and at the 13-week horizon three of the four cells have a
+95% interval entirely below zero (bold) — ex-2020 drawdown, all-years volatility, and ex-2020
+volatility. So not only does a pullback-flagged name fail to predict a better forward return
+(P2), it also shows weak but statistically non-trivial evidence of a *worse* forward path at 13
+weeks: deeper further drawdown and higher volatility, not calmer. This is exploratory (decided
+after seeing P2, not pre-registered beforehand) and the sample is the same 139/123-week Broad
+pool as P2, so it should be read as a caution against the idea, not a confirmed reversal effect.
+
 **P4 is built (`p4_study`/`run_p4` in `scripts/pullback_tests.py`) but was not run.** The spec
-gates P4 on P2 passing; running it now, after P2 failed, would be a post-hoc fishing expedition
-over a ranking that nothing here supports. Left in place for later if the owner wants the
-building-blocks re-examined on their own.
+gates P4 on P2 passing; running it now, after P2 (and P2b) failed, would be a post-hoc fishing
+expedition over a ranking that nothing here supports. Left in place for later if the owner wants
+the building-blocks re-examined on their own.
 
 ### P3. Exit side: hold through a small pullback
 
@@ -186,26 +226,34 @@ most rolling windows, has a shallower worst drawdown more often than not, and th
 the same in both halves. Hold through PBR (the stricter flag, requiring the turn) does nothing —
 win shares sit at or below 50%, consistent with PBR's much smaller, noisier sample in P2.
 
-### P5. Does it stack with the cadence fix?
+### P5. Does it stack with the every-2-weeks cadence lever?
 
-Only "p1a, mode off" and "hold through PB" qualify to run P5 (the full pass in P1/P3 above).
-Baseline for both: the every-2-weeks, 2-tranche cadence blend alone, mode off, no pullback lever:
-36.32% / 1.248 / -19.85%.
+Only "p1a, mode off" and "hold through PB" qualify to run P5 (the full pass in P1/P3 above). The
+every-2-weeks, 2-tranche cadence blend (3.9.23) is **not an adopted default** — defaults still
+trade every week; the cadence blend is itself a pending owner decision — so this asks only
+whether the pullback lever is a second, independent effect on top of it, not whether either is
+shipped. Baseline for both: the cadence blend alone, **mode off** (matching the variant under
+test — the first run of this section mistakenly built the baseline in mode on, which has a much
+shallower native drawdown, and understated the true MaxDD win share as a false 0%; `run_p5` now
+takes an explicit `mode` and asserts the baseline's plain MaxDD against the known value for that
+mode before using it, so a repeat of this mistake fails loudly): 43.71% / 1.295 / -32.01% (full,
+mode off, un-tranched sanity check -40.4% as expected for a plain mode-off run before blending).
 
-| Stacked variant | Full CAGR/Sharpe/MaxDD | Roll win share CAGR/Sharpe/MaxDD | Median dCAGR | Wins most | DSR |
-|---|---|---|---|---|---|
-| p1a weights 1,0,1,1,1 + cadence | 46.98% / 1.398 / -37.16% | 79% / 54% / **0%** | +10.6pt | Yes | 0.99997 |
-| Hold through PB + cadence | 44.09% / 1.313 / -28.30% | 71% / 50% / **0%** | +6.6pt | No (Sharpe exactly 50%) | 0.99995 |
+| Stacked variant | Full CAGR/Sharpe/MaxDD | Roll win share CAGR/Sharpe/MaxDD | Median dCAGR | 2017-21 | 2022+ | Same dir | Wins most | MaxDD ok | DSR | **Full pass** |
+|---|---|---|---|---|---|---|---|---|---|---|
+| p1a weights 1,0,1,1,1 + cadence | 46.98% / 1.398 / -37.16% | 79% / 79% / 50% | +5.0pt | +4.84 | +5.25 | Yes | Yes | **No** (exactly 50%) | 0.99998 | **No** |
+| Hold through PB + cadence | 44.09% / 1.313 / -28.30% | 57% / 61% / 39% | +0.2pt | -1.88 | +0.55 | **No** | Yes | **No** (39%) | 0.99995 | **No** |
 
-**The gain does not stack cleanly with the cadence fix.** CAGR keeps improving when either lever
-is added on top of the every-2-weeks blend, but the MaxDD win share is exactly **0% in both
-cases** — the stacked variant has a deeper worst drawdown than the cadence blend alone in every
-single one of the 28 rolling windows, with no exception. For "hold through PB" the Sharpe win
-share also drops to exactly 50%, so it no longer even passes "wins most" once cadence is already
-in place. This is the sharpest finding in the whole study: whatever edge p1a and the PB hold
-rule have on their own comes substantially from the same place the cadence fix already found
-(fewer, later trades reacting to the same short-term reversal), and stacking them trades away
-drawdown robustness for a CAGR number that was already mostly captured by the simpler lever.
+**Corrected conclusion: neither variant passes the full rule once stacked on the cadence
+blend, though the numbers are far less dramatic than the mode-bug run first suggested.** With
+the baseline built in the right mode, the CAGR and Sharpe win shares nominally still clear 50%
+for both (so "wins most" holds), but MaxDD does not improve: p1a's MaxDD win share lands exactly
+at 50% (a wash, not a win — the pass rule needs strictly over half), and hold-through-PB's drops
+to 39% (a net loser on drawdown) and its direction flips sign between the two halves. So the
+median CAGR gain from stacking is real but small (+5.0pt for p1a, essentially zero at +0.2pt for
+hold-through-PB) and comes with no drawdown benefit — consistent with the two levers drawing on
+the same short-term-reversal mechanism the cadence blend already captures, rather than adding a
+second, independent one.
 
 ### Plain-English answer
 
@@ -213,23 +261,26 @@ drawdown robustness for a CAGR number that was already mostly captured by the si
 narrow, caveated sense. The direct test of the idea — does being in a pullback state actually
 predict better forward returns for an already-strong stock? — fails (P2): the effect is
 statistically indistinguishable from zero at both the 4- and 13-week horizons that matter, in
-both halves of the sample, with or without 2020. Two mechanical variants of the idea do pass
-the pre-registered backtest rule in isolation — dropping the 4-week lookback from the ranking
-(P1a) and not selling a held name through a brief pullback (P3, hold-through-PB) — but only on
-one of the two category-selection modes each, and the fork caveat (a different ranking changes
-which categories get chosen in the first place) applies to every row that passed, including
-those two.
+both halves of the sample, with or without 2020. An exploratory follow-up (P2b, added after
+seeing P2) asked whether a pullback at least protects on the downside even without predicting a
+better return — it doesn't: at 13 weeks the effect runs the other way, with a statistically
+non-trivial *worse* forward drawdown and higher forward volatility. Two mechanical variants of
+the idea do pass the pre-registered backtest rule in isolation — dropping the 4-week lookback
+from the ranking (P1a) and not selling a held name through a brief pullback (P3,
+hold-through-PB) — but only on one of the two category-selection modes each, the fork caveat (a
+different ranking changes which categories get chosen in the first place) applies to every row
+that passed, and p1a's own full-sample worst drawdown is actually deeper than the plain ranking's
+(-52.8% vs -40.4%) even though it wins more rolling windows than it loses.
 
-**Does it add anything beyond trading less often?** No. That is the decisive result of P5: when
-either passing variant is stacked on top of the already-known every-2-weeks cadence fix (3.9.23),
-the drawdown benefit disappears completely — the stacked backtest has a worse worst-drawdown
-than the cadence-alone blend in literally every one of the 28 rolling windows — and for the P3
-exit-hold variant the Sharpe advantage disappears too (exactly a 50% win share). The surviving
-CAGR gain looks like the same short-term-reversal mechanism the cadence fix already captures,
-expressed a second way, not a second, independent edge. Combined with survivorship bias
-(today's Nifty 50 members backdated — a name that fell into a pullback and never recovered, then
-left the index, is invisible here) and the failed direct predictive test, there is no case for
-building this as a live feature. The one clean, cross-validated finding from the whole exercise
-is the opposite direction from the hint in 3.9.30: this says nothing new is added once the
-cadence lever is in place; nothing here overturns that lever's own standing recommendation.
-Build decisions are left to the owner.
+**Does it add anything beyond trading less often?** No. P5 is the direct test of that question,
+and once the mode bug in the first run is fixed, neither qualifying variant passes the full rule
+when stacked on the every-2-weeks cadence lever from 3.9.23 (itself not an adopted default): the
+CAGR gain shrinks sharply (to near zero for hold-through-PB) and neither gets a MaxDD benefit —
+p1a's MaxDD win share is an exact wash at 50%, and hold-through-PB's is a net loss at 39% with
+the direction of its CAGR gain flipping between the two halves. The surviving edge for p1a looks
+like the same short-term-reversal mechanism the cadence lever already captures, expressed a
+second way, not a clearly second, independent one. Combined with survivorship bias (today's
+Nifty 50 members backdated — a name that fell into a pullback and never recovered, then left the
+index, is invisible here), the failed direct predictive test, and P2b's hint of the opposite
+effect at 13 weeks, there is no case for building this as a live feature. Build decisions are
+left to the owner.
