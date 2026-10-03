@@ -2,7 +2,9 @@
 
 import { Fragment, useMemo, useState } from 'react';
 
+import { useAppRoute } from '../../hooks/useAppRoute';
 import { usePolledResource } from '../../hooks/usePolledResource';
+import { MOMENTUM_SCORE_KINDS, type MomentumScoreKind, oneOf } from '../../lib/routes';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { StateMessage } from '../ui/StateMessage';
@@ -79,7 +81,9 @@ function compareNumbers(
 export function MomentumScoresView() {
   const { data, loading, error, refetch } =
     usePolledResource<MomentumScores>('/api/momentum/scores');
-  const [kind, setKind] = useState<'stocks' | 'sectors'>('stocks');
+  const { rest, navigate } = useAppRoute();
+  const kind: MomentumScoreKind = oneOf(MOMENTUM_SCORE_KINDS, rest[1]) ?? 'stocks';
+  const setKind = (next: MomentumScoreKind) => navigate('momentum', 'scores', next);
   const [query, setQuery] = useState('');
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [selectedStock, setSelectedStock] = useState<StockScore | null>(null);

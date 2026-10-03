@@ -445,6 +445,20 @@ class _Sim:
     # affordability ceiling). Never forces a sale: a holding stays until its rank says sell, and
     # may still be topped up, so a stock that grows past the ceiling is simply held through.
     no_buy: pd.DataFrame | None = None
+    # Circuit locks, fill-week aligned (NOT shifted by signal_delay: they describe the day the
+    # trade would actually fill). uc_locked = stuck at the upper circuit, so nobody sells it to
+    # you: it may not be bought. lc_locked = stuck at the lower circuit, so nobody buys it from
+    # you: a holding may not be sold, trimmed or traded away until the lock lifts. Both None
+    # (default) leave the engine exactly as before.
+    uc_locked: pd.DataFrame | None = None
+    lc_locked: pd.DataFrame | None = None
+
+    def sell_blocked(self, asset: str, week: pd.Timestamp) -> bool:
+        return (
+            self.lc_locked is not None
+            and asset in self.lc_locked.columns
+            and bool(self.lc_locked.at[week, asset])
+        )
 
     def group(self, week: pd.Timestamp, asset: str) -> str | None:
         """The group `asset` counts toward that week, or None (ungrouped / no table supplied)."""
@@ -492,6 +506,8 @@ class _Sim:
     def exit_reason(self, asset: str, week: pd.Timestamp, slack: int = 0) -> str | None:
         """Why a holding must be sold this week, or None to keep it. `slack` widens the exit
         rank for this one holding (see `tax_hold_band`)."""
+        if self.sell_blocked(asset, week):
+            return None  # locked at the lower circuit: no buyer, so it cannot be sold this week
         rank = self.rank(week, asset)
         if pd.isna(rank):
             return "ineligible"
@@ -522,11 +538,12 @@ class _Sim:
                 for n in names
                 if n not in self.membership.columns or bool(self.membership.at[week, n])
             ]
-        if self.no_buy is None:
+        gates = [g for g in (self.no_buy, self.uc_locked) if g is not None]
+        if not gates:
             return names
 
         def blocked(n: str) -> bool:
-            return n in self.no_buy.columns and bool(self.no_buy.at[week, n])
+            return any(n in g.columns and bool(g.at[week, n]) for g in gates)
 
         out = [n for n in names if n in held or not blocked(n)]
         if len(out) >= self.config.top_n:
@@ -622,6 +639,8 @@ def run_backtest(
     mass_exit_weeks: frozenset[pd.Timestamp] | None = None,
     groups: pd.DataFrame | None = None,
     no_buy: pd.DataFrame | None = None,
+    uc_locked: pd.DataFrame | None = None,
+    lc_locked: pd.DataFrame | None = None,
 ) -> Result:
     """`rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ.
     `trade_prices` (signal week x instrument) is what trades fill at and holdings are valued
@@ -656,7 +675,13 @@ def run_backtest(
 
     `no_buy` (week x instrument booleans, True = not buyable that week) blocks NEW purchases only
     - see `_Sim.no_buy`. Shifted by `signal_delay` with the ranks. Broad Momentum uses it for the
-    share-price ceiling, which is about whether a small budget can afford a first share."""
+    share-price ceiling, which is about whether a small budget can afford a first share.
+
+    `uc_locked` / `lc_locked` (week x instrument booleans) model circuit locks on the day a trade
+    would fill: a stock locked at the upper circuit cannot be bought, one locked at the lower
+    circuit cannot be sold or trimmed (so it is held through, and marked down, until the lock
+    lifts). Unlike `no_buy` they are not shifted by `signal_delay`. See
+    categories/circuit_exposure.py for how they are built."""
     names = ranked_universe(includes, config)
     missing = [n for n in [*names, CASH, config.benchmark] if n not in prices]
     if missing:
@@ -704,6 +729,10 @@ def run_backtest(
         no_buy = no_buy.reindex(ranks.index).fillna(False).astype(bool)
     if groups is not None:
         groups = groups.reindex(ranks.index)
+    if uc_locked is not None:
+        uc_locked = uc_locked.reindex(ranks.index).fillna(False).astype(bool)
+    if lc_locked is not None:
+        lc_locked = lc_locked.reindex(ranks.index).fillna(False).astype(bool)
 
     in_window = ranks.index >= pd.Timestamp(config.start)
     if config.end:
@@ -738,6 +767,8 @@ def run_backtest(
         mass_exit_weeks=mass_exit_weeks,
         groups=groups,
         no_buy=no_buy,
+        uc_locked=uc_locked,
+        lc_locked=lc_locked,
     )
     outcome = _run_slots(sim, weeks) if config.portfolio == "slots" else _run_buffer(sim, weeks)
 
@@ -1066,6 +1097,8 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             if cap is not None:
                 total = portfolio_value(week) + proceeds
                 for asset in [a for a in lots if a != _POOL]:
+                    if sim.sell_blocked(asset, week):
+                        continue
                     share = value(asset, week) / total
                     if share > cap + config.cap_band:
                         gross, net, tax = sell(asset, 1 - cap / share, week)
@@ -1081,6 +1114,8 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     share = sum(value(a, week) for a in members) / total
                     if share > gcap + config.cap_band:
                         for asset in members:
+                            if sim.sell_blocked(asset, week):
+                                continue
                             gross, net, tax = sell(asset, 1 - gcap / share, week)
                             reason = f"{label} above the {gcap:.0%} group cap ({share:.0%})"
                             sim.record(week, "TRIM", asset, reason, gross, tax=tax)
@@ -1200,6 +1235,8 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                             continue
                     raised = 0.0
                     for asset in holders:
+                        if sim.sell_blocked(asset, week):
+                            continue
                         gross, net, tax = sell(asset, fraction, week)
                         shown = CASH if asset == _POOL else asset
                         sim.record(week, "TRIM", shown, f"make room for {name}", gross, tax=tax)

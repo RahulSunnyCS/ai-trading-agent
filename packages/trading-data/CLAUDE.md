@@ -20,6 +20,10 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `003_stock_weekly.sql` / `004_stock_weekly_series.sql`: the Nifty 50 stock dataset's
     cached weekly series (`stock_weekly_prices`, `stock_membership_weekly`,
     `stock_weekly_series` for its benchmark TRIs and cash)
+  - `005_stock_action_candidates.sql` / `006_stock_action_scan_state.sql`:
+    large-drop review candidates, persistent split/bonus/crash decisions,
+    cumulative share factors, and the baseline after which new events need
+    user review
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`)
 - `raw/` — gzipped verbatim vendor responses

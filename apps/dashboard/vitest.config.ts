@@ -9,6 +9,9 @@ import { defineConfig } from 'vitest/config';
  * src/frontend being excluded from the root tsconfig's typecheck.
  */
 export default defineConfig({
+  // Component tests (opt in per file with `// @vitest-environment happy-dom`) need JSX compiled
+  // with the automatic runtime, as Next does, instead of requiring React in scope.
+  esbuild: { jsx: 'automatic' },
   test: {
     globals: true,
     environment: 'node',

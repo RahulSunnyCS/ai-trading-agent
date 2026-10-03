@@ -27,10 +27,12 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("002_momentum",),
             ("003_stock_weekly",),
             ("004_stock_weekly_series",),
+            ("005_stock_action_candidates",),
+            ("006_stock_action_scan_state",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 4
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 6
 
 
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):

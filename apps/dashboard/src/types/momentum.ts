@@ -54,6 +54,92 @@ export interface MomentumComparison {
   series: Array<number | null>;
 }
 
+/** An upper-circuit run a held stock went through in the backtest. */
+export interface MomentumCircuitEpisode {
+  symbol: string;
+  direction: 'LC' | 'UC';
+  start: string;
+  end: string;
+  days: number;
+  band_pct: number;
+  /** Cumulative move over the locked sessions, percent. */
+  move_pct: number;
+  /** Share of the portfolio held when the lock began, percent. */
+  portfolio_share_pct: number;
+  /** share x move, percent of the whole portfolio. */
+  portfolio_impact_pct: number;
+  /** A UC run covering the day the backtest bought: not fillable for real. */
+  blocked_entry: boolean;
+  /** Times the backtest held this stock through the same lock. */
+  times_held: number;
+}
+
+/** A lower-circuit run that began while the strategy still held the stock. */
+export interface MomentumCircuitTrapped {
+  symbol: string;
+  start: string;
+  end: string;
+  days: number;
+  band_pct: number;
+  /** Fall over the locked sessions themselves, percent. */
+  move_pct: number;
+  /** sold_during = the sale was filled on a locked day, which live would have been blocked. */
+  exit: 'sold_during' | 'sold_after' | 'still_held';
+  exit_date: string | null;
+  /** Move from the first locked day to the day the strategy actually sold, percent. */
+  realised_move_pct: number;
+  portfolio_share_pct: number;
+  portfolio_impact_pct: number;
+}
+
+/** A lower-circuit run on a stock the strategy had already sold shortly before it began. */
+export interface MomentumCircuitEscaped {
+  symbol: string;
+  start: string;
+  end: string;
+  days: number;
+  band_pct: number;
+  move_pct: number;
+  exit_date: string;
+  days_before: number;
+  portfolio_share_pct: number;
+  /** What the lock would have cost at the position size it had just sold, percent. */
+  avoided_impact_pct: number;
+}
+
+export interface MomentumCircuitRunStats {
+  cagr: number;
+  max_drawdown: number;
+  total_return: number;
+  trades: number;
+}
+
+/** The same backtest with circuit locks ignored and respected. */
+export interface MomentumCircuitRealism {
+  /** True when this run's own numbers are the "respecting" ones. */
+  this_run_respects_locks: boolean;
+  ignoring_locks: MomentumCircuitRunStats;
+  respecting_locks: MomentumCircuitRunStats;
+  /** respecting - ignoring, as a fraction (0.02 = 2 points of CAGR). */
+  cagr_impact: number;
+}
+
+export interface MomentumCircuitExposure {
+  realism?: MomentumCircuitRealism;
+  positions: number;
+  /** Holdings that met at least one band-edge close. */
+  touched: number;
+  episodes: number;
+  blocked_entries: number;
+  blocked_exits: number;
+  lc: MomentumCircuitTrapped[];
+  uc: MomentumCircuitEpisode[];
+  lc_escaped: MomentumCircuitEscaped[];
+  lc_trapped_count: number;
+  lc_escaped_count: number;
+  lc_trapped_sold_during: number;
+}
+
 export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
@@ -80,6 +166,8 @@ export interface MomentumResult {
   crashes: Array<Record<string, unknown>>;
   held_categories?: Array<{ position: number; status: string; category: string; picks: string[] }>;
   missing_symbols?: string[];
+  /** Broad Momentum only; null when it couldn't be computed. */
+  circuit_exposure?: MomentumCircuitExposure | null;
   skipped_categories?: string[];
   fills?: { proxy_trades: number; warnings: string[] };
 }

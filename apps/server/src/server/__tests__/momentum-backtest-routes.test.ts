@@ -41,6 +41,36 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards the liquidity preview query and rejects out-of-range thresholds', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { eligible: 1 }));
+
+    const ok = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/liquidity-preview?min_turnover_cr=2&circuit=true&max_circuit_days=8&universe=all_liquid',
+    });
+    expect(ok.statusCode).toBe(200);
+    const forwarded = String(fetchMock.mock.calls[0]?.[0]);
+    expect(forwarded.startsWith('http://127.0.0.1:8765/api/liquidity-preview?')).toBe(true);
+    for (const part of [
+      'min_turnover_cr=2',
+      'circuit=true',
+      'max_circuit_days=8',
+      'universe=all_liquid',
+    ]) {
+      expect(forwarded).toContain(part);
+    }
+
+    const bad = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/liquidity-preview?min_turnover_cr=-1',
+    });
+    expect(bad.statusCode).toBe(400);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
   it('forwards a backtest request without reimplementing Python validation', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);
@@ -210,6 +240,61 @@ describe('momentum backtest proxy routes', () => {
 
     expect(response.statusCode).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith(upstream, expect.anything());
+    await server.close();
+  });
+
+  it('forwards starting a background backtest job', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(202, { job: { id: 'ab12', status: 'queued' } }));
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/momentum/backtest/jobs',
+      payload: { dataset: 'etf', fresh: true },
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/backtest/jobs',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ dataset: 'etf', fresh: true }),
+      }),
+    );
+    await server.close();
+  });
+
+  it('forwards polling a backtest job and the job list', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { job: { id: 'ab12' } }));
+
+    await server.inject({ method: 'GET', url: '/api/momentum/backtest/jobs/ab12' });
+    await server.inject({ method: 'GET', url: '/api/momentum/backtest/jobs' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/backtest/jobs/ab12',
+      expect.anything(),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/backtest/jobs',
+      expect.anything(),
+    );
+    await server.close();
+  });
+
+  it('rejects a job id that is not hex before it reaches the upstream path', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/backtest/jobs/..%2Fsaved-runs',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
     await server.close();
   });
 

@@ -99,6 +99,16 @@ previously a favourite that failed (e.g. the tax-config bug below) meant the job
 signal, found no usable active result, and exited 0 with nothing sent and no alert, for every
 run, for over a week, before anyone noticed.
 
+**Backtest runs are background jobs too** (2026-10-03): `POST /api/backtest/jobs` (202) →
+`GET /api/backtest/jobs/{id}` / `GET /api/backtest/jobs` (list, no results), proxied at
+`/api/momentum/backtest/jobs*`. `_BacktestJobs` in `api.py` keeps many jobs in memory (30 max,
+lost on restart), runs at most 3 at once (CPU-bound — more only slows each) and queues the
+rest; a `fresh: true` run (`DATA.reset()`) runs alone so it never wipes caches under another
+run. The synchronous `POST /api/backtest` still exists (tests, scripts). The dashboard side is
+`apps/dashboard/src/store/momentumRuns.ts`: a module-level store + poller (so runs survive
+leaving the page; in-flight ones are mirrored to localStorage) rendered as one tab per run in
+`MomentumBacktestingView.tsx`; finished runs are auto-saved as Saved runs by the store.
+
 `POST /api/weekly/run` (`api.py`, proxied at `/api/momentum/weekly/run`) backs the dashboard
 Momentum tab's "Weekly signal" section and runs the same all-favourites orchestration as the
 CLI and scheduled job: every favourite is evaluated, while only the one global active
@@ -187,6 +197,23 @@ contract, not a shared service).
   (`compute_universe_ranking`, `compute_category_selection*`,
   `run_broad_backtest`) — a pure, no-P&L ranking layer that feeds `engine.py`
   a derived rank table rather than duplicating its buy/sell logic.
+- `categories/liquidity.py` — Broad Momentum's tradability gate (turnover, price, EQ-series, circuit
+  rules; TODO 3.9.24) and the whole-market member list (`market_members_by_year`, INE ISINs only).
+  `broad.load_stock_universe_frame(liquidity=..., universe="all_liquid")` applies it to point-in-time
+  membership, and `compute_universe_ranking` re-applies it to the quarterly pool every week. The
+  expensive SQL features are cached per catalog version, so thresholds are cheap to change. The
+  newest bhavcopy day can lag the Fyers top-up (which covers only the Total Market pool), so
+  `preview` reports the last *full* week and a warning. `rebalance.live_broad_ranking` accepts the
+  gate, but the API refuses the whole-market universe there. Keep new Broad request fields in
+  `get_broad_ranking`'s cache key, or stale rankings will be served.
+- `categories/circuit_exposure.py` — post-hoc, display-only: walks a Broad backtest's holding periods
+  (`holding_periods`) over the daily bars and reports the worst lower/upper-circuit runs it held
+  through (`circuit_exposure`, payload key `circuit_exposure`). An open position has a `NaT` sell
+  date, not `None` — use `pd.isna`. It must never change a backtest's result or fail a run.
+  `lock_masks` builds the `uc_locked`/`lc_locked` tables `engine.run_backtest` accepts (buy blocked
+  while upper-locked, sell/trim blocked while lower-locked, fill-week aligned); only
+  `broad_respect_circuits` turns them on, and `api._circuit_realism` runs the opposite setting so
+  the card can show CAGR both ways.
 - `categories/momentum_scores.py` — per-stock/sector percentile momentum
   scoring for the Momentum Scores UI page (a cheap single-week snapshot, not
   a full backtest).

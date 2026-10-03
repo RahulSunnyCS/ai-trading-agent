@@ -1,147 +1,19 @@
-"""Per-stock weekly price series for the category-momentum inner backtest, with
-naive corporate-action-like-event detection -- Piece A of the category-momentum
-feature (see the task brief; Piece B, the inner/outer composition, is
-categories/compose.py).
+"""Build weekly stock prices for category and Broad Momentum backtests.
 
-**Scope, deliberately narrow**: no dividend/rights/scheme/demerger *adjustment*
-of any kind. This module never tries to compute a return-preserving adjustment
-factor (that is what stocks/adjust.py's total-return machinery does, for a much
-narrower Nifty-50-only dataset, for a different purpose -- see that package's
-own module docstring). The only thing detected here is: was a big single-day
-price move a *mechanical* corporate-action-like event (split/bonus/demerger --
-anything that mechanically changes what a share represents) or a genuine market
-move (crash, rally, business news)? On a detected event, the symbol is simply
-split into two synthetic instruments at that point -- no attempt to preserve
-price continuity across it. See "Detection rule" and "Split, don't adjust"
-below.
+Verified split and bonus events from ``stock_action_candidates`` are applied to
+*earlier* raw daily closes as share-count multipliers, preserving the return
+through the ex-date. These factors come from matching an explicit NSE filing or
+a saved human review; the volume/turnover estimate alone never authorizes an
+adjustment. ``return_raw_weekly`` also returns unadjusted closes, used for the
+max-entry-price cap and live LTP comparisons.
 
-**Detection rule**: for any day where `close` drops >= `min_drop_pct` (default
-15%) vs the prior trading day's close, look at the turnover ratio
-`turnover[t] / turnover[t-1]` (turnover = rupee value traded, i.e. price x
-volume -- already a daily.parquet column, not derived). If turnover did NOT
-spike several-fold (< `turnover_spike_multiple`, default 3x), the drop is
-treated as corporate-action-like: a mechanical share-count/face-value change
-moves the price without anyone actually selling in a panic, so volume stays
-normal (or even *drops*, since fewer shares now change hands for the same
-rupee interest -- see ONGC below). A drop accompanied by a genuine turnover
-spike is treated as a real market move: an unmechanical crash needs someone to
-actually sell into it.
-
-**Threshold justification (3x, tested 2026-09 against real daily.parquet
-rows)**:
-  - ONGC's real 2011-02-08 bonus+split: close -76.4%, turnover ratio 0.52x
-    (turnover roughly *halved* -- verified against this exact dataset. This
-    package README/brief's own reference example).
-  - Policybazaar's real 2026-09-24 crash (confirmed genuine business news, not
-    a CA): close -36.0%, turnover ratio 7.57x (verified).
-  - A broader sweep of well-known large-cap splits/bonuses in this dataset
-    (TATAMOTORS 2011-09-12 face-value split, ratio 1.05x; ICICIBANK 2014-12-04
-    split, 1.14x; INFY's three bonus/split events 2014-2018, 0.53-1.43x; WIPRO's
-    three bonuses 2017-2024, 0.72-1.38x; BAJFINANCE's 2016 split and its
-    documented 2025-06-16 bonus+split (see stocks/schemas.py's EventKind
-    docstring), 0.63x/0.70x; GRASIM's 2016 demerger, 2.24x; TATASTEEL's 2022
-    10:1 split, 2.72x) all cluster well under 3x, with the highest at 2.72x.
-  - A sweep of confirmed genuine, news-driven crashes (INFY's 2019 whistleblower
-    crash, 7.70x; YESBANK's 2018/2019/2020 crisis days, 3.27-13.8x; DHFL's 2018
-    IL&FS-crisis-adjacent crash, 13.2x; PC Jeweller's 2018 crashes, 10.8-14.5x;
-    RCom's 2017 crash, 6.71x) all cluster well above 3x, with the lowest
-    comfortably-genuine case at 3.27x -- and even that one (YESBANK) also has a
-    same-week corroborating event above 7x.
-  - 3x sits in the gap between 2.72x (highest confirmed real CA) and 3.27x
-    (lowest confirmed genuine crash) for every case checked. It is not a
-    precisely optimal boundary -- there is no such thing with only ~15 hand
-    labelled points -- but it is a reasonable, documented, testable default,
-    and it is a `min_drop_pct`/`turnover_spike_multiple` keyword on every
-    function below so a caller can retune it without touching this module.
-
-**Known limitation -- correlated market-wide crashes (flag for review, not
-solved here)**: this rule has one confirmed false-positive mode. During the
-COVID March-2020 crash week, several large-caps show a >=15% single-day drop
-with a turnover ratio *below* 3x (e.g. ICICIBANK 2020-03-23 at 0.55x,
-BAJFINANCE 2020-03-23 at 0.68x, GRASIM 2020-03-23 at 1.21x -- verified against
-this dataset), because the *previous* day was already an elevated-volume panic
-day, so day-over-day turnover doesn't "spike" even though the move is a
-genuine, market-wide, news-driven event, not a mechanical one. The brief for
-this task specifies exactly the turnover-ratio rule above (no market-breadth
-cross-check); implementing a broader "was this move genuinely single-stock, or
-did most of the market move together that day" heuristic is a real, separate
-design decision. This is flagged here deliberately rather than silently
-papered over -- a caller running this over a period spanning March 2020 should
-expect a small number of false-positive splits around 2020-03-09..2020-03-24
-and sanity-check that window specifically.
-
-**Known limitation -- the opposite failure, a real split/bonus with a genuine
-turnover spike on its own ex-date (flag for review, not solved here; TODO.md
-3.9.21)**: confirmed live 2026-09-29 against this exact dataset. AIIL (Authum
-Investment & Infrastructure) had a real bonus issue around 2026-01-13 (close
-3098.6 -> 667.9, -78.4%, consistent with NSE's reported ~4:1 bonus ratio and
-corroborated by AIIL's own reported all-time-high of ~683 shortly after, at
-the new post-bonus price level) -- but same-day turnover was 257.6 Cr against
-44.4 Cr the prior day, a 5.81x ratio, comfortably *above* `turnover_spike_
-multiple` (3.0x). `detect_events` therefore never flags this day at all (the
-`turnover_ratio < turnover_spike_multiple` condition fails), AIIL's price
-series is never split, and this single stock's column silently carries a
-fake -78% "return" into any backtest ranking it over that period. Root cause:
-unlike the well-behaved historical splits/bonuses this module's 3x threshold
-was tuned against (see "Threshold justification" above, all comfortably
-<=2.72x), a corporate action's own record/ex-date can itself draw genuine
-elevated trading (arbitrage, index-linked flows, retail reaction to the
-lower post-event price) large enough to clear the same multiple used to spot
-a genuine crash -- so single-day turnover ratio alone cannot reliably
-separate this case from a real market move; simply raising the 3x threshold
-would fix this instance but reopens the door to misclassifying genuine
-crashes as mechanical (the lowest confirmed genuine crash in this dataset,
-YESBANK, sits at 3.27x -- barely above 3x, so a fix that raises the multiple
-enough to clear 5.81x would very likely swallow real crashes too, trading
-one failure mode for a worse one; not attempted here). A more promising fix
-direction, not implemented here because it is a real design change to a
-shared price-adjustment path every backtest depends on: cross-check a
-turnover-spike candidate against `stocks/corporate_actions.py`'s existing
-NSE whole-market corporate-actions feed fetcher (symbol/date/subject, not
-Nifty-50-scoped) before falling back to the turnover-ratio heuristic alone --
-a real bonus/split filing on/near the candidate date would settle the
-classification independent of that day's turnover, at the cost of a new
-fetch/cache dependency this module doesn't currently have for the 755-name
-Total Market universe. Flagged here deliberately, mirroring the false-
-positive limitation above, rather than silently left for the next person to
-rediscover.
-
-**Split, don't adjust**: on a detected event, the symbol's price history is
-partitioned at that point into two (or, over repeated events, more) synthetic
-column names: `TICKER` keeps everything up to (not including) the event, and
-`TICKER#2` starts fresh from the event onward; a third event on the same
-underlying symbol produces `TICKER#3`, and so on. This is deliberately the
-*same* treatment for every detected event, not just demergers -- there is no
-reliable columns-only signal (this dataset has no corporate-action-kind label,
-unlike stocks/events.parquet's curated feed) to distinguish "clean bonus,
-preserve continuity" from "demerger, the old entity's economics genuinely end
-here", so resetting is the uniform, safe default. See
-categories/compose.py and engine.py's own module docstring for why splitting
-(rather than adjusting) needs no engine.py change: a column whose valid prices
-simply stop is exactly `_Sim.exit_reason`'s existing "rank went NaN -> force
-sell" path, and a column that only starts partway through is exactly how a
-newly-listed instrument already becomes eligible today (once it has a full
-lookback window of history).
-
-**Detection granularity: daily, snapped to the week boundary**. Detection
-itself runs on the *daily* close/turnover series (not the weekly-resampled
-one): a single bad day would otherwise get diluted into a Friday-over-Friday
-return if only the weekly series were checked, which could both miss real
-events (the drop lands mid-week, largely offset by the rest of that week's
-move by Friday) and misattribute the timing of ones it did catch. Once an
-event's exact daily date is found, the split point is snapped to the *Monday
-of that date's trading week* (Mon-Fri, labelled by `sources.weekly`'s own
-W-FRI convention) rather than the exact day: the whole week containing the
-event is assigned wholly to the *new* segment, and the previous week is the
-last one wholly in the *old* segment. This avoids a transition week where the
-old segment holds a stale (pre-event) Friday resample value and the new
-segment simultaneously starts populating for the *same* week x symbol column
-pair (the two would otherwise sit awkwardly close together mid-week, and
-`run_backtest`'s ranking is week-granular, not daily, so a same-week
-old/new-both-partial overlap has no clean interpretation for it). This is
-the one place this module deviates from "exactly the reported daily event
-date" -- documented here per the brief's request to verify and justify this
-choice rather than silently assume it.
+For events without a confirmed share factor, the older daily heuristic still
+splits a symbol into synthetic segments when its close drops at least 15% and
+rupee turnover rises less than 3x. A reviewed genuine crash is exempted from
+that segmentation. Demergers, rights, special dividends, and unresolved large
+drops require separate valuation work; the heuristic can still mishandle those.
+The split point is snapped to the Monday of the event week so weekly columns
+do not overlap within a partial week.
 """
 
 from __future__ import annotations
@@ -314,7 +186,11 @@ def build_stock_weekly_prices(
     min_drop_pct: float = DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     carry_forward_stopped_segments: bool = True,
-) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, pd.Timestamp]]:
+    return_raw_weekly: bool = False,
+) -> (
+    tuple[pd.DataFrame, pd.DataFrame, dict[str, pd.Timestamp]]
+    | tuple[pd.DataFrame, pd.DataFrame, dict[str, pd.Timestamp], pd.DataFrame]
+):
     """The main entry point: given a set of stock symbols (typically from
     `resolve_category_members`), build a weekly (Friday-close) price
     DataFrame (columns = symbol, or `symbol#N` for a post-event segment;
@@ -400,24 +276,60 @@ def build_stock_weekly_prices(
     """
     daily = load_daily_prices(symbols, stocks_data_dir=stocks_data_dir)
     if daily.empty:
-        return pd.DataFrame(), pd.DataFrame(columns=list(EVENT_COLUMNS)), {}
+        empty = (pd.DataFrame(), pd.DataFrame(columns=list(EVENT_COLUMNS)), {})
+        return (*empty, pd.DataFrame()) if return_raw_weekly else empty
+
+    # Confirmed exchange filings supply share-count factors. Back-adjust only
+    # earlier closes; this preserves economic returns through splits/bonuses.
+    # The raw closes are kept separately for the per-share entry price ceiling.
+    raw_daily = daily.copy()
+    from trading_data.db import connect, data_root
+
+    from momentum_backtesting import db_read, stock_actions
+
+    actions = {}
+    crashes: set[tuple[str, pd.Timestamp]] = set()
+    if db_read.catalog_mtime() is not None:
+        with connect(data_root(), read_only=True) as con:
+            if db_read._has_table(con, "stock_action_candidates"):
+                wanted = daily["symbol"].unique().tolist()
+                actions = stock_actions.confirmed_factors(con, wanted)
+                crashes = stock_actions.classified_crashes(con, wanted)
+    symbol_indices = daily.groupby("symbol", sort=False).indices
+    for symbol, events_for_symbol in actions.items():
+        indices = symbol_indices.get(symbol)
+        if indices is None:
+            continue
+        for ex_date, factor in events_for_symbol:
+            before = indices[daily.loc[indices, "date"].to_numpy() < ex_date.to_datetime64()]
+            daily.loc[before, "close"] /= factor
 
     events = detect_events(
         daily, min_drop_pct=min_drop_pct, turnover_spike_multiple=turnover_spike_multiple
     )
+    if crashes and not events.empty:
+        events = events.loc[
+            ~events.apply(lambda row: (row.symbol, row.event_date) in crashes, axis=1)
+        ].reset_index(drop=True)
     events_by_symbol = events.groupby("symbol")["event_date"].apply(list).to_dict()
 
     weekly_columns: dict[str, pd.Series] = {}
+    raw_weekly_columns: dict[str, pd.Series] = {}
     new_column_by_symbol_boundary: dict[str, str] = {}
     non_terminal_columns: list[str] = []
     for symbol, group in daily.groupby("symbol", sort=True):
         close = group.set_index("date")["close"].sort_index()
         close = close[~close.index.duplicated(keep="last")]
+        raw_close = None
+        if return_raw_weekly:
+            raw_close = raw_daily.loc[group.index].set_index("date")["close"]
         segments, boundary_names, non_terminal_names = build_symbol_segments(
             close, symbol, events_by_symbol.get(symbol, [])
         )
         for name, seg in segments.items():
             weekly_columns[name] = weekly(seg)
+            if raw_close is not None:
+                raw_weekly_columns[name] = weekly(raw_close.reindex(seg.index))
         for boundary, name in boundary_names:
             new_column_by_symbol_boundary[(symbol, boundary)] = name
         non_terminal_columns.extend(non_terminal_names)
@@ -450,4 +362,10 @@ def build_stock_weekly_prices(
         ]
         events_out = events_out[list(EVENT_COLUMNS)]
 
+    if return_raw_weekly:
+        raw_frame = pd.DataFrame(raw_weekly_columns).reindex(frame.index)
+        if carry_forward_stopped_segments:
+            for col in stale_columns_to_fill:
+                raw_frame[col] = raw_frame[col].ffill()
+        return frame, events_out, stale_columns, raw_frame
     return frame, events_out, stale_columns

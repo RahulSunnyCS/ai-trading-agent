@@ -1,21 +1,28 @@
 'use client';
 
 import {
+  AlertCircle,
   ArrowUp,
   CheckCircle2,
   ChevronDown,
+  Clock,
   Link as LinkIcon,
   Loader2,
   Play,
   RefreshCw,
   RotateCw,
+  X,
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { useAppRoute } from '../hooks/useAppRoute';
 import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { cn } from '../lib/cn';
+import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
+import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
+import { MomentumCircuitExposureCard } from './momentum/MomentumCircuitExposure';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
 import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
 import {
@@ -38,9 +45,8 @@ import { Button } from './ui/Button';
 import { StateMessage } from './ui/StateMessage';
 
 type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
-type Section = 'backtest' | 'scores' | 'saved' | 'weekly' | 'rebalance';
 
-const SECTIONS: Array<{ id: Section; label: string; description: string }> = [
+const SECTIONS: Array<{ id: MomentumSection; label: string; description: string }> = [
   {
     id: 'backtest',
     label: 'Backtest',
@@ -143,12 +149,126 @@ async function fetchSavedRuns(dataset: Dataset): Promise<MomentumSavedRun[]> {
   return response.ok ? response.data : [];
 }
 
+const DATASET_SHORT: Record<string, string> = {
+  etf: 'ETF',
+  stock: 'Stocks',
+  custom_index: 'Custom',
+  broad: 'Broad',
+};
+
+/** One tab per run - queued, running, finished or failed - so runs can go side by side. */
+function MomentumRunTabs({
+  runs,
+  activeId,
+  now,
+  onSelect,
+  onClose,
+}: {
+  runs: MomentumRun[];
+  activeId: string | null;
+  now: number;
+  onSelect: (run: MomentumRun) => void;
+  onClose: (run: MomentumRun) => void;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Backtest runs"
+      className="flex gap-2 overflow-x-auto rounded-xl border border-border bg-surface p-2"
+    >
+      {runs.map((run) => {
+        const inFlight = run.status === 'queued' || run.status === 'running';
+        const selected = run.id === activeId;
+        const seconds = Math.max(
+          0,
+          Math.floor(((inFlight ? now : (run.finishedAt ?? now)) - run.startedAt) / 1000),
+        );
+        return (
+          <div
+            key={run.id}
+            className={cn(
+              'flex shrink-0 items-center rounded-lg border text-sm transition-colors',
+              selected
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-surface-2/30 text-muted hover:border-border-strong hover:text-foreground',
+            )}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => onSelect(run)}
+              className="flex items-center gap-2 rounded-l-lg px-3 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {run.status === 'queued' ? (
+                <Clock className="h-3.5 w-3.5" aria-label="queued" />
+              ) : run.status === 'running' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="running" />
+              ) : run.status === 'done' ? (
+                <CheckCircle2 className="h-3.5 w-3.5 text-positive" aria-label="done" />
+              ) : (
+                <AlertCircle className="h-3.5 w-3.5 text-negative" aria-label="failed" />
+              )}
+              <span className="font-medium">{run.label}</span>
+              <span className="text-xs opacity-70">
+                {DATASET_SHORT[run.dataset] ?? run.dataset}
+              </span>
+              <span className="font-mono text-xs tabular-nums opacity-70">{seconds}s</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onClose(run)}
+              aria-label={`Close ${run.label}`}
+              title={
+                inFlight ? 'Hide this tab (the run keeps going on the server)' : 'Close this tab'
+              }
+              className="rounded-r-lg px-1.5 py-1.5 opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function MomentumBacktestingView() {
   // Lives here, not in the Weekly view, so the section tab can show that a run is still
   // going after the user has moved to another section.
   const weekly = useMomentumWeeklyJob();
-  const [section, setSection] = useState<Section>('backtest');
-  const [dataset, setDataset] = useState<Dataset>('etf');
+  const { rest, navigate } = useAppRoute();
+  const section: MomentumSection = oneOf(MOMENTUM_SECTIONS, rest[0]) ?? 'backtest';
+  const urlDataset = section === 'backtest' ? oneOf(MOMENTUM_DATASETS, rest[1]) : null;
+  const runs = useMomentumRunsStore((state) => state.runs);
+  const activeRunId = useMomentumRunsStore((state) => state.activeId);
+  const activeRun = runs.find((run) => run.id === activeRunId) ?? null;
+  // Seeds the settings from the run you were looking at when you left this page (first load only).
+  const mountSeedRef = useRef<Record<string, unknown> | null>(activeRun?.config ?? null);
+  const [dataset, setDatasetState] = useState<Dataset>(() => {
+    if (urlDataset && VISIBLE_DATASET_IDS.has(urlDataset)) return urlDataset;
+    const initial = activeRun?.dataset;
+    return initial === 'etf' ||
+      initial === 'stock' ||
+      initial === 'custom_index' ||
+      initial === 'broad'
+      ? initial
+      : 'etf';
+  });
+  // The URL carries section + dataset (/momentum/backtest/broad), so a refresh or a pasted link
+  // reopens the same view; back/forward flows in through urlDataset.
+  useEffect(() => {
+    if (urlDataset && VISIBLE_DATASET_IDS.has(urlDataset) && urlDataset !== dataset) {
+      setDatasetState(urlDataset);
+    }
+  }, [urlDataset, dataset]);
+  function setDataset(next: Dataset): void {
+    setDatasetState(next);
+    if (section === 'backtest') navigate('momentum', 'backtest', next);
+  }
+  function setSection(next: MomentumSection): void {
+    navigate('momentum', next, next === 'backtest' ? dataset : undefined);
+  }
   const [meta, setMeta] = useState<MomentumMeta | null>(null);
   const [core, setCore] = useState<CoreSettings>({
     start: '',
@@ -161,21 +281,37 @@ export function MomentumBacktestingView() {
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
+  const [starting, setStarting] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const [runInfo, setRunInfo] = useState<MomentumRunInfo | null>(null);
   const [doneNoticeAt, setDoneNoticeAt] = useState<number | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   // Why the LAST Run click produced no new results (a validation message, or the server's 4xx/5xx).
   // Kept apart from `error` (data failed to load) on purpose: after a failed run the previous
   // results stay on screen, and the reason must be visible right where Run was clicked.
-  const [runError, setRunError] = useState<string | null>(null);
-  const [runningFresh, setRunningFresh] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const runErrorRef = useRef<HTMLDivElement>(null);
-  const [result, setResult] = useState<MomentumResult | null>(null);
-  const [lastRunConfig, setLastRunConfig] = useState<Record<string, unknown> | null>(null);
+  // Everything about "the run on screen" is derived from the store, so it survives leaving
+  // this page and several runs can be in flight at once (one tab each).
+  const running =
+    activeRun !== null && (activeRun.status === 'queued' || activeRun.status === 'running');
+  const runningFresh = running && activeRun.fresh;
+  const runStartedAt = running ? activeRun.startedAt : null;
+  const result: MomentumResult | null = activeRun?.result ?? null;
+  const lastRunConfig = activeRun?.status === 'done' ? activeRun.config : null;
+  const runError = startError ?? (activeRun?.status === 'failed' ? activeRun.error : null);
+  const runInfo: MomentumRunInfo | null =
+    activeRun?.status === 'done' && activeRun.finishedAt !== null
+      ? {
+          finishedAt: activeRun.finishedAt,
+          durationMs: activeRun.finishedAt - activeRun.startedAt,
+          savedAs: activeRun.savedAs,
+          fresh: activeRun.fresh,
+        }
+      : null;
+  const inFlightCount = runs.filter(
+    (run) => run.status === 'queued' || run.status === 'running',
+  ).length;
   const [savedRuns, setSavedRuns] = useState<MomentumSavedRun[]>([]);
   const [savedRunError, setSavedRunError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -227,10 +363,7 @@ export function MomentumBacktestingView() {
   async function loadMeta(nextDataset: Dataset, seed?: Record<string, unknown>): Promise<void> {
     setLoading(true);
     setError(null);
-    setRunError(null);
-    setResult(null);
-    setLastRunConfig(null);
-    setRunInfo(null);
+    setStartError(null);
     const response = await apiGet<MomentumMeta>(`/api/momentum/meta?dataset=${nextDataset}`);
     setLoading(false);
     if (!response.ok) {
@@ -263,13 +396,33 @@ export function MomentumBacktestingView() {
     );
   }
 
+  useEffect(() => {
+    hydrateMomentumRuns();
+  }, []);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadMeta is redefined every render; it should only re-run when the dataset itself changes
   useEffect(() => {
     setSavedRuns([]);
     setSavedRunError(null);
     void fetchSavedRuns(dataset).then(setSavedRuns);
-    void loadMeta(dataset);
+    const seed = mountSeedRef.current;
+    mountSeedRef.current = null;
+    void loadMeta(dataset, seed && seed.dataset === dataset ? seed : undefined);
+    // Show a run of the dataset you switched to (a tab picked from another dataset already
+    // matches and is left alone), else nothing.
+    const { runs: all, activeId, setActive } = useMomentumRunsStore.getState();
+    if (all.find((run) => run.id === activeId)?.dataset !== dataset) {
+      setActive([...all].reverse().find((run) => run.dataset === dataset)?.id ?? null);
+    }
   }, [dataset]);
+
+  // A run that finishes while you are on this page refreshes the saved-runs list (the store
+  // auto-saves it) so overlays and the "Saved runs" count are current.
+  const savedKey = runs.map((run) => run.savedAs ?? '').join('|');
+  // biome-ignore lint/correctness/useExhaustiveDependencies: savedKey is the trigger
+  useEffect(() => {
+    void fetchSavedRuns(dataset).then(setSavedRuns);
+  }, [savedKey]);
 
   function loadSettings(run: MomentumSavedRun): void {
     const config = run.config;
@@ -332,61 +485,38 @@ export function MomentumBacktestingView() {
    */
   async function runBacktest({ fresh = false }: { fresh?: boolean } = {}): Promise<void> {
     let config: Record<string, unknown>;
-    setRunError(null);
+    setStartError(null);
     try {
       config = buildConfig();
     } catch (cause) {
-      setRunError(cause instanceof Error ? cause.message : String(cause));
+      setStartError(cause instanceof Error ? cause.message : String(cause));
       return;
     }
-    const startedAt = Date.now();
-    setRunStartedAt(startedAt);
-    setNow(startedAt);
-    setRunning(true);
-    setRunningFresh(fresh);
     setError(null);
-    const response = await apiPost<MomentumResult>(
-      '/api/momentum/backtest',
-      fresh ? { ...config, fresh: true } : config,
-    );
-    setRunning(false);
-    setRunningFresh(false);
-    setRunStartedAt(null);
-    if (!response.ok) {
-      setRunError(response.error);
-      return;
-    }
-    const finishedAt = Date.now();
-    setResult(response.data);
-    setLastRunConfig(config);
-    setRunInfo({ finishedAt, durationMs: finishedAt - startedAt, savedAs: null, fresh });
-    setSettingsOpen(false);
-    const kpis = response.data.kpis;
-    const sequence = Math.max(0, ...savedRuns.map((run) => run.n)) + 1;
-    const saved = await apiPost<MomentumSavedRun>('/api/momentum/saved-runs', {
-      dataset,
-      name: `Run ${sequence}`,
-      config,
-      kpis: {
-        cagr: typeof kpis.cagr === 'number' ? kpis.cagr : null,
-        excess_cagr: typeof kpis.excess_cagr === 'number' ? kpis.excess_cagr : null,
-        max_drawdown: typeof kpis.max_drawdown === 'number' ? kpis.max_drawdown : null,
-        sharpe: typeof kpis.sharpe === 'number' ? kpis.sharpe : null,
-        turnover_per_year:
-          typeof kpis.turnover_per_year === 'number' ? kpis.turnover_per_year : null,
-        avg_holdings: typeof kpis.avg_holdings === 'number' ? kpis.avg_holdings : null,
-      },
-      dates: response.data.series.dates,
-      strategy: response.data.series.strategy,
-      overlay: false,
-    });
-    if (saved.ok) {
-      setSavedRuns(await fetchSavedRuns(dataset));
-      setRunInfo((info) =>
-        info?.finishedAt === finishedAt ? { ...info, savedAs: saved.data.name } : info,
-      );
-    }
+    setStarting(true);
+    const failure = await useMomentumRunsStore.getState().startRun(dataset, config, fresh);
+    setStarting(false);
+    if (failure) setStartError(failure);
   }
+
+  // When the run on screen finishes while you are here, tuck the settings away and, if the
+  // summary is out of view, say so where you are looking. Switching to an already-finished tab
+  // changes the run id, so it does neither.
+  const watchedRef = useRef<{ id: string | null; running: boolean }>({ id: null, running: false });
+  // Layout effect, not requestAnimationFrame: it measures the freshly committed layout
+  // immediately, even in a background tab where animation frames are paused.
+  useLayoutEffect(() => {
+    const prev = watchedRef.current;
+    const nowDone = activeRun?.status === 'done';
+    watchedRef.current = { id: activeRun?.id ?? null, running };
+    if (!(prev.running && prev.id === activeRun?.id && nowDone)) return;
+    setSettingsOpen(false);
+    const rect = summaryRef.current?.getBoundingClientRect();
+    // The header + headline numbers sit at the card's top edge; a sliver of its bottom
+    // peeking into view doesn't count as "seen".
+    const visible = rect !== undefined && rect.top > 56 && rect.top < window.innerHeight - 120;
+    setDoneNoticeAt(visible ? null : (activeRun?.finishedAt ?? Date.now()));
+  }, [activeRun?.id, activeRun?.status, activeRun?.finishedAt, running]);
 
   // A failed run leaves the previous results on screen, so bring the reason into view: the Run
   // button sits at the bottom of a long form and the user would otherwise see nothing happen.
@@ -396,31 +526,19 @@ export function MomentumBacktestingView() {
 
   // Ticks the elapsed-time readout while a run is in flight.
   useEffect(() => {
-    if (runStartedAt === null) return;
+    if (inFlightCount === 0) return;
+    setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(timer);
-  }, [runStartedAt]);
+  }, [inFlightCount]);
   const elapsedMs = runStartedAt === null ? 0 : Math.max(0, now - runStartedAt);
 
-  // When a run lands while the summary is scrolled out of view (e.g. you were reading the
-  // chart), say so where you are looking, with a way back up — nothing if it's already on screen.
   const finishedAt = runInfo?.finishedAt ?? null;
-  // Layout effect, not requestAnimationFrame: it measures the freshly committed layout
-  // immediately, even in a background tab where animation frames are paused.
-  useLayoutEffect(() => {
-    if (finishedAt === null) return;
-    const rect = summaryRef.current?.getBoundingClientRect();
-    // The header + headline numbers sit at the card's top edge; a sliver of its bottom
-    // peeking into view doesn't count as "seen".
-    const visible = rect !== undefined && rect.top > 56 && rect.top < window.innerHeight - 120;
-    setDoneNoticeAt(visible ? null : finishedAt);
-  }, [finishedAt]);
   useEffect(() => {
     if (doneNoticeAt === null) return;
     const timer = setTimeout(() => setDoneNoticeAt(null), 6000);
     return () => clearTimeout(timer);
   }, [doneNoticeAt]);
-  const elapsedLabel = `${Math.floor(elapsedMs / 1000)}s`;
 
   // Ctrl/Cmd+Enter runs the backtest from anywhere in the settings panel. A ref keeps the
   // handler reading the latest run() without re-attaching the listener on every keystroke.
@@ -529,11 +647,28 @@ export function MomentumBacktestingView() {
                 section !== item.id && 'text-foreground/80',
               )}
               onClick={() => setSection(item.id)}
+              title={
+                item.id === 'weekly' && weekly.running
+                  ? 'Weekly signal is running in the background'
+                  : undefined
+              }
             >
               {item.label}
               {item.id === 'saved' ? ` (${savedRuns.length})` : ''}
+              {item.id === 'backtest' && inFlightCount > 0 ? (
+                <span
+                  className="relative ml-1 flex h-2 w-2"
+                  aria-label={`${inFlightCount} running`}
+                >
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                </span>
+              ) : null}
               {item.id === 'weekly' && weekly.running ? (
-                <span className="ml-1 h-2 w-2 rounded-full bg-warning" aria-label="running" />
+                <span className="relative ml-1 flex h-2 w-2" aria-label="running">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                </span>
               ) : null}
             </Button>
           ))}
@@ -603,6 +738,20 @@ export function MomentumBacktestingView() {
               </div>
             </div>
 
+            {runs.length > 0 ? (
+              <MomentumRunTabs
+                runs={runs}
+                activeId={activeRunId}
+                now={now}
+                onSelect={(run) => {
+                  setStartError(null);
+                  useMomentumRunsStore.getState().setActive(run.id);
+                  if (run.dataset !== dataset) setDataset(run.dataset as Dataset);
+                }}
+                onClose={(run) => useMomentumRunsStore.getState().closeRun(run.id)}
+              />
+            ) : null}
+
             {error ? (
               <StateMessage
                 variant="error"
@@ -643,7 +792,7 @@ export function MomentumBacktestingView() {
                     <button
                       type="button"
                       onClick={() => void runBacktest({ fresh: true })}
-                      disabled={running}
+                      disabled={starting}
                       title="Re-run from scratch: drops the server's cached rankings and data, reloads them, then recomputes"
                       aria-label="Re-run from scratch"
                       className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -687,15 +836,20 @@ export function MomentumBacktestingView() {
                       <Button
                         variant="primary"
                         onClick={() => void runBacktest()}
-                        disabled={running}
+                        disabled={starting}
                       >
-                        {running ? (
+                        {starting ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <Play className="h-3.5 w-3.5" />
                         )}
-                        {running ? `Running… ${elapsedLabel}` : 'Run momentum backtest'}
+                        {starting ? 'Starting…' : 'Run momentum backtest'}
                       </Button>
+                      {inFlightCount > 0 ? (
+                        <span className="text-xs text-muted">
+                          {inFlightCount} running — starting another runs it alongside
+                        </span>
+                      ) : null}
                       <span className="hidden text-xs text-faint sm:inline">Ctrl/Cmd + Enter</span>
                       <Button size="sm" onClick={shareLink}>
                         <LinkIcon className="h-3.5 w-3.5" />{' '}
@@ -709,18 +863,14 @@ export function MomentumBacktestingView() {
                       variant="primary"
                       size="sm"
                       onClick={() => void runBacktest()}
-                      disabled={running}
+                      disabled={starting}
                     >
-                      {running ? (
+                      {starting ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Play className="h-3.5 w-3.5" />
                       )}
-                      {running
-                        ? `Running… ${elapsedLabel}`
-                        : dirty
-                          ? 'Run again'
-                          : 'Run momentum backtest'}
+                      {starting ? 'Starting…' : dirty ? 'Run again' : 'Run momentum backtest'}
                     </Button>
                   </div>
                 )}
@@ -730,13 +880,8 @@ export function MomentumBacktestingView() {
                     role="alert"
                     className="mx-4 mb-4 rounded-lg border border-negative/30 bg-negative/10 px-3 py-2.5 text-sm text-negative"
                   >
-                    <p className="font-medium">The run didn&apos;t finish — nothing was updated</p>
+                    <p className="font-medium">The run didn&apos;t finish</p>
                     <p className="mt-0.5 text-foreground/80">{runError}</p>
-                    {result ? (
-                      <p className="mt-0.5 text-xs text-muted">
-                        The results below are from your previous run.
-                      </p>
-                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -749,7 +894,8 @@ export function MomentumBacktestingView() {
                   elapsedMs={elapsedMs}
                   dataset={dataset}
                   datasetLabel={DATASETS.find((item) => item.id === dataset)?.label ?? 'momentum'}
-                  hasPreviousResult={result !== null}
+                  hasPreviousResult={false}
+                  queued={activeRun?.status === 'queued'}
                 />
               </div>
             ) : null}
@@ -789,9 +935,9 @@ export function MomentumBacktestingView() {
                 <div ref={summaryRef} className="scroll-mt-20">
                   {dataset === 'broad' && meta && resultEnd && resultEnd < meta.last_week ? (
                     <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
-                      Result ends {result.series.dates.at(-1)}, while prices extend to{' '}
-                      {meta.last_week}. Some weeks may have been skipped for insufficient ranked
-                      names. Check “Simulate every week” in Broad Momentum settings.
+                      Result ends {resultEnd}, while prices extend to {meta.last_week}. Some weeks
+                      may have been skipped for insufficient ranked names. Check “Simulate every
+                      week” in Broad Momentum settings.
                     </div>
                   ) : null}
                   <MomentumPerformanceCard
@@ -816,6 +962,7 @@ export function MomentumBacktestingView() {
                   savedRuns={savedRuns}
                   flashKey={finishedAt}
                 />
+                <MomentumCircuitExposureCard exposure={result.circuit_exposure} />
               </div>
             ) : null}
           </>

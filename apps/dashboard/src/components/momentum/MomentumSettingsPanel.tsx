@@ -3,6 +3,7 @@
 import { Plus, Search, X } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 
+import { type LiquidityPreviewParams, useLiquidityPreview } from '../../hooks/useLiquidityPreview';
 import { cn } from '../../lib/cn';
 import { Accordion } from '../ui/Accordion';
 import { Badge } from '../ui/Badge';
@@ -167,17 +168,25 @@ function Toggle({
   help,
   checked,
   onChange,
+  disabled,
 }: {
   label: string;
   help?: string | undefined;
   checked: boolean;
   onChange: (value: boolean) => void;
+  disabled?: boolean | undefined;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 text-xs text-foreground">
+    <label
+      className={cn(
+        'flex items-start gap-2.5 text-xs text-foreground',
+        disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer',
+      )}
+    >
       <input
         type="checkbox"
         className="mt-0.5 accent-[hsl(var(--primary))]"
+        disabled={disabled}
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
       />
@@ -489,7 +498,252 @@ function LookbackTable({
 }
 
 /** Defaults for every field this panel owns, before the backend's own `meta.defaults` overlay. */
-export const SETTINGS_FALLBACKS: Values = {
+export const TURNOVER_PRESETS = [0.5, 1, 2, 5, 10];
+
+function formatRupees(value: number): string {
+  return `₹${Math.round(value).toLocaleString('en-IN')}`;
+}
+
+/** Live "how many stocks pass" card, with the reason each rejected stock failed. */
+function LiquidityPreviewCard({
+  params,
+  positionRupees,
+  poolTopN,
+}: {
+  params: LiquidityPreviewParams;
+  positionRupees: number;
+  poolTopN: number;
+}) {
+  const { data, loading, error } = useLiquidityPreview(params);
+  if (error && !data) {
+    return <Hint>Couldn&apos;t load the tradability preview: {error}</Hint>;
+  }
+  if (!data) {
+    return <Hint>{loading ? 'Checking which stocks pass…' : 'No preview available.'}</Hint>;
+  }
+  const reasons = Object.entries(data.reasons).sort((a, b) => b[1] - a[1]);
+  const ratio =
+    positionRupees > 0 ? Math.round((params.min_turnover_cr * 10_000_000) / positionRupees) : null;
+  return (
+    <div className="space-y-2 rounded-lg border border-border bg-surface-2/40 p-3">
+      <p className="text-xs text-foreground">
+        As of <span className="font-medium">{data.as_of ?? '—'}</span>:{' '}
+        <span className="font-semibold text-primary">{data.eligible.toLocaleString('en-IN')}</span>{' '}
+        of {data.universe.toLocaleString('en-IN')} stocks pass
+        {loading ? ' (updating…)' : ''}.
+      </p>
+      {reasons.length > 0 ? (
+        <p className="text-[11px] leading-relaxed text-muted">
+          Dropped: {reasons.map(([reason, count]) => `${count} ${reason}`).join(' · ')}.
+        </p>
+      ) : null}
+      {data.warning ? <p className="text-[11px] text-warning">{data.warning}</p> : null}
+      {data.eligible < Math.max(300, poolTopN) ? (
+        <p className="text-[11px] text-warning">
+          Only {data.eligible} stocks pass, so the top-{poolTopN} pool will be thin. Loosen a
+          threshold if that is more than you want.
+        </p>
+      ) : null}
+      {ratio !== null && ratio > 0 ? (
+        <p className="text-[11px] text-muted">
+          One full position (~{formatRupees(positionRupees)}, from Capital × Max position) is about
+          1/{ratio.toLocaleString('en-IN')} of the minimum daily turnover.
+        </p>
+      ) : null}
+      {data.excluded.length > 0 ? (
+        <details className="text-[11px] text-muted">
+          <summary className="cursor-pointer font-medium text-foreground">
+            Stocks dropped today ({data.excluded.length}
+            {data.excluded.length >= 200 ? '+, thinnest first' : ''})
+          </summary>
+          <div className="mt-2 max-h-60 overflow-auto rounded-md border border-border">
+            <table className="w-full text-left">
+              <thead className="sticky top-0 bg-surface text-faint">
+                <tr>
+                  <th className="px-2 py-1 font-medium">Stock</th>
+                  <th className="px-2 py-1 font-medium">Why</th>
+                  <th className="px-2 py-1 text-right font-medium">Median ₹ Cr/day</th>
+                  <th className="px-2 py-1 text-right font-medium">Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.excluded.map((row) => (
+                  <tr key={row.symbol} className="border-t border-border">
+                    <td className="px-2 py-1 font-medium text-foreground">{row.symbol}</td>
+                    <td className="px-2 py-1">{row.reason}</td>
+                    <td className="px-2 py-1 text-right tabular-nums">
+                      {row.median_turnover_cr ?? '—'}
+                    </td>
+                    <td className="px-2 py-1 text-right tabular-nums">{row.price ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Broad Momentum's universe choice and tradability filter. The filter is optional on the
+ * Total Market pool and mandatory on the whole-market universe, where it is what narrows
+ * ~2,500 listed stocks down to the ones you could really buy and sell.
+ */
+function BroadUniverseControls({
+  values,
+  onChange,
+}: {
+  values: Values;
+  onChange: (key: string, value: unknown) => void;
+}) {
+  const num = (key: string, fallback: number) =>
+    typeof values[key] === 'number' ? (values[key] as number) : fallback;
+  const wholeMarket = values.broad_universe === 'all_liquid';
+  const active = wholeMarket || Boolean(values.broad_liquidity_filter);
+  const minTurnover = num('broad_liq_min_turnover_cr', 1);
+  const maxCircuitRaw = values.broad_liq_max_circuit_days;
+  const maxCircuitDays = typeof maxCircuitRaw === 'number' ? maxCircuitRaw : null;
+  const positionRupees = num('capital', 1_000_000) * num('max_position', 0.35);
+
+  return (
+    <div className="space-y-3">
+      <RadioCards
+        name="broad_universe"
+        value={wholeMarket ? 'all_liquid' : 'total_market'}
+        onChange={(value) => onChange('broad_universe', value)}
+        options={[
+          {
+            value: 'total_market',
+            label: 'Nifty Total Market',
+            description:
+              "about 750 stocks from NSE's own Total Market index. Category ranking covers all of them.",
+          },
+          {
+            value: 'all_liquid',
+            label: 'Whole NSE market (liquid only)',
+            description:
+              'every listed NSE equity, narrowed each week to the ones you could really trade. Only stocks with a category tag can be picked in category mode, so "Rank stocks directly" uses it fully.',
+          },
+        ]}
+      />
+      <Toggle
+        label={
+          wholeMarket ? 'Tradability filter (always on for the whole market)' : 'Tradability filter'
+        }
+        disabled={wholeMarket}
+        help="Each week, keep only stocks with enough daily turnover to buy and sell your position, that are not pinned at a circuit limit. Uses only data available at that date. Always on for the whole-market universe."
+        checked={active}
+        onChange={(value) => onChange('broad_liquidity_filter', value)}
+      />
+      <Toggle
+        label="Respect circuit locks (realistic fills)"
+        help="Off (default): the backtest fills at any Friday close, even when the stock was locked that day. On: it cannot buy a stock locked at the upper circuit, and cannot sell one locked at the lower circuit, so a holding that locks down is held through the fall until the lock lifts. A lock means 3 or more sessions in a row closing at a price-band edge. The results card shows the CAGR both ways whichever you pick."
+        checked={values.broad_respect_circuits === true}
+        onChange={(value) => onChange('broad_respect_circuits', value)}
+      />
+      {active ? (
+        <div className="space-y-3 rounded-lg border border-border p-3">
+          <div>
+            <NumberField
+              label="Minimum daily turnover (₹ crore, median of last 60 sessions)"
+              help="A stock must trade at least this much, on a typical day, to stay in. Higher is safer for exits and removes thin stocks, but it also removes some of the strongest small-cap momentum."
+              value={minTurnover}
+              min={0.1}
+              max={1000}
+              step={0.5}
+              onChange={(value) => onChange('broad_liq_min_turnover_cr', value)}
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {TURNOVER_PRESETS.map((preset) => (
+                <Chip
+                  key={preset}
+                  active={minTurnover === preset}
+                  onClick={() => onChange('broad_liq_min_turnover_cr', preset)}
+                >
+                  ₹{preset} Cr
+                </Chip>
+              ))}
+            </div>
+          </div>
+          <Toggle
+            label="Skip stocks stuck at circuit limits"
+            help="Drops a stock that closed at a price-band edge (2%, 5%, 10% or 20%) in the same direction for several sessions in a row within the last ~6 months. You can't reliably buy or sell a stock that is locked."
+            checked={values.broad_liq_circuit !== false}
+            onChange={(value) => onChange('broad_liq_circuit', value)}
+          />
+          <details className="text-xs">
+            <summary className="cursor-pointer font-medium text-foreground">
+              Advanced tradability settings
+            </summary>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <PercentField
+                label="Worst-day floor (% of minimum)"
+                help="The quietest 10% of days must still reach this share of the minimum turnover, so an exit is possible on a thin day."
+                values={values}
+                name="broad_liq_floor_ratio"
+                onChange={onChange}
+                step={5}
+              />
+              <NumberField
+                label="Minimum price (₹)"
+                help="Skips very low-priced stocks, where spreads and tick sizes eat the trade."
+                value={num('broad_liq_min_price', 20)}
+                min={0}
+                max={100000}
+                onChange={(value) => onChange('broad_liq_min_price', value)}
+              />
+              <NumberField
+                label="Stuck-at-circuit run (sessions)"
+                help="How many sessions in a row at the same band edge count as 'stuck'."
+                value={num('broad_liq_circuit_run', 3)}
+                min={2}
+                max={20}
+                disabled={values.broad_liq_circuit === false}
+                onChange={(value) => onChange('broad_liq_circuit_run', value)}
+              />
+              <Field
+                label="Circuit days allowed (last 60 sessions)"
+                help="Most LC or UC days (closing at a band edge, either direction) a stock may have in its last 60 sessions, even if they weren't in a row. Blank = no limit. A 2% move also happens on ordinary volatile stocks, so start around 8 or higher."
+              >
+                <input
+                  type="number"
+                  className={inputClass}
+                  placeholder="No limit"
+                  min={0}
+                  max={60}
+                  value={maxCircuitDays ?? ''}
+                  onChange={(event) =>
+                    onChange(
+                      'broad_liq_max_circuit_days',
+                      event.target.value === '' ? null : Number(event.target.value),
+                    )
+                  }
+                />
+              </Field>
+            </div>
+          </details>
+          <LiquidityPreviewCard
+            params={{
+              min_turnover_cr: minTurnover,
+              floor_ratio: num('broad_liq_floor_ratio', 0.25),
+              min_price: num('broad_liq_min_price', 20),
+              circuit: values.broad_liq_circuit !== false,
+              circuit_run: num('broad_liq_circuit_run', 3),
+              max_circuit_days: maxCircuitDays,
+              universe: wholeMarket ? 'all_liquid' : 'total_market',
+            }}
+            positionRupees={positionRupees}
+            poolTopN={num('broad_pool_top_n', 200)}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+const SETTINGS_FALLBACKS: Values = {
   portfolio: 'buffer',
   entry: 'wait',
   max_position: 0.35,
@@ -535,6 +789,15 @@ export const SETTINGS_FALLBACKS: Values = {
   broad_picks_per_category: 2,
   broad_off_top_n: 10,
   broad_off_exit_rank: 20,
+  broad_universe: 'total_market',
+  broad_liquidity_filter: false,
+  broad_respect_circuits: false,
+  broad_liq_min_turnover_cr: 1,
+  broad_liq_floor_ratio: 0.25,
+  broad_liq_min_price: 20,
+  broad_liq_circuit: true,
+  broad_liq_circuit_run: 3,
+  broad_liq_max_circuit_days: null,
 };
 
 export function momentumSettingsDefaults(metaDefaults: Values): Values {
@@ -653,6 +916,7 @@ export function MomentumSettingsPanel({
               },
             ]}
           />
+          <BroadUniverseControls values={values} onChange={onChange} />
           <div className="grid grid-cols-2 gap-3">
             <NumberField
               label="Pool top N"

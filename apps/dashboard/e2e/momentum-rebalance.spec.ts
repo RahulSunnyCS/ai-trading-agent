@@ -9,10 +9,7 @@ test('standalone momentum metadata does not crash the default Live tab', async (
     }),
   );
 
-  await Promise.all([
-    page.waitForResponse((response) => new URL(response.url()).pathname === '/api/meta'),
-    page.goto('/'),
-  ]);
+  await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Live', exact: true })).toBeVisible();
   if (
     await page

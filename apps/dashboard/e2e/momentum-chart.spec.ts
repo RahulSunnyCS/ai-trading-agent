@@ -46,43 +46,51 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
       }),
     }),
   );
-  await page.route('**/api/momentum/backtest', (route) =>
+  const result = {
+    benchmark_name: 'Nifty 50',
+    kpis: { cagr: 0.12 },
+    rotations: [
+      {
+        week: '2024-01-12',
+        value: 102000,
+        outs: [],
+        ins: [],
+        trims: [],
+        parked: false,
+        holdings: [{ asset: 'Nifty 50', share: 1 }],
+      },
+    ],
+    latest: { week: '2024-01-19', explain: 'Hold current position.', rows: [] },
+    open_positions: [],
+    trades: [],
+    instruments: [],
+    timeline: [],
+    yearly: [],
+    crashes: [],
+    series: {
+      dates: ['2024-01-05', '2024-01-12', '2024-01-19'],
+      strategy: [100000, 102000, 103000],
+      benchmark: [100000, 101000, 102000],
+      cash: [100000, 100100, 100200],
+      drawdown_strategy: [0, 0, -0.01],
+      drawdown_benchmark: [0, -0.01, 0],
+      rolling_52w_excess: [null, null, 0.01],
+      idle_share: [0, 0, 0],
+      holdings_count: [1, 1, 1],
+    },
+  };
+  await page.route('**/api/momentum/backtest/jobs', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        benchmark_name: 'Nifty 50',
-        kpis: { cagr: 0.12 },
-        rotations: [
-          {
-            week: '2024-01-12',
-            value: 102000,
-            outs: [],
-            ins: [],
-            trims: [],
-            parked: false,
-            holdings: [{ asset: 'Nifty 50', share: 1 }],
-          },
-        ],
-        latest: { week: '2024-01-19', explain: 'Hold current position.', rows: [] },
-        open_positions: [],
-        trades: [],
-        instruments: [],
-        timeline: [],
-        yearly: [],
-        crashes: [],
-        series: {
-          dates: ['2024-01-05', '2024-01-12', '2024-01-19'],
-          strategy: [100000, 102000, 103000],
-          benchmark: [100000, 101000, 102000],
-          cash: [100000, 100100, 100200],
-          drawdown_strategy: [0, 0, -0.01],
-          drawdown_benchmark: [0, -0.01, 0],
-          rolling_52w_excess: [null, null, 0.01],
-          idle_share: [0, 0, 0],
-          holdings_count: [1, 1, 1],
-        },
-      }),
+      body: JSON.stringify({ job: { id: 'job-1', status: 'running', result: null, error: null } }),
+    }),
+  );
+  await page.route('**/api/momentum/backtest/jobs/job-1', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ job: { id: 'job-1', status: 'done', result, error: null } }),
     }),
   );
 

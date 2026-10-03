@@ -40,11 +40,14 @@ export function MomentumRunBanner({
   datasetLabel,
   dataset,
   hasPreviousResult,
+  queued = false,
 }: {
   elapsedMs: number;
   datasetLabel: string;
   dataset: string;
   hasPreviousResult: boolean;
+  /** Waiting for a free slot behind other runs, not computing yet. */
+  queued?: boolean;
 }) {
   const seconds = Math.floor(elapsedMs / 1000);
   const hint =
@@ -62,7 +65,9 @@ export function MomentumRunBanner({
       <div className="flex flex-wrap items-center justify-between gap-2 bg-primary/5 px-4 py-3">
         <div className="flex items-center gap-2.5 text-sm font-medium text-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          Running {datasetLabel} backtest
+          {queued
+            ? `Queued ${datasetLabel} backtest — waiting for other runs to finish`
+            : `Running ${datasetLabel} backtest`}
           {hasPreviousResult ? (
             <span className="text-xs font-normal text-muted">
               · previous results shown faded until this finishes

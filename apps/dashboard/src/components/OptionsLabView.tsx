@@ -8,14 +8,14 @@
  *  - Strategy builder: create/edit/backtest/save AlgoTest-style strategies.
  */
 
-import { useState } from 'react';
-
+import { useAppRoute } from '../hooks/useAppRoute';
 import { cn } from '../lib/cn';
+import { OPTIONS_LAB_SECTIONS, oneOf } from '../lib/routes';
 import { RegimesPanel } from './optionslab/RegimesPanel';
 import { ResultsPanel } from './optionslab/ResultsPanel';
 import { StrategyBuilder } from './optionslab/StrategyBuilder';
 
-type Section = 'results' | 'regimes' | 'builder';
+type Section = (typeof OPTIONS_LAB_SECTIONS)[number];
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: 'results', label: 'Daily results' },
@@ -24,7 +24,9 @@ const SECTIONS: { id: Section; label: string }[] = [
 ];
 
 export function OptionsLabView() {
-  const [section, setSection] = useState<Section>('results');
+  const { rest, navigate } = useAppRoute();
+  const section: Section = oneOf(OPTIONS_LAB_SECTIONS, rest[0]) ?? 'results';
+  const setSection = (next: Section) => navigate('optionslab', next);
   return (
     <div className="space-y-5">
       <div className="inline-flex rounded-lg border border-border bg-surface p-1">
