@@ -17,9 +17,12 @@ is already documented as free-form JSON. This mirrors what used to be a
 `localStorage` array of `MomentumSavedRun` objects, just moved server-side so
 saved runs survive a browser/device change (see TODO.md's P4 entry).
 
-Capped at 10 ordinary runs per dataset, oldest dropped first. Favourited runs
-are retained separately from that disposable comparison history because the
-weekly scheduler must be able to evaluate them even after many ad-hoc runs.
+Capped at 10 ordinary runs per dataset, oldest dropped first. Favourited and
+overlay runs are retained separately from that disposable comparison history:
+the weekly scheduler must be able to evaluate favourites, and an overlay is a
+curve the user chose to keep on the chart. Neither is ever pruned; only an
+explicit delete (or un-marking, which returns the run to the capped pool)
+removes them.
 """
 
 from __future__ import annotations
@@ -118,11 +121,12 @@ def save_run(
 
 
 def _prune(con: duckdb.DuckDBPyConnection, dataset: str) -> None:
-    """Keep only the newest ordinary runs; never prune scheduled favourites."""
+    """Keep only the newest ordinary runs; never prune favourites or overlays."""
     stale = con.execute(
         "SELECT r.run_id FROM backtest_runs r JOIN strategy_versions v USING (version_id) "
         "WHERE v.strategy_id = ? AND r.kind = 'weekly' "
         "AND COALESCE((r.summary ->> 'favorite')::BOOLEAN, FALSE) = FALSE "
+        "AND COALESCE((r.summary ->> 'overlay')::BOOLEAN, FALSE) = FALSE "
         "ORDER BY r.created_at DESC OFFSET ?",
         [_strategy_id(dataset), MAX_RUNS_PER_DATASET],
     ).fetchall()
