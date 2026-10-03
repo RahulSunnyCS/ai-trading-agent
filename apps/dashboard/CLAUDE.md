@@ -23,6 +23,13 @@ serves its API;
 its research chart uses a lazy-loaded Plotly basic bundle with optional wheel/
 touchpad zoom and the shared CSS theme tokens.
 
+**Routing:** the URL is the source of truth for tab and sub-tab (`app/[[...slug]]/page.tsx`
+renders the shell; `lib/routes.ts` holds the path grammar, `hooks/useAppRoute.ts` reads/pushes
+it). Paths: `/<tab>`, `/optionslab/<results|regimes|builder>`,
+`/momentum/<backtest|scores|saved|weekly|rebalance>`, `/momentum/backtest/<dataset>`,
+`/momentum/scores/<stocks|sectors>`. A new sub-tab = add its ids to `lib/routes.ts` and derive
+state from `useAppRoute().rest` — don't add another `useState` for navigation.
+
 ## Cross-package links
 
 This app has **no internal package dependencies** (`package.json` declares

@@ -1,6 +1,9 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
 
+import { useAppRoute } from './hooks/useAppRoute';
+import { DEFAULT_TAB } from './lib/routes';
+
 import { BackfillView } from './components/BackfillView';
 import { BacktestView } from './components/BacktestView';
 import { BrokerLoginsView } from './components/BrokerLoginsView';
@@ -87,7 +90,9 @@ function renderView(
  * view rendered in a centered content column.
  */
 export function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('live');
+  const { tab, navigate, replace } = useAppRoute();
+  const activeTab: Tab = tab ?? DEFAULT_TAB;
+  const setActiveTab = (next: Tab) => navigate(next);
   const [menuOpen, setMenuOpen] = useState(false);
   const [navigationPreferences, setNavigationPreferences] = useState<NavigationPreferences>(
     DEFAULT_NAVIGATION_PREFERENCES,
@@ -100,14 +105,27 @@ export function App() {
     hydrateThemeFromStorage();
     const stored = loadNavigationPreferences();
     setNavigationPreferences(stored);
-    if (stored.hidden.includes('live')) setActiveTab(firstVisibleTab(stored));
   }, []);
+
+  // "/" and unknown paths land on the default tab (a legacy shared Momentum link, which used
+  // to be "/#momentum-cfg=…", keeps its hash and opens Momentum). A tab the user has hidden
+  // falls back to the first visible one.
+  useEffect(() => {
+    if (!tab) {
+      if (window.location.hash.startsWith('#momentum-cfg=')) {
+        window.location.replace(`/momentum/backtest${window.location.hash}`);
+      } else {
+        replace(firstVisibleTab(navigationPreferences));
+      }
+    } else if (navigationPreferences.hidden.includes(tab)) {
+      replace(firstVisibleTab(navigationPreferences));
+    }
+  }, [tab, navigationPreferences, replace]);
 
   function updateNavigationPreferences(nextValue: NavigationPreferences): void {
     const next = normalizeNavigationPreferences(nextValue);
     setNavigationPreferences(next);
     saveNavigationPreferences(next);
-    if (next.hidden.includes(activeTab)) setActiveTab(firstVisibleTab(next));
   }
 
   return (

@@ -12,9 +12,16 @@ import {
 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { useAppRoute } from '../hooks/useAppRoute';
 import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { cn } from '../lib/cn';
+import {
+  MOMENTUM_DATASETS,
+  MOMENTUM_SECTIONS,
+  type MomentumSection,
+  oneOf,
+} from '../lib/routes';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
 import { MomentumCircuitExposureCard } from './momentum/MomentumCircuitExposure';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
@@ -119,10 +126,26 @@ export function MomentumBacktestingView() {
   // Lives here, not in the Weekly view, so the section tab can show that a run is still
   // going after the user has moved to another section.
   const weekly = useMomentumWeeklyJob();
-  const [section, setSection] = useState<'backtest' | 'scores' | 'saved' | 'weekly' | 'rebalance'>(
-    'backtest',
+  const { rest, navigate } = useAppRoute();
+  const section: MomentumSection = oneOf(MOMENTUM_SECTIONS, rest[0]) ?? 'backtest';
+  const urlDataset = section === 'backtest' ? oneOf(MOMENTUM_DATASETS, rest[1]) : null;
+  const [dataset, setDatasetState] = useState<Dataset>(
+    urlDataset && VISIBLE_DATASET_IDS.has(urlDataset) ? urlDataset : 'etf',
   );
-  const [dataset, setDataset] = useState<Dataset>('etf');
+  // The URL carries section + dataset (/momentum/backtest/broad), so a refresh or a pasted link
+  // reopens the same view; back/forward flows in through urlDataset.
+  useEffect(() => {
+    if (urlDataset && VISIBLE_DATASET_IDS.has(urlDataset) && urlDataset !== dataset) {
+      setDatasetState(urlDataset);
+    }
+  }, [urlDataset, dataset]);
+  function setDataset(next: Dataset): void {
+    setDatasetState(next);
+    if (section === 'backtest') navigate('momentum', 'backtest', next);
+  }
+  function setSection(next: MomentumSection): void {
+    navigate('momentum', next, next === 'backtest' ? dataset : undefined);
+  }
   const [meta, setMeta] = useState<MomentumMeta | null>(null);
   const [core, setCore] = useState<CoreSettings>({
     start: '',
