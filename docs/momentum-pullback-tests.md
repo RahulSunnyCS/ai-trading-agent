@@ -206,10 +206,25 @@ weeks: deeper further drawdown and higher volatility, not calmer. This is explor
 after seeing P2, not pre-registered beforehand) and the sample is the same 139/123-week Broad
 pool as P2, so it should be read as a caution against the idea, not a confirmed reversal effect.
 
-**P4 is built (`p4_study`/`run_p4` in `scripts/pullback_tests.py`) but was not run.** The spec
-gates P4 on P2 passing; running it now, after P2 (and P2b) failed, would be a post-hoc fishing
-expedition over a ranking that nothing here supports. Left in place for later if the owner wants
-the building-blocks re-examined on their own.
+**P4 (run 2026-10-03, post-hoc, by owner request after seeing P2/P2b fail — a curiosity check,
+not a build candidate): a clear rejection.**
+
+| Variant | Full CAGR/Sharpe/MaxDD | Buys/yr | Roll CAGR/Sharpe win share | DSR |
+|---|---|---|---|---|
+| base | 31.66% / 1.057 / -20.39% | 116 | — | 0.973 |
+| tilt 0.3, no turn | 7.65% / 0.252 / -16.77% | 17 | 0% / 0% | 0.353 |
+| tilt 0.3 + turn | 6.62% / 0.129 / -18.10% | 17 | 0% / 0% | 0.251 |
+| tilt 0.5, no turn | 7.65% / 0.252 / -16.77% | 17 | 0% / 0% | 0.353 |
+| tilt 0.5 + turn | 6.62% / 0.129 / -18.10% | 17 | 0% / 0% | 0.251 |
+
+Every variant loses on CAGR and Sharpe in all 28 rolling windows (0% win share), CAGR collapses
+from 31.7% to 6.6-7.7%, and DSR is 0.25-0.35, nowhere near the 0.95 bar. The `no_buy` screen
+(not LT-strong, or not Stage 2, or more than 20% below the 13-week high) is so restrictive on
+Broad's pool that buys/year drops from 116 to 17 — the portfolio sits mostly uninvested, which
+is also why MaxDD looks shallower (not a real risk benefit) and why tilt 0.3 and 0.5 give
+identical numbers (so few names clear the screen each week that the tilt weight never gets to
+matter). This confirms the P2 gate was the right call — P4 would have failed on its own terms
+even without the gate.
 
 ### P3. Exit side: hold through a small pullback
 
