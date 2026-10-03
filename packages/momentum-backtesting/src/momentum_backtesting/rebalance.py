@@ -265,7 +265,9 @@ def live_broad_ranking(
         )
 
     prices = ranking.prices.copy()
+    raw_prices = ranking.raw_prices.copy() if ranking.raw_prices is not None else prices.copy()
     live = prices.loc[last].copy()
+    raw_live = raw_prices.loc[last].copy()
     ltp: dict[str, float] = {}
     for name, symbol in symbols.items():
         price = quotes[symbol]
@@ -288,6 +290,7 @@ def live_broad_ranking(
                 )
             live[name] = price
         ltp[name] = price
+        raw_live[name] = live[name] if name in broad.ATOMIC_NAMES else price
 
     if week > last:
         prices.loc[week] = live
@@ -298,6 +301,9 @@ def live_broad_ranking(
     # forces an unscheduled Broad pool refresh.
     prices.loc[settlement_week] = live
     prices = prices.sort_index()
+    raw_prices.loc[week] = raw_live
+    raw_prices.loc[settlement_week] = raw_live
+    raw_prices = raw_prices.sort_index()
     ranks, _ = engine.compute_ranks(prices, config)
     stock_columns = list(ranking.column_to_base_symbol)
     universe = broad.load_stock_universe_frame(
@@ -333,6 +339,7 @@ def live_broad_ranking(
     updated = replace(
         ranking,
         prices=prices,
+        raw_prices=raw_prices,
         weeks=list(prices.index),
         global_ranks=ranks,
         pool_membership=pool,

@@ -122,4 +122,5 @@ def test_whole_market_universe_forces_the_gate_on() -> None:
 def test_default_request_keeps_the_original_ungated_pool() -> None:
     req = api.BacktestRequest(dataset="broad", universe=["broad_momentum"])
     assert req.broad_universe == "total_market"
+    assert req.broad_respect_circuits is False  # fills ignore locks unless asked
     assert api._liquidity_config(req) is None

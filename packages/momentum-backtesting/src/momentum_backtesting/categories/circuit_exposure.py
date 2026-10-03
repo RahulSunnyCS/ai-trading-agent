@@ -33,6 +33,10 @@ from ..engine import IDLE, Result
 _BANDS = ((0.019, 0.0205), (0.049, 0.0505), (0.099, 0.1005), (0.199, 0.2005))
 _BAND_LABELS = (0.02, 0.05, 0.10, 0.20)
 _EPS = 1e-9
+#: A band-edge run counts as a *lock* (nobody on the other side) from this many sessions on, the
+#: owner's own rule. Used for the "respect circuit locks" backtest mode and the blocked-fill counts;
+#: a single 2% or 5% close is an ordinary move, not a lock.
+LOCK_MIN_DAYS = 3
 #: An LC run shorter than this is an ordinary bad day, not a lock worth classifying.
 MIN_LOCK_DAYS = 2
 #: A stock sold up to this long before an LC run began counts as "got out in time".
@@ -44,6 +48,67 @@ def _band_of(abs_move: float) -> float | None:
         if lo <= abs_move <= hi:
             return label
     return None
+
+
+def _band_sql() -> str:
+    return " or ".join(f"abs(r) between {lo} and {hi}" for lo, hi in _BANDS)
+
+
+_mask_cache: dict[tuple, tuple[pd.DataFrame, pd.DataFrame]] = {}
+
+
+def lock_masks(
+    column_to_base: dict[str, str],
+    weeks: pd.Index,
+    *,
+    min_days: int = LOCK_MIN_DAYS,
+    root: Path | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(uc_locked, lc_locked): week x column booleans, True when the stock's last session of
+    that week (the day a weekly trade fills) sits inside a same-direction band-edge run of at
+    least `min_days` sessions. The whole run counts, from its first day, because that is known
+    only in hindsight -- which is the point: this is a what-would-have-been-impossible check,
+    not something a live rule could see coming."""
+    from .. import db_read  # noqa: PLC0415 (avoid an import cycle at module load)
+
+    symbols = sorted(set(column_to_base.values()))
+    key = (db_read.catalog_mtime(root), tuple(symbols), tuple(weeks), min_days)
+    hit = _mask_cache.get(key)
+    if hit is not None:
+        return hit
+    n = int(min_days)
+    sql = f"""
+    with d as (
+      select i.symbol, b.date, b.close / nullif(b.prevclose, 0) - 1 as r
+      from bars_1d_stock b join instruments i using (instrument_id)
+      where i.symbol in (select unnest(?)) and b.series = 'EQ' and b.date >= ?),
+    h as (select *, case when {_band_sql()} then sign(r) else 0 end as hit from d),
+    c as (select *, lag(hit) over (partition by symbol order by date) as lh from h),
+    g as (
+      select *, sum(case when hit is distinct from lh then 1 else 0 end)
+                over (partition by symbol order by date) as grp from c),
+    t as (
+      select *, count(*) over (partition by symbol, grp) as run_total from g where hit <> 0)
+    select symbol, (date_trunc('week', date) + interval 4 day)::date as wk,
+           arg_max(case when hit = 1 and run_total >= {n} then 1 else 0 end, date) as up,
+           arg_max(case when hit = -1 and run_total >= {n} then 1 else 0 end, date) as down
+    from (
+      select d2.symbol, d2.date, coalesce(t.hit, 0) as hit, t.run_total
+      from d d2 left join t on t.symbol = d2.symbol and t.date = d2.date)
+    group by 1, 2"""
+    start = (pd.Timestamp(weeks.min()) - pd.Timedelta(days=14)).date()
+    with connect(root or data_root(), read_only=True) as con:
+        frame = con.execute(sql, [symbols, start]).df()
+    frame["wk"] = pd.to_datetime(frame["wk"])
+    out = []
+    for field in ("up", "down"):
+        wide = frame.pivot_table(index="wk", columns="symbol", values=field, aggfunc="max")
+        wide = wide.reindex(index=weeks, columns=symbols).fillna(0).astype(bool)
+        out.append(pd.DataFrame({col: wide[base] for col, base in column_to_base.items()}))
+    if len(_mask_cache) > 4:
+        _mask_cache.clear()
+    _mask_cache[key] = (out[0], out[1])
+    return out[0], out[1]
 
 
 def holding_periods(result: Result, column_to_base: dict[str, str]) -> pd.DataFrame:
@@ -255,8 +320,12 @@ def circuit_exposure(
                     "portfolio_share_pct": round(share * 100, 1),
                     "portfolio_impact_pct": round(share * run["move"] * 100, 2),
                     # Backtest filled on the very close that was locked: not achievable live.
-                    "blocked_entry": run["direction"] == "UC" and run["start"] <= buy <= run["end"],
-                    "blocked_exit": run["direction"] == "LC" and run["start"] <= sell <= run["end"],
+                    "blocked_entry": run["direction"] == "UC"
+                    and run["days"] >= LOCK_MIN_DAYS
+                    and run["start"] <= buy <= run["end"],
+                    "blocked_exit": run["direction"] == "LC"
+                    and run["days"] >= LOCK_MIN_DAYS
+                    and run["start"] <= sell <= run["end"],
                     "held_through": run["start"] > buy and run["end"] < sell,
                 }
             )

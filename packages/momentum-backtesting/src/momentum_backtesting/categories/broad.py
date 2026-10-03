@@ -293,6 +293,7 @@ class StockUniverseFrame:
     events: pd.DataFrame
     stale_columns: dict[str, pd.Timestamp]
     missing_symbols: list[str]  # Total Market symbols with no daily.parquet rows at all
+    raw_frame: pd.DataFrame | None = None  # unadjusted per-share closes for the entry ceiling
     # week x column booleans from categories/liquidity.py; None = no liquidity gate requested.
     # Already AND-ed into `stock_membership`; kept separately so the quarterly-fixed pool can be
     # re-gated every week (a held stock that turns illiquid mid-quarter must drop out).
@@ -321,11 +322,12 @@ def load_stock_universe_frame(
         members_by_year = total_market_members_by_year(categories_data_dir)
     all_symbols = sorted(set().union(*members_by_year.values()))
 
-    frame, events, stale_columns = cat_prices.build_stock_weekly_prices(
+    frame, events, stale_columns, raw_frame = cat_prices.build_stock_weekly_prices(
         all_symbols,
         stocks_data_dir=stocks_data_dir,
         min_drop_pct=min_drop_pct,
         turnover_spike_multiple=turnover_spike_multiple,
+        return_raw_weekly=True,
     )
     if frame.empty:
         raise ValueError("no priced weeks for the Total Market universe -- check daily.parquet")
@@ -357,6 +359,7 @@ def load_stock_universe_frame(
         events=events,
         stale_columns=stale_columns,
         missing_symbols=missing_symbols,
+        raw_frame=raw_frame,
         liquidity_gate=gate,
     )
 
@@ -381,6 +384,7 @@ class UniverseRanking:
     events: pd.DataFrame
     stale_columns: dict[str, pd.Timestamp]
     missing_symbols: list[str]  # Total Market symbols with no daily.parquet rows at all
+    raw_prices: pd.DataFrame | None = None  # raw stock prices plus atomics, for entry cap
 
 
 def _dense_rank(masked: pd.DataFrame) -> pd.DataFrame:
@@ -480,6 +484,9 @@ def compute_universe_ranking(
 
     atomics = outer_prices.reindex(frame.index)[list(ATOMIC_NAMES)]
     full_frame = pd.concat([frame, atomics], axis=1)
+    raw_full_frame = (
+        pd.concat([universe.raw_frame, atomics], axis=1) if universe.raw_frame is not None else None
+    )
     weeks = list(full_frame.index)
 
     config = Config(
@@ -524,6 +531,7 @@ def compute_universe_ranking(
         events=universe.events,
         stale_columns=universe.stale_columns,
         missing_symbols=missing_symbols,
+        raw_prices=raw_full_frame,
     )
 
 
@@ -904,6 +912,10 @@ def run_broad_backtest(
     # stock_tilt_screen_pct are then used only to decide WHETHER to apply it, not recomputed.
     # Script/CLI callers that don't bother caching just set stock_tilt > 0 and leave this None.
     stock_tilt_ranks: tuple[pd.DataFrame, pd.DataFrame] | None = None,
+    # Circuit-lock realism (categories/circuit_exposure.py::lock_masks): None = ignore locks, as
+    # every earlier run did. uc_locked blocks buying that week, lc_locked blocks selling.
+    uc_locked: pd.DataFrame | None = None,
+    lc_locked: pd.DataFrame | None = None,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -961,7 +973,10 @@ def run_broad_backtest(
             pool_exit_rank=pool_exit_rank,
         )
 
-    over_ceiling = price_ceiling_mask(ranking.prices, max_stock_price)
+    over_ceiling = price_ceiling_mask(
+        ranking.raw_prices if ranking.raw_prices is not None else ranking.prices,
+        max_stock_price,
+    )
     if extra_no_buy is not None:
         # Research gates (levers.py, TODO 3.9.23): OR-ed with the price ceiling, same entry-only
         # semantics - they block new buys, never force a sale.
@@ -1071,6 +1086,8 @@ def run_broad_backtest(
             else None
         ),
         no_buy=over_ceiling.reindex(prices.index) if over_ceiling is not None else None,
+        uc_locked=uc_locked,
+        lc_locked=lc_locked,
     )
     return BroadBacktestResult(
         result=result,

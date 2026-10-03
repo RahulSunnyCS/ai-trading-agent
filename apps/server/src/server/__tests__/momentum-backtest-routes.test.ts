@@ -243,6 +243,61 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards starting a background backtest job', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(202, { job: { id: 'ab12', status: 'queued' } }));
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/momentum/backtest/jobs',
+      payload: { dataset: 'etf', fresh: true },
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/backtest/jobs',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ dataset: 'etf', fresh: true }),
+      }),
+    );
+    await server.close();
+  });
+
+  it('forwards polling a backtest job and the job list', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { job: { id: 'ab12' } }));
+
+    await server.inject({ method: 'GET', url: '/api/momentum/backtest/jobs/ab12' });
+    await server.inject({ method: 'GET', url: '/api/momentum/backtest/jobs' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/backtest/jobs/ab12',
+      expect.anything(),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/backtest/jobs',
+      expect.anything(),
+    );
+    await server.close();
+  });
+
+  it('rejects a job id that is not hex before it reaches the upstream path', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/backtest/jobs/..%2Fsaved-runs',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await server.close();
+  });
+
   it('forwards a manual stock-sync trigger', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

@@ -257,6 +257,7 @@ function assumptionChips(result: MomentumResult, config: Record<string, unknown>
       ? `Beaten-down tilt ${Math.round(Number(config.broad_reversal_tilt) * 100)}%`
       : null,
     dataset === 'broad' && config.broad_universe === 'all_liquid' ? 'Whole NSE market' : null,
+    dataset === 'broad' && config.broad_respect_circuits ? 'Circuit locks respected' : null,
     dataset === 'broad' && (config.broad_universe === 'all_liquid' || config.broad_liquidity_filter)
       ? `Tradable: ≥ ₹${Number(config.broad_liq_min_turnover_cr ?? 1)} Cr/day${
           config.broad_liq_circuit === false ? '' : ', no circuit lock'

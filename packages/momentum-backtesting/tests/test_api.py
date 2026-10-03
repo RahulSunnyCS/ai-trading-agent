@@ -1432,3 +1432,100 @@ def test_get_momentum_universe_invalidates_when_only_the_catalog_changes(monkeyp
 
     assert len(calls) == 2
     assert first is not second
+
+
+def _wait_for(job_id, client, *statuses, timeout=10.0):
+    import time
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        job = client.get(f"/api/backtest/jobs/{job_id}").json()["job"]
+        if job["status"] in statuses:
+            return job
+        time.sleep(0.02)
+    raise AssertionError(f"job {job_id} never reached {statuses}: {job['status']}")
+
+
+def test_backtest_job_runs_in_the_background_and_matches_the_sync_result(client):
+    body = {"universe": core(client), "start": "2017-01-06"}
+    started = client.post("/api/backtest/jobs", json=body)
+    assert started.status_code == 202
+    job = started.json()["job"]
+    assert "result" not in job  # the start response never carries the (large) result
+    done = _wait_for(job["id"], client, "done", "failed")
+    assert done["status"] == "done", done["error"]
+    assert done["result"]["kpis"] == client.post("/api/backtest", json=body).json()["kpis"]
+    assert job["id"] in [j["id"] for j in client.get("/api/backtest/jobs").json()["jobs"]]
+    assert all("result" not in j for j in client.get("/api/backtest/jobs").json()["jobs"])
+
+
+def test_backtest_job_failure_lands_in_the_job_not_the_http_response(client):
+    # Passes request validation (so 202) but the computation rejects it.
+    res = client.post("/api/backtest/jobs", json={"universe": core(client)[:2], "top_n": 5})
+    assert res.status_code == 202
+    job = _wait_for(res.json()["job"]["id"], client, "done", "failed")
+    assert job["status"] == "failed" and job["error"]
+
+
+def test_backtest_job_unknown_id_is_a_404(client):
+    assert client.get("/api/backtest/jobs/deadbeef").status_code == 404
+
+
+def test_backtest_jobs_run_concurrently_up_to_the_cap_and_queue_the_rest():
+    import threading
+
+    jobs = api._BacktestJobs()
+    jobs.MAX_CONCURRENT = 2
+    gate = threading.Event()
+    running = []
+
+    def work():
+        running.append(1)
+        gate.wait(5)
+        return {"ok": True}
+
+    ids = [jobs.start(work, False, {})["id"] for _ in range(3)]
+    import time
+
+    time.sleep(0.2)
+    statuses = [jobs.get(i)["status"] for i in ids]
+    assert sorted(statuses) == ["queued", "running", "running"]
+    gate.set()
+    for i in ids:
+        for _ in range(100):
+            if jobs.get(i)["status"] == "done":
+                break
+            time.sleep(0.02)
+        assert jobs.get(i)["status"] == "done"
+
+
+def test_fresh_backtest_job_runs_alone():
+    import threading
+    import time
+
+    jobs = api._BacktestJobs()
+    release = threading.Event()
+    log = []
+
+    def slow():
+        log.append("slow-start")
+        release.wait(5)
+        log.append("slow-end")
+        return {}
+
+    def fresh():
+        log.append("fresh")
+        return {}
+
+    first = jobs.start(slow, False, {})["id"]
+    time.sleep(0.1)
+    fresh_id = jobs.start(fresh, True, {})["id"]
+    time.sleep(0.2)
+    assert jobs.get(fresh_id)["status"] == "queued"  # waits for the running job
+    release.set()
+    for _ in range(100):
+        if jobs.get(fresh_id)["status"] == "done":
+            break
+        time.sleep(0.02)
+    assert log == ["slow-start", "slow-end", "fresh"]
+    assert jobs.get(first)["status"] == "done"

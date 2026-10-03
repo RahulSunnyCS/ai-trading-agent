@@ -637,6 +637,12 @@ function BroadUniverseControls({
         checked={active}
         onChange={(value) => onChange('broad_liquidity_filter', value)}
       />
+      <Toggle
+        label="Respect circuit locks (realistic fills)"
+        help="Off (default): the backtest fills at any Friday close, even when the stock was locked that day. On: it cannot buy a stock locked at the upper circuit, and cannot sell one locked at the lower circuit, so a holding that locks down is held through the fall until the lock lifts. A lock means 3 or more sessions in a row closing at a price-band edge. The results card shows the CAGR both ways whichever you pick."
+        checked={values.broad_respect_circuits === true}
+        onChange={(value) => onChange('broad_respect_circuits', value)}
+      />
       {active ? (
         <div className="space-y-3 rounded-lg border border-border p-3">
           <div>
@@ -785,6 +791,7 @@ const SETTINGS_FALLBACKS: Values = {
   broad_off_exit_rank: 20,
   broad_universe: 'total_market',
   broad_liquidity_filter: false,
+  broad_respect_circuits: false,
   broad_liq_min_turnover_cr: 1,
   broad_liq_floor_ratio: 0.25,
   broad_liq_min_price: 20,

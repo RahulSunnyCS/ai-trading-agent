@@ -1,0 +1,71 @@
+symbol,ex_date,decision,factor,source_url,note
+MPHASIS,2011-02-25,crash,,https://www.telegraphindia.com/business/investors-punish-mphasis-scrip/cid/425240,Weak quarterly result and governance concerns; 28 percent fall
+SUNTV,2011-06-02,crash,,https://www.indiatoday.in/business/corporate/story/sun-tv-share-prices-fall-134931-2011-06-02,2G investigation concerns; 28 percent fall
+ADANIENT,2011-07-29,crash,,https://www.oneindia.com/2011/07/29/karnataka-lokayukta-5-firms-indicted-for-illegal-mining.html,Named in Karnataka illegal mining report released that day; 21 percent fall
+RENUKA,2011-11-14,crash,,https://www.moneycontrol.com/news/business/earnings/-1401597.html/amp,Quarterly loss and foreign exchange losses
+IGL,2012-04-10,crash,,https://www.ndtvprofit.com/business/5-reasons-why-igl-shares-tanked-40-301571-10722125,Regulatory gas tariff cut; 34 percent fall
+WELCORP,2013-02-25,crash,,https://www.goodreturns.in/news/2013/02/25/sudden-carnage-select-mid-caps-scare-markets-160910.html,Midcap selling; article reports Welspun Corp down 26 percent
+SUZLON,2013-02-28,crash,,https://www.business-standard.com/article/reuters/suzlon-shares-plunge-34-percent-after-promoters-sell-partial-stake-113022800380_1.html,Promoter stake sale during debt restructuring; 34 percent fall
+NHPC,2013-03-04,crash,,https://www.business-standard.com/amp/article/markets/nhpc-shares-succumb-to-margin-calls-113030400082_1.html,Margin calls and forced selling
+INFY,2013-04-12,crash,,https://www.indiatoday.in/business/market/story/bse-sensex-april-12-2013-infosys-158618-2013-04-11,Weak earnings and revenue guidance; 21 percent fall
+APOLLOTYRE,2013-06-13,crash,,https://www.business-standard.com/amp/article/markets/apollo-tyres-slumps-26-on-debt-concerns-113061300630_1.html,Debt concerns from Cooper Tire acquisition; 25 percent fall
+IRB,2013-08-01,crash,,https://www.business-standard.com/article/markets/irb-stock-looks-beaten-and-attractive-113080200645_1.html,Withdrew Mumbai Trans Harbour Link bid; 25 percent fall
+DLF,2014-10-14,crash,,https://www.sebi.gov.in/enforcement/orders/oct-2014/order-in-the-matter-of-dlf-limited_28215.html,SEBI order barred company and executives from securities market; 28 percent fall
+SUNTV,2015-06-08,crash,,https://economictimes.indiatimes.com/markets/stocks/news/sun-tv-shares-crash-22-market-capitalisation-dips-rs-3052-crore/articleshow/47587151.cms,Security clearance refused for 33 channels; 22 percent fall
+DIVISLAB,2016-12-23,crash,,https://www.motilaloswal.com/site/rreports/636183398743568825.pdf,US FDA inspection observations; 22 percent fall
+PCJEWELLER,2018-02-02,crash,,https://economictimes.indiatimes.com/markets/stocks/news/pc-jeweller-promoters-come-clean-shares-end-25-lower/articleshow/62755406.cms,Vakrangee link and promoter sale rumours; 25 percent fall
+PCJEWELLER,2018-04-27,crash,,https://www.business-standard.com/article/markets/pc-jeweller-tanks-46-in-three-days-despite-clarification-on-price-fall-118042700610_1.html,Continuing selloff despite company clarification; 25 percent fall
+PCJEWELLER,2018-05-02,crash,,https://www.goodreturns.in/news/2018/04/30/p-c-jewellers-shares-drop-from-rs-600-rs-180-what-s-happening-701276.html,Continuing share price collapse amid promoter and Vakrangee concerns
+HCC,2018-05-03,crash,,https://www.business-standard.com/article/markets/hindustan-construction-corp-stock-slips-25-as-auditors-red-flag-lavasa-118050400075_1.html,Lavasa auditor going concern warning; 25 percent fall
+STAR,2018-05-18,crash,,https://www.moneycontrol.com/news/business/earnings/strides-shasun-q4-consolidated-loss-from-continuing-operations-at-rs-4-4-cr-2571177.html,Weak Q4 result; 23 percent fall
+PCJEWELLER,2018-07-16,crash,,https://www.financialexpress.com/business/industry-pc-jeweller-crashes-26-on-buyback-offer-withdrawal-1247255/lite/,Proposed buyback withdrawn; 26 percent fall
+YESBANK,2018-09-21,crash,,https://economictimes.indiatimes.com/markets/stocks/news/yes-bank-tanks-29-on-worries-over-kapoors-imminent-exit/articleshow/65908350.cms,RBI curtailed founder CEO tenure; shares fell 29%
+HINDPETRO,2018-10-05,crash,,https://www.moneycontrol.com/news/business/markets/d-street-buzz-oil-hindalco-jspl-fall-4-5-it-in-green-3016171.html,Government fuel excise cut; HPCL down over 20 percent
+ZEEL,2019-01-25,crash,,https://indianexpress.com/article/business/companies/subhash-chandra-shares-tumble-zee-group-chairman-sends-out-sos-to-lenders-5555714/,Essel promoter debt and pledged share concerns; 26 percent fall
+RPOWER,2019-02-04,crash,,https://nsearchives.nseindia.com/web/sites/default/files/inline-files/NSE_Market_Pulse_Feb2019_1.pdf,Anil Ambani group 4-7 Feb selloff and pledged share liquidation
+RPOWER,2019-02-05,crash,,https://nsearchives.nseindia.com/web/sites/default/files/inline-files/NSE_Market_Pulse_Feb2019_1.pdf,Anil Ambani group 4-7 Feb selloff and pledged share liquidation
+RPOWER,2019-02-07,crash,,https://nsearchives.nseindia.com/web/sites/default/files/inline-files/NSE_Market_Pulse_Feb2019_1.pdf,Anil Ambani group 4-7 Feb selloff and pledged share liquidation
+CGPOWER,2019-02-13,crash,,https://www.ndtvprofit.com/markets/why-shares-of-cg-power-tumbled-the-most-since-listing-10419821,CG Power fell 29.8 percent amid debt concern
+YESBANK,2019-04-30,crash,,https://indianexpress.com/article/business/banking-and-finance/yes-bank-sinks-after-bad-loans-drive-lender-to-surprise-loss-5702132/,Surprise quarterly loss and bad loan provisions; shares fell about 30%
+IDEA,2019-07-29,crash,,https://economictimes.indiatimes.com/markets/stocks/news/vodafone-idea-hits-all-time-low-drops-27-after-poor-q1-show/articleshow/70442869.cms,Weak quarterly results; 27 percent fall
+YESBANK,2019-10-01,crash,,https://www.yesbank.in/content/published/api/v1.1/assets/CONTC5DC17A159514BB5B15A581631E38E49/native/press_release_02oct2019_pdf.pdf?channelToken=21f7ccfa2fc3401091938f541a6f8f2a&download=false,Bank statement attributes 23 percent fall to forced sale of pledged shares
+IDEA,2019-10-24,crash,,https://www.financialexpress.com/market/vodafone-idea-shares-fall-over-27-after-supreme-court-order-yes-bank-sbi-also-down-1745215/,Supreme Court AGR dues decision; 23 percent close fall
+IDEA,2019-11-14,crash,,https://indianexpress.com/article/business/market/vodafone-idea-shares-tank-hit-an-all-time-low-6119052/,AGR dues demand; 20 percent fall
+IDEA,2020-01-17,crash,,https://www.ndtvprofit.com/business/vodafone-idea-plunges-39-as-supreme-court-rejects-agr-verdict-review-10285844?src=also_read,Supreme Court rejected AGR review; 25 percent close fall
+IDEA,2020-02-14,crash,,https://techcrunch.com/2020/02/14/vodafone-idea-shares-tumble-23-after-india-orders-it-to-pay-billions-in-dues/,AGR payment order; 24 percent fall
+YESBANK,2020-03-06,crash,,https://rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx?prid=49479,RBI moratorium began 5 March; shares fell 56% next session
+ADANIPOWER,2020-03-12,crash,,https://timesofindia.indiatimes.com/business/india-business/sensex-tanks-over-1800-points-over-coronavirus-pandemic-nifty-skids-below-9950/articleshow/74587245.cms,COVID market selloff; Nifty fell 8.3% this session
+GLENMARK,2020-03-12,crash,,https://timesofindia.indiatimes.com/business/india-business/sensex-tanks-over-1800-points-over-coronavirus-pandemic-nifty-skids-below-9950/articleshow/74587245.cms,COVID market selloff; Nifty fell 8.3% this session
+RBLBANK,2020-03-16,crash,,https://www.business-standard.com/amp/article/markets/financial-shares-under-pressure-indusind-bank-rbl-bank-slips-up-to-24-120031600689_1.html,COVID period bank selloff; RBL fell over 20 percent
+IDEA,2020-03-18,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-50-stock-markets-live-updates-coronavirus-6319827/,COVID market selloff; NSE benchmarks fell over 5.5% this session
+INDUSINDBK,2020-03-18,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-50-stock-markets-live-updates-coronavirus-6319827/,COVID market selloff; bank index fell 5.87% this session
+AXISBANK,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+BAJAJFINSV,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+BAJFINANCE,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+BANDHANBNK,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+BRIGADE,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+CANBK,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+CHOLAFIN,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+FEDERALBNK,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+ICICIPRULI,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+INDUSINDBK,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+M&MFIN,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+MFSL,2020-03-23,crash,,https://indianexpress.com/article/business/market/bse-sensex-nse-nifty-stock-market-live-updates-coronavirus-global-markets-6327415/,COVID lockdown selloff; Nifty fell 12.98% this session
+VEDL,2020-10-12,crash,,https://www.financialexpress.com/market/vedanta-limited-stock-price-tanks-after-delisting-failure-anil-agarwal-counter-offer-2103505/,Failed delisting offer; 20 percent fall
+IDEA,2022-01-11,crash,,https://theprint.in/economy/indian-govt-to-now-own-35-8-stake-in-vodafone-idea-after-converting-dues-into-equity/800339/,AGR and spectrum dues converted into government equity; 20 percent fall
+RBLBANK,2022-06-13,crash,,https://www.goodreturns.in/news/rbl-bank-shares-fall-23-here-is-why-1252172.html,Broad market selloff and RBL Bank weakness; 23 percent fall
+ADANIENT,2023-02-01,crash,,https://apnews.com/article/a06d01ead7be3c6105b058998667f98d,Adani group selloff after Hindenburg allegations; 28 percent fall
+ADANIENT,2023-02-02,crash,,https://apnews.com/article/ed5912fe32fd98263a93dbd604452bb8,Adani group selloff and cancelled share offering; 27 percent fall
+POLYCAB,2024-01-11,crash,,https://www.hindustantimes.com/business/why-polycab-india-shares-tumble-21-in-a-day-101704992012384.html,Tax evasion concerns; 21 percent fall
+ZEEL,2024-01-23,crash,,https://www.business-standard.com/markets/news/zee-entertainment-stock-slumps-30-after-failed-merger-deal-with-sony-124012300553_1.html,Sony merger termination; 33 percent fall
+ADANIPORTS,2024-06-04,crash,,https://sansad.in/getFile/loksabhaquestions/annex/182/AU26_hwkW5f.pdf?source=pqals,Election result selloff; Nifty fell 5.9% this session
+BHEL,2024-06-04,crash,,https://sansad.in/getFile/loksabhaquestions/annex/182/AU26_hwkW5f.pdf?source=pqals,Election result selloff; Nifty fell 5.9% this session
+PFC,2024-06-04,crash,,https://sansad.in/getFile/loksabhaquestions/annex/182/AU26_hwkW5f.pdf?source=pqals,Election result selloff; Nifty fell 5.9% this session
+RECLTD,2024-06-04,crash,,https://sansad.in/getFile/loksabhaquestions/annex/182/AU26_hwkW5f.pdf?source=pqals,Election result selloff; Nifty fell 5.9% this session
+ADANIENT,2024-11-21,crash,,https://apnews.com/article/cd1ee53edee0df1bf00de01b044366b4,US bribery indictment; Adani group shares sold off
+CYIENT,2025-01-24,crash,,https://www.livemint.com/market/stock-market-news/cyient-shares-tumble-20-hit-17-month-low-amid-weak-q3-results-analysts-lower-target-price-11737695920411.html,Weak Q3 results and leadership uncertainty; 23 percent fall
+KEI,2025-02-27,crash,,https://bsmedia.business-standard.com/_media/bs/data/announcements/bse/28022025/a0a25878-bb30-49a0-baf8-788df7db40fd.pdf,UltraTech entry into wire and cable market; 21 percent fall
+INDUSINDBK,2025-03-11,crash,,https://www.ndtvprofit.com/markets/indusind-bank-share-price-plunges-10-to-erase-rs-7100-crore-in-market-value-on-derivative-discrepancies-9961063,Forex derivatives accounting discrepancy; 27 percent fall
+IEX,2025-07-24,crash,,https://www.msei.in/SX-Content/Circulars/2025/October/Circular-17986.pdf,CERC market coupling order; 29.6 percent fall
+KAYNES,2026-05-14,crash,,https://www.moneycontrol.com/news/business/markets/kaynes-tech-plunges-over-17-as-firm-misses-guidance-in-q4-jpmorgan-downgrades-stock-13918824.html,Q4 profit decline and analyst downgrade; 20 percent fall
+POLICYBZR,2026-09-24,crash,,https://www.indiatoday.in/business/market/story/pb-fintech-share-price-crash-today-policybazaar-parent-falls-on-irdai-commission-proposal-3001829-2026-09-24,Insurance distribution commission proposal; shares fell 36%

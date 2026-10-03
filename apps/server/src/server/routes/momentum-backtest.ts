@@ -119,6 +119,41 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // Background backtest jobs: start returns at once, the browser polls, so leaving the page
+  // (or running several backtests side by side) loses nothing.
+  fastify.post(
+    '/api/momentum/backtest/jobs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/backtest/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.get('/api/momentum/backtest/jobs', async (_request, reply) => {
+    await forward(reply, '/api/backtest/jobs');
+  });
+
+  fastify.get(
+    '/api/momentum/backtest/jobs/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await forward(reply, `/api/backtest/jobs/${id}`);
+    },
+  );
+
   // Saved runs (P4): previously kept only in the browser's localStorage, now
   // persisted server-side in the shared trading-data catalog — see
   // packages/momentum-backtesting/src/momentum_backtesting/runs_store.py.

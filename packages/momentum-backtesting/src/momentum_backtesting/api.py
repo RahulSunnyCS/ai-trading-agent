@@ -1,5 +1,6 @@
 """Private Momentum API consumed by the shared dashboard."""
 
+import contextlib
 import json
 import os
 import threading
@@ -21,6 +22,7 @@ from . import (
     db_read,
     fyers,
     levers,
+    metrics,
     rebalance,
     reference_benchmarks,
     runs_store,
@@ -551,6 +553,10 @@ class BacktestRequest(BaseModel):
     # every NSE equity, narrowed week by week by the tradability gate (which is then mandatory).
     broad_universe: Literal["total_market", "all_liquid"] = "total_market"
     broad_liquidity_filter: bool = False
+    # Fill as a live account would around circuit locks: no buying a stock locked at the upper
+    # circuit, no selling one locked at the lower circuit. Off = fills ignore locks (the original
+    # behaviour); the results card always shows the CAGR both ways.
+    broad_respect_circuits: bool = False
     broad_liq_min_turnover_cr: float = Field(1.0, gt=0, le=1000)
     broad_liq_floor_ratio: float = Field(0.25, ge=0, le=1)
     broad_liq_min_price: float = Field(20.0, ge=0, le=100_000)
@@ -1336,6 +1342,7 @@ def _broad_meta() -> dict:
             "broad_every_week": True,
             "broad_universe": "total_market",
             "broad_liquidity_filter": False,
+            "broad_respect_circuits": False,
             "broad_liq_min_turnover_cr": 1.0,
             "broad_liq_floor_ratio": 0.25,
             "broad_liq_min_price": 20.0,
@@ -1434,6 +1441,11 @@ def _run_broad(
         stock_tilt_ranks = DATA.get_broad_tilt_ranks(
             ranking, tuple(req.lookbacks), req.broad_reversal_tilt, req.broad_reversal_screen_pct
         )
+    uc_locked = lc_locked = None
+    if req.broad_respect_circuits:
+        uc_locked, lc_locked = circuit_exposure_mod.lock_masks(
+            ranking.column_to_base_symbol, ranking.prices.index
+        )
     return broad.run_broad_backtest(
         outer_prices=outer_prices,
         stocks_data_dir=DATA_DIR / "stocks",
@@ -1478,7 +1490,46 @@ def _run_broad(
         stock_tilt=req.broad_reversal_tilt,
         stock_tilt_screen_pct=req.broad_reversal_screen_pct,
         stock_tilt_ranks=stock_tilt_ranks,
+        uc_locked=uc_locked,
+        lc_locked=lc_locked,
     )
+
+
+def _circuit_realism(
+    req: BacktestRequest, ranking: broad.UniverseRanking, outcome: broad.BroadBacktestResult
+) -> dict:
+    """The same run with circuit locks ignored and with them respected, so the cost of locks is
+    visible whichever way this run was set. Costs one extra engine pass (ranking is cached)."""
+
+    def summary(result: Result) -> dict:
+        equity = result.equity
+        return {
+            "cagr": float(metrics.cagr(equity)),
+            "max_drawdown": float(metrics.max_drawdown(equity)[0]),
+            "total_return": float(equity.iloc[-1] - 1),
+            "trades": int(len(result.trades)),
+        }
+
+    other = _run_broad(
+        req.model_copy(update={"broad_respect_circuits": not req.broad_respect_circuits}),
+        ranking,
+        DATA.get(),
+    )
+    this_run, alternative = summary(outcome.result), summary(other.result)
+    ignoring, respecting = (
+        (alternative, this_run)
+        if req.broad_respect_circuits
+        else (
+            this_run,
+            alternative,
+        )
+    )
+    return {
+        "this_run_respects_locks": req.broad_respect_circuits,
+        "ignoring_locks": ignoring,
+        "respecting_locks": respecting,
+        "cagr_impact": respecting["cagr"] - ignoring["cagr"],
+    }
 
 
 def _liquidity_config(req: BacktestRequest) -> liquidity_mod.LiquidityConfig | None:
@@ -1559,6 +1610,10 @@ def _broad_backtest(req: BacktestRequest) -> dict:
         )
     except Exception:  # noqa: BLE001
         payload["circuit_exposure"] = None
+    if payload["circuit_exposure"] is not None:
+        # The comparison is optional: if its second run fails, keep the rest of the card.
+        with contextlib.suppress(Exception):
+            payload["circuit_exposure"]["realism"] = _circuit_realism(req, ranking, outcome)
     return payload
 
 
@@ -1851,6 +1906,101 @@ WEEKLY_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
 
 
+class _BacktestJobs:
+    """Backtest runs executed off the request thread, several at once, so the browser can leave
+    the page (or start a second run) while one is still computing. Unlike `_SingleFlightJob` this
+    keeps many jobs, in memory (a service restart forgets them; finished runs are also saved
+    server-side by the dashboard). At most `MAX_CONCURRENT` compute at a time - the work is
+    CPU-bound Python, so more only makes each slower - the rest wait as `queued`. A `fresh` run
+    (`DATA.reset()`) runs alone: it waits for the others to finish and holds new ones back, so it
+    never wipes caches out from under a run that is mid-computation."""
+
+    MAX_CONCURRENT = 3
+    MAX_KEPT = 30
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition()
+        self._jobs: OrderedDict[str, dict] = OrderedDict()
+        self._active = 0
+        self._fresh_waiting = 0
+        self._fresh_running = False
+
+    @staticmethod
+    def _public(job: dict, with_result: bool) -> dict:
+        view = {k: v for k, v in job.items() if k != "result"}
+        if with_result:
+            view["result"] = job["result"]
+        return view
+
+    def get(self, job_id: str) -> dict | None:
+        with self._cond:
+            job = self._jobs.get(job_id)
+            return self._public(job, True) if job is not None else None
+
+    def list(self) -> list[dict]:
+        """Newest first, without the (large) results."""
+        with self._cond:
+            return [self._public(job, False) for job in reversed(self._jobs.values())]
+
+    def start(self, work: Callable[[], dict], fresh: bool, extra_fields: dict) -> dict:
+        with self._cond:
+            job = {
+                "id": os.urandom(8).hex(),
+                "status": "queued",
+                "fresh": fresh,
+                "started_at": datetime.now(IST).isoformat(timespec="seconds"),
+                "compute_started_at": None,
+                "finished_at": None,
+                "result": None,
+                "error": None,
+                **extra_fields,
+            }
+            self._jobs[job["id"]] = job
+            self._evict()
+            if fresh:
+                self._fresh_waiting += 1
+            snapshot = self._public(job, False)
+        threading.Thread(target=self._execute, args=(job, work, fresh), daemon=True).start()
+        return snapshot
+
+    def _evict(self) -> None:
+        """Drop the oldest finished jobs beyond MAX_KEPT (never a queued/running one)."""
+        for job_id in [j for j, v in self._jobs.items() if v["status"] in ("done", "failed")]:
+            if len(self._jobs) <= self.MAX_KEPT:
+                break
+            del self._jobs[job_id]
+
+    def _can_run(self, fresh: bool) -> bool:
+        if self._fresh_running:
+            return False
+        if fresh:
+            return self._active == 0
+        return self._active < self.MAX_CONCURRENT and self._fresh_waiting == 0
+
+    def _execute(self, job: dict, work: Callable[[], dict], fresh: bool) -> None:
+        with self._cond:
+            self._cond.wait_for(lambda: self._can_run(fresh))
+            self._active += 1
+            if fresh:
+                self._fresh_waiting -= 1
+                self._fresh_running = True
+            job["status"] = "running"
+            job["compute_started_at"] = datetime.now(IST).isoformat(timespec="seconds")
+        try:
+            result, error = work(), None
+        except Exception as exc:  # the job must always finish, or the UI spins forever
+            result, error = None, f"{type(exc).__name__}: {getattr(exc, 'detail', exc)}"
+        with self._cond:
+            job["status"] = "failed" if error else "done"
+            job["result"], job["error"] = result, error
+            job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
+            self._active -= 1
+            if fresh:
+                self._fresh_running = False
+            self._cond.notify_all()
+
+
+BACKTEST_JOBS = _BacktestJobs()
 
 
 def _execute_stock_sync() -> dict:
@@ -2157,8 +2307,7 @@ def create_app() -> FastAPI:
             universe,
         )
 
-    @app.post("/api/backtest")
-    def backtest(req: BacktestRequest) -> dict:
+    def _dispatch_backtest(req: BacktestRequest) -> dict:
         if req.fresh:
             DATA.reset()
         if req.dataset == "stock":
@@ -2168,6 +2317,33 @@ def create_app() -> FastAPI:
         if req.dataset == "custom_index":
             return _custom_index_backtest(req)
         return _etf_backtest(req)
+
+    @app.post("/api/backtest")
+    def backtest(req: BacktestRequest) -> dict:
+        return _dispatch_backtest(req)
+
+    @app.post("/api/backtest/jobs", status_code=202)
+    def backtest_start_job(req: BacktestRequest) -> dict:
+        """Same computation as `/api/backtest`, run in the background so the browser can leave
+        the page or start more runs. Body validation (422) still happens here, up front; a failure
+        during the computation lands in the job's `error`. Returns the job at once."""
+        job = BACKTEST_JOBS.start(
+            lambda: _dispatch_backtest(req),
+            req.fresh,
+            {"dataset": req.dataset},
+        )
+        return {"job": job}
+
+    @app.get("/api/backtest/jobs")
+    def backtest_list_jobs() -> dict:
+        return {"jobs": BACKTEST_JOBS.list()}
+
+    @app.get("/api/backtest/jobs/{job_id}")
+    def backtest_get_job(job_id: str) -> dict:
+        job = BACKTEST_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "backtest job not found (the service may have restarted)")
+        return {"job": job}
 
     @app.get("/api/saved-runs")
     def saved_runs(dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf") -> list[dict]:

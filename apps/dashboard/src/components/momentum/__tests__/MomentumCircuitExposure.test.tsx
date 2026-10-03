@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { MomentumCircuitExposure } from '../../../types/momentum';
@@ -46,6 +46,12 @@ const exposure: MomentumCircuitExposure = {
   lc_trapped_count: 9,
   lc_escaped_count: 1,
   lc_trapped_sold_during: 0,
+  realism: {
+    this_run_respects_locks: false,
+    ignoring_locks: { cagr: 0.408, max_drawdown: -0.4463, total_return: 26.97, trades: 8315 },
+    respecting_locks: { cagr: 0.3856, max_drawdown: -0.448, total_return: 22.93, trades: 8306 },
+    cagr_impact: -0.0224,
+  },
 };
 
 describe('MomentumCircuitExposureCard', () => {
@@ -54,16 +60,34 @@ describe('MomentumCircuitExposureCard', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('shows who was trapped, who got out in time, and the escape rate', () => {
+  it('compares the CAGR with locks ignored and respected, and marks this run', () => {
+    render(<MomentumCircuitExposureCard exposure={exposure} />);
+    expect(screen.getByText('Ignoring locks')).toBeTruthy();
+    expect(screen.getByText('Respecting locks')).toBeTruthy();
+    expect(screen.getByText('40.8%')).toBeTruthy();
+    expect(screen.getByText('38.6%')).toBeTruthy();
+    expect(screen.getByText('-2.2')).toBeTruthy();
+    expect(screen.getAllByText('this run')).toHaveLength(1);
+  });
+
+  it('shows the trapped table first and switches tabs without losing the summary', () => {
     render(<MomentumCircuitExposureCard exposure={exposure} />);
     expect(screen.getByText('ATGL')).toBeTruthy();
     expect(screen.getByText('-81.5%')).toBeTruthy();
     expect(screen.getByText('sold 2023-10-27, after the lock')).toBeTruthy();
+    expect(screen.queryByText('QUESS')).toBeNull();
+    expect(screen.getByText(/already out before 1 \(10%\)/)).toBeTruthy();
+    expect(screen.getByText(/still holding in 9/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: /got out in time \(1\)/ }));
     expect(screen.getByText('QUESS')).toBeTruthy();
     expect(screen.getByText('2020-01-31 (47 days before)')).toBeTruthy();
     expect(screen.getByText('-3.41%')).toBeTruthy();
+    expect(screen.queryByText('ATGL')).toBeNull();
     expect(screen.getByText(/already out before 1 \(10%\)/)).toBeTruthy();
-    expect(screen.getByText(/still holding in 9/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Upper circuit/ }));
     expect(screen.getByText(/No upper-circuit run hit a stock/)).toBeTruthy();
+    expect(screen.getAllByRole('tab')).toHaveLength(3);
   });
 });

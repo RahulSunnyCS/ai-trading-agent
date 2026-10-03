@@ -107,7 +107,25 @@ export interface MomentumCircuitEscaped {
   avoided_impact_pct: number;
 }
 
+export interface MomentumCircuitRunStats {
+  cagr: number;
+  max_drawdown: number;
+  total_return: number;
+  trades: number;
+}
+
+/** The same backtest with circuit locks ignored and respected. */
+export interface MomentumCircuitRealism {
+  /** True when this run's own numbers are the "respecting" ones. */
+  this_run_respects_locks: boolean;
+  ignoring_locks: MomentumCircuitRunStats;
+  respecting_locks: MomentumCircuitRunStats;
+  /** respecting - ignoring, as a fraction (0.02 = 2 points of CAGR). */
+  cagr_impact: number;
+}
+
 export interface MomentumCircuitExposure {
+  realism?: MomentumCircuitRealism;
   positions: number;
   /** Holdings that met at least one band-edge close. */
   touched: number;

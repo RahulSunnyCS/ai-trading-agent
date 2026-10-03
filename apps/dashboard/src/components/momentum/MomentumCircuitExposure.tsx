@@ -1,15 +1,19 @@
 'use client';
 
+import { useState } from 'react';
+
+import { cn } from '../../lib/cn';
 import type {
   MomentumCircuitEpisode,
   MomentumCircuitEscaped,
   MomentumCircuitExposure,
+  MomentumCircuitRealism,
+  MomentumCircuitRunStats,
   MomentumCircuitTrapped,
 } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader } from '../ui/Card';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
-import { ResultSection } from './ResultSection';
 
 function signed(value: number, digits = 1): string {
   return `${value > 0 ? '+' : ''}${value.toFixed(digits)}%`;
@@ -170,6 +174,81 @@ function UpperTable({ rows }: { rows: MomentumCircuitEpisode[] }) {
   );
 }
 
+type Tab = 'trapped' | 'escaped' | 'upper';
+
+function pct(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function Stat({
+  label,
+  stats,
+  current,
+}: {
+  label: string;
+  stats: MomentumCircuitRunStats;
+  current: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-lg border px-3 py-2',
+        current ? 'border-primary/40 bg-primary/5' : 'border-border bg-surface-2/40',
+      )}
+    >
+      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-faint">
+        {label}
+        {current ? <Badge tone="primary">this run</Badge> : null}
+      </p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
+        {pct(stats.cagr)} <span className="text-xs font-normal text-muted">CAGR</span>
+      </p>
+      <p className="text-[11px] text-muted">
+        Worst drawdown {pct(stats.max_drawdown)} · total return {pct(stats.total_return)}
+      </p>
+    </div>
+  );
+}
+
+/** What circuit locks cost: the same run with fills that ignore them vs. respect them. */
+function RealismStrip({ realism }: { realism: MomentumCircuitRealism }) {
+  const impact = realism.cagr_impact * 100;
+  const same = Math.abs(impact) < 0.05;
+  return (
+    <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Stat
+          label="Ignoring locks"
+          stats={realism.ignoring_locks}
+          current={!realism.this_run_respects_locks}
+        />
+        <Stat
+          label="Respecting locks"
+          stats={realism.respecting_locks}
+          current={realism.this_run_respects_locks}
+        />
+        <div className="rounded-lg border border-border bg-surface-2/40 px-3 py-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-faint">
+            Impact of locks
+          </p>
+          <p
+            className={cn(
+              'mt-0.5 text-lg font-semibold tabular-nums',
+              same ? 'text-foreground' : impact < 0 ? 'text-negative' : 'text-positive',
+            )}
+          >
+            {same ? 'about 0' : `${impact > 0 ? '+' : ''}${impact.toFixed(1)}`}{' '}
+            <span className="text-xs font-normal text-muted">CAGR points</span>
+          </p>
+          <p className="text-[11px] text-muted">
+            Respecting locks cannot buy a stock locked up or sell one locked down.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The worst lower/upper-circuit runs among the stocks this backtest held, and whether the strategy
  * was already out of a stock before it locked down. Display only: it never changes what the
@@ -180,7 +259,25 @@ export function MomentumCircuitExposureCard({
 }: {
   exposure: MomentumCircuitExposure | null | undefined;
 }) {
+  const [tab, setTab] = useState<Tab>('trapped');
   if (!exposure) return null;
+  const tabs: Array<[Tab, string, string]> = [
+    [
+      'trapped',
+      `Lower circuit: still holding (${exposure.lc_trapped_count.toLocaleString('en-IN')})`,
+      'Longest locks first. Effect = your position size × the fall until the strategy sold.',
+    ],
+    [
+      'escaped',
+      `Lower circuit: got out in time (${exposure.lc_escaped_count.toLocaleString('en-IN')})`,
+      'The strategy sold these up to 8 weeks before the lock began. Biggest losses avoided first.',
+    ],
+    [
+      'upper',
+      'Upper circuit',
+      'Longest runs first. A rise like this is real only if you were already in before the lock.',
+    ],
+  ];
   const near = exposure.lc_trapped_count + exposure.lc_escaped_count;
   const escapePct = near > 0 ? Math.round((exposure.lc_escaped_count / near) * 100) : null;
   return (
@@ -190,6 +287,7 @@ export function MomentumCircuitExposureCard({
         description="Stocks the backtest held that closed at a price-band edge for several sessions in a row. Measured after the fact; it does not change the results above."
       />
       <div className="space-y-6">
+        {exposure.realism ? <RealismStrip realism={exposure.realism} /> : null}
         <div className="space-y-1.5 text-xs leading-relaxed text-muted">
           <p>
             {exposure.touched.toLocaleString('en-IN')} of{' '}
@@ -219,27 +317,32 @@ export function MomentumCircuitExposureCard({
             )}
           </p>
         </div>
-        <ResultSection
-          padded={false}
-          title="Lower circuit: still holding when it locked"
-          description="Longest locks first. Effect = your position size × the fall until the strategy sold."
-        >
-          <TrappedTable rows={exposure.lc} />
-        </ResultSection>
-        <ResultSection
-          padded={false}
-          title="Lower circuit: already out before it locked"
-          description="The strategy sold these up to 8 weeks before the lock began. Biggest losses avoided first."
-        >
-          <EscapedTable rows={exposure.lc_escaped} />
-        </ResultSection>
-        <ResultSection
-          padded={false}
-          title="Upper circuit (a stock you could not buy)"
-          description="Longest runs first. A rise like this is real only if you were already in before the lock."
-        >
-          <UpperTable rows={exposure.uc} />
-        </ResultSection>
+        <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
+          {tabs.map(([id, label, description]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              title={description}
+              onClick={() => setTab(id)}
+              className={cn(
+                '-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                tab === id
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted hover:text-foreground',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div role="tabpanel" className="space-y-3">
+          <p className="text-xs text-muted">{tabs.find(([id]) => id === tab)?.[2]}</p>
+          {tab === 'trapped' ? <TrappedTable rows={exposure.lc} /> : null}
+          {tab === 'escaped' ? <EscapedTable rows={exposure.lc_escaped} /> : null}
+          {tab === 'upper' ? <UpperTable rows={exposure.uc} /> : null}
+        </div>
         <p className="text-[11px] text-faint">
           Circuits are inferred from closes at a 2%, 5%, 10% or 20% move from the previous close, in
           the same direction on consecutive sessions; the daily bars carry no band data.

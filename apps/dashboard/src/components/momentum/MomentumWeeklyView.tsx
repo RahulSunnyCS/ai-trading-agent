@@ -194,14 +194,20 @@ function StockActionAlerts({ stockSyncFinishedAt }: { stockSyncFinishedAt: strin
         description="After each stock-data refresh, new one-day drops over 20.1% are checked against exchange filings. Unmatched moves need a classification before any share adjustment is applied."
       />
       {actions.error ? (
-        <StateMessage variant="error" title="Could not load stock-action alerts" description={actions.error} />
+        <StateMessage
+          variant="error"
+          title="Could not load stock-action alerts"
+          description={actions.error}
+        />
       ) : actions.loading && !actions.data ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : actions.data?.items.length ? (
         <div className="space-y-3">
           <p className="text-xs text-muted">
-            {actions.data.pending_count} new unresolved move(s) since {formatDay(actions.data.manual_review_after)}.
-            The rounded multiplier comes from volume ÷ rupee turnover. It reflects the price change and needs filing evidence before it can be treated as a split.
+            {actions.data.pending_count} new unresolved move(s) since{' '}
+            {formatDay(actions.data.manual_review_after)}. The rounded multiplier comes from volume
+            ÷ rupee turnover. It reflects the price change and needs filing evidence before it can
+            be treated as a split.
             {actions.data.pending_count > actions.data.items.length
               ? ` Showing the newest ${actions.data.items.length}; more appear as these are resolved.`
               : ''}
@@ -238,10 +244,10 @@ function StockActionAlertRow({
   const [error, setError] = useState<string | null>(null);
   const dropPct = (1 - item.close / item.previous_close) * 100;
   const volumeRatio = item.previous_volume > 0 ? item.volume / item.previous_volume : null;
-  const turnoverRatio =
-    item.previous_turnover > 0 ? item.turnover / item.previous_turnover : null;
+  const turnoverRatio = item.previous_turnover > 0 ? item.turnover / item.previous_turnover : null;
   const needsEntitlement =
-    item.event_kind != null && ['demerger', 'scheme', 'rights', 'dividend'].includes(item.event_kind);
+    item.event_kind != null &&
+    ['demerger', 'scheme', 'rights', 'dividend'].includes(item.event_kind);
 
   async function save() {
     if (!decision) return;
@@ -268,8 +274,8 @@ function StockActionAlertRow({
         <span className="text-muted">{formatDay(item.ex_date)}</span>
         <Badge tone="warning">Price −{dropPct.toFixed(1)}%</Badge>
         <span className="text-muted">
-          Volume {volumeRatio?.toFixed(1) ?? '—'}× · turnover {turnoverRatio?.toFixed(1) ?? '—'}×
-          {' '}· price-implied multiple {item.suggested_factor?.toFixed(1) ?? '—'}×
+          Volume {volumeRatio?.toFixed(1) ?? '—'}× · turnover {turnoverRatio?.toFixed(1) ?? '—'}× ·
+          price-implied multiple {item.suggested_factor?.toFixed(1) ?? '—'}×
         </span>
       </div>
       {item.subject ? (
@@ -283,50 +289,55 @@ function StockActionAlertRow({
       )}
       {needsEntitlement ? (
         <p className="mt-1 text-xs text-warning">
-          This filing needs entitlement or cash payout valuation before the historical return can be corrected.
+          This filing needs entitlement or cash payout valuation before the historical return can be
+          corrected.
         </p>
       ) : null}
-      {!needsEntitlement ? <div className="mt-3 flex flex-wrap items-center gap-2">
-        <select
-          aria-label={`Classify ${item.symbol} move`}
-          value={decision}
-          onChange={(event) => setDecision(event.target.value as typeof decision)}
-          className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
-        >
-          <option value="">Choose classification</option>
-          <option value="split">Split</option>
-          <option value="bonus">Bonus</option>
-          <option value="crash">Genuine price fall</option>
-        </select>
-        {decision === 'split' || decision === 'bonus' ? (
+      {!needsEntitlement ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            aria-label={`Classify ${item.symbol} move`}
+            value={decision}
+            onChange={(event) => setDecision(event.target.value as typeof decision)}
+            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+          >
+            <option value="">Choose classification</option>
+            <option value="split">Split</option>
+            <option value="bonus">Bonus</option>
+            <option value="crash">Genuine price fall</option>
+          </select>
+          {decision === 'split' || decision === 'bonus' ? (
+            <input
+              aria-label="New shares per old share"
+              type="number"
+              min="1.1"
+              max="100"
+              step="0.1"
+              placeholder="New shares / old share"
+              value={factor}
+              onChange={(event) => setFactor(event.target.value)}
+              className="w-44 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            />
+          ) : null}
           <input
-            aria-label="New shares per old share"
-            type="number"
-            min="1.1"
-            max="100"
-            step="0.1"
-            placeholder="New shares / old share"
-            value={factor}
-            onChange={(event) => setFactor(event.target.value)}
-            className="w-44 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            aria-label="Evidence URL or note"
+            type="text"
+            placeholder="Evidence URL or note"
+            value={evidence}
+            onChange={(event) => setEvidence(event.target.value)}
+            className="min-w-48 flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
           />
-        ) : null}
-        <input
-          aria-label="Evidence URL or note"
-          type="text"
-          placeholder="Evidence URL or note"
-          value={evidence}
-          onChange={(event) => setEvidence(event.target.value)}
-          className="min-w-48 flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
-        />
-        <Button
-          size="sm"
-          onClick={() => void save()}
-          disabled={!decision || saving || (decision !== 'crash' && (!factor || !evidence.trim()))}
-        >
-          {saving ? 'Saving…' : 'Save classification'}
-        </Button>
-      </div> : null}
+          <Button
+            size="sm"
+            onClick={() => void save()}
+            disabled={
+              !decision || saving || (decision !== 'crash' && (!factor || !evidence.trim()))
+            }
+          >
+            {saving ? 'Saving…' : 'Save classification'}
+          </Button>
+        </div>
+      ) : null}
       {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
     </div>
   );
