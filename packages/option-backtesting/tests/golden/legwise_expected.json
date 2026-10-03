@@ -1,0 +1,3251 @@
+{
+  "schema_version": 1,
+  "purpose": "Characterization baseline: review diffs; do not treat current output alone as a correctness oracle.",
+  "inputs": {
+    "source": "Frozen Fyers 1-minute NIFTY data collected 2026-09-23 through 2026-10-01",
+    "days": [
+      "2026-09-23",
+      "2026-09-24",
+      "2026-09-25",
+      "2026-09-28",
+      "2026-09-29",
+      "2026-10-01"
+    ],
+    "fixture_files_sha256": {
+      "lake/bars_1m/asset=option/underlying=NIFTY/date=2026-09-23/data.parquet": "3ae6c6bb30cefbfb51bde5a6aa8986da54cdb2cc5cab8531206bfb229187e73f",
+      "lake/bars_1m/asset=index/symbol=NIFTY/date=2026-09-23/data.parquet": "48879ecc50f163e52a167137979d7fbc2828071d0453ce50027ea302a667ee93",
+      "lake/symbol_master/vendor=fyers/date=2026-09-23/data.parquet": "b91478c8725a0ec7c6b1d700779311f136f445b7799b1ebea745f1d4912cc3ee",
+      "lake/bars_1m/asset=option/underlying=NIFTY/date=2026-09-24/data.parquet": "892293fb456a95e59887c2c7c96009a26c79c8b779d71747805b4cdad27e78b8",
+      "lake/bars_1m/asset=index/symbol=NIFTY/date=2026-09-24/data.parquet": "8a8f7d873248b361fc9ebcfbad91ec2121f1caea63e4aab7223169d33918e53a",
+      "lake/symbol_master/vendor=fyers/date=2026-09-24/data.parquet": "b91478c8725a0ec7c6b1d700779311f136f445b7799b1ebea745f1d4912cc3ee",
+      "lake/bars_1m/asset=option/underlying=NIFTY/date=2026-09-25/data.parquet": "877a16c35507849b1ee84fb77db753cecf0e3f4df099cf13daf8b88197cafcf6",
+      "lake/bars_1m/asset=index/symbol=NIFTY/date=2026-09-25/data.parquet": "1531a0b953a485e2d1383db780524095795bd9e4b3d4ad4e02a8489f510b1dbf",
+      "lake/symbol_master/vendor=fyers/date=2026-09-25/data.parquet": "b91478c8725a0ec7c6b1d700779311f136f445b7799b1ebea745f1d4912cc3ee",
+      "lake/bars_1m/asset=option/underlying=NIFTY/date=2026-09-28/data.parquet": "721de8279a0664d031fdd1e06fe1d29c85b8504bc64c7f21a49c2afbe152b58c",
+      "lake/bars_1m/asset=index/symbol=NIFTY/date=2026-09-28/data.parquet": "858cc80f5b6acb7e3fa638d7a271bb528e4ed39f6902fc134d5503c8dc839dac",
+      "lake/symbol_master/vendor=fyers/date=2026-09-28/data.parquet": "b91478c8725a0ec7c6b1d700779311f136f445b7799b1ebea745f1d4912cc3ee",
+      "lake/bars_1m/asset=option/underlying=NIFTY/date=2026-09-29/data.parquet": "dacc7f173eeb116765dc608abbab0bb216a58cc94ed17b73aa33b1fd19e615a0",
+      "lake/bars_1m/asset=index/symbol=NIFTY/date=2026-09-29/data.parquet": "ce6bcb664c1ee5dc1e727bc9eef55cac77b069cc99d8596f36fedf64f9e57006",
+      "lake/symbol_master/vendor=fyers/date=2026-09-29/data.parquet": "b91478c8725a0ec7c6b1d700779311f136f445b7799b1ebea745f1d4912cc3ee",
+      "lake/bars_1m/asset=option/underlying=NIFTY/date=2026-10-01/data.parquet": "aaeff9d4dd29f70cc6eeca035785748e5af80edfe926ef037fe06ccfeaeb7e47",
+      "lake/bars_1m/asset=index/symbol=NIFTY/date=2026-10-01/data.parquet": "5dccd8ef71e1b3cc3e2bbd0734d1840764544af003824a05eaf094087b4aa316",
+      "lake/symbol_master/vendor=fyers/date=2026-10-01/data.parquet": "553d6737e830f69ace266f697141a879d959e66fa386086cbffc16d5b74a0665"
+    },
+    "reference_files_sha256": {
+      "lot_sizes.csv": "7f46a02965e939c58c28618d2fb770a136cfa1d7353292759e9e6a334a97d7dc",
+      "strike_step.csv": "5c7ba7b1e7ca767022fb7ba7dcfa7a7fb93af484a2faf396b826c69e283cc826"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "nifty_buy_range_breakout__2026_09_23",
+      "strategy_file": "nifty_buy_range_breakout.yaml",
+      "strategy_id": "nifty_buy_range_breakout",
+      "strategy_spec_hash": "c3c55d3dffd5",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-09-23"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -62.56,
+        "costs": 0.0,
+        "net": -62.56,
+        "win_days": 0,
+        "max_drawdown": -62.56,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": -62.56,
+          "costs": 0.0,
+          "net": -62.56,
+          "worst_mtm": -728.0,
+          "best_mtm": 598.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23200.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:49",
+              "entry_price": 55.2,
+              "exit_time": "10:18",
+              "exit_price": 45.4,
+              "exit_reason": "SL",
+              "pnl": -637.0
+            },
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "10:18",
+              "entry_price": 44.65,
+              "exit_time": "12:48",
+              "exit_price": 53.4875,
+              "exit_reason": "SL",
+              "pnl": 574.44
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_buy_range_breakout__2026_09_24",
+      "strategy_file": "nifty_buy_range_breakout.yaml",
+      "strategy_id": "nifty_buy_range_breakout",
+      "strategy_spec_hash": "c3c55d3dffd5",
+      "window": {
+        "from": "2026-09-24",
+        "to": "2026-09-24"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -726.37,
+        "costs": 0.0,
+        "net": -726.37,
+        "win_days": 0,
+        "max_drawdown": -726.37,
+        "trades": 1
+      },
+      "days": [
+        {
+          "day": "2026-09-24",
+          "gross": -726.37,
+          "costs": 0.0,
+          "net": -726.37,
+          "worst_mtm": -726.37,
+          "best_mtm": 182.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23100.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:45",
+              "entry_price": 64.7,
+              "exit_time": "10:09",
+              "exit_price": 53.525,
+              "exit_reason": "SL",
+              "pnl": -726.37
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_buy_range_breakout__2026_09_25",
+      "strategy_file": "nifty_buy_range_breakout.yaml",
+      "strategy_id": "nifty_buy_range_breakout",
+      "strategy_spec_hash": "c3c55d3dffd5",
+      "window": {
+        "from": "2026-09-25",
+        "to": "2026-09-25"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 138.12,
+        "costs": 0.0,
+        "net": 138.12,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-25",
+          "gross": 138.12,
+          "costs": 0.0,
+          "net": 138.12,
+          "worst_mtm": -1311.38,
+          "best_mtm": 489.12,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22950.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:52",
+              "entry_price": 66.9,
+              "exit_time": "10:07",
+              "exit_price": 50.175,
+              "exit_reason": "SL",
+              "pnl": -1087.12
+            },
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "CE"
+              },
+              "entry_time": "14:02",
+              "entry_price": 48.6,
+              "exit_time": "14:05",
+              "exit_price": 67.45,
+              "exit_reason": "SL",
+              "pnl": 1225.25
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_buy_range_breakout__2026_09_28",
+      "strategy_file": "nifty_buy_range_breakout.yaml",
+      "strategy_id": "nifty_buy_range_breakout",
+      "strategy_spec_hash": "c3c55d3dffd5",
+      "window": {
+        "from": "2026-09-28",
+        "to": "2026-09-28"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -637.81,
+        "costs": 0.0,
+        "net": -637.81,
+        "win_days": 0,
+        "max_drawdown": -637.81,
+        "trades": 1
+      },
+      "days": [
+        {
+          "day": "2026-09-28",
+          "gross": -637.81,
+          "costs": 0.0,
+          "net": -637.81,
+          "worst_mtm": -637.81,
+          "best_mtm": 500.5,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "650d5efe81ed967f920f75ba7f08dc48a9516d80435003bc0f18ccb2257ff67e",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22850.0,
+                "option_type": "PE"
+              },
+              "entry_time": "10:17",
+              "entry_price": 79.25,
+              "exit_time": "11:40",
+              "exit_price": 69.4375,
+              "exit_reason": "SL",
+              "pnl": -637.81
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_buy_range_breakout__2026_09_29",
+      "strategy_file": "nifty_buy_range_breakout.yaml",
+      "strategy_id": "nifty_buy_range_breakout",
+      "strategy_spec_hash": "c3c55d3dffd5",
+      "window": {
+        "from": "2026-09-29",
+        "to": "2026-09-29"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 1776.94,
+        "costs": 0.0,
+        "net": 1776.94,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 1
+      },
+      "days": [
+        {
+          "day": "2026-09-29",
+          "gross": 1776.94,
+          "costs": 0.0,
+          "net": 1776.94,
+          "worst_mtm": 0.0,
+          "best_mtm": 2044.25,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "9963bdc3342977696c7e3e1099298b294bf22cc09156a5a29019479a49ea616c",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22650.0,
+                "option_type": "CE"
+              },
+              "entry_time": "11:10",
+              "entry_price": 58.65,
+              "exit_time": "11:16",
+              "exit_price": 85.9875,
+              "exit_reason": "SL",
+              "pnl": 1776.94
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_buy_range_breakout__2026_10_01",
+      "strategy_file": "nifty_buy_range_breakout.yaml",
+      "strategy_id": "nifty_buy_range_breakout",
+      "strategy_spec_hash": "c3c55d3dffd5",
+      "window": {
+        "from": "2026-10-01",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 6464.25,
+        "costs": 0.0,
+        "net": 6464.25,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-10-01",
+          "gross": 6464.25,
+          "costs": 0.0,
+          "net": 6464.25,
+          "worst_mtm": -494.0,
+          "best_mtm": 7096.38,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "361b1a7ecca510b354a144eaeda3483046aa2b188d6c7500503a3d74b3bdc111",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22800.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:49",
+              "entry_price": 53.3,
+              "exit_time": "10:13",
+              "exit_price": 48.975,
+              "exit_reason": "SL",
+              "pnl": -281.13
+            },
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22350.0,
+                "option_type": "PE"
+              },
+              "entry_time": "12:10",
+              "entry_price": 56.9,
+              "exit_time": "12:59",
+              "exit_price": 160.675,
+              "exit_reason": "SL",
+              "pnl": 6745.38
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_dir_924_itm1_sl21_recost__2026_09_23",
+      "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
+      "strategy_id": "nifty_dir_924_itm1_sl21_recost",
+      "strategy_spec_hash": "86c3168c238a",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-09-23"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -594.85,
+        "costs": 0.0,
+        "net": -594.85,
+        "win_days": 0,
+        "max_drawdown": -594.85,
+        "trades": 3
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": -594.85,
+          "costs": 0.0,
+          "net": -594.85,
+          "worst_mtm": -1215.6,
+          "best_mtm": 663.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "47da2dc89324cbcbbd649cc30badde5dabf7edaf85314162bfeb7bc15a11856a",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23350.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 162.15,
+              "exit_time": "12:06",
+              "exit_price": 196.2015,
+              "exit_reason": "SL",
+              "pnl": -2213.35
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23450.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 134.85,
+              "exit_time": "15:28",
+              "exit_price": 104.05,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 2002.0
+            },
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23350.0,
+                "option_type": "CE"
+              },
+              "entry_time": "14:48",
+              "entry_price": 162.0,
+              "exit_time": "15:28",
+              "exit_price": 167.9,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -383.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_dir_924_itm1_sl21_recost__2026_09_24",
+      "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
+      "strategy_id": "nifty_dir_924_itm1_sl21_recost",
+      "strategy_spec_hash": "86c3168c238a",
+      "window": {
+        "from": "2026-09-24",
+        "to": "2026-09-24"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 2467.4,
+        "costs": 0.0,
+        "net": 2467.4,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-24",
+          "gross": 2467.4,
+          "costs": 0.0,
+          "net": 2467.4,
+          "worst_mtm": -1458.6,
+          "best_mtm": 2542.15,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "9d6a174405ead83e3784d789fbafc3b673ebb443c543671f7d35c0ec35342d06",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23200.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 150.65,
+              "exit_time": "15:28",
+              "exit_price": 85.6,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 4228.25
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 129.0,
+              "exit_time": "09:47",
+              "exit_price": 156.09,
+              "exit_reason": "SL",
+              "pnl": -1760.85
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_dir_924_itm1_sl21_recost__2026_09_25",
+      "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
+      "strategy_id": "nifty_dir_924_itm1_sl21_recost",
+      "strategy_spec_hash": "86c3168c238a",
+      "window": {
+        "from": "2026-09-25",
+        "to": "2026-09-25"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -3124.74,
+        "costs": 0.0,
+        "net": -3124.74,
+        "win_days": 0,
+        "max_drawdown": -3124.74,
+        "trades": 3
+      },
+      "days": [
+        {
+          "day": "2026-09-25",
+          "gross": -3124.74,
+          "costs": 0.0,
+          "net": -3124.74,
+          "worst_mtm": -3124.74,
+          "best_mtm": 29.25,
+          "stopped_by": "overall SL at 11:17",
+          "notes": [],
+          "mtm_points": 114,
+          "mtm_sha256": "06a44ff0406ee0eef5644f6af06fa72fdc311373b8d90851c30a29ab12bec053",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23050.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 162.0,
+              "exit_time": "11:17",
+              "exit_price": 160.45,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 100.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23150.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 118.15,
+              "exit_time": "09:42",
+              "exit_price": 142.9615,
+              "exit_reason": "SL",
+              "pnl": -1612.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23150.0,
+                "option_type": "PE"
+              },
+              "entry_time": "10:08",
+              "entry_price": 118.15,
+              "exit_time": "10:47",
+              "exit_price": 142.9615,
+              "exit_reason": "SL",
+              "pnl": -1612.75
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_dir_924_itm1_sl21_recost__2026_09_28",
+      "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
+      "strategy_id": "nifty_dir_924_itm1_sl21_recost",
+      "strategy_spec_hash": "86c3168c238a",
+      "window": {
+        "from": "2026-09-28",
+        "to": "2026-09-28"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 3989.54,
+        "costs": 0.0,
+        "net": 3989.54,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-28",
+          "gross": 3989.54,
+          "costs": 0.0,
+          "net": 3989.54,
+          "worst_mtm": -342.71,
+          "best_mtm": 4113.04,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "4db30a1fa564ce4dd766e1ec3496f669ef0f2b4716e21076acfbd73869535cc1",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22900.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 124.2,
+              "exit_time": "15:28",
+              "exit_price": 40.3,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 5453.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23000.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 107.25,
+              "exit_time": "09:33",
+              "exit_price": 129.7725,
+              "exit_reason": "SL",
+              "pnl": -1463.96
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_dir_924_itm1_sl21_recost__2026_09_29",
+      "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
+      "strategy_id": "nifty_dir_924_itm1_sl21_recost",
+      "strategy_spec_hash": "86c3168c238a",
+      "window": {
+        "from": "2026-09-29",
+        "to": "2026-09-29"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -3622.48,
+        "costs": 0.0,
+        "net": -3622.48,
+        "win_days": 0,
+        "max_drawdown": -3622.48,
+        "trades": 4
+      },
+      "days": [
+        {
+          "day": "2026-09-29",
+          "gross": -3622.48,
+          "costs": 0.0,
+          "net": -3622.48,
+          "worst_mtm": -3622.48,
+          "best_mtm": 3118.99,
+          "stopped_by": "overall SL at 12:41",
+          "notes": [],
+          "mtm_points": 198,
+          "mtm_sha256": "ed978cb128607a8db2ffb028b629cbadfaf89b20dfe59603392ab4ee94b9d713",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 115.95,
+              "exit_time": "11:30",
+              "exit_price": 140.2995,
+              "exit_reason": "SL",
+              "pnl": -1582.72
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22700.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 70.55,
+              "exit_time": "09:27",
+              "exit_price": 85.3655,
+              "exit_reason": "SL",
+              "pnl": -963.01
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22700.0,
+                "option_type": "PE"
+              },
+              "entry_time": "11:11",
+              "entry_price": 70.55,
+              "exit_time": "12:32",
+              "exit_price": 85.3655,
+              "exit_reason": "SL",
+              "pnl": -963.01
+            },
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "12:27",
+              "entry_price": 115.95,
+              "exit_time": "12:41",
+              "exit_price": 117.7,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -113.75
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_dir_924_itm1_sl21_recost__2026_10_01",
+      "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
+      "strategy_id": "nifty_dir_924_itm1_sl21_recost",
+      "strategy_spec_hash": "86c3168c238a",
+      "window": {
+        "from": "2026-10-01",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -351.36,
+        "costs": 0.0,
+        "net": -351.36,
+        "win_days": 0,
+        "max_drawdown": -351.36,
+        "trades": 3
+      },
+      "days": [
+        {
+          "day": "2026-10-01",
+          "gross": -351.36,
+          "costs": 0.0,
+          "net": -351.36,
+          "worst_mtm": -2669.26,
+          "best_mtm": 2992.89,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "f7ff5bd80a9f8b54cf28cce189e9a6176c018d97297cb64da1f32f385072b232",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22450.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 190.55,
+              "exit_time": "10:01",
+              "exit_price": 230.5655,
+              "exit_reason": "SL",
+              "pnl": -2601.01
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22550.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 129.0,
+              "exit_time": "12:23",
+              "exit_price": 156.09,
+              "exit_reason": "SL",
+              "pnl": -1760.85
+            },
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22450.0,
+                "option_type": "CE"
+              },
+              "entry_time": "11:23",
+              "entry_price": 190.55,
+              "exit_time": "15:28",
+              "exit_price": 128.85,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 4010.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_closest_premium__2026_09_23",
+      "strategy_file": "nifty_widesl_917_closest_premium.yaml",
+      "strategy_id": "nifty_widesl_917_closest_premium",
+      "strategy_spec_hash": "0d61a25b3902",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-09-23"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 1134.25,
+        "costs": 0.0,
+        "net": 1134.25,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": 1134.25,
+          "costs": 0.0,
+          "net": 1134.25,
+          "worst_mtm": -393.25,
+          "best_mtm": 1222.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 368,
+          "mtm_sha256": "fe9b9a20ac2560ed6ee928e3a3c25f827b166180ec2527a27f2d50664ccf6188",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23550.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 54.35,
+              "exit_time": "15:25",
+              "exit_price": 61.85,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -487.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23250.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 66.15,
+              "exit_time": "15:25",
+              "exit_price": 41.2,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 1621.75
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_closest_premium__2026_09_24",
+      "strategy_file": "nifty_widesl_917_closest_premium.yaml",
+      "strategy_id": "nifty_widesl_917_closest_premium",
+      "strategy_spec_hash": "0d61a25b3902",
+      "window": {
+        "from": "2026-09-24",
+        "to": "2026-09-24"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -2609.75,
+        "costs": 0.0,
+        "net": -2609.75,
+        "win_days": 0,
+        "max_drawdown": -2609.75,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-24",
+          "gross": -2609.75,
+          "costs": 0.0,
+          "net": -2609.75,
+          "worst_mtm": -2609.75,
+          "best_mtm": 0.0,
+          "stopped_by": "overall SL at 13:26",
+          "notes": [],
+          "mtm_points": 250,
+          "mtm_sha256": "3fcf74e043a07e7029c775fcaa0b8e0573c64f0508b53fe6a3591753494562b7",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23400.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 52.7,
+              "exit_time": "13:26",
+              "exit_price": 38.3,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 936.0
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23150.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 66.2,
+              "exit_time": "13:26",
+              "exit_price": 120.75,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -3545.75
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_closest_premium__2026_09_25",
+      "strategy_file": "nifty_widesl_917_closest_premium.yaml",
+      "strategy_id": "nifty_widesl_917_closest_premium",
+      "strategy_spec_hash": "0d61a25b3902",
+      "window": {
+        "from": "2026-09-25",
+        "to": "2026-09-25"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 1647.75,
+        "costs": 0.0,
+        "net": 1647.75,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-25",
+          "gross": 1647.75,
+          "costs": 0.0,
+          "net": 1647.75,
+          "worst_mtm": -510.25,
+          "best_mtm": 1742.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 368,
+          "mtm_sha256": "acec446c2c6708eb9bea4116e284d0dccb01aaeb3ba9a07912c0e1ed0aa5bf77",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23250.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 65.9,
+              "exit_time": "15:25",
+              "exit_price": 66.65,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -48.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23000.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 59.55,
+              "exit_time": "15:25",
+              "exit_price": 33.45,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 1696.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_closest_premium__2026_09_28",
+      "strategy_file": "nifty_widesl_917_closest_premium.yaml",
+      "strategy_id": "nifty_widesl_917_closest_premium",
+      "strategy_spec_hash": "0d61a25b3902",
+      "window": {
+        "from": "2026-09-28",
+        "to": "2026-09-28"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -736.94,
+        "costs": 0.0,
+        "net": -736.94,
+        "win_days": 0,
+        "max_drawdown": -736.94,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-28",
+          "gross": -736.94,
+          "costs": 0.0,
+          "net": -736.94,
+          "worst_mtm": -2017.44,
+          "best_mtm": 354.25,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 368,
+          "mtm_sha256": "c923a6c50a80b0f65e9702eb1a5bc85ae7df841a867c469cf3fc6ea0fd5f798e",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23050.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 62.1,
+              "exit_time": "15:25",
+              "exit_price": 14.5,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 3094.0
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22900.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 51.25,
+              "exit_time": "10:41",
+              "exit_price": 110.1875,
+              "exit_reason": "SL",
+              "pnl": -3830.94
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_closest_premium__2026_09_29",
+      "strategy_file": "nifty_widesl_917_closest_premium.yaml",
+      "strategy_id": "nifty_widesl_917_closest_premium",
+      "strategy_spec_hash": "0d61a25b3902",
+      "window": {
+        "from": "2026-09-29",
+        "to": "2026-09-29"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -2764.12,
+        "costs": 0.0,
+        "net": -2764.12,
+        "win_days": 0,
+        "max_drawdown": -2764.12,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-29",
+          "gross": -2764.12,
+          "costs": 0.0,
+          "net": -2764.12,
+          "worst_mtm": -2764.12,
+          "best_mtm": 29.25,
+          "stopped_by": "overall SL at 11:12",
+          "notes": [],
+          "mtm_points": 116,
+          "mtm_sha256": "10e9afa534828d7300c3cb361dddfb2655bbc20a4eb363a0f5d040aa083324a7",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22750.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 51.65,
+              "exit_time": "11:12",
+              "exit_price": 30.35,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 1384.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22700.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 55.5,
+              "exit_time": "09:35",
+              "exit_price": 119.325,
+              "exit_reason": "SL",
+              "pnl": -4148.62
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_closest_premium__2026_10_01",
+      "strategy_file": "nifty_widesl_917_closest_premium.yaml",
+      "strategy_id": "nifty_widesl_917_closest_premium",
+      "strategy_spec_hash": "0d61a25b3902",
+      "window": {
+        "from": "2026-10-01",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -2800.85,
+        "costs": 0.0,
+        "net": -2800.85,
+        "win_days": 0,
+        "max_drawdown": -2800.85,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-10-01",
+          "gross": -2800.85,
+          "costs": 0.0,
+          "net": -2800.85,
+          "worst_mtm": -2800.85,
+          "best_mtm": 591.5,
+          "stopped_by": "overall SL at 12:46",
+          "notes": [],
+          "mtm_points": 210,
+          "mtm_sha256": "a7a6a78caabe8b23402dbbd992dc74c02575a1caa7a48925b439cce596883e98",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22800.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 53.3,
+              "exit_time": "12:46",
+              "exit_price": 30.15,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 1504.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22400.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 57.6,
+              "exit_time": "12:46",
+              "exit_price": 123.84,
+              "exit_reason": "SL",
+              "pnl": -4305.6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_otm1__2026_09_23",
+      "strategy_file": "nifty_widesl_917_otm1.yaml",
+      "strategy_id": "nifty_widesl_917_otm1",
+      "strategy_spec_hash": "5ea12a323ef3",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-09-23"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 786.5,
+        "costs": 0.0,
+        "net": 786.5,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": 786.5,
+          "costs": 0.0,
+          "net": 786.5,
+          "worst_mtm": -1228.5,
+          "best_mtm": 906.75,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 371,
+          "mtm_sha256": "92fc14d7d2940a35d0a8df1b36402e5daf34af1e27daa553e593738d1ce79a4a",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23400.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 116.45,
+              "exit_time": "15:28",
+              "exit_price": 135.15,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -1215.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 82.6,
+              "exit_time": "15:28",
+              "exit_price": 51.8,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 2002.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_otm1__2026_09_24",
+      "strategy_file": "nifty_widesl_917_otm1.yaml",
+      "strategy_id": "nifty_widesl_917_otm1",
+      "strategy_spec_hash": "5ea12a323ef3",
+      "window": {
+        "from": "2026-09-24",
+        "to": "2026-09-24"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -2596.75,
+        "costs": 0.0,
+        "net": -2596.75,
+        "win_days": 0,
+        "max_drawdown": -2596.75,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-24",
+          "gross": -2596.75,
+          "costs": 0.0,
+          "net": -2596.75,
+          "worst_mtm": -2596.75,
+          "best_mtm": 81.25,
+          "stopped_by": "overall SL at 13:42",
+          "notes": [],
+          "mtm_points": 266,
+          "mtm_sha256": "fdce0e153fa96ba02132251c3171b9c3f91510a12886a8356d18a9eac3568fbf",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 92.8,
+              "exit_time": "13:42",
+              "exit_price": 64.0,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 1872.0
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23200.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 83.85,
+              "exit_time": "13:42",
+              "exit_price": 152.6,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -4468.75
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_otm1__2026_09_25",
+      "strategy_file": "nifty_widesl_917_otm1.yaml",
+      "strategy_id": "nifty_widesl_917_otm1",
+      "strategy_spec_hash": "5ea12a323ef3",
+      "window": {
+        "from": "2026-09-25",
+        "to": "2026-09-25"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 1625.0,
+        "costs": 0.0,
+        "net": 1625.0,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-25",
+          "gross": 1625.0,
+          "costs": 0.0,
+          "net": 1625.0,
+          "worst_mtm": -650.0,
+          "best_mtm": 1738.75,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 371,
+          "mtm_sha256": "986ce54ec9db674d13e784fec9a55a3ddf0d965d9bd8c127f39d9e493f962c1f",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23150.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 109.55,
+              "exit_time": "15:28",
+              "exit_price": 116.4,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -445.25
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23050.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 75.6,
+              "exit_time": "15:28",
+              "exit_price": 43.75,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 2070.25
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_otm1__2026_09_28",
+      "strategy_file": "nifty_widesl_917_otm1.yaml",
+      "strategy_id": "nifty_widesl_917_otm1",
+      "strategy_spec_hash": "5ea12a323ef3",
+      "window": {
+        "from": "2026-09-28",
+        "to": "2026-09-28"
+      },
+      "summary": {
+        "days": 1,
+        "gross": 394.06,
+        "costs": 0.0,
+        "net": 394.06,
+        "win_days": 1,
+        "max_drawdown": 0.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-28",
+          "gross": 394.06,
+          "costs": 0.0,
+          "net": 394.06,
+          "worst_mtm": -1380.44,
+          "best_mtm": 429.81,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 371,
+          "mtm_sha256": "c8754aa57dd9ef10744fc1b3511eaa8bce71ca1ed5e18e20d7509a6442f6601b",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23000.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 84.85,
+              "exit_time": "15:28",
+              "exit_price": 19.85,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 4225.0
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22900.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 51.25,
+              "exit_time": "10:41",
+              "exit_price": 110.1875,
+              "exit_reason": "SL",
+              "pnl": -3830.94
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_otm1__2026_09_29",
+      "strategy_file": "nifty_widesl_917_otm1.yaml",
+      "strategy_id": "nifty_widesl_917_otm1",
+      "strategy_spec_hash": "5ea12a323ef3",
+      "window": {
+        "from": "2026-09-29",
+        "to": "2026-09-29"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -2918.99,
+        "costs": 0.0,
+        "net": -2918.99,
+        "win_days": 0,
+        "max_drawdown": -2918.99,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-09-29",
+          "gross": -2918.99,
+          "costs": 0.0,
+          "net": -2918.99,
+          "worst_mtm": -2918.99,
+          "best_mtm": 276.25,
+          "stopped_by": "overall SL at 11:30",
+          "notes": [],
+          "mtm_points": 134,
+          "mtm_sha256": "428612dd3752b2556ca4ec24b54250db5c24b0040b36c5f2eb21169140180277",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22750.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 51.65,
+              "exit_time": "11:30",
+              "exit_price": 55.1,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -224.25
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22650.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 36.05,
+              "exit_time": "09:32",
+              "exit_price": 77.5075,
+              "exit_reason": "SL",
+              "pnl": -2694.74
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_otm1__2026_10_01",
+      "strategy_file": "nifty_widesl_917_otm1.yaml",
+      "strategy_id": "nifty_widesl_917_otm1",
+      "strategy_spec_hash": "5ea12a323ef3",
+      "window": {
+        "from": "2026-10-01",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 1,
+        "gross": -2912.0,
+        "costs": 0.0,
+        "net": -2912.0,
+        "win_days": 0,
+        "max_drawdown": -2912.0,
+        "trades": 2
+      },
+      "days": [
+        {
+          "day": "2026-10-01",
+          "gross": -2912.0,
+          "costs": 0.0,
+          "net": -2912.0,
+          "worst_mtm": -2912.0,
+          "best_mtm": 705.25,
+          "stopped_by": "overall SL at 12:45",
+          "notes": [],
+          "mtm_points": 209,
+          "mtm_sha256": "ef0f92a11fd5cdf826078e73d4c67bedd2458a657d0ec45a704a502e4d3f2185",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22650.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 106.2,
+              "exit_time": "12:45",
+              "exit_price": 54.45,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 3363.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22550.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 106.15,
+              "exit_time": "12:45",
+              "exit_price": 202.7,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -6275.75
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_buy_range_breakout__all_6d",
+      "strategy_file": "nifty_buy_range_breakout.yaml",
+      "strategy_id": "nifty_buy_range_breakout",
+      "strategy_spec_hash": "c3c55d3dffd5",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 6,
+        "gross": 6952.56,
+        "costs": 0.0,
+        "net": 6952.56,
+        "win_days": 3,
+        "max_drawdown": -1288.62,
+        "trades": 9
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": -62.56,
+          "costs": 0.0,
+          "net": -62.56,
+          "worst_mtm": -728.0,
+          "best_mtm": 598.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23200.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:49",
+              "entry_price": 55.2,
+              "exit_time": "10:18",
+              "exit_price": 45.4,
+              "exit_reason": "SL",
+              "pnl": -637.0
+            },
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "10:18",
+              "entry_price": 44.65,
+              "exit_time": "12:48",
+              "exit_price": 53.4875,
+              "exit_reason": "SL",
+              "pnl": 574.44
+            }
+          ]
+        },
+        {
+          "day": "2026-09-24",
+          "gross": -726.37,
+          "costs": 0.0,
+          "net": -726.37,
+          "worst_mtm": -726.37,
+          "best_mtm": 182.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23100.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:45",
+              "entry_price": 64.7,
+              "exit_time": "10:09",
+              "exit_price": 53.525,
+              "exit_reason": "SL",
+              "pnl": -726.37
+            }
+          ]
+        },
+        {
+          "day": "2026-09-25",
+          "gross": 138.12,
+          "costs": 0.0,
+          "net": 138.12,
+          "worst_mtm": -1311.38,
+          "best_mtm": 489.12,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22950.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:52",
+              "entry_price": 66.9,
+              "exit_time": "10:07",
+              "exit_price": 50.175,
+              "exit_reason": "SL",
+              "pnl": -1087.12
+            },
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "CE"
+              },
+              "entry_time": "14:02",
+              "entry_price": 48.6,
+              "exit_time": "14:05",
+              "exit_price": 67.45,
+              "exit_reason": "SL",
+              "pnl": 1225.25
+            }
+          ]
+        },
+        {
+          "day": "2026-09-28",
+          "gross": -637.81,
+          "costs": 0.0,
+          "net": -637.81,
+          "worst_mtm": -637.81,
+          "best_mtm": 500.5,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "650d5efe81ed967f920f75ba7f08dc48a9516d80435003bc0f18ccb2257ff67e",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22850.0,
+                "option_type": "PE"
+              },
+              "entry_time": "10:17",
+              "entry_price": 79.25,
+              "exit_time": "11:40",
+              "exit_price": 69.4375,
+              "exit_reason": "SL",
+              "pnl": -637.81
+            }
+          ]
+        },
+        {
+          "day": "2026-09-29",
+          "gross": 1776.94,
+          "costs": 0.0,
+          "net": 1776.94,
+          "worst_mtm": 0.0,
+          "best_mtm": 2044.25,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "9963bdc3342977696c7e3e1099298b294bf22cc09156a5a29019479a49ea616c",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22650.0,
+                "option_type": "CE"
+              },
+              "entry_time": "11:10",
+              "entry_price": 58.65,
+              "exit_time": "11:16",
+              "exit_price": 85.9875,
+              "exit_reason": "SL",
+              "pnl": 1776.94
+            }
+          ]
+        },
+        {
+          "day": "2026-10-01",
+          "gross": 6464.25,
+          "costs": 0.0,
+          "net": 6464.25,
+          "worst_mtm": -494.0,
+          "best_mtm": 7096.38,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "361b1a7ecca510b354a144eaeda3483046aa2b188d6c7500503a3d74b3bdc111",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22800.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:49",
+              "entry_price": 53.3,
+              "exit_time": "10:13",
+              "exit_price": 48.975,
+              "exit_reason": "SL",
+              "pnl": -281.13
+            },
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22350.0,
+                "option_type": "PE"
+              },
+              "entry_time": "12:10",
+              "entry_price": 56.9,
+              "exit_time": "12:59",
+              "exit_price": 160.675,
+              "exit_reason": "SL",
+              "pnl": 6745.38
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_dir_924_itm1_sl21_recost__all_6d",
+      "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
+      "strategy_id": "nifty_dir_924_itm1_sl21_recost",
+      "strategy_spec_hash": "86c3168c238a",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 6,
+        "gross": -1236.49,
+        "costs": 0.0,
+        "net": -1236.49,
+        "win_days": 2,
+        "max_drawdown": -3973.84,
+        "trades": 17
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": -594.85,
+          "costs": 0.0,
+          "net": -594.85,
+          "worst_mtm": -1215.6,
+          "best_mtm": 663.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "47da2dc89324cbcbbd649cc30badde5dabf7edaf85314162bfeb7bc15a11856a",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23350.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 162.15,
+              "exit_time": "12:06",
+              "exit_price": 196.2015,
+              "exit_reason": "SL",
+              "pnl": -2213.35
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23450.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 134.85,
+              "exit_time": "15:28",
+              "exit_price": 104.05,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 2002.0
+            },
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23350.0,
+                "option_type": "CE"
+              },
+              "entry_time": "14:48",
+              "entry_price": 162.0,
+              "exit_time": "15:28",
+              "exit_price": 167.9,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -383.5
+            }
+          ]
+        },
+        {
+          "day": "2026-09-24",
+          "gross": 2467.4,
+          "costs": 0.0,
+          "net": 2467.4,
+          "worst_mtm": -1458.6,
+          "best_mtm": 2542.15,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "9d6a174405ead83e3784d789fbafc3b673ebb443c543671f7d35c0ec35342d06",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23200.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 150.65,
+              "exit_time": "15:28",
+              "exit_price": 85.6,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 4228.25
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 129.0,
+              "exit_time": "09:47",
+              "exit_price": 156.09,
+              "exit_reason": "SL",
+              "pnl": -1760.85
+            }
+          ]
+        },
+        {
+          "day": "2026-09-25",
+          "gross": -3124.74,
+          "costs": 0.0,
+          "net": -3124.74,
+          "worst_mtm": -3124.74,
+          "best_mtm": 29.25,
+          "stopped_by": "overall SL at 11:17",
+          "notes": [],
+          "mtm_points": 114,
+          "mtm_sha256": "06a44ff0406ee0eef5644f6af06fa72fdc311373b8d90851c30a29ab12bec053",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23050.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 162.0,
+              "exit_time": "11:17",
+              "exit_price": 160.45,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 100.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23150.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 118.15,
+              "exit_time": "09:42",
+              "exit_price": 142.9615,
+              "exit_reason": "SL",
+              "pnl": -1612.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23150.0,
+                "option_type": "PE"
+              },
+              "entry_time": "10:08",
+              "entry_price": 118.15,
+              "exit_time": "10:47",
+              "exit_price": 142.9615,
+              "exit_reason": "SL",
+              "pnl": -1612.75
+            }
+          ]
+        },
+        {
+          "day": "2026-09-28",
+          "gross": 3989.54,
+          "costs": 0.0,
+          "net": 3989.54,
+          "worst_mtm": -342.71,
+          "best_mtm": 4113.04,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "4db30a1fa564ce4dd766e1ec3496f669ef0f2b4716e21076acfbd73869535cc1",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22900.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 124.2,
+              "exit_time": "15:28",
+              "exit_price": 40.3,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 5453.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23000.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 107.25,
+              "exit_time": "09:33",
+              "exit_price": 129.7725,
+              "exit_reason": "SL",
+              "pnl": -1463.96
+            }
+          ]
+        },
+        {
+          "day": "2026-09-29",
+          "gross": -3622.48,
+          "costs": 0.0,
+          "net": -3622.48,
+          "worst_mtm": -3622.48,
+          "best_mtm": 3118.99,
+          "stopped_by": "overall SL at 12:41",
+          "notes": [],
+          "mtm_points": 198,
+          "mtm_sha256": "ed978cb128607a8db2ffb028b629cbadfaf89b20dfe59603392ab4ee94b9d713",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 115.95,
+              "exit_time": "11:30",
+              "exit_price": 140.2995,
+              "exit_reason": "SL",
+              "pnl": -1582.72
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22700.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 70.55,
+              "exit_time": "09:27",
+              "exit_price": 85.3655,
+              "exit_reason": "SL",
+              "pnl": -963.01
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22700.0,
+                "option_type": "PE"
+              },
+              "entry_time": "11:11",
+              "entry_price": 70.55,
+              "exit_time": "12:32",
+              "exit_price": 85.3655,
+              "exit_reason": "SL",
+              "pnl": -963.01
+            },
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "12:27",
+              "entry_price": 115.95,
+              "exit_time": "12:41",
+              "exit_price": 117.7,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -113.75
+            }
+          ]
+        },
+        {
+          "day": "2026-10-01",
+          "gross": -351.36,
+          "costs": 0.0,
+          "net": -351.36,
+          "worst_mtm": -2669.26,
+          "best_mtm": 2992.89,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "f7ff5bd80a9f8b54cf28cce189e9a6176c018d97297cb64da1f32f385072b232",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22450.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 190.55,
+              "exit_time": "10:01",
+              "exit_price": 230.5655,
+              "exit_reason": "SL",
+              "pnl": -2601.01
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22550.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 129.0,
+              "exit_time": "12:23",
+              "exit_price": 156.09,
+              "exit_reason": "SL",
+              "pnl": -1760.85
+            },
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22450.0,
+                "option_type": "CE"
+              },
+              "entry_time": "11:23",
+              "entry_price": 190.55,
+              "exit_time": "15:28",
+              "exit_price": 128.85,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 4010.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_closest_premium__all_6d",
+      "strategy_file": "nifty_widesl_917_closest_premium.yaml",
+      "strategy_id": "nifty_widesl_917_closest_premium",
+      "strategy_spec_hash": "0d61a25b3902",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 6,
+        "gross": -6129.66,
+        "costs": 0.0,
+        "net": -6129.66,
+        "win_days": 2,
+        "max_drawdown": -7263.91,
+        "trades": 12
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": 1134.25,
+          "costs": 0.0,
+          "net": 1134.25,
+          "worst_mtm": -393.25,
+          "best_mtm": 1222.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 368,
+          "mtm_sha256": "fe9b9a20ac2560ed6ee928e3a3c25f827b166180ec2527a27f2d50664ccf6188",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23550.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 54.35,
+              "exit_time": "15:25",
+              "exit_price": 61.85,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -487.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23250.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 66.15,
+              "exit_time": "15:25",
+              "exit_price": 41.2,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 1621.75
+            }
+          ]
+        },
+        {
+          "day": "2026-09-24",
+          "gross": -2609.75,
+          "costs": 0.0,
+          "net": -2609.75,
+          "worst_mtm": -2609.75,
+          "best_mtm": 0.0,
+          "stopped_by": "overall SL at 13:26",
+          "notes": [],
+          "mtm_points": 250,
+          "mtm_sha256": "3fcf74e043a07e7029c775fcaa0b8e0573c64f0508b53fe6a3591753494562b7",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23400.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 52.7,
+              "exit_time": "13:26",
+              "exit_price": 38.3,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 936.0
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23150.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 66.2,
+              "exit_time": "13:26",
+              "exit_price": 120.75,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -3545.75
+            }
+          ]
+        },
+        {
+          "day": "2026-09-25",
+          "gross": 1647.75,
+          "costs": 0.0,
+          "net": 1647.75,
+          "worst_mtm": -510.25,
+          "best_mtm": 1742.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 368,
+          "mtm_sha256": "acec446c2c6708eb9bea4116e284d0dccb01aaeb3ba9a07912c0e1ed0aa5bf77",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23250.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 65.9,
+              "exit_time": "15:25",
+              "exit_price": 66.65,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -48.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23000.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 59.55,
+              "exit_time": "15:25",
+              "exit_price": 33.45,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 1696.5
+            }
+          ]
+        },
+        {
+          "day": "2026-09-28",
+          "gross": -736.94,
+          "costs": 0.0,
+          "net": -736.94,
+          "worst_mtm": -2017.44,
+          "best_mtm": 354.25,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 368,
+          "mtm_sha256": "c923a6c50a80b0f65e9702eb1a5bc85ae7df841a867c469cf3fc6ea0fd5f798e",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23050.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 62.1,
+              "exit_time": "15:25",
+              "exit_price": 14.5,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 3094.0
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22900.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 51.25,
+              "exit_time": "10:41",
+              "exit_price": 110.1875,
+              "exit_reason": "SL",
+              "pnl": -3830.94
+            }
+          ]
+        },
+        {
+          "day": "2026-09-29",
+          "gross": -2764.12,
+          "costs": 0.0,
+          "net": -2764.12,
+          "worst_mtm": -2764.12,
+          "best_mtm": 29.25,
+          "stopped_by": "overall SL at 11:12",
+          "notes": [],
+          "mtm_points": 116,
+          "mtm_sha256": "10e9afa534828d7300c3cb361dddfb2655bbc20a4eb363a0f5d040aa083324a7",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22750.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 51.65,
+              "exit_time": "11:12",
+              "exit_price": 30.35,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 1384.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22700.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 55.5,
+              "exit_time": "09:35",
+              "exit_price": 119.325,
+              "exit_reason": "SL",
+              "pnl": -4148.62
+            }
+          ]
+        },
+        {
+          "day": "2026-10-01",
+          "gross": -2800.85,
+          "costs": 0.0,
+          "net": -2800.85,
+          "worst_mtm": -2800.85,
+          "best_mtm": 591.5,
+          "stopped_by": "overall SL at 12:46",
+          "notes": [],
+          "mtm_points": 210,
+          "mtm_sha256": "a7a6a78caabe8b23402dbbd992dc74c02575a1caa7a48925b439cce596883e98",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22800.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 53.3,
+              "exit_time": "12:46",
+              "exit_price": 30.15,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 1504.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22400.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 57.6,
+              "exit_time": "12:46",
+              "exit_price": 123.84,
+              "exit_reason": "SL",
+              "pnl": -4305.6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_widesl_917_otm1__all_6d",
+      "strategy_file": "nifty_widesl_917_otm1.yaml",
+      "strategy_id": "nifty_widesl_917_otm1",
+      "strategy_spec_hash": "5ea12a323ef3",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 6,
+        "gross": -5622.18,
+        "costs": 0.0,
+        "net": -5622.18,
+        "win_days": 3,
+        "max_drawdown": -6408.67,
+        "trades": 12
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": 786.5,
+          "costs": 0.0,
+          "net": 786.5,
+          "worst_mtm": -1228.5,
+          "best_mtm": 906.75,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 371,
+          "mtm_sha256": "92fc14d7d2940a35d0a8df1b36402e5daf34af1e27daa553e593738d1ce79a4a",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23400.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 116.45,
+              "exit_time": "15:28",
+              "exit_price": 135.15,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -1215.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 82.6,
+              "exit_time": "15:28",
+              "exit_price": 51.8,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 2002.0
+            }
+          ]
+        },
+        {
+          "day": "2026-09-24",
+          "gross": -2596.75,
+          "costs": 0.0,
+          "net": -2596.75,
+          "worst_mtm": -2596.75,
+          "best_mtm": 81.25,
+          "stopped_by": "overall SL at 13:42",
+          "notes": [],
+          "mtm_points": 266,
+          "mtm_sha256": "fdce0e153fa96ba02132251c3171b9c3f91510a12886a8356d18a9eac3568fbf",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 92.8,
+              "exit_time": "13:42",
+              "exit_price": 64.0,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 1872.0
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23200.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 83.85,
+              "exit_time": "13:42",
+              "exit_price": 152.6,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -4468.75
+            }
+          ]
+        },
+        {
+          "day": "2026-09-25",
+          "gross": 1625.0,
+          "costs": 0.0,
+          "net": 1625.0,
+          "worst_mtm": -650.0,
+          "best_mtm": 1738.75,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 371,
+          "mtm_sha256": "986ce54ec9db674d13e784fec9a55a3ddf0d965d9bd8c127f39d9e493f962c1f",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23150.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 109.55,
+              "exit_time": "15:28",
+              "exit_price": 116.4,
+              "exit_reason": "EXIT_TIME",
+              "pnl": -445.25
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23050.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 75.6,
+              "exit_time": "15:28",
+              "exit_price": 43.75,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 2070.25
+            }
+          ]
+        },
+        {
+          "day": "2026-09-28",
+          "gross": 394.06,
+          "costs": 0.0,
+          "net": 394.06,
+          "worst_mtm": -1380.44,
+          "best_mtm": 429.81,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 371,
+          "mtm_sha256": "c8754aa57dd9ef10744fc1b3511eaa8bce71ca1ed5e18e20d7509a6442f6601b",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23000.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 84.85,
+              "exit_time": "15:28",
+              "exit_price": 19.85,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 4225.0
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22900.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 51.25,
+              "exit_time": "10:41",
+              "exit_price": 110.1875,
+              "exit_reason": "SL",
+              "pnl": -3830.94
+            }
+          ]
+        },
+        {
+          "day": "2026-09-29",
+          "gross": -2918.99,
+          "costs": 0.0,
+          "net": -2918.99,
+          "worst_mtm": -2918.99,
+          "best_mtm": 276.25,
+          "stopped_by": "overall SL at 11:30",
+          "notes": [],
+          "mtm_points": 134,
+          "mtm_sha256": "428612dd3752b2556ca4ec24b54250db5c24b0040b36c5f2eb21169140180277",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22750.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 51.65,
+              "exit_time": "11:30",
+              "exit_price": 55.1,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -224.25
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22650.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 36.05,
+              "exit_time": "09:32",
+              "exit_price": 77.5075,
+              "exit_reason": "SL",
+              "pnl": -2694.74
+            }
+          ]
+        },
+        {
+          "day": "2026-10-01",
+          "gross": -2912.0,
+          "costs": 0.0,
+          "net": -2912.0,
+          "worst_mtm": -2912.0,
+          "best_mtm": 705.25,
+          "stopped_by": "overall SL at 12:45",
+          "notes": [],
+          "mtm_points": 209,
+          "mtm_sha256": "ef0f92a11fd5cdf826078e73d4c67bedd2458a657d0ec45a704a502e4d3f2185",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22650.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 106.2,
+              "exit_time": "12:45",
+              "exit_price": 54.45,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 3363.75
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22550.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:17",
+              "entry_price": 106.15,
+              "exit_time": "12:45",
+              "exit_price": 202.7,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -6275.75
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_buy_range_breakout__early_3d",
+      "strategy_file": "nifty_buy_range_breakout.yaml",
+      "strategy_id": "nifty_buy_range_breakout",
+      "strategy_spec_hash": "c3c55d3dffd5",
+      "window": {
+        "from": "2026-09-23",
+        "to": "2026-09-25"
+      },
+      "summary": {
+        "days": 3,
+        "gross": -650.81,
+        "costs": 0.0,
+        "net": -650.81,
+        "win_days": 1,
+        "max_drawdown": -788.94,
+        "trades": 5
+      },
+      "days": [
+        {
+          "day": "2026-09-23",
+          "gross": -62.56,
+          "costs": 0.0,
+          "net": -62.56,
+          "worst_mtm": -728.0,
+          "best_mtm": 598.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23200.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:49",
+              "entry_price": 55.2,
+              "exit_time": "10:18",
+              "exit_price": 45.4,
+              "exit_reason": "SL",
+              "pnl": -637.0
+            },
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "10:18",
+              "entry_price": 44.65,
+              "exit_time": "12:48",
+              "exit_price": 53.4875,
+              "exit_reason": "SL",
+              "pnl": 574.44
+            }
+          ]
+        },
+        {
+          "day": "2026-09-24",
+          "gross": -726.37,
+          "costs": 0.0,
+          "net": -726.37,
+          "worst_mtm": -726.37,
+          "best_mtm": 182.0,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23100.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:45",
+              "entry_price": 64.7,
+              "exit_time": "10:09",
+              "exit_price": 53.525,
+              "exit_reason": "SL",
+              "pnl": -726.37
+            }
+          ]
+        },
+        {
+          "day": "2026-09-25",
+          "gross": 138.12,
+          "costs": 0.0,
+          "net": 138.12,
+          "worst_mtm": -1311.38,
+          "best_mtm": 489.12,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 339,
+          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "trades": [
+            {
+              "leg": "pe",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22950.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:52",
+              "entry_price": 66.9,
+              "exit_time": "10:07",
+              "exit_price": 50.175,
+              "exit_reason": "SL",
+              "pnl": -1087.12
+            },
+            {
+              "leg": "ce",
+              "position": "buy",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "CE"
+              },
+              "entry_time": "14:02",
+              "entry_price": 48.6,
+              "exit_time": "14:05",
+              "exit_price": 67.45,
+              "exit_reason": "SL",
+              "pnl": 1225.25
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nifty_dir_924_itm1_sl21_recost__late_3d",
+      "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
+      "strategy_id": "nifty_dir_924_itm1_sl21_recost",
+      "strategy_spec_hash": "86c3168c238a",
+      "window": {
+        "from": "2026-09-28",
+        "to": "2026-10-01"
+      },
+      "summary": {
+        "days": 3,
+        "gross": 15.7,
+        "costs": 0.0,
+        "net": 15.7,
+        "win_days": 1,
+        "max_drawdown": -3973.84,
+        "trades": 9
+      },
+      "days": [
+        {
+          "day": "2026-09-28",
+          "gross": 3989.54,
+          "costs": 0.0,
+          "net": 3989.54,
+          "worst_mtm": -342.71,
+          "best_mtm": 4113.04,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "4db30a1fa564ce4dd766e1ec3496f669ef0f2b4716e21076acfbd73869535cc1",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22900.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 124.2,
+              "exit_time": "15:28",
+              "exit_price": 40.3,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 5453.5
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23000.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 107.25,
+              "exit_time": "09:33",
+              "exit_price": 129.7725,
+              "exit_reason": "SL",
+              "pnl": -1463.96
+            }
+          ]
+        },
+        {
+          "day": "2026-09-29",
+          "gross": -3622.48,
+          "costs": 0.0,
+          "net": -3622.48,
+          "worst_mtm": -3622.48,
+          "best_mtm": 3118.99,
+          "stopped_by": "overall SL at 12:41",
+          "notes": [],
+          "mtm_points": 198,
+          "mtm_sha256": "ed978cb128607a8db2ffb028b629cbadfaf89b20dfe59603392ab4ee94b9d713",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 115.95,
+              "exit_time": "11:30",
+              "exit_price": 140.2995,
+              "exit_reason": "SL",
+              "pnl": -1582.72
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22700.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 70.55,
+              "exit_time": "09:27",
+              "exit_price": 85.3655,
+              "exit_reason": "SL",
+              "pnl": -963.01
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22700.0,
+                "option_type": "PE"
+              },
+              "entry_time": "11:11",
+              "entry_price": 70.55,
+              "exit_time": "12:32",
+              "exit_price": 85.3655,
+              "exit_reason": "SL",
+              "pnl": -963.01
+            },
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 22600.0,
+                "option_type": "CE"
+              },
+              "entry_time": "12:27",
+              "entry_price": 115.95,
+              "exit_time": "12:41",
+              "exit_price": 117.7,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -113.75
+            }
+          ]
+        },
+        {
+          "day": "2026-10-01",
+          "gross": -351.36,
+          "costs": 0.0,
+          "net": -351.36,
+          "worst_mtm": -2669.26,
+          "best_mtm": 2992.89,
+          "stopped_by": null,
+          "notes": [],
+          "mtm_points": 364,
+          "mtm_sha256": "f7ff5bd80a9f8b54cf28cce189e9a6176c018d97297cb64da1f32f385072b232",
+          "trades": [
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22450.0,
+                "option_type": "CE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 190.55,
+              "exit_time": "10:01",
+              "exit_price": 230.5655,
+              "exit_reason": "SL",
+              "pnl": -2601.01
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22550.0,
+                "option_type": "PE"
+              },
+              "entry_time": "09:24",
+              "entry_price": 129.0,
+              "exit_time": "12:23",
+              "exit_price": 156.09,
+              "exit_reason": "SL",
+              "pnl": -1760.85
+            },
+            {
+              "leg": "ce",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-10-06",
+                "strike": 22450.0,
+                "option_type": "CE"
+              },
+              "entry_time": "11:23",
+              "entry_price": 190.55,
+              "exit_time": "15:28",
+              "exit_price": 128.85,
+              "exit_reason": "EXIT_TIME",
+              "pnl": 4010.5
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

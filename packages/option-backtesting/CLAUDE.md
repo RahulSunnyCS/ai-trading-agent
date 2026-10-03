@@ -120,4 +120,6 @@ uv run obt fyers history                # backfill NIFTY + VIX index history (an
 uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades]
 uv run obt daily                        # evening routine: fetch + run strategies/legwise + summary
 uv run obt legwise rerun                # re-run every strategy over every collected day (after an edit)
+uv run pytest tests/golden/test_legwise_scenarios.py  # 30 frozen-input leg-wise regressions
+uv run python scripts/update-legwise-goldens.py       # check snapshots; writes nothing
 ```

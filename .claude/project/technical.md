@@ -101,6 +101,8 @@ uv run tdata backup --to /Volumes/<disk>/TradingData   # monthly; copies only ne
 uv run obt legwise run strategies/legwise/*.yaml [--trades]   # AlgoTest-style leg-wise backtests over that data
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
 uv run obt daily            # the evening routine: fetch the last closed session, run every strategies/legwise/*.yaml, save, summarise + Telegram (--no-telegram)
+uv run pytest tests/golden/test_legwise_scenarios.py  # 30 frozen-input exact-output scenarios
+uv run python scripts/update-legwise-goldens.py       # check-only; --accept-results after reviewing an intentional correction
 
 # option-backtesting FastAPI service (loopback-only, port 8000) — from repo root
 bun run py:api               # equivalent to: cd packages/option-backtesting && uv run obt-api

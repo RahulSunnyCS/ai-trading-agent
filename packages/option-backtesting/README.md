@@ -18,6 +18,31 @@ uv run pytest
 uv run obt --help
 ```
 
+## Leg-wise golden regression suite
+
+`tests/golden/test_legwise_scenarios.py` runs 30 exact-output scenarios over frozen Fyers
+1-minute inputs: four production strategies on six individual days, all four strategies over
+the full six-day window, and two three-day sub-windows. The snapshot includes every fill,
+trade P&L, daily MTM extrema and an MTM-curve checksum; it is a characterization baseline, not
+permission to assume every current answer is correct.
+
+Normal checks never rewrite the baseline:
+
+```bash
+uv run pytest tests/golden/test_legwise_scenarios.py
+uv run python scripts/update-legwise-goldens.py
+```
+
+After a calculation correction, review the failing scenario diff, add or update a focused
+correctness test explaining the correction, then explicitly accept the changed outputs:
+
+```bash
+uv run python scripts/update-legwise-goldens.py --accept-results
+```
+
+Do not accept a snapshot merely to make CI green. Refreshing the frozen market inputs is a
+separate, deliberately explicit operation documented by the script's `--help` output.
+
 ## Layout
 
 See `.claude/project/technical.md` for the full monorepo layout. Within this package:
