@@ -25,6 +25,9 @@ Two locks, both required:
 The password **fails closed**: under `next start` / Vercel (or whenever the service-token
 vars are set) a missing `DASHBOARD_PASSWORD` makes every request return `503
 DASHBOARD_PASSWORD not configured`. Only plain local `next dev` (`bun run start`) is open.
+The service token fails closed too: setting only one of `UPSTREAM_ACCESS_CLIENT_ID` /
+`UPSTREAM_ACCESS_CLIENT_SECRET` (or leaving one blank) makes every request return a 503 naming
+both, instead of every API call failing at Cloudflare.
 
 ## 1. Backend laptop (once)
 

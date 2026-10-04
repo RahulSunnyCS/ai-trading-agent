@@ -19,6 +19,7 @@ describe('gateConfig', () => {
       password: null,
       passwordRequired: false,
       upstream: null,
+      configError: null,
     });
   });
 
@@ -34,10 +35,22 @@ describe('gateConfig', () => {
   });
 
   it('needs both halves of the service token', () => {
-    expect(
-      gateConfig({ UPSTREAM_ACCESS_CLIENT_ID: 'id', UPSTREAM_ACCESS_CLIENT_SECRET: 'sec' })
-        .upstream,
-    ).toEqual({ clientId: 'id', clientSecret: 'sec' });
+    const config = gateConfig({
+      UPSTREAM_ACCESS_CLIENT_ID: 'id',
+      UPSTREAM_ACCESS_CLIENT_SECRET: 'sec',
+    });
+    expect(config.upstream).toEqual({ clientId: 'id', clientSecret: 'sec' });
+    expect(config.configError).toBeNull();
+  });
+
+  it.each([
+    { UPSTREAM_ACCESS_CLIENT_ID: 'id' },
+    { UPSTREAM_ACCESS_CLIENT_SECRET: 'sec' },
+    { UPSTREAM_ACCESS_CLIENT_ID: 'id', UPSTREAM_ACCESS_CLIENT_SECRET: '  ' },
+  ])('reports half a service token as a config error: %o', (env) => {
+    const config = gateConfig({ NODE_ENV: 'production', DASHBOARD_PASSWORD: 'pw', ...env });
+    expect(config.upstream).toBeNull();
+    expect(config.configError).toMatch(/must both be set/);
   });
 });
 
@@ -67,7 +80,7 @@ describe('passwordMatches', () => {
 });
 
 describe('checkPassword', () => {
-  const required = { password: null, passwordRequired: true, upstream: null };
+  const required = { password: null, passwordRequired: true, upstream: null, configError: null };
 
   it('fails closed when required and unset', async () => {
     expect(await checkPassword(basic('u', 'x'), required)).toEqual({ kind: 'misconfigured' });
@@ -88,7 +101,7 @@ describe('checkPassword', () => {
 });
 
 describe('upstreamHeaders', () => {
-  const open = { password: null, passwordRequired: false, upstream: null };
+  const open = { password: null, passwordRequired: false, upstream: null, configError: null };
 
   it('leaves untouched requests alone', () => {
     expect(upstreamHeaders(new Headers({ accept: 'application/json' }), open)).toBeNull();
@@ -141,6 +154,18 @@ describe('middleware', () => {
     vi.stubEnv('DASHBOARD_PASSWORD', '');
     const res = await middleware(request('/momentum'));
     expect(res.status).toBe(503);
+  });
+
+  it('returns 503 for half a service token, even with the right password', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('DASHBOARD_PASSWORD', 'hunter2');
+    vi.stubEnv('UPSTREAM_ACCESS_CLIENT_ID', 'real-id');
+    vi.stubEnv('UPSTREAM_ACCESS_CLIENT_SECRET', '');
+    const res = await middleware(
+      request('/api/momentum/meta', { authorization: basic('u', 'hunter2') }),
+    );
+    expect(res.status).toBe(503);
+    expect(await res.text()).toMatch(/UPSTREAM_ACCESS_CLIENT_SECRET must both be set/);
   });
 
   it('challenges with Basic auth and then lets the right password through', async () => {

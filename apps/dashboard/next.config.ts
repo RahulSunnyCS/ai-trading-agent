@@ -86,6 +86,12 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/saved-runs/:runId`,
             },
             {
+              // Weekly signal's favourites + Telegram-active strategy. Without this rule the call
+              // fell through to Fastify (not running in this mode) and 500'd silently.
+              source: '/api/momentum/favorite-strategies',
+              destination: `${momentumDirectOrigin}/api/favorite-strategies`,
+            },
+            {
               // run, jobs/latest and status
               source: '/api/momentum/weekly/:path*',
               destination: `${momentumDirectOrigin}/api/weekly/:path*`,
