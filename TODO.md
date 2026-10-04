@@ -470,6 +470,20 @@ while the parity gaps below remain open. Do not create a competing frontend pack
 
 ---
 
+### 3.13 Momentum evaluation review — [BL-010](backlog/BL-010-momentum-evaluation-review.md)
+
+The plan, findings and pass/kill thresholds live in the backlog item; this table only tracks
+where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.13.0 | Phase 0: freeze, criteria committed before any run | claude | **Done 2026-10-05.** `packages/momentum-backtesting/search_spaces/bl010_criteria.json` (three drawdown baskets, ₹5 lakh, comparators, every pass/kill threshold). No new search rounds until Phase 3 passes |
+| 3.13.1 | Phase 1a: engine fixes E1–E8, each with a failing-then-passing test | claude | **Built 2026-10-05, in review** (branch `feat/bl-010-phase-0-1`). Impact on six round 7 configs in `packages/momentum-backtesting/docs/evaluation-review.md` |
+| 3.13.2 | Phase 1b: live weekly signal = backtest (F11, E9) — one series policy, identical API/CLI/search defaults, 12-week shadow check | claude | **Open — next.** The owner plans to follow the signal with real money, so this comes before anything else |
+| 3.13.3 | Phase 2: independent ledger replay, ten hand-checked trades, jump scan, truncation test | claude | Open. Truncation harness is shared with BL-001 |
+| 3.13.4 | Phase 3: point-in-time universe, launch-dated taxonomy, data fixes; step-by-step CAGR loss table | claude | Open |
+| 3.13.5 | Phases 4–7 | claude | Open — see the backlog item |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

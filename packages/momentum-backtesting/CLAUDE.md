@@ -232,6 +232,16 @@ contract, not a shared service).
   P&L on the traded ETF instead of the ranked index).
 - `sweep.py` — the parameter-sweep harness used for every "is this lever
   worth it" investigation (see `TODO.md` §3.9.18 for the most recent one).
+- `metrics.turnover(result)` — the ONE turnover figure (everything sold / mean equity / years).
+  The dashboard KPI, the search's `turnover_x` and every tier cap call it; never recompute
+  turnover from the trade log elsewhere. Search results logged before 2026-10-05 carry an older
+  buys-only `turnover_x` (BL-010 E7).
+- Trade log audit columns — every fill row in `Result.trades` carries `fill_price`, `units`,
+  `prev_units` and `cost` (see `_Sim.record`), enough to rebuild positions and equity without
+  the simulation. Keep them filled on any new trade path (BL-010 E8).
+- `search_spaces/bl010_criteria.json` — the pre-registered objective, drawdown baskets and
+  pass/kill thresholds for the evaluation review (BL-010). Never edit after results are seen;
+  supersede with a new file.
 - `search.py` + `search_spaces/*.toml` — `mbt search run|analyze`: resumable parallel parameter search over
   Broad Momentum (TODO 3.9.25). Parameters are *heavy* (change the global ranking; one
   `broad.compute_universe_base` per combination) or *light* (everything after, incl. the pool cut via
