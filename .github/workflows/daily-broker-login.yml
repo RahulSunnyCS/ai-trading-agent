@@ -1,6 +1,11 @@
 name: Daily broker login
 
 on:
+  # PRIMARY TRIGGER IS NOT HERE: since 2026-10-05 the owner's laptop dispatches this
+  # workflow at 08:00 IST weekdays (deploy/launchd/, packages/broker-login/src/dispatch.ts),
+  # because GitHub delivered these crons ~6 hours late. They stay as a late backstop
+  # for days the laptop is off; brokers already logged in are reported SKIPPED.
+  #
   # 02:45 UTC = 08:15 IST, weekdays only. AlgoTest opens broker logins at 08:15 IST;
   # if the scheduler fires a minute early, main.ts's window guard waits it out. The
   # second entry is a 08:45 IST backstop for a dropped or failed first run: a broker

@@ -25,7 +25,9 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - Docker Compose — development infrastructure (TimescaleDB + Redis)
 - Simulation mode (`SIMULATE=true`) — fully self-contained, no broker credentials needed
 - **`packages/broker-login`** — daily Playwright job that logs the brokers into
-  AlgoTest (08:15 IST weekdays, 08:45 IST backstop). Scheduled since 2026-09-28
+  AlgoTest. Runs on GitHub Actions; since 2026-10-05 the owner's laptop triggers it
+  at 08:00 IST weekdays (`deploy/launchd/`, BL-011) because GitHub's own 08:15/08:45
+  cron arrived hours late — that cron stays only as a backstop
 - **`packages/contract-notes`** — daily job turning broker contract-note emails
   into realised F&O P&L in a Google Sheet. Schedule currently disabled pending
   cutover; the `trade-analytics` repo still owns the live cron
