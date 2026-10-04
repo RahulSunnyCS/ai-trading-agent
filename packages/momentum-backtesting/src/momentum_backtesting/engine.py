@@ -674,7 +674,8 @@ def run_backtest(
     `mass_exit_weeks` (TODO.md 3.9.20) - weeks flagged by an external, per-run computation (see
     categories/broad.py's `compute_category_selection_mass_exit`) as a synchronized mass exit;
     only consulted when `config.mass_exit_throttle` is True, same "data, not a Config field"
-    reasoning as `external_ranks`/`trade_prices`/`membership` above.
+    reasoning as `external_ranks`/`trade_prices`/`membership` above. Signal-week aligned: it is
+    shifted by `signal_delay` together with the ranks.
 
     `groups` (week x instrument group labels, same shape as `ranks`) is what `config.max_group`
     caps against - see `_Sim.group`. It is shifted by `signal_delay` together with the ranks it
@@ -733,6 +734,15 @@ def run_backtest(
             groups = groups.shift(config.signal_delay)
         if no_buy is not None:
             no_buy = no_buy.shift(config.signal_delay)
+        if mass_exit_weeks:
+            # Flagged on the week the ranking showed the mass exit; like the ranks, it is acted
+            # on `signal_delay` rows later. Left unshifted it throttled the week of the signal
+            # itself, a week before the delayed ranks could have been traded on.
+            index = ranks.index
+            at = index.get_indexer(sorted(mass_exit_weeks)) + config.signal_delay
+            mass_exit_weeks = frozenset(
+                index[i] for i in at if config.signal_delay <= i < len(index)
+            )
     if no_buy is not None:
         no_buy = no_buy.reindex(ranks.index).fillna(False).astype(bool)
     if groups is not None:

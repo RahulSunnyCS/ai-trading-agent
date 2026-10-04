@@ -879,6 +879,29 @@ def test_mass_exit_throttle_withholds_capital_on_a_flagged_week():
     assert not any("mass exit" in r for r in later_park_reasons)
 
 
+def test_mass_exit_weeks_are_delayed_together_with_the_signal():
+    """A mass exit seen in week S's ranking is traded on a week later under signal_delay=1, so
+    the throttle belongs on that later week - not on S, before the delayed ranks could act."""
+    prices = frame(A=path((29, 0.03)), B=path((29, 0.01)))
+    config = bcfg(
+        top_n=1,
+        exit_rank=2,
+        signal_delay=1,
+        mass_exit_throttle=True,
+        mass_exit_throttle_fraction=0.5,
+    )
+    baseline = run_backtest(prices, includes(prices), bcfg(top_n=1, exit_rank=2, signal_delay=1))
+    trade_week = baseline.trades["week"].iloc[0]
+    signal_week = prices.index[prices.index.get_loc(trade_week) - 1]
+
+    throttled = run_backtest(
+        prices, includes(prices), config, mass_exit_weeks=frozenset({signal_week})
+    )
+    parks = throttled.trades[throttled.trades["reason"].str.contains("mass exit")]
+    assert parks["week"].tolist() == [trade_week]
+    assert throttled.weights.loc[trade_week, IDLE] == pytest.approx(0.5, abs=1e-6)
+
+
 def test_mass_exit_throttle_fraction_controls_how_much_is_withheld():
     prices = frame(A=path((29, 0.03)), B=path((29, 0.01)))
     baseline = run_backtest(prices, includes(prices), bcfg(top_n=1, exit_rank=2))
