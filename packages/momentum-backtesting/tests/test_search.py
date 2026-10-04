@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from momentum_backtesting import search as sr
 
@@ -167,6 +168,37 @@ def test_run_metrics_on_a_simple_curve():
     assert m["mdd"] == 0.0 and m["cagr"] > m["bench_cagr"] > 0
     assert m["idle_share"] == 0.1 and m["roll3y_beat"] == 1.0
     assert m["turnover_x"] > 0 and m["weeks"] == 400
+
+
+def test_turnover_is_one_number_everywhere_and_counts_top_ups():
+    """The search's `turnover_x` (which the tier caps read) and the dashboard KPI are the same
+    figure: everything sold over average equity per year. The search used to count first-time
+    BUYs only, so money recycled into top-ups (ADD) never showed up."""
+    from momentum_backtesting import analysis, metrics
+
+    idx = pd.date_range("2018-01-05", periods=400, freq="7D")
+
+    class R:
+        equity = pd.Series(np.linspace(1.0, 2.0, 400), index=idx)
+        benchmark = pd.Series(np.linspace(1.0, 1.5, 400), index=idx)
+        cash = pd.Series(np.linspace(1.0, 1.1, 400), index=idx)
+        weights = pd.DataFrame({"Idle cash": np.full(400, 0.1)}, index=idx)
+        trades = pd.DataFrame(
+            {
+                "action": ["BUY", "SELL", "ADD", "TRIM", "ADD", "PARK"],
+                "value": [0.5, 0.6, 0.6, 0.1, 0.1, 0.2],
+            }
+        )
+
+    expected = (0.6 + 0.1) / R.equity.mean() / ((idx[-1] - idx[0]).days / 365.25)
+    assert metrics.turnover(R) == pytest.approx(expected)
+    assert sr.run_metrics(R, "Idle cash")["turnover_x"] == pytest.approx(expected, abs=1e-5)
+    buys_only = 0.5 / R.equity.mean() / ((idx[-1] - idx[0]).days / 365.25)
+    assert metrics.turnover(R) > buys_only
+
+    empty = type("E", (R,), {"trades": pd.DataFrame()})
+    assert metrics.turnover(empty) == 0.0
+    assert analysis.metrics.turnover is metrics.turnover
 
 
 def test_sealed_from_requires_an_earlier_end_date(tmp_path):

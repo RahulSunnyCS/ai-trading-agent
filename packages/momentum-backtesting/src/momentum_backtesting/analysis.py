@@ -107,8 +107,7 @@ def kpis(result: Result, closed: pd.DataFrame) -> dict:
     years = (eq.index[-1] - eq.index[0]).days / 365.25
     weekly = eq.pct_change().dropna()
     downside = weekly[weekly < 0].std() * math.sqrt(52)
-    sold = _of(result.trades, "SELL", "TRIM")
-    turnover = sold["value"].sum() / eq.mean() / years if len(sold) else 0.0
+    turnover = metrics.turnover(result)
     rets = closed["position_return"] if len(closed) else pd.Series(dtype=float)
     wins, losses = rets[rets > 0], rets[rets <= 0]
     rolling = (eq / eq.shift(52)) - (result.benchmark / result.benchmark.shift(52))
