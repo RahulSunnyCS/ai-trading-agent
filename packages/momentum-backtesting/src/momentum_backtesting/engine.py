@@ -527,7 +527,11 @@ class _Sim:
 
         `no_buy` gate: a name flagged that week and not in `held` is skipped, and the list is
         refilled from the next-best-ranked names (those flagged are never used as fillers) so
-        the top-N slot goes to the best name that can actually be bought."""
+        the top-N slot goes to the best name that can actually be bought.
+
+        `uc_locked` gate: nobody is selling a stock stuck at the upper circuit, so it can be
+        neither bought nor topped up. A held one keeps its top-N slot (no filler is bought in
+        its place) but is left out of the returned list, so it receives no money that week."""
         ranks = self.ranks.loc[week].dropna().sort_values()
         names = [
             n for n in ranks.index if ranks[n] <= self.config.top_n and self.passes_filter(n, week)
@@ -545,9 +549,13 @@ class _Sim:
         def blocked(n: str) -> bool:
             return any(n in g.columns and bool(g.at[week, n]) for g in gates)
 
+        def unbuyable(n: str) -> bool:
+            locked = self.uc_locked
+            return locked is not None and n in locked.columns and bool(locked.at[week, n])
+
         out = [n for n in names if n in held or not blocked(n)]
         if len(out) >= self.config.top_n:
-            return out
+            return [n for n in out if not unbuyable(n)]
         for n in ranks.index:
             if len(out) >= self.config.top_n:
                 break
@@ -562,7 +570,7 @@ class _Sim:
             if ranks[n] > self.config.exit_rank:
                 break
             out.append(n)
-        return out
+        return [n for n in out if not unbuyable(n)]
 
     def tax(self, asset: str, gain: float, held_days: int) -> float:
         if self.ledger is None:

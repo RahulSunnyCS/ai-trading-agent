@@ -3,6 +3,7 @@ circuit cannot be bought, one locked at the lower circuit cannot be sold."""
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from momentum_backtesting.engine import BENCHMARK, CASH, GILT, Config, run_backtest
 
@@ -115,3 +116,35 @@ def test_a_held_name_that_locks_up_can_still_be_sold() -> None:
         return r.trades.query("action == 'SELL' and asset == 'A'")["week"].tolist()
 
     assert sells(result) == sells(base) != []
+
+
+def test_a_held_name_locked_at_the_upper_circuit_is_not_topped_up() -> None:
+    """Sale proceeds must not flow into a holding nobody is selling. It keeps its top-N slot,
+    so no extra name is bought in its place: the money goes to the rest of the top N."""
+    prices, includes = prices_and_includes()
+    prices["D"] = path((4, 0.03), (25, -0.01))
+    includes["D"] = "core"
+    cfg = Config(
+        lookbacks=(1, 2),
+        top_n=2,
+        exit_rank=3,
+        cost_pct=0.0,
+        start="2020-01-01",
+        portfolio="buffer",
+        max_position=None,
+    )
+    base = run_backtest(prices, includes, cfg)
+    adds = base.trades.query("action == 'ADD' and asset == 'A'")
+    assert not adds.empty, "the scenario needs A to be topped up at some point"
+    locked_week = adds["week"].iloc[0]
+
+    result = run_backtest(prices, includes, cfg, uc_locked=flags(prices, A=[locked_week]))
+
+    def bought(r):
+        rows = r.trades[(r.trades["week"] == locked_week) & r.trades["action"].isin(["BUY", "ADD"])]
+        return dict(zip(rows["asset"], rows["value"], strict=True))
+
+    before, after = bought(base), bought(result)
+    assert "A" not in after
+    assert set(after) == set(before) - {"A"}  # no filler bought in A's slot
+    assert sum(after.values()) == pytest.approx(sum(before.values()))  # same money, fewer names
