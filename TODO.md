@@ -32,8 +32,10 @@ though see 3.3.0 for the difference between *present* and *audited*.
 ## Priority 1 — Broker login, live in the monorepo
 
 The daily Playwright job that logs Angel One and Finvasia into AlgoTest.
-**Live since 2026-09-28:** scheduled 08:15 IST weekdays with an 08:45 IST
-backstop, after dispatch run `36373883041` logged both brokers in.
+**Live since 2026-09-28,** after dispatch run `36373883041` logged both brokers in.
+GitHub delivered its 08:15/08:45 IST cron about six hours late, so since
+2026-10-05 the laptop dispatches it at 08:00 IST weekdays (1.8); the GitHub cron
+stays as a backstop.
 
 **Closed 2026-09-28:** 1.1 (secrets created), 1.3 (weekday dispatch passed —
 after two container fixes: `unzip` for `setup-bun`, and `safe.directory` for the
@@ -48,6 +50,7 @@ One takes, so a holiday refusal may read differently per broker.
 | 1.5 | Merge `claude/stock-trading-monorepo-plan-k4zs5t` → `main` in `algo-automation` | owner | A branch was created there on 2026-09-19 carrying one doc-only commit (a new `CLAUDE.md`, since that repo had none, pointing at this monorepo). Nothing breaks if it is never merged — but the repo stays without any orientation file until it is. |
 | 1.6 | CODEOWNERS on `packages/broker-login/` | claude | So execution-path changes always get a review. |
 | 1.7 | Selector-drift canary | claude | A scheduled run that asserts the AlgoTest login selectors still resolve, so drift is caught before 08:15 on a trading day rather than during it. Case + cost: `docs/roadmap.md` → Ideas #4. |
+| 1.8 | Laptop scheduler — [BL-011](backlog/BL-011-laptop-scheduler.md) | claude | **Phase 1 done 2026-10-05:** launchd job `com.ai-trading-agent.broker-login` (`deploy/launchd/`) runs `packages/broker-login/src/dispatch.ts` at 08:00 IST Mon–Fri, which triggers `daily-broker-login.yml` via `gh` and alerts on Telegram if it can't. Installed; first real fire 2026-10-06 — confirm a `workflow_dispatch` run at about 08:00 in `gh run list`. Phases 2–4 (momentum plists moved here, wake/missed-run handling, more jobs) are in the backlog item. |
 
 ---
 

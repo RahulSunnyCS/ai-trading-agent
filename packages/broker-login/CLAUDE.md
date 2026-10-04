@@ -13,11 +13,12 @@ preserved) on 2026-09-19. The merge is not yet a cutover:
   in whichever repo is live) — check that repo directly for its current
   schedule state before assuming this package's disabled schedule is the
   only one.
-- **This package** (`packages/broker-login`) is where new work should land,
-  but its own daily workflow (`.github/workflows/daily-broker-login.yml` at
-  this monorepo's root) has its `schedule:` trigger commented out pending a
-  verified `workflow_dispatch` run — see `docs/algotest-execution.md` in
-  this repo's root for the full cutover plan, checklist, and rollback.
+- **This package** (`packages/broker-login`) is where new work lands. Its
+  daily workflow (`.github/workflows/daily-broker-login.yml` at this
+  monorepo's root) is live. Since 2026-10-05 the owner's laptop starts it at
+  08:00 IST weekdays via `npm run dispatch` (`deploy/launchd/`,
+  `backlog/BL-011-laptop-scheduler.md`), because the workflow's own cron
+  arrived hours late; that cron is now only a backstop.
 
 Its sibling package in this monorepo is `packages/contract-notes` (merged
 from the standalone `trade-analytics` repo the same way, same cutover
@@ -46,7 +47,8 @@ npm run test-login     # tsx scripts/test-login.ts — connectivity + selector h
 npm run check         # tsx scripts/check.ts — RFC 6238 vectors, error classification, redaction, live TOTP codes + Telegram preflight (refuses to run in CI)
 npm run record        # tsx scripts/record.ts — interactive flow recorder for capturing new selectors
 npm run fyers-token   # tsx src/fyers.ts — headless Fyers login for the momentum weekly job; writes a 0600 token file (FYERS_TOKEN_FILE), never prints it
-npm run test          # node:test unit tests for the browser-free Fyers auth helpers
+npm run dispatch      # tsx src/dispatch.ts — triggers the GitHub workflow via `gh` (the laptop's 08:00 launchd job); DRY_RUN=1 only checks gh auth
+npm run test          # node:test unit tests for the browser-free helpers (Fyers auth, dispatch rules)
 npm run typecheck
 ```
 
@@ -62,4 +64,5 @@ npm run typecheck
 - `src/diagnose.ts` — screenshot/HTML dump helpers used on failure
 - `src/fyers.ts` — Fyers OAuth login (client ID → TOTP → PIN) → access token file; separate from the AlgoTest flow, used by `.github/workflows/momentum-weekly.yml`. Its locators (`fyersLogin` in `src/selectors.ts`) are PROVISIONAL until a real run's diagnostics confirm them
 - `src/fyers-auth.ts` — the browser-free half: auth URL, redirect parsing (state-checked), token exchange, error classification (only a TOTP rejection is retried; a wrong PIN never is)
+- `src/dispatch.ts` — runs `gh workflow run daily-broker-login.yml` with retries, confirms a run appeared, Telegram alert if not; `src/dispatch-rules.ts` holds the testable weekday 07:45–15:35 IST rule (launchd fires missed jobs on wake)
 - `src/notify.ts` — `formatReport()`, the broker-specific Telegram report formatter (transport itself is `@trading/notify`)

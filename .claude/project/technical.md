@@ -71,6 +71,10 @@ bun run --filter '*' typecheck     # packages only — NOT the root app
 (cd packages/broker-login   && bun run typecheck)
 (cd packages/contract-notes && bun run test)   # Jest; needs Node 20 on PATH
 
+# Laptop scheduler (launchd) — see deploy/launchd/README.md
+deploy/launchd/install.sh    # (re)install every job in deploy/launchd/jobs/
+deploy/launchd/uninstall.sh
+
 # Tests
 bun run test                # unit tests in every workspace package
 bun run test:unit           # server unit tests only
@@ -178,6 +182,7 @@ ai-trading-agent/
 ├── .mcp.json                        # registers the "option-backtesting" MCP server (obt-mcp, stdio)
 ├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
 ├── deploy/cloudflared/              # tunnel config template for serving the research APIs from a laptop (docs/remote-dashboard.md)
+├── deploy/launchd/                  # laptop-as-scheduler LaunchAgents (jobs/*.plist) + install/uninstall (BL-011)
 ├── apps/
 │   ├── server/                      # @ata/server — the Fastify/Bun backend
 │   │   ├── package.json · tsconfig.json · vitest.config.ts · vitest.workspace.ts

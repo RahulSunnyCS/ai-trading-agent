@@ -14,6 +14,7 @@
     "record": "tsx scripts/record.ts",
     "typecheck": "tsc --noEmit",
     "fyers-token": "tsx src/fyers.ts",
+    "dispatch": "tsx src/dispatch.ts",
     "test": "tsx --test src/*.test.ts"
   },
   "dependencies": {
