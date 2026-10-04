@@ -54,6 +54,7 @@ BENCHMARK = "Nifty 50"
 IDLE = "Idle cash"  # money parked in the liquid fund because nothing qualified
 _POOL = "__pool__"  # the buffer rule's idle-money position, priced as the liquid fund
 MIN_TRADE = 0.005  # don't move parked cash for less than 0.5% of the portfolio
+_LIQUID_FUND = frozenset({CASH, _POOL, IDLE})  # every name the liquid fund goes by
 
 DefensiveMode = Literal["off", "ranked", "filter"]
 PortfolioRule = Literal["buffer", "slots"]
@@ -73,6 +74,11 @@ STAMP_DUTY_BUY_RATE = 0.00015  # stamp duty, 0.015%, buy side only
 EXCHANGE_FEES_RATE = 0.00004  # exchange transaction charge + SEBI fee + GST, ~0.004% each side
 DP_CHARGE_RS = 16.0  # flat depository participant charge per SELL (approx.; varies by DP)
 DP_CHARGE_FRACTION_CAP = 0.05  # cap so a dust-sized sell doesn't get an absurd cost fraction
+# Itemised model, money moving into the liquid fund (parked cash, or cash held as a ranked
+# defensive): a liquid mutual fund pays stamp duty on purchase and nothing else - no STT, no
+# exchange fees, no slippage, no DP charge, and no exit load from the 7th day (the engine's
+# shortest holding period is one week).
+LIQUID_FUND_STAMP_DUTY_RATE = 0.00005
 
 
 @dataclass(frozen=True)
@@ -467,19 +473,24 @@ class _Sim:
         label = self.groups.at[week, asset]
         return label if isinstance(label, str) else None
 
-    def buy_cost(self, value_fraction: float) -> float:
+    def buy_cost(self, value_fraction: float, asset: str | None = None) -> float:
         """Cost fraction charged on a buy of size `value_fraction` of the 1.0-normalised
-        portfolio."""
+        portfolio. `asset` only matters to the itemised model, which prices the liquid fund as
+        a mutual fund rather than a listed share (see LIQUID_FUND_STAMP_DUTY_RATE)."""
         if self.config.cost_model == "flat":
             return self.config.cost_pct / 100
+        if asset in _LIQUID_FUND:
+            return LIQUID_FUND_STAMP_DUTY_RATE
         slippage = self.config.slippage_bps / 10000
         return STT_RATE + STAMP_DUTY_BUY_RATE + EXCHANGE_FEES_RATE + slippage
 
-    def sell_cost(self, value_fraction: float) -> float:
+    def sell_cost(self, value_fraction: float, asset: str | None = None) -> float:
         """Cost fraction charged on a sell of size `value_fraction` of the 1.0-normalised
-        portfolio."""
+        portfolio. `asset`: as for `buy_cost`."""
         if self.config.cost_model == "flat":
             return self.config.cost_pct / 100
+        if asset in _LIQUID_FUND:
+            return 0.0
         slippage = self.config.slippage_bps / 10000
         return STT_RATE + EXCHANGE_FEES_RATE + slippage + self._dp_charge_fraction(value_fraction)
 
@@ -832,7 +843,7 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
 
     def realise(slot, week) -> float:
         """Sell the slot's position: costs, then tax on the gain. Returns the tax paid."""
-        slot["value"] *= 1 - sim.sell_cost(slot["value"])
+        slot["value"] *= 1 - sim.sell_cost(slot["value"], slot["asset"])
         if slot["since"] is None:
             return 0.0
         tax = sim.tax(slot["asset"], slot["value"] - slot["basis"], (week - slot["since"]).days)
@@ -859,7 +870,8 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     continue
                 tax = realise(slot, week)
                 sim.record(week, "SELL", asset, reason, value_before, slot_no, tax, **details)
-                slot["value"] *= 1 - sim.buy_cost(slot["value"])  # park proceeds in the liquid fund
+                # park proceeds in the liquid fund
+                slot["value"] *= 1 - sim.buy_cost(slot["value"], CASH)
                 slot.update(asset=CASH, kind="parked", since=week, basis=slot["value"])
 
             # 2. Buys: best-ranked names within the top N that aren't already held.
@@ -875,12 +887,12 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     else:
                         if slot["asset"] is not None:  # leaving the liquid fund
                             realise(slot, week)
-                        slot["value"] *= 1 - sim.buy_cost(slot["value"])
+                        slot["value"] *= 1 - sim.buy_cost(slot["value"], name)
                         slot.update(asset=name, kind="held", since=week, basis=slot["value"])
                     rank = int(sim.rank(week, name))
                     sim.record(week, "BUY", name, f"rank {rank}", slot["value"], slot_no)
                 elif slot["asset"] is None:
-                    slot["value"] *= 1 - sim.buy_cost(slot["value"])
+                    slot["value"] *= 1 - sim.buy_cost(slot["value"], CASH)
                     slot.update(asset=CASH, kind="parked", since=week, basis=slot["value"])
 
         total = sum(s["value"] for s in slots)
@@ -933,7 +945,7 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         closing = copy.deepcopy(ledger)
         total = 0.0
         for slot in slots:
-            proceeds = slot["value"] * (1 - sim.sell_cost(slot["value"]))
+            proceeds = slot["value"] * (1 - sim.sell_cost(slot["value"], slot["asset"]))
             if slot["since"] is not None and slot["asset"] is not None:
                 tax_class = sim.tax_classes.get(slot["asset"], DEBT)
                 days = (last - slot["since"]).days
@@ -1008,7 +1020,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         return sum(lot["units"] for lot in lots.get(asset, [])) * sim.price(asset, week)
 
     def buy(asset: str, amount: float, week) -> None:
-        net = amount * (1 - sim.buy_cost(amount))
+        net = amount * (1 - sim.buy_cost(amount, asset))
         lots.setdefault(asset, []).append(
             {"units": net / sim.price(asset, week), "since": week, "basis": net}
         )
@@ -1077,7 +1089,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         # Gross first, so the itemised cost's DP-charge fraction (which depends on the total
         # value_fraction sold) is computed once and applied consistently across every lot.
         gross = sum(lot["units"] * fraction * price for lot in lots[asset])
-        sell_frac = sim.sell_cost(gross)
+        sell_frac = sim.sell_cost(gross, asset)
         tax = 0.0
         for lot in lots[asset]:
             units, basis = lot["units"] * fraction, lot["basis"] * fraction
@@ -1314,7 +1326,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             tax_class = sim.tax_classes.get(CASH if asset == _POOL else asset, DEBT)
             for lot in position:
                 gross = lot["units"] * price
-                net = gross * (1 - sim.sell_cost(gross))
+                net = gross * (1 - sim.sell_cost(gross, asset))
                 total += net - closing.sale(
                     tax_class, net - lot["basis"], (last - lot["since"]).days
                 )

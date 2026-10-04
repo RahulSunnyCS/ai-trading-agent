@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from momentum_backtesting import metrics
+from momentum_backtesting import engine, metrics
 from momentum_backtesting.engine import (
     BENCHMARK,
     CASH,
@@ -877,6 +877,30 @@ def test_mass_exit_throttle_withholds_capital_on_a_flagged_week():
         "reason"
     ]
     assert not any("mass exit" in r for r in later_park_reasons)
+
+
+def test_itemised_costs_price_parked_cash_as_a_liquid_fund_not_a_share():
+    """Nothing qualifies, so the whole portfolio is parked. Under the itemised model that is a
+    liquid-fund purchase (stamp duty only), not an equity delivery trade with STT, exchange
+    fees, slippage and - on the way out - a DP charge."""
+    prices = frame(A=path((29, -0.01)), B=path((29, -0.02)), Nifty_50=path((29, -0.005)))
+    for portfolio in ("buffer", "slots"):
+        result = run_backtest(
+            prices,
+            includes(prices),
+            cfg(
+                portfolio=portfolio,
+                max_position=None,
+                defensive="filter",
+                filter_lookback=2,
+                cost_model="itemised",
+            ),
+        )
+        actions = set(result.trades["action"]) if len(result.trades) else set()
+        assert actions <= {"PARK"}, "the scenario must only ever park"
+        cash_growth = result.cash.iloc[-1] / result.cash.iloc[0]
+        expected = (1 - engine.LIQUID_FUND_STAMP_DUTY_RATE) * cash_growth
+        assert result.equity.iloc[-1] == pytest.approx(expected, rel=1e-9)
 
 
 def test_mass_exit_weeks_are_delayed_together_with_the_signal():
