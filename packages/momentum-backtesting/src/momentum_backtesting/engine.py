@@ -590,6 +590,12 @@ class _Sim:
         return self.ledger.sale(tax_class, gain, held_days)
 
     def record(self, week, action, asset, reason, value, slot=None, tax=0.0, **extra) -> None:
+        """One trade-log row. `value` is the trade's gross size in portfolio units (1.0 = the
+        starting capital). Rows for a real fill also carry, via `extra`, what an independent
+        replay needs: `fill_price`, `units` traded (value units / price, so rupee shares are
+        `units * capital`), `prev_units` held before the trade, and `cost` paid (same units as
+        `value`; excludes `tax`). A sell's `units * fill_price` is `value`; a buffer-rule buy's
+        is `value - cost` (the slots rule logs a buy's value net of cost - see `_run_slots`)."""
         self.trade_rows.append(
             {
                 "week": week,
@@ -868,8 +874,17 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     sim.record(week, "SELL", asset, reason, value_before, slot_no, 0.0, **details)
                     slot["kind"] = "parked"
                     continue
+                price = sim.price(asset, week)
+                fill = {
+                    "units": value_before / price,
+                    "fill_price": price,
+                    "cost": value_before * sim.sell_cost(value_before, asset),
+                    "prev_units": value_before / price,
+                }
                 tax = realise(slot, week)
-                sim.record(week, "SELL", asset, reason, value_before, slot_no, tax, **details)
+                sim.record(
+                    week, "SELL", asset, reason, value_before, slot_no, tax, **details, **fill
+                )
                 # park proceeds in the liquid fund
                 slot["value"] *= 1 - sim.buy_cost(slot["value"], CASH)
                 slot.update(asset=CASH, kind="parked", since=week, basis=slot["value"])
@@ -882,15 +897,25 @@ def _run_slots(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     continue
                 if candidates:
                     name = candidates.pop(0)
+                    price, cost = sim.price(name, week), 0.0
                     if slot["asset"] == name:  # cash already parked in the liquid fund
                         slot["kind"] = "held"
                     else:
                         if slot["asset"] is not None:  # leaving the liquid fund
                             realise(slot, week)
-                        slot["value"] *= 1 - sim.buy_cost(slot["value"], name)
+                        cost = slot["value"] * sim.buy_cost(slot["value"], name)
+                        slot["value"] -= cost
                         slot.update(asset=name, kind="held", since=week, basis=slot["value"])
                     rank = int(sim.rank(week, name))
-                    sim.record(week, "BUY", name, f"rank {rank}", slot["value"], slot_no)
+                    # Slots log the position's value AFTER the buying cost (unlike the buffer
+                    # rule's gross `value`), so here `units * fill_price` is `value` itself.
+                    fill = {
+                        "units": slot["value"] / price,
+                        "fill_price": price,
+                        "cost": cost,
+                        "prev_units": 0.0,
+                    }
+                    sim.record(week, "BUY", name, f"rank {rank}", slot["value"], slot_no, **fill)
                 elif slot["asset"] is None:
                     slot["value"] *= 1 - sim.buy_cost(slot["value"], CASH)
                     slot.update(asset=CASH, kind="parked", since=week, basis=slot["value"])
@@ -1019,11 +1044,20 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
     def value(asset: str, week) -> float:
         return sum(lot["units"] for lot in lots.get(asset, [])) * sim.price(asset, week)
 
-    def buy(asset: str, amount: float, week) -> None:
+    def units_held(asset: str) -> float:
+        return sum(lot["units"] for lot in lots.get(asset, []))
+
+    def buy(asset: str, amount: float, week) -> dict:
+        """Returns the fill details `sim.record` stores for an audit."""
+        price, before = sim.price(asset, week), units_held(asset)
         net = amount * (1 - sim.buy_cost(amount, asset))
-        lots.setdefault(asset, []).append(
-            {"units": net / sim.price(asset, week), "since": week, "basis": net}
-        )
+        lots.setdefault(asset, []).append({"units": net / price, "since": week, "basis": net})
+        return {
+            "units": net / price,
+            "fill_price": price,
+            "cost": amount - net,
+            "prev_units": before,
+        }
 
     cap = config.max_position
 
@@ -1083,9 +1117,10 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         in_gain = oldest["units"] * sim.price(asset, week) > oldest["basis"]
         return config.tax_hold_band if in_gain else 0
 
-    def sell(asset: str, fraction: float, week) -> tuple[float, float, float]:
-        """Sell `fraction` of every lot. Returns (gross value, net proceeds, tax)."""
-        price = sim.price(asset, week)
+    def sell(asset: str, fraction: float, week) -> tuple[float, float, float, dict]:
+        """Sell `fraction` of every lot. Returns (gross value, net proceeds, tax, fill details
+        for `sim.record`)."""
+        price, before = sim.price(asset, week), units_held(asset)
         # Gross first, so the itemised cost's DP-charge fraction (which depends on the total
         # value_fraction sold) is computed once and applied consistently across every lot.
         gross = sum(lot["units"] * fraction * price for lot in lots[asset])
@@ -1099,7 +1134,13 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             lot["basis"] -= basis
         if fraction >= 1 - 1e-12:
             del lots[asset]
-        return gross, gross * (1 - sell_frac) - tax, tax
+        fill = {
+            "units": gross / price,
+            "fill_price": price,
+            "cost": gross * sell_frac,
+            "prev_units": before,
+        }
+        return gross, gross * (1 - sell_frac) - tax, tax, fill
 
     for i, week in enumerate(weeks[:-1]):
         proceeds, uninvested = uninvested, 0.0
@@ -1118,8 +1159,8 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                 basis = sum(lot["basis"] for lot in position)
                 value_before = value(asset, week)
                 details = sim.exit_details(asset, week, since, basis, value_before)
-                _, net, tax = sell(asset, 1.0, week)
-                sim.record(week, "SELL", asset, reason, value_before, tax=tax, **details)
+                _, net, tax, fill = sell(asset, 1.0, week)
+                sim.record(week, "SELL", asset, reason, value_before, tax=tax, **details, **fill)
                 proceeds += net
 
         if is_buy_week:
@@ -1131,9 +1172,9 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                         continue
                     share = value(asset, week) / total
                     if share > cap + config.cap_band:
-                        gross, net, tax = sell(asset, 1 - cap / share, week)
+                        gross, net, tax, fill = sell(asset, 1 - cap / share, week)
                         reason = f"above the {cap:.0%} cap ({share:.0%})"
-                        sim.record(week, "TRIM", asset, reason, gross, tax=tax)
+                        sim.record(week, "TRIM", asset, reason, gross, tax=tax, **fill)
                         proceeds += net
 
             # 2b. Same for a whole group (e.g. a category holding two stocks): once the group
@@ -1146,9 +1187,9 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                         for asset in members:
                             if sim.sell_blocked(asset, week):
                                 continue
-                            gross, net, tax = sell(asset, 1 - gcap / share, week)
+                            gross, net, tax, fill = sell(asset, 1 - gcap / share, week)
                             reason = f"{label} above the {gcap:.0%} group cap ({share:.0%})"
-                            sim.record(week, "TRIM", asset, reason, gross, tax=tax)
+                            sim.record(week, "TRIM", asset, reason, gross, tax=tax, **fill)
                             proceeds += net
 
             # 3. Split the money equally across the current top N, but never past the cap. Parked
@@ -1158,8 +1199,10 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             if tops and _POOL in lots:
                 need = absorbable(tops, total, week) - proceeds
                 if need > MIN_TRADE * total:
-                    gross, net, tax = sell(_POOL, min(1.0, need / value(_POOL, week)), week)
-                    sim.record(week, "UNPARK", CASH, "back into the top N", gross, tax=tax)
+                    fraction = min(1.0, need / value(_POOL, week))
+                    gross, net, tax, fill = sell(_POOL, fraction, week)
+                    reason = "back into the top N"
+                    sim.record(week, "UNPARK", CASH, reason, gross, tax=tax, **fill)
                     proceeds += net
             if proceeds > 1e-12:
                 # Momentum sizing: reduce what's available to the split loop BEFORE it runs (not
@@ -1223,29 +1266,29 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     for name in tops:
                         if given[name] > 1e-12:
                             action = "ADD" if name in lots else "BUY"
-                            buy(name, given[name], week)
+                            fill = buy(name, given[name], week)
                             rank = int(sim.rank(week, name))
-                            sim.record(week, action, name, f"rank {rank}", given[name])
+                            sim.record(week, action, name, f"rank {rank}", given[name], **fill)
                 if left > 1e-12:
-                    buy(_POOL, left, week)
+                    fill = buy(_POOL, left, week)
                     if not tops:
                         reason = "nothing in the top N qualifies"
                     elif gcap is None:
                         reason = f"top N all at the {cap:.0%} cap"
                     else:
                         reason = "top N all at the position/group cap"
-                    sim.record(week, "PARK", CASH, reason, left)
+                    sim.record(week, "PARK", CASH, reason, left, **fill)
                 if momentum_reserved > 1e-12:
-                    buy(_POOL, momentum_reserved, week)
+                    fill = buy(_POOL, momentum_reserved, week)
                     reason = f"momentum sizing: recent win rate -> {multiplier:.0%} size deployed"
-                    sim.record(week, "PARK", CASH, reason, momentum_reserved)
+                    sim.record(week, "PARK", CASH, reason, momentum_reserved, **fill)
                 if mass_exit_reserved > 1e-12:
-                    buy(_POOL, mass_exit_reserved, week)
+                    fill = buy(_POOL, mass_exit_reserved, week)
                     reason = (
                         "mass exit: over half of last week's held names exited -> "
                         f"{1 - config.mass_exit_throttle_fraction:.0%} of fresh capital deployed"
                     )
-                    sim.record(week, "PARK", CASH, reason, mass_exit_reserved)
+                    sim.record(week, "PARK", CASH, reason, mass_exit_reserved, **fill)
 
             # 4. Make room: a top-N name still not held is bought now, funded by trimming every
             #    holding by the same percentage, sized as an equal share of the portfolio (capped).
@@ -1267,13 +1310,14 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                     for asset in holders:
                         if sim.sell_blocked(asset, week):
                             continue
-                        gross, net, tax = sell(asset, fraction, week)
+                        gross, net, tax, fill = sell(asset, fraction, week)
                         shown = CASH if asset == _POOL else asset
-                        sim.record(week, "TRIM", shown, f"make room for {name}", gross, tax=tax)
+                        reason = f"make room for {name}"
+                        sim.record(week, "TRIM", shown, reason, gross, tax=tax, **fill)
                         raised += net
-                    buy(name, raised, week)
+                    fill = buy(name, raised, week)
                     rank = int(sim.rank(week, name))
-                    sim.record(week, "BUY", name, f"rank {rank} (made room)", raised)
+                    sim.record(week, "BUY", name, f"rank {rank} (made room)", raised, **fill)
         else:
             # Not a buy week (rebalance="monthly", rebalance_every > 1, or a plain non-cadence
             # week): no new buys, cap trims or make_room. Whatever wasn't yet deployed - either

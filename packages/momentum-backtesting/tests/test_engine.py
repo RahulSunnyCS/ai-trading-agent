@@ -879,6 +879,52 @@ def test_mass_exit_throttle_withholds_capital_on_a_flagged_week():
     assert not any("mass exit" in r for r in later_park_reasons)
 
 
+def test_buffer_trade_log_alone_rebuilds_the_final_portfolio():
+    """Every fill carries units, fill price and cost, so the positions - and from them the final
+    equity - can be rebuilt from the trade log and prices without touching the simulation."""
+    prices = frame(
+        A=path((8, 0.05), (21, -0.01)),
+        B=path((8, 0.0), (21, 0.02)),
+        C=path((14, 0.0), (15, 0.04)),
+        D=path((4, 0.03), (25, -0.01)),
+    )
+    result = run_backtest(
+        prices,
+        includes(prices),
+        cfg(portfolio="buffer", top_n=2, exit_rank=3, cost_pct=0.25, max_position=0.4),
+    )
+    trades = result.trades
+    assert {"BUY", "ADD", "SELL", "TRIM", "PARK"} <= set(trades["action"]), "scenario too thin"
+
+    buys = trades[trades["action"].isin(["BUY", "ADD", "PARK"])]
+    sells = trades[trades["action"].isin(["SELL", "TRIM", "UNPARK"])]
+    for rows, net in ((buys, buys["value"] - buys["cost"]), (sells, sells["value"])):
+        assert (rows["units"] * rows["fill_price"]).tolist() == pytest.approx(net.tolist())
+        assert rows["cost"].tolist() == pytest.approx((rows["value"] * 0.0025).tolist())
+        fill_prices = [prices.at[r.week, r.asset] for r in rows.itertuples()]
+        assert rows["fill_price"].tolist() == fill_prices
+
+    units: dict[str, float] = {}
+    for row in trades.itertuples():
+        assert row.prev_units == pytest.approx(units.get(row.asset, 0.0), abs=1e-12)
+        sign = 1 if row.action in ("BUY", "ADD", "PARK") else -1
+        units[row.asset] = units.get(row.asset, 0.0) + sign * row.units
+    last = result.equity.index[-1]
+    rebuilt = sum(held * prices.at[last, asset] for asset, held in units.items())
+    assert rebuilt == pytest.approx(result.equity.iloc[-1], rel=1e-12)
+
+
+def test_slots_trade_log_carries_fill_details():
+    prices = frame(A=path((8, 0.05), (21, -0.01)), B=path((8, 0.0), (21, 0.02)))
+    result = run_backtest(prices, includes(prices), cfg(cost_pct=0.25))
+    trades = result.trades[result.trades["asset"] != CASH]
+    assert {"BUY", "SELL"} <= set(trades["action"])
+    assert (trades["units"] * trades["fill_price"]).tolist() == pytest.approx(
+        trades["value"].tolist()
+    )
+    assert (trades["cost"] > 0).all()
+
+
 def test_itemised_costs_price_parked_cash_as_a_liquid_fund_not_a_share():
     """Nothing qualifies, so the whole portfolio is parked. Under the itemised model that is a
     liquid-fund purchase (stamp duty only), not an equity delivery trade with STT, exchange
