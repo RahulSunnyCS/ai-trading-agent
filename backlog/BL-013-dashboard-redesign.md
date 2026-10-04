@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the dashboard is the paid product surface; today it reads as a generated template, ships eleven CSS classes that never compile, and hides results a page away from the controls that made them |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | improvement |
 | **Area** | dashboard |
 | **Created** | 2026-10-05 |
 | **Depends on** | none to start. Overlaps: BL-003 (Momentum loading states), BL-006 (Scores table responsiveness), BL-007 (Momentum polish) — those stay separate; this item references rather than absorbs them |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | §3.12.12 (server follow-ups: §3.12.13) |
 
 ## Context
 
@@ -291,19 +291,58 @@ ships on its own. Estimates assume one engineer.
 
 ## Open questions
 
+Answered by the owner on 2026-10-05, when the item was started.
+
 1. Direction: B "Quant Studio" as proposed, A "Terminal" for a denser Quantiply-like feel, or
    C "Ledger" to keep the warm brand? And dark as the default theme?
+   **Answer: Direction B "Quant Studio". Dark is the default theme for first-time visitors,
+   with a Light / Dark / System control in Settings.**
 2. Should the YAML backtest engine stay user-facing at all after the merge, or become an
    advanced mode behind a flag?
+   **Answer: stays user-facing as Builder › YAML mode, visible to every user; `/backtest`
+   redirects there.**
 3. Is the "N pending items" roadmap surface wanted anywhere for the owner (developer flag), or
    removed entirely?
+   **Answer: keep it behind a developer flag.**
 4. Login: is a cookie session acceptable for the remote dashboard, or must it stay Basic auth
    for a reason not in `docs/remote-dashboard.md`?
+   **Answer: cookie login page (`/login`, HMAC-signed `HttpOnly` cookie); Basic auth kept for
+   `/api/*` and curl.**
 5. Billing history and builder `run_id` need small server changes; do those ride this item or
    their own rows in `TODO.md`?
+   **Answer: their own `TODO.md` rows (§3.12.13). This item stays frontend-only; the dependent
+   UI waits for them.**
 6. Phase 9: is the assistant panel in scope for this quarter, or parked?
+   **Answer: parked. Phases 1–8 first; revisit Phase 9 (palette and assistant panel) after.**
 
 ## Log
 
 - 2026-10-05 — created from the dashboard UI review (`docs/dashboard-ui-review.md`,
   artifact linked above). Plan only; no code changed.
+- 2026-10-05 — started. Open questions answered (above); status `In progress`; TODO.md
+  §3.12.12 added.
+- 2026-10-05 — **Phase 1 done** (branch `feat/bl-013-phase-1`). All ten tasks landed: opacity
+  steps changed in the five files (classes changed, `theme.opacity` left alone);
+  `EditPersonalityDialog` and `MomentumWeeklyView` tokens; Replay filters on `completed` via
+  `lib/backfill.ts`, with `BackfillStatus` now a union in `types/trading.ts` and a test pinned
+  to it; `cash` in `PERCENT_KEYS`; builder day table shows Net / lot and Worst MTM / lot;
+  "Refresh data" split into "Reload prices" (keeps edits) and "Reset to defaults" (inline
+  confirm); `lib/momentumConfig.ts` `describeConfig` used by the strip, the collapsed summary,
+  the cadence chip and Rebalance; cumulative P&L series is one point per IST day; "latest 100
+  trades" captions on P&L and Trades; `lib/__tests__/tailwindClasses.test.ts` compiles Tailwind
+  over `src/**`. Checked: dashboard typecheck, 163 dashboard unit tests, Biome, and a browser
+  pass of `/personalities` (edit dialog), `/replay`, `/momentum/backtest` (ETF and Broad),
+  `/optionslab/builder` (2-lot backtest) and `/pnl`.
+  - Decision: "Reload prices" moves the end date to the new last week only when it was still
+    on the old last week; every other setting is untouched.
+  - Not done in Phase 1, by design: showing a DB failure on `/api/trades` as an error needs the
+    server to stop answering `{data: []}` on failure (§3.12.13).
+  - Found outside the task list, not fixed here:
+    - Root `bun run test` fails under bun 1.3.14 before running anything: `bun run --workspaces
+      test` stops at `packages/notify`, which has no `test` script.
+    - `apps/server` unit test `fetchHistoricalCandles — dashboard credential precedence > uses
+      the stored token even when env credentials are set` fails on this laptop (964 others
+      pass); this branch changes nothing under `apps/server`.
+    - The Tailwind test only covers token-bearing utility families (`bg-`, `text-`, `border-`,
+      `ring-`, `shadow-`, `rounded-`, `font-`, …); a typo in a layout utility (`flex-`, `grid-`,
+      `p-`) is not caught.

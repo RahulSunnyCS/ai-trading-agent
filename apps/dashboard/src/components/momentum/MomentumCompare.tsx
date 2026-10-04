@@ -94,7 +94,7 @@ export function MomentumCompare({ runs }: { runs: MomentumSavedRun[] }) {
                         className={cn(
                           'px-3 py-2 text-right font-medium tabular-nums',
                           index === winner
-                            ? 'rounded bg-primary/12 text-primary'
+                            ? 'rounded bg-primary/10 text-primary'
                             : 'text-foreground',
                         )}
                       >

@@ -14,7 +14,7 @@ import { createChart } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { useEffect, useMemo, useRef } from 'react';
 
-import { usePaperTrades } from '../hooks/usePaperTrades';
+import { TRADES_WINDOW_CAPTION, usePaperTrades } from '../hooks/usePaperTrades';
 import { getChartTheme } from '../lib/chartTheme';
 import { formatPnl } from '../lib/format';
 import { type PnlSeriesPoint, computePnlSummary } from '../lib/pnl';
@@ -147,7 +147,7 @@ export function PnlView() {
           {/* Hero realized P&L */}
           <Card>
             <p className="text-xs font-medium uppercase tracking-wider text-faint">
-              Realized P&L · closed trades
+              Realized P&L · closed trades · {TRADES_WINDOW_CAPTION.toLowerCase()}
             </p>
             <p
               className={`metric mt-1 text-4xl font-semibold tracking-tight ${
@@ -187,7 +187,7 @@ export function PnlView() {
           <Card>
             <CardHeader
               title="Cumulative Realized P&L"
-              description="Running net across closed trades"
+              description={`Running net across closed trades, one point per IST day · ${TRADES_WINDOW_CAPTION.toLowerCase()}`}
             />
             <CumulativeChart series={summary.cumulativeSeries} />
           </Card>

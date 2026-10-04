@@ -45,8 +45,8 @@ function monthlyReturns(dates: string[], values: Array<number | null>): Map<stri
 function cellTone(value: number | undefined): string {
   if (value === undefined) return 'bg-surface-2/30 text-faint';
   if (value > 0.04) return 'bg-positive/30 text-positive';
-  if (value > 0) return 'bg-positive/12 text-positive';
-  if (value > -0.04) return 'bg-negative/12 text-negative';
+  if (value > 0) return 'bg-positive/10 text-positive';
+  if (value > -0.04) return 'bg-negative/10 text-negative';
   return 'bg-negative/30 text-negative';
 }
 

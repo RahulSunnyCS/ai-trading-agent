@@ -417,6 +417,12 @@ The system is a **real-time event-driven pipeline** in four layers:
   via a `// @vitest-environment happy-dom` pragma rather than changing
   `vitest.config.ts`'s shared `'node'` default, so the two existing
   pure-logic test files are unaffected
+- **Tailwind class test (Vitest):**
+  `apps/dashboard/src/lib/__tests__/tailwindClasses.test.ts` compiles Tailwind over
+  `src/**` and fails on any token-bearing utility (`bg-`, `text-`, `border-`, `ring-`,
+  `shadow-`, `rounded-`, `font-`, …) that emits no CSS — Tailwind drops an unknown class
+  silently, which is how `bg-positive/12` and `bg-surface-1` shipped with no style. A
+  utility-shaped string that is not a class goes in that file's `NOT_CLASSES`
 - **No coverage threshold set yet** — will be added when Sprint 2 test suite stabilises
 - **Backtesting requirement:** Before any production deployment, run against minimum 6 months of historical tick data with separate training and test periods
 

@@ -92,7 +92,7 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
                     onDrop={(event) => dropBefore(event, item.id, groupTabs)}
                     className={cn(
                       'flex items-center gap-3 px-4 py-3 transition-colors',
-                      dragging === item.id ? 'bg-primary/8' : 'hover:bg-surface-2/60',
+                      dragging === item.id ? 'bg-primary/10' : 'hover:bg-surface-2/60',
                     )}
                   >
                     <button

@@ -54,7 +54,7 @@ export function Sidebar({ activeTab, onSelect, preferences, onNavigate }: Sideba
                     'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     active
-                      ? 'bg-primary/12 text-primary'
+                      ? 'bg-primary/10 text-primary'
                       : 'text-muted hover:bg-surface-2 hover:text-foreground',
                   )}
                 >

@@ -401,7 +401,7 @@ function StockActionAlertRow({
           </Button>
         </div>
       ) : null}
-      {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-negative">{error}</p> : null}
     </div>
   );
 }
