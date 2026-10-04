@@ -54,7 +54,10 @@ every trading day the laptop is on.
 - **Deliverables:** the files above, 5 unit tests, `deploy/launchd/README.md`.
 - **Done when:** a weekday morning shows a `workflow_dispatch` run created at about
   08:00 IST in `gh run list`, and the Telegram report arrives at about 08:17.
-  *Installed and dry-run verified 2026-10-05; first real fire is 2026-10-06 08:00.*
+  *Installed and dry-run verified 2026-10-05; first real fire is Mon 2026-10-05 08:00.*
+
+> **Phases 2–4 moved to [BL-012](BL-012-scheduler-service.md)** (2026-10-05): a scheduler
+> service that replaces per-job plists and can move to a host later. Kept below for history.
 
 ### Phase 2 — One home for every scheduled job
 - **Tasks:** move the three momentum plists into `deploy/launchd/jobs/`, delete
@@ -116,3 +119,5 @@ For Phase 2 onwards:
   `gh` and its auth. The dry run also showed the first rule (skip only after 15:35) would
   have dispatched a login at 00:38; tightened to weekday 07:45–15:35. No real login was
   dispatched during verification.
+- 2026-10-05 — corrected the first-fire date (Mon 5 Oct, not Tue 6 Oct). Phases 2–4
+  superseded by BL-012; this item closes once Phase 1's first real run is confirmed.
