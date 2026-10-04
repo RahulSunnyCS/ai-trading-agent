@@ -114,8 +114,8 @@ def save_run(
         con.execute("ROLLBACK")
         raise
     created_at = con.execute(
-        "SELECT strftime(created_at, '%Y-%m-%dT%H:%M:%S%z') "
-        "FROM backtest_runs WHERE run_id = ?", [run_id]
+        "SELECT strftime(created_at, '%Y-%m-%dT%H:%M:%S%z') FROM backtest_runs WHERE run_id = ?",
+        [run_id],
     ).fetchone()[0]
     return _record(run_id, config, summary, created_at)
 
@@ -134,7 +134,9 @@ def _prune(con: duckdb.DuckDBPyConnection, dataset: str) -> None:
         con.execute("DELETE FROM backtest_runs WHERE run_id = ?", [run_id])
 
 
-def _record(run_id: str, config: dict[str, Any], summary: dict[str, Any], created_at: str) -> dict[str, Any]:
+def _record(
+    run_id: str, config: dict[str, Any], summary: dict[str, Any], created_at: str
+) -> dict[str, Any]:
     return {
         "id": run_id,
         "created_at": created_at,

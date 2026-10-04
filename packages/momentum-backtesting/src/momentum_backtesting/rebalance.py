@@ -174,9 +174,7 @@ def persisted_stock_prices(
 
     extras = ((set(universe) | set(holdings)) & set(stock.extra_instruments)) - {CASH}
     extra_trade_symbols = extra_symbols(extras)
-    stored_extras = db_read.latest_momentum_closes_from_db_or_none(
-        sorted(extras), "etf", as_of
-    )
+    stored_extras = db_read.latest_momentum_closes_from_db_or_none(sorted(extras), "etf", as_of)
     if stored_extras is not None:
         for name, (close, _day) in stored_extras.items():
             ltp[name] = close

@@ -43,9 +43,7 @@ def test_plan_rejects_missing_live_price():
 
 
 def test_as_of_plan_keeps_weight_change_when_persisted_price_is_missing():
-    rows = build_plan(
-        {}, {"C0002": 1.0}, {}, {}, 100_000, allow_missing_prices=True
-    )
+    rows = build_plan({}, {"C0002": 1.0}, {}, {}, 100_000, allow_missing_prices=True)
     assert rows == [
         {
             "asset": "C0002",

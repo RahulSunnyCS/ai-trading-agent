@@ -278,10 +278,7 @@ def latest_momentum_closes_from_db_or_none(
             ") WHERE position = 1",
             [instruments, kind, as_of],
         ).fetchall()
-    return {
-        str(instrument): (float(close), trading_day)
-        for instrument, close, trading_day in rows
-    }
+    return {str(instrument): (float(close), trading_day) for instrument, close, trading_day in rows}
 
 
 def total_market_members_by_year_from_db_or_none(

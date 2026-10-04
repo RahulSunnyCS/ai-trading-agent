@@ -245,8 +245,8 @@ export function MomentumRebalanceView({
           </p>
         ) : null}
         <p className="mt-3 text-xs text-muted">
-          Live prices are used during NSE market hours (09:15–15:30 IST). Outside market hours,
-          or when live quotes are unavailable, the result is clearly marked as an as-of preview.
+          Live prices are used during NSE market hours (09:15–15:30 IST). Outside market hours, or
+          when live quotes are unavailable, the result is clearly marked as an as-of preview.
         </p>
         {loadError ? (
           <div className="mt-3">
@@ -326,8 +326,8 @@ export function MomentumRebalanceView({
           <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
             <p className="text-sm font-medium text-foreground">First allocation</p>
             <p className="mt-0.5 text-sm text-muted">
-              No invested allocation is entered, so the portfolio is treated as 100% cash and
-              this preview is labelled as your first allocation.
+              No invested allocation is entered, so the portfolio is treated as 100% cash and this
+              preview is labelled as your first allocation.
             </p>
           </div>
         ) : null}
@@ -407,8 +407,8 @@ export function MomentumRebalanceView({
               </p>
               {!plan.rebalance_schedule.is_rebalance_week ? (
                 <p className="mt-1 text-sm text-muted">
-                  The table below shows the changes needed to match the current model target; it
-                  is not a scheduled rebalance for this signal week.
+                  The table below shows the changes needed to match the current model target; it is
+                  not a scheduled rebalance for this signal week.
                 </p>
               ) : null}
             </div>
