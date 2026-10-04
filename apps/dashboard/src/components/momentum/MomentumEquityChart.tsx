@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { getChartTheme, getSeriesPalette, pickSeries, plotlyChrome } from '../../lib/chartTheme';
+import { EMPTY, formatInr, formatPct } from '../../lib/format';
 import { useThemeStore } from '../../store/theme';
 import type {
   MomentumComparison,
@@ -25,14 +26,9 @@ type PlotlyHTMLElement = HTMLDivElement & {
 };
 
 const lakh = (value: number | null) => (value === null ? null : value / 100_000);
+/** A rupee value in lakh, up to two decimals: 125000 → "₹1.25 L". */
 const rupees = (value: number | null) =>
-  value === null
-    ? '—'
-    : `₹${(value / 100_000).toLocaleString('en-IN', { maximumFractionDigits: 2 })} L`;
-const asPct = (value: number | null | undefined, showSign = false) =>
-  value === null || value === undefined
-    ? '—'
-    : `${showSign && value > 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
+  value === null ? EMPTY : `${formatInr(value / 100_000, { dp: 2, trim: true })} L`;
 
 const HOVER_HINT = 'Hover the chart to see that week’s values and trades here.';
 
@@ -58,15 +54,15 @@ function WeekDetail({
         <span>
           Strategy <b className="text-foreground">{rupees(series.strategy[index] ?? null)}</b> ·{' '}
           {series.holdings_count[index] ?? '–'} held
-          {idle > 0.001 ? ` · ${asPct(idle, false)} cash` : ''}
+          {idle > 0.001 ? ` · ${formatPct(idle)} cash` : ''}
         </span>
         <span>
           {benchmarkName} {rupees(series.benchmark[index] ?? null)}
         </span>
         <span>Liquid fund {rupees(series.cash[index] ?? null)}</span>
         <span>
-          Drawdown <b className="text-negative">{asPct(series.drawdown_strategy[index])}</b> (
-          {benchmarkName} {asPct(series.drawdown_benchmark[index])})
+          Drawdown <b className="text-negative">{formatPct(series.drawdown_strategy[index])}</b> (
+          {benchmarkName} {formatPct(series.drawdown_benchmark[index])})
         </span>
         <span>
           52w edge{' '}
@@ -75,7 +71,7 @@ function WeekDetail({
               (series.rolling_52w_excess[index] ?? 0) >= 0 ? 'text-positive' : 'text-negative'
             }
           >
-            {asPct(series.rolling_52w_excess[index], true)}
+            {formatPct(series.rolling_52w_excess[index], 1, { sign: true })}
           </b>
         </span>
       </div>
@@ -84,7 +80,7 @@ function WeekDetail({
           {rotation.outs.map((row) => (
             <p key={`out-${row.asset}`}>
               <span className="font-semibold text-negative">OUT</span> {row.asset} — held{' '}
-              {row.weeks_held ?? '–'}w, {asPct(row.return, true)} ({row.reason})
+              {row.weeks_held ?? '–'}w, {formatPct(row.return, 1, { sign: true })} ({row.reason})
             </p>
           ))}
           {rotation.ins.map((row) => (
@@ -104,7 +100,7 @@ function WeekDetail({
           {rotation.holdings.length ? (
             <p className="italic text-muted">
               Holding {rotation.holdings.length}:{' '}
-              {rotation.holdings.map((h) => `${h.asset} ${asPct(h.share, false)}`).join(', ')}
+              {rotation.holdings.map((h) => `${h.asset} ${formatPct(h.share)}`).join(', ')}
             </p>
           ) : null}
         </div>

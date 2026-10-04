@@ -5,13 +5,24 @@ import { useMemo, useState } from 'react';
 
 import { cn } from '../../lib/cn';
 import { downloadCsv } from '../../lib/csv';
+import {
+  EMPTY,
+  formatDuration,
+  formatInr,
+  formatIstTime,
+  formatNumber,
+  formatPct,
+} from '../../lib/format';
 import { describeConfig } from '../../lib/momentumConfig';
 import type { MomentumResult, MomentumSavedRun } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { InfoTooltip } from '../ui/InfoTooltip';
+import { Input } from '../ui/Input';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { TabPanel, Tabs } from '../ui/Tabs';
 import { MomentumCompare } from './MomentumCompare';
 import { MomentumHoldingsSplit } from './MomentumHoldingsSplit';
 import { MomentumInsights } from './MomentumInsights';
@@ -25,13 +36,13 @@ import { ResultSection } from './ResultSection';
 type Panel = 'returns' | 'week' | 'trades' | 'split' | 'risk' | 'compare';
 type ReturnsView = 'chart' | 'table' | 'monthly';
 
-const TABS: Array<[Panel, string]> = [
-  ['returns', 'Returns'],
-  ['week', 'This week'],
-  ['trades', 'Trades'],
-  ['split', 'Trade split'],
-  ['risk', 'Risk'],
-  ['compare', 'Compare'],
+const TABS: Array<{ value: Panel; label: string }> = [
+  { value: 'returns', label: 'Returns' },
+  { value: 'week', label: 'This week' },
+  { value: 'trades', label: 'Trades' },
+  { value: 'split', label: 'Trade split' },
+  { value: 'risk', label: 'Risk' },
+  { value: 'compare', label: 'Compare' },
 ];
 
 const RETURNS_VIEWS: Array<[ReturnsView, string, string, string]> = [
@@ -107,14 +118,13 @@ const PERCENT_KEYS = new Set([
 ]);
 
 function format(value: unknown, key = ''): string {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined) return EMPTY;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'number') {
-    if (PERCENT_KEYS.has(key)) return `${(value * 100).toFixed(1)}%`;
-    if (key === 'pnl' || key === 'value')
-      return `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    if (PERCENT_KEYS.has(key)) return formatPct(value);
+    if (key === 'pnl' || key === 'value') return formatInr(value);
     if (key === 'year') return String(value);
-    return value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    return formatNumber(value, 2, { trim: true });
   }
   return String(value);
 }
@@ -300,10 +310,6 @@ export interface MomentumRunInfo {
   fresh?: boolean;
 }
 
-function formatDuration(ms: number): string {
-  return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`;
-}
-
 export function MomentumPerformanceCard({
   result,
   config,
@@ -334,13 +340,8 @@ export function MomentumPerformanceCard({
           {runInfo ? (
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
               <CheckCircle2 className="h-3.5 w-3.5 text-positive" />
-              Updated{' '}
-              {new Date(runInfo.finishedAt).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              })}{' '}
-              · took {formatDuration(runInfo.durationMs)}
+              Updated {formatIstTime(runInfo.finishedAt, { seconds: true })} · took{' '}
+              {formatDuration(runInfo.durationMs)}
               {runInfo.fresh ? ' · recomputed from scratch' : ''}
               {runInfo.savedAs ? ` · saved as ${runInfo.savedAs}` : ''}
               <InfoTooltip text="Every run recomputes the backtest for exactly the settings shown. A run that finishes in a second or two just means the server already had this strategy's price data and rankings cached — the numbers are still fresh for these settings. To drop the caches and recompute everything anyway, use the ↻ icon beside Strategy settings." />
@@ -389,33 +390,6 @@ export function MomentumPerformanceCard({
   );
 }
 
-function Segmented<T extends string>({
-  value,
-  options,
-  onChange,
-}: { value: T; options: Array<[T, string]>; onChange: (value: T) => void }) {
-  return (
-    <fieldset className="inline-flex min-w-0 rounded-lg border border-border bg-surface-2/40 p-0.5">
-      {options.map(([id, label]) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={value === id}
-          onClick={() => onChange(id)}
-          className={cn(
-            'rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            value === id
-              ? 'bg-surface text-foreground shadow-card'
-              : 'text-muted hover:text-foreground',
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </fieldset>
-  );
-}
-
 /** Everything below the chart, as one card with tabs rather than a stack of cards. */
 export function MomentumResultDetails({
   result,
@@ -443,172 +417,162 @@ export function MomentumResultDetails({
 
   return (
     <Card flush className={cn(flashing && 'animate-result-flash')}>
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border px-3">
-        {TABS.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={panel === id}
-            onClick={() => setPanel(id)}
-            className={cn(
-              '-mb-px whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-              panel === id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted hover:text-foreground',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div role="tabpanel" className="divide-y divide-border p-5">
-        {panel === 'returns' ? (
-          <ResultSection
-            title={returnsTitle}
-            description={returnsDescription}
-            actions={
-              <Segmented
-                value={returnsView}
-                onChange={setReturnsView}
-                options={RETURNS_VIEWS.map(([id, label]) => [id, label])}
-              />
-            }
-          >
-            {returnsView === 'chart' ? (
-              <MomentumYearlyChart rows={result.yearly} benchmarkName={result.benchmark_name} />
-            ) : returnsView === 'table' ? (
-              <DataTable
-                rows={result.yearly}
-                columns={[
-                  ['year', 'Year'],
-                  ['strategy', 'Strategy'],
-                  ['benchmark', result.benchmark_name],
-                  ['cash', 'Liquid fund'],
-                  ['vs_benchmark', 'Difference'],
-                ]}
-                csvName="momentum-yearly"
-              />
-            ) : (
-              <MomentumMonthlyHeatmap series={result.series} />
-            )}
-          </ResultSection>
-        ) : null}
-
-        {panel === 'week' ? (
-          <>
+      <Tabs
+        ariaLabel="Result details"
+        value={panel}
+        items={TABS}
+        onChange={setPanel}
+        className="px-5"
+      >
+        <TabPanel value={panel} className="divide-y divide-border p-5">
+          {panel === 'returns' ? (
             <ResultSection
-              title={`Signals · ${result.latest.week}`}
-              description={result.latest.explain}
+              title={returnsTitle}
+              description={returnsDescription}
+              actions={
+                <SegmentedControl
+                  ariaLabel="Returns view"
+                  size="sm"
+                  value={returnsView}
+                  onChange={setReturnsView}
+                  options={RETURNS_VIEWS.map(([id, label]) => ({ value: id, label }))}
+                />
+              }
             >
-              <Table>
-                <THead>
-                  <Th>Rank</Th>
-                  <Th>Asset</Th>
-                  <Th>Action</Th>
-                  <Th>Why</Th>
-                  <Th>Score</Th>
-                  <Th>Held</Th>
-                </THead>
-                <tbody>
-                  {signalRows.map((row) => (
-                    <TRow key={row.asset}>
-                      <Td numeric>{format(row.rank)}</Td>
-                      <Td>{row.asset}</Td>
-                      <Td>{row.action || '—'}</Td>
-                      <Td className="text-muted">{row.reason}</Td>
-                      <Td numeric>{format(row.score)}</Td>
-                      <Td>{row.held ? 'Yes' : 'No'}</Td>
-                    </TRow>
-                  ))}
-                </tbody>
-              </Table>
-            </ResultSection>
-            {result.held_categories?.length ? (
-              <ResultSection
-                title="Held categories"
-                description="Fresh selections and positions still held through the exit buffer"
-              >
+              {returnsView === 'chart' ? (
+                <MomentumYearlyChart rows={result.yearly} benchmarkName={result.benchmark_name} />
+              ) : returnsView === 'table' ? (
                 <DataTable
-                  rows={result.held_categories.map((row) => ({
-                    ...row,
-                    picks: row.picks.join(', '),
-                  }))}
+                  rows={result.yearly}
                   columns={[
-                    ['position', '#'],
-                    ['status', 'Status'],
-                    ['category', 'Category'],
-                    ['picks', 'Stock picks'],
+                    ['year', 'Year'],
+                    ['strategy', 'Strategy'],
+                    ['benchmark', result.benchmark_name],
+                    ['cash', 'Liquid fund'],
+                    ['vs_benchmark', 'Difference'],
                   ]}
+                  csvName="momentum-yearly"
+                />
+              ) : (
+                <MomentumMonthlyHeatmap series={result.series} />
+              )}
+            </ResultSection>
+          ) : null}
+
+          {panel === 'week' ? (
+            <>
+              <ResultSection
+                title={`Signals · ${result.latest.week}`}
+                description={result.latest.explain}
+              >
+                <Table>
+                  <THead>
+                    <Th>Rank</Th>
+                    <Th>Asset</Th>
+                    <Th>Action</Th>
+                    <Th>Why</Th>
+                    <Th>Score</Th>
+                    <Th>Held</Th>
+                  </THead>
+                  <tbody>
+                    {signalRows.map((row) => (
+                      <TRow key={row.asset}>
+                        <Td numeric>{format(row.rank)}</Td>
+                        <Td>{row.asset}</Td>
+                        <Td>{row.action || EMPTY}</Td>
+                        <Td className="text-muted">{row.reason}</Td>
+                        <Td numeric>{format(row.score)}</Td>
+                        <Td>{row.held ? 'Yes' : 'No'}</Td>
+                      </TRow>
+                    ))}
+                  </tbody>
+                </Table>
+              </ResultSection>
+              {result.held_categories?.length ? (
+                <ResultSection
+                  title="Held categories"
+                  description="Fresh selections and positions still held through the exit buffer"
+                >
+                  <DataTable
+                    rows={result.held_categories.map((row) => ({
+                      ...row,
+                      picks: row.picks.join(', '),
+                    }))}
+                    columns={[
+                      ['position', '#'],
+                      ['status', 'Status'],
+                      ['category', 'Category'],
+                      ['picks', 'Stock picks'],
+                    ]}
+                  />
+                </ResultSection>
+              ) : null}
+              <ResultSection title="Open positions">
+                <DataTable
+                  rows={result.open_positions}
+                  columns={[
+                    ['asset', 'Asset'],
+                    ['entry_week', 'Since'],
+                    ['weeks_held', 'Weeks'],
+                    ['rank', 'Rank'],
+                    ['position_return', 'Return'],
+                    ['value', 'Value'],
+                    ['pnl', 'P&L'],
+                  ]}
+                  csvName="momentum-open-positions"
                 />
               </ResultSection>
-            ) : null}
-            <ResultSection title="Open positions">
-              <DataTable
-                rows={result.open_positions}
-                columns={[
-                  ['asset', 'Asset'],
-                  ['entry_week', 'Since'],
-                  ['weeks_held', 'Weeks'],
-                  ['rank', 'Rank'],
-                  ['position_return', 'Return'],
-                  ['value', 'Value'],
-                  ['pnl', 'P&L'],
-                ]}
-                csvName="momentum-open-positions"
-              />
-            </ResultSection>
+              <ResultSection
+                title="Instrument attribution"
+                description="How each instrument contributed across the whole run"
+              >
+                <DataTable
+                  rows={result.instruments}
+                  columns={COLUMNS.holdings}
+                  csvName="momentum-instruments"
+                />
+              </ResultSection>
+            </>
+          ) : null}
+
+          {panel === 'trades' ? (
             <ResultSection
-              title="Instrument attribution"
-              description="How each instrument contributed across the whole run"
+              title="Closed trades"
+              description="Position returns include all purchases and top ups"
+              actions={
+                <Input
+                  type="search"
+                  aria-label="Filter trades"
+                  placeholder="Filter asset or reason…"
+                  value={tradeFilter}
+                  onChange={(event) => setTradeFilter(event.target.value)}
+                  className="w-auto"
+                />
+              }
             >
-              <DataTable
-                rows={result.instruments}
-                columns={COLUMNS.holdings}
-                csvName="momentum-instruments"
-              />
+              <DataTable rows={trades} columns={COLUMNS.trades} csvName="momentum-trades" />
             </ResultSection>
-          </>
-        ) : null}
+          ) : null}
 
-        {panel === 'trades' ? (
-          <ResultSection
-            title="Closed trades"
-            description="Position returns include all purchases and top ups"
-            actions={
-              <input
-                type="search"
-                aria-label="Filter trades"
-                placeholder="Filter asset or reason…"
-                value={tradeFilter}
-                onChange={(event) => setTradeFilter(event.target.value)}
-                className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm"
-              />
-            }
-          >
-            <DataTable rows={trades} columns={COLUMNS.trades} csvName="momentum-trades" />
-          </ResultSection>
-        ) : null}
+          {panel === 'split' ? (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <MomentumTimelineChart rows={result.timeline} />
+              <MomentumHoldingsSplit positions={result.open_positions} />
+            </div>
+          ) : null}
 
-        {panel === 'split' ? (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <MomentumTimelineChart rows={result.timeline} />
-            <MomentumHoldingsSplit positions={result.open_positions} />
-          </div>
-        ) : null}
+          {panel === 'risk' ? (
+            <ResultSection
+              title="Worst benchmark falls"
+              description="Strategy and benchmark over the same peak-to-trough windows"
+            >
+              <DataTable rows={result.crashes} columns={COLUMNS.risk} csvName="momentum-crashes" />
+            </ResultSection>
+          ) : null}
 
-        {panel === 'risk' ? (
-          <ResultSection
-            title="Worst benchmark falls"
-            description="Strategy and benchmark over the same peak-to-trough windows"
-          >
-            <DataTable rows={result.crashes} columns={COLUMNS.risk} csvName="momentum-crashes" />
-          </ResultSection>
-        ) : null}
-
-        {panel === 'compare' ? <MomentumCompare runs={savedRuns} /> : null}
-      </div>
+          {panel === 'compare' ? <MomentumCompare runs={savedRuns} /> : null}
+        </TabPanel>
+      </Tabs>
     </Card>
   );
 }

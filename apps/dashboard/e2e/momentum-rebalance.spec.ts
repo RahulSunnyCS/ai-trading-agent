@@ -99,7 +99,7 @@ test('Momentum rebalance previews holdings without changing Backtest dataset', a
   await page.getByRole('button', { name: 'Momentum', exact: true }).click();
   await page.getByRole('tab', { name: 'Rebalance preview' }).click();
 
-  await page.getByRole('button', { name: 'Nifty 50 Stocks' }).click();
+  await page.getByRole('radio', { name: 'Nifty 50 Stocks' }).click();
   await expect(page.getByText('First allocation', { exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Asset 1' }).fill('C0001');
   await page.getByRole('spinbutton', { name: 'Weight %' }).fill('40');
@@ -116,5 +116,8 @@ test('Momentum rebalance previews holdings without changing Backtest dataset', a
   await expect(page.getByRole('row', { name: /BUY C0001/ })).toContainText('200');
   await expect(page.getByText('No orders were placed.')).toBeVisible();
   await page.getByRole('tab', { name: 'Backtest' }).click();
-  await expect(page.getByRole('button', { name: 'ETF Rotation' })).toHaveClass(/border-primary/);
+  await expect(page.getByRole('radio', { name: 'ETF Rotation' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
 });

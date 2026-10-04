@@ -9,18 +9,18 @@
  */
 
 import { useAppRoute } from '../hooks/useAppRoute';
-import { cn } from '../lib/cn';
 import { OPTIONS_LAB_SECTIONS, oneOf } from '../lib/routes';
 import { RegimesPanel } from './optionslab/RegimesPanel';
 import { ResultsPanel } from './optionslab/ResultsPanel';
 import { StrategyBuilder } from './optionslab/StrategyBuilder';
+import { type TabItem, Tabs } from './ui/Tabs';
 
 type Section = (typeof OPTIONS_LAB_SECTIONS)[number];
 
-const SECTIONS: { id: Section; label: string }[] = [
-  { id: 'results', label: 'Daily results' },
-  { id: 'regimes', label: 'Market regimes' },
-  { id: 'builder', label: 'Strategy builder' },
+const SECTIONS: TabItem<Section>[] = [
+  { value: 'results', label: 'Daily results' },
+  { value: 'regimes', label: 'Market regimes' },
+  { value: 'builder', label: 'Strategy builder' },
 ];
 
 export function OptionsLabView() {
@@ -29,23 +29,14 @@ export function OptionsLabView() {
   const setSection = (next: Section) => navigate('optionslab', next);
   return (
     <div className="space-y-5">
-      <div className="inline-flex rounded-lg border border-border bg-surface p-1">
-        {SECTIONS.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setSection(s.id)}
-            className={cn(
-              'rounded-md px-3 py-1.5 text-sm transition-colors',
-              section === s.id
-                ? 'bg-surface-2 text-foreground shadow-card'
-                : 'text-muted hover:text-foreground',
-            )}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={section}
+        items={SECTIONS}
+        onChange={setSection}
+        ariaLabel="Options Lab sections"
+        variant="pill"
+        className="w-fit"
+      />
       {section === 'results' && <ResultsPanel />}
       {section === 'regimes' && <RegimesPanel />}
       {section === 'builder' && <StrategyBuilder />}

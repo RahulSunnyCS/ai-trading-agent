@@ -10,20 +10,29 @@ import {
 
 import { cn } from '../../lib/cn';
 
-/** The one field style. Use <Input> / <Select> / <NumberField>; reach for this only for a <textarea>. */
-export const inputClass =
-  'w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-foreground transition-colors placeholder:text-faint hover:border-border-strong focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-negative';
+/** The field style without a width, for a field that sets its own (`w-16`, `w-28`). */
+export const fieldClass =
+  'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-foreground transition-colors placeholder:text-faint hover:border-border-strong focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-negative';
+
+/** The one field style, full width. Use <Input> / <Select> / <NumberField>; reach for this only for a <textarea>. */
+export const inputClass = `w-full ${fieldClass}`;
+
+/** Full width unless the caller passes a width class (`cn` joins classes; it does not resolve conflicts). */
+function fieldClasses(className: string | undefined): string {
+  const hasWidth = className?.split(/\s+/).some((name) => /^(?:[a-z0-9-]+:)*w-/.test(name));
+  return cn(hasWidth ? fieldClass : inputClass, className);
+}
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {
-    return <input ref={ref} className={cn(inputClass, className)} {...rest} />;
+    return <input ref={ref} className={fieldClasses(className)} {...rest} />;
   },
 );
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
   function Select({ className, children, ...rest }, ref) {
     return (
-      <select ref={ref} className={cn(inputClass, className)} {...rest}>
+      <select ref={ref} className={fieldClasses(className)} {...rest}>
         {children}
       </select>
     );
@@ -97,7 +106,7 @@ export function NumberField({
     <input
       type="number"
       inputMode="decimal"
-      className={cn(inputClass, className)}
+      className={fieldClasses(className)}
       value={draft}
       min={min}
       max={max}

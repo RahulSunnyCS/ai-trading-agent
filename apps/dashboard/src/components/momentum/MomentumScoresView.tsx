@@ -4,9 +4,12 @@ import { Fragment, useMemo, useState } from 'react';
 
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { usePolledResource } from '../../hooks/usePolledResource';
+import { EMPTY, formatInr, formatNumber, formatPct } from '../../lib/format';
 import { MOMENTUM_SCORE_KINDS, type MomentumScoreKind, oneOf } from '../../lib/routes';
-import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { Input, Select } from '../ui/Input';
+import { RefreshButton } from '../ui/RefreshButton';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { MomentumScoresSkeleton } from './MomentumSkeletons';
@@ -40,18 +43,8 @@ interface MomentumScores {
   sectors: SectorScore[];
 }
 
-function number(value: number | null | undefined, digits = 1): string {
-  return value === null || value === undefined
-    ? '—'
-    : value.toLocaleString('en-IN', { maximumFractionDigits: digits });
-}
-
-function percent(value: number | null | undefined, digits = 1): string {
-  return value === null || value === undefined ? '—' : `${number(value * 100, digits)}%`;
-}
-
 function Score({ value }: { value: number | null | undefined }) {
-  if (value === null || value === undefined) return <span className="text-muted">—</span>;
+  if (value === null || value === undefined) return <span className="text-muted">{EMPTY}</span>;
   const tone =
     value <= 40
       ? 'bg-negative/10 text-negative'
@@ -62,7 +55,7 @@ function Score({ value }: { value: number | null | undefined }) {
     <span
       className={`inline-block min-w-9 rounded px-1.5 py-0.5 text-center font-semibold ${tone}`}
     >
-      {number(value, 0)}
+      {formatNumber(value, 0)}
     </span>
   );
 }
@@ -160,51 +153,42 @@ export function MomentumScoresView() {
               ? `Prices as of ${data.as_of ?? 'latest data'} · ${data.stocks.length} scored of ${data.universe_size} stocks`
               : 'Current stock and sector momentum'
           }
-          actions={
-            <Button size="sm" onClick={refetch} disabled={loading}>
-              Refresh
-            </Button>
-          }
+          actions={<RefreshButton onClick={refetch} loading={loading} />}
         />
         <p className="mb-3 text-sm text-muted">
           Each 0–100 score ranks a stock’s return against the eligible universe for that lookback.
           100 is strongest. The 4, 13 and 26 week windows approximate 1, 3 and 6 months.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
+          <SegmentedControl
+            ariaLabel="Score kind"
             size="sm"
-            variant={kind === 'stocks' ? 'primary' : 'secondary'}
-            onClick={() => {
-              setKind('stocks');
-              setSelectedSector(null);
+            value={kind}
+            options={[
+              { value: 'stocks', label: 'Stocks' },
+              { value: 'sectors', label: 'Sectors' },
+            ]}
+            onChange={(next) => {
+              setKind(next);
+              if (next === 'stocks') setSelectedSector(null);
+              else setSelectedStock(null);
             }}
-          >
-            Stocks
-          </Button>
-          <Button
-            size="sm"
-            variant={kind === 'sectors' ? 'primary' : 'secondary'}
-            onClick={() => {
-              setKind('sectors');
-              setSelectedStock(null);
-            }}
-          >
-            Sectors
-          </Button>
-          <input
+          />
+          <Input
             type="search"
             aria-label={`Filter ${kind}`}
             placeholder={`Filter ${kind}…`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="ml-auto min-w-48 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-foreground"
+            className="ml-auto w-auto min-w-48"
           />
         </div>
         {data ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
-            <label>
+            <label htmlFor="momentum-score-lookback">
               Rank by{' '}
-              <select
+              <Select
+                id="momentum-score-lookback"
                 aria-label="Score lookback"
                 value={activeLookback}
                 onChange={(event) => {
@@ -212,14 +196,14 @@ export function MomentumScoresView() {
                   setSortKey('score');
                   setAscending(false);
                 }}
-                className="rounded border border-border bg-surface px-2 py-1 text-foreground"
+                className="w-auto"
               >
                 {data.lookbacks.map((weeks) => (
                   <option key={weeks} value={weeks}>
                     {weeks} weeks
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <span>0–40 weaker · 41–60 middle · 61–100 stronger</span>
             <span>
@@ -318,10 +302,10 @@ export function MomentumScoresView() {
                     </Td>
                     <Td>{stock.subgroup}</Td>
                     <Td align="right" numeric>
-                      ₹{number(stock.last_price, 2)}
+                      {formatInr(stock.last_price, { dp: 2, trim: true })}
                     </Td>
                     <Td align="right" numeric>
-                      {percent(stock.change_1w_pct, 2)}
+                      {formatPct(stock.change_1w_pct, 2)}
                     </Td>
                     {data.lookbacks.map((lookback) => (
                       <Td key={lookback} align="right" numeric>
@@ -343,8 +327,8 @@ export function MomentumScoresView() {
                             >
                               <strong>{weeks} week return</strong>
                               <p>
-                                {percent(stock.returns[String(weeks)], 1)} · relative score{' '}
-                                {number(stock.scores[String(weeks)], 0)}
+                                {formatPct(stock.returns[String(weeks)])} · relative score{' '}
+                                {formatNumber(stock.scores[String(weeks)], 0)}
                               </p>
                             </div>
                           ))}
@@ -468,10 +452,10 @@ export function MomentumScoresView() {
                                       {stock.symbol} · {stock.company_name}
                                     </td>
                                     <td className="py-1.5 text-right">
-                                      ₹{number(stock.last_price, 2)}
+                                      {formatInr(stock.last_price, { dp: 2, trim: true })}
                                     </td>
                                     <td className="py-1.5 text-right">
-                                      {percent(stock.change_1w_pct, 2)}
+                                      {formatPct(stock.change_1w_pct, 2)}
                                     </td>
                                     {data.lookbacks.map((weeks) => (
                                       <td key={weeks} className="py-1.5 text-right">

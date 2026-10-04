@@ -79,14 +79,15 @@ describe('MomentumCircuitExposureCard', () => {
     expect(screen.getByText(/already out before 1 \(10%\)/)).toBeTruthy();
     expect(screen.getByText(/still holding in 9/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('tab', { name: /got out in time \(1\)/ }));
+    // The shared Tabs (Radix) selects on mouse down, not on click.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /got out in time \(1\)/ }));
     expect(screen.getByText('QUESS')).toBeTruthy();
     expect(screen.getByText('2020-01-31 (47 days before)')).toBeTruthy();
     expect(screen.getByText('-3.41%')).toBeTruthy();
     expect(screen.queryByText('ATGL')).toBeNull();
     expect(screen.getByText(/already out before 1 \(10%\)/)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('tab', { name: /Upper circuit/ }));
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Upper circuit/ }));
     expect(screen.getByText(/No upper-circuit run hit a stock/)).toBeTruthy();
     expect(screen.getAllByRole('tab')).toHaveLength(3);
   });

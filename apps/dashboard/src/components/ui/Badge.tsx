@@ -43,7 +43,7 @@ export const STATUS_TONE: Record<Status, Tone> = {
   open: 'info',
   closed: 'neutral',
   connected: 'primary',
-  disconnected: 'warning',
+  disconnected: 'negative',
   completed: 'neutral',
   running: 'info',
   queued: 'neutral',

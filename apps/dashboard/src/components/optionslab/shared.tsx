@@ -8,10 +8,12 @@ import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { type ReactNode, useEffect, useRef } from 'react';
 
 import { getChartTheme, getSeriesPalette, pickSeries } from '../../lib/chartTheme';
-import { formatPnl } from '../../lib/format';
+import { cn } from '../../lib/cn';
+import { formatNumber, formatPnl } from '../../lib/format';
 import type { StrategyStats } from '../../lib/legwiseStats';
 import { useThemeStore } from '../../store/theme';
 import type { TradeRow } from '../../types/legwise';
+import { fieldClass } from '../ui/Input';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 
 export function pnlClass(value: number): string {
@@ -102,10 +104,10 @@ export function TradeLog({ trades }: { trades: TradeRow[] }) {
             <Td>{t.leg}</Td>
             <Td>{t.contract}</Td>
             <Td align="right" numeric>
-              {t.entry} @ {t.entry_price.toFixed(2)}
+              {t.entry} @ {formatNumber(t.entry_price, 2)}
             </Td>
             <Td align="right" numeric>
-              {t.exit ?? '--:--'} @ {t.exit_price?.toFixed(2) ?? '—'}
+              {t.exit ?? '--:--'} @ {formatNumber(t.exit_price, 2)}
             </Td>
             <Td>{t.reason}</Td>
             <Td align="right" numeric className={pnlClass(t.pnl)}>
@@ -118,8 +120,12 @@ export function TradeLog({ trades }: { trades: TradeRow[] }) {
   );
 }
 
-const INPUT =
-  'rounded-lg border border-border bg-surface-2/50 px-2.5 py-1.5 text-sm text-foreground disabled:opacity-50';
+/**
+ * The shared field style (ui/Input) without its `w-full`: these controls sit side by side in
+ * wrapping rows and size to their content or to a width the caller passes. `cn` does not
+ * resolve conflicting Tailwind classes, so the width has to be dropped, not overridden.
+ */
+const FIELD = fieldClass;
 
 /** A captioned group that can contain multiple controls. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -144,7 +150,7 @@ export function TextInput(props: {
       value={props.value}
       placeholder={props.placeholder}
       onChange={(e) => props.onChange(e.target.value)}
-      className={`${INPUT} ${props.className ?? ''}`}
+      className={cn(FIELD, props.className)}
     />
   );
 }
@@ -163,7 +169,7 @@ export function NumberInput(props: {
       step={props.step ?? 1}
       disabled={props.disabled}
       onChange={(e) => props.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
-      className={`${INPUT} w-24 ${props.className ?? ''}`}
+      className={cn(FIELD, props.className ?? 'w-24')}
     />
   );
 }
@@ -179,7 +185,7 @@ export function Select<T extends string>(props: {
       value={props.value}
       disabled={props.disabled}
       onChange={(e) => props.onChange(e.target.value as T)}
-      className={INPUT}
+      className={FIELD}
     >
       {props.options.map((o) => {
         const value = typeof o === 'string' ? o : o.value;

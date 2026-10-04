@@ -370,4 +370,36 @@ Answered by the owner on 2026-10-05, when the item was started.
       the review's values; small coloured figures are affected.
     - The series palette has four colours where Options Lab had six, so a fifth strategy on one
       chart repeats the first colour.
+- 2026-10-05 — **Phase 3 done** (branch `feat/bl-013-phase-3`, stacked on Phase 2).
+  `lib/format.ts` now owns display formatting (`formatNumber`, `formatInt`, `formatInr`,
+  `formatPct`, `formatPp`, `formatMultiple`, `formatIstDate`, `formatIstTime`,
+  `formatIstDateTimeShort`, `formatDay`, `formatRelative`, `formatDuration`, `EMPTY`) and every
+  view calls it; new `ui/` primitives `SegmentedControl`, `Tabs`, `Input` / `Select` /
+  `NumberField`, `Toolbar`, `Toast`, `RefreshButton`, `CopyButton`; `Button` (`loading`,
+  `size="icon"`, `asChild`), `StatCard` (`hint`, `delta`, `loading`), `Badge` (`status`),
+  `Table` (`stickyFirstCol`, `maxHeight`, clickable `TRow`), and ARIA on `StatusDot`,
+  `Skeleton`, `StateMessage`, `InfoTooltip`. Both done-when greps are empty: no
+  `Intl.*` / `toFixed` / `toLocale*` outside `lib/`, no `role="tablist"` outside `ui/Tabs`.
+  Checked: typecheck, 201 dashboard unit tests (new: formatters, NumberField drafts,
+  SegmentedControl keyboard), Biome, and a browser pass of Momentum (all five sections, both
+  datasets), Options Lab builder, Backfill, Replay and Live in dark at 1440 px.
+  - Visible changes that come with one formatter: negative rupees read `-₹1,234` (were
+    `₹-1,234`); numbers of 1,000+ that used `toFixed` gain en-IN grouping (trade-log prices,
+    Pricing); a signed zero reads `0.0%` (was `+0.0%`); dates read `05 Oct 2026`; the Momentum
+    "Updated" time is IST 24-hour (was browser-local); Edge vs benchmark is `+1.2 pp` on the
+    KPI tile and in Saved runs (was `1.2 pp` / `1.2%`); Scores percentages show fixed decimals.
+  - Visible changes that come with the primitives: dataset switches and Stocks / Sectors are
+    segmented radiogroups; section and run tabs are Radix tabs (active = solid primary pill);
+    number fields can be cleared and settle on blur instead of snapping to 0 or NaN; Open,
+    Connected and Completed badges no longer share the profit green (info, primary, neutral);
+    Replay commands have copy buttons; the builder's day row is clickable as a whole.
+  - Left for later, deliberately: raw ISO dates printed as-is (circuit lock dates, signal week,
+    saved-run period) — an existing test pins them; "Beat X by 1.2% a year" in Insights and the
+    yearly table's Difference column stay `%` because `formatPp` is always signed; the YAML
+    textarea and the "Running…" buttons were not moved to `inputClass` / `Button loading`;
+    `Toolbar`, `Toast`, `StatCard` `hint`/`delta` and `Table` `stickyFirstCol`/`maxHeight`
+    exist but have no caller yet (Phases 6–8 use them); nullable number fields (blank = off)
+    keep their local input.
+  - `e2e/momentum-rebalance.spec.ts` selectors updated for the radiogroup; the Playwright suite
+    itself was not run (it is stale: BL-008).
 

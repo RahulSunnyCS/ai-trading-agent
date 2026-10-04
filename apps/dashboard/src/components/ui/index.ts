@@ -3,7 +3,7 @@ export { Badge, STATUS_TONE } from './Badge';
 export type { Status, Tone } from './Badge';
 export { Button, buttonClass } from './Button';
 export { CopyButton } from './CopyButton';
-export { Input, NumberField, Select, inputClass } from './Input';
+export { Input, NumberField, Select, fieldClass, inputClass } from './Input';
 export { RefreshButton } from './RefreshButton';
 export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedOption } from './SegmentedControl';

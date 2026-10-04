@@ -1,13 +1,10 @@
 import { Sparkles } from 'lucide-react';
 
+import { formatPct } from '../../lib/format';
 import type { MomentumResult } from '../../types/momentum';
 
 function num(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function pct(value: number | null, digits = 1): string {
-  return value === null ? '—' : `${(value * 100).toFixed(digits)}%`;
 }
 
 function fmtDate(value: unknown): string {
@@ -48,8 +45,8 @@ export function MomentumInsights({ result }: { result: MomentumResult }) {
   if (excessCagr !== null) {
     sentences.push(
       excessCagr >= 0
-        ? `Beat ${benchmarkName} by ${pct(excessCagr)} a year`
-        : `Trailed ${benchmarkName} by ${pct(Math.abs(excessCagr))} a year`,
+        ? `Beat ${benchmarkName} by ${formatPct(excessCagr)} a year`
+        : `Trailed ${benchmarkName} by ${formatPct(Math.abs(excessCagr))} a year`,
     );
   }
   if (yearsBeating !== null && years !== null) {
@@ -57,14 +54,14 @@ export function MomentumInsights({ result }: { result: MomentumResult }) {
   }
   if (bestYear && worstYear && bestYear.year !== worstYear.year) {
     sentences.push(
-      `best relative year ${bestYear.year} (${bestYear.vs >= 0 ? '+' : ''}${pct(bestYear.vs, 0)} vs benchmark), worst ${worstYear.year} (${worstYear.vs >= 0 ? '+' : ''}${pct(worstYear.vs, 0)})`,
+      `best relative year ${bestYear.year} (${formatPct(bestYear.vs, 0, { sign: true })} vs benchmark), worst ${worstYear.year} (${formatPct(worstYear.vs, 0, { sign: true })})`,
     );
   }
   if (maxDrawdown !== null) {
-    sentences.push(`deepest fall ${pct(maxDrawdown)}, bottoming ${fmtDate(drawdownTrough)}`);
+    sentences.push(`deepest fall ${formatPct(maxDrawdown)}, bottoming ${fmtDate(drawdownTrough)}`);
   }
   if (winRate !== null) {
-    sentences.push(`${pct(winRate, 0)} of closed trades were profitable`);
+    sentences.push(`${formatPct(winRate, 0)} of closed trades were profitable`);
   }
 
   if (sentences.length === 0) return null;

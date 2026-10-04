@@ -11,14 +11,16 @@
  * arrive, so unapproved suggestions auto-expire daily).
  */
 
-import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { usePendingSuggestions } from '../hooks/usePendingSuggestions';
 import { apiPost } from '../lib/api';
+import { EMPTY, formatDay, formatInt, formatPct } from '../lib/format';
 import type { PendingSuggestion, Personality } from '../types/trading';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { RefreshButton } from './ui/RefreshButton';
 import { StateMessage } from './ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from './ui/Table';
 
@@ -45,12 +47,12 @@ function toIstDateString(isoOrDate: string): string {
 }
 
 function formatProposedAdjustments(adj: Record<string, unknown> | null): string {
-  if (!adj) return '—';
+  if (!adj) return EMPTY;
   const parts: string[] = [];
   for (const [k, v] of Object.entries(adj)) {
     if (typeof v === 'number') {
       // min_probability is a fraction — show as percent for readability.
-      parts.push(k === 'min_probability' ? `${k}=${(v * 100).toFixed(0)}%` : `${k}=${v}`);
+      parts.push(k === 'min_probability' ? `${k}=${formatPct(v, 0)}` : `${k}=${v}`);
     } else {
       parts.push(`${k}=${String(v)}`);
     }
@@ -100,10 +102,7 @@ export function PendingSuggestionsCard({ personalities, onApplied }: PendingSugg
             Parameter changes the evolution engine has proposed — awaiting your approval
           </p>
         </div>
-        <Button size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <RefreshButton onClick={refresh} loading={loading} />
       </div>
 
       <div className="px-2 py-1">
@@ -149,13 +148,13 @@ export function PendingSuggestionsCard({ personalities, onApplied }: PendingSugg
                     <Td className="font-medium text-foreground">
                       {nameById.get(s.personality_id) ?? s.personality_id.slice(0, 8)}
                     </Td>
-                    <Td className="tabular-nums text-muted">{tradeDate}</Td>
-                    <Td className="text-muted">{s.market_regime ?? '—'}</Td>
+                    <Td className="tabular-nums text-muted">{formatDay(tradeDate)}</Td>
+                    <Td className="text-muted">{s.market_regime ?? EMPTY}</Td>
                     <Td numeric align="right" className="text-foreground">
-                      {total.toLocaleString('en-IN')}
+                      {formatInt(total)}
                     </Td>
                     <Td numeric align="right" className="text-foreground">
-                      {winRate !== null ? `${winRate.toFixed(0)}%` : '—'}
+                      {formatPct(winRate, 0, { unit: 'percent' })}
                     </Td>
                     <Td className="tabular-nums text-foreground">
                       {formatProposedAdjustments(s.proposed_adjustments)}

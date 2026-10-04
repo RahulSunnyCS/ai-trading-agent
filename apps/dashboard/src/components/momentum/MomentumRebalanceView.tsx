@@ -4,13 +4,26 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiGet, apiPost } from '../../lib/api';
+import {
+  formatDay,
+  formatInr,
+  formatIstDateTimeShort,
+  formatPct,
+  formatPp,
+  istToday,
+} from '../../lib/format';
 import { describeConfig } from '../../lib/momentumConfig';
 import type { MomentumRebalanceResult, MomentumSavedRun } from '../../types/momentum';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { StateMessage } from '../ui/StateMessage';
 
 type Dataset = 'stock' | 'broad';
+const DATASET_OPTIONS: ReadonlyArray<SegmentedOption<Dataset>> = [
+  { value: 'stock', label: 'Nifty 50 Stocks' },
+  { value: 'broad', label: 'Broad Momentum' },
+];
 type Holding = { id: number; asset: string; percent: string };
 type Meta = {
   defaults: Record<string, unknown>;
@@ -24,23 +37,8 @@ type Meta = {
 };
 type Scores = { stocks: Array<{ symbol: string; company_name: string }> };
 
-function indiaToday(): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
-}
-
 function displayDate(value: string | null): string {
-  if (!value) return 'none yet';
-  return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-IN', {
-    dateStyle: 'medium',
-    timeZone: 'UTC',
-  });
+  return value ? formatDay(value) : 'none yet';
 }
 
 function cadenceLabel(schedule: MomentumRebalanceResult['rebalance_schedule']): string {
@@ -86,7 +84,7 @@ export function MomentumRebalanceView({
   const [holdings, setHoldings] = useState<Holding[]>([{ id: 0, asset: '', percent: '' }]);
   const [nextId, setNextId] = useState(1);
   const [portfolioValue, setPortfolioValue] = useState('100000');
-  const [strategyStartDate, setStrategyStartDate] = useState(indiaToday);
+  const [strategyStartDate, setStrategyStartDate] = useState(() => istToday());
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<MomentumRebalanceResult | null>(null);
@@ -194,25 +192,13 @@ export function MomentumRebalanceView({
           title="Rebalance preview"
           description="Compare your actual holdings with the model target at any time. Market hours use live Fyers prices; otherwise the preview uses the latest database close. It never places orders."
         />
-        <fieldset className="flex flex-wrap gap-2">
-          <legend className="sr-only">Rebalance dataset</legend>
-          <Button
-            size="sm"
-            variant={dataset === 'stock' ? 'primary' : 'ghost'}
-            aria-pressed={dataset === 'stock'}
-            onClick={() => chooseDataset('stock')}
-          >
-            Nifty 50 Stocks
-          </Button>
-          <Button
-            size="sm"
-            variant={dataset === 'broad' ? 'primary' : 'ghost'}
-            aria-pressed={dataset === 'broad'}
-            onClick={() => chooseDataset('broad')}
-          >
-            Broad Momentum
-          </Button>
-        </fieldset>
+        <SegmentedControl
+          ariaLabel="Rebalance dataset"
+          size="sm"
+          value={dataset}
+          options={DATASET_OPTIONS}
+          onChange={chooseDataset}
+        />
         <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <label className="text-xs font-medium text-muted">
             Strategy settings
@@ -325,9 +311,11 @@ export function MomentumRebalanceView({
         </Button>
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <span className={cash < -0.0001 ? 'text-negative' : 'text-muted'}>
-            Allocated {allocated.toFixed(2)}%
+            Allocated {formatPct(allocated, 2, { unit: 'percent' })}
           </span>
-          <span className="text-muted">Cash remainder {cash.toFixed(2)}%</span>
+          <span className="text-muted">
+            Cash remainder {formatPct(cash, 2, { unit: 'percent' })}
+          </span>
         </div>
         {allocated <= 0.0001 ? (
           <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
@@ -388,7 +376,7 @@ export function MomentumRebalanceView({
             title="Indicative changes"
             description={`${plan.price_source} · ${
               plan.price_mode === 'live'
-                ? `${new Date(plan.as_of).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`
+                ? `${formatIstDateTimeShort(plan.as_of, { seconds: true })} IST`
                 : `as of ${plan.as_of}`
             } · Signal week ${plan.signal_week}`}
           />
@@ -445,17 +433,20 @@ export function MomentumRebalanceView({
                           {row.symbol ?? 'Cash allocation'}
                         </span>
                       </td>
-                      <td className="py-2 pr-3 text-right">{row.current_pct.toFixed(2)}%</td>
-                      <td className="py-2 pr-3 text-right">{row.target_pct.toFixed(2)}%</td>
                       <td className="py-2 pr-3 text-right">
-                        {row.delta_pct > 0 ? '+' : ''}
-                        {row.delta_pct.toFixed(2)} pp
+                        {formatPct(row.current_pct, 2, { unit: 'percent' })}
                       </td>
                       <td className="py-2 pr-3 text-right">
-                        {row.ltp === null ? '—' : `₹${row.ltp.toLocaleString('en-IN')}`}
+                        {formatPct(row.target_pct, 2, { unit: 'percent' })}
                       </td>
                       <td className="py-2 pr-3 text-right">
-                        ₹{row.indicative_value.toLocaleString('en-IN')}
+                        {formatPp(row.delta_pct, 2, { unit: 'percent' })}
+                      </td>
+                      <td className="py-2 pr-3 text-right">
+                        {formatInr(row.ltp, { dp: 2, trim: true })}
+                      </td>
+                      <td className="py-2 pr-3 text-right">
+                        {formatInr(row.indicative_value, { dp: 2, trim: true })}
                       </td>
                       <td className="py-2 text-right">{row.indicative_quantity ?? '—'}</td>
                     </tr>

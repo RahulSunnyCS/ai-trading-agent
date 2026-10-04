@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 
 import { getChartTheme, plotlyChrome } from '../../lib/chartTheme';
+import { formatPct } from '../../lib/format';
 import { useThemeStore } from '../../store/theme';
 import { ResultSection } from './ResultSection';
 
@@ -57,7 +58,7 @@ export function MomentumTimelineChart({ rows }: { rows: Array<Record<string, unk
         customdata: rows.map((row) => [
           String(row.start).slice(0, 10),
           String(row.end).slice(0, 10),
-          typeof row.return === 'number' ? `${(row.return * 100).toFixed(1)}%` : '—',
+          formatPct(typeof row.return === 'number' ? row.return : null),
           String(row.weeks ?? '–'),
           row.open ? 'open' : 'closed',
         ]),

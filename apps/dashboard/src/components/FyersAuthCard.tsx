@@ -4,7 +4,7 @@
  *
  * States rendered:
  *  - Not configured  → neutral badge, env-var hint, no login button
- *  - Connected       → positive badge, token expiry time, secondary Re-login button
+ *  - Connected       → `connected` status badge, token expiry time, secondary Re-login button
  *  - Disconnected    → negative badge, primary Login button
  *
  * After the user completes login in the new tab and switches back, the
@@ -15,29 +15,12 @@
 import { AlertCircle, CheckCircle2, ExternalLink, LogIn } from 'lucide-react';
 
 import { useFyersAuthStatus } from '../hooks/useFyersAuthStatus';
+import { formatIstDateTimeShort } from '../lib/format';
 import { startFyersLogin } from '../lib/fyers-login';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
 import { StatusDot } from './ui/StatusDot';
-
-// ---------------------------------------------------------------------------
-// Date formatter — IST, matching BackfillView / RegimeView pattern
-// ---------------------------------------------------------------------------
-
-const expiryFmt = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-});
-
-function formatExpiry(iso: string): string {
-  return expiryFmt.format(new Date(iso));
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -111,7 +94,7 @@ export function FyersAuthCard() {
 
         {!loading && status !== null && isConfigured && isConnected && (
           <>
-            <Badge tone="positive" dot>
+            <Badge status="connected" dot>
               <CheckCircle2 className="h-3 w-3" />
               Connected
             </Badge>
@@ -124,7 +107,7 @@ export function FyersAuthCard() {
               <span className="text-sm text-muted">
                 Expires{' '}
                 <span className="tabular-nums text-foreground">
-                  {formatExpiry(status.expiresAt)} IST
+                  {formatIstDateTimeShort(status.expiresAt)} IST
                 </span>
               </span>
             )}

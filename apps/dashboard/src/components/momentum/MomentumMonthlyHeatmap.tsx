@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 
 import { cn } from '../../lib/cn';
+import { formatNumber } from '../../lib/format';
 import type { MomentumSeries } from '../../types/momentum';
 
 const MONTH_LABELS = [
@@ -86,7 +87,7 @@ export function MomentumMonthlyHeatmap({ series }: { series: MomentumSeries }) {
                     key={key}
                     className={cn('rounded px-1.5 py-2 text-center tabular-nums', cellTone(value))}
                   >
-                    {value === undefined ? '' : `${(value * 100).toFixed(1)}`}
+                    {value === undefined ? '' : formatNumber(value * 100, 1)}
                   </td>
                 );
               })}

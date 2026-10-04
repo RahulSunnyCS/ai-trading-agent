@@ -4,10 +4,12 @@ import { AlertTriangle, CheckCircle2, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { usePolledResource } from '../../hooks/usePolledResource';
+import { EMPTY, formatIstDate, formatNumber, formatPct, formatPp } from '../../lib/format';
 import type { MomentumSavedRun, MomentumWeeklyStatus } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { Input, Select } from '../ui/Input';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { MomentumListSkeleton } from './MomentumSkeletons';
 
@@ -124,8 +126,9 @@ function settingValue(value: unknown): string {
 
 function metric(run: MomentumSavedRun | undefined, key: string): string {
   const value = run?.kpis[key];
-  if (value === null || value === undefined) return '—';
-  return PERCENT_METRICS.has(key) ? `${(value * 100).toFixed(1)}%` : value.toFixed(2);
+  if (value === null || value === undefined) return EMPTY;
+  if (key === 'excess_cagr') return formatPp(value);
+  return PERCENT_METRICS.has(key) ? formatPct(value) : formatNumber(value, 2);
 }
 
 export function MomentumSavedRunsView({
@@ -195,31 +198,35 @@ export function MomentumSavedRunsView({
           <p className="text-sm text-muted">Run a backtest to start a comparison.</p>
         ) : (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <input
+            <Input
               type="search"
               aria-label="Search saved runs"
               placeholder="Search by name…"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="min-w-56 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+              className="w-auto min-w-56"
             />
-            <label className="flex items-center gap-1.5 text-xs text-muted">
+            <label
+              htmlFor="momentum-saved-runs-sort"
+              className="flex items-center gap-1.5 text-xs text-muted"
+            >
               Sort by
-              <select
+              <Select
+                id="momentum-saved-runs-sort"
                 aria-label="Sort saved runs"
                 value={sortKey}
                 onChange={(event) => {
                   setSortKey(event.target.value as SortKey);
                   setReversed(false);
                 }}
-                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+                className="w-auto"
               >
                 {SORTS.map(([key, label]) => (
                   <option key={key} value={key}>
                     {label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <Button
               size="sm"
@@ -281,7 +288,7 @@ export function MomentumSavedRunsView({
                     Telegram active
                   </label>
                 ) : null}
-                <input
+                <Input
                   aria-label={`Name for run ${run.n}`}
                   value={draftNames[run.id] ?? run.name}
                   maxLength={64}
@@ -300,7 +307,7 @@ export function MomentumSavedRunsView({
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') event.currentTarget.blur();
                   }}
-                  className="min-w-48 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+                  className="w-auto min-w-48"
                 />
                 <span className="text-xs text-muted">
                   CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Turnover{' '}
@@ -308,12 +315,7 @@ export function MomentumSavedRunsView({
                   {typeof run.config.start === 'string'
                     ? ` · ${run.config.start} → ${String(run.config.end ?? 'latest')}`
                     : ''}
-                  {' · '}Saved{' '}
-                  {new Date(run.created_at).toLocaleDateString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
+                  {' · '}Saved {formatIstDate(run.created_at)}
                 </span>
                 <div className="ml-auto flex gap-2">
                   <Button size="sm" onClick={() => onLoad(run)}>
@@ -375,23 +377,23 @@ export function MomentumSavedRunsView({
             description="Choose any two saved runs from this dataset."
             actions={
               <div className="flex flex-wrap gap-2">
-                <select
+                <Select
                   aria-label="First run to compare"
                   value={current.id}
                   onChange={(event) => setBaseId(event.target.value)}
-                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+                  className="w-auto"
                 >
                   {runs.map((run) => (
                     <option key={run.id} value={run.id}>
                       {run.name}
                     </option>
                   ))}
-                </select>
-                <select
+                </Select>
+                <Select
                   aria-label="Second run to compare"
                   value={comparison.id}
                   onChange={(event) => setCompareId(event.target.value)}
-                  className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+                  className="w-auto"
                 >
                   {runs
                     .filter((run) => run.id !== current.id)
@@ -400,7 +402,7 @@ export function MomentumSavedRunsView({
                         {run.name}
                       </option>
                     ))}
-                </select>
+                </Select>
               </div>
             }
           />

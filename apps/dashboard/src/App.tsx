@@ -22,6 +22,7 @@ import { Sidebar } from './components/shell/Sidebar';
 import { Topbar } from './components/shell/Topbar';
 import { type Tab, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
+import { Toaster } from './components/ui/Toast';
 import {
   DEFAULT_NAVIGATION_PREFERENCES,
   type NavigationPreferences,
@@ -170,6 +171,7 @@ export function App() {
           </div>
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }
