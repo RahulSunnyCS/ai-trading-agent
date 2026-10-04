@@ -658,14 +658,15 @@ describe('fetchHistoricalCandles — no credentials loud failure', () => {
 });
 
 describe('fetchHistoricalCandles — dashboard credential precedence', () => {
-  it('uses the stored token even when env credentials are set', async () => {
+  /** Authorization header sent when env credentials (setFyersEnv) and a stored token coexist. */
+  async function authorizationWithStoredToken(storedAppId: string): Promise<unknown> {
     const cleanupEnv = setFyersEnv();
     try {
       const db = {
         query: async () => ({
           rows: [
             {
-              app_id: 'dashboard-app',
+              app_id: storedAppId,
               access_token: 'dashboard-token',
               refresh_token: null,
               expires_at: new Date(Date.now() + 3_600_000),
@@ -685,12 +686,23 @@ describe('fetchHistoricalCandles — dashboard credential precedence', () => {
       });
 
       const requestInit = rawMock.mock.calls[0]?.[1] as RequestInit;
-      expect(requestInit.headers).toMatchObject({
-        Authorization: 'dashboard-app:dashboard-token',
-      });
+      return (requestInit.headers as Record<string, string>).Authorization;
     } finally {
       cleanupEnv();
     }
+  }
+
+  it('uses the stored token over env credentials for the same app', async () => {
+    expect(await authorizationWithStoredToken('TESTAPP1234-100')).toBe(
+      'TESTAPP1234-100:dashboard-token',
+    );
+  });
+
+  it('falls back to env credentials when the stored token was minted for another app', async () => {
+    // A token issued to a different Fyers app cannot authenticate against FYERS_APP_ID's API.
+    expect(await authorizationWithStoredToken('dashboard-app')).toBe(
+      'TESTAPP1234-100:test-access-token-xyz',
+    );
   });
 });
 
