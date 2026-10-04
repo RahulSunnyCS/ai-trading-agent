@@ -15,14 +15,20 @@ const DOT_TONES: Record<Tone, string> = {
 export function StatusDot({
   tone = 'neutral',
   pulse = false,
+  label,
   className,
 }: {
   tone?: Tone;
   pulse?: boolean;
+  /** What the dot means ("Feed live"). Without it the dot is decorative and hidden from screen readers. */
+  label?: string;
   className?: string;
 }) {
   return (
-    <span className={cn('relative inline-flex h-2 w-2', className)}>
+    <span
+      className={cn('relative inline-flex h-2 w-2', className)}
+      {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
+    >
       {pulse ? (
         <span
           className={cn(

@@ -7,14 +7,21 @@ import { Info } from 'lucide-react';
  * does (e.g. "Buffer" vs "Fixed slots") — the whole point is the reader never
  * has to guess or go hunting in docs.
  */
-export function InfoTooltip({ text }: { text: string }) {
+export function InfoTooltip({
+  text,
+  label,
+}: {
+  text: string;
+  /** Names what the tooltip explains ("About Sharpe"), so screen readers can tell them apart. */
+  label?: string | undefined;
+}) {
   return (
     <Tooltip.Provider delayDuration={150}>
       <Tooltip.Root>
         <Tooltip.Trigger asChild>
           <button
             type="button"
-            aria-label="What does this mean?"
+            aria-label={label ?? 'What does this mean?'}
             className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-faint transition-colors hover:bg-surface-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Info className="h-3.5 w-3.5" />

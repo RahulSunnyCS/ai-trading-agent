@@ -151,3 +151,188 @@ export function istToday(now?: Date): string {
   const day = parts.day ?? '';
   return `${year}-${month}-${day}`;
 }
+
+// ---------------------------------------------------------------------------
+// Shared display formatting (BL-013 Phase 3)
+//
+// Every number, percentage, rupee amount and date a component shows goes through
+// one of the functions below, so the same quantity never renders two ways.
+// Components must not call Intl.*, toFixed or toLocaleString themselves.
+// ---------------------------------------------------------------------------
+
+/** What a missing value renders as, everywhere. */
+export const EMPTY = '—';
+
+type Num = number | null | undefined;
+
+function usable(value: Num): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+const _fixedCache = new Map<string, Intl.NumberFormat>();
+function fixed(minDp: number, maxDp: number): Intl.NumberFormat {
+  const key = `${minDp}:${maxDp}`;
+  let formatter = _fixedCache.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: minDp,
+      maximumFractionDigits: maxDp,
+    });
+    _fixedCache.set(key, formatter);
+  }
+  return formatter;
+}
+
+function signPrefix(value: number, sign: boolean): string {
+  return sign && value > 0 ? '+' : '';
+}
+
+/**
+ * A plain number with en-IN grouping and exactly `dp` decimals: 1234.5 → "1,234.50".
+ * `trim` drops trailing zeros (up to `dp` decimals); `sign` adds "+" to positives.
+ */
+export function formatNumber(
+  value: Num,
+  dp = 2,
+  options: { trim?: boolean; sign?: boolean } = {},
+): string {
+  if (!usable(value)) return EMPTY;
+  return `${signPrefix(value, options.sign ?? false)}${fixed(options.trim ? 0 : dp, dp).format(value)}`;
+}
+
+/** A whole number with en-IN grouping: 123456 → "1,23,456". */
+export function formatInt(value: Num): string {
+  return usable(value) ? fixed(0, 0).format(Math.round(value)) : EMPTY;
+}
+
+/**
+ * Rupees: "₹1,23,456", "-₹1,234.50". `dp` decimals (default 0); `trim` drops trailing
+ * zeros; `sign` adds "+" to positives; `compact` switches to lakh / crore above ₹1 lakh
+ * ("₹1.25 L", "₹3.40 Cr").
+ */
+export function formatInr(
+  value: Num,
+  options: { dp?: number; trim?: boolean; sign?: boolean; compact?: boolean } = {},
+): string {
+  if (!usable(value)) return EMPTY;
+  const prefix = value < 0 ? '-' : signPrefix(value, options.sign ?? false);
+  const abs = Math.abs(value);
+  if (options.compact && abs >= 1e7) return `${prefix}₹${fixed(2, 2).format(abs / 1e7)} Cr`;
+  if (options.compact && abs >= 1e5) return `${prefix}₹${fixed(2, 2).format(abs / 1e5)} L`;
+  const dp = options.dp ?? 0;
+  return `${prefix}₹${fixed(options.trim ? 0 : dp, dp).format(abs)}`;
+}
+
+interface PctOptions {
+  /** Add "+" to positive values. */
+  sign?: boolean;
+  /** 'fraction' (default): 0.123 → 12.3%. 'percent': the value is already in percent units. */
+  unit?: 'fraction' | 'percent';
+}
+
+/** A percentage: formatPct(0.1234) → "12.3%". Pass `{ unit: 'percent' }` for 12.34 → "12.3%". */
+export function formatPct(value: Num, dp = 1, options: PctOptions = {}): string {
+  if (!usable(value)) return EMPTY;
+  const pct = options.unit === 'percent' ? value : value * 100;
+  return `${signPrefix(pct, options.sign ?? false)}${fixed(dp, dp).format(pct)}%`;
+}
+
+/** A difference between two percentages, always signed: formatPp(0.012) → "+1.2 pp". */
+export function formatPp(value: Num, dp = 1, options: Pick<PctOptions, 'unit'> = {}): string {
+  if (!usable(value)) return EMPTY;
+  const pp = options.unit === 'percent' ? value : value * 100;
+  return `${signPrefix(pp, true)}${fixed(dp, dp).format(pp)} pp`;
+}
+
+/** A multiple: formatMultiple(1.234) → "1.2×". */
+export function formatMultiple(value: Num, dp = 1): string {
+  return usable(value) ? `${fixed(dp, dp).format(value)}×` : EMPTY;
+}
+
+const _istDate = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kolkata',
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+});
+const _istTime = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kolkata',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+const _istTimeSeconds = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kolkata',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+const _utcDate = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+});
+
+type Instant = string | number | Date | null | undefined;
+
+function toDate(value: Instant): Date | null {
+  if (value === null || value === undefined || value === '') return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** The IST calendar date of an instant: "05 Oct 2026". */
+export function formatIstDate(value: Instant): string {
+  const date = toDate(value);
+  return date ? _istDate.format(date) : EMPTY;
+}
+
+/** The IST wall-clock time of an instant: "14:35" (or "14:35:07" with seconds). */
+export function formatIstTime(value: Instant, options: { seconds?: boolean } = {}): string {
+  const date = toDate(value);
+  if (!date) return EMPTY;
+  return (options.seconds ? _istTimeSeconds : _istTime).format(date);
+}
+
+/** IST date and time together: "05 Oct 2026, 14:35". */
+export function formatIstDateTimeShort(
+  value: Instant,
+  options: { seconds?: boolean } = {},
+): string {
+  const date = toDate(value);
+  return date ? `${_istDate.format(date)}, ${formatIstTime(date, options)}` : EMPTY;
+}
+
+/**
+ * A calendar day that carries no time zone ("2026-10-05", a trading day or signal week):
+ * "05 Oct 2026". Unlike formatIstDate it never shifts the day.
+ */
+export function formatDay(day: string | null | undefined): string {
+  if (!day) return EMPTY;
+  const date = new Date(`${day.slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? EMPTY : _utcDate.format(date);
+}
+
+/** How long ago an instant was: "just now", "42s ago", "5 min ago", "3 h ago", "2 d ago". */
+export function formatRelative(value: Instant, now: Date | number = Date.now()): string {
+  const date = toDate(value);
+  if (!date) return EMPTY;
+  const seconds = Math.round((Number(now) - date.getTime()) / 1000);
+  if (seconds < 0) return formatIstDateTimeShort(date);
+  if (seconds < 5) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h ago`;
+  return `${Math.floor(seconds / 86_400)} d ago`;
+}
+
+/** A duration in milliseconds: "4.2s" under ten seconds, "37s", then "2m 05s". */
+export function formatDuration(ms: Num): string {
+  if (!usable(ms)) return EMPTY;
+  if (ms < 10_000) return `${fixed(1, 1).format(ms / 1000)}s`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
+}
