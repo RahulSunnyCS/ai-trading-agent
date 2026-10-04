@@ -295,6 +295,30 @@ def test_build_effective_stock_ranks_fresh_and_lingering_buckets():
         assert result.top_n < week_ranks[name] <= result.exit_rank
 
 
+def test_build_effective_stock_ranks_shared_stock_keeps_its_better_category_rank():
+    """S1 is tagged to both held categories. It must keep the fresh rank it gets as cat1's top
+    pick, not be overwritten with the lingering rank it would get through cat2."""
+    weeks = [pd.Timestamp("2023-01-06")]
+    group_members = {"cat1": {"S1", "S2"}, "cat2": {"S1", "T1"}}
+    row = pd.Series({"S1": 1.0, "S2": 2.0, "T1": 3.0})
+    result = broad.build_effective_stock_ranks(
+        {weeks[0]: ["cat1", "cat2"]},
+        pd.DataFrame([row], index=weeks),
+        group_members,
+        weeks,
+        columns=["S1", "S2", "T1"],
+        atomic_names=(),
+        category_top_n=1,
+        category_exit_rank=2,
+        picks_per_category=2,
+    )
+    week_ranks = result.ranks.loc[weeks[0]]
+    assert week_ranks["S1"] == 1  # cat1, fresh, slot 1 - not 3 (cat2, lingering, slot 1)
+    assert week_ranks["S2"] == 2
+    assert week_ranks["T1"] == 4  # cat2's second pick keeps its own reserved slot
+    assert result.groups.loc[weeks[0], "S1"] == "cat1"
+
+
 def test_build_effective_stock_ranks_empty_held_produces_all_nan():
     weeks = [pd.Timestamp("2023-01-06")]
     row = pd.Series({"S1": 1.0})

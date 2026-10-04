@@ -957,6 +957,11 @@ def build_effective_stock_ranks(
             for slot, name in enumerate(picks, start=1):
                 if name not in ranks.columns:
                     continue
+                # A stock tagged to two held categories keeps the rank (and group) from the
+                # better-placed one. `held` is best-first, so that is whichever wrote it first;
+                # overwriting it here used to hand a top pick a lingering, unbuyable rank.
+                if pd.notna(ranks.at[w, name]):
+                    continue
                 ranks.at[w, name] = base + (bucket_pos - 1) * picks_per_category + slot
                 groups.at[w, name] = cid
 
