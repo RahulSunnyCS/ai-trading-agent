@@ -1,0 +1,15 @@
+# Cloudflare Tunnel for the laptop-served research APIs (docs/remote-dashboard.md).
+# Copy to ~/.cloudflared/config.yml and fill in the tunnel id + your domain.
+# The Python services stay bound to 127.0.0.1 — cloudflared dials out, no ports opened.
+# Both hostnames MUST sit behind a Cloudflare Access application; without it
+# anyone with the URL could drive the APIs.
+
+tunnel: <TUNNEL-UUID>
+credentials-file: /Users/<you>/.cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+  - hostname: momentum-api.<your-domain>
+    service: http://127.0.0.1:8765
+  - hostname: options-api.<your-domain>
+    service: http://127.0.0.1:8000
+  - service: http_status:404

@@ -8,6 +8,9 @@ import type { NextConfig } from 'next';
  */
 const apiOrigin = process.env.DASHBOARD_API_URL ?? 'http://localhost:3000';
 const momentumDirectOrigin = process.env.MOMENTUM_DIRECT_API_URL ?? 'http://127.0.0.1:8765';
+// Both direct origins may be a Cloudflare Tunnel hostname when the dashboard runs off the
+// backend laptop (docs/remote-dashboard.md); middleware.ts adds the Access service token.
+const optionsDirectOrigin = process.env.OBT_DIRECT_API_URL ?? 'http://127.0.0.1:8000';
 
 const nextConfig: NextConfig = {
   // A cold whole-market Broad Momentum run (or Custom Index) takes about a minute; Next's default
@@ -22,7 +25,7 @@ const nextConfig: NextConfig = {
         ? [
             {
               source: '/api/backtest/legwise/:path*',
-              destination: 'http://127.0.0.1:8000/legwise/:path*',
+              destination: `${optionsDirectOrigin}/legwise/:path*`,
             },
           ]
         : []),
