@@ -37,8 +37,61 @@ function cssHsl(name: string, alpha?: number): string {
   return alpha === undefined ? `rgb(${rgb.join(', ')})` : `rgba(${rgb.join(', ')}, ${alpha})`;
 }
 
+function bodyFontFamily(): string {
+  if (typeof document === 'undefined') return 'sans-serif';
+  return getComputedStyle(document.body).fontFamily || 'sans-serif';
+}
+
+/** How many `--series-N` tokens index.css defines; a longer list of series cycles through them. */
+export const SERIES_COUNT = 4;
+
+/**
+ * The chart series palette (`--series-1..4`) as rgb() strings for Lightweight Charts / Plotly.
+ * Series colours carry identity only — never use positive/negative to tell two lines apart.
+ */
+export function getSeriesPalette(theme: Theme): string[] {
+  void theme;
+  return Array.from({ length: SERIES_COUNT }, (_, i) => cssHsl(`--series-${i + 1}`));
+}
+
+/** The i-th colour of a palette, cycling when there are more series than colours. */
+export function pickSeries(palette: string[], index: number): string {
+  return palette[index % palette.length] ?? 'rgb(128, 128, 128)';
+}
+
+/** The i-th series colour as a CSS value, for DOM swatches that should follow the theme live. */
+export function seriesCssColor(index: number): string {
+  return `hsl(var(--series-${(index % SERIES_COUNT) + 1}))`;
+}
+
+/** 'rgb(r, g, b)' → 'rgba(r, g, b, a)'. */
+export function withAlpha(rgb: string, alpha: number): string {
+  const m = /^rgb\(([^)]+)\)$/.exec(rgb);
+  return m ? `rgba(${m[1]}, ${alpha})` : rgb;
+}
+
+/** Plotly `layout.font` + `layout.hoverlabel`, so every Plotly chart shares the theme's type. */
+export function plotlyChrome(
+  t: ChartTheme,
+  size = 12,
+): { font: Record<string, unknown>; hoverlabel: Record<string, unknown> } {
+  return {
+    font: { family: t.fontFamily, color: t.text, size },
+    hoverlabel: {
+      bgcolor: t.surface,
+      bordercolor: t.border,
+      font: { family: t.fontFamily, color: t.foreground, size },
+    },
+  };
+}
+
 export interface ChartTheme {
   background: string;
+  /** Card surface, for chart tooltips / hover labels. */
+  surface: string;
+  foreground: string;
+  /** The page's body face (IBM Plex Sans via next/font), for chart text. */
+  fontFamily: string;
   text: string;
   grid: string;
   border: string;
@@ -55,6 +108,9 @@ export function getChartTheme(theme: Theme): ChartTheme {
   void theme;
   return {
     background: 'transparent',
+    surface: cssHsl('--surface'),
+    foreground: cssHsl('--foreground'),
+    fontFamily: bodyFontFamily(),
     text: cssHsl('--muted'),
     grid: cssHsl('--border', 0.5),
     border: cssHsl('--border'),

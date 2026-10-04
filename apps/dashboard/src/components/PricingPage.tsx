@@ -203,9 +203,7 @@ export function PricingPage() {
         <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       )}
       <div>
-        <h2 className="font-serif text-2xl font-semibold tracking-tight text-foreground">
-          Pricing
-        </h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-foreground">Pricing</h2>
         <p className="mt-1 text-sm text-muted">Choose the plan that works for you.</p>
       </div>
 

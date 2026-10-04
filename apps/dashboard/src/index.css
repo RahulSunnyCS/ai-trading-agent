@@ -3,66 +3,81 @@
 @tailwind utilities;
 
 /*
- * Design tokens — a warm, "Claude-style" minimalist system.
- * Colors are semantic (intent, not literal) and expressed as HSL channels so
- * Tailwind utilities can apply opacity, e.g. bg-warning/15. The same token
- * names resolve to different values in light vs .dark, so components never
- * hardcode a theme.
+ * Design tokens — Direction B "Quant Studio" (BL-013): neutral graphite surfaces, one
+ * restrained indigo accent, semantic colour reserved for meaning. Roles are documented in
+ * docs/dashboard-design-tokens.md.
+ *
+ * Colors are semantic (intent, not literal) and expressed as HSL channels so Tailwind
+ * utilities can apply opacity, e.g. bg-warning/15. The same token names resolve to different
+ * values in light vs .dark, so components never hardcode a theme.
  */
 @layer base {
   :root {
-    /* Surfaces — warm ivory, not stark white */
-    --background: 40 30% 97%;
-    --surface: 40 40% 99.5%;
-    --surface-2: 40 22% 93%;
-    --border: 36 17% 86%;
-    --border-strong: 34 15% 78%;
+    /* Surfaces — cool neutral greys */
+    --background: 220 20% 97.1%; /* #f6f7f9 */
+    --surface: 0 0% 100%; /* #ffffff */
+    --surface-2: 216 17% 94.3%; /* #eef0f3 */
+    --border: 213 16% 89.2%; /* #dfe3e8 */
+    --border-strong: 216 15% 80.6%; /* #c6ccd5 */
 
-    /* Text — warm ink */
-    --foreground: 32 16% 17%;
-    --muted: 33 9% 42%;
-    --faint: 34 8% 58%;
+    /* Text */
+    --foreground: 223 14% 10%; /* #16181d */
+    --muted: 219 10% 41.2%; /* #5f6673 */
+    /* #687080 — darker than the review's #8e95a1 so it passes AA (4.5:1) on background and surface */
+    --faint: 220 10% 45.5%;
 
-    /* Accent — Claude terracotta/clay, used sparingly */
-    --primary: 15 55% 52%;
-    --primary-foreground: 40 40% 98%;
-    --ring: 15 55% 52%;
+    /* Accent — indigo, for primary actions and focus only */
+    --primary: 228 69% 54.5%; /* #3b5bdb */
+    --primary-foreground: 0 0% 100%;
+    --ring: 228 69% 54.5%;
 
     /* Semantic status */
-    --positive: 146 48% 33%;
-    --negative: 8 62% 47%;
-    --warning: 33 74% 42%;
-    --info: 208 52% 42%;
-    --accent: 264 38% 50%;
+    --positive: 145 65% 32.7%; /* #1d8a4a */
+    --negative: 356 54% 51.8%; /* #c7414a */
+    --warning: 35 73% 42%; /* #b9771d */
+    --info: 221 83% 53.3%; /* #2563eb */
+    --accent: 262 52% 55%;
 
-    --radius: 0.75rem;
+    /* Chart series — identity only, never profit/loss. Read through getSeriesPalette(). */
+    --series-1: 213 68% 50.2%; /* #2a78d6 */
+    --series-2: 17 82% 56.3%; /* #eb6834 */
+    --series-3: 159 73% 39.6%; /* #1baf7a */
+    --series-4: 41 100% 46.5%; /* #eda100 */
+
+    --radius: 0.5rem;
     color-scheme: light;
   }
 
   .dark {
-    /* Surfaces — warm-tinted charcoal, not pure gray */
-    --background: 30 8% 10%;
-    --surface: 30 7% 13.5%;
-    --surface-2: 30 6% 18%;
-    --border: 30 6% 23%;
-    --border-strong: 30 6% 32%;
+    /* Surfaces — neutral graphite */
+    --background: 216 12% 8%; /* #121417 */
+    --surface: 218 14% 11.4%; /* #191c21 */
+    --surface-2: 218 15% 14.7%; /* #20242b */
+    --border: 219 14% 19.2%; /* #2a2f38 */
+    --border-strong: 218 14% 26.5%; /* #3a414d */
 
-    /* Text — warm off-white */
-    --foreground: 40 18% 92%;
-    --muted: 38 8% 64%;
-    --faint: 34 6% 47%;
+    /* Text */
+    --foreground: 220 15% 92.2%; /* #e8eaee */
+    --muted: 217 10% 63.9%; /* #9aa1ac */
+    /* #868e9a — lighter than the review's #6c7480 so it passes AA (4.5:1) on every surface */
+    --faint: 216 9% 56.5%;
 
-    /* Accent — slightly brighter clay for low light */
-    --primary: 16 62% 59%;
-    --primary-foreground: 30 12% 10%;
-    --ring: 16 62% 59%;
+    /* Accent */
+    --primary: 226 100% 74.9%; /* #7f9cff */
+    --primary-foreground: 231 42% 8.8%; /* #0d1020 */
+    --ring: 226 100% 74.9%;
 
     /* Semantic status — lifted for dark surfaces */
-    --positive: 146 44% 55%;
-    --negative: 8 66% 64%;
-    --warning: 38 78% 60%;
-    --info: 205 58% 63%;
-    --accent: 265 48% 71%;
+    --positive: 140 48% 52.5%; /* #4cc072 */
+    --negative: 356 81% 69%; /* #f07079 */
+    --warning: 35 71% 58.4%; /* #e0a24a */
+    --info: 210 100% 71.2%; /* #6cb6ff */
+    --accent: 262 70% 76%;
+
+    --series-1: 213 77% 56.1%; /* #3987e5 */
+    --series-2: 17 70% 50%; /* #d95926 */
+    --series-3: 159 73% 35.9%; /* #199e70 */
+    --series-4: 40 100% 39.4%; /* #c98500 */
 
     color-scheme: dark;
   }
@@ -79,7 +94,6 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
   /* Tabular, lining numerals everywhere money/metrics appear */
@@ -87,6 +101,11 @@
   table,
   .metric {
     font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  /* Figures are set in the mono face so digits align down a column and across cards */
+  .metric {
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
 
   ::selection {

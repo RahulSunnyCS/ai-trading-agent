@@ -45,7 +45,7 @@ function CumulativeChart({ series }: { series: PnlSeriesPoint[] }) {
     const chart = createChart(container, {
       width: container.clientWidth,
       height: 220,
-      layout: { background: { color: 'transparent' }, textColor: '#888' },
+      layout: { background: { color: 'transparent' } },
       grid: { vertLines: { color: 'transparent' }, horzLines: { color: 'transparent' } },
       timeScale: { rightOffset: 2 },
     });
@@ -77,7 +77,7 @@ function CumulativeChart({ series }: { series: PnlSeriesPoint[] }) {
     if (chart === null || lineSeries === null) return;
     const t = getChartTheme(theme);
     chart.applyOptions({
-      layout: { background: { color: 'transparent' }, textColor: t.text },
+      layout: { background: { color: 'transparent' }, textColor: t.text, fontFamily: t.fontFamily },
       grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
       rightPriceScale: { borderColor: t.border },
       timeScale: { borderColor: t.border },

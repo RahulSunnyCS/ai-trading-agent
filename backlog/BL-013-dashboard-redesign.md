@@ -346,3 +346,28 @@ Answered by the owner on 2026-10-05, when the item was started.
     - The Tailwind test only covers token-bearing utility families (`bg-`, `text-`, `border-`,
       `ring-`, `shadow-`, `rounded-`, `font-`, …); a typo in a layout utility (`flex-`, `grid-`,
       `p-`) is not caught.
+- 2026-10-05 — **Phase 2 done** (branch `feat/bl-013-phase-2`, stacked on Phase 1). Direction B
+  tokens in `index.css` for both themes; `--series-1..4` with `getSeriesPalette()`,
+  `pickSeries()`, `seriesCssColor()` and `plotlyChrome()` in `lib/chartTheme.ts`; Options Lab's
+  `SERIES_COLORS`, the Momentum comparison/overlay lines and the holdings donut now use the
+  series palette; IBM Plex Sans / Plex Mono through `next/font`; `.metric` and `Td numeric` set
+  figures in mono; `--radius` 8 px; no serif; dark default with Light / Dark / System in
+  Settings › Appearance; Plotly and Lightweight Charts take their font from the theme; token
+  roles in `docs/dashboard-design-tokens.md`. Checked: typecheck, 177 dashboard unit tests
+  (new: token contrast, theme preference), Biome, and a browser pass in dark and light at
+  1440 px (Momentum backtest, Options Lab results, Trades, Settings) and light at 390 px (P&L).
+  - Decision: `--faint` is `#687080` (light) and `#868e9a` (dark), not the review's `#8e95a1` /
+    `#6c7480`, which measure 2.8:1 and 3.9:1. The chosen values pass AA on background and
+    surface; light faint on `surface-2` is 4.36:1.
+  - Decision: the 13 px base size from the review's description of Direction B was not applied.
+    Sizes here are Tailwind `rem` classes, so changing the root size would shrink every control;
+    density is Phase 4's "Compact" setting.
+  - Not checked: the Momentum Plotly charts (equity, yearly, timeline, donut) were not rendered
+    in the browser pass, because running a backtest auto-saves a run to the owner's saved runs.
+    The sweep was a sample of routes, not every route in every theme and width.
+  - Found outside the task list, not fixed here:
+    - Light-theme `positive` (4.1:1) and `warning` (3.4:1) text on `background` are below AA at
+      the review's values; small coloured figures are affected.
+    - The series palette has four colours where Options Lab had six, so a fifth strategy on one
+      chart repeats the first colour.
+

@@ -2,7 +2,13 @@
 
 import { useEffect, useRef } from 'react';
 
-import { getChartTheme } from '../../lib/chartTheme';
+import {
+  getChartTheme,
+  getSeriesPalette,
+  pickSeries,
+  plotlyChrome,
+  withAlpha,
+} from '../../lib/chartTheme';
 import { useThemeStore } from '../../store/theme';
 import { ResultSection } from './ResultSection';
 
@@ -27,13 +33,12 @@ export function MomentumHoldingsSplit({
       if (!mounted || !element) return;
       plotly = loaded.default;
       const colors = getChartTheme(theme);
-      const palette = [
-        colors.primary,
-        colors.positive,
-        colors.negative,
-        colors.text,
-        colors.border,
-      ];
+      // Identity colours only: the series palette at three strengths gives twelve distinct
+      // slices without borrowing the profit/loss colours.
+      const series = getSeriesPalette(theme);
+      const palette = [1, 0.6, 0.35].flatMap((alpha) =>
+        series.map((color) => (alpha === 1 ? color : withAlpha(color, alpha))),
+      );
       const sorted = [...rows].sort((a, b) => Number(b.value) - Number(a.value));
       const trace: Record<string, unknown> = {
         type: 'pie',
@@ -43,14 +48,14 @@ export function MomentumHoldingsSplit({
         textinfo: 'label+percent',
         textposition: 'outside',
         automargin: true,
-        marker: { colors: sorted.map((_, i) => palette[i % palette.length]) },
+        marker: { colors: sorted.map((_, i) => pickSeries(palette, i)) },
         hovertemplate: '%{label}: %{percent} of portfolio<extra></extra>',
       };
       const layout: Record<string, unknown> = {
         height: 320,
         margin: { l: 10, r: 10, t: 10, b: 10 },
         paper_bgcolor: 'rgba(0,0,0,0)',
-        font: { color: colors.text, size: 11 },
+        ...plotlyChrome(colors, 11),
         showlegend: false,
       };
       await plotly.react(element, [trace], layout, {

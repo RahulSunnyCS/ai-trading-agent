@@ -4,10 +4,12 @@ import { type DragEvent, useState } from 'react';
 import { cn } from '../lib/cn';
 import type { NavigationPreferences } from '../store/navigation';
 import { DEFAULT_NAVIGATION_PREFERENCES, moveTabBefore } from '../store/navigation';
+import { type ThemePreference, useThemeStore } from '../store/theme';
 import { NAV_GROUPS, type Tab } from './shell/nav';
 import { PENDING_BY_TAB } from './shell/pending';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
+import { RadioCards } from './ui/RadioCards';
 
 interface SettingsViewProps {
   preferences: NavigationPreferences;
@@ -16,6 +18,8 @@ interface SettingsViewProps {
 
 export function SettingsView({ preferences, onChange }: SettingsViewProps) {
   const [dragging, setDragging] = useState<Tab | null>(null);
+  const themePreference = useThemeStore((state) => state.preference);
+  const setThemePreference = useThemeStore((state) => state.setPreference);
   const hidden = new Set(preferences.hidden);
   const rank = new Map(preferences.order.map((id, index) => [id, index]));
 
@@ -52,6 +56,24 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
 
   return (
     <div className="space-y-5">
+      <Card>
+        <CardHeader
+          title="Appearance"
+          description="Dark is the default. The sun / moon button in the top bar switches between light and dark."
+        />
+        <RadioCards
+          name="theme"
+          columns={3}
+          value={themePreference}
+          onChange={(value) => setThemePreference(value as ThemePreference)}
+          options={[
+            { value: 'light', label: 'Light', description: 'Always light' },
+            { value: 'dark', label: 'Dark', description: 'Always dark' },
+            { value: 'system', label: 'System', description: 'Follow this device' },
+          ]}
+        />
+      </Card>
+
       <CardHeader
         title="Navigation settings"
         description={`${visibleCount} of ${preferences.order.length} optional tabs shown. Settings stays pinned so you can always restore hidden tabs.`}

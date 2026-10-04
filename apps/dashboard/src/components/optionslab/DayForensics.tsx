@@ -11,7 +11,7 @@ import type { IChartApi, ISeriesApi, SeriesMarker, Time, UTCTimestamp } from 'li
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { DEFAULT_CUTS, useDayForensics } from '../../hooks/useLegwise';
-import { getChartTheme } from '../../lib/chartTheme';
+import { getChartTheme, getSeriesPalette, pickSeries, withAlpha } from '../../lib/chartTheme';
 import { formatPnl } from '../../lib/format';
 import { useThemeStore } from '../../store/theme';
 import type { DayForensics as Forensics, TimedValue } from '../../types/legwise';
@@ -20,15 +20,9 @@ import { Card, CardHeader } from '../ui/Card';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { LABEL_TEXT, LABEL_TONE, describeSegment } from './anatomy';
-import { SERIES_COLORS, TradeLog, pnlClass } from './shared';
+import { TradeLog, pnlClass } from './shared';
 
 const CHART_HEIGHT = 300;
-
-/** 'rgb(r, g, b)' → 'rgba(r, g, b, a)' — Lightweight Charts can't take hsl or css vars. */
-function withAlpha(rgb: string, alpha: number): string {
-  const m = /rgb\(([^)]+)\)/.exec(rgb);
-  return m ? `rgba(${m[1]}, ${alpha})` : rgb;
-}
 
 const toData = (points: TimedValue[]) =>
   points.map((p) => ({ time: p.ts as UTCTimestamp, value: p.v }));
@@ -45,7 +39,7 @@ function useChart(container: React.RefObject<HTMLDivElement>, withLeftScale: boo
     const chart = createChart(el, {
       width: el.clientWidth,
       height: CHART_HEIGHT,
-      layout: { background: { color: 'transparent' }, textColor: '#888' },
+      layout: { background: { color: 'transparent' } },
       leftPriceScale: { visible: withLeftScale },
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 2 },
     });
@@ -68,7 +62,7 @@ function useChart(container: React.RefObject<HTMLDivElement>, withLeftScale: boo
     if (!ready || chart === null) return; // `ready` re-runs this once the chart exists
     const t = getChartTheme(theme);
     chart.applyOptions({
-      layout: { background: { color: 'transparent' }, textColor: t.text },
+      layout: { background: { color: 'transparent' }, textColor: t.text, fontFamily: t.fontFamily },
       grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
       rightPriceScale: { borderColor: t.border },
       leftPriceScale: { borderColor: t.border },
@@ -195,13 +189,15 @@ function MtmChart({ f }: { f: Forensics }) {
 function PremiumChart({ f }: { f: Forensics }) {
   const container = useRef<HTMLDivElement>(null);
   const { chartRef, ready } = useChart(container, false);
+  const theme = useThemeStore((s) => s.theme);
 
   useEffect(() => {
     const chart = chartRef.current;
     if (chart === null || !ready) return;
+    const palette = getSeriesPalette(theme);
     const lines = f.legs.map((leg, i) => {
       const s = chart.addLineSeries({
-        color: SERIES_COLORS[i % SERIES_COLORS.length] ?? '#3b82f6',
+        color: pickSeries(palette, i),
         lineWidth: 2,
         title: `${leg.leg} ${leg.contract}`,
         priceLineVisible: false,
@@ -219,7 +215,7 @@ function PremiumChart({ f }: { f: Forensics }) {
         }
       }
     };
-  }, [f, ready, chartRef]);
+  }, [f, ready, chartRef, theme]);
 
   return <div ref={container} className="w-full" style={{ minHeight: CHART_HEIGHT }} />;
 }

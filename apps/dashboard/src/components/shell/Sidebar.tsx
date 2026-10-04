@@ -25,7 +25,7 @@ export function Sidebar({ activeTab, onSelect, preferences, onNavigate }: Sideba
           <BrandIcon className="h-4 w-4" />
         </span>
         <div className="leading-tight">
-          <div className="font-serif text-[15px] font-semibold tracking-tight text-foreground">
+          <div className="text-[15px] font-semibold tracking-tight text-foreground">
             AI Trading Agent
           </div>
           <div className="text-[11px] text-faint">Research console</div>

@@ -6,11 +6,10 @@
 
 import { useEffect, useRef } from 'react';
 
-import { getChartTheme } from '../../lib/chartTheme';
+import { getChartTheme, getSeriesPalette, pickSeries, plotlyChrome } from '../../lib/chartTheme';
 import type { ScatterPoint } from '../../lib/legwiseJoin';
 import { loadPlotly } from '../../lib/plotly';
 import { useThemeStore } from '../../store/theme';
-import { SERIES_COLORS } from './shared';
 
 export interface ScatterSeries {
   id: string;
@@ -32,6 +31,7 @@ export function PnlScatter({ series }: { series: ScatterSeries[] }) {
       const plotly = await loadPlotly();
       if (!mounted) return;
       const t = getChartTheme(theme);
+      const palette = getSeriesPalette(theme);
       const traces = series.map((s, i) => ({
         x: s.points.map((p) => p.x),
         y: s.points.map((p) => p.y),
@@ -39,7 +39,7 @@ export function PnlScatter({ series }: { series: ScatterSeries[] }) {
         name: s.id,
         type: 'scatter',
         mode: 'markers',
-        marker: { size: 9, color: SERIES_COLORS[i % SERIES_COLORS.length], opacity: 0.8 },
+        marker: { size: 9, color: pickSeries(palette, i), opacity: 0.8 },
         hovertemplate:
           '%{text}<br>range ÷ implied %{x:.2f}<br>₹ %{y:,.0f} per lot<extra>%{fullData.name}</extra>',
       }));
@@ -52,7 +52,7 @@ export function PnlScatter({ series }: { series: ScatterSeries[] }) {
           margin: { l: 64, r: 16, t: 8, b: 48 },
           paper_bgcolor: 'rgba(0,0,0,0)',
           plot_bgcolor: 'rgba(0,0,0,0)',
-          font: { color: t.text, size: 11 },
+          ...plotlyChrome(t, 11),
           xaxis: {
             ...axis,
             title: { text: 'market range ÷ VIX-implied range  (1.0 = realised matched implied)' },

@@ -283,7 +283,7 @@ function TickChart({ ticks }: { ticks: readonly { time: number; ltp: number }[] 
     if (el === null) return;
 
     const chart = createChart(el, {
-      layout: { background: { color: 'transparent' }, textColor: '#888' },
+      layout: { background: { color: 'transparent' } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: true },
       handleScale: false,
@@ -322,7 +322,7 @@ function TickChart({ ticks }: { ticks: readonly { time: number; ltp: number }[] 
     if (chart === null || series === null) return;
     const t = getChartTheme(theme);
     chart.applyOptions({
-      layout: { background: { color: 'transparent' }, textColor: t.text },
+      layout: { background: { color: 'transparent' }, textColor: t.text, fontFamily: t.fontFamily },
       grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
     });
     series.applyOptions({ color: t.primary });

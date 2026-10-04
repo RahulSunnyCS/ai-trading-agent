@@ -65,7 +65,7 @@ export function Td({ children, align = 'left', numeric = false, className, ...re
     <td
       className={cn(
         'px-3 py-3 text-foreground',
-        numeric && 'tabular-nums',
+        numeric && 'font-mono tabular-nums',
         align === 'right' && 'text-right',
         align === 'center' && 'text-center',
         className,
