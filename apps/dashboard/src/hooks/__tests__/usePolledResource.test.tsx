@@ -13,7 +13,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { usePolledResource } from '../usePolledResource';
+import { clearPolledResourceCache, fetchCached, usePolledResource } from '../usePolledResource';
 
 interface PendingCall {
   url: string;
@@ -76,6 +76,7 @@ describe('usePolledResource', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearPolledResourceCache();
   });
 
   it('starts loading, then applies the first successful response', async () => {
@@ -249,5 +250,78 @@ describe('usePolledResource', () => {
 
     act(() => ctl.calls[1]!.resolve({ x: 5 }));
     await waitFor(() => expect(result.current.data).toEqual({ x: 5 }));
+  });
+
+  it('cache: a re-mounted view shows the last response at once, then revalidates', async () => {
+    const first = renderHook(() => usePolledResource<{ x: number }>('/api/x', { cache: true }));
+    await waitFor(() => expect(ctl.calls).toHaveLength(1));
+    act(() => ctl.calls[0]!.resolve({ x: 1 }));
+    await waitFor(() => expect(first.result.current.data).toEqual({ x: 1 }));
+    first.unmount();
+
+    const second = renderHook(() => usePolledResource<{ x: number }>('/api/x', { cache: true }));
+    // Cached data on the very first render, while the revalidation is in flight.
+    expect(second.result.current.data).toEqual({ x: 1 });
+    expect(second.result.current.loading).toBe(true);
+    await waitFor(() => expect(ctl.calls).toHaveLength(2));
+    act(() => ctl.calls[1]!.resolve({ x: 2 }));
+    await waitFor(() => expect(second.result.current.loading).toBe(false));
+    expect(second.result.current.data).toEqual({ x: 2 });
+  });
+
+  it('without cache, a re-mounted view starts empty (the default is unchanged)', async () => {
+    const first = renderHook(() => usePolledResource<{ x: number }>('/api/x'));
+    await waitFor(() => expect(ctl.calls).toHaveLength(1));
+    act(() => ctl.calls[0]!.resolve({ x: 1 }));
+    await waitFor(() => expect(first.result.current.data).toEqual({ x: 1 }));
+    first.unmount();
+
+    const second = renderHook(() => usePolledResource<{ x: number }>('/api/x'));
+    expect(second.result.current.data).toBeNull();
+  });
+
+  it("cache: a url change swaps to that url's cached response, not the previous url's", async () => {
+    const { result, rerender } = renderHook(
+      ({ url }) => usePolledResource<{ x: number }>(url, { cache: true }),
+      { initialProps: { url: '/api/x?a' } },
+    );
+    await waitFor(() => expect(ctl.calls).toHaveLength(1));
+    act(() => ctl.calls[0]!.resolve({ x: 1 }));
+    await waitFor(() => expect(result.current.data).toEqual({ x: 1 }));
+    rerender({ url: '/api/x?b' });
+    await waitFor(() => expect(ctl.calls).toHaveLength(2));
+    act(() => ctl.calls[1]!.resolve({ x: 2 }));
+    await waitFor(() => expect(result.current.data).toEqual({ x: 2 }));
+
+    rerender({ url: '/api/x?a' });
+    await waitFor(() => expect(ctl.calls).toHaveLength(3));
+    expect(result.current.data).toEqual({ x: 1 });
+  });
+
+  it('fetchCached answers from what the hook already loaded, without a request', async () => {
+    const { result } = renderHook(() =>
+      usePolledResource<{ x: number }>('/api/x', { cache: true }),
+    );
+    await waitFor(() => expect(ctl.calls).toHaveLength(1));
+    act(() => ctl.calls[0]!.resolve({ x: 1 }));
+    await waitFor(() => expect(result.current.data).toEqual({ x: 1 }));
+
+    await expect(fetchCached<{ x: number }>('/api/x')).resolves.toEqual({
+      ok: true,
+      data: { x: 1 },
+    });
+    expect(ctl.calls).toHaveLength(1);
+  });
+
+  it('fetchCached does not cache a failed response', async () => {
+    const failed = fetchCached('/api/y');
+    await waitFor(() => expect(ctl.calls).toHaveLength(1));
+    ctl.calls[0]!.resolve({ error: 'boom' }, { ok: false, status: 500 });
+    await expect(failed).resolves.toMatchObject({ ok: false });
+
+    const retried = fetchCached<{ y: number }>('/api/y');
+    await waitFor(() => expect(ctl.calls).toHaveLength(2));
+    ctl.calls[1]!.resolve({ y: 1 });
+    await expect(retried).resolves.toEqual({ ok: true, data: { y: 1 } });
   });
 });

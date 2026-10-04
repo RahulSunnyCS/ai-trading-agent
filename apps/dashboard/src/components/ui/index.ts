@@ -8,7 +8,7 @@ export { InfoTooltip } from './InfoTooltip';
 export { PendingInfo } from './PendingInfo';
 export { RadioCards } from './RadioCards';
 export type { RadioCardOption } from './RadioCards';
-export { Skeleton, SkeletonRows } from './Skeleton';
+export { Shimmer, Skeleton, SkeletonRows } from './Skeleton';
 export { StatCard } from './StatCard';
 export { StateMessage } from './StateMessage';
 export { StatusDot } from './StatusDot';

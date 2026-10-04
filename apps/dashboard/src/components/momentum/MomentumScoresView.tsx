@@ -9,6 +9,7 @@ import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { MomentumScoresSkeleton } from './MomentumSkeletons';
 
 interface StockScore {
   symbol: string;
@@ -79,8 +80,12 @@ function compareNumbers(
 }
 
 export function MomentumScoresView() {
-  const { data, loading, error, refetch } =
-    usePolledResource<MomentumScores>('/api/momentum/scores');
+  // Cached: the ~300 KB payload changes once a day, so coming back to this section shows the last
+  // copy straight away while it revalidates.
+  const { data, loading, error, refetch } = usePolledResource<MomentumScores>(
+    '/api/momentum/scores',
+    { cache: true },
+  );
   const { rest, navigate } = useAppRoute();
   const kind: MomentumScoreKind = oneOf(MOMENTUM_SCORE_KINDS, rest[1]) ?? 'stocks';
   const setKind = (next: MomentumScoreKind) => navigate('momentum', 'scores', next);
@@ -227,7 +232,7 @@ export function MomentumScoresView() {
       {error ? (
         <StateMessage variant="error" title="Couldn't load momentum scores" description={error} />
       ) : null}
-      {loading && !data ? <p className="text-sm text-muted">Loading momentum scores…</p> : null}
+      {loading && !data && !error ? <MomentumScoresSkeleton /> : null}
       {data?.missing_symbols.length ? (
         <details className="text-xs text-warning">
           <summary>

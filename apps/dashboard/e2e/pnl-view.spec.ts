@@ -59,7 +59,10 @@ async function openPnlTab(page: Page, tradesPayload: unknown = { data: [] }): Pr
 
   await page.goto('/');
   await page.getByRole('button', { name: 'P&L' }).click();
-  await expect(page.getByRole('heading', { name: /P&L Summary/i })).toBeVisible();
+  // The page title, present in every state. Not "P&L Summary": that card only shows while
+  // loading or with no closed trades, so waiting on it passed only when the check happened to
+  // land during the loading state — and tab switches no longer take long enough for that.
+  await expect(page.getByRole('heading', { level: 1, name: 'P&L' })).toBeVisible();
 }
 
 // ---------------------------------------------------------------------------

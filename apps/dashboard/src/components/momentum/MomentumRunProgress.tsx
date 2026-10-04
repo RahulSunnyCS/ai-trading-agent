@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { cn } from '../../lib/cn';
 import { Card } from '../ui/Card';
+import { Shimmer } from '../ui/Skeleton';
 
 const SLOW_DATASETS = new Set(['custom_index', 'broad']);
 
@@ -21,17 +22,6 @@ export function useResultFlash(key: number | null): boolean {
     return () => clearTimeout(timer);
   }, [key]);
   return flashing;
-}
-
-function Shimmer({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        'animate-shimmer rounded-md bg-[length:200%_100%] bg-[linear-gradient(90deg,hsl(var(--surface-2))_0%,hsl(var(--border))_50%,hsl(var(--surface-2))_100%)]',
-        className,
-      )}
-    />
-  );
 }
 
 /** Slim "working on it" strip with an elapsed timer, shown for every run. */

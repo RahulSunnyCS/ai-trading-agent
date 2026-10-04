@@ -35,7 +35,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { apiGet } from '../lib/api';
+import { type ApiResult, apiGet } from '../lib/api';
+
+/** Last successful response per URL, for callers that opt in with `cache: true`. Lives for the
+ * page session only: it makes coming back to a view instant, never replaces the revalidation. */
+const responseCache = new Map<string, unknown>();
+
+/**
+ * One-off GET that shares `usePolledResource`'s cache: answers from it when this URL has
+ * already been loaded (by either), otherwise fetches and stores. For data a view needs once
+ * and does not have to be the very latest — e.g. autocomplete suggestions.
+ */
+export async function fetchCached<T>(url: string): Promise<ApiResult<T>> {
+  if (responseCache.has(url)) return { ok: true, data: responseCache.get(url) as T };
+  const result = await apiGet<T>(url);
+  if (result.ok) responseCache.set(url, result.data);
+  return result;
+}
+
+/** Test seam: forget cached responses between tests. */
+export function clearPolledResourceCache(): void {
+  responseCache.clear();
+}
 
 export interface PolledResourceState<T> {
   data: T | null;
@@ -56,6 +77,10 @@ export interface UsePolledResourceOptions {
   /** Re-fetch on this interval, in addition to the initial mount fetch and
    * any manual refetch(). Omit for fetch-once-with-manual-refetch. */
   intervalMs?: number;
+  /** Start from the last response for this URL (kept in memory for the session), so a view
+   * that re-mounts — switching sections and back — shows its data at once instead of a
+   * loading state. It still re-fetches as usual; `loading` is true until that lands. */
+  cache?: boolean;
 }
 
 type FetchMode = 'manual' | 'poll';
@@ -64,12 +89,12 @@ export function usePolledResource<T>(
   url: string,
   opts: UsePolledResourceOptions = {},
 ): PolledResourceResult<T> {
-  const { intervalMs } = opts;
-  const [state, setState] = useState<PolledResourceState<T>>({
-    data: null,
+  const { intervalMs, cache = false } = opts;
+  const [state, setState] = useState<PolledResourceState<T>>(() => ({
+    data: cache && responseCache.has(url) ? (responseCache.get(url) as T) : null,
     loading: true,
     error: null,
-  });
+  }));
 
   // Doubles as the in-flight guard for poll ticks (non-null = a request is
   // outstanding) and as the "am I still the current request" check for
@@ -94,8 +119,13 @@ export function usePolledResource<T>(
         // Poll ticks deliberately do NOT flip loading back to true — doing
         // so would flicker the view every interval. A manual refetch (and
         // the initial mount call, which starts from loading: true anyway)
-        // is a real "the view is reloading" event, so it does.
-        setState((prev) => ({ ...prev, loading: true, error: null }));
+        // is a real "the view is reloading" event, so it does. A cached response for a new
+        // url replaces the previous url's data straight away.
+        setState((prev) => ({
+          data: cache && responseCache.has(url) ? (responseCache.get(url) as T) : prev.data,
+          loading: true,
+          error: null,
+        }));
       }
 
       const result = await apiGet<T>(url, controller.signal);
@@ -116,9 +146,10 @@ export function usePolledResource<T>(
         return;
       }
 
+      if (cache) responseCache.set(url, result.data);
       setState({ data: result.data, loading: false, error: null });
     },
-    [url],
+    [url, cache],
   );
 
   useEffect(() => {

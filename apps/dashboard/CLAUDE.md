@@ -28,7 +28,10 @@ renders the shell; `lib/routes.ts` holds the path grammar, `hooks/useAppRoute.ts
 it). Paths: `/<tab>`, `/optionslab/<results|regimes|builder>`,
 `/momentum/<backtest|scores|saved|weekly|rebalance>`, `/momentum/backtest/<dataset>`,
 `/momentum/scores/<stocks|sectors>`. A new sub-tab = add its ids to `lib/routes.ts` and derive
-state from `useAppRoute().rest` — don't add another `useState` for navigation.
+state from `useAppRoute().rest` — don't add another `useState` for navigation. `useAppRoute`
+moves with `window.history.pushState`/`replaceState`, never `router.push`: every path is the same
+`[[...slug]]` page, and a router navigation to a different slug re-mounts the whole shell (all
+state lost, every view refetches). Next keeps `usePathname` and back/forward in sync with it.
 
 **Remote hosting:** `src/middleware.ts` (logic in `lib/accessGate.ts`) puts a password prompt
 in front of everything and adds the Cloudflare Access service token to forwarded `/api/*`
@@ -54,7 +57,8 @@ needs to be shared with the server, it is currently hand-duplicated in
   in-flight-guard fetch loop; see root `technical.md`'s Key Patterns section
   for the exact bug this fixed (two hooks got stuck on "loading" forever from
   duplicated logic before the extraction). Pass `{ intervalMs }` for polling,
-  omit it for fetch-once-with-manual-refresh.
+  omit it for fetch-once-with-manual-refresh; `{ cache: true }` is in root
+  `technical.md`.
 - `src/lib/api.ts` — the one HTTP client wrapper; route new API calls through
   this rather than a fresh `fetch()` call site.
 - `src/lib/pnl.ts` / `src/lib/format.ts` — shared P&L and number/currency

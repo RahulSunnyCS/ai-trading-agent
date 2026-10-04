@@ -40,6 +40,7 @@ import {
   MomentumSettingsPanel,
   momentumSettingsDefaults,
 } from './momentum/MomentumSettingsPanel';
+import { MomentumSettingsSkeleton } from './momentum/MomentumSkeletons';
 import { MomentumWeeklyView } from './momentum/MomentumWeeklyView';
 import { Button } from './ui/Button';
 import { StateMessage } from './ui/StateMessage';
@@ -174,12 +175,6 @@ function comparableConfig(config: Record<string, unknown>): string {
   );
 }
 
-/** Saved runs are persisted server-side, grouped by dataset. */
-async function fetchSavedRuns(dataset: Dataset): Promise<MomentumSavedRun[]> {
-  const response = await apiGet<MomentumSavedRun[]>(`/api/momentum/saved-runs?dataset=${dataset}`);
-  return response.ok ? response.data : [];
-}
-
 const DATASET_SHORT: Record<string, string> = {
   etf: 'ETF',
   stock: 'Stocks',
@@ -264,12 +259,9 @@ function MomentumRunTabs({
   );
 }
 
-// Next re-creates this whole view whenever the route changes (the section and dataset are in the
-// URL), which discards React state. Two things must survive that, so they live out here:
-//  - `pendingLoad`: the config "Load settings" just picked. Without it the view comes back up
-//    seeded from the active run tab instead, and the loaded settings are silently lost.
-//  - `lastDataset`: the dataset being worked on, for sections whose URL carries none (Saved runs).
-let pendingLoad: Record<string, unknown> | null = null;
+// The dataset being worked on, for sections whose URL carries none (Saved runs). Lives out here
+// because leaving the Momentum tab altogether unmounts this view; moving between its sections
+// does not (useAppRoute updates the URL in place).
 let lastDataset: Dataset | null = null;
 
 export function MomentumBacktestingView() {
@@ -283,13 +275,9 @@ export function MomentumBacktestingView() {
   const activeRunId = useMomentumRunsStore((state) => state.activeId);
   const activeRun = runs.find((run) => run.id === activeRunId) ?? null;
   // Seeds the settings from the run you were looking at when you left this page (first load only).
-  const mountSeedRef = useRef<Record<string, unknown> | null>(
-    pendingLoad ?? activeRun?.config ?? null,
-  );
+  const mountSeedRef = useRef<Record<string, unknown> | null>(activeRun?.config ?? null);
   const [dataset, setDatasetState] = useState<Dataset>(() => {
     if (urlDataset && VISIBLE_DATASET_IDS.has(urlDataset)) return urlDataset;
-    const loaded = pendingLoad?.dataset;
-    if (loaded === 'etf' || loaded === 'broad') return loaded;
     if (lastDataset && VISIBLE_DATASET_IDS.has(lastDataset)) return lastDataset;
     const initial = activeRun?.dataset;
     return initial === 'etf' ||
@@ -357,6 +345,11 @@ export function MomentumBacktestingView() {
     (run) => run.status === 'queued' || run.status === 'running',
   ).length;
   const [savedRuns, setSavedRuns] = useState<MomentumSavedRun[]>([]);
+  // Until the first response lands the list is unknown, not empty: the Saved runs section shows
+  // placeholders and its tab shows no count, rather than "0 runs".
+  const [savedRunsLoading, setSavedRunsLoading] = useState(true);
+  const [savedRunsLoadError, setSavedRunsLoadError] = useState<string | null>(null);
+  const savedRunsRequest = useRef(0);
   const [savedRunError, setSavedRunError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -365,6 +358,21 @@ export function MomentumBacktestingView() {
     () => savedRuns.filter((run, index) => index > 0 && run.overlay),
     [savedRuns],
   );
+
+  /** Saved runs are persisted server-side, grouped by dataset. Only the newest request may update
+   * the list, so a slow response for the dataset you just left can't replace the current one. */
+  async function refreshSavedRuns(target: Dataset): Promise<void> {
+    const request = ++savedRunsRequest.current;
+    const response = await apiGet<MomentumSavedRun[]>(`/api/momentum/saved-runs?dataset=${target}`);
+    if (request !== savedRunsRequest.current) return;
+    setSavedRunsLoading(false);
+    if (response.ok) {
+      setSavedRuns(response.data);
+      setSavedRunsLoadError(null);
+    } else {
+      setSavedRunsLoadError(response.error);
+    }
+  }
 
   function onCoreChange(patch: Partial<CoreSettings>): void {
     setCore((current) => ({ ...current, ...patch }));
@@ -380,7 +388,7 @@ export function MomentumBacktestingView() {
       setSavedRunError(response.error);
       return;
     }
-    setSavedRuns(await fetchSavedRuns(dataset));
+    await refreshSavedRuns(dataset);
   }
   async function renameRun(id: string, name: string): Promise<void> {
     await patchRun(id, { name });
@@ -401,7 +409,7 @@ export function MomentumBacktestingView() {
       setSavedRunError(response.error);
       return;
     }
-    setSavedRuns(await fetchSavedRuns(dataset));
+    await refreshSavedRuns(dataset);
   }
 
   async function loadMeta(nextDataset: Dataset, seed?: Record<string, unknown>): Promise<void> {
@@ -438,10 +446,7 @@ export function MomentumBacktestingView() {
         benchmark: stringDefault(base, 'benchmark', nextMeta.benchmarks?.[0] ?? ''),
       }),
     );
-    if (seed) {
-      mountSeedRef.current = null;
-      if (seed === pendingLoad) pendingLoad = null;
-    }
+    if (seed) mountSeedRef.current = null;
   }
 
   useEffect(() => {
@@ -451,15 +456,14 @@ export function MomentumBacktestingView() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadMeta is redefined every render; it should only re-run when the dataset itself changes
   useEffect(() => {
     setSavedRuns([]);
+    setSavedRunsLoading(true);
+    setSavedRunsLoadError(null);
     setSavedRunError(null);
-    void fetchSavedRuns(dataset).then(setSavedRuns);
+    void refreshSavedRuns(dataset);
     lastDataset = dataset;
     const seed = mountSeedRef.current;
     const usable = seed && seed.dataset === dataset ? seed : undefined;
-    if (!usable) {
-      mountSeedRef.current = null;
-      pendingLoad = null;
-    }
+    if (!usable) mountSeedRef.current = null;
     void loadMeta(dataset, usable);
     // Show a run of the dataset you switched to (a tab picked from another dataset already
     // matches and is left alone), else nothing.
@@ -470,11 +474,15 @@ export function MomentumBacktestingView() {
   }, [dataset]);
 
   // A run that finishes while you are on this page refreshes the saved-runs list (the store
-  // auto-saves it) so overlays and the "Saved runs" count are current.
+  // auto-saves it) so overlays and the "Saved runs" count are current. Only on a change: the
+  // dataset effect above already loads the list on mount.
   const savedKey = runs.map((run) => run.savedAs ?? '').join('|');
+  const savedKeyRef = useRef(savedKey);
   // biome-ignore lint/correctness/useExhaustiveDependencies: savedKey is the trigger
   useEffect(() => {
-    void fetchSavedRuns(dataset).then(setSavedRuns);
+    if (savedKeyRef.current === savedKey) return;
+    savedKeyRef.current = savedKey;
+    void refreshSavedRuns(dataset);
   }, [savedKey]);
 
   function loadSettings(run: MomentumSavedRun): void {
@@ -490,8 +498,6 @@ export function MomentumBacktestingView() {
       lookbacks: lookbacksFromConfig(config),
     });
     setValues((current) => momentumSettingsDefaults({ ...current, ...config }));
-    // From another section the route change re-creates this view; hand the config over to it.
-    if (section !== 'backtest') pendingLoad = { ...config };
     setSection('backtest');
     setSettingsOpen(true);
   }
@@ -709,7 +715,7 @@ export function MomentumBacktestingView() {
               }
             >
               {item.label}
-              {item.id === 'saved' ? ` (${savedRuns.length})` : ''}
+              {item.id === 'saved' ? (savedRunsLoading ? ' (…)' : ` (${savedRuns.length})`) : ''}
               {item.id === 'backtest' && inFlightCount > 0 ? (
                 <span
                   className="relative ml-1 flex h-2 w-2"
@@ -754,9 +760,17 @@ export function MomentumBacktestingView() {
                 description={savedRunError}
               />
             ) : null}
+            {savedRunsLoadError ? (
+              <StateMessage
+                variant="error"
+                title="Could not load saved runs"
+                description={savedRunsLoadError}
+              />
+            ) : null}
             <MomentumSavedRunsView
               dataset={dataset}
               runs={savedRuns}
+              loading={savedRunsLoading}
               onRename={renameRun}
               onToggleOverlay={toggleOverlay}
               onToggleFavorite={toggleFavorite}
@@ -799,7 +813,11 @@ export function MomentumBacktestingView() {
               />
             ) : null}
 
-            {loading || !meta ? null : (
+            {loading || !meta ? (
+              error ? null : (
+                <MomentumSettingsSkeleton />
+              )
+            ) : (
               <div className="rounded-xl border border-border bg-surface">
                 <div className="border-b border-border px-4 py-3 text-sm text-muted">
                   <span className="font-medium text-foreground">What this run tests:</span>{' '}

@@ -396,7 +396,10 @@ The system is a **real-time event-driven pipeline** in four layers:
   fetch) always cancels and replaces; only a poll tick skips itself when one
   is already in flight, so a slow endpoint does not pile up overlapping
   requests. Pass `{ intervalMs }` for a polling hook (e.g. `usePaperTrades`);
-  omit it for fetch-once-with-manual-refresh (most of the others)
+  omit it for fetch-once-with-manual-refresh (most of the others). Add
+  `{ cache: true }` when a view re-mounts often (the Momentum sections): it
+  starts from the last response for that URL, kept in memory for the session,
+  and still revalidates; `fetchCached()` shares that cache for one-off reads
 
 ## Testing
 

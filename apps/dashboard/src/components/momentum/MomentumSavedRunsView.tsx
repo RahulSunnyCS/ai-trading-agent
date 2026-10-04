@@ -9,6 +9,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { MomentumListSkeleton } from './MomentumSkeletons';
 
 /** Custom Index and Broad Momentum price through the same bhavcopy-backed stock layer as
  * Stock mode (see weekly.py's A5 gate investigation), so they share the "stock" readiness
@@ -130,6 +131,7 @@ function metric(run: MomentumSavedRun | undefined, key: string): string {
 export function MomentumSavedRunsView({
   dataset,
   runs,
+  loading = false,
   onRename,
   onToggleOverlay,
   onToggleFavorite,
@@ -139,6 +141,8 @@ export function MomentumSavedRunsView({
 }: {
   dataset: 'etf' | 'stock' | 'custom_index' | 'broad';
   runs: MomentumSavedRun[];
+  /** The list has not arrived yet: show placeholders, never the "no runs" empty state. */
+  loading?: boolean;
   onRename: (id: string, name: string) => void;
   onToggleOverlay: (id: string, overlay: boolean) => void;
   onToggleFavorite: (id: string, favorite: boolean) => void;
@@ -174,16 +178,20 @@ export function MomentumSavedRunsView({
       : [];
   // Shares the Weekly signal tab's endpoint rather than threading its status down through
   // props — cheap to poll and keeps this view self-contained.
-  const { data: status } = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status');
+  const { data: status } = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status', {
+    cache: true,
+  });
 
   return (
     <div className="space-y-5">
       <Card>
         <CardHeader
           title={`Saved runs · ${({ etf: 'ETF Rotation', stock: 'Nifty 50 Stocks', custom_index: 'Custom Index', broad: 'Broad Momentum' } as const)[dataset]}`}
-          description={`${runs.length} runs for this dataset. Favourites run every weekly cycle; only the active favourite is sent to Telegram.`}
+          description={`${loading ? 'Loading the saved runs' : `${runs.length} runs`} for this dataset. Favourites run every weekly cycle; only the active favourite is sent to Telegram.`}
         />
-        {runs.length === 0 ? (
+        {loading && runs.length === 0 ? (
+          <MomentumListSkeleton rows={4} label="Loading saved runs" />
+        ) : runs.length === 0 ? (
           <p className="text-sm text-muted">Run a backtest to start a comparison.</p>
         ) : (
           <div className="mb-3 flex flex-wrap items-center gap-2">
