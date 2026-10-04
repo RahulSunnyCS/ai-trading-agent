@@ -11,7 +11,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Priority | Status | Type | Area |
 |---|---|---|---|---|---|
-| _none yet_ | | | | | |
+| [BL-001](BL-001-momentum-result-integrity.md) | Momentum result integrity: goldens, parameter coverage, drift alerts | P0 | Planned | improvement | momentum |
 
 ## Done / Dropped
 
