@@ -17,6 +17,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-005](BL-005-faster-momentum-backtests.md) | Faster Momentum backtests (Broad: 55 s cold, 21 s warm) | P1 | Planned | improvement | momentum |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-011](BL-011-laptop-scheduler.md) | Laptop as scheduler: broker login at 08:00 (Phases 2–4 moved to BL-012) | P1 | In progress | feature | infra |
+| [BL-013](BL-013-research-position-review.md) | Research-position review: decide which of five measurement upgrades (forward ledger, dataset protection, trial counting, slippage kill rule, one-book view) are required | P1 | Planned | research | cross-cutting |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-003](BL-003-momentum-weekly-rebalance-loading.md) | Momentum: honest loading states on Weekly signal and Rebalance | P2 | Planned | improvement | dashboard |
 | [BL-004](BL-004-research-stack-production-mode.md) | Production-build mode for the local research stack (`bun run start:prod`) | P2 | Planned | improvement | infra |
