@@ -100,6 +100,28 @@ def test_eligibility_reuses_a_verdict_for_one_holiday_week_only(monkeypatch) -> 
     assert out["A"].tolist() == [True, True, False, False]
 
 
+def test_eligibility_does_not_carry_a_pass_into_a_week_that_was_measured_and_failed(
+    monkeypatch,
+) -> None:
+    weeks = pd.date_range("2026-09-04", periods=4, freq="W-FRI")
+    frame = _features(
+        [
+            {"symbol": "A", "wk": weeks[0]},
+            {"symbol": "A", "wk": weeks[1], "med60": 0.01},  # measured, fails the turnover gate
+            {"symbol": "A", "wk": weeks[2], "med60": 0.01},
+            {"symbol": "A", "wk": weeks[3]},
+            {"symbol": "B", "wk": weeks[0]},  # keeps every week present in the feature frame
+            {"symbol": "B", "wk": weeks[1]},
+            {"symbol": "B", "wk": weeks[2]},
+            {"symbol": "B", "wk": weeks[3]},
+        ]
+    )
+    monkeypatch.setattr(liq, "weekly_features", lambda symbols, root=None: frame)
+    out = liq.eligibility(liq.LiquidityConfig(), ["A", "B"], pd.Index(weeks))
+    assert out["A"].tolist() == [True, False, False, True]
+    assert out["B"].tolist() == [True, True, True, True]
+
+
 def test_preview_reports_why_a_stock_failed(monkeypatch) -> None:
     frame = _features([{"symbol": "OK"}, {"symbol": "THIN", "med60": 0.2}])
     monkeypatch.setattr(liq, "weekly_features", lambda symbols, root=None: frame)
