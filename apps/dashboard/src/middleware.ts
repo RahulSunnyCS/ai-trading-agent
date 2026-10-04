@@ -9,6 +9,9 @@ import { PASSWORD_REALM, checkPassword, gateConfig, upstreamHeaders } from './li
  */
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const config = gateConfig(process.env);
+  if (config.configError) {
+    return new NextResponse(config.configError, { status: 503 });
+  }
 
   const decision = await checkPassword(request.headers.get('authorization'), config);
   if (decision.kind === 'misconfigured') {

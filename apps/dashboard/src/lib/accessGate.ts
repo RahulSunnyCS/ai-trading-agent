@@ -10,7 +10,9 @@
  *  2. Upstream headers — the Cloudflare Access service token that lets the
  *     Next server's rewrites through the tunnel to the laptop-served APIs.
  *     Any client-supplied copies are always stripped so a browser can never
- *     inject its own.
+ *     inject its own. Half a token (one var set, the other unset or blank) is
+ *     a deployment mistake, not "no token": it also blocks every request, so
+ *     the dashboard fails loudly instead of every API call failing upstream.
  *
  * Runs in the edge middleware runtime: Web Crypto only, no node:crypto.
  */
@@ -28,6 +30,8 @@ export interface GateConfig {
   /** True when a missing password must block requests rather than allow them. */
   passwordRequired: boolean;
   upstream: { clientId: string; clientSecret: string } | null;
+  /** Why every request must be refused (a broken deployment), or null. */
+  configError: string | null;
 }
 
 function nonBlank(value: string | undefined): string | null {
@@ -40,11 +44,15 @@ export function gateConfig(env: Env): GateConfig {
   const clientSecret = nonBlank(env.UPSTREAM_ACCESS_CLIENT_SECRET);
   const upstream = clientId && clientSecret ? { clientId, clientSecret } : null;
   const remote = env.NODE_ENV === 'production' || Boolean(clientId || clientSecret);
+  const halfToken = Boolean(clientId) !== Boolean(clientSecret);
   return {
     // Not trimmed: a password is used exactly as configured.
     password: env.DASHBOARD_PASSWORD ? env.DASHBOARD_PASSWORD : null,
     passwordRequired: remote,
     upstream,
+    configError: halfToken
+      ? 'UPSTREAM_ACCESS_CLIENT_ID and UPSTREAM_ACCESS_CLIENT_SECRET must both be set (only one is)'
+      : null,
   };
 }
 
