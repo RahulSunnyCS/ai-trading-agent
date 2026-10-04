@@ -64,13 +64,16 @@ from __future__ import annotations
 
 import csv
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+import numpy as np
 import pandas as pd
 
 from momentum_backtesting import engine
+from momentum_backtesting import tax as tax_mod
 from momentum_backtesting.categories import compose, snapshots, sources
 from momentum_backtesting.categories import liquidity as liquidity_mod
 from momentum_backtesting.categories import prices as cat_prices
@@ -94,6 +97,10 @@ TOTAL_MARKET_FETCH_REPORT_FILENAME = "total_market_fetch_report.csv"
 #: curated/stock_groups.csv's own filename (TODO.md 3.9.12 -- committed package data, read-only
 #: from here per categories/__init__.py's documented boundary).
 STOCK_GROUPS_FILENAME = "stock_groups.csv"
+#: The extra tags for every NSE-listed stock outside the 755-name Total Market (derived from BSE's
+#: sector/industry classification; see curated/stock_groups_wide_catalog.md). Read only when a run
+#: asks for `category_tags="extended"` -- the default curated-only behaviour is unchanged.
+STOCK_GROUPS_WIDE_FILENAME = "stock_groups_wide.csv"
 
 #: Defaults -- Step 6's real sweep (TODO.md 3.9.13's own row has the full numbers) found
 #: pool_exit_rank=250 a clean, unambiguous win over the plan's original 300 guess (better CAGR,
@@ -212,21 +219,48 @@ def total_market_members_by_year(data_dir: Path) -> dict[int, set[str]]:
 # ---------------------------------------------------------------------------------------------
 
 
-def load_stock_groups(curated_dir: Path) -> dict[str, set[str]]:
-    """category_id ("parent_group :: subgroup") -> member symbols, from stock_groups.csv.
-    `parent_group :: subgroup` (not `subgroup` alone) is used as the id so two differently-
-    parented subgroups that happen to share a display name can never collide -- verified none
-    do as of 2026-09 (113 subgroups, 113 distinct ids), but the qualified id costs nothing and
-    removes the assumption."""
-    path = curated_dir / STOCK_GROUPS_FILENAME
-    groups: dict[str, set[str]] = {}
+def _read_groups(path: Path, groups: dict[str, set[str]]) -> None:
     with path.open(newline="") as f:
         for row in csv.DictReader(f):
             cid = f"{row['parent_group']} :: {row['subgroup']}"
             symbol = row["symbol"].strip()
             if symbol:
                 groups.setdefault(cid, set()).add(symbol)
+
+
+def load_stock_groups(curated_dir: Path, extended: bool = False) -> dict[str, set[str]]:
+    """category_id ("parent_group :: subgroup") -> member symbols, from stock_groups.csv.
+    `parent_group :: subgroup` (not `subgroup` alone) is used as the id so two differently-
+    parented subgroups that happen to share a display name can never collide -- verified none
+    do as of 2026-09 (113 subgroups, 113 distinct ids), but the qualified id costs nothing and
+    removes the assumption.
+
+    `extended=True` also reads `stock_groups_wide.csv` (tags for stocks outside the 755-name
+    Total Market). Rows that name an existing category id add members to it; others make new
+    categories. The default is the curated file only, so every existing result is unchanged."""
+    path = curated_dir / STOCK_GROUPS_FILENAME
+    wide = curated_dir / STOCK_GROUPS_WIDE_FILENAME
+    use_wide = extended and wide.exists()
+    if extended and not wide.exists():
+        raise FileNotFoundError(
+            f"{wide} is missing; build it before using category_tags='extended'"
+        )
+    stamp = (str(path), path.stat().st_mtime_ns, wide.stat().st_mtime_ns if use_wide else 0)
+    cached = _groups_cache.get(stamp)
+    if cached is not None:
+        return cached
+    groups: dict[str, set[str]] = {}
+    _read_groups(path, groups)
+    if use_wide:
+        _read_groups(wide, groups)
+    # Same object back on every call until the file changes, so callers must treat it as
+    # read-only; it is also what lets `ordered_categories_by_week` recognise repeat calls.
+    # One entry per variant (curated / extended) so alternating between them keeps both cached.
+    _groups_cache[stamp] = groups
     return groups
+
+
+_groups_cache: dict[tuple[str, int, int], dict[str, set[str]]] = {}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -308,6 +342,7 @@ def load_stock_universe_frame(
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
     universe: Literal["total_market", "all_liquid"] = "total_market",
+    series_breaks: Literal["legacy", "verified"] = "legacy",
 ) -> StockUniverseFrame:
     """The 755-name Total Market weekly price frame + point-in-time membership gate, computed
     over the WHOLE available price history -- no ranking, no atomics, no pool. See
@@ -327,6 +362,7 @@ def load_stock_universe_frame(
         stocks_data_dir=stocks_data_dir,
         min_drop_pct=min_drop_pct,
         turnover_spike_multiple=turnover_spike_multiple,
+        series_breaks=series_breaks,
         return_raw_weekly=True,
     )
     if frame.empty:
@@ -385,6 +421,9 @@ class UniverseRanking:
     stale_columns: dict[str, pd.Timestamp]
     missing_symbols: list[str]  # Total Market symbols with no daily.parquet rows at all
     raw_prices: pd.DataFrame | None = None  # raw stock prices plus atomics, for entry cap
+    # week x stock column booleans from the tradability gate (None = no gate). Kept so a trade
+    # list can say an exit was "liquidity failed" rather than just "ineligible".
+    liquidity_gate: pd.DataFrame | None = None
 
 
 def _dense_rank(masked: pd.DataFrame) -> pd.DataFrame:
@@ -442,7 +481,18 @@ def _compute_pool_membership(
     return out
 
 
-def compute_universe_ranking(
+@dataclass(frozen=True)
+class UniverseBase:
+    """Step 2 up to the global momentum ranks -- see `compute_universe_base`."""
+
+    universe: StockUniverseFrame
+    full_frame: pd.DataFrame
+    raw_full_frame: pd.DataFrame | None
+    weeks: list[pd.Timestamp]
+    global_ranks: pd.DataFrame
+
+
+def compute_universe_base(
     *,
     outer_prices: pd.DataFrame,
     stocks_data_dir: Path,
@@ -451,14 +501,17 @@ def compute_universe_ranking(
     weights: tuple[float, ...] | None = None,
     score: Literal["ranksum", "voladj", "blend"] = "ranksum",
     voladj_skip_recent_month: bool = True,
-    pool_top_n: int = DEFAULT_POOL_TOP_N,
-    pool_exit_rank: int = DEFAULT_POOL_EXIT_RANK,
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
     universe_kind: Literal["total_market", "all_liquid"] = "total_market",
-) -> UniverseRanking:
-    """Step 2 end to end: build the 755-name weekly price frame (Piece A, reused unmodified),
+    series_breaks: Literal["legacy", "verified"] = "legacy",
+) -> UniverseBase:
+    """The expensive half of Step 2 -- everything that does not depend on the pool size.
+    `finish_universe_ranking` adds the pool cut (cheap), so a search can reuse one base across
+    many `pool_top_n`/`pool_exit_rank` settings. Originally `compute_universe_ranking` in one
+    piece (still available, below): build the 755-name weekly price frame (Piece A, reused
+    unmodified),
     rank it (the existing engine.compute_ranks, unmodified -- just a bigger universe than any
     existing caller passes), and derive the quarterly-refreshed qualifying pool. Computed over
     the WHOLE available price history (no start/end restriction) -- `run_backtest`'s own
@@ -476,11 +529,9 @@ def compute_universe_ranking(
         turnover_spike_multiple=turnover_spike_multiple,
         liquidity=liquidity,
         universe=universe_kind,
+        series_breaks=series_breaks,
     )
     frame = universe.frame
-    column_to_base_symbol = universe.column_to_base_symbol
-    missing_symbols = universe.missing_symbols
-    stock_membership = universe.stock_membership
 
     atomics = outer_prices.reindex(frame.index)[list(ATOMIC_NAMES)]
     full_frame = pd.concat([frame, atomics], axis=1)
@@ -497,6 +548,32 @@ def compute_universe_ranking(
         universe=tuple(full_frame.columns),
     )
     global_ranks, _global_scores = engine.compute_ranks(full_frame, config)
+
+    return UniverseBase(
+        universe=universe,
+        full_frame=full_frame,
+        raw_full_frame=raw_full_frame,
+        weeks=weeks,
+        global_ranks=global_ranks,
+    )
+
+
+def finish_universe_ranking(
+    base: UniverseBase,
+    *,
+    pool_top_n: int = DEFAULT_POOL_TOP_N,
+    pool_exit_rank: int = DEFAULT_POOL_EXIT_RANK,
+) -> UniverseRanking:
+    """The cheap half of Step 2: the quarterly pool cut on a `UniverseBase`'s global ranks."""
+    universe = base.universe
+    frame = universe.frame
+    column_to_base_symbol = universe.column_to_base_symbol
+    missing_symbols = universe.missing_symbols
+    stock_membership = universe.stock_membership
+    full_frame = base.full_frame
+    raw_full_frame = base.raw_full_frame
+    weeks = base.weeks
+    global_ranks = base.global_ranks
 
     pool_membership = _compute_pool_membership(
         global_ranks[list(frame.columns)],
@@ -532,6 +609,21 @@ def compute_universe_ranking(
         stale_columns=universe.stale_columns,
         missing_symbols=missing_symbols,
         raw_prices=raw_full_frame,
+        liquidity_gate=universe.liquidity_gate,
+    )
+
+
+def compute_universe_ranking(
+    *,
+    pool_top_n: int = DEFAULT_POOL_TOP_N,
+    pool_exit_rank: int = DEFAULT_POOL_EXIT_RANK,
+    **base_kwargs,
+) -> UniverseRanking:
+    """Step 2 end to end: `compute_universe_base` then `finish_universe_ranking`."""
+    return finish_universe_ranking(
+        compute_universe_base(**base_kwargs),
+        pool_top_n=pool_top_n,
+        pool_exit_rank=pool_exit_rank,
     )
 
 
@@ -572,6 +664,76 @@ def score_categories(
         if name in pool_ranks_row.index and pd.notna(pool_ranks_row[name]):
             scores[name] = pool_ranks_row[name]
     return scores
+
+
+_ORDER_CACHE_SIZE = 6
+_order_cache: OrderedDict[tuple, tuple] = OrderedDict()
+
+
+def ordered_categories_by_week(
+    combined_pool_ranks: pd.DataFrame,
+    group_members: dict[str, set[str]],
+    atomic_names: tuple[str, ...],
+    coverage_floor: float,
+) -> list[list[str]]:
+    """For every row of `combined_pool_ranks`, the categories/atomics `score_categories` would
+    return, ordered best-first by (score, name) -- the exact input `apply_hysteresis` wants.
+
+    Same numbers as calling `score_categories` week by week, computed once as array maths instead
+    (the ranks are whole numbers, so the means are exact either way). It depends only on the
+    ranking, the groups and `coverage_floor` -- not on top_n/exit_rank -- so a search that varies
+    those reuses it: results are cached against the identity of the inputs."""
+    key = (id(combined_pool_ranks), id(group_members), atomic_names, coverage_floor)
+    hit = _order_cache.get(key)
+    if hit is not None and hit[0] is combined_pool_ranks and hit[1] is group_members:
+        _order_cache.move_to_end(key)
+        return hit[2]
+
+    columns = {name: i for i, name in enumerate(combined_pool_ranks.columns)}
+    values = combined_pool_ranks.to_numpy(dtype=float)
+    names: list[str] = []
+    score_cols: list[np.ndarray] = []
+    for cid, members in group_members.items():
+        if not members:
+            continue
+        idx = [columns[m] for m in members if m in columns]
+        if not idx:
+            continue
+        sub = values[:, idx]
+        valid = ~np.isnan(sub)
+        count = valid.sum(axis=1)
+        total = np.where(valid, sub, 0.0).sum(axis=1)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            mean = total / count
+            covered = (count / len(members) >= coverage_floor) & (count > 0)
+        names.append(cid)
+        score_cols.append(np.where(covered, mean, np.nan))
+    atomic_scores: dict[str, np.ndarray] = {}
+    for name in atomic_names:
+        if name in columns:
+            atomic_scores[name] = values[:, columns[name]]
+    for name, col in atomic_scores.items():
+        if name in names:  # score_categories: an atomic overwrites a same-named category
+            score_cols[names.index(name)] = col
+        else:
+            names.append(name)
+            score_cols.append(col)
+
+    out: list[list[str]] = []
+    if names:
+        matrix = np.column_stack(score_cols)
+        name_order = np.argsort(np.argsort(np.array(names, dtype=object).astype(str)))
+        for row in matrix:
+            idx = np.flatnonzero(~np.isnan(row))
+            order = np.lexsort((name_order[idx], row[idx]))
+            out.append([names[i] for i in idx[order]])
+    else:
+        out = [[] for _ in range(len(combined_pool_ranks))]
+
+    _order_cache[key] = (combined_pool_ranks, group_members, out)
+    while len(_order_cache) > _ORDER_CACHE_SIZE:
+        _order_cache.popitem(last=False)
+    return out
 
 
 def compute_category_selection(
@@ -688,10 +850,11 @@ def compute_category_selection_mass_exit(
     held: list[str] = []
     out: dict[pd.Timestamp, list[str]] = {}
     mass_exit_weeks: set[pd.Timestamp] = set()
+    all_ordered = ordered_categories_by_week(
+        combined_pool_ranks, group_members, atomic_names, coverage_floor
+    )
     for w in weeks:
-        row = combined_pool_ranks.loc[w]
-        scores = score_categories(row, group_members, atomic_names, coverage_floor=coverage_floor)
-        ordered = sorted(scores.keys(), key=lambda n: (scores[n], n))
+        ordered = all_ordered[combined_pool_ranks.index.get_loc(w)]
         rank_of = {name: i + 1 for i, name in enumerate(ordered)}
 
         prev_held = set(held)
@@ -855,6 +1018,16 @@ class BroadBacktestResult:
     mass_exit_weeks: frozenset[pd.Timestamp] | None = None
 
 
+def _tax_classes(columns: list[str]) -> dict[str, str]:
+    """Tax class per column of a Broad frame: stocks are listed equity; Gold/Silver and the two
+    international indices are what tax.py assumes for them; idle cash is taxed like debt."""
+    classes = dict.fromkeys(columns, tax_mod.EQUITY)
+    classes["Gold"] = classes["Silver"] = tax_mod.GOLD_SILVER
+    classes["Nasdaq 100"] = classes["Hang Seng"] = tax_mod.INTERNATIONAL
+    classes[CASH] = tax_mod.DEBT
+    return classes
+
+
 def run_broad_backtest(
     *,
     outer_prices: pd.DataFrame,
@@ -862,6 +1035,7 @@ def run_broad_backtest(
     categories_data_dir: Path,
     curated_dir: Path,
     category_mode: Literal["on", "off"] = "on",
+    category_tags: Literal["curated", "extended"] = "curated",
     start: str = "2017-01-01",
     end: str | None = None,
     lookbacks: tuple[int, ...] = (1, 4, 13, 26, 52),
@@ -916,6 +1090,9 @@ def run_broad_backtest(
     # every earlier run did. uc_locked blocks buying that week, lc_locked blocks selling.
     uc_locked: pd.DataFrame | None = None,
     lc_locked: pd.DataFrame | None = None,
+    # Capital-gains tax per sale (tax.py). None = pre-tax, exactly as before. Every stock is
+    # taxed as listed equity; the atomics by what they are (see `_tax_classes`).
+    tax: tax_mod.TaxRules | None = None,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -929,11 +1106,11 @@ def run_broad_backtest(
     itself -- see that parameter's own docstring in engine.py), so they were genuine gaps, not
     dataset-specific exclusions: the UI already sent `signal_delay` for every dataset including
     this one, but `_broad_backtest` silently dropped it before this fix. `defensive`/
-    `filter_lookback`/`tax` deliberately stay out (not added here): CASH never enters this
+    `filter_lookback` deliberately stay out (not added here): CASH never enters this
     dataset's `external_ranks` table (Steps 1-4 only ever rank stocks/atomics against each
-    other), so `defensive="ranked"` would silently do nothing, and `tax` would need its own
-    equity/gold_silver classification for the ~755-name Total Market universe (`stock.tax_classes`
-    has no equivalent here) -- out of scope for a same-mechanism pass-through.
+    other), so `defensive="ranked"` would silently do nothing. `tax` IS supported (added for the
+    Round-4 validation): pass a `tax.TaxRules` and every sale is taxed by `_tax_classes`; None
+    (the default) is pre-tax, byte-identical to before. The API does not expose it yet.
 
     `max_position` caps ONE stock's share of the portfolio; `max_category` caps everything held
     through ONE category (its up-to-`picks_per_category` stocks together) - category mode ON
@@ -984,14 +1161,19 @@ def run_broad_backtest(
         extra = extra.fillna(False).astype(bool)
         over_ceiling = extra if over_ceiling is None else (over_ceiling.astype(bool) | extra)
 
-    prices = ranking.prices.copy()
+    # Value held positions through gaps in a stock's price history (a suspension, or a move out of
+    # the EQ series into trade-for-trade, leaves months with no EQ bars). Without this a held
+    # stock's NaN price makes the whole equity curve NaN from that week on. Only valuation sees the
+    # filled prices; the rankings were built from the unfilled frame, so a stock in a gap has no
+    # rank and cannot be bought. A curve that was already finite is unchanged by this.
+    prices = ranking.prices.ffill()
     prices[CASH] = outer_prices.reindex(prices.index)[CASH]
     prices[benchmark] = outer_prices.reindex(prices.index)[benchmark]
 
     held_by_week: dict[pd.Timestamp, list[str]] | None = None
     mass_exit_weeks: frozenset[pd.Timestamp] | None = None
     if category_mode == "on":
-        group_members = load_stock_groups(curated_dir)
+        group_members = load_stock_groups(curated_dir, extended=category_tags == "extended")
         selection = compute_category_selection_mass_exit(
             ranking.combined_pool_ranks,
             group_members,
@@ -1073,6 +1255,7 @@ def run_broad_backtest(
         min_ranked=min_ranked,
         mass_exit_throttle=(mass_exit_response == "throttle"),
         mass_exit_throttle_fraction=mass_exit_throttle_fraction,
+        tax=tax,
     )
     result = engine.run_backtest(
         prices,
@@ -1088,6 +1271,7 @@ def run_broad_backtest(
         no_buy=over_ceiling.reindex(prices.index) if over_ceiling is not None else None,
         uc_locked=uc_locked,
         lc_locked=lc_locked,
+        tax_classes=_tax_classes(list(prices.columns)) if tax is not None else None,
     )
     return BroadBacktestResult(
         result=result,

@@ -348,3 +348,32 @@ def test_build_stock_weekly_prices_flags_a_stale_column_with_no_detected_event(t
     assert stale_columns == {"XYZ": pd.Timestamp("2021-01-08")}
     assert frame["XYZ"].isna().sum() == 0  # forward-filled, not left to go NaN
     assert frame.loc["2021-01-15", "XYZ"] == pytest.approx(101.0)  # flat at its last real close
+
+
+def test_verified_series_breaks_keep_one_continuous_series_for_an_unexplained_fall(tmp_path):
+    rows = [
+        _row("2021-01-04", "ABC", 100.0, 1000.0),
+        _row("2021-01-08", "ABC", 104.0, 1000.0),
+        _row("2021-01-11", "ABC", 80.0, 900.0),  # -23% on normal volume, no corporate action
+        _row("2021-01-15", "ABC", 82.0, 900.0),
+        _row("2021-01-22", "ABC", 85.0, 900.0),
+    ]
+    _write_daily_parquet(tmp_path / "daily.parquet", rows)
+
+    legacy, legacy_events, _ = build_stock_weekly_prices(["ABC"], stocks_data_dir=tmp_path)
+    frame, events, stale = build_stock_weekly_prices(
+        ["ABC"], stocks_data_dir=tmp_path, series_breaks="verified"
+    )
+
+    assert len(legacy_events) == 1 and set(legacy.columns) == {"ABC", "ABC#2"}  # unchanged default
+    assert events.empty and list(frame.columns) == ["ABC"]
+    assert stale == {}
+    # The fall is a real fall, so a held position is valued at the real price, not frozen.
+    assert frame.loc["2021-01-15", "ABC"] == pytest.approx(82.0)
+    assert frame.loc["2021-01-22", "ABC"] == pytest.approx(85.0)
+
+
+def test_series_breaks_rejects_an_unknown_policy(tmp_path):
+    _write_daily_parquet(tmp_path / "daily.parquet", [_row("2021-01-04", "ABC", 100.0, 1000.0)])
+    with pytest.raises(ValueError):
+        build_stock_weekly_prices(["ABC"], stocks_data_dir=tmp_path, series_breaks="nope")

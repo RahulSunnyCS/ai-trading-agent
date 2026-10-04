@@ -6,13 +6,17 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from momentum_backtesting import api, fyers, rebalance
 from momentum_backtesting.api import RebalanceRequest, rebalance_preview
 from momentum_backtesting.engine import IDLE, Config, Result
-from momentum_backtesting.rebalance import broad_quote_symbols, build_plan, model_holdings
+from momentum_backtesting.rebalance import (
+    broad_quote_symbols,
+    build_plan,
+    model_holdings,
+    operational_rebalance_schedule,
+)
 from momentum_backtesting.stocks.ui_data import StockDataset
 
 
@@ -36,6 +40,25 @@ def test_plan_sells_before_buys_and_counts_idle_cash():
 def test_plan_rejects_missing_live_price():
     with pytest.raises(ValueError, match="No tradeable LTP"):
         build_plan({}, {"C0002": 1.0}, {}, {}, 100_000)
+
+
+def test_as_of_plan_keeps_weight_change_when_persisted_price_is_missing():
+    rows = build_plan(
+        {}, {"C0002": 1.0}, {}, {}, 100_000, allow_missing_prices=True
+    )
+    assert rows == [
+        {
+            "asset": "C0002",
+            "symbol": None,
+            "action": "BUY",
+            "current_pct": 0.0,
+            "target_pct": 100.0,
+            "delta_pct": 100.0,
+            "ltp": None,
+            "indicative_value": 100_000.0,
+            "indicative_quantity": None,
+        }
+    ]
 
 
 def test_plan_rejects_overallocated_holdings():
@@ -96,14 +119,126 @@ def test_model_holdings_reads_signal_week_not_last_row():
     assert model_holdings(result, week) == {"A": 0.7, IDLE: 0.3}
 
 
-def test_preview_rejects_outside_market_hours_before_fyers():
+def test_operational_schedule_anchors_every_four_weeks_to_live_start():
+    between = operational_rebalance_schedule(
+        date(2026, 10, 2),
+        strategy_start=date(2026, 9, 18),
+        rebalance_kind="weekly",
+        every=4,
+    )
+    assert between == {
+        "strategy_start_date": "2026-09-18",
+        "cadence": "every_n_weeks",
+        "interval_weeks": 4,
+        "effective_rebalance_offset": 3,
+        "is_rebalance_week": False,
+        "previous_rebalance_date": "2026-09-18",
+        "current_rebalance_date": None,
+        "next_rebalance_date": "2026-10-16",
+    }
+
+    scheduled = operational_rebalance_schedule(
+        date(2026, 10, 16),
+        strategy_start=date(2026, 9, 18),
+        rebalance_kind="weekly",
+        every=4,
+    )
+    assert scheduled["is_rebalance_week"] is True
+    assert scheduled["previous_rebalance_date"] == "2026-09-18"
+    assert scheduled["current_rebalance_date"] == "2026-10-16"
+    assert scheduled["next_rebalance_date"] == "2026-11-13"
+
+
+def test_operational_schedule_before_first_allocation_has_no_previous_date():
+    schedule = operational_rebalance_schedule(
+        date(2026, 10, 2),
+        strategy_start=date(2026, 10, 4),
+        rebalance_kind="weekly",
+        every=2,
+    )
+    assert schedule["is_rebalance_week"] is False
+    assert schedule["previous_rebalance_date"] is None
+    assert schedule["next_rebalance_date"] == "2026-10-09"
+
+
+def test_operational_monthly_schedule_uses_month_end_fridays():
+    schedule = operational_rebalance_schedule(
+        date(2026, 10, 2),
+        strategy_start=date(2026, 9, 20),
+        rebalance_kind="monthly",
+        every=1,
+    )
+    assert schedule["cadence"] == "monthly"
+    assert schedule["previous_rebalance_date"] == "2026-09-25"
+    assert schedule["next_rebalance_date"] == "2026-10-30"
+    assert schedule["is_rebalance_week"] is False
+
+
+def test_preview_uses_persisted_close_outside_market_hours_without_fyers(monkeypatch):
+    week = pd.Timestamp("2026-10-02")
+    prices = pd.DataFrame({"C0001": [200.0]}, index=[week])
+    stock = StockDataset(
+        prices=prices,
+        price_only=prices.copy(),
+        membership=pd.DataFrame({"C0001": [True]}, index=[week]),
+        companies={"C0001": "Example"},
+        tax_classes={"C0001": "equity"},
+        last_week=week,
+    )
+    outcome = Result(
+        config=Config(),
+        equity=pd.Series(dtype=float),
+        benchmark=pd.Series(dtype=float),
+        cash=pd.Series(dtype=float),
+        weights=pd.DataFrame({"C0001": [1.0]}, index=[week]),
+        holdings=pd.DataFrame(),
+        trades=pd.DataFrame(),
+        ranks=pd.DataFrame(),
+        scores=pd.DataFrame(),
+    )
+    monkeypatch.setattr(api.DATA, "get_stock", lambda: stock)
+    monkeypatch.setattr(
+        rebalance,
+        "persisted_stock_prices",
+        lambda *_args, **_kwargs: ({"C0001": 100.0}, {"C0001": "NSE:EXAMPLE-EQ"}),
+    )
+    captured = {}
+
+    def stock_target(*args):
+        captured["config"] = args[-1]
+        return outcome
+
+    monkeypatch.setattr(rebalance, "stock_target", stock_target)
+    monkeypatch.setattr(
+        fyers,
+        "resolve_credentials",
+        lambda **_kwargs: pytest.fail("off-hours preview must not resolve Fyers credentials"),
+    )
     request = RebalanceRequest(
         dataset="stock",
         universe=["C0001"],
         portfolio_value=100_000,
+        strategy_start_date=date(2026, 9, 18),
+        rebalance_every=4,
+        rebalance_offset=0,
     )
-    with pytest.raises(HTTPException, match="market hours"):
-        rebalance_preview(request, now=datetime(2026, 9, 30, 8, 0, tzinfo=ZoneInfo("Asia/Kolkata")))
+    result = rebalance_preview(
+        request, now=datetime(2026, 10, 4, 0, 28, tzinfo=ZoneInfo("Asia/Kolkata"))
+    )
+
+    assert result["price_mode"] == "last_close"
+    assert result["price_source"] == "Latest database close"
+    assert result["as_of"] == "2026-10-02"
+    assert result["first_allocation"] is True
+    assert result["rebalance_schedule"]["previous_rebalance_date"] == "2026-09-18"
+    assert result["rebalance_schedule"]["next_rebalance_date"] == "2026-10-16"
+    assert result["rebalance_schedule"]["is_rebalance_week"] is False
+    # First allocation: replay only the signal week and trade at once, ignoring the cadence phase.
+    assert captured["config"].start == "2026-10-02"
+    assert captured["config"].rebalance_every == 1
+    assert captured["config"].rebalance_offset == 0
+    buy = next(row for row in result["rows"] if row["asset"] == "C0001")
+    assert buy["indicative_quantity"] == 1_000
 
 
 def test_local_browser_oauth_caches_token_only_after_valid_state(monkeypatch):

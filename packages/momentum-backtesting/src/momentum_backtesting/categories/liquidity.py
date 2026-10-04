@@ -103,7 +103,17 @@ def weekly_features(symbols: list[str], root: Path | None = None) -> pd.DataFram
         return hit
     if mtime is None or not symbols:
         return pd.DataFrame()
+    frame = compute_weekly_features(symbols, root)
+    with _lock:
+        _cache.clear()  # one live entry is enough; a new catalog version invalidates the rest
+        _cache[key] = frame
+    return frame
 
+
+def compute_weekly_features(symbols: list[str], root: Path | None = None) -> pd.DataFrame:
+    """`weekly_features` without the cache: for a handful of symbols (e.g. explaining why a few
+    holdings were sold) where evicting the whole-market entry would make the next run recompute
+    it."""
     sql = f"""
     with d as (
       select i.symbol, b.date, b.series, b.close, b.volume, b.turnover / 1e7 as cr,
@@ -143,9 +153,6 @@ def weekly_features(symbols: list[str], root: Path | None = None) -> pd.DataFram
     with connect(root or data_root(), read_only=True) as con:
         frame = con.execute(sql, [symbols]).df()
     frame["wk"] = pd.to_datetime(frame["wk"])
-    with _lock:
-        _cache.clear()  # one live entry is enough; a new catalog version invalidates the rest
-        _cache[key] = frame
     return frame
 
 
@@ -163,6 +170,53 @@ def _passes(features: pd.DataFrame, cfg: LiquidityConfig) -> pd.Series:
     if cfg.max_circuit_days is not None:
         ok &= features["bandhits60"] <= cfg.max_circuit_days
     return ok
+
+
+def failure_reason(row: pd.Series, cfg: LiquidityConfig) -> str:
+    """The first gate test a stock's feature row fails (short label), or "eligible"."""
+    if row["n60"] < MIN_SESSIONS:
+        return "too few sessions"
+    if row["noneq60"] > 0:
+        return "not EQ series throughout"
+    if row["zero60"] > 0:
+        return "zero-volume days"
+    if row["med60"] < cfg.min_turnover_cr:
+        return "median turnover too low"
+    if row["p10_60"] < cfg.min_turnover_cr * cfg.floor_ratio:
+        return "quiet days too thin"
+    if row["px"] < cfg.min_price:
+        return "price too low"
+    if cfg.circuit and row["maxrun125"] >= cfg.circuit_run:
+        return "stuck at circuit"
+    if cfg.max_circuit_days is not None and row["bandhits60"] > cfg.max_circuit_days:
+        return "too many circuit days"
+    return "eligible"
+
+
+def failure_detail(row: pd.Series, cfg: LiquidityConfig) -> str:
+    """`failure_reason` with the numbers, for a human reading a trade list."""
+    label = failure_reason(row, cfg)
+    if label == "too few sessions":
+        return f"only {int(row['n60'])} trading days in the last 60 (needs {MIN_SESSIONS})"
+    if label == "not EQ series throughout":
+        return f"{int(row['noneq60'])} of the last 60 sessions were outside the EQ series"
+    if label == "zero-volume days":
+        return f"{int(row['zero60'])} zero-volume days in the last 60 sessions"
+    if label == "median turnover too low":
+        return (
+            f"median daily turnover Rs {row['med60']:.2f} cr "
+            f"below the Rs {cfg.min_turnover_cr:g} cr gate"
+        )
+    if label == "quiet days too thin":
+        floor = cfg.min_turnover_cr * cfg.floor_ratio
+        return f"quietest days Rs {row['p10_60']:.2f} cr below the Rs {floor:.2f} cr floor"
+    if label == "price too low":
+        return f"price Rs {row['px']:.0f} below the Rs {cfg.min_price:g} minimum"
+    if label == "stuck at circuit":
+        return f"{int(row['maxrun125'])} sessions in a row at the circuit limit"
+    if label == "too many circuit days":
+        return f"{int(row['bandhits60'])} circuit-limit days in the last 60 sessions"
+    return label
 
 
 def eligibility(
@@ -219,23 +273,7 @@ def preview(
     eligible = _passes(snap, cfg)
 
     def reason(row: pd.Series) -> str:
-        if row["n60"] < MIN_SESSIONS:
-            return "too few sessions"
-        if row["noneq60"] > 0:
-            return "not EQ series throughout"
-        if row["zero60"] > 0:
-            return "zero-volume days"
-        if row["med60"] < cfg.min_turnover_cr:
-            return "median turnover too low"
-        if row["p10_60"] < cfg.min_turnover_cr * cfg.floor_ratio:
-            return "quiet days too thin"
-        if row["px"] < cfg.min_price:
-            return "price too low"
-        if cfg.circuit and row["maxrun125"] >= cfg.circuit_run:
-            return "stuck at circuit"
-        if cfg.max_circuit_days is not None and row["bandhits60"] > cfg.max_circuit_days:
-            return "too many circuit days"
-        return "eligible"
+        return failure_reason(row, cfg)
 
     rejected = snap[~eligible]
     reasons = rejected.apply(reason, axis=1)

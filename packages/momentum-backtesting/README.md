@@ -23,14 +23,25 @@ the local `mbt login` cache. Without a database, these standalone sources work a
 ## On-demand rebalance preview
 
 The shared dashboard's **Momentum Backtesting → Rebalance now** tab and the CLI use
-the same read-only calculation. They support Nifty 50 Stocks and Broad Momentum,
-collect Fyers LTPs during NSE market hours, and compare the model's live-week target
-with your actual holdings in percentages. Fyers login is managed from the shared
+the same read-only calculation. They support Nifty 50 Stocks and Broad Momentum and
+compare the model target with your actual holdings in percentages at any time. During
+NSE market hours they prefer Fyers LTPs and calculate a live-week target; outside market
+hours, or if Fyers is unavailable, they use the latest persisted strategy week and raw
+trade closes from the shared database (with a file fallback only on a fresh checkout).
+The response and dashboard label the source and as-of date, so a saved close is never
+presented as live. Fyers login is managed from the shared
 dashboard's Broker logins tab. The access token is AES-256 encrypted server-side in
 `broker_tokens` until the expiry Fyers reports, and the app secret stays in server
 environment configuration, never browser storage. The preview
 never submits orders. Keep `mbt stocks fetch` and, for Broad,
 `mbt categories fetch-universe` data current before using it.
+
+The dashboard also asks for the **strategy live start date**. This is operational state,
+separate from the backtest's historical `start`: it anchors which Friday is the live phase for
+an every-K-weeks strategy. The result states whether the current signal week is scheduled,
+plus the previous and next rebalance dates. When no invested holding weights are entered, the
+request and result are explicitly labelled **first allocation** rather than presenting 100%
+cash as an ordinary rebalance.
 
 For a local dashboard preview without Fastify/Postgres, set `MOMENTUM_DIRECT=1`
 and `MOMENTUM_DIRECT_API_URL=http://127.0.0.1:3000` when starting Next, then run

@@ -1,0 +1,21 @@
+# Smoke space for arm C1 (all-liquid ~4,000-name universe, category layer ON). Not a real search.
+name = "smoke_C1"
+arm = "C1"
+
+[fixed]
+start = "2017-01-01"
+cost_model = "itemised"
+slippage_bps = 15.0
+respect_circuits = true
+min_ranked = 1
+liq_min_turnover_cr = 2.0
+
+[heavy]
+lookbacks = { choice = [[1, 4, 13, 26, 52]] }
+
+[light]
+pool_top_n = { int = [50, 250] }
+pool_band = { int = [0, 100] }
+category_top_n = { int = [3, 10] }
+category_band = { int = [0, 8] }
+max_position = { choice = [0.2, 0.35] }

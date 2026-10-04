@@ -111,6 +111,37 @@ const DATASETS: Array<{ id: Dataset; label: string; description: string }> = [
 const VISIBLE_DATASET_IDS: ReadonlySet<Dataset> = new Set<Dataset>(['etf', 'broad']);
 const VISIBLE_DATASETS = DATASETS.filter((item) => VISIBLE_DATASET_IDS.has(item.id));
 
+/** The dataset switch (ETF Rotation / Broad Momentum). Shown on Backtest and on Saved runs: saved
+ * runs are stored per dataset, so without it a run saved under the other dataset is invisible. */
+function DatasetButtons({
+  dataset,
+  onSelect,
+}: {
+  dataset: Dataset;
+  onSelect: (next: Dataset) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {VISIBLE_DATASETS.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => onSelect(item.id)}
+          title={item.description}
+          className={cn(
+            'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            dataset === item.id
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border bg-surface-2/30 text-muted hover:border-border-strong hover:text-foreground',
+          )}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function numberDefault(defaults: Record<string, unknown>, key: string, fallback: number): number {
   const value = defaults[key];
   return typeof value === 'number' ? value : fallback;
@@ -233,6 +264,14 @@ function MomentumRunTabs({
   );
 }
 
+// Next re-creates this whole view whenever the route changes (the section and dataset are in the
+// URL), which discards React state. Two things must survive that, so they live out here:
+//  - `pendingLoad`: the config "Load settings" just picked. Without it the view comes back up
+//    seeded from the active run tab instead, and the loaded settings are silently lost.
+//  - `lastDataset`: the dataset being worked on, for sections whose URL carries none (Saved runs).
+let pendingLoad: Record<string, unknown> | null = null;
+let lastDataset: Dataset | null = null;
+
 export function MomentumBacktestingView() {
   // Lives here, not in the Weekly view, so the section tab can show that a run is still
   // going after the user has moved to another section.
@@ -244,9 +283,14 @@ export function MomentumBacktestingView() {
   const activeRunId = useMomentumRunsStore((state) => state.activeId);
   const activeRun = runs.find((run) => run.id === activeRunId) ?? null;
   // Seeds the settings from the run you were looking at when you left this page (first load only).
-  const mountSeedRef = useRef<Record<string, unknown> | null>(activeRun?.config ?? null);
+  const mountSeedRef = useRef<Record<string, unknown> | null>(
+    pendingLoad ?? activeRun?.config ?? null,
+  );
   const [dataset, setDatasetState] = useState<Dataset>(() => {
     if (urlDataset && VISIBLE_DATASET_IDS.has(urlDataset)) return urlDataset;
+    const loaded = pendingLoad?.dataset;
+    if (loaded === 'etf' || loaded === 'broad') return loaded;
+    if (lastDataset && VISIBLE_DATASET_IDS.has(lastDataset)) return lastDataset;
     const initial = activeRun?.dataset;
     return initial === 'etf' ||
       initial === 'stock' ||
@@ -394,6 +438,10 @@ export function MomentumBacktestingView() {
         benchmark: stringDefault(base, 'benchmark', nextMeta.benchmarks?.[0] ?? ''),
       }),
     );
+    if (seed) {
+      mountSeedRef.current = null;
+      if (seed === pendingLoad) pendingLoad = null;
+    }
   }
 
   useEffect(() => {
@@ -405,9 +453,14 @@ export function MomentumBacktestingView() {
     setSavedRuns([]);
     setSavedRunError(null);
     void fetchSavedRuns(dataset).then(setSavedRuns);
+    lastDataset = dataset;
     const seed = mountSeedRef.current;
-    mountSeedRef.current = null;
-    void loadMeta(dataset, seed && seed.dataset === dataset ? seed : undefined);
+    const usable = seed && seed.dataset === dataset ? seed : undefined;
+    if (!usable) {
+      mountSeedRef.current = null;
+      pendingLoad = null;
+    }
+    void loadMeta(dataset, usable);
     // Show a run of the dataset you switched to (a tab picked from another dataset already
     // matches and is left alone), else nothing.
     const { runs: all, activeId, setActive } = useMomentumRunsStore.getState();
@@ -437,6 +490,8 @@ export function MomentumBacktestingView() {
       lookbacks: lookbacksFromConfig(config),
     });
     setValues((current) => momentumSettingsDefaults({ ...current, ...config }));
+    // From another section the route change re-creates this view; hand the config over to it.
+    if (section !== 'backtest') pendingLoad = { ...config };
     setSection('backtest');
     setSettingsOpen(true);
   }
@@ -691,6 +746,7 @@ export function MomentumBacktestingView() {
           <MomentumRebalanceView currentBroadConfig={dataset === 'broad' ? currentConfig : null} />
         ) : section === 'saved' ? (
           <div className="space-y-3">
+            <DatasetButtons dataset={dataset} onSelect={setDataset} />
             {savedRunError ? (
               <StateMessage
                 variant="error"
@@ -713,24 +769,7 @@ export function MomentumBacktestingView() {
           <>
             <div className="rounded-xl border border-border bg-surface p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-2">
-                  {VISIBLE_DATASETS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setDataset(item.id)}
-                      title={item.description}
-                      className={cn(
-                        'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                        dataset === item.id
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border bg-surface-2/30 text-muted hover:border-border-strong hover:text-foreground',
-                      )}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
+                <DatasetButtons dataset={dataset} onSelect={setDataset} />
                 <Button size="sm" onClick={() => void loadMeta(dataset)} disabled={loading}>
                   <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
                   Refresh data

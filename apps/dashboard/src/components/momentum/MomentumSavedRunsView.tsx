@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, CheckCircle2, Star } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { usePolledResource } from '../../hooks/usePolledResource';
 import type { MomentumSavedRun, MomentumWeeklyStatus } from '../../types/momentum';
@@ -62,6 +62,54 @@ const SETTING_LABELS: Record<string, string> = {
   slippage_bps: 'Slippage (bps)',
 };
 
+type SortKey =
+  | 'saved'
+  | 'name'
+  | 'cagr'
+  | 'max_drawdown'
+  | 'turnover_per_year'
+  | 'sharpe'
+  | 'excess_cagr';
+const SORTS: Array<[SortKey, string]> = [
+  ['saved', 'Saved date'],
+  ['cagr', 'CAGR'],
+  ['max_drawdown', 'Max drawdown'],
+  ['turnover_per_year', 'Turnover'],
+  ['sharpe', 'Sharpe'],
+  ['excess_cagr', 'Edge vs benchmark'],
+  ['name', 'Name'],
+];
+// The natural "best first" direction per column: high CAGR/Sharpe/edge, shallow drawdown
+// (max_drawdown is stored negative, so descending already puts -20% above -50%), low turnover.
+const BEST_FIRST_DESC: Record<SortKey, boolean> = {
+  saved: true,
+  name: false,
+  cagr: true,
+  max_drawdown: true,
+  turnover_per_year: false,
+  sharpe: true,
+  excess_cagr: true,
+};
+
+function sortRuns(runs: MomentumSavedRun[], key: SortKey, reversed: boolean): MomentumSavedRun[] {
+  const desc = BEST_FIRST_DESC[key] !== reversed;
+  const value = (run: MomentumSavedRun): number | string | null =>
+    key === 'saved'
+      ? run.created_at
+      : key === 'name'
+        ? run.name.toLowerCase()
+        : (run.kpis[key] ?? null);
+  return [...runs].sort((a, b) => {
+    const x = value(a);
+    const y = value(b);
+    // Runs without the metric always sink to the bottom, whichever way the sort runs.
+    if (x === null || x === undefined) return y === null || y === undefined ? 0 : 1;
+    if (y === null || y === undefined) return -1;
+    const order = x < y ? -1 : x > y ? 1 : 0;
+    return desc ? -order : order;
+  });
+}
+
 function settingValue(value: unknown): string {
   if (Array.isArray(value)) return value.join(', ');
   if (typeof value === 'boolean') return value ? 'On' : 'Off';
@@ -102,6 +150,18 @@ export function MomentumSavedRunsView({
   const [compareId, setCompareId] = useState('');
   const [draftNames, setDraftNames] = useState<Record<string, string>>({});
   const [removeId, setRemoveId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('saved');
+  const [reversed, setReversed] = useState(false);
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const filtered = runs.filter(
+      (run) =>
+        (!favouritesOnly || run.favorite) && (!needle || run.name.toLowerCase().includes(needle)),
+    );
+    return sortRuns(filtered, sortKey, reversed);
+  }, [runs, query, sortKey, reversed, favouritesOnly]);
   const current = runs.find((run) => run.id === baseId) ?? runs[0];
   const comparison =
     runs.find((run) => run.id === compareId && run.id !== current?.id) ??
@@ -125,8 +185,58 @@ export function MomentumSavedRunsView({
         />
         {runs.length === 0 ? (
           <p className="text-sm text-muted">Run a backtest to start a comparison.</p>
-        ) : null}
-        {runs.map((run, index) => {
+        ) : (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              aria-label="Search saved runs"
+              placeholder="Search by name…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="min-w-56 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            />
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              Sort by
+              <select
+                aria-label="Sort saved runs"
+                value={sortKey}
+                onChange={(event) => {
+                  setSortKey(event.target.value as SortKey);
+                  setReversed(false);
+                }}
+                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+              >
+                {SORTS.map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label="Reverse sort order"
+              onClick={() => setReversed((value) => !value)}
+            >
+              {BEST_FIRST_DESC[sortKey] !== reversed ? '↓ Descending' : '↑ Ascending'}
+            </Button>
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              <input
+                type="checkbox"
+                checked={favouritesOnly}
+                onChange={(event) => setFavouritesOnly(event.target.checked)}
+              />
+              Favourites only
+            </label>
+            <span className="text-xs text-muted">
+              Showing {shown.length} of {runs.length}
+            </span>
+          </div>
+        )}
+        {shown.map((run) => {
+          // The overlay base is the first saved run, whatever order the list is sorted in.
+          const index = runs.indexOf(run);
           const ready = readiness(run, status ?? null);
           return (
             <div key={run.id} className="border-t border-border py-3">
@@ -185,8 +295,8 @@ export function MomentumSavedRunsView({
                   className="min-w-48 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
                 />
                 <span className="text-xs text-muted">
-                  CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Sharpe{' '}
-                  {metric(run, 'sharpe')}
+                  CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Turnover{' '}
+                  {metric(run, 'turnover_per_year')} · Sharpe {metric(run, 'sharpe')}
                   {typeof run.config.start === 'string'
                     ? ` · ${run.config.start} → ${String(run.config.end ?? 'latest')}`
                     : ''}

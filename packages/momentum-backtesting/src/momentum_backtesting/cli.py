@@ -986,6 +986,321 @@ categories_app = typer.Typer(
 )
 app.add_typer(categories_app, name="categories")
 
+search_app = typer.Typer(
+    no_args_is_help=True,
+    help="Broad Momentum parameter search: resumable parallel sweeps over a TOML space file.",
+)
+app.add_typer(search_app, name="search")
+
+
+@search_app.command("run")
+def search_run(
+    space: Path = typer.Argument(..., help="Search-space TOML (see search_spaces/)."),
+    out: Path = typer.Option(None, "--out", help="Results folder (default data/search/<name>)."),
+    heavy: int = typer.Option(20, help="Distinct ranking combinations (the expensive ones)."),
+    light: int = typer.Option(50, help="Runs per ranking combination."),
+    seed: int = typer.Option(1, help="Sampling seed; same seed + space = same runs."),
+    workers: int = typer.Option(2, help="Worker processes (~1 GB each, ~1.5 GB for all-liquid)."),
+    limit_groups: int = typer.Option(None, help="Only the first N groups (smoke tests)."),
+) -> None:
+    """Run (or resume) a search. Re-running the same command skips runs already saved."""
+    from . import search as sr
+
+    spec = sr.load_space(space)
+    out = out or DATA_DIR / "search" / spec.name
+    sr.run_search(
+        space,
+        out,
+        heavy_count=heavy,
+        light_count=light,
+        seed=seed,
+        workers=workers,
+        limit_groups=limit_groups,
+        echo=typer.echo,
+    )
+    typer.echo(f"results in {out}")
+
+
+@search_app.command("bias")
+def search_bias(
+    out: Path = typer.Argument(..., help="A results folder from `mbt search run`."),
+    space: Path = typer.Option(..., "--space", help="The search-space TOML the folder came from."),
+    seeds: int = typer.Option(5, help="Random-ranking placebo seeds per config."),
+) -> None:
+    """Try to break the best configs: random-ranking placebo, much stricter liquidity, removing the
+    biggest winners, and shifted/cut date windows. Writes <out>/bias.json and prints a summary."""
+    from . import bias
+
+    report = bias.run_checks(out, space, seeds=seeds, echo=typer.echo)
+    typer.echo("\n" + bias.render(report))
+    typer.echo(f"saved {out / 'bias.json'}")
+
+
+@search_app.command("robust")
+def search_robust(
+    out: Path = typer.Argument(..., help="A finished search's results folder (e.g. round2_A)."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML (must be sealed)."),
+    top: int = typer.Option(45, help="How many candidates to nudge."),
+    workers: int = typer.Option(4, help="Worker processes (~1 GB each)."),
+    dest: Path = typer.Option(None, "--dest", help="Where to write (default <out>/round3)."),
+    ids_file: Path = typer.Option(
+        None, "--ids-file", help="JSON list of run ids to nudge instead."
+    ),
+) -> None:
+    """Round 3: nudge the best candidates (neighbouring parameters, other rebalance days, later
+    starts) inside the tuning window and see whether their results hold. Resumable."""
+    import json as _json
+
+    from . import robust
+
+    ids = _json.loads(ids_file.read_text()) if ids_file else None
+    robust.run_round3(
+        out, space, dest or out / "round3", top=top, workers=workers, ids=ids, echo=typer.echo
+    )
+
+
+@search_app.command("robust-report")
+def search_robust_report(
+    dest: Path = typer.Argument(..., help="The round3 folder written by `mbt search robust`."),
+    show: int = typer.Option(15, help="Candidates to print."),
+    dd_floor: float = typer.Option(-0.30, help="Depth a nudged version may not exceed."),
+    uw_cap: float = typer.Option(None, help="Max weeks below a previous high (80% of nudges)."),
+) -> None:
+    """One verdict per candidate: how far its result strays when nudged, and who survives."""
+    from . import robust
+
+    frame = robust.load_robust(dest)
+    if frame.empty:
+        typer.echo("no results yet")
+        raise typer.Exit(1)
+    table = robust.verdicts(frame, dd_floor=dd_floor, uw_cap=uw_cap)
+    typer.echo(
+        f"{table.cid.nunique()} candidates; {int(table.survives.sum())} survive "
+        f"({frame.error.notna().sum()} errored nudges of {len(frame)})"
+    )
+    typer.echo(table.head(show).round(3).to_string(index=False))
+
+
+@search_app.command("final")
+def search_final(
+    out: Path = typer.Argument(..., help="The tuning search's results folder (e.g. round2_A)."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    finalists: Path = typer.Option(..., "--finalists", help="JSON {label: run id} chosen BEFORE."),
+    open_sealed: bool = typer.Option(False, "--open-sealed", help="Confirm: opens 2023+ for good."),
+    workers: int = typer.Option(4, help="Worker processes (~1.5 GB each, strict-liquidity pass)."),
+) -> None:
+    """Round 4: the one-time out-of-sample test (2023+) of the finalists, with tax, a random-rank
+    placebo and a stricter liquidity gate. One-way door: see final.py's docstring."""
+    from . import final
+
+    final.run_final(
+        out, space, finalists, open_sealed=open_sealed, workers=workers, echo=typer.echo
+    )
+
+
+@search_app.command("final-report")
+def search_final_report(
+    out: Path = typer.Argument(..., help="The tuning search's results folder."),
+    trials: int = typer.Option(20866, help="Total configs tried across all rounds (for the DSR)."),
+) -> None:
+    """Apply the pre-registered criteria to the Round 4 results."""
+    import numpy as np
+
+    from . import final
+    from . import search as sr
+
+    rows = final.load_final(out / "round4")
+    if not rows:
+        typer.echo("no Round 4 results yet")
+        raise typer.Exit(1)
+    results = sr.load_results(out)
+    weekly_sr = (results["sharpe"].dropna() / np.sqrt(52)).to_numpy()
+    table = final.evaluate(rows, weekly_sr, trials)
+    typer.echo(table.round(3).T.to_string())
+    passed = int(table.passes.sum())
+    typer.echo(
+        f"\n{passed} of {len(table)} finalists pass all four pre-registered criteria -> "
+        f"{final.reading(passed, len(table))}"
+    )
+
+
+@search_app.command("rescore")
+def search_rescore(
+    out: Path = typer.Argument(..., help="A finished search's results folder (e.g. round2_A)."),
+    space: Path = typer.Option(..., "--space", help="Space TOML for the FULL period (round5_A)."),
+    min_cagr: float = typer.Option(0.20, help="Re-run candidates with at least this CAGR."),
+    workers: int = typer.Option(4, help="Worker processes (~1 GB each)."),
+    dest: Path = typer.Option(None, "--dest", help="Default <out>/round5."),
+) -> None:
+    """Re-run the best candidates over the full period and keep the weekly equity curve, so time
+    under water and new-high behaviour can be judged. Resumable."""
+    from . import rescore
+
+    rescore.run_rescore(
+        out, space, dest or out / "round5", min_cagr=min_cagr, workers=workers, echo=typer.echo
+    )
+
+
+@search_app.command("steady-select")
+def search_steady_select(
+    out: Path = typer.Argument(..., help="The tuning search's results folder (round2_A)."),
+    top: int = typer.Option(40, help="Candidates to send to the nudge test."),
+    track: str = typer.Option("strict", help="strict (pre-registered) or relaxed (post-hoc)."),
+) -> None:
+    """Apply the steady-highs selection rules (round5_criteria.json) to the full-period re-score."""
+    import json as _json
+
+    from . import rescore, steady
+
+    df = rescore.load_rescored(out / "round5")
+    if df.empty:
+        typer.echo("no re-scored runs yet")
+        raise typer.Exit(1)
+    chosen, cap, counts = steady.select_candidates(df, top, relaxed=(track == "relaxed"))
+    typer.echo(
+        f"[{track}] {len(df)} re-scored; passing every filter at each cap: {counts}; "
+        f"using U = {cap} weeks"
+    )
+    (out / "round5" / track).mkdir(parents=True, exist_ok=True)
+    (out / "round5" / track / "candidates.json").write_text(
+        _json.dumps({"cap_weeks": cap, "ids": list(chosen["id"])}, indent=1)
+    )
+    show = [
+        "id",
+        "cagr",
+        "mdd",
+        "turnover_x",
+        steady.UW,
+        "uw_recovery_weeks",
+        "w1_cagr",
+        "w1_newhigh",
+        "w2_cagr",
+        "w2_newhigh",
+    ]
+    typer.echo(chosen[show].head(15).round(3).to_string(index=False))
+
+
+@search_app.command("steady-finalists")
+def search_steady_finalists(
+    out: Path = typer.Argument(..., help="The tuning search's results folder (round2_A)."),
+    top: int = typer.Option(10, help="Finalists to keep."),
+    track: str = typer.Option("strict", help="strict (pre-registered) or relaxed (post-hoc)."),
+) -> None:
+    """Top survivors of the duration-aware nudge test, by full-period CAGR -> finalists file."""
+    import json as _json
+
+    from . import rescore, robust
+
+    meta = _json.loads((out / "round5" / track / "candidates.json").read_text())
+    cap = meta["cap_weeks"]
+    table = robust.verdicts(
+        robust.load_robust(out / "round5" / track / "nudge"), dd_floor=-0.38, uw_cap=1.5 * cap
+    )
+    scored = rescore.load_rescored(out / "round5").set_index("id")
+    table["cagr"] = table["cid"].map(scored["cagr"])
+    alive = table[table.survives].sort_values("cagr", ascending=False).head(top)
+    typer.echo(
+        f"{int(table.survives.sum())} of {len(table)} survive the nudge test (U = {cap}, "
+        f"nudges allowed {1.5 * cap:.0f} weeks)"
+    )
+    (out / "round5" / track / "finalists.json").write_text(
+        _json.dumps({f"finalist_{i + 1}": cid for i, cid in enumerate(alive["cid"])}, indent=1)
+    )
+    typer.echo(
+        alive[
+            [
+                "cid",
+                "cagr",
+                "base_mdd",
+                "base_uw_weeks",
+                "nudge_p25",
+                "nudge_worst",
+                "nudge_share_uw_ok",
+            ]
+        ]
+        .round(3)
+        .to_string(index=False)
+    )
+
+
+@search_app.command("steady-validate")
+def search_steady_validate(
+    out: Path = typer.Argument(..., help="The tuning search's results folder (round2_A)."),
+    space: Path = typer.Option(..., "--space", help="search_spaces/round5_A.toml"),
+    workers: int = typer.Option(3, help="Worker processes."),
+    track: str = typer.Option("strict", help="strict (pre-registered) or relaxed (post-hoc)."),
+) -> None:
+    """Placebo, tax and stricter-liquidity checks for the finalists, over the full period."""
+    import json as _json
+
+    from . import steady
+
+    finalists = _json.loads((out / "round5" / track / "finalists.json").read_text())
+    steady.run_validation(
+        out,
+        space,
+        finalists,
+        out / "round5" / track / "validate",
+        workers=workers,
+        echo=typer.echo,
+    )
+
+
+@search_app.command("steady-report")
+def search_steady_report(
+    out: Path = typer.Argument(..., help="The tuning search's results folder (round2_A)."),
+    trials: int = typer.Option(22000, help="Total configs tried across all rounds (DSR)."),
+    track: str = typer.Option("strict", help="strict (pre-registered) or relaxed (post-hoc)."),
+) -> None:
+    """Winner / Finalist verdict for the steady-highs finalists."""
+    import numpy as np
+
+    from . import rescore, steady
+    from . import search as sr
+
+    rows = steady.load_validation(out / "round5" / track / "validate")
+    if not rows:
+        typer.echo("no validation results yet")
+        raise typer.Exit(1)
+    results = sr.load_results(out)
+    weekly_sr = (results["sharpe"].dropna() / np.sqrt(52)).to_numpy()
+    table = steady.evaluate(rows, rescore.load_rescored(out / "round5"), weekly_sr, trials)
+    typer.echo(table.round(3).T.to_string())
+    typer.echo(f"\n{int(table.winner.sum())} of {len(table)} are Winners")
+
+
+@search_app.command("analyze")
+def search_analyze(
+    out: Path = typer.Argument(..., help="A results folder from `mbt search run`."),
+    top: int = typer.Option(10, help="Rows per profile."),
+    max_turnover: float = typer.Option(
+        None, help="Reject runs above this one-way turnover (x/yr)."
+    ),
+) -> None:
+    """Best runs per drawdown profile (aggressive / balanced <=1.5x / defensive <=1.0x the
+    benchmark's own max drawdown), plus which searched parameters correlate with CAGR."""
+    from . import search as sr
+
+    df = sr.load_results(out)
+    if df.empty:
+        typer.echo("no results yet")
+        raise typer.Exit(1)
+    errors = df["error"].notna().sum()
+    typer.echo(
+        f"{len(df)} runs ({errors} errors); benchmark max drawdown "
+        f"{df['bench_mdd'].dropna().iloc[0]:.1%}, CAGR {df['bench_cagr'].dropna().iloc[0]:.1%}"
+    )
+    if errors:
+        typer.echo(df["error"].dropna().value_counts().head(3).to_string())
+    show = ["cagr", "mdd", "calmar", "turnover_x", "buys_per_yr", "roll3y_worst", "roll3y_beat"]
+    for name, table in sr.profile_tables(df, top=top, max_turnover=max_turnover).items():
+        typer.echo(f"\n== {name}: {len(table)} shown ==")
+        params = [c for c in table.columns if c.startswith(("p_", "h_"))]
+        keep = [c for c in params if table[c].nunique() > 1 or len(table) == 1]
+        typer.echo(table[show + keep].round(3).to_string(index=False))
+    typer.echo("\n== |rank correlation| with CAGR ==")
+    typer.echo(sr.importance(df).head(12).round(2).to_string())
+
 
 def _categories_data_dir() -> Path:
     return DATA_DIR / "categories"
@@ -1377,7 +1692,7 @@ def rebalance(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print the complete JSON response."),
 ) -> None:
-    """Fetch Fyers LTPs and preview the buys/sells needed to reach the model target."""
+    """Preview model buys/sells using live prices or the latest persisted close."""
     import json
 
     from fastapi import HTTPException
@@ -1402,7 +1717,9 @@ def rebalance(
     if json_output:
         typer.echo(json.dumps(plan, indent=2))
         return
-    typer.echo(f"{plan['dataset']} rebalance preview at {plan['as_of']}")
+    typer.echo(
+        f"{plan['dataset']} rebalance preview at {plan['as_of']} using {plan['price_source']}"
+    )
     typer.echo(f"Portfolio: ₹{portfolio_value:,.2f}; signal week {plan['signal_week']}")
     if not plan["rows"]:
         typer.echo("No weight changes are indicated.")
@@ -1411,6 +1728,8 @@ def rebalance(
             f"~{row['indicative_quantity']} shares @ ₹{row['ltp']:,.2f}"
             if row["indicative_quantity"] is not None
             else "cash allocation"
+            if row["asset"] in ("Idle cash", "Cash (liquid fund)")
+            else "share quantity unavailable"
         )
         typer.echo(
             f"{row['action']:4} {row['asset']:25} "

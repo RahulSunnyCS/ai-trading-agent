@@ -30,6 +30,7 @@ from . import (
 )
 from .categories import broad
 from .categories import circuit_exposure as circuit_exposure_mod
+from .categories import exit_reasons as exit_reasons_mod
 from .categories import liquidity as liquidity_mod
 from .categories import momentum_scores as momentum_scores_mod
 from .categories.compose import (
@@ -344,6 +345,7 @@ class _Data:
         pool_exit_rank: int,
         liquidity: liquidity_mod.LiquidityConfig | None = None,
         universe_kind: Literal["total_market", "all_liquid"] = "total_market",
+        series_breaks: Literal["legacy", "verified"] = "legacy",
     ) -> broad.UniverseRanking:
         """Step 2 (categories/broad.py) for this exact parameter combination - cached the same
         way get_categories_universe caches AllCategoriesResult (the expensive part is independent
@@ -367,6 +369,7 @@ class _Data:
             pool_exit_rank,
             liquidity,
             universe_kind,
+            series_breaks,
         )
         with self._lock:
             if mtimes != self._broad_mtimes:
@@ -388,6 +391,7 @@ class _Data:
             pool_exit_rank=pool_exit_rank,
             liquidity=liquidity,
             universe_kind=universe_kind,
+            series_breaks=series_breaks,
         )
         with self._lock:
             self.broad_ranking_cache[key] = ranking
@@ -536,6 +540,14 @@ class BacktestRequest(BaseModel):
     # broad_off_top_n/broad_off_exit_rank below) - never conflated with the ON-mode category
     # top_n/exit_rank fields.
     broad_category_mode: Literal["on", "off"] = "on"
+    # "extended" also tags stocks outside the 755-name Total Market (BSE-derived sectors), so the
+    # all-liquid universe's category layer can hold them; "curated" is the original 755-name file.
+    broad_category_tags: Literal["curated", "extended"] = "curated"
+    # How big one-day falls are treated when building price series. "legacy" (default, so saved
+    # runs reproduce) starts a new series at every unexplained fall >= 15%, which retires and
+    # freezes a held position; "verified" keeps one continuous series unless a corporate action
+    # that cannot be back-adjusted (demerger, rights, scheme, dividend) explains the fall.
+    broad_series_breaks: Literal["legacy", "verified"] = "legacy"
     # Step 2: the quarterly-refreshed qualifying-pool hysteresis (shared by both modes).
     broad_pool_top_n: int = Field(broad.DEFAULT_POOL_TOP_N, ge=10, le=500)
     broad_pool_exit_rank: int = Field(broad.DEFAULT_POOL_EXIT_RANK, ge=10, le=700)
@@ -609,6 +621,9 @@ class RebalanceRequest(BacktestRequest):
 
     holdings_pct: dict[str, float] = Field(default_factory=dict)
     portfolio_value: float = Field(gt=0)
+    # Operational/live start, distinct from BacktestRequest.start (the research window).
+    # When supplied it anchors the every-K-weeks cadence phase used by this preview.
+    strategy_start_date: date | None = None
     auth_source: Literal["auto", "dashboard"] = "auto"
 
 
@@ -1452,6 +1467,7 @@ def _run_broad(
         categories_data_dir=DATA_DIR / "categories",
         curated_dir=CATEGORIES_CURATED_DIR,
         category_mode=req.broad_category_mode,
+        category_tags=req.broad_category_tags,
         start=req.start,
         end=req.end or None,
         lookbacks=tuple(req.lookbacks),
@@ -1573,6 +1589,7 @@ def _broad_backtest(req: BacktestRequest) -> dict:
             pool_exit_rank=req.broad_pool_exit_rank,
             liquidity=_liquidity_config(req),
             universe_kind=req.broad_universe,
+            series_breaks=req.broad_series_breaks,
         )
         outcome = _run_broad(req, ranking, DATA.get())
         DATA.trim_cache()
@@ -1595,7 +1612,13 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     )
     # Always present (empty list for category_mode="off", where there is no category layer at
     # all) - a consistent response shape the frontend can rely on regardless of mode.
-    group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR) if on else {}
+    group_members = (
+        broad.load_stock_groups(
+            CATEGORIES_CURATED_DIR, extended=req.broad_category_tags == "extended"
+        )
+        if on
+        else {}
+    )
     payload["held_categories"] = broad.current_holdings_detail(
         outcome,
         group_members,
@@ -1603,6 +1626,19 @@ def _broad_backtest(req: BacktestRequest) -> dict:
         picks_per_category=req.broad_picks_per_category,
     )
     payload["missing_symbols"] = outcome.ranking.missing_symbols
+    # Fill blank exit ranks and say WHY a holding was sold when it simply stopped being ranked
+    # (liquidity gate, left the pool, lost its category). Display-only; never fails the run.
+    with contextlib.suppress(Exception):
+        exit_reasons_mod.explain_exits(
+            payload["trades"],
+            ranking=outcome.ranking,
+            held_by_week=outcome.held_by_week,
+            group_members=group_members,
+            signal_delay=req.signal_delay,
+            pool_exit_rank=req.broad_pool_exit_rank,
+            picks_per_category=req.broad_picks_per_category,
+            liquidity_cfg=_liquidity_config(req),
+        )
     # Display-only "worst LC/UC you'd have walked into" card; never allowed to fail the run.
     try:
         payload["circuit_exposure"] = circuit_exposure_mod.circuit_exposure(
@@ -1618,14 +1654,15 @@ def _broad_backtest(req: BacktestRequest) -> dict:
 
 
 def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> dict:
-    """Live, read-only target versus user holdings. Also called by `mbt rebalance`."""
+    """Always-available, read-only target versus user holdings.
+
+    Market hours prefer a temporary Fyers LTP row. At every other time (and when
+    live credentials or quotes are unavailable), the latest persisted strategy week
+    and trade closes are used without pretending those prices are live.
+    """
     now = (now or datetime.now(IST)).astimezone(IST)
-    if now.weekday() >= 5 or not time(9, 15) <= now.time() <= time(15, 30):
-        raise HTTPException(
-            422, "Live preview is available during NSE market hours (09:15–15:30 IST)."
-        )
     if req.dataset not in ("stock", "broad"):
-        raise HTTPException(422, "Live stock rebalance preview supports Stock and Broad Momentum.")
+        raise HTTPException(422, "Rebalance preview supports Stock and Broad Momentum.")
     if req.weights is not None and len(req.weights) != len(req.lookbacks):
         raise HTTPException(422, "Give one weight per lookback.")
     if any(value < 0 or value > 100 for value in req.holdings_pct.values()):
@@ -1633,17 +1670,44 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
     if sum(req.holdings_pct.values()) > 100.0001:
         raise HTTPException(422, "Current holding percentages total more than 100%.")
 
-    load_repo_env()
-    try:
-        creds = fyers.resolve_credentials(prefer_dashboard=req.auth_source == "dashboard")
-    except fyers.FyersCredentialsError as error:
-        raise HTTPException(401, f"Fyers login required: {error}") from None
+    first_allocation = not any(
+        name != IDLE and weight > 1e-6 for name, weight in req.holdings_pct.items()
+    )
 
-    week = rebalance.signal_week(now.date())
-    settlement_week = week + pd.Timedelta(days=7)
-    # The engine decides trades for weeks[:-1]. A flat, in-memory sentinel week
-    # lets it decide on today's LTP row without inventing a future price move.
-    model_req = req.model_copy(update={"end": settlement_week.strftime("%Y-%m-%d")})
+    def model_request(week: pd.Timestamp, settlement_week: pd.Timestamp):
+        updates: dict[str, object] = {"end": settlement_week.strftime("%Y-%m-%d")}
+        if first_allocation:
+            # A first allocation has no history to inherit: replay only the signal week so the
+            # target is the current top-N split equally, not weights drifted by past buys.
+            # Trade immediately, whatever the cadence phase.
+            updates.update(
+                start=week.strftime("%Y-%m-%d"),
+                rebalance="weekly",
+                rebalance_every=1,
+                rebalance_offset=0,
+            )
+        schedule = None
+        if req.strategy_start_date is not None:
+            schedule = rebalance.operational_rebalance_schedule(
+                week.date(),
+                strategy_start=req.strategy_start_date,
+                rebalance_kind=req.rebalance,
+                every=req.rebalance_every,
+            )
+            offset = schedule["effective_rebalance_offset"]
+            if not first_allocation and req.rebalance == "weekly" and isinstance(offset, int):
+                updates["rebalance_offset"] = offset
+        return req.model_copy(update=updates), schedule
+
+    live = now.weekday() < 5 and time(9, 15) <= now.time() <= time(15, 30)
+    creds = None
+    if live:
+        load_repo_env()
+        try:
+            creds = fyers.resolve_credentials(prefer_dashboard=req.auth_source == "dashboard")
+        except fyers.FyersCredentialsError:
+            live = False
+
     try:
         if req.dataset == "stock":
             stock = DATA.get_stock()
@@ -1652,23 +1716,32 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
             )
             if unknown:
                 raise ValueError(f"Unknown holding identifiers: {', '.join(sorted(unknown))}.")
-            quotes = rebalance.quote_stock_universe(
-                stock, req.universe, req.holdings_pct, now.date(), creds
-            )
-            prices, membership, ltp, symbols = rebalance.live_stock_prices(
-                stock, req.universe, req.holdings_pct, quotes, now.date()
-            )
+            if live:
+                try:
+                    quotes = rebalance.quote_stock_universe(
+                        stock, req.universe, req.holdings_pct, now.date(), creds
+                    )
+                    prices, membership, ltp, symbols = rebalance.live_stock_prices(
+                        stock, req.universe, req.holdings_pct, quotes, now.date()
+                    )
+                    week = rebalance.signal_week(now.date())
+                except (fyers.FyersCredentialsError, RuntimeError, ValueError):
+                    live = False
+            if not live:
+                week = stock.prices.index[-1]
+                prices = stock.prices.copy()
+                membership = stock.membership.copy()
+                ltp, symbols = rebalance.persisted_stock_prices(
+                    stock, req.universe, req.holdings_pct, week.date()
+                )
+            settlement_week = week + pd.Timedelta(days=7)
             prices.loc[settlement_week] = prices.loc[week]
             membership.loc[settlement_week] = membership.loc[week]
+            model_req, schedule = model_request(week, settlement_week)
             config = Config(**_config_kwargs(model_req))
             outcome = rebalance.stock_target(stock, prices, membership, config)
             target = rebalance.model_holdings(outcome, week)
         else:
-            if req.broad_universe == "all_liquid":
-                raise ValueError(
-                    "Live rebalance preview isn't available for the whole-market universe yet "
-                    "(it would need LTPs for thousands of stocks). Use the Total Market pool."
-                )
             if (
                 req.broad_category_mode == "on"
                 and req.broad_category_top_n > req.broad_category_exit_rank
@@ -1683,59 +1756,95 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                 pool_exit_rank=req.broad_pool_exit_rank,
                 liquidity=_liquidity_config(req),
                 universe_kind=req.broad_universe,
+                series_breaks=req.broad_series_breaks,
             )
             symbol_map = rebalance.broad_quote_symbols(ranking)
             unknown = set(req.holdings_pct) - set(symbol_map) - {IDLE}
             if unknown:
                 raise ValueError(f"Unknown or inactive holdings: {', '.join(sorted(unknown))}.")
-            quotes = fyers.quotes(sorted(set(symbol_map.values())), creds)
-            config = Config(
-                lookbacks=tuple(req.lookbacks),
-                weights=tuple(req.weights) if req.weights else None,
-                score=req.score,
-                voladj_skip_recent_month=req.voladj_skip_recent_month,
-            )
-            live_ranking, ltp, symbols = rebalance.live_broad_ranking(
-                ranking,
-                quotes,
-                now.date(),
-                config,
-                pool_top_n=req.broad_pool_top_n,
-                pool_exit_rank=req.broad_pool_exit_rank,
-                liquidity=_liquidity_config(req),
-                universe_kind=req.broad_universe,
-            )
+            # Quoting every listed stock is intentionally avoided for the whole-market
+            # universe. Its preview remains available from the latest database close.
+            if live and req.broad_universe == "all_liquid":
+                live = False
+            if live:
+                try:
+                    quotes = fyers.quotes(sorted(set(symbol_map.values())), creds)
+                    config = Config(
+                        lookbacks=tuple(req.lookbacks),
+                        weights=tuple(req.weights) if req.weights else None,
+                        score=req.score,
+                        voladj_skip_recent_month=req.voladj_skip_recent_month,
+                    )
+                    preview_ranking, ltp, symbols = rebalance.live_broad_ranking(
+                        ranking,
+                        quotes,
+                        now.date(),
+                        config,
+                        pool_top_n=req.broad_pool_top_n,
+                        pool_exit_rank=req.broad_pool_exit_rank,
+                        liquidity=_liquidity_config(req),
+                        universe_kind=req.broad_universe,
+                    )
+                    week = rebalance.signal_week(now.date())
+                except (fyers.FyersCredentialsError, RuntimeError, ValueError):
+                    live = False
+            if not live:
+                week = ranking.prices.index[-1]
+                preview_ranking = rebalance.persisted_broad_ranking(ranking)
+                ltp, symbols = rebalance.persisted_broad_prices(ranking, week.date())
+            settlement_week = week + pd.Timedelta(days=7)
+            model_req, schedule = model_request(week, settlement_week)
             outer = DATA.get().copy()
-            if week > outer.index[-1]:
-                outer.loc[week] = outer.iloc[-1]
+            if week not in outer.index:
+                available = outer.loc[outer.index <= week]
+                if available.empty:
+                    raise ValueError("No persisted outer-market data for the preview week.")
+                outer.loc[week] = available.iloc[-1]
             outer.loc[settlement_week] = outer.loc[week]
-            outcome = _run_broad(model_req, live_ranking, outer).result
+            outcome = _run_broad(model_req, preview_ranking, outer).result
             target = rebalance.model_holdings(outcome, week)
         current = dict(req.holdings_pct)
         current[IDLE] = current.get(IDLE, 0.0) + max(0.0, 100 - sum(current.values()))
-        rows = rebalance.build_plan(current, target, ltp, symbols, req.portfolio_value)
-    except fyers.FyersCredentialsError as error:
-        raise HTTPException(401, f"Fyers login required: {error}") from None
+        rows = rebalance.build_plan(
+            current,
+            target,
+            ltp,
+            symbols,
+            req.portfolio_value,
+            allow_missing_prices=not live,
+        )
     except (ValueError, KeyError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
     except FileNotFoundError as error:
         raise HTTPException(409, str(error)) from None
-    except RuntimeError as error:
-        raise HTTPException(502, f"Fyers quote request failed: {error}") from None
+    price_mode = "live" if live else "last_close"
 
     return {
         "dataset": req.dataset,
-        "as_of": now.isoformat(timespec="seconds"),
+        "as_of": now.isoformat(timespec="seconds") if live else week.strftime("%Y-%m-%d"),
         "signal_week": week.strftime("%Y-%m-%d"),
-        "price_source": "Fyers last traded price",
+        "price_mode": price_mode,
+        "price_source": "Fyers last traded price" if live else "Latest database close",
         "portfolio_value": req.portfolio_value,
+        "first_allocation": first_allocation,
+        "rebalance_schedule": schedule,
         "current_pct": current,
         "target_pct": {name: round(weight * 100, 4) for name, weight in target.items()},
         "rows": rows,
         "note": (
-            "Model target uses the strategy's simulated historical holdings. "
+            (
+                "No invested holdings were supplied, so this is a first allocation. "
+                if first_allocation
+                else ""
+            )
+            + "Model target uses the strategy's simulated historical holdings. "
             "Your supplied weights determine the difference. "
-            "Quantities are indicative whole shares; "
+            + (
+                "Live Fyers prices were used. "
+                if live
+                else "This is an as-of preview using persisted closes, not live prices. "
+            )
+            + "Quantities are indicative whole shares; "
             "fees, taxes and live order-book liquidity are not included. No orders were placed."
         ),
     }

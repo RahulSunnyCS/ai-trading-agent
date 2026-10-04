@@ -23,6 +23,33 @@ type Meta = {
 };
 type Scores = { stocks: Array<{ symbol: string; company_name: string }> };
 
+function indiaToday(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function displayDate(value: string | null): string {
+  if (!value) return 'none yet';
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-IN', {
+    dateStyle: 'medium',
+    timeZone: 'UTC',
+  });
+}
+
+function cadenceLabel(schedule: MomentumRebalanceResult['rebalance_schedule']): string {
+  if (!schedule) return 'Unknown cadence';
+  if (schedule.cadence === 'monthly') return 'Monthly';
+  return schedule.interval_weeks === 1
+    ? 'Every week'
+    : `Every ${schedule.interval_weeks ?? '—'} weeks`;
+}
+
 function parseHoldings(rows: Holding[]): Record<string, number> {
   const holdings: Record<string, number> = {};
   for (const [index, row] of rows.entries()) {
@@ -58,6 +85,7 @@ export function MomentumRebalanceView({
   const [holdings, setHoldings] = useState<Holding[]>([{ id: 0, asset: '', percent: '' }]);
   const [nextId, setNextId] = useState(1);
   const [portfolioValue, setPortfolioValue] = useState('100000');
+  const [strategyStartDate, setStrategyStartDate] = useState(indiaToday);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<MomentumRebalanceResult | null>(null);
@@ -135,12 +163,14 @@ export function MomentumRebalanceView({
       const capital = Number(portfolioValue);
       if (!Number.isFinite(capital) || capital <= 0)
         throw new Error('Enter a positive portfolio value.');
+      if (!strategyStartDate) throw new Error('Choose the date you started this strategy.');
       if (!config) throw new Error('Strategy settings are still loading.');
       setRunning(true);
       const response = await apiPost<MomentumRebalanceResult>('/api/momentum/rebalance-preview', {
         ...config,
         holdings_pct: currentHoldings,
         portfolio_value: capital,
+        strategy_start_date: strategyStartDate,
         auth_source: 'dashboard',
       });
       if (!response.ok) setError(response.error);
@@ -157,7 +187,7 @@ export function MomentumRebalanceView({
       <Card>
         <CardHeader
           title="Rebalance preview"
-          description="Compare your actual holdings with a model target using live Fyers last traded prices. This is a read-only preview; it never places orders."
+          description="Compare your actual holdings with the model target at any time. Market hours use live Fyers prices; otherwise the preview uses the latest database close. It never places orders."
         />
         <fieldset className="flex flex-wrap gap-2">
           <legend className="sr-only">Rebalance dataset</legend>
@@ -215,8 +245,8 @@ export function MomentumRebalanceView({
           </p>
         ) : null}
         <p className="mt-3 text-xs text-muted">
-          Available during NSE market hours (09:15–15:30 IST). If needed, reconnect Fyers from
-          Broker logins.
+          Live prices are used during NSE market hours (09:15–15:30 IST). Outside market hours,
+          or when live quotes are unavailable, the result is clearly marked as an as-of preview.
         </p>
         {loadError ? (
           <div className="mt-3">
@@ -292,27 +322,54 @@ export function MomentumRebalanceView({
           </span>
           <span className="text-muted">Cash remainder {cash.toFixed(2)}%</span>
         </div>
-        <label className="mt-4 block max-w-xs text-xs text-muted">
-          Total portfolio value (₹)
-          <input
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={portfolioValue}
-            onChange={(event) => {
-              setPortfolioValue(event.target.value);
-              setPlan(null);
-            }}
-            className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
-          />
-        </label>
+        {allocated <= 0.0001 ? (
+          <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+            <p className="text-sm font-medium text-foreground">First allocation</p>
+            <p className="mt-0.5 text-sm text-muted">
+              No invested allocation is entered, so the portfolio is treated as 100% cash and
+              this preview is labelled as your first allocation.
+            </p>
+          </div>
+        ) : null}
+        <div className="mt-4 grid max-w-2xl gap-3 sm:grid-cols-2">
+          <label className="text-xs text-muted">
+            Total portfolio value (₹)
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={portfolioValue}
+              onChange={(event) => {
+                setPortfolioValue(event.target.value);
+                setPlan(null);
+              }}
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="text-xs text-muted">
+            Strategy live start date
+            <input
+              type="date"
+              required
+              value={strategyStartDate}
+              onChange={(event) => {
+                setStrategyStartDate(event.target.value);
+                setPlan(null);
+              }}
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
+            />
+            <span className="mt-1 block">
+              Anchors which Friday is week 1 for an every-2, every-3 or every-4-week strategy.
+            </span>
+          </label>
+        </div>
         <Button
           className="mt-4"
           variant="primary"
           disabled={running || loading || !config || cash < -0.0001}
           onClick={() => void preview()}
         >
-          {running ? 'Collecting LTPs and computing target…' : 'Preview rebalance'}
+          {running ? 'Computing preview…' : 'Preview rebalance'}
         </Button>
       </Card>
       {error ? (
@@ -322,8 +379,40 @@ export function MomentumRebalanceView({
         <Card>
           <CardHeader
             title="Indicative changes"
-            description={`${plan.price_source} · ${new Date(plan.as_of).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST · Signal week ${plan.signal_week}`}
+            description={`${plan.price_source} · ${
+              plan.price_mode === 'live'
+                ? `${new Date(plan.as_of).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST`
+                : `as of ${plan.as_of}`
+            } · Signal week ${plan.signal_week}`}
           />
+          {plan.rebalance_schedule ? (
+            <div
+              className={`mb-4 rounded-lg border px-4 py-3 ${
+                plan.rebalance_schedule.is_rebalance_week
+                  ? 'border-positive/30 bg-positive/5'
+                  : 'border-warning/30 bg-warning/10'
+              }`}
+            >
+              <p className="text-sm font-medium text-foreground">
+                {plan.first_allocation ? 'First allocation · ' : ''}
+                {plan.rebalance_schedule.is_rebalance_week
+                  ? 'Rebalance is scheduled this week'
+                  : 'No rebalance is scheduled this week'}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {cadenceLabel(plan.rebalance_schedule)} from the live start date{' '}
+                {displayDate(plan.rebalance_schedule.strategy_start_date)}. Previous rebalance:{' '}
+                {displayDate(plan.rebalance_schedule.previous_rebalance_date)} · Next rebalance:{' '}
+                {displayDate(plan.rebalance_schedule.next_rebalance_date)}.
+              </p>
+              {!plan.rebalance_schedule.is_rebalance_week ? (
+                <p className="mt-1 text-sm text-muted">
+                  The table below shows the changes needed to match the current model target; it
+                  is not a scheduled rebalance for this signal week.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {plan.rows.length ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[820px] text-left text-sm">
@@ -334,7 +423,7 @@ export function MomentumRebalanceView({
                     <th className="py-2 pr-3 text-right">Current</th>
                     <th className="py-2 pr-3 text-right">Target</th>
                     <th className="py-2 pr-3 text-right">Change</th>
-                    <th className="py-2 pr-3 text-right">LTP</th>
+                    <th className="py-2 pr-3 text-right">Price</th>
                     <th className="py-2 pr-3 text-right">Indicative value</th>
                     <th className="py-2 text-right">Shares</th>
                   </tr>

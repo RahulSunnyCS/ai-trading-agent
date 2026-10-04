@@ -593,3 +593,49 @@ def test_price_ceiling_mask_is_point_in_time_not_a_permanent_label():
     prices["LATE"] = [500.0, 15_000.0, 60_000.0]
     over = broad.price_ceiling_mask(prices, 20_000)
     assert over["LATE"].tolist() == [False, False, True]
+
+
+def test_ordered_categories_by_week_matches_score_categories_week_by_week():
+    """The array-maths ordering the selection loop now uses must equal the original per-week
+    `score_categories` + (score, name) sort, including coverage floors and atomics."""
+    import numpy as np
+
+    rng = np.random.default_rng(3)
+    weeks = pd.date_range("2024-01-05", periods=30, freq="7D")
+    stocks = [f"S{i}" for i in range(12)]
+    ranks = pd.DataFrame(
+        rng.integers(1, 40, size=(30, 14)).astype(float),
+        index=weeks,
+        columns=stocks + ["GOLD", "SILVER"],
+    )
+    ranks = ranks.mask(rng.random(ranks.shape) < 0.25)  # holes: names outside the pool that week
+    groups = {
+        "a :: x": {"S0", "S1", "S2"},
+        "a :: y": {"S3", "S4", "NOT_IN_FRAME"},
+        "b :: z": {"S5", "S6", "S7", "S8"},
+        "b :: w": {"S9"},
+        "c :: empty": set(),
+    }
+    broad._order_cache.clear()
+    for floor in (0.0, 0.4, 0.75):
+        fast = broad.ordered_categories_by_week(ranks, groups, ("GOLD", "SILVER"), floor)
+        for i, w in enumerate(weeks):
+            scores = broad.score_categories(
+                ranks.loc[w], groups, ("GOLD", "SILVER"), coverage_floor=floor
+            )
+            assert fast[i] == sorted(scores, key=lambda n: (scores[n], n))
+    # Same inputs again: served from the cache, same object.
+    again = broad.ordered_categories_by_week(ranks, groups, ("GOLD", "SILVER"), 0.75)
+    assert again is broad.ordered_categories_by_week(ranks, groups, ("GOLD", "SILVER"), 0.75)
+
+
+def test_tax_classes_cover_stocks_atomics_and_idle_cash():
+    from momentum_backtesting import tax as tax_mod
+
+    classes = broad._tax_classes(
+        ["AAA", "BBB#2", "Gold", "Silver", "Nasdaq 100", "Hang Seng", broad.CASH]
+    )
+    assert classes["AAA"] == classes["BBB#2"] == tax_mod.EQUITY
+    assert classes["Gold"] == classes["Silver"] == tax_mod.GOLD_SILVER
+    assert classes["Nasdaq 100"] == classes["Hang Seng"] == tax_mod.INTERNATIONAL
+    assert classes[broad.CASH] == tax_mod.DEBT

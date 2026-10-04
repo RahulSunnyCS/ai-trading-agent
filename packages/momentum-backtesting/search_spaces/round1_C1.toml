@@ -1,0 +1,47 @@
+# Round 1 (wide screening), arm A: all-liquid universe (~4,000 names, liquidity-gated), category layer ON.
+#   uv run mbt search run search_spaces/round1_C1.toml --heavy 40 --light 200 --workers 2
+# TOML has no null: the string "none" means None (e.g. no cap).
+name = "round1_C1"
+arm = "C1"
+
+[fixed]
+start = "2017-01-01"
+cost_model = "itemised"
+slippage_bps = 15.0           # illiquid names cost more to trade
+respect_circuits = true        # UC blocks buys, LC blocks sells
+min_ranked = 1
+liq_floor_ratio = 0.25
+liq_circuit = true
+
+# Each distinct combination costs one full ranking build (~56 s and ~1.5 GB on this universe: keep --heavy small, --workers 2-3).
+[heavy]
+lookbacks = { choice = [[1, 4, 13, 26, 52], [4, 13, 26, 52], [13, 26, 52], [4, 13, 26], [13, 26]] }
+weight_scheme = { choice = ["equal", "recent", "long"] }
+score = { choice = ["ranksum", "voladj", "blend"] }
+voladj_skip_recent_month = { choice = [true, false] }
+liq_min_turnover_cr = { choice = [2.0, 5.0, 10.0] }
+liq_min_price = { choice = [20.0, 50.0] }
+liq_circuit_run = { choice = [3, 5] }
+liq_max_circuit_days = { choice = ["none", 5, 10] }
+
+# Cheap: ~1 s each on a cached ranking.
+[light]
+pool_top_n = { int = [30, 400] }
+pool_band = { int = [0, 300] }
+category_top_n = { int = [3, 15] }
+category_band = { int = [0, 15] }
+picks_per_category = { int = [1, 3] }
+coverage_floor = { float = [0.2, 0.8] }
+max_position = { choice = [0.1, 0.15, 0.2, 0.25, 0.35, "none"] }
+max_category = { choice = ["none", 0.2, 0.3, 0.4] }
+cap_band = { float = [0.02, 0.1] }
+entry = { choice = ["wait", "make_room"] }
+rebalance_every = { choice = [1, 2, 4] }
+rebalance_offset_raw = { int = [0, 3] }
+sell_every_week = { choice = [true, false] }
+signal_delay = { choice = [0, 1] }
+max_stock_price = { choice = ["none", 5000, 20000] }
+mass_exit_response = { choice = ["off", "throttle", "halve_top_n"] }
+mass_exit_threshold = { choice = [0.4, 0.5, 0.6] }
+mass_exit_throttle_fraction = { choice = [0.3, 0.5, 0.7] }
+momentum_sizing = { choice = [false, true] }

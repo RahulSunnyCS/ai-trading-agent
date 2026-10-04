@@ -4,6 +4,7 @@ The live quote row exists only in memory. Holdings are the user's current portfo
 weights, while the target is produced by the existing backtest engine and rules.
 """
 
+import calendar
 import csv
 import math
 from dataclasses import replace
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import engine, fyers
+from . import db_read, engine, fyers
 from .categories import broad
 from .categories.liquidity import LiquidityConfig
 from .config import DATA_DIR
@@ -24,6 +25,94 @@ from .stocks.ui_data import StockDataset
 def signal_week(today: date) -> pd.Timestamp:
     """Friday label for the current trading week, including a weekday preview."""
     return pd.Timestamp(today + timedelta(days=(4 - today.weekday()) % 7))
+
+
+def _friday_on_or_after(day: date) -> date:
+    return day + timedelta(days=(4 - day.weekday()) % 7)
+
+
+def _last_friday(year: int, month: int) -> date:
+    last = date(year, month, calendar.monthrange(year, month)[1])
+    return last - timedelta(days=(last.weekday() - 4) % 7)
+
+
+def _next_month(year: int, month: int) -> tuple[int, int]:
+    return (year + 1, 1) if month == 12 else (year, month + 1)
+
+
+def operational_rebalance_schedule(
+    signal: date,
+    *,
+    strategy_start: date,
+    rebalance_kind: str,
+    every: int,
+) -> dict[str, object]:
+    """Previous/current/next live dates, anchored to the user's operational start.
+
+    The backtest's historical ``start`` remains a research-window setting. This separate date
+    chooses the live cadence phase: the first Friday on or after the operational start for an
+    every-K-weeks strategy, or the first month-end Friday on/after it for monthly rotation.
+    Previous and next are strict neighbours, so a current rebalance week can show all three.
+    """
+    if every < 1:
+        raise ValueError("Rebalance interval must be at least one week.")
+
+    if rebalance_kind == "monthly":
+        year, month = strategy_start.year, strategy_start.month
+        first = _last_friday(year, month)
+        if first < strategy_start:
+            year, month = _next_month(year, month)
+            first = _last_friday(year, month)
+
+        dates: list[date] = []
+        scheduled = first
+        while scheduled <= signal:
+            dates.append(scheduled)
+            year, month = _next_month(scheduled.year, scheduled.month)
+            scheduled = _last_friday(year, month)
+        on_schedule = bool(dates and dates[-1] == signal)
+        previous = dates[-2] if on_schedule and len(dates) > 1 else (dates[-1] if dates else None)
+        current = signal if on_schedule else None
+        following = scheduled
+        return {
+            "strategy_start_date": strategy_start.isoformat(),
+            "cadence": "monthly",
+            "interval_weeks": None,
+            "effective_rebalance_offset": None,
+            "is_rebalance_week": on_schedule,
+            "previous_rebalance_date": previous.isoformat() if previous else None,
+            "current_rebalance_date": current.isoformat() if current else None,
+            "next_rebalance_date": following.isoformat(),
+        }
+
+    first = _friday_on_or_after(strategy_start)
+    interval = timedelta(weeks=every)
+    if signal < first:
+        previous = None
+        current = None
+        following = first
+    else:
+        elapsed = (signal - first).days // 7
+        periods = elapsed // every
+        latest = first + periods * interval
+        on_schedule = latest == signal
+        current = signal if on_schedule else None
+        previous = latest - interval if on_schedule else latest
+        if previous < first:
+            previous = None
+        following = latest + interval
+
+    offset = round((pd.Timestamp(first) - engine.CADENCE_EPOCH).days / 7) % every
+    return {
+        "strategy_start_date": strategy_start.isoformat(),
+        "cadence": "weekly" if every == 1 else "every_n_weeks",
+        "interval_weeks": every,
+        "effective_rebalance_offset": offset,
+        "is_rebalance_week": current is not None,
+        "previous_rebalance_date": previous.isoformat() if previous else None,
+        "current_rebalance_date": current.isoformat() if current else None,
+        "next_rebalance_date": following.isoformat(),
+    }
 
 
 def active_aliases(today: date, path: Path | None = None) -> dict[str, str]:
@@ -52,6 +141,54 @@ def extra_symbols(names: set[str]) -> dict[str, str]:
         for name in names
         if name != CASH and name in by_name
     }
+
+
+def persisted_stock_prices(
+    stock: StockDataset,
+    universe: list[str],
+    holdings: dict[str, float],
+    as_of: date,
+    *,
+    data_dir: Path = DATA_DIR,
+) -> tuple[dict[str, float], dict[str, str]]:
+    """Per-share closes for an off-hours Stock preview, preferring the shared DB."""
+    member_row = stock.membership.iloc[-1]
+    names = {
+        name for name in universe if name in stock.companies and bool(member_row.get(name, False))
+    }
+    names.update(name for name in holdings if name in stock.companies)
+    stored = db_read.latest_company_closes_from_db_or_none(sorted(names), as_of)
+    ltp: dict[str, float] = {}
+    symbols: dict[str, str] = {}
+    if stored is not None:
+        for name, (close, symbol, _day) in stored.items():
+            ltp[name] = close
+            symbols[name] = f"NSE:{symbol}-EQ"
+    else:
+        raw = last_raw_closes(data_dir)
+        aliases = active_aliases(as_of)
+        for name in names:
+            if name in raw and name in aliases:
+                ltp[name] = raw[name]
+                symbols[name] = f"NSE:{aliases[name]}-EQ"
+
+    extras = ((set(universe) | set(holdings)) & set(stock.extra_instruments)) - {CASH}
+    extra_trade_symbols = extra_symbols(extras)
+    stored_extras = db_read.latest_momentum_closes_from_db_or_none(
+        sorted(extras), "etf", as_of
+    )
+    if stored_extras is not None:
+        for name, (close, _day) in stored_extras.items():
+            ltp[name] = close
+            if name in extra_trade_symbols:
+                symbols[name] = extra_trade_symbols[name]
+    else:
+        for name, symbol in extra_trade_symbols.items():
+            path = data_dir / "daily_etf" / f"{name}.csv"
+            if path.exists():
+                ltp[name] = float(pd.read_csv(path)["close"].dropna().iloc[-1])
+                symbols[name] = symbol
+    return ltp, symbols
 
 
 def live_stock_prices(
@@ -164,6 +301,8 @@ def build_plan(
     ltp: dict[str, float],
     trade_symbols: dict[str, str],
     capital: float,
+    *,
+    allow_missing_prices: bool = False,
 ) -> list[dict]:
     """Translate model target versus actual percentages into indicative trade quantities."""
     if not math.isfinite(capital) or capital <= 0:
@@ -185,7 +324,12 @@ def build_plan(
         if abs(delta) < 0.01:
             continue
         price = ltp.get(name)
-        if name != IDLE and name != CASH and (price is None or price <= 0):
+        if (
+            not allow_missing_prices
+            and name != IDLE
+            and name != CASH
+            and (price is None or price <= 0)
+        ):
             raise ValueError(f"No tradeable LTP for {name}; preview cancelled.")
         notional = abs(delta) / 100 * capital
         rows.append(
@@ -236,6 +380,60 @@ def broad_quote_symbols(ranking: broad.UniverseRanking) -> dict[str, str]:
         and pd.notna(latest.get(name))
         and pd.notna(ranking.global_ranks.iloc[-1].get(name))
     } | extra_symbols(set(broad.ATOMIC_NAMES))
+
+
+def persisted_broad_prices(
+    ranking: broad.UniverseRanking,
+    as_of: date,
+    *,
+    data_dir: Path = DATA_DIR,
+) -> tuple[dict[str, float], dict[str, str]]:
+    """Latest stored per-share prices for an off-hours Broad preview."""
+    symbols = broad_quote_symbols(ranking)
+    raw = ranking.raw_prices if ranking.raw_prices is not None else ranking.prices
+    latest = raw.loc[raw.index[-1]]
+    ltp = {
+        name: float(latest[name])
+        for name in symbols
+        if name not in broad.ATOMIC_NAMES and pd.notna(latest.get(name))
+    }
+
+    atomics = sorted(set(symbols) & set(broad.ATOMIC_NAMES))
+    stored = db_read.latest_momentum_closes_from_db_or_none(atomics, "etf", as_of)
+    if stored is not None:
+        ltp.update({name: close for name, (close, _day) in stored.items()})
+    else:
+        for name in atomics:
+            path = data_dir / "daily_etf" / f"{name}.csv"
+            if path.exists():
+                ltp[name] = float(pd.read_csv(path)["close"].dropna().iloc[-1])
+    return ltp, symbols
+
+
+def persisted_broad_ranking(ranking: broad.UniverseRanking) -> broad.UniverseRanking:
+    """Add one flat sentinel week so the engine can decide on the last stored week."""
+    week = ranking.prices.index[-1]
+    sentinel = week + pd.Timedelta(days=7)
+
+    def extended(frame: pd.DataFrame | None) -> pd.DataFrame | None:
+        if frame is None:
+            return None
+        result = frame.copy()
+        result.loc[sentinel] = result.loc[week]
+        return result.sort_index()
+
+    prices = extended(ranking.prices)
+    assert prices is not None
+    return replace(
+        ranking,
+        prices=prices,
+        raw_prices=extended(ranking.raw_prices),
+        weeks=[*ranking.weeks, sentinel],
+        global_ranks=extended(ranking.global_ranks),
+        pool_membership=extended(ranking.pool_membership),
+        stock_pool_ranks=extended(ranking.stock_pool_ranks),
+        combined_pool_ranks=extended(ranking.combined_pool_ranks),
+    )
 
 
 def live_broad_ranking(

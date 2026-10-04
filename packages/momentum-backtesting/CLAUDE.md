@@ -232,6 +232,37 @@ contract, not a shared service).
   P&L on the traded ETF instead of the ranked index).
 - `sweep.py` — the parameter-sweep harness used for every "is this lever
   worth it" investigation (see `TODO.md` §3.9.18 for the most recent one).
+- `search.py` + `search_spaces/*.toml` — `mbt search run|analyze`: resumable parallel parameter search over
+  Broad Momentum (TODO 3.9.25). Parameters are *heavy* (change the global ranking; one
+  `broad.compute_universe_base` per combination) or *light* (everything after, incl. the pool cut via
+  `broad.finish_universe_ranking`); a run is heavy × light points, light ones from a shifted Halton
+  sequence. Results append to `data/search/<name>/results-<pid>.jsonl`; a run id hashes its full
+  parameters, so re-running skips finished runs. Space files are TOML (no PyYAML here; `"none"` = None).
+  `broad.ordered_categories_by_week` caches each week's category order per (ranking, groups, floor), so
+  `load_stock_groups` returns one shared dict — treat it as read-only.
+- `categories/wide_tags.py` + `curated/stock_groups_wide.csv` — tags for the ~1,100 gate-passing NSE stocks
+  outside the 755-name Total Market, which `curated/stock_groups.csv` does not cover (so in category mode they
+  could never be bought; arm C1 was effectively arm A with a harder pool cut). Built from BSE's own
+  Sector > Industry > Group > Sub-group classification (fetched once per ISIN from BSE's `ComHeader` API through
+  the in-app browser: plain scripts get 403, and an unthrottled burst got the whole site blocked for ~30 min).
+  Opt in per run with `category_tags="extended"` (`run_broad_backtest`, `BacktestRequest.broad_category_tags`;
+  search arm C1 only, `search.EXTENDED_TAG_ARMS`); the default keeps every existing result unchanged. Tags are the
+  CURRENT classification applied to all years. Stocks BSE does not list (NSE-only, delisted) stay untagged.
+- `categories/exit_reasons.py` — display-only: for Broad Momentum closed trades the engine records as
+  "ineligible" (rank NaN: the stock stopped being selected), fills the blank `exit_rank` (pool rank, else
+  momentum rank) and sets a specific `reason` + `exit_cause` (`liquidity` with the failing gate test and its
+  numbers, `pool` = dropped at the quarterly pool re-selection, `category`, `series_break`, `unranked`). Ranks are
+  shifted by `signal_delay` in the engine, so it explains the decision week, not the fill week. Called from
+  `api._broad_backtest`; never changes a result. `series_break` marks a real artifact: a one-day drop of about
+  20% (e.g. the 23 Mar 2020 circuit day) makes the price builder start a new `SYMBOL#2` column, which retires the
+  held segment and force-sells it.
+- Broad Momentum gotcha: a stock with a gap in its EQ price history (suspension, or a move to trade-for-trade)
+  has NaN weekly prices in the middle; `run_broad_backtest` now forward-fills the prices it values positions with
+  (rankings still use the unfilled frame), otherwise a held stock hitting a gap turns the whole equity curve NaN
+  (found in search arm B: 9 of the first 409 runs; A, which holds only the 755, never hit it).
+- `bias.py` (`mbt search bias`) — tries to break a search's best configs: random-ranking placebo, stricter
+  liquidity gate, removing the top-profit stocks, shifted/cut windows (never opens a sealed period). Re-runs
+  `run_broad_backtest` with one thing changed; writes `<results>/bias.json` only.
 - `reference_benchmarks.py` — Nifty 50 TRI and Nifty200 Momentum 30 TRI comparison lines
   (`load_references`, `compare`), added to every backtest payload as `comparisons`. Use it,
   not the dataset's own `benchmark`, when judging edge: index-mode benchmarks are price-only

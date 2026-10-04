@@ -281,8 +281,20 @@ export interface MomentumRebalanceResult {
   dataset: 'stock' | 'broad';
   as_of: string;
   signal_week: string;
+  price_mode: 'live' | 'last_close';
   price_source: string;
   portfolio_value: number;
+  first_allocation: boolean;
+  rebalance_schedule: {
+    strategy_start_date: string;
+    cadence: 'weekly' | 'every_n_weeks' | 'monthly';
+    interval_weeks: number | null;
+    effective_rebalance_offset: number | null;
+    is_rebalance_week: boolean;
+    previous_rebalance_date: string | null;
+    current_rebalance_date: string | null;
+    next_rebalance_date: string;
+  } | null;
   current_pct: Record<string, number>;
   target_pct: Record<string, number>;
   rows: Array<{

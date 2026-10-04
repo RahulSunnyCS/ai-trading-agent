@@ -2,6 +2,7 @@
 
 import math
 
+import numpy as np
 import pandas as pd
 
 from .engine import CASH, GILT, IDLE, Result
@@ -131,3 +132,68 @@ def crash_table(result: Result) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def underwater_stats(series: pd.Series) -> dict[str, float]:
+    """How long a curve spends below its previous high, in weeks (the series is weekly).
+
+    max_underwater_weeks   the longest stretch from a peak until the next new high. A stretch
+                           still open at the end counts up to the last week.
+    recovery_weeks         from the trough of the deepest drawdown to the next new high; if it
+                           never recovers, the weeks left in the series (a lower bound).
+    recovered              1.0 if the deepest drawdown was recovered by the end, else 0.0.
+    underwater_share_5     share of weeks more than 5% below the previous high.
+    ulcer                  root-mean-square drawdown: penalises depth and duration together.
+    """
+    values = series.to_numpy(dtype=float)
+    peak = np.maximum.accumulate(values)
+    dd = values / peak - 1
+    under = values < peak - 1e-12
+    longest = run = 0
+    for flag in under:
+        run = run + 1 if flag else 0
+        longest = max(longest, run)
+    trough = int(np.argmin(dd))
+    after = np.flatnonzero(values[trough:] >= peak[trough] - 1e-12)
+    recovered = len(after) > 0
+    recovery = float(after[0]) if recovered else float(len(values) - 1 - trough)
+    return {
+        "max_underwater_weeks": float(longest),
+        "recovery_weeks": recovery,
+        "recovered": 1.0 if recovered else 0.0,
+        "underwater_share_5": float((dd < -0.05).mean()),
+        "ulcer": float(np.sqrt((dd**2).mean())),
+    }
+
+
+def window_stats(series: pd.Series, windows: dict[str, tuple[str, str | None]]) -> dict[str, float]:
+    """Per named (start, end) window of a weekly curve, judged against the curve's OWN running high
+    over its whole history (so a stretch that starts under an old peak counts as under water):
+
+      <name>_cagr      annualised growth over the weeks inside the window
+      <name>_newhigh   share of those weeks that set a new all-time high of the curve
+      <name>_uw        longest run of consecutive weeks inside the window below the previous high
+    """
+    values = series.to_numpy(dtype=float)
+    peak = np.maximum.accumulate(values)
+    new_high = np.zeros(len(values), dtype=bool)
+    new_high[1:] = values[1:] > peak[:-1] + 1e-12
+    under = values < peak - 1e-12
+    out: dict[str, float] = {}
+    for name, (start, end) in windows.items():
+        mask = (series.index >= pd.Timestamp(start)) & (
+            True if end is None else series.index <= pd.Timestamp(end)
+        )
+        mask = np.asarray(mask)
+        if mask.sum() < 2:
+            continue
+        idx = np.flatnonzero(mask)
+        years = (series.index[idx[-1]] - series.index[idx[0]]).days / 365.25
+        out[f"{name}_cagr"] = float((values[idx[-1]] / values[idx[0]]) ** (1 / years) - 1)
+        out[f"{name}_newhigh"] = float(new_high[mask].mean())
+        longest = run = 0
+        for flag in under[mask]:
+            run = run + 1 if flag else 0
+            longest = max(longest, run)
+        out[f"{name}_uw"] = float(longest)
+    return out

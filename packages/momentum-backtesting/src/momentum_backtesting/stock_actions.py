@@ -292,6 +292,33 @@ def classified_crashes(
     return {(symbol, pd.Timestamp(ex_date)) for symbol, ex_date in rows}
 
 
+#: Corporate actions the price builder cannot back-adjust with a share-count factor, so a price
+#: break around them is a real discontinuity worth segmenting (value moved to another stock, or a
+#: partial entitlement). Everything else that falls on a normal-volume day is a genuine price fall.
+UNADJUSTABLE_KINDS = ("demerger", "rights", "scheme", "dividend")
+
+
+def explained_breaks(
+    con: duckdb.DuckDBPyConnection, symbols: list[str], *, slack_days: int = 3
+) -> set[tuple[str, pd.Timestamp]]:
+    """(symbol, date) pairs, widened by `slack_days` either side, where an unadjustable corporate
+    action (see UNADJUSTABLE_KINDS) explains a price break. Used by series_breaks="verified"."""
+    if not symbols:
+        return set()
+    rows = con.execute(
+        "SELECT symbol, ex_date FROM stock_action_candidates "
+        "WHERE event_kind IN (SELECT unnest(?)) AND status <> 'crash' "
+        "AND symbol IN (SELECT unnest(?))",
+        [list(UNADJUSTABLE_KINDS), symbols],
+    ).fetchall()
+    out: set[tuple[str, pd.Timestamp]] = set()
+    for symbol, ex_date in rows:
+        center = pd.Timestamp(ex_date)
+        for offset in range(-slack_days, slack_days + 1):
+            out.add((symbol, center + pd.Timedelta(days=offset)))
+    return out
+
+
 def review_snapshot(con: duckdb.DuckDBPyConnection, limit: int = 50) -> dict:
     baseline_row = con.execute(
         "SELECT manual_review_after FROM stock_action_scan_state WHERE id=1"

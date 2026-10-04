@@ -1,0 +1,50 @@
+# Round 6 (CAGR-first wide screening), arm C1: all-liquid ~4,000-name universe, category layer ON.
+# Owner's answers (2026-10-04): capital Rs 2 lakh, rank on PRE-tax CAGR, tier thresholds accepted.
+# Criteria are written in data/search/round6_criteria.json before running.
+#   uv run mbt search run search_spaces/round6_C1_cagr.toml --heavy 20 --light 200 --workers 3
+#
+# Differences from Round 2: a MUCH wider and more concentrated space (1-8 categories, 0.0
+# coverage floor, shorter lookbacks, bigger position caps, stock_tilt, make_room entry). Realism
+# is NOT searched: gate, delay, slippage, circuit locks stay fixed. No hold-out exists any more
+# (all data to Oct-2026 has been seen), so everything found here is validated by time blocks,
+# placebo, nudge test, tax and forward tracking - not by a sealed period.
+# TOML has no null: the string "none" means None.
+name = "round6_C1_cagr"
+arm = "C1"
+
+[fixed]
+start = "2017-01-01"
+cost_model = "itemised"
+slippage_bps = 15.0
+capital = 200000                # Rs 2 lakh: makes the flat Rs16 DP charge per sell count properly
+respect_circuits = true
+min_ranked = 1
+momentum_sizing = false         # can lock the strategy in cash (TODO 3.9.25)
+signal_delay = 1
+cap_band = 0.05
+max_stock_price = 10000         # Rs 2 lakh / 5-10 holdings: very expensive shares are barely affordable
+sell_every_week = false
+liq_min_turnover_cr = 2.0       # Rs 2 cr/day: ~Rs20-40k positions have no market impact
+liq_min_price = 30.0
+liq_floor_ratio = 0.25
+liq_circuit = true
+liq_circuit_run = 3
+voladj_skip_recent_month = true
+
+[heavy]
+lookbacks = { choice = [[4, 13, 26], [13, 26], [13, 26, 52], [1, 4, 13, 26], [4, 13, 26, 52]] }
+weight_scheme = { choice = ["equal", "recent", "long"] }
+score = { choice = ["voladj", "blend", "ranksum"] }
+
+[light]
+coverage_floor = { float = [0.0, 0.3] }
+pool_top_n = { int = [30, 350] }
+pool_band = { int = [0, 200] }
+category_top_n = { int = [1, 8] }
+category_band = { int = [0, 8] }
+picks_per_category = { int = [1, 3] }
+max_position = { choice = [0.2, 0.25, 0.35, 0.5, "none"] }
+rebalance_every = { choice = [1, 2, 4] }
+rebalance_offset_raw = { int = [0, 3] }
+entry = { choice = ["wait", "make_room"] }
+stock_tilt = { choice = [0.0, 0.5, 1.0] }

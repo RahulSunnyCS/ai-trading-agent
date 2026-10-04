@@ -1,0 +1,20 @@
+# Smoke space for arm B (Total Market pool, category layer OFF). Not a real search.
+name = "smoke_B"
+arm = "B"
+
+[fixed]
+start = "2017-01-01"
+cost_model = "itemised"
+respect_circuits = true
+min_ranked = 1
+
+[heavy]
+lookbacks = { choice = [[1, 4, 13, 26, 52]] }
+
+[light]
+pool_top_n = { int = [30, 250] }
+pool_band = { int = [0, 100] }
+off_top_n = { int = [5, 30] }
+off_band = { int = [0, 30] }
+max_position = { choice = [0.1, 0.2, 0.35] }
+mass_exit_response = { choice = ["off", "throttle"] }   # must be ignored (no categories in OFF)

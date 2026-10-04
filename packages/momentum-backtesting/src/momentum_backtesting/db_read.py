@@ -23,6 +23,7 @@ database-first read path; see TODO 3.11.8.
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -227,6 +228,60 @@ def daily_prices_from_db_or_none(
         ).df()
     frame["date"] = pd.to_datetime(frame["date"])
     return frame
+
+
+def latest_company_closes_from_db_or_none(
+    company_ids: list[str], as_of: date, root: Path | None = None
+) -> dict[str, tuple[float, str, date]] | None:
+    """Latest persisted raw share close on or before ``as_of`` for each company.
+
+    Returns ``company_id -> (close, exchange symbol, trading day)``. ``None`` means
+    there is no catalog, allowing the rebalance preview to use its file fallback on
+    fresh checkouts. An existing catalog is authoritative even when no matching rows
+    exist, consistent with :func:`daily_prices_from_db_or_none`.
+    """
+    if catalog_mtime(root) is None:
+        return None
+    if not company_ids:
+        return {}
+    with connect(root or data_root(), read_only=True) as con:
+        rows = con.execute(
+            "SELECT company_id, close, symbol, date FROM ("
+            "SELECT i.company_id, b.close, i.symbol, b.date, "
+            "row_number() OVER (PARTITION BY i.company_id ORDER BY b.date DESC) AS position "
+            "FROM bars_1d_stock b JOIN instruments i USING (instrument_id) "
+            "WHERE i.company_id IN (SELECT unnest(?)) AND b.date <= ?"
+            ") WHERE position = 1",
+            [company_ids, as_of],
+        ).fetchall()
+    return {
+        str(company_id): (float(close), str(symbol), trading_day)
+        for company_id, close, symbol, trading_day in rows
+    }
+
+
+def latest_momentum_closes_from_db_or_none(
+    instruments: list[str], kind: str, as_of: date, root: Path | None = None
+) -> dict[str, tuple[float, date]] | None:
+    """Latest persisted momentum-series close for each requested instrument."""
+    if catalog_mtime(root) is None:
+        return None
+    if not instruments:
+        return {}
+    with connect(root or data_root(), read_only=True) as con:
+        rows = con.execute(
+            "SELECT instrument, close, date FROM ("
+            "SELECT instrument, close, date, "
+            "row_number() OVER (PARTITION BY instrument ORDER BY date DESC) AS position "
+            "FROM momentum_prices WHERE instrument IN (SELECT unnest(?)) "
+            "AND kind = ? AND date <= ?"
+            ") WHERE position = 1",
+            [instruments, kind, as_of],
+        ).fetchall()
+    return {
+        str(instrument): (float(close), trading_day)
+        for instrument, close, trading_day in rows
+    }
 
 
 def total_market_members_by_year_from_db_or_none(

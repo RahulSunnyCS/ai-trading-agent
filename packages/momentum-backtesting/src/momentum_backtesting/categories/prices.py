@@ -185,6 +185,7 @@ def build_stock_weekly_prices(
     stocks_data_dir: Path,
     min_drop_pct: float = DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = DEFAULT_TURNOVER_SPIKE_MULTIPLE,
+    series_breaks: str = "legacy",
     carry_forward_stopped_segments: bool = True,
     return_raw_weekly: bool = False,
 ) -> (
@@ -287,7 +288,10 @@ def build_stock_weekly_prices(
 
     from momentum_backtesting import db_read, stock_actions
 
+    if series_breaks not in ("legacy", "verified"):
+        raise ValueError("series_breaks must be 'legacy' or 'verified'")
     actions = {}
+    explained: set[tuple[str, pd.Timestamp]] = set()
     crashes: set[tuple[str, pd.Timestamp]] = set()
     if db_read.catalog_mtime() is not None:
         with connect(data_root(), read_only=True) as con:
@@ -295,6 +299,8 @@ def build_stock_weekly_prices(
                 wanted = daily["symbol"].unique().tolist()
                 actions = stock_actions.confirmed_factors(con, wanted)
                 crashes = stock_actions.classified_crashes(con, wanted)
+                if series_breaks == "verified":
+                    explained = stock_actions.explained_breaks(con, wanted)
     symbol_indices = daily.groupby("symbol", sort=False).indices
     for symbol, events_for_symbol in actions.items():
         indices = symbol_indices.get(symbol)
@@ -310,6 +316,14 @@ def build_stock_weekly_prices(
     if crashes and not events.empty:
         events = events.loc[
             ~events.apply(lambda row: (row.symbol, row.event_date) in crashes, axis=1)
+        ].reset_index(drop=True)
+    if series_breaks == "verified" and not events.empty:
+        # A fall with no corporate-action explanation is a genuine price move: keep ONE continuous
+        # series. ("legacy" starts a new column at every such fall, which retires the held segment,
+        # freezes it at its pre-fall price and sells it there - so a position that crashes is
+        # valued as if it had not. Measured: -7 to -12 points of CAGR on Round 6 winners.)
+        events = events.loc[
+            events.apply(lambda row: (row.symbol, row.event_date) in explained, axis=1)
         ].reset_index(drop=True)
     events_by_symbol = events.groupby("symbol")["event_date"].apply(list).to_dict()
 

@@ -1,0 +1,60 @@
+# Round 2 (focused search), arm A: Total Market pool, category layer ON.
+#   uv run mbt search run search_spaces/round2_A.toml --heavy 12 --light 1000 --workers 4
+#
+# Built from Round 1 (data/search/round1_A) + its bias checks:
+#   - SEALED HOLD-OUT: tunes on 2017 -> 2022-12-31 only. 2023+ is opened once, for finalists, in
+#     Round 4. (`sealed_from` makes the runner refuse a file whose `end` could see it.)
+#   - momentum_sizing pinned OFF: it can lock the strategy in cash for years (TODO 3.9.25).
+#   - Liquidity gate FIXED at a tradeable level (Rs 5 cr daily turnover, price >= Rs 50), not
+#     searched: Round 1's best returns leaned on thinly traded stocks, and a search allowed to
+#     loosen the gate always drifts back to them.
+#   - signal_delay pinned at 1 (act a week after the signal): the conservative reading, and
+#     Round 1 showed it costs almost nothing.
+#   - Parameters that did nothing in Round 1 are pinned: entry, cap_band, max_category,
+#     sell_every_week, mass-exit settings (which the dashboard cannot run anyway).
+#   - Dropped from the choices: the 1-week lookback sets, the ranksum score, recent-weighted
+#     scoring (all worse in Round 1).
+# TOML has no null: the string "none" means None.
+name = "round2_A"
+arm = "A"
+sealed_from = "2023-01-01"
+
+[fixed]
+start = "2017-01-01"
+end = "2022-12-31"
+cost_model = "itemised"
+slippage_bps = 10.0            # a little worse than Round 1's 5: the gate still admits mid-caps
+respect_circuits = true        # UC blocks buys, LC blocks sells
+min_ranked = 1
+momentum_sizing = false
+signal_delay = 1
+entry = "wait"
+cap_band = 0.05
+sell_every_week = false
+max_stock_price = 20000
+liq_min_turnover_cr = 5.0
+liq_min_price = 50.0
+liq_floor_ratio = 0.25
+liq_circuit = true
+liq_circuit_run = 3
+voladj_skip_recent_month = true
+
+# 3 x 2 x 2 = 12 ranking combinations: every one is run (each costs one ~9 s ranking build).
+[heavy]
+lookbacks = { choice = [[13, 26], [13, 26, 52], [4, 13, 26, 52]] }
+weight_scheme = { choice = ["equal", "long"] }
+score = { choice = ["voladj", "blend"] }
+
+# The parameters Round 1 said matter, over ranges narrowed around its good regions.
+# coverage_floor goes down to 0.05 (Round 1's best region was at the 0.2 edge) and up to 0.8
+# (the shallow-drawdown region), so one run covers all three profiles.
+[light]
+coverage_floor = { float = [0.05, 0.8] }
+pool_top_n = { int = [30, 350] }
+pool_band = { int = [0, 200] }
+category_top_n = { int = [3, 12] }
+category_band = { int = [0, 10] }
+picks_per_category = { int = [1, 3] }
+max_position = { choice = [0.15, 0.2, 0.25, 0.35, "none"] }
+rebalance_every = { choice = [1, 2, 4] }
+rebalance_offset_raw = { int = [0, 3] }
