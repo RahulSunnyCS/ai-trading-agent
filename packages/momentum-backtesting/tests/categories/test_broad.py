@@ -329,6 +329,62 @@ def test_build_effective_stock_ranks_empty_held_produces_all_nan():
     assert result.ranks.loc[weeks[0], "S1"] != result.ranks.loc[weeks[0], "S1"]  # NaN
 
 
+# --------------------------------------------------------------------------
+# Split price segments (`SYM#2`) in category mode: tags name symbols, the frame has columns.
+# --------------------------------------------------------------------------
+
+
+def test_collapse_segments_takes_the_live_segment_and_is_a_no_op_without_segments():
+    weeks = pd.to_datetime(["2023-01-06", "2023-01-13"])
+    ranks = pd.DataFrame(
+        {"X": [2.0, None], "X#2": [None, 1.0], "Y": [1.0, 2.0], "Gold": [3.0, 3.0]}, index=weeks
+    )
+    bases = {"X": "X", "X#2": "X", "Y": "Y"}  # atomics are not in the map
+    collapsed = broad.collapse_segments(ranks, bases)
+    assert list(collapsed.columns) == ["X", "Y", "Gold"]
+    assert collapsed["X"].tolist() == [2.0, 1.0]
+    assert broad.collapse_segments(ranks, bases) is collapsed  # cached against its source
+
+    plain = ranks[["Y", "Gold"]]
+    assert broad.collapse_segments(plain, {"Y": "Y"}) is plain
+
+
+def test_segment_members_adds_later_segments_only():
+    groups = {"cat1": {"X", "Y"}, "cat2": {"Y"}}
+    out = broad.segment_members(groups, {"X": "X", "X#2": "X", "Y": "Y"})
+    assert out == {"cat1": {"X", "X#2", "Y"}, "cat2": {"Y"}}
+    assert broad.segment_members(groups, {"X": "X", "Y": "Y"}) is groups
+
+
+def test_a_stock_stays_pickable_in_category_mode_after_its_series_splits():
+    """Before the fix a category never saw `X#2`: once X's first segment ended, the category
+    lost its coverage and X could not be picked through it again."""
+    weeks = list(pd.to_datetime(["2023-01-06", "2023-01-13"]))
+    ranks = pd.DataFrame({"X": [1.0, None], "X#2": [None, 1.0], "Y": [2.0, 2.0]}, index=weeks)
+    bases = {"X": "X", "X#2": "X", "Y": "Y"}
+    groups = {"cat1": {"X"}, "cat2": {"Y"}}
+
+    selection = broad.compute_category_selection_mass_exit(
+        broad.collapse_segments(ranks, bases), groups, weeks, atomic_names=(), top_n=1, exit_rank=1
+    )
+    assert selection.held_by_week == {weeks[0]: ["cat1"], weeks[1]: ["cat1"]}
+
+    effective = broad.build_effective_stock_ranks(
+        selection.held_by_week,
+        ranks,
+        broad.segment_members(groups, bases),
+        weeks,
+        columns=["X", "X#2", "Y"],
+        atomic_names=(),
+        category_top_n=1,
+        category_exit_rank=1,
+        picks_per_category=1,
+    )
+    assert effective.ranks.loc[weeks[0], "X"] == 1
+    assert effective.ranks.loc[weeks[1], "X#2"] == 1
+    assert pd.isna(effective.ranks.loc[weeks[1], "X"])
+
+
 def test_build_off_mode_ranks_passthrough():
     weeks = [pd.Timestamp("2023-01-06")]
     stock_pool_ranks = pd.DataFrame([{"S1": 1.0, "S2": 2.0}], index=weeks)
