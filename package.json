@@ -12,6 +12,7 @@
     "start:backend": "bun scripts/dev-stack.mjs backends",
     "start:frontend": "bun scripts/dev-stack.mjs frontend",
     "stop:research": "bun scripts/dev-stack.mjs stop",
+    "start:tunnel": "cloudflared tunnel run",
     "start:server": "bun run --filter @ata/server start",
     "migrate": "bun run --filter @ata/server migrate",
     "replay": "bun run --filter @ata/server replay",

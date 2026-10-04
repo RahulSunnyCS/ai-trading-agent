@@ -30,6 +30,12 @@ it). Paths: `/<tab>`, `/optionslab/<results|regimes|builder>`,
 `/momentum/scores/<stocks|sectors>`. A new sub-tab = add its ids to `lib/routes.ts` and derive
 state from `useAppRoute().rest` — don't add another `useState` for navigation.
 
+**Remote hosting:** `src/middleware.ts` (logic in `lib/accessGate.ts`) puts a password prompt
+in front of everything and adds the Cloudflare Access service token to forwarded `/api/*`
+calls, so the dashboard can run off the laptop that serves the APIs. The password is
+mandatory (fails closed) in production builds; plain `next dev` stays open. Runbook:
+`docs/remote-dashboard.md`.
+
 ## Cross-package links
 
 This app has **no internal package dependencies** (`package.json` declares
