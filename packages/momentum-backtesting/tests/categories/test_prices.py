@@ -260,7 +260,9 @@ def test_build_stock_weekly_prices_end_to_end_with_a_split(tmp_path):
     ]
     _write_daily_parquet(tmp_path / "daily.parquet", rows)
 
-    frame, events, stale_columns = build_stock_weekly_prices(["ABC"], stocks_data_dir=tmp_path)
+    frame, events, stale_columns = build_stock_weekly_prices(
+        ["ABC"], stocks_data_dir=tmp_path, series_breaks="legacy"
+    )
 
     assert set(frame.columns) == {"ABC", "ABC#2"}
     assert len(events) == 1
@@ -286,7 +288,9 @@ def test_build_stock_weekly_prices_carries_forward_the_old_segment_by_default(tm
     ]
     _write_daily_parquet(tmp_path / "daily.parquet", rows)
 
-    frame, _events, _stale = build_stock_weekly_prices(["ABC"], stocks_data_dir=tmp_path)
+    frame, _events, _stale = build_stock_weekly_prices(
+        ["ABC"], stocks_data_dir=tmp_path, series_breaks="legacy"
+    )
 
     # The old "ABC" segment (real data only through 2021-01-08) is forward-filled flat
     # through the rest of the frame -- never NaN once started -- so a currently-held
@@ -308,7 +312,10 @@ def test_build_stock_weekly_prices_can_opt_out_of_carry_forward(tmp_path):
     _write_daily_parquet(tmp_path / "daily.parquet", rows)
 
     frame, _events, _stale = build_stock_weekly_prices(
-        ["ABC"], stocks_data_dir=tmp_path, carry_forward_stopped_segments=False
+        ["ABC"],
+        stocks_data_dir=tmp_path,
+        carry_forward_stopped_segments=False,
+        series_breaks="legacy",
     )
 
     assert frame.loc["2021-01-15", "ABC"] != frame.loc["2021-01-15", "ABC"]  # NaN
@@ -360,12 +367,12 @@ def test_verified_series_breaks_keep_one_continuous_series_for_an_unexplained_fa
     ]
     _write_daily_parquet(tmp_path / "daily.parquet", rows)
 
-    legacy, legacy_events, _ = build_stock_weekly_prices(["ABC"], stocks_data_dir=tmp_path)
-    frame, events, stale = build_stock_weekly_prices(
-        ["ABC"], stocks_data_dir=tmp_path, series_breaks="verified"
+    legacy, legacy_events, _ = build_stock_weekly_prices(
+        ["ABC"], stocks_data_dir=tmp_path, series_breaks="legacy"
     )
+    frame, events, stale = build_stock_weekly_prices(["ABC"], stocks_data_dir=tmp_path)  # default
 
-    assert len(legacy_events) == 1 and set(legacy.columns) == {"ABC", "ABC#2"}  # unchanged default
+    assert len(legacy_events) == 1 and set(legacy.columns) == {"ABC", "ABC#2"}
     assert events.empty and list(frame.columns) == ["ABC"]
     assert stale == {}
     # The fall is a real fall, so a held position is valued at the real price, not frozen.

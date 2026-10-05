@@ -445,8 +445,13 @@ def live_broad_ranking(
     data_dir: Path = DATA_DIR,
     liquidity: LiquidityConfig | None = None,
     universe_kind: str = "total_market",
+    series_breaks: str = "verified",
 ) -> tuple[broad.UniverseRanking, dict[str, float], dict[str, str]]:
-    """Recompute the Broad funnel on a temporary LTP week; never write history."""
+    """Recompute the Broad funnel on a temporary LTP week; never write history.
+
+    `series_breaks` must be the policy `ranking` was built with: the pool membership and
+    liquidity gate are rebuilt here, and their columns only line up with the ranking's when
+    both come from the same price-series rule."""
     last = ranking.prices.index[-1]
     week = signal_week(today)
     settlement_week = week + pd.Timedelta(days=7)
@@ -507,6 +512,7 @@ def live_broad_ranking(
         categories_data_dir=data_dir / "categories",
         liquidity=liquidity,
         universe=universe_kind,  # type: ignore[arg-type]
+        series_breaks=series_breaks,  # type: ignore[arg-type]
     )
     membership = universe.stock_membership.copy()
     if week > last:

@@ -86,7 +86,10 @@ def test_confirmed_factors_chain_and_raw_entry_price_stays_raw(tmp_path, monkeyp
         ]
 
     adjusted, detected, _, raw = build_stock_weekly_prices(
-        ["DIXON", "CRASH"], stocks_data_dir=tmp_path, return_raw_weekly=True
+        ["DIXON", "CRASH"],
+        stocks_data_dir=tmp_path,
+        return_raw_weekly=True,
+        series_breaks="legacy",
     )
     assert adjusted.loc["2021-03-12", "DIXON"] == pytest.approx(10.0)
     assert raw.loc["2021-03-12", "DIXON"] == pytest.approx(100.0)
@@ -110,7 +113,10 @@ def test_confirmed_factors_chain_and_raw_entry_price_stays_raw(tmp_path, monkeyp
         assert scan_and_store(con, raw_dir)["crash"] == 1
         assert review_snapshot(con)["manual_review_after"] == "2025-01-03"
     adjusted_after_review, events_after_review, _, _ = build_stock_weekly_prices(
-        ["DIXON", "CRASH"], stocks_data_dir=tmp_path, return_raw_weekly=True
+        ["DIXON", "CRASH"],
+        stocks_data_dir=tmp_path,
+        return_raw_weekly=True,
+        series_breaks="legacy",
     )
     assert events_after_review.empty
     assert adjusted_after_review.loc["2021-03-19", "CRASH"] == pytest.approx(21.0)

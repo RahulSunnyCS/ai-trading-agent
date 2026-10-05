@@ -342,7 +342,7 @@ def load_stock_universe_frame(
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
     universe: Literal["total_market", "all_liquid"] = "total_market",
-    series_breaks: Literal["legacy", "verified"] = "legacy",
+    series_breaks: Literal["legacy", "verified"] = "verified",
 ) -> StockUniverseFrame:
     """The 755-name Total Market weekly price frame + point-in-time membership gate, computed
     over the WHOLE available price history -- no ranking, no atomics, no pool. See
@@ -505,7 +505,7 @@ def compute_universe_base(
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
     universe_kind: Literal["total_market", "all_liquid"] = "total_market",
-    series_breaks: Literal["legacy", "verified"] = "legacy",
+    series_breaks: Literal["legacy", "verified"] = "verified",
 ) -> UniverseBase:
     """The expensive half of Step 2 -- everything that does not depend on the pool size.
     `finish_universe_ranking` adds the pool cut (cheap), so a search can reuse one base across

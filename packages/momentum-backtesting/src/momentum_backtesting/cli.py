@@ -1579,6 +1579,9 @@ def categories_broad_backtest(
             stock_tilt=stock_tilt,
             stock_tilt_screen_pct=stock_tilt_screen_pct,
             cost_pct=cost_pct,
+            # Same as the API's default (`broad_every_week`): simulate the thin weeks too, or
+            # this command silently skips them and disagrees with the dashboard.
+            min_ranked=1,
         )
     except (broad.TotalMarketDataNotFoundError, ValueError) as error:
         typer.echo(str(error))

@@ -345,7 +345,7 @@ class _Data:
         pool_exit_rank: int,
         liquidity: liquidity_mod.LiquidityConfig | None = None,
         universe_kind: Literal["total_market", "all_liquid"] = "total_market",
-        series_breaks: Literal["legacy", "verified"] = "legacy",
+        series_breaks: Literal["legacy", "verified"] = "verified",
     ) -> broad.UniverseRanking:
         """Step 2 (categories/broad.py) for this exact parameter combination - cached the same
         way get_categories_universe caches AllCategoriesResult (the expensive part is independent
@@ -543,11 +543,13 @@ class BacktestRequest(BaseModel):
     # "extended" also tags stocks outside the 755-name Total Market (BSE-derived sectors), so the
     # all-liquid universe's category layer can hold them; "curated" is the original 755-name file.
     broad_category_tags: Literal["curated", "extended"] = "curated"
-    # How big one-day falls are treated when building price series. "legacy" (default, so saved
-    # runs reproduce) starts a new series at every unexplained fall >= 15%, which retires and
-    # freezes a held position; "verified" keeps one continuous series unless a corporate action
+    # How big one-day falls are treated when building price series. "verified" (the default
+    # everywhere since 2026-10-05, BL-010) keeps one continuous series unless a corporate action
     # that cannot be back-adjusted (demerger, rights, scheme, dividend) explains the fall.
-    broad_series_breaks: Literal["legacy", "verified"] = "legacy"
+    # "legacy" starts a new series at every unexplained fall >= 15%, which retires and freezes a
+    # held position; it is kept only to reproduce results saved before the switch, and a run
+    # saved without this field now re-runs on "verified".
+    broad_series_breaks: Literal["legacy", "verified"] = "verified"
     # Step 2: the quarterly-refreshed qualifying-pool hysteresis (shared by both modes).
     broad_pool_top_n: int = Field(broad.DEFAULT_POOL_TOP_N, ge=10, le=500)
     broad_pool_exit_rank: int = Field(broad.DEFAULT_POOL_EXIT_RANK, ge=10, le=700)
@@ -1784,6 +1786,7 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                         pool_exit_rank=req.broad_pool_exit_rank,
                         liquidity=_liquidity_config(req),
                         universe_kind=req.broad_universe,
+                        series_breaks=req.broad_series_breaks,
                     )
                     week = rebalance.signal_week(now.date())
                 except (fyers.FyersCredentialsError, RuntimeError, ValueError):
