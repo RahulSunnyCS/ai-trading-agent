@@ -1358,8 +1358,12 @@ def _broad_meta() -> dict:
             "broad_off_exit_rank": 20,
             "broad_every_week": True,
             "broad_universe": "total_market",
-            "broad_liquidity_filter": False,
-            "broad_respect_circuits": False,
+            # A new Broad run starts realistic (owner decision 2026-10-05, BL-010 §3.13.2): only
+            # stocks that trade enough, and no fills on a circuit-locked day. Together they cut
+            # the default run from 53% to 40% CAGR. The request model keeps False, so a saved
+            # run (which carries its own values) re-runs unchanged.
+            "broad_liquidity_filter": True,
+            "broad_respect_circuits": True,
             "broad_liq_min_turnover_cr": 1.0,
             "broad_liq_floor_ratio": 0.25,
             "broad_liq_min_price": 20.0,

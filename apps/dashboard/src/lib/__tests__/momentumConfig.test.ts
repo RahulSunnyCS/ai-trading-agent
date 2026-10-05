@@ -4,6 +4,7 @@ import {
   MOMENTUM_SETTING_LABELS,
   describeConfig,
   diffConfigs,
+  hindsightWarning,
   modifiedSections,
   settingsSectionOf,
 } from '../momentumConfig';
@@ -328,5 +329,37 @@ describe('diffConfigs', () => {
     expect(diffConfigs(RUN, { ...RUN, max_position: null })).toEqual([
       'Max per holding 35% → none',
     ]);
+  });
+});
+
+describe('hindsightWarning', () => {
+  it('warns on Broad and names the realism switches left off', () => {
+    const w = hindsightWarning({ dataset: 'broad' });
+    expect(w?.headline).toMatch(/upper bound/);
+    expect(w?.realismOff).toEqual(['circuit locks', 'the tradability filter']);
+  });
+
+  it('lists nothing extra when both Broad switches are on', () => {
+    const w = hindsightWarning({
+      dataset: 'broad',
+      broad_respect_circuits: true,
+      broad_liquidity_filter: true,
+    });
+    expect(w?.realismOff).toEqual([]);
+  });
+
+  it('counts the whole-market universe as filtered (the gate is mandatory there)', () => {
+    const w = hindsightWarning({
+      dataset: 'broad',
+      broad_respect_circuits: true,
+      broad_universe: 'all_liquid',
+    });
+    expect(w?.realismOff).toEqual([]);
+  });
+
+  it('warns on Custom Index, and not on ETF Rotation or the Nifty 50 stock set', () => {
+    expect(hindsightWarning({ dataset: 'custom_index' })).not.toBeNull();
+    expect(hindsightWarning({ dataset: 'etf' })).toBeNull();
+    expect(hindsightWarning({ dataset: 'stock' })).toBeNull();
   });
 });

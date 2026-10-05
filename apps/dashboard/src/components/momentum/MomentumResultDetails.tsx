@@ -15,7 +15,7 @@ import {
   formatPct,
   formatPp,
 } from '../../lib/format';
-import { describeConfig } from '../../lib/momentumConfig';
+import { describeConfig, hindsightWarning } from '../../lib/momentumConfig';
 import { type DetailsTab, useMomentumViewStore } from '../../store/momentumView';
 import type { MomentumResult, MomentumSavedRun } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
@@ -336,6 +336,7 @@ export function MomentumPerformanceCard({
   const [expanded, setExpanded] = useState(false);
   const flashing = useResultFlash(runInfo?.finishedAt ?? null);
   const notes = dataNotes(result);
+  const warning = hindsightWarning(config);
   const label = DATASET_LABELS[String(config.dataset)] ?? 'Backtest';
 
   return (
@@ -368,6 +369,24 @@ export function MomentumPerformanceCard({
           </Button>
         </div>
       </div>
+      {warning ? (
+        <div
+          role="note"
+          className="mt-3 flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">{warning.headline}</p>
+            <p className="text-muted">{warning.detail}</p>
+            {warning.realismOff.length ? (
+              <p className="text-muted">
+                This run also ignores {warning.realismOff.join(' and ')}. On the default Broad
+                settings, turning both on takes about 13 points off the CAGR.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <div className="mt-3 flex flex-wrap items-start gap-1.5">
         {assumptionChips(result, config).map((chip) => (
           <span

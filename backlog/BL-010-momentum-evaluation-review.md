@@ -334,3 +334,10 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
 - 2026-10-05 — Phase 1a merged (PR #10). Phase 1b: `verified` made the default series rule (owner
   approved), live ranking uses the ranking's own rule, CLI thin weeks fixed. Found: the Telegram
   signal is the ETF strategy; the Broad preview is literally equal to the backtest by construction.
+- 2026-10-05 — owner decision (from the dashboard session): new Broad runs default to circuit-lock
+  fills and the tradability filter. Measured on the default Broad run, 2017-01 → 2026-10:
+  53.2% as shipped; 48.7% with circuit locks; 41.3% with the tradability filter; 44.3% with a
+  one-week signal delay; 40.4% with locks + filter; 40.3% with all three (Nifty200 Momentum 30
+  TRI 17.0%). Broad and Custom Index results now show an "upper bound, not an expected return"
+  note citing F1/F2 until Phase 3 re-measures point-in-time. Signal delay left at 0.
+
