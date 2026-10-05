@@ -467,4 +467,47 @@ Answered by the owner on 2026-10-05, when the item was started.
     and More (Account moved under More).
   - Not done: a component test for `OverviewView`; the feed card opens its own WebSocket
     (acceptable only because tabs render one at a time).
+- 2026-10-05 — **Phase 6 done** (branch `feat/bl-013-phase-6`, stacked on Phase 5). One PR for
+  the whole phase, not one per sub-tab as the plan said: the sub-tabs share `lib/` helpers and
+  were built together.
+  - Backtest: two-pane layout from `xl` (sticky settings column with a run bar: Run, labelled
+    "Re-run fresh", dirty badge, Ctrl/Cmd+Enter); settings chips from `describeConfig` above
+    the results, each opening its accordion; the previous result stays faded while a run
+    computes; KPI deltas vs the previous run, benchmark values where the payload has them,
+    Sharpe and Sortino split; circuit card under the Performance card for Broad; run tabs show
+    CAGR / edge and a tooltip of what changed.
+  - Settings panel: Period & benchmark together; Broad split into "Universe & tradability" and
+    "Selection" with no generic Top N; `grid-cols-1 sm:grid-cols-2`; a modified dot per
+    accordion; long write-ups behind "Why?"; accordion state survives collapsing.
+  - Chart: week detail docked below the plot (tap selects a week); 1Y / 3Y / 5Y / All with
+    rebasing; legible benchmark and liquid-fund lines; rotation markers thinned when zoomed out.
+  - Details: "Timeline & holdings" capped to the 25 longest-held; heatmap with a Strategy /
+    Benchmark / Difference toggle, year totals and focusable cells; signal actions as Badges;
+    "Rank score" with the per-lookback returns that explain it.
+  - Scores: pill plus signed return per lookback; real sort icons with `aria-sort`; sticky
+    header and first column; parent-group filter.
+  - Saved runs: sortable table with a sparkline, the Telegram-active run pinned; rename
+    commits on Enter with a toast; read-only viewer; "Load settings" replaces; one shared
+    Compare (up to four, union-of-keys settings diff); Telegram-active asks first.
+  - Weekly: result directly under the controls; Run is primary; an inline confirm before
+    anything is sent; a preview can no longer be sent; one readiness card; action Badges.
+  - Rebalance: paste holdings; "use the previewed target as my holdings"; the reason Preview
+    is disabled sits beside it; full current → target table with HOLD, cash and totals.
+  - Checked: typecheck, 533 dashboard unit tests, Biome, both done-when greps; in the browser
+    (page text and DOM, no screenshots: the pane was not displayed) one ETF backtest run with
+    every detail tab opened, and the Scores, Saved runs, Weekly and Rebalance pages loaded.
+    That run auto-saved one more run to the owner's saved runs.
+  - Not exercised, because they write or send: rename, favourite, Telegram-active, remove,
+    a weekly run and its confirm row, a rebalance preview and its result table. They are
+    covered by types and the `lib/` tests only. Playwright was not run; three specs' selectors
+    were updated.
+  - Where the data fell short: Held / Candidate badges on Scores need a GET that returns the
+    saved latest signal's rows (they show only after a manual weekly run in the same service
+    session); saved runs store six KPIs and the strategy line, so the viewer has no benchmark
+    line or full KPI set; there is no benchmark Sharpe / Sortino / volatility; "use last
+    signal's target" needs weights on research weekly signals. These are §3.12.13 items.
+  - Left: the circuit card sits below the Performance card rather than inside it; the run-tab
+    diff is a native tooltip; in-session and saved "Run N" are still two sequences in the
+    store (the tab shows the saved name once saved); the overlay rule in the parent still
+    assumes the first saved run is the one shown.
 

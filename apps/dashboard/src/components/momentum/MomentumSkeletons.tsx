@@ -11,20 +11,20 @@ import { Shimmer } from '../ui/Skeleton';
 
 const CHECKBOX_ROWS = ['w-24', 'w-32', 'w-28', 'w-20', 'w-36', 'w-24', 'w-28', 'w-32'];
 
-/** Backtest: the "What this run tests" strip, the Strategy settings header, and the start of
- * the universe picker. */
+/** Backtest settings column: the Strategy settings header, the start of the universe picker and
+ * the run bar. */
 export function MomentumSettingsSkeleton() {
   return (
     <output
       className="block rounded-xl border border-border bg-surface"
       aria-label="Loading strategy settings"
     >
-      <div className="border-b border-border px-4 py-3">
-        <Shimmer className="h-4 w-3/4 max-w-2xl" />
-      </div>
       <div className="flex items-center justify-between px-4 py-3">
-        <Shimmer className="h-4 w-32" />
-        <Shimmer className="h-4 w-12" />
+        <div className="space-y-2">
+          <Shimmer className="h-4 w-32" />
+          <Shimmer className="h-3 w-24" />
+        </div>
+        <Shimmer className="h-8 w-8" />
       </div>
       <div className="space-y-4 border-t border-border p-4">
         <Shimmer className="h-3 w-40" />
@@ -49,6 +49,10 @@ export function MomentumSettingsSkeleton() {
             ))}
           </div>
         </div>
+      </div>
+      <div className="flex gap-2 border-t border-border px-4 py-3">
+        <Shimmer className="h-9 flex-1" />
+        <Shimmer className="h-9 w-28" />
       </div>
     </output>
   );

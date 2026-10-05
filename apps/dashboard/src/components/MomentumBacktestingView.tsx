@@ -3,25 +3,37 @@
 import {
   AlertCircle,
   ArrowUp,
+  Check,
   CheckCircle2,
   ChevronDown,
   Clock,
   Link as LinkIcon,
   Loader2,
-  Play,
   RefreshCw,
   RotateCcw,
-  RotateCw,
   X,
 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { useAppRoute } from '../hooks/useAppRoute';
 import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { cn } from '../lib/cn';
-import { formatNumber } from '../lib/format';
-import { describeConfig } from '../lib/momentumConfig';
+import { formatDuration, formatPct, formatPp } from '../lib/format';
+import {
+  type MomentumSettingsSection,
+  describeConfig,
+  diffConfigs,
+  modifiedSections,
+} from '../lib/momentumConfig';
 import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
 import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
 import {
@@ -47,13 +59,17 @@ import {
   type LookbackRow,
   MomentumSettingsPanel,
   momentumSettingsDefaults,
+  settingsSectionDomId,
 } from './momentum/MomentumSettingsPanel';
 import { MomentumSettingsSkeleton } from './momentum/MomentumSkeletons';
 import { MomentumWeeklyView } from './momentum/MomentumWeeklyView';
+import { MomentumRunBar } from './momentum/backtest/MomentumRunBar';
+import { MomentumSettingsChips } from './momentum/backtest/MomentumSettingsChips';
 import { Button } from './ui/Button';
 import { SegmentedControl, type SegmentedOption } from './ui/SegmentedControl';
 import { StateMessage } from './ui/StateMessage';
 import { type TabItem, Tabs } from './ui/Tabs';
+import { toast } from './ui/Toast';
 
 type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
 
@@ -183,6 +199,52 @@ const DATASET_SHORT: Record<string, string> = {
   broad: 'Broad',
 };
 
+/** Where the settings column sticks under the app top bar: Tailwind's `top-[4.5rem]`. */
+const SETTINGS_STICKY_TOP_PX = 72;
+
+const inFlight = (run: MomentumRun): boolean => run.status === 'queued' || run.status === 'running';
+
+/**
+ * One name per run. A finished run is auto-saved under the server's own "Run N" sequence, and
+ * that is the name it carries everywhere (this tab, the Performance card, Saved runs). Until
+ * then the session counter is shown as "Unsaved N", so it cannot be mistaken for a saved run
+ * that happens to have the same number.
+ */
+function runName(run: MomentumRun): string {
+  return run.savedAs ?? run.label.replace(/^Run\b/, 'Unsaved');
+}
+
+const MAX_DIFF_LINES = 10;
+
+/** The tab's tooltip: how long the run took and what it changed against the tab before it. */
+function runTabTitle(run: MomentumRun, previous: MomentumRun | null, now: number): string {
+  const lines = [
+    `${runName(run)} · ${DATASET_SHORT[run.dataset] ?? run.dataset} · ${
+      inFlight(run)
+        ? `running for ${formatDuration(Math.max(0, now - run.startedAt))}`
+        : run.status === 'failed'
+          ? 'failed'
+          : `took ${formatDuration((run.finishedAt ?? now) - run.startedAt)}`
+    }${run.fresh ? ' · recomputed with caches dropped' : ''}`,
+  ];
+  if (!previous) return `${lines[0]}\nFirst run in this session.`;
+  const changes = diffConfigs(previous.config, run.config);
+  if (changes.length === 0) {
+    lines.push(`Same settings as ${runName(previous)}.`);
+  } else {
+    lines.push(`Changed vs ${runName(previous)}:`, ...changes.slice(0, MAX_DIFF_LINES));
+    if (changes.length > MAX_DIFF_LINES) {
+      lines.push(`+ ${changes.length - MAX_DIFF_LINES} more`);
+    }
+  }
+  return lines.join('\n');
+}
+
+const kpi = (run: MomentumRun, key: string): number | null => {
+  const value = run.result?.kpis[key];
+  return typeof value === 'number' ? value : null;
+};
+
 /** One tab per run - queued, running, finished or failed - so runs can go side by side. */
 function MomentumRunTabs({
   runs,
@@ -197,14 +259,11 @@ function MomentumRunTabs({
   onSelect: (run: MomentumRun) => void;
   onClose: (run: MomentumRun) => void;
 }) {
-  const items: Array<TabItem<string>> = runs.map((run) => {
-    const inFlight = run.status === 'queued' || run.status === 'running';
-    const seconds = Math.max(
-      0,
-      Math.floor(((inFlight ? now : (run.finishedAt ?? now)) - run.startedAt) / 1000),
-    );
+  const items: Array<TabItem<string>> = runs.map((run, index) => {
+    const name = runName(run);
     return {
       value: run.id,
+      title: runTabTitle(run, runs[index - 1] ?? null, now),
       label: (
         <>
           {run.status === 'queued' ? (
@@ -212,21 +271,36 @@ function MomentumRunTabs({
           ) : run.status === 'running' ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="running" />
           ) : run.status === 'done' ? (
-            <CheckCircle2 className="h-3.5 w-3.5 text-positive" aria-label="done" />
+            <CheckCircle2 className="h-3.5 w-3.5" aria-label="done" />
           ) : (
-            <AlertCircle className="h-3.5 w-3.5 text-negative" aria-label="failed" />
+            <AlertCircle className="h-3.5 w-3.5" aria-label="failed" />
           )}
-          <span className="font-medium">{run.label}</span>
+          <span className="font-medium">{name}</span>
           <span className="text-xs opacity-70">{DATASET_SHORT[run.dataset] ?? run.dataset}</span>
-          <span className="font-mono text-xs tabular-nums opacity-70">{seconds}s</span>
+          {run.status === 'done' ? (
+            <>
+              <span className="metric text-xs">{formatPct(kpi(run, 'cagr'))}</span>
+              <span className="metric text-xs opacity-70">
+                {formatPp(kpi(run, 'excess_cagr'))} edge
+              </span>
+            </>
+          ) : run.status === 'failed' ? (
+            <span className="text-xs opacity-70">failed</span>
+          ) : (
+            <span className="metric text-xs opacity-70">
+              {formatDuration(Math.max(0, now - run.startedAt))}
+            </span>
+          )}
         </>
       ),
       trailing: (
         <button
           type="button"
           onClick={() => onClose(run)}
-          aria-label={`Close ${run.label}`}
-          title={inFlight ? 'Hide this tab (the run keeps going on the server)' : 'Close this tab'}
+          aria-label={`Close ${name}`}
+          title={
+            inFlight(run) ? 'Hide this tab (the run keeps going on the server)' : 'Close this tab'
+          }
           className="rounded-md px-1.5 py-1.5 text-muted opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <X className="h-3.5 w-3.5" />
@@ -307,7 +381,14 @@ export function MomentumBacktestingView() {
   const [loading, setLoading] = useState(true);
   const [reloading, setReloading] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [starting, setStarting] = useState(false);
+  // Which accordions the user opened or closed, by id. Held here, not in the panel, so it
+  // survives collapsing the settings and lets a summary chip open the accordion it describes.
+  const [openSections, setOpenSections] = useState<
+    Partial<Record<MomentumSettingsSection, boolean>>
+  >({});
+  const settingsBodyRef = useRef<HTMLDivElement>(null);
+  const settingsColumnRef = useRef<HTMLElement>(null);
+  const [starting, setStarting] = useState<'run' | 'fresh' | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [doneNoticeAt, setDoneNoticeAt] = useState<number | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
@@ -319,25 +400,32 @@ export function MomentumBacktestingView() {
   const runErrorRef = useRef<HTMLDivElement>(null);
   // Everything about "the run on screen" is derived from the store, so it survives leaving
   // this page and several runs can be in flight at once (one tab each).
-  const running =
-    activeRun !== null && (activeRun.status === 'queued' || activeRun.status === 'running');
-  const runningFresh = running && activeRun.fresh;
+  const running = activeRun !== null && inFlight(activeRun);
   const runStartedAt = running ? activeRun.startedAt : null;
-  const result: MomentumResult | null = activeRun?.result ?? null;
+  // While a new run computes, the last finished run of the same dataset stays on screen (faded)
+  // instead of a skeleton. Only a first-ever run has nothing to show.
+  const previousRun = running
+    ? (runs
+        .slice(0, runs.indexOf(activeRun))
+        .reverse()
+        .find((run) => run.status === 'done' && run.result && run.dataset === activeRun.dataset) ??
+      null)
+    : null;
+  const shownRun = activeRun?.status === 'done' ? activeRun : previousRun;
+  const result: MomentumResult | null = shownRun?.result ?? null;
+  const shownConfig = shownRun?.config ?? null;
   const lastRunConfig = activeRun?.status === 'done' ? activeRun.config : null;
   const runError = startError ?? (activeRun?.status === 'failed' ? activeRun.error : null);
   const runInfo: MomentumRunInfo | null =
-    activeRun?.status === 'done' && activeRun.finishedAt !== null
+    shownRun && shownRun.finishedAt !== null
       ? {
-          finishedAt: activeRun.finishedAt,
-          durationMs: activeRun.finishedAt - activeRun.startedAt,
-          savedAs: activeRun.savedAs,
-          fresh: activeRun.fresh,
+          finishedAt: shownRun.finishedAt,
+          durationMs: shownRun.finishedAt - shownRun.startedAt,
+          savedAs: shownRun.savedAs,
+          fresh: shownRun.fresh,
         }
       : null;
-  const inFlightCount = runs.filter(
-    (run) => run.status === 'queued' || run.status === 'running',
-  ).length;
+  const inFlightCount = runs.filter(inFlight).length;
   const [savedRuns, setSavedRuns] = useState<MomentumSavedRun[]>([]);
   // Until the first response lands the list is unknown, not empty: the Saved runs section shows
   // placeholders and its tab shows no count, rather than "0 runs".
@@ -346,7 +434,6 @@ export function MomentumBacktestingView() {
   const savedRunsRequest = useRef(0);
   const [savedRunError, setSavedRunError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const overlays = useMemo(
     () => savedRuns.filter((run, index) => index > 0 && run.overlay),
@@ -514,7 +601,11 @@ export function MomentumBacktestingView() {
       exitRank: numberDefault(config, 'exit_rank', 10),
       lookbacks: lookbacksFromConfig(config),
     });
-    setValues((current) => momentumSettingsDefaults({ ...current, ...config }));
+    // Replace, not merge: a setting the saved run does not carry goes back to its default
+    // instead of keeping whatever the form held.
+    setValues((current) =>
+      momentumSettingsDefaults(meta ? { ...meta.defaults, ...config } : { ...current, ...config }),
+    );
     setSection('backtest');
     setSettingsOpen(true);
   }
@@ -539,7 +630,8 @@ export function MomentumBacktestingView() {
     if (dataset !== 'broad' && core.selected.length === 0) {
       throw new Error('Select at least one instrument before running the strategy.');
     }
-    if (core.exitRank < core.topN) {
+    // Broad Momentum has its own selection keys and no Top N / exit-rank fields to correct.
+    if (dataset !== 'broad' && core.exitRank < core.topN) {
       throw new Error('Sell-when-rank-exceeds must be at least Top N.');
     }
     return {
@@ -557,7 +649,7 @@ export function MomentumBacktestingView() {
   }
 
   /**
-   * `fresh` is the "re-run from scratch" icon: the server drops its cached rankings and data and
+   * `fresh` is the "Re-run fresh" button: the server drops its cached rankings and data and
    * reloads before computing. It is sent alongside the config but is NOT part of it, so it never
    * enters `lastRunConfig`, a saved run, or the "changed since last run" comparison.
    */
@@ -571,9 +663,9 @@ export function MomentumBacktestingView() {
       return;
     }
     setError(null);
-    setStarting(true);
+    setStarting(fresh ? 'fresh' : 'run');
     const failure = await useMomentumRunsStore.getState().startRun(dataset, config, fresh);
-    setStarting(false);
+    setStarting(null);
     if (failure) setStartError(failure);
   }
 
@@ -596,8 +688,8 @@ export function MomentumBacktestingView() {
     setDoneNoticeAt(visible ? null : (activeRun?.finishedAt ?? Date.now()));
   }, [activeRun?.id, activeRun?.status, activeRun?.finishedAt, running]);
 
-  // A failed run leaves the previous results on screen, so bring the reason into view: the Run
-  // button sits at the bottom of a long form and the user would otherwise see nothing happen.
+  // A failed run leaves the previous results on screen, so bring the reason (shown in the run
+  // bar, by the button) into view; otherwise nothing would seem to happen.
   useEffect(() => {
     if (runError) runErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [runError]);
@@ -618,24 +710,13 @@ export function MomentumBacktestingView() {
     return () => clearTimeout(timer);
   }, [doneNoticeAt]);
 
-  // Ctrl/Cmd+Enter runs the backtest from anywhere in the settings panel. A ref keeps the
-  // handler reading the latest run() without re-attaching the listener on every keystroke.
-  const runStateRef = useRef({ running, meta, run: runBacktest });
-  runStateRef.current = { running, meta, run: runBacktest };
-
-  useEffect(() => {
-    if (section !== 'backtest') return;
-    function onKeyDown(event: KeyboardEvent): void {
-      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        event.preventDefault();
-        const { running: isRunning, meta: currentMeta, run } = runStateRef.current;
-        if (!isRunning && currentMeta) void run();
-      }
-    }
-    const node = containerRef.current;
-    node?.addEventListener('keydown', onKeyDown);
-    return () => node?.removeEventListener('keydown', onKeyDown);
-  }, [section]);
+  // Ctrl/Cmd+Enter runs the backtest from anywhere in the settings column. Ignored while a run
+  // request is already being sent, so holding the keys cannot queue duplicates.
+  function onSettingsKeyDown(event: KeyboardEvent<HTMLElement>): void {
+    if (!(event.ctrlKey || event.metaKey) || event.key !== 'Enter') return;
+    event.preventDefault();
+    if (starting === null && meta) void runBacktest();
+  }
 
   const currentConfig = meta
     ? (() => {
@@ -657,6 +738,7 @@ export function MomentumBacktestingView() {
     const url = `${window.location.origin}${window.location.pathname}#momentum-cfg=${encoded}`;
     void navigator.clipboard?.writeText(url).then(() => {
       setCopied(true);
+      toast('Shareable link copied');
       setTimeout(() => setCopied(false), 1800);
     });
   }
@@ -680,24 +762,109 @@ export function MomentumBacktestingView() {
     }
   }, []);
 
-  // The form's current settings as one config, described once for both summaries below.
-  const described = describeConfig(
-    {
+  // The form's current settings as one config (never throws, unlike buildConfig). It feeds the
+  // summary chips and the per-accordion "modified" dots, so the two cannot disagree.
+  const formConfig = useMemo<Record<string, unknown>>(
+    () => ({
       ...values,
+      universe: core.selected,
       start: core.start,
-      end: core.end || 'End',
+      end: core.end,
       top_n: core.topN,
       exit_rank: core.exitRank,
-    },
-    dataset,
+      lookbacks: core.lookbacks.map((row) => row.weeks),
+      weights: core.lookbacks.map((row) => row.weight),
+    }),
+    [values, core],
   );
-  const summary = meta
-    ? `${described.period} · ${described.cadence} · ${described.selectionShort} · ${values.benchmark ?? ''}`
-    : '';
+  const described = describeConfig({ ...formConfig, end: core.end || 'End' }, dataset);
+  // What a fresh form for this dataset holds: the same values loadMeta() seeds without a run.
+  const defaultsConfig = useMemo<Record<string, unknown> | null>(() => {
+    if (!meta) return null;
+    const rows = lookbacksFromConfig({ lookbacks: meta.defaults.lookbacks });
+    return {
+      ...momentumSettingsDefaults({
+        ...meta.defaults,
+        benchmark: stringDefault(meta.defaults, 'benchmark', meta.benchmarks?.[0] ?? ''),
+      }),
+      universe: selectedByDefault(meta),
+      start: defaultStart(meta, meta.defaults),
+      end: stringDefault(meta.defaults, 'end', meta.last_week),
+      top_n: numberDefault(meta.defaults, 'top_n', 5),
+      exit_rank: numberDefault(meta.defaults, 'exit_rank', 10),
+      lookbacks: rows.map((row) => row.weeks),
+      weights: rows.map((row) => row.weight),
+    };
+  }, [meta]);
+  const modified = useMemo(
+    () =>
+      defaultsConfig
+        ? modifiedSections(formConfig, defaultsConfig, dataset)
+        : new Set<MomentumSettingsSection>(),
+    [formConfig, defaultsConfig, dataset],
+  );
+
+  const toggleSection = useCallback((id: MomentumSettingsSection, open: boolean): void => {
+    setOpenSections((current) => ({ ...current, [id]: open }));
+  }, []);
+
+  // A summary chip was clicked: open its accordion, then bring it into view once it has rendered.
+  const [revealSection, setRevealSection] = useState<{
+    id: MomentumSettingsSection;
+    tick: number;
+  } | null>(null);
+  function openSection(id: MomentumSettingsSection): void {
+    toggleSection(id, true);
+    setSettingsOpen(true);
+    setRevealSection((current) => ({ id, tick: (current?.tick ?? 0) + 1 }));
+  }
+  useEffect(() => {
+    if (!revealSection) return;
+    const node = document.getElementById(settingsSectionDomId(revealSection.id));
+    if (!node) return;
+    const body = settingsBodyRef.current;
+    if (body && body.scrollHeight > body.clientHeight + 1) {
+      // Two-pane layout: the settings column scrolls on its own, so move only that column.
+      const offset = node.getBoundingClientRect().top - body.getBoundingClientRect().top;
+      body.scrollTo({ top: body.scrollTop + offset - 8, behavior: 'smooth' });
+    } else {
+      node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    node.querySelector('button')?.focus({ preventScroll: true });
+  }, [revealSection]);
+
+  // The settings column is as tall as the viewport below it allows, so its run bar is on screen
+  // both before the page is scrolled (the column starts under the page header) and once it is
+  // stuck under the top bar. CSS alone can only express the stuck case.
+  const settingsShown = section === 'backtest' && meta !== null && !loading;
+  useEffect(() => {
+    if (!settingsShown) return;
+    const node = settingsColumnRef.current;
+    if (!node) return;
+    let frame = 0;
+    const measure = (): void => {
+      frame = 0;
+      const top = Math.max(SETTINGS_STICKY_TOP_PX, Math.round(node.getBoundingClientRect().top));
+      node.style.setProperty('--settings-top', `${top}px`);
+    };
+    const schedule = (): void => {
+      if (frame === 0) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [settingsShown]);
+
   const resultEnd = result?.series.dates.at(-1);
+  const datasetLabel = DATASETS.find((item) => item.id === dataset)?.label ?? 'Momentum';
 
   return (
-    <div ref={containerRef} className="space-y-5">
+    <div className="space-y-5">
       <Tabs
         ariaLabel="Momentum sections"
         variant="pill"
@@ -834,20 +1001,6 @@ export function MomentumBacktestingView() {
               </div>
             </div>
 
-            {runs.length > 0 ? (
-              <MomentumRunTabs
-                runs={runs}
-                activeId={activeRunId}
-                now={now}
-                onSelect={(run) => {
-                  setStartError(null);
-                  useMomentumRunsStore.getState().setActive(run.id);
-                  if (run.dataset !== dataset) setDataset(run.dataset as Dataset);
-                }}
-                onClose={(run) => useMomentumRunsStore.getState().closeRun(run.id)}
-              />
-            ) : null}
-
             {error ? (
               <StateMessage
                 variant="error"
@@ -856,69 +1009,70 @@ export function MomentumBacktestingView() {
               />
             ) : null}
 
-            {loading || !meta ? (
-              error ? null : (
-                <MomentumSettingsSkeleton />
-              )
-            ) : (
-              <div className="rounded-xl border border-border bg-surface">
-                <div className="border-b border-border px-4 py-3 text-sm text-muted">
-                  <span className="font-medium text-foreground">What this run tests:</span>{' '}
-                  {DATASETS.find((item) => item.id === dataset)?.label} · {core.start} to {core.end}
-                  {' · '}
-                  {described.cadence} rebalancing
-                  {' · '}
-                  {described.selection}
-                  {' · '}benchmark {described.benchmark}
-                  {' · '}prices through {meta.last_week}
-                </div>
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => setSettingsOpen((open) => !open)}
-                    aria-expanded={settingsOpen}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <p className="text-sm font-semibold text-foreground">Strategy settings</p>
-                    {!settingsOpen ? (
-                      <p className="truncate text-xs text-muted">{summary}</p>
-                    ) : null}
-                  </button>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {dirty ? (
-                      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
-                        Changed since last run
-                      </span>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => void runBacktest({ fresh: true })}
-                      disabled={starting}
-                      title="Re-run from scratch: drops the server's cached rankings and data, reloads them, then recomputes"
-                      aria-label="Re-run from scratch"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            {/* Two panes from xl: settings on the left in their own scroll, results on the right,
+                so a setting and what it does to the result are on screen together. */}
+            <div className="grid gap-5 xl:grid-cols-[26.5rem_minmax(0,1fr)] xl:items-start 2xl:grid-cols-[28.5rem_minmax(0,1fr)]">
+              {loading || !meta ? (
+                error ? (
+                  <div className="hidden xl:block" />
+                ) : (
+                  <MomentumSettingsSkeleton />
+                )
+              ) : (
+                <section
+                  ref={settingsColumnRef}
+                  aria-label="Strategy settings"
+                  onKeyDown={onSettingsKeyDown}
+                  className="rounded-xl border border-border bg-surface xl:sticky xl:top-[4.5rem] xl:flex xl:max-h-[calc(100vh-var(--settings-top,4.5rem)-1rem)] xl:min-h-[20rem] xl:flex-col"
+                >
+                  <div className="flex items-center gap-2 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-sm font-semibold text-foreground">Strategy settings</h2>
+                      <p className="truncate text-xs text-muted">
+                        {modified.size === 0
+                          ? 'Dataset defaults'
+                          : `${modified.size} ${modified.size === 1 ? 'section' : 'sections'} changed from the defaults`}
+                      </p>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={shareLink}
+                      disabled={!currentConfig}
+                      aria-label="Copy shareable link"
+                      title={
+                        copied
+                          ? 'Link copied'
+                          : 'Copy shareable link: a URL that reopens this page with these settings'
+                      }
                     >
-                      <RotateCw
-                        className={cn(
-                          'h-3.5 w-3.5 shrink-0',
-                          running && runningFresh && 'animate-spin',
-                        )}
-                      />
-                    </button>
-                    <button
-                      type="button"
+                      {copied ? (
+                        <Check className="h-4 w-4 text-positive" />
+                      ) : (
+                        <LinkIcon className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="xl:hidden"
                       onClick={() => setSettingsOpen((open) => !open)}
+                      aria-expanded={settingsOpen}
                       aria-label={settingsOpen ? 'Collapse settings' : 'Expand settings'}
-                      className="rounded p-1 text-faint hover:text-foreground"
                     >
                       <ChevronDown
                         className={cn('h-4 w-4 transition-transform', settingsOpen && 'rotate-180')}
                       />
-                    </button>
+                    </Button>
                   </div>
-                </div>
-                {settingsOpen ? (
-                  <div className="space-y-4 border-t border-border p-4">
+                  {/* Collapsing (below xl only) hides the panel rather than unmounting it. */}
+                  <div
+                    ref={settingsBodyRef}
+                    className={cn(
+                      'border-t border-border p-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto',
+                      !settingsOpen && 'hidden xl:block',
+                    )}
+                  >
                     <MomentumSettingsPanel
                       dataset={dataset}
                       instruments={meta.instruments}
@@ -932,140 +1086,141 @@ export function MomentumBacktestingView() {
                       onCoreChange={onCoreChange}
                       values={values}
                       onChange={onValueChange}
+                      openSections={openSections}
+                      onToggleSection={toggleSection}
+                      modifiedSections={modified}
                     />
-                    <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                      <Button
-                        variant="primary"
-                        onClick={() => void runBacktest()}
-                        disabled={starting}
+                  </div>
+                  <MomentumRunBar
+                    starting={starting}
+                    disabled={!meta}
+                    dirty={dirty}
+                    hasRun={lastRunConfig !== null}
+                    inFlightCount={inFlightCount}
+                    runError={runError}
+                    runErrorRef={runErrorRef}
+                    onRun={(options) => void runBacktest(options)}
+                  />
+                </section>
+              )}
+
+              <div className="min-w-0 space-y-4">
+                {meta && !loading ? (
+                  <MomentumSettingsChips
+                    datasetLabel={datasetLabel}
+                    chips={described.chips}
+                    pricesThrough={meta.last_week}
+                    onOpenSection={openSection}
+                  />
+                ) : null}
+
+                {runs.length > 0 ? (
+                  <MomentumRunTabs
+                    runs={runs}
+                    activeId={activeRunId}
+                    now={now}
+                    onSelect={(run) => {
+                      setStartError(null);
+                      useMomentumRunsStore.getState().setActive(run.id);
+                      if (run.dataset !== dataset) setDataset(run.dataset as Dataset);
+                    }}
+                    onClose={(run) => useMomentumRunsStore.getState().closeRun(run.id)}
+                  />
+                ) : null}
+
+                {running ? (
+                  // Pinned under the app top bar, so the timer stays visible while you scroll.
+                  <div className="sticky top-[4.5rem] z-20">
+                    <MomentumRunBanner
+                      elapsedMs={elapsedMs}
+                      dataset={dataset}
+                      datasetLabel={datasetLabel}
+                      hasPreviousResult={result !== null}
+                      queued={activeRun?.status === 'queued'}
+                    />
+                  </div>
+                ) : null}
+
+                {doneNoticeAt !== null && runInfo && !running ? (
+                  // Zero-height sticky slot: the pill floats over the page without shifting content.
+                  <div className="sticky top-[4.5rem] z-20 h-0">
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          summaryRef.current?.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start',
+                          });
+                          setDoneNoticeAt(null);
+                        }}
+                        className="inline-flex animate-fade-in items-center gap-2 rounded-full border border-positive/30 bg-surface px-4 py-2 text-sm text-foreground shadow-elevated transition-colors hover:border-positive/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        {starting ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Play className="h-3.5 w-3.5" />
-                        )}
-                        {starting ? 'Starting…' : 'Run momentum backtest'}
-                      </Button>
-                      {inFlightCount > 0 ? (
-                        <span className="text-xs text-muted">
-                          {inFlightCount} running — starting another runs it alongside
+                        <CheckCircle2 className="h-4 w-4 text-positive" />
+                        Results updated · took {formatDuration(runInfo.durationMs)}
+                        <span className="inline-flex items-center gap-1 font-medium text-primary">
+                          View summary <ArrowUp className="h-3.5 w-3.5" />
                         </span>
-                      ) : null}
-                      <span className="hidden text-xs text-faint sm:inline">Ctrl/Cmd + Enter</span>
-                      <Button size="sm" onClick={shareLink}>
-                        <LinkIcon className="h-3.5 w-3.5" />{' '}
-                        {copied ? 'Link copied' : 'Copy shareable link'}
-                      </Button>
+                      </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2 px-4 pb-4">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => void runBacktest()}
-                      disabled={starting}
-                    >
-                      {starting ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Play className="h-3.5 w-3.5" />
-                      )}
-                      {starting ? 'Starting…' : dirty ? 'Run again' : 'Run momentum backtest'}
-                    </Button>
-                  </div>
-                )}
-                {runError ? (
+                ) : null}
+
+                {running && !result ? <MomentumResultsSkeleton /> : null}
+
+                {!running && !result && !activeRun && meta && !loading ? (
+                  <StateMessage
+                    variant="empty"
+                    title="No results yet"
+                    description="Choose the settings and press Run momentum backtest (Ctrl/Cmd + Enter). The result appears here."
+                  />
+                ) : null}
+
+                {result ? (
                   <div
-                    ref={runErrorRef}
-                    role="alert"
-                    className="mx-4 mb-4 rounded-lg border border-negative/30 bg-negative/10 px-3 py-2.5 text-sm text-negative"
+                    className={cn(
+                      'space-y-5 transition-opacity duration-300',
+                      running && 'pointer-events-none select-none opacity-40',
+                    )}
+                    aria-busy={running}
                   >
-                    <p className="font-medium">The run didn&apos;t finish</p>
-                    <p className="mt-0.5 text-foreground/80">{runError}</p>
+                    <div ref={summaryRef} className="scroll-mt-20">
+                      {dataset === 'broad' && meta && resultEnd && resultEnd < meta.last_week ? (
+                        <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
+                          Result ends {resultEnd}, while prices extend to {meta.last_week}. Some
+                          weeks may have been skipped for insufficient ranked names. Check “Simulate
+                          every week” in Broad Momentum settings.
+                        </div>
+                      ) : null}
+                      <MomentumPerformanceCard
+                        result={result}
+                        config={shownConfig ?? {}}
+                        stale={dirty && !running}
+                        lastRunFailed={runError !== null && !running}
+                        runInfo={runInfo}
+                      />
+                    </div>
+                    {/* Broad only (renders nothing otherwise): how real the fills were, kept
+                        with the performance numbers it qualifies. */}
+                    <MomentumCircuitExposureCard exposure={result.circuit_exposure} />
+                    <MomentumEquityChart
+                      series={result.series}
+                      benchmarkName={result.benchmark_name}
+                      rotations={result.rotations}
+                      overlays={overlays}
+                      comparisons={result.comparisons ?? []}
+                      flashKey={finishedAt}
+                    />
+                    <MomentumResultDetails
+                      result={result}
+                      config={shownConfig ?? {}}
+                      savedRuns={savedRuns}
+                      flashKey={finishedAt}
+                    />
                   </div>
                 ) : null}
               </div>
-            )}
-
-            {running ? (
-              // Pinned under the app top bar, so the timer stays visible while you scroll.
-              <div className="sticky top-[4.5rem] z-20">
-                <MomentumRunBanner
-                  elapsedMs={elapsedMs}
-                  dataset={dataset}
-                  datasetLabel={DATASETS.find((item) => item.id === dataset)?.label ?? 'momentum'}
-                  hasPreviousResult={false}
-                  queued={activeRun?.status === 'queued'}
-                />
-              </div>
-            ) : null}
-
-            {doneNoticeAt !== null && runInfo ? (
-              // Zero-height sticky slot: the pill floats over the page without shifting content.
-              <div className="sticky top-[4.5rem] z-20 h-0">
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      setDoneNoticeAt(null);
-                    }}
-                    className="inline-flex animate-fade-in items-center gap-2 rounded-full border border-positive/30 bg-surface px-4 py-2 text-sm text-foreground shadow-elevated transition-colors hover:border-positive/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <CheckCircle2 className="h-4 w-4 text-positive" />
-                    Results updated · took {formatNumber(runInfo.durationMs / 1000, 1)}s
-                    <span className="inline-flex items-center gap-1 font-medium text-primary">
-                      View summary <ArrowUp className="h-3.5 w-3.5" />
-                    </span>
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {running && !result ? <MomentumResultsSkeleton /> : null}
-
-            {result ? (
-              <div
-                className={cn(
-                  'space-y-5 transition-opacity duration-300',
-                  running && 'pointer-events-none select-none opacity-40',
-                )}
-                aria-busy={running}
-              >
-                <div ref={summaryRef} className="scroll-mt-20">
-                  {dataset === 'broad' && meta && resultEnd && resultEnd < meta.last_week ? (
-                    <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
-                      Result ends {resultEnd}, while prices extend to {meta.last_week}. Some weeks
-                      may have been skipped for insufficient ranked names. Check “Simulate every
-                      week” in Broad Momentum settings.
-                    </div>
-                  ) : null}
-                  <MomentumPerformanceCard
-                    result={result}
-                    config={lastRunConfig ?? {}}
-                    stale={dirty && !running}
-                    lastRunFailed={runError !== null && !running}
-                    runInfo={runInfo}
-                  />
-                </div>
-                <MomentumEquityChart
-                  series={result.series}
-                  benchmarkName={result.benchmark_name}
-                  rotations={result.rotations}
-                  overlays={overlays}
-                  comparisons={result.comparisons ?? []}
-                  flashKey={finishedAt}
-                />
-                <MomentumResultDetails
-                  result={result}
-                  config={lastRunConfig ?? {}}
-                  savedRuns={savedRuns}
-                  flashKey={finishedAt}
-                />
-                <MomentumCircuitExposureCard exposure={result.circuit_exposure} />
-              </div>
-            ) : null}
+            </div>
           </>
         )}
       </div>

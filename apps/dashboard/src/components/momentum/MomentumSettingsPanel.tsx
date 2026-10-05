@@ -1,16 +1,17 @@
 'use client';
 
 import { Plus, Search, X } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, createContext, useContext, useMemo, useState } from 'react';
 
 import { type LiquidityPreviewParams, useLiquidityPreview } from '../../hooks/useLiquidityPreview';
 import { cn } from '../../lib/cn';
-import { formatInr, formatInt } from '../../lib/format';
-import { Accordion } from '../ui/Accordion';
+import { formatInr, formatInt, formatNumber } from '../../lib/format';
+import type { MomentumSettingsSection } from '../../lib/momentumConfig';
 import { Badge } from '../ui/Badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input, Select, NumberField as UiNumberField } from '../ui/Input';
 import { RadioCards } from '../ui/RadioCards';
+import { SettingsAccordion } from './backtest/SettingsAccordion';
 
 export type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
 
@@ -104,32 +105,119 @@ const LOOKBACK_PRESETS: Array<[string, LookbackRow[]]> = [
   ],
 ];
 
+/** Which accordions start open; the parent's `openSections` overrides these per id. */
+const SECTION_DEFAULT_OPEN: Record<MomentumSettingsSection, boolean> = {
+  universe: true,
+  period: true,
+  selection: true,
+  ranking: false,
+  portfolio: true,
+  limits: false,
+  inner: false,
+  protection: false,
+  costs: false,
+};
+
+/** DOM id of a settings accordion, for scrolling to it from outside the panel. */
+export function settingsSectionDomId(section: MomentumSettingsSection): string {
+  return `momentum-settings-${section}`;
+}
+
+interface SectionState {
+  open: Readonly<Partial<Record<MomentumSettingsSection, boolean>>>;
+  onToggle: (section: MomentumSettingsSection, open: boolean) => void;
+  modified: ReadonlySet<MomentumSettingsSection>;
+}
+
+const NO_SECTIONS: ReadonlySet<MomentumSettingsSection> = new Set();
+
+const SectionContext = createContext<SectionState>({
+  open: {},
+  onToggle: () => {},
+  modified: NO_SECTIONS,
+});
+
+/** One settings accordion. Its open state and "modified" dot come from the panel's parent. */
+function Section({
+  id,
+  title,
+  description,
+  badge,
+  children,
+}: {
+  id: MomentumSettingsSection;
+  title: ReactNode;
+  description?: ReactNode;
+  badge?: ReactNode;
+  children: ReactNode;
+}) {
+  const { open, onToggle, modified } = useContext(SectionContext);
+  return (
+    <SettingsAccordion
+      id={settingsSectionDomId(id)}
+      title={title}
+      description={description}
+      badge={badge}
+      modified={modified.has(id)}
+      open={open[id] ?? SECTION_DEFAULT_OPEN[id]}
+      onToggle={(next) => onToggle(id, next)}
+    >
+      {children}
+    </SettingsAccordion>
+  );
+}
+
+/** The long-form reasoning or research behind a setting, kept out of its one-line tooltip. */
+function Why({ children }: { children: ReactNode }) {
+  return (
+    <details className="mt-1.5 text-xs">
+      <summary className="w-fit cursor-pointer rounded font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        Why?
+      </summary>
+      <p className="mt-1.5 rounded-lg border border-border bg-surface-2/40 px-2.5 py-2 font-normal leading-relaxed text-muted">
+        {children}
+      </p>
+    </details>
+  );
+}
+
 function Field({
   label,
   help,
+  why,
   children,
   className,
 }: {
   label: string;
   help?: string | undefined;
+  /** Long write-up shown behind a "Why?" disclosure under the field. */
+  why?: string | undefined;
   children: ReactNode;
   className?: string;
 }) {
-  return (
+  const field = (
     // biome-ignore lint/a11y/noLabelWithoutControl: children is always the field's own input/select/textarea, wrapped for implicit label association
-    <label className={cn('block text-xs font-medium text-muted', className)}>
+    <label className={cn('block text-xs font-medium text-muted', why ? undefined : className)}>
       <span className="flex items-center gap-1.5">
         {label}
-        {help ? <InfoTooltip text={help} /> : null}
+        {help ? <InfoTooltip text={help} label={`About ${label}`} /> : null}
       </span>
       {children}
     </label>
+  );
+  if (!why) return field;
+  return (
+    <div className={className}>
+      {field}
+      <Why>{why}</Why>
+    </div>
   );
 }
 
 function NumberField({
   label,
   help,
+  why,
   value,
   onChange,
   min,
@@ -139,6 +227,7 @@ function NumberField({
 }: {
   label: string;
   help?: string | undefined;
+  why?: string | undefined;
   value: number;
   onChange: (value: number) => void;
   min?: number;
@@ -147,7 +236,7 @@ function NumberField({
   disabled?: boolean | undefined;
 }) {
   return (
-    <Field label={label} help={help}>
+    <Field label={label} help={help} why={why}>
       <UiNumberField
         className="mt-1"
         value={Number.isFinite(value) ? value : 0}
@@ -164,17 +253,19 @@ function NumberField({
 function Toggle({
   label,
   help,
+  why,
   checked,
   onChange,
   disabled,
 }: {
   label: string;
   help?: string | undefined;
+  why?: string | undefined;
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean | undefined;
 }) {
-  return (
+  const toggle = (
     <label
       className={cn(
         'flex items-start gap-2.5 text-xs text-foreground',
@@ -190,9 +281,18 @@ function Toggle({
       />
       <span className="flex items-center gap-1.5 font-medium">
         {label}
-        {help ? <InfoTooltip text={help} /> : null}
+        {help ? <InfoTooltip text={help} label={`About ${label}`} /> : null}
       </span>
     </label>
+  );
+  if (!why) return toggle;
+  return (
+    <div>
+      {toggle}
+      <div className="pl-6">
+        <Why>{why}</Why>
+      </div>
+    </div>
   );
 }
 
@@ -242,6 +342,7 @@ function Chip({
 function PercentField({
   label,
   help,
+  why,
   values,
   name,
   onChange,
@@ -252,6 +353,7 @@ function PercentField({
 }: {
   label: string;
   help?: string | undefined;
+  why?: string | undefined;
   values: Values;
   name: string;
   onChange: (key: string, value: unknown) => void;
@@ -266,6 +368,7 @@ function PercentField({
     <NumberField
       label={label}
       help={help}
+      why={why}
       value={shown}
       min={0}
       max={max}
@@ -316,7 +419,8 @@ function UniverseSection({
 
   const heading = { etf: 'ETFs', stock: 'Nifty 50 stocks', custom_index: 'Categories' }[dataset];
   return (
-    <Accordion
+    <Section
+      id="universe"
       title={heading}
       badge={
         <Badge tone="primary">
@@ -408,7 +512,7 @@ function UniverseSection({
           );
         })}
       </div>
-    </Accordion>
+    </Section>
   );
 }
 
@@ -423,7 +527,10 @@ function LookbackTable({
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
         <SubHeading>Lookbacks</SubHeading>
-        <InfoTooltip text="Each lookback's return is ranked (1 = best) and score = Σ rank × weight; lowest score wins. A NEGATIVE weight flips that lookback: it rewards the worst performers over it. E.g. −1 on 26 and 52 weeks with +1 on 1 and 4 weeks hunts for long-term laggards that are turning up (a reversal signal)." />
+        <InfoTooltip
+          label="About Lookbacks"
+          text="Each lookback's return is ranked (1 = best) and score = Σ rank × weight; lowest score wins."
+        />
       </div>
       <div className="overflow-hidden rounded-lg border border-border">
         <table className="w-full text-xs">
@@ -487,6 +594,11 @@ function LookbackTable({
           </Chip>
         ))}
       </div>
+      <Why>
+        A NEGATIVE weight flips that lookback: it rewards the worst performers over it. E.g. −1 on
+        26 and 52 weeks with +1 on 1 and 4 weeks hunts for long-term laggards that are turning up (a
+        reversal signal).
+      </Why>
     </div>
   );
 }
@@ -629,7 +741,8 @@ function BroadUniverseControls({
       />
       <Toggle
         label="Respect circuit locks (realistic fills)"
-        help="Off (default): the backtest fills at any Friday close, even when the stock was locked that day. On: it cannot buy a stock locked at the upper circuit, and cannot sell one locked at the lower circuit, so a holding that locks down is held through the fall until the lock lifts. A lock means 3 or more sessions in a row closing at a price-band edge. The results card shows the CAGR both ways whichever you pick."
+        help="When on, the backtest cannot buy a stock locked at the upper circuit or sell one locked at the lower circuit."
+        why="Off (default): the backtest fills at any Friday close, even when the stock was locked that day. On: it cannot buy a stock locked at the upper circuit, and cannot sell one locked at the lower circuit, so a holding that locks down is held through the fall until the lock lifts. A lock means 3 or more sessions in a row closing at a price-band edge. The results card shows the CAGR both ways whichever you pick."
         checked={values.broad_respect_circuits === true}
         onChange={(value) => onChange('broad_respect_circuits', value)}
       />
@@ -667,7 +780,7 @@ function BroadUniverseControls({
             <summary className="cursor-pointer font-medium text-foreground">
               Advanced tradability settings
             </summary>
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <PercentField
                 label="Worst-day floor (% of minimum)"
                 help="The quietest 10% of days must still reach this share of the minimum turnover, so an exit is possible on a thin day."
@@ -695,7 +808,8 @@ function BroadUniverseControls({
               />
               <Field
                 label="Circuit days allowed (last 60 sessions)"
-                help="Most LC or UC days (closing at a band edge, either direction) a stock may have in its last 60 sessions, even if they weren't in a row. Blank = no limit. A 2% move also happens on ordinary volatile stocks, so start around 8 or higher."
+                help="Most LC or UC days a stock may have in its last 60 sessions. Blank = no limit."
+                why="Most LC or UC days (closing at a band edge, either direction) a stock may have in its last 60 sessions, even if they weren't in a row. Blank = no limit. A 2% move also happens on ordinary volatile stocks, so start around 8 or higher."
               >
                 <Input
                   type="number"
@@ -810,6 +924,9 @@ export function MomentumSettingsPanel({
   onCoreChange,
   values,
   onChange,
+  openSections,
+  onToggleSection,
+  modifiedSections = NO_SECTIONS,
 }: {
   dataset: Dataset;
   instruments: Instrument[];
@@ -820,7 +937,19 @@ export function MomentumSettingsPanel({
   onCoreChange: (patch: Partial<CoreSettings>) => void;
   values: Values;
   onChange: (key: string, value: unknown) => void;
+  /**
+   * Which accordions are open, by id; an id that is absent uses the panel's default. Owned by
+   * the parent so the state survives this panel being collapsed (unmounted) and reopened.
+   */
+  openSections: Readonly<Partial<Record<MomentumSettingsSection, boolean>>>;
+  onToggleSection: (section: MomentumSettingsSection, open: boolean) => void;
+  /** Accordions holding a setting that differs from the dataset's defaults. */
+  modifiedSections?: ReadonlySet<MomentumSettingsSection>;
 }) {
+  const sectionState = useMemo<SectionState>(
+    () => ({ open: openSections, onToggle: onToggleSection, modified: modifiedSections }),
+    [openSections, onToggleSection, modifiedSections],
+  );
   const str = (key: string, fallback: string) =>
     typeof values[key] === 'string' ? (values[key] as string) : fallback;
   const num = (key: string, fallback: number) =>
@@ -876,753 +1005,796 @@ export function MomentumSettingsPanel({
     return hint;
   })();
 
+  const benchmarkName = str('benchmark', benchmarks[0] ?? '');
+
   return (
-    <div className="space-y-3">
-      <GroupTitle step={1}>Universe &amp; period</GroupTitle>
+    <SectionContext.Provider value={sectionState}>
+      <div className="space-y-3">
+        <GroupTitle step={1}>Universe &amp; period</GroupTitle>
 
-      {broad ? (
-        <Accordion title="Broad Momentum universe" description="Nifty Total Market pool">
-          <Hint>
-            Stocks in the Nifty Total Market universe are screened using available membership data
-            and the pool is refreshed quarterly; each pool member&apos;s own rank still updates
-            weekly.
-          </Hint>
-          <RadioCards
-            name="broad_category_mode"
-            value={str('broad_category_mode', 'on')}
-            onChange={(value) => onChange('broad_category_mode', value)}
-            options={[
-              {
-                value: 'on',
-                label: 'Rank categories',
-                description:
-                  "rank eligible categories by their stocks' momentum, then hold the strongest categories and their top stocks. Gold, Silver, Nasdaq 100 and Hang Seng compete alongside them.",
-              },
-              {
-                value: 'off',
-                label: 'Rank stocks directly',
-                description:
-                  'skip categories and pick stocks from the eligible pool purely by their own momentum.',
-              },
-            ]}
-          />
-          <BroadUniverseControls values={values} onChange={onChange} />
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField
-              label="Pool top N"
-              help="How many of the top-momentum, currently-qualifying stocks form the pool the strategy picks from."
-              value={num('broad_pool_top_n', 200)}
-              min={10}
-              max={500}
-              onChange={(value) => onChange('broad_pool_top_n', value)}
-            />
-            <NumberField
-              label="Pool exit rank"
-              help="A pool stock is only dropped once its rank falls past this (hysteresis), so the pool doesn't churn every quarter."
-              value={num('broad_pool_exit_rank', 250)}
-              min={10}
-              max={700}
-              onChange={(value) => onChange('broad_pool_exit_rank', value)}
-            />
-          </div>
-          <Toggle
-            label="Simulate every week (recommended)"
-            help="Off reproduces the original engine rule: a week with fewer ranked stocks than categories × picks is skipped entirely, so nothing is sold or bought and the chart jumps several weeks. That hit about 190 of 508 weeks since 2017 and overstated CAGR by about 6 points and Sharpe by about 0.6. On trades every week, holding fewer names plus cash when few categories qualify."
-            checked={bool('broad_every_week')}
-            onChange={(value) => onChange('broad_every_week', value)}
-          />
-          {broadOn ? (
-            <div className="grid grid-cols-2 gap-3">
-              <PercentField
-                label="Coverage floor %"
-                help="A category needs at least this share of its member stocks inside the pool to be scored at all — stops a category with 1 lucky stock from ranking."
-                values={values}
-                name="broad_coverage_floor"
-                onChange={onChange}
-              />
-              <NumberField
-                label="Categories held"
-                help="How many top-ranked categories to buy fresh."
-                value={num('broad_category_top_n', 4)}
-                min={1}
-                max={20}
-                onChange={(value) => onChange('broad_category_top_n', value)}
-              />
-              <NumberField
-                label="Sell category when rank >"
-                help="A held category is only sold once its rank falls past this — the buffer between this and 'Categories held' avoids selling on a small slip."
-                value={num('broad_category_exit_rank', 8)}
-                min={1}
-                max={40}
-                onChange={(value) => onChange('broad_category_exit_rank', value)}
-              />
-              <NumberField
-                label="Top stocks per category"
-                help="How many of each held category's strongest stocks to own."
-                value={num('broad_picks_per_category', 2)}
-                min={1}
-                max={5}
-                onChange={(value) => onChange('broad_picks_per_category', value)}
-              />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <NumberField
-                label="Stocks to hold"
-                help="How many of the top-ranked pool stocks to buy."
-                value={num('broad_off_top_n', 10)}
-                min={1}
-                max={50}
-                onChange={(value) => onChange('broad_off_top_n', value)}
-              />
-              <NumberField
-                label="Sell when rank >"
-                help="A held stock is only sold once its rank falls past this."
-                value={num('broad_off_exit_rank', 20)}
-                min={1}
-                max={100}
-                onChange={(value) => onChange('broad_off_exit_rank', value)}
-              />
-            </div>
-          )}
-        </Accordion>
-      ) : (
-        <UniverseSection
-          dataset={dataset}
-          instruments={instruments}
-          selected={core.selected}
-          onChange={(selected) => onCoreChange({ selected })}
-        />
-      )}
-
-      <Accordion
-        title="Period"
-        description={`${core.start || firstWeek} → ${core.end || lastWeek}`}
-      >
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="From">
-            <Input
-              type="date"
-              className="mt-1"
-              value={core.start}
-              min={firstWeek}
-              max={lastWeek}
-              onChange={(event) => onCoreChange({ start: event.target.value })}
-            />
-          </Field>
-          <Field label="To">
-            <Input
-              type="date"
-              className="mt-1"
-              value={core.end}
-              min={firstWeek}
-              max={lastWeek}
-              onChange={(event) => onCoreChange({ end: event.target.value })}
-            />
-          </Field>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {periods.map(([label, start, end]) => (
-            <Chip
-              key={label}
-              active={core.start === start && core.end === end}
-              onClick={() => onCoreChange({ start, end })}
-            >
-              {label}
-            </Chip>
-          ))}
-        </div>
-        <Hint>
-          Data available {firstWeek} → {lastWeek}.
-        </Hint>
-        {maxLookbackWeeks > 0 ? (
-          <Hint>
-            Ranking needs {maxLookbackWeeks} weeks of history, so a{' '}
-            {customIndex ? 'category' : dataset === 'etf' ? 'ETF' : 'stock'} joins{' '}
-            {maxLookbackWeeks} weeks after its data starts.
-          </Hint>
-        ) : null}
-        {periodWeeks !== null && maxLookbackWeeks > 0 && periodWeeks < maxLookbackWeeks ? (
-          <p className="rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
-            The selected period ({periodWeeks} weeks) is shorter than the longest lookback (
-            {maxLookbackWeeks} weeks) — the strategy will have little or no history to rank on.
-          </p>
-        ) : null}
-      </Accordion>
-
-      <GroupTitle step={2}>Selection &amp; portfolio</GroupTitle>
-
-      <Accordion
-        title="Ranking rule"
-        description="Advanced · how instruments are scored"
-        defaultOpen={false}
-      >
-        <RadioCards
-          name="score"
-          value={score}
-          onChange={(value) => onChange('score', value)}
-          options={[
-            {
-              value: 'ranksum',
-              label: 'Rank-sum',
-              description:
-                "rank each lookback's return (1 = best) and add the weighted ranks; lowest total wins. Simple and robust (default).",
-            },
-            {
-              value: 'voladj',
-              label: 'Volatility-adjusted',
-              description:
-                'return divided by volatility — prefers steady climbers over jumpy names with the same return.',
-            },
-            {
-              value: 'blend',
-              label: 'Blend',
-              description: 'average of rank-sum and volatility-adjusted.',
-            },
-          ]}
-        />
-        {score !== 'ranksum' ? (
-          <Toggle
-            label="Skip the most recent month"
-            help="Ignore the latest ~4 weeks when computing the volatility-adjusted score — a standard momentum tweak that avoids short-term reversal noise."
-            checked={bool('voladj_skip_recent_month')}
-            onChange={(value) => onChange('voladj_skip_recent_month', value)}
-          />
-        ) : (
-          <>
-            <LookbackTable
-              rows={core.lookbacks}
-              onChange={(lookbacks) => onCoreChange({ lookbacks })}
-            />
-            {core.lookbacks.every((row) => row.weight < 0) ? (
-              <p className="rounded-lg border border-info/30 bg-info/10 px-2.5 py-1.5 text-xs text-info">
-                Every weight is negative — this ranks purely on who performed worst (a pure
-                reversal/mean-reversion strategy), not a momentum-plus-reversal blend.
-              </p>
-            ) : null}
-          </>
-        )}
-        {dataset === 'etf' ? (
-          <div className="space-y-2 border-t border-border pt-3">
-            <SubHeading>Beaten-down tilt (new, ETF only)</SubHeading>
-            <Hint>
-              Replaces the ranking above with: rank the short lookbacks (1/4/13w) on their own, rank
-              the long lookbacks (26/52w) on their own with the worst performer first, turn both
-              into a 0-100% score within that week's names, then add them — tilt is how much the
-              long-term beaten-down score counts. 0% is plain short-term momentum. Measured: around
-              30% tilt beats both plain short-term momentum and the shipped 5-lookback strategy on
-              CAGR, Sharpe and drawdown in most rolling 3-year windows — the strongest result of
-              this whole study; much above that (100%+) overshoots and gets worse. A stock making a
-              fresh 52-week low is never freshly bought, whatever the tilt.
-            </Hint>
-            <div className="grid grid-cols-2 gap-3">
-              <PercentField
-                label="Tilt"
-                help="0% ranks purely on 1/4/13-week momentum. 100% weighs the beaten-down score as much as the momentum score; above 100% starts to favour it."
-                values={values}
-                name="reversal_tilt"
-                onChange={onChange}
-                max={200}
-              />
-              <PercentField
-                label="Screen: top % by short-term momentum"
-                help="Optional hard filter applied before the tilt: only names in this top share by 1/4/13-week momentum are ranked at all. 0% = no filter, rank everyone."
-                values={values}
-                name="reversal_screen_pct"
-                onChange={onChange}
-                max={90}
-              />
-            </div>
-          </div>
-        ) : null}
-        {dataset === 'broad' ? (
-          <div className="space-y-2 border-t border-border pt-3">
-            <SubHeading>Beaten-down tilt (new)</SubHeading>
-            <Hint>
-              Does not change which categories or pool stocks qualify — it only re-orders the stocks
-              the funnel already picked: rank the short lookbacks (1/4/13w) on their own, rank the
-              long lookbacks (26/52w) on their own with the worst performer first, turn both into a
-              0-100% score, then add them — tilt is how much the long-term beaten-down score counts.
-              0% leaves today's plain-momentum order untouched. Measured: unlike the ETF version, it
-              does NOT help here — every tilt setting loses to plain momentum on both return and
-              risk-adjusted return in almost every rolling window. On individual stocks the momentum
-              leaders, not the beaten-down names, are what drives the return. Left at 0% by default
-              for this reason. A stock making a fresh 52-week low is never freshly bought, whatever
-              the tilt (an already-held stock may still be topped up).
-            </Hint>
-            <div className="grid grid-cols-2 gap-3">
-              <PercentField
-                label="Tilt"
-                help="0% keeps today's plain-momentum order within the current selection. 100% weighs the beaten-down score as much as the momentum score; above 100% starts to favour it."
-                values={values}
-                name="broad_reversal_tilt"
-                onChange={onChange}
-                max={200}
-              />
-              <PercentField
-                label="Screen: top % by short-term momentum"
-                help="Optional hard filter applied before the tilt, within the funnel's own selection: only names in this top share by 1/4/13-week momentum are ranked at all. 0% = no filter."
-                values={values}
-                name="broad_reversal_screen_pct"
-                onChange={onChange}
-                max={90}
-              />
-            </div>
-          </div>
-        ) : null}
-      </Accordion>
-
-      <Accordion title="Portfolio rule" description={buffer ? 'Buffer' : 'Fixed slots'}>
-        <RadioCards
-          name="portfolio"
-          value={str('portfolio', 'buffer')}
-          onChange={(value) => onChange('portfolio', value)}
-          options={[
-            {
-              value: 'buffer',
-              label: 'Buffer',
-              description:
-                "buy the top N and keep each holding until its rank falls past the exit rank, so a name slipping from #5 to #7 isn't sold. Money from a sale is reinvested equally across the top N.",
-            },
-            {
-              value: 'slots',
-              label: 'Fixed slots',
-              description:
-                "exactly N equal positions; when one is sold, its money buys the best-ranked name you don't already hold.",
-            },
-          ]}
-        />
-        {buffer ? (
-          <div className="space-y-2">
-            <SubHeading>A new name enters the top N but nothing was sold</SubHeading>
-            <RadioCards
-              name="entry"
-              value={str('entry', 'wait')}
-              onChange={(value) => onChange('entry', value)}
-              options={[
-                {
-                  value: 'wait',
-                  label: 'Wait',
-                  description:
-                    'buy it only when the next sale frees up money — fewer trades, but a new leader can be bought late.',
-                },
-                {
-                  value: 'make_room',
-                  label: 'Make room',
-                  description:
-                    'buy it now, trimming every current holding equally to fund it — tracks the ranking closely at the cost of more trading.',
-                },
-              ]}
-            />
-          </div>
-        ) : null}
         {broad ? (
-          <Hint>Broad Momentum sets its own top N / exit rank in the universe panel above.</Hint>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-3">
+          <Section
+            id="universe"
+            title="Universe &amp; tradability"
+            description={
+              str('broad_universe', 'total_market') === 'all_liquid'
+                ? 'Whole NSE market'
+                : 'Nifty Total Market pool'
+            }
+          >
+            <Hint>
+              Stocks in the Nifty Total Market universe are screened using available membership data
+              and the pool is refreshed quarterly; each pool member&apos;s own rank still updates
+              weekly.
+            </Hint>
+            <BroadUniverseControls values={values} onChange={onChange} />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <NumberField
-                label="Top N"
-                help={`How many of the highest-ranked ${customIndex ? 'categories' : 'names'} to buy.`}
-                value={core.topN}
-                min={1}
-                max={20}
-                onChange={(topN) => onCoreChange({ topN })}
+                label="Pool top N"
+                help="How many of the top-momentum, currently-qualifying stocks form the pool the strategy picks from."
+                value={num('broad_pool_top_n', 200)}
+                min={10}
+                max={500}
+                onChange={(value) => onChange('broad_pool_top_n', value)}
               />
               <NumberField
-                label="Sell when rank >"
-                help="A holding is only sold once its rank falls past this. The gap between Top N and this number is the buffer that stops a name being sold the moment it slips a place or two."
-                value={core.exitRank}
-                min={1}
-                max={40}
-                onChange={(exitRank) => onCoreChange({ exitRank })}
+                label="Pool exit rank"
+                help="A pool stock is only dropped once its rank falls past this (hysteresis), so the pool doesn't churn every quarter."
+                value={num('broad_pool_exit_rank', 250)}
+                min={10}
+                max={700}
+                onChange={(value) => onChange('broad_pool_exit_rank', value)}
               />
             </div>
-            {core.exitRank < core.topN ? (
-              <p className="rounded-lg border border-negative/30 bg-negative/10 px-2.5 py-1.5 text-xs text-negative">
-                Exit rank is below Top N — every purchase would immediately qualify for sale. Set
-                exit rank ≥ Top N.
-              </p>
-            ) : portfolioHint ? (
-              <Hint>{portfolioHint}</Hint>
-            ) : null}
-          </>
+          </Section>
+        ) : (
+          <UniverseSection
+            dataset={dataset}
+            instruments={instruments}
+            selected={core.selected}
+            onChange={(selected) => onCoreChange({ selected })}
+          />
         )}
-        <div className="grid grid-cols-2 gap-3">
+
+        <Section
+          id="period"
+          title="Period &amp; benchmark"
+          description={`${core.start || firstWeek} → ${core.end || lastWeek} · vs ${benchmarkName}`}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="From">
+              <Input
+                type="date"
+                className="mt-1"
+                value={core.start}
+                min={firstWeek}
+                max={lastWeek}
+                onChange={(event) => onCoreChange({ start: event.target.value })}
+              />
+            </Field>
+            <Field label="To">
+              <Input
+                type="date"
+                className="mt-1"
+                value={core.end}
+                min={firstWeek}
+                max={lastWeek}
+                onChange={(event) => onCoreChange({ end: event.target.value })}
+              />
+            </Field>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {periods.map(([label, start, end]) => (
+              <Chip
+                key={label}
+                active={core.start === start && core.end === end}
+                onClick={() => onCoreChange({ start, end })}
+              >
+                {label}
+              </Chip>
+            ))}
+          </div>
+          <Hint>
+            Data available {firstWeek} → {lastWeek}.
+          </Hint>
+          {maxLookbackWeeks > 0 ? (
+            <Hint>
+              Ranking needs {maxLookbackWeeks} weeks of history, so a{' '}
+              {customIndex ? 'category' : dataset === 'etf' ? 'ETF' : 'stock'} joins{' '}
+              {maxLookbackWeeks} weeks after its data starts.
+            </Hint>
+          ) : null}
+          {periodWeeks !== null && maxLookbackWeeks > 0 && periodWeeks < maxLookbackWeeks ? (
+            <p className="rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
+              The selected period ({periodWeeks} weeks) is shorter than the longest lookback (
+              {maxLookbackWeeks} weeks) — the strategy will have little or no history to rank on.
+            </p>
+          ) : null}
           <Field
-            label="Rebalance"
-            help="Weekly acts on every Friday's ranking. Every 2 or 4 weeks trades only on those Fridays (the ranking is still recomputed weekly). Monthly only trades in the last week of each month. Slower cadences churn less but react later."
+            label="Benchmark"
+            help="What the strategy is compared against in the chart, the KPIs and the year-by-year table."
           >
             <Select
               className="mt-1"
-              value={
-                str('rebalance', 'weekly') === 'monthly'
-                  ? 'monthly'
-                  : `every${num('rebalance_every', 1)}`
-              }
-              onChange={(event) => {
-                const choice = event.target.value;
-                onChange('rebalance', choice === 'monthly' ? 'monthly' : 'weekly');
-                onChange('rebalance_every', choice === 'monthly' ? 1 : Number(choice.slice(5)));
-                onChange('rebalance_offset', 0);
-              }}
+              value={benchmarkName}
+              onChange={(event) => onChange('benchmark', event.target.value)}
             >
-              <option value="every1">Weekly</option>
-              <option value="every2">Every 2 weeks</option>
-              <option value="every4">Every 4 weeks</option>
-              <option value="monthly">Monthly (month-end only)</option>
+              {benchmarks.map((benchmark) => (
+                <option key={benchmark} value={benchmark}>
+                  {benchmark}
+                </option>
+              ))}
             </Select>
           </Field>
-          {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' ? (
+        </Section>
+
+        <GroupTitle step={2}>Selection &amp; portfolio</GroupTitle>
+
+        {broad ? (
+          <Section
+            id="selection"
+            title="Selection"
+            description={broadOn ? 'Categories, then their top stocks' : 'Stocks ranked directly'}
+          >
+            <RadioCards
+              name="broad_category_mode"
+              value={str('broad_category_mode', 'on')}
+              onChange={(value) => onChange('broad_category_mode', value)}
+              options={[
+                {
+                  value: 'on',
+                  label: 'Rank categories',
+                  description:
+                    "rank eligible categories by their stocks' momentum, then hold the strongest categories and their top stocks. Gold, Silver, Nasdaq 100 and Hang Seng compete alongside them.",
+                },
+                {
+                  value: 'off',
+                  label: 'Rank stocks directly',
+                  description:
+                    'skip categories and pick stocks from the eligible pool purely by their own momentum.',
+                },
+              ]}
+            />
+            {broadOn ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <PercentField
+                  label="Coverage floor %"
+                  help="A category needs at least this share of its member stocks inside the pool to be scored at all — stops a category with 1 lucky stock from ranking."
+                  values={values}
+                  name="broad_coverage_floor"
+                  onChange={onChange}
+                />
+                <NumberField
+                  label="Categories held"
+                  help="How many top-ranked categories to buy fresh."
+                  value={num('broad_category_top_n', 4)}
+                  min={1}
+                  max={20}
+                  onChange={(value) => onChange('broad_category_top_n', value)}
+                />
+                <NumberField
+                  label="Sell category when rank >"
+                  help="A held category is only sold once its rank falls past this — the buffer between this and 'Categories held' avoids selling on a small slip."
+                  value={num('broad_category_exit_rank', 8)}
+                  min={1}
+                  max={40}
+                  onChange={(value) => onChange('broad_category_exit_rank', value)}
+                />
+                <NumberField
+                  label="Top stocks per category"
+                  help="How many of each held category's strongest stocks to own."
+                  value={num('broad_picks_per_category', 2)}
+                  min={1}
+                  max={5}
+                  onChange={(value) => onChange('broad_picks_per_category', value)}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <NumberField
+                  label="Stocks to hold"
+                  help="How many of the top-ranked pool stocks to buy."
+                  value={num('broad_off_top_n', 10)}
+                  min={1}
+                  max={50}
+                  onChange={(value) => onChange('broad_off_top_n', value)}
+                />
+                <NumberField
+                  label="Sell when rank >"
+                  help="A held stock is only sold once its rank falls past this."
+                  value={num('broad_off_exit_rank', 20)}
+                  min={1}
+                  max={100}
+                  onChange={(value) => onChange('broad_off_exit_rank', value)}
+                />
+              </div>
+            )}
+            <Toggle
+              label="Simulate every week (recommended)"
+              help="When on, the strategy trades every week, holding fewer names plus cash when few categories qualify."
+              why="Off reproduces the original engine rule: a week with fewer ranked stocks than categories × picks is skipped entirely, so nothing is sold or bought and the chart jumps several weeks. That hit about 190 of 508 weeks since 2017 and overstated CAGR by about 6 points and Sharpe by about 0.6. On trades every week, holding fewer names plus cash when few categories qualify."
+              checked={bool('broad_every_week')}
+              onChange={(value) => onChange('broad_every_week', value)}
+            />
+          </Section>
+        ) : null}
+
+        <Section
+          id="ranking"
+          title="Ranking rule"
+          description="Advanced · how instruments are scored"
+        >
+          <RadioCards
+            name="score"
+            value={score}
+            onChange={(value) => onChange('score', value)}
+            options={[
+              {
+                value: 'ranksum',
+                label: 'Rank-sum',
+                description:
+                  "rank each lookback's return (1 = best) and add the weighted ranks; lowest total wins. Simple and robust (default).",
+              },
+              {
+                value: 'voladj',
+                label: 'Volatility-adjusted',
+                description:
+                  'return divided by volatility — prefers steady climbers over jumpy names with the same return.',
+              },
+              {
+                value: 'blend',
+                label: 'Blend',
+                description: 'average of rank-sum and volatility-adjusted.',
+              },
+            ]}
+          />
+          {score !== 'ranksum' ? (
+            <Toggle
+              label="Skip the most recent month"
+              help="Ignore the latest ~4 weeks when computing the volatility-adjusted score — a standard momentum tweak that avoids short-term reversal noise."
+              checked={bool('voladj_skip_recent_month')}
+              onChange={(value) => onChange('voladj_skip_recent_month', value)}
+            />
+          ) : (
+            <>
+              <LookbackTable
+                rows={core.lookbacks}
+                onChange={(lookbacks) => onCoreChange({ lookbacks })}
+              />
+              {core.lookbacks.every((row) => row.weight < 0) ? (
+                <p className="rounded-lg border border-info/30 bg-info/10 px-2.5 py-1.5 text-xs text-info">
+                  Every weight is negative — this ranks purely on who performed worst (a pure
+                  reversal/mean-reversion strategy), not a momentum-plus-reversal blend.
+                </p>
+              ) : null}
+            </>
+          )}
+          {dataset === 'etf' ? (
+            <div className="space-y-2 border-t border-border pt-3">
+              <SubHeading>Beaten-down tilt (new, ETF only)</SubHeading>
+              <Hint>
+                Replaces the ranking above with: rank the short lookbacks (1/4/13w) on their own,
+                rank the long lookbacks (26/52w) on their own with the worst performer first, turn
+                both into a 0-100% score within that week's names, then add them — tilt is how much
+                the long-term beaten-down score counts. 0% is plain short-term momentum. A stock
+                making a fresh 52-week low is never freshly bought, whatever the tilt.
+              </Hint>
+              <Why>
+                Measured: around 30% tilt beats both plain short-term momentum and the shipped
+                5-lookback strategy on CAGR, Sharpe and drawdown in most rolling 3-year windows —
+                the strongest result of this whole study; much above that (100%+) overshoots and
+                gets worse.
+              </Why>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <PercentField
+                  label="Tilt"
+                  help="0% ranks purely on 1/4/13-week momentum. 100% weighs the beaten-down score as much as the momentum score; above 100% starts to favour it."
+                  values={values}
+                  name="reversal_tilt"
+                  onChange={onChange}
+                  max={200}
+                />
+                <PercentField
+                  label="Screen: top % by short-term momentum"
+                  help="Optional hard filter applied before the tilt: only names in this top share by 1/4/13-week momentum are ranked at all. 0% = no filter, rank everyone."
+                  values={values}
+                  name="reversal_screen_pct"
+                  onChange={onChange}
+                  max={90}
+                />
+              </div>
+            </div>
+          ) : null}
+          {dataset === 'broad' ? (
+            <div className="space-y-2 border-t border-border pt-3">
+              <SubHeading>Beaten-down tilt (new)</SubHeading>
+              <Hint>
+                Does not change which categories or pool stocks qualify — it only re-orders the
+                stocks the funnel already picked: rank the short lookbacks (1/4/13w) on their own,
+                rank the long lookbacks (26/52w) on their own with the worst performer first, turn
+                both into a 0-100% score, then add them — tilt is how much the long-term beaten-down
+                score counts. 0% leaves today's plain-momentum order untouched. A stock making a
+                fresh 52-week low is never freshly bought, whatever the tilt (an already-held stock
+                may still be topped up).
+              </Hint>
+              <Why>
+                Measured: unlike the ETF version, it does NOT help here — every tilt setting loses
+                to plain momentum on both return and risk-adjusted return in almost every rolling
+                window. On individual stocks the momentum leaders, not the beaten-down names, are
+                what drives the return. Left at 0% by default for this reason.
+              </Why>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <PercentField
+                  label="Tilt"
+                  help="0% keeps today's plain-momentum order within the current selection. 100% weighs the beaten-down score as much as the momentum score; above 100% starts to favour it."
+                  values={values}
+                  name="broad_reversal_tilt"
+                  onChange={onChange}
+                  max={200}
+                />
+                <PercentField
+                  label="Screen: top % by short-term momentum"
+                  help="Optional hard filter applied before the tilt, within the funnel's own selection: only names in this top share by 1/4/13-week momentum are ranked at all. 0% = no filter."
+                  values={values}
+                  name="broad_reversal_screen_pct"
+                  onChange={onChange}
+                  max={90}
+                />
+              </div>
+            </div>
+          ) : null}
+        </Section>
+
+        <Section
+          id="portfolio"
+          title="Portfolio rule"
+          description={buffer ? 'Buffer' : 'Fixed slots'}
+        >
+          <RadioCards
+            name="portfolio"
+            value={str('portfolio', 'buffer')}
+            onChange={(value) => onChange('portfolio', value)}
+            options={[
+              {
+                value: 'buffer',
+                label: 'Buffer',
+                description:
+                  "buy the top N and keep each holding until its rank falls past the exit rank, so a name slipping from #5 to #7 isn't sold. Money from a sale is reinvested equally across the top N.",
+              },
+              {
+                value: 'slots',
+                label: 'Fixed slots',
+                description:
+                  "exactly N equal positions; when one is sold, its money buys the best-ranked name you don't already hold.",
+              },
+            ]}
+          />
+          {buffer ? (
+            <div className="space-y-2">
+              <SubHeading>A new name enters the top N but nothing was sold</SubHeading>
+              <RadioCards
+                name="entry"
+                value={str('entry', 'wait')}
+                onChange={(value) => onChange('entry', value)}
+                options={[
+                  {
+                    value: 'wait',
+                    label: 'Wait',
+                    description:
+                      'buy it only when the next sale frees up money — fewer trades, but a new leader can be bought late.',
+                  },
+                  {
+                    value: 'make_room',
+                    label: 'Make room',
+                    description:
+                      'buy it now, trimming every current holding equally to fund it — tracks the ranking closely at the cost of more trading.',
+                  },
+                ]}
+              />
+            </div>
+          ) : null}
+          {broad ? null : (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <NumberField
+                  label="Top N"
+                  help={`How many of the highest-ranked ${customIndex ? 'categories' : 'names'} to buy.`}
+                  value={core.topN}
+                  min={1}
+                  max={20}
+                  onChange={(topN) => onCoreChange({ topN })}
+                />
+                <NumberField
+                  label="Sell when rank >"
+                  help="A holding is only sold once its rank falls past this. The gap between Top N and this number is the buffer that stops a name being sold the moment it slips a place or two."
+                  value={core.exitRank}
+                  min={1}
+                  max={40}
+                  onChange={(exitRank) => onCoreChange({ exitRank })}
+                />
+              </div>
+              {core.exitRank < core.topN ? (
+                <p className="rounded-lg border border-negative/30 bg-negative/10 px-2.5 py-1.5 text-xs text-negative">
+                  Exit rank is below Top N — every purchase would immediately qualify for sale. Set
+                  exit rank ≥ Top N.
+                </p>
+              ) : portfolioHint ? (
+                <Hint>{portfolioHint}</Hint>
+              ) : null}
+            </>
+          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field
-              label="Which Fridays"
-              help="Trading weeks are fixed on the calendar (counted from 1 Jan 2016), so each choice is a different set of Fridays. Comparing them shows how much of a result is down to lucky timing."
+              label="Rebalance"
+              help="How often the strategy acts on the weekly ranking."
+              why="Weekly acts on every Friday's ranking. Every 2 or 4 weeks trades only on those Fridays (the ranking is still recomputed weekly). Monthly only trades in the last week of each month. Slower cadences churn less but react later."
             >
               <Select
                 className="mt-1"
-                value={num('rebalance_offset', 0)}
-                onChange={(event) => onChange('rebalance_offset', Number(event.target.value))}
+                value={
+                  str('rebalance', 'weekly') === 'monthly'
+                    ? 'monthly'
+                    : `every${num('rebalance_every', 1)}`
+                }
+                onChange={(event) => {
+                  const choice = event.target.value;
+                  onChange('rebalance', choice === 'monthly' ? 'monthly' : 'weekly');
+                  onChange('rebalance_every', choice === 'monthly' ? 1 : Number(choice.slice(5)));
+                  onChange('rebalance_offset', 0);
+                }}
               >
-                {Array.from({ length: num('rebalance_every', 1) }, (_, i) => i).map((phase) => (
-                  <option key={phase} value={phase}>
-                    Phase {phase + 1} of {num('rebalance_every', 1)}
-                  </option>
-                ))}
+                <option value="every1">Weekly</option>
+                <option value="every2">Every 2 weeks</option>
+                <option value="every4">Every 4 weeks</option>
+                <option value="monthly">Monthly (month-end only)</option>
               </Select>
             </Field>
-          ) : null}
-        </div>
-        {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' && buffer ? (
-          <Toggle
-            label="Sell exits weekly, buy only on the cadence"
-            help="Normally a dropped-rank holding waits for the next cadence Friday to be sold, same as a new buy. Switch this on and exits happen the week they're due - only new buys and cap trims still wait. Measured: it mostly reverses the cadence's own edge (every 4 weeks on Broad: +5.2 points a year became -10.3) in exchange for a shallower drawdown more often - not recommended."
-            checked={bool('sell_every_week')}
-            onChange={(value) => onChange('sell_every_week', value)}
-          />
-        ) : null}
-        <Toggle
-          label="Win-rate position sizing"
-          help="Shrink new and top-up buys after a run of losing trades, ramping back to full size as wins return. In the worst case it sits entirely in cash. Buffer rule only."
-          checked={bool('momentum_sizing')}
-          onChange={(value) => onChange('momentum_sizing', value)}
-        />
-        {bool('momentum_sizing') ? (
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField
-              label="Sizing window (trades)"
-              help="How many of the most recent closed trades feed the win-rate. Shorter reacts faster to a fresh streak but is noisier; longer is steadier but slower to recover."
-              value={num('momentum_sizing_window', 10)}
-              min={1}
-              max={52}
-              onChange={(value) => onChange('momentum_sizing_window', value)}
-            />
-            <PercentField
-              label="Min size floor %"
-              help="Floor on the size multiplier. 0% means an all-loss streak can deploy nothing (full cash); a higher floor keeps at least that much invested."
-              values={values}
-              name="momentum_sizing_floor"
-              onChange={onChange}
-            />
+            {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' ? (
+              <Field
+                label="Which Fridays"
+                help="Trading weeks are fixed on the calendar (counted from 1 Jan 2016), so each choice is a different set of Fridays. Comparing them shows how much of a result is down to lucky timing."
+              >
+                <Select
+                  className="mt-1"
+                  value={num('rebalance_offset', 0)}
+                  onChange={(event) => onChange('rebalance_offset', Number(event.target.value))}
+                >
+                  {Array.from({ length: num('rebalance_every', 1) }, (_, i) => i).map((phase) => (
+                    <option key={phase} value={phase}>
+                      Phase {phase + 1} of {num('rebalance_every', 1)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : null}
           </div>
-        ) : null}
-      </Accordion>
-
-      <Accordion title="Position limits" description="Caps on any one holding" defaultOpen={false}>
-        {!buffer ? (
-          <Hint>
-            Position and category caps only apply to the Buffer rule — switch the portfolio rule to
-            Buffer to use them.
-          </Hint>
-        ) : null}
-        <div className="grid grid-cols-2 gap-3">
-          <PercentField
-            label={`Max per ${holdingNoun} %`}
-            help={`No single ${holdingNoun} may grow beyond this share of the portfolio; the excess is trimmed and spread over the others. 0 = no cap.`}
-            values={values}
-            name="max_position"
-            onChange={onChange}
-            nullWhenZero
-            disabled={!buffer}
+          {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' && buffer ? (
+            <Toggle
+              label="Sell exits weekly, buy only on the cadence"
+              help="Sell a dropped-rank holding the week it is due instead of waiting for the next cadence Friday."
+              why="Normally a dropped-rank holding waits for the next cadence Friday to be sold, same as a new buy. Switch this on and exits happen the week they're due - only new buys and cap trims still wait. Measured: it mostly reverses the cadence's own edge (every 4 weeks on Broad: +5.2 points a year became -10.3) in exchange for a shallower drawdown more often - not recommended."
+              checked={bool('sell_every_week')}
+              onChange={(value) => onChange('sell_every_week', value)}
+            />
+          ) : null}
+          <Toggle
+            label="Win-rate position sizing"
+            help="Shrink new and top-up buys after a run of losing trades, ramping back to full size as wins return. In the worst case it sits entirely in cash. Buffer rule only."
+            checked={bool('momentum_sizing')}
+            onChange={(value) => onChange('momentum_sizing', value)}
           />
-          {broadOn ? (
+          {bool('momentum_sizing') ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <NumberField
+                label="Sizing window (trades)"
+                help="How many of the most recent closed trades feed the win-rate. Shorter reacts faster to a fresh streak but is noisier; longer is steadier but slower to recover."
+                value={num('momentum_sizing_window', 10)}
+                min={1}
+                max={52}
+                onChange={(value) => onChange('momentum_sizing_window', value)}
+              />
+              <PercentField
+                label="Min size floor %"
+                help="Floor on the size multiplier. 0% means an all-loss streak can deploy nothing (full cash); a higher floor keeps at least that much invested."
+                values={values}
+                name="momentum_sizing_floor"
+                onChange={onChange}
+              />
+            </div>
+          ) : null}
+        </Section>
+
+        <Section id="limits" title="Position limits" description="Caps on any one holding">
+          {!buffer ? (
+            <Hint>
+              Position and category caps only apply to the Buffer rule — switch the portfolio rule
+              to Buffer to use them.
+            </Hint>
+          ) : null}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <PercentField
-              label="Max per category %"
-              help="Everything held through one category (its top stocks together) is limited to this share of the portfolio. 0 = no cap."
+              label={`Max per ${holdingNoun} %`}
+              help={`No single ${holdingNoun} may grow beyond this share of the portfolio; the excess is trimmed and spread over the others. 0 = no cap.`}
               values={values}
-              name="max_category"
+              name="max_position"
               onChange={onChange}
               nullWhenZero
               disabled={!buffer}
             />
-          ) : null}
-          <NumberField
-            label="Trim when above by (pts)"
-            help="A holding is only trimmed once it passes its cap by this many percentage points — stops a position sitting right at the cap being trimmed every week."
-            value={Math.round(num('cap_band', 0.05) * 1000) / 10}
-            min={0}
-            max={50}
-            onChange={(value) => onChange('cap_band', value / 100)}
-            disabled={!buffer}
-          />
-          {broad ? (
-            <NumberField
-              label="Max price to buy ₹"
-              help="A stock priced above this can't be newly bought and the next-best stock takes its slot, so a small budget is never asked to buy one very expensive share. Existing holdings are kept. Gold, Silver and international ETFs are exempt. 0 = no limit."
-              value={num('max_stock_price', 0)}
-              min={0}
-              step={1000}
-              onChange={(value) => onChange('max_stock_price', value > 0 ? value : null)}
-            />
-          ) : null}
-          {dataset === 'etf' ? (
-            <PercentField
-              label="Skip most volatile % (new buys)"
-              help="Never freshly buy the instruments in the most volatile X% of the ranked list that week (26-week weekly volatility); the next-best name takes the slot and holdings stay until their rank says sell. Measured 2017–2026 on the live ETF strategy: skipping the top 20% lifted CAGR 25.8% → 27.9% and Sharpe 0.99 → 1.12, better in about 9 of 10 rolling 3-year windows. It mostly keeps out Realty and PSU Bank. It hurt stock strategies, so it is ETF only. 0 = off."
-              values={values}
-              name="exclude_high_vol"
-              onChange={onChange}
-              max={50}
-            />
-          ) : null}
-        </div>
-      </Accordion>
-
-      {customIndex ? (
-        <Accordion
-          title="Inner rotation"
-          description="Advanced · stocks within each category"
-          defaultOpen={false}
-        >
-          <Hint>
-            Each held category is itself a rotation: its top-K tagged stocks, rotated on their own
-            tighter threshold — separate from the category-vs-category rule above.
-          </Hint>
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField
-              label="Stocks per category"
-              help="How many of a held category's strongest stocks to own."
-              value={num('inner_top_n', 2)}
-              min={1}
-              max={10}
-              onChange={(value) => onChange('inner_top_n', value)}
-            />
-            <NumberField
-              label="Sell from category when rank >"
-              help="A stock inside a held category is sold once its rank within that category falls past this."
-              value={num('inner_exit_rank', 8)}
-              min={1}
-              max={40}
-              onChange={(value) => onChange('inner_exit_rank', value)}
-            />
-            <NumberField
-              label="Gold/Silver slots"
-              help="How many ranked slots Gold and Silver may each take at once when their momentum is strong. 1 = ordinary single-instrument behaviour."
-              value={num('commodity_copies', 1)}
-              min={1}
-              max={10}
-              onChange={(value) => onChange('commodity_copies', value)}
-            />
-            <NumberField
-              label="Cash/Gilt slots"
-              help="How many ranked slots Cash and Gilt may each take at once. 1 = ordinary single-instrument behaviour."
-              value={num('debt_copies', 1)}
-              min={1}
-              max={10}
-              onChange={(value) => onChange('debt_copies', value)}
-            />
-          </div>
-        </Accordion>
-      ) : null}
-
-      {!broad ? (
-        <>
-          <GroupTitle step={3}>Risk protection</GroupTitle>
-          <Accordion
-            title="Crash protection"
-            description={
-              { off: 'Off', ranked: 'Debt in ranking', filter: 'Cash filter' }[
-                str('defensive', 'off')
-              ]
-            }
-            defaultOpen={false}
-          >
-            <RadioCards
-              name="defensive"
-              value={str('defensive', 'off')}
-              onChange={(value) => onChange('defensive', value)}
-              options={[
-                {
-                  value: 'off',
-                  label: 'Off',
-                  description: 'always fully invested in the top-ranked names.',
-                },
-                {
-                  value: 'ranked',
-                  label: 'Debt in ranking',
-                  description:
-                    'the selected Debt rows (liquid fund, gilt) compete like any other asset, so in a sell-off they rise into the top N and the strategy rotates into them.',
-                },
-                {
-                  value: 'filter',
-                  label: 'Cash filter',
-                  description:
-                    "only hold names beating cash over the lookback below; money that can't find a qualifying name waits in cash.",
-                },
-              ]}
-            />
-            {str('defensive', 'off') === 'filter' ? (
-              <NumberField
-                label="Must beat cash over (weeks)"
-                help="The window over which a name's return must exceed the liquid fund's to be held."
-                value={num('filter_lookback', 13)}
-                min={1}
-                max={104}
-                onChange={(value) => onChange('filter_lookback', value)}
+            {broadOn ? (
+              <PercentField
+                label="Max per category %"
+                help="Everything held through one category (its top stocks together) is limited to this share of the portfolio. 0 = no cap."
+                values={values}
+                name="max_category"
+                onChange={onChange}
+                nullWhenZero
+                disabled={!buffer}
               />
             ) : null}
-          </Accordion>
-        </>
-      ) : null}
-
-      <GroupTitle step={broad ? 3 : 4}>Execution &amp; tax</GroupTitle>
-      <Accordion title="Costs, timing & tax" defaultOpen={false}>
-        <RadioCards
-          name="cost_model"
-          value={str('cost_model', 'flat')}
-          onChange={(value) => onChange('cost_model', value)}
-          columns={2}
-          options={[
-            {
-              value: 'flat',
-              label: 'Flat %',
-              description: 'one percentage charged on every buy and sell.',
-            },
-            {
-              value: 'itemised',
-              label: 'Itemised',
-              description:
-                'real Indian charges — STT, stamp duty, exchange/SEBI fees, DP charges and slippage — on an actual rupee capital.',
-            },
-          ]}
-        />
-        <div className="grid grid-cols-2 gap-3">
-          {itemised ? (
-            <>
-              <NumberField
-                label="Capital ₹"
-                help="The rupee amount traded. Matters for itemised costs because DP charges are a flat ₹ per sell, which hurts small portfolios more."
-                value={num('capital', 1_000_000)}
-                min={1}
-                step={10000}
-                onChange={(value) => onChange('capital', value)}
-              />
-              <NumberField
-                label="Slippage (bps)"
-                help="Assumed gap between the signal price and your actual fill, in basis points (5 bps = 0.05%)."
-                value={num('slippage_bps', 5)}
-                min={0}
-                step={0.5}
-                onChange={(value) => onChange('slippage_bps', value)}
-              />
-            </>
-          ) : (
             <NumberField
-              label="Cost per side %"
-              help="Charged on each buy and each sell — 0.10% per side is roughly a 0.2% round trip."
-              value={num('cost_pct', 0.1)}
+              label="Trim when above by (pts)"
+              help="A holding is only trimmed once it passes its cap by this many percentage points — stops a position sitting right at the cap being trimmed every week."
+              value={Math.round(num('cap_band', 0.05) * 1000) / 10}
               min={0}
-              max={5}
-              step={0.05}
-              onChange={(value) => onChange('cost_pct', value)}
+              max={50}
+              onChange={(value) => onChange('cap_band', value / 100)}
+              disabled={!buffer}
             />
-          )}
-          <Field
-            label="Trade"
-            help="Trade at the signal week's close, or 1–2 weeks later — shows how sensitive the strategy is to acting late."
-          >
-            <Select
-              className="mt-1"
-              value={num('signal_delay', 0)}
-              onChange={(event) => onChange('signal_delay', Number(event.target.value))}
-            >
-              <option value={0}>at the signal close</option>
-              <option value={1}>1 week later</option>
-              <option value={2}>2 weeks later</option>
-            </Select>
-          </Field>
-        </div>
-        {dataset === 'etf' ? (
-          <div className="grid grid-cols-2 gap-3">
-            <Field
-              label="P&L on"
-              help="The ranking always uses the index. This picks what profit and loss is measured on — the index itself, or the ETF you would actually trade (index less TER before the ETF listed)."
-            >
-              <Select
-                className="mt-1"
-                value={str('track', 'etf')}
-                onChange={(event) => onChange('track', event.target.value)}
-              >
-                <option value="index">the index (underlying)</option>
-                <option value="etf">the ETF you&apos;d trade</option>
-              </Select>
-            </Field>
-            <Field label="Fill at" help="When a trade decided at Friday's close actually fills.">
-              <Select
-                className="mt-1"
-                value={str('execution', 'fri_close')}
-                onChange={(event) => onChange('execution', event.target.value)}
-              >
-                <option value="fri_close">Friday close</option>
-                <option value="mon_open">Monday open</option>
-                <option value="mon_10am">Monday 10:00</option>
-              </Select>
-            </Field>
+            {broad ? (
+              <NumberField
+                label="Max price to buy ₹"
+                help="A stock priced above this can't be newly bought; 0 = no limit."
+                why="A stock priced above this can't be newly bought and the next-best stock takes its slot, so a small budget is never asked to buy one very expensive share. Existing holdings are kept. Gold, Silver and international ETFs are exempt. 0 = no limit."
+                value={num('max_stock_price', 0)}
+                min={0}
+                step={1000}
+                onChange={(value) => onChange('max_stock_price', value > 0 ? value : null)}
+              />
+            ) : null}
+            {dataset === 'etf' ? (
+              <PercentField
+                label="Skip most volatile % (new buys)"
+                help="Never freshly buy the instruments in the most volatile X% of the ranked list that week; 0 = off."
+                why="Never freshly buy the instruments in the most volatile X% of the ranked list that week (26-week weekly volatility); the next-best name takes the slot and holdings stay until their rank says sell. Measured 2017–2026 on the live ETF strategy: skipping the top 20% lifted CAGR 25.8% → 27.9% and Sharpe 0.99 → 1.12, better in about 9 of 10 rolling 3-year windows. It mostly keeps out Realty and PSU Bank. It hurt stock strategies, so it is ETF only. 0 = off."
+                values={values}
+                name="exclude_high_vol"
+                onChange={onChange}
+                max={50}
+              />
+            ) : null}
           </div>
+        </Section>
+
+        {customIndex ? (
+          <Section
+            id="inner"
+            title="Inner rotation"
+            description="Advanced · stocks within each category"
+          >
+            <Hint>
+              Each held category is itself a rotation: its top-K tagged stocks, rotated on their own
+              tighter threshold — separate from the category-vs-category rule above.
+            </Hint>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <NumberField
+                label="Stocks per category"
+                help="How many of a held category's strongest stocks to own."
+                value={num('inner_top_n', 2)}
+                min={1}
+                max={10}
+                onChange={(value) => onChange('inner_top_n', value)}
+              />
+              <NumberField
+                label="Sell from category when rank >"
+                help="A stock inside a held category is sold once its rank within that category falls past this."
+                value={num('inner_exit_rank', 8)}
+                min={1}
+                max={40}
+                onChange={(value) => onChange('inner_exit_rank', value)}
+              />
+              <NumberField
+                label="Gold/Silver slots"
+                help="How many ranked slots Gold and Silver may each take at once when their momentum is strong. 1 = ordinary single-instrument behaviour."
+                value={num('commodity_copies', 1)}
+                min={1}
+                max={10}
+                onChange={(value) => onChange('commodity_copies', value)}
+              />
+              <NumberField
+                label="Cash/Gilt slots"
+                help="How many ranked slots Cash and Gilt may each take at once. 1 = ordinary single-instrument behaviour."
+                value={num('debt_copies', 1)}
+                min={1}
+                max={10}
+                onChange={(value) => onChange('debt_copies', value)}
+              />
+            </div>
+          </Section>
         ) : null}
+
         {!broad ? (
-          <div className="grid grid-cols-2 items-end gap-3">
-            <Toggle
-              label="Apply capital-gains tax"
-              help="Deduct Indian capital-gains tax on every sale (short or long term by holding period, including a final sale at the end)."
-              checked={bool('tax')}
-              onChange={(value) => onChange('tax', value)}
-            />
+          <>
+            <GroupTitle step={3}>Risk protection</GroupTitle>
+            <Section
+              id="protection"
+              title="Crash protection"
+              description={
+                { off: 'Off', ranked: 'Debt in ranking', filter: 'Cash filter' }[
+                  str('defensive', 'off')
+                ]
+              }
+            >
+              <RadioCards
+                name="defensive"
+                value={str('defensive', 'off')}
+                onChange={(value) => onChange('defensive', value)}
+                options={[
+                  {
+                    value: 'off',
+                    label: 'Off',
+                    description: 'always fully invested in the top-ranked names.',
+                  },
+                  {
+                    value: 'ranked',
+                    label: 'Debt in ranking',
+                    description:
+                      'the selected Debt rows (liquid fund, gilt) compete like any other asset, so in a sell-off they rise into the top N and the strategy rotates into them.',
+                  },
+                  {
+                    value: 'filter',
+                    label: 'Cash filter',
+                    description:
+                      "only hold names beating cash over the lookback below; money that can't find a qualifying name waits in cash.",
+                  },
+                ]}
+              />
+              {str('defensive', 'off') === 'filter' ? (
+                <NumberField
+                  label="Must beat cash over (weeks)"
+                  help="The window over which a name's return must exceed the liquid fund's to be held."
+                  value={num('filter_lookback', 13)}
+                  min={1}
+                  max={104}
+                  onChange={(value) => onChange('filter_lookback', value)}
+                />
+              ) : null}
+            </Section>
+          </>
+        ) : null}
+
+        <GroupTitle step={broad ? 3 : 4}>Execution &amp; tax</GroupTitle>
+        <Section
+          id="costs"
+          title={broad ? 'Costs & timing' : 'Costs, timing & tax'}
+          description={
+            itemised
+              ? 'Itemised costs'
+              : `${formatNumber(num('cost_pct', 0.1), 2, { trim: true })}% per side`
+          }
+        >
+          <RadioCards
+            name="cost_model"
+            value={str('cost_model', 'flat')}
+            onChange={(value) => onChange('cost_model', value)}
+            columns={2}
+            options={[
+              {
+                value: 'flat',
+                label: 'Flat %',
+                description: 'one percentage charged on every buy and sell.',
+              },
+              {
+                value: 'itemised',
+                label: 'Itemised',
+                description:
+                  'real Indian charges — STT, stamp duty, exchange/SEBI fees, DP charges and slippage — on an actual rupee capital.',
+              },
+            ]}
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {itemised ? (
+              <>
+                <NumberField
+                  label="Capital ₹"
+                  help="The rupee amount traded. Matters for itemised costs because DP charges are a flat ₹ per sell, which hurts small portfolios more."
+                  value={num('capital', 1_000_000)}
+                  min={1}
+                  step={10000}
+                  onChange={(value) => onChange('capital', value)}
+                />
+                <NumberField
+                  label="Slippage (bps)"
+                  help="Assumed gap between the signal price and your actual fill, in basis points (5 bps = 0.05%)."
+                  value={num('slippage_bps', 5)}
+                  min={0}
+                  step={0.5}
+                  onChange={(value) => onChange('slippage_bps', value)}
+                />
+              </>
+            ) : (
+              <NumberField
+                label="Cost per side %"
+                help="Charged on each buy and each sell — 0.10% per side is roughly a 0.2% round trip."
+                value={num('cost_pct', 0.1)}
+                min={0}
+                max={5}
+                step={0.05}
+                onChange={(value) => onChange('cost_pct', value)}
+              />
+            )}
             <Field
-              label="Slab"
-              help="Your income-tax slab, used for gains taxed at slab rate (e.g. debt funds)."
+              label="Trade"
+              help="Trade at the signal week's close, or 1–2 weeks later — shows how sensitive the strategy is to acting late."
             >
               <Select
                 className="mt-1"
-                value={num('slab_rate', 0.3)}
-                disabled={!bool('tax')}
-                onChange={(event) => onChange('slab_rate', Number(event.target.value))}
+                value={num('signal_delay', 0)}
+                onChange={(event) => onChange('signal_delay', Number(event.target.value))}
               >
-                {[0, 0.05, 0.1, 0.2, 0.3].map((rate) => (
-                  <option key={rate} value={rate}>
-                    {rate * 100}%
-                  </option>
-                ))}
+                <option value={0}>at the signal close</option>
+                <option value={1}>1 week later</option>
+                <option value={2}>2 weeks later</option>
               </Select>
             </Field>
           </div>
-        ) : null}
-        <Field
-          label="Benchmark"
-          help="What the strategy is compared against in the chart, the KPIs and the year-by-year table."
-        >
-          <Select
-            className="mt-1"
-            value={str('benchmark', benchmarks[0] ?? '')}
-            onChange={(event) => onChange('benchmark', event.target.value)}
-          >
-            {benchmarks.map((benchmark) => (
-              <option key={benchmark} value={benchmark}>
-                {benchmark}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </Accordion>
-    </div>
+          {dataset === 'etf' ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field
+                label="P&L on"
+                help="The ranking always uses the index. This picks what profit and loss is measured on — the index itself, or the ETF you would actually trade (index less TER before the ETF listed)."
+              >
+                <Select
+                  className="mt-1"
+                  value={str('track', 'etf')}
+                  onChange={(event) => onChange('track', event.target.value)}
+                >
+                  <option value="index">the index (underlying)</option>
+                  <option value="etf">the ETF you&apos;d trade</option>
+                </Select>
+              </Field>
+              <Field label="Fill at" help="When a trade decided at Friday's close actually fills.">
+                <Select
+                  className="mt-1"
+                  value={str('execution', 'fri_close')}
+                  onChange={(event) => onChange('execution', event.target.value)}
+                >
+                  <option value="fri_close">Friday close</option>
+                  <option value="mon_open">Monday open</option>
+                  <option value="mon_10am">Monday 10:00</option>
+                </Select>
+              </Field>
+            </div>
+          ) : null}
+          {!broad ? (
+            <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2">
+              <Toggle
+                label="Apply capital-gains tax"
+                help="Deduct Indian capital-gains tax on every sale (short or long term by holding period, including a final sale at the end)."
+                checked={bool('tax')}
+                onChange={(value) => onChange('tax', value)}
+              />
+              <Field
+                label="Slab"
+                help="Your income-tax slab, used for gains taxed at slab rate (e.g. debt funds)."
+              >
+                <Select
+                  className="mt-1"
+                  value={num('slab_rate', 0.3)}
+                  disabled={!bool('tax')}
+                  onChange={(event) => onChange('slab_rate', Number(event.target.value))}
+                >
+                  {[0, 0.05, 0.1, 0.2, 0.3].map((rate) => (
+                    <option key={rate} value={rate}>
+                      {rate * 100}%
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          ) : null}
+        </Section>
+      </div>
+    </SectionContext.Provider>
   );
 }

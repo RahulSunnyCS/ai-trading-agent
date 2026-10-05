@@ -1,12 +1,37 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
+import { Fragment, type ReactNode, useMemo, useState } from 'react';
 
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { usePolledResource } from '../../hooks/usePolledResource';
-import { EMPTY, formatInr, formatNumber, formatPct } from '../../lib/format';
+import { cn } from '../../lib/cn';
+import { EMPTY, formatDay, formatInr, formatInt, formatNumber, formatPct } from '../../lib/format';
+import {
+  ALL_GROUPS,
+  type MomentumScores,
+  type ScoreSort,
+  type ScoreSortKey,
+  type SignalMark,
+  type StockScore,
+  activeSignalFromJob,
+  ariaSort,
+  filterSectors,
+  filterStocks,
+  markKey,
+  nextSort,
+  parentGroups,
+  scoreBand,
+  sectorMembers,
+  signOf,
+  sortSectors,
+  sortStocks,
+} from '../../lib/momentumScores';
 import { MOMENTUM_SCORE_KINDS, type MomentumScoreKind, oneOf } from '../../lib/routes';
+import type { MomentumSavedRun } from '../../types/momentum';
+import { Badge } from '../ui/Badge';
 import { Card, CardHeader } from '../ui/Card';
+import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input, Select } from '../ui/Input';
 import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
@@ -14,62 +39,112 @@ import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { MomentumScoresSkeleton } from './MomentumSkeletons';
 
-interface StockScore {
-  symbol: string;
-  company_name: string;
-  parent_group: string;
-  subgroup: string;
-  last_price: number | null;
-  change_1w_pct: number | null;
-  returns: Record<string, number | null>;
-  scores: Record<string, number | null>;
-}
+const SCORE_HELP =
+  'Score is a 0–100 percentile: where this return ranks in the eligible universe for that lookback. Higher is better; 100 is the strongest. It is not the backtest signals table’s rank score, where lower is better.';
 
-interface SectorScore {
-  cid: string;
-  parent_group: string;
-  subgroup: string;
-  member_count: number;
-  qualifying_count: number;
-  scores: Record<string, number | null>;
-}
+/** The table scrolls inside the card, so the header and the symbol column stay in view. */
+const TABLE_MAX_HEIGHT = '70vh';
 
-interface MomentumScores {
-  as_of: string | null;
-  universe_size: number;
-  lookbacks: number[];
-  missing_symbols: string[];
-  stocks: StockScore[];
-  sectors: SectorScore[];
+const BAND_TONE = {
+  weak: 'bg-negative/10 text-negative',
+  middle: 'bg-warning/10 text-warning',
+  strong: 'bg-positive/10 text-positive',
+} as const;
+
+function signTone(value: number | null | undefined): string {
+  const sign = signOf(value);
+  return sign === 1 ? 'text-positive' : sign === -1 ? 'text-negative' : 'text-muted';
 }
 
 function Score({ value }: { value: number | null | undefined }) {
-  if (value === null || value === undefined) return <span className="text-muted">{EMPTY}</span>;
-  const tone =
-    value <= 40
-      ? 'bg-negative/10 text-negative'
-      : value <= 60
-        ? 'bg-warning/10 text-warning'
-        : 'bg-positive/10 text-positive';
+  const band = scoreBand(value);
+  if (!band) return <span className="inline-block min-w-9 text-center text-muted">{EMPTY}</span>;
   return (
     <span
-      className={`inline-block min-w-9 rounded px-1.5 py-0.5 text-center font-semibold ${tone}`}
+      className={cn(
+        'inline-block min-w-9 rounded px-1.5 py-0.5 text-center font-semibold',
+        BAND_TONE[band],
+      )}
     >
       {formatNumber(value, 0)}
     </span>
   );
 }
 
-type SortKey = 'score' | 'name' | 'change' | 'price' | 'members';
+/** A signed percentage coloured by its sign. */
+function SignedPct({
+  value,
+  dp,
+  className,
+}: {
+  value: number | null | undefined;
+  dp: number;
+  className?: string;
+}) {
+  return (
+    <span className={cn(signTone(value), className)}>{formatPct(value, dp, { sign: true })}</span>
+  );
+}
 
-function compareNumbers(
-  a: number | null | undefined,
-  b: number | null | undefined,
-  ascending: boolean,
-): number {
-  if (a == null) return 1;
-  if (b == null) return -1;
-  return ascending ? a - b : b - a;
+/** One lookback: the 0–100 score pill, with the raw return beside it when the row has one. */
+function LookbackCell({ score, ret }: { score: number | null | undefined; ret?: number | null }) {
+  return (
+    <span className="inline-flex items-center justify-end gap-2">
+      <Score value={score} />
+      {ret !== undefined ? <SignedPct value={ret} dp={1} className="w-16 text-xs" /> : null}
+    </span>
+  );
+}
+
+function MarkBadge({ mark }: { mark: SignalMark | undefined }) {
+  if (!mark) return null;
+  return mark === 'held' ? (
+    <Badge tone="primary">Held</Badge>
+  ) : (
+    <Badge tone="info">Candidate</Badge>
+  );
+}
+
+/** A sortable column header: an arrow for the active column, a neutral glyph otherwise. */
+function SortTh({
+  children,
+  sort,
+  sortKey,
+  lookback = null,
+  onSort,
+  align = 'left',
+  title,
+}: {
+  children: ReactNode;
+  sort: ScoreSort;
+  sortKey: ScoreSortKey;
+  lookback?: number | null;
+  onSort: (key: ScoreSortKey, lookback: number | null) => void;
+  align?: 'left' | 'right';
+  title?: string;
+}) {
+  const state = ariaSort(sort, sortKey, lookback);
+  const Icon =
+    state === 'ascending' ? ArrowUp : state === 'descending' ? ArrowDown : ChevronsUpDown;
+  return (
+    <Th align={align} aria-sort={state}>
+      <button
+        type="button"
+        title={title}
+        onClick={() => onSort(sortKey, lookback)}
+        className={cn(
+          'inline-flex items-center gap-1 rounded uppercase tracking-wider transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          state !== 'none' && 'text-foreground',
+        )}
+      >
+        {children}
+        <Icon
+          aria-hidden
+          className={cn('h-3.5 w-3.5 shrink-0', state === 'none' && 'opacity-50')}
+        />
+      </button>
+    </Th>
+  );
 }
 
 export function MomentumScoresView() {
@@ -79,69 +154,85 @@ export function MomentumScoresView() {
     '/api/momentum/scores',
     { cache: true },
   );
+  // Read-only: the most recent manual weekly run this service still remembers. It is the only
+  // GET that carries a signal's rows; nothing here ever starts a run.
+  const latestJob = usePolledResource<unknown>('/api/momentum/weekly/jobs/latest');
+  const favorites = usePolledResource<MomentumSavedRun[]>('/api/momentum/favorite-strategies', {
+    cache: true,
+  });
   const { rest, navigate } = useAppRoute();
   const kind: MomentumScoreKind = oneOf(MOMENTUM_SCORE_KINDS, rest[1]) ?? 'stocks';
   const setKind = (next: MomentumScoreKind) => navigate('momentum', 'scores', next);
   const [query, setQuery] = useState('');
+  const [group, setGroup] = useState<string>(ALL_GROUPS);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
-  const [selectedStock, setSelectedStock] = useState<StockScore | null>(null);
-  const [lookback, setLookback] = useState<number | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>('score');
-  const [ascending, setAscending] = useState(false);
+  const [chosenSort, setChosenSort] = useState<ScoreSort>({
+    key: 'score',
+    lookback: null,
+    ascending: false,
+  });
 
-  const activeLookback =
-    lookback && data?.lookbacks.includes(lookback) ? lookback : data?.lookbacks.at(-1);
-  function chooseSort(key: SortKey) {
-    if (sortKey === key) setAscending((value) => !value);
-    else {
-      setSortKey(key);
-      setAscending(key === 'name');
+  // The sort in force: a column the current table lacks, or a lookback the payload lacks, falls
+  // back to the longest lookback's score, strongest first.
+  const lookbacks = data?.lookbacks;
+  const sort = useMemo<ScoreSort>(() => {
+    const longest = lookbacks?.at(-1) ?? null;
+    const applies =
+      chosenSort.key === 'name' ||
+      chosenSort.key === 'score' ||
+      (kind === 'stocks' ? chosenSort.key !== 'members' : chosenSort.key === 'members');
+    if (!applies) return { key: 'score', lookback: longest, ascending: false };
+    if (chosenSort.key !== 'score') return chosenSort;
+    const known = chosenSort.lookback !== null && lookbacks?.includes(chosenSort.lookback);
+    return known ? chosenSort : { ...chosenSort, lookback: longest };
+  }, [chosenSort, kind, lookbacks]);
+  const onSort = (key: ScoreSortKey, lookback: number | null) =>
+    setChosenSort(nextSort(sort, key, lookback));
+
+  const groups = useMemo(
+    () => (data ? parentGroups(kind === 'stocks' ? data.stocks : data.sectors) : []),
+    [data, kind],
+  );
+  const activeGroup = groups.some((option) => option.group === group) ? group : ALL_GROUPS;
+  const stocks = useMemo(
+    () => (data ? sortStocks(filterStocks(data.stocks, { query, group: activeGroup }), sort) : []),
+    [data, query, activeGroup, sort],
+  );
+  const sectors = useMemo(
+    () =>
+      data ? sortSectors(filterSectors(data.sectors, { query, group: activeGroup }), sort) : [],
+    [data, query, activeGroup, sort],
+  );
+
+  const activeSignal = useMemo(() => activeSignalFromJob(latestJob.data), [latestJob.data]);
+  const marks = activeSignal?.marks;
+  const markOf = (stock: StockScore) => marks?.get(markKey(stock.symbol));
+  const markCounts = useMemo(() => {
+    let held = 0;
+    let candidate = 0;
+    for (const stock of data?.stocks ?? []) {
+      const mark = marks?.get(markKey(stock.symbol));
+      if (mark === 'held') held += 1;
+      else if (mark === 'candidate') candidate += 1;
     }
-  }
-  const stocks = useMemo(() => {
-    if (!data) return [];
-    const needle = query.trim().toLowerCase();
-    return data.stocks
-      .filter(
-        (stock) =>
-          !needle ||
-          `${stock.symbol} ${stock.company_name} ${stock.subgroup}`.toLowerCase().includes(needle),
-      )
-      .sort((a, b) => {
-        if (sortKey === 'name')
-          return ascending ? a.symbol.localeCompare(b.symbol) : b.symbol.localeCompare(a.symbol);
-        if (sortKey === 'change')
-          return compareNumbers(a.change_1w_pct, b.change_1w_pct, ascending);
-        if (sortKey === 'price') return compareNumbers(a.last_price, b.last_price, ascending);
-        return compareNumbers(
-          a.scores[String(activeLookback)],
-          b.scores[String(activeLookback)],
-          ascending,
-        );
-      });
-  }, [data, activeLookback, query, sortKey, ascending]);
-  const sectors = useMemo(() => {
-    if (!data) return [];
-    const needle = query.trim().toLowerCase();
-    return data.sectors
-      .filter(
-        (sector) =>
-          !needle || `${sector.subgroup} ${sector.parent_group}`.toLowerCase().includes(needle),
-      )
-      .sort((a, b) => {
-        if (sortKey === 'name')
-          return ascending
-            ? a.subgroup.localeCompare(b.subgroup)
-            : b.subgroup.localeCompare(a.subgroup);
-        if (sortKey === 'members')
-          return compareNumbers(a.qualifying_count, b.qualifying_count, ascending);
-        return compareNumbers(
-          a.scores[String(activeLookback)],
-          b.scores[String(activeLookback)],
-          ascending,
-        );
-      });
-  }, [data, activeLookback, query, sortKey, ascending]);
+    return { held, candidate };
+  }, [data, marks]);
+  const activeFavorite = favorites.data?.find((favorite) => favorite.active);
+  const signalNote = (() => {
+    if (activeSignal) {
+      if (activeSignal.blocked)
+        return `${activeSignal.name} produced no signal in the latest weekly run, so no rows are marked Held or Candidate.`;
+      if (markCounts.held + markCounts.candidate === 0)
+        return `${activeSignal.name}’s latest signal names nothing listed here (it trades other instruments), so no rows are marked Held or Candidate.`;
+      return `Marked from ${activeSignal.name}’s signal for the week ending ${formatDay(activeSignal.week)}: ${formatInt(markCounts.held)} held, ${formatInt(markCounts.candidate)} candidates.`;
+    }
+    if (latestJob.loading || favorites.loading) return null;
+    return activeFavorite
+      ? `Held and Candidate marks come from ${activeFavorite.name}’s latest weekly run, and no run result is available right now. They appear after the next run from Weekly signal.`
+      : 'Held and Candidate marks need an active favourite strategy and a weekly run; neither is available right now.';
+  })();
+
+  const matching = kind === 'stocks' ? stocks.length : sectors.length;
 
   return (
     <div className="space-y-5">
@@ -150,14 +241,17 @@ export function MomentumScoresView() {
           title="Momentum Scores"
           description={
             data
-              ? `Prices as of ${data.as_of ?? 'latest data'} · ${data.stocks.length} scored of ${data.universe_size} stocks`
+              ? `Prices as of ${data.as_of ? formatDay(data.as_of) : 'latest data'} · ${formatInt(data.stocks.length)} scored of ${formatInt(data.universe_size)} stocks`
               : 'Current stock and sector momentum'
           }
           actions={<RefreshButton onClick={refetch} loading={loading} />}
         />
-        <p className="mb-3 text-sm text-muted">
-          Each 0–100 score ranks a stock’s return against the eligible universe for that lookback.
-          100 is strongest. The 4, 13 and 26 week windows approximate 1, 3 and 6 months.
+        <p className="mb-3 flex flex-wrap items-center gap-1.5 text-sm text-muted">
+          <span>
+            Score is a 0–100 percentile of the return against the eligible universe for that
+            lookback: higher is better.
+          </span>
+          <InfoTooltip text={SCORE_HELP} label="About Score" />
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <SegmentedControl
@@ -171,46 +265,41 @@ export function MomentumScoresView() {
             onChange={(next) => {
               setKind(next);
               if (next === 'stocks') setSelectedSector(null);
-              else setSelectedStock(null);
             }}
           />
+          <Select
+            aria-label="Parent group"
+            value={activeGroup}
+            onChange={(event) => setGroup(event.target.value)}
+            className="ml-auto w-auto max-w-full"
+            disabled={!data}
+          >
+            <option value={ALL_GROUPS}>All groups</option>
+            {groups.map((option) => (
+              <option key={option.group} value={option.group}>
+                {option.group} ({formatInt(option.count)})
+              </option>
+            ))}
+          </Select>
           <Input
             type="search"
             aria-label={`Filter ${kind}`}
             placeholder={`Filter ${kind}…`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="ml-auto w-auto min-w-48"
+            className="w-auto min-w-48"
           />
         </div>
         {data ? (
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
-            <label htmlFor="momentum-score-lookback">
-              Rank by{' '}
-              <Select
-                id="momentum-score-lookback"
-                aria-label="Score lookback"
-                value={activeLookback}
-                onChange={(event) => {
-                  setLookback(Number(event.target.value));
-                  setSortKey('score');
-                  setAscending(false);
-                }}
-                className="w-auto"
-              >
-                {data.lookbacks.map((weeks) => (
-                  <option key={weeks} value={weeks}>
-                    {weeks} weeks
-                  </option>
-                ))}
-              </Select>
-            </label>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
             <span>0–40 weaker · 41–60 middle · 61–100 stronger</span>
+            <span>The 4, 13 and 26 week windows approximate 1, 3 and 6 months</span>
             <span>
-              {kind === 'stocks' ? stocks.length : sectors.length} matching {kind}
+              {formatInt(matching)} matching {kind}
             </span>
           </div>
         ) : null}
+        {data && signalNote ? <p className="mt-2 text-xs text-muted">{signalNote}</p> : null}
       </Card>
 
       {error ? (
@@ -220,7 +309,8 @@ export function MomentumScoresView() {
       {data?.missing_symbols.length ? (
         <details className="text-xs text-warning">
           <summary>
-            {data.missing_symbols.length} symbols have no usable price history and are excluded
+            {formatInt(data.missing_symbols.length)} symbols have no usable price history and are
+            excluded
           </summary>
           <p className="mt-1 text-muted">{data.missing_symbols.join(', ')}</p>
         </details>
@@ -228,115 +318,61 @@ export function MomentumScoresView() {
 
       {data && kind === 'stocks' ? (
         <Card>
-          <Table>
+          <Table stickyFirstCol maxHeight={TABLE_MAX_HEIGHT}>
             <THead>
-              <Th
-                aria-sort={sortKey === 'name' ? (ascending ? 'ascending' : 'descending') : 'none'}
-              >
-                <button type="button" onClick={() => chooseSort('name')}>
-                  Stock ↕
-                </button>
-              </Th>
+              <SortTh sort={sort} sortKey="name" onSort={onSort}>
+                Stock
+              </SortTh>
               <Th>Sector</Th>
-              <Th
-                align="right"
-                aria-sort={sortKey === 'price' ? (ascending ? 'ascending' : 'descending') : 'none'}
-              >
-                <button type="button" onClick={() => chooseSort('price')}>
-                  Last price ↕
-                </button>
-              </Th>
-              <Th
-                align="right"
-                aria-sort={sortKey === 'change' ? (ascending ? 'ascending' : 'descending') : 'none'}
-              >
-                <button type="button" onClick={() => chooseSort('change')}>
-                  1 week ↕
-                </button>
-              </Th>
-              {data.lookbacks.map((lookback) => (
-                <Th
-                  key={lookback}
+              <SortTh sort={sort} sortKey="price" onSort={onSort} align="right">
+                Last price
+              </SortTh>
+              <SortTh sort={sort} sortKey="change" onSort={onSort} align="right">
+                1 week
+              </SortTh>
+              {data.lookbacks.map((weeks) => (
+                <SortTh
+                  key={weeks}
+                  sort={sort}
+                  sortKey="score"
+                  lookback={weeks}
+                  onSort={onSort}
                   align="right"
-                  aria-sort={
-                    sortKey === 'score' && activeLookback === lookback
-                      ? ascending
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
+                  title={`Sort by the ${weeks} week Score (0–100 percentile, higher is better). The return over the same ${weeks} weeks is shown beside it.`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (sortKey === 'score' && activeLookback === lookback)
-                        setAscending((value) => !value);
-                      else {
-                        setLookback(lookback);
-                        setSortKey('score');
-                        setAscending(false);
-                      }
-                    }}
-                  >
-                    {lookback}w score ↕
-                  </button>
-                </Th>
+                  {weeks}w score · return
+                </SortTh>
               ))}
             </THead>
             <tbody>
               {stocks.map((stock) => (
-                <Fragment key={stock.symbol}>
-                  <TRow>
-                    <Td>
-                      <button
-                        type="button"
-                        className="text-left text-primary hover:underline"
-                        aria-expanded={selectedStock?.symbol === stock.symbol}
-                        onClick={() =>
-                          setSelectedStock(selectedStock?.symbol === stock.symbol ? null : stock)
-                        }
-                      >
-                        {selectedStock?.symbol === stock.symbol ? '▾' : '▸'} {stock.symbol}
-                      </button>
-                      <span className="block text-xs text-muted">{stock.company_name}</span>
+                <TRow key={stock.symbol}>
+                  <Td>
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-medium">{stock.symbol}</span>
+                      <MarkBadge mark={markOf(stock)} />
+                    </span>
+                    <span className="block text-xs text-muted">{stock.company_name}</span>
+                  </Td>
+                  <Td>
+                    {stock.subgroup}
+                    <span className="block text-xs text-muted">{stock.parent_group}</span>
+                  </Td>
+                  <Td align="right" numeric>
+                    {formatInr(stock.last_price, { dp: 2, trim: true })}
+                  </Td>
+                  <Td align="right" numeric>
+                    <SignedPct value={stock.change_1w_pct} dp={2} />
+                  </Td>
+                  {data.lookbacks.map((weeks) => (
+                    <Td key={weeks} align="right" numeric>
+                      <LookbackCell
+                        score={stock.scores[String(weeks)]}
+                        ret={stock.returns[String(weeks)] ?? null}
+                      />
                     </Td>
-                    <Td>{stock.subgroup}</Td>
-                    <Td align="right" numeric>
-                      {formatInr(stock.last_price, { dp: 2, trim: true })}
-                    </Td>
-                    <Td align="right" numeric>
-                      {formatPct(stock.change_1w_pct, 2)}
-                    </Td>
-                    {data.lookbacks.map((lookback) => (
-                      <Td key={lookback} align="right" numeric>
-                        <Score value={stock.scores[String(lookback)]} />
-                      </Td>
-                    ))}
-                  </TRow>
-                  {selectedStock?.symbol === stock.symbol ? (
-                    <tr>
-                      <td colSpan={4 + data.lookbacks.length} className="bg-surface-2/30 px-3 py-3">
-                        <p className="mb-2 text-xs text-muted">
-                          {stock.parent_group} · {stock.subgroup}
-                        </p>
-                        <div className="grid gap-2 sm:grid-cols-3">
-                          {data.lookbacks.map((weeks) => (
-                            <div
-                              key={weeks}
-                              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-                            >
-                              <strong>{weeks} week return</strong>
-                              <p>
-                                {formatPct(stock.returns[String(weeks)])} · relative score{' '}
-                                {formatNumber(stock.scores[String(weeks)], 0)}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ) : null}
-                </Fragment>
+                  ))}
+                </TRow>
               ))}
             </tbody>
           </Table>
@@ -348,52 +384,26 @@ export function MomentumScoresView() {
 
       {data && kind === 'sectors' ? (
         <Card>
-          <Table>
+          <Table stickyFirstCol maxHeight={TABLE_MAX_HEIGHT}>
             <THead>
-              <Th
-                aria-sort={sortKey === 'name' ? (ascending ? 'ascending' : 'descending') : 'none'}
-              >
-                <button type="button" onClick={() => chooseSort('name')}>
-                  Sector ↕
-                </button>
-              </Th>
-              <Th
-                align="right"
-                aria-sort={
-                  sortKey === 'members' ? (ascending ? 'ascending' : 'descending') : 'none'
-                }
-              >
-                <button type="button" onClick={() => chooseSort('members')}>
-                  Members ↕
-                </button>
-              </Th>
-              {data.lookbacks.map((lookback) => (
-                <Th
-                  key={lookback}
+              <SortTh sort={sort} sortKey="name" onSort={onSort}>
+                Sector
+              </SortTh>
+              <SortTh sort={sort} sortKey="members" onSort={onSort} align="right">
+                Members
+              </SortTh>
+              {data.lookbacks.map((weeks) => (
+                <SortTh
+                  key={weeks}
+                  sort={sort}
+                  sortKey="score"
+                  lookback={weeks}
+                  onSort={onSort}
                   align="right"
-                  aria-sort={
-                    sortKey === 'score' && activeLookback === lookback
-                      ? ascending
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
+                  title={`Sort by the ${weeks} week Score (0–100, higher is better)`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (sortKey === 'score' && activeLookback === lookback)
-                        setAscending((value) => !value);
-                      else {
-                        setLookback(lookback);
-                        setSortKey('score');
-                        setAscending(false);
-                      }
-                    }}
-                  >
-                    {lookback}w score ↕
-                  </button>
-                </Th>
+                  {weeks}w score
+                </SortTh>
               ))}
             </THead>
             <tbody>
@@ -414,56 +424,61 @@ export function MomentumScoresView() {
                       <span className="block text-xs text-muted">{sector.parent_group}</span>
                     </Td>
                     <Td align="right" numeric>
-                      {sector.qualifying_count} / {sector.member_count}
+                      {formatInt(sector.qualifying_count)} / {formatInt(sector.member_count)}
                     </Td>
-                    {data.lookbacks.map((lookback) => (
-                      <Td key={lookback} align="right" numeric>
-                        <Score value={sector.scores[String(lookback)]} />
+                    {data.lookbacks.map((weeks) => (
+                      <Td key={weeks} align="right" numeric>
+                        <LookbackCell score={sector.scores[String(weeks)]} />
                       </Td>
                     ))}
                   </TRow>
                   {selectedSector === sector.cid ? (
                     <tr>
-                      <td colSpan={2 + data.lookbacks.length} className="bg-surface-2/30 px-3 py-3">
-                        <div className="overflow-x-auto">
-                          <table className="w-full min-w-[520px] text-xs">
+                      <td colSpan={2 + data.lookbacks.length} className="p-0">
+                        <div className="overflow-x-auto border-l-2 border-primary/30 px-3 py-3">
+                          <table className="w-full min-w-[640px] text-xs">
                             <thead>
                               <tr className="text-left text-muted">
-                                <th className="pb-2">Member stock</th>
+                                <th className="bg-surface pb-2">Member stock</th>
                                 <th className="pb-2 text-right">Last price</th>
                                 <th className="pb-2 text-right">1 week</th>
                                 {data.lookbacks.map((weeks) => (
                                   <th key={weeks} className="pb-2 text-right">
-                                    {weeks}w score
+                                    {weeks}w score · return
                                   </th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody>
-                              {data.stocks
-                                .filter(
-                                  (stock) =>
-                                    stock.parent_group === sector.parent_group &&
-                                    stock.subgroup === sector.subgroup,
-                                )
-                                .map((stock) => (
-                                  <tr key={stock.symbol} className="border-t border-border/50">
-                                    <td className="py-1.5">
-                                      {stock.symbol} · {stock.company_name}
+                              {sectorMembers(data.stocks, sector).map((stock) => (
+                                <tr key={stock.symbol} className="border-t border-border/50">
+                                  <td className="py-1.5">
+                                    <span className="flex flex-wrap items-center gap-2">
+                                      <span>
+                                        {stock.symbol} · {stock.company_name}
+                                      </span>
+                                      <MarkBadge mark={markOf(stock)} />
+                                    </span>
+                                  </td>
+                                  <td className="py-1.5 text-right font-mono tabular-nums">
+                                    {formatInr(stock.last_price, { dp: 2, trim: true })}
+                                  </td>
+                                  <td className="py-1.5 text-right font-mono tabular-nums">
+                                    <SignedPct value={stock.change_1w_pct} dp={2} />
+                                  </td>
+                                  {data.lookbacks.map((weeks) => (
+                                    <td
+                                      key={weeks}
+                                      className="py-1.5 text-right font-mono tabular-nums"
+                                    >
+                                      <LookbackCell
+                                        score={stock.scores[String(weeks)]}
+                                        ret={stock.returns[String(weeks)] ?? null}
+                                      />
                                     </td>
-                                    <td className="py-1.5 text-right">
-                                      {formatInr(stock.last_price, { dp: 2, trim: true })}
-                                    </td>
-                                    <td className="py-1.5 text-right">
-                                      {formatPct(stock.change_1w_pct, 2)}
-                                    </td>
-                                    {data.lookbacks.map((weeks) => (
-                                      <td key={weeks} className="py-1.5 text-right">
-                                        <Score value={stock.scores[String(weeks)]} />
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
+                                  ))}
+                                </tr>
+                              ))}
                             </tbody>
                           </table>
                         </div>

@@ -1,24 +1,52 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Star } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { ArrowDown, ArrowUp, ArrowUpDown, Star } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { usePolledResource } from '../../hooks/usePolledResource';
+import { cn } from '../../lib/cn';
+import { EMPTY, formatDay, formatIstDate, formatIstDateTimeShort } from '../../lib/format';
 import {
-  EMPTY,
-  formatDay,
-  formatIstDate,
-  formatNumber,
-  formatPct,
-  formatPp,
-} from '../../lib/format';
+  COMPARE_METRICS,
+  MAX_COMPARE,
+  type SavedRunSortKey,
+  type SortDirection,
+  completeConfig,
+  defaultSortDirection,
+  runPeriod,
+  sortSavedRuns,
+  toggleSelection,
+} from '../../lib/momentumCompare';
 import type { MomentumSavedRun, MomentumWeeklyStatus } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
-import { Input, Select } from '../ui/Input';
+import { InfoTooltip } from '../ui/InfoTooltip';
+import { Input } from '../ui/Input';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { toast } from '../ui/Toast';
+import { MomentumCompare } from './MomentumCompare';
+import { momentumSettingsDefaults } from './MomentumSettingsPanel';
 import { MomentumListSkeleton } from './MomentumSkeletons';
+import { type RenameState, SavedRunName } from './saved/SavedRunName';
+import { SavedRunSparkline } from './saved/SavedRunSparkline';
+import { SavedRunViewer } from './saved/SavedRunViewer';
+
+type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
+
+const DATASET_NAMES: Record<Dataset, string> = {
+  etf: 'ETF Rotation',
+  stock: 'Nifty 50 Stocks',
+  custom_index: 'Custom Index',
+  broad: 'Broad Momentum',
+};
+
+const LIMIT_MESSAGE = `Compare takes up to ${MAX_COMPARE} runs. Untick one to add another.`;
+const OVERLAY_DISABLED_REASON =
+  'Not available for this run: the Backtest chart never draws the first run in the saved list as an overlay (it treats it as the run being shown).';
+const TELEGRAM_CONFIRM =
+  "Send this strategy's weekly signal to Telegram from now on? The current active strategy stops being sent.";
 
 /** Custom Index and Broad Momentum price through the same bhavcopy-backed stock layer as
  * Stock mode (see weekly.py's A5 gate investigation), so they share the "stock" readiness
@@ -39,103 +67,47 @@ function readiness(
   return {
     ready: item.ready,
     detail: item.ready
-      ? `Data through ${item.through ?? '—'}`
+      ? `Data through ${formatDay(item.through)}`
       : item.through
-        ? `Data only through ${item.through} — this week's data isn't ingested yet.`
+        ? `Data only through ${formatDay(item.through)}: this week's data isn't ingested yet.`
         : 'No data ingested yet.',
   };
 }
 
-const PERCENT_METRICS = new Set(['cagr', 'excess_cagr', 'max_drawdown', 'turnover_per_year']);
-const METRICS: Array<[string, string]> = [
-  ['cagr', 'CAGR'],
-  ['excess_cagr', 'Edge vs benchmark'],
-  ['max_drawdown', 'Max drawdown'],
-  ['sharpe', 'Sharpe'],
-  ['turnover_per_year', 'Annual turnover'],
-  ['avg_holdings', 'Average holdings'],
-];
-
-const SETTING_LABELS: Record<string, string> = {
-  start: 'From',
-  end: 'To',
-  universe: 'Universe',
-  top_n: 'Positions held',
-  exit_rank: 'Sell after rank',
-  lookbacks: 'Lookback weeks',
-  weights: 'Lookback weights',
-  benchmark: 'Benchmark',
-  rebalance: 'Rebalance cadence',
-  rebalance_every: 'Weeks between rebalances',
-  min_ranked: 'Minimum ranked names',
-  tax: 'Capital gains tax',
-  slippage_bps: 'Slippage (bps)',
-};
-
-type SortKey =
-  | 'saved'
-  | 'name'
-  | 'cagr'
-  | 'max_drawdown'
-  | 'turnover_per_year'
-  | 'sharpe'
-  | 'excess_cagr';
-const SORTS: Array<[SortKey, string]> = [
-  ['saved', 'Saved date'],
-  ['cagr', 'CAGR'],
-  ['max_drawdown', 'Max drawdown'],
-  ['turnover_per_year', 'Turnover'],
-  ['sharpe', 'Sharpe'],
-  ['excess_cagr', 'Edge vs benchmark'],
-  ['name', 'Name'],
-];
-// The natural "best first" direction per column: high CAGR/Sharpe/edge, shallow drawdown
-// (max_drawdown is stored negative, so descending already puts -20% above -50%), low turnover.
-const BEST_FIRST_DESC: Record<SortKey, boolean> = {
-  saved: true,
-  name: false,
-  cagr: true,
-  max_drawdown: true,
-  turnover_per_year: false,
-  sharpe: true,
-  excess_cagr: true,
-};
-
-function sortRuns(runs: MomentumSavedRun[], key: SortKey, reversed: boolean): MomentumSavedRun[] {
-  const desc = BEST_FIRST_DESC[key] !== reversed;
-  const value = (run: MomentumSavedRun): number | string | null =>
-    key === 'saved'
-      ? run.created_at
-      : key === 'name'
-        ? run.name.toLowerCase()
-        : (run.kpis[key] ?? null);
-  return [...runs].sort((a, b) => {
-    const x = value(a);
-    const y = value(b);
-    // Runs without the metric always sink to the bottom, whichever way the sort runs.
-    if (x === null || x === undefined) return y === null || y === undefined ? 0 : 1;
-    if (y === null || y === undefined) return -1;
-    const order = x < y ? -1 : x > y ? 1 : 0;
-    return desc ? -order : order;
-  });
-}
-
-function settingValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(', ');
-  if (typeof value === 'boolean') return value ? 'On' : 'Off';
-  if (value === null || value === undefined) return '—';
-  if (typeof value === 'object')
-    return Object.entries(value)
-      .map(([key, item]) => `${key}: ${String(item)}`)
-      .join(', ');
-  return String(value);
-}
-
-function metric(run: MomentumSavedRun | undefined, key: string): string {
-  const value = run?.kpis[key];
-  if (value === null || value === undefined) return EMPTY;
-  if (key === 'excess_cagr') return formatPp(value);
-  return PERCENT_METRICS.has(key) ? formatPct(value) : formatNumber(value, 2);
+function SortHeader({
+  label,
+  sortKey,
+  active,
+  direction,
+  align = 'left',
+  onSort,
+}: {
+  label: string;
+  sortKey: SavedRunSortKey;
+  active: boolean;
+  direction: SortDirection;
+  align?: 'left' | 'right';
+  onSort: (key: SavedRunSortKey) => void;
+}) {
+  const Icon = !active ? ArrowUpDown : direction === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <Th
+      align={align}
+      aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          'inline-flex items-center gap-1 rounded uppercase tracking-wider hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          active && 'text-foreground',
+        )}
+      >
+        {label}
+        <Icon className={cn('h-3 w-3', !active && 'opacity-50')} aria-hidden />
+      </button>
+    </Th>
+  );
 }
 
 export function MomentumSavedRunsView({
@@ -149,54 +121,160 @@ export function MomentumSavedRunsView({
   onRemove,
   onLoad,
 }: {
-  dataset: 'etf' | 'stock' | 'custom_index' | 'broad';
+  dataset: Dataset;
   runs: MomentumSavedRun[];
   /** The list has not arrived yet: show placeholders, never the "no runs" empty state. */
   loading?: boolean;
-  onRename: (id: string, name: string) => void;
+  /** May return a promise; the view waits for it before confirming or reporting the rename. */
+  onRename: (id: string, name: string) => void | Promise<void>;
   onToggleOverlay: (id: string, overlay: boolean) => void;
   onToggleFavorite: (id: string, favorite: boolean) => void;
   onSetActive: (id: string) => void;
   onRemove: (id: string) => void;
   onLoad: (run: MomentumSavedRun) => void;
 }) {
-  const [baseId, setBaseId] = useState('');
-  const [compareId, setCompareId] = useState('');
-  const [draftNames, setDraftNames] = useState<Record<string, string>>({});
-  const [removeId, setRemoveId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('saved');
-  const [reversed, setReversed] = useState(false);
   const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [sortKey, setSortKey] = useState<SavedRunSortKey>('saved');
+  const [direction, setDirection] = useState<SortDirection>('desc');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [refused, setRefused] = useState(false);
+  const [rename, setRename] = useState<RenameState | null>(null);
+  const [removeId, setRemoveId] = useState<string | null>(null);
+  const [confirmActiveId, setConfirmActiveId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  // Shares the Weekly signal tab's endpoint rather than threading its status down through
+  // props — cheap to poll and keeps this view self-contained.
+  const { data: status } = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status', {
+    cache: true,
+  });
+  // The dataset's default settings, so "Load settings" can hand the parent a complete config.
+  const { data: meta } = usePolledResource<{ defaults?: Record<string, unknown> }>(
+    `/api/momentum/meta?dataset=${dataset}`,
+    { cache: true },
+  );
+
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = runs.filter(
       (run) =>
         (!favouritesOnly || run.favorite) && (!needle || run.name.toLowerCase().includes(needle)),
     );
-    return sortRuns(filtered, sortKey, reversed);
-  }, [runs, query, sortKey, reversed, favouritesOnly]);
-  const current = runs.find((run) => run.id === baseId) ?? runs[0];
-  const comparison =
-    runs.find((run) => run.id === compareId && run.id !== current?.id) ??
-    runs.find((run) => run.id !== current?.id);
-  const differences =
-    current && comparison
-      ? Object.keys(current.config).filter(
-          (key) => JSON.stringify(current.config[key]) !== JSON.stringify(comparison.config[key]),
-        )
-      : [];
-  // Shares the Weekly signal tab's endpoint rather than threading its status down through
-  // props — cheap to poll and keeps this view self-contained.
-  const { data: status } = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status', {
-    cache: true,
+    return sortSavedRuns(filtered, sortKey, direction);
+  }, [runs, query, favouritesOnly, sortKey, direction]);
+
+  // A removed run drops out of the comparison.
+  const selectedIds = useMemo(
+    () => selected.filter((id) => runs.some((run) => run.id === id)),
+    [selected, runs],
+  );
+  const opened = runs.find((run) => run.id === openId) ?? null;
+  const confirmRun = runs.find((run) => run.id === confirmActiveId) ?? null;
+  const currentActive = runs.find((run) => run.active) ?? null;
+
+  // A rename is confirmed by the refreshed list carrying the new name. If the parent's call has
+  // returned and the name is still the old one, the save failed (the parent shows its reason
+  // above the table): keep the typed text so it can be retried.
+  useEffect(() => {
+    if (!rename || rename.status !== 'saving') return;
+    const run = runs.find((item) => item.id === rename.id);
+    if (!run) {
+      setRename(null);
+    } else if (run.name === rename.submitted) {
+      toast(`Renamed to "${run.name}"`);
+      setRename(null);
+    } else if (rename.settled) {
+      setRename({
+        ...rename,
+        status: 'failed',
+        error: rename.error ?? 'The name was not saved. Your text is kept: try again.',
+      });
+    }
+  }, [rename, runs]);
+
+  function sortBy(key: SavedRunSortKey): void {
+    if (key === sortKey) {
+      setDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setDirection(defaultSortDirection(key));
+    }
+  }
+
+  function toggleCompare(id: string): void {
+    const next = toggleSelection(selectedIds, id);
+    setRefused(next.refused);
+    if (next.refused) {
+      toast(LIMIT_MESSAGE, 'info');
+      return;
+    }
+    setSelected(next.selected);
+  }
+
+  function commitRename(run: MomentumSavedRun): void {
+    if (!rename || rename.id !== run.id || rename.status === 'saving') return;
+    const name = rename.draft.trim();
+    if (!name) {
+      setRename({ ...rename, status: 'failed', error: 'A name cannot be empty.' });
+      return;
+    }
+    if (name === run.name) {
+      setRename(null);
+      return;
+    }
+    setRename({ ...rename, status: 'saving', submitted: name, settled: false, error: null });
+    const settle = (error: string | null) =>
+      setRename((current) =>
+        current && current.id === run.id && current.status === 'saving'
+          ? { ...current, settled: true, error }
+          : current,
+      );
+    Promise.resolve()
+      .then(() => onRename(run.id, name))
+      .then(
+        () => settle(null),
+        (reason: unknown) =>
+          settle(
+            `Could not rename: ${reason instanceof Error ? reason.message : String(reason)}. Your text is kept.`,
+          ),
+      );
+  }
+
+  /**
+   * The parent merges a loaded config over its current form, so a setting the saved run never
+   * stored would keep whatever the form holds now. Completing the config with the dataset's
+   * defaults first makes that merge a replace.
+   */
+  function loadSettings(run: MomentumSavedRun): void {
+    if (meta?.defaults) {
+      onLoad({
+        ...run,
+        config: completeConfig(momentumSettingsDefaults(meta.defaults), run.config),
+      });
+      toast(`Settings replaced with "${run.name}"`);
+    } else {
+      onLoad(run);
+      toast(
+        `Loaded "${run.name}". The dataset defaults had not arrived, so settings this run never stored keep their current values.`,
+        'info',
+      );
+    }
+    setOpenId(null);
+  }
+
+  const sortProps = (key: SavedRunSortKey) => ({
+    sortKey: key,
+    active: sortKey === key,
+    direction,
+    onSort: sortBy,
   });
 
   return (
     <div className="space-y-5">
       <Card>
         <CardHeader
-          title={`Saved runs · ${({ etf: 'ETF Rotation', stock: 'Nifty 50 Stocks', custom_index: 'Custom Index', broad: 'Broad Momentum' } as const)[dataset]}`}
+          title={`Saved runs · ${DATASET_NAMES[dataset]}`}
           description={`${loading ? 'Loading the saved runs' : `${runs.length} runs`} for this dataset. Favourites run every weekly cycle; only the active favourite is sent to Telegram.`}
         />
         {loading && runs.length === 0 ? (
@@ -204,250 +282,314 @@ export function MomentumSavedRunsView({
         ) : runs.length === 0 ? (
           <p className="text-sm text-muted">Run a backtest to start a comparison.</p>
         ) : (
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Input
-              type="search"
-              aria-label="Search saved runs"
-              placeholder="Search by name…"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="w-auto min-w-56"
-            />
-            <label
-              htmlFor="momentum-saved-runs-sort"
-              className="flex items-center gap-1.5 text-xs text-muted"
-            >
-              Sort by
-              <Select
-                id="momentum-saved-runs-sort"
-                aria-label="Sort saved runs"
-                value={sortKey}
-                onChange={(event) => {
-                  setSortKey(event.target.value as SortKey);
-                  setReversed(false);
-                }}
-                className="w-auto"
-              >
-                {SORTS.map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Reverse sort order"
-              onClick={() => setReversed((value) => !value)}
-            >
-              {BEST_FIRST_DESC[sortKey] !== reversed ? '↓ Descending' : '↑ Ascending'}
-            </Button>
-            <label className="flex items-center gap-1.5 text-xs text-muted">
-              <input
-                type="checkbox"
-                checked={favouritesOnly}
-                onChange={(event) => setFavouritesOnly(event.target.checked)}
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Input
+                type="search"
+                aria-label="Search saved runs"
+                placeholder="Search by name…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="w-56"
               />
-              Favourites only
-            </label>
-            <span className="text-xs text-muted">
-              Showing {shown.length} of {runs.length}
-            </span>
-          </div>
-        )}
-        {shown.map((run) => {
-          // The overlay base is the first saved run, whatever order the list is sorted in.
-          const index = runs.indexOf(run);
-          const ready = readiness(run, status ?? null);
-          return (
-            <div key={run.id} className="border-t border-border py-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-1.5 text-xs text-muted">
-                  <input
-                    type="checkbox"
-                    aria-label={`Overlay ${run.name}`}
-                    checked={run.overlay}
-                    disabled={index === 0}
-                    onChange={(event) => onToggleOverlay(run.id, event.target.checked)}
-                  />
-                  Overlay
-                </label>
-                <label className="flex items-center gap-1.5 text-xs text-muted">
-                  <input
-                    type="checkbox"
-                    aria-label={`Favourite ${run.name}`}
-                    checked={run.favorite}
-                    onChange={(event) => onToggleFavorite(run.id, event.target.checked)}
-                  />
-                  <Star className="h-3.5 w-3.5" aria-hidden />
-                  Favourite
-                </label>
-                {run.favorite ? (
-                  <label className="flex items-center gap-1.5 text-xs text-muted">
-                    <input
-                      type="radio"
-                      name="active-weekly-strategy"
-                      aria-label={`Use ${run.name} for Telegram`}
-                      checked={run.active}
-                      onChange={() => onSetActive(run.id)}
-                    />
-                    Telegram active
-                  </label>
-                ) : null}
-                <Input
-                  aria-label={`Name for run ${run.n}`}
-                  value={draftNames[run.id] ?? run.name}
-                  maxLength={64}
-                  onChange={(event) =>
-                    setDraftNames((names) => ({ ...names, [run.id]: event.target.value }))
-                  }
-                  onBlur={() => {
-                    const name = (draftNames[run.id] ?? run.name).trim();
-                    if (name && name !== run.name) onRename(run.id, name);
-                    setDraftNames((names) => {
-                      const next = { ...names };
-                      delete next[run.id];
-                      return next;
-                    });
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') event.currentTarget.blur();
-                  }}
-                  className="w-auto min-w-48"
+              <label className="flex items-center gap-1.5 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  className="accent-primary"
+                  checked={favouritesOnly}
+                  onChange={(event) => setFavouritesOnly(event.target.checked)}
                 />
-                <span className="text-xs text-muted">
-                  CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Turnover{' '}
-                  {metric(run, 'turnover_per_year')} · Sharpe {metric(run, 'sharpe')}
-                  {typeof run.config.start === 'string'
-                    ? ` · ${formatDay(String(run.config.start))} → ${typeof run.config.end === 'string' ? formatDay(run.config.end) : 'latest'}`
-                    : ''}
-                  {' · '}Saved {formatIstDate(run.created_at)}
-                </span>
-                <div className="ml-auto flex gap-2">
-                  <Button size="sm" onClick={() => onLoad(run)}>
-                    Load settings
+                Favourites only
+              </label>
+              <span className="text-xs text-muted">
+                Showing {shown.length} of {runs.length}
+              </span>
+              <span className="ml-auto flex items-center gap-2 text-xs text-muted">
+                {selectedIds.length} of {MAX_COMPARE} ticked to compare
+                {selectedIds.length > 0 ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setSelected([]);
+                      setRefused(false);
+                    }}
+                  >
+                    Clear
                   </Button>
-                  {removeId === run.id ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => {
-                          onRemove(run.id);
-                          setRemoveId(null);
-                        }}
-                      >
-                        Confirm remove
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setRemoveId(null)}>
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <Button size="sm" variant="ghost" onClick={() => setRemoveId(run.id)}>
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              </div>
-              {ready ? (
-                <div className="mt-2 flex items-center gap-1.5 pl-0.5 text-xs">
-                  {ready.ready ? (
-                    <Badge tone="positive" dot>
-                      Ready for this week&apos;s weekly run
-                    </Badge>
-                  ) : (
-                    <Badge tone="warning" dot>
-                      Will be blocked this week
-                    </Badge>
-                  )}
-                  <span className="flex items-center gap-1 text-muted">
-                    {ready.ready ? (
-                      <CheckCircle2 className="h-3 w-3" />
-                    ) : (
-                      <AlertTriangle className="h-3 w-3" />
-                    )}
-                    {ready.detail}
-                  </span>
-                </div>
-              ) : null}
+                ) : null}
+              </span>
             </div>
-          );
-        })}
+            {refused ? (
+              <output className="block mb-2 text-xs text-warning">{LIMIT_MESSAGE}</output>
+            ) : null}
+            {shown.length === 0 ? (
+              <p className="text-sm text-muted">No saved run matches this filter.</p>
+            ) : (
+              <Table stickyFirstCol>
+                <THead>
+                  <SortHeader label="Name" {...sortProps('name')} />
+                  <Th>Equity</Th>
+                  <SortHeader label="Saved" {...sortProps('saved')} />
+                  <SortHeader label="Period" {...sortProps('period')} />
+                  {COMPARE_METRICS.map((metric) => (
+                    <SortHeader
+                      key={metric.key}
+                      label={metric.short}
+                      align="right"
+                      {...sortProps(metric.key)}
+                    />
+                  ))}
+                  <Th>Weekly signal</Th>
+                  <Th>Overlay</Th>
+                  <Th align="right">Actions</Th>
+                </THead>
+                <tbody>
+                  {shown.map((run) => {
+                    // The parent's chart skips the first run of the list as it arrived
+                    // (unsorted) when drawing overlays, so its tick would do nothing.
+                    const overlayDisabled = runs.indexOf(run) === 0;
+                    const ready = readiness(run, status ?? null);
+                    const ticked = selectedIds.includes(run.id);
+                    return (
+                      <TRow key={run.id} selected={ticked}>
+                        <Td className="min-w-52 max-w-80">
+                          <div className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              className="mt-1 accent-primary"
+                              aria-label={`Compare ${run.name}`}
+                              checked={ticked}
+                              onChange={() => toggleCompare(run.id)}
+                            />
+                            <div className="min-w-0 space-y-1">
+                              <SavedRunName
+                                name={run.name}
+                                n={run.n}
+                                rename={rename?.id === run.id ? rename : null}
+                                onStart={() =>
+                                  setRename({
+                                    id: run.id,
+                                    draft: run.name,
+                                    status: 'editing',
+                                    submitted: null,
+                                    settled: false,
+                                    error: null,
+                                  })
+                                }
+                                onDraft={(draft) =>
+                                  setRename((current) =>
+                                    current && current.id === run.id
+                                      ? { ...current, draft, status: 'editing', error: null }
+                                      : current,
+                                  )
+                                }
+                                onCommit={() => commitRename(run)}
+                                onCancel={() => setRename(null)}
+                              />
+                              {run.active ? (
+                                <Badge tone="primary" dot>
+                                  Active
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                        </Td>
+                        <Td>
+                          <SavedRunSparkline values={run.strategy} name={run.name} />
+                        </Td>
+                        <Td
+                          className="whitespace-nowrap text-xs text-muted"
+                          title={formatIstDateTimeShort(run.created_at)}
+                        >
+                          {formatIstDate(run.created_at)}
+                        </Td>
+                        <Td className="whitespace-nowrap text-xs text-muted">
+                          {runPeriod(run.config)}
+                        </Td>
+                        {COMPARE_METRICS.map((metric) => {
+                          const value = run.kpis[metric.key];
+                          return (
+                            <Td
+                              key={metric.key}
+                              align="right"
+                              numeric
+                              className={cn(
+                                'whitespace-nowrap',
+                                metric.key === 'excess_cagr' &&
+                                  typeof value === 'number' &&
+                                  (value > 0 ? 'text-positive' : value < 0 ? 'text-negative' : ''),
+                              )}
+                            >
+                              {metric.format(value)}
+                            </Td>
+                          );
+                        })}
+                        <Td>
+                          <div className="flex flex-col items-start gap-1">
+                            <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
+                              <input
+                                type="checkbox"
+                                className="accent-primary"
+                                aria-label={`Favourite ${run.name}`}
+                                checked={run.favorite}
+                                onChange={(event) => onToggleFavorite(run.id, event.target.checked)}
+                              />
+                              <Star className="h-3.5 w-3.5" aria-hidden />
+                              Favourite
+                            </label>
+                            {run.active ? (
+                              <span className="whitespace-nowrap text-xs font-medium text-primary">
+                                Sent to Telegram
+                              </span>
+                            ) : run.favorite ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-1.5"
+                                aria-label={`Use ${run.name} for Telegram`}
+                                onClick={() => setConfirmActiveId(run.id)}
+                              >
+                                Make Telegram active
+                              </Button>
+                            ) : null}
+                            {ready ? (
+                              <span title={ready.detail}>
+                                <Badge tone={ready.ready ? 'positive' : 'warning'} dot>
+                                  {ready.ready ? 'Ready this week' : 'Blocked this week'}
+                                </Badge>
+                                <span className="sr-only">{ready.detail}</span>
+                              </span>
+                            ) : null}
+                          </div>
+                        </Td>
+                        <Td>
+                          <span className="flex items-center gap-1">
+                            <label
+                              className="flex items-center gap-1.5 text-xs text-muted"
+                              title={overlayDisabled ? OVERLAY_DISABLED_REASON : undefined}
+                            >
+                              <input
+                                type="checkbox"
+                                className="accent-primary"
+                                aria-label={`Overlay ${run.name}`}
+                                checked={run.overlay}
+                                disabled={overlayDisabled}
+                                onChange={(event) => onToggleOverlay(run.id, event.target.checked)}
+                              />
+                              <span className="sr-only">Overlay on the Backtest chart</span>
+                            </label>
+                            {overlayDisabled ? (
+                              <InfoTooltip
+                                text={OVERLAY_DISABLED_REASON}
+                                label={`Why ${run.name} cannot be overlaid`}
+                              />
+                            ) : null}
+                          </span>
+                        </Td>
+                        <Td align="right">
+                          <div className="flex justify-end gap-1.5 whitespace-nowrap">
+                            {removeId === run.id ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="danger"
+                                  onClick={() => {
+                                    onRemove(run.id);
+                                    setRemoveId(null);
+                                  }}
+                                >
+                                  Confirm remove
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setRemoveId(null)}>
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  size="sm"
+                                  aria-label={`Open ${run.name}`}
+                                  onClick={() => setOpenId(run.id)}
+                                >
+                                  Open
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => loadSettings(run)}>
+                                  Load settings
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setRemoveId(run.id)}
+                                >
+                                  Remove
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </Td>
+                      </TRow>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            )}
+            <p className="mt-3 text-xs text-faint">
+              The Telegram-active run stays on top whatever the sort. Equity is each run&apos;s
+              stored weekly value over its own period ({EMPTY} when none was stored).
+            </p>
+          </>
+        )}
       </Card>
 
-      {current && comparison ? (
+      {runs.length > 0 ? (
         <Card>
-          <CardHeader
-            title="Compare runs"
-            description="Choose any two saved runs from this dataset."
-            actions={
-              <div className="flex flex-wrap gap-2">
-                <Select
-                  aria-label="First run to compare"
-                  value={current.id}
-                  onChange={(event) => setBaseId(event.target.value)}
-                  className="w-auto"
-                >
-                  {runs.map((run) => (
-                    <option key={run.id} value={run.id}>
-                      {run.name}
-                    </option>
-                  ))}
-                </Select>
-                <Select
-                  aria-label="Second run to compare"
-                  value={comparison.id}
-                  onChange={(event) => setCompareId(event.target.value)}
-                  className="w-auto"
-                >
-                  {runs
-                    .filter((run) => run.id !== current.id)
-                    .map((run) => (
-                      <option key={run.id} value={run.id}>
-                        {run.name}
-                      </option>
-                    ))}
-                </Select>
-              </div>
-            }
+          <MomentumCompare
+            runs={runs}
+            selectedIds={selectedIds}
+            onSelectedIdsChange={setSelected}
+            picker={false}
           />
-          <Table>
-            <THead>
-              <Th>Metric</Th>
-              <Th>{current.name}</Th>
-              <Th>{comparison.name}</Th>
-            </THead>
-            <tbody>
-              {METRICS.map(([key, label]) => (
-                <TRow key={key}>
-                  <Td>{label}</Td>
-                  <Td numeric>{metric(current, key)}</Td>
-                  <Td numeric>{metric(comparison, key)}</Td>
-                </TRow>
-              ))}
-            </tbody>
-          </Table>
-          <h3 className="mb-2 mt-5 text-sm font-semibold">
-            Settings that differ ({differences.length})
-          </h3>
-          <div className="space-y-1 text-xs text-muted">
-            {differences.length === 0 ? (
-              <p>No settings differ.</p>
-            ) : (
-              differences.map((key) => (
-                <p key={key}>
-                  <span className="font-semibold text-foreground">
-                    {SETTING_LABELS[key] ?? key.replaceAll('_', ' ')}:
-                  </span>{' '}
-                  {settingValue(current.config[key])} → {settingValue(comparison.config[key])}
-                </p>
-              ))
-            )}
-          </div>
         </Card>
       ) : null}
+
+      <SavedRunViewer run={opened} onClose={() => setOpenId(null)} onLoad={loadSettings} />
+
+      <Dialog.Root
+        open={confirmRun !== null}
+        onOpenChange={(open) => (open ? undefined : setConfirmActiveId(null))}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(440px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-6 shadow-elevated">
+            <Dialog.Title className="text-base font-semibold tracking-tight text-foreground">
+              Make “{confirmRun?.name}” the Telegram strategy?
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-muted">
+              {TELEGRAM_CONFIRM}
+            </Dialog.Description>
+            <p className="mt-2 text-xs text-muted">
+              {currentActive
+                ? `Active now: ${currentActive.name}.`
+                : 'No strategy is active right now.'}
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirmActiveId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (confirmRun) onSetActive(confirmRun.id);
+                  setConfirmActiveId(null);
+                }}
+              >
+                Confirm
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

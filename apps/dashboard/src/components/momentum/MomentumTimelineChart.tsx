@@ -1,18 +1,39 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { getChartTheme, plotlyChrome } from '../../lib/chartTheme';
-import { formatPct } from '../../lib/format';
+import { formatInt, formatPct } from '../../lib/format';
+import { TIMELINE_TOP_N, longestHeldAssets } from '../../lib/momentumResult';
+import { type PlotlyBasic, loadPlotly } from '../../lib/plotly';
 import { useThemeStore } from '../../store/theme';
+import { Button } from '../ui/Button';
 import { ResultSection } from './ResultSection';
 
-type PlotlyBasic = typeof import('plotly.js-basic-dist-min').default;
-
-/** One row per instrument, time left to right — a Gantt of every closed and open position. */
-export function MomentumTimelineChart({ rows }: { rows: Array<Record<string, unknown>> }) {
+/**
+ * One row per instrument, time left to right — a Gantt of every closed and open position.
+ * Capped to the instruments held longest (a Broad run holds hundreds of names over its life,
+ * which is unreadable as one chart), with a toggle to show them all in a scrolling box.
+ */
+export function MomentumTimelineChart({
+  rows: allRows,
+  topN = TIMELINE_TOP_N,
+}: {
+  rows: Array<Record<string, unknown>>;
+  /** How many instruments to show before "Show all". */
+  topN?: number;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const theme = useThemeStore((state) => state.theme);
+  const [showAll, setShowAll] = useState(false);
+
+  const longest = useMemo(() => longestHeldAssets(allRows, topN), [allRows, topN]);
+  const capped = longest.total > topN;
+  const rows = useMemo(() => {
+    if (!capped || showAll) return allRows;
+    const keep = new Set(longest.assets);
+    return allRows.filter((row) => keep.has(String(row.asset)));
+  }, [allRows, capped, showAll, longest]);
 
   const assetOrder = useMemo(() => {
     const firstSeen = new Map<string, string>();
@@ -32,9 +53,9 @@ export function MomentumTimelineChart({ rows }: { rows: Array<Record<string, unk
     let plotly: PlotlyBasic | null = null;
 
     async function render(): Promise<void> {
-      const loaded = await import('plotly.js-basic-dist-min');
+      const loaded = await loadPlotly();
       if (!mounted || !element) return;
-      plotly = loaded.default;
+      plotly = loaded;
       const colors = getChartTheme(theme);
       const durationsMs = rows.map((row) => {
         const start = new Date(String(row.start)).getTime();
@@ -66,7 +87,9 @@ export function MomentumTimelineChart({ rows }: { rows: Array<Record<string, unk
           '%{y}<br>%{customdata[0]} → %{customdata[1]} (%{customdata[3]}w)<br>Return %{customdata[2]} · %{customdata[4]}<extra></extra>',
       };
       const layout: Record<string, unknown> = {
-        height: Math.max(220, Math.min(assetOrder.length * 24, 620)),
+        // Every instrument gets a readable row; "show all" scrolls inside its box instead of
+        // squeezing hundreds of rows into a fixed height.
+        height: Math.max(220, assetOrder.length * 22 + 40),
         margin: { l: 110, r: 18, t: 10, b: 30 },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
@@ -97,13 +120,31 @@ export function MomentumTimelineChart({ rows }: { rows: Array<Record<string, unk
   return (
     <ResultSection
       title="Trade timeline"
-      description="One bar per position held — green closed a winner, red a loser, orange still open. Hover for dates and return."
+      description="One bar per position held — green closed a winner, red a loser, the accent colour is still open. Hover for dates and return."
       padded={false}
+      actions={
+        capped ? (
+          <Button size="sm" aria-pressed={showAll} onClick={() => setShowAll((value) => !value)}>
+            {showAll
+              ? `Show the ${formatInt(topN)} longest-held`
+              : `Show all ${formatInt(longest.total)}`}
+          </Button>
+        ) : null
+      }
     >
-      {rows.length === 0 ? (
+      {capped ? (
+        <p className="text-xs text-muted">
+          {showAll
+            ? `Showing all ${formatInt(longest.total)} instruments, oldest entry first.`
+            : `Showing the ${formatInt(topN)} longest-held of ${formatInt(longest.total)}.`}
+        </p>
+      ) : null}
+      {allRows.length === 0 ? (
         <p className="text-sm text-muted">No trades for this run.</p>
       ) : (
-        <div ref={ref} className="w-full" />
+        <div className="max-h-[640px] overflow-y-auto">
+          <div ref={ref} className="w-full" />
+        </div>
       )}
     </ResultSection>
   );
