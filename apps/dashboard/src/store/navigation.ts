@@ -22,6 +22,11 @@ export const DEFAULT_NAVIGATION_PREFERENCES: NavigationPreferences = {
  * value stored under an earlier grouping (Trading / Research / Account) needs no
  * migration and no new storage key when the groups change: hidden tabs stay
  * hidden and any two tabs that share a group keep their relative order.
+ *
+ * A tab the stored value has never seen is placed where the default order has it:
+ * straight after the tab that precedes it there, or first when nothing does. So a
+ * newly added first tab (Overview) leads a stored order too, and becomes the
+ * landing tab, instead of being appended behind every older tab.
  */
 export function normalizeNavigationPreferences(value: unknown): NavigationPreferences {
   const candidate =
@@ -30,9 +35,12 @@ export function normalizeNavigationPreferences(value: unknown): NavigationPrefer
     ? candidate.order.filter((id): id is Tab => CONFIGURABLE_SET.has(id as Tab))
     : [];
   const uniqueOrder = [...new Set(order)];
-  for (const id of CONFIGURABLE_IDS) {
-    if (!uniqueOrder.includes(id)) uniqueOrder.push(id);
-  }
+  CONFIGURABLE_IDS.forEach((id, index) => {
+    if (uniqueOrder.includes(id)) return;
+    // Every earlier default tab is already present (stored, or inserted on a previous pass).
+    const previous = CONFIGURABLE_IDS[index - 1];
+    uniqueOrder.splice(previous === undefined ? 0 : uniqueOrder.indexOf(previous) + 1, 0, id);
+  });
 
   const hidden = Array.isArray(candidate.hidden)
     ? [...new Set(candidate.hidden.filter((id): id is Tab => CONFIGURABLE_SET.has(id as Tab)))]

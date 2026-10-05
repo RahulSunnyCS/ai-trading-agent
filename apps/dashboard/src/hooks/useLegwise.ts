@@ -27,9 +27,12 @@ export function useLegwiseData() {
   return usePolledResource<DataStatus>(`${BASE}/data`);
 }
 
-/** Polls every 2s so the evening run's log streams in while it collects. */
-export function useDailyJob() {
-  return usePolledResource<DailyJob>(`${BASE}/daily`, { intervalMs: 2000 });
+/**
+ * Polls every 2s by default so the evening run's log streams in while it collects. A view
+ * that only shows the job's state (Overview) passes a slower interval.
+ */
+export function useDailyJob(intervalMs = 2000) {
+  return usePolledResource<DailyJob>(`${BASE}/daily`, { intervalMs });
 }
 
 /** Cut times as the API wants them: '10:30,13:30'. */

@@ -6,6 +6,7 @@ import {
   Database,
   FlaskConical,
   Layers,
+  LayoutDashboard,
   LineChart,
   type LucideIcon,
   Repeat,
@@ -18,6 +19,7 @@ import {
 
 /** The dashboard views. */
 export type Tab =
+  | 'overview'
   | 'live'
   | 'trades'
   | 'personalities'
@@ -50,7 +52,7 @@ export interface NavItem {
   children?: NavChild[];
 }
 
-export type NavGroupId = 'live' | 'optionslab' | 'momentum' | 'data' | 'account';
+export type NavGroupId = 'overview' | 'live' | 'optionslab' | 'momentum' | 'data' | 'account';
 
 export interface NavGroup {
   id: NavGroupId;
@@ -65,11 +67,18 @@ export interface NavGroup {
  * mobile bottom bar and the Settings tab list.
  *
  * Tab ids and URLs are unchanged from the old Trading / Research / Account
- * grouping; only the grouping and two labels moved. Screens the plan adds later
- * (Overview, Options Lab strategies/runs, a merged Data coverage page, Billing)
- * are deliberately absent until they exist.
+ * grouping; only the grouping and two labels moved. Overview (the landing view)
+ * is its own first group. Screens the plan adds later (Options Lab
+ * strategies/runs, a merged Data coverage page, Billing) are deliberately absent
+ * until they exist.
  */
 export const NAV_GROUPS: NavGroup[] = [
+  {
+    id: 'overview',
+    heading: 'Overview',
+    icon: LayoutDashboard,
+    items: [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }],
+  },
   {
     id: 'live',
     heading: 'Live',

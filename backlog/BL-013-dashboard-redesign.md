@@ -450,4 +450,21 @@ Answered by the owner on 2026-10-05, when the item was started.
     `/momentum`. Status, token and meta are polled by each component that shows them (up to
     three status polls a minute); a shared store would remove the duplicates. The Fyers
     callback redirect and "Feed: live / reconnecting" need the server (§3.12.13).
+- 2026-10-05 — **Phase 5 done** (branch `feat/bl-013-phase-5`, stacked on Phase 4).
+  `OverviewView.tsx` at `/overview` is the default landing tab, with cards for market session
+  and IST clock, feed health, Fyers token, paper trading (open positions, today's P&L), weekly
+  momentum signal, the Options Lab evening job and credits; each links into its tab and has
+  loading and unreachable states. Derivations in `lib/overview.ts` (tested). Checked:
+  typecheck, 398 dashboard unit tests, Biome, and the page's text in the browser with the
+  Fastify API down (no screenshot: the browser pane was not displayed).
+  - Where the data fell short of the plan: the weekly status has no per-signal rows, so buy /
+    sell / hold counts show only after a finished manual final run for the same week; the next
+    scheduled run is the schedule's text ("Fri 14:40 IST"), not a computed date; the evening
+    job's last run is held in the Python service's memory and is lost on restart.
+  - Changes outside the view: a stored navigation order gains Overview first (hidden tabs and
+    order kept), so existing browsers now land on Overview unless a landing tab is set or
+    Overview is hidden; the mobile bottom bar shows Overview, Live, Options Lab, Momentum, Data
+    and More (Account moved under More).
+  - Not done: a component test for `OverviewView`; the feed card opens its own WebSocket
+    (acceptable only because tabs render one at a time).
 

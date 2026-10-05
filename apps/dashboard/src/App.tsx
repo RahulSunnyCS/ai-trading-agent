@@ -10,6 +10,7 @@ import { BrokerLoginsView } from './components/BrokerLoginsView';
 import { LiveView } from './components/LiveView';
 import { MomentumBacktestingView } from './components/MomentumBacktestingView';
 import { OptionsLabView } from './components/OptionsLabView';
+import { OverviewView } from './components/OverviewView';
 import { PaymentTestModeBanner } from './components/PaymentTestModeBanner';
 import { PersonalitiesView } from './components/PersonalitiesView';
 import { PnlView } from './components/PnlView';
@@ -38,6 +39,7 @@ import { hydrateThemeFromStorage } from './store/theme';
 
 /** One-line subtitle shown under each view's title in the top bar. */
 const SUBTITLES: Record<Tab, string> = {
+  overview: 'Today at a glance: market, feed, token, positions and scheduled jobs',
   live: 'Real-time straddle, momentum, and feed status',
   trades: 'Simulated paper-trade log',
   personalities: 'The 10 decision engines and their configs',
@@ -59,6 +61,8 @@ function renderView(
   onPreferencesChange: (preferences: NavigationPreferences) => void,
 ) {
   switch (tab) {
+    case 'overview':
+      return <OverviewView />;
     case 'live':
       return <LiveView />;
     case 'trades':

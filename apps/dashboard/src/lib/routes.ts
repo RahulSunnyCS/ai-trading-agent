@@ -2,6 +2,7 @@
  * URL <-> navigation state. Every tab and sub-tab has a real path so a refresh,
  * back/forward and a pasted link land on the same view:
  *
+ *   /overview
  *   /live  /trades  /personalities  /pnl  /regime  /backfill  /replay  /backtest
  *   /optionslab/{results|regimes|builder}
  *   /momentum/{backtest|scores|saved|weekly|rebalance}
@@ -17,7 +18,8 @@
 
 import { NAV_GROUPS, type Tab, activeNavChild, navItem } from '../components/shell/nav';
 
-export const DEFAULT_TAB: Tab = 'live';
+/** Rendered while "/" (or an unknown path) is being redirected to the landing tab. */
+export const DEFAULT_TAB: Tab = 'overview';
 
 const TABS = new Set<string>(NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)));
 

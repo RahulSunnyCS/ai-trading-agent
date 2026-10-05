@@ -13,6 +13,10 @@ export interface PaymentBalanceState {
   enabled: boolean;
   /** Feature-token credits left, or null when payment is off or the balance is not known. */
   balance: number | null;
+  /** True until the first answer about whether billing is on (and, when it is, the balance). */
+  loading: boolean;
+  /** Why billing status or the balance could not be read, or null. */
+  error: string | null;
 }
 
 const BALANCE_POLL_MS = 60_000;
@@ -33,5 +37,10 @@ export function usePaymentBalance(): PaymentBalanceState {
   return {
     enabled,
     balance: enabled && typeof raw === 'number' && Number.isFinite(raw) ? raw : null,
+    loading:
+      (status.loading && status.data === null) ||
+      (enabled && balance.loading && balance.data === null),
+    error:
+      status.data === null ? status.error : enabled && balance.data === null ? balance.error : null,
   };
 }
