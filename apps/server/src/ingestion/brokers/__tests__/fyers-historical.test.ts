@@ -665,7 +665,9 @@ describe('fetchHistoricalCandles — dashboard credential precedence', () => {
         query: async () => ({
           rows: [
             {
-              app_id: 'dashboard-app',
+              // Must match FYERS_APP_ID from setFyersEnv(): a stored token minted for a
+              // different app is rejected (see resolveFyersCredentials).
+              app_id: 'TESTAPP1234-100',
               access_token: 'dashboard-token',
               refresh_token: null,
               expires_at: new Date(Date.now() + 3_600_000),
@@ -686,7 +688,7 @@ describe('fetchHistoricalCandles — dashboard credential precedence', () => {
 
       const requestInit = rawMock.mock.calls[0]?.[1] as RequestInit;
       expect(requestInit.headers).toMatchObject({
-        Authorization: 'dashboard-app:dashboard-token',
+        Authorization: 'TESTAPP1234-100:dashboard-token',
       });
     } finally {
       cleanupEnv();
