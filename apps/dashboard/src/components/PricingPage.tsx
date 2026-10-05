@@ -26,14 +26,10 @@ import Script from 'next/script';
 import { useState } from 'react';
 
 import { type Plan, usePricingPlans } from '../hooks/usePricingPlans';
+import { formatInr } from '../lib/format';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { StateMessage } from './ui/StateMessage';
-
-/** Formats an integer paise amount to a human-readable rupee string. */
-function formatPrice(paise: number): string {
-  return `₹${(paise / 100).toFixed(2)}`;
-}
 
 interface CreateOrderSuccess {
   orderId: string;
@@ -72,7 +68,7 @@ function PlanCard({
         <h3 className="text-lg font-semibold tracking-tight text-foreground">{plan.name}</h3>
         <p className="mt-1 text-sm text-muted">{plan.description}</p>
         <p className="metric mt-5 text-3xl font-semibold tracking-tight text-foreground">
-          {formatPrice(plan.pricePaise)}
+          {formatInr(plan.pricePaise / 100, { dp: 2 })}
         </p>
       </div>
       <Button

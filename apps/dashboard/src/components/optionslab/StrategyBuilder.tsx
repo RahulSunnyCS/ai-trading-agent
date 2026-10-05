@@ -15,7 +15,7 @@ import { useMemo, useState } from 'react';
 
 import { LEGWISE_API, useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise';
 import { apiPost, apiPut } from '../../lib/api';
-import { formatPnl } from '../../lib/format';
+import { formatNumber, formatPnl } from '../../lib/format';
 import {
   type BaselineComparison,
   compareToBaseline,
@@ -33,6 +33,7 @@ import type {
 } from '../../types/legwise';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { NumberField } from '../ui/Input';
 import { StatCard } from '../ui/StatCard';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import {
@@ -205,10 +206,10 @@ function LegEditor(props: {
           Leg {props.index + 1}
         </span>
         <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={props.onCopy} aria-label="Copy leg">
+          <Button size="icon" variant="ghost" onClick={props.onCopy} aria-label="Copy leg">
             <Copy className="h-3.5 w-3.5" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={props.onRemove} aria-label="Remove leg">
+          <Button size="icon" variant="ghost" onClick={props.onRemove} aria-label="Remove leg">
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -218,7 +219,15 @@ function LegEditor(props: {
           <TextInput value={leg.id} onChange={(v) => set('id', v)} className="w-20" />
         </Field>
         <Field label="Lots">
-          <NumberInput value={leg.lots} onChange={(v) => set('lots', v ?? 1)} className="w-16" />
+          <div className="w-16">
+            <NumberField
+              value={leg.lots}
+              min={1}
+              step={1}
+              aria-label="Lots"
+              onChange={(v) => set('lots', v)}
+            />
+          </div>
         </Field>
         <Field label="Position">
           <Select
@@ -406,7 +415,7 @@ function BacktestResult({
         />
         <StatCard
           label="Profit factor"
-          value={st.profitFactor === null ? '—' : st.profitFactor.toFixed(2)}
+          value={formatNumber(st.profitFactor, 2)}
           note={st.avgLoss === null ? 'no losing day' : `avg loss ${formatPnl(st.avgLoss)}`}
         />
         <StatCard
@@ -448,12 +457,12 @@ function BacktestResult({
         </THead>
         <tbody>
           {result.days.map((d: DayRow) => (
-            <TRow key={d.day} className="cursor-pointer">
-              <Td
-                numeric
-                className="whitespace-nowrap"
-                onClick={() => setOpen(open === d.day ? null : d.day)}
-              >
+            <TRow
+              key={d.day}
+              onClick={() => setOpen(open === d.day ? null : d.day)}
+              selected={open === d.day}
+            >
+              <Td numeric className="whitespace-nowrap">
                 {d.day} {open === d.day ? '▾' : '▸'}
               </Td>
               <Td align="right" numeric>
@@ -720,8 +729,8 @@ export function StrategyBuilder() {
             <CheckCircle2 className="h-3.5 w-3.5" />
             Validate
           </Button>
-          <Button variant="primary" disabled={busy} onClick={() => void backtest()}>
-            <FlaskConical className="h-3.5 w-3.5" />
+          <Button variant="primary" loading={busy} onClick={() => void backtest()}>
+            {busy ? null : <FlaskConical className="h-3.5 w-3.5" />}
             {busy ? 'Running…' : 'Backtest'}
           </Button>
           <Button onClick={() => void save()}>

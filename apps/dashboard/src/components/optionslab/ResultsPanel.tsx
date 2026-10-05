@@ -8,7 +8,7 @@
  * "stale" and excluded, the same rule `obt daily` applies in the terminal.
  */
 
-import { Play, RefreshCw } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -22,13 +22,14 @@ import {
 } from '../../hooks/useLegwise';
 import { apiPost } from '../../lib/api';
 import { seriesCssColor } from '../../lib/chartTheme';
-import { formatPnl } from '../../lib/format';
+import { formatNumber, formatPct, formatPnl } from '../../lib/format';
 import type { PnlDay } from '../../lib/legwiseJoin';
 import { lotsOf, statsOf } from '../../lib/legwiseStats';
 import type { DailyJob, DayAnatomy, SavedResult } from '../../types/legwise';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { RefreshButton } from '../ui/RefreshButton';
 import { StatCard } from '../ui/StatCard';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
@@ -49,9 +50,6 @@ function shade(value: number, max: number): string {
     negative: ['bg-negative/10', 'bg-negative/20', 'bg-negative/30'],
   }[tone][step - 1] as string;
 }
-
-const fmtPct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(0)}%`);
-const fmtPnl = (v: number | null) => (v === null ? '—' : formatPnl(v));
 
 function RunDailyCard({ onFinished }: { onFinished: () => void }) {
   const data = useLegwiseData();
@@ -247,13 +245,13 @@ export function ResultsPanel() {
                         n={st.days} · {st.up} up · max DD {formatPnl(st.maxDrawdown)}
                       </span>
                       <span className={st.thin ? 'block text-faint' : 'block'}>
-                        win {fmtPct(st.winRate)} · avg win {fmtPnl(st.avgWin)} · avg loss{' '}
-                        {fmtPnl(st.avgLoss)}
+                        win {formatPct(st.winRate, 0)} · avg win {formatPnl(st.avgWin)} · avg loss{' '}
+                        {formatPnl(st.avgLoss)}
                       </span>
                       <span className={st.thin ? 'block text-faint' : 'block'}>
-                        expectancy {fmtPnl(st.expectancy)} · PF{' '}
-                        {st.profitFactor === null ? '—' : st.profitFactor.toFixed(2)} · worst day{' '}
-                        {fmtPnl(st.worst)} · losing streak {st.longestLosingStreak}
+                        expectancy {formatPnl(st.expectancy)} · PF{' '}
+                        {formatNumber(st.profitFactor, 2)} · worst day {formatPnl(st.worst)} ·
+                        losing streak {st.longestLosingStreak}
                       </span>
                       {st.thin && (
                         <span className="block text-faint">
@@ -271,12 +269,7 @@ export function ResultsPanel() {
             <CardHeader
               title="Cumulative net P&L"
               description="₹ per lot (net of each strategy's costs; a strategy's lot = its smallest leg)"
-              actions={
-                <Button size="sm" variant="ghost" onClick={results.refetch}>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Refresh
-                </Button>
-              }
+              actions={<RefreshButton onClick={results.refetch} loading={results.loading} />}
             />
             <CumulativeLines lines={lines} />
           </Card>

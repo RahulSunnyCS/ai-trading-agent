@@ -4,6 +4,7 @@
  * forensics panel and the market-regimes tab.
  */
 
+import { formatMultiple, formatPct } from '../../lib/format';
 import type { AnatomySegment, DayAnatomy, SegmentLabel } from '../../types/legwise';
 import { Badge, type Tone } from '../ui/Badge';
 
@@ -33,8 +34,8 @@ export const LABEL_GLYPH: Record<SegmentLabel, string> = {
 };
 
 export function describeSegment(s: AnatomySegment): string {
-  const ratio = s.range_over_implied === null ? 'n/a' : `${s.range_over_implied.toFixed(2)}×`;
-  return `${s.start}–${s.end}: ${LABEL_TEXT[s.label]} · move ${s.ret_pct >= 0 ? '+' : ''}${s.ret_pct.toFixed(2)}% · range ${s.range_pct.toFixed(2)}% (${ratio} of VIX-implied) · directional strength ${s.strength.toFixed(1)}× a random walk`;
+  const ratio = s.range_over_implied === null ? 'n/a' : formatMultiple(s.range_over_implied, 2);
+  return `${s.start}–${s.end}: ${LABEL_TEXT[s.label]} · move ${formatPct(s.ret_pct, 2, { sign: true, unit: 'percent' })} · range ${formatPct(s.range_pct, 2, { unit: 'percent' })} (${ratio} of VIX-implied) · directional strength ${formatMultiple(s.strength, 1)} a random walk`;
 }
 
 /** One small chip per segment, in session order. The tooltip carries the numbers. */

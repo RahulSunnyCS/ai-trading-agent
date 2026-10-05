@@ -5,13 +5,18 @@
  * VOLATILE_REVERTING → warning · EVENT_DAY → accent · else neutral.
  */
 
-import { RefreshCw } from 'lucide-react';
-
 import { useRegimeTags } from '../hooks/useRegimeTags';
+import {
+  EMPTY,
+  formatIstDate,
+  formatIstDateTimeShort,
+  formatPct,
+  toNumberOrNull,
+} from '../lib/format';
 import type { RegimeTag } from '../types/trading';
 import { Badge, type Tone } from './ui/Badge';
-import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { RefreshButton } from './ui/RefreshButton';
 import { SkeletonRows } from './ui/Skeleton';
 import { StateMessage } from './ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from './ui/Table';
@@ -32,35 +37,10 @@ function regimeTone(regime: string): Tone {
 }
 
 function ConfidenceCell({ raw }: { raw: string | null }) {
-  if (raw === null) return <span className="text-faint">—</span>;
-  const n = Number.parseFloat(raw);
-  if (Number.isNaN(n)) return <span className="text-faint">—</span>;
-  return (
-    <span className="tabular-nums text-foreground">
-      {new Intl.NumberFormat('en-IN', {
-        style: 'percent',
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
-      }).format(n)}
-    </span>
-  );
+  const n = toNumberOrNull(raw);
+  if (n === null) return <span className="text-faint">{EMPTY}</span>;
+  return <span className="tabular-nums text-foreground">{formatPct(n, 1)}</span>;
 }
-
-const dateFmt = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-const dateTimeFmt = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-});
 
 function RegimeTable({ tags }: { tags: RegimeTag[] }) {
   return (
@@ -76,7 +56,7 @@ function RegimeTable({ tags }: { tags: RegimeTag[] }) {
         {tags.map((tag) => (
           <TRow key={`${tag.trade_date}-${tag.symbol}`}>
             <Td numeric className="text-foreground">
-              {dateFmt.format(new Date(tag.trade_date))}
+              {formatIstDate(tag.trade_date)}
             </Td>
             <Td className="text-muted">{tag.symbol}</Td>
             <Td>
@@ -86,7 +66,7 @@ function RegimeTable({ tags }: { tags: RegimeTag[] }) {
               <ConfidenceCell raw={tag.regime_confidence} />
             </Td>
             <Td numeric className="text-muted">
-              {dateTimeFmt.format(new Date(tag.classified_at))}
+              {formatIstDateTimeShort(tag.classified_at)}
             </Td>
           </TRow>
         ))}
@@ -110,10 +90,7 @@ export function RegimeView() {
             Market-regime classification, most recent first
           </p>
         </div>
-        <Button size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <RefreshButton onClick={refresh} loading={loading} />
       </div>
 
       <div className="px-2 py-1">

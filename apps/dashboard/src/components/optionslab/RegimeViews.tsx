@@ -5,6 +5,7 @@
 
 import { useEffect, useRef } from 'react';
 
+import { formatPct } from '../../lib/format';
 import { type CrossTab, MIN_CELL_COUNT, MIN_ROW_N, type Transitions } from '../../lib/regimeStats';
 import type { DayAnatomy, SegmentLabel } from '../../types/legwise';
 import { Badge } from '../ui/Badge';
@@ -20,8 +21,6 @@ const CELL: Record<SegmentLabel, string> = {
   QUIET: 'bg-border-strong/50',
   UNKNOWN: 'bg-border/40',
 };
-
-const pct = (v: number | undefined) => (v === undefined ? '—' : `${(v * 100).toFixed(0)}%`);
 
 export function LabelChip({ label }: { label: string }) {
   const key = label as SegmentLabel;
@@ -137,7 +136,7 @@ export function LabelMixTable({
             </Td>
             {STATES.map((s) => (
               <Td key={s} align="right" numeric>
-                {pct(r.rates[s])}
+                {formatPct(r.rates[s], 0)}
               </Td>
             ))}
           </TRow>
@@ -191,7 +190,7 @@ export function TransitionMatrix({
                     key={to}
                     align="right"
                     numeric
-                    title={`base rate ${pct(base[to])}; n=${t.counts[from]?.[to] ?? 0}`}
+                    title={`base rate ${formatPct(base[to], 0)}; n=${t.counts[from]?.[to] ?? 0}`}
                     className={
                       callOut && lift >= 0.1
                         ? 'font-semibold text-positive'
@@ -200,7 +199,7 @@ export function TransitionMatrix({
                           : ''
                     }
                   >
-                    {pct(p)}
+                    {formatPct(p, 0)}
                     <span className="ml-1 text-[10px] text-faint">
                       ({t.counts[from]?.[to] ?? 0})
                     </span>
@@ -215,7 +214,7 @@ export function TransitionMatrix({
           <Td align="right">{null}</Td>
           {t.states.map((s) => (
             <Td key={s} align="right" numeric className="text-faint">
-              {pct(base[s])}
+              {formatPct(base[s], 0)}
             </Td>
           ))}
         </TRow>
@@ -266,7 +265,7 @@ export function CrossTabTable({
               </Td>
               {t.cols.map((c) => (
                 <Td key={c} align="right" numeric>
-                  {total ? pct((t.counts[r]?.[c] ?? 0) / total) : '—'}
+                  {total ? formatPct((t.counts[r]?.[c] ?? 0) / total, 0) : '—'}
                   <span className="ml-1 text-[10px] text-faint">({t.counts[r]?.[c] ?? 0})</span>
                 </Td>
               ))}

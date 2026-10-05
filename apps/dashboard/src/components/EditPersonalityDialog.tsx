@@ -18,8 +18,10 @@ import { X } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 
 import { apiPut } from '../lib/api';
+import { formatPct } from '../lib/format';
 import type { Personality } from '../types/trading';
 import { Button } from './ui/Button';
+import { NumberField } from './ui/Input';
 
 interface EditPersonalityDialogProps {
   personality: Personality;
@@ -120,7 +122,7 @@ export function EditPersonalityDialog({
                 className="mb-1 flex items-baseline justify-between text-xs font-medium"
               >
                 <span className="text-muted">Minimum probability</span>
-                <span className="tabular-nums text-foreground">{(minProb * 100).toFixed(0)}%</span>
+                <span className="tabular-nums text-foreground">{formatPct(minProb, 0)}</span>
               </label>
               <input
                 id={`min-prob-${personality.id}`}
@@ -147,15 +149,14 @@ export function EditPersonalityDialog({
               >
                 Stop-loss (% of straddle)
               </label>
-              <input
+              <NumberField
                 id={`sl-pct-${personality.id}`}
-                type="number"
                 min={0}
                 max={100}
                 step={0.5}
                 value={slPct}
-                onChange={(e) => setSlPct(Number.parseFloat(e.target.value))}
-                className="h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm tabular-nums text-foreground focus:border-primary focus:outline-none"
+                onChange={setSlPct}
+                className="tabular-nums"
               />
             </div>
 

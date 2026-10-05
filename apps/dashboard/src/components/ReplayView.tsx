@@ -10,18 +10,35 @@
  * status 'completed' have candle data and are therefore replayable.
  */
 
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 import { useBackfillStatus } from '../hooks/useBackfillStatus';
 import { isReplayable } from '../lib/backfill';
+import { formatInt, formatIstDate } from '../lib/format';
 import type { BackfillRangeRow } from '../types/trading';
-import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
 import { CodeBlock } from './ui/CodeBlock';
+import { CopyButton } from './ui/CopyButton';
+import { RefreshButton } from './ui/RefreshButton';
 import { StateMessage } from './ui/StateMessage';
 
 function replayCommand(row: BackfillRangeRow): string {
   return `bun run replay --from ${row.from_ts} --to ${row.to_ts} --underlying ${row.symbol} --dry-run`;
+}
+
+const HOW_TO_COMMANDS = [
+  'bun run replay --from <ISO> --to <ISO> --underlying NIFTY --dry-run',
+  'bun run replay --from <ISO> --to <ISO> --underlying NIFTY --against-live',
+];
+
+/** A command line with a copy button beside it. */
+function CommandLine({ command }: { command: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <CodeBlock className="min-w-0 flex-1 whitespace-pre">{command}</CodeBlock>
+      <CopyButton text={command} label="Copy command" />
+    </div>
+  );
 }
 
 function HowToRun() {
@@ -32,12 +49,9 @@ function HowToRun() {
         description="Replay re-runs stored historical ticks through the same live pipeline to produce a deterministic, reproducible result. Run it from a shell:"
       />
       <div className="space-y-2">
-        <CodeBlock>
-          bun run replay --from &lt;ISO&gt; --to &lt;ISO&gt; --underlying NIFTY --dry-run
-        </CodeBlock>
-        <CodeBlock>
-          bun run replay --from &lt;ISO&gt; --to &lt;ISO&gt; --underlying NIFTY --against-live
-        </CodeBlock>
+        {HOW_TO_COMMANDS.map((command) => (
+          <CommandLine key={command} command={command} />
+        ))}
       </div>
       <div className="mt-4 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
@@ -58,13 +72,6 @@ function HowToRun() {
   );
 }
 
-const dateFmt = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
 function CoverageList({ ranges }: { ranges: BackfillRangeRow[] }) {
   return (
     <div className="space-y-3">
@@ -72,17 +79,16 @@ function CoverageList({ ranges }: { ranges: BackfillRangeRow[] }) {
         <div key={row.id} className="rounded-lg border border-border bg-surface-2/50 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="font-medium text-foreground">
-              {row.symbol} · {dateFmt.format(new Date(row.from_ts))} →{' '}
-              {dateFmt.format(new Date(row.to_ts))}
+              {row.symbol} · {formatIstDate(row.from_ts)} → {formatIstDate(row.to_ts)}
             </span>
             <span className="tabular-nums text-faint">
-              {row.rows_written.toLocaleString('en-IN')} candles
+              {formatInt(row.rows_written)} candles
               {row.gaps_detected > 0 ? (
                 <span className="ml-2 text-warning">· {row.gaps_detected} gaps</span>
               ) : null}
             </span>
           </div>
-          <CodeBlock className="whitespace-pre">{replayCommand(row)}</CodeBlock>
+          <CommandLine command={replayCommand(row)} />
         </div>
       ))}
     </div>
@@ -101,12 +107,7 @@ export function ReplayView() {
         <CardHeader
           title="Replayable data coverage"
           description="Backfilled ranges with enough candle data to replay"
-          actions={
-            <Button size="sm" onClick={refresh} disabled={loading}>
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          }
+          actions={<RefreshButton onClick={refresh} loading={loading} />}
         />
         {error !== null ? (
           <StateMessage

@@ -5,9 +5,11 @@ import { type ReactNode, useMemo, useState } from 'react';
 
 import { type LiquidityPreviewParams, useLiquidityPreview } from '../../hooks/useLiquidityPreview';
 import { cn } from '../../lib/cn';
+import { formatInr, formatInt } from '../../lib/format';
 import { Accordion } from '../ui/Accordion';
 import { Badge } from '../ui/Badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
+import { Input, Select, NumberField as UiNumberField } from '../ui/Input';
 import { RadioCards } from '../ui/RadioCards';
 
 export type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
@@ -102,9 +104,6 @@ const LOOKBACK_PRESETS: Array<[string, LookbackRow[]]> = [
   ],
 ];
 
-const inputClass =
-  'mt-1 w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-foreground transition-colors hover:border-border-strong focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50';
-
 function Field({
   label,
   help,
@@ -149,15 +148,14 @@ function NumberField({
 }) {
   return (
     <Field label={label} help={help}>
-      <input
-        type="number"
-        className={inputClass}
+      <UiNumberField
+        className="mt-1"
         value={Number.isFinite(value) ? value : 0}
-        min={min}
-        max={max}
+        onChange={onChange}
+        {...(min === undefined ? {} : { min })}
+        {...(max === undefined ? {} : { max })}
         step={step}
         disabled={disabled}
-        onChange={(event) => onChange(Number(event.target.value))}
       />
     </Field>
   );
@@ -263,7 +261,7 @@ function PercentField({
   disabled?: boolean | undefined;
 }) {
   const raw = values[name];
-  const shown = typeof raw === 'number' ? Math.round(raw * 1000) / 10 : 0;
+  const shown = typeof raw === 'number' ? Math.round(raw * 10000) / 100 : 0;
   return (
     <NumberField
       label={label}
@@ -339,12 +337,12 @@ function UniverseSection({
       </div>
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
-        <input
+        <Input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Find by name or symbol"
-          className={cn(inputClass, 'mt-0 pl-8')}
+          className="pl-8"
         />
       </div>
       <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
@@ -441,25 +439,21 @@ function LookbackTable({
               // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable id (freely added/removed/reordered); every cell is controlled by index already
               <tr key={index} className="border-t border-border">
                 <td className="px-1.5 py-1">
-                  <input
+                  <Input
                     type="number"
                     min={1}
                     max={260}
-                    className={cn(inputClass, 'mt-0 py-1')}
+                    className="py-1"
                     value={row.weeks}
                     onChange={(event) => update(index, { weeks: Number(event.target.value) })}
                     aria-label={`Lookback ${index + 1} weeks`}
                   />
                 </td>
                 <td className="px-1.5 py-1">
-                  <input
+                  <Input
                     type="number"
                     step={0.25}
-                    className={cn(
-                      inputClass,
-                      'mt-0 py-1',
-                      row.weight < 0 && 'border-negative/50 text-negative',
-                    )}
+                    className={cn('py-1', row.weight < 0 && 'border-negative/50 text-negative')}
                     value={row.weight}
                     onChange={(event) => update(index, { weight: Number(event.target.value) })}
                     aria-label={`Lookback ${index + 1} weight`}
@@ -500,10 +494,6 @@ function LookbackTable({
 /** Defaults for every field this panel owns, before the backend's own `meta.defaults` overlay. */
 export const TURNOVER_PRESETS = [0.5, 1, 2, 5, 10];
 
-function formatRupees(value: number): string {
-  return `₹${Math.round(value).toLocaleString('en-IN')}`;
-}
-
 /** Live "how many stocks pass" card, with the reason each rejected stock failed. */
 function LiquidityPreviewCard({
   params,
@@ -528,8 +518,8 @@ function LiquidityPreviewCard({
     <div className="space-y-2 rounded-lg border border-border bg-surface-2/40 p-3">
       <p className="text-xs text-foreground">
         As of <span className="font-medium">{data.as_of ?? '—'}</span>:{' '}
-        <span className="font-semibold text-primary">{data.eligible.toLocaleString('en-IN')}</span>{' '}
-        of {data.universe.toLocaleString('en-IN')} stocks pass
+        <span className="font-semibold text-primary">{formatInt(data.eligible)}</span> of{' '}
+        {formatInt(data.universe)} stocks pass
         {loading ? ' (updating…)' : ''}.
       </p>
       {reasons.length > 0 ? (
@@ -546,8 +536,8 @@ function LiquidityPreviewCard({
       ) : null}
       {ratio !== null && ratio > 0 ? (
         <p className="text-[11px] text-muted">
-          One full position (~{formatRupees(positionRupees)}, from Capital × Max position) is about
-          1/{ratio.toLocaleString('en-IN')} of the minimum daily turnover.
+          One full position (~{formatInr(positionRupees)}, from Capital × Max position) is about 1/
+          {formatInt(ratio)} of the minimum daily turnover.
         </p>
       ) : null}
       {data.excluded.length > 0 ? (
@@ -707,9 +697,9 @@ function BroadUniverseControls({
                 label="Circuit days allowed (last 60 sessions)"
                 help="Most LC or UC days (closing at a band edge, either direction) a stock may have in its last 60 sessions, even if they weren't in a row. Blank = no limit. A 2% move also happens on ordinary volatile stocks, so start around 8 or higher."
               >
-                <input
+                <Input
                   type="number"
-                  className={inputClass}
+                  className="mt-1"
                   placeholder="No limit"
                   min={0}
                   max={60}
@@ -1011,9 +1001,9 @@ export function MomentumSettingsPanel({
       >
         <div className="grid grid-cols-2 gap-3">
           <Field label="From">
-            <input
+            <Input
               type="date"
-              className={inputClass}
+              className="mt-1"
               value={core.start}
               min={firstWeek}
               max={lastWeek}
@@ -1021,9 +1011,9 @@ export function MomentumSettingsPanel({
             />
           </Field>
           <Field label="To">
-            <input
+            <Input
               type="date"
-              className={inputClass}
+              className="mt-1"
               value={core.end}
               min={firstWeek}
               max={lastWeek}
@@ -1263,8 +1253,8 @@ export function MomentumSettingsPanel({
             label="Rebalance"
             help="Weekly acts on every Friday's ranking. Every 2 or 4 weeks trades only on those Fridays (the ranking is still recomputed weekly). Monthly only trades in the last week of each month. Slower cadences churn less but react later."
           >
-            <select
-              className={inputClass}
+            <Select
+              className="mt-1"
               value={
                 str('rebalance', 'weekly') === 'monthly'
                   ? 'monthly'
@@ -1281,15 +1271,15 @@ export function MomentumSettingsPanel({
               <option value="every2">Every 2 weeks</option>
               <option value="every4">Every 4 weeks</option>
               <option value="monthly">Monthly (month-end only)</option>
-            </select>
+            </Select>
           </Field>
           {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' ? (
             <Field
               label="Which Fridays"
               help="Trading weeks are fixed on the calendar (counted from 1 Jan 2016), so each choice is a different set of Fridays. Comparing them shows how much of a result is down to lucky timing."
             >
-              <select
-                className={inputClass}
+              <Select
+                className="mt-1"
                 value={num('rebalance_offset', 0)}
                 onChange={(event) => onChange('rebalance_offset', Number(event.target.value))}
               >
@@ -1298,7 +1288,7 @@ export function MomentumSettingsPanel({
                     Phase {phase + 1} of {num('rebalance_every', 1)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           ) : null}
         </div>
@@ -1550,15 +1540,15 @@ export function MomentumSettingsPanel({
             label="Trade"
             help="Trade at the signal week's close, or 1–2 weeks later — shows how sensitive the strategy is to acting late."
           >
-            <select
-              className={inputClass}
+            <Select
+              className="mt-1"
               value={num('signal_delay', 0)}
               onChange={(event) => onChange('signal_delay', Number(event.target.value))}
             >
               <option value={0}>at the signal close</option>
               <option value={1}>1 week later</option>
               <option value={2}>2 weeks later</option>
-            </select>
+            </Select>
           </Field>
         </div>
         {dataset === 'etf' ? (
@@ -1567,25 +1557,25 @@ export function MomentumSettingsPanel({
               label="P&L on"
               help="The ranking always uses the index. This picks what profit and loss is measured on — the index itself, or the ETF you would actually trade (index less TER before the ETF listed)."
             >
-              <select
-                className={inputClass}
+              <Select
+                className="mt-1"
                 value={str('track', 'etf')}
                 onChange={(event) => onChange('track', event.target.value)}
               >
                 <option value="index">the index (underlying)</option>
                 <option value="etf">the ETF you&apos;d trade</option>
-              </select>
+              </Select>
             </Field>
             <Field label="Fill at" help="When a trade decided at Friday's close actually fills.">
-              <select
-                className={inputClass}
+              <Select
+                className="mt-1"
                 value={str('execution', 'fri_close')}
                 onChange={(event) => onChange('execution', event.target.value)}
               >
                 <option value="fri_close">Friday close</option>
                 <option value="mon_open">Monday open</option>
                 <option value="mon_10am">Monday 10:00</option>
-              </select>
+              </Select>
             </Field>
           </div>
         ) : null}
@@ -1601,8 +1591,8 @@ export function MomentumSettingsPanel({
               label="Slab"
               help="Your income-tax slab, used for gains taxed at slab rate (e.g. debt funds)."
             >
-              <select
-                className={inputClass}
+              <Select
+                className="mt-1"
                 value={num('slab_rate', 0.3)}
                 disabled={!bool('tax')}
                 onChange={(event) => onChange('slab_rate', Number(event.target.value))}
@@ -1612,7 +1602,7 @@ export function MomentumSettingsPanel({
                     {rate * 100}%
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </div>
         ) : null}
@@ -1620,8 +1610,8 @@ export function MomentumSettingsPanel({
           label="Benchmark"
           help="What the strategy is compared against in the chart, the KPIs and the year-by-year table."
         >
-          <select
-            className={inputClass}
+          <Select
+            className="mt-1"
             value={str('benchmark', benchmarks[0] ?? '')}
             onChange={(event) => onChange('benchmark', event.target.value)}
           >
@@ -1630,7 +1620,7 @@ export function MomentumSettingsPanel({
                 {benchmark}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
       </Accordion>
     </div>

@@ -1,4 +1,4 @@
-import type { ReactNode, TdHTMLAttributes, ThHTMLAttributes } from 'react';
+import type { KeyboardEvent, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 
 import { cn } from '../../lib/cn';
 
@@ -6,10 +6,37 @@ import { cn } from '../../lib/cn';
  * Table primitives. Replaces the per-view `Th` copies and the repeated
  * row/border patterns with one consistent, scrollable, sticky-header table.
  */
-export function Table({ children, className }: { children: ReactNode; className?: string }) {
+export function Table({
+  children,
+  className,
+  maxHeight,
+  stickyFirstCol = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  /**
+   * Caps the table's height and scrolls it inside its own box. This is what makes the header
+   * stick: a sticky header only works when the scrolling box is the table's own wrapper.
+   */
+  maxHeight?: number | string;
+  /** Keeps the first column in view while the rest scrolls sideways. */
+  stickyFirstCol?: boolean;
+}) {
   return (
-    <div className="-mx-1 overflow-x-auto">
-      <table className={cn('w-full border-collapse text-sm', className)}>{children}</table>
+    <div
+      className={cn('-mx-1 overflow-x-auto', maxHeight !== undefined && 'overflow-y-auto')}
+      style={maxHeight !== undefined ? { maxHeight } : undefined}
+    >
+      <table
+        className={cn(
+          'w-full border-collapse text-sm',
+          stickyFirstCol &&
+            '[&_td:first-child]:sticky [&_td:first-child]:left-0 [&_td:first-child]:z-[1] [&_td:first-child]:bg-surface [&_th:first-child]:sticky [&_th:first-child]:left-0 [&_th:first-child]:z-[2]',
+          className,
+        )}
+      >
+        {children}
+      </table>
     </div>
   );
 }
@@ -44,10 +71,41 @@ export function Th({ children, align = 'left', className, ...rest }: ThProps) {
   );
 }
 
-export function TRow({ children, className }: { children: ReactNode; className?: string }) {
+export function TRow({
+  children,
+  className,
+  onClick,
+  selected,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** Makes the whole row a control: clickable, focusable, and activated by Enter or Space. */
+  onClick?: (() => void) | undefined;
+  selected?: boolean | undefined;
+}) {
   return (
     <tr
-      className={cn('border-b border-border/60 transition-colors hover:bg-surface-2/50', className)}
+      className={cn(
+        'border-b border-border/60 transition-colors hover:bg-surface-2/50',
+        onClick &&
+          'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+        selected && 'bg-surface-2/60',
+        className,
+      )}
+      {...(onClick
+        ? {
+            tabIndex: 0,
+            'aria-selected': selected,
+            onClick,
+            onKeyDown: (event: KeyboardEvent<HTMLTableRowElement>) => {
+              if (event.target !== event.currentTarget) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onClick();
+              }
+            },
+          }
+        : {})}
     >
       {children}
     </tr>

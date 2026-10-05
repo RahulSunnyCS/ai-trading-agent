@@ -7,15 +7,18 @@
  * in_progress → info · failed → negative.
  */
 
-import { Play, RefreshCw } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { useState } from 'react';
 
 import { useBackfillStatus } from '../hooks/useBackfillStatus';
 import { apiPost } from '../lib/api';
-import type { BackfillRangeRow } from '../types/trading';
-import { Badge, type Tone } from './ui/Badge';
+import { formatInt, formatIstDate } from '../lib/format';
+import type { BackfillRangeRow, BackfillStatus } from '../types/trading';
+import { Badge, type Status } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { Input, Select } from './ui/Input';
+import { RefreshButton } from './ui/RefreshButton';
 import { SkeletonRows } from './ui/Skeleton';
 import { StateMessage } from './ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from './ui/Table';
@@ -25,18 +28,11 @@ import { THead, TRow, Table, Td, Th } from './ui/Table';
 // ---------------------------------------------------------------------------
 
 // The API normalises every backfill row to one of three statuses.
-function statusTone(status: string): Tone {
-  switch (status) {
-    case 'completed':
-      return 'positive';
-    case 'in_progress':
-      return 'info';
-    case 'failed':
-      return 'negative';
-    default:
-      return 'neutral';
-  }
-}
+const BACKFILL_STATUS: Record<BackfillStatus, Status> = {
+  completed: 'completed',
+  in_progress: 'running',
+  failed: 'failed',
+};
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -51,13 +47,6 @@ function statusLabel(status: string): string {
   }
 }
 
-const dateFmt = new Intl.DateTimeFormat('en-IN', {
-  timeZone: 'Asia/Kolkata',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
 /**
  * Computes the default from/to date range for the trigger form.
  * Called once during useState initialisation — not inside render.
@@ -71,12 +60,6 @@ function defaultDateRange(): { from: string; to: string } {
   from.setDate(from.getDate() - 7);
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 }
-
-// Input / select Tailwind classes — kept as a constant to avoid repetition and
-// ensure all fields share identical chrome.
-const INPUT_CLS =
-  'h-9 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-foreground' +
-  ' placeholder:text-faint focus:border-primary focus:outline-none';
 
 const LABEL_CLS = 'mb-1 block text-xs font-medium text-muted';
 
@@ -95,7 +78,7 @@ const BACKFILL_SYMBOLS = [
 function DateRangeCell({ from, to }: { from: string; to: string }) {
   return (
     <span className="tabular-nums text-foreground">
-      {dateFmt.format(new Date(from))} → {dateFmt.format(new Date(to))}
+      {formatIstDate(from)} → {formatIstDate(to)}
     </span>
   );
 }
@@ -120,12 +103,12 @@ function BackfillTable({ ranges }: { ranges: BackfillRangeRow[] }) {
             </Td>
             <Td className="text-muted">{row.resolution}</Td>
             <Td>
-              <Badge tone={statusTone(row.status)} dot>
+              <Badge status={BACKFILL_STATUS[row.status]} dot>
                 {statusLabel(row.status)}
               </Badge>
             </Td>
             <Td numeric align="right" className="text-foreground">
-              {row.rows_written.toLocaleString('en-IN')}
+              {formatInt(row.rows_written)}
             </Td>
             <Td numeric align="right">
               {row.gaps_detected > 0 ? (
@@ -201,19 +184,18 @@ function TriggerBackfillCard({ onQueued }: TriggerCardProps) {
             <label htmlFor="bf-symbol" className={LABEL_CLS}>
               Symbol
             </label>
-            <select
+            <Select
               id="bf-symbol"
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
               required
-              className={INPUT_CLS}
             >
               {BACKFILL_SYMBOLS.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Resolution */}
@@ -221,20 +203,17 @@ function TriggerBackfillCard({ onQueued }: TriggerCardProps) {
             <label htmlFor="bf-resolution" className={LABEL_CLS}>
               Resolution
             </label>
-            <select
+            <Select
               id="bf-resolution"
               value={resolution}
               onChange={(e) => setResolution(e.target.value)}
-              // appearance-none omitted intentionally — native select arrow aids
-              // discoverability on all platforms without a custom dropdown component.
-              className={INPUT_CLS}
             >
               <option value="1">1-min</option>
               <option value="5">5-min</option>
               <option value="15">15-min</option>
               <option value="D">Daily</option>
               <option value="W">Weekly</option>
-            </select>
+            </Select>
           </div>
 
           {/* From date */}
@@ -242,13 +221,12 @@ function TriggerBackfillCard({ onQueued }: TriggerCardProps) {
             <label htmlFor="bf-from" className={LABEL_CLS}>
               From
             </label>
-            <input
+            <Input
               id="bf-from"
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
               required
-              className={INPUT_CLS}
             />
           </div>
 
@@ -257,13 +235,12 @@ function TriggerBackfillCard({ onQueued }: TriggerCardProps) {
             <label htmlFor="bf-to" className={LABEL_CLS}>
               To
             </label>
-            <input
+            <Input
               id="bf-to"
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
               required
-              className={INPUT_CLS}
             />
           </div>
         </div>
@@ -319,10 +296,7 @@ export function BackfillView() {
               Latest backfill per symbol — each rerun replaces the previous one
             </p>
           </div>
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <RefreshButton onClick={refresh} loading={loading} />
         </div>
 
         <div className="px-2 py-1">

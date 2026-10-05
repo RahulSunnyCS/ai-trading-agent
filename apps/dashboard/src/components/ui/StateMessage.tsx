@@ -22,6 +22,7 @@ export function StateMessage({ variant, title, description, icon, className }: S
   if (variant === 'error') {
     return (
       <div
+        role="alert"
         className={cn(
           'flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3.5',
           className,
@@ -37,7 +38,7 @@ export function StateMessage({ variant, title, description, icon, className }: S
   }
 
   return (
-    <div
+    <output
       className={cn(
         'flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border px-6 py-12 text-center',
         className,
@@ -50,6 +51,6 @@ export function StateMessage({ variant, title, description, icon, className }: S
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted">{description}</p>
         ) : null}
       </div>
-    </div>
+    </output>
   );
 }

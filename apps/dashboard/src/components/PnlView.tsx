@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import { TRADES_WINDOW_CAPTION, usePaperTrades } from '../hooks/usePaperTrades';
 import { getChartTheme } from '../lib/chartTheme';
-import { formatPnl } from '../lib/format';
+import { formatPct, formatPnl } from '../lib/format';
 import { type PnlSeriesPoint, computePnlSummary } from '../lib/pnl';
 import { useThemeStore } from '../store/theme';
 import { Card, CardHeader } from './ui/Card';
@@ -162,7 +162,7 @@ export function PnlView() {
             </p>
             <p className="mt-1 text-sm text-muted">
               Across {summary.closedCount} closed trade{summary.closedCount !== 1 ? 's' : ''} ·{' '}
-              {(summary.winRate * 100).toFixed(1)}% win rate
+              {formatPct(summary.winRate, 1)} win rate
             </p>
           </Card>
 
@@ -173,7 +173,7 @@ export function PnlView() {
               value={formatPnl(summary.todayRealizedPnl)}
               tone={pnlTone(summary.todayRealizedPnl)}
             />
-            <StatCard label="Win Rate" value={`${(summary.winRate * 100).toFixed(1)}%`} />
+            <StatCard label="Win Rate" value={formatPct(summary.winRate, 1)} />
             <StatCard label="Closed Trades" value={summary.closedCount} />
             <StatCard
               label="Open Positions"

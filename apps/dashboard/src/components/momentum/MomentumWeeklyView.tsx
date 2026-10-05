@@ -15,7 +15,7 @@ import { useMomentumStockSync } from '../../hooks/useMomentumStockSync';
 import type { MomentumWeeklyJobState } from '../../hooks/useMomentumWeeklyJob';
 import { usePolledResource } from '../../hooks/usePolledResource';
 import { apiPost } from '../../lib/api';
-import { formatIstDateTime } from '../../lib/format';
+import { formatDay, formatIstDateTime, formatMultiple, formatPct } from '../../lib/format';
 import type {
   MomentumSavedRun,
   MomentumStockActionReview,
@@ -30,16 +30,6 @@ import { StateMessage } from '../ui/StateMessage';
 type RunKind = 'preview' | 'final';
 
 const DAY_MS = 86_400_000;
-
-/** "2026-09-25" → "25 Sep 2026", read as a calendar date (no timezone shift). */
-function formatDay(day: string): string {
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
 
 function weeksBehind(through: string, target: string): number {
   return Math.round((Date.parse(target) - Date.parse(through)) / (7 * DAY_MS));
@@ -335,10 +325,10 @@ function StockActionAlertRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <span className="font-semibold text-foreground">{item.symbol}</span>
         <span className="text-muted">{formatDay(item.ex_date)}</span>
-        <Badge tone="warning">Price −{dropPct.toFixed(1)}%</Badge>
+        <Badge tone="warning">Price −{formatPct(dropPct, 1, { unit: 'percent' })}</Badge>
         <span className="text-muted">
-          Volume {volumeRatio?.toFixed(1) ?? '—'}× · turnover {turnoverRatio?.toFixed(1) ?? '—'}× ·
-          price-implied multiple {item.suggested_factor?.toFixed(1) ?? '—'}×
+          Volume {formatMultiple(volumeRatio)} · turnover {formatMultiple(turnoverRatio)} ·
+          price-implied multiple {formatMultiple(item.suggested_factor)}
         </span>
       </div>
       {item.subject ? (

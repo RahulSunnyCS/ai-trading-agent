@@ -393,6 +393,13 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
   the chart palette helpers (`lib/chartTheme.ts`) and the font setup (`next/font`, IBM Plex
   Sans / Mono) are in `docs/dashboard-design-tokens.md`
+- **Dashboard display formatting lives in `apps/dashboard/src/lib/format.ts`** — components
+  never call `Intl.*`, `toFixed` or `toLocaleString`. Use `formatInr`, `formatPct` (takes a
+  fraction; pass `{ unit: 'percent' }` otherwise), `formatPp`, `formatNumber`, `formatDay`
+  (a zone-less 'YYYY-MM-DD'), `formatIstDate` / `formatIstTime` (instants), `EMPTY`
+- **Dashboard controls come from `components/ui/`** — `SegmentedControl` for one-of-N,
+  `Tabs` for any tab bar (the only place `role="tablist"` appears), `Input` / `Select` /
+  `NumberField` for fields, `RefreshButton`, `CopyButton`, `toast()`. Do not hand-roll another
 - **Dashboard data fetching goes through `usePolledResource<T>`**
   (`apps/dashboard/src/hooks/usePolledResource.ts`) — never hand-roll another
   AbortController + in-flight-guard fetch loop. It existed independently in

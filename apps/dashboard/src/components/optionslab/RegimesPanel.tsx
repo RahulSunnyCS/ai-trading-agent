@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { DEFAULT_CUTS, useAnatomy } from '../../hooks/useLegwise';
+import { formatNumber, formatPct } from '../../lib/format';
 import { styleProxies, zscore } from '../../lib/legwiseJoin';
 import {
   type Label,
@@ -342,13 +343,13 @@ export function RegimesPanel() {
               <Verdict
                 title="Stays in the same state"
                 test={analysis.stay}
-                fmt={(v) => `${(v * 100).toFixed(0)}%`}
+                fmt={(v) => formatPct(v, 0)}
                 thin={thin}
               />
               <Verdict
                 title="Average run length (days)"
                 test={analysis.run}
-                fmt={(v) => v.toFixed(2)}
+                fmt={(v) => formatNumber(v, 2)}
                 thin={thin}
               />
             </div>
@@ -419,7 +420,7 @@ export function RegimesPanel() {
                 <Verdict
                   title="Association between the two segments (χ²)"
                   test={within.test}
-                  fmt={(v) => v.toFixed(1)}
+                  fmt={(v) => formatNumber(v, 1)}
                   thin={thin}
                 />
               </div>
@@ -452,7 +453,7 @@ function Verdict({
         <span className="ml-2 text-muted">by chance {fmt(test.chanceMean)}</span>
       </div>
       <div className={`mt-0.5 text-xs ${significant ? 'text-positive' : 'text-muted'}`}>
-        p = {test.p.toFixed(3)} (shuffled day order, {test.iterations} runs) ·{' '}
+        p = {formatNumber(test.p, 3)} (shuffled day order, {test.iterations} runs) ·{' '}
         {thin
           ? 'too few days to call'
           : significant

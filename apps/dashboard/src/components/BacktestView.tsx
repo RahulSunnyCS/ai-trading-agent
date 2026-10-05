@@ -10,17 +10,20 @@
  * via /api/backtest/*; this component never talks to it directly.
  */
 
-import { AlertCircle, CheckCircle2, Play, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { useBacktestPresets } from '../hooks/useBacktestPresets';
 import { useBacktestRuns } from '../hooks/useBacktestRuns';
 import { useBacktestValidate } from '../hooks/useBacktestValidate';
 import { apiGet, apiPost } from '../lib/api';
+import { formatInr, formatNumber, formatPct } from '../lib/format';
 import type { CoverageResponse, RunResult } from '../types/backtest';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
+import { Input, fieldClass } from './ui/Input';
+import { RefreshButton } from './ui/RefreshButton';
 import { StatCard } from './ui/StatCard';
 import { StateMessage } from './ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from './ui/Table';
@@ -28,10 +31,6 @@ import { THead, TRow, Table, Td, Th } from './ui/Table';
 function extractUnderlying(yaml: string): string | null {
   const match = yaml.match(/underlying:\s*["']?(\w+)["']?/);
   return match?.[1] ?? null;
-}
-
-function fmtInr(n: number): string {
-  return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 }
 
 // ---------------------------------------------------------------------------
@@ -57,12 +56,7 @@ function PresetPicker({ onSelect }: { onSelect: (yaml: string) => void }) {
       <CardHeader
         title="Preset strategies"
         description="Load an example strategy into the editor below, then tweak it"
-        actions={
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        }
+        actions={<RefreshButton onClick={refresh} loading={loading} />}
       />
       {error !== null ? (
         <StateMessage variant="error" title="Couldn't load presets" description={error} />
@@ -160,7 +154,7 @@ function StrategyEditor({
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}
         rows={16}
-        className="w-full rounded-lg border border-border bg-surface-2/50 p-3 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={`${fieldClass} w-full font-mono !text-xs`}
         placeholder="Pick a preset above, or paste a strategy YAML"
       />
 
@@ -175,26 +169,26 @@ function StrategyEditor({
       )}
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs text-muted">
+        <label htmlFor="backtest-from" className="flex flex-col gap-1 text-xs text-muted">
           From
-          <input
+          <Input
+            id="backtest-from"
             type="date"
             value={from}
             onChange={(e) => onFromChange(e.target.value)}
-            className="rounded-lg border border-border bg-surface-2/50 px-2.5 py-1.5 text-sm text-foreground"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-muted">
+        <label htmlFor="backtest-to" className="flex flex-col gap-1 text-xs text-muted">
           To
-          <input
+          <Input
+            id="backtest-to"
             type="date"
             value={to}
             onChange={(e) => onToChange(e.target.value)}
-            className="rounded-lg border border-border bg-surface-2/50 px-2.5 py-1.5 text-sm text-foreground"
           />
         </label>
-        <Button variant="primary" disabled={!canRun} onClick={onRun}>
-          <Play className="h-3.5 w-3.5" />
+        <Button variant="primary" disabled={!canRun} loading={running} onClick={onRun}>
+          {running ? null : <Play className="h-3.5 w-3.5" />}
           {running ? 'Running…' : 'Run backtest'}
         </Button>
         {coverage && Object.keys(coverage).length > 0 && (
@@ -228,22 +222,22 @@ function ResultCard({ result }: { result: RunResult }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
           label="Net"
-          value={`₹${fmtInr(result.net_inr)}`}
+          value={formatInr(result.net_inr)}
           tone={result.net_inr >= 0 ? 'positive' : 'negative'}
         />
-        <StatCard label="Gross" value={`₹${fmtInr(result.gross_inr)}`} />
+        <StatCard label="Gross" value={formatInr(result.gross_inr)} />
         <StatCard label="Win days" value={`${result.win_days} / ${result.sessions.length}`} />
-        <StatCard label="Worst day" value={`₹${fmtInr(result.worst_day)}`} tone="negative" />
-        <StatCard label="Lot-days" value={result.lot_days.toFixed(2)} />
+        <StatCard label="Worst day" value={formatInr(result.worst_day)} tone="negative" />
+        <StatCard label="Lot-days" value={formatNumber(result.lot_days, 2)} />
         <StatCard
           label="INR / lot-day"
-          value={`₹${fmtInr(result.inr_per_lot_day)}`}
+          value={formatInr(result.inr_per_lot_day)}
           tone={result.inr_per_lot_day >= 0 ? 'positive' : 'negative'}
         />
         {result.margin && (
           <StatCard
             label="Return on peak margin"
-            value={`${(result.margin.return_on_peak_margin * 100).toFixed(2)}%`}
+            value={formatPct(result.margin.return_on_peak_margin, 2)}
             tone={result.margin.return_on_peak_margin >= 0 ? 'positive' : 'negative'}
           />
         )}
@@ -251,18 +245,18 @@ function ResultCard({ result }: { result: RunResult }) {
 
       {result.margin && (
         <p className="mt-3 text-xs text-muted">
-          Peak margin: ₹{fmtInr(result.margin.peak_margin_inr)} ({result.margin.peak_lots} lots × ₹
-          {fmtInr(result.margin.margin_per_lot_inr)}/lot on {result.margin.peak_date}, category:{' '}
+          Peak margin: {formatInr(result.margin.peak_margin_inr)} ({result.margin.peak_lots} lots ×{' '}
+          {formatInr(result.margin.margin_per_lot_inr)}/lot on {result.margin.peak_date}, category:{' '}
           {result.margin.strategy_type})
         </p>
       )}
 
       {result.bootstrap && (
         <p className="mt-3 text-xs text-muted">
-          Bootstrap 90% CI (n={result.bootstrap.n_resamples}, seed={result.bootstrap.seed}): net [₹
-          {fmtInr(result.bootstrap.net_lo)}, ₹{fmtInr(result.bootstrap.net_hi)}] · INR/lot-day [₹
-          {fmtInr(result.bootstrap.inr_per_lot_day_lo)}, ₹
-          {fmtInr(result.bootstrap.inr_per_lot_day_hi)}]
+          Bootstrap 90% CI (n={result.bootstrap.n_resamples}, seed={result.bootstrap.seed}): net [
+          {formatInr(result.bootstrap.net_lo)}, {formatInr(result.bootstrap.net_hi)}] · INR/lot-day
+          [{formatInr(result.bootstrap.inr_per_lot_day_lo)},{' '}
+          {formatInr(result.bootstrap.inr_per_lot_day_hi)}]
         </p>
       )}
 
@@ -279,7 +273,7 @@ function ResultCard({ result }: { result: RunResult }) {
               <TRow key={dte}>
                 <Td>{dte}</Td>
                 <Td align="right" numeric>
-                  ₹{fmtInr(net)}
+                  {formatInr(net)}
                 </Td>
               </TRow>
             ))}
@@ -301,7 +295,7 @@ function ResultCard({ result }: { result: RunResult }) {
                 <TRow key={regimeName}>
                   <Td>{regimeName}</Td>
                   <Td align="right" numeric>
-                    ₹{fmtInr(net)}
+                    {formatInr(net)}
                   </Td>
                 </TRow>
               ))}
@@ -330,19 +324,19 @@ function ResultCard({ result }: { result: RunResult }) {
                 {s.dte}
               </Td>
               <Td align="right" numeric>
-                ₹{fmtInr(s.net)}
+                {formatInr(s.net)}
               </Td>
               <Td align="right" numeric>
-                ₹{fmtInr(s.gross)}
+                {formatInr(s.gross)}
               </Td>
               <Td align="right" numeric>
-                ₹{fmtInr(s.cost)}
+                {formatInr(s.cost)}
               </Td>
               <Td align="right" numeric>
-                {s.lot_days.toFixed(2)}
+                {formatNumber(s.lot_days, 2)}
               </Td>
               <Td align="right" numeric>
-                ₹{fmtInr(s.peak_loss)}
+                {formatInr(s.peak_loss)}
               </Td>
               <Td align="right" numeric>
                 {s.total_lots}
@@ -375,12 +369,7 @@ function PastRunsCard({ refreshKey }: { refreshKey: number }) {
       <CardHeader
         title="Past runs"
         description="Recorded in the option-backtesting run registry"
-        actions={
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        }
+        actions={<RefreshButton onClick={refresh} loading={loading} />}
       />
       {error !== null ? (
         <StateMessage variant="error" title="Couldn't load past runs" description={error} />
@@ -403,13 +392,13 @@ function PastRunsCard({ refreshKey }: { refreshKey: number }) {
                   {r.date_from} → {r.date_to}
                 </Td>
                 <Td align="right" numeric>
-                  ₹{fmtInr(r.net_inr)}
+                  {formatInr(r.net_inr)}
                 </Td>
                 <Td align="right" numeric>
                   {r.win_days} / {r.n_sessions}
                 </Td>
                 <Td align="right" numeric>
-                  ₹{fmtInr(r.inr_per_lot_day)}
+                  {formatInr(r.inr_per_lot_day)}
                 </Td>
               </TRow>
             ))}

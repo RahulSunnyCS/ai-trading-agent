@@ -12,7 +12,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { DEFAULT_CUTS, useDayForensics } from '../../hooks/useLegwise';
 import { getChartTheme, getSeriesPalette, pickSeries, withAlpha } from '../../lib/chartTheme';
-import { formatPnl } from '../../lib/format';
+import { formatMultiple, formatNumber, formatPct, formatPnl } from '../../lib/format';
 import { useThemeStore } from '../../store/theme';
 import type { DayForensics as Forensics, TimedValue } from '../../types/legwise';
 import { Badge } from '../ui/Badge';
@@ -234,7 +234,8 @@ function Anatomy({ f }: { f: Forensics }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
         <span>{a.weekday}</span>
         <span>
-          gap {a.gap_pct === null ? 'n/a' : `${a.gap_pct >= 0 ? '+' : ''}${a.gap_pct.toFixed(2)}%`}
+          gap{' '}
+          {a.gap_pct === null ? 'n/a' : formatPct(a.gap_pct, 2, { sign: true, unit: 'percent' })}
         </span>
         <span>VIX open {a.vix_open ?? 'n/a'}</span>
         <span>{a.dte === null ? 'DTE n/a' : a.is_expiry ? 'expiry day' : `${a.dte} DTE`}</span>
@@ -254,10 +255,9 @@ function Anatomy({ f }: { f: Forensics }) {
                 <Badge tone={LABEL_TONE[s.label]}>{LABEL_TEXT[s.label]}</Badge>
               </div>
               <div className="metric mt-1 text-xs text-muted">
-                move {s.ret_pct >= 0 ? '+' : ''}
-                {s.ret_pct.toFixed(2)}% · range ×
-                {s.range_over_implied === null ? 'n/a' : s.range_over_implied.toFixed(2)} implied ·
-                strength {s.strength.toFixed(1)}×
+                move {formatPct(s.ret_pct, 2, { sign: true, unit: 'percent' })} · range ×
+                {s.range_over_implied === null ? 'n/a' : formatNumber(s.range_over_implied, 2)}{' '}
+                implied · strength {formatMultiple(s.strength, 1)}
               </div>
             </div>
           ) : null,

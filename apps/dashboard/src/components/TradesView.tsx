@@ -8,7 +8,7 @@
 import { useMemo } from 'react';
 
 import { TRADES_WINDOW_CAPTION, usePaperTrades } from '../hooks/usePaperTrades';
-import { formatIstDateTime, formatPnl, toNumberOrNull } from '../lib/format';
+import { EMPTY, formatIstDateTime, formatNumber, formatPnl, toNumberOrNull } from '../lib/format';
 import type { PaperTrade } from '../types/trading';
 import { Badge } from './ui/Badge';
 import { Card, CardHeader } from './ui/Card';
@@ -20,22 +20,15 @@ import { THead, TRow, Table, Td, Th } from './ui/Table';
 /** Colour-codes a P&L cell by sign; em dash for null (open trades). */
 function PnlCell({ raw }: { raw: string | null }) {
   const value = toNumberOrNull(raw);
-  if (value === null) return <span className="text-faint">—</span>;
+  if (value === null) return <span className="text-faint">{EMPTY}</span>;
   const tone = value > 0 ? 'text-positive' : value < 0 ? 'text-negative' : 'text-muted';
   return <span className={`font-medium ${tone}`}>{formatPnl(value)}</span>;
 }
 
 function StraddleCell({ raw }: { raw: string | null }) {
   const value = toNumberOrNull(raw);
-  if (value === null) return <span className="text-faint">—</span>;
-  return (
-    <span className="tabular-nums">
-      {new Intl.NumberFormat('en-IN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(value)}
-    </span>
-  );
+  if (value === null) return <span className="text-faint">{EMPTY}</span>;
+  return <span className="tabular-nums">{formatNumber(value, 2)}</span>;
 }
 
 interface Summary {
@@ -78,7 +71,7 @@ function TradesTable({ trades }: { trades: PaperTrade[] }) {
               {formatIstDateTime(trade.entry_time)}
             </Td>
             <Td>
-              <Badge tone={trade.status === 'open' ? 'positive' : 'neutral'} dot>
+              <Badge status={trade.status === 'open' ? 'open' : 'closed'} dot>
                 {trade.status === 'open' ? 'Open' : 'Closed'}
               </Badge>
             </Td>
@@ -92,7 +85,7 @@ function TradesTable({ trades }: { trades: PaperTrade[] }) {
               <PnlCell raw={trade.net_pnl} />
             </Td>
             <Td className="text-muted">
-              {trade.exit_reason ?? <span className="text-faint">—</span>}
+              {trade.exit_reason ?? <span className="text-faint">{EMPTY}</span>}
             </Td>
           </TRow>
         ))}

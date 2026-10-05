@@ -11,7 +11,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { formatPnl } from '../../lib/format';
+import { formatPct, formatPnl } from '../../lib/format';
 import { MIN_BUCKET_N, type PnlDay, bucketByLabel, scatterPoints } from '../../lib/legwiseJoin';
 import type { DayAnatomy } from '../../types/legwise';
 import { Card, CardHeader } from '../ui/Card';
@@ -19,8 +19,6 @@ import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { PnlScatter } from './PnlScatter';
 import { LabelChip, STATES } from './RegimeViews';
 import { Select, pnlClass } from './shared';
-
-const pct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(0)}%`);
 
 export function DayTypeCard({
   strategies,
@@ -114,7 +112,7 @@ export function DayTypeCard({
                           numeric
                           className={a && a.n < MIN_BUCKET_N ? 'text-faint' : ''}
                         >
-                          {pct(a?.winRate ?? null)}
+                          {formatPct(a?.winRate, 0)}
                         </Td>
                         <Td align="right" numeric>
                           {cell(b)}
@@ -124,7 +122,7 @@ export function DayTypeCard({
                           numeric
                           className={b && b.n < MIN_BUCKET_N ? 'text-faint' : ''}
                         >
-                          {pct(b?.winRate ?? null)}
+                          {formatPct(b?.winRate, 0)}
                         </Td>
                       </TRow>
                     );

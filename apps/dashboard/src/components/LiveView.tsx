@@ -21,10 +21,10 @@ import { useLiveTicks } from '../hooks/useLiveTicks';
 import type { StraddleSnapshot } from '../hooks/useLiveTicks';
 import { apiGet, unwrapData } from '../lib/api';
 import { getChartTheme } from '../lib/chartTheme';
-import { formatIstDateTime } from '../lib/format';
+import { formatIstDateTime, formatNumber } from '../lib/format';
 import { useThemeStore } from '../store/theme';
 import type { ApiEnvelope } from '../types/trading';
-import { Badge, type Tone } from './ui/Badge';
+import { Badge, STATUS_TONE, type Tone } from './ui/Badge';
 import { Card } from './ui/Card';
 import { StatusDot } from './ui/StatusDot';
 
@@ -43,7 +43,6 @@ interface PolledStraddleSnapshot {
 
 const STRADDLE_POLL_MS = 10_000;
 const META_POLL_MS = 30_000;
-const num2 = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ---------------------------------------------------------------------------
 // Connection status pill
@@ -52,8 +51,12 @@ const num2 = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumF
 function ConnectionPill({ status }: { status: 'connecting' | 'connected' | 'disconnected' }) {
   const map: Record<typeof status, { tone: Tone; label: string; pulse: boolean }> = {
     connecting: { tone: 'warning', label: 'Connecting…', pulse: true },
-    connected: { tone: 'positive', label: 'Connected', pulse: false },
-    disconnected: { tone: 'negative', label: 'Disconnected — reconnecting', pulse: true },
+    connected: { tone: STATUS_TONE.connected, label: 'Connected', pulse: false },
+    disconnected: {
+      tone: STATUS_TONE.disconnected,
+      label: 'Disconnected — reconnecting',
+      pulse: true,
+    },
   };
   const { tone, label, pulse } = map[status];
   return (
@@ -122,7 +125,7 @@ function StraddleSection() {
       ) : (
         <div>
           <p className="metric text-3xl font-semibold tracking-tight text-foreground">
-            {num2.format(snapshot.value)}
+            {formatNumber(snapshot.value, 2)}
           </p>
           {snapshot.symbol !== undefined && (
             <p className="mt-1 text-xs text-faint">{snapshot.symbol}</p>
@@ -176,28 +179,26 @@ function WsStraddlePanel({ straddle }: { straddle: StraddleSnapshot | null }) {
       ) : (
         <div>
           <p className="metric text-3xl font-semibold tracking-tight text-foreground">
-            {num2.format(straddle.straddleValue)}
+            {formatNumber(straddle.straddleValue, 2)}
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             <Leg label="ATM" value={String(straddle.atmStrike)} tone="text-foreground" />
-            <Leg label="CE" value={num2.format(straddle.cePrice)} tone="text-info" />
-            <Leg label="PE" value={num2.format(straddle.pePrice)} tone="text-accent" />
+            <Leg label="CE" value={formatNumber(straddle.cePrice, 2)} tone="text-info" />
+            <Leg label="PE" value={formatNumber(straddle.pePrice, 2)} tone="text-accent" />
           </div>
           {straddle.roc !== undefined && (
             <div className="mt-3 flex gap-4 text-xs text-muted">
               <span>
                 ROC{' '}
                 <span className="tabular-nums text-foreground">
-                  {straddle.roc > 0 ? '+' : ''}
-                  {straddle.roc.toFixed(4)}
+                  {formatNumber(straddle.roc, 4, { sign: true })}
                 </span>
               </span>
               {straddle.acceleration !== undefined && (
                 <span>
                   Accel{' '}
                   <span className="tabular-nums text-foreground">
-                    {straddle.acceleration > 0 ? '+' : ''}
-                    {straddle.acceleration.toFixed(4)}
+                    {formatNumber(straddle.acceleration, 4, { sign: true })}
                   </span>
                 </span>
               )}
@@ -408,7 +409,7 @@ export function LiveView() {
             {latestLtp !== null ? (
               <>
                 <p className="metric mt-1 text-4xl font-semibold tracking-tight text-foreground">
-                  {num2.format(latestLtp)}
+                  {formatNumber(latestLtp, 2)}
                 </p>
                 {lastUpdateIso !== null && (
                   <p className="mt-1 text-xs text-faint">

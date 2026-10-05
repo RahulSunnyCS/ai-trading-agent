@@ -16,7 +16,7 @@ export function SystemStatus() {
   return (
     <div className="flex items-center gap-2">
       {meta.authDegraded ? (
-        <Badge tone="warning">
+        <Badge status="attention">
           <AlertTriangle className="h-3 w-3" />
           Re-login required
         </Badge>
@@ -26,6 +26,13 @@ export function SystemStatus() {
         <StatusDot
           tone={meta.simulate ? 'info' : 'positive'}
           pulse={!meta.simulate && !meta.authDegraded}
+          label={
+            meta.simulate
+              ? 'Simulated feed'
+              : meta.authDegraded
+                ? 'Live feed degraded'
+                : 'Live feed connected'
+          }
         />
         {meta.simulate ? 'Simulation' : 'Live'}
         {meta.broker ? <span className="text-faint">· {meta.broker}</span> : null}

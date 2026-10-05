@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { cn } from '../../lib/cn';
+import { formatDay, formatInt, formatNumber, formatPct } from '../../lib/format';
 import type {
   MomentumCircuitEpisode,
   MomentumCircuitEscaped,
@@ -14,9 +15,11 @@ import type {
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader } from '../ui/Card';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
+import { TabPanel, Tabs } from '../ui/Tabs';
 
+/** A signed percentage for a value already in percent units. */
 function signed(value: number, digits = 1): string {
-  return `${value > 0 ? '+' : ''}${value.toFixed(digits)}%`;
+  return formatPct(value, digits, { sign: true, unit: 'percent' });
 }
 
 function tone(value: number): string {
@@ -32,7 +35,7 @@ function ExitBadge({ row }: { row: MomentumCircuitTrapped }) {
   if (row.exit === 'sold_during') {
     return <Badge tone="negative">sold on a locked day (not possible live)</Badge>;
   }
-  return <Badge tone="warning">sold {row.exit_date}, after the lock</Badge>;
+  return <Badge tone="warning">sold {formatDay(row.exit_date)}, after the lock</Badge>;
 }
 
 function TrappedTable({ rows }: { rows: MomentumCircuitTrapped[] }) {
@@ -55,7 +58,7 @@ function TrappedTable({ rows }: { rows: MomentumCircuitTrapped[] }) {
           <TRow key={`${row.symbol}-${row.start}`}>
             <Td className="font-medium text-foreground">{row.symbol}</Td>
             <Td className="whitespace-nowrap text-muted">
-              {row.start} → {row.end}
+              {formatDay(row.start)} → {formatDay(row.end)}
             </Td>
             <Td align="right" className="tabular-nums">
               {row.days}
@@ -68,7 +71,7 @@ function TrappedTable({ rows }: { rows: MomentumCircuitTrapped[] }) {
               {signed(row.realised_move_pct)}
             </Td>
             <Td align="right" className="tabular-nums">
-              {row.portfolio_share_pct.toFixed(1)}%
+              {formatPct(row.portfolio_share_pct, 1, { unit: 'percent' })}
             </Td>
             <Td align="right" className={tone(row.portfolio_impact_pct)}>
               {signed(row.portfolio_impact_pct, 2)}
@@ -103,7 +106,7 @@ function EscapedTable({ rows }: { rows: MomentumCircuitEscaped[] }) {
           <TRow key={`${row.symbol}-${row.start}`}>
             <Td className="font-medium text-foreground">{row.symbol}</Td>
             <Td className="whitespace-nowrap text-muted">
-              {row.start} → {row.end}
+              {formatDay(row.start)} → {formatDay(row.end)}
             </Td>
             <Td align="right" className="tabular-nums">
               {row.days}
@@ -113,10 +116,10 @@ function EscapedTable({ rows }: { rows: MomentumCircuitEscaped[] }) {
               {signed(row.move_pct)}
             </Td>
             <Td className="whitespace-nowrap text-muted">
-              {row.exit_date} ({row.days_before} days before)
+              {formatDay(row.exit_date)} ({row.days_before} days before)
             </Td>
             <Td align="right" className="tabular-nums">
-              {row.portfolio_share_pct.toFixed(1)}%
+              {formatPct(row.portfolio_share_pct, 1, { unit: 'percent' })}
             </Td>
             <Td align="right" className={tone(row.avoided_impact_pct)}>
               {signed(row.avoided_impact_pct, 2)}
@@ -146,7 +149,7 @@ function UpperTable({ rows }: { rows: MomentumCircuitEpisode[] }) {
           <TRow key={`${row.symbol}-${row.start}`}>
             <Td className="font-medium text-foreground">{row.symbol}</Td>
             <Td className="whitespace-nowrap text-muted">
-              {row.start} → {row.end}
+              {formatDay(row.start)} → {formatDay(row.end)}
             </Td>
             <Td align="right" className="tabular-nums">
               {row.days}
@@ -156,7 +159,7 @@ function UpperTable({ rows }: { rows: MomentumCircuitEpisode[] }) {
               {signed(row.move_pct)}
             </Td>
             <Td align="right" className="tabular-nums">
-              {row.portfolio_share_pct.toFixed(1)}%
+              {formatPct(row.portfolio_share_pct, 1, { unit: 'percent' })}
             </Td>
             <Td align="right" className={tone(row.portfolio_impact_pct)}>
               {signed(row.portfolio_impact_pct, 2)}
@@ -175,10 +178,6 @@ function UpperTable({ rows }: { rows: MomentumCircuitEpisode[] }) {
 }
 
 type Tab = 'trapped' | 'escaped' | 'upper';
-
-function pct(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
-}
 
 function Stat({
   label,
@@ -201,10 +200,11 @@ function Stat({
         {current ? <Badge tone="primary">this run</Badge> : null}
       </p>
       <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
-        {pct(stats.cagr)} <span className="text-xs font-normal text-muted">CAGR</span>
+        {formatPct(stats.cagr)} <span className="text-xs font-normal text-muted">CAGR</span>
       </p>
       <p className="text-[11px] text-muted">
-        Worst drawdown {pct(stats.max_drawdown)} · total return {pct(stats.total_return)}
+        Worst drawdown {formatPct(stats.max_drawdown)} · total return{' '}
+        {formatPct(stats.total_return)}
       </p>
     </div>
   );
@@ -237,7 +237,7 @@ function RealismStrip({ realism }: { realism: MomentumCircuitRealism }) {
               same ? 'text-foreground' : impact < 0 ? 'text-negative' : 'text-positive',
             )}
           >
-            {same ? 'about 0' : `${impact > 0 ? '+' : ''}${impact.toFixed(1)}`}{' '}
+            {same ? 'about 0' : formatNumber(impact, 1, { sign: true })}{' '}
             <span className="text-xs font-normal text-muted">CAGR points</span>
           </p>
           <p className="text-[11px] text-muted">
@@ -261,22 +261,25 @@ export function MomentumCircuitExposureCard({
 }) {
   const [tab, setTab] = useState<Tab>('trapped');
   if (!exposure) return null;
-  const tabs: Array<[Tab, string, string]> = [
-    [
-      'trapped',
-      `Lower circuit: still holding (${exposure.lc_trapped_count.toLocaleString('en-IN')})`,
-      'Longest locks first. Effect = your position size × the fall until the strategy sold.',
-    ],
-    [
-      'escaped',
-      `Lower circuit: got out in time (${exposure.lc_escaped_count.toLocaleString('en-IN')})`,
-      'The strategy sold these up to 8 weeks before the lock began. Biggest losses avoided first.',
-    ],
-    [
-      'upper',
-      'Upper circuit',
-      'Longest runs first. A rise like this is real only if you were already in before the lock.',
-    ],
+  const tabs: Array<{ value: Tab; label: string; description: string }> = [
+    {
+      value: 'trapped',
+      label: `Lower circuit: still holding (${formatInt(exposure.lc_trapped_count)})`,
+      description:
+        'Longest locks first. Effect = your position size × the fall until the strategy sold.',
+    },
+    {
+      value: 'escaped',
+      label: `Lower circuit: got out in time (${formatInt(exposure.lc_escaped_count)})`,
+      description:
+        'The strategy sold these up to 8 weeks before the lock began. Biggest losses avoided first.',
+    },
+    {
+      value: 'upper',
+      label: 'Upper circuit',
+      description:
+        'Longest runs first. A rise like this is real only if you were already in before the lock.',
+    },
   ];
   const near = exposure.lc_trapped_count + exposure.lc_escaped_count;
   const escapePct = near > 0 ? Math.round((exposure.lc_escaped_count / near) * 100) : null;
@@ -290,25 +293,24 @@ export function MomentumCircuitExposureCard({
         {exposure.realism ? <RealismStrip realism={exposure.realism} /> : null}
         <div className="space-y-1.5 text-xs leading-relaxed text-muted">
           <p>
-            {exposure.touched.toLocaleString('en-IN')} of{' '}
-            {exposure.positions.toLocaleString('en-IN')} holdings met at least one band-edge close.
+            {formatInt(exposure.touched)} of {formatInt(exposure.positions)} holdings met at least
+            one band-edge close.
           </p>
           <p>
             {near > 0 ? (
               <>
-                Of {near.toLocaleString('en-IN')} lower-circuit locks (2+ sessions) on stocks it
-                held or had sold in the prior 8 weeks, the strategy was{' '}
+                Of {formatInt(near)} lower-circuit locks (2+ sessions) on stocks it held or had sold
+                in the prior 8 weeks, the strategy was{' '}
                 <span className="font-medium text-foreground">
-                  already out before {exposure.lc_escaped_count.toLocaleString('en-IN')} (
-                  {escapePct}
+                  already out before {formatInt(exposure.lc_escaped_count)} ({escapePct}
                   %)
                 </span>{' '}
                 and{' '}
                 <span className="font-medium text-foreground">
-                  still holding in {exposure.lc_trapped_count.toLocaleString('en-IN')}
+                  still holding in {formatInt(exposure.lc_trapped_count)}
                 </span>
                 {exposure.lc_trapped_sold_during > 0
-                  ? `, ${exposure.lc_trapped_sold_during.toLocaleString('en-IN')} of which it sold in the middle of the lock, a fill a live run could not have got`
+                  ? `, ${formatInt(exposure.lc_trapped_sold_during)} of which it sold in the middle of the lock, a fill a live run could not have got`
                   : ''}
                 .
               </>
@@ -317,32 +319,21 @@ export function MomentumCircuitExposureCard({
             )}
           </p>
         </div>
-        <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
-          {tabs.map(([id, label, description]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              title={description}
-              onClick={() => setTab(id)}
-              className={cn(
-                '-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                tab === id
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted hover:text-foreground',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div role="tabpanel" className="space-y-3">
-          <p className="text-xs text-muted">{tabs.find(([id]) => id === tab)?.[2]}</p>
-          {tab === 'trapped' ? <TrappedTable rows={exposure.lc} /> : null}
-          {tab === 'escaped' ? <EscapedTable rows={exposure.lc_escaped} /> : null}
-          {tab === 'upper' ? <UpperTable rows={exposure.uc} /> : null}
-        </div>
+        <Tabs
+          ariaLabel="Circuit situations"
+          value={tab}
+          items={tabs.map((item) => ({ ...item, title: item.description }))}
+          onChange={setTab}
+        >
+          <TabPanel value={tab} className="mt-6 space-y-3">
+            <p className="text-xs text-muted">
+              {tabs.find((item) => item.value === tab)?.description}
+            </p>
+            {tab === 'trapped' ? <TrappedTable rows={exposure.lc} /> : null}
+            {tab === 'escaped' ? <EscapedTable rows={exposure.lc_escaped} /> : null}
+            {tab === 'upper' ? <UpperTable rows={exposure.uc} /> : null}
+          </TabPanel>
+        </Tabs>
         <p className="text-[11px] text-faint">
           Circuits are inferred from closes at a 2%, 5%, 10% or 20% move from the previous close, in
           the same direction on consecutive sessions; the daily bars carry no band data.

@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../lib/cn';
+import { EMPTY, formatNumber, formatPct, formatPp } from '../../lib/format';
 import type { MomentumSavedRun } from '../../types/momentum';
 import { ResultSection } from './ResultSection';
 
@@ -13,27 +14,27 @@ interface MetricDef {
 }
 
 const METRICS: MetricDef[] = [
-  { key: 'cagr', label: 'CAGR', format: (v) => `${(v * 100).toFixed(1)}%`, better: 'high' },
+  { key: 'cagr', label: 'CAGR', format: (v) => formatPct(v), better: 'high' },
   {
     key: 'excess_cagr',
     label: 'Edge vs benchmark',
-    format: (v) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)} pp`,
+    format: (v) => formatPp(v),
     better: 'high',
   },
   {
     key: 'max_drawdown',
     label: 'Max drawdown',
-    format: (v) => `${(v * 100).toFixed(1)}%`,
+    format: (v) => formatPct(v),
     better: 'high',
   },
-  { key: 'sharpe', label: 'Sharpe', format: (v) => v.toFixed(2), better: 'high' },
+  { key: 'sharpe', label: 'Sharpe', format: (v) => formatNumber(v, 2), better: 'high' },
   {
     key: 'turnover_per_year',
     label: 'Churn / year',
-    format: (v) => `${(v * 100).toFixed(0)}%`,
+    format: (v) => formatPct(v, 0),
     better: 'low',
   },
-  { key: 'avg_holdings', label: 'Avg holdings', format: (v) => v.toFixed(1), better: 'high' },
+  { key: 'avg_holdings', label: 'Avg holdings', format: (v) => formatNumber(v, 1), better: 'high' },
 ];
 
 /**
@@ -98,7 +99,7 @@ export function MomentumCompare({ runs }: { runs: MomentumSavedRun[] }) {
                             : 'text-foreground',
                         )}
                       >
-                        {typeof value === 'number' ? metric.format(value) : '—'}
+                        {typeof value === 'number' ? metric.format(value) : EMPTY}
                       </td>
                     );
                   })}

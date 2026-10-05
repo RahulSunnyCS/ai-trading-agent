@@ -20,6 +20,7 @@ import { useAppRoute } from '../hooks/useAppRoute';
 import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { cn } from '../lib/cn';
+import { formatNumber } from '../lib/format';
 import { describeConfig } from '../lib/momentumConfig';
 import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
 import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
@@ -45,7 +46,9 @@ import {
 import { MomentumSettingsSkeleton } from './momentum/MomentumSkeletons';
 import { MomentumWeeklyView } from './momentum/MomentumWeeklyView';
 import { Button } from './ui/Button';
+import { SegmentedControl, type SegmentedOption } from './ui/SegmentedControl';
 import { StateMessage } from './ui/StateMessage';
+import { type TabItem, Tabs } from './ui/Tabs';
 
 type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
 
@@ -116,34 +119,10 @@ const VISIBLE_DATASETS = DATASETS.filter((item) => VISIBLE_DATASET_IDS.has(item.
 
 /** The dataset switch (ETF Rotation / Broad Momentum). Shown on Backtest and on Saved runs: saved
  * runs are stored per dataset, so without it a run saved under the other dataset is invisible. */
-function DatasetButtons({
-  dataset,
-  onSelect,
-}: {
-  dataset: Dataset;
-  onSelect: (next: Dataset) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {VISIBLE_DATASETS.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onSelect(item.id)}
-          title={item.description}
-          className={cn(
-            'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            dataset === item.id
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border bg-surface-2/30 text-muted hover:border-border-strong hover:text-foreground',
-          )}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const DATASET_OPTIONS: ReadonlyArray<SegmentedOption<Dataset>> = VISIBLE_DATASETS.map((item) => ({
+  value: item.id,
+  label: <span title={item.description}>{item.label}</span>,
+}));
 
 function numberDefault(defaults: Record<string, unknown>, key: string, fallback: number): number {
   const value = defaults[key];
@@ -198,66 +177,54 @@ function MomentumRunTabs({
   onSelect: (run: MomentumRun) => void;
   onClose: (run: MomentumRun) => void;
 }) {
+  const items: Array<TabItem<string>> = runs.map((run) => {
+    const inFlight = run.status === 'queued' || run.status === 'running';
+    const seconds = Math.max(
+      0,
+      Math.floor(((inFlight ? now : (run.finishedAt ?? now)) - run.startedAt) / 1000),
+    );
+    return {
+      value: run.id,
+      label: (
+        <>
+          {run.status === 'queued' ? (
+            <Clock className="h-3.5 w-3.5" aria-label="queued" />
+          ) : run.status === 'running' ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="running" />
+          ) : run.status === 'done' ? (
+            <CheckCircle2 className="h-3.5 w-3.5 text-positive" aria-label="done" />
+          ) : (
+            <AlertCircle className="h-3.5 w-3.5 text-negative" aria-label="failed" />
+          )}
+          <span className="font-medium">{run.label}</span>
+          <span className="text-xs opacity-70">{DATASET_SHORT[run.dataset] ?? run.dataset}</span>
+          <span className="font-mono text-xs tabular-nums opacity-70">{seconds}s</span>
+        </>
+      ),
+      trailing: (
+        <button
+          type="button"
+          onClick={() => onClose(run)}
+          aria-label={`Close ${run.label}`}
+          title={inFlight ? 'Hide this tab (the run keeps going on the server)' : 'Close this tab'}
+          className="rounded-md px-1.5 py-1.5 text-muted opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      ),
+    };
+  });
   return (
-    <div
-      role="tablist"
-      aria-label="Backtest runs"
-      className="flex gap-2 overflow-x-auto rounded-xl border border-border bg-surface p-2"
-    >
-      {runs.map((run) => {
-        const inFlight = run.status === 'queued' || run.status === 'running';
-        const selected = run.id === activeId;
-        const seconds = Math.max(
-          0,
-          Math.floor(((inFlight ? now : (run.finishedAt ?? now)) - run.startedAt) / 1000),
-        );
-        return (
-          <div
-            key={run.id}
-            className={cn(
-              'flex shrink-0 items-center rounded-lg border text-sm transition-colors',
-              selected
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border bg-surface-2/30 text-muted hover:border-border-strong hover:text-foreground',
-            )}
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => onSelect(run)}
-              className="flex items-center gap-2 rounded-l-lg px-3 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {run.status === 'queued' ? (
-                <Clock className="h-3.5 w-3.5" aria-label="queued" />
-              ) : run.status === 'running' ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="running" />
-              ) : run.status === 'done' ? (
-                <CheckCircle2 className="h-3.5 w-3.5 text-positive" aria-label="done" />
-              ) : (
-                <AlertCircle className="h-3.5 w-3.5 text-negative" aria-label="failed" />
-              )}
-              <span className="font-medium">{run.label}</span>
-              <span className="text-xs opacity-70">
-                {DATASET_SHORT[run.dataset] ?? run.dataset}
-              </span>
-              <span className="font-mono text-xs tabular-nums opacity-70">{seconds}s</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onClose(run)}
-              aria-label={`Close ${run.label}`}
-              title={
-                inFlight ? 'Hide this tab (the run keeps going on the server)' : 'Close this tab'
-              }
-              className="rounded-r-lg px-1.5 py-1.5 opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        );
-      })}
-    </div>
+    <Tabs
+      ariaLabel="Backtest runs"
+      variant="pill"
+      value={activeId ?? ''}
+      items={items}
+      onChange={(id) => {
+        const run = runs.find((item) => item.id === id);
+        if (run) onSelect(run);
+      }}
+    />
   );
 }
 
@@ -706,44 +673,17 @@ export function MomentumBacktestingView() {
 
   return (
     <div ref={containerRef} className="space-y-5">
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
-        <div
-          role="tablist"
-          aria-label="Momentum sections"
-          className="inline-flex min-w-max rounded-lg border border-border bg-surface p-1"
-          onKeyDown={(event) => {
-            if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
-            event.preventDefault();
-            const index = SECTIONS.findIndex((item) => item.id === section);
-            const next =
-              event.key === 'Home'
-                ? 0
-                : event.key === 'End'
-                  ? SECTIONS.length - 1
-                  : (index + (event.key === 'ArrowRight' ? 1 : -1) + SECTIONS.length) %
-                    SECTIONS.length;
-            const id = SECTIONS[next]?.id;
-            if (id) {
-              setSection(id);
-              document.getElementById(`momentum-tab-${id}`)?.focus();
-            }
-          }}
-        >
-          {SECTIONS.map((item) => (
-            <Button
-              key={item.id}
-              id={`momentum-tab-${item.id}`}
-              role="tab"
-              aria-selected={section === item.id}
-              aria-controls="momentum-section-panel"
-              tabIndex={section === item.id ? 0 : -1}
-              size="sm"
-              variant={section === item.id ? 'primary' : 'ghost'}
-              className={cn(
-                'min-h-10 whitespace-nowrap',
-                section !== item.id && 'text-foreground/80',
-              )}
-              onClick={() => setSection(item.id)}
+      <Tabs
+        ariaLabel="Momentum sections"
+        variant="pill"
+        className="w-fit"
+        value={section}
+        onChange={setSection}
+        items={SECTIONS.map((item) => ({
+          value: item.id,
+          label: (
+            <span
+              className="inline-flex min-h-7 items-center gap-2"
               title={
                 item.id === 'weekly' && weekly.running
                   ? 'Weekly signal is running in the background'
@@ -753,31 +693,28 @@ export function MomentumBacktestingView() {
               {item.label}
               {item.id === 'saved' ? (savedRunsLoading ? ' (…)' : ` (${savedRuns.length})`) : ''}
               {item.id === 'backtest' && inFlightCount > 0 ? (
-                <span
-                  className="relative ml-1 flex h-2 w-2"
-                  aria-label={`${inFlightCount} running`}
-                >
+                <span className="relative flex h-2 w-2" aria-label={`${inFlightCount} running`}>
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
                 </span>
               ) : null}
               {item.id === 'weekly' && weekly.running ? (
-                <span className="relative ml-1 flex h-2 w-2" aria-label="running">
+                <span className="relative flex h-2 w-2" aria-label="running">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
                 </span>
               ) : null}
-            </Button>
-          ))}
-        </div>
-      </div>
+            </span>
+          ),
+        }))}
+      />
       <p className="text-sm text-muted">
         {SECTIONS.find((item) => item.id === section)?.description}
       </p>
       <div
         id="momentum-section-panel"
         role="tabpanel"
-        aria-labelledby={`momentum-tab-${section}`}
+        aria-label={SECTIONS.find((item) => item.id === section)?.label}
         className="space-y-5"
       >
         {section === 'scores' ? (
@@ -788,7 +725,12 @@ export function MomentumBacktestingView() {
           <MomentumRebalanceView currentBroadConfig={dataset === 'broad' ? currentConfig : null} />
         ) : section === 'saved' ? (
           <div className="space-y-3">
-            <DatasetButtons dataset={dataset} onSelect={setDataset} />
+            <SegmentedControl
+              ariaLabel="Dataset"
+              value={dataset}
+              options={DATASET_OPTIONS}
+              onChange={setDataset}
+            />
             {savedRunError ? (
               <StateMessage
                 variant="error"
@@ -819,7 +761,12 @@ export function MomentumBacktestingView() {
           <>
             <div className="rounded-xl border border-border bg-surface p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <DatasetButtons dataset={dataset} onSelect={setDataset} />
+                <SegmentedControl
+                  ariaLabel="Dataset"
+                  value={dataset}
+                  options={DATASET_OPTIONS}
+                  onChange={setDataset}
+                />
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     size="sm"
@@ -1042,7 +989,7 @@ export function MomentumBacktestingView() {
                     className="inline-flex animate-fade-in items-center gap-2 rounded-full border border-positive/30 bg-surface px-4 py-2 text-sm text-foreground shadow-elevated transition-colors hover:border-positive/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <CheckCircle2 className="h-4 w-4 text-positive" />
-                    Results updated · took {(runInfo.durationMs / 1000).toFixed(1)}s
+                    Results updated · took {formatNumber(runInfo.durationMs / 1000, 1)}s
                     <span className="inline-flex items-center gap-1 font-medium text-primary">
                       View summary <ArrowUp className="h-3.5 w-3.5" />
                     </span>

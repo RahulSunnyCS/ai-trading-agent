@@ -5,16 +5,18 @@
  * Management style → tone:  hold → info · roll → warning · cut_reenter → accent.
  */
 
-import { Pencil, RefreshCw } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { useState } from 'react';
 
 import { usePersonalities } from '../hooks/usePersonalities';
+import { formatPct } from '../lib/format';
 import type { Personality } from '../types/trading';
 import { EditPersonalityDialog } from './EditPersonalityDialog';
 import { PendingSuggestionsCard } from './PendingSuggestionsCard';
 import { Badge, type Tone } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { RefreshButton } from './ui/RefreshButton';
 import { SkeletonRows } from './ui/Skeleton';
 import { StateMessage } from './ui/StateMessage';
 import { StatusDot } from './ui/StatusDot';
@@ -40,7 +42,7 @@ function managementLabel(style: string): string {
 function ParamsSummary({ params }: { params: Record<string, unknown> }) {
   const parts: string[] = [];
   if (typeof params.min_probability === 'number') {
-    parts.push(`min_prob: ${(params.min_probability * 100).toFixed(0)}%`);
+    parts.push(`min_prob: ${formatPct(params.min_probability, 0)}`);
   }
   if (typeof params.sl_pct === 'number') {
     parts.push(`sl: ${params.sl_pct}%`);
@@ -72,7 +74,11 @@ function PersonalitiesTable({ personalities, onEdit }: PersonalitiesTableProps) 
           <TRow key={p.id}>
             <Td>
               <div className="flex items-center gap-2">
-                <StatusDot tone={p.is_active ? 'positive' : 'neutral'} pulse={p.is_active} />
+                <StatusDot
+                  tone={p.is_active ? 'positive' : 'neutral'}
+                  pulse={p.is_active}
+                  label={p.is_active ? 'Active' : 'Inactive'}
+                />
                 {p.is_frozen && <Badge tone="neutral">Frozen</Badge>}
               </div>
             </Td>
@@ -138,10 +144,7 @@ export function PersonalitiesView() {
               Decision-engine configurations for the M2 engine — click Edit to tune
             </p>
           </div>
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <RefreshButton onClick={refresh} loading={loading} />
         </div>
 
         <div className="px-2 py-1">
