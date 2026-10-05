@@ -16,13 +16,20 @@ export interface TabItem<T extends string> {
 }
 
 interface TabsProps<T extends string> {
-  value: T;
+  /** The selected tab; null (only useful with `onCollapse`) selects none. */
+  value: T | null;
   items: ReadonlyArray<TabItem<T>>;
   onChange: (value: T) => void;
   ariaLabel: string;
   /** 'underline' for sections of a page; 'pill' for a compact bar inside a card. */
   variant?: 'underline' | 'pill';
   className?: string;
+  /**
+   * Makes the bar collapsible: pressing the selected tab again calls this, and the caller sets
+   * `value` to null. Tabs are then activated by click / Enter / Space only, not by focus, so
+   * tabbing past a collapsed bar does not open a panel.
+   */
+  onCollapse?: () => void;
   /** Tab panels, as <TabPanel value="…"> children. Omit when the caller renders the content. */
   children?: ReactNode;
 }
@@ -38,10 +45,15 @@ export function Tabs<T extends string>({
   ariaLabel,
   variant = 'underline',
   className,
+  onCollapse,
   children,
 }: TabsProps<T>) {
   return (
-    <RadixTabs.Root value={value} onValueChange={(next) => onChange(next as T)}>
+    <RadixTabs.Root
+      value={value ?? ''}
+      onValueChange={(next) => onChange(next as T)}
+      activationMode={onCollapse ? 'manual' : 'automatic'}
+    >
       <RadixTabs.List
         aria-label={ariaLabel}
         className={cn(
@@ -58,6 +70,20 @@ export function Tabs<T extends string>({
               value={item.value}
               disabled={item.disabled}
               title={item.title}
+              // Radix selects on mouse-down and ignores a press on the selected tab; a
+              // collapsible bar closes on it instead (preventDefault skips Radix's handler).
+              onMouseDown={(event) => {
+                if (!onCollapse || item.value !== value) return;
+                if (event.button !== 0 || event.ctrlKey) return;
+                event.preventDefault();
+                onCollapse();
+              }}
+              onKeyDown={(event) => {
+                if (!onCollapse || item.value !== value) return;
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                onCollapse();
+              }}
               className={cn(
                 'inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',

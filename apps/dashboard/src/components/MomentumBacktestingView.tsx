@@ -9,8 +9,13 @@ import {
   Clock,
   Link as LinkIcon,
   Loader2,
+  Maximize2,
+  Minimize2,
+  Play,
   RefreshCw,
   RotateCcw,
+  RotateCw,
+  SlidersHorizontal,
   X,
 } from 'lucide-react';
 import {
@@ -36,6 +41,7 @@ import {
 } from '../lib/momentumConfig';
 import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
 import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
+import { hydrateMomentumViewFromStorage, useMomentumViewStore } from '../store/momentumView';
 import {
   FULL_HISTORY_YEARS,
   getDefaultDateRangeYears,
@@ -65,6 +71,7 @@ import { MomentumSettingsSkeleton } from './momentum/MomentumSkeletons';
 import { MomentumWeeklyView } from './momentum/MomentumWeeklyView';
 import { MomentumRunBar } from './momentum/backtest/MomentumRunBar';
 import { MomentumSettingsChips } from './momentum/backtest/MomentumSettingsChips';
+import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { SegmentedControl, type SegmentedOption } from './ui/SegmentedControl';
 import { StateMessage } from './ui/StateMessage';
@@ -386,6 +393,10 @@ export function MomentumBacktestingView() {
   const [openSections, setOpenSections] = useState<
     Partial<Record<MomentumSettingsSection, boolean>>
   >({});
+  // Full-width results (from xl): the settings column is hidden and the chips row above the
+  // results stands in for it, with its own Run buttons. Remembered in this browser.
+  const resultsExpanded = useMomentumViewStore((state) => state.resultsExpanded);
+  const setResultsExpanded = useMomentumViewStore((state) => state.setResultsExpanded);
   const settingsBodyRef = useRef<HTMLDivElement>(null);
   const settingsColumnRef = useRef<HTMLElement>(null);
   const [starting, setStarting] = useState<'run' | 'fresh' | null>(null);
@@ -555,6 +566,7 @@ export function MomentumBacktestingView() {
 
   useEffect(() => {
     hydrateMomentumRuns();
+    hydrateMomentumViewFromStorage();
   }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadMeta is redefined every render; it should only re-run when the dataset itself changes
@@ -816,6 +828,8 @@ export function MomentumBacktestingView() {
   function openSection(id: MomentumSettingsSection): void {
     toggleSection(id, true);
     setSettingsOpen(true);
+    // The accordion lives in the settings column, so bring that back beside the results.
+    setResultsExpanded(false);
     setRevealSection((current) => ({ id, tick: (current?.tick ?? 0) + 1 }));
   }
   useEffect(() => {
@@ -838,7 +852,8 @@ export function MomentumBacktestingView() {
   // stuck under the top bar. CSS alone can only express the stuck case.
   const settingsShown = section === 'backtest' && meta !== null && !loading;
   useEffect(() => {
-    if (!settingsShown) return;
+    // Hidden in full-width results; measured again when the column comes back.
+    if (!settingsShown || resultsExpanded) return;
     const node = settingsColumnRef.current;
     if (!node) return;
     let frame = 0;
@@ -858,7 +873,7 @@ export function MomentumBacktestingView() {
       window.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
     };
-  }, [settingsShown]);
+  }, [settingsShown, resultsExpanded]);
 
   const resultEnd = result?.series.dates.at(-1);
   const datasetLabel = DATASETS.find((item) => item.id === dataset)?.label ?? 'Momentum';
@@ -1011,19 +1026,31 @@ export function MomentumBacktestingView() {
 
             {/* Two panes from xl: settings on the left in their own scroll, results on the right,
                 so a setting and what it does to the result are on screen together. */}
-            <div className="grid gap-5 xl:grid-cols-[26.5rem_minmax(0,1fr)] xl:items-start 2xl:grid-cols-[28.5rem_minmax(0,1fr)]">
+            <div
+              className={cn(
+                'grid gap-5 xl:items-start',
+                !resultsExpanded &&
+                  'xl:grid-cols-[26.5rem_minmax(0,1fr)] 2xl:grid-cols-[28.5rem_minmax(0,1fr)]',
+              )}
+            >
               {loading || !meta ? (
                 error ? (
-                  <div className="hidden xl:block" />
+                  <div className={cn('hidden', !resultsExpanded && 'xl:block')} />
                 ) : (
-                  <MomentumSettingsSkeleton />
+                  <div className={cn(resultsExpanded && 'xl:hidden')}>
+                    <MomentumSettingsSkeleton />
+                  </div>
                 )
               ) : (
                 <section
                   ref={settingsColumnRef}
                   aria-label="Strategy settings"
                   onKeyDown={onSettingsKeyDown}
-                  className="rounded-xl border border-border bg-surface xl:sticky xl:top-[4.5rem] xl:flex xl:max-h-[calc(100vh-var(--settings-top,4.5rem)-1rem)] xl:min-h-[20rem] xl:flex-col"
+                  className={cn(
+                    'rounded-xl border border-border bg-surface xl:sticky xl:top-[4.5rem] xl:max-h-[calc(100vh-var(--settings-top,4.5rem)-1rem)] xl:min-h-[20rem] xl:flex-col',
+                    // Hidden, not unmounted, in full-width results: edits and open accordions stay.
+                    resultsExpanded ? 'xl:hidden' : 'xl:flex',
+                  )}
                 >
                   <div className="flex items-center gap-2 px-4 py-3">
                     <div className="min-w-0 flex-1">
@@ -1106,12 +1133,83 @@ export function MomentumBacktestingView() {
 
               <div className="min-w-0 space-y-4">
                 {meta && !loading ? (
-                  <MomentumSettingsChips
-                    datasetLabel={datasetLabel}
-                    chips={described.chips}
-                    pricesThrough={meta.last_week}
-                    onOpenSection={openSection}
-                  />
+                  <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+                    <div className="min-w-0 flex-1">
+                      <MomentumSettingsChips
+                        datasetLabel={datasetLabel}
+                        chips={described.chips}
+                        pricesThrough={meta.last_week}
+                        onOpenSection={openSection}
+                      />
+                    </div>
+                    {/* The settings column's stand-in while the results are full width. */}
+                    {resultsExpanded ? (
+                      <div className="hidden shrink-0 flex-wrap items-center gap-2 xl:flex">
+                        {dirty ? <Badge tone="warning">Changed since last run</Badge> : null}
+                        <Button
+                          size="sm"
+                          onClick={() => setResultsExpanded(false)}
+                          title="Show the settings beside the results"
+                        >
+                          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                          Settings
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          loading={starting === 'run'}
+                          disabled={starting !== null}
+                          onClick={() => void runBacktest({ fresh: false })}
+                          title="Run the backtest with these settings"
+                        >
+                          {starting === 'run' ? null : (
+                            <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                          )}
+                          {dirty && lastRunConfig !== null ? 'Run again' : 'Run'}
+                        </Button>
+                        <Button
+                          size="icon"
+                          loading={starting === 'fresh'}
+                          disabled={starting !== null}
+                          onClick={() => void runBacktest({ fresh: true })}
+                          aria-label="Re-run fresh"
+                          title="Re-run from scratch: drops the server's cached rankings and data, reloads them, then recomputes. Slower; use it when the numbers look stale."
+                        >
+                          <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    ) : null}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="hidden xl:inline-flex"
+                      aria-pressed={resultsExpanded}
+                      onClick={() => setResultsExpanded(!resultsExpanded)}
+                      aria-label={
+                        resultsExpanded ? 'Show settings beside results' : 'Full-width results'
+                      }
+                      title={
+                        resultsExpanded ? 'Show settings beside results' : 'Full-width results'
+                      }
+                    >
+                      {resultsExpanded ? (
+                        <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </Button>
+                  </div>
+                ) : null}
+
+                {/* The run bar that normally reports a failed run is in the hidden column. */}
+                {resultsExpanded && runError ? (
+                  <div
+                    role="alert"
+                    className="hidden rounded-lg border border-negative/30 bg-negative/10 px-3 py-2 text-sm text-negative xl:block"
+                  >
+                    <p className="font-medium">The run didn&apos;t finish</p>
+                    <p className="mt-0.5 text-foreground/80">{runError}</p>
+                  </div>
                 ) : null}
 
                 {runs.length > 0 ? (
