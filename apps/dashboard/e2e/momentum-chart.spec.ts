@@ -100,7 +100,22 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
 
   const chart = page.getByRole('img', { name: /Strategy, benchmark and cash values/ });
   await expect(chart.locator('.main-svg').first()).toBeVisible();
-  await expect(chart.getByText('Strategy', { exact: true }).first()).toBeVisible();
+  // The legend is our own header above the plot: one toggle per line, with its value.
+  const strategy = page
+    .getByRole('group', { name: 'Chart series' })
+    .getByRole('button', { name: /^Strategy/ });
+  await expect(strategy).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('region', { name: 'Week readout' })).toContainText(
+    'Week of 19 Jan 2024',
+  );
+  await expect(page.getByRole('button', { name: /Week changes/ })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await expect(page.getByRole('button', { name: 'Show drawdown & 52-week edge' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
 
   const zoom = page.getByRole('button', { name: 'Touchpad zoom off' });
   await expect(zoom).toHaveAttribute('aria-pressed', 'false');

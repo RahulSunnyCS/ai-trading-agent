@@ -3,10 +3,15 @@ import { describe, expect, it } from 'vitest';
 import {
   countVisibleWeeks,
   differenceByKey,
+  drawdownStats,
+  fitNames,
+  fittedNamesText,
   heatLevel,
   isInactiveSignalAction,
   isRealRotation,
+  latestValue,
   longestHeldAssets,
+  longestUnderwater,
   lookbackKeys,
   lookbackLabel,
   monthlyReturns,
@@ -14,9 +19,15 @@ import {
   rangeStartIndex,
   rebaseFactor,
   rebaseSeries,
+  rotationOnOrBefore,
+  rotationSymbol,
   signalActionTone,
   sliceSeries,
   thinRotations,
+  weekChangeCounts,
+  weekReturn,
+  weekSummary,
+  weekSummaryText,
   yearlyFromMonthly,
 } from '../momentumResult';
 
@@ -221,5 +232,196 @@ describe('signal actions', () => {
     expect(lookbackKeys([{ returns: { ytd: 1, '4': 1 } }])).toEqual(['4', 'ytd']);
     expect(lookbackLabel('13')).toBe('13w');
     expect(lookbackLabel('ytd')).toBe('ytd');
+  });
+});
+
+describe('fitNames', () => {
+  const names = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'];
+
+  it('shows every name when they fit', () => {
+    // 5 + 5 + 7 + 5 + 4 letters and four ", " separators = 34 characters.
+    expect(fitNames(names, 34)).toEqual({ shown: names, more: 0 });
+    expect(fitNames([], 10)).toEqual({ shown: [], more: 0 });
+  });
+
+  it('keeps room for "+N more" when it cuts the list', () => {
+    // "Alpha, Bravo" is 12; with the 10 kept free for "+N more" that needs 22.
+    expect(fitNames(names, 22)).toEqual({ shown: ['Alpha', 'Bravo'], more: 3 });
+    expect(fitNames(names, 21)).toEqual({ shown: ['Alpha'], more: 4 });
+    expect(fittedNamesText(fitNames(names, 22))).toBe('Alpha, Bravo +3 more');
+  });
+
+  it('always shows the first name, even over budget', () => {
+    expect(fitNames(names, 0)).toEqual({ shown: ['Alpha'], more: 4 });
+    expect(fitNames(['A very long instrument name'], 3)).toEqual({
+      shown: ['A very long instrument name'],
+      more: 0,
+    });
+  });
+
+  it('cuts to "+1 more" when the last name does not fit', () => {
+    const fitted = fitNames(['Alpha', 'Bravo'], 8);
+    expect(fitted).toEqual({ shown: ['Alpha'], more: 1 });
+  });
+});
+
+describe('weekSummary', () => {
+  const rotation = {
+    outs: [{ asset: 'Old One' }, { asset: 'Old Two' }],
+    ins: [
+      { asset: 'New One', top_up: false },
+      { asset: 'Topped', top_up: true },
+    ],
+    trims: [{ asset: 'Big' }],
+    parked: false,
+  };
+
+  it('describes a rotation week', () => {
+    const summary = weekSummary(rotation, 5, 200);
+    expect(summary.kind).toBe('rotation');
+    expect(summary.inCount).toBe(1);
+    expect(summary.outCount).toBe(2);
+    expect(summary.toppedUp).toBe(1);
+    expect(summary.trimmed).toBe(1);
+    expect(weekSummaryText(summary)).toBe(
+      '▲ 1 in New One · ▼ 2 out Old One, Old Two · 1 topped up · 1 trimmed · Held 5',
+    );
+    expect(weekChangeCounts(summary)).toBe('1 in · 2 out · 1 topped up · 1 trimmed');
+  });
+
+  it('truncates entry and exit names to one shared budget', () => {
+    const many = {
+      outs: Array.from({ length: 10 }, (_, i) => ({ asset: `Exit Name ${i}` })),
+      ins: Array.from({ length: 8 }, (_, i) => ({ asset: `Entry Name ${i}` })),
+      trims: [],
+      parked: false,
+    };
+    const summary = weekSummary(many, 20, 60);
+    expect(summary.inCount).toBe(8);
+    expect(summary.outCount).toBe(10);
+    expect(summary.ins.shown.length + summary.ins.more).toBe(8);
+    expect(summary.outs.shown.length + summary.outs.more).toBe(10);
+    expect(fittedNamesText(summary.ins).length).toBeLessThanOrEqual(30);
+    // What the entries leave unused goes to the exits; together they stay inside the budget.
+    expect(
+      fittedNamesText(summary.ins).length + fittedNamesText(summary.outs).length,
+    ).toBeLessThanOrEqual(60);
+    expect(summary.ins.more).toBeGreaterThan(0);
+  });
+
+  it('gives one side the room the other does not use', () => {
+    const lopsided = {
+      outs: [{ asset: 'X' }],
+      ins: Array.from({ length: 6 }, (_, i) => ({ asset: `Entry ${i}` })),
+      trims: [],
+      parked: false,
+    };
+    // Six names of 7 characters and five separators = 52; the exit needs 1 of the 60.
+    expect(weekSummary(lopsided, 6, 60).ins.more).toBe(0);
+  });
+
+  it('reads "No change" for a week without a rotation', () => {
+    const summary = weekSummary(undefined, 5, 80);
+    expect(summary.kind).toBe('none');
+    expect(weekSummaryText(summary)).toBe('No change · Held 5');
+    expect(weekChangeCounts(summary)).toBe('No change');
+    expect(weekSummaryText(weekSummary(null, null, 80))).toBe('No change');
+  });
+
+  it('says so when the week is parked in the liquid fund', () => {
+    const parked = { outs: [{ asset: 'Old One' }], ins: [], trims: [], parked: true };
+    const summary = weekSummary(parked, 0, 80);
+    expect(summary.kind).toBe('parked');
+    expect(weekSummaryText(summary)).toBe('▼ 1 out Old One · Parked in the liquid fund');
+    // Still parked in a later week with no trades: nothing is held.
+    expect(weekSummaryText(weekSummary(undefined, 0, 80))).toBe('Parked in the liquid fund');
+  });
+});
+
+describe('rotationSymbol', () => {
+  const base = { outs: [], ins: [], trims: [], parked: false };
+  it('picks the marker by what happened', () => {
+    expect(rotationSymbol({ ...base, ins: [{ top_up: false }] })).toBe('triangle-up');
+    expect(rotationSymbol({ ...base, outs: [{}] })).toBe('triangle-down');
+    expect(rotationSymbol({ ...base, outs: [{}], ins: [{ top_up: false }] })).toBe('diamond');
+    expect(rotationSymbol({ ...base, ins: [{ top_up: true }] })).toBe('circle');
+    expect(rotationSymbol({ ...base, parked: true })).toBe('circle');
+    expect(rotationSymbol({ ...base, outs: [{}], ins: [{ top_up: true }] })).toBe('triangle-down');
+  });
+});
+
+describe('weekReturn and rotationOnOrBefore', () => {
+  it('measures a week against the one before', () => {
+    expect(weekReturn([100, 110, 99], 1)).toBeCloseTo(0.1);
+    expect(weekReturn([100, 110, 99], 2)).toBeCloseTo(-0.1);
+    expect(weekReturn([100, 110], 0)).toBeNull();
+    expect(weekReturn([null, 110], 1)).toBeNull();
+    expect(weekReturn([100, null], 1)).toBeNull();
+  });
+
+  it('finds the last rotation on or before a day', () => {
+    const rotations = [{ week: '2026-01-02' }, { week: '2026-01-16T00:00:00' }];
+    expect(rotationOnOrBefore(rotations, '2026-01-01')).toBeNull();
+    expect(rotationOnOrBefore(rotations, '2026-01-09')?.week).toBe('2026-01-02');
+    expect(rotationOnOrBefore(rotations, '2026-01-16')?.week).toBe('2026-01-16T00:00:00');
+    expect(rotationOnOrBefore(rotations, '2026-03-01')?.week).toBe('2026-01-16T00:00:00');
+  });
+});
+
+describe('longestUnderwater', () => {
+  const dates = weeks(10);
+
+  it('is null when the strategy never fell below a peak', () => {
+    expect(longestUnderwater(dates, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])).toBeNull();
+    expect(longestUnderwater([], [])).toBeNull();
+  });
+
+  it('counts the weeks from a peak to the week it is regained', () => {
+    //                 peak            recovered   peak        recovered
+    const drawdown = [0, -0.1, -0.2, -0.05, 0, 0, -0.1, 0, 0, 0];
+    expect(longestUnderwater(dates, drawdown)).toEqual({
+      weeks: 4,
+      from: dates[0],
+      to: dates[4],
+      ongoing: false,
+    });
+  });
+
+  it('reports a spell that has not recovered by the last week', () => {
+    const drawdown = [0, -0.1, 0, 0, -0.1, -0.2, -0.3, -0.2, -0.1, -0.05];
+    expect(longestUnderwater(dates, drawdown)).toEqual({
+      weeks: 6,
+      from: dates[3],
+      to: dates[9],
+      ongoing: true,
+    });
+  });
+
+  it('treats a missing value as at the peak', () => {
+    const drawdown = [null, -0.1, -0.1, 0, 0, 0, 0, 0, 0, 0];
+    expect(longestUnderwater(dates, drawdown)?.weeks).toBe(3);
+  });
+
+  it('feeds drawdownStats with the trough and the current drawdown', () => {
+    const drawdown = [0, -0.1, -0.25, -0.05, 0, 0, -0.1, 0, -0.02, -0.04];
+    const stats = drawdownStats(dates, drawdown);
+    expect(stats.max).toBe(-0.25);
+    expect(stats.troughDate).toBe(dates[2]);
+    expect(stats.current).toBe(-0.04);
+    expect(stats.underwater?.weeks).toBe(4);
+    expect(drawdownStats([], [])).toEqual({
+      max: null,
+      troughDate: null,
+      current: null,
+      underwater: null,
+    });
+  });
+});
+
+describe('latestValue', () => {
+  it('skips trailing gaps', () => {
+    const dates = weeks(4);
+    expect(latestValue(dates, [null, 0.1, 0.2, null])).toEqual({ value: 0.2, date: dates[2] });
+    expect(latestValue(dates, [null, null, null, null])).toBeNull();
   });
 });

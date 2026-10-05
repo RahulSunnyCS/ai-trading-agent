@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { NumberField, parseDraft, settleDraft } from '../Input';
 import { SegmentedControl, nextEnabled } from '../SegmentedControl';
+import { TabPanel, Tabs } from '../Tabs';
 
 afterEach(cleanup);
 
@@ -113,5 +114,53 @@ describe('SegmentedControl keyboard', () => {
     expect(a.getAttribute('aria-checked')).toBe('true');
     fireEvent.keyDown(a, { key: 'ArrowLeft' });
     expect(c.getAttribute('aria-checked')).toBe('true');
+  });
+});
+
+describe('Tabs with onCollapse', () => {
+  function Harness() {
+    const [value, setValue] = useState<'a' | 'b' | null>(null);
+    return (
+      <Tabs
+        ariaLabel="Details"
+        value={value}
+        onChange={setValue}
+        onCollapse={() => setValue(null)}
+        items={[
+          { value: 'a', label: 'Alpha' },
+          { value: 'b', label: 'Bravo' },
+        ]}
+      >
+        {value === null ? null : <TabPanel value={value}>Panel {value}</TabPanel>}
+      </Tabs>
+    );
+  }
+
+  it('starts with no tab selected, opens on a press and closes on a second press', () => {
+    render(<Harness />);
+    const alpha = screen.getByRole('tab', { name: 'Alpha' });
+    expect(alpha.getAttribute('aria-selected')).toBe('false');
+    expect(screen.queryByText('Panel a')).toBeNull();
+
+    fireEvent.mouseDown(alpha, { button: 0 });
+    expect(alpha.getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByText('Panel a')).toBeTruthy();
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Bravo' }), { button: 0 });
+    expect(screen.getByText('Panel b')).toBeTruthy();
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Bravo' }), { button: 0 });
+    expect(screen.queryByText('Panel b')).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Bravo' }).getAttribute('aria-selected')).toBe('false');
+  });
+
+  it('does not open a panel when a tab only receives focus', () => {
+    render(<Harness />);
+    fireEvent.focus(screen.getByRole('tab', { name: 'Alpha' }));
+    expect(screen.queryByText('Panel a')).toBeNull();
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Alpha' }), { key: 'Enter' });
+    expect(screen.getByText('Panel a')).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Alpha' }), { key: 'Enter' });
+    expect(screen.queryByText('Panel a')).toBeNull();
   });
 });

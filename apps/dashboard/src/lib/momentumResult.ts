@@ -138,6 +138,254 @@ export function countVisibleWeeks(
   return count;
 }
 
+/** Plotly marker symbols for a rotation: entries only, exits only, both, or neither. */
+export type RotationSymbol = 'triangle-up' | 'triangle-down' | 'diamond' | 'circle';
+
+/**
+ * What a week's marker looks like. An entry is a NEW name (a top-up of a name already held is
+ * not one); a week with only top-ups, trims or a park gets the plain circle.
+ */
+export function rotationSymbol(rotation: RotationLike): RotationSymbol {
+  const entered = rotation.ins.some((row) => !row.top_up);
+  const exited = rotation.outs.length > 0;
+  if (entered && exited) return 'diamond';
+  if (entered) return 'triangle-up';
+  if (exited) return 'triangle-down';
+  return 'circle';
+}
+
+// ---------------------------------------------------------------------------
+// Equity chart: the week line above the plot
+// ---------------------------------------------------------------------------
+
+export interface FittedNames {
+  shown: string[];
+  /** How many names were left out ("+3 more"). */
+  more: number;
+}
+
+/** "+12 more" plus its separator: what a truncated list keeps free. */
+const MORE_RESERVE = 10;
+
+/**
+ * As many leading names as fit in `budget` characters when joined with ", ". When some are
+ * left out, room for " +N more" is kept free. The first name is always shown, however long.
+ */
+export function fitNames(names: ReadonlyArray<string>, budget: number): FittedNames {
+  const joined = (count: number): number =>
+    names.slice(0, count).reduce((sum, name) => sum + name.length, 0) + Math.max(count - 1, 0) * 2;
+  if (names.length === 0) return { shown: [], more: 0 };
+  if (joined(names.length) <= budget) return { shown: [...names], more: 0 };
+  let count = 1;
+  while (count < names.length - 1 && joined(count + 1) + MORE_RESERVE <= budget) count += 1;
+  return { shown: names.slice(0, count), more: names.length - count };
+}
+
+/** "A, B +3 more"; empty when there are no names. */
+export function fittedNamesText(fitted: FittedNames): string {
+  const names = fitted.shown.join(', ');
+  return fitted.more > 0 ? `${names} +${fitted.more} more` : names;
+}
+
+interface WeekRotationLike {
+  outs: ReadonlyArray<{ asset: string }>;
+  ins: ReadonlyArray<{ asset: string; top_up?: boolean }>;
+  trims: ReadonlyArray<unknown>;
+  parked: boolean;
+}
+
+export interface WeekSummary {
+  /** 'parked' = everything in the liquid fund; 'none' = nothing was traded. */
+  kind: 'rotation' | 'none' | 'parked';
+  /** New names bought (top-ups are counted in `toppedUp`). */
+  inCount: number;
+  ins: FittedNames;
+  outCount: number;
+  outs: FittedNames;
+  toppedUp: number;
+  trimmed: number;
+  held: number | null;
+}
+
+/**
+ * One week in words. `budget` is the characters available for entry and exit names together:
+ * each side gets half, and what one side does not use goes to the other.
+ */
+export function weekSummary(
+  rotation: WeekRotationLike | null | undefined,
+  held: number | null | undefined,
+  budget: number,
+): WeekSummary {
+  const heldCount = typeof held === 'number' && Number.isFinite(held) ? held : null;
+  const inNames = (rotation?.ins ?? []).filter((row) => !row.top_up).map((row) => row.asset);
+  const outNames = (rotation?.outs ?? []).map((row) => row.asset);
+  const toppedUp = (rotation?.ins ?? []).length - inNames.length;
+  const trimmed = rotation?.trims.length ?? 0;
+  const half = Math.floor(Math.max(budget, 0) / 2);
+  const length = (names: string[]): number =>
+    names.reduce((sum, name) => sum + name.length, 0) + Math.max(names.length - 1, 0) * 2;
+  const inBudget = Math.max(half, budget - length(outNames));
+  const ins = fitNames(inNames, inBudget);
+  const outs = fitNames(outNames, Math.max(half, budget - fittedNamesText(ins).length));
+  const parked = Boolean(rotation?.parked) || heldCount === 0;
+  const changed = inNames.length + outNames.length + toppedUp + trimmed > 0;
+  return {
+    kind: parked ? 'parked' : changed ? 'rotation' : 'none',
+    inCount: inNames.length,
+    ins,
+    outCount: outNames.length,
+    outs,
+    toppedUp,
+    trimmed,
+    held: heldCount,
+  };
+}
+
+/** The counts of a week's changes: "8 in · 10 out · 2 trimmed"; "No change" when there are none. */
+export function weekChangeCounts(summary: WeekSummary): string {
+  const parts = [
+    summary.inCount > 0 ? `${summary.inCount} in` : null,
+    summary.outCount > 0 ? `${summary.outCount} out` : null,
+    summary.toppedUp > 0 ? `${summary.toppedUp} topped up` : null,
+    summary.trimmed > 0 ? `${summary.trimmed} trimmed` : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length ? parts.join(' · ') : 'No change';
+}
+
+/**
+ * The week line as plain text (the visible line is built from the same summary):
+ * "▲ 2 in A, B · ▼ 1 out C · Held 5", "No change · Held 5", "Parked in the liquid fund".
+ */
+export function weekSummaryText(summary: WeekSummary): string {
+  const parts: string[] = [];
+  if (summary.inCount > 0) parts.push(`▲ ${summary.inCount} in ${fittedNamesText(summary.ins)}`);
+  if (summary.outCount > 0) {
+    parts.push(`▼ ${summary.outCount} out ${fittedNamesText(summary.outs)}`);
+  }
+  if (summary.toppedUp > 0) parts.push(`${summary.toppedUp} topped up`);
+  if (summary.trimmed > 0) parts.push(`${summary.trimmed} trimmed`);
+  if (summary.kind === 'parked') parts.push('Parked in the liquid fund');
+  else {
+    if (parts.length === 0) parts.push('No change');
+    if (summary.held !== null) parts.push(`Held ${summary.held}`);
+  }
+  return parts.join(' · ');
+}
+
+/** The return of week `index` over the week before it; null at the first week or on a gap. */
+export function weekReturn(values: Series, index: number): number | null {
+  const now = values[index];
+  const before = values[index - 1];
+  if (typeof now !== 'number' || typeof before !== 'number' || before <= 0) return null;
+  return now / before - 1;
+}
+
+/** The last rotation on or before `day` (rotations oldest first), for "what is held now". */
+export function rotationOnOrBefore<T extends { week: string }>(
+  rotations: ReadonlyArray<T>,
+  day: string,
+): T | null {
+  let found: T | null = null;
+  for (const rotation of rotations) {
+    if (rotation.week.slice(0, 10) > day.slice(0, 10)) break;
+    found = rotation;
+  }
+  return found;
+}
+
+// ---------------------------------------------------------------------------
+// Drawdown stats
+// ---------------------------------------------------------------------------
+
+export interface UnderwaterSpell {
+  /** Weeks from the peak to the week that peak was regained (or to the last week, if not yet). */
+  weeks: number;
+  /** The peak week. */
+  from: string;
+  /** The recovery week, or the last week when `ongoing`. */
+  to: string;
+  ongoing: boolean;
+}
+
+/** A drawdown this close to zero counts as "at the peak" (float noise). */
+const AT_PEAK = -1e-9;
+
+/**
+ * The longest stretch the strategy spent below a previous peak, from a drawdown series
+ * (0 at a peak, negative below it). Null when it was never under water. A missing value
+ * counts as at the peak. If the series starts under water, the spell starts at its first week.
+ */
+export function longestUnderwater(
+  dates: ReadonlyArray<string>,
+  drawdown: Series,
+): UnderwaterSpell | null {
+  let best: UnderwaterSpell | null = null;
+  let peak = 0;
+  let under = false;
+  const close = (end: number, ongoing: boolean): void => {
+    const from = dates[peak];
+    const to = dates[end];
+    if (from === undefined || to === undefined) return;
+    if (best === null || end - peak > best.weeks) {
+      best = { weeks: end - peak, from: from.slice(0, 10), to: to.slice(0, 10), ongoing };
+    }
+  };
+  const count = Math.min(dates.length, drawdown.length);
+  for (let i = 0; i < count; i += 1) {
+    const value = drawdown[i];
+    const below = typeof value === 'number' && value < AT_PEAK;
+    if (below) under = true;
+    else {
+      if (under) close(i, false);
+      under = false;
+      peak = i;
+    }
+  }
+  if (under && count > 0) close(count - 1, true);
+  return best;
+}
+
+export interface DrawdownStats {
+  /** The deepest drawdown (≤ 0) and the week it bottomed; null when there is no data. */
+  max: number | null;
+  troughDate: string | null;
+  /** The last week's drawdown. */
+  current: number | null;
+  underwater: UnderwaterSpell | null;
+}
+
+export function drawdownStats(dates: ReadonlyArray<string>, drawdown: Series): DrawdownStats {
+  let max: number | null = null;
+  let troughDate: string | null = null;
+  let current: number | null = null;
+  const count = Math.min(dates.length, drawdown.length);
+  for (let i = 0; i < count; i += 1) {
+    const value = drawdown[i];
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    current = value;
+    if (max === null || value < max) {
+      max = value;
+      troughDate = dates[i]?.slice(0, 10) ?? null;
+    }
+  }
+  return { max, troughDate, current, underwater: longestUnderwater(dates, drawdown) };
+}
+
+/** The last usable value of a series and its date; null when there is none. */
+export function latestValue(
+  dates: ReadonlyArray<string>,
+  values: Series,
+): { value: number; date: string } | null {
+  for (let i = Math.min(dates.length, values.length) - 1; i >= 0; i -= 1) {
+    const value = values[i];
+    const date = dates[i];
+    if (typeof value === 'number' && Number.isFinite(value) && date !== undefined) {
+      return { value, date: date.slice(0, 10) };
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Monthly heatmap
 // ---------------------------------------------------------------------------
