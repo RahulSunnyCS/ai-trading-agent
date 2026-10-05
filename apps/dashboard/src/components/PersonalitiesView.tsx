@@ -1,150 +1,103 @@
 /**
- * PersonalitiesView — the personality engine config table from GET /api/personalities,
- * plus an "approval inbox" for evolution suggestions and a per-row Edit dialog.
- *
- * Management style → tone:  hold → info · roll → warning · cut_reenter → accent.
+ * PersonalitiesView — every trading personality (GET /api/personalities?include_inactive=true,
+ * filtered client-side by the Active / Include paused toggle), its recent performance joined
+ * from the latest-100 trades window (lib/personalities.ts), expandable full parameters, the
+ * suggestions inbox and the Edit dialog.
  */
 
-import { Pencil } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
+import { TRADES_WINDOW_CAPTION, usePaperTrades } from '../hooks/usePaperTrades';
 import { usePersonalities } from '../hooks/usePersonalities';
-import { formatPct } from '../lib/format';
+import { formatInt } from '../lib/format';
+import {
+  type PersonalitySort,
+  type PersonalitySortKey,
+  joinPerformance,
+  nextSort,
+  sortPersonalities,
+  visiblePersonalities,
+} from '../lib/personalities';
 import type { Personality } from '../types/trading';
 import { EditPersonalityDialog } from './EditPersonalityDialog';
 import { PendingSuggestionsCard } from './PendingSuggestionsCard';
-import { Badge, type Tone } from './ui/Badge';
-import { Button } from './ui/Button';
+import { PersonalitiesTable } from './personalities/PersonalitiesTable';
 import { Card } from './ui/Card';
 import { RefreshButton } from './ui/RefreshButton';
+import { SegmentedControl } from './ui/SegmentedControl';
 import { SkeletonRows } from './ui/Skeleton';
 import { StateMessage } from './ui/StateMessage';
-import { StatusDot } from './ui/StatusDot';
-import { THead, TRow, Table, Td, Th } from './ui/Table';
 
-function managementTone(style: string): Tone {
-  switch (style) {
-    case 'hold':
-      return 'info';
-    case 'roll':
-      return 'warning';
-    case 'cut_reenter':
-      return 'accent';
-    default:
-      return 'neutral';
-  }
-}
-
-function managementLabel(style: string): string {
-  return style === 'cut_reenter' ? 'Cut+Re-enter' : style.charAt(0).toUpperCase() + style.slice(1);
-}
-
-function ParamsSummary({ params }: { params: Record<string, unknown> }) {
-  const parts: string[] = [];
-  if (typeof params.min_probability === 'number') {
-    parts.push(`min_prob: ${formatPct(params.min_probability, 0)}`);
-  }
-  if (typeof params.sl_pct === 'number') {
-    parts.push(`sl: ${params.sl_pct}%`);
-  }
-  if (parts.length === 0) return <span className="text-xs text-faint">—</span>;
-  return <span className="text-xs tabular-nums text-muted">{parts.join(' · ')}</span>;
-}
-
-interface PersonalitiesTableProps {
-  personalities: Personality[];
-  onEdit: (p: Personality) => void;
-}
-
-function PersonalitiesTable({ personalities, onEdit }: PersonalitiesTableProps) {
-  return (
-    <Table>
-      <THead>
-        <Th>Status</Th>
-        <Th>Name</Th>
-        <Th>Group</Th>
-        <Th>Entry Type</Th>
-        <Th>Management</Th>
-        <Th align="right">Phase</Th>
-        <Th>Key Params</Th>
-        <Th>{''}</Th>
-      </THead>
-      <tbody>
-        {personalities.map((p) => (
-          <TRow key={p.id}>
-            <Td>
-              <div className="flex items-center gap-2">
-                <StatusDot
-                  tone={p.is_active ? 'positive' : 'neutral'}
-                  pulse={p.is_active}
-                  label={p.is_active ? 'Active' : 'Inactive'}
-                />
-                {p.is_frozen && <Badge tone="neutral">Frozen</Badge>}
-              </div>
-            </Td>
-            <Td>
-              <span className="font-medium text-foreground">{p.display_name}</span>
-              <span className="ml-1.5 text-xs text-faint">{p.name}</span>
-            </Td>
-            <Td className="capitalize text-muted">{p.group_type}</Td>
-            <Td className="text-muted">{p.entry_type.replace(/_/g, ' ')}</Td>
-            <Td>
-              <Badge tone={managementTone(p.management_style)}>
-                {managementLabel(p.management_style)}
-              </Badge>
-            </Td>
-            <Td numeric align="right" className="text-muted">
-              {p.phase}
-            </Td>
-            <Td>
-              <ParamsSummary params={p.params} />
-            </Td>
-            <Td align="right">
-              {/* Frozen personalities (Clockwork) reject any param edit at the
-                  API layer with 403 FROZEN_VIOLATION; disable the button so
-                  the operator never wastes a click. */}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onEdit(p)}
-                disabled={p.is_frozen}
-                title={p.is_frozen ? 'Frozen — parameters immutable' : 'Edit parameters'}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit
-              </Button>
-            </Td>
-          </TRow>
-        ))}
-      </tbody>
-    </Table>
-  );
-}
+type Scope = 'active' | 'all';
 
 export function PersonalitiesView() {
-  const { personalities, loading, error, refresh } = usePersonalities();
+  // Always fetch every personality: the toggle filters client-side, and the suggestions inbox
+  // and the integrity check need the paused ones too.
+  const { personalities, loading, error, refresh } = usePersonalities(true);
+  const { trades, error: tradesError } = usePaperTrades();
+
+  const [scope, setScope] = useState<Scope>('active');
+  const [sort, setSort] = useState<PersonalitySort | null>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  // The personality being edited; null = dialog closed.
+  const [editing, setEditing] = useState<Personality | null>(null);
+
+  const performance = useMemo(
+    () => joinPerformance(personalities, trades),
+    [personalities, trades],
+  );
+  const rows = useMemo(
+    () =>
+      sortPersonalities(
+        visiblePersonalities(personalities, scope === 'all'),
+        sort,
+        performance.byId,
+      ),
+    [personalities, scope, sort, performance],
+  );
+  const pausedCount = personalities.filter((p) => !p.is_active).length;
   const hasData = personalities.length > 0;
 
-  // Tracks which personality (if any) is being edited via the dialog.
-  // `null` = dialog closed.
-  const [editing, setEditing] = useState<Personality | null>(null);
+  function toggle(id: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-4">
-      {/* Approval inbox — only meaningful once paper trades exist; gracefully empty otherwise. */}
       <PendingSuggestionsCard personalities={personalities} onApplied={refresh} />
 
       <Card flush>
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
             <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Trading Personalities
+              Trading personalities
             </h2>
             <p className="mt-0.5 text-sm text-muted">
-              Decision-engine configurations for the M2 engine — click Edit to tune
+              How each personality picks and manages trades, and how it has done recently. Click a
+              row for all of its settings.
             </p>
           </div>
-          <RefreshButton onClick={refresh} loading={loading} />
+          <div className="flex items-center gap-2">
+            <SegmentedControl<Scope>
+              ariaLabel="Which personalities to show"
+              size="sm"
+              value={scope}
+              onChange={setScope}
+              options={[
+                { value: 'active', label: 'Active' },
+                {
+                  value: 'all',
+                  label: `Include paused${pausedCount > 0 ? ` (${formatInt(pausedCount)})` : ''}`,
+                },
+              ]}
+            />
+            <RefreshButton onClick={refresh} loading={loading} />
+          </div>
         </div>
 
         <div className="px-2 py-1">
@@ -152,7 +105,7 @@ export function PersonalitiesView() {
           {error !== null && (
             <StateMessage
               variant="error"
-              title="Couldn't load personalities — retrying…"
+              title="Couldn't load personalities"
               description={error}
               className="m-3"
             />
@@ -161,18 +114,46 @@ export function PersonalitiesView() {
             <StateMessage
               variant="empty"
               title="No personalities found"
-              description="Personality configs appear once the M2 seed migration has run."
+              description="They appear once the database has been set up with its starting personalities."
             />
           )}
-          {hasData && <PersonalitiesTable personalities={personalities} onEdit={setEditing} />}
+          {hasData && rows.length === 0 && (
+            <StateMessage
+              variant="empty"
+              title="No active personalities"
+              description="Every personality is paused. Choose Include paused to see them."
+            />
+          )}
+          {rows.length > 0 && (
+            <PersonalitiesTable
+              personalities={rows}
+              performance={performance.byId}
+              sort={sort}
+              onSort={(key: PersonalitySortKey) => setSort((current) => nextSort(current, key))}
+              expanded={expanded}
+              onToggle={toggle}
+              onEdit={setEditing}
+            />
+          )}
         </div>
+
+        {hasData && (
+          <p className="border-t border-border px-5 py-3 text-xs text-faint">
+            Net P&amp;L, Win % and Trades cover the {TRADES_WINDOW_CAPTION.toLowerCase()} across all
+            personalities, not full history.
+            {performance.unattributed > 0
+              ? ` ${formatInt(performance.unattributed)} of them carry no personality and are not counted.`
+              : ''}
+            {tradesError !== null ? ` Trades could not be loaded (${tradesError}).` : ''}
+          </p>
+        )}
       </Card>
 
-      {/* The dialog mounts only when a personality is selected — keeps the
-          form's local state cleanly scoped per-edit-session. */}
+      {/* Mounts only while editing, so the form's state is scoped to one edit. */}
       {editing !== null && (
         <EditPersonalityDialog
           personality={editing}
+          personalities={personalities}
           open={true}
           onOpenChange={(next) => {
             if (!next) setEditing(null);

@@ -460,7 +460,9 @@ function WeeklySignalCard() {
   const { job, running } = useMomentumWeeklyJob();
 
   let body: ReactNode;
-  if (status.data === null) {
+  // A reply without the expected shape (an error body, a proxy page) is treated as unreachable
+  // rather than crashing the whole Overview.
+  if (status.data === null || !Array.isArray(status.data.signals)) {
     body = status.loading ? <CardSkeleton /> : <PlainState>{MOMENTUM_UNREACHABLE}</PlainState>;
   } else {
     // Same reading as Momentum › Weekly signal: the newest saved final signal, and the
@@ -599,7 +601,7 @@ function CreditsCard() {
     <OverviewCard
       title="Credits"
       icon={<CreditCard className="h-4 w-4" />}
-      links={[{ label: 'Pricing', tab: 'pricing' }]}
+      links={[{ label: 'Billing', tab: 'pricing' }]}
     >
       {body}
     </OverviewCard>

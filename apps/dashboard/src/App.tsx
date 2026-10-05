@@ -4,18 +4,16 @@ import { useEffect, useState } from 'react';
 import { useAppRoute } from './hooks/useAppRoute';
 import { DEFAULT_TAB, aliasTarget, documentTitle } from './lib/routes';
 
-import { BackfillView } from './components/BackfillView';
 import { BrokerLoginsView } from './components/BrokerLoginsView';
+import { CoverageView } from './components/CoverageView';
 import { LiveView } from './components/LiveView';
 import { MomentumBacktestingView } from './components/MomentumBacktestingView';
 import { OptionsLabView } from './components/OptionsLabView';
 import { OverviewView } from './components/OverviewView';
-import { PaymentTestModeBanner } from './components/PaymentTestModeBanner';
 import { PersonalitiesView } from './components/PersonalitiesView';
 import { PnlView } from './components/PnlView';
 import { PricingPage } from './components/PricingPage';
 import { RegimeView } from './components/RegimeView';
-import { ReplayView } from './components/ReplayView';
 import { SettingsView } from './components/SettingsView';
 import { TradesView } from './components/TradesView';
 import { BottomBar } from './components/shell/BottomBar';
@@ -45,13 +43,12 @@ const SUBTITLES: Record<Tab, string> = {
   personalities: 'The 10 decision engines and their configs',
   pnl: 'Realized P&L across closed paper trades',
   regime: 'Daily market-regime classification history',
-  backfill: 'Historical tick-data ingestion coverage',
-  replay: 'Deterministic replay of historical sessions',
+  coverage: 'Historical candle backfill, and the ranges it makes replayable',
   optionslab:
     'Build, backtest and track option strategies: leg-wise on 1-minute Fyers data, or the YAML engine',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
   brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',
-  pricing: 'Subscription access and feature credits',
+  pricing: 'Your credits, payment mode and plans',
   settings: 'Choose which tabs appear and arrange their navigation priority',
 };
 
@@ -73,10 +70,8 @@ function renderView(
       return <PnlView />;
     case 'regime':
       return <RegimeView />;
-    case 'backfill':
-      return <BackfillView />;
-    case 'replay':
-      return <ReplayView />;
+    case 'coverage':
+      return <CoverageView />;
     case 'optionslab':
       return <OptionsLabView />;
     case 'momentum':
@@ -224,7 +219,6 @@ export function App() {
           tabIndex={-1}
           className="mx-auto max-w-7xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-6 focus:outline-none sm:px-6 md:pb-6"
         >
-          <PaymentTestModeBanner />
           <div key={activeTab} className="animate-fade-in">
             {renderView(activeTab, navigationPreferences, updateNavigationPreferences)}
           </div>

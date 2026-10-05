@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { NAV_GROUPS } from '../../components/shell/nav';
 import {
+  COVERAGE_DEFAULT_SECTION,
+  COVERAGE_SECTIONS,
   DEFAULT_TAB,
   MOMENTUM_SECTIONS,
   OPTIONS_LAB_DEFAULT_SECTION,
@@ -13,6 +15,7 @@ import {
   documentTitle,
   oneOf,
   parsePath,
+  tabSegment,
 } from '../routes';
 
 describe('routes', () => {
@@ -59,8 +62,9 @@ describe('routes', () => {
     ['/personalities', 'personalities', []],
     ['/pnl', 'pnl', []],
     ['/regime', 'regime', []],
-    ['/backfill', 'backfill', []],
-    ['/replay', 'replay', []],
+    ['/coverage', 'coverage', []],
+    ['/coverage/backfill', 'coverage', ['backfill']],
+    ['/coverage/replay', 'coverage', ['replay']],
     ['/optionslab', 'optionslab', []],
     ['/optionslab/strategies', 'optionslab', ['strategies']],
     ['/optionslab/builder', 'optionslab', ['builder']],
@@ -81,7 +85,7 @@ describe('routes', () => {
     ['/momentum/weekly', 'momentum', ['weekly']],
     ['/momentum/rebalance', 'momentum', ['rebalance']],
     ['/brokerLogins', 'brokerLogins', []],
-    ['/pricing', 'pricing', []],
+    ['/billing', 'pricing', []],
     ['/settings', 'settings', []],
   ] as const)('known path %s resolves to %s', (path, tab, rest) => {
     expect(parsePath(path)).toEqual({ tab, rest: [...rest] });
@@ -89,16 +93,18 @@ describe('routes', () => {
   });
 
   it.each([
-    ['/billing', '/pricing', 'pricing', []],
+    ['/pricing', '/billing', 'pricing', []],
     ['/brokers', '/brokerLogins', 'brokerLogins', []],
     ['/brokerlogins', '/brokerLogins', 'brokerLogins', []],
-    ['/data/backfill', '/backfill', 'backfill', []],
-    ['/data/replay', '/replay', 'replay', []],
+    ['/backfill', '/coverage/backfill', 'coverage', ['backfill']],
+    ['/replay', '/coverage/replay', 'coverage', ['replay']],
+    ['/data/backfill', '/coverage/backfill', 'coverage', ['backfill']],
+    ['/data/replay', '/coverage/replay', 'coverage', ['replay']],
     ['/backtest', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/backtest/', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/optionslab/yaml', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
-    ['/data/replay/', '/replay', 'replay', []],
-    ['/billing/extra', '/pricing/extra', 'pricing', ['extra']],
+    ['/data/replay/', '/coverage/replay', 'coverage', ['replay']],
+    ['/pricing/extra', '/billing/extra', 'pricing', ['extra']],
   ] as const)('alias %s redirects to %s', (path, target, tab, rest) => {
     expect(aliasTarget(path)).toBe(target);
     expect(parsePath(path)).toEqual({ tab, rest: [...rest] });
@@ -113,7 +119,8 @@ describe('routes', () => {
   });
 
   it('does not treat a partial segment or an unknown path as an alias', () => {
-    expect(aliasTarget('/billings')).toBeNull();
+    expect(aliasTarget('/pricings')).toBeNull();
+    expect(aliasTarget('/coverage/backfill')).toBeNull();
     expect(aliasTarget('/data')).toBeNull();
     expect(parsePath('/data')).toEqual({ tab: null, rest: [] });
     expect(parsePath('/optionslab/yamlish')).toEqual({ tab: 'optionslab', rest: ['yamlish'] });
@@ -153,6 +160,23 @@ describe('routes', () => {
         ?.children?.map((child) => child.segment);
     expect(children('optionslab')).toEqual([...OPTIONS_LAB_SECTIONS]);
     expect(children('momentum')).toEqual([...MOMENTUM_SECTIONS]);
+    expect(children('coverage')).toEqual([...COVERAGE_SECTIONS]);
+  });
+
+  it('retires the backfill and replay tab ids into Coverage, opening Backfill by default', () => {
+    const ids = NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)) as string[];
+    expect(ids).not.toContain('backfill');
+    expect(ids).not.toContain('replay');
+    expect(COVERAGE_DEFAULT_SECTION).toBe('backfill');
+    expect(oneOf(COVERAGE_SECTIONS, parsePath('/coverage').rest[0])).toBeNull();
+  });
+
+  it('serves the pricing tab at /billing', () => {
+    expect(tabSegment('pricing')).toBe('billing');
+    expect(tabSegment('coverage')).toBe('coverage');
+    expect(buildPath('pricing')).toBe('/billing');
+    expect(parsePath(buildPath('pricing'))).toEqual({ tab: 'pricing', rest: [] });
+    expect(buildPath('coverage', 'replay')).toBe('/coverage/replay');
   });
 
   it.each([
@@ -171,6 +195,10 @@ describe('routes', () => {
     ['optionslab', ['regimes'], 'Options Lab › Regimes · AI Trading Agent'],
     ['optionslab', [], 'Options Lab › Daily results · AI Trading Agent'],
     ['optionslab', ['nope'], 'Options Lab › Daily results · AI Trading Agent'],
+    ['coverage', [], 'Coverage › Backfill · AI Trading Agent'],
+    ['coverage', ['backfill'], 'Coverage › Backfill · AI Trading Agent'],
+    ['coverage', ['replay'], 'Coverage › Replay · AI Trading Agent'],
+    ['pricing', [], 'Billing · AI Trading Agent'],
   ] as const)('titles %s %j as %s', (tab, rest, title) => {
     expect(documentTitle(tab, rest)).toBe(title);
   });

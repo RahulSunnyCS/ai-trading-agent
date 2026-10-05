@@ -339,7 +339,7 @@ export function YamlBacktest() {
             />
             {runError.outOfCredits && (
               <Button variant="secondary" size="sm" onClick={() => navigate('pricing')}>
-                Top up on Pricing
+                Top up on Billing
               </Button>
             )}
           </div>

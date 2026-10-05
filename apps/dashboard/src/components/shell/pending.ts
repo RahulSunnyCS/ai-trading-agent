@@ -38,15 +38,12 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Add a regime-distribution chart',
     'Link regimes to per-personality performance',
   ],
-  backfill: [
-    'Show live progress for running jobs',
+  coverage: [
+    'Record checkpoint_ts while a backfill runs (today only an interrupted run has one), so the progress bar moves',
     'Add a one-click gap-fill action',
     'Filter by symbol and resolution',
-  ],
-  replay: [
     'Add a safe server-driven backtest endpoint (M3b, deferred)',
     'Render replay results in the UI',
-    'Add one-click dry-run from a coverage row',
   ],
   optionslab: [
     'Run `obt fyers history` once (live Fyers token needed) to unlock the market-regime study',
@@ -69,8 +66,8 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
   ],
   brokerLogins: [],
   pricing: [
-    'Show the current subscription / credit balance',
-    'Add purchase history and receipts',
+    'Show the access pass and its expiry (needs a server endpoint exposing checkAccess)',
+    'Add purchase history and receipts (needs a server endpoint)',
     'Add GST display and invoicing (Phase 2)',
     'Add international payments via Stripe (Phase 2)',
   ],

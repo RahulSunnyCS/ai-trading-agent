@@ -14,8 +14,21 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { PaperTrade } from '../../types/trading';
-import { computePnlSummary } from '../pnl';
+import type { PaperTrade, Personality } from '../../types/trading';
+import {
+  DEFAULT_PERSONALITY_SORT,
+  computeDailyPnl,
+  computeMaxDrawdown,
+  computePersonalityPnl,
+  computePnlStats,
+  computePnlSummary,
+  filterTradesByRange,
+  findClockwork,
+  nextPersonalitySort,
+  parsePnlRange,
+  rangeStartDay,
+  sortPersonalityPnl,
+} from '../pnl';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -507,5 +520,260 @@ describe('computePnlSummary — cumulative series', () => {
     expect(summary.cumulativeSeries).toHaveLength(1);
     // Must be the IST date 2026-05-20, not the UTC date 2026-05-19.
     expect(summary.cumulativeSeries[0]?.time).toBe('2026-05-20');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. BL-013 Phase 8: range, daily bars, risk metrics, per-personality table
+// ---------------------------------------------------------------------------
+
+/** A closed trade exiting at 15:00 IST on `day` with net P&L `net` (null → missing). */
+let closedSeq = 0;
+function closedOn(day: string, net: string | null, extra: Partial<PaperTrade> = {}): PaperTrade {
+  closedSeq += 1;
+  return makeTrade({
+    id: `closed-${closedSeq}`,
+    status: 'closed',
+    exit_time: `${day}T09:30:00.000Z`,
+    net_pnl: net,
+    ...extra,
+  });
+}
+
+function personality(overrides: Partial<Personality> = {}): Personality {
+  return {
+    id: 'p1',
+    name: 'Clockwork',
+    display_name: 'Clockwork',
+    group_type: 'reference',
+    entry_type: 'fixed_time',
+    management_style: 'hold',
+    is_frozen: true,
+    is_active: true,
+    phase: 1,
+    params: {},
+    created_at: '2026-05-01T00:00:00.000Z',
+    updated_at: '2026-05-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('range filter', () => {
+  it('parses the range parameter, defaulting to all', () => {
+    expect(parsePnlRange('30d')).toBe('30d');
+    expect(parsePnlRange('1y')).toBe('all');
+    expect(parsePnlRange(null)).toBe('all');
+  });
+
+  it('counts today as one of the range days', () => {
+    expect(rangeStartDay('7d', '2026-05-20')).toBe('2026-05-14');
+    expect(rangeStartDay('30d', '2026-03-01')).toBe('2026-01-31');
+    expect(rangeStartDay('all', '2026-05-20')).toBeNull();
+  });
+
+  it('keeps closed trades by IST exit day, and every open trade', () => {
+    const trades = [
+      closedOn('2026-05-13', '10', { id: 'out' }), // just outside 7D
+      closedOn('2026-05-14', '20', { id: 'first' }), // first 7D day
+      // 2026-05-13T19:00Z is 00:30 IST on 14 May, so inside 7D.
+      makeTrade({ id: 'edge', status: 'closed', exit_time: '2026-05-13T19:00:00.000Z' }),
+      makeTrade({ id: 'open', status: 'open', exit_time: null, net_pnl: null }),
+      makeTrade({ id: 'noexit', status: 'closed', exit_time: null }),
+    ];
+    const kept = filterTradesByRange(trades, '7d', '2026-05-20');
+    expect(kept.map((t) => t.id)).toEqual(['first', 'edge', 'open']);
+    expect(filterTradesByRange(trades, 'all', '2026-05-20')).toHaveLength(5);
+  });
+});
+
+describe('computeDailyPnl', () => {
+  it('sums each IST day, ascending, skipping null net and open trades', () => {
+    const daily = computeDailyPnl([
+      closedOn('2026-05-19', '-30'),
+      closedOn('2026-05-18', '100'),
+      closedOn('2026-05-19', '50'),
+      closedOn('2026-05-19', null),
+      makeTrade({ status: 'open', exit_time: null, net_pnl: null }),
+    ]);
+    expect(daily).toEqual([
+      { time: '2026-05-18', value: 100, trades: 1 },
+      { time: '2026-05-19', value: 20, trades: 2 },
+    ]);
+  });
+
+  it('is empty for no trades', () => {
+    expect(computeDailyPnl([])).toEqual([]);
+  });
+});
+
+describe('computeMaxDrawdown', () => {
+  it('measures the deepest fall from a running high', () => {
+    const dd = computeMaxDrawdown([
+      { time: '2026-05-18', value: 100, trades: 1 }, // 100 (peak)
+      { time: '2026-05-19', value: -150, trades: 1 }, // -50
+      { time: '2026-05-20', value: 30, trades: 1 }, // -20
+      { time: '2026-05-21', value: 200, trades: 1 }, // 180
+      { time: '2026-05-22', value: -60, trades: 1 }, // 120
+    ]);
+    expect(dd).toEqual({ amount: 150, peakDay: '2026-05-18', troughDay: '2026-05-19' });
+  });
+
+  it('counts a first losing day as a drawdown from zero', () => {
+    expect(
+      computeMaxDrawdown([
+        { time: '2026-05-18', value: -40, trades: 1 },
+        { time: '2026-05-19', value: -10, trades: 1 },
+      ]),
+    ).toEqual({ amount: 50, peakDay: null, troughDay: '2026-05-19' });
+  });
+
+  it('is zero when equity only rises, and for no days', () => {
+    const none = { amount: 0, peakDay: null, troughDay: null };
+    expect(computeMaxDrawdown([{ time: '2026-05-18', value: 10, trades: 1 }])).toEqual(none);
+    expect(computeMaxDrawdown([])).toEqual(none);
+  });
+});
+
+describe('computePnlStats', () => {
+  it('returns nulls, not zeros or NaN, for empty input', () => {
+    const stats = computePnlStats([]);
+    expect(stats).toMatchObject({
+      tradeCount: 0,
+      wins: 0,
+      losses: 0,
+      profitFactor: null,
+      avgWin: null,
+      avgLoss: null,
+      expectancy: null,
+      bestDay: null,
+      worstDay: null,
+      daily: [],
+    });
+    expect(stats.maxDrawdown.amount).toBe(0);
+  });
+
+  it('handles all wins: no profit factor (no losses), no average loss', () => {
+    const stats = computePnlStats([closedOn('2026-05-18', '100'), closedOn('2026-05-19', '50')]);
+    expect(stats.profitFactor).toBeNull();
+    expect(stats.avgWin).toBe(75);
+    expect(stats.avgLoss).toBeNull();
+    expect(stats.expectancy).toBe(75);
+    expect(stats.maxDrawdown.amount).toBe(0);
+    expect(stats.bestDay?.time).toBe('2026-05-18');
+    expect(stats.worstDay?.time).toBe('2026-05-19');
+  });
+
+  it('handles all losses: profit factor 0, no average win', () => {
+    const stats = computePnlStats([closedOn('2026-05-18', '-100'), closedOn('2026-05-19', '-20')]);
+    expect(stats.profitFactor).toBe(0);
+    expect(stats.avgWin).toBeNull();
+    expect(stats.avgLoss).toBe(-60);
+    expect(stats.expectancy).toBe(-60);
+    expect(stats.maxDrawdown).toEqual({ amount: 120, peakDay: null, troughDay: '2026-05-19' });
+    expect(stats.worstDay).toEqual({ time: '2026-05-18', value: -100, trades: 1 });
+  });
+
+  it('computes profit factor, averages and expectancy, skipping nulls and open trades', () => {
+    const stats = computePnlStats([
+      closedOn('2026-05-18', '300'),
+      closedOn('2026-05-18', '-100'),
+      closedOn('2026-05-19', '100'),
+      closedOn('2026-05-19', '-100'),
+      closedOn('2026-05-19', '0'),
+      closedOn('2026-05-20', null),
+      closedOn('2026-05-20', 'abc'),
+      makeTrade({ status: 'open', exit_time: null, net_pnl: '999' }),
+    ]);
+    expect(stats.tradeCount).toBe(5);
+    expect(stats.wins).toBe(2);
+    expect(stats.losses).toBe(2);
+    expect(stats.profitFactor).toBe(2);
+    expect(stats.avgWin).toBe(200);
+    expect(stats.avgLoss).toBe(-100);
+    expect(stats.expectancy).toBe(40);
+    expect(stats.bestDay?.value).toBe(200);
+    expect(stats.worstDay?.value).toBe(0);
+    expect(stats.daily).toHaveLength(2);
+  });
+});
+
+describe('findClockwork', () => {
+  it('prefers the personality named Clockwork, then the first frozen one', () => {
+    const named = personality({ id: 'cw', is_frozen: false });
+    const frozen = personality({ id: 'fz', name: 'Anchor', is_frozen: true });
+    expect(findClockwork([frozen, named])?.id).toBe('cw');
+    expect(findClockwork([personality({ id: 'x', name: 'X', is_frozen: false }), frozen])?.id).toBe(
+      'fz',
+    );
+    expect(findClockwork([personality({ name: 'X', is_frozen: false })])).toBeNull();
+  });
+});
+
+describe('computePersonalityPnl', () => {
+  const people = [
+    personality({ id: 'cw' }),
+    personality({ id: 'pr', name: 'Precision', display_name: 'Precision', is_frozen: false }),
+    personality({ id: 'ad', name: 'Adjuster', display_name: 'Adjuster', is_frozen: false }),
+  ];
+
+  it('groups closed trades, computes win rate, net and Beat-Clockwork Δ', () => {
+    const rows = computePersonalityPnl(
+      [
+        closedOn('2026-05-18', '100', { personality_id: 'cw' }),
+        closedOn('2026-05-18', '-40', { personality_id: 'cw' }),
+        closedOn('2026-05-18', '200', { personality_id: 'pr' }),
+        closedOn('2026-05-19', '-50', { personality_id: 'pr' }),
+        closedOn('2026-05-19', null, { personality_id: 'pr' }),
+        closedOn('2026-05-19', '30', { personality_id: null }),
+        closedOn('2026-05-19', '10', { personality_id: 'deleted' }),
+        makeTrade({ status: 'open', exit_time: null, net_pnl: null, personality_id: 'ad' }),
+      ],
+      people,
+    );
+    expect(rows.map((r) => r.name)).toEqual(['Precision', 'Clockwork', 'Unassigned']);
+    const [precision, clockwork, unassigned] = rows;
+    expect(precision).toMatchObject({ trades: 3, wins: 1, net: 150, beatClockwork: 90 });
+    expect(precision?.winRate).toBeCloseTo(1 / 3);
+    expect(clockwork).toMatchObject({ isClockwork: true, net: 60, beatClockwork: null });
+    expect(unassigned).toMatchObject({
+      personalityId: null,
+      trades: 2,
+      net: 40,
+      beatClockwork: -20,
+    });
+  });
+
+  it('has no Δ when Clockwork closed no trade in the window, or is unknown', () => {
+    const trades = [closedOn('2026-05-18', '100', { personality_id: 'pr' })];
+    expect(computePersonalityPnl(trades, people)[0]?.beatClockwork).toBeNull();
+    expect(computePersonalityPnl(trades, people.slice(1))[0]?.beatClockwork).toBeNull();
+  });
+
+  it('is empty for no trades', () => {
+    expect(computePersonalityPnl([], people)).toEqual([]);
+  });
+
+  it('sorts by any column with null Δ last both ways', () => {
+    const rows = computePersonalityPnl(
+      [
+        closedOn('2026-05-18', '100', { personality_id: 'cw' }),
+        closedOn('2026-05-18', '50', { personality_id: 'pr' }),
+        closedOn('2026-05-18', '300', { personality_id: 'ad' }),
+      ],
+      people,
+    );
+    const names = (key: Parameters<typeof nextPersonalitySort>[1], dir: 'asc' | 'desc') =>
+      sortPersonalityPnl(rows, { key, dir }).map((r) => r.name);
+    expect(names('beatClockwork', 'desc')).toEqual(['Adjuster', 'Precision', 'Clockwork']);
+    expect(names('beatClockwork', 'asc')).toEqual(['Precision', 'Adjuster', 'Clockwork']);
+    expect(names('name', 'asc')).toEqual(['Adjuster', 'Clockwork', 'Precision']);
+    expect(nextPersonalitySort(DEFAULT_PERSONALITY_SORT, 'net')).toEqual({
+      key: 'net',
+      dir: 'asc',
+    });
+    expect(nextPersonalitySort(DEFAULT_PERSONALITY_SORT, 'name')).toEqual({
+      key: 'name',
+      dir: 'asc',
+    });
   });
 });

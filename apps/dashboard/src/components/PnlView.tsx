@@ -1,8 +1,12 @@
 /**
- * PnlView — realized P&L aggregates and cumulative chart for the P&L tab.
+ * PnlView — realized P&L aggregates, risk metrics, charts and a per-personality table.
  *
  * Data source: the shared usePaperTrades hook (polled from GET /api/trades) —
  * TradesView and PnlView consume the same hook to avoid duplicate fetches.
+ *
+ * A range control (7D / 30D / 90D / All, kept in the query string as ?range=30d) limits every
+ * figure and chart to closed trades whose IST exit day falls in the window; open positions are
+ * "now" and always counted.
  *
  * Honesty constraints: the headline is "Realized P&L (closed trades)"; open
  * positions are a separate count (we never invent an unrealized number); the
@@ -10,108 +14,96 @@
  * failure can't be misread as a no-activity day).
  */
 
-import { createChart } from 'lightweight-charts';
-import type { IChartApi, ISeriesApi } from 'lightweight-charts';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
 import { TRADES_WINDOW_CAPTION, usePaperTrades } from '../hooks/usePaperTrades';
-import { getChartTheme } from '../lib/chartTheme';
-import { formatPct, formatPnl } from '../lib/format';
-import { type PnlSeriesPoint, computePnlSummary } from '../lib/pnl';
-import { useThemeStore } from '../store/theme';
+import { usePersonalities } from '../hooks/usePersonalities';
+import { useQueryState } from '../hooks/useQueryState';
+import { EMPTY, formatDay, formatInr, formatInt, formatMultiple, formatPct } from '../lib/format';
+import {
+  type PnlRange,
+  computePersonalityPnl,
+  computePnlStats,
+  computePnlSummary,
+  filterTradesByRange,
+  findClockwork,
+  parsePnlRange,
+} from '../lib/pnl';
+import { PersonalityPnlTable } from './pnl/PersonalityPnlTable';
+import { CumulativePnlChart, DailyPnlChart } from './pnl/PnlCharts';
 import { Card, CardHeader } from './ui/Card';
+import { SegmentedControl } from './ui/SegmentedControl';
 import { SkeletonRows } from './ui/Skeleton';
 import { StatCard } from './ui/StatCard';
 import { StateMessage } from './ui/StateMessage';
+import { Toolbar } from './ui/Toolbar';
 
-function pnlTone(value: number): 'positive' | 'negative' | 'muted' {
-  if (value > 0) return 'positive';
-  if (value < 0) return 'negative';
-  return 'muted';
+const RANGE_OPTIONS = [
+  { value: '7d', label: '7D' },
+  { value: '30d', label: '30D' },
+  { value: '90d', label: '90D' },
+  { value: 'all', label: 'All' },
+] as const;
+
+const RANGE_TEXT: Record<PnlRange, string> = {
+  '7d': 'last 7 days',
+  '30d': 'last 30 days',
+  '90d': 'last 90 days',
+  all: TRADES_WINDOW_CAPTION.toLowerCase(),
+};
+
+function pnlTone(value: number | null): 'positive' | 'negative' | 'muted' {
+  if (value === null || value === 0) return 'muted';
+  return value > 0 ? 'positive' : 'negative';
 }
 
-/** Cumulative realized-P&L line, theme-aware (recolors on theme toggle). */
-function CumulativeChart({ series }: { series: PnlSeriesPoint[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const theme = useThemeStore((s) => s.theme);
-
-  // Create the chart + series + ResizeObserver once on mount.
-  useEffect(() => {
-    const container = containerRef.current;
-    if (container === null) return;
-
-    const chart = createChart(container, {
-      width: container.clientWidth,
-      height: 220,
-      layout: { background: { color: 'transparent' } },
-      grid: { vertLines: { color: 'transparent' }, horzLines: { color: 'transparent' } },
-      timeScale: { rightOffset: 2 },
-    });
-    const lineSeries = chart.addLineSeries({
-      lineWidth: 2,
-      priceLineVisible: true,
-      lastValueVisible: true,
-    });
-    chartRef.current = chart;
-    seriesRef.current = lineSeries;
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) chart.applyOptions({ width: entry.contentRect.width });
-    });
-    observer.observe(container);
-
-    return () => {
-      seriesRef.current = null;
-      chartRef.current = null;
-      observer.disconnect();
-      chart.remove();
-    };
-  }, []);
-
-  // Apply theme colors on mount and whenever the theme flips.
-  useEffect(() => {
-    const chart = chartRef.current;
-    const lineSeries = seriesRef.current;
-    if (chart === null || lineSeries === null) return;
-    const t = getChartTheme(theme);
-    chart.applyOptions({
-      layout: { background: { color: 'transparent' }, textColor: t.text, fontFamily: t.fontFamily },
-      grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
-      rightPriceScale: { borderColor: t.border },
-      timeScale: { borderColor: t.border },
-    });
-    lineSeries.applyOptions({ color: t.positive });
-  }, [theme]);
-
-  // Push data into the existing series whenever it changes.
-  useEffect(() => {
-    const lineSeries = seriesRef.current;
-    if (lineSeries === null) return;
-    if (series.length > 0) {
-      lineSeries.setData(series);
-      chartRef.current?.timeScale().fitContent();
-    }
-  }, [series]);
-
-  return (
-    <div
-      ref={containerRef}
-      className="w-full"
-      style={{ minHeight: 220 }}
-      aria-label="Cumulative P&L chart"
-    />
-  );
-}
+/** Signed rupees that never wrap between the sign and the amount. */
+const money = (value: number | null) => (
+  <span className="whitespace-nowrap">{formatInr(value, { dp: 2, sign: true })}</span>
+);
 
 export function PnlView() {
   const { trades, loading, error } = usePaperTrades();
-  const summary = useMemo(() => computePnlSummary(trades), [trades]);
+  const { personalities } = usePersonalities(true);
+  const [rangeParam, setRangeParam] = useQueryState('range');
+  const range = parsePnlRange(rangeParam);
+
+  const inRange = useMemo(() => filterTradesByRange(trades, range), [trades, range]);
+  const summary = useMemo(() => computePnlSummary(inRange), [inRange]);
+  const stats = useMemo(() => computePnlStats(inRange), [inRange]);
+  const byPersonality = useMemo(
+    () => computePersonalityPnl(inRange, personalities),
+    [inRange, personalities],
+  );
+  const clockwork = findClockwork(personalities);
   const hasClosed = summary.closedCount > 0;
+  const anyClosed = useMemo(() => trades.some((t) => t.status === 'closed'), [trades]);
+  const rangeText = RANGE_TEXT[range];
+
+  const profitFactorText =
+    stats.profitFactor !== null
+      ? formatMultiple(stats.profitFactor, 2)
+      : stats.wins > 0
+        ? 'No losses'
+        : EMPTY;
 
   return (
     <div className="space-y-5">
+      {trades.length > 0 ? (
+        <Toolbar ariaLabel="P&L range">
+          <SegmentedControl
+            ariaLabel="Date range"
+            size="sm"
+            value={range}
+            options={RANGE_OPTIONS}
+            onChange={(next) => setRangeParam(next === 'all' ? null : next)}
+          />
+          <span className="text-xs text-muted">
+            Closed trades by IST exit day · {TRADES_WINDOW_CAPTION.toLowerCase()}
+          </span>
+        </Toolbar>
+      ) : null}
+
       {loading && trades.length === 0 && (
         <Card>
           <CardHeader title="P&L Summary" />
@@ -132,11 +124,13 @@ export function PnlView() {
           <CardHeader title="P&L Summary" />
           <StateMessage
             variant="empty"
-            title="No closed trades yet"
+            title={anyClosed ? `No closed trades in the ${rangeText}` : 'No closed trades yet'}
             description={
-              summary.openCount > 0
-                ? `Realized P&L appears once a position closes. ${summary.openCount} open position${summary.openCount !== 1 ? 's' : ''} currently running.`
-                : 'Realized P&L will appear once the first position is closed.'
+              anyClosed
+                ? 'Choose a longer range to see earlier trades.'
+                : summary.openCount > 0
+                  ? `Realized P&L appears once a position closes. ${summary.openCount} open position${summary.openCount !== 1 ? 's' : ''} currently running.`
+                  : 'Realized P&L will appear once the first position is closed.'
             }
           />
         </Card>
@@ -147,7 +141,7 @@ export function PnlView() {
           {/* Hero realized P&L */}
           <Card>
             <p className="text-xs font-medium uppercase tracking-wider text-faint">
-              Realized P&L · closed trades · {TRADES_WINDOW_CAPTION.toLowerCase()}
+              Realized P&L · closed trades · {rangeText}
             </p>
             <p
               className={`metric mt-1 text-4xl font-semibold tracking-tight ${
@@ -158,38 +152,117 @@ export function PnlView() {
                     : 'text-foreground'
               }`}
             >
-              {formatPnl(summary.totalRealizedPnl)}
+              {money(summary.totalRealizedPnl)}
             </p>
             <p className="mt-1 text-sm text-muted">
-              Across {summary.closedCount} closed trade{summary.closedCount !== 1 ? 's' : ''} ·{' '}
-              {formatPct(summary.winRate, 1)} win rate
+              Across {formatInt(summary.closedCount)} closed trade
+              {summary.closedCount !== 1 ? 's' : ''} · {formatPct(summary.winRate, 1)} win rate
             </p>
           </Card>
 
-          {/* Secondary metrics */}
+          {/* Secondary metrics — win rate and closed count live in the hero only. */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard
               label="Today's P&L (IST)"
-              value={formatPnl(summary.todayRealizedPnl)}
+              value={money(summary.todayRealizedPnl)}
               tone={pnlTone(summary.todayRealizedPnl)}
             />
-            <StatCard label="Win Rate" value={formatPct(summary.winRate, 1)} />
-            <StatCard label="Closed Trades" value={summary.closedCount} />
             <StatCard
-              label="Open Positions"
-              value={summary.openCount}
-              note="Unrealized P&L not shown"
+              label="Open positions"
+              value={formatInt(summary.openCount)}
+              note="Now · unrealized P&L not shown"
               tone="muted"
+            />
+            <StatCard
+              label="Max drawdown"
+              value={
+                <span className="whitespace-nowrap">
+                  {formatInr(-stats.maxDrawdown.amount || 0, { dp: 2 })}
+                </span>
+              }
+              tone={stats.maxDrawdown.amount > 0 ? 'negative' : 'muted'}
+              note={
+                stats.maxDrawdown.troughDay
+                  ? `Low on ${formatDay(stats.maxDrawdown.troughDay)}`
+                  : 'No drawdown in range'
+              }
+              hint="The largest fall in end-of-day cumulative P&L from its running high (starting from zero) within the range."
+            />
+            <StatCard
+              label="Profit factor"
+              value={profitFactorText}
+              tone={
+                stats.profitFactor === null
+                  ? 'muted'
+                  : stats.profitFactor >= 1
+                    ? 'positive'
+                    : 'negative'
+              }
+              hint="Gross profit of winning trades divided by the gross loss of losing trades. Above 1× means winners outweigh losers."
+            />
+            <StatCard
+              label="Avg win / loss"
+              value={
+                <span className="text-xl">
+                  <span className="text-positive">{money(stats.avgWin)}</span>
+                  <span className="text-faint"> / </span>
+                  <span className="text-negative">{money(stats.avgLoss)}</span>
+                </span>
+              }
+              note={`${formatInt(stats.wins)} wins · ${formatInt(stats.losses)} losses`}
+            />
+            <StatCard
+              label="Expectancy"
+              value={money(stats.expectancy)}
+              tone={pnlTone(stats.expectancy)}
+              note="Per closed trade"
+              hint="Average net P&L per closed trade in the range."
+            />
+            <StatCard
+              label="Best day"
+              value={money(stats.bestDay?.value ?? null)}
+              tone={pnlTone(stats.bestDay?.value ?? null)}
+              note={stats.bestDay ? formatDay(stats.bestDay.time) : undefined}
+            />
+            <StatCard
+              label="Worst day"
+              value={money(stats.worstDay?.value ?? null)}
+              tone={pnlTone(stats.worstDay?.value ?? null)}
+              note={stats.worstDay ? formatDay(stats.worstDay.time) : undefined}
             />
           </div>
 
-          {/* Cumulative chart */}
+          {/* Cumulative line + daily bars */}
           <Card>
             <CardHeader
               title="Cumulative Realized P&L"
-              description={`Running net across closed trades, one point per IST day · ${TRADES_WINDOW_CAPTION.toLowerCase()}`}
+              description={`Running net across closed trades, one point per IST day · ${rangeText}`}
             />
-            <CumulativeChart series={summary.cumulativeSeries} />
+            <CumulativePnlChart series={summary.cumulativeSeries} />
+            <h3 className="mb-2 mt-5 text-xs font-medium uppercase tracking-wider text-faint">
+              Daily net P&L
+            </h3>
+            <DailyPnlChart daily={stats.daily} />
+          </Card>
+
+          {/* Per personality */}
+          <Card flush>
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-base font-semibold tracking-tight text-foreground">
+                By personality
+              </h2>
+              <p className="mt-0.5 text-xs text-muted">
+                Closed trades · {rangeText}
+                {clockwork === null
+                  ? ' · Beat-Clockwork Δ needs the Clockwork personality, which was not found'
+                  : byPersonality.some((row) => row.isClockwork)
+                    ? ''
+                    : ' · Clockwork closed no trade in this range, so there is no Δ'}
+              </p>
+            </div>
+            <div className="px-2 py-1">
+              <PersonalityPnlTable rows={byPersonality} />
+            </div>
           </Card>
         </>
       )}

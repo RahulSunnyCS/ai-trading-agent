@@ -6,6 +6,9 @@
  * `refresh` callback so the view can re-fetch after the user changes the
  * symbol/date filters.
  *
+ * `{ cache: true }`: returning to the tab (or back to a window already viewed) starts from
+ * the last answer for that URL while it revalidates.
+ *
  * This used to hand-roll the same abort-then-skip-if-in-flight pattern as
  * usePersonalities, with the same bug: refresh() called while a fetch was
  * already pending could abort it and then skip starting a replacement,
@@ -15,6 +18,9 @@
 
 import type { ApiEnvelope, RegimeTag } from '../types/trading';
 import { usePolledResource } from './usePolledResource';
+
+/** One shared empty list, so a memo keyed on `tags` does not recompute every render. */
+const NO_TAGS: RegimeTag[] = [];
 
 export interface RegimeTagsState {
   tags: RegimeTag[];
@@ -44,7 +50,10 @@ export function useRegimeTags(symbol = 'NIFTY', from?: string, to?: string): Reg
 
   const { data, loading, error, refetch } = usePolledResource<ApiEnvelope<RegimeTag[]>>(
     `/api/regime-tags?${params.toString()}`,
+    { cache: true },
   );
 
-  return { tags: data?.data ?? [], loading, error, refresh: refetch };
+  // Another service answering on /api (a standalone preview) may not send the envelope.
+  const tags = Array.isArray(data?.data) ? data.data : NO_TAGS;
+  return { tags, loading, error, refresh: refetch };
 }

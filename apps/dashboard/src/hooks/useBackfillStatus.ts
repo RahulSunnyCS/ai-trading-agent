@@ -1,16 +1,19 @@
 /**
  * useBackfillStatus — fetches GET /api/backfill on mount and returns the result.
  *
- * Built on usePolledResource: single fetch on mount, no polling (backfill
- * jobs run infrequently), and a `refresh` callback for the view to trigger
- * a re-fetch. This hook's own hand-rolled version was the one other hooks
- * should have copied — it already cancelled and replaced on refresh rather
- * than skipping while a request was in flight — so migrating it here changes
- * nothing about its behavior, only where the plumbing lives.
+ * Built on usePolledResource. It fetches once on mount and on `refresh`, and polls every
+ * BACKFILL_POLL_MS while any row is in progress (or while a just-queued job is being watched
+ * for, see `watchForNewJob`), then stops again once every row has settled.
  */
 
+import { useCallback, useEffect, useState } from 'react';
+
+import { BACKFILL_POLL_MS, shouldPollBackfill } from '../lib/backfill';
 import type { ApiEnvelope, BackfillRangeRow } from '../types/trading';
 import { usePolledResource } from './usePolledResource';
+
+/** How long after queueing a job the view keeps polling for its row to appear. */
+const WATCH_NEW_JOB_MS = 30_000;
 
 export interface BackfillStatusState {
   ranges: BackfillRangeRow[];
@@ -18,6 +21,10 @@ export interface BackfillStatusState {
   error: string | null;
   /** Call to re-fetch with the same params without remounting. */
   refresh: () => void;
+  /** True while the table is re-reading the endpoint on a timer. */
+  polling: boolean;
+  /** Re-fetch now and keep polling for a while, so a job just queued shows up by itself. */
+  watchForNewJob: () => void;
 }
 
 /**
@@ -36,9 +43,25 @@ export function useBackfillStatus(symbol?: string): BackfillStatusState {
   if (symbol) params.set('symbol', symbol);
   const qs = params.toString();
 
+  // Whether to poll depends on the rows the last answer carried, so it is held in state and
+  // re-derived after each answer (and each poll tick re-renders, which re-checks the watch).
+  const [polling, setPolling] = useState(false);
+  const [watchUntil, setWatchUntil] = useState<number | null>(null);
+
   const { data, loading, error, refetch } = usePolledResource<ApiEnvelope<BackfillRangeRow[]>>(
     `/api/backfill${qs ? `?${qs}` : ''}`,
+    polling ? { intervalMs: BACKFILL_POLL_MS } : {},
   );
+  const ranges = data?.data ?? [];
 
-  return { ranges: data?.data ?? [], loading, error, refresh: refetch };
+  useEffect(() => {
+    setPolling(shouldPollBackfill(data?.data ?? [], watchUntil, Date.now()));
+  }, [data, watchUntil]);
+
+  const watchForNewJob = useCallback(() => {
+    setWatchUntil(Date.now() + WATCH_NEW_JOB_MS);
+    refetch();
+  }, [refetch]);
+
+  return { ranges, loading, error, refresh: refetch, polling, watchForNewJob };
 }

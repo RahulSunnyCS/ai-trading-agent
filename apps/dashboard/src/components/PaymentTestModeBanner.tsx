@@ -1,25 +1,19 @@
-import { BadgeCheck } from 'lucide-react';
-
-import { usePaymentTestMode } from '../hooks/usePaymentTestMode';
+import { Info } from 'lucide-react';
 
 /**
- * Renders a "Test Mode" notice when using Razorpay test keys. Theme-aware via
- * the design tokens (reads correctly in light and dark). Returns null in live
- * mode — zero cost when not shown.
- *
- * Usage:
- *   <PaymentTestModeBanner />
- *   (no props needed — auto-detects from NEXT_PUBLIC_RAZORPAY_KEY_ID)
+ * "Test mode" notice for the Billing page, in the info tone. Shown only there, and only when
+ * the server says its Razorpay key is a test key (`testMode` from GET /api/payment/status,
+ * read by usePricingPlans: the one source for the flag). Renders nothing otherwise.
  */
-export function PaymentTestModeBanner() {
-  const isTest = usePaymentTestMode();
-  if (!isTest) return null;
+export function PaymentTestModeBanner({ testMode }: { testMode: boolean }) {
+  if (!testMode) return null;
 
   return (
-    <output className="mb-4 flex items-center gap-2 rounded-lg border border-positive/25 bg-positive/10 px-4 py-2.5 text-sm font-medium text-positive">
-      <BadgeCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+    <output className="flex items-center gap-2 rounded-lg border border-info/25 bg-info/10 px-4 py-2.5 text-sm">
+      <Info className="h-4 w-4 shrink-0 text-info" aria-hidden="true" />
       <span className="text-foreground">
-        Payment Test Mode — you will <strong className="font-semibold">not</strong> be charged.
+        Payment test mode: checkouts use Razorpay test keys and you will{' '}
+        <strong className="font-semibold">not</strong> be charged.
       </span>
     </output>
   );

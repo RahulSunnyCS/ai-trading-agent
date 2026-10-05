@@ -76,7 +76,7 @@ function PricingLink({ children }: { children: ReactNode }) {
   const { navigate } = useAppRoute();
   return (
     <a
-      href="/pricing"
+      href="/billing"
       className="font-medium underline underline-offset-2"
       onClick={(event) => {
         // In-app navigation keeps the form; a plain link would reload and lose the edits.
@@ -244,12 +244,12 @@ export function StrategyBuilder() {
       kind === 'credits' ? (
         <>
           You are out of credits, so this backtest did not run. Top up on the{' '}
-          <PricingLink>Pricing page</PricingLink>.
+          <PricingLink>Billing page</PricingLink>.
         </>
       ) : kind === 'access' ? (
         <>
           Backtesting needs an active access pass, so this backtest did not run. Get one on the{' '}
-          <PricingLink>Pricing page</PricingLink>.
+          <PricingLink>Billing page</PricingLink>.
         </>
       ) : (
         <Lines text={r.error} strategy={payload} />

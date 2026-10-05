@@ -10,7 +10,7 @@
 - **Paper Trade Execution** — Simulated straddle entries and exits recorded to PostgreSQL; Quantiply API integration for paper trade tracking; 3 management styles: Hold, Roll (Adjuster), Cut + Re-enter (Reducer)
 - **EOD Retrospection Engine** — BullMQ batch job computes per-personality daily metrics, Beat-Clockwork deltas, signal calibration scores, management effectiveness, and queues rule-based parameter suggestions; all results are regime-tagged (RANGING / TRENDING_STRONG / VOLATILE_REVERTING / EVENT_DAY)
 - **Parameter Evolution** — Phase 1: rule-based adjustments with minimum sample sizes, cooldown periods, and approval gates; Phase 2: Bayesian optimization; Phase 3: genetic algorithms; Phase 4: RL (if data warrants)
-- **React Dashboard** — Real-time straddle value + momentum indicators, active signals, per-personality running P&L, EOD retrospection charts, and a central Broker logins surface (currently Fyers); served via Next.js; uses Lightweight Charts and Zustand
+- **React Dashboard** — Grouped by product (redesigned under BL-013, 2026-10-05): an Overview home (market session, feed, token, paper P&L, weekly signal, evening job, credits); Live, Trades, P&L, Personalities and Regimes; Options Lab (strategies, builder with Form and YAML modes, runs, daily results, market regimes); Momentum; Data › Coverage (backfill and replay); Broker logins, Billing and Settings; behind a `/login` page when hosted remotely; served via Next.js; uses Lightweight Charts, Plotly and Zustand
 
 ## Target Users
 
