@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { NAV_GROUPS } from '../../components/shell/nav';
 import {
+  DEFAULT_TAB,
   MOMENTUM_SECTIONS,
   OPTIONS_LAB_SECTIONS,
   PATH_ALIASES,
@@ -50,6 +51,7 @@ describe('routes', () => {
   // Every path that has ever resolved must keep landing on its view. When a tab is renamed
   // or merged, its old path moves to PATH_ALIASES and stays in this table.
   it.each([
+    ['/overview', 'overview', []],
     ['/live', 'live', []],
     ['/trades', 'trades', []],
     ['/personalities', 'personalities', []],
@@ -125,6 +127,7 @@ describe('routes', () => {
   });
 
   it.each([
+    ['overview', [], 'Overview · AI Trading Agent'],
     ['trades', [], 'Trades · AI Trading Agent'],
     ['pnl', [], 'P&L · AI Trading Agent'],
     ['backtest', [], 'YAML backtest · AI Trading Agent'],
@@ -136,6 +139,11 @@ describe('routes', () => {
     ['optionslab', [], 'Options Lab › Daily results · AI Trading Agent'],
   ] as const)('titles %s %j as %s', (tab, rest, title) => {
     expect(documentTitle(tab, rest)).toBe(title);
+  });
+
+  it('renders Overview while the root path is being redirected', () => {
+    expect(DEFAULT_TAB).toBe('overview');
+    expect(buildPath(DEFAULT_TAB)).toBe('/overview');
   });
 
   it('titles an unknown route with the app name alone', () => {

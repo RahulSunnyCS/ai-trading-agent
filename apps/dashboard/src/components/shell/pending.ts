@@ -8,6 +8,7 @@ import type { Tab } from './nav';
  * gaps and Phase-2 roadmap in .claude/project/overview.md.
  */
 export const PENDING_BY_TAB: Record<Tab, string[]> = {
+  overview: [],
   live: [
     'Wire /api/straddle/latest — it currently returns a null stub',
     'Add Fyers token auto-refresh (manual daily re-login today — Phase B)',
