@@ -1,0 +1,16 @@
+{
+  "written_before_running": "2026-10-05T21:45:00+05:30",
+  "name": "BL-010 criteria, addendum 1: Monday-open repricing (Phase 2 step 7)",
+  "adds_to": "bl010_criteria.json - unchanged; this file only adds a step that file does not have",
+  "rule": "Committed before the step ran. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
+  "reason": "Owner decision 2026-10-05: a new Broad run keeps signal_delay 0, and Phase 2 measures the cost of trading at Monday's open instead of Friday's close. The flag level is fixed here so that 'does the gap matter' is not decided after seeing it.",
+  "phase_2_arithmetic": {
+    "monday_open_repricing": {
+      "what": "The engine's own trade list for each of the six Phase 2 configs, every fill moved from the fill week's last close to the next trading day's open",
+      "report": ["change in CAGR, pts", "change in max drawdown, pts"],
+      "flag_if_cagr_falls_by_more_than_pts": 1.0,
+      "flag_applies_to": "any one of the six configs",
+      "if_flagged": "Broad gets a Monday-fill execution option and results are quoted on it; a week's signal delay is not the fix"
+    }
+  }
+}

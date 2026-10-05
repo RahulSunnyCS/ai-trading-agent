@@ -241,7 +241,8 @@ contract, not a shared service).
   the simulation. Keep them filled on any new trade path (BL-010 E8).
 - `search_spaces/bl010_criteria.json` — the pre-registered objective, drawdown baskets and
   pass/kill thresholds for the evaluation review (BL-010). Never edit after results are seen;
-  supersede with a new file.
+  supersede with a new file. A step added later gets its own `bl010_criteria_addendum_N.json`,
+  committed before that step runs (addendum 1: Monday-open repricing).
 - `search.py` + `search_spaces/*.toml` — `mbt search run|analyze`: resumable parallel parameter search over
   Broad Momentum (TODO 3.9.25). Parameters are *heavy* (change the global ranking; one
   `broad.compute_universe_base` per combination) or *light* (everything after, incl. the pool cut via
