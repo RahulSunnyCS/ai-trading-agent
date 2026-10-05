@@ -3,20 +3,24 @@
  * login button that opens the Fyers authorization URL in a new tab.
  *
  * States rendered:
- *  - Not configured  → neutral badge, env-var hint, no login button
- *  - Connected       → `connected` status badge, token expiry time, secondary Re-login button
- *  - Disconnected    → negative badge, primary Login button
+ *  - Not configured → neutral badge, env-var hint, no login button
+ *  - Connected      → `connected` badge, countdown + expiry time, secondary Re-login button
+ *  - Expiring soon  → `attention` badge (two hours or less left), countdown, primary Login
+ *  - Expired        → `failed` badge, when it expired, primary Login
+ *  - No API token   → `disconnected` badge, primary Login
  *
  * After the user completes login in the new tab and switches back, the
- * useFyersAuthStatus focus-listener automatically re-polls the status — no
- * extra logic needed here.
+ * useFyersAuthStatus focus-listener re-polls the status. That refetch (and the
+ * 60 s poll) keeps the previous status on screen, so the badge and the Login
+ * button stay put; only the very first load shows "Checking connection…".
  */
 
-import { AlertCircle, CheckCircle2, ExternalLink, LogIn } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, ExternalLink, LogIn } from 'lucide-react';
 
 import { useFyersAuthStatus } from '../hooks/useFyersAuthStatus';
 import { formatIstDateTimeShort } from '../lib/format';
 import { startFyersLogin } from '../lib/fyers-login';
+import { formatCountdown } from '../lib/market';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
@@ -27,10 +31,19 @@ import { StatusDot } from './ui/StatusDot';
 // ---------------------------------------------------------------------------
 
 export function FyersAuthCard() {
-  const { status, loading, error } = useFyersAuthStatus();
+  const { status, loading, error, tokenState, msLeft } = useFyersAuthStatus();
 
-  const isConnected = Boolean(status?.connected && !status.needsReauth);
   const isConfigured = Boolean(status?.configured);
+  const isConnected = tokenState === 'valid' || tokenState === 'expiring';
+  const expiring = tokenState === 'expiring';
+  // A primary button whenever logging in is the thing to do next.
+  const loginIsPrimary = tokenState !== 'valid';
+
+  const appId = status?.appId ? (
+    <span className="text-sm text-muted">
+      App: <span className="font-mono text-xs text-foreground">{status.appId}</span>
+    </span>
+  ) : null;
 
   return (
     <Card>
@@ -40,28 +53,30 @@ export function FyersAuthCard() {
         icon={
           <StatusDot
             tone={
-              isConnected ? 'positive' : status !== null && !isConfigured ? 'neutral' : 'negative'
+              status === null || !isConfigured
+                ? 'neutral'
+                : tokenState === 'valid'
+                  ? 'primary'
+                  : expiring
+                    ? 'warning'
+                    : 'negative'
             }
-            pulse={isConnected}
+            pulse={tokenState === 'valid'}
           />
         }
         actions={
-          // Show nothing while loading to avoid flicker
-          loading ? undefined : (
-            <>
-              {isConfigured && (
-                <Button
-                  size="sm"
-                  variant={isConnected ? 'secondary' : 'primary'}
-                  onClick={startFyersLogin}
-                >
-                  <LogIn className="h-3.5 w-3.5" />
-                  {isConnected ? 'Re-login' : 'Login with Fyers'}
-                  <ExternalLink className="h-3 w-3 opacity-60" />
-                </Button>
-              )}
-            </>
-          )
+          // Hidden only until the first status arrives; background refetches leave it alone.
+          isConfigured ? (
+            <Button
+              size="sm"
+              variant={loginIsPrimary ? 'primary' : 'secondary'}
+              onClick={startFyersLogin}
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              {isConnected ? 'Re-login' : 'Login with Fyers'}
+              <ExternalLink className="h-3 w-3 opacity-60" />
+            </Button>
+          ) : undefined
         }
       />
 
@@ -69,13 +84,9 @@ export function FyersAuthCard() {
       <div className="flex flex-wrap items-center gap-3">
         {loading && <span className="text-sm text-muted">Checking connection…</span>}
 
-        {!loading && error && (
-          <p className="text-sm text-negative">Could not check Fyers status: {error}</p>
-        )}
-
         {!loading && status === null && <Badge tone="neutral">Unknown</Badge>}
 
-        {!loading && status !== null && !isConfigured && (
+        {status !== null && !isConfigured && (
           <>
             <Badge tone="neutral">Not configured</Badge>
             <p className="text-sm text-muted">
@@ -92,40 +103,83 @@ export function FyersAuthCard() {
           </>
         )}
 
-        {!loading && status !== null && isConfigured && isConnected && (
+        {status !== null && isConfigured && isConnected && (
           <>
-            <Badge status="connected" dot>
-              <CheckCircle2 className="h-3 w-3" />
-              Connected
-            </Badge>
-            {status.appId && (
+            {expiring ? (
+              <Badge status="attention" dot>
+                <AlertTriangle className="h-3 w-3" />
+                Expiring soon
+              </Badge>
+            ) : (
+              <Badge status="connected" dot>
+                <CheckCircle2 className="h-3 w-3" />
+                Connected
+              </Badge>
+            )}
+            {appId}
+            {status.expiresAt && msLeft !== null && (
               <span className="text-sm text-muted">
-                App: <span className="font-mono text-xs text-foreground">{status.appId}</span>
+                Expires in{' '}
+                <span
+                  className={
+                    expiring ? 'tabular-nums text-warning' : 'tabular-nums text-foreground'
+                  }
+                >
+                  {formatCountdown(msLeft)}
+                </span>{' '}
+                <span className="tabular-nums">
+                  ({formatIstDateTimeShort(status.expiresAt)} IST)
+                </span>
               </span>
             )}
+            {expiring && (
+              <p className="basis-full text-sm text-muted">
+                Log in again before the market opens so the live feed and backfill keep working.
+              </p>
+            )}
+          </>
+        )}
+
+        {status !== null && isConfigured && tokenState === 'expired' && (
+          <>
+            <Badge status="failed" dot>
+              <AlertCircle className="h-3 w-3" />
+              Expired
+            </Badge>
+            {appId}
             {status.expiresAt && (
               <span className="text-sm text-muted">
-                Expires{' '}
+                Expired{' '}
                 <span className="tabular-nums text-foreground">
                   {formatIstDateTimeShort(status.expiresAt)} IST
                 </span>
               </span>
             )}
+            <p className="basis-full text-sm text-muted">
+              Fyers tokens last one day. Click "Login with Fyers" to store a fresh one.
+            </p>
           </>
         )}
 
-        {!loading && status !== null && isConfigured && !isConnected && (
+        {status !== null && isConfigured && tokenState === 'missing' && (
           <>
-            <Badge tone="negative" dot>
+            <Badge status="disconnected" dot>
               <AlertCircle className="h-3 w-3" />
               No API token
             </Badge>
             <p className="text-sm text-muted">
-              {status.degraded
-                ? 'The token is missing, expired, or belongs to a different app. Re-login with Fyers.'
+              {status.expiresAt
+                ? 'The stored token belongs to a different app. Re-login with Fyers.'
                 : 'Click "Login with Fyers" to authorise this app and store a fresh token.'}
             </p>
           </>
+        )}
+
+        {!loading && error && (
+          <p className="basis-full text-sm text-negative">
+            Could not check Fyers status: {error}
+            {status !== null ? ' (showing the last known state)' : ''}
+          </p>
         )}
       </div>
     </Card>

@@ -14,7 +14,15 @@ export const DEFAULT_NAVIGATION_PREFERENCES: NavigationPreferences = {
   order: [...CONFIGURABLE_IDS],
 };
 
-/** Repair stale/partial browser preferences when tabs are added or removed. */
+/**
+ * Repair stale/partial browser preferences when tabs are added or removed.
+ *
+ * `order` is one flat ranking of tab ids and says nothing about groups:
+ * `visibleNavigationGroups` only uses it to sort tabs *within* each group. So a
+ * value stored under an earlier grouping (Trading / Research / Account) needs no
+ * migration and no new storage key when the groups change: hidden tabs stay
+ * hidden and any two tabs that share a group keep their relative order.
+ */
 export function normalizeNavigationPreferences(value: unknown): NavigationPreferences {
   const candidate =
     value && typeof value === 'object' ? (value as Partial<NavigationPreferences>) : {};

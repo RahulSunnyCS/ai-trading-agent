@@ -1,17 +1,22 @@
+'use client';
+
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Info } from 'lucide-react';
+
+import { useSettingsStore } from '../../store/settings';
 
 /**
  * Info icon that reveals a tab's "what's still pending to complete" checklist
  * on hover (and on keyboard focus). Items are shown as an ordered list, one
- * line each, in the order provided. Renders nothing when there is nothing
- * pending.
+ * line each, in the order provided. A developer aid: renders nothing unless
+ * Developer mode is on (Settings → About), or when there is nothing pending.
  */
 export function PendingInfo({
   items,
   title = 'Pending in this tab',
 }: { items: string[]; title?: string }) {
-  if (items.length === 0) return null;
+  const developer = useSettingsStore((state) => state.developer);
+  if (!developer || items.length === 0) return null;
 
   return (
     <Tooltip.Provider delayDuration={120}>

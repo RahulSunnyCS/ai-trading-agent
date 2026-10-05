@@ -24,6 +24,11 @@ import { formatNumber } from '../lib/format';
 import { describeConfig } from '../lib/momentumConfig';
 import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
 import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
+import {
+  FULL_HISTORY_YEARS,
+  getDefaultDateRangeYears,
+  getDefaultMomentumDataset,
+} from '../store/settings';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
 import { MomentumCircuitExposureCard } from './momentum/MomentumCircuitExposure';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
@@ -123,6 +128,21 @@ const DATASET_OPTIONS: ReadonlyArray<SegmentedOption<Dataset>> = VISIBLE_DATASET
   value: item.id,
   label: <span title={item.description}>{item.label}</span>,
 }));
+
+/**
+ * The start date for a fresh form: Settings › Defaults › Backtest period (the last N years,
+ * never earlier than the data begins) when one is set, else the dataset's own default.
+ */
+function defaultStart(meta: MomentumMeta, defaults: Record<string, unknown>): string {
+  const fallback = stringDefault(defaults, 'start', meta.first_week);
+  const years = getDefaultDateRangeYears();
+  if (years === null) return fallback;
+  if (years === FULL_HISTORY_YEARS) return meta.first_week;
+  const from = new Date(`${meta.last_week}T00:00:00Z`);
+  from.setUTCFullYear(from.getUTCFullYear() - years);
+  const start = from.toISOString().slice(0, 10);
+  return start > meta.first_week ? start : meta.first_week;
+}
 
 function numberDefault(defaults: Record<string, unknown>, key: string, fallback: number): number {
   const value = defaults[key];
@@ -248,6 +268,9 @@ export function MomentumBacktestingView() {
   const [dataset, setDatasetState] = useState<Dataset>(() => {
     if (urlDataset && VISIBLE_DATASET_IDS.has(urlDataset)) return urlDataset;
     if (lastDataset && VISIBLE_DATASET_IDS.has(lastDataset)) return lastDataset;
+    // Settings › Defaults › Momentum dataset.
+    const preferred = getDefaultMomentumDataset();
+    if (preferred && VISIBLE_DATASET_IDS.has(preferred)) return preferred;
     const initial = activeRun?.dataset;
     return initial === 'etf' ||
       initial === 'stock' ||
@@ -401,7 +424,9 @@ export function MomentumBacktestingView() {
       selected: Array.isArray(seed?.universe)
         ? (seed.universe as unknown[]).filter((v): v is string => typeof v === 'string')
         : selectedByDefault(nextMeta),
-      start: stringDefault(base, 'start', nextMeta.first_week),
+      start: seed
+        ? stringDefault(base, 'start', nextMeta.first_week)
+        : defaultStart(nextMeta, base),
       end: stringDefault(base, 'end', nextMeta.last_week),
       topN: numberDefault(base, 'top_n', 5),
       exitRank: numberDefault(base, 'exit_rank', 10),

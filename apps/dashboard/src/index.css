@@ -140,3 +140,24 @@
     }
   }
 }
+
+/*
+ * Compact density (Settings → Appearance). `store/settings.ts` puts `.density-compact` on <html>.
+ * Kept outside the layers and one selector deeper than a utility class, so these win over the
+ * `py-*` / `text-*` classes on the shared Table and StatCard primitives without `!important`.
+ * Comfortable (no class) is untouched.
+ */
+.density-compact table {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+.density-compact table th,
+.density-compact table td {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+/* KPI figures (StatCard's value) step down one size. */
+.density-compact .metric.text-2xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}

@@ -8,8 +8,11 @@ export interface Meta {
 }
 
 export interface MetaState {
+  /** The last successful response; kept while a later poll fails. */
   meta: Meta | null;
   loading: boolean;
+  /** Why the most recent request failed, or null when it succeeded (or none has settled). */
+  error: string | null;
 }
 
 const POLL_MS = 30_000;
@@ -17,10 +20,11 @@ const POLL_MS = 30_000;
 /**
  * Polls /api/meta for environment + broker-health status shown in the top bar
  * (SIM/LIVE badge, broker name, auth-degraded warning). Built on
- * usePolledResource; fails quietly (meta stays null) so the shell renders
- * even if the endpoint is down.
+ * usePolledResource; a failure never throws (meta stays at its last value, or
+ * null) so the shell renders even if the endpoint is down, and `error` says
+ * whether the last poll reached the API.
  */
 export function useMeta(): MetaState {
-  const { data, loading } = usePolledResource<Meta>('/api/meta', { intervalMs: POLL_MS });
-  return { meta: data, loading };
+  const { data, loading, error } = usePolledResource<Meta>('/api/meta', { intervalMs: POLL_MS });
+  return { meta: data, loading, error };
 }
