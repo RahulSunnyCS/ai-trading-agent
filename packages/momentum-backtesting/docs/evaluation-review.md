@@ -12,7 +12,8 @@ by phase, and what has not yet been re-verified.
 | Engine bugs E1–E7 | Each reproduced by a test that fails on the old code and passes on the fix |
 | E8 (trade log could not be audited) | Fixed; a test rebuilds the final portfolio from the trade log alone |
 | Stored round 7 arm A results | The unfixed code reproduces all six configs below to 5 decimals |
-| E9, F11 (live preview ≠ backtest, differing defaults) | Not yet examined — Phase 1b |
+| F11 (live Rebalance ranking rebuilt its pool with the legacy series rule) | Fixed in Phase 1b; `verified` is now the default rule everywhere |
+| E9 (API / CLI / search defaults differ) | Series rule and the CLI's skipped weeks fixed. Still different: Broad's API default signal delay is 0 and circuit locks are off, the search uses 1 and on |
 | Findings F1–F10, F12–F16 and their numbers | Taken from the 2026-10-04 review session; **not** independently re-verified, and the queries that produced them are not captured here yet |
 
 ## Phase 1a — what each engine fix does to round 7 arm A
@@ -64,3 +65,15 @@ conservative −29.69 → −33.03; medians −28.50 → −25.88, −47.07 → 
 
 Reproduce: `impact.py` + `picks.json` (kept with the PR description), run once per source tree
 with `PYTHONPATH` pointing at that tree and `MOMENTUM_DATA_DIR` at the data directory.
+
+## Phase 1b — live preview against the backtest (2026-10-05)
+
+- The Rebalance preview runs the same `_run_broad` function as the backtest on the stored
+  ranking plus one flat week, so its target for week t is what the backtest holds after trading
+  at t. For a strategy with `signal_delay = 1` that means the target comes from the ranking at
+  t−1 — exactly what was backtested, and one week older than the freshest ranking. Whether live
+  trading should act on the fresher ranking is an operating decision, not a bug; it is open.
+- The Friday Telegram signal (`mbt weekly`) runs the ETF strategy in `live_config.toml`. No
+  Broad Momentum config feeds it.
+- Not yet done: replaying the preview week by week over the last 12 weeks against the backtest
+  (needs data truncated at each week — the Phase 2 harness).

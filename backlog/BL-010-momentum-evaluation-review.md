@@ -297,7 +297,11 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
 
 ## Open questions
 
-None open.
+1. Broad defaults in the API and dashboard: signal delay 0 and circuit locks off, against the
+   search's 1 and on. Switch them (changes what a default dashboard run shows)?
+2. For a delay-1 strategy the Rebalance preview targets last week's ranking, as backtested.
+   When trading live, act on that or on the freshest ranking?
+3. Which strategy will be followed with real money (ETF signal or a Broad candidate) — not yet decided.
 
 ### Answered
 
@@ -327,3 +331,6 @@ None open.
   been re-verified. Phase 1, first half: E1–E8 fixed with tests on branch
   `feat/bl-010-phase-0-1`; impact table in `docs/evaluation-review.md`.
 - 2026-10-05 — owner accepted the three Phase 1a decisions (E5 kept, E3 gap left, C2 dropped).
+- 2026-10-05 — Phase 1a merged (PR #10). Phase 1b: `verified` made the default series rule (owner
+  approved), live ranking uses the ranking's own rule, CLI thin weeks fixed. Found: the Telegram
+  signal is the ETF strategy; the Broad preview is literally equal to the backtest by construction.

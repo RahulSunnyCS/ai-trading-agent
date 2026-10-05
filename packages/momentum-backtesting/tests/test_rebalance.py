@@ -99,6 +99,55 @@ def test_live_stock_ltp_is_scaled_to_total_return_units_without_mutating_history
     assert symbols == {"C0001": "NSE:EXAMPLE-EQ"}
 
 
+def test_live_broad_ranking_rebuilds_the_pool_with_the_rankings_own_series_rule(
+    monkeypatch, tmp_path
+):
+    """The live preview rebuilds pool membership and the liquidity gate. They must come from the
+    same price-series rule as the ranking, or their columns describe different segments."""
+    weeks = pd.date_range("2026-01-02", "2026-09-25", freq="W-FRI")
+    columns = ["AAA", *rebalance.broad.ATOMIC_NAMES]
+    prices = pd.DataFrame(100.0, index=weeks, columns=columns)
+    ranking = rebalance.broad.UniverseRanking(
+        prices=prices,
+        weeks=list(weeks),
+        global_ranks=pd.DataFrame(1.0, index=weeks, columns=columns),
+        pool_membership=pd.DataFrame(True, index=weeks, columns=["AAA"]),
+        stock_pool_ranks=pd.DataFrame(1.0, index=weeks, columns=["AAA"]),
+        combined_pool_ranks=pd.DataFrame(1.0, index=weeks, columns=columns),
+        column_to_base_symbol={"AAA": "AAA"},
+        events=pd.DataFrame(),
+        stale_columns={},
+        missing_symbols=[],
+    )
+    (tmp_path / "daily_etf").mkdir()
+    for name in ("Nasdaq 100", "Hang Seng"):
+        pd.DataFrame({"close": [50.0]}).to_csv(tmp_path / "daily_etf" / f"{name}.csv")
+    quotes = dict.fromkeys(broad_quote_symbols(ranking).values(), 100.0)
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def universe_frame(**kwargs):
+        seen.update(kwargs)
+        raise Stop
+
+    monkeypatch.setattr(rebalance.broad, "load_stock_universe_frame", universe_frame)
+    for policy in ("verified", "legacy"):
+        with pytest.raises(Stop):
+            rebalance.live_broad_ranking(
+                ranking,
+                quotes,
+                date(2026, 9, 30),
+                Config(lookbacks=(1, 2)),
+                pool_top_n=10,
+                pool_exit_rank=20,
+                data_dir=tmp_path,
+                series_breaks=policy,
+            )
+        assert seen["series_breaks"] == policy
+
+
 def test_model_holdings_reads_signal_week_not_last_row():
     week = pd.Timestamp("2026-10-02")
     result = Result(

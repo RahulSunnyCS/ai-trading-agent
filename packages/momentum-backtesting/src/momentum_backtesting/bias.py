@@ -127,7 +127,7 @@ class Runner:
             **kwargs,
             liquidity=liquidity,
             universe_kind=universe_kind,
-            series_breaks=h.get("series_break_policy", "legacy"),
+            series_breaks=h.get("series_break_policy", "verified"),
         )
 
     def locks(self, ranking):

@@ -185,7 +185,7 @@ def build_stock_weekly_prices(
     stocks_data_dir: Path,
     min_drop_pct: float = DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = DEFAULT_TURNOVER_SPIKE_MULTIPLE,
-    series_breaks: str = "legacy",
+    series_breaks: str = "verified",
     carry_forward_stopped_segments: bool = True,
     return_raw_weekly: bool = False,
 ) -> (
