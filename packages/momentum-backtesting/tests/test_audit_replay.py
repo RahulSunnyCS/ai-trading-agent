@@ -466,7 +466,7 @@ def test_asset_definitions_place_a_split_series_in_time():
     assert assets[CASH] == {"kind": "liquid_fund", "instrument": CASH}
 
 
-# --- the truncated database for the look-ahead test ------------------------------------------------
+# --- the truncated database for the look-ahead test ---------------------------------------------
 
 
 def test_a_truncated_root_holds_nothing_after_the_cut(small_market, tmp_path_factory):
