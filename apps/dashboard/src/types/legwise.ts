@@ -85,6 +85,8 @@ export interface DayRow {
 
 export interface BacktestResponse {
   strategy_id: string;
+  /** Every builder run is stored as an `adhoc` run under this id (legwise_routes.py). */
+  run_id?: string | undefined;
   days: DayRow[];
 }
 

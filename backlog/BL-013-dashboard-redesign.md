@@ -510,4 +510,39 @@ Answered by the owner on 2026-10-05, when the item was started.
     diff is a native tooltip; in-session and saved "Run N" are still two sequences in the
     store (the tab shows the saved name once saved); the overlay rule in the parent still
     assumes the first saved run is the one shown.
+- 2026-10-05 — **Phase 7 done** (branch `feat/bl-013-phase-7`). Options Lab has five sections:
+  Strategies, Builder (Form | YAML), Runs, Daily results, Regimes. `/backtest` and
+  `/optionslab/yaml` redirect to `/optionslab/builder/yaml`; the YAML tab left the navigation and
+  `BacktestView.tsx` is gone.
+  - Builder: legs as collapsible one-line summaries beside a sticky run rail (date range,
+    "Backtest · 1 credit · N left" when billing is on, live validation with pydantic paths placed
+    beside their fields, the latest result with Δ vs the saved version and a sparkline); busy
+    states; 402 handled with a link to Pricing; loaded name + sha, dirty flag, confirms before
+    Save overwrites and before New / Load / a template discards edits; unique ids on copy;
+    Short straddle / Short strangle / Iron condor templates (all 15 template × index pairs pass
+    the engine's validate endpoint); tooltips on the re-entry, trail, square-off and strike
+    terms; the run id with a copy button. `?load=<name>` (from Strategies) opens a strategy.
+  - Daily results: the evening run is a status bar with options and log behind a disclosure;
+    a sortable strategy comparison table with sparklines replaces the stat cards; clicking a
+    day opens its replay inline; weekday, DTE, VIX-open and gap columns; sticky day column;
+    date-range filter; the underlying comes from the strategies; QUIET has its own glyph.
+  - Regimes: month and weekday labels, focusable cells with a readout, direction glyphs, a
+    neutral diverging tint for lift, a dedicated share chart with a 50 % line, an Expiry /
+    Non-expiry filter, CLI hints as copyable commands. Cut times live in `store/regimeCuts.ts`
+    and Daily results and the replay now use them.
+  - One regime vocabulary in `lib/regimeMeta.ts` (`<RegimeBadge>`), used by Regimes and the
+    YAML result.
+  - Runs: one list of YAML registry runs and leg-wise runs with the unit on every Net figure,
+    a kind filter, two-run comparison within a kind, and a detail view per run.
+  - Checked: typecheck, 663 dashboard unit tests, Biome; in the browser (page text and DOM;
+    the pane was not displayed, so no screenshots) every section loaded real local data with no
+    console errors, `?load=` opened the strategy, `/backtest` redirected, and a day's replay
+    opened inline. No backtest was run and nothing was saved.
+  - Where the data fell short: `/legwise/results` returns only the evening job's daily rows,
+    without kind, run id or time, so builder experiments (stored as `adhoc` runs) are not
+    listed in Runs; the YAML registry keeps headline figures only, so a stored YAML run has no
+    per-session rows or equity chart. Both are §3.12.13 items.
+  - How it was built: four parallel agents were stopped part-way when the session hit a usage
+    limit; their work was picked up from the working tree, the missing Runs panel written, the
+    shared pieces wired (cuts store, regime badge, `?load=`), and the checks above run.
 

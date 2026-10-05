@@ -10,8 +10,7 @@ orientation pointer rather than duplicating that.
 
 `@ata/dashboard` (Next.js + React 18 + Zustand + Tailwind) is the frontend: live
 straddle/momentum charts (Lightweight Charts), active signals, per-personality
-running P&L, EOD retrospection charts, pricing/payment UI, a "Backtest"
-tab for `packages/option-backtesting`'s results, and an "Options Lab" tab
+running P&L, EOD retrospection charts, pricing/payment UI, and an "Options Lab" tab
 (`OptionsLabView.tsx` + `components/optionslab/`) — daily leg-wise option
 strategies on the Fyers 1-minute data: saved `obt daily` results, the evening
 run button, and an AlgoTest-style strategy builder that validates, backtests
@@ -25,7 +24,8 @@ touchpad zoom and the shared CSS theme tokens.
 
 **Routing:** the URL is the source of truth for tab and sub-tab (`app/[[...slug]]/page.tsx`
 renders the shell; `lib/routes.ts` holds the path grammar, `hooks/useAppRoute.ts` reads/pushes
-it). Paths: `/<tab>`, `/optionslab/<results|regimes|builder>`,
+it). Paths: `/<tab>`, `/optionslab/<strategies|builder|runs|results|regimes>`,
+`/optionslab/builder/yaml` (the YAML engine; `/backtest` redirects there),
 `/momentum/<backtest|scores|saved|weekly|rebalance>`, `/momentum/backtest/<dataset>`,
 `/momentum/scores/<stocks|sectors>`. A new sub-tab = add its ids to `lib/routes.ts` and derive
 state from `useAppRoute().rest` — don't add another `useState` for navigation. `useAppRoute`
@@ -74,7 +74,7 @@ needs to be shared with the server, it is currently hand-duplicated in
 ## Source layout
 
 - `src/components/` — one file per dashboard view/dialog (`LiveView.tsx`,
-  `PersonalitiesView.tsx`, `BacktestView.tsx`, `PnlView.tsx`, …), plus
+  `PersonalitiesView.tsx`, `OptionsLabView.tsx`, `PnlView.tsx`, …), plus
   `shell/` (layout chrome) and `ui/` (generic primitives)
 - `src/pages/` — top-level routed pages
 - `src/hooks/` — one hook per data resource, all built on `usePolledResource`

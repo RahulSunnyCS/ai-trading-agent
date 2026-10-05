@@ -1,761 +1,595 @@
 /**
- * Options Lab → Strategy builder: an AlgoTest/Quantiply-style form over the
- * leg-wise schema (legwise/schema.py). Load a saved strategy or start fresh,
- * edit instrument/timing, legs (strike, SL, target, trail SL, re-entry, range
- * breakout) and the overall stop/target, then Validate, Backtest over the
- * collected Fyers days (nothing saved), or Save to strategies/legwise/<name>.yaml
- * — after which the evening run includes it.
+ * Options Lab → Strategy builder: an AlgoTest/Quantiply-style form over the leg-wise schema
+ * (legwise/schema.py). Two panes from `xl`: the strategy and its legs (each collapsed to a
+ * one-line summary) on the left, and a sticky run rail on the right with the date range, live
+ * validation, Backtest (its credit cost beside it), Save and the latest run.
  *
- * The form only shapes JSON; the Python schema is the validator and its
- * messages are shown verbatim.
+ * The form only shapes JSON; the Python schema is the validator. It is asked on every edit
+ * (useLegwiseValidate) and its messages are placed beside the fields they are about.
+ * Pure logic (defaults, templates, summaries, dirty check, message mapping) lives in
+ * lib/legwiseBuilder.ts.
  */
 
-import { CheckCircle2, Copy, FlaskConical, Plus, Save, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useAppRoute } from '../../hooks/useAppRoute';
 import { LEGWISE_API, useLegwiseResults, useLegwiseStrategies } from '../../hooks/useLegwise';
+import { useLegwiseValidate } from '../../hooks/useLegwiseValidate';
+import { usePaymentBalance } from '../../hooks/usePaymentBalance';
 import { apiPost, apiPut } from '../../lib/api';
-import { formatNumber, formatPnl } from '../../lib/format';
 import {
-  type BaselineComparison,
-  compareToBaseline,
-  lotsOf,
-  statsOf,
-} from '../../lib/legwiseStats';
-import type {
-  Amount,
-  BacktestResponse,
-  DayRow,
-  Leg,
-  LegwiseStrategy,
-  ReEntry,
-  Underlying,
-} from '../../types/legwise';
+  STRATEGY_NAME_RE,
+  TEMPLATES,
+  type TemplateId,
+  UNDERLYINGS,
+  buildTemplate,
+  fromSaved,
+  isDirty,
+  newLeg,
+  newStrategy,
+  nextLegId,
+  parseIssue,
+  placeIssues,
+  runFailureKind,
+  toPayload,
+} from '../../lib/legwiseBuilder';
+import { compareToBaseline, lotsOf } from '../../lib/legwiseStats';
+import type { BacktestResponse, Leg, LegwiseStrategy } from '../../types/legwise';
+import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
-import { NumberField } from '../ui/Input';
-import { StatCard } from '../ui/StatCard';
-import { THead, TRow, Table, Td, Th } from '../ui/Table';
-import {
-  CumulativeLines,
-  Field,
-  NumberInput,
-  Select,
-  TextInput,
-  TradeLog,
-  pnlClass,
-} from './shared';
+import { toast } from '../ui/Toast';
+import { ConfirmDialog, type ConfirmRequest } from './builder/ConfirmDialog';
+import { LegCard } from './builder/LegCard';
+import { ResultTable } from './builder/ResultTable';
+import { RunRail } from './builder/RunRail';
+import { Choice, LabeledField, OptionalNumber, TextField } from './builder/fields';
 
-const UNDERLYINGS: readonly Underlying[] = [
-  'NIFTY',
-  'BANKNIFTY',
-  'MIDCPNIFTY',
-  'FINNIFTY',
-  'SENSEX',
-];
-const STRIKE_TYPES = [
-  'ITM3',
-  'ITM2',
-  'ITM1',
-  'ATM',
-  'OTM1',
-  'OTM2',
-  'OTM3',
-  'OTM4',
-  'OTM5',
-  'OTM6',
-  'OTM7',
-  'OTM8',
-  'OTM9',
-  'OTM10',
-] as const;
+const BLANK_NAME = 'my_strategy';
 
-function newLeg(n: number): Leg {
-  return {
-    id: `leg${n}`,
-    lots: 1,
-    position: 'sell',
-    option_type: n % 2 === 0 ? 'PE' : 'CE',
-    expiry: 'weekly',
-    strike: { strike_type: 'ATM' },
-    stop_loss: { percent: 25 },
-  };
+const HINTS = {
+  noReentryAfter:
+    'After this time a stopped-out leg is not re-entered, even if it has re-entries left.',
+  squareOff:
+    'Partial closes only the leg whose stop loss or target was hit; Complete closes every leg as soon as any one of them is.',
+} as const;
+
+interface Version {
+  name: string;
+  strategy: LegwiseStrategy;
 }
 
-function newStrategy(): LegwiseStrategy {
-  return {
-    id: 'my_strategy',
-    underlying: 'NIFTY',
-    entry_time: '09:20',
-    exit_time: '15:15',
-    square_off: 'partial',
-    legs: [newLeg(1), newLeg(2)],
-    overall: {},
-    execution: { slippage_pct: 0, cost_per_order_inr: 0 },
-  };
-}
-
-/** Drop keys whose value is undefined — the Python schema forbids nulls for optionals. */
-function clean<T extends object>(o: T): T {
-  return JSON.parse(JSON.stringify(o)) as T;
-}
-
-type Unit = 'off' | 'points' | 'percent';
-
-function AmountEditor(props: {
-  label: string;
-  value: Amount | undefined;
-  onChange: (a: Amount | undefined) => void;
-}) {
-  const unit: Unit =
-    props.value?.points !== undefined
-      ? 'points'
-      : props.value?.percent !== undefined
-        ? 'percent'
-        : 'off';
-  const num = props.value?.points ?? props.value?.percent;
-  const set = (u: Unit, v: number | undefined) =>
-    props.onChange(
-      u === 'off' ? undefined : u === 'points' ? { points: v ?? 10 } : { percent: v ?? 25 },
-    );
-  return (
-    <Field label={props.label}>
-      <div className="flex gap-1.5">
-        <Select<Unit>
-          value={unit}
-          options={[
-            { value: 'off', label: 'Off' },
-            { value: 'points', label: 'Points' },
-            { value: 'percent', label: '%' },
-          ]}
-          onChange={(u) => set(u, num)}
-        />
-        <NumberInput
-          value={num}
-          disabled={unit === 'off'}
-          step={0.5}
-          onChange={(v) => set(unit, v)}
-        />
-      </div>
-    </Field>
-  );
-}
-
-function ReEntryEditor(props: {
-  label: string;
-  value: ReEntry | undefined;
-  onChange: (r: ReEntry | undefined) => void;
-}) {
-  const mode = props.value?.mode ?? 'off';
-  return (
-    <Field label={props.label}>
-      <div className="flex gap-1.5">
-        <Select<'off' | 'asap' | 'cost'>
-          value={mode}
-          options={[
-            { value: 'off', label: 'Off' },
-            { value: 'cost', label: 'RE COST' },
-            { value: 'asap', label: 'RE ASAP' },
-          ]}
-          onChange={(m) =>
-            props.onChange(m === 'off' ? undefined : { mode: m, count: props.value?.count ?? 1 })
-          }
-        />
-        <NumberInput
-          value={props.value?.count}
-          disabled={mode === 'off'}
-          onChange={(c) => props.value && props.onChange({ ...props.value, count: c ?? 1 })}
-          className="w-16"
-        />
-      </div>
-    </Field>
-  );
-}
-
-function LegEditor(props: {
-  leg: Leg;
-  index: number;
-  onChange: (leg: Leg) => void;
-  onRemove: () => void;
-  onCopy: () => void;
-}) {
-  const { leg, onChange } = props;
-  const set = <K extends keyof Leg>(key: K, value: Leg[K]) => onChange({ ...leg, [key]: value });
-  const byPremium = leg.strike.closest_premium !== undefined;
-  const trailUnit: Unit = leg.trail_sl?.points
-    ? 'points'
-    : leg.trail_sl?.percent
-      ? 'percent'
-      : 'off';
-  const trail = leg.trail_sl?.points ?? leg.trail_sl?.percent;
-  const setTrail = (u: Unit, xy: [number, number] | undefined) =>
-    set(
-      'trail_sl',
-      u === 'off'
-        ? undefined
-        : u === 'points'
-          ? { points: xy ?? [10, 5] }
-          : { percent: xy ?? [10, 5] },
-    );
-  const rb = leg.range_breakout;
-
-  return (
-    <div className="rounded-lg border border-border bg-surface-2/30 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-faint">
-          Leg {props.index + 1}
-        </span>
-        <div className="flex gap-1">
-          <Button size="icon" variant="ghost" onClick={props.onCopy} aria-label="Copy leg">
-            <Copy className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={props.onRemove} aria-label="Remove leg">
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <Field label="Id">
-          <TextInput value={leg.id} onChange={(v) => set('id', v)} className="w-20" />
-        </Field>
-        <Field label="Lots">
-          <div className="w-16">
-            <NumberField
-              value={leg.lots}
-              min={1}
-              step={1}
-              aria-label="Lots"
-              onChange={(v) => set('lots', v)}
-            />
-          </div>
-        </Field>
-        <Field label="Position">
-          <Select
-            value={leg.position}
-            options={['sell', 'buy'] as const}
-            onChange={(v) => set('position', v)}
-          />
-        </Field>
-        <Field label="Option">
-          <Select
-            value={leg.option_type}
-            options={['CE', 'PE'] as const}
-            onChange={(v) => set('option_type', v)}
-          />
-        </Field>
-        <Field label="Expiry">
-          <Select
-            value={leg.expiry}
-            options={[
-              { value: 'weekly', label: 'Weekly' },
-              { value: 'next_weekly', label: 'Next weekly' },
-              { value: 'monthly', label: 'Monthly' },
-            ]}
-            onChange={(v) => set('expiry', v)}
-          />
-        </Field>
-        <Field label="Strike">
-          <div className="flex gap-1.5">
-            <Select<'type' | 'premium'>
-              value={byPremium ? 'premium' : 'type'}
-              options={[
-                { value: 'type', label: 'Strike type' },
-                { value: 'premium', label: 'Closest premium' },
-              ]}
-              onChange={(m) =>
-                set('strike', m === 'premium' ? { closest_premium: 50 } : { strike_type: 'ATM' })
-              }
-            />
-            {byPremium ? (
-              <NumberInput
-                value={leg.strike.closest_premium}
-                onChange={(v) => set('strike', { closest_premium: v ?? 50 })}
-              />
-            ) : (
-              <Select
-                value={(leg.strike.strike_type ?? 'ATM') as (typeof STRIKE_TYPES)[number]}
-                options={STRIKE_TYPES}
-                onChange={(v) => set('strike', { strike_type: v })}
-              />
-            )}
-          </div>
-        </Field>
-      </div>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <AmountEditor
-          label="Stop loss"
-          value={leg.stop_loss}
-          onChange={(a) => set('stop_loss', a)}
-        />
-        <AmountEditor label="Target" value={leg.target} onChange={(a) => set('target', a)} />
-        <Field label="Trail SL (every X move SL by Y)">
-          <div className="flex gap-1.5">
-            <Select<Unit>
-              value={trailUnit}
-              options={[
-                { value: 'off', label: 'Off' },
-                { value: 'points', label: 'Points' },
-                { value: 'percent', label: '%' },
-              ]}
-              onChange={(u) => setTrail(u, trail)}
-            />
-            <NumberInput
-              value={trail?.[0]}
-              disabled={trailUnit === 'off'}
-              onChange={(x) => setTrail(trailUnit, [x ?? 1, trail?.[1] ?? 1])}
-              className="w-16"
-            />
-            <NumberInput
-              value={trail?.[1]}
-              disabled={trailUnit === 'off'}
-              onChange={(y) => setTrail(trailUnit, [trail?.[0] ?? 1, y ?? 1])}
-              className="w-16"
-            />
-          </div>
-        </Field>
-        <ReEntryEditor
-          label="Re-entry on SL"
-          value={leg.reentry_on_sl}
-          onChange={(r) => set('reentry_on_sl', r)}
-        />
-        <ReEntryEditor
-          label="Re-entry on target"
-          value={leg.reentry_on_target}
-          onChange={(r) => set('reentry_on_target', r)}
-        />
-      </div>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="flex items-center gap-2 pb-2 text-xs text-muted">
-          <input
-            type="checkbox"
-            checked={rb !== undefined}
-            onChange={(e) =>
-              set(
-                'range_breakout',
-                e.target.checked
-                  ? { until: '09:45', side: 'high', source: 'instrument' }
-                  : undefined,
-              )
-            }
-          />
-          Range breakout
-        </label>
-        {rb && (
-          <>
-            <Field label="Range until">
-              <TextInput
-                type="time"
-                value={rb.until}
-                onChange={(v) => set('range_breakout', { ...rb, until: v })}
-              />
-            </Field>
-            <Field label="Break of">
-              <Select
-                value={rb.side}
-                options={[
-                  { value: 'high', label: 'High' },
-                  { value: 'low', label: 'Low' },
-                ]}
-                onChange={(v) => set('range_breakout', { ...rb, side: v })}
-              />
-            </Field>
-            <Field label="Range on">
-              <Select
-                value={rb.source}
-                options={[
-                  { value: 'instrument', label: 'Option premium' },
-                  { value: 'underlying', label: 'Index' },
-                ]}
-                onChange={(v) => set('range_breakout', { ...rb, source: v })}
-              />
-            </Field>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function BacktestResult({
-  result,
-  lots,
-  baseline,
-}: {
+interface Run {
   result: BacktestResponse;
+  /** The strategy's "one lot" when it ran, so later edits to lots do not rescale the result. */
   lots: number;
-  /** The saved version's stored ₹/lot per day, when one is loaded and has results. */
-  baseline: Map<string, number> | null;
-}) {
-  const [open, setOpen] = useState<string | null>(null);
-  // Same divisor statsOf and compareToBaseline use, so every column is ₹ per lot.
-  const perLot = lots > 0 ? lots : 1;
-  const st = statsOf(result.days, lots);
-  const cmp: BaselineComparison | null = baseline
-    ? compareToBaseline(result.days, lots, baseline)
-    : null;
+  /** The exact JSON that ran, to tell whether the form has moved on since. */
+  sent: string;
+}
+
+function blank(): Version {
+  return { name: BLANK_NAME, strategy: newStrategy() };
+}
+
+function PricingLink({ children }: { children: ReactNode }) {
+  const { navigate } = useAppRoute();
   return (
-    <Card>
-      <CardHeader
-        title="Backtest result"
-        description={`${result.strategy_id} over ${st.days} collected days · ₹ per lot${
-          st.thin ? ' · fewer than 20 days: ratios are noise' : ''
-        }`}
-      />
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard
-          label="Net / lot"
-          value={formatPnl(st.total)}
-          tone={st.total >= 0 ? 'positive' : 'negative'}
-        />
-        <StatCard label="Up days" value={`${st.up} / ${st.days}`} />
-        <StatCard
-          label="Expectancy"
-          value={st.expectancy === null ? '—' : formatPnl(st.expectancy)}
-          note="avg ₹ / day"
-        />
-        <StatCard
-          label="Profit factor"
-          value={formatNumber(st.profitFactor, 2)}
-          note={st.avgLoss === null ? 'no losing day' : `avg loss ${formatPnl(st.avgLoss)}`}
-        />
-        <StatCard
-          label="Worst day"
-          value={st.worst === null ? '—' : formatPnl(st.worst)}
-          tone="negative"
-          note={`losing streak ${st.longestLosingStreak}`}
-        />
-        <StatCard label="Max drawdown" value={formatPnl(st.maxDrawdown)} tone="negative" />
-      </div>
-      {cmp && cmp.shared > 0 && (
-        <p className="mb-3 text-sm">
-          <span className="text-muted">
-            Versus the saved version over {cmp.shared} shared days:{' '}
-          </span>
-          <span className={pnlClass(cmp.deltaTotal)}>
-            {formatPnl(cmp.deltaTotal)} per lot (
-            {cmp.deltaTotal >= 0 ? 'edit did better' : 'edit did worse'})
-          </span>
-          {cmp.uncovered > 0 && (
-            <span className="text-faint">
-              {' '}
-              · {cmp.uncovered} days have no stored result for the saved version and are not
-              compared
-            </span>
-          )}
-        </p>
-      )}
-      <CumulativeLines lines={[{ id: result.strategy_id, points: st.cumulative }]} />
-      <Table>
-        <THead>
-          <Th>Day</Th>
-          <Th align="right">Trades</Th>
-          <Th align="right">Net / lot</Th>
-          {cmp && cmp.shared > 0 && <Th align="right">Saved (₹/lot)</Th>}
-          {cmp && cmp.shared > 0 && <Th align="right">Δ / lot</Th>}
-          <Th align="right">Worst MTM / lot</Th>
-          <Th>Note</Th>
-        </THead>
-        <tbody>
-          {result.days.map((d: DayRow) => (
-            <TRow
-              key={d.day}
-              onClick={() => setOpen(open === d.day ? null : d.day)}
-              selected={open === d.day}
-            >
-              <Td numeric className="whitespace-nowrap">
-                {d.day} {open === d.day ? '▾' : '▸'}
-              </Td>
-              <Td align="right" numeric>
-                {d.trades.length}
-              </Td>
-              <Td align="right" numeric className={pnlClass(d.net)}>
-                {formatPnl(d.net / perLot)}
-              </Td>
-              {cmp && cmp.shared > 0 && (
-                <Td align="right" numeric className="text-muted">
-                  {cmp.byDay.has(d.day) ? formatPnl(cmp.byDay.get(d.day)?.saved ?? 0) : '—'}
-                </Td>
-              )}
-              {cmp && cmp.shared > 0 && (
-                <Td align="right" numeric className={pnlClass(cmp.byDay.get(d.day)?.delta ?? 0)}>
-                  {cmp.byDay.has(d.day) ? formatPnl(cmp.byDay.get(d.day)?.delta ?? 0) : '—'}
-                </Td>
-              )}
-              <Td align="right" numeric>
-                {formatPnl(d.worst_mtm / perLot)}
-              </Td>
-              <Td className="text-xs text-muted">
-                {[d.stopped_by, ...d.notes].filter(Boolean).join('; ')}
-              </Td>
-            </TRow>
-          ))}
-        </tbody>
-      </Table>
-      {open && (
-        <div className="mt-4">
-          <p className="mb-2 text-sm font-medium">Trades on {open}</p>
-          <TradeLog trades={result.days.find((d) => d.day === open)?.trades ?? []} />
-        </div>
-      )}
-    </Card>
+    <a
+      href="/pricing"
+      className="font-medium underline underline-offset-2"
+      onClick={(event) => {
+        // In-app navigation keeps the form; a plain link would reload and lose the edits.
+        event.preventDefault();
+        navigate('pricing');
+      }}
+    >
+      {children}
+    </a>
   );
 }
 
 export function StrategyBuilder() {
   const saved = useLegwiseStrategies();
   const stored = useLegwiseResults();
-  const [name, setName] = useState('my_strategy');
+  const payment = usePaymentBalance();
+
+  const [name, setName] = useState(BLANK_NAME);
   const [s, setS] = useState<LegwiseStrategy>(newStrategy);
+  /** What the form started from: the loaded (or last saved) version, or the blank strategy. */
+  const [baseline, setBaseline] = useState<Version>(blank);
+  const [loaded, setLoaded] = useState<{ name: string; sha: string } | null>(null);
+  const [openLegs, setOpenLegs] = useState<ReadonlySet<number>>(new Set());
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [messages, setMessages] = useState<{ ok: boolean; lines: string[] } | null>(null);
-  const [result, setResult] = useState<BacktestResponse | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<ReactNode | null>(null);
+  const [run, setRun] = useState<Run | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  /** Credits used here since the balance was last read (it is only re-read once a minute). */
+  const [spent, setSpent] = useState<{ at: number | null; count: number }>({ at: null, count: 0 });
+
+  const payload = useMemo(() => toPayload(s), [s]);
+  const sent = useMemo(() => JSON.stringify(payload), [payload]);
+  const validation = useLegwiseValidate(payload);
+  const issues = useMemo(
+    () => placeIssues(validation.errors, payload),
+    [validation.errors, payload],
+  );
+  const dirty = useMemo(() => isDirty({ name, strategy: s }, baseline), [name, s, baseline]);
+  const slot = (key: string) => issues.bySlot[key];
+
+  const balance =
+    payment.balance !== null && spent.at === payment.balance
+      ? Math.max(0, payment.balance - spent.count)
+      : payment.balance;
 
   const set = <K extends keyof LegwiseStrategy>(key: K, value: LegwiseStrategy[K]) =>
     setS({ ...s, [key]: value });
-  const setLeg = (i: number, leg: Leg) =>
-    set(
-      'legs',
-      s.legs.map((l, j) => (j === i ? leg : l)),
-    );
-  const payload = useMemo(
-    () => clean({ ...s, no_reentry_after: s.no_reentry_after || undefined }),
-    [s],
-  );
+  const setLegs = (legs: Leg[]) => set('legs', legs);
 
   // The saved version's results are already stored (keyed by version hash), so comparing
   // an edit against them is free — a second backtest call would spend a credit.
-  const baseline = useMemo(() => {
-    const version = saved.data?.find((x) => x.name === name);
+  const savedBaseline = useMemo(() => {
+    const version = saved.data?.find((x) => x.name === (loaded?.name ?? name));
     if (!version) return null;
     const lots = lotsOf(version.strategy);
     const mine = (stored.data?.results ?? []).filter(
       (r) => r.strategy_id === version.strategy.id && r.strategy_sha === version.sha,
     );
     return mine.length ? new Map(mine.map((r) => [r.day, r.net / lots])) : null;
-  }, [saved.data, stored.data, name]);
+  }, [saved.data, stored.data, loaded, name]);
 
-  function load(n: string) {
-    const found = saved.data?.find((x) => x.name === n);
-    if (!found) return;
-    setName(found.name);
-    setS({ ...newStrategy(), ...found.strategy, overall: found.strategy.overall ?? {} });
-    setResult(null);
-    setMessages(null);
+  const comparison = useMemo(
+    () =>
+      run && savedBaseline ? compareToBaseline(run.result.days, run.lots, savedBaseline) : null,
+    [run, savedBaseline],
+  );
+
+  /** Start over from `version`; the previous run and messages belong to the old form. */
+  function replaceForm(version: Version, origin: { name: string; sha: string } | null) {
+    setName(version.name);
+    setS(version.strategy);
+    setLoaded(origin);
+    setBaseline(origin ? version : blank());
+    setOpenLegs(new Set());
+    setRun(null);
+    setProblem(null);
   }
 
-  async function validate() {
-    const r = await apiPost<{ valid: boolean; errors: string[] }>(`${LEGWISE_API}/validate`, {
-      strategy: payload,
+  /** Run `action` now, or after the user agrees to lose their unsaved edits. */
+  function discardThen(title: string, action: () => void) {
+    if (!dirty) {
+      action();
+      return;
+    }
+    setConfirm({
+      title,
+      body: (
+        <>
+          <span className="font-medium text-foreground">{name}</span> has unsaved changes. They will
+          be lost.
+        </>
+      ),
+      confirmLabel: 'Discard changes',
+      danger: true,
+      onConfirm: action,
     });
-    setMessages(
-      r.ok
-        ? { ok: r.data.valid, lines: r.data.valid ? ['Valid'] : r.data.errors }
-        : { ok: false, lines: [r.error] },
+  }
+
+  function load(target: string) {
+    const found = saved.data?.find((x) => x.name === target);
+    if (!found) return;
+    discardThen(`Load ${found.name}?`, () =>
+      replaceForm(
+        { name: found.name, strategy: fromSaved(found.strategy) },
+        { name: found.name, sha: found.sha },
+      ),
     );
   }
 
+  // Strategies › "Open in builder" links here with ?load=<file name>. Load it once, as soon as
+  // the saved list arrives, then drop the parameter so a refresh does not reload over edits.
+  const loadParamHandled = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load is redefined every render; this runs when the saved list arrives
+  useEffect(() => {
+    if (loadParamHandled.current || !saved.data) return;
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get('load');
+    loadParamHandled.current = true;
+    if (!target) return;
+    params.delete('load');
+    const query = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}`,
+    );
+    load(target);
+  }, [saved.data]);
+
+  function startNew() {
+    discardThen('Start a new strategy?', () => replaceForm(blank(), null));
+  }
+
+  function applyTemplate(id: TemplateId) {
+    const template = TEMPLATES.find((t) => t.id === id);
+    if (!template) return;
+    discardThen(`Start from ${template.label}?`, () => {
+      const strategy = buildTemplate(id, s.underlying);
+      replaceForm({ name: strategy.id, strategy }, null);
+    });
+  }
+
   async function backtest() {
-    setBusy(true);
-    setResult(null);
+    setRunning(true);
+    setProblem(null);
     const body: Record<string, unknown> = { strategy: payload };
     if (from) body.from = from;
     if (to) body.to = to;
     const r = await apiPost<BacktestResponse>(`${LEGWISE_API}/backtest`, body);
-    setBusy(false);
+    setRunning(false);
     if (r.ok) {
-      setResult(r.data);
-      setMessages(null);
-    } else setMessages({ ok: false, lines: r.error.split('; ') });
+      setRun({ result: r.data, lots: lotsOf(payload), sent });
+      if (payment.enabled)
+        setSpent((prev) => ({
+          at: payment.balance,
+          count: prev.at === payment.balance ? prev.count + 1 : 1,
+        }));
+      return;
+    }
+    const kind = runFailureKind(r.status, r.error);
+    setProblem(
+      kind === 'credits' ? (
+        <>
+          You are out of credits, so this backtest did not run. Top up on the{' '}
+          <PricingLink>Pricing page</PricingLink>.
+        </>
+      ) : kind === 'access' ? (
+        <>
+          Backtesting needs an active access pass, so this backtest did not run. Get one on the{' '}
+          <PricingLink>Pricing page</PricingLink>.
+        </>
+      ) : (
+        <Lines text={r.error} strategy={payload} />
+      ),
+    );
   }
 
-  async function save() {
-    const r = await apiPut<{ name: string }>(
+  async function writeFile() {
+    setSaving(true);
+    setProblem(null);
+    const r = await apiPut<{ name: string; sha?: string }>(
       `${LEGWISE_API}/strategies/${encodeURIComponent(name)}`,
-      {
-        strategy: payload,
-      },
+      { strategy: payload },
     );
-    setMessages(
-      r.ok
-        ? {
-            ok: true,
-            lines: [
-              `Saved as strategies/legwise/${r.data.name}.yaml — the evening run now includes it`,
-            ],
-          }
-        : { ok: false, lines: r.error.split('; ') },
-    );
-    if (r.ok) saved.refetch();
+    setSaving(false);
+    if (!r.ok) {
+      setProblem(<Lines text={r.error} strategy={payload} />);
+      return;
+    }
+    toast(`Saved as strategies/legwise/${r.data.name}.yaml. The evening run now includes it.`);
+    setLoaded({ name: r.data.name, sha: r.data.sha ?? '' });
+    setBaseline({ name, strategy: s });
+    saved.refetch();
   }
+
+  function save() {
+    const existing = saved.data?.find((x) => x.name === name);
+    if (!existing) {
+      void writeFile();
+      return;
+    }
+    setConfirm({
+      title: `Overwrite ${existing.name}?`,
+      body: (
+        <>
+          <span className="font-mono text-foreground">strategies/legwise/{existing.name}.yaml</span>{' '}
+          already exists (version <span className="font-mono">{existing.sha}</span>). Saving
+          replaces it, and the evening run will use the new version from now on. Results stored for
+          the old version are kept.
+        </>
+      ),
+      confirmLabel: 'Overwrite',
+      danger: true,
+      onConfirm: () => void writeFile(),
+    });
+  }
+
+  const nameError = STRATEGY_NAME_RE.test(name)
+    ? null
+    : 'File name must be 1–64 characters of a–z, 0–9 and _';
+  const loadOptions = [
+    { value: '', label: saved.loading && !saved.data ? 'Loading…' : 'Load saved…' },
+    ...(saved.data ?? []).map((x) => ({ value: x.name, label: x.name })),
+    ...(loaded && !saved.data?.some((x) => x.name === loaded.name)
+      ? [{ value: loaded.name, label: loaded.name }]
+      : []),
+  ];
 
   return (
-    <div className="space-y-5">
-      <Card>
-        <CardHeader
-          title="Strategy"
-          description="Leg-wise, AlgoTest-style. Backtests run on the 1-minute Fyers data collected so far."
-          actions={
-            <div className="flex items-center gap-2">
-              <Select<string>
-                value=""
-                options={[
-                  { value: '', label: 'Load saved…' },
-                  ...(saved.data ?? []).map((x) => ({ value: x.name, label: x.name })),
-                ]}
-                onChange={load}
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+      <div className="min-w-0 space-y-5">
+        <Card>
+          <CardHeader
+            title={
+              <span className="flex flex-wrap items-center gap-2">
+                Strategy
+                {loaded ? (
+                  <Badge tone="neutral">
+                    {loaded.name}
+                    {loaded.sha ? <span className="font-mono">· {loaded.sha}</span> : null}
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral">Not saved yet</Badge>
+                )}
+                {dirty && <Badge status="attention">Unsaved changes</Badge>}
+              </span>
+            }
+            description="Leg-wise, AlgoTest-style. Backtests run on the 1-minute Fyers data collected so far."
+            className="flex-wrap"
+            actions={
+              <>
+                <Choice<string>
+                  label="Load a saved strategy"
+                  value={loaded?.name ?? ''}
+                  options={loadOptions}
+                  onChange={load}
+                />
+                <Choice<TemplateId | ''>
+                  label="Start from a template"
+                  value=""
+                  options={[
+                    { value: '', label: 'Start from…' },
+                    ...TEMPLATES.map((t) => ({ value: t.id, label: t.label })),
+                  ]}
+                  onChange={(id) => id && applyTemplate(id)}
+                />
+                <Button size="sm" onClick={startNew}>
+                  New
+                </Button>
+              </>
+            }
+          />
+          {saved.error && !saved.data && (
+            <p className="mb-3 text-xs text-warning">
+              Saved strategies could not be loaded ({saved.error}).
+            </p>
+          )}
+          <div className="flex flex-wrap items-start gap-3">
+            <LabeledField
+              label="File name (a-z 0-9 _)"
+              errors={nameError ? [nameError] : undefined}
+            >
+              <TextField
+                label="File name"
+                value={name}
+                onChange={setName}
+                className="w-48"
+                errors={nameError ? [nameError] : undefined}
               />
-              <Button
-                size="sm"
-                onClick={() => {
-                  setS(newStrategy());
-                  setName('my_strategy');
-                  setResult(null);
+            </LabeledField>
+            <LabeledField label="Strategy id" errors={slot('id')}>
+              <TextField
+                label="Strategy id"
+                value={s.id}
+                onChange={(v) => set('id', v)}
+                className="w-48"
+                errors={slot('id')}
+              />
+            </LabeledField>
+            <LabeledField label="Index" errors={slot('underlying')}>
+              <Choice
+                label="Index"
+                value={s.underlying}
+                options={UNDERLYINGS}
+                onChange={(v) => set('underlying', v)}
+              />
+            </LabeledField>
+            <LabeledField label="Entry" errors={slot('entry_time')}>
+              <TextField
+                label="Entry time"
+                type="time"
+                value={s.entry_time}
+                errors={slot('entry_time')}
+                onChange={(v) => set('entry_time', v)}
+              />
+            </LabeledField>
+            <LabeledField label="Exit" errors={slot('exit_time')}>
+              <TextField
+                label="Exit time"
+                type="time"
+                value={s.exit_time}
+                errors={slot('exit_time')}
+                onChange={(v) => set('exit_time', v)}
+              />
+            </LabeledField>
+            <LabeledField
+              label="No re-entry after"
+              hint={HINTS.noReentryAfter}
+              errors={slot('no_reentry_after')}
+            >
+              <TextField
+                label="No re-entry after"
+                type="time"
+                value={s.no_reentry_after ?? ''}
+                errors={slot('no_reentry_after')}
+                onChange={(v) => set('no_reentry_after', v || undefined)}
+              />
+            </LabeledField>
+            <LabeledField label="Square off" hint={HINTS.squareOff} errors={slot('square_off')}>
+              <Choice
+                label="Square off"
+                value={s.square_off}
+                errors={slot('square_off')}
+                options={[
+                  { value: 'partial', label: 'Partial (only the leg)' },
+                  { value: 'complete', label: 'Complete (all legs)' },
+                ]}
+                onChange={(v) => set('square_off', v)}
+              />
+            </LabeledField>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Legs"
+            description={s.legs.length === 0 ? 'Add at least one leg.' : undefined}
+            actions={
+              <>
+                {s.legs.length > 1 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setOpenLegs(
+                        openLegs.size === s.legs.length ? new Set() : new Set(s.legs.keys()),
+                      )
+                    }
+                  >
+                    {openLegs.size === s.legs.length ? 'Collapse all' : 'Expand all'}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const last = s.legs[s.legs.length - 1];
+                    setLegs([
+                      ...s.legs,
+                      newLeg(
+                        nextLegId(s.legs.map((l) => l.id)),
+                        last?.option_type === 'CE' ? 'PE' : 'CE',
+                      ),
+                    ]);
+                    setOpenLegs(new Set([...openLegs, s.legs.length]));
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add leg
+                </Button>
+              </>
+            }
+          />
+          <div className="space-y-2">
+            {s.legs.map((leg, i) => (
+              <LegCard
+                // biome-ignore lint/suspicious/noArrayIndexKey: legs have no stable identity (ids are user-edited and may repeat while typing); every input is controlled, so a position key cannot leave stale input state behind
+                key={i}
+                leg={leg}
+                index={i}
+                underlying={s.underlying}
+                issues={issues}
+                open={openLegs.has(i)}
+                onToggle={() => {
+                  const next = new Set(openLegs);
+                  if (!next.delete(i)) next.add(i);
+                  setOpenLegs(next);
                 }}
-              >
-                New
-              </Button>
-            </div>
-          }
-        />
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="File name (a-z 0-9 _)">
-            <TextInput value={name} onChange={setName} className="w-48" />
-          </Field>
-          <Field label="Strategy id">
-            <TextInput value={s.id} onChange={(v) => set('id', v)} className="w-48" />
-          </Field>
-          <Field label="Index">
-            <Select
-              value={s.underlying}
-              options={UNDERLYINGS}
-              onChange={(v) => set('underlying', v)}
-            />
-          </Field>
-          <Field label="Entry">
-            <TextInput type="time" value={s.entry_time} onChange={(v) => set('entry_time', v)} />
-          </Field>
-          <Field label="Exit">
-            <TextInput type="time" value={s.exit_time} onChange={(v) => set('exit_time', v)} />
-          </Field>
-          <Field label="No re-entry after">
-            <TextInput
-              type="time"
-              value={s.no_reentry_after ?? ''}
-              onChange={(v) => set('no_reentry_after', v || undefined)}
-            />
-          </Field>
-          <Field label="Square off">
-            <Select
-              value={s.square_off}
-              options={[
-                { value: 'partial', label: 'Partial (only the leg)' },
-                { value: 'complete', label: 'Complete (all legs)' },
-              ]}
-              onChange={(v) => set('square_off', v)}
-            />
-          </Field>
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader
-          title="Legs"
-          actions={
-            <Button size="sm" onClick={() => set('legs', [...s.legs, newLeg(s.legs.length + 1)])}>
-              <Plus className="h-3.5 w-3.5" />
-              Add leg
-            </Button>
-          }
-        />
-        <div className="space-y-3">
-          {s.legs.map((leg, i) => (
-            <LegEditor
-              // biome-ignore lint/suspicious/noArrayIndexKey: legs have no stable identity (ids are user-edited and may repeat); every input is controlled, so a position key cannot leave stale input state behind
-              key={i}
-              leg={leg}
-              index={i}
-              onChange={(l) => setLeg(i, l)}
-              onRemove={() =>
-                set(
-                  'legs',
-                  s.legs.filter((_, j) => j !== i),
-                )
-              }
-              onCopy={() => set('legs', [...s.legs, { ...leg, id: `${leg.id}_2` }])}
-            />
-          ))}
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader title="Overall & execution" />
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="Overall max loss (₹)">
-            <NumberInput
-              value={s.overall.stop_loss_inr}
-              onChange={(v) => set('overall', { ...s.overall, stop_loss_inr: v })}
-            />
-          </Field>
-          <Field label="Overall max profit (₹)">
-            <NumberInput
-              value={s.overall.target_inr}
-              onChange={(v) => set('overall', { ...s.overall, target_inr: v })}
-            />
-          </Field>
-          <Field label="Slippage %">
-            <NumberInput
-              value={s.execution.slippage_pct}
-              step={0.1}
-              onChange={(v) => set('execution', { ...s.execution, slippage_pct: v ?? 0 })}
-            />
-          </Field>
-          <Field label="Cost per order (₹)">
-            <NumberInput
-              value={s.execution.cost_per_order_inr}
-              onChange={(v) => set('execution', { ...s.execution, cost_per_order_inr: v ?? 0 })}
-            />
-          </Field>
-        </div>
-        <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-border pt-4">
-          <Field label="Backtest from (blank = all)">
-            <TextInput type="date" value={from} onChange={setFrom} />
-          </Field>
-          <Field label="to">
-            <TextInput type="date" value={to} onChange={setTo} />
-          </Field>
-          <Button onClick={() => void validate()}>
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Validate
-          </Button>
-          <Button variant="primary" loading={busy} onClick={() => void backtest()}>
-            {busy ? null : <FlaskConical className="h-3.5 w-3.5" />}
-            {busy ? 'Running…' : 'Backtest'}
-          </Button>
-          <Button onClick={() => void save()}>
-            <Save className="h-3.5 w-3.5" />
-            Save
-          </Button>
-        </div>
-        {messages && (
-          <div className="mt-3 space-y-1">
-            {messages.lines.map((l) => (
-              <p key={l} className={`text-xs ${messages.ok ? 'text-positive' : 'text-negative'}`}>
-                {l}
-              </p>
+                onChange={(l) => setLegs(s.legs.map((x, j) => (j === i ? l : x)))}
+                onRemove={() => {
+                  setLegs(s.legs.filter((_, j) => j !== i));
+                  // Keep the cards after the removed one open or closed as they were.
+                  setOpenLegs(
+                    new Set([...openLegs].filter((j) => j !== i).map((j) => (j > i ? j - 1 : j))),
+                  );
+                }}
+                onCopy={() => {
+                  setLegs([
+                    ...s.legs,
+                    {
+                      ...leg,
+                      id: nextLegId(
+                        s.legs.map((l) => l.id),
+                        leg.id,
+                      ),
+                    },
+                  ]);
+                  setOpenLegs(new Set([...openLegs, s.legs.length]));
+                }}
+              />
             ))}
           </div>
-        )}
-      </Card>
+        </Card>
 
-      {result && (
-        <BacktestResult
-          result={result}
-          lots={lotsOf(payload as LegwiseStrategy)}
-          baseline={baseline}
-        />
+        <Card>
+          <CardHeader title="Overall & execution" />
+          <div className="flex flex-wrap items-start gap-3">
+            <LabeledField label="Overall max loss (₹)" errors={slot('overall.stop_loss_inr')}>
+              <OptionalNumber
+                label="Overall max loss in rupees"
+                value={s.overall.stop_loss_inr}
+                errors={slot('overall.stop_loss_inr')}
+                onChange={(v) => set('overall', { ...s.overall, stop_loss_inr: v })}
+              />
+            </LabeledField>
+            <LabeledField label="Overall max profit (₹)" errors={slot('overall.target_inr')}>
+              <OptionalNumber
+                label="Overall max profit in rupees"
+                value={s.overall.target_inr}
+                errors={slot('overall.target_inr')}
+                onChange={(v) => set('overall', { ...s.overall, target_inr: v })}
+              />
+            </LabeledField>
+            <LabeledField label="Slippage %" errors={slot('execution.slippage_pct')}>
+              <OptionalNumber
+                label="Slippage percent"
+                value={s.execution.slippage_pct}
+                step={0.1}
+                errors={slot('execution.slippage_pct')}
+                onChange={(v) => set('execution', { ...s.execution, slippage_pct: v ?? 0 })}
+              />
+            </LabeledField>
+            <LabeledField label="Cost per order (₹)" errors={slot('execution.cost_per_order_inr')}>
+              <OptionalNumber
+                label="Cost per order in rupees"
+                value={s.execution.cost_per_order_inr}
+                errors={slot('execution.cost_per_order_inr')}
+                onChange={(v) => set('execution', { ...s.execution, cost_per_order_inr: v ?? 0 })}
+              />
+            </LabeledField>
+          </div>
+        </Card>
+      </div>
+
+      <RunRail
+        from={from}
+        to={to}
+        onFrom={setFrom}
+        onTo={setTo}
+        validation={validation}
+        issues={issues}
+        payment={{ enabled: payment.enabled, balance }}
+        running={running}
+        saving={saving}
+        saveBlocked={nameError}
+        onBacktest={() => void backtest()}
+        onSave={save}
+        problem={problem}
+        summary={
+          run ? { result: run.result, lots: run.lots, comparison, stale: run.sent !== sent } : null
+        }
+      />
+
+      {run && (
+        <div className="min-w-0 xl:col-span-2">
+          <ResultTable result={run.result} lots={run.lots} comparison={comparison} />
+        </div>
       )}
+
+      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
     </div>
+  );
+}
+
+/** A failed call's message, one line per problem, in plain words where the mapping knows them. */
+function Lines({ text, strategy }: { text: string; strategy: LegwiseStrategy }) {
+  return (
+    <>
+      {text.split('; ').map((line) => (
+        <p key={line}>{parseIssue(line, strategy).message}</p>
+      ))}
+    </>
   );
 }

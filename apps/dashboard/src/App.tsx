@@ -5,7 +5,6 @@ import { useAppRoute } from './hooks/useAppRoute';
 import { DEFAULT_TAB, aliasTarget, documentTitle } from './lib/routes';
 
 import { BackfillView } from './components/BackfillView';
-import { BacktestView } from './components/BacktestView';
 import { BrokerLoginsView } from './components/BrokerLoginsView';
 import { LiveView } from './components/LiveView';
 import { MomentumBacktestingView } from './components/MomentumBacktestingView';
@@ -34,6 +33,7 @@ import {
   normalizeNavigationPreferences,
   saveNavigationPreferences,
 } from './store/navigation';
+import { hydrateRegimeCutsFromStorage } from './store/regimeCuts';
 import { getLandingTab, hydrateSettingsFromStorage } from './store/settings';
 import { hydrateThemeFromStorage } from './store/theme';
 
@@ -47,8 +47,8 @@ const SUBTITLES: Record<Tab, string> = {
   regime: 'Daily market-regime classification history',
   backfill: 'Historical tick-data ingestion coverage',
   replay: 'Deterministic replay of historical sessions',
-  backtest: 'Options strategy backtesting research workbench',
-  optionslab: 'Daily 1-minute Fyers data · build, backtest and track leg-wise option strategies',
+  optionslab:
+    'Build, backtest and track option strategies: leg-wise on 1-minute Fyers data, or the YAML engine',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
   brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',
   pricing: 'Subscription access and feature credits',
@@ -77,8 +77,6 @@ function renderView(
       return <BackfillView />;
     case 'replay':
       return <ReplayView />;
-    case 'backtest':
-      return <BacktestView />;
     case 'optionslab':
       return <OptionsLabView />;
     case 'momentum':
@@ -120,6 +118,7 @@ export function App() {
   useEffect(() => {
     hydrateThemeFromStorage();
     hydrateSettingsFromStorage();
+    hydrateRegimeCutsFromStorage();
     const stored = loadNavigationPreferences();
     setNavigationPreferences(stored);
   }, []);

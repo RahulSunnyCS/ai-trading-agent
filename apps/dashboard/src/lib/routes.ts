@@ -3,8 +3,9 @@
  * back/forward and a pasted link land on the same view:
  *
  *   /overview
- *   /live  /trades  /personalities  /pnl  /regime  /backfill  /replay  /backtest
- *   /optionslab/{results|regimes|builder}
+ *   /live  /trades  /personalities  /pnl  /regime  /backfill  /replay
+ *   /optionslab/{strategies|builder|runs|results|regimes}
+ *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
  *   /momentum/{backtest|scores|saved|weekly|rebalance}
  *   /momentum/backtest/{etf|stock|custom_index|broad}
  *   /momentum/scores/{stocks|sectors}
@@ -23,8 +24,27 @@ export const DEFAULT_TAB: Tab = 'overview';
 
 const TABS = new Set<string>(NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)));
 
-export const OPTIONS_LAB_SECTIONS = ['results', 'regimes', 'builder'] as const;
+/** In display order. Must match the Options Lab nav item's children (a test checks it). */
+export const OPTIONS_LAB_SECTIONS = [
+  'strategies',
+  'builder',
+  'runs',
+  'results',
+  'regimes',
+] as const;
 export type OptionsLabSection = (typeof OPTIONS_LAB_SECTIONS)[number];
+
+/** What `/optionslab` opens. Daily results was the default before the other sections existed. */
+export const OPTIONS_LAB_DEFAULT_SECTION: OptionsLabSection = 'results';
+
+/** `/optionslab/builder` is the form; `/optionslab/builder/yaml` is the YAML engine. */
+export const BUILDER_MODES = ['form', 'yaml'] as const;
+export type BuilderMode = (typeof BUILDER_MODES)[number];
+
+/** The builder mode a route's segments name (`rest` is what follows `/optionslab`). */
+export function builderMode(rest: readonly string[]): BuilderMode {
+  return rest[0] === 'builder' && rest[1] === 'yaml' ? 'yaml' : 'form';
+}
 
 export const MOMENTUM_SECTIONS = ['backtest', 'scores', 'saved', 'weekly', 'rebalance'] as const;
 export type MomentumSection = (typeof MOMENTUM_SECTIONS)[number];
@@ -56,7 +76,9 @@ export const PATH_ALIASES: Readonly<Record<string, string>> = {
   '/brokerlogins': '/brokerLogins',
   '/data/backfill': '/backfill',
   '/data/replay': '/replay',
-  '/optionslab/yaml': '/backtest',
+  // The standalone YAML Backtest tab became the builder's YAML mode (BL-013 Phase 7).
+  '/backtest': '/optionslab/builder/yaml',
+  '/optionslab/yaml': '/optionslab/builder/yaml',
 };
 
 const ALIASES = Object.entries(PATH_ALIASES)
@@ -114,13 +136,15 @@ export const APP_NAME = 'AI Trading Agent';
 
 /**
  * Browser-tab title for a route: "Trades · AI Trading Agent", or with the
- * sub-section for tabs that have them: "Momentum › Scores · AI Trading Agent".
+ * sub-section for tabs that have them: "Momentum › Scores · AI Trading Agent". The
+ * builder's YAML mode adds its own level: "Options Lab › Builder › YAML · AI Trading Agent".
  */
 export function documentTitle(tab: Tab | null, rest: readonly string[] = []): string {
   if (!tab) return APP_NAME;
   const item = navItem(tab);
   if (!item) return APP_NAME;
   const child = activeNavChild(item, rest);
-  const view = child ? `${item.label} › ${child.label}` : item.label;
+  let view = child ? `${item.label} › ${child.label}` : item.label;
+  if (tab === 'optionslab' && builderMode(rest) === 'yaml') view += ' › YAML';
   return `${view} · ${APP_NAME}`;
 }

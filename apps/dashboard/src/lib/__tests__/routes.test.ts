@@ -4,10 +4,12 @@ import { NAV_GROUPS } from '../../components/shell/nav';
 import {
   DEFAULT_TAB,
   MOMENTUM_SECTIONS,
+  OPTIONS_LAB_DEFAULT_SECTION,
   OPTIONS_LAB_SECTIONS,
   PATH_ALIASES,
   aliasTarget,
   buildPath,
+  builderMode,
   documentTitle,
   oneOf,
   parsePath,
@@ -59,11 +61,13 @@ describe('routes', () => {
     ['/regime', 'regime', []],
     ['/backfill', 'backfill', []],
     ['/replay', 'replay', []],
-    ['/backtest', 'backtest', []],
     ['/optionslab', 'optionslab', []],
+    ['/optionslab/strategies', 'optionslab', ['strategies']],
+    ['/optionslab/builder', 'optionslab', ['builder']],
+    ['/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
+    ['/optionslab/runs', 'optionslab', ['runs']],
     ['/optionslab/results', 'optionslab', ['results']],
     ['/optionslab/regimes', 'optionslab', ['regimes']],
-    ['/optionslab/builder', 'optionslab', ['builder']],
     ['/momentum', 'momentum', []],
     ['/momentum/backtest', 'momentum', ['backtest']],
     ['/momentum/backtest/etf', 'momentum', ['backtest', 'etf']],
@@ -90,7 +94,9 @@ describe('routes', () => {
     ['/brokerlogins', '/brokerLogins', 'brokerLogins', []],
     ['/data/backfill', '/backfill', 'backfill', []],
     ['/data/replay', '/replay', 'replay', []],
-    ['/optionslab/yaml', '/backtest', 'backtest', []],
+    ['/backtest', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
+    ['/backtest/', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
+    ['/optionslab/yaml', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/data/replay/', '/replay', 'replay', []],
     ['/billing/extra', '/pricing/extra', 'pricing', ['extra']],
   ] as const)('alias %s redirects to %s', (path, target, tab, rest) => {
@@ -111,6 +117,29 @@ describe('routes', () => {
     expect(aliasTarget('/data')).toBeNull();
     expect(parsePath('/data')).toEqual({ tab: null, rest: [] });
     expect(parsePath('/optionslab/yamlish')).toEqual({ tab: 'optionslab', rest: ['yamlish'] });
+    expect(aliasTarget('/backtests')).toBeNull();
+    // Momentum's own Backtest section is not the retired tab.
+    expect(aliasTarget('/momentum/backtest')).toBeNull();
+  });
+
+  it('retires the backtest tab: it is no longer a tab id of its own', () => {
+    const ids = NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)) as string[];
+    expect(ids).not.toContain('backtest');
+    expect(parsePath('/backtest').tab).toBe('optionslab');
+  });
+
+  it('reads the builder mode from the path', () => {
+    expect(builderMode(['builder'])).toBe('form');
+    expect(builderMode(['builder', 'yaml'])).toBe('yaml');
+    expect(builderMode(['builder', 'nope'])).toBe('form');
+    expect(builderMode(['runs', 'yaml'])).toBe('form');
+    expect(builderMode(parsePath('/backtest').rest)).toBe('yaml');
+  });
+
+  it('opens Daily results for the bare Options Lab path', () => {
+    expect(OPTIONS_LAB_DEFAULT_SECTION).toBe('results');
+    expect(oneOf(OPTIONS_LAB_SECTIONS, parsePath('/optionslab').rest[0])).toBeNull();
+    expect(OPTIONS_LAB_SECTIONS).toEqual(['strategies', 'builder', 'runs', 'results', 'regimes']);
   });
 
   it('survives a malformed percent-escape', () => {
@@ -130,13 +159,18 @@ describe('routes', () => {
     ['overview', [], 'Overview · AI Trading Agent'],
     ['trades', [], 'Trades · AI Trading Agent'],
     ['pnl', [], 'P&L · AI Trading Agent'],
-    ['backtest', [], 'YAML backtest · AI Trading Agent'],
     ['momentum', ['scores'], 'Momentum › Scores · AI Trading Agent'],
     ['momentum', ['scores', 'sectors'], 'Momentum › Scores · AI Trading Agent'],
     ['momentum', [], 'Momentum › Backtest · AI Trading Agent'],
     ['momentum', ['nope'], 'Momentum › Backtest · AI Trading Agent'],
-    ['optionslab', ['builder'], 'Options Lab › Strategy builder · AI Trading Agent'],
+    ['optionslab', ['strategies'], 'Options Lab › Strategies · AI Trading Agent'],
+    ['optionslab', ['builder'], 'Options Lab › Builder · AI Trading Agent'],
+    ['optionslab', ['builder', 'yaml'], 'Options Lab › Builder › YAML · AI Trading Agent'],
+    ['optionslab', ['runs'], 'Options Lab › Runs · AI Trading Agent'],
+    ['optionslab', ['results'], 'Options Lab › Daily results · AI Trading Agent'],
+    ['optionslab', ['regimes'], 'Options Lab › Regimes · AI Trading Agent'],
     ['optionslab', [], 'Options Lab › Daily results · AI Trading Agent'],
+    ['optionslab', ['nope'], 'Options Lab › Daily results · AI Trading Agent'],
   ] as const)('titles %s %j as %s', (tab, rest, title) => {
     expect(documentTitle(tab, rest)).toBe(title);
   });

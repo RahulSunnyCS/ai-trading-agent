@@ -57,13 +57,11 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Check the engine intrabar rules against a few real trades (optional)',
     'Brokerage/taxes presets instead of a flat per-order cost',
     'Strategy features not built yet: simple momentum, overall trailing/re-entry',
-  ],
-  backtest: [
-    'Add weekday buckets alongside the DTE and regime breakdowns (M-5)',
-    'Add walk-forward / sweep reporting and overfitting guard (M-5)',
-    'Surface ingest-time quality flags on the run result, not just P&L',
-    'Add a compare view across multiple past runs',
-    'Add an export-to-personality action once a run looks promising (M-5)',
+    'YAML mode: weekday buckets alongside the DTE and regime breakdowns (M-5)',
+    'YAML mode: walk-forward / sweep reporting and the overfitting guard (M-5)',
+    'YAML mode: surface ingest-time quality flags on the run result, not just P&L',
+    'YAML mode: an export-to-personality action once a run looks promising (M-5)',
+    'Runs: stored YAML runs return headline figures only, and builder (adhoc) runs are not listed by the API',
   ],
   momentum: [
     'Verify every migrated dataset against real Python backtest results',

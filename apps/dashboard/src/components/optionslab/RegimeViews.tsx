@@ -1,109 +1,55 @@
 /**
- * Presentational pieces of the Market regimes tab: calendar heatmap, label-mix table,
- * transition matrix and cross-tab. All numbers come from lib/regimeStats.ts.
+ * Presentational pieces of the Market regimes tab: label-mix table, transition matrix and
+ * cross-tab (the calendar heatmap lives in regimes/CalendarHeatmap.tsx). All numbers come
+ * from lib/regimeStats.ts; all labels, tones and glyphs from lib/regimeMeta.ts.
+ *
+ * Two colour scales, never mixed: green / red is trend direction (the badges and calendar
+ * cells); the lift tint (primary = more often than the base rate, warning = less often) is
+ * deliberately not green / red.
  */
 
-import { useEffect, useRef } from 'react';
-
-import { formatPct } from '../../lib/format';
-import { type CrossTab, MIN_CELL_COUNT, MIN_ROW_N, type Transitions } from '../../lib/regimeStats';
-import type { DayAnatomy, SegmentLabel } from '../../types/legwise';
-import { Badge } from '../ui/Badge';
+import { cn } from '../../lib/cn';
+import { EMPTY, formatInt, formatPct, formatPp } from '../../lib/format';
+import { regimeMeta } from '../../lib/regimeMeta';
+import {
+  type CrossTab,
+  LIFT_STEP,
+  LIFT_STRONG,
+  type LiftBand,
+  MIN_CELL_COUNT,
+  MIN_ROW_N,
+  type Transitions,
+  liftBand,
+} from '../../lib/regimeStats';
+import type { SegmentLabel } from '../../types/legwise';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
-import { LABEL_TEXT, LABEL_TONE, describeSegment } from './anatomy';
+import {
+  CalendarHeatmap,
+  HeatmapLegend as CalendarLegend,
+  describeDay,
+} from './regimes/CalendarHeatmap';
+import { RegimeBadge } from './regimes/RegimeBadge';
+
+export { CalendarHeatmap, describeDay };
 
 export const STATES: SegmentLabel[] = ['TREND_UP', 'TREND_DOWN', 'CHOP', 'QUIET'];
 
-const CELL: Record<SegmentLabel, string> = {
-  TREND_UP: 'bg-positive/70',
-  TREND_DOWN: 'bg-negative/70',
-  CHOP: 'bg-warning/60',
-  QUIET: 'bg-border-strong/50',
-  UNKNOWN: 'bg-border/40',
-};
-
+/** The shared regime badge, under the name this folder has always used. */
 export function LabelChip({ label }: { label: string }) {
-  const key = label as SegmentLabel;
-  return <Badge tone={LABEL_TONE[key] ?? 'neutral'}>{LABEL_TEXT[key] ?? label}</Badge>;
-}
-
-// ---------------------------------------------------------------------------
-// Calendar heatmap: columns = weeks, rows = Mon..Fri. Runs of one colour ARE the
-// "periods" the study is about.
-// ---------------------------------------------------------------------------
-
-function weekStart(day: string): string {
-  const d = new Date(`${day}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); // back to Monday
-  return d.toISOString().slice(0, 10);
-}
-
-export function CalendarHeatmap({
-  days,
-  series,
-  caption,
-}: {
-  days: DayAnatomy[];
-  /** -1 = whole day, otherwise the segment index. */
-  series: number;
-  caption: string;
-}) {
-  const scroller = useRef<HTMLDivElement>(null);
-  const weeks = [...new Set(days.map((d) => weekStart(d.day)))].sort();
-  const byKey = new Map(days.map((d) => [d.day, d]));
-  const weekdayOf = (day: string) => (new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7;
-  const grid = new Map<string, DayAnatomy>();
-  for (const d of days) grid.set(`${weekStart(d.day)}:${weekdayOf(d.day)}`, d);
-
-  // Most recent weeks are the interesting ones: start scrolled to the right edge.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only needs to run when the span changes
-  useEffect(() => {
-    const el = scroller.current;
-    if (el) el.scrollLeft = el.scrollWidth;
-  }, [weeks.length]);
-
-  return (
-    <div>
-      <p className="mb-1 text-xs font-medium text-muted">{caption}</p>
-      <div ref={scroller} className="overflow-x-auto pb-1">
-        <div
-          className="grid gap-[2px]"
-          style={{
-            gridTemplateRows: 'repeat(5, 11px)',
-            gridAutoFlow: 'column',
-            gridAutoColumns: '11px',
-          }}
-        >
-          {weeks.flatMap((w) =>
-            [0, 1, 2, 3, 4].map((wd) => {
-              const d = grid.get(`${w}:${wd}`);
-              const seg = d ? (series < 0 ? d.whole : d.segments[series]) : null;
-              return (
-                <div
-                  key={`${w}:${wd}`}
-                  title={d && seg ? `${d.day} ${d.weekday} — ${describeSegment(seg)}` : undefined}
-                  className={`rounded-[2px] ${seg ? CELL[seg.label] : 'bg-transparent'}`}
-                />
-              );
-            }),
-          )}
-        </div>
-      </div>
-      <span className="sr-only">{byKey.size} days</span>
-    </div>
-  );
+  return <RegimeBadge regime={label} />;
 }
 
 export function HeatmapLegend() {
+  return <CalendarLegend states={STATES} />;
+}
+
+/** A column header for a regime: glyph + label, with the definition on hover. */
+function RegimeHeading({ regime }: { regime: string }) {
+  const meta = regimeMeta(regime);
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-      {STATES.map((s) => (
-        <span key={s} className="inline-flex items-center gap-1.5">
-          <span className={`inline-block h-2.5 w-2.5 rounded-[2px] ${CELL[s]}`} />
-          {LABEL_TEXT[s]}
-        </span>
-      ))}
-    </div>
+    <span title={meta.definition}>
+      <span aria-hidden="true">{meta.glyph}</span> {meta.label}
+    </span>
   );
 }
 
@@ -123,7 +69,7 @@ export function LabelMixTable({
         <Th align="right">Days</Th>
         {STATES.map((s) => (
           <Th key={s} align="right">
-            {LABEL_TEXT[s]}
+            <RegimeHeading regime={s} />
           </Th>
         ))}
       </THead>
@@ -132,17 +78,63 @@ export function LabelMixTable({
           <TRow key={r.name}>
             <Td>{r.name}</Td>
             <Td align="right" numeric>
-              {r.n}
+              {formatInt(r.n)}
             </Td>
             {STATES.map((s) => (
               <Td key={s} align="right" numeric>
-                {formatPct(r.rates[s], 0)}
+                {r.n > 0 ? formatPct(r.rates[s] ?? 0, 0) : EMPTY}
               </Td>
             ))}
           </TRow>
         ))}
       </tbody>
     </Table>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lift: how far a conditional share sits from the base rate. Neutral diverging tint.
+// ---------------------------------------------------------------------------
+
+const LIFT_TINT: Record<LiftBand, string> = {
+  2: 'bg-primary/30 font-semibold',
+  1: 'bg-primary/15',
+  0: '',
+  [-1]: 'bg-warning/15',
+  [-2]: 'bg-warning/30 font-semibold',
+};
+
+function Swatch({ band }: { band: LiftBand }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('inline-block h-3 w-4 rounded-sm border border-border', LIFT_TINT[band])}
+    />
+  );
+}
+
+/** Says what each of the two colour scales in the persistence table means. */
+export function LiftLegend() {
+  const step = formatPp(LIFT_STEP, 0);
+  const strong = formatPp(LIFT_STRONG, 0);
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="font-medium text-foreground">Cell tint</span>
+        <Swatch band={-2} />
+        <Swatch band={-1} />
+        less often than the base rate
+        <Swatch band={1} />
+        <Swatch band={2} />
+        more often (from {step}, stronger from {strong})
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="font-medium text-foreground">Badges</span>
+        <span className="text-positive">{regimeMeta('TREND_UP').glyph} green</span> and{' '}
+        <span className="text-negative">{regimeMeta('TREND_DOWN').glyph} red</span> are trend
+        direction only
+      </span>
+    </div>
   );
 }
 
@@ -161,10 +153,10 @@ export function TransitionMatrix({
     <Table>
       <THead>
         <Th>Today ↓ → next day</Th>
-        <Th align="right">n</Th>
+        <Th align="right">Days</Th>
         {t.states.map((s) => (
           <Th key={s} align="right">
-            {LABEL_TEXT[s as SegmentLabel]}
+            <RegimeHeading regime={s} />
           </Th>
         ))}
       </THead>
@@ -178,31 +170,29 @@ export function TransitionMatrix({
                 <LabelChip label={from} />
               </Td>
               <Td align="right" numeric>
-                {total}
+                {formatInt(total)}
               </Td>
               {t.states.map((to) => {
                 const p = t.probs[from]?.[to];
                 const cellN = t.counts[from]?.[to] ?? 0;
-                const lift = p === undefined ? 0 : p - (base[to] ?? 0);
-                const callOut = !thin && cellN >= MIN_CELL_COUNT;
+                const baseRate = base[to] ?? 0;
+                const band = !thin && cellN >= MIN_CELL_COUNT ? liftBand(p, baseRate) : 0;
+                const lift = p === undefined ? null : p - baseRate;
                 return (
                   <Td
                     key={to}
                     align="right"
                     numeric
-                    title={`base rate ${formatPct(base[to], 0)}; n=${t.counts[from]?.[to] ?? 0}`}
-                    className={
-                      callOut && lift >= 0.1
-                        ? 'font-semibold text-positive'
-                        : callOut && lift <= -0.1
-                          ? 'text-negative'
-                          : ''
-                    }
+                    title={`Base rate ${formatPct(baseRate, 0)}, ${formatInt(cellN)} days`}
+                    className={LIFT_TINT[band]}
                   >
                     {formatPct(p, 0)}
-                    <span className="ml-1 text-[10px] text-faint">
-                      ({t.counts[from]?.[to] ?? 0})
-                    </span>
+                    <span className="ml-1 text-[10px] text-faint">({formatInt(cellN)})</span>
+                    {band !== 0 && (
+                      <span className="block text-[10px] font-normal text-muted">
+                        {formatPp(lift, 0)} vs base
+                      </span>
+                    )}
                   </Td>
                 );
               })}
@@ -214,7 +204,7 @@ export function TransitionMatrix({
           <Td align="right">{null}</Td>
           {t.states.map((s) => (
             <Td key={s} align="right" numeric className="text-faint">
-              {formatPct(base[s], 0)}
+              {formatPct(base[s] ?? 0, 0)}
             </Td>
           ))}
         </TRow>
@@ -224,7 +214,7 @@ export function TransitionMatrix({
 }
 
 // ---------------------------------------------------------------------------
-// Within-day cross-tab: P(segment B label | segment A label), same day.
+// Cross-tab: P(B's label | A's label) on the same day.
 // ---------------------------------------------------------------------------
 
 export function CrossTabTable({
@@ -236,7 +226,7 @@ export function CrossTabTable({
   t: CrossTab;
   aName: string;
   bName: string;
-  /** Override the column header text (e.g. for non-anatomy states such as T-33 tags). */
+  /** Override the column header text. By default every key goes through lib/regimeMeta.ts. */
   colLabel?: (c: string) => string;
 }) {
   return (
@@ -245,10 +235,10 @@ export function CrossTabTable({
         <Th>
           {aName} ↓ → {bName}
         </Th>
-        <Th align="right">n</Th>
+        <Th align="right">Days</Th>
         {t.cols.map((c) => (
           <Th key={c} align="right">
-            {colLabel ? colLabel(c) : LABEL_TEXT[c as SegmentLabel]}
+            {colLabel ? colLabel(c) : <RegimeHeading regime={c} />}
           </Th>
         ))}
       </THead>
@@ -261,12 +251,14 @@ export function CrossTabTable({
                 <LabelChip label={r} />
               </Td>
               <Td align="right" numeric>
-                {total}
+                {formatInt(total)}
               </Td>
               {t.cols.map((c) => (
                 <Td key={c} align="right" numeric>
-                  {total ? formatPct((t.counts[r]?.[c] ?? 0) / total, 0) : '—'}
-                  <span className="ml-1 text-[10px] text-faint">({t.counts[r]?.[c] ?? 0})</span>
+                  {total ? formatPct((t.counts[r]?.[c] ?? 0) / total, 0) : EMPTY}
+                  <span className="ml-1 text-[10px] text-faint">
+                    ({formatInt(t.counts[r]?.[c] ?? 0)})
+                  </span>
                 </Td>
               ))}
             </TRow>
