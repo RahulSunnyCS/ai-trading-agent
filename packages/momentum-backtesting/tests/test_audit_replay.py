@@ -464,3 +464,40 @@ def test_asset_definitions_place_a_split_series_in_time():
     assert assets["TCS"] == {"kind": "stock", "symbol": "TCS", "from": None, "until": None}
     assert assets["Gold"] == {"kind": "series", "instrument": "Gold"}
     assert assets[CASH] == {"kind": "liquid_fund", "instrument": CASH}
+
+
+# --- the truncated database for the look-ahead test ---------------------------------------------
+
+
+def test_a_truncated_root_holds_nothing_after_the_cut(small_market, tmp_path_factory):
+    import duckdb
+
+    from momentum_backtesting.audit import truncate
+
+    cut = date(2021, 6, 25)
+    target = truncate.truncated_root(small_market, tmp_path_factory.mktemp("cut"), cut)
+    con = duckdb.connect(str(target / "catalog.duckdb"), read_only=True)
+    assert con.execute("SELECT max(date) FROM momentum_prices").fetchone()[0] == cut
+    # The split's ex-date (23 June) is before the cut, so its factor stays.
+    assert con.execute("SELECT count(*) FROM stock_action_candidates").fetchone()[0] == 1
+    con.close()
+    bars = (target / "lake/bars_1d/asset=stock/year=2021/data.parquet").as_posix()
+    newest, rows = duckdb.sql(f"SELECT max(date), count(*) FROM read_parquet('{bars}')").fetchone()
+    assert pd.Timestamp(newest).date() == cut and rows > 0
+    before = truncate.truncated_root(
+        small_market, tmp_path_factory.mktemp("early"), date(2021, 6, 1)
+    )
+    con = duckdb.connect(str(before / "catalog.duckdb"), read_only=True)
+    assert con.execute("SELECT count(*) FROM stock_action_candidates").fetchone()[0] == 0
+
+
+def test_same_result_names_the_first_difference(small_market):
+    from momentum_backtesting.audit import truncate
+
+    made, _market = _run(small_market)
+    assert truncate.same_result(made, copy.deepcopy(made)) == []
+    other = copy.deepcopy(made)
+    other["orders"][5]["asset"] = "ZZZ"
+    other["claims"]["equity"][30] *= 1.001
+    found = truncate.same_result(made, other)
+    assert len(found) == 2 and found[0].startswith("order 5:") and "equity on" in found[1]

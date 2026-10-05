@@ -1348,6 +1348,7 @@ def audit_bundle(
     tax: bool = typer.Option(False, "--tax", help="Tax each sale (tax.TaxRules defaults)."),
     capital: float = typer.Option(None, help="Starting capital in rupees, not the space's."),
     signal_delay: int = typer.Option(None, help="Weeks from signal to trade, not the space's."),
+    end: str = typer.Option(None, help="Last week of the run (YYYY-MM-DD), not the latest."),
 ) -> None:
     """Re-run stored search configs on the current code and write one audit bundle each: the
     run's orders, and what the backtest claims came of them."""
@@ -1361,6 +1362,8 @@ def audit_bundle(
         override["capital"] = capital
     if signal_delay is not None:
         override["signal_delay"] = signal_delay
+    if end is not None:
+        override["end"] = end
     bundle_mod.bundle_search_runs(
         space,
         results,
@@ -1371,6 +1374,56 @@ def audit_bundle(
         echo=typer.echo,
         **override,
     )
+
+
+@audit_app.command("lookahead")
+def audit_lookahead(
+    space: Path = typer.Argument(..., help="The search-space TOML the runs came from."),
+    results: Path = typer.Argument(..., help="That search's results folder."),
+    picks: Path = typer.Option(..., "--picks", help='JSON file: {"label": "run id", ...}.'),
+    cut: list[str] = typer.Option(..., help="A cut date, YYYY-MM-DD (repeat for several)."),
+    out: Path = typer.Option(None, "--out", help="Where to write (default data/audit/lookahead)."),
+) -> None:
+    """Each run stopped at a cut date, twice: on the full database, and on a copy that holds
+    nothing after that date. The orders and the equity curve must be the same. Exits 1 if any
+    differ. Needs disk space for one copy of the database per cut date (removed afterwards)."""
+    import json as _json
+    import os
+    import shutil
+    import subprocess
+    import sys
+    import tempfile
+
+    from trading_data.db import data_root
+
+    from .audit import truncate
+
+    out = out or DATA_DIR / "audit" / "lookahead"
+    base = [sys.executable, "-m", "momentum_backtesting.cli", "audit", "bundle"]
+    base += [str(space), str(results), "--picks", str(picks)]
+    failures = 0
+    for day in cut:
+        whole_dir, cut_dir = out / f"whole_{day}", out / f"truncated_{day}"
+        subprocess.run(
+            [*base, "--end", day, "--variant", f"to_{day}", "--out", str(whole_dir)], check=True
+        )
+        with tempfile.TemporaryDirectory(prefix="mbt-cut-") as tmp:
+            truncate.truncated_root(data_root(), Path(tmp), date.fromisoformat(day))
+            env = {**os.environ, "TRADING_DATA_ROOT": tmp}
+            subprocess.run(
+                [*base, "--end", day, "--variant", f"to_{day}", "--out", str(cut_dir)],
+                check=True,
+                env=env,
+            )
+            shutil.rmtree(tmp, ignore_errors=True)
+        for path in sorted(whole_dir.glob("*.json")):
+            found = truncate.same_result(
+                _json.loads(path.read_text()), _json.loads((cut_dir / path.name).read_text())
+            )
+            failures += bool(found)
+            typer.echo(f"{day} {path.stem}: {'same' if not found else '; '.join(found)}")
+    if failures:
+        raise typer.Exit(1)
 
 
 @audit_app.command("replay")
