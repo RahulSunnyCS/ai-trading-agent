@@ -124,6 +124,27 @@ def _exchange_events(
     return out, other
 
 
+def _same_company_symbols(con: duckdb.DuckDBPyConnection) -> dict[str, set[str]]:
+    """symbol -> the other symbols that traded under one of its ISINs (a rename keeps the
+    ISIN). Only symbols that have such a twin appear."""
+    columns = {row[0] for row in con.execute("DESCRIBE bars_1d_stock").fetchall()}
+    if "isin" not in columns:  # a lake written without ISINs has no way to tell
+        return {}
+    rows = con.execute(
+        "SELECT DISTINCT i.symbol, b.isin FROM bars_1d_stock b "
+        "JOIN instruments i USING (instrument_id) WHERE b.isin IS NOT NULL"
+    ).fetchall()
+    by_isin: dict[str, set[str]] = defaultdict(set)
+    for symbol, isin in rows:
+        by_isin[isin].add(symbol)
+    out: dict[str, set[str]] = defaultdict(set)
+    for symbols in by_isin.values():
+        if len(symbols) > 1:
+            for symbol in symbols:
+                out[symbol] |= symbols - {symbol}
+    return dict(out)
+
+
 def scan_and_store(con: duckdb.DuckDBPyConnection, raw_dir: Path) -> dict[str, int]:
     """Scan all available stock history after migration; replace the derived review table."""
     with CURATED_REVIEWS_PATH.open(newline="") as handle:
@@ -155,6 +176,14 @@ def scan_and_store(con: duckdb.DuckDBPyConnection, raw_dir: Path) -> dict[str, i
                 [latest],
             )
     exchange, other_filings = _exchange_events(raw_dir)
+    # The exchange files an old action under the company's CURRENT symbol (MCDOWELL-N's 2018
+    # split is under UNITDSPR), while the prices of the time sit under the old one. Two symbols
+    # that ever shared an ISIN are one company, so each filing also answers to those names.
+    for old_name, names in _same_company_symbols(con).items():
+        for filings in (exchange, other_filings):
+            for (symbol, ex_date), filing in list(filings.items()):
+                if symbol in names:
+                    filings.setdefault((old_name, ex_date), filing)
     reviews = {
         (symbol, ex_date): (decision, factor, source_url, note)
         for symbol, ex_date, decision, factor, source_url, note in con.execute(

@@ -1269,6 +1269,136 @@ def search_steady_report(
     typer.echo(f"\n{int(table.winner.sum())} of {len(table)} are Winners")
 
 
+@search_app.command("pit-rerun")
+def search_pit_rerun(
+    out: Path = typer.Argument(..., help="A finished search's results folder (arm A)."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    top: int = typer.Option(50, help="How many of the best stored runs to re-run."),
+    also: Path = typer.Option(None, "--also", help='More runs: JSON {"label": "run id"}.'),
+    dest: Path = typer.Option(None, "--dest", help="Output file (default <out>/pit_rerun.jsonl)."),
+) -> None:
+    """Re-run the best configs unchanged on a point-in-time universe (each year's 750
+    most-traded stocks) and print what the result loses. Resumable."""
+    import json as _json
+
+    from . import pit_rerun
+
+    extra = _json.loads(also.read_text()) if also else {}
+    dest = dest or out / "pit_rerun.jsonl"
+    pit_rerun.run(space, out, pit_rerun.pick(out, top, extra), dest, echo=typer.echo)
+    rows = pit_rerun.table(dest)
+    for label in sorted(rows.get("as_searched", {})):
+        cells = [
+            f"{variant} {rows[variant][label]['cagr']:.1%}"
+            for variant in pit_rerun.VARIANTS
+            if label in rows.get(variant, {})
+        ]
+        typer.echo(f"{label}: " + ", ".join(cells))
+
+
+@search_app.command("category-shuffle")
+def search_category_shuffle(
+    out: Path = typer.Argument(..., help="A finished search's results folder (arm A)."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    picks: Path = typer.Option(..., "--picks", help='Runs to test: JSON {"label": "run id"}.'),
+    shuffles: int = typer.Option(100, help="How many random dealings of stocks to categories."),
+    dest: Path = typer.Option(
+        None, "--dest", help="Output (default <out>/category_shuffle.jsonl)."
+    ),
+) -> None:
+    """Each config with the stocks dealt out to the categories at random, against the same
+    config on the real tags. Tells whether the categories themselves add anything. Resumable."""
+    import json as _json
+
+    from . import category_shuffle
+
+    dest = dest or out / "category_shuffle.jsonl"
+    category_shuffle.run(
+        space, out, _json.loads(picks.read_text()), dest, shuffles=shuffles, echo=typer.echo
+    )
+    for label, row in category_shuffle.summary(dest).items():
+        typer.echo(
+            f"{label}: real {row['real']:.1%}; shuffled median {row['shuffled_median']:.1%}, "
+            f"95th percentile {row['shuffled_p95']:.1%}, best {row['shuffled_max']:.1%}; "
+            f"{row['beaten_by']} of {row['shuffles']} shuffles match or beat it"
+        )
+
+
+@search_app.command("score")
+def search_score(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    dest: Path = typer.Option(None, "--dest", help="Output folder (default <out>/scored)."),
+    workers: int = typer.Option(4, help="Worker processes (~1 GB each)."),
+    universe: str = typer.Option(None, help="Score on another universe, e.g. turnover_rank."),
+    tags: str = typer.Option(None, help="Category tags to use: curated or extended."),
+    limit: int = typer.Option(None, help="Only the first N configs of each ranking (a trial run)."),
+    max_rankings: int = typer.Option(None, help="Score at most this many rankings, then stop."),
+) -> None:
+    """Re-score every config of a finished search on all its rebalance phases and keep the
+    weekly curves (BL-010 Phase 4), then report the probability of backtest overfitting.
+    Resumable: a ranking already scored is skipped."""
+    from . import method, reference_benchmarks
+
+    dest = dest or out / "scored"
+    runner = {}
+    if universe:
+        runner["universe_kind"] = universe
+    if tags:
+        runner["category_tags"] = tags
+    method.score_search(
+        space,
+        out,
+        dest,
+        workers=workers,
+        runner=runner,
+        limit=limit,
+        max_rankings=max_rankings,
+        echo=typer.echo,
+    )
+    scores, curves = method.load_scores(dest)
+    refs = reference_benchmarks.load_references()
+    excess = method.excess_log_returns(curves, refs["Nifty200 Momentum 30 TRI"])
+    result = method.pbo(excess.to_numpy())
+    typer.echo(
+        f"{len(scores)} configs scored; median CAGR {scores['cagr'].median():.1%}, "
+        f"best {scores['cagr'].max():.1%}"
+    )
+    typer.echo(
+        f"PBO {result['pbo']:.2f} over {result['splits']} splits of {result['configs']} configs "
+        f"(kill above {method.PBO_KILL}); the in-sample best is below the benchmark out of "
+        f"sample in {result['picked_oos_negative']:.0%} of splits; slope {result['slope']:.2f}"
+    )
+
+
+@search_app.command("fair-placebo")
+def search_fair_placebo(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    picks: Path = typer.Option(..., "--picks", help='Runs to test: JSON {"label": "run id"}.'),
+    seeds: int = typer.Option(100, help="Random rankings per config."),
+    dest: Path = typer.Option(None, "--dest", help="Output (default <out>/fair_placebo.jsonl)."),
+) -> None:
+    """Each config against random rankings that change only every 13 weeks, so the baseline
+    trades about as often as the real thing (BL-010 Phase 4). The config's own stock tilt is
+    switched off in both, since it would re-order random picks by real momentum. Resumable."""
+    import json as _json
+
+    from . import method
+
+    dest = dest or out / "fair_placebo.jsonl"
+    method.fair_placebo(
+        space, out, _json.loads(picks.read_text()), dest, seeds=seeds, echo=typer.echo
+    )
+    for label, row in method.placebo_summary(dest).items():
+        typer.echo(
+            f"{label}: real {row['real']:.1%} (turnover {row['real_turnover']:.1f}x); random "
+            f"median {row['placebo_median']:.1%}, 95th percentile {row['placebo_p95']:.1%} "
+            f"(turnover {row['placebo_turnover_median']:.1f}x); margin "
+            f"{row['margin_over_p95'] * 100:+.1f} pts, {'passes' if row['passes'] else 'fails'}"
+        )
+
+
 @search_app.command("analyze")
 def search_analyze(
     out: Path = typer.Argument(..., help="A results folder from `mbt search run`."),
