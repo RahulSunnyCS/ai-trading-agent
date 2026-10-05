@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — protects the correctness of the numbers favourites and weekly signals are chosen on |
-| **Status** | Planned |
+| **Status** | In progress (Phases 1 and 2 done; 3 and 4 not started) |
 | **Type** | improvement |
 | **Area** | momentum (+ trading-data for one migration, dashboard for one provenance line) |
 | **Created** | 2026-10-04 |
 | **Depends on** | none — the baseline commit is already in place (see Context) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.14 |
 
 ## Context
 
@@ -315,7 +315,35 @@ To ask when starting:
 4. Is one muted provenance line in Saved runs enough, or should the dashboard also badge a run
    whose re-run no longer matches?
 
+### Answered when starting (2026-10-05)
+
+- **Scope:** Phases 1 and 2 now; 3 and 4 later. BL-010 was waiting on these two.
+- **Fixture:** about 15 MB is acceptable. Built at 14.7 MB: 170 stocks, bars from 2017, end
+  2025-06-27.
+- **Baseline:** freeze the engine as it is, then fix BL-010's E10 to E13 through the accept
+  step.
+
+Questions 2 to 4 above belong to Phases 3 and 4 and are still open.
+
+### As built (differences from the plan)
+
+- Scenarios start from the API's own defaults (`$meta`) and change a few settings each, instead
+  of spelling out every field. A default that flips then moves a frozen result, which is the
+  case this item exists for.
+- Expected results are one gzipped JSON per scenario (1.5 MB in all; plain JSON was 10 MB) plus
+  a readable `summary.json`. The accept script prints the differences.
+- The coverage test checks every request field and every choice. It does not map fields to
+  datasets or inspect `engine.Config`.
+- The look-ahead test runs at three cut dates on all four datasets and compares results only.
+  Three fields are left out with reasons: `price` (a level on today's share count), `proxy`,
+  and the order of equal-weight holdings.
+- Not built: the always-true checks, the nightly reverse-order and wiring runs, and the CI
+  nightly flag.
+
 ## Log
 
 - 2026-10-04 — created from the planning conversation. Priority P0 (protects result
   correctness). Baseline and enforcement questions answered. Status `Planned`.
+- 2026-10-05 — started. Phases 1 and 2 built: 16 scenarios frozen, coverage test, look-ahead
+  test (passes on all four datasets at three cut dates; fails on a planted `shift(-1)`), accept
+  script with a changelog, pre-push hook. A changed cost constant trips five scenarios.

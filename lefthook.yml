@@ -55,3 +55,14 @@ pre-commit:
 # apps/server/src/utils/clock.ts so that tests can inject a deterministic
 # FakeClock. Any PR introducing Date.now() or new Date() outside that file
 # must be rejected at code review.
+
+pre-push:
+  commands:
+    momentum-goldens:
+      # BL-001: a change that moves any frozen momentum backtest result may not be pushed
+      # without accepting it (packages/momentum-backtesting/scripts/update-goldens.py).
+      # Only runs when the push touches the momentum engine or the shared data package.
+      run: |
+        if git diff --name-only origin/main...HEAD | grep -qE '^packages/(momentum-backtesting|trading-data)/'; then
+          cd packages/momentum-backtesting && uv run pytest tests/golden/test_golden.py tests/golden/test_coverage.py -q
+        fi
