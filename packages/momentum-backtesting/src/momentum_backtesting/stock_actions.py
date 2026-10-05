@@ -9,6 +9,7 @@ Other drops remain review items.
 from __future__ import annotations
 
 import csv
+import math
 import re
 from collections import defaultdict
 from datetime import date
@@ -239,6 +240,52 @@ def scan_and_store(con: duckdb.DuckDBPyConnection, raw_dir: Path) -> dict[str, i
                 subject,
             )
         )
+
+    # A bonus of 1:4 or smaller moves the price by less than MIN_DROP, so the scan above never
+    # sees it and the fall was read as a real one (BL-010 F9: 15 such events in the Total
+    # Market since 2016). The exchange's own filing is the evidence here; the price only has
+    # to be consistent with it.
+    seen = {(record[0], record[1]) for record in records}
+    filed = [key for key in exchange if key not in seen]
+    if filed:
+        con.execute("CREATE OR REPLACE TEMP TABLE _filed_actions (symbol TEXT, ex_date DATE)")
+        con.executemany("INSERT INTO _filed_actions VALUES (?, ?)", filed)
+        small = con.execute(
+            """
+            WITH daily AS (
+                SELECT i.symbol, b.date AS ex_date, b.close, b.volume, b.turnover,
+                       lag(b.close) OVER w AS previous_close,
+                       lag(b.volume) OVER w AS previous_volume,
+                       lag(b.turnover) OVER w AS previous_turnover
+                FROM bars_1d_stock b JOIN instruments i USING (instrument_id)
+                WHERE i.symbol IN (SELECT symbol FROM _filed_actions)
+                WINDOW w AS (PARTITION BY i.symbol ORDER BY b.date)
+            )
+            SELECT symbol, ex_date, previous_close, close, previous_volume, volume,
+                   previous_turnover, turnover
+            FROM daily JOIN _filed_actions USING (symbol, ex_date)
+            WHERE previous_close > 0 AND close > 0
+            """
+        ).fetchall()
+        for symbol, ex_date, previous_close, close, *rest in small:
+            ex_date = pd.Timestamp(ex_date).date()
+            factor, kind, subject = exchange[(symbol, ex_date)]
+            # The fall must look more like the filed multiple than like no change at all;
+            # otherwise the ex-date or the filing is not what the price shows. Leave it alone.
+            seen_multiple = math.log(previous_close / close)
+            if factor <= 1.0 or abs(seen_multiple - math.log(factor)) >= abs(seen_multiple):
+                continue
+            records.append(
+                (symbol, ex_date, previous_close, close, *rest, None, None, factor, None)
+                + ("confirmed", kind, "NSE corporate actions", subject)
+            )
+        # Cumulative factors run in date order within a symbol, across both kinds of record.
+        records.sort(key=lambda record: (record[0], record[1]))
+        running: dict[str, float] = defaultdict(lambda: 1.0)
+        for i, record in enumerate(records):
+            if record[10] is not None:
+                running[record[0]] *= record[10]
+                records[i] = (*record[:11], running[record[0]], *record[12:])
 
     con.execute("BEGIN TRANSACTION")
     try:

@@ -183,3 +183,59 @@ def test_dashboard_reviews_only_new_simple_events(tmp_path, monkeypatch):
             ).fetchone()[0]
             == 2.0
         )
+
+
+def test_a_small_bonus_the_drop_scan_cannot_see_is_adjusted_from_its_filing(tmp_path, monkeypatch):
+    """BL-010 F9: a 1:4 bonus moves the price 20%, under the scan's threshold. The exchange's
+    filing confirms it; a filing the price does not bear out is left alone."""
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    with connect(tmp_path) as con:
+        ids = {
+            symbol: con.execute(
+                "INSERT INTO instruments (instrument_key, asset_class, exchange, symbol) "
+                "VALUES (?, 'stock', 'NSE', ?) RETURNING instrument_id",
+                [f"stock:NSE:{symbol}", symbol],
+            ).fetchone()[0]
+            for symbol in ("PFC", "FLAT")
+        }
+    bars = pd.DataFrame(
+        [
+            (ids["PFC"], "2023-09-15", 300.0, 100, 30000.0),
+            (ids["PFC"], "2023-09-20", 300.0, 100, 30000.0),
+            (ids["PFC"], "2023-09-21", 243.0, 120, 29160.0),  # ex-bonus: 300 / 1.25, then +1.25%
+            (ids["PFC"], "2023-09-22", 246.0, 110, 27060.0),
+            (ids["FLAT"], "2023-09-20", 100.0, 100, 10000.0),
+            (ids["FLAT"], "2023-09-21", 99.0, 100, 9900.0),  # filed, but the price never moved
+        ],
+        columns=["instrument_id", "date", "close", "volume", "turnover"],
+    )
+    bars["date"] = pd.to_datetime(bars["date"])
+    path = tmp_path / "lake" / "bars_1d" / "asset=stock" / "year=2023" / "data.parquet"
+    path.parent.mkdir(parents=True)
+    bars.to_parquet(path, index=False)
+    ca_dir = tmp_path / "raw" / "corporate_actions"
+    ca_dir.mkdir(parents=True)
+    filing = {
+        "series": "EQ",
+        "isin": "X",
+        "faceVal": "10",
+        "exDate": "21-Sep-2023",
+        "recDate": "21-Sep-2023",
+        "subject": "Bonus 1:4",
+    }
+    (ca_dir / "ca_2023.json").write_text(
+        json.dumps([{**filing, "symbol": "PFC"}, {**filing, "symbol": "FLAT"}])
+    )
+    with connect(tmp_path) as con:
+        report = scan_and_store(con, tmp_path / "raw")
+        rows = con.execute(
+            "SELECT symbol, ex_date, confirmed_factor, cumulative_factor, status "
+            "FROM stock_action_candidates"
+        ).fetchall()
+    assert report["confirmed"] == 1
+    assert rows == [("PFC", date(2023, 9, 21), 1.25, 1.25, "confirmed")]
+
+    adjusted, _events, _stale = build_stock_weekly_prices(["PFC"], stocks_data_dir=tmp_path)
+    week_before, week_of = adjusted["PFC"].iloc[0], adjusted["PFC"].iloc[1]
+    assert week_before == pytest.approx(300.0 / 1.25)  # not a 20% fall any more
+    assert week_of / week_before - 1 == pytest.approx(246.0 / 240.0 - 1)

@@ -98,9 +98,9 @@ Evidence and numbers: `packages/momentum-backtesting/docs/evaluation-review.md`.
 
 | # | Finding | Direction |
 |---|---|---|
-| E10 | **A holding whose stock stops trading is sold at its last close.** FORCEMOT did not trade on NSE for 3.5 months; four of six runs sold it in the gap. Should block the sale, like a lower-circuit lock. | Either way |
-| E11 | **A retired price series stays buyable until the next quarterly pool refresh.** One run added to pre-demerger `VEDL` at a frozen price for 11 weeks. | Distorts picks |
-| E12 | A taxed run's final sell-off charges the ₹16 depository fee per lot, not per stock. | Under 0.001 pt |
+| ~~E10~~ fixed 2026-10-06 | **A holding whose stock stops trading is sold at its last close.** FORCEMOT did not trade on NSE for 3.5 months; four of six runs sold it in the gap. Should block the sale, like a lower-circuit lock. | Either way |
+| ~~E11~~ fixed 2026-10-06 | **A retired price series stays buyable until the next quarterly pool refresh.** One run added to pre-demerger `VEDL` at a frozen price for 11 weeks. | Distorts picks |
+| ~~E12~~ fixed 2026-10-06 | A taxed run's final sell-off charges the ₹16 depository fee per lot, not per stock. | Under 0.001 pt |
 | E13 | **Broad fills at Friday's close; the first real fill is Monday's open.** Costs a delay-0 run 1.0 pt of CAGR on average, over 1 pt on two of six. Add a Monday-fill option (committed rule, addendum 1). | Optimistic |
 | F9a | F9 confirmed and sized: 15 of 292 filed splits and bonuses in the universe since 2016 are not adjusted, all small bonuses. Held ones cost 0.1–0.3 pt. Fix in Phase 3 step 2. | Pessimistic |
 | F17 | **Concentration.** The top five companies are 42–81% of the compounded return; CUPID alone is 17–33% in every one of the six runs. | Fragile |
@@ -393,3 +393,10 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   equity on the full database and on a copy cut off at that date (`mbt audit lookahead`).
   Phase 2 is done: steps 1 and 4 pass; step 2 fails on PFC's missed bonus; the flags of steps
   3, 5, 6 and 7 are recorded above.
+- 2026-10-06 — E10, E11 and E12 fixed, each with a failing-then-passing test and an accepted
+  entry in the goldens' changelog. Effect on the six configs: −0.2 to +0.5 points of CAGR.
+  E13 (a Monday-fill option for Broad) is still open.
+- 2026-10-06 — Phase 3 step 2, first part: the action scan confirms small bonuses from exchange
+  filings; applied to the shared database after a backup (owner approved). 41 new factors, 13
+  in the Total Market; three filings still need a manual look. Six configs move −1.3 to +0.7
+  points.

@@ -1368,9 +1368,11 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         for asset, position in lots.items():
             price = sim.price(asset, last)
             tax_class = sim.tax_classes.get(CASH if asset == _POOL else asset, DEBT)
+            # One sale of the whole position, so one flat depository charge, as in `sell`.
+            sell_frac = sim.sell_cost(value(asset, last), asset)
             for lot in position:
                 gross = lot["units"] * price
-                net = gross * (1 - sim.sell_cost(gross, asset))
+                net = gross * (1 - sell_frac)
                 total += net - closing.sale(
                     tax_class, net - lot["basis"], (last - lot["since"]).days
                 )

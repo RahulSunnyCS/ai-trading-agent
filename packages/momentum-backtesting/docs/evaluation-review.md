@@ -265,3 +265,50 @@ uv run mbt audit outside $B/{aggressive,midway,conservative,median1,median2,medi
   --day NEULANDLAB:2023-05-11 --day POLYCAB:2024-01-11 --day RECLTD:2024-06-04 \
   --day RVNL:2022-12-23 --out $A
 ```
+
+## Phase 2 follow-up — fixes E10 to E12 (2026-10-06)
+
+Each has a test that fails on the old code (`tests/test_phase2_fixes.py`) and went through the
+frozen-results accept step (`tests/golden/CHANGELOG.md`). All twelve re-runs below still
+reconcile in the independent replay.
+
+| Config | As searched: before → after | ₹5 lakh after tax: before → after |
+|---|---|---|
+| Aggressive winner | 52.17% → 52.17% | 40.16% → 40.16% |
+| Midway winner | 52.86% → 52.94% | 42.32% → 42.42% |
+| Conservative winner | 45.99% → 45.92% | 37.15% → 37.09% |
+| Median 1 | 34.87% → 34.69% | 28.11% → 27.98% |
+| Median 2 | 32.53% → 32.53% | 24.77% → 24.77% |
+| Median 3 | 32.40% → 32.91% | 26.34% → 26.74% |
+
+- **E10:** with circuit locks respected, a stock that had no session in a week can be neither
+  bought nor sold. FORCEMOT is now held through its 3.5 months off NSE; no order fills at a
+  stale price in five of the six runs.
+- **E11:** a price series that has ended leaves the pool the week after its last real price.
+- **E12:** one depository charge per stock when a taxed run sells everything at the end.
+- **E13 (Monday-fill option) is not done.** It is a new execution mode, not a fix.
+
+## Phase 3 step 2 (first part) — small bonuses adjusted (2026-10-06)
+
+`stock_actions.scan_and_store` now also confirms a split or bonus from the exchange's filing
+when the price on the ex-date moved more like the filed multiple than like no change. The
+scan was re-run on the shared database (backup:
+`~/TradingData/backups/catalog-2026-10-06-before-small-bonus-fix.duckdb`): 41 new confirmed
+factors, 13 of them for Total Market stocks; no existing row changed.
+
+Still unadjusted, because the price on the filed ex-date does not show them: CUPID 1:5
+(2018-10-11), KARURVYSYA 1:10 (2018-08-14), KTKBANK 1:10 (2020-03-17). They need a manual look.
+
+| Config | As searched: before → after | ₹5 lakh after tax: before → after |
+|---|---|---|
+| Aggressive winner | 52.17% → 52.16% | 40.16% → 40.15% |
+| Midway winner | 52.94% → 53.54% | 42.42% → 43.04% |
+| Conservative winner | 45.92% → 44.65% | 37.09% → 36.10% |
+| Median 1 | 34.69% → 35.43% | 27.98% → 28.33% |
+| Median 2 | 32.53% → 31.82% | 24.77% → 24.24% |
+| Median 3 | 32.91% → 32.55% | 26.74% → 26.42% |
+
+"Before" is after fixes E10 to E12. The changes come mostly from rankings: a stock no longer
+shows a fall it never had, so it is ranked, bought and sold differently. No filed split or
+bonus inside any holding of the six runs is unadjusted now, and all twelve runs reconcile.
+Every earlier number in this file was measured before this data change.

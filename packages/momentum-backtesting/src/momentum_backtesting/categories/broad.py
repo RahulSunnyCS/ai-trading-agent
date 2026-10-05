@@ -589,6 +589,13 @@ def finish_universe_ranking(
             pool_membership
         ).fillna(False)
 
+    # Nor may a series that has ended (the pre-demerger half of a split series, a delisted
+    # stock) stay in the pool until the next quarter: its price is only carried forward, so a
+    # buy would fill at a frozen price nobody could trade at.
+    for column, last_real_week in universe.stale_columns.items():
+        if column in pool_membership.columns:
+            pool_membership.loc[pool_membership.index > last_real_week, column] = False
+
     stock_pool_ranks = _dense_rank(global_ranks[list(frame.columns)].where(pool_membership))
 
     combined_eligible = pd.DataFrame(False, index=weeks, columns=full_frame.columns)
