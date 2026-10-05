@@ -2,7 +2,8 @@ import type { Tab } from './nav';
 
 /**
  * Per-tab "what's still pending to complete" checklists, surfaced via the info
- * icon next to each view's title. Each entry is a single line, listed in
+ * icon next to each view's title — only in Developer mode (Settings → About;
+ * see ui/PendingInfo). Each entry is a single line, listed in
  * priority order (most foundational first). Grounded in the documented M3/M4
  * gaps and Phase-2 roadmap in .claude/project/overview.md.
  */
@@ -10,7 +11,6 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
   live: [
     'Wire /api/straddle/latest — it currently returns a null stub',
     'Add Fyers token auto-refresh (manual daily re-login today — Phase B)',
-    'Encrypt broker_tokens at rest (Phase B)',
     'Add FYERS_PIN support (Phase B)',
     'Surface the India VIX value alongside the straddle',
   ],
@@ -24,7 +24,6 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Show live running P&L per personality',
     'Add the Beat-Clockwork delta column',
     'Surface the full parameter set and evolution history',
-    'Add the parameter-suggestion approval UI (Phase 2)',
   ],
   pnl: [
     'Add a per-personality P&L breakdown',
@@ -39,14 +38,12 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Link regimes to per-personality performance',
   ],
   backfill: [
-    'Add an in-UI trigger to start a backfill (CLI-only today)',
     'Show live progress for running jobs',
     'Add a one-click gap-fill action',
     'Filter by symbol and resolution',
   ],
   replay: [
     'Add a safe server-driven backtest endpoint (M3b, deferred)',
-    'Build the backtest runner (T-51, deferred)',
     'Render replay results in the UI',
     'Add one-click dry-run from a coverage row',
   ],
@@ -57,12 +54,11 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Export DATABASE_URL for obt-api to light up the T-33 cross-check in Market regimes',
     'Fix the pre-Sep-2025 NIFTY expiry calendar so days-to-expiry works on older history (TODO 3.10.15)',
     'Check the engine intrabar rules against a few real trades (optional)',
-    'Telegram summary after the evening run',
     'Brokerage/taxes presets instead of a flat per-order cost',
     'Strategy features not built yet: simple momentum, overall trailing/re-entry',
   ],
   backtest: [
-    'Add weekday and regime buckets alongside the DTE breakdown (M-5)',
+    'Add weekday buckets alongside the DTE and regime breakdowns (M-5)',
     'Add walk-forward / sweep reporting and overfitting guard (M-5)',
     'Surface ingest-time quality flags on the run result, not just P&L',
     'Add a compare view across multiple past runs',
@@ -70,7 +66,6 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
   ],
   momentum: [
     'Verify every migrated dataset against real Python backtest results',
-    'Add the annual and holdings timeline charts, CSV exports and shareable settings URL',
     'Finish Custom Index inner trade details before declaring Momentum UI parity',
   ],
   brokerLogins: [],

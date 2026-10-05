@@ -1,66 +1,55 @@
-import { ArrowDown, ArrowUp, Eye, EyeOff, GripVertical, RotateCcw } from 'lucide-react';
-import { type DragEvent, useState } from 'react';
+'use client';
 
-import { cn } from '../lib/cn';
+import { LogOut } from 'lucide-react';
+import { type ReactNode, useEffect, useState } from 'react';
+
+import { useMeta } from '../hooks/useMeta';
+import { EMPTY, formatInt } from '../lib/format';
 import type { NavigationPreferences } from '../store/navigation';
-import { DEFAULT_NAVIGATION_PREFERENCES, moveTabBefore } from '../store/navigation';
+import {
+  DATE_RANGE_YEAR_CHOICES,
+  type Density,
+  FULL_HISTORY_YEARS,
+  type MomentumDefaultDataset,
+  useSettingsStore,
+} from '../store/settings';
 import { type ThemePreference, useThemeStore } from '../store/theme';
+import { NavigationSection } from './settings/NavigationSection';
+import { SettingRow, SettingSwitch } from './settings/SettingSwitch';
 import { NAV_GROUPS, type Tab } from './shell/nav';
-import { PENDING_BY_TAB } from './shell/pending';
+import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
+import { Select } from './ui/Input';
 import { RadioCards } from './ui/RadioCards';
+import { SegmentedControl } from './ui/SegmentedControl';
 
 interface SettingsViewProps {
   preferences: NavigationPreferences;
   onChange: (preferences: NavigationPreferences) => void;
 }
 
-export function SettingsView({ preferences, onChange }: SettingsViewProps) {
-  const [dragging, setDragging] = useState<Tab | null>(null);
+/** <select> value for "no preference": the app's own default applies. */
+const APP_DEFAULT = '';
+
+function yearsLabel(years: number): string {
+  if (years === FULL_HISTORY_YEARS) return 'Full history';
+  return `${formatInt(years)} ${years === 1 ? 'year' : 'years'}`;
+}
+
+function AppearanceSection() {
   const themePreference = useThemeStore((state) => state.preference);
   const setThemePreference = useThemeStore((state) => state.setPreference);
-  const hidden = new Set(preferences.hidden);
-  const rank = new Map(preferences.order.map((id, index) => [id, index]));
-
-  function toggleVisibility(tab: Tab): void {
-    const nextHidden = hidden.has(tab)
-      ? preferences.hidden.filter((id) => id !== tab)
-      : [...preferences.hidden, tab];
-    onChange({ ...preferences, hidden: nextHidden });
-  }
-
-  function reorder(groupTabs: Tab[], tab: Tab, direction: -1 | 1): void {
-    const index = groupTabs.indexOf(tab);
-    const swapWith = groupTabs[index + direction];
-    if (!swapWith) return;
-    const next = [...preferences.order];
-    const from = next.indexOf(tab);
-    const to = next.indexOf(swapWith);
-    const moved = next[from];
-    const displaced = next[to];
-    if (!moved || !displaced) return;
-    next[from] = displaced;
-    next[to] = moved;
-    onChange({ ...preferences, order: next });
-  }
-
-  function dropBefore(event: DragEvent, target: Tab, groupTabs: Tab[]): void {
-    event.preventDefault();
-    if (!dragging || !groupTabs.includes(dragging)) return;
-    onChange({ ...preferences, order: moveTabBefore(preferences.order, dragging, target) });
-    setDragging(null);
-  }
-
-  const visibleCount = preferences.order.length - preferences.hidden.length;
+  const density = useSettingsStore((state) => state.density);
+  const setDensity = useSettingsStore((state) => state.setDensity);
 
   return (
-    <div className="space-y-5">
-      <Card>
-        <CardHeader
-          title="Appearance"
-          description="Dark is the default. The sun / moon button in the top bar switches between light and dark."
-        />
+    <Card>
+      <CardHeader
+        title="Appearance"
+        description="Dark is the default. The sun / moon button in the top bar switches between light and dark."
+      />
+      <div className="space-y-4">
         <RadioCards
           name="theme"
           columns={3}
@@ -72,135 +61,227 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
             { value: 'system', label: 'System', description: 'Follow this device' },
           ]}
         />
-      </Card>
+        <SettingRow
+          label="Density"
+          description="Compact tightens table rows and figures to fit more on screen."
+        >
+          <SegmentedControl<Density>
+            ariaLabel="Density"
+            value={density}
+            onChange={setDensity}
+            options={[
+              { value: 'comfortable', label: 'Comfortable' },
+              { value: 'compact', label: 'Compact' },
+            ]}
+          />
+        </SettingRow>
+      </div>
+    </Card>
+  );
+}
 
+function DefaultsSection({ preferences }: { preferences: NavigationPreferences }) {
+  const defaults = useSettingsStore((state) => state.defaults);
+  const setDefaults = useSettingsStore((state) => state.setDefaults);
+
+  const hidden = new Set(preferences.hidden);
+  const rank = new Map(preferences.order.map((id, index) => [id, index]));
+  const landingOptions = NAV_GROUPS.flatMap((group) => group.items)
+    .filter((item) => item.id !== 'settings')
+    .filter((item) => !hidden.has(item.id) || item.id === defaults.landingTab)
+    .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+
+  return (
+    <Card>
       <CardHeader
-        title="Navigation settings"
-        description={`${visibleCount} of ${preferences.order.length} optional tabs shown. Settings stays pinned so you can always restore hidden tabs.`}
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onChange(DEFAULT_NAVIGATION_PREFERENCES)}
+        title="Defaults"
+        description="These apply the next time the dashboard opens. Saved in this browser only."
+      />
+      <div className="space-y-4">
+        <SettingRow
+          label="Landing tab"
+          description="The tab the dashboard opens on."
+          htmlFor="settings-landing-tab"
+        >
+          <Select
+            id="settings-landing-tab"
+            className="w-full sm:w-56"
+            value={defaults.landingTab ?? APP_DEFAULT}
+            onChange={(event) =>
+              setDefaults({
+                landingTab: event.target.value === APP_DEFAULT ? null : (event.target.value as Tab),
+              })
+            }
           >
-            <RotateCcw className="h-3.5 w-3.5" /> Reset
+            <option value={APP_DEFAULT}>App default</option>
+            {landingOptions.map((item) => (
+              <option key={item.id} value={item.id}>
+                {hidden.has(item.id) ? `${item.label} (hidden)` : item.label}
+              </option>
+            ))}
+          </Select>
+        </SettingRow>
+
+        <SettingRow
+          label="Momentum dataset"
+          description="The dataset Momentum starts on."
+          htmlFor="settings-momentum-dataset"
+        >
+          <Select
+            id="settings-momentum-dataset"
+            className="w-full sm:w-56"
+            value={defaults.momentumDataset ?? APP_DEFAULT}
+            onChange={(event) =>
+              setDefaults({
+                momentumDataset:
+                  event.target.value === APP_DEFAULT
+                    ? null
+                    : (event.target.value as MomentumDefaultDataset),
+              })
+            }
+          >
+            <option value={APP_DEFAULT}>App default</option>
+            <option value="etf">ETF Rotation</option>
+            <option value="broad">Broad Momentum</option>
+          </Select>
+        </SettingRow>
+
+        <SettingRow
+          label="Backtest period"
+          description="How much history a new backtest starts with."
+          htmlFor="settings-date-range"
+        >
+          <Select
+            id="settings-date-range"
+            className="w-full sm:w-56"
+            value={defaults.dateRangeYears === null ? APP_DEFAULT : String(defaults.dateRangeYears)}
+            onChange={(event) =>
+              setDefaults({
+                dateRangeYears:
+                  event.target.value === APP_DEFAULT ? null : Number(event.target.value),
+              })
+            }
+          >
+            <option value={APP_DEFAULT}>App default</option>
+            {DATE_RANGE_YEAR_CHOICES.map((years) => (
+              <option key={years} value={String(years)}>
+                {yearsLabel(years)}
+              </option>
+            ))}
+          </Select>
+        </SettingRow>
+      </div>
+    </Card>
+  );
+}
+
+function NotificationsSection() {
+  const tokenExpiry = useSettingsStore((state) => state.notifications.tokenExpiry);
+  const setNotifications = useSettingsStore((state) => state.setNotifications);
+
+  return (
+    <Card>
+      <CardHeader
+        title="Notifications"
+        description="Alerts such as the weekly signal and broker login results go to Telegram. Delivery is configured on the server, so there is nothing to set up here."
+      />
+      <SettingSwitch
+        label="Warn me in the dashboard before the Fyers token expires"
+        description="Applies to this browser only."
+        checked={tokenExpiry}
+        onChange={(checked) => setNotifications({ tokenExpiry: checked })}
+      />
+    </Card>
+  );
+}
+
+function AccountSection() {
+  return (
+    <Card>
+      <CardHeader
+        title="Account"
+        description="This dashboard is protected by a single shared password."
+        actions={
+          <Button asChild variant="secondary" size="sm">
+            <a href="/logout">
+              <LogOut className="h-3.5 w-3.5" aria-hidden="true" /> Log out
+            </a>
           </Button>
         }
       />
+    </Card>
+  );
+}
 
-      {NAV_GROUPS.map((group) => {
-        const items = group.items
-          .filter((item) => item.id !== 'settings')
-          .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
-        if (items.length === 0) return null;
-        const groupTabs = items.map((item) => item.id);
-        return (
-          <Card key={group.heading} flush>
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="text-sm font-semibold text-foreground">{group.heading}</h2>
-              <p className="mt-0.5 text-xs text-muted">
-                Drag tabs to set their priority within this section.
-              </p>
-            </div>
-            <div className="divide-y divide-border">
-              {items.map((item, index) => {
-                const Icon = item.icon;
-                const isHidden = hidden.has(item.id);
-                const pending = PENDING_BY_TAB[item.id].length;
-                return (
-                  <div
-                    key={item.id}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => dropBefore(event, item.id, groupTabs)}
-                    className={cn(
-                      'flex items-center gap-3 px-4 py-3 transition-colors',
-                      dragging === item.id ? 'bg-primary/10' : 'hover:bg-surface-2/60',
-                    )}
-                  >
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = 'move';
-                        setDragging(item.id);
-                      }}
-                      onDragEnd={() => setDragging(null)}
-                      aria-label={`Drag ${item.label}`}
-                      className="cursor-grab rounded p-1 text-faint hover:bg-surface-2 hover:text-muted active:cursor-grabbing"
-                    >
-                      <GripVertical className="h-4 w-4" />
-                    </button>
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-muted">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={cn(
-                          'text-sm font-medium',
-                          isHidden ? 'text-faint' : 'text-foreground',
-                        )}
-                      >
-                        {item.label}
-                      </div>
-                      <div className="text-xs text-faint">
-                        {pending > 0
-                          ? `${pending} pending ${pending === 1 ? 'item' : 'items'}`
-                          : 'Ready'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => reorder(groupTabs, item.id, -1)}
-                        disabled={index === 0}
-                        aria-label={`Move ${item.label} up`}
-                        className="rounded-md p-2 text-faint hover:bg-surface-2 hover:text-foreground disabled:opacity-30"
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => reorder(groupTabs, item.id, 1)}
-                        disabled={index === items.length - 1}
-                        aria-label={`Move ${item.label} down`}
-                        className="rounded-md p-2 text-faint hover:bg-surface-2 hover:text-foreground disabled:opacity-30"
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleVisibility(item.id)}
-                        aria-pressed={!isHidden}
-                        aria-label={`${isHidden ? 'Show' : 'Hide'} ${item.label}`}
-                        className={cn(
-                          'ml-1 inline-flex min-w-24 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
-                          isHidden
-                            ? 'border-border bg-surface text-muted hover:bg-surface-2'
-                            : 'border-primary/25 bg-primary/10 text-primary hover:bg-primary/15',
-                        )}
-                      >
-                        {isHidden ? (
-                          <EyeOff className="h-3.5 w-3.5" />
-                        ) : (
-                          <Eye className="h-3.5 w-3.5" />
-                        )}
-                        {isHidden ? 'Hidden' : 'Shown'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        );
-      })}
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <dt className="text-sm text-muted">{label}</dt>
+      <dd className="min-w-0 truncate text-sm text-foreground">{children}</dd>
+    </div>
+  );
+}
 
-      <Card className="border-dashed">
-        <p className="text-sm text-muted">
-          Settings is always visible and pinned last under Account. Visibility and order are saved
-          only in this browser.
-        </p>
-      </Card>
+function AboutSection() {
+  const { meta, loading } = useMeta();
+  const developer = useSettingsStore((state) => state.developer);
+  const setDeveloper = useSettingsStore((state) => state.setDeveloper);
+  // Read after mount: the server render has no window, and the two must match.
+  const [origin, setOrigin] = useState<string | null>(null);
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  const unavailable = <span className="text-faint">{loading ? 'Loading…' : 'Unavailable'}</span>;
+
+  return (
+    <Card>
+      <CardHeader title="About" description="What this dashboard is connected to." />
+      <dl className="divide-y divide-border">
+        <Fact label="Mode">
+          {meta ? (
+            <Badge tone={meta.simulate ? 'warning' : 'positive'}>
+              {meta.simulate ? 'Simulation' : 'Live market data'}
+            </Badge>
+          ) : (
+            unavailable
+          )}
+        </Fact>
+        <Fact label="Broker">{meta ? meta.broker || EMPTY : unavailable}</Fact>
+        <Fact label="Broker sign-in">
+          {meta ? (
+            <Badge status={meta.authDegraded ? 'attention' : 'connected'}>
+              {meta.authDegraded ? 'Needs attention' : 'OK'}
+            </Badge>
+          ) : (
+            unavailable
+          )}
+        </Fact>
+        <Fact label="Address">
+          <span className="font-mono text-xs">{origin ?? EMPTY}</span>
+        </Fact>
+      </dl>
+      <div className="mt-4 border-t border-border pt-4">
+        <SettingSwitch
+          label="Developer mode"
+          description="Shows the pending-work notes in each tab's header."
+          checked={developer}
+          onChange={setDeveloper}
+        />
+      </div>
+    </Card>
+  );
+}
+
+export function SettingsView({ preferences, onChange }: SettingsViewProps) {
+  return (
+    <div className="space-y-5">
+      <AppearanceSection />
+      <NavigationSection preferences={preferences} onChange={onChange} />
+      <DefaultsSection preferences={preferences} />
+      <NotificationsSection />
+      <AccountSection />
+      <AboutSection />
     </div>
   );
 }

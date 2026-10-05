@@ -49,4 +49,67 @@ describe('navigation preferences', () => {
       }),
     ).toBe('settings');
   });
+
+  // What a browser holds from before the regroup: the flat order of the old
+  // Trading / Research / Account groups, here with the user's own changes
+  // (P&L dragged above Live, Replay above Backfill) and three hidden tabs.
+  it('keeps hidden tabs and relative order from a value stored under the old grouping', () => {
+    const stored = JSON.parse(
+      JSON.stringify({
+        hidden: ['personalities', 'backtest', 'pricing'],
+        order: [
+          'pnl',
+          'live',
+          'trades',
+          'personalities',
+          'regime',
+          'replay',
+          'backfill',
+          'backtest',
+          'optionslab',
+          'momentum',
+          'brokerLogins',
+          'pricing',
+        ],
+      }),
+    );
+
+    const preferences = normalizeNavigationPreferences(stored);
+    expect(preferences).toEqual(stored);
+
+    const groups = visibleNavigationGroups(preferences);
+    expect(groups.map((group) => [group.id, group.items.map((item) => item.id)])).toEqual([
+      ['live', ['pnl', 'live', 'trades', 'regime']],
+      ['optionslab', ['optionslab']],
+      ['momentum', ['momentum']],
+      ['data', ['replay', 'backfill']],
+      ['account', ['brokerLogins', 'settings']],
+    ]);
+    expect(firstVisibleTab(preferences)).toBe('pnl');
+  });
+
+  it('drops a group whose tabs are all hidden', () => {
+    const groups = visibleNavigationGroups({
+      ...DEFAULT_NAVIGATION_PREFERENCES,
+      hidden: ['backfill', 'replay'],
+    });
+    expect(groups.map((group) => group.id)).toEqual(['live', 'optionslab', 'momentum', 'account']);
+  });
+
+  it('defaults to the product grouping order', () => {
+    expect(DEFAULT_NAVIGATION_PREFERENCES.order).toEqual([
+      'live',
+      'trades',
+      'pnl',
+      'personalities',
+      'regime',
+      'optionslab',
+      'backtest',
+      'momentum',
+      'backfill',
+      'replay',
+      'brokerLogins',
+      'pricing',
+    ]);
+  });
 });

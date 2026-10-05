@@ -410,4 +410,44 @@ Answered by the owner on 2026-10-05, when the item was started.
   `Tabs` items take a `title`; `formatPnl` accepts null. One ETF backtest was run in the
   browser to check the KPI cards, insights line, equity chart and yearly chart after Phases 2
   and 3 (it auto-saved one run to the owner's saved runs).
+- 2026-10-05 — **Phase 4 done** (branch `feat/bl-013-phase-4`, stacked on Phase 3).
+  - Status cluster (`shell/SystemStatus.tsx`) always renders: API reachable or "API
+    unreachable", market Open / Pre-open / Closed (`lib/market.ts`, weekdays only: exchange
+    holidays are not known to the dashboard), mode, the Fyers token as a button that starts
+    login, credits; dots only on phones. `shell/TokenBanner.tsx` warns from two hours before
+    expiry. `FyersAuthCard` has four states with a countdown; `useFyersAuthStatus` keeps the
+    last status through refetches and polls every 60 s.
+  - Navigation regrouped with what exists today: Live (Live, Trades, P&L, Personalities,
+    Regimes) · Options Lab (with nested Daily results / Market regimes / Strategy builder, and
+    "YAML backtest") · Momentum (nested sections) · Data (Backfill, Replay) · Account (Broker
+    logins, Pricing, Settings). Tab ids and URLs are unchanged; aliases `/billing`, `/brokers`,
+    `/data/backfill`, `/data/replay`, `/optionslab/yaml` resolve now. Stored preferences need
+    no migration (a test covers an old-order value). Per-tab titles (server-rendered for first
+    paint), skip link, `aria-label` on nav, mobile bottom bar.
+  - Settings in sections: Appearance (theme, density), Navigation, Defaults (landing tab,
+    Momentum dataset, backtest period), Notifications, Account (Log out), About (with Developer
+    mode). `store/settings.ts` holds them. `PendingInfo` shows only in Developer mode; six
+    stale `pending.ts` entries removed.
+  - Login: `/login` page, HMAC-signed `HttpOnly` session cookie (30 days, key derived from
+    `DASHBOARD_PASSWORD`, so changing it signs everyone out), Basic auth kept for `/api/*` and
+    curl, `/logout`, per-IP backoff, generic 503 body. Fail-closed rules unchanged.
+  - Checked: typecheck, dashboard unit tests, Biome; a browser pass of the shell at 1440 px
+    and 390 px; and the gated flow against a local dev server started with a generated test
+    password: page redirect, API 401, Basic right/wrong, login right/wrong, `next=//evil…`
+    falling back to `/`, tampered cookie rejected, logout, and lockout (429 + `Retry-After`)
+    on the fifth wrong password. Not checked: a production build, and the flow behind the
+    Cloudflare tunnel.
+  - Limits of the login, stated plainly: the backoff lives in one instance's memory (resets on
+    restart, not shared between edge instances) and trusts `X-Forwarded-For`, so it slows
+    guessing only behind a proxy that sets that header; with no such header all clients share
+    one bucket, so five wrong passwords lock out new logins for everyone for up to 15 minutes;
+    there is no server-side session revocation short of changing the password; the app does
+    not yet send the user to `/login` when a session expires mid-use (requests fail until
+    reload).
+  - Left for later: Overview (Phase 5), Options Lab Strategies / Runs and the YAML merge
+    (Phase 7), the Coverage merge and Billing rename (Phase 8) — only their URL aliases exist.
+    The Momentum dataset default is not applied when the dashboard is opened directly on
+    `/momentum`. Status, token and meta are polled by each component that shows them (up to
+    three status polls a minute); a shared store would remove the duplicates. The Fyers
+    callback redirect and "Feed: live / reconnecting" need the server (§3.12.13).
 

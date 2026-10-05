@@ -33,8 +33,9 @@ moves with `window.history.pushState`/`replaceState`, never `router.push`: every
 `[[...slug]]` page, and a router navigation to a different slug re-mounts the whole shell (all
 state lost, every view refetches). Next keeps `usePathname` and back/forward in sync with it.
 
-**Remote hosting:** `src/middleware.ts` (logic in `lib/accessGate.ts`) puts a password prompt
-in front of everything and adds the Cloudflare Access service token to forwarded `/api/*`
+**Remote hosting:** `src/middleware.ts` (logic in `lib/accessGate.ts`, cookie signing in
+`lib/session.ts`) puts a login in front of everything (a `/login` page and session cookie for
+people, HTTP Basic for `/api/*` and curl) and adds the Cloudflare Access service token to forwarded `/api/*`
 calls, so the dashboard can run off the laptop that serves the APIs. The password is
 mandatory (fails closed) in production builds; plain `next dev` stays open. Runbook:
 `docs/remote-dashboard.md`.
@@ -77,7 +78,8 @@ needs to be shared with the server, it is currently hand-duplicated in
   `shell/` (layout chrome) and `ui/` (generic primitives)
 - `src/pages/` — top-level routed pages
 - `src/hooks/` — one hook per data resource, all built on `usePolledResource`
-- `src/store/theme.ts` — Zustand theme store; `src/store/navigation.ts` owns the
+- `src/store/settings.ts` — density, defaults, notifications and the developer flag
+  (Settings tab); `src/store/theme.ts` — Zustand theme store; `src/store/navigation.ts` owns the
   locally persisted tab visibility/order preferences. Personality/live state is
   fetched via hooks, not centralized in a store.
 - `src/types/` — `backtest.ts` etc. — hand-kept in sync with `apps/server`'s

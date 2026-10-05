@@ -2,8 +2,9 @@
  * Access gate for a remotely served dashboard (see docs/remote-dashboard.md).
  *
  * Two independent jobs, both read from env per request so tests can vary them:
- *  1. Password gate — the browser's Basic-Auth prompt, checked against
- *     DASHBOARD_PASSWORD (username ignored). Fails closed: once the dashboard
+ *  1. Password gate — DASHBOARD_PASSWORD, proven either by the session cookie
+ *     the /login page issues (lib/session.ts) or by Basic auth (username
+ *     ignored; what curl and scripts use). Fails closed: once the dashboard
  *     is reachable remotely (production build, or upstream service-token vars
  *     set) a missing password blocks every request instead of serving openly.
  *     Plain local `next dev` stays open, as it always was.
@@ -14,10 +15,19 @@
  *     a deployment mistake, not "no token": it also blocks every request, so
  *     the dashboard fails loudly instead of every API call failing upstream.
  *
+ * This file holds the pure pieces (config, password check, redirect-target
+ * validation, wrong-password backoff); middleware.ts wires them to requests.
+ *
  * Runs in the edge middleware runtime: Web Crypto only, no node:crypto.
  */
 
+import { SESSION_COOKIE, withoutCookie } from './session';
+
 export const PASSWORD_REALM = 'Trading Research';
+
+/** What a browser is told when the deployment is broken. The reason goes to the server log only. */
+export const UNAVAILABLE_MESSAGE = 'The dashboard is not available right now.';
+export const PASSWORD_MISSING_REASON = 'DASHBOARD_PASSWORD not configured';
 
 const UPSTREAM_ID_HEADER = 'cf-access-client-id';
 const UPSTREAM_SECRET_HEADER = 'cf-access-client-secret';
@@ -102,23 +112,138 @@ export async function checkPassword(
 
 /**
  * Request headers to forward upstream: incoming headers minus any client-sent
- * Access credentials (and minus Authorization, which carries the dashboard
- * password and has no business reaching the APIs), plus the configured
- * service token when set. Returns null when nothing needs changing.
+ * Access credentials (and minus Authorization and the session cookie, which
+ * prove the dashboard password and have no business reaching the APIs), plus
+ * the configured service token when set. Returns null when nothing needs changing.
  */
 export function upstreamHeaders(incoming: Headers, config: GateConfig): Headers | null {
+  const cookie = incoming.get('cookie');
+  const hasSessionCookie = cookie?.includes(`${SESSION_COOKIE}=`) ?? false;
   const hasClientCopies =
     incoming.has(UPSTREAM_ID_HEADER) ||
     incoming.has(UPSTREAM_SECRET_HEADER) ||
-    incoming.has('authorization');
+    incoming.has('authorization') ||
+    hasSessionCookie;
   if (!hasClientCopies && !config.upstream) return null;
   const headers = new Headers(incoming);
   headers.delete(UPSTREAM_ID_HEADER);
   headers.delete(UPSTREAM_SECRET_HEADER);
   headers.delete('authorization');
+  if (cookie && hasSessionCookie) {
+    const rest = withoutCookie(cookie, SESSION_COOKIE);
+    if (rest) headers.set('cookie', rest);
+    else headers.delete('cookie');
+  }
   if (config.upstream) {
     headers.set(UPSTREAM_ID_HEADER, config.upstream.clientId);
     headers.set(UPSTREAM_SECRET_HEADER, config.upstream.clientSecret);
   }
   return headers;
+}
+
+/** Paths Next rewrites to the APIs: these answer 401, never a redirect to an HTML page. */
+export function isApiPath(pathname: string): boolean {
+  return pathname.startsWith('/api/') || pathname.startsWith('/retrospection/');
+}
+
+/** A browser navigating to a page: the only kind of request worth redirecting to /login. */
+export function isPageRequest(method: string, pathname: string, accept: string | null): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  if (isApiPath(pathname)) return false;
+  return accept?.toLowerCase().includes('text/html') ?? false;
+}
+
+/**
+ * Where to go after login. Only a same-origin relative path survives: it must start with a
+ * single `/`, hold no backslash (browsers read `/\host` as `//host`) or control character,
+ * and still resolve to our own origin. Everything else, and the login/logout paths themselves,
+ * becomes `/`.
+ */
+export function safeNextPath(next: string | null | undefined): string {
+  if (!next || next.length > 2048) return '/';
+  if (!next.startsWith('/') || next.startsWith('//')) return '/';
+  for (let i = 0; i < next.length; i += 1) {
+    const code = next.charCodeAt(i);
+    if (code <= 0x20 || code === 0x7f || code === 0x5c) return '/';
+  }
+  const base = 'http://dashboard.invalid';
+  let url: URL;
+  try {
+    url = new URL(next, base);
+  } catch {
+    return '/';
+  }
+  if (url.origin !== base || !url.pathname.startsWith('/') || url.pathname.startsWith('//')) {
+    return '/';
+  }
+  const first = url.pathname.split('/')[1];
+  if (first === 'login' || first === 'logout') return '/';
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** The bucket wrong passwords are counted under: the first `X-Forwarded-For` hop. */
+export function clientIp(forwardedFor: string | null): string {
+  const first = forwardedFor?.split(',')[0]?.trim();
+  return first ? first.slice(0, 64) : 'unknown';
+}
+
+/**
+ * Wrong-password backoff, per client IP.
+ *
+ * The store is a plain in-memory Map owned by the middleware module, so it is PER INSTANCE:
+ * it resets on every restart or cold start, and edge/serverless instances do not share it. An
+ * attacker spread over several instances, or one who can forge `X-Forwarded-For` because no
+ * trusted proxy overwrites it, gets more guesses than the numbers below suggest. It slows
+ * guessing; it is not a hard limit. The real defence is a long random password.
+ */
+export interface AttemptRecord {
+  failures: number;
+  lastFailureAt: number;
+  lockedUntil: number;
+}
+export type AttemptStore = Map<string, AttemptRecord>;
+
+export const BACKOFF = {
+  /** Wrong passwords allowed before the first lockout. */
+  threshold: 5,
+  /** First lockout; each further wrong password doubles it. */
+  baseLockMs: 60_000,
+  maxLockMs: 15 * 60_000,
+  /** A record with no failure for this long is forgotten. */
+  forgetAfterMs: 60 * 60_000,
+  /** Cap on tracked IPs; the least recently failing one is evicted first. */
+  maxEntries: 2000,
+} as const;
+
+/** Seconds until this IP may try again; 0 when it is not locked out. */
+export function lockoutSeconds(store: AttemptStore, ip: string, now: number): number {
+  const record = store.get(ip);
+  if (!record || record.lockedUntil <= now) return 0;
+  return Math.ceil((record.lockedUntil - now) / 1000);
+}
+
+/** Counts one wrong password. Returns the lockout it caused in seconds, or 0. */
+export function recordFailure(store: AttemptStore, ip: string, now: number): number {
+  const previous = store.get(ip);
+  const fresh = previous && now - previous.lastFailureAt <= BACKOFF.forgetAfterMs;
+  const failures = (fresh ? previous.failures : 0) + 1;
+  let lockedUntil = 0;
+  if (failures >= BACKOFF.threshold) {
+    const doublings = Math.min(failures - BACKOFF.threshold, 10);
+    lockedUntil = now + Math.min(BACKOFF.baseLockMs * 2 ** doublings, BACKOFF.maxLockMs);
+  }
+  // Re-insert so Map order is least-recently-failing first, then trim from the front.
+  store.delete(ip);
+  store.set(ip, { failures, lastFailureAt: now, lockedUntil });
+  while (store.size > BACKOFF.maxEntries) {
+    const oldest = store.keys().next();
+    if (oldest.done) break;
+    store.delete(oldest.value);
+  }
+  return lockedUntil > now ? Math.ceil((lockedUntil - now) / 1000) : 0;
+}
+
+/** A correct password clears the IP's count. */
+export function clearFailures(store: AttemptStore, ip: string): void {
+  store.delete(ip);
 }

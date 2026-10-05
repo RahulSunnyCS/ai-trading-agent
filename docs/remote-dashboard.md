@@ -6,7 +6,7 @@ beyond a domain you already own.
 
 ```
 browser ──► Next (Vercel / laptop B) ──[CF-Access service token]──► Cloudflare ──tunnel──► laptop A 127.0.0.1:8765 / :8000
-   └─ password prompt (apps/dashboard/src/middleware.ts)
+   └─ login page + session cookie (apps/dashboard/src/middleware.ts)
 ```
 
 The browser only ever talks to the dashboard; the dashboard's **server** forwards
@@ -23,11 +23,47 @@ Two locks, both required:
 | Cloudflare Access service token | the tunnel hostnames, so the APIs can't be called around the dashboard | Cloudflare Zero Trust + `UPSTREAM_ACCESS_CLIENT_ID/SECRET` on the dashboard host |
 
 The password **fails closed**: under `next start` / Vercel (or whenever the service-token
-vars are set) a missing `DASHBOARD_PASSWORD` makes every request return `503
-DASHBOARD_PASSWORD not configured`. Only plain local `next dev` (`bun run start`) is open.
-The service token fails closed too: setting only one of `UPSTREAM_ACCESS_CLIENT_ID` /
-`UPSTREAM_ACCESS_CLIENT_SECRET` (or leaving one blank) makes every request return a 503 naming
-both, instead of every API call failing at Cloudflare.
+vars are set) a missing `DASHBOARD_PASSWORD` makes every request, the login page included,
+return 503. Only plain local `next dev` (`bun run start`) is open. The service token fails
+closed too: setting only one of `UPSTREAM_ACCESS_CLIENT_ID` / `UPSTREAM_ACCESS_CLIENT_SECRET`
+(or leaving one blank) also makes every request return 503, instead of every API call failing
+at Cloudflare.
+
+The 503 body is the same in both cases ("The dashboard is not available right now.") and
+names nothing. The reason is in the dashboard host's server log, on a line starting
+`[dashboard gate] refusing every request:`.
+
+## Logging in
+
+- **People** get a login page. Any page request without a session is redirected to
+  `/login?next=<where you were going>`; the right password sets a session cookie and sends you
+  on. A wrong one returns to the form with an error. There is no username.
+- **Scripts and curl** use HTTP Basic auth, on any path, with any username:
+  `curl -u :<password> https://<dashboard-host>/api/momentum/meta`. An `/api/*` request
+  without credentials gets `401`, never a redirect to the login page.
+- **Session length:** 30 days from login, then you log in again. The cookie (`ata_session`) is
+  `HttpOnly`, `SameSite=Lax`, and `Secure` over https. It holds two timestamps and an
+  HMAC-SHA-256 signature keyed from the password; it does not contain the password.
+- **Changing `DASHBOARD_PASSWORD`** (and restarting / redeploying) ends every session at once,
+  on every device, because the signing key is derived from the password. That is also the only
+  way to revoke a session: there is no server-side session list.
+- **Logging out:** open `/logout` (Settings has the link). It clears the cookie in that
+  browser and returns to the login page. It does not invalidate a copy of the cookie held
+  elsewhere; change the password for that.
+- **Wrong-password backoff:** five wrong passwords from one IP address lock that address out
+  for 1 minute, and each further wrong one doubles it (2, 4, 8, then 15 minutes at most). While
+  locked, every attempt from that address gets `429` with `Retry-After`, the right password
+  included, on the form and on Basic auth alike. A browser already logged in is not affected.
+  A correct password clears the count; so does an hour without a wrong one.
+
+  Know its limits. The counts live in the memory of one server instance: they reset on a
+  restart or cold start, and on Vercel separate instances each keep their own, so a
+  determined guesser gets more tries than the numbers above say. The address is the first
+  `X-Forwarded-For` hop, which is only trustworthy when a proxy you trust sets it (Vercel
+  does); with `next start` exposed directly a client can send its own and dodge the count, and
+  with no such header everyone shares one bucket, so one person's typos can lock out everybody
+  for a few minutes. It slows guessing; it is not a hard limit. The password's length is what
+  protects the dashboard.
 
 ## 1. Backend laptop (once)
 
@@ -79,8 +115,8 @@ already forwards that path — at the cost of local-only logins.
 
 ## 3. Dashboard host
 
-Generate the password once: `openssl rand -base64 24`. There is no rate limiting on the
-prompt, so keep it long.
+Generate the password once: `openssl rand -base64 24`. Keep it that long: the wrong-password
+backoff only slows guessing (see "Logging in" above).
 
 Environment (both targets):
 
@@ -116,7 +152,8 @@ Use `start`, not `dev`: production mode is what makes the password mandatory.
 
 - Research stack only. The Live / Personalities / P&L tabs need the Fastify server and its
   Postgres/Redis and keep failing remotely, exactly as they do under `bun run start`.
-- One shared password, no per-user accounts.
+- One shared password, no per-user accounts, and no way to end a single session short of
+  changing the password.
 - Long backtests use the async `/backtest/jobs` polling endpoints, so platform proxy
   timeouts shouldn't bite — but run one cold Broad Momentum backtest after deploying to
   confirm.

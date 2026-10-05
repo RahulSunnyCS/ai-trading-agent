@@ -2,7 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
 
 import { useAppRoute } from './hooks/useAppRoute';
-import { DEFAULT_TAB } from './lib/routes';
+import { DEFAULT_TAB, aliasTarget, documentTitle } from './lib/routes';
 
 import { BackfillView } from './components/BackfillView';
 import { BacktestView } from './components/BacktestView';
@@ -18,7 +18,9 @@ import { RegimeView } from './components/RegimeView';
 import { ReplayView } from './components/ReplayView';
 import { SettingsView } from './components/SettingsView';
 import { TradesView } from './components/TradesView';
+import { BottomBar } from './components/shell/BottomBar';
 import { Sidebar } from './components/shell/Sidebar';
+import { TokenBanner } from './components/shell/TokenBanner';
 import { Topbar } from './components/shell/Topbar';
 import { type Tab, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
@@ -31,6 +33,7 @@ import {
   normalizeNavigationPreferences,
   saveNavigationPreferences,
 } from './store/navigation';
+import { getLandingTab, hydrateSettingsFromStorage } from './store/settings';
 import { hydrateThemeFromStorage } from './store/theme';
 
 /** One-line subtitle shown under each view's title in the top bar. */
@@ -85,15 +88,23 @@ function renderView(
   }
 }
 
+/** `id` of the <main> element: the skip link's target. */
+const MAIN_ID = 'main-content';
+
 /**
- * Application shell: a fixed grouped sidebar (desktop) / slide-over drawer
- * (mobile), a sticky top bar with live status + theme toggle, and the active
- * view rendered in a centered content column.
+ * Application shell. Root structure, in DOM order:
+ *
+ *   skip link
+ *   <aside>      desktop sidebar (lg and up)
+ *   drawer       the same navigation as a slide-over (below lg)
+ *   main column  <Topbar>, then <main id="main-content"> with the active view
+ *   <BottomBar>  section tab bar (below md)
+ *   <Toaster>
  */
 export function App() {
-  const { tab, navigate, replace } = useAppRoute();
+  const { pathname, tab, rest, navigate, replace } = useAppRoute();
   const activeTab: Tab = tab ?? DEFAULT_TAB;
-  const setActiveTab = (next: Tab) => navigate(next);
+  const setActiveTab = (next: Tab, ...nextRest: string[]) => navigate(next, ...nextRest);
   const [menuOpen, setMenuOpen] = useState(false);
   const [navigationPreferences, setNavigationPreferences] = useState<NavigationPreferences>(
     DEFAULT_NAVIGATION_PREFERENCES,
@@ -104,9 +115,27 @@ export function App() {
   // can't happen during render/SSR without crashing hydration).
   useEffect(() => {
     hydrateThemeFromStorage();
+    hydrateSettingsFromStorage();
     const stored = loadNavigationPreferences();
     setNavigationPreferences(stored);
   }, []);
+
+  // An alias (an old or planned path, see PATH_ALIASES) already renders its view; this puts
+  // the canonical path in the address bar, keeping any query string and hash.
+  useEffect(() => {
+    const target = aliasTarget(pathname);
+    if (target) {
+      window.history.replaceState(
+        null,
+        '',
+        `${target}${window.location.search}${window.location.hash}`,
+      );
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    document.title = documentTitle(activeTab, tab ? rest : []);
+  }, [activeTab, tab, rest]);
 
   // "/" and unknown paths land on the default tab (a legacy shared Momentum link, which used
   // to be "/#momentum-cfg=…", keeps its hash and opens Momentum). A tab the user has hidden
@@ -116,7 +145,13 @@ export function App() {
       if (window.location.hash.startsWith('#momentum-cfg=')) {
         window.location.replace(`/momentum/backtest${window.location.hash}`);
       } else {
-        replace(firstVisibleTab(navigationPreferences));
+        // Settings › Defaults › Landing tab, unless that tab has since been hidden.
+        const landing = getLandingTab();
+        replace(
+          landing && !navigationPreferences.hidden.includes(landing)
+            ? landing
+            : firstVisibleTab(navigationPreferences),
+        );
       }
     } else if (navigationPreferences.hidden.includes(tab)) {
       replace(firstVisibleTab(navigationPreferences));
@@ -131,10 +166,24 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* First focusable element. Focuses <main> directly rather than following the hash,
+          so the URL (which may carry a shared Momentum config in its hash) is untouched. */}
+      <a
+        href={`#${MAIN_ID}`}
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById(MAIN_ID)?.focus();
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-elevated focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        Skip to content
+      </a>
+
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-surface/50 lg:block">
         <Sidebar
           activeTab={activeTab}
+          activeRest={rest}
           onSelect={setActiveTab}
           preferences={navigationPreferences}
         />
@@ -148,6 +197,7 @@ export function App() {
             <Dialog.Title className="sr-only">Navigation</Dialog.Title>
             <Sidebar
               activeTab={activeTab}
+              activeRest={rest}
               onSelect={setActiveTab}
               preferences={navigationPreferences}
               onNavigate={() => setMenuOpen(false)}
@@ -164,13 +214,27 @@ export function App() {
           pending={PENDING_BY_TAB[activeTab]}
           onOpenMenu={() => setMenuOpen(true)}
         />
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <TokenBanner />
+        {/* Bottom padding below md clears the fixed BottomBar. */}
+        <main
+          id={MAIN_ID}
+          tabIndex={-1}
+          className="mx-auto max-w-7xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-6 focus:outline-none sm:px-6 md:pb-6"
+        >
           <PaymentTestModeBanner />
           <div key={activeTab} className="animate-fade-in">
             {renderView(activeTab, navigationPreferences, updateNavigationPreferences)}
           </div>
         </main>
       </div>
+
+      <BottomBar
+        activeTab={activeTab}
+        onSelect={setActiveTab}
+        preferences={navigationPreferences}
+        onOpenMenu={() => setMenuOpen(true)}
+        menuOpen={menuOpen}
+      />
       <Toaster />
     </div>
   );
