@@ -7,10 +7,7 @@
   "phase_2_arithmetic": {
     "monday_open_repricing": {
       "what": "Each of the six Phase 2 configs re-run with signal_delay 0 (the default for a new Broad run; everything else as searched: Rs 2 lakh, itemised costs, pre-tax). The same decisions are then replayed twice from raw data: filled at the signal week's last close, as the backtest assumes, and filled at the next trading day's open. The difference between the two is the result.",
-      "report": [
-        "change in CAGR, pts",
-        "change in max drawdown, pts"
-      ],
+      "report": ["change in CAGR, pts", "change in max drawdown, pts"],
       "flag_if_cagr_falls_by_more_than_pts": 1.0,
       "flag_applies_to": "any one of the six delay-0 runs",
       "if_flagged": "Broad gets a Monday-fill execution option and results are quoted on it; a week's signal delay is not the fix",
