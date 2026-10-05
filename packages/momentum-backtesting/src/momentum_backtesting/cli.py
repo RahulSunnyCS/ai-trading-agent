@@ -1296,6 +1296,34 @@ def search_pit_rerun(
         typer.echo(f"{label}: " + ", ".join(cells))
 
 
+@search_app.command("category-shuffle")
+def search_category_shuffle(
+    out: Path = typer.Argument(..., help="A finished search's results folder (arm A)."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    picks: Path = typer.Option(..., "--picks", help='Runs to test: JSON {"label": "run id"}.'),
+    shuffles: int = typer.Option(100, help="How many random dealings of stocks to categories."),
+    dest: Path = typer.Option(
+        None, "--dest", help="Output (default <out>/category_shuffle.jsonl)."
+    ),
+) -> None:
+    """Each config with the stocks dealt out to the categories at random, against the same
+    config on the real tags. Tells whether the categories themselves add anything. Resumable."""
+    import json as _json
+
+    from . import category_shuffle
+
+    dest = dest or out / "category_shuffle.jsonl"
+    category_shuffle.run(
+        space, out, _json.loads(picks.read_text()), dest, shuffles=shuffles, echo=typer.echo
+    )
+    for label, row in category_shuffle.summary(dest).items():
+        typer.echo(
+            f"{label}: real {row['real']:.1%}; shuffled median {row['shuffled_median']:.1%}, "
+            f"95th percentile {row['shuffled_p95']:.1%}, best {row['shuffled_max']:.1%}; "
+            f"{row['beaten_by']} of {row['shuffles']} shuffles match or beat it"
+        )
+
+
 @search_app.command("analyze")
 def search_analyze(
     out: Path = typer.Argument(..., help="A results folder from `mbt search run`."),

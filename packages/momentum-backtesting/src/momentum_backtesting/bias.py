@@ -153,9 +153,11 @@ class Runner:
         locks=None,
         extra_no_buy: pd.DataFrame | None = None,
         tax=None,
+        curated_dir: Path | None = None,
         **window: Any,
     ):
-        """One backtest on `base` (any UniverseBase, including a placebo one)."""
+        """One backtest on `base` (any UniverseBase, including a placebo one). `curated_dir`
+        swaps the folder the category tags are read from (the label-shuffle placebo)."""
         from .categories import broad
 
         merged = {**self.space.fixed, **light, **window}
@@ -169,7 +171,7 @@ class Runner:
         heavy_kwargs, _ = self.heavy_args(heavy)
         outcome = broad.run_broad_backtest(
             **self.common,
-            curated_dir=self.api.CATEGORIES_CURATED_DIR,
+            curated_dir=curated_dir or self.api.CATEGORIES_CURATED_DIR,
             **heavy_kwargs,
             pool_top_n=pool[0],
             pool_exit_rank=pool[1],
