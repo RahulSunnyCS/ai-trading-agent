@@ -306,8 +306,7 @@ def run_metrics(result, hold_idle: str) -> dict[str, float]:
         "bench_cagr": metrics.cagr(bench),
         "bench_mdd": metrics.max_drawdown(bench)[0],
         "buys_per_yr": len(buys) / years,
-        # One-way turnover as a multiple of average portfolio value, per year.
-        "turnover_x": float(buys["value"].sum() / eq.mean() / years) if len(buys) else 0.0,
+        "turnover_x": metrics.turnover(result),
         "cagr_h1": metrics.cagr(eq.iloc[: half + 1]),
         "cagr_h2": metrics.cagr(eq.iloc[half:]),
         "idle_share": float(result.weights[hold_idle].mean()) if hold_idle in result.weights else 0,

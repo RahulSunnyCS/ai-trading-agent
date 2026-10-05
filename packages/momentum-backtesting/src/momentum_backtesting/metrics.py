@@ -30,6 +30,18 @@ def max_drawdown(series: pd.Series) -> tuple[float, pd.Timestamp, pd.Timestamp]:
     return dd.min(), peak, trough
 
 
+def turnover(result: Result) -> float:
+    """One-way turnover per year as a multiple of average portfolio value: everything sold
+    (full exits and trims) / mean equity / years. The one definition the dashboard KPI, the
+    search's `turnover_x` and every tier cap use. (The search used to count first-time buys
+    only, which left top-ups out and understated a config that adds to its holdings.)"""
+    trades = result.trades
+    if not len(trades):
+        return 0.0
+    sold = trades.loc[trades["action"].isin(["SELL", "TRIM"]), "value"].sum()
+    return float(sold / result.equity.mean() / _years(result.equity))
+
+
 def curve_stats(equity: pd.Series, cash: pd.Series) -> dict[str, float]:
     """CAGR, volatility, Sharpe (vs cash, same definition as `summary`) and max drawdown of a
     bare equity curve - for curves that are not a single Result (tranche blends, windows)."""

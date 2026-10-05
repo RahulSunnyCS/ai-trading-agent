@@ -1,0 +1,111 @@
+{
+  "written_before_running": "2026-10-05T03:30:00+05:30",
+  "name": "BL-010 momentum evaluation review: objective, baskets and pass/kill thresholds",
+  "source": "backlog/BL-010-momentum-evaluation-review.md - the plan; this file is the machine-readable copy of its thresholds",
+  "rule": "Committed before any BL-010 run. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
+  "objective": "Highest CAGR after cost and tax among configurations whose drawdown passes the basket",
+  "capital_rs": 500000,
+  "measured": "after itemised costs and after tax; pre-tax shown alongside",
+  "baskets": {
+    "conservative": {
+      "max_drawdown": -0.25,
+      "or_relative": { "index": "Nifty Midcap 150 TRI", "multiple": 1.0 },
+      "hard_ceiling": -0.4
+    },
+    "medium": {
+      "max_drawdown": -0.3,
+      "or_relative": { "index": "Nifty Smallcap 250 TRI", "multiple": 1.0 },
+      "hard_ceiling": -0.4
+    },
+    "aggressive": {
+      "max_drawdown": -0.35,
+      "or_relative": { "index": "Nifty Smallcap 250 TRI", "multiple": 1.2 },
+      "hard_ceiling": -0.4
+    }
+  },
+  "basket_drawdown_rule": "A strategy drawdown episode (peak to trough) passes if its depth is within max_drawdown, OR within multiple x the index's largest peak-to-trough fall inside the same window; in every case it must be within hard_ceiling. Every episode must pass.",
+  "minimum_bar": {
+    "benchmark": "Nifty200 Momentum 30 TRI",
+    "excess_cagr_pts": 5,
+    "after_tax": true
+  },
+  "comparators": [
+    "Nifty200 Momentum 30 TRI",
+    "Nifty Smallcap 250 TRI",
+    "Nifty Midcap 150 TRI",
+    "Nifty Midcap150 Momentum 50 TRI",
+    "Nifty 500 TRI"
+  ],
+  "portfolio_view": {
+    "slice_of_portfolio": [0.1, 0.15, 0.2],
+    "horizon_years": 2,
+    "report": [
+      "rolling 2-year windows: worst/median/best",
+      "recovery weeks per major fall",
+      "bootstrapped 95th-percentile drawdown",
+      "weeks the Smallcap 250 / Midcap 150 fall most",
+      "lower-circuit blocked sales"
+    ]
+  },
+  "phase_2_arithmetic": {
+    "ledger_replay": {
+      "fill_price_tol": 0.0005,
+      "weekly_equity_tol": 0.001,
+      "cagr_tol_pts": 0.1,
+      "max_dd_tol_pts": 0.2
+    },
+    "hand_checked_trades": { "count": 10, "tol": 0.005 },
+    "jump_scan": {
+      "flag_abs_daily_move": 0.2,
+      "kill_if_top20_contributor_flagged": true,
+      "kill_if_cagr_moves_pts": 2
+    },
+    "truncation": { "cut_dates": 3, "kill_on_any_difference_before_cut": true },
+    "contribution_flags": { "top5_share_of_log_return": 0.5, "single_year_share": 0.4 },
+    "realism": { "flag_participation": 0.05, "report_cagr_at_participation_cap": 0.01 }
+  },
+  "phase_3_hindsight": {
+    "kill_arm_A_headline": { "pit_rerun_loses_pts": 10, "or_below_minimum_bar": true },
+    "kill_category_layer": {
+      "must_beat_label_shuffle_percentile": 95,
+      "or_A_minus_B_pts_at_most": 2
+    }
+  },
+  "phase_4_method": {
+    "offset_average": { "kill_if_tranche_mean_below_reported_pts": 3 },
+    "placebo": { "seeds": 100, "must_beat_percentile": 95, "by_pts": 5 },
+    "pbo": { "blocks": 16, "kill_above": 0.3 },
+    "no_window_is_both_selection_filter_and_validation_block": true
+  },
+  "phase_5_robustness": {
+    "config_pass": { "top_half_of_space_in_fy_windows": 0.7, "no_fy_trailing_mom30_by_pts": 10 },
+    "kill_top100_claim": { "beats_random100_in_fy_windows_below": 0.6 },
+    "walk_forward": {
+      "embargo_weeks": 13,
+      "kill_if_not_above_median_config_pts": 3,
+      "kill_if_not_above_mom30": true
+    },
+    "factor_regression": { "kill_alpha_below_pct": 5, "kill_abs_t_below": 2 },
+    "choice": {
+      "kill_if_lower_bound_top50_overlap_with_cagr_top50_below": 0.2,
+      "holdings_preferred": [8, 12],
+      "kill_holdings_advice_if_2_to_6_beats_by_pts": 3,
+      "threshold_stability_pts": 5
+    }
+  },
+  "phase_6_holdout": {
+    "backcast": {
+      "from": "2012-01-01",
+      "to": "2016-12-31",
+      "runs_allowed": 1,
+      "pass_excess_pts": 5,
+      "pass_dd_multiple_of_benchmark": 1.5
+    },
+    "paper_tracking": {
+      "months": [6, 12],
+      "fail_if_trailing_mom30_pts_over_6m": 10,
+      "fail_if_dd_above_multiple_of_bootstrap_p95": 1.3
+    }
+  },
+  "supersedes": "data/search/round7_criteria.json tiers (-0.30 / -0.40 / -0.55), which were never committed and are kept only to read round 7"
+}

@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | Planned |
+| **Status** | In progress (Phase 0 done; Phase 1 engine fixes in review) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
 | **Depends on** | Interlocks with **BL-001** (see "Order against BL-001"); BL-005 Phase 3 (engine rewrite) should wait until Phase 1 here is done |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.13 |
 
 ## Context
 
@@ -101,8 +101,51 @@ independently re-verified** — Phase 0 records the queries that reproduce them.
   writing, that no config beats the index alternative.
 - The live weekly signal provably equals the backtest's trade list for the same weeks.
 
-The deciding question: **after the fixes, after cost and tax, does the strategy still clear
-Nifty200 Momentum 30 TRI + 5 pts?**
+The deciding question: **after the fixes, after cost and tax, what is the highest CAGR each
+basket can reach inside its drawdown limit — and does it still clear the benchmark by a clear
+margin?** (Minimum bar: Nifty200 Momentum 30 TRI + 5 pts after tax.)
+
+### Owner's objective and baskets (2026-10-05)
+
+Highest CAGR after cost and tax, within an acceptable drawdown, in three baskets. A drawdown
+passes a basket if it meets **either** the fixed limit **or** the relative limit, and is never
+deeper than the hard ceiling:
+
+| Basket | Fixed limit | Or, relative to the index over the same period | Hard ceiling |
+|---|---|---|---|
+| Conservative | 25% | no worse than the Midcap 150's fall | 40% |
+| Medium | 30% | no worse than the Smallcap 250's fall | 40% |
+| Aggressive | 35% | up to 1.2× the Smallcap 250's fall | 40% |
+
+"Same period": for each strategy drawdown (peak to trough), the index's largest fall inside
+that window. These replace round 7's tiers (−30% / −40% / −55%) and are committed in
+`packages/momentum-backtesting/search_spaces/bl010_criteria.json`.
+
+### Portfolio view (owner, 2026-10-05)
+
+The strategy is a 10–20% slice (about ₹5 lakh) of a ~₹25 lakh portfolio that is otherwise mostly
+Indian small and mid caps, with 10–20% in US gold/silver miners and ~20% in gold; the owner is
+deliberately taking high risk for about two years. So every phase that reports results also reports:
+
+- each drawdown as a share of the slice **and** of the whole portfolio (at 10%, 15%, 20%);
+- behaviour in the weeks the Smallcap 250 / Midcap 150 fall most (the slice overlaps the rest
+  of the portfolio, so it is not a diversifier);
+- recovery time for each major fall, and a resampled 95th-percentile drawdown;
+- every rolling two-year window since 2017 — worst, median, best — after cost and tax;
+- comparators: Nifty200 Momentum 30, Smallcap 250, Midcap 150, Midcap150 Momentum 50 (all TRI);
+- how often a sale was blocked by a lower circuit, and what it cost;
+- realism checks at **₹5 lakh** (not ₹2 lakh).
+
+### Model per phase (owner, 2026-10-05)
+
+A session cannot change its own model, so the split is done with helper agents.
+
+| Phase | Model |
+|---|---|
+| 0 | Sonnet helper (done inline on Fable — it was a few file edits) |
+| 1–4: engine fixes, replay, hindsight fixes, evaluation method | Fable, main session |
+| 5: robustness windows and runs | Sonnet helper; the choice rule checked on Fable |
+| 6: hold-out run and paper tracking | Sonnet helper |
 
 ## Out of scope
 
@@ -254,15 +297,33 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
 
 ## Open questions
 
-1. BL-010 Phase 1 before BL-001's goldens (recommended), or BL-001 first?
-2. Is the weekly signal being followed with real money today? If so, what should happen to it
-   while this review runs — the owner's call; this item only makes sure signal = backtest.
-3. Let round 7 C1/C2 finish (recommended — C2 is the clean reference), or stop them?
-4. Capital stays ₹2L for realism checks?
-5. Is "Nifty200 Momentum 30 TRI + 5 pts, after tax" the right bar, or a different benchmark/margin?
+None open.
+
+### Answered
+
+- **E5, parked cash (2026-10-05):** keep the change — under the itemised model the liquid fund
+  pays stamp duty going in and nothing coming out.
+- **E3, shared stock (2026-10-05):** leave the worse-placed category's slot empty for now.
+- **Round 7 arm C2 (2026-10-05):** dropped at 754 of 4,000 runs; Phase 3's point-in-time
+  universe runs replace it.
+- **Order against BL-001 (2026-10-05):** BL-010's engine fixes go first.
+- **Real money (2026-10-05):** not yet followed with real money; the owner plans to start. The
+  live-signal parity check (Phase 1, second half) is therefore the next thing to finish.
+- **Round 7 (2026-10-05):** the owner stopped it after C1 (A 8,003 runs, C1 4,000, C2 754).
+  All of it is pre-fix.
+- **Capital (2026-10-05):** ₹5 lakh for realism checks.
+- **Bar (2026-10-05):** the three baskets above; beating the benchmark by a clear margin is a minimum.
 
 ## Log
 
 - 2026-10-04 — review written in a separate session (findings F1–F16, E1–E9, six phases).
 - 2026-10-05 — finalised and added to the backlog as BL-010; ten changes listed above; E1–E3
   spot-checked against the code.
+- 2026-10-05 — started. Owner answers recorded (order, baskets, ₹5 lakh, portfolio view, model
+  split). Phase 0: criteria committed; the ten round 7 favourites were already saved under
+  "Candidate - …" names, so nothing in the catalog was changed (two older "Finalist - …" runs
+  from Round 4 keep their names — rename in the dashboard if wanted). The review's reproducing
+  queries are **not** yet captured; `docs/evaluation-review.md` records what has and has not
+  been re-verified. Phase 1, first half: E1–E8 fixed with tests on branch
+  `feat/bl-010-phase-0-1`; impact table in `docs/evaluation-review.md`.
+- 2026-10-05 — owner accepted the three Phase 1a decisions (E5 kept, E3 gap left, C2 dropped).

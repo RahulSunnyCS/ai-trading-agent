@@ -736,6 +736,49 @@ def ordered_categories_by_week(
     return out
 
 
+_collapse_cache: OrderedDict[int, tuple] = OrderedDict()
+
+
+def collapse_segments(ranks: pd.DataFrame, column_to_base: dict[str, str]) -> pd.DataFrame:
+    """`ranks` with one column per SYMBOL: the best (lowest) rank among that symbol's price
+    series segments (`SYM`, `SYM#2`, ...). Category tags name symbols, so scoring a category
+    against the raw columns never saw a stock again after a real price break (a demerger) moved
+    it to `SYM#2`. With no split segments the same object comes back, so a frame without them
+    behaves exactly as before and `ordered_categories_by_week`'s identity cache still hits;
+    the collapsed frame is cached against its source for the same reason."""
+    bases = [column_to_base.get(c, c) for c in ranks.columns]
+    if bases == list(ranks.columns):
+        return ranks
+    hit = _collapse_cache.get(id(ranks))
+    if hit is not None and hit[0] is ranks:
+        _collapse_cache.move_to_end(id(ranks))
+        return hit[1]
+    collapsed = ranks.T.groupby(bases, sort=False).min().T
+    _collapse_cache[id(ranks)] = (ranks, collapsed)
+    while len(_collapse_cache) > _ORDER_CACHE_SIZE:
+        _collapse_cache.popitem(last=False)
+    return collapsed
+
+
+def segment_members(
+    group_members: dict[str, set[str]], column_to_base: dict[str, str]
+) -> dict[str, set[str]]:
+    """`group_members` with every member symbol joined by its later price-series columns, so a
+    category can pick `SYM#2` once that is the live column. Only one segment of a symbol has a
+    rank in any week (the others have no price), so a symbol is still picked at most once.
+    Returns `group_members` itself when no symbol has a second segment."""
+    later: dict[str, set[str]] = {}
+    for column, base in column_to_base.items():
+        if column != base:
+            later.setdefault(base, set()).add(column)
+    if not later:
+        return group_members
+    return {
+        cid: members.union(*(later[m] for m in members if m in later))
+        for cid, members in group_members.items()
+    }
+
+
 def compute_category_selection(
     combined_pool_ranks: pd.DataFrame,
     group_members: dict[str, set[str]],
@@ -957,6 +1000,11 @@ def build_effective_stock_ranks(
             for slot, name in enumerate(picks, start=1):
                 if name not in ranks.columns:
                     continue
+                # A stock tagged to two held categories keeps the rank (and group) from the
+                # better-placed one. `held` is best-first, so that is whichever wrote it first;
+                # overwriting it here used to hand a top pick a lingering, unbuyable rank.
+                if pd.notna(ranks.at[w, name]):
+                    continue
                 ranks.at[w, name] = base + (bucket_pos - 1) * picks_per_category + slot
                 groups.at[w, name] = cid
 
@@ -1174,8 +1222,10 @@ def run_broad_backtest(
     mass_exit_weeks: frozenset[pd.Timestamp] | None = None
     if category_mode == "on":
         group_members = load_stock_groups(curated_dir, extended=category_tags == "extended")
+        # Categories are scored per symbol and pick per price column: see collapse_segments.
+        segments = ranking.column_to_base_symbol
         selection = compute_category_selection_mass_exit(
-            ranking.combined_pool_ranks,
+            collapse_segments(ranking.combined_pool_ranks, segments),
             group_members,
             ranking.weeks,
             coverage_floor=coverage_floor,
@@ -1189,7 +1239,7 @@ def run_broad_backtest(
         effective = build_effective_stock_ranks(
             held_by_week,
             ranking.combined_pool_ranks,
-            group_members,
+            segment_members(group_members, segments),
             ranking.weeks,
             columns=list(prices.columns),
             category_top_n=category_top_n,
@@ -1299,6 +1349,7 @@ def current_holdings_detail(
     last_week = max(outcome.held_by_week)
     held = outcome.held_by_week[last_week]
     row = outcome.ranking.combined_pool_ranks.loc[last_week]
+    group_members = segment_members(group_members, outcome.ranking.column_to_base_symbol)
     return [
         {
             "category": cid,

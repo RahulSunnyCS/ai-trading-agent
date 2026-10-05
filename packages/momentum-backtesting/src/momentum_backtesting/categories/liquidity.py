@@ -228,14 +228,16 @@ def eligibility(
     features = weekly_features(symbols, root)
     if features.empty:
         return pd.DataFrame(False, index=weeks, columns=symbols)
-    passing = features[_passes(features, cfg)].assign(ok=True)
-    wide = passing.pivot_table(index="wk", columns="symbol", values="ok", aggfunc="max")
-    wide = wide.reindex(index=weeks.union(wide.index)).sort_index()
-    seen = features.pivot_table(index="wk", columns="symbol", values="n60", aggfunc="max")
-    seen = seen.reindex(index=wide.index).notna()
-    verdict = wide.where(seen).ffill(limit=1)
+    # 1.0 = passed, 0.0 = has a fresh row and failed, NaN = no fresh row that week. Only the NaN
+    # weeks may reuse the previous verdict: a week that was measured and failed must stay failed
+    # (it used to be left as NaN too, so the forward-fill turned every first failing week back
+    # into a pass and each gate exit landed a week late).
+    verdict = features.assign(ok=_passes(features, cfg).astype(float)).pivot_table(
+        index="wk", columns="symbol", values="ok", aggfunc="max"
+    )
+    verdict = verdict.reindex(index=weeks.union(verdict.index)).sort_index().ffill(limit=1)
     out = verdict.reindex(index=weeks, columns=symbols)
-    return out.fillna(False).astype(bool)
+    return out.fillna(0.0).astype(bool)
 
 
 def _last_full_week(features: pd.DataFrame) -> pd.Timestamp:
