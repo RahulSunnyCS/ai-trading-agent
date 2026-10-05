@@ -396,3 +396,7 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
 - 2026-10-06 — E10, E11 and E12 fixed, each with a failing-then-passing test and an accepted
   entry in the goldens' changelog. Effect on the six configs: −0.2 to +0.5 points of CAGR.
   E13 (a Monday-fill option for Broad) is still open.
+- 2026-10-06 — Phase 3 step 2, first part: the action scan confirms small bonuses from exchange
+  filings; applied to the shared database after a backup (owner approved). 41 new factors, 13
+  in the Total Market; three filings still need a manual look. Six configs move −1.3 to +0.7
+  points.
