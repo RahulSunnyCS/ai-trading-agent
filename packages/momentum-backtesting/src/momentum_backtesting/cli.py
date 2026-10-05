@@ -1333,6 +1333,7 @@ def search_score(
     universe: str = typer.Option(None, help="Score on another universe, e.g. turnover_rank."),
     tags: str = typer.Option(None, help="Category tags to use: curated or extended."),
     limit: int = typer.Option(None, help="Only the first N configs of each ranking (a trial run)."),
+    max_rankings: int = typer.Option(None, help="Score at most this many rankings, then stop."),
 ) -> None:
     """Re-score every config of a finished search on all its rebalance phases and keep the
     weekly curves (BL-010 Phase 4), then report the probability of backtest overfitting.
@@ -1346,7 +1347,14 @@ def search_score(
     if tags:
         runner["category_tags"] = tags
     method.score_search(
-        space, out, dest, workers=workers, runner=runner, limit=limit, echo=typer.echo
+        space,
+        out,
+        dest,
+        workers=workers,
+        runner=runner,
+        limit=limit,
+        max_rankings=max_rankings,
+        echo=typer.echo,
     )
     scores, curves = method.load_scores(dest)
     refs = reference_benchmarks.load_references()

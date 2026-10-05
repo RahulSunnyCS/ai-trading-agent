@@ -90,11 +90,14 @@ def score_search(
     workers: int = 4,
     runner: dict[str, Any] | None = None,
     limit: int | None = None,
+    max_rankings: int | None = None,
     echo=print,
 ) -> None:
     """Re-run every config of a finished search on all its phases and keep the blended weekly
     curves. One task per ranking; a finished task's files are not redone. `runner` passes
-    `universe_kind` / `category_tags` through to score the same configs on another universe."""
+    `universe_kind` / `category_tags` through to score the same configs on another universe.
+    `max_rankings` stops after that many, for a machine that limits how long one job may run:
+    a ranking is only saved whole, so a job cut off mid-way loses what it was working on."""
     dest.mkdir(parents=True, exist_ok=True)
     groups: dict[str, dict] = {}
     for path in sorted(Path(results_dir).glob("results-*.jsonl")):
@@ -123,7 +126,12 @@ def score_search(
                 "runner": runner or {},
             }
         )
-    echo(f"{len(tasks)} of {len(groups)} rankings to score, {workers} workers")
+    remaining = len(tasks)
+    tasks = tasks[:max_rankings]
+    echo(
+        f"{remaining} of {len(groups)} rankings still to score; doing {len(tasks)} now, "
+        f"{workers} workers"
+    )
     started = time.time()
     ctx = mp.get_context("spawn")
     with ctx.Pool(workers, maxtasksperchild=1) as pool:

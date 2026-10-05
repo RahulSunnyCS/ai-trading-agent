@@ -312,3 +312,107 @@ Still unadjusted, because the price on the filed ex-date does not show them: CUP
 shows a fall it never had, so it is ranked, bought and sold differently. No filed split or
 bonus inside any holding of the six runs is unadjusted now, and all twelve runs reconcile.
 Every earlier number in this file was measured before this data change.
+
+## Phase 3 — removing hindsight (2026-10-06)
+
+All numbers: round 7 arm A configs, pre-tax, ₹2 lakh, as searched, on the engine after fixes
+E10 to E12 and the data after both action-scan fixes below.
+
+### Step 2 — data fixes
+
+- Small bonuses are confirmed from exchange filings (above).
+- **Renamed symbols:** the exchange files an old action under a company's current symbol. A
+  filing now answers to every symbol that shared an ISIN with it. Applied to the shared
+  database (backup `catalog-2026-10-06-before-rename-match.duckdb`): 61 falls that were under
+  review are now confirmed splits or bonuses (MCDOWELL-N 2018, MINDAIND 2016/2018/2022,
+  MOTHERSUMI five times, INFIBEAM three times, TATAMOTORS 2011 and others). No confirmed or
+  crash row changed.
+- Not done: a split that also changed the ISIN under a renamed symbol with no later shared
+  ISIN; the 2,155 falls still under review; the extension to 2011–2016 for Phase 6.
+
+### Step 1 and 4 — the same configs on a point-in-time universe
+
+`turnover_rank`: each year's 750 most-traded stocks, ranked on the six months before
+(`liquidity.turnover_rank_members_by_year`). It is a stand-in for the index, which NSE builds
+on free-float market value. In 2017, 405 of those 750 are not in today's list; in 2026, 110.
+
+| Config | Today's list (as searched) | Point-in-time, curated tags | Point-in-time, extended tags |
+|---|---|---|---|
+| Aggressive winner | 52.2% / −44.9% | 38.0% / −48.1% | 21.6% / −60.6% |
+| Midway winner | 53.5% / −29.1% | 39.4% / −38.6% | 46.9% / −30.8% |
+| Conservative winner | 44.7% / −33.0% | 36.2% / −37.3% | 34.7% / −26.2% |
+| Median 1 | 35.4% / −25.9% | 29.8% / −29.2% | 25.1% / −35.8% |
+| Median 2 | 31.8% / −45.3% | 20.2% / −40.1% | 17.4% / −52.0% |
+| Median 3 | 32.6% / −39.2% | 23.3% / −36.8% | 16.0% / −27.9% |
+
+CAGR / max drawdown. The curated tags name only today's 755 stocks, so under them a stock
+that later left the index can be ranked but never picked through a category; the extended
+tags cover the others, with coarser categories.
+
+**The 50 best stored configs** (`mbt search pit-rerun --top 50`):
+
+| | Today's list | Point-in-time, curated | Point-in-time, extended |
+|---|---|---|---|
+| Median CAGR | 54.7% | 34.2% | 31.0% |
+| Range | 34.4% to 74.3% | 14.6% to 53.6% | 0.1% to 52.8% |
+| Lose more than 10 points | | 45 of 50 | 43 of 50 |
+| Below Nifty200 Momentum 30 TRI + 5 (22.1%) | 0 | 4 | 9 |
+
+Median loss: 21.9 points (curated), 24.9 (extended).
+
+**Kill, arm A as a headline: tripped.** The committed level is a loss of more than 10 points
+or a fall below the momentum index plus 5. Nine in ten of the best configs lose more than 10.
+No arm A CAGR measured on today's list should be quoted as a result.
+
+What survives: on the point-in-time universe the typical top config still returns 31–34% a
+year before tax against 17.1% for the momentum index. That is before tax (6 to 12 points in
+Phase 2), before the Monday-fill cost (about 1 point), and these 50 were chosen on the biased
+universe, so even this is an upper reading.
+
+### Step 3 — do the category tags carry information?
+
+**Label shuffle** (`mbt search category-shuffle`, 100 shuffles each): the stocks dealt out to
+the same categories at random.
+
+| Config | Real tags | Shuffled median | Shuffled 95th percentile | Shuffles at or above real |
+|---|---|---|---|---|
+| Aggressive winner | 52.2% | 20.6% | 36.1% | 0 |
+| Midway winner | 53.5% | 26.6% | 42.9% | 2 |
+| Conservative winner | 44.7% | 28.2% | 41.4% | 3 |
+| Median 1 | 35.4% | 27.5% | 37.6% | 8 |
+| Median 2 | 31.8% | 19.5% | 28.4% | 3 |
+| Median 3 | 32.6% | 25.5% | 34.2% | 10 |
+
+Four of six beat the shuffle's 95th percentile; Median 1 and Median 3 do not. The three
+winners were chosen on the real tags, so they are a biased sample; of the three median
+configs, one passes. **Kill, the category layer: not decided.** The second half of the test,
+a taxonomy in which a theme is usable only from the date it publicly existed, needs launch
+dates for 113 themes and has not been built. On this evidence the tags help the winners and
+do little for an ordinary config.
+
+## Phase 4 — the evaluation method (2026-10-06, partial)
+
+### Step 2 — a fair random baseline: pass (6 of 6)
+
+`mbt search fair-placebo`: random rankings that change every 13 weeks, 100 seeds, the config's
+stock tilt off on both sides.
+
+| Config | Real | Random median | Random 95th percentile | Margin | Turnover real / random |
+|---|---|---|---|---|---|
+| Aggressive winner | 54.6% | 13.0% | 29.4% | +25.2 | 6.6× / 3.0× |
+| Midway winner | 53.5% | 16.1% | 35.7% | +17.8 | 4.1× / 4.4× |
+| Conservative winner | 41.3% | 16.8% | 29.6% | +11.7 | 3.0× / 4.2× |
+| Median 1 | 35.7% | 17.7% | 27.3% | +8.4 | 4.8× / 4.4× |
+| Median 2 | 31.8% | 15.6% | 26.5% | +5.3 | 14.4× / 5.1× |
+| Median 3 | 32.6% | 16.9% | 24.2% | +8.3 | 3.0× / 2.9× |
+
+Pass level: 5 points over the 95th percentile. Measured on today's list: it shows momentum
+ranking beats random ranking among survivors, nothing about the survivorship.
+
+### Steps 1 and 3 — every config on all its rebalance phases, and the overfitting measure
+
+`mbt search score` is running over all 8,003 configs. Results are added when it finishes.
+
+### Not started
+
+Step 4 (criteria as code, data snapshot in the run id), step 5 (generic nudges), step 6.
