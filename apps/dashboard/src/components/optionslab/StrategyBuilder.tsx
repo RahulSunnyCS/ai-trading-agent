@@ -729,8 +729,8 @@ export function StrategyBuilder() {
             <CheckCircle2 className="h-3.5 w-3.5" />
             Validate
           </Button>
-          <Button variant="primary" disabled={busy} onClick={() => void backtest()}>
-            <FlaskConical className="h-3.5 w-3.5" />
+          <Button variant="primary" loading={busy} onClick={() => void backtest()}>
+            {busy ? null : <FlaskConical className="h-3.5 w-3.5" />}
             {busy ? 'Running…' : 'Backtest'}
           </Button>
           <Button onClick={() => void save()}>

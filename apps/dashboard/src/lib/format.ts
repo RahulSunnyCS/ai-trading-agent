@@ -49,7 +49,8 @@ export function toNumberOrNull(v: string | number | null | undefined): number | 
  * @param value  The numeric P&L amount.  Pass 0 for a flat result.
  * @returns      A human-readable string ready for display.
  */
-export function formatPnl(value: number): string {
+export function formatPnl(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
   // Intl.NumberFormat handles thousands-grouping and decimal rounding.
   // We use 'en-IN' locale so numbers format as per Indian convention
   // (lakh/crore grouping: 1,00,000) which is appropriate for this tool.
@@ -237,11 +238,14 @@ export function formatPct(value: Num, dp = 1, options: PctOptions = {}): string 
   return `${signPrefix(pct, options.sign ?? false)}${fixed(dp, dp).format(pct)}%`;
 }
 
-/** A difference between two percentages, always signed: formatPp(0.012) → "+1.2 pp". */
-export function formatPp(value: Num, dp = 1, options: Pick<PctOptions, 'unit'> = {}): string {
+/**
+ * A difference between two percentages: formatPp(0.012) → "+1.2 pp". Signed unless
+ * `{ sign: false }`, for a sentence that already says the direction ("beat it by 1.2 pp").
+ */
+export function formatPp(value: Num, dp = 1, options: PctOptions = {}): string {
   if (!usable(value)) return EMPTY;
   const pp = options.unit === 'percent' ? value : value * 100;
-  return `${signPrefix(pp, true)}${fixed(dp, dp).format(pp)} pp`;
+  return `${signPrefix(pp, options.sign ?? true)}${fixed(dp, dp).format(pp)} pp`;
 }
 
 /** A multiple: formatMultiple(1.234) → "1.2×". */

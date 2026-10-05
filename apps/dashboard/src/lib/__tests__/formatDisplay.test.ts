@@ -82,6 +82,7 @@ describe('percentages', () => {
     expect(formatPp(-0.012)).toBe('-1.2 pp');
     expect(formatPp(0)).toBe('0.0 pp');
     expect(formatPp(1.25, 2, { unit: 'percent' })).toBe('+1.25 pp');
+    expect(formatPp(0.012, 1, { sign: false })).toBe('1.2 pp');
   });
 
   it('formatMultiple', () => {

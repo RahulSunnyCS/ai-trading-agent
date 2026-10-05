@@ -1,6 +1,6 @@
 import { Sparkles } from 'lucide-react';
 
-import { formatPct } from '../../lib/format';
+import { EMPTY, formatDay, formatPct, formatPp } from '../../lib/format';
 import type { MomentumResult } from '../../types/momentum';
 
 function num(value: unknown): number | null {
@@ -8,7 +8,7 @@ function num(value: unknown): number | null {
 }
 
 function fmtDate(value: unknown): string {
-  return typeof value === 'string' ? value : '—';
+  return typeof value === 'string' ? formatDay(value) : EMPTY;
 }
 
 /**
@@ -45,8 +45,8 @@ export function MomentumInsights({ result }: { result: MomentumResult }) {
   if (excessCagr !== null) {
     sentences.push(
       excessCagr >= 0
-        ? `Beat ${benchmarkName} by ${formatPct(excessCagr)} a year`
-        : `Trailed ${benchmarkName} by ${formatPct(Math.abs(excessCagr))} a year`,
+        ? `Beat ${benchmarkName} by ${formatPp(excessCagr, 1, { sign: false })} a year`
+        : `Trailed ${benchmarkName} by ${formatPp(Math.abs(excessCagr), 1, { sign: false })} a year`,
     );
   }
   if (yearsBeating !== null && years !== null) {

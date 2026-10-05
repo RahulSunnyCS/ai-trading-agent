@@ -74,7 +74,7 @@ describe('MomentumCircuitExposureCard', () => {
     render(<MomentumCircuitExposureCard exposure={exposure} />);
     expect(screen.getByText('ATGL')).toBeTruthy();
     expect(screen.getByText('-81.5%')).toBeTruthy();
-    expect(screen.getByText('sold 2023-10-27, after the lock')).toBeTruthy();
+    expect(screen.getByText('sold 27 Oct 2023, after the lock')).toBeTruthy();
     expect(screen.queryByText('QUESS')).toBeNull();
     expect(screen.getByText(/already out before 1 \(10%\)/)).toBeTruthy();
     expect(screen.getByText(/still holding in 9/)).toBeTruthy();
@@ -82,7 +82,7 @@ describe('MomentumCircuitExposureCard', () => {
     // The shared Tabs (Radix) selects on mouse down, not on click.
     fireEvent.mouseDown(screen.getByRole('tab', { name: /got out in time \(1\)/ }));
     expect(screen.getByText('QUESS')).toBeTruthy();
-    expect(screen.getByText('2020-01-31 (47 days before)')).toBeTruthy();
+    expect(screen.getByText('31 Jan 2020 (47 days before)')).toBeTruthy();
     expect(screen.getByText('-3.41%')).toBeTruthy();
     expect(screen.queryByText('ATGL')).toBeNull();
     expect(screen.getByText(/already out before 1 \(10%\)/)).toBeTruthy();

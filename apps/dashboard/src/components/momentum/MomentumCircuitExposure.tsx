@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { cn } from '../../lib/cn';
-import { formatInt, formatNumber, formatPct } from '../../lib/format';
+import { formatDay, formatInt, formatNumber, formatPct } from '../../lib/format';
 import type {
   MomentumCircuitEpisode,
   MomentumCircuitEscaped,
@@ -35,7 +35,7 @@ function ExitBadge({ row }: { row: MomentumCircuitTrapped }) {
   if (row.exit === 'sold_during') {
     return <Badge tone="negative">sold on a locked day (not possible live)</Badge>;
   }
-  return <Badge tone="warning">sold {row.exit_date}, after the lock</Badge>;
+  return <Badge tone="warning">sold {formatDay(row.exit_date)}, after the lock</Badge>;
 }
 
 function TrappedTable({ rows }: { rows: MomentumCircuitTrapped[] }) {
@@ -58,7 +58,7 @@ function TrappedTable({ rows }: { rows: MomentumCircuitTrapped[] }) {
           <TRow key={`${row.symbol}-${row.start}`}>
             <Td className="font-medium text-foreground">{row.symbol}</Td>
             <Td className="whitespace-nowrap text-muted">
-              {row.start} → {row.end}
+              {formatDay(row.start)} → {formatDay(row.end)}
             </Td>
             <Td align="right" className="tabular-nums">
               {row.days}
@@ -106,7 +106,7 @@ function EscapedTable({ rows }: { rows: MomentumCircuitEscaped[] }) {
           <TRow key={`${row.symbol}-${row.start}`}>
             <Td className="font-medium text-foreground">{row.symbol}</Td>
             <Td className="whitespace-nowrap text-muted">
-              {row.start} → {row.end}
+              {formatDay(row.start)} → {formatDay(row.end)}
             </Td>
             <Td align="right" className="tabular-nums">
               {row.days}
@@ -116,7 +116,7 @@ function EscapedTable({ rows }: { rows: MomentumCircuitEscaped[] }) {
               {signed(row.move_pct)}
             </Td>
             <Td className="whitespace-nowrap text-muted">
-              {row.exit_date} ({row.days_before} days before)
+              {formatDay(row.exit_date)} ({row.days_before} days before)
             </Td>
             <Td align="right" className="tabular-nums">
               {formatPct(row.portfolio_share_pct, 1, { unit: 'percent' })}
@@ -149,7 +149,7 @@ function UpperTable({ rows }: { rows: MomentumCircuitEpisode[] }) {
           <TRow key={`${row.symbol}-${row.start}`}>
             <Td className="font-medium text-foreground">{row.symbol}</Td>
             <Td className="whitespace-nowrap text-muted">
-              {row.start} → {row.end}
+              {formatDay(row.start)} → {formatDay(row.end)}
             </Td>
             <Td align="right" className="tabular-nums">
               {row.days}
@@ -319,7 +319,12 @@ export function MomentumCircuitExposureCard({
             )}
           </p>
         </div>
-        <Tabs ariaLabel="Circuit situations" value={tab} items={tabs} onChange={setTab}>
+        <Tabs
+          ariaLabel="Circuit situations"
+          value={tab}
+          items={tabs.map((item) => ({ ...item, title: item.description }))}
+          onChange={setTab}
+        >
           <TabPanel value={tab} className="mt-6 space-y-3">
             <p className="text-xs text-muted">
               {tabs.find((item) => item.value === tab)?.description}

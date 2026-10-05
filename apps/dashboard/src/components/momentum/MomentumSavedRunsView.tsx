@@ -4,7 +4,14 @@ import { AlertTriangle, CheckCircle2, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { usePolledResource } from '../../hooks/usePolledResource';
-import { EMPTY, formatIstDate, formatNumber, formatPct, formatPp } from '../../lib/format';
+import {
+  EMPTY,
+  formatDay,
+  formatIstDate,
+  formatNumber,
+  formatPct,
+  formatPp,
+} from '../../lib/format';
 import type { MomentumSavedRun, MomentumWeeklyStatus } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -313,7 +320,7 @@ export function MomentumSavedRunsView({
                   CAGR {metric(run, 'cagr')} · DD {metric(run, 'max_drawdown')} · Turnover{' '}
                   {metric(run, 'turnover_per_year')} · Sharpe {metric(run, 'sharpe')}
                   {typeof run.config.start === 'string'
-                    ? ` · ${run.config.start} → ${String(run.config.end ?? 'latest')}`
+                    ? ` · ${formatDay(String(run.config.start))} → ${typeof run.config.end === 'string' ? formatDay(run.config.end) : 'latest'}`
                     : ''}
                   {' · '}Saved {formatIstDate(run.created_at)}
                 </span>

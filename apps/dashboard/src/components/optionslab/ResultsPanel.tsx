@@ -51,8 +51,6 @@ function shade(value: number, max: number): string {
   }[tone][step - 1] as string;
 }
 
-const fmtPnl = (v: number | null) => (v === null ? '—' : formatPnl(v));
-
 function RunDailyCard({ onFinished }: { onFinished: () => void }) {
   const data = useLegwiseData();
   const job = useDailyJob();
@@ -247,12 +245,13 @@ export function ResultsPanel() {
                         n={st.days} · {st.up} up · max DD {formatPnl(st.maxDrawdown)}
                       </span>
                       <span className={st.thin ? 'block text-faint' : 'block'}>
-                        win {formatPct(st.winRate, 0)} · avg win {fmtPnl(st.avgWin)} · avg loss{' '}
-                        {fmtPnl(st.avgLoss)}
+                        win {formatPct(st.winRate, 0)} · avg win {formatPnl(st.avgWin)} · avg loss{' '}
+                        {formatPnl(st.avgLoss)}
                       </span>
                       <span className={st.thin ? 'block text-faint' : 'block'}>
-                        expectancy {fmtPnl(st.expectancy)} · PF {formatNumber(st.profitFactor, 2)} ·
-                        worst day {fmtPnl(st.worst)} · losing streak {st.longestLosingStreak}
+                        expectancy {formatPnl(st.expectancy)} · PF{' '}
+                        {formatNumber(st.profitFactor, 2)} · worst day {formatPnl(st.worst)} ·
+                        losing streak {st.longestLosingStreak}
                       </span>
                       {st.thin && (
                         <span className="block text-faint">

@@ -7,11 +7,13 @@ import { cn } from '../../lib/cn';
 import { downloadCsv } from '../../lib/csv';
 import {
   EMPTY,
+  formatDay,
   formatDuration,
   formatInr,
   formatIstTime,
   formatNumber,
   formatPct,
+  formatPp,
 } from '../../lib/format';
 import { describeConfig } from '../../lib/momentumConfig';
 import type { MomentumResult, MomentumSavedRun } from '../../types/momentum';
@@ -112,7 +114,6 @@ const PERCENT_KEYS = new Set([
   'position_return',
   'strategy',
   'benchmark',
-  'vs_benchmark',
   'cash',
   'return',
 ]);
@@ -121,6 +122,7 @@ function format(value: unknown, key = ''): string {
   if (value === null || value === undefined) return EMPTY;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'number') {
+    if (key === 'vs_benchmark') return formatPp(value);
     if (PERCENT_KEYS.has(key)) return formatPct(value);
     if (key === 'pnl' || key === 'value') return formatInr(value);
     if (key === 'year') return String(value);
@@ -335,7 +337,7 @@ export function MomentumPerformanceCard({
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-faint">Performance</p>
           <h2 className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
-            {label} · {result.series.dates[0] ?? ''} → {result.series.dates.at(-1) ?? ''}
+            {label} · {formatDay(result.series.dates[0])} → {formatDay(result.series.dates.at(-1))}
           </h2>
           {runInfo ? (
             <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
@@ -462,7 +464,7 @@ export function MomentumResultDetails({
           {panel === 'week' ? (
             <>
               <ResultSection
-                title={`Signals · ${result.latest.week}`}
+                title={`Signals · ${formatDay(result.latest.week)}`}
                 description={result.latest.explain}
               >
                 <Table>

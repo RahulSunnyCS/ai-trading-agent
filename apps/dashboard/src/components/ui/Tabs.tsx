@@ -9,6 +9,8 @@ export interface TabItem<T extends string> {
   value: T;
   label: ReactNode;
   disabled?: boolean;
+  /** Native tooltip on the tab. */
+  title?: string | undefined;
   /** Rendered after the tab, outside its button (a close button, a count). */
   trailing?: ReactNode;
 }
@@ -55,6 +57,7 @@ export function Tabs<T extends string>({
             <RadixTabs.Trigger
               value={item.value}
               disabled={item.disabled}
+              title={item.title}
               className={cn(
                 'inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',

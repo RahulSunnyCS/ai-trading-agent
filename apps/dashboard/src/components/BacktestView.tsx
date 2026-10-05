@@ -22,7 +22,7 @@ import type { CoverageResponse, RunResult } from '../types/backtest';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
-import { Input } from './ui/Input';
+import { Input, fieldClass } from './ui/Input';
 import { RefreshButton } from './ui/RefreshButton';
 import { StatCard } from './ui/StatCard';
 import { StateMessage } from './ui/StateMessage';
@@ -154,7 +154,7 @@ function StrategyEditor({
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}
         rows={16}
-        className="w-full rounded-lg border border-border bg-surface-2/50 p-3 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={`${fieldClass} w-full font-mono !text-xs`}
         placeholder="Pick a preset above, or paste a strategy YAML"
       />
 
@@ -187,8 +187,8 @@ function StrategyEditor({
             onChange={(e) => onToChange(e.target.value)}
           />
         </label>
-        <Button variant="primary" disabled={!canRun} onClick={onRun}>
-          <Play className="h-3.5 w-3.5" />
+        <Button variant="primary" disabled={!canRun} loading={running} onClick={onRun}>
+          {running ? null : <Play className="h-3.5 w-3.5" />}
           {running ? 'Running…' : 'Run backtest'}
         </Button>
         {coverage && Object.keys(coverage).length > 0 && (

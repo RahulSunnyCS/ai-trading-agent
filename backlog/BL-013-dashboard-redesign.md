@@ -402,4 +402,12 @@ Answered by the owner on 2026-10-05, when the item was started.
     keep their local input.
   - `e2e/momentum-rebalance.spec.ts` selectors updated for the radiogroup; the Playwright suite
     itself was not run (it is stale: BL-008).
+- 2026-10-05 — Phase 3 leftovers closed on the same branch: the raw ISO dates now go through
+  `formatDay` (circuit lock and exit dates, signal week, saved-run period, result period, the
+  Insights drawdown date; the component test's expected strings were updated); Insights and the
+  yearly table's Difference column use `formatPp` (unsigned inside the "Beat X by …" sentence);
+  the YAML textarea uses `fieldClass`; the two "Running…" buttons use `Button loading`;
+  `Tabs` items take a `title`; `formatPnl` accepts null. One ETF backtest was run in the
+  browser to check the KPI cards, insights line, equity chart and yearly chart after Phases 2
+  and 3 (it auto-saved one run to the owner's saved runs).
 
