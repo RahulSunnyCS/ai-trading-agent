@@ -297,16 +297,15 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
 
 ## Open questions
 
-1. E5 (parked cash): under the itemised cost model the liquid fund is now priced as a mutual
-   fund (stamp duty in, nothing out). The flat model still charges `cost_pct` on parking.
-   Confirm that is the intended treatment.
-2. E3: when two held categories pick the same stock, the worse-placed category's slot is left
-   empty (it does not take its next-best member). Fill it, or leave it?
-3. Round 7 arm C2 stopped at 754 of 4,000 runs. Resume it on the fixed engine in Phase 3, or
-   drop it in favour of the point-in-time universe runs?
+None open.
 
 ### Answered
 
+- **E5, parked cash (2026-10-05):** keep the change — under the itemised model the liquid fund
+  pays stamp duty going in and nothing coming out.
+- **E3, shared stock (2026-10-05):** leave the worse-placed category's slot empty for now.
+- **Round 7 arm C2 (2026-10-05):** dropped at 754 of 4,000 runs; Phase 3's point-in-time
+  universe runs replace it.
 - **Order against BL-001 (2026-10-05):** BL-010's engine fixes go first.
 - **Real money (2026-10-05):** not yet followed with real money; the owner plans to start. The
   live-signal parity check (Phase 1, second half) is therefore the next thing to finish.
@@ -327,3 +326,4 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   queries are **not** yet captured; `docs/evaluation-review.md` records what has and has not
   been re-verified. Phase 1, first half: E1–E8 fixed with tests on branch
   `feat/bl-010-phase-0-1`; impact table in `docs/evaluation-review.md`.
+- 2026-10-05 — owner accepted the three Phase 1a decisions (E5 kept, E3 gap left, C2 dropped).
