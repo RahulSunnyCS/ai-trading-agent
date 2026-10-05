@@ -213,9 +213,11 @@ median), re-run on the fixed engine. Steps 1–3 and 5–7 first; step 4 after B
    *Flag:* top-5 stocks > 50% of total log return, or one year > 40%.
 6. **Realism at ₹5 lakh** — integer shares, price cap, participation (position ÷ 60-day median
    turnover) per fill. *Flag:* any fill above 5%; report CAGR at a 1% participation cap.
-7. **Monday-open repricing** — the same trade list with every fill moved from the Friday close
-   to the next trading day's open, which is when a Broad signal can first be traded (Friday's
-   stock data arrives at 19:30 IST). Report the change in CAGR and max DD per config.
+7. **Monday-open repricing** — the six configs re-run with signal delay 0, then the same
+   decisions filled twice: at the Friday close, as the backtest assumes, and at the next
+   trading day's open, which is when a Broad signal can first be traded (Friday's stock data
+   arrives at 19:30 IST). Report the change in CAGR and max DD per config; the same pair on the
+   delay-1 runs is shown for reference only.
    *Flag:* more than 1 pt of CAGR on any of the six → Broad gets a Monday-fill option and
    results are quoted on it; a week's signal delay is not the fix. Threshold committed in
    `search_spaces/bl010_criteria_addendum_1.json` before the step ran.
