@@ -913,8 +913,9 @@ export function MomentumEquityChart({
           marker: {
             // Circles, coloured by what happened: names added, names out, both, or neither.
             symbol: 'circle',
-            size: 9,
-            line: { width: 1, color: colors.grid },
+            // Small, so ten years of weekly rotations read as dots on the line, not a band.
+            size: 6,
+            line: { width: 0.5, color: colors.grid },
             color: rotationPoints.map((item) => colors[KIND_COLOR[item.kind]]),
           },
           hoverinfo: 'none',
