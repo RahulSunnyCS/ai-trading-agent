@@ -1269,6 +1269,33 @@ def search_steady_report(
     typer.echo(f"\n{int(table.winner.sum())} of {len(table)} are Winners")
 
 
+@search_app.command("pit-rerun")
+def search_pit_rerun(
+    out: Path = typer.Argument(..., help="A finished search's results folder (arm A)."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    top: int = typer.Option(50, help="How many of the best stored runs to re-run."),
+    also: Path = typer.Option(None, "--also", help='More runs: JSON {"label": "run id"}.'),
+    dest: Path = typer.Option(None, "--dest", help="Output file (default <out>/pit_rerun.jsonl)."),
+) -> None:
+    """Re-run the best configs unchanged on a point-in-time universe (each year's 750
+    most-traded stocks) and print what the result loses. Resumable."""
+    import json as _json
+
+    from . import pit_rerun
+
+    extra = _json.loads(also.read_text()) if also else {}
+    dest = dest or out / "pit_rerun.jsonl"
+    pit_rerun.run(space, out, pit_rerun.pick(out, top, extra), dest, echo=typer.echo)
+    rows = pit_rerun.table(dest)
+    for label in sorted(rows.get("as_searched", {})):
+        cells = [
+            f"{variant} {rows[variant][label]['cagr']:.1%}"
+            for variant in pit_rerun.VARIANTS
+            if label in rows.get(variant, {})
+        ]
+        typer.echo(f"{label}: " + ", ".join(cells))
+
+
 @search_app.command("analyze")
 def search_analyze(
     out: Path = typer.Argument(..., help="A results folder from `mbt search run`."),

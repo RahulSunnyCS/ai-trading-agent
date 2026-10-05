@@ -87,6 +87,46 @@ def market_members_by_year(root: Path | None = None) -> dict[int, set[str]]:
     return out
 
 
+#: How many of the most-traded stocks stand in for the Total Market index each year.
+TURNOVER_RANK_TOP = 750
+
+
+def turnover_rank_members_by_year(
+    top: int = TURNOVER_RANK_TOP, root: Path | None = None
+) -> dict[int, set[str]]:
+    """year -> the `top` real-equity symbols by median daily turnover over the last six months
+    of the year before. A stand-in for the index's membership as it was at the time (BL-010
+    F1): the stored Total Market list is today's 755 names applied to every year, so every one
+    of them is a survivor. This uses only what was known on 1 January of each year and keeps
+    stocks that later fell out or were delisted.
+
+    It is a proxy, not the index: NSE ranks by free-float market value, which is not in the
+    data. A stock needs 60 sessions in the window, so a recent listing waits a year."""
+    with connect(root or data_root(), read_only=True) as con:
+        rows = con.execute(
+            """
+            WITH window_stats AS (
+                SELECT year(b.date) + 1 AS for_year, i.symbol,
+                       median(b.turnover) AS typical, count(*) AS sessions
+                FROM bars_1d_stock b JOIN instruments i USING (instrument_id)
+                WHERE b.isin LIKE 'INE%' AND month(b.date) >= 7
+                  AND NOT coalesce(b.synthetic_close, false)
+                GROUP BY 1, 2
+            )
+            SELECT for_year, symbol FROM (
+                SELECT *, row_number() OVER (
+                    PARTITION BY for_year ORDER BY typical DESC, symbol) AS place
+                FROM window_stats WHERE sessions >= 60
+            ) WHERE place <= ?
+            """,
+            [top],
+        ).fetchall()
+    out: dict[int, set[str]] = {}
+    for year, symbol in rows:
+        out.setdefault(int(year), set()).add(symbol)
+    return out
+
+
 def _band_sql() -> str:
     return " or ".join(f"abs(r) between {lo} and {hi}" for lo, hi in _BANDS)
 

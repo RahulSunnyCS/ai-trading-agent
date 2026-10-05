@@ -83,11 +83,21 @@ def load_records(out_dir: Path, ids: set[str]) -> dict[str, dict[str, Any]]:
 class Runner:
     """Builds rankings and runs backtests for one space, with small caches."""
 
-    def __init__(self, space: search.Space) -> None:
+    def __init__(
+        self,
+        space: search.Space,
+        *,
+        universe_kind: str | None = None,
+        category_tags: str | None = None,
+    ) -> None:
+        """`universe_kind` / `category_tags` run the space's configs on another universe or
+        tag file than its arm names (BL-010 Phase 3: the same configs, point-in-time)."""
         from . import api
 
         self.api = api
         self.space = space
+        self.universe_kind = universe_kind or search.ARMS[space.arm][0]
+        self.category_tags = category_tags
         self.common = dict(
             outer_prices=api.DATA.get(),
             stocks_data_dir=api.DATA_DIR / "stocks",
@@ -120,13 +130,12 @@ class Runner:
         from .categories import broad
 
         kwargs, liquidity = self.heavy_args(heavy, **override)
-        universe_kind = search.ARMS[self.space.arm][0]
         h = {**heavy, **override}
         return broad.compute_universe_base(
             **self.common,
             **kwargs,
             liquidity=liquidity,
-            universe_kind=universe_kind,
+            universe_kind=self.universe_kind,
             series_breaks=h.get("series_break_policy", "verified"),
         )
 
@@ -153,6 +162,8 @@ class Runner:
         pool = (merged.get("pool_top_n", 200), merged.get("pool_exit_rank", 250))
         ranking = broad.finish_universe_ranking(base, pool_top_n=pool[0], pool_exit_rank=pool[1])
         kwargs = search._split_light(self.space, merged)
+        if self.category_tags is not None:
+            kwargs["category_tags"] = self.category_tags
         if kwargs.pop("respect_circuits", False):
             kwargs["uc_locked"], kwargs["lc_locked"] = locks or self.locks(ranking)
         heavy_kwargs, _ = self.heavy_args(heavy)
