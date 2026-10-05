@@ -154,11 +154,13 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
   await page.getByRole('button', { name: 'Momentum', exact: true }).click();
   await page.getByRole('tab', { name: 'Momentum Scores' }).click();
   await expect(page.getByText('Test Company')).toBeVisible();
-  await page.getByRole('button', { name: /TEST/ }).click();
-  await expect(page.getByText('8% · relative score 75')).toBeVisible();
-  await page.getByRole('button', { name: 'Sectors', exact: true }).click();
+  // Raw returns sit beside each score pill; stock rows no longer expand.
+  const stockRow = page.getByRole('row', { name: /Test Company/ });
+  await expect(stockRow).toContainText('+8.0%');
+  await expect(stockRow).toContainText('+2.00%');
+  await page.getByRole('radio', { name: 'Sectors', exact: true }).click();
   await page.getByRole('button', { name: /Metals/ }).click();
-  await expect(
-    page.getByRole('row', { name: 'TEST · Test Company ₹120 2% 75 80 90', exact: true }),
-  ).toBeVisible();
+  const memberRow = page.getByRole('row', { name: /TEST · Test Company/ });
+  await expect(memberRow).toContainText('₹120');
+  await expect(memberRow).toContainText('+20.0%');
 });

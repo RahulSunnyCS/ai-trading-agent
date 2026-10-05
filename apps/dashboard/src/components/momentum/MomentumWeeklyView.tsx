@@ -9,13 +9,40 @@ import {
   RefreshCw,
   Send,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useMomentumStockSync } from '../../hooks/useMomentumStockSync';
 import type { MomentumWeeklyJobState } from '../../hooks/useMomentumWeeklyJob';
 import { usePolledResource } from '../../hooks/usePolledResource';
 import { apiPost } from '../../lib/api';
-import { formatDay, formatIstDateTime, formatMultiple, formatPct } from '../../lib/format';
+import { cn } from '../../lib/cn';
+import {
+  EMPTY,
+  formatDay,
+  formatInt,
+  formatIstDateTime,
+  formatMultiple,
+  formatPct,
+} from '../../lib/format';
+import {
+  type BlockSeverity,
+  type WeeklyReadiness,
+  type WeeklyRunKind,
+  actionTone,
+  blockSeverity,
+  canSend,
+  datasetLabel,
+  effectiveSend,
+  isTradeAction,
+  resultStrategies,
+  runButtonLabel,
+  sendConfirmationText,
+  sendDisabledReason,
+  signalActionRows,
+  sortSignalRows,
+  weeklyReadiness,
+  weeksBehind,
+} from '../../lib/momentumWeekly';
 import type {
   MomentumSavedRun,
   MomentumStockActionReview,
@@ -25,15 +52,15 @@ import type {
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { Input, Select } from '../ui/Input';
+import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { StateMessage } from '../ui/StateMessage';
+import { toast } from '../ui/Toast';
 
-type RunKind = 'preview' | 'final';
-
-const DAY_MS = 86_400_000;
-
-function weeksBehind(through: string, target: string): number {
-  return Math.round((Date.parse(target) - Date.parse(through)) / (7 * DAY_MS));
-}
+const RUN_OPTIONS: ReadonlyArray<SegmentedOption<WeeklyRunKind>> = [
+  { value: 'preview', label: 'Preview (live prices)' },
+  { value: 'final', label: 'Final (official closes)' },
+];
 
 function useElapsed(startedAt: string | null, active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
@@ -51,21 +78,26 @@ function useElapsed(startedAt: string | null, active: boolean): number {
  * in the background on the Momentum service, so the user can switch sections or
  * leave the dashboard; the job state lives in the parent (see
  * useMomentumWeeklyJob) so the section tab can show a running indicator too.
+ *
+ * Order: readiness strip, run controls, the latest run's result, then schedule and data
+ * health. Sending to Telegram needs a final run and an explicit confirmation (the rules are
+ * in lib/momentumWeekly.ts).
  */
 export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState }) {
-  const [runKind, setRunKind] = useState<RunKind>('final');
+  const [runKind, setRunKind] = useState<WeeklyRunKind>('final');
   const [send, setSend] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const { job, running, startError, start } = weekly;
   const status = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status');
   const favorites = usePolledResource<MomentumSavedRun[]>('/api/momentum/favorite-strategies');
   const elapsed = useElapsed(job?.started_at ?? null, running);
   const stockSync = useMomentumStockSync();
-  const active = favorites.data?.find((run) => run.active);
-  const latestFinal = status.data?.signals.find((signal) => signal.run === 'final');
-  const activeDataKey = active?.config.dataset === 'etf' ? 'etf' : 'stock';
-  const activeReady = active
-    ? status.data?.datasets.find((item) => item.key === activeDataKey)
-    : null;
+  const readiness = useMemo(
+    () => weeklyReadiness(status.data ?? null, favorites.data ?? null),
+    [status.data, favorites.data],
+  );
+  const sendReason = sendDisabledReason(runKind);
+  const willSend = effectiveSend(runKind, send);
 
   // A finished run may have refreshed prices and saved a signal: re-read the status panel.
   const finishedAt = job?.finished_at ?? null;
@@ -75,101 +107,138 @@ export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState 
     if (finishedAt || stockSyncFinishedAt) refetchStatus();
   }, [finishedAt, stockSyncFinishedAt, refetchStatus]);
 
+  // Bring the result into view when a run that was seen running here finishes (not on a
+  // plain mount with an old result).
+  const resultRef = useRef<HTMLDivElement>(null);
+  const sawRunning = useRef(false);
+  const jobStatus = job?.status ?? null;
+  const jobRun = job?.run ?? null;
+  useEffect(() => {
+    if (running) {
+      sawRunning.current = true;
+      return;
+    }
+    if (!sawRunning.current || !jobStatus || jobStatus === 'running') return;
+    sawRunning.current = false;
+    resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (jobStatus === 'failed') toast(`The ${jobRun ?? 'weekly'} run failed`, 'error');
+    else toast(`The ${jobRun ?? 'weekly'} run finished`);
+  }, [running, jobStatus, jobRun]);
+
+  function chooseRun(next: WeeklyRunKind): void {
+    setRunKind(next);
+    setConfirming(false);
+    if (!canSend(next)) setSend(false);
+  }
+
+  function onRun(): void {
+    if (willSend) setConfirming(true);
+    else void start(runKind, false);
+  }
+
+  function confirmSend(): void {
+    setConfirming(false);
+    // Re-checked here so a send can only ever leave from this confirmed path.
+    if (effectiveSend(runKind, send)) void start(runKind, true);
+  }
+
+  const favouriteCount = favorites.data?.length ?? 0;
+
   return (
     <div className="space-y-5">
+      <ReadinessCard
+        status={status.data ?? null}
+        statusError={status.error}
+        favoritesError={favorites.data ? null : favorites.error}
+        readiness={readiness}
+        stockSync={stockSync}
+      />
+
       <Card>
         <CardHeader
-          title="This week's status"
-          description={
-            status.data
-              ? `Target week ending ${formatDay(status.data.target_week)}`
-              : 'Checking signal and data status…'
-          }
-        />
-        <div className="grid gap-3 text-sm sm:grid-cols-3">
-          <div>
-            <p className="text-xs text-muted">Latest final signal</p>
-            <p className="font-medium text-foreground">
-              {latestFinal
-                ? `${formatDay(latestFinal.week)} · ${latestFinal.label}`
-                : 'None saved yet'}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted">Telegram-active strategy</p>
-            <p className="font-medium text-foreground">{active?.name ?? 'Default live strategy'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted">Readiness</p>
-            <p className="font-medium text-foreground">
-              {activeReady
-                ? activeReady.ready
-                  ? 'Data ready'
-                  : `Blocked · ${activeReady.note}`
-                : active
-                  ? 'Checking data…'
-                  : 'Check default strategy data below'}
-            </p>
-          </div>
-        </div>
-      </Card>
-      <Card>
-        <CardHeader
-          title="Weekly signal"
+          title="Run the weekly signal"
           description="Manually run the Friday momentum signal — the same job the laptop schedule (14:40 preview / 16:45 final IST) runs automatically."
         />
         <p className="mb-3 text-xs text-muted">
           Preview uses live prices and may change. Final uses official closes for the completed
           week.
-          {favorites.data?.length
-            ? ` ${favorites.data.length} favourite strategies will be evaluated.`
-            : ' The default live strategy will be evaluated.'}
+          {favorites.data
+            ? favouriteCount
+              ? ` ${formatInt(favouriteCount)} favourite ${favouriteCount === 1 ? 'strategy' : 'strategies'} will be evaluated.`
+              : ' The default live strategy will be evaluated.'
+            : ''}
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex rounded-lg border border-border bg-surface-2/30 p-1">
-            <Button
-              size="sm"
-              variant={runKind === 'preview' ? 'primary' : 'ghost'}
-              onClick={() => setRunKind('preview')}
-            >
-              Preview (live prices)
-            </Button>
-            <Button
-              size="sm"
-              variant={runKind === 'final' ? 'primary' : 'ghost'}
-              onClick={() => setRunKind('final')}
-            >
-              Final (official closes)
-            </Button>
-          </div>
-          <label className="flex items-center gap-1.5 text-xs text-muted">
+          <SegmentedControl
+            ariaLabel="Run type"
+            size="sm"
+            value={runKind}
+            options={RUN_OPTIONS}
+            onChange={chooseRun}
+          />
+          <label
+            className={cn(
+              'flex items-center gap-1.5 text-xs',
+              sendReason ? 'cursor-not-allowed text-faint' : 'text-muted',
+            )}
+            title={sendReason ?? undefined}
+          >
             <input
               type="checkbox"
-              checked={send}
-              onChange={(event) => setSend(event.target.checked)}
+              checked={willSend}
+              disabled={sendReason !== null || running}
+              aria-describedby="weekly-send-note"
+              onChange={(event) => {
+                setSend(event.target.checked);
+                setConfirming(false);
+              }}
             />
             Send to Telegram
           </label>
           <Button
+            variant="primary"
             size="sm"
-            onClick={() => void start(runKind, send)}
-            disabled={running}
+            onClick={onRun}
+            loading={running}
+            disabled={confirming}
             className="ml-auto"
           >
-            <Send className={running ? 'h-3.5 w-3.5 animate-pulse' : 'h-3.5 w-3.5'} />
-            {running ? 'Running…' : send ? 'Run and send to Telegram' : 'Run without sending'}
+            {running ? null : <Send className="h-3.5 w-3.5" aria-hidden="true" />}
+            {running ? 'Running…' : runButtonLabel(runKind, send)}
           </Button>
         </div>
-        <p className="mt-2 text-xs text-muted">
-          {send
-            ? `Telegram will receive the result for ${active?.name ?? 'the default live strategy'}.`
-            : 'No Telegram message will be sent from this manual run.'}
+        <p id="weekly-send-note" className="mt-2 text-xs text-muted">
+          {sendReason ??
+            (willSend
+              ? 'You will be asked to confirm before anything is sent.'
+              : 'No Telegram message will be sent from this manual run.')}
         </p>
 
+        {confirming && !running ? (
+          <fieldset
+            aria-label="Confirm sending to Telegram"
+            className="mt-3 flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3"
+          >
+            <p className="min-w-0 flex-1 basis-64 text-sm text-foreground">
+              {sendConfirmationText(readiness.activeName, readiness.activeKnown)}
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="primary" onClick={confirmSend}>
+                Confirm and send
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
+            </div>
+          </fieldset>
+        ) : null}
+      </Card>
+
+      <div ref={resultRef} className="scroll-mt-4 space-y-3 empty:hidden">
         {running ? (
           <output
             aria-live="polite"
-            className="mt-4 block rounded-lg border border-primary/30 bg-primary/5 px-4 py-3"
+            className="block rounded-lg border border-primary/30 bg-primary/5 px-4 py-3"
           >
             <div className="flex items-center gap-2.5 text-sm font-medium text-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -184,33 +253,40 @@ export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState 
             </p>
           </output>
         ) : null}
-
         {startError ? (
-          <div className="mt-4">
-            <StateMessage
-              variant="error"
-              title="Could not start the run"
-              description={startError}
-            />
-          </div>
+          <StateMessage variant="error" title="Could not start the run" description={startError} />
         ) : null}
         {!running && job?.status === 'failed' ? (
-          <div className="mt-4">
-            <StateMessage
-              variant="error"
-              title={`The ${job.run} run failed`}
-              description={job.error ?? 'Unknown error'}
-            />
-          </div>
+          <StateMessage
+            variant="error"
+            title={`The ${job.run} run failed`}
+            description={job.error ?? 'Unknown error'}
+          />
         ) : null}
-      </Card>
+        {!running && job?.status === 'done' && job.result ? (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-semibold tracking-tight text-foreground">
+                Latest run result
+              </h2>
+              <Badge tone="neutral">{job.run === 'final' ? 'Final' : 'Preview'}</Badge>
+              {job.result.sent_to_telegram ? (
+                <Badge tone="primary" dot>
+                  Sent to Telegram
+                </Badge>
+              ) : (
+                <Badge tone="neutral">Not sent</Badge>
+              )}
+              <span className="text-xs text-muted">
+                finished {job.finished_at ? `${formatIstDateTime(job.finished_at)} IST` : EMPTY}
+              </span>
+            </div>
+            <WeeklyResults result={job.result} />
+          </>
+        ) : null}
+      </div>
 
-      <IngestionStatusCard
-        status={status.data}
-        error={status.error}
-        loading={status.loading}
-        stockSync={stockSync}
-      />
+      <ScheduleCard status={status.data ?? null} />
       <details className="rounded-xl border border-border bg-surface p-4">
         <summary className="cursor-pointer text-sm font-semibold text-foreground">
           Data health · stock action reviews
@@ -219,16 +295,6 @@ export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState 
           <StockActionAlerts stockSyncFinishedAt={stockSyncFinishedAt} />
         </div>
       </details>
-
-      {!running && job?.status === 'done' && job.result ? (
-        <div className="space-y-3">
-          <p className="text-xs text-muted">
-            Last manual {job.run} run finished{' '}
-            {job.finished_at ? formatIstDateTime(job.finished_at) : ''} IST
-          </p>
-          <WeeklyResults result={job.result} />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -348,19 +414,19 @@ function StockActionAlertRow({
       ) : null}
       {!needsEntitlement ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select
+          <Select
             aria-label={`Classify ${item.symbol} move`}
             value={decision}
             onChange={(event) => setDecision(event.target.value as typeof decision)}
-            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            className="w-auto"
           >
             <option value="">Choose classification</option>
             <option value="split">Split</option>
             <option value="bonus">Bonus</option>
             <option value="crash">Genuine price fall</option>
-          </select>
+          </Select>
           {decision === 'split' || decision === 'bonus' ? (
-            <input
+            <Input
               aria-label="New shares per old share"
               type="number"
               min="1.1"
@@ -369,16 +435,16 @@ function StockActionAlertRow({
               placeholder="New shares / old share"
               value={factor}
               onChange={(event) => setFactor(event.target.value)}
-              className="w-44 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+              className="w-44"
             />
           ) : null}
-          <input
+          <Input
             aria-label="Evidence URL or note"
             type="text"
             placeholder="Evidence URL or note"
             value={evidence}
             onChange={(event) => setEvidence(event.target.value)}
-            className="min-w-48 flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            className="w-auto min-w-48 flex-1"
           />
           <Button
             size="sm"
@@ -396,29 +462,147 @@ function StockActionAlertRow({
   );
 }
 
-function IngestionStatusCard({
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-muted">{label}</p>
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-foreground">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The one readiness strip: target week, latest final, the Telegram-active strategy, how fresh
+ * each dataset is and anything that would block this week's signal.
+ */
+function ReadinessCard({
   status,
-  error,
-  loading,
+  statusError,
+  favoritesError,
+  readiness,
   stockSync,
 }: {
   status: MomentumWeeklyStatus | null;
-  error: string | null;
-  loading: boolean;
+  statusError: string | null;
+  favoritesError: string | null;
+  readiness: WeeklyReadiness;
   stockSync: ReturnType<typeof useMomentumStockSync>;
 }) {
+  const blocked = readiness.blockedReasons.length > 0;
   return (
     <Card>
       <CardHeader
-        title="Data & schedule"
-        description={
-          status
-            ? `A final run produces the signal for the week ending ${formatDay(status.target_week)}. Each strategy needs its data ingested through that week.`
-            : 'How far each data source has been ingested.'
+        title="This week's readiness"
+        description="A final run produces the signal for the target week. Each strategy needs its data ingested through that week."
+        actions={
+          status ? (
+            blocked ? (
+              <Badge status="attention" dot>
+                Needs attention
+              </Badge>
+            ) : (
+              <Badge tone="positive" dot>
+                Ready
+              </Badge>
+            )
+          ) : null
         }
       />
-      {stockSync.startError ? (
+      {statusError && !status ? (
         <div className="mb-3">
+          <StateMessage
+            variant="error"
+            title="Could not load data status"
+            description={statusError}
+          />
+        </div>
+      ) : null}
+      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-3">
+        <Fact label="Target week ending">{status ? formatDay(status.target_week) : EMPTY}</Fact>
+        <Fact label="Latest final signal">
+          {status
+            ? readiness.latestFinal
+              ? `${formatDay(readiness.latestFinal.week)} · ${readiness.latestFinal.label}`
+              : 'None saved yet'
+            : EMPTY}
+        </Fact>
+        <Fact label="Telegram-active strategy">
+          {favoritesError ? (
+            <span className="text-warning">Couldn&apos;t load favourites</span>
+          ) : readiness.activeKnown ? (
+            <>
+              <span className="truncate">{readiness.activeName ?? 'None selected'}</span>
+              {readiness.activeReady === true ? <Badge tone="positive">Data ready</Badge> : null}
+              {readiness.activeReady === false ? <Badge status="attention">Blocked</Badge> : null}
+            </>
+          ) : (
+            EMPTY
+          )}
+        </Fact>
+      </div>
+
+      {status ? (
+        <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+          {status.datasets.map((item) => (
+            <li key={item.key} className="flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-2.5">
+              <Database className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+              <div className="min-w-0 flex-1 basis-56">
+                <div className="text-sm font-medium text-foreground">{item.label}</div>
+                <div className={cn('text-xs', item.error ? 'text-warning' : 'text-muted')}>
+                  {item.error ?? item.note}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <span className="text-sm tabular-nums text-foreground">
+                  {item.through ? `Through ${formatDay(item.through)}` : 'No data'}
+                </span>
+                {item.ready ? (
+                  <Badge tone="positive" dot>
+                    Up to date
+                  </Badge>
+                ) : (
+                  <Badge status="attention" dot>
+                    {item.through
+                      ? `${formatInt(weeksBehind(item.through, status.target_week))} week(s) behind`
+                      : 'Not ingested'}
+                  </Badge>
+                )}
+                {item.key === 'stock' ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void stockSync.start()}
+                    loading={stockSync.running}
+                  >
+                    {stockSync.running ? null : (
+                      <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                    )}
+                    {stockSync.running ? 'Refreshing…' : 'Refresh stock data'}
+                  </Button>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {blocked ? (
+        <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+          <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+            What would block this week&apos;s signal
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-9 text-sm text-muted">
+            {readiness.blockedReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {stockSync.startError ? (
+        <div className="mt-3">
           <StateMessage
             variant="error"
             title="Could not start the stock-data refresh"
@@ -427,7 +611,7 @@ function IngestionStatusCard({
         </div>
       ) : null}
       {!stockSync.running && stockSync.job?.status === 'failed' ? (
-        <div className="mb-3">
+        <div className="mt-3">
           <StateMessage
             variant="error"
             title="Stock-data refresh failed"
@@ -435,185 +619,146 @@ function IngestionStatusCard({
           />
         </div>
       ) : null}
-      {error && !status ? (
-        <StateMessage variant="error" title="Could not load data status" description={error} />
-      ) : !status ? (
-        <p className="text-sm text-muted">{loading ? 'Loading…' : 'No status yet.'}</p>
-      ) : (
-        <div className="space-y-4">
-          <ul className="divide-y divide-border rounded-lg border border-border">
-            {status.datasets.map((item) => (
-              <li key={item.key} className="flex flex-wrap items-start gap-3 px-3 py-2.5">
-                <Database className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-foreground">{item.label}</div>
-                  <div className="text-xs text-muted">{item.error ?? item.note}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm tabular-nums text-foreground">
-                    {item.through ? `Data through ${formatDay(item.through)}` : 'No data'}
+    </Card>
+  );
+}
+
+/** When the scheduled jobs last ran and which signals are saved. Readiness lives in the strip above. */
+function ScheduleCard({ status }: { status: MomentumWeeklyStatus | null }) {
+  if (!status) return null;
+  return (
+    <Card>
+      <CardHeader
+        title="Schedule & saved signals"
+        description="The laptop's scheduled runs and the signals they (or a manual final run) have saved."
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
+            Scheduled runs
+          </div>
+          <ul className="space-y-1.5">
+            {status.schedule.map((item) => (
+              <li key={item.run} className="flex items-start gap-2 text-sm">
+                <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
+                <div className="min-w-0">
+                  <span className="capitalize text-foreground">{item.run.replace('-', ' ')}</span>{' '}
+                  <span className="text-muted">· {item.when}</span>
+                  {item.ran_late_by_minutes != null ? (
+                    <Badge status="attention" dot className="ml-1.5">
+                      ran {formatInt(item.ran_late_by_minutes)}m late
+                    </Badge>
+                  ) : null}
+                  <div className="truncate text-xs text-muted" title={item.last_line ?? ''}>
+                    {item.last_ran_at
+                      ? `Last ran ${formatIstDateTime(item.last_ran_at)}${item.last_line ? ` — ${item.last_line}` : ''}`
+                      : 'Has not run yet on this machine'}
                   </div>
-                  {item.ready ? (
-                    <Badge tone="positive" dot>
-                      Up to date
-                    </Badge>
-                  ) : (
-                    <Badge tone="warning" dot>
-                      {item.through
-                        ? `${weeksBehind(item.through, status.target_week)} week(s) behind`
-                        : 'Not ingested'}
-                    </Badge>
-                  )}
-                  {item.key === 'stock' ? (
-                    <div className="mt-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void stockSync.start()}
-                        disabled={stockSync.running}
-                      >
-                        <RefreshCw
-                          className={stockSync.running ? 'h-3 w-3 animate-spin' : 'h-3 w-3'}
-                        />
-                        {stockSync.running ? 'Refreshing…' : 'Refresh stock data'}
-                      </Button>
+                  {item.ran_late_by_minutes != null ? (
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-warning">
+                      <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                      Likely because the laptop was asleep at the scheduled time.
                     </div>
                   ) : null}
                 </div>
               </li>
             ))}
           </ul>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
-                Scheduled runs
-              </div>
-              <ul className="space-y-1.5">
-                {status.schedule.map((item) => (
-                  <li key={item.run} className="flex items-start gap-2 text-sm">
-                    <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted" />
-                    <div className="min-w-0">
-                      <span className="capitalize text-foreground">
-                        {item.run.replace('-', ' ')}
-                      </span>{' '}
-                      <span className="text-muted">· {item.when}</span>
-                      {item.ran_late_by_minutes != null ? (
-                        <Badge tone="warning" dot className="ml-1.5">
-                          ran {item.ran_late_by_minutes}m late
-                        </Badge>
-                      ) : null}
-                      <div className="truncate text-xs text-muted" title={item.last_line ?? ''}>
-                        {item.last_ran_at
-                          ? `Last ran ${formatIstDateTime(item.last_ran_at)}${item.last_line ? ` — ${item.last_line}` : ''}`
-                          : 'Has not run yet on this machine'}
-                      </div>
-                      {item.ran_late_by_minutes != null ? (
-                        <div className="mt-0.5 flex items-center gap-1 text-xs text-warning">
-                          <AlertTriangle className="h-3 w-3" />
-                          Likely because the laptop was asleep at the scheduled time.
-                        </div>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
-                Saved signals
-              </div>
-              {status.signals.length === 0 ? (
-                <p className="text-sm text-muted">No signal has been saved yet.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {status.signals.map((item) => (
-                    <li
-                      key={`${item.week}-${item.run}-${item.label}`}
-                      className="flex items-start gap-2 text-sm"
-                    >
-                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive" />
-                      <div className="min-w-0">
-                        <span className="text-foreground">
-                          Week of {formatDay(item.week)} · {item.run}
-                        </span>
-                        <div className="truncate text-xs text-muted">
-                          {item.label} · {formatIstDateTime(item.generated_at)}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
         </div>
-      )}
+        <div>
+          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
+            Saved signals
+          </div>
+          {status.signals.length === 0 ? (
+            <p className="text-sm text-muted">No signal has been saved yet.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {status.signals.map((item) => (
+                <li
+                  key={`${item.week}-${item.run}-${item.label}`}
+                  className="flex items-start gap-2 text-sm"
+                >
+                  <CheckCircle2
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <span className="text-foreground">
+                      Week of {formatDay(item.week)} · {item.run}
+                    </span>
+                    <div className="truncate text-xs text-muted">
+                      {item.label} · {formatIstDateTime(item.generated_at)}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }
 
+const SEVERITY_BORDER: Record<BlockSeverity, string> = {
+  info: 'border-border',
+  warning: 'border-warning/40',
+  blocked: 'border-negative/40',
+};
+
 function WeeklyResults({ result }: { result: MomentumWeeklyRunResult }) {
-  const strategies = result.strategies ?? [
-    {
-      id: null,
-      name: 'Default live strategy',
-      dataset: 'etf' as const,
-      active: true,
-      blocked: null,
-      title: result.title,
-      body: result.body,
-      signal: result.signal,
-    },
-  ];
   return (
     <>
-      {strategies.map((strategy) => {
-        const rawRows = strategy.signal?.rows;
-        const rows = Array.isArray(rawRows)
-          ? rawRows.filter(
-              (row): row is { asset: string; action: string; rank?: number | null } =>
-                typeof row === 'object' &&
-                row !== null &&
-                typeof row.asset === 'string' &&
-                typeof row.action === 'string',
-            )
-          : [];
-        const actions = rows.filter((row) => row.action.trim());
+      {resultStrategies(result).map((strategy) => {
+        const rows = sortSignalRows(signalActionRows(strategy.signal));
+        const trades = rows.filter((row) => isTradeAction(row.action)).length;
+        const severity = blockSeverity(strategy, result.severity);
+        const week = typeof strategy.signal?.week === 'string' ? strategy.signal.week : null;
         return (
-          <Card key={strategy.id ?? strategy.name}>
-            <CardHeader
-              title={strategy.title ?? strategy.name}
-              description={
-                strategy.blocked
+          <section
+            key={strategy.id ?? strategy.name}
+            data-severity={severity}
+            className={cn(
+              'rounded-xl border bg-surface p-5 shadow-card',
+              SEVERITY_BORDER[severity],
+            )}
+          >
+            <div className="mb-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold tracking-tight text-foreground">
+                  {strategy.title ?? strategy.name}
+                </h3>
+                <Badge tone="neutral">{datasetLabel(strategy.dataset)}</Badge>
+                {strategy.active ? <Badge tone="primary">Telegram-active</Badge> : null}
+                {severity === 'blocked' ? <Badge tone="negative">Blocked</Badge> : null}
+              </div>
+              <p className="mt-1 text-sm text-muted">
+                {strategy.blocked
                   ? `${strategy.name}: ${strategy.blocked}`
                   : strategy.active
                     ? result.sent_to_telegram
                       ? `${strategy.name} is active and was sent to Telegram.`
                       : `${strategy.name} is active; Telegram was not selected.`
-                    : `${strategy.name} was evaluated in the dashboard only.`
-              }
-            />
-            {strategy.blocked ? (
-              <Badge tone="warning">Blocked</Badge>
-            ) : strategy.signal ? (
+                    : `${strategy.name} was evaluated in the dashboard only.`}
+              </p>
+            </div>
+            {!strategy.blocked && strategy.signal ? (
               <div className="space-y-2 text-sm">
                 <p className="text-muted">
-                  Signal week {String(strategy.signal.week ?? '—')} · {actions.length} indicated
-                  action{actions.length === 1 ? '' : 's'}
+                  Signal week {formatDay(week)} · {formatInt(trades)} trade
+                  {trades === 1 ? '' : 's'} indicated
                 </p>
-                {actions.length ? (
+                {rows.length ? (
                   <ul className="flex flex-wrap gap-2">
-                    {actions.map((row) => (
+                    {rows.map((row) => (
                       <li
                         key={`${row.asset}-${row.action}`}
-                        className="rounded-lg border border-border bg-surface-2/40 px-3 py-2"
+                        className="flex items-center gap-2 rounded-lg border border-border bg-surface-2/40 px-2.5 py-1.5"
                       >
-                        <span className="font-medium text-foreground">
-                          {row.action} {row.asset}
-                        </span>
+                        <Badge tone={actionTone(row.action)}>{row.action}</Badge>
+                        <span className="font-medium text-foreground">{row.asset}</span>
                         {row.rank != null ? (
-                          <span className="ml-1 text-xs text-muted">rank {row.rank}</span>
+                          <span className="text-xs text-muted">rank {formatInt(row.rank)}</span>
                         ) : null}
                       </li>
                     ))}
@@ -634,7 +779,7 @@ function WeeklyResults({ result }: { result: MomentumWeeklyRunResult }) {
                 </pre>
               </details>
             ) : null}
-          </Card>
+          </section>
         );
       })}
     </>

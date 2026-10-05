@@ -99,7 +99,7 @@ test('Momentum rebalance previews holdings without changing Backtest dataset', a
   await page.getByRole('button', { name: 'Momentum', exact: true }).click();
   await page.getByRole('tab', { name: 'Rebalance preview' }).click();
 
-  await page.getByRole('radio', { name: 'Nifty 50 Stocks' }).click();
+  await page.getByRole('radio', { name: 'Nifty 50 stock dataset' }).click();
   await expect(page.getByText('First allocation', { exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Asset 1' }).fill('C0001');
   await page.getByRole('spinbutton', { name: 'Weight %' }).fill('40');
@@ -109,11 +109,11 @@ test('Momentum rebalance previews holdings without changing Backtest dataset', a
   await page.getByRole('button', { name: 'Preview rebalance' }).click();
 
   await expect(page.getByRole('heading', { name: 'Indicative changes' })).toBeVisible();
-  await expect(page.getByText(/Latest database close · as of 2026-10-02/)).toBeVisible();
+  await expect(page.getByText(/Latest database close · as of 02 Oct 2026/)).toBeVisible();
   await expect(page.getByText('No rebalance is scheduled this week')).toBeVisible();
   await expect(page.getByText(/Previous rebalance: 18 Sept 2026/)).toBeVisible();
   await expect(page.getByText(/Next rebalance: 16 Oct 2026/)).toBeVisible();
-  await expect(page.getByRole('row', { name: /BUY C0001/ })).toContainText('200');
+  await expect(page.getByRole('row', { name: /C0001.*BUY/ })).toContainText('200');
   await expect(page.getByText('No orders were placed.')).toBeVisible();
   await page.getByRole('tab', { name: 'Backtest' }).click();
   await expect(page.getByRole('radio', { name: 'ETF Rotation' })).toHaveAttribute(

@@ -34,6 +34,7 @@ import { useResultFlash } from './MomentumRunProgress';
 import { MomentumTimelineChart } from './MomentumTimelineChart';
 import { MomentumYearlyChart } from './MomentumYearlyChart';
 import { ResultSection } from './ResultSection';
+import { SignalsTable } from './details/SignalsTable';
 
 type Panel = 'returns' | 'week' | 'trades' | 'split' | 'risk' | 'compare';
 type ReturnsView = 'chart' | 'table' | 'monthly';
@@ -42,7 +43,7 @@ const TABS: Array<{ value: Panel; label: string }> = [
   { value: 'returns', label: 'Returns' },
   { value: 'week', label: 'This week' },
   { value: 'trades', label: 'Trades' },
-  { value: 'split', label: 'Trade split' },
+  { value: 'split', label: 'Timeline & holdings' },
   { value: 'risk', label: 'Risk' },
   { value: 'compare', label: 'Compare' },
 ];
@@ -60,7 +61,12 @@ const RETURNS_VIEWS: Array<[ReturnsView, string, string, string]> = [
     'Annual performance',
     'Calendar-year returns against the benchmark and the liquid fund',
   ],
-  ['monthly', 'Monthly', 'Monthly returns', 'Strategy return by calendar month'],
+  [
+    'monthly',
+    'Monthly',
+    'Monthly returns',
+    'Return by calendar month with a yearly total — switch between the strategy, the benchmark and the difference',
+  ],
 ];
 
 const RETURNS_COPY: Record<ReturnsView, [string, string]> = Object.fromEntries(
@@ -346,7 +352,7 @@ export function MomentumPerformanceCard({
               {formatDuration(runInfo.durationMs)}
               {runInfo.fresh ? ' · recomputed from scratch' : ''}
               {runInfo.savedAs ? ` · saved as ${runInfo.savedAs}` : ''}
-              <InfoTooltip text="Every run recomputes the backtest for exactly the settings shown. A run that finishes in a second or two just means the server already had this strategy's price data and rankings cached — the numbers are still fresh for these settings. To drop the caches and recompute everything anyway, use the ↻ icon beside Strategy settings." />
+              <InfoTooltip text="Every run recomputes the backtest for exactly the settings shown. A run that finishes in a second or two just means the server already had this strategy's price data and rankings cached — the numbers are still fresh for these settings. To drop the caches and recompute everything anyway, use Re-run fresh beside the Run button." />
             </p>
           ) : null}
         </div>
@@ -456,7 +462,10 @@ export function MomentumResultDetails({
                   csvName="momentum-yearly"
                 />
               ) : (
-                <MomentumMonthlyHeatmap series={result.series} />
+                <MomentumMonthlyHeatmap
+                  series={result.series}
+                  benchmarkName={result.benchmark_name}
+                />
               )}
             </ResultSection>
           ) : null}
@@ -467,28 +476,7 @@ export function MomentumResultDetails({
                 title={`Signals · ${formatDay(result.latest.week)}`}
                 description={result.latest.explain}
               >
-                <Table>
-                  <THead>
-                    <Th>Rank</Th>
-                    <Th>Asset</Th>
-                    <Th>Action</Th>
-                    <Th>Why</Th>
-                    <Th>Score</Th>
-                    <Th>Held</Th>
-                  </THead>
-                  <tbody>
-                    {signalRows.map((row) => (
-                      <TRow key={row.asset}>
-                        <Td numeric>{format(row.rank)}</Td>
-                        <Td>{row.asset}</Td>
-                        <Td>{row.action || EMPTY}</Td>
-                        <Td className="text-muted">{row.reason}</Td>
-                        <Td numeric>{format(row.score)}</Td>
-                        <Td>{row.held ? 'Yes' : 'No'}</Td>
-                      </TRow>
-                    ))}
-                  </tbody>
-                </Table>
+                <SignalsTable rows={signalRows} />
               </ResultSection>
               {result.held_categories?.length ? (
                 <ResultSection
