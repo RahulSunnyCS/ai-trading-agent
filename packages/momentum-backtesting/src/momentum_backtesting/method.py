@@ -196,3 +196,106 @@ def excess_log_returns(curves: pd.DataFrame, benchmark: pd.Series) -> pd.DataFra
     bench = benchmark.reindex(frame.index).ffill()
     returns = np.log(frame.astype("float64")).diff().iloc[1:]
     return returns.sub(np.log(bench).diff().iloc[1:], axis=0)
+
+
+# --- a fair random baseline --------------------------------------------------------------------
+
+PLACEBO_HOLD_WEEKS = 13
+PLACEBO_PASS_PTS = 0.05  # bl010_criteria.json: phase_4_method.placebo.by_pts
+
+
+def persistent_random_ranks(
+    ranks: pd.DataFrame, seed: int, hold: int = PLACEBO_HOLD_WEEKS
+) -> pd.DataFrame:
+    """Random ranks that last: every `hold` weeks each name draws a new random score, and each
+    week the names that have a real rank are ranked by it.
+
+    The first placebo reshuffled every week, so it traded 6 to 34 times a year against 1 to 3
+    for the real configs and lost mostly to costs (finding F7). Momentum ranks move slowly;
+    a fair "no skill" baseline has to move slowly too, or the comparison is about turnover."""
+    rng = np.random.default_rng(seed)
+    present = ranks.notna().to_numpy()
+    out = np.full(present.shape, np.nan)
+    score = rng.random(present.shape[1])
+    for i in range(len(ranks)):
+        if i % hold == 0:
+            score = rng.random(present.shape[1])
+        names = np.flatnonzero(present[i])
+        out[i, names[np.argsort(score[names], kind="stable")]] = np.arange(1, len(names) + 1)
+    return pd.DataFrame(out, index=ranks.index, columns=ranks.columns)
+
+
+def fair_placebo(
+    space_path: Path,
+    results_dir: Path,
+    picks: dict[str, str],
+    out: Path,
+    *,
+    seeds: int = 100,
+    echo=print,
+) -> None:
+    """Each picked config on the real ranks (seed -1) and on `seeds` persistent random ones.
+    One line per run in `out`, with turnover, so the two can be seen to trade alike. Resumable."""
+    import dataclasses
+
+    from .engine import IDLE
+
+    space = search.load_space(space_path)
+    records = bias.load_records(results_dir, set(picks.values()))
+    runner = bias.Runner(space)
+    done = set()
+    if out.exists():
+        done = {(r["id"], r["seed"]) for r in map(json.loads, out.read_text().splitlines())}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    for label, run_id in picks.items():
+        rec = records[run_id]
+        base = runner.base(rec["heavy"])
+        locks = None
+        for seed in range(-1, seeds):
+            if (run_id, seed) in done:
+                continue
+            used = base
+            if seed >= 0:
+                fake = persistent_random_ranks(base.global_ranks, seed)
+                used = dataclasses.replace(base, global_ranks=fake)
+            # stock_tilt re-orders picks by real momentum, which would let skill back in.
+            outcome, ranking = runner.run(
+                used, rec["heavy"], rec["light"], locks=locks, stock_tilt=0.0
+            )
+            locks = locks or runner.locks(ranking)
+            metric = search.run_metrics(outcome.result, IDLE)
+            row = {"label": label, "id": run_id, "seed": seed}
+            row.update({k: metric[k] for k in ("cagr", "mdd", "turnover_x")})
+            with out.open("a") as sink:
+                sink.write(json.dumps(row) + "\n")
+            if seed < 0 or seed % 25 == 24:
+                shown = f"CAGR {metric['cagr']:.3f}, turnover {metric['turnover_x']:.1f}"
+                echo(f"{label} seed {seed}: {shown}")
+
+
+def placebo_summary(out: Path) -> dict[str, dict]:
+    rows: dict[str, dict] = {}
+    for row in map(json.loads, out.read_text().splitlines()):
+        entry = rows.setdefault(row["label"], {"real": None, "fake": []})
+        if row["seed"] < 0:
+            entry["real"] = row
+        else:
+            entry["fake"].append(row)
+    result = {}
+    for label, entry in rows.items():
+        if entry["real"] is None or not entry["fake"]:
+            continue
+        cagrs = sorted(r["cagr"] for r in entry["fake"])
+        p95 = cagrs[min(len(cagrs) - 1, int(0.95 * len(cagrs)))]
+        turnover = sorted(r["turnover_x"] for r in entry["fake"])
+        result[label] = {
+            "real": entry["real"]["cagr"],
+            "real_turnover": entry["real"]["turnover_x"],
+            "seeds": len(cagrs),
+            "placebo_median": cagrs[len(cagrs) // 2],
+            "placebo_p95": p95,
+            "placebo_turnover_median": turnover[len(turnover) // 2],
+            "margin_over_p95": entry["real"]["cagr"] - p95,
+            "passes": entry["real"]["cagr"] - p95 >= PLACEBO_PASS_PTS,
+        }
+    return result

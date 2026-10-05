@@ -1363,6 +1363,34 @@ def search_score(
     )
 
 
+@search_app.command("fair-placebo")
+def search_fair_placebo(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    picks: Path = typer.Option(..., "--picks", help='Runs to test: JSON {"label": "run id"}.'),
+    seeds: int = typer.Option(100, help="Random rankings per config."),
+    dest: Path = typer.Option(None, "--dest", help="Output (default <out>/fair_placebo.jsonl)."),
+) -> None:
+    """Each config against random rankings that change only every 13 weeks, so the baseline
+    trades about as often as the real thing (BL-010 Phase 4). The config's own stock tilt is
+    switched off in both, since it would re-order random picks by real momentum. Resumable."""
+    import json as _json
+
+    from . import method
+
+    dest = dest or out / "fair_placebo.jsonl"
+    method.fair_placebo(
+        space, out, _json.loads(picks.read_text()), dest, seeds=seeds, echo=typer.echo
+    )
+    for label, row in method.placebo_summary(dest).items():
+        typer.echo(
+            f"{label}: real {row['real']:.1%} (turnover {row['real_turnover']:.1f}x); random "
+            f"median {row['placebo_median']:.1%}, 95th percentile {row['placebo_p95']:.1%} "
+            f"(turnover {row['placebo_turnover_median']:.1f}x); margin "
+            f"{row['margin_over_p95'] * 100:+.1f} pts, {'passes' if row['passes'] else 'fails'}"
+        )
+
+
 @search_app.command("analyze")
 def search_analyze(
     out: Path = typer.Argument(..., help="A results folder from `mbt search run`."),

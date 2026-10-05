@@ -96,3 +96,24 @@ def test_excess_log_returns_are_measured_against_the_benchmark():
     excess = method.excess_log_returns(curves, bench)
     assert np.allclose(excess["a"], 0.0)  # grew exactly with the benchmark
     assert np.allclose(excess["b"], -np.log(1.1))
+
+
+def test_persistent_random_ranks_change_only_when_the_hold_ends():
+    import numpy as np
+    import pandas as pd
+
+    from momentum_backtesting import method
+
+    weeks = pd.date_range("2021-01-01", periods=30, freq="W-FRI")
+    real = pd.DataFrame(
+        np.tile(np.arange(1.0, 9.0), (30, 1)), index=weeks, columns=list("abcdefgh")
+    )
+    real.iloc[10:, 0] = np.nan  # a name that stops being ranked
+    fake = method.persistent_random_ranks(real, seed=5, hold=13)
+    assert fake.isna().equals(real.isna())
+    assert (fake.iloc[0:10].nunique() == 1).all()  # same order all through the first hold
+    for i in range(30):
+        ranked = fake.iloc[i].dropna()
+        assert sorted(ranked) == list(range(1, len(ranked) + 1))
+    assert not fake.iloc[12].equals(fake.iloc[13])  # a new draw at week 13
+    assert fake.equals(method.persistent_random_ranks(real, seed=5, hold=13))
