@@ -2,7 +2,7 @@ import type { Config } from 'tailwindcss';
 
 /**
  * Token-driven Tailwind theme. Colors reference the CSS variables defined in
- * src/frontend/index.css (HSL channels + <alpha-value> so opacity modifiers
+ * src/index.css (HSL channels + <alpha-value> so opacity modifiers
  * like bg-warning/15 work). Dark mode is class-based: the theme store toggles
  * `.dark` on <html>.
  */
@@ -35,9 +35,16 @@ export default {
         warning: 'hsl(var(--warning) / <alpha-value>)',
         info: 'hsl(var(--info) / <alpha-value>)',
         accent: 'hsl(var(--accent) / <alpha-value>)',
+        series: {
+          1: 'hsl(var(--series-1) / <alpha-value>)',
+          2: 'hsl(var(--series-2) / <alpha-value>)',
+          3: 'hsl(var(--series-3) / <alpha-value>)',
+          4: 'hsl(var(--series-4) / <alpha-value>)',
+        },
       },
       fontFamily: {
         sans: [
+          'var(--font-sans)',
           'ui-sans-serif',
           'system-ui',
           '-apple-system',
@@ -47,8 +54,8 @@ export default {
           'Arial',
           'sans-serif',
         ],
-        serif: ['ui-serif', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
         mono: [
+          'var(--font-mono)',
           'ui-monospace',
           'SFMono-Regular',
           'Menlo',
@@ -63,8 +70,8 @@ export default {
         '2xl': 'calc(var(--radius) + 0.5rem)',
       },
       boxShadow: {
-        card: '0 1px 2px rgb(40 33 28 / 0.04), 0 1px 3px rgb(40 33 28 / 0.06)',
-        elevated: '0 6px 20px -4px rgb(40 33 28 / 0.12), 0 2px 6px rgb(40 33 28 / 0.06)',
+        card: '0 1px 2px rgb(10 12 16 / 0.05), 0 1px 3px rgb(10 12 16 / 0.07)',
+        elevated: '0 8px 24px -4px rgb(10 12 16 / 0.22), 0 2px 6px rgb(10 12 16 / 0.1)',
       },
       keyframes: {
         'fade-in': {

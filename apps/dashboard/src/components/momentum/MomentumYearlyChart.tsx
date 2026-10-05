@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 
-import { getChartTheme } from '../../lib/chartTheme';
+import { getChartTheme, plotlyChrome } from '../../lib/chartTheme';
 import { useThemeStore } from '../../store/theme';
 
 type PlotlyBasic = typeof import('plotly.js-basic-dist-min').default;
@@ -62,7 +62,7 @@ export function MomentumYearlyChart({
         margin: { l: 50, r: 18, t: 10, b: 30 },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
-        font: { color: colors.text, size: 12 },
+        ...plotlyChrome(colors),
         barmode: 'group',
         bargap: 0.25,
         legend: { orientation: 'h', y: 1.1, x: 0 },

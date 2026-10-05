@@ -390,6 +390,9 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`
 - **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `apps/server/src/types/fyers-api-v3.d.ts` covers the SDK surface we use
 - **No default exports:** Use named exports throughout
+- **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
+  the chart palette helpers (`lib/chartTheme.ts`) and the font setup (`next/font`, IBM Plex
+  Sans / Mono) are in `docs/dashboard-design-tokens.md`
 - **Dashboard data fetching goes through `usePolledResource<T>`**
   (`apps/dashboard/src/hooks/usePolledResource.ts`) — never hand-roll another
   AbortController + in-flight-guard fetch loop. It existed independently in

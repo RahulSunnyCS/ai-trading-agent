@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { getChartTheme } from '../../lib/chartTheme';
+import { getChartTheme, getSeriesPalette, pickSeries, plotlyChrome } from '../../lib/chartTheme';
 import { useThemeStore } from '../../store/theme';
 import type {
   MomentumComparison,
@@ -165,6 +165,7 @@ export function MomentumEquityChart({
       if (!mounted || !element) return;
       plotly = loaded.default;
       const colors = getChartTheme(theme);
+      const palette = getSeriesPalette(theme);
       const traces: Array<Record<string, unknown>> = [
         {
           x: series.dates,
@@ -201,7 +202,7 @@ export function MomentumEquityChart({
           name: line.name,
           type: 'scatter',
           mode: 'lines',
-          line: { color: index === 0 ? colors.info : colors.warning, width: 1.3, dash: 'dashdot' },
+          line: { color: pickSeries(palette, index), width: 1.3, dash: 'dashdot' },
           hoverinfo: 'none',
         })),
         {
@@ -230,7 +231,8 @@ export function MomentumEquityChart({
           type: 'scatter',
           mode: 'lines',
           line: {
-            color: index % 2 === 0 ? colors.positive : colors.negative,
+            // Offset from the comparison lines above so an overlay and a comparison differ.
+            color: pickSeries(palette, index + comparisons.length),
             width: 1.5,
             dash: 'dash',
           },
@@ -279,7 +281,7 @@ export function MomentumEquityChart({
         margin: { l: 66, r: 18, t: 32, b: 36 },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
-        font: { color: colors.text, size: 12 },
+        ...plotlyChrome(colors),
         hovermode: 'x unified',
         dragmode: 'pan',
         uirevision: `${logScale}`,

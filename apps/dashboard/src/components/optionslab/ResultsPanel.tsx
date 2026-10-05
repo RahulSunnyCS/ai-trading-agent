@@ -21,6 +21,7 @@ import {
   useLegwiseStrategies,
 } from '../../hooks/useLegwise';
 import { apiPost } from '../../lib/api';
+import { seriesCssColor } from '../../lib/chartTheme';
 import { formatPnl } from '../../lib/format';
 import type { PnlDay } from '../../lib/legwiseJoin';
 import { lotsOf, statsOf } from '../../lib/legwiseStats';
@@ -34,7 +35,7 @@ import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { DayForensics } from './DayForensics';
 import { DayTypeCard } from './DayTypeCard';
 import { SegmentChips } from './anatomy';
-import { CumulativeLines, Field, SERIES_COLORS, TextInput, TradeLog, pnlClass } from './shared';
+import { CumulativeLines, Field, TextInput, TradeLog, pnlClass } from './shared';
 
 /** Cell shading by |₹ per lot| relative to the biggest cell: 3 literal buckets so
  * Tailwind's JIT sees every class name. */
@@ -233,7 +234,7 @@ export function ResultsPanel() {
                     <span className="flex items-center gap-1.5 normal-case tracking-normal">
                       <span
                         className="inline-block h-2 w-2 rounded-full"
-                        style={{ background: SERIES_COLORS[i % SERIES_COLORS.length] }}
+                        style={{ background: seriesCssColor(i) }}
                       />
                       {s.id}
                     </span>

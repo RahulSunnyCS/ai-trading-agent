@@ -7,14 +7,12 @@ import { createChart } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { type ReactNode, useEffect, useRef } from 'react';
 
-import { getChartTheme } from '../../lib/chartTheme';
+import { getChartTheme, getSeriesPalette, pickSeries } from '../../lib/chartTheme';
 import { formatPnl } from '../../lib/format';
 import type { StrategyStats } from '../../lib/legwiseStats';
 import { useThemeStore } from '../../store/theme';
 import type { TradeRow } from '../../types/legwise';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
-
-export const SERIES_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export function pnlClass(value: number): string {
   if (value > 0) return 'text-positive';
@@ -37,7 +35,7 @@ export function CumulativeLines({
     const chart = createChart(container, {
       width: container.clientWidth,
       height: 260,
-      layout: { background: { color: 'transparent' }, textColor: '#888' },
+      layout: { background: { color: 'transparent' } },
       timeScale: { rightOffset: 1 },
     });
     chartRef.current = chart;
@@ -58,7 +56,7 @@ export function CumulativeLines({
     if (chart === null) return;
     const t = getChartTheme(theme);
     chart.applyOptions({
-      layout: { background: { color: 'transparent' }, textColor: t.text },
+      layout: { background: { color: 'transparent' }, textColor: t.text, fontFamily: t.fontFamily },
       grid: { vertLines: { color: t.grid }, horzLines: { color: t.grid } },
       rightPriceScale: { borderColor: t.border },
       timeScale: { borderColor: t.border },
@@ -69,9 +67,10 @@ export function CumulativeLines({
     const chart = chartRef.current;
     if (chart === null) return;
     for (const s of seriesRef.current) chart.removeSeries(s);
+    const palette = getSeriesPalette(theme);
     seriesRef.current = lines.map((line, i) => {
       const series = chart.addLineSeries({
-        color: SERIES_COLORS[i % SERIES_COLORS.length] ?? '#3b82f6',
+        color: pickSeries(palette, i),
         lineWidth: 2,
         title: line.id,
         priceLineVisible: false,
@@ -80,7 +79,7 @@ export function CumulativeLines({
       return series;
     });
     chart.timeScale().fitContent();
-  }, [lines]);
+  }, [lines, theme]);
 
   return <div ref={containerRef} className="w-full" style={{ minHeight: 260 }} />;
 }

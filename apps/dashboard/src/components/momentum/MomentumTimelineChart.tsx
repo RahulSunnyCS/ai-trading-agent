@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 
-import { getChartTheme } from '../../lib/chartTheme';
+import { getChartTheme, plotlyChrome } from '../../lib/chartTheme';
 import { useThemeStore } from '../../store/theme';
 import { ResultSection } from './ResultSection';
 
@@ -69,7 +69,7 @@ export function MomentumTimelineChart({ rows }: { rows: Array<Record<string, unk
         margin: { l: 110, r: 18, t: 10, b: 30 },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
-        font: { color: colors.text, size: 11 },
+        ...plotlyChrome(colors, 11),
         showlegend: false,
         xaxis: { type: 'date', gridcolor: colors.grid },
         yaxis: {
