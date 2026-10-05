@@ -182,7 +182,7 @@ class Market:
                 ).fetchall()
             )
             rows = con.execute(
-                f"SELECT instrument_id, date, open, close, turnover, "
+                f"SELECT instrument_id, CAST(date AS DATE), open, close, turnover, "
                 f"coalesce(synthetic_close, false) FROM {bars_sql} "
                 "WHERE instrument_id IN (SELECT unnest(?)) ORDER BY instrument_id, date",
                 [sorted(ids)],
@@ -199,7 +199,7 @@ class Market:
                 "ORDER BY instrument, kind, date",
                 [sorted(series_names)],
             ).fetchall()
-            last_bar = con.execute(f"SELECT max(date) FROM {bars_sql}").fetchone()[0]
+            last_bar = con.execute(f"SELECT CAST(max(date) AS DATE) FROM {bars_sql}").fetchone()[0]
         finally:
             con.close()
 

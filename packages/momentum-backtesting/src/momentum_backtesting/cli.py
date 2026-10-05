@@ -1312,6 +1312,158 @@ def _categories_curated_dir() -> Path:
     return Path(__file__).parent / "categories" / "curated"
 
 
+audit_app = typer.Typer(
+    no_args_is_help=True,
+    help="Check a backtest against raw exchange data (BL-010): bundle a run's orders and "
+    "claims, replay them independently, and study the replayed run.",
+)
+app.add_typer(audit_app, name="audit")
+
+
+def _audit_runs(bundles: list[Path]) -> dict:
+    """label__variant -> (bundle, market data, reconciling replay)."""
+    import json as _json
+
+    from .audit import replay as rp
+
+    runs = {}
+    for path in bundles:
+        bundle = _json.loads(path.read_text())
+        market = rp.market_for(bundle)
+        runs[f"{bundle['label']}__{bundle['variant']}"] = (
+            bundle,
+            market,
+            rp.replay(bundle, market),
+        )
+    return runs
+
+
+@audit_app.command("bundle")
+def audit_bundle(
+    space: Path = typer.Argument(..., help="The search-space TOML the runs came from."),
+    results: Path = typer.Argument(..., help="That search's results folder."),
+    picks: Path = typer.Option(..., "--picks", help='JSON file: {"label": "run id", ...}.'),
+    out: Path = typer.Option(None, "--out", help="Where to write (default data/audit/bundles)."),
+    variant: str = typer.Option("as_searched", help="A name for this set of settings."),
+    tax: bool = typer.Option(False, "--tax", help="Tax each sale (tax.TaxRules defaults)."),
+    capital: float = typer.Option(None, help="Starting capital in rupees, not the space's."),
+    signal_delay: int = typer.Option(None, help="Weeks from signal to trade, not the space's."),
+) -> None:
+    """Re-run stored search configs on the current code and write one audit bundle each: the
+    run's orders, and what the backtest claims came of them."""
+    import json as _json
+
+    from .audit import bundle as bundle_mod
+    from .tax import TaxRules
+
+    override = {}
+    if capital is not None:
+        override["capital"] = capital
+    if signal_delay is not None:
+        override["signal_delay"] = signal_delay
+    bundle_mod.bundle_search_runs(
+        space,
+        results,
+        _json.loads(picks.read_text()),
+        out or DATA_DIR / "audit" / "bundles",
+        variant=variant,
+        tax=TaxRules() if tax else None,
+        echo=typer.echo,
+        **override,
+    )
+
+
+@audit_app.command("replay")
+def audit_replay(
+    bundles: list[Path] = typer.Argument(..., help="Bundle files from `mbt audit bundle`."),
+    out: Path = typer.Option(None, "--out", help="Also save each report as JSON here."),
+) -> None:
+    """Rebuild each bundle's result from its orders and the raw daily bars, and compare it with
+    what the backtest claimed. Exits 1 if any check fails."""
+    import json as _json
+
+    from .audit import replay as rp
+
+    reports = [rp.run(path) for path in bundles]
+    typer.echo("\n\n".join(rp.render(report) for report in reports))
+    if out is not None:
+        out.mkdir(parents=True, exist_ok=True)
+        for report in reports:
+            name = f"{report['label']}__{report['variant']}.json"
+            (out / name).write_text(_json.dumps(report, indent=1, default=str))
+    if not all(report["passed"] for report in reports):
+        raise typer.Exit(1)
+
+
+@audit_app.command("study")
+def audit_study(
+    bundles: list[Path] = typer.Argument(..., help="Bundle files from `mbt audit bundle`."),
+    what: str = typer.Option(
+        "all", help="contribution | jumps | realism | monday-open | all (comma-separated)."
+    ),
+    out: Path = typer.Option(None, "--out", help="Save each result as JSON here."),
+    actions: Path = typer.Option(
+        None, "--actions", help="Cached NSE corporate-action filings (ca_<year>.json files)."
+    ),
+) -> None:
+    """Questions about a replayed run, answered from raw data: where the profit came from,
+    which held days could be data artefacts, whether a real account could have placed the
+    orders, and what filling at the next open instead of the close costs."""
+    import json as _json
+
+    from .audit import studies as st
+
+    names = list(st.STUDIES) if what == "all" else [name.strip() for name in what.split(",")]
+    unknown = sorted(set(names) - set(st.STUDIES))
+    if unknown:
+        raise typer.BadParameter(f"unknown study {unknown}; choose from {sorted(st.STUDIES)}")
+    feed = None
+    if "jumps" in names:
+        feed = st.load_action_feed(actions or DATA_DIR / "stocks" / "raw" / "corporate_actions")
+    for key, (bundle, market, mine) in _audit_runs(bundles).items():
+        for name in names:
+            result = st.STUDIES[name](bundle, market, mine, feed)
+            typer.echo(f"{key} {name}: {st.headline(name, result)}")
+            if out is not None:
+                out.mkdir(parents=True, exist_ok=True)
+                (out / f"{key}__{name}.json").write_text(_json.dumps(result, indent=1, default=str))
+
+
+@audit_app.command("outside")
+def audit_outside(
+    bundles: list[Path] = typer.Argument(..., help="Bundle files (one variant of each run)."),
+    primary: str = typer.Option(..., help="The run whose five largest contributors are checked."),
+    also: list[str] = typer.Option(
+        [], help="Another holding to check, as run:instrument:YYYY-MM-DD:why."
+    ),
+    day: list[str] = typer.Option([], help="A single day's move to check, as SYMBOL:YYYY-MM-DD."),
+    out: Path = typer.Option(..., "--out", help="Folder for the worksheet (JSON and Markdown)."),
+    actions: Path = typer.Option(None, "--actions", help="Cached NSE corporate-action filings."),
+) -> None:
+    """Check ten holdings, picked by rule before any outside price is fetched, against Yahoo
+    Finance's daily history. Needs the network."""
+    import json as _json
+
+    from .audit import outside as ou
+    from .audit import studies as st
+
+    runs = {key.split("__")[0]: run for key, run in _audit_runs(bundles).items()}
+    feed = st.load_action_feed(actions or DATA_DIR / "stocks" / "raw" / "corporate_actions")
+    extra = []
+    for item in also:
+        run, name, when, why = item.split(":", 3)
+        extra.append((run, name, date.fromisoformat(when), why))
+    picked = ou.pick_sample(runs, feed, primary, extra)
+    days = [(d.split(":")[0], date.fromisoformat(d.split(":")[1])) for d in day]
+    checked = ou.check_sample(picked, runs, days)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "outside_check.json").write_text(_json.dumps(checked, indent=1, default=str))
+    (out / "outside_check.md").write_text(ou.worksheet(checked) + "\n")
+    typer.echo(ou.worksheet(checked))
+    passed = sum(h["check"]["passed"] for h in checked["holdings"])
+    typer.echo(f"\n{passed} of {len(checked['holdings'])} holdings pass")
+
+
 @categories_app.command("fetch")
 def categories_fetch(
     from_year: int = typer.Option(
