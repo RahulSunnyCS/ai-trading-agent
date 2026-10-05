@@ -179,9 +179,21 @@ and filed splits and bonuses were checked against the adjustment factors.
 - Demergers, rights issues and schemes inside holdings (four, all in one median run) move value
   the price series cannot follow.
 
-### Step 4 — look-ahead truncation test: not run
+### Step 4 — look-ahead truncation test: pass (18 of 18)
 
-Waits for BL-001's harness, as agreed.
+Each of the six configs stopped at 2019-06-28, 2021-06-25 and 2024-03-28, twice: on the full
+database, and on a copy holding nothing after that date (`audit/truncate.py`). Orders and the
+equity curve are identical in all 18 pairs. BL-001's `tests/golden/test_lookahead.py` does the
+same on frozen data for all four datasets and fails on a planted `shift(-1)`.
+
+It cannot see hindsight stored without a date: today's index list and the category tags
+(findings F1 to F3, Phase 3).
+
+```bash
+uv run mbt audit lookahead search_spaces/round7_A.toml data/search/round7_A \
+  --picks search_spaces/bl010_phase2_picks.json \
+  --cut 2019-06-28 --cut 2021-06-25 --cut 2024-03-28
+```
 
 ### Step 5 — where the profit came from: flag trips in five of six runs
 

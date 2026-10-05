@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0 and 1a done; Phase 1b and Phase 2 step 4 wait on BL-001's harness; Phase 2's other steps done) |
+| **Status** | In progress (Phases 0, 1a and 2 done; Phase 1b's 12-week check and engine fixes E10–E13 are next; then Phase 3) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -389,4 +389,7 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   every flagged day is real. Step 5's flag trips in five runs (CUPID). Step 6 is fine at
   ₹5 lakh. Step 7's flag trips. New findings E10–E13, F9a, F17, F18 above. Step 4 and every
   engine fix wait for BL-001's harness. The owner's spot-check of two or three holdings is open.
-
+- 2026-10-06 — Phase 2 step 4 passes: six configs at three cut dates give the same orders and
+  equity on the full database and on a copy cut off at that date (`mbt audit lookahead`).
+  Phase 2 is done: steps 1 and 4 pass; step 2 fails on PFC's missed bonus; the flags of steps
+  3, 5, 6 and 7 are recorded above.
