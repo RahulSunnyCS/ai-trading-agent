@@ -408,3 +408,42 @@ export function diffConfigs(
   }
   return lines;
 }
+
+/**
+ * Why a result's CAGR should not be read as an expected return, for the datasets whose history
+ * uses hindsight (BL-010: today's stock list for every year, categories built from 2026
+ * themes). Null for datasets without a known leak (ETF Rotation, the survivorship-free Nifty
+ * 50 stock set). `realismOff` names the Broad realism switches this run left off.
+ */
+export interface HindsightWarning {
+  headline: string;
+  detail: string;
+  realismOff: string[];
+}
+
+export function hindsightWarning(config: Record<string, unknown>): HindsightWarning | null {
+  const dataset = config.dataset;
+  if (dataset === 'broad') {
+    const realismOff = [
+      config.broad_respect_circuits === true ? null : 'circuit locks',
+      config.broad_liquidity_filter === true || config.broad_universe === 'all_liquid'
+        ? null
+        : 'the tradability filter',
+    ].filter((item): item is string => item !== null);
+    return {
+      headline: 'Treat this CAGR as an upper bound, not an expected return.',
+      detail:
+        "Every year since 2017 uses today's stock list, so most stocks that later fell out or were delisted are missing, and the categories come from 2026 themes. Real returns are likely well below this until BL-010 re-measures it point-in-time.",
+      realismOff,
+    };
+  }
+  if (dataset === 'custom_index') {
+    return {
+      headline: 'Treat this CAGR as an upper bound, not an expected return.',
+      detail:
+        "The categories and their member stocks come from 2026 themes and today's lists, so earlier years benefit from hindsight (BL-010).",
+      realismOff: [],
+    };
+  }
+  return null;
+}

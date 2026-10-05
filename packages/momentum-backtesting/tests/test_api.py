@@ -899,6 +899,9 @@ def test_broad_meta_reports_no_instrument_picker_and_broad_defaults(broad_client
     assert meta["defaults"]["broad_category_mode"] == "on"
     assert meta["defaults"]["broad_pool_top_n"] > 0
     assert meta["defaults"]["broad_category_top_n"] <= meta["defaults"]["broad_category_exit_rank"]
+    # A new Broad run starts realistic: tradability gate and circuit-lock fills on (BL-010).
+    assert meta["defaults"]["broad_liquidity_filter"] is True
+    assert meta["defaults"]["broad_respect_circuits"] is True
 
 
 def test_broad_meta_membership_warning_follows_file_provenance(broad_client, tmp_path):
