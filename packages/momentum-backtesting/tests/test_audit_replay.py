@@ -333,6 +333,7 @@ def test_contribution_adds_up_to_the_whole_return(small_market):
     profile = studies.contribution(made, mine)
     assert sum(profile["by_calendar_year"].values()) == pytest.approx(1.0)
     assert sum(profile["by_financial_year"].values()) == pytest.approx(1.0)
+    assert sum(profile["by_category"].values()) == pytest.approx(1.0)
     last = max(mine.equity)
     assert profile["total_log_return"] == pytest.approx(math.log(mine.equity[last]))
 

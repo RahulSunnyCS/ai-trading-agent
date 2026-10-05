@@ -78,6 +78,13 @@ def asset_definitions(
     return out
 
 
+def _category(categories: pd.DataFrame | None, week: Any, asset: str) -> str | None:
+    if categories is None or asset not in categories.columns or week not in categories.index:
+        return None
+    label = categories.at[week, asset]
+    return label if isinstance(label, str) else None
+
+
 def _provenance() -> dict:
     package = Path(__file__).resolve().parents[3]
 
@@ -104,9 +111,11 @@ def build_bundle(
     run_id: str,
     variant: str,
     params: dict | None = None,
+    categories: pd.DataFrame | None = None,
 ) -> dict:
     """One run as a bundle. `prices` is the weekly table the backtest filled and valued at
-    (it goes into the claims, never to the replay's own pricing)."""
+    (it goes into the claims, never to the replay's own pricing). `categories` (fill week x
+    instrument) is the category each stock was picked through, for the profit breakdown."""
     config = result.config
     weeks = list(result.equity.index)
     trades = result.trades
@@ -135,6 +144,7 @@ def build_bundle(
                 "cost": _number(row.get("cost")),
                 "tax": _number(row.get("tax")),
                 "reason": row.get("reason"),
+                "category": _category(categories, row["week"], row["asset"]),
             }
         )
 
@@ -219,6 +229,9 @@ def bundle_search_runs(
         outcome, ranking = runner.run(base, rec["heavy"], rec["light"], tax=tax, **override)
         prices = ranking.prices.ffill()
         prices[CASH] = runner.common["outer_prices"].reindex(prices.index)[CASH]
+        groups = outcome.effective.groups
+        if groups is not None:  # labelled by signal week; an order fills `signal_delay` later
+            groups = groups.reindex(prices.index).shift(outcome.result.config.signal_delay)
         bundle = build_bundle(
             outcome.result,
             prices=prices,
@@ -235,6 +248,7 @@ def bundle_search_runs(
                 "override": {k: v for k, v in override.items()},
                 "stored_metrics": rec.get("metrics"),
             },
+            categories=groups,
         )
         path = out_dir / f"{label}__{variant}.json"
         path.write_text(json.dumps(bundle, indent=1, default=str))

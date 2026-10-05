@@ -117,7 +117,16 @@ def contribution(bundle: dict, reconciled: Replayed) -> dict:
     rupees: dict[str, float] = {}
     by_year: dict[int, float] = {}
     by_fy: dict[str, float] = {}
+    # The category a holding was opened through, as the backtest labelled its first buy.
+    by_category: dict[str, float] = {}
+    category_of: dict[str, str] = {}
+    opened: dict[date, list[tuple[str, str]]] = {}
+    for fill in reconciled.fills:
+        label = bundle["claims"]["fills"][fill.index].get("category")
+        if fill.action in BUYS and fill.held_before <= 0 and label:
+            opened.setdefault(fill.week, []).append((fill.asset, label))
     for before, week in zip(weeks, weeks[1:], strict=False):
+        category_of.update(dict(opened.get(before, [])))
         start, end = reconciled.equity[before], reconciled.equity[week]
         change = end / start - 1
         log_return = math.log(end / start)
@@ -126,6 +135,8 @@ def contribution(bundle: dict, reconciled: Replayed) -> dict:
             company = symbol_of(bundle, name)
             by_company[company] = by_company.get(company, 0.0) + pnl * scale
             rupees[company] = rupees.get(company, 0.0) + pnl
+            category = category_of.get(name, "(none recorded)")
+            by_category[category] = by_category.get(category, 0.0) + pnl * scale
         by_year[week.year] = by_year.get(week.year, 0.0) + log_return
         fy_start = week.year if week.month >= 4 else week.year - 1
         label = f"FY{fy_start}-{(fy_start + 1) % 100:02d}"
@@ -160,6 +171,9 @@ def contribution(bundle: dict, reconciled: Replayed) -> dict:
         "companies_traded": len(by_company),
         "by_calendar_year": {str(y): by_year[y] / total for y in sorted(by_year)},
         "by_financial_year": {y: by_fy[y] / total for y in sorted(by_fy)},
+        "by_category": {
+            c: by_category[c] / total for c in sorted(by_category, key=lambda c: -by_category[c])
+        },
         "largest_year": {"year": top_year, "share": by_year[top_year] / total},
         "largest_financial_year": {"year": top_fy, "share": by_fy[top_fy] / total},
         "flags": {
