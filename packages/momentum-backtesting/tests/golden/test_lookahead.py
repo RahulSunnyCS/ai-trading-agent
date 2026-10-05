@@ -33,15 +33,11 @@ NOT_COMPARED = {
 
 
 def _comparable(value):
-    """`value` without the fields above, and with each week's holdings in name order: they are
-    listed by weight, and equal weights tie-break on float noise."""
+    """`value` without the fields above."""
     if isinstance(value, dict):
         return {k: _comparable(v) for k, v in value.items() if k not in NOT_COMPARED}
     if isinstance(value, list):
-        items = [_comparable(v) for v in value]
-        if items and all(isinstance(i, dict) and set(i) == {"asset", "share"} for i in items):
-            items.sort(key=lambda i: i["asset"])
-        return items
+        return [_comparable(v) for v in value]
     return value
 
 

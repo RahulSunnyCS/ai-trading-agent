@@ -30,11 +30,17 @@ VOLATILE_KEYS = frozenset({"elapsed_ms", "computed_at", "cache", "provenance"})
 
 
 def normalise(value):
-    """Floats to 10 significant digits (NaN and infinities as text), volatile keys dropped."""
+    """Floats to 10 significant digits (NaN and infinities as text), volatile keys dropped,
+    each week's holdings in name order."""
     if isinstance(value, dict):
         return {k: normalise(v) for k, v in value.items() if k not in VOLATILE_KEYS}
     if isinstance(value, list):
-        return [normalise(v) for v in value]
+        items = [normalise(v) for v in value]
+        # A week's holdings are listed by weight, and equal weights tie-break on float noise
+        # that differs between machines: list them by name instead.
+        if items and all(isinstance(i, dict) and set(i) == {"asset", "share"} for i in items):
+            items.sort(key=lambda i: i["asset"])
+        return items
     if isinstance(value, float):
         if math.isnan(value) or math.isinf(value):
             return str(value)

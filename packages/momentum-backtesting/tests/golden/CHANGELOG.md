@@ -30,3 +30,26 @@ Custom Index scenario now sets inner_top_n to 3 so the coverage test has a non-d
 | Scenario | CAGR | Max drawdown |
 |---|---|---|
 | custom_index_inner_and_copies | 15.76% -> 16.55% | -25.90% -> -19.37% |
+
+## 2026-10-06 (on top of `e26a479`)
+
+Holdings within a week are now compared in name order: equal weights tie-broke differently on Linux CI. No code or result change.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| etf_default | 24.58% -> 24.58% | -30.51% -> -30.51% |
+| etf_slots_ranked_weighted_delayed | 17.45% -> 17.45% | -31.45% -> -31.45% |
+| etf_filter_taxed_itemised | 15.52% -> 15.52% | -42.00% -> -42.00% |
+| etf_traded_at_monday_open_tilted | 31.34% -> 31.34% | -24.56% -> -24.56% |
+| etf_fortnightly_make_room_sized | 19.81% -> 19.81% | -25.81% -> -25.81% |
+| stock_default | 10.78% -> 10.78% | -28.97% -> -28.97% |
+| stock_voladj_monthly | 13.70% -> 13.70% | -16.00% -> -16.00% |
+| stock_blend_slots | 6.77% -> 6.77% | -29.50% -> -29.50% |
+| custom_index_default | 22.71% -> 22.71% | -29.20% -> -29.20% |
+| custom_index_inner_and_copies | 16.55% -> 16.55% | -19.37% -> -19.37% |
+| broad_default | 18.29% -> 18.29% | -26.72% -> -26.72% |
+| broad_category_mode_off | 37.62% -> 37.62% | -27.73% -> -27.73% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |
+| broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
+| broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
+| broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
