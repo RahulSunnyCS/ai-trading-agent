@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiGet, apiPost } from '../../lib/api';
+import { describeConfig } from '../../lib/momentumConfig';
 import type { MomentumRebalanceResult, MomentumSavedRun } from '../../types/momentum';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
@@ -139,6 +140,10 @@ export function MomentumRebalanceView({
               .map((item) => item.name),
     };
   }, [choice, currentBroadConfig, dataset, meta, selectedRun]);
+  const described = useMemo(
+    () => (config ? describeConfig(config, dataset) : null),
+    [config, dataset],
+  );
   const allocated = holdings.reduce((sum, row) => sum + (Number(row.percent) || 0), 0);
   const cash = 100 - allocated;
 
@@ -236,12 +241,14 @@ export function MomentumRebalanceView({
           </label>
           <p className="text-xs text-muted">Data through {meta?.last_week ?? '—'}</p>
         </div>
-        {config ? (
+        {config && described ? (
           <p className="mt-3 rounded-lg bg-surface-2/50 px-3 py-2 text-xs text-muted">
-            {String(config.start ?? 'Start')} → {String(config.end ?? 'latest')}
-            {' · '}top {String(config.top_n ?? '—')}
-            {' · '}exit after rank {String(config.exit_rank ?? '—')}
-            {' · '}benchmark {String(config.benchmark ?? '—')}
+            {described.period}
+            {' · '}
+            {described.cadence} rebalancing
+            {' · '}
+            {described.selection}
+            {' · '}benchmark {described.benchmark}
           </p>
         ) : null}
         <p className="mt-3 text-xs text-muted">

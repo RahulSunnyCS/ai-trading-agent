@@ -33,6 +33,12 @@ export interface PaperTradesState {
 const POLL_INTERVAL_MS = 10_000;
 
 /**
+ * GET /api/trades returns only the newest 100 trades (no pagination yet), so every
+ * figure derived from this hook covers that window, not all history.
+ */
+export const TRADES_WINDOW_CAPTION = 'Latest 100 trades';
+
+/**
  * Polls /api/trades on a ~10 s interval.
  *
  * State transitions:

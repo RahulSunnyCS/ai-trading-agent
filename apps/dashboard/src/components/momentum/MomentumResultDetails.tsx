@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 
 import { cn } from '../../lib/cn';
 import { downloadCsv } from '../../lib/csv';
+import { describeConfig } from '../../lib/momentumConfig';
 import type { MomentumResult, MomentumSavedRun } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -101,6 +102,7 @@ const PERCENT_KEYS = new Set([
   'strategy',
   'benchmark',
   'vs_benchmark',
+  'cash',
   'return',
 ]);
 
@@ -240,11 +242,7 @@ function assumptionChips(result: MomentumResult, config: Record<string, unknown>
     mon_10am: 'Monday 10:00',
   };
   return [
-    config.rebalance === 'monthly'
-      ? 'Monthly rebalance'
-      : Number(config.rebalance_every ?? 1) > 1
-        ? `Every ${config.rebalance_every} weeks (phase ${Number(config.rebalance_offset ?? 0) + 1})`
-        : 'Weekly rebalance',
+    describeConfig(config, String(dataset)).cadenceChip,
     config.sell_every_week ? 'Exits sold weekly' : null,
     config.portfolio === 'buffer' ? 'Buffer rule' : 'Fixed slots',
     dataset === 'etf' && Number(config.exclude_high_vol ?? 0) > 0

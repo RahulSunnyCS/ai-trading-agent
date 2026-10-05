@@ -10,12 +10,12 @@ import { cn } from '../../lib/cn';
 export type Tone = 'positive' | 'negative' | 'warning' | 'info' | 'accent' | 'neutral' | 'primary';
 
 const TONES: Record<Tone, string> = {
-  positive: 'bg-positive/12 text-positive ring-positive/25',
-  negative: 'bg-negative/12 text-negative ring-negative/25',
-  warning: 'bg-warning/14 text-warning ring-warning/25',
-  info: 'bg-info/12 text-info ring-info/25',
-  accent: 'bg-accent/14 text-accent ring-accent/25',
-  primary: 'bg-primary/12 text-primary ring-primary/25',
+  positive: 'bg-positive/10 text-positive ring-positive/25',
+  negative: 'bg-negative/10 text-negative ring-negative/25',
+  warning: 'bg-warning/15 text-warning ring-warning/25',
+  info: 'bg-info/10 text-info ring-info/25',
+  accent: 'bg-accent/15 text-accent ring-accent/25',
+  primary: 'bg-primary/10 text-primary ring-primary/25',
   neutral: 'bg-surface-2 text-muted ring-border',
 };
 

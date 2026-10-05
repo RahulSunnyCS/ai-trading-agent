@@ -214,13 +214,16 @@ export interface RegimeTag {
  *     JS numbers for INTEGER, not strings)
  *   - gaps_json as string|null (JSON-encoded TEXT column; callers parse if needed)
  */
+/** Every status GET /api/backfill can return (the server folds partial/gapped into these). */
+export type BackfillStatus = 'failed' | 'in_progress' | 'completed';
+
 export interface BackfillRangeRow {
   id: number;
   symbol: string;
   from_ts: string; // ISO-8601 timestamp
   to_ts: string; // ISO-8601 timestamp
   resolution: string; // e.g. '1', '5', '15', 'D'
-  status: string; // normalised by the API to 'failed'|'in_progress'|'completed'
+  status: BackfillStatus;
   rows_written: number; // INTEGER — arrives as JS number
   checkpoint_ts: string | null; // ISO-8601 or null
   gaps_detected: number; // INTEGER — arrives as JS number

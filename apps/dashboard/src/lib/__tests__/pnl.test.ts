@@ -369,17 +369,17 @@ describe('computePnlSummary — cumulative series', () => {
         id: 'c2',
         status: 'closed',
         net_pnl: '50.00',
-        exit_time: '2026-05-20T11:00:00.000Z',
+        exit_time: '2026-05-20T09:00:00.000Z',
       }),
       makeTrade({
         id: 'c1',
         status: 'closed',
         net_pnl: '100.00',
-        exit_time: '2026-05-20T09:00:00.000Z',
+        exit_time: '2026-05-19T09:00:00.000Z',
       }),
     ];
     const summary = computePnlSummary(trades, TODAY_IST);
-    // c1 exits at 09:00, c2 at 11:00 — series must be c1 first.
+    // c1 exits the day before c2 — series must be c1 first.
     expect(summary.cumulativeSeries).toHaveLength(2);
     // First point: just c1's P&L = 100
     expect(summary.cumulativeSeries[0]?.value).toBeCloseTo(100, 5);
@@ -393,13 +393,13 @@ describe('computePnlSummary — cumulative series', () => {
         id: 'c1',
         status: 'closed',
         net_pnl: '100.00',
-        exit_time: '2026-05-20T09:00:00.000Z',
+        exit_time: '2026-05-18T09:00:00.000Z',
       }),
       makeTrade({
         id: 'c2',
         status: 'closed',
         net_pnl: null,
-        exit_time: '2026-05-20T10:00:00.000Z',
+        exit_time: '2026-05-19T10:00:00.000Z',
       }),
       makeTrade({
         id: 'c3',
@@ -457,6 +457,39 @@ describe('computePnlSummary — cumulative series', () => {
     expect(summary.cumulativeSeries[0]?.value).toBeCloseTo(100, 5); // 100
     expect(summary.cumulativeSeries[1]?.value).toBeCloseTo(60, 5); // 100 - 40
     expect(summary.cumulativeSeries[2]?.value).toBeCloseTo(120, 5); // 100 - 40 + 60
+  });
+
+  it('folds trades that close on the same IST day into one end-of-day point', () => {
+    // Lightweight Charts throws on duplicate time keys, so two exits on one day
+    // must produce one point carrying the cumulative total after both.
+    const trades: PaperTrade[] = [
+      makeTrade({
+        id: 'c1',
+        status: 'closed',
+        net_pnl: '100.00',
+        exit_time: '2026-05-19T05:00:00.000Z',
+      }),
+      makeTrade({
+        id: 'c3',
+        status: 'closed',
+        net_pnl: '-30.00',
+        exit_time: '2026-05-20T09:00:00.000Z',
+      }),
+      makeTrade({
+        id: 'c2',
+        status: 'closed',
+        net_pnl: '50.00',
+        exit_time: '2026-05-20T04:00:00.000Z',
+      }),
+    ];
+    const series = computePnlSummary(trades, TODAY_IST).cumulativeSeries;
+    expect(series).toEqual([
+      { time: '2026-05-19', value: 100 },
+      { time: '2026-05-20', value: 120 },
+    ]);
+    const times = series.map((point) => point.time);
+    expect(new Set(times).size).toBe(times.length);
+    expect([...times].sort()).toEqual(times);
   });
 
   it('uses the IST date (not UTC date) for the series time field', () => {

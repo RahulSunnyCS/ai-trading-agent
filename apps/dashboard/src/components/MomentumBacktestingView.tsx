@@ -10,6 +10,7 @@ import {
   Loader2,
   Play,
   RefreshCw,
+  RotateCcw,
   RotateCw,
   X,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import { useAppRoute } from '../hooks/useAppRoute';
 import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
 import { cn } from '../lib/cn';
+import { describeConfig } from '../lib/momentumConfig';
 import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
 import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
@@ -313,6 +315,8 @@ export function MomentumBacktestingView() {
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [reloading, setReloading] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [starting, setStarting] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [doneNoticeAt, setDoneNoticeAt] = useState<number | null>(null);
@@ -447,6 +451,27 @@ export function MomentumBacktestingView() {
       }),
     );
     if (seed) mountSeedRef.current = null;
+  }
+
+  /**
+   * "Reload prices": refetch the dataset's meta (price coverage, instruments, benchmarks) and
+   * keep every edited setting. Only an end date still sitting on the old last week follows the
+   * new one, since that is the default tracking the data rather than an edit.
+   */
+  async function reloadPrices(): Promise<void> {
+    setReloading(true);
+    setError(null);
+    const response = await apiGet<MomentumMeta>(`/api/momentum/meta?dataset=${dataset}`);
+    setReloading(false);
+    if (!response.ok) {
+      setError(response.error);
+      return;
+    }
+    const previousLastWeek = meta?.last_week;
+    setMeta(response.data);
+    setCore((current) =>
+      current.end === previousLastWeek ? { ...current, end: response.data.last_week } : current,
+    );
   }
 
   useEffect(() => {
@@ -663,8 +688,19 @@ export function MomentumBacktestingView() {
     }
   }, []);
 
+  // The form's current settings as one config, described once for both summaries below.
+  const described = describeConfig(
+    {
+      ...values,
+      start: core.start,
+      end: core.end || 'End',
+      top_n: core.topN,
+      exit_rank: core.exitRank,
+    },
+    dataset,
+  );
   const summary = meta
-    ? `${core.start || 'Start'} → ${core.end || 'End'} · ${values.rebalance === 'monthly' ? 'monthly' : Number(values.rebalance_every ?? 1) > 1 ? `every ${values.rebalance_every} weeks` : 'weekly'} · top ${core.topN} / exit >${core.exitRank} · ${values.benchmark ?? ''}`
+    ? `${described.period} · ${described.cadence} · ${described.selectionShort} · ${values.benchmark ?? ''}`
     : '';
   const resultEnd = result?.series.dates.at(-1);
 
@@ -784,10 +820,45 @@ export function MomentumBacktestingView() {
             <div className="rounded-xl border border-border bg-surface p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <DatasetButtons dataset={dataset} onSelect={setDataset} />
-                <Button size="sm" onClick={() => void loadMeta(dataset)} disabled={loading}>
-                  <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
-                  Refresh data
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => void reloadPrices()}
+                    disabled={loading || reloading}
+                    title="Fetch the latest price coverage; your edited settings are kept"
+                  >
+                    <RefreshCw className={reloading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
+                    Reload prices
+                  </Button>
+                  {confirmReset ? (
+                    <>
+                      <span className="text-xs text-muted">Discard every edited setting?</span>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => {
+                          setConfirmReset(false);
+                          void loadMeta(dataset);
+                        }}
+                      >
+                        Reset
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)}>
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmReset(true)}
+                      disabled={loading || reloading}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Reset to defaults
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -823,9 +894,10 @@ export function MomentumBacktestingView() {
                   <span className="font-medium text-foreground">What this run tests:</span>{' '}
                   {DATASETS.find((item) => item.id === dataset)?.label} · {core.start} to {core.end}
                   {' · '}
-                  {values.rebalance === 'monthly' ? 'monthly' : 'weekly'} rebalancing
-                  {' · '}top {core.topN}, exit after rank {core.exitRank}
-                  {' · '}benchmark {String(values.benchmark ?? '—')}
+                  {described.cadence} rebalancing
+                  {' · '}
+                  {described.selection}
+                  {' · '}benchmark {described.benchmark}
                   {' · '}prices through {meta.last_week}
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3">

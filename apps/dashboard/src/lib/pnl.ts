@@ -36,13 +36,11 @@ import { istToday, toNumberOrNull } from './format';
  *              confusion with `UTCTimestamp`.
  *  - `value` : running cumulative net P&L up to and including this point.
  *
- * Note: multiple trades may share the same IST exit date.  Each trade produces
- * its own point (the running total at the moment it closed).  Lightweight
- * Charts handles duplicate time keys by replacing earlier values with later
- * ones for the same key, so if two trades close on the same day the last one
- * wins.  This is intentional: the chart is a "last value of the day" view,
- * not a tick-level chart.  If intraday resolution is needed later, switch
- * time to a UNIX timestamp.
+ * One point per IST day: trades that close on the same day are folded into a
+ * single end-of-day cumulative value.  Lightweight Charts requires strictly
+ * ascending time keys and throws on a duplicate day, so the series must never
+ * carry two points for one date.  If intraday resolution is needed later,
+ * switch time to a UNIX timestamp.
  */
 export interface PnlSeriesPoint {
   time: string; // YYYY-MM-DD in IST
@@ -69,9 +67,9 @@ export interface PnlSummary {
   /** Count of trades with status === 'closed'. */
   closedCount: number;
   /**
-   * Cumulative-P&L series for closed trades ordered by exit_time ascending.
-   * Each point's `value` is the running total at that point.
-   * Trades with null exit_time or null net_pnl are excluded.
+   * Cumulative-P&L series for closed trades, one point per IST exit day in
+   * ascending order.  Each point's `value` is the running total at the end of
+   * that day.  Trades with null exit_time or null net_pnl are excluded.
    */
   cumulativeSeries: PnlSeriesPoint[];
 }
@@ -172,7 +170,7 @@ export function computePnlSummary(trades: PaperTrade[], today?: string): PnlSumm
 }
 
 /**
- * Build a cumulative P&L series from closed trades.
+ * Build a cumulative P&L series from closed trades, one point per IST day.
  *
  * Sorting rationale: we sort by exit_time ascending because the series must be
  * monotonically increasing in time for Lightweight Charts.  Passing an
@@ -204,14 +202,16 @@ function buildCumulativeSeries(closedTrades: PaperTrade[]): PnlSeriesPoint[] {
     const pnl = toNumberOrNull(trade.net_pnl) as number;
     runningTotal += pnl;
 
-    series.push({
-      // Use IST date for the chart's horizontal axis so day boundaries align
-      // with Indian market hours.  Multiple trades on the same IST day will
-      // produce multiple points with the same date — Lightweight Charts renders
-      // the last one at that x position, which is the correct EOD cumulative.
-      time: exitTimeToIstDate(trade.exit_time),
-      value: runningTotal,
-    });
+    // Use IST date for the chart's horizontal axis so day boundaries align
+    // with Indian market hours.  A later trade on the same IST day overwrites
+    // that day's point, leaving one end-of-day cumulative value per date.
+    const time = exitTimeToIstDate(trade.exit_time);
+    const last = series[series.length - 1];
+    if (last !== undefined && last.time === time) {
+      last.value = runningTotal;
+    } else {
+      series.push({ time, value: runningTotal });
+    }
   }
 
   return series;

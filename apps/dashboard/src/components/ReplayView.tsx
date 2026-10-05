@@ -7,22 +7,18 @@
  * backfilled ranges have enough data to replay.
  *
  * Data source: reuses GET /api/backfill (useBackfillStatus) — ranges with
- * status 'complete' or 'gapped' have candle data and are therefore replayable.
+ * status 'completed' have candle data and are therefore replayable.
  */
 
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 import { useBackfillStatus } from '../hooks/useBackfillStatus';
+import { isReplayable } from '../lib/backfill';
 import type { BackfillRangeRow } from '../types/trading';
 import { Button } from './ui/Button';
 import { Card, CardHeader } from './ui/Card';
 import { CodeBlock } from './ui/CodeBlock';
 import { StateMessage } from './ui/StateMessage';
-
-/** A range is replayable once its candles are written (complete or gapped). */
-function isReplayable(row: BackfillRangeRow): boolean {
-  return row.status === 'complete' || row.status === 'gapped';
-}
 
 function replayCommand(row: BackfillRangeRow): string {
   return `bun run replay --from ${row.from_ts} --to ${row.to_ts} --underlying ${row.symbol} --dry-run`;

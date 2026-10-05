@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 
-import { usePaperTrades } from '../hooks/usePaperTrades';
+import { TRADES_WINDOW_CAPTION, usePaperTrades } from '../hooks/usePaperTrades';
 import { formatIstDateTime, formatPnl, toNumberOrNull } from '../lib/format';
 import type { PaperTrade } from '../types/trading';
 import { Badge } from './ui/Badge';
@@ -134,6 +134,9 @@ export function TradesView() {
         ) : (
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-base font-semibold tracking-tight text-foreground">Paper Trades</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              {TRADES_WINDOW_CAPTION}, newest first — the totals above cover this window only
+            </p>
           </div>
         )}
 

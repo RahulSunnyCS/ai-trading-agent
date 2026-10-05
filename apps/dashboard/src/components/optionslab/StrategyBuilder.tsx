@@ -378,6 +378,8 @@ function BacktestResult({
   baseline: Map<string, number> | null;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  // Same divisor statsOf and compareToBaseline use, so every column is ₹ per lot.
+  const perLot = lots > 0 ? lots : 1;
   const st = statsOf(result.days, lots);
   const cmp: BaselineComparison | null = baseline
     ? compareToBaseline(result.days, lots, baseline)
@@ -438,10 +440,10 @@ function BacktestResult({
         <THead>
           <Th>Day</Th>
           <Th align="right">Trades</Th>
-          <Th align="right">Net</Th>
+          <Th align="right">Net / lot</Th>
           {cmp && cmp.shared > 0 && <Th align="right">Saved (₹/lot)</Th>}
           {cmp && cmp.shared > 0 && <Th align="right">Δ / lot</Th>}
-          <Th align="right">Worst MTM</Th>
+          <Th align="right">Worst MTM / lot</Th>
           <Th>Note</Th>
         </THead>
         <tbody>
@@ -458,7 +460,7 @@ function BacktestResult({
                 {d.trades.length}
               </Td>
               <Td align="right" numeric className={pnlClass(d.net)}>
-                {formatPnl(d.net)}
+                {formatPnl(d.net / perLot)}
               </Td>
               {cmp && cmp.shared > 0 && (
                 <Td align="right" numeric className="text-muted">
@@ -471,7 +473,7 @@ function BacktestResult({
                 </Td>
               )}
               <Td align="right" numeric>
-                {formatPnl(d.worst_mtm)}
+                {formatPnl(d.worst_mtm / perLot)}
               </Td>
               <Td className="text-xs text-muted">
                 {[d.stopped_by, ...d.notes].filter(Boolean).join('; ')}
