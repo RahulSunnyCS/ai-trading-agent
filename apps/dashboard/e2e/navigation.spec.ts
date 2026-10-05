@@ -3,7 +3,8 @@
  *
  * Covers:
  *  - Tab switching renders the correct view
- *  - PaymentTestModeBanner is visible on every tab
+ *  - The header stays mounted on every tab (the payment test-mode banner now renders only on
+ *    Billing)
  *  - All three wired tabs show an error/unavailable state when the backend is
  *    completely unreachable (network offline)
  *  - Keyboard accessibility for tab buttons
@@ -38,8 +39,8 @@ async function installStandardMocks(page: Page): Promise<void> {
     });
   });
 
-  // Suppress pricing-plan fetch errors if the Pricing tab makes a request.
-  await page.route('**/api/pricing/**', (route) => {
+  // Suppress payment fetch errors if the Billing tab makes a request.
+  await page.route('**/api/payment/**', (route) => {
     void route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -52,7 +53,7 @@ async function installStandardMocks(page: Page): Promise<void> {
 // Checklist: tab switching renders the correct view — @functional
 // ---------------------------------------------------------------------------
 
-test('Switching between Live / Trades / P&L / Pricing tabs renders the right view @functional', async ({
+test('Switching between Live / Trades / P&L / Billing tabs renders the right view @functional', async ({
   page,
 }) => {
   await installStandardMocks(page);
@@ -71,8 +72,8 @@ test('Switching between Live / Trades / P&L / Pricing tabs renders the right vie
   await expect(page.getByRole('heading', { name: /P&L Summary/i })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Paper Trades' })).not.toBeVisible();
 
-  // Switch to Pricing tab.
-  await page.getByRole('button', { name: 'Pricing' }).click();
+  // Switch to Billing tab.
+  await page.getByRole('button', { name: 'Billing' }).click();
   await expect(page.getByRole('heading', { name: /P&L Summary/i })).not.toBeVisible();
 
   // Switch back to Live.
@@ -145,7 +146,7 @@ test('PaymentTestModeBanner remains visible on all four tabs @non-blocker', asyn
   await expect(header).toBeVisible();
 
   // Check the banner persists as we navigate through each tab.
-  for (const tabName of ['Trades', 'P&L', 'Pricing', 'Live']) {
+  for (const tabName of ['Trades', 'P&L', 'Billing', 'Live']) {
     await page.getByRole('button', { name: tabName }).click();
     // Header must remain visible after every tab switch.
     await expect(header).toBeVisible();

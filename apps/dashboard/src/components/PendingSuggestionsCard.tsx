@@ -1,14 +1,12 @@
 /**
- * PendingSuggestionsCard — the "approval inbox" for evolution-engine proposals.
+ * PendingSuggestionsCard — the inbox of parameter changes the end-of-day review has proposed.
  *
- * Shows every retrospection_results row where the engine has proposed a
- * parameter adjustment that hasn't yet been applied. The operator can Approve
- * one to commit the change to personality_configs.params via the existing
- * POST /api/retrospection/evolution/apply/:personalityId endpoint.
+ * Each suggestion shows Current → Proposed for every proposed key (current from the
+ * personality's params) and the evidence it was based on. Approve asks first, then calls
+ * POST /retrospection/evolution/apply/:personalityId, which writes min_probability only.
  *
- * Out of scope for v1: a Reject button (no backend endpoint exists; the next
- * EOD job will overwrite proposed_adjustments anyway when fresher metrics
- * arrive, so unapproved suggestions auto-expire daily).
+ * There is no Reject: the server has no endpoint for it, so an unapproved suggestion stays
+ * in this list.
  */
 
 import { CheckCircle2 } from 'lucide-react';
@@ -16,75 +14,142 @@ import { useState } from 'react';
 
 import { usePendingSuggestions } from '../hooks/usePendingSuggestions';
 import { apiPost } from '../lib/api';
-import { EMPTY, formatDay, formatInt, formatPct } from '../lib/format';
+import { cn } from '../lib/cn';
+import { EMPTY, formatDay, formatInt, formatNumber, formatPct, formatPp } from '../lib/format';
+import {
+  type SuggestionChange,
+  serverErrorMessage,
+  suggestionChanges,
+  suggestionEvidence,
+} from '../lib/personalities';
+import { regimeBadge } from '../lib/regimeMeta';
 import type { PendingSuggestion, Personality } from '../types/trading';
+import {
+  type ApproveRequest,
+  ApproveSuggestionDialog,
+} from './personalities/ApproveSuggestionDialog';
+import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { InfoTooltip } from './ui/InfoTooltip';
 import { RefreshButton } from './ui/RefreshButton';
+import { SkeletonRows } from './ui/Skeleton';
 import { StateMessage } from './ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from './ui/Table';
+import { toast } from './ui/Toast';
 
 interface PendingSuggestionsCardProps {
-  /** Used to resolve personality_id → display_name for the row labels. */
-  personalities: Personality[];
+  /** Every personality (including paused), for names and current values. */
+  personalities: readonly Personality[];
   /** Called after a successful apply so the personality list refreshes. */
   onApplied: () => void;
 }
 
-/**
- * The retrospection API returns `trade_date` as an ISO timestamp because
- * pg-node serialises DATE columns by converting them to a Date at midnight
- * SERVER-LOCAL time, which then JSON-stringifies to UTC. With a server in
- * Asia/Kolkata, stored DATE '2026-05-29' arrives as '2026-05-28T18:30:00.000Z'.
- * A naive `slice(0, 10)` on that ISO string gives '2026-05-28' — wrong by one
- * day. We add the IST offset back so we recover the original calendar date,
- * which is what the apply endpoint matches against.
- */
-function toIstDateString(isoOrDate: string): string {
-  const ms = new Date(isoOrDate).getTime();
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  return new Date(ms + IST_OFFSET_MS).toISOString().slice(0, 10);
+function signedTone(value: number | null): string {
+  if (value === null || value === 0) return 'text-foreground';
+  return value > 0 ? 'text-positive' : 'text-negative';
 }
 
-function formatProposedAdjustments(adj: Record<string, unknown> | null): string {
-  if (!adj) return EMPTY;
-  const parts: string[] = [];
-  for (const [k, v] of Object.entries(adj)) {
-    if (typeof v === 'number') {
-      // min_probability is a fraction — show as percent for readability.
-      parts.push(k === 'min_probability' ? `${k}=${formatPct(v, 0)}` : `${k}=${v}`);
-    } else {
-      parts.push(`${k}=${String(v)}`);
-    }
+function Evidence({
+  label,
+  value,
+  className,
+  hint,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <dt className="flex items-center gap-1 text-xs text-faint">
+        {label}
+        {hint ? <InfoTooltip text={hint} label={`About ${label}`} /> : null}
+      </dt>
+      <dd className={cn('metric mt-0.5 text-sm', className ?? 'text-foreground')}>{value}</dd>
+    </div>
+  );
+}
+
+function formatDelta(change: SuggestionChange): string {
+  if (change.delta === null) return EMPTY;
+  if (change.deltaUnit === 'pp') return formatPp(change.delta, 1, { unit: 'percent' });
+  return formatNumber(change.delta, 2, { trim: true, sign: true });
+}
+
+function ChangesTable({ changes }: { changes: SuggestionChange[] }) {
+  if (changes.length === 0) {
+    return <p className="text-sm text-muted">No parameter change was attached.</p>;
   }
-  return parts.join(' · ');
+  return (
+    <Table>
+      <THead>
+        <Th>Parameter</Th>
+        <Th align="right">Current</Th>
+        <Th align="right">Proposed</Th>
+        <Th align="right">Change</Th>
+      </THead>
+      <tbody>
+        {changes.map((c) => (
+          <TRow key={c.key}>
+            <Td className="text-muted">
+              {c.label}
+              {c.applied ? null : (
+                <span className="ml-1.5 text-xs text-faint">(not applied by Approve)</span>
+              )}
+            </Td>
+            <Td numeric align="right" className="text-muted">
+              {c.current}
+            </Td>
+            <Td numeric align="right" className="font-medium text-foreground">
+              {c.proposed}
+            </Td>
+            <Td numeric align="right" className="text-muted">
+              {formatDelta(c)}
+            </Td>
+          </TRow>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
+function suggestionKey(s: PendingSuggestion, tradeDate: string): string {
+  return `${s.personality_id}:${tradeDate}`;
 }
 
 export function PendingSuggestionsCard({ personalities, onApplied }: PendingSuggestionsCardProps) {
   const { suggestions, loading, error, refresh } = usePendingSuggestions();
-  const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [errorById, setErrorById] = useState<Record<string, string>>({});
+  const [confirming, setConfirming] = useState<(ApproveRequest & { personalityId: string }) | null>(
+    null,
+  );
+  const [applying, setApplying] = useState(false);
 
-  // Fast id→name lookup so a row can render its personality's display name.
-  const nameById = new Map(personalities.map((p) => [p.id, p.display_name]));
+  const byId = new Map(personalities.map((p) => [p.id, p]));
 
-  async function approve(s: PendingSuggestion) {
-    const tradeDate = toIstDateString(s.trade_date);
-    const key = `${s.personality_id}:${tradeDate}`;
-    setApplyingId(key);
-    setErrorById((prev) => ({ ...prev, [key]: '' }));
+  async function approve() {
+    if (confirming === null) return;
+    const { personalityId, personalityName, tradeDate, changes } = confirming;
+    setApplying(true);
     // See usePendingSuggestions for why this path is not under /api.
-    const res = await apiPost<{ data: unknown }>(
-      `/retrospection/evolution/apply/${s.personality_id}`,
-      { trade_date: tradeDate },
-    );
-    setApplyingId(null);
+    const res = await apiPost<unknown>(`/retrospection/evolution/apply/${personalityId}`, {
+      trade_date: tradeDate,
+    });
+    setApplying(false);
+    setConfirming(null);
     if (!res.ok) {
-      setErrorById((prev) => ({ ...prev, [key]: res.error }));
+      toast(
+        `Couldn't apply the change to ${personalityName}: ${serverErrorMessage(res.error)}`,
+        'error',
+      );
       return;
     }
-    // Refresh both lists: the suggestions row will disappear, and the personality
-    // params summary in the parent table will show the newly-applied value.
+    const summary = changes
+      .filter((c) => c.applied)
+      .map((c) => `${c.label} ${c.current} → ${c.proposed}`)
+      .join(', ');
+    toast(`Applied to ${personalityName}${summary ? `: ${summary}` : ''}`);
     refresh();
     onApplied();
   }
@@ -95,95 +160,115 @@ export function PendingSuggestionsCard({ personalities, onApplied }: PendingSugg
     <Card flush>
       <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-foreground">
-            Pending Evolution Suggestions
+          <h2 className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-foreground">
+            Suggested changes
+            {hasSuggestions ? (
+              <Badge status="attention">{formatInt(suggestions.length)}</Badge>
+            ) : null}
           </h2>
-          <p className="mt-0.5 text-sm text-muted">
-            Parameter changes the evolution engine has proposed — awaiting your approval
+          <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted">
+            Parameter changes proposed by the end-of-day review, waiting for your approval.
+            <InfoTooltip
+              label="About rejecting a suggestion"
+              text="There is no Reject yet: the trading server has no endpoint for it, so a suggestion you don't approve stays in this list."
+            />
           </p>
         </div>
         <RefreshButton onClick={refresh} loading={loading} />
       </div>
 
-      <div className="px-2 py-1">
+      <div className="px-5 py-4">
+        {loading && !hasSuggestions && error === null && <SkeletonRows rows={2} />}
         {error !== null && (
           <StateMessage
             variant="error"
-            title="Couldn't load pending suggestions"
+            title="Couldn't load suggested changes"
             description={error}
-            className="m-3"
           />
         )}
         {!loading && error === null && !hasSuggestions && (
           <StateMessage
             variant="empty"
             title="Nothing waiting for approval"
-            description="The EOD retrospection job (runs at 16:00 IST on trading days) populates this list when it proposes parameter changes."
+            description="The end-of-day review (16:00 IST on trading days) adds a suggestion here when it proposes a parameter change."
+            className="py-8"
           />
         )}
         {hasSuggestions && (
-          <Table>
-            <THead>
-              <Th>Personality</Th>
-              <Th>Trade Date</Th>
-              <Th>Regime</Th>
-              <Th align="right">Trades</Th>
-              <Th align="right">Win Rate</Th>
-              <Th>Proposed Change</Th>
-              <Th>{''}</Th>
-            </THead>
-            <tbody>
-              {suggestions.map((s) => {
-                // Normalise the API's ISO timestamp to the original IST DATE so
-                // both the row key and the displayed date match what the apply
-                // endpoint expects (and what the operator actually meant).
-                const tradeDate = toIstDateString(s.trade_date);
-                const key = `${s.personality_id}:${tradeDate}`;
-                const total = Number(s.total_trades);
-                const wins = Number(s.winning_trades);
-                const winRate = total > 0 ? (wins / total) * 100 : null;
-                const rowError = errorById[key];
-                return (
-                  <TRow key={key}>
-                    <Td className="font-medium text-foreground">
-                      {nameById.get(s.personality_id) ?? s.personality_id.slice(0, 8)}
-                    </Td>
-                    <Td className="tabular-nums text-muted">{formatDay(tradeDate)}</Td>
-                    <Td className="text-muted">{s.market_regime ?? EMPTY}</Td>
-                    <Td numeric align="right" className="text-foreground">
-                      {formatInt(total)}
-                    </Td>
-                    <Td numeric align="right" className="text-foreground">
-                      {formatPct(winRate, 0, { unit: 'percent' })}
-                    </Td>
-                    <Td className="tabular-nums text-foreground">
-                      {formatProposedAdjustments(s.proposed_adjustments)}
-                    </Td>
-                    <Td align="right">
-                      <div className="flex flex-col items-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          disabled={applyingId === key}
-                          onClick={() => void approve(s)}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          {applyingId === key ? 'Applying…' : 'Approve'}
-                        </Button>
-                        {rowError ? (
-                          <span className="max-w-[12rem] text-right text-[10px] text-negative">
-                            {rowError}
-                          </span>
-                        ) : null}
-                      </div>
-                    </Td>
-                  </TRow>
-                );
-              })}
-            </tbody>
-          </Table>
+          <ul className="space-y-3">
+            {suggestions.map((s) => {
+              const evidence = suggestionEvidence(s);
+              const key = suggestionKey(s, evidence.tradeDate);
+              const personality = byId.get(s.personality_id);
+              const name =
+                personality?.display_name ?? `Personality ${s.personality_id.slice(0, 8)}`;
+              const changes = suggestionChanges(
+                s.proposed_adjustments,
+                personality?.params ?? null,
+              );
+              const regime = regimeBadge(s.market_regime);
+              return (
+                <li key={key} className="rounded-lg border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-foreground">{name}</span>
+                      <span className="text-xs text-faint">{formatDay(evidence.tradeDate)}</span>
+                      <span title={regime.title}>
+                        <Badge tone={regime.tone}>{regime.text}</Badge>
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      disabled={personality?.is_frozen === true}
+                      onClick={() =>
+                        setConfirming({
+                          key,
+                          personalityId: s.personality_id,
+                          personalityName: name,
+                          tradeDate: evidence.tradeDate,
+                          changes,
+                        })
+                      }
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Approve…
+                    </Button>
+                  </div>
+
+                  <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <Evidence label="Trades" value={formatInt(evidence.trades)} />
+                    <Evidence label="Win rate" value={formatPct(evidence.winRate, 0)} />
+                    <Evidence
+                      label="P&L"
+                      value={formatPct(evidence.pnlPct, 2, { unit: 'percent', sign: true })}
+                      className={signedTone(evidence.pnlPct)}
+                      hint="The day's summed P&L % across this personality's closed trades."
+                    />
+                    <Evidence
+                      label="Beat Clockwork Δ"
+                      value={formatPp(evidence.beatClockwork, 2, { unit: 'percent' })}
+                      className={signedTone(evidence.beatClockwork)}
+                      hint="This personality's P&L % minus Clockwork's for the same day and regime. Positive means it beat the benchmark."
+                    />
+                  </dl>
+
+                  <div className="mt-3">
+                    <ChangesTable changes={changes} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
+
+      <ApproveSuggestionDialog
+        request={confirming}
+        applying={applying}
+        onConfirm={() => void approve()}
+        onClose={() => setConfirming(null)}
+      />
     </Card>
   );
 }

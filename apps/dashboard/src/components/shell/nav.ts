@@ -1,7 +1,6 @@
 import {
   Activity,
   Building2,
-  CalendarClock,
   CreditCard,
   Database,
   Layers,
@@ -24,8 +23,7 @@ export type Tab =
   | 'personalities'
   | 'pnl'
   | 'regime'
-  | 'backfill'
-  | 'replay'
+  | 'coverage'
   | 'optionslab'
   | 'momentum'
   | 'brokerLogins'
@@ -66,12 +64,12 @@ export interface NavGroup {
  * Navigation grouped by product. Drives the sidebar, the mobile drawer, the
  * mobile bottom bar and the Settings tab list.
  *
- * Tab ids and URLs are unchanged from the old Trading / Research / Account
- * grouping; only the grouping and two labels moved. Overview (the landing view)
- * is its own first group. The YAML backtest is no longer a tab: it is the
- * Options Lab builder's YAML mode (/optionslab/builder/yaml), and /backtest
- * redirects there. Screens the plan adds later (a merged Data coverage page,
- * Billing) are deliberately absent until they exist.
+ * Overview (the landing view) is its own first group. The YAML backtest is no
+ * longer a tab: it is the Options Lab builder's YAML mode (/optionslab/builder/yaml),
+ * and /backtest redirects there. Backfill and Replay are the two sections of Data ›
+ * Coverage (/coverage/backfill, /coverage/replay); their old paths redirect. Pricing is
+ * labelled Billing and lives at /billing, keeping its `pricing` id (see TAB_SEGMENT in
+ * lib/routes.ts) so stored preferences and existing callers need no change.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -137,8 +135,15 @@ export const NAV_GROUPS: NavGroup[] = [
     heading: 'Data',
     icon: Database,
     items: [
-      { id: 'backfill', label: 'Backfill', icon: Database },
-      { id: 'replay', label: 'Replay', icon: CalendarClock },
+      {
+        id: 'coverage',
+        label: 'Coverage',
+        icon: Database,
+        children: [
+          { segment: 'backfill', label: 'Backfill' },
+          { segment: 'replay', label: 'Replay' },
+        ],
+      },
     ],
   },
   {
@@ -147,7 +152,7 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Settings,
     items: [
       { id: 'brokerLogins', label: 'Broker logins', icon: Building2 },
-      { id: 'pricing', label: 'Pricing', icon: CreditCard },
+      { id: 'pricing', label: 'Billing', icon: CreditCard },
       { id: 'settings', label: 'Settings', icon: Settings },
     ],
   },

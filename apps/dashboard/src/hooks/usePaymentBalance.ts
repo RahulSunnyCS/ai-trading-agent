@@ -17,6 +17,8 @@ export interface PaymentBalanceState {
   loading: boolean;
   /** Why billing status or the balance could not be read, or null. */
   error: string | null;
+  /** Re-read the balance now (after a purchase, say) instead of waiting for the next poll. */
+  refresh: () => void;
 }
 
 const BALANCE_POLL_MS = 60_000;
@@ -42,5 +44,6 @@ export function usePaymentBalance(): PaymentBalanceState {
       (enabled && balance.loading && balance.data === null),
     error:
       status.data === null ? status.error : enabled && balance.data === null ? balance.error : null,
+    refresh: balance.refetch,
   };
 }

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the dashboard is the paid product surface; today it reads as a generated template, ships eleven CSS classes that never compile, and hides results a page away from the controls that made them |
-| **Status** | In progress |
+| **Status** | Done (Phases 1–8; Phase 9 parked by the owner) |
 | **Type** | improvement |
 | **Area** | dashboard |
 | **Created** | 2026-10-05 |
@@ -545,4 +545,42 @@ Answered by the owner on 2026-10-05, when the item was started.
   - How it was built: four parallel agents were stopped part-way when the session hit a usage
     limit; their work was picked up from the working tree, the missing Runs panel written, the
     shared pieces wired (cuts store, regime badge, `?load=`), and the checks above run.
+- 2026-10-05 — **Phase 8 done** (branch `feat/bl-013-phase-8`). One PR for the phase.
+  - Live: market session badge; "Updated Ns ago" with Live / Simulation / Stale / Idle from
+    the shared feed rule; the null-stub REST straddle panel and its poll removed; one token
+    banner with an inline Login; `useMeta` replaces the local loop; a straddle sparkline;
+    tooltips on ATM / CE / PE / ROC / Accel; the tick history survives tab switches; only index
+    ticks drive the index value (VIX and option legs used to overwrite it).
+  - Trades: toolbar (status, personality, IST date range, Export CSV) kept in the URL; columns
+    for personality, contract, exit time and holding time, lots × size, P&L % of premium,
+    exit-reason labels, regime and VIX where the row has them; Open has its own badge.
+  - P&L: drawdown, profit factor, average win / loss, expectancy, best / worst day; daily P&L
+    bars; a 7D / 30D / 90D / All range in the URL; the line coloured by sign; a
+    per-personality table with Beat-Clockwork Δ.
+  - Personalities: Active / Paused / Frozen badges; include paused; Net P&L / Win % / Trades;
+    full params on expand; suggestions with Current → Proposed and evidence, Approve behind a
+    confirmation; edit validation with the 8 pp integrity warning; Clockwork not editable.
+  - Regimes (trading tab): filter bar, `regimeMeta` badges, a calendar strip, distribution
+    tiles, P&L by regime.
+  - Data › Coverage replaces Backfill and Replay (old paths redirect; stored preferences map
+    to the new tab): polling with a progress bar while a job runs, range validation with IST
+    defaults, a token pre-flight, one label map, replay commands the CLI accepts.
+  - Billing replaces Pricing (`/billing`; `/pricing` redirects): credits and payment mode first,
+    plan inclusions, a recommended plan, per-plan buying state, neutral cancellation, a success
+    toast with the order id; the test-mode banner only on Billing, from the server flag.
+  - Checked: typecheck, 819 dashboard unit tests, Biome, both done-when greps; in the browser
+    (page text and DOM against the fixture API; no screenshots) every page rendered, the old
+    paths redirected, the sidebar shows the final grouping, no console errors. Nothing was
+    queued, bought, approved or saved.
+  - Server problems found, not changed here (§3.12.13): the running server does not register
+    `PUT /api/personalities/:id`, so the Edit dialog's Save fails against it; the
+    `paper_trades.exit_reason` CHECK rejects DAILY_LOSS, EXIT_WINDOW, ROLL and CUT, which the
+    engine writes; no Reject endpoint for suggestions; the trading engine ignores the stored
+    stop-loss parameter (fixed 20 %); no access-status or purchase-history endpoint; backfill
+    writes `checkpoint_ts` only on interruption, so a running job's bar is indeterminate; ticks
+    carry no previous close, so Live has no day change.
+  - Integration fixes: Overview no longer crashes on a weekly-status reply without `signals`;
+    links that said Pricing say Billing.
+- 2026-10-05 — **BL-013 closed** for Phases 1–8. Phase 9 (⌘K palette, assistant panel) stays
+  parked by the owner's decision; reopen it as its own item when wanted.
 

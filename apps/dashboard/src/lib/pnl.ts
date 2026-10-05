@@ -13,13 +13,13 @@
  *
  * Timezone correctness:
  *  - "Today" is always IST, not UTC.  We delegate to `istToday` from format.ts
- *    which uses `Intl.DateTimeFormat` with `timeZone: 'Asia/Kolkata'`.
+ *    which formats with the `Asia/Kolkata` time zone.
  *  - An optional `today` parameter lets tests inject a specific IST date
  *    string (YYYY-MM-DD) so the IST-boundary logic is verifiable without
  *    relying on wall-clock time.
  */
 
-import type { PaperTrade } from '../types/trading';
+import type { PaperTrade, Personality } from '../types/trading';
 import { istToday, toNumberOrNull } from './format';
 
 // ---------------------------------------------------------------------------
@@ -215,4 +215,307 @@ function buildCumulativeSeries(closedTrades: PaperTrade[]): PnlSeriesPoint[] {
   }
 
   return series;
+}
+
+// ---------------------------------------------------------------------------
+// BL-013 Phase 8: range, daily bars, risk metrics, per-personality table
+//
+// Same money-math rules as above: a closed trade whose net_pnl is null / NaN is skipped (never
+// counted as 0), and every day is an IST calendar day of the exit.
+// ---------------------------------------------------------------------------
+
+export const PNL_RANGES = ['7d', '30d', '90d', 'all'] as const;
+export type PnlRange = (typeof PNL_RANGES)[number];
+
+const RANGE_DAYS: Record<Exclude<PnlRange, 'all'>, number> = { '7d': 7, '30d': 30, '90d': 90 };
+
+export function parsePnlRange(raw: string | null | undefined): PnlRange {
+  return PNL_RANGES.find((range) => range === raw) ?? 'all';
+}
+
+/** YYYY-MM-DD minus `days` calendar days (no time zone involved: the input is already a day). */
+function shiftDay(day: string, days: number): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** The first IST day a range covers (today counts as one of its days); null for 'all'. */
+export function rangeStartDay(range: PnlRange, today: string = istToday()): string | null {
+  return range === 'all' ? null : shiftDay(today, RANGE_DAYS[range] - 1);
+}
+
+/**
+ * The trades a range covers: closed trades whose IST exit day falls in the window, plus every
+ * open trade (an open position is "now", which every window includes). A closed trade with no
+ * exit_time is kept only by 'all'.
+ */
+export function filterTradesByRange(
+  trades: readonly PaperTrade[],
+  range: PnlRange,
+  today: string = istToday(),
+): PaperTrade[] {
+  const start = rangeStartDay(range, today);
+  if (start === null) return [...trades];
+  return trades.filter((trade) => {
+    if (trade.status === 'open') return true;
+    if (trade.exit_time === null) return false;
+    const day = exitTimeToIstDate(trade.exit_time);
+    return day >= start && day <= today;
+  });
+}
+
+/** Closed trades with a usable exit_time and net_pnl, as (day, net) pairs in exit order. */
+function closedNets(trades: readonly PaperTrade[]): Array<{ day: string; net: number }> {
+  const out: Array<{ day: string; exit: string; net: number }> = [];
+  for (const trade of trades) {
+    if (trade.status !== 'closed' || trade.exit_time === null) continue;
+    const net = toNumberOrNull(trade.net_pnl);
+    if (net === null) continue;
+    out.push({ day: exitTimeToIstDate(trade.exit_time), exit: trade.exit_time, net });
+  }
+  out.sort((a, b) => a.exit.localeCompare(b.exit));
+  return out.map(({ day, net }) => ({ day, net }));
+}
+
+export interface DailyPnlPoint {
+  /** IST exit day, YYYY-MM-DD (Lightweight Charts' business-day key). */
+  time: string;
+  /** Net P&L of the trades that closed that day. */
+  value: number;
+  /** How many trades closed that day (with a usable net_pnl). */
+  trades: number;
+}
+
+/** One bar per IST exit day, ascending; days with no closed trade are not listed. */
+export function computeDailyPnl(trades: readonly PaperTrade[]): DailyPnlPoint[] {
+  const days: DailyPnlPoint[] = [];
+  for (const { day, net } of closedNets(trades)) {
+    const last = days[days.length - 1];
+    if (last !== undefined && last.time === day) {
+      last.value += net;
+      last.trades += 1;
+    } else {
+      days.push({ time: day, value: net, trades: 1 });
+    }
+  }
+  return days;
+}
+
+export interface Drawdown {
+  /** The largest fall from a running peak of end-of-day cumulative P&L, in ₹ (≥ 0). */
+  amount: number;
+  /** The day the running peak was set (null when the peak is the starting zero). */
+  peakDay: string | null;
+  /** The day the deepest point was reached; null when there was no drawdown. */
+  troughDay: string | null;
+}
+
+/**
+ * Maximum drawdown over end-of-day cumulative P&L, measured from a starting balance of zero, so
+ * a first losing day counts as a drawdown from the start.
+ */
+export function computeMaxDrawdown(daily: readonly DailyPnlPoint[]): Drawdown {
+  let equity = 0;
+  let peak = 0;
+  let peakDay: string | null = null;
+  let worst: Drawdown = { amount: 0, peakDay: null, troughDay: null };
+  for (const point of daily) {
+    equity += point.value;
+    if (equity > peak) {
+      peak = equity;
+      peakDay = point.time;
+    }
+    const drop = peak - equity;
+    if (drop > worst.amount) worst = { amount: drop, peakDay, troughDay: point.time };
+  }
+  return worst;
+}
+
+export interface PnlStats {
+  /** Closed trades with a usable net_pnl. */
+  tradeCount: number;
+  wins: number;
+  losses: number;
+  /** Sum of winning trades' net P&L. */
+  grossProfit: number;
+  /** Sum of losing trades' net P&L, as a positive number. */
+  grossLoss: number;
+  /** grossProfit ÷ grossLoss; null when there is no losing trade (undefined, not infinite). */
+  profitFactor: number | null;
+  /** Mean net P&L of winning trades; null with none. */
+  avgWin: number | null;
+  /** Mean net P&L of losing trades (negative); null with none. */
+  avgLoss: number | null;
+  /** Mean net P&L per trade; null with no trades. */
+  expectancy: number | null;
+  bestDay: DailyPnlPoint | null;
+  worstDay: DailyPnlPoint | null;
+  maxDrawdown: Drawdown;
+  daily: DailyPnlPoint[];
+}
+
+/** Risk and distribution metrics over the closed trades in `trades` (open ones are ignored). */
+export function computePnlStats(trades: readonly PaperTrade[]): PnlStats {
+  let wins = 0;
+  let losses = 0;
+  let grossProfit = 0;
+  let grossLoss = 0;
+  let total = 0;
+  const nets = closedNets(trades);
+  for (const { net } of nets) {
+    total += net;
+    if (net > 0) {
+      wins += 1;
+      grossProfit += net;
+    } else if (net < 0) {
+      losses += 1;
+      grossLoss += -net;
+    }
+  }
+  const daily = computeDailyPnl(trades);
+  let bestDay: DailyPnlPoint | null = null;
+  let worstDay: DailyPnlPoint | null = null;
+  for (const point of daily) {
+    if (bestDay === null || point.value > bestDay.value) bestDay = point;
+    if (worstDay === null || point.value < worstDay.value) worstDay = point;
+  }
+  return {
+    tradeCount: nets.length,
+    wins,
+    losses,
+    grossProfit,
+    grossLoss,
+    profitFactor: grossLoss > 0 ? grossProfit / grossLoss : null,
+    avgWin: wins > 0 ? grossProfit / wins : null,
+    avgLoss: losses > 0 ? -grossLoss / losses : null,
+    expectancy: nets.length > 0 ? total / nets.length : null,
+    bestDay,
+    worstDay,
+    maxDrawdown: computeMaxDrawdown(daily),
+    daily,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Per-personality P&L with Beat-Clockwork Δ
+// ---------------------------------------------------------------------------
+
+/** The frozen benchmark personality: the one named Clockwork, else the first frozen one. */
+export function findClockwork<P extends Pick<Personality, 'id' | 'name' | 'is_frozen'>>(
+  personalities: readonly P[],
+): P | null {
+  return (
+    personalities.find((p) => p.name.trim().toLowerCase() === 'clockwork') ??
+    personalities.find((p) => p.is_frozen) ??
+    null
+  );
+}
+
+export interface PersonalityPnlRow {
+  /** personality_configs.id, or null for trades with no (or an unknown) personality. */
+  personalityId: string | null;
+  name: string;
+  isClockwork: boolean;
+  /** Closed trades in the window. */
+  trades: number;
+  wins: number;
+  /** wins ÷ closed trades (the same definition as computePnlSummary's winRate). */
+  winRate: number;
+  /** Sum of net P&L (null values skipped). */
+  net: number;
+  /**
+   * net − Clockwork's net over the same trades. Null for Clockwork itself, and for everyone when
+   * Clockwork is unknown or closed no trade in the window (a comparison with nothing).
+   */
+  beatClockwork: number | null;
+}
+
+/**
+ * One row per personality with at least one closed trade in `trades`, plus "Unassigned" for
+ * trades whose personality_id is null or not in `personalities`. Rows are ordered by net,
+ * highest first.
+ */
+export function computePersonalityPnl(
+  trades: readonly PaperTrade[],
+  personalities: readonly Personality[],
+): PersonalityPnlRow[] {
+  const byId = new Map(personalities.map((p) => [p.id, p]));
+  const clockwork = findClockwork(personalities);
+  const buckets = new Map<string | null, { trades: number; wins: number; net: number }>();
+
+  for (const trade of trades) {
+    if (trade.status !== 'closed') continue;
+    const rawId = trade.personality_id ?? null;
+    const id = rawId !== null && byId.has(rawId) ? rawId : null;
+    const bucket = buckets.get(id) ?? { trades: 0, wins: 0, net: 0 };
+    bucket.trades += 1;
+    const net = toNumberOrNull(trade.net_pnl);
+    if (net !== null) {
+      bucket.net += net;
+      if (net > 0) bucket.wins += 1;
+    }
+    buckets.set(id, bucket);
+  }
+
+  const clockworkBucket = clockwork ? buckets.get(clockwork.id) : undefined;
+  const benchmark = clockworkBucket ? clockworkBucket.net : null;
+
+  const rows: PersonalityPnlRow[] = [];
+  for (const [id, bucket] of buckets) {
+    const personality = id === null ? undefined : byId.get(id);
+    const isClockwork = clockwork !== null && id === clockwork.id;
+    rows.push({
+      personalityId: id,
+      name: personality ? personality.display_name || personality.name : 'Unassigned',
+      isClockwork,
+      trades: bucket.trades,
+      wins: bucket.wins,
+      winRate: bucket.trades === 0 ? 0 : bucket.wins / bucket.trades,
+      net: bucket.net,
+      beatClockwork: isClockwork || benchmark === null ? null : bucket.net - benchmark,
+    });
+  }
+  return rows.sort((a, b) => b.net - a.net);
+}
+
+export type PersonalitySortKey = 'name' | 'trades' | 'winRate' | 'net' | 'beatClockwork';
+
+export interface PersonalitySort {
+  key: PersonalitySortKey;
+  dir: 'asc' | 'desc';
+}
+
+export const DEFAULT_PERSONALITY_SORT: PersonalitySort = { key: 'net', dir: 'desc' };
+
+/** Sorted copy; a null Δ goes last in both directions and ties keep the input order. */
+export function sortPersonalityPnl(
+  rows: readonly PersonalityPnlRow[],
+  sort: PersonalitySort,
+): PersonalityPnlRow[] {
+  const sign = sort.dir === 'asc' ? 1 : -1;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      if (sort.key === 'name') {
+        const cmp = a.row.name.localeCompare(b.row.name);
+        return cmp !== 0 ? cmp * sign : a.index - b.index;
+      }
+      const av = a.row[sort.key];
+      const bv = b.row[sort.key];
+      if (av === null || bv === null) {
+        if (av === bv) return a.index - b.index;
+        return av === null ? 1 : -1;
+      }
+      return av !== bv ? (av - bv) * sign : a.index - b.index;
+    })
+    .map((entry) => entry.row);
+}
+
+export function nextPersonalitySort(
+  current: PersonalitySort,
+  key: PersonalitySortKey,
+): PersonalitySort {
+  if (current.key === key) return { key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
+  return { key, dir: key === 'name' ? 'asc' : 'desc' };
 }

@@ -15,6 +15,26 @@ export const DEFAULT_NAVIGATION_PREFERENCES: NavigationPreferences = {
 };
 
 /**
+ * Retired tab id -> the tab that absorbed it. Unlike `backtest` (dropped), these were merged
+ * one-for-one into a tab that shows the same thing.
+ */
+export const MERGED_TABS: ReadonlyMap<string, Tab> = new Map<string, Tab>([
+  ['backfill', 'coverage'],
+  ['replay', 'coverage'],
+]);
+
+/** Tab -> the retired ids merged into it. */
+const MERGED_FROM = new Map<Tab, string[]>();
+for (const [old, tab] of MERGED_TABS) {
+  MERGED_FROM.set(tab, [...(MERGED_FROM.get(tab) ?? []), old]);
+}
+
+/** The current id for a stored one: a merged id becomes its new tab, anything else is kept. */
+function mergedTab(id: unknown): unknown {
+  return (typeof id === 'string' && MERGED_TABS.get(id)) || id;
+}
+
+/**
  * Repair stale/partial browser preferences when tabs are added or removed.
  *
  * `order` is one flat ranking of tab ids and says nothing about groups:
@@ -27,6 +47,12 @@ export const DEFAULT_NAVIGATION_PREFERENCES: NavigationPreferences = {
  * dropped from both lists. It is not mapped onto another tab: a user who hid the YAML
  * backtest did not ask to hide Options Lab.
  *
+ * Ids that were merged into one tab (`backfill` and `replay`, now the two sections of
+ * Coverage) are renamed to it, see MERGED_TABS: in `order` the merged tab takes the place of
+ * whichever old id ranked first, and in `hidden` it stays hidden only when every old id it
+ * replaces was hidden. Hiding just Replay never hid the backfill controls, so it does not
+ * hide Coverage now.
+ *
  * A tab the stored value has never seen is placed where the default order has it:
  * straight after the tab that precedes it there, or first when nothing does. So a
  * newly added first tab (Overview) leads a stored order too, and becomes the
@@ -34,10 +60,12 @@ export const DEFAULT_NAVIGATION_PREFERENCES: NavigationPreferences = {
  */
 export function normalizeNavigationPreferences(value: unknown): NavigationPreferences {
   const candidate =
-    value && typeof value === 'object' ? (value as Partial<NavigationPreferences>) : {};
-  const order = Array.isArray(candidate.order)
-    ? candidate.order.filter((id): id is Tab => CONFIGURABLE_SET.has(id as Tab))
-    : [];
+    value && typeof value === 'object' ? (value as { hidden?: unknown; order?: unknown }) : {};
+  const storedOrder = Array.isArray(candidate.order) ? (candidate.order as unknown[]) : [];
+  const storedHidden = Array.isArray(candidate.hidden) ? (candidate.hidden as unknown[]) : [];
+  const order = storedOrder
+    .map(mergedTab)
+    .filter((id): id is Tab => CONFIGURABLE_SET.has(id as Tab));
   const uniqueOrder = [...new Set(order)];
   CONFIGURABLE_IDS.forEach((id, index) => {
     if (uniqueOrder.includes(id)) return;
@@ -46,9 +74,19 @@ export function normalizeNavigationPreferences(value: unknown): NavigationPrefer
     uniqueOrder.splice(previous === undefined ? 0 : uniqueOrder.indexOf(previous) + 1, 0, id);
   });
 
-  const hidden = Array.isArray(candidate.hidden)
-    ? [...new Set(candidate.hidden.filter((id): id is Tab => CONFIGURABLE_SET.has(id as Tab)))]
-    : [];
+  const hiddenIds = new Set(storedHidden);
+  const hidden = [
+    ...new Set(
+      storedHidden
+        .filter((id) => {
+          const sources = MERGED_FROM.get(mergedTab(id) as Tab);
+          // A merged tab named by an old id is hidden only when all of its old ids were.
+          return !sources?.includes(id as string) || sources.every((old) => hiddenIds.has(old));
+        })
+        .map(mergedTab)
+        .filter((id): id is Tab => CONFIGURABLE_SET.has(id as Tab)),
+    ),
+  ];
   return { hidden, order: uniqueOrder };
 }
 

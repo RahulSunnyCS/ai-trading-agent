@@ -79,12 +79,25 @@ describe('navigation preferences', () => {
     );
 
     // Overview did not exist when this value was stored: it is added first. `backtest` is no
-    // longer a tab (it is Options Lab › Builder › YAML), so it leaves both lists. Nothing
+    // longer a tab (it is Options Lab › Builder › YAML), so it leaves both lists. Replay and
+    // Backfill merged into Coverage, which takes Replay's place (it ranked first). Nothing
     // else about the value changes.
     const preferences = normalizeNavigationPreferences(stored);
     expect(preferences).toEqual({
       hidden: ['personalities', 'pricing'],
-      order: ['overview', ...stored.order.filter((id: string) => id !== 'backtest')],
+      order: [
+        'overview',
+        'pnl',
+        'live',
+        'trades',
+        'personalities',
+        'regime',
+        'coverage',
+        'optionslab',
+        'momentum',
+        'brokerLogins',
+        'pricing',
+      ],
     });
 
     const groups = visibleNavigationGroups(preferences);
@@ -93,7 +106,7 @@ describe('navigation preferences', () => {
       ['live', ['pnl', 'live', 'trades', 'regime']],
       ['optionslab', ['optionslab']],
       ['momentum', ['momentum']],
-      ['data', ['replay', 'backfill']],
+      ['data', ['coverage']],
       ['account', ['brokerLogins', 'settings']],
     ]);
     // Overview is the landing tab even for a browser whose stored order began with another.
@@ -107,10 +120,10 @@ describe('navigation preferences', () => {
     expect(hiddenOnly).toEqual(DEFAULT_NAVIGATION_PREFERENCES);
 
     const preferences = normalizeNavigationPreferences({
-      hidden: ['backtest', 'replay'],
+      hidden: ['backtest', 'personalities'],
       order: ['backtest', 'optionslab', 'live', 'backtest'],
     });
-    expect(preferences.hidden).toEqual(['replay']);
+    expect(preferences.hidden).toEqual(['personalities']);
     expect(preferences.order as string[]).not.toContain('backtest');
     expect(new Set(preferences.order)).toEqual(new Set(DEFAULT_NAVIGATION_PREFERENCES.order));
     expect(preferences.order.indexOf('optionslab')).toBeLessThan(preferences.order.indexOf('live'));
@@ -158,7 +171,7 @@ describe('navigation preferences', () => {
   it('drops a group whose tabs are all hidden', () => {
     const groups = visibleNavigationGroups({
       ...DEFAULT_NAVIGATION_PREFERENCES,
-      hidden: ['backfill', 'replay'],
+      hidden: ['coverage'],
     });
     expect(groups.map((group) => group.id)).toEqual([
       'overview',
@@ -179,10 +192,70 @@ describe('navigation preferences', () => {
       'regime',
       'optionslab',
       'momentum',
-      'backfill',
-      'replay',
+      'coverage',
       'brokerLogins',
       'pricing',
     ]);
+  });
+
+  // Backfill and Replay became the two sections of Coverage (BL-013 Phase 8).
+  describe('the Backfill and Replay tabs merged into Coverage', () => {
+    it('hides Coverage only when both old tabs were hidden', () => {
+      expect(normalizeNavigationPreferences({ hidden: ['backfill', 'replay'] }).hidden).toEqual([
+        'coverage',
+      ]);
+      expect(
+        normalizeNavigationPreferences({ hidden: ['replay', 'live', 'backfill'] }).hidden,
+      ).toEqual(['coverage', 'live']);
+    });
+
+    it('keeps Coverage visible when only one of them was hidden', () => {
+      expect(normalizeNavigationPreferences({ hidden: ['backfill'] }).hidden).toEqual([]);
+      expect(normalizeNavigationPreferences({ hidden: ['replay', 'trades'] }).hidden).toEqual([
+        'trades',
+      ]);
+    });
+
+    it('puts Coverage where the first of the old ids ranked, once', () => {
+      const result = normalizeNavigationPreferences({
+        hidden: [],
+        order: ['backfill', 'live', 'replay', 'trades'],
+      });
+      expect(result.order[1]).toBe('coverage');
+      expect(result.order.indexOf('coverage')).toBeLessThan(result.order.indexOf('live'));
+      expect(result.order.indexOf('live')).toBeLessThan(result.order.indexOf('trades'));
+      expect(result.order.filter((id) => id === 'coverage')).toHaveLength(1);
+      expect(new Set(result.order)).toEqual(new Set(DEFAULT_NAVIGATION_PREFERENCES.order));
+    });
+
+    it('loads a value that names the old ids and the new one, and re-normalises to itself', () => {
+      const result = normalizeNavigationPreferences({
+        hidden: ['coverage', 'replay'],
+        order: ['replay', 'coverage', 'backfill'],
+      });
+      expect(result.hidden).toEqual(['coverage']);
+      expect(result.order as string[]).not.toContain('backfill');
+      expect(result.order as string[]).not.toContain('replay');
+      expect(normalizeNavigationPreferences(result)).toEqual(result);
+    });
+
+    it('lands on the next visible tab when Coverage starts hidden', () => {
+      const result = normalizeNavigationPreferences({
+        hidden: [
+          'overview',
+          'live',
+          'trades',
+          'pnl',
+          'personalities',
+          'regime',
+          'optionslab',
+          'momentum',
+          'backfill',
+          'replay',
+        ],
+        order: [],
+      });
+      expect(firstVisibleTab(result)).toBe('brokerLogins');
+    });
   });
 });

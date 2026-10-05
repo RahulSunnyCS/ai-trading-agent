@@ -1,7 +1,16 @@
-import { useEffect, useState } from 'react';
+/**
+ * usePricingPlans — GET /api/payment/status and GET /api/payment/plans, on mount and on
+ * `refresh`. Built on usePolledResource; the two requests run side by side (the plans
+ * endpoint answers `{ plans: [] }` when payment is off, so it need not wait for the status).
+ *
+ * `testMode` here is the one source for the payment test-mode flag: the server derives it
+ * from its own RAZORPAY_KEY_ID, the key that actually creates the orders.
+ */
+
+import { usePolledResource } from './usePolledResource';
 
 // ---------------------------------------------------------------------------
-// Public types — exported so PricingPage can import them without re-declaring.
+// Public types — exported so the Billing page can import them without re-declaring.
 // ---------------------------------------------------------------------------
 
 export interface Plan {
@@ -11,13 +20,21 @@ export interface Plan {
   description: string;
 }
 
+export type RegionConfidence = 'high' | 'low' | 'unknown';
+
 export interface PricingState {
   plans: Plan[];
   loading: boolean;
   error: string | null;
   paymentEnabled: boolean;
+  /** ISO country code from the server's IP geolocation, or null when it could not tell. */
   region: string | null;
+  /** How sure the geolocation is. */
+  confidence: RegionConfidence;
+  /** True when the server's Razorpay key is a test key: checkouts charge nothing. */
   testMode: boolean;
+  /** Re-read status and plans. */
+  refresh: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,14 +59,17 @@ function extractStatus(body: unknown): {
   enabled: boolean;
   testMode: boolean;
   region: string | null;
+  confidence: RegionConfidence;
 } {
   if (!isPlainObject(body)) {
-    return { enabled: false, testMode: false, region: null };
+    return { enabled: false, testMode: false, region: null, confidence: 'unknown' };
   }
+  const { confidence } = body;
   return {
     enabled: body.enabled === true,
     testMode: body.testMode === true,
     region: typeof body.region === 'string' ? body.region : null,
+    confidence: confidence === 'high' || confidence === 'low' ? confidence : 'unknown',
   };
 }
 
@@ -65,6 +85,7 @@ function narrowPlan(item: unknown): Plan | null {
     typeof id !== 'string' ||
     typeof name !== 'string' ||
     typeof pricePaise !== 'number' ||
+    !Number.isFinite(pricePaise) ||
     typeof description !== 'string'
   ) {
     return null;
@@ -95,92 +116,34 @@ function extractPlans(body: unknown): Plan[] {
 // Hook
 // ---------------------------------------------------------------------------
 
-/**
- * Fetches payment status and plan list on mount.
- *
- * Flow:
- *   1. GET /api/payment/status — check enabled flag, region, testMode
- *   2. If enabled: GET /api/payment/plans — fetch the plan list
- *
- * Both fetches happen sequentially because the plan fetch is conditional on
- * the status response. An AbortController is used so that if the component
- * unmounts mid-fetch the in-flight request is cancelled and the state setter
- * is not called on an unmounted component (avoids the React no-op warning).
- */
 export function usePricingPlans(): PricingState {
-  const [state, setState] = useState<PricingState>({
-    plans: [],
-    loading: true,
-    error: null,
-    paymentEnabled: false,
-    region: null,
-    testMode: false,
-  });
+  const status = usePolledResource<unknown>('/api/payment/status');
+  const plansResource = usePolledResource<unknown>('/api/payment/plans');
+  const { enabled, testMode, region, confidence } = extractStatus(status.data);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const { signal } = controller;
+  // Plans only matter once the status says payment is on; a plans failure while payment is
+  // off is not an error the page needs to show.
+  const loading =
+    (status.loading && status.data === null) ||
+    (enabled && plansResource.loading && plansResource.data === null);
+  const error =
+    status.data === null
+      ? status.error
+      : enabled && plansResource.data === null
+        ? plansResource.error
+        : null;
 
-    async function load(): Promise<void> {
-      try {
-        // Step 1: fetch status
-        const statusRes = await fetch('/api/payment/status', { signal });
-        if (!statusRes.ok) {
-          throw new Error(`Status fetch failed: ${statusRes.status}`);
-        }
-        const statusBody: unknown = await statusRes.json();
-        const { enabled, testMode, region } = extractStatus(statusBody);
-
-        if (!enabled) {
-          // Payment disabled — no need to fetch plans.
-          setState({
-            plans: [],
-            loading: false,
-            error: null,
-            paymentEnabled: false,
-            region,
-            testMode,
-          });
-          return;
-        }
-
-        // Step 2: fetch plans (only when payment is enabled)
-        const plansRes = await fetch('/api/payment/plans', { signal });
-        if (!plansRes.ok) {
-          throw new Error(`Plans fetch failed: ${plansRes.status}`);
-        }
-        const plansBody: unknown = await plansRes.json();
-        const plans = extractPlans(plansBody);
-
-        setState({
-          plans,
-          loading: false,
-          error: null,
-          paymentEnabled: true,
-          region,
-          testMode,
-        });
-      } catch (err: unknown) {
-        // AbortError is not a real error — it means the component unmounted.
-        // We silently ignore it so we do not flash a spurious error message.
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-
-        const message = err instanceof Error ? err.message : 'Failed to load pricing information.';
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          error: message,
-        }));
-      }
-    }
-
-    void load();
-
-    // Cancel the in-flight fetch when the component unmounts.
-    return () => {
-      controller.abort();
-    };
-  }, []); // Empty deps — fetch once on mount; plans do not change at runtime.
-
-  return state;
+  return {
+    plans: enabled ? extractPlans(plansResource.data) : [],
+    loading,
+    error,
+    paymentEnabled: enabled,
+    region,
+    confidence,
+    testMode,
+    refresh: () => {
+      status.refetch();
+      plansResource.refetch();
+    },
+  };
 }

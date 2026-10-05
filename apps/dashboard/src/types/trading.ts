@@ -72,6 +72,37 @@ export interface PaperTrade {
    */
   lot_size: number;
 
+  // ---- Further paper_trades columns (001_core_schema / 004 / 012). GET /api/trades is
+  // `SELECT *`, so these normally arrive; they are optional because older rows, the
+  // fixture API and tests may omit them. NUMERIC columns are strings, as above. ----
+
+  /** personality_configs.id that opened the trade; null for pre-M2 (Milestone 1) trades. */
+  personality_id?: string | null;
+  /** The straddle_signals row that triggered it; null for Clockwork's fixed-time entries. */
+  signal_id?: string | null;
+  /** The trade this one rolled from (Adjuster); null for ordinary trades. */
+  parent_trade_id?: string | null;
+  /** Underlying, e.g. "NIFTY". */
+  symbol?: string | null;
+  /** Weekly expiry, a DATE column serialised as an ISO string. */
+  expiry?: string | null;
+  /** ATM strike (NUMERIC(10,2)). */
+  strike?: string | null;
+  /** 'MOMENTUM_EXHAUSTION' | 'SCHEDULED' | … */
+  entry_type?: string | null;
+  /** Day regime tag the EOD retrospection fills in; null until then. */
+  market_regime?: string | null;
+  /** India VIX when the trade was entered. */
+  vix_at_entry?: string | null;
+  /** Index spot when the trade was entered. */
+  spot_at_entry?: string | null;
+  /** Lowest straddle value seen while open (trailing-stop reference). */
+  lowest_straddle_value_seen?: string | null;
+  /** Leg prices at exit. */
+  exit_ce_price?: string | null;
+  exit_pe_price?: string | null;
+  notes?: string | null;
+
   // Allow extra fields the server might include in future without breaking
   // existing consumers.  Using an index signature with `unknown` keeps strict
   // type safety — callers must assert or narrow before using any extra field.

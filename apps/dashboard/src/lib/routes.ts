@@ -3,13 +3,17 @@
  * back/forward and a pasted link land on the same view:
  *
  *   /overview
- *   /live  /trades  /personalities  /pnl  /regime  /backfill  /replay
+ *   /live  /trades  /personalities  /pnl  /regime
  *   /optionslab/{strategies|builder|runs|results|regimes}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
  *   /momentum/{backtest|scores|saved|weekly|rebalance}
  *   /momentum/backtest/{etf|stock|custom_index|broad}
  *   /momentum/scores/{stocks|sectors}
- *   /brokerLogins  /pricing  /settings
+ *   /coverage/{backfill|replay}
+ *   /brokerLogins  /billing  /settings
+ *
+ * A path's first segment is the tab id, except where TAB_SEGMENT says otherwise (the
+ * `pricing` tab lives at /billing).
  *
  * PATH_ALIASES lists the other paths that resolve to one of those: old URLs
  * that must keep working, and the names later phases of the redesign will use.
@@ -22,7 +26,22 @@ import { NAV_GROUPS, type Tab, activeNavChild, navItem } from '../components/she
 /** Rendered while "/" (or an unknown path) is being redirected to the landing tab. */
 export const DEFAULT_TAB: Tab = 'overview';
 
-const TABS = new Set<string>(NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id)));
+/**
+ * Tabs whose URL segment differs from their id. Pricing was renamed Billing (BL-013 Phase 8):
+ * the id stays `pricing`, so stored navigation preferences and `navigate('pricing')` callers
+ * keep working, while the address bar says /billing.
+ */
+const TAB_SEGMENT: Readonly<Partial<Record<Tab, string>>> = { pricing: 'billing' };
+
+/** The first path segment of a tab's URL. */
+export function tabSegment(tab: Tab): string {
+  return TAB_SEGMENT[tab] ?? tab;
+}
+
+/** First path segment -> tab. */
+const TAB_BY_SEGMENT = new Map<string, Tab>(
+  NAV_GROUPS.flatMap((group) => group.items.map((item) => [tabSegment(item.id), item.id])),
+);
 
 /** In display order. Must match the Options Lab nav item's children (a test checks it). */
 export const OPTIONS_LAB_SECTIONS = [
@@ -46,6 +65,13 @@ export function builderMode(rest: readonly string[]): BuilderMode {
   return rest[0] === 'builder' && rest[1] === 'yaml' ? 'yaml' : 'form';
 }
 
+/** Data › Coverage's sections, in display order. Must match the Coverage nav item's children. */
+export const COVERAGE_SECTIONS = ['backfill', 'replay'] as const;
+export type CoverageSection = (typeof COVERAGE_SECTIONS)[number];
+
+/** What `/coverage` opens. */
+export const COVERAGE_DEFAULT_SECTION: CoverageSection = 'backfill';
+
 export const MOMENTUM_SECTIONS = ['backtest', 'scores', 'saved', 'weekly', 'rebalance'] as const;
 export type MomentumSection = (typeof MOMENTUM_SECTIONS)[number];
 
@@ -65,17 +91,21 @@ export interface ParsedRoute {
 /**
  * Alias path -> the canonical path it resolves to. Matched on whole leading
  * segments, longest alias first, and whatever follows the alias is kept
- * (`/data/backfill/x` -> `/backfill/x`). The shell rewrites the address bar to
- * the canonical path, so an alias behaves like a redirect.
+ * (`/pricing/x` -> `/billing/x`). The shell rewrites the address bar to the
+ * canonical path, so an alias behaves like a redirect.
  *
  * When a later phase renames or merges a screen, its old path goes here.
  */
 export const PATH_ALIASES: Readonly<Record<string, string>> = {
-  '/billing': '/pricing',
+  // Pricing was renamed Billing (BL-013 Phase 8).
+  '/pricing': '/billing',
   '/brokers': '/brokerLogins',
   '/brokerlogins': '/brokerLogins',
-  '/data/backfill': '/backfill',
-  '/data/replay': '/replay',
+  // The Backfill and Replay tabs became Data › Coverage's two sections (BL-013 Phase 8).
+  '/backfill': '/coverage/backfill',
+  '/replay': '/coverage/replay',
+  '/data/backfill': '/coverage/backfill',
+  '/data/replay': '/coverage/replay',
   // The standalone YAML Backtest tab became the builder's YAML mode (BL-013 Phase 7).
   '/backtest': '/optionslab/builder/yaml',
   '/optionslab/yaml': '/optionslab/builder/yaml',
@@ -116,11 +146,12 @@ export function aliasTarget(pathname: string): string | null {
 export function parsePath(pathname: string): ParsedRoute {
   const raw = splitPath(pathname);
   const [first, ...rest] = resolveAlias(raw) ?? raw;
-  return first && TABS.has(first) ? { tab: first as Tab, rest } : { tab: null, rest: [] };
+  const tab = first === undefined ? undefined : TAB_BY_SEGMENT.get(first);
+  return tab ? { tab, rest } : { tab: null, rest: [] };
 }
 
 export function buildPath(tab: Tab, ...rest: Array<string | undefined>): string {
-  const parts = [tab, ...rest.filter((part): part is string => Boolean(part))];
+  const parts = [tabSegment(tab), ...rest.filter((part): part is string => Boolean(part))];
   return `/${parts.map(encodeURIComponent).join('/')}`;
 }
 

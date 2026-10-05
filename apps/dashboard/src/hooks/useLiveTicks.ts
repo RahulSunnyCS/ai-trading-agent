@@ -2,8 +2,17 @@
  * useLiveTicks — WebSocket hook for /ws/ticks
  *
  * Manages a single WebSocket connection to the live tick feed, tracks
- * connection status, maintains a bounded ring buffer of recent ticks,
- * and handles reconnection with exponential backoff + jitter.
+ * connection status, keeps bounded histories of recent index ticks and
+ * straddle snapshots, and handles reconnection with exponential backoff + jitter.
+ *
+ * The histories live at module level, not in the component: they survive the
+ * Live tab unmounting, so switching away and back shows the recent history
+ * instead of an empty chart (the socket itself is still closed on unmount).
+ * They last for the page session; a reload starts empty. The append rule is
+ * `appendPoint` in lib/live.ts (unit-tested there).
+ *
+ * Only index ticks feed `latestLtp` / `ticks`: the socket also forwards India
+ * VIX and the ATM option-leg ticks from the same Redis stream (`isIndexTick`).
  *
  * Designed to be React 18 StrictMode-safe: the cleanup path nullifies
  * the socket reference and detaches `onclose` BEFORE calling close(),
@@ -11,7 +20,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TickMessage } from '../types/trading';
+import { TICK_BUFFER_CAP, appendPoint, isIndexTick } from '../lib/live';
+import type { TickMessage, WsStraddleMessage } from '../types/trading';
 
 // ---------------------------------------------------------------------------
 // Public API types
@@ -37,18 +47,27 @@ export interface StraddleSnapshot {
   cePrice: number;
   pePrice: number;
   timestamp: number; // epoch ms
+  /** Percent change in straddle value since the previous snapshot. */
   roc?: number;
+  /** This snapshot's ROC minus the previous one's, in percentage points. */
   acceleration?: number;
+}
+
+/** One straddle value in the history (for the sparkline). */
+export interface StraddlePoint {
+  /** Epoch milliseconds. */
+  time: number;
+  value: number;
 }
 
 export interface UseLiveTicksResult {
   /** Reflects the current WebSocket readyState in plain terms. */
   status: ConnectionStatus;
-  /** The most-recently received ltp value, or null before the first tick. */
+  /** The most-recently received index ltp, or null before the first index tick. */
   latestLtp: number | null;
-  /** Epoch ms timestamp of the latest tick, or null before the first tick. */
+  /** Epoch ms timestamp of the latest index tick, or null before the first one. */
   latestTimestamp: number | null;
-  /** Bounded ring buffer of recent ticks (oldest first). Max BUFFER_CAP entries. */
+  /** Bounded history of recent index ticks (oldest first). Max TICK_BUFFER_CAP entries. */
   ticks: readonly TickPoint[];
   /**
    * Latest straddle snapshot received via /ws/ticks, or null before the first
@@ -56,14 +75,77 @@ export interface UseLiveTicksResult {
    * straddle.values entry (approximately every 15 s).
    */
   latestStraddle: StraddleSnapshot | null;
+  /** Bounded history of straddle values received this page session (oldest first). */
+  straddles: readonly StraddlePoint[];
+}
+
+// ---------------------------------------------------------------------------
+// Session history (module level: survives the component unmounting)
+// ---------------------------------------------------------------------------
+
+interface LiveHistory {
+  ticks: readonly TickPoint[];
+  straddles: readonly StraddlePoint[];
+  latestStraddle: StraddleSnapshot | null;
+}
+
+const EMPTY_HISTORY: LiveHistory = { ticks: [], straddles: [], latestStraddle: null };
+
+let history: LiveHistory = EMPTY_HISTORY;
+
+/** Test seam: forget the session history. */
+export function resetLiveHistory(): void {
+  history = EMPTY_HISTORY;
+}
+
+function asNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Fold one parsed /ws/ticks frame into a history. Returns the same object when the frame
+ * changes nothing (unknown type, a non-index tick, malformed numbers, an out-of-order point).
+ * Exported for tests.
+ */
+export function applyFrame(prev: LiveHistory, msg: TickMessage): LiveHistory {
+  if (msg.type === 'tick') {
+    const ltp = asNumber(msg.ltp);
+    const time = asNumber(msg.timestamp);
+    if (ltp === null || time === null || !isIndexTick(msg.symbol)) return prev;
+    const ticks = appendPoint(prev.ticks, { time, ltp }, TICK_BUFFER_CAP);
+    return ticks === prev.ticks ? prev : { ...prev, ticks };
+  }
+  if (msg.type === 'straddle') {
+    const s = msg as WsStraddleMessage;
+    const value = asNumber(s.straddleValue);
+    const time = asNumber(s.timestamp);
+    if (value === null || time === null) return prev;
+    const straddles = appendPoint(prev.straddles, { time, value }, TICK_BUFFER_CAP);
+    if (straddles === prev.straddles) return prev;
+    const roc = asNumber(s.roc);
+    const acceleration = asNumber(s.acceleration);
+    return {
+      ...prev,
+      straddles,
+      latestStraddle: {
+        straddleValue: value,
+        atmStrike: s.atmStrike,
+        cePrice: s.cePrice,
+        pePrice: s.pePrice,
+        timestamp: time,
+        // Spread optional fields only when present to keep the snapshot lean.
+        ...(roc !== null ? { roc } : {}),
+        ...(acceleration !== null ? { acceleration } : {}),
+      },
+    };
+  }
+  // 'connected' and any future unknown types are ignored (backward compatible).
+  return prev;
 }
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-/** Maximum number of tick points retained in memory. */
-const BUFFER_CAP = 300;
 
 /**
  * Backoff base delay in milliseconds.
@@ -115,10 +197,8 @@ function buildWsUrl(): string {
 
 export function useLiveTicks(): UseLiveTicksResult {
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
-  const [latestLtp, setLatestLtp] = useState<number | null>(null);
-  const [latestTimestamp, setLatestTimestamp] = useState<number | null>(null);
-  const [ticks, setTicks] = useState<TickPoint[]>([]);
-  const [latestStraddle, setLatestStraddle] = useState<StraddleSnapshot | null>(null);
+  // Starts from the session history, so a remount shows what arrived before it.
+  const [live, setLive] = useState<LiveHistory>(() => history);
 
   // `attemptRef` tracks the current reconnect attempt count so the backoff
   // callback always reads the latest value without needing it in the
@@ -174,53 +254,13 @@ export function useLiveTicks(): UseLiveTicksResult {
         return;
       }
 
-      // Narrow via the discriminated union; dispatch on `type`.
-      // 'connected' messages are acknowledged by the server and intentionally
-      // ignored here (status is already set in onopen).
-      // Unknown types are silently dropped — this keeps the hook
-      // backward-compatible if the server ever adds new message types.
-      const typed = msg as TickMessage;
-
-      if (typed.type === 'tick') {
-        const { ltp, timestamp } = typed;
-
-        setLatestLtp(ltp);
-        setLatestTimestamp(timestamp);
-
-        // Append to the ring buffer, dropping the oldest point when full.
-        // We use a functional setState so the closure always sees the latest
-        // array — avoids stale capture if the hook re-runs.
-        setTicks((prev) => {
-          const next: TickPoint[] =
-            prev.length >= BUFFER_CAP
-              ? // Slice from index 1 drops the oldest entry.
-                [...prev.slice(1), { time: timestamp, ltp }]
-              : [...prev, { time: timestamp, ltp }];
-          return next;
-        });
-        return;
-      }
-
-      if (typed.type === 'straddle') {
-        // Cast to the concrete straddle type — the discriminated union already
-        // narrowed `type` to 'straddle', so this is safe and avoids importing
-        // WsStraddleMessage into the component layer.
-        const s = typed as import('../types/trading').WsStraddleMessage;
-        setLatestStraddle({
-          straddleValue: s.straddleValue,
-          atmStrike: s.atmStrike,
-          cePrice: s.cePrice,
-          pePrice: s.pePrice,
-          timestamp: s.timestamp,
-          // Spread optional fields only when present to keep the snapshot lean.
-          ...(s.roc !== undefined ? { roc: s.roc } : {}),
-          ...(s.acceleration !== undefined ? { acceleration: s.acceleration } : {}),
-        });
-        return;
-      }
-
-      // All other types ('connected' and any future unknown types) are
-      // intentionally ignored — backward compatibility is preserved.
+      // Fold the frame into the module-level history (it outlives this component), then
+      // mirror it into state. Unknown types and non-index ticks leave it unchanged.
+      if (typeof msg !== 'object' || msg === null) return;
+      const next = applyFrame(history, msg as TickMessage);
+      if (next === history) return;
+      history = next;
+      setLive(next);
     };
 
     ws.onerror = () => {
@@ -305,5 +345,13 @@ export function useLiveTicks(): UseLiveTicksResult {
     };
   }, [connect]);
 
-  return { status, latestLtp, latestTimestamp, ticks, latestStraddle };
+  const lastTick = live.ticks[live.ticks.length - 1];
+  return {
+    status,
+    latestLtp: lastTick?.ltp ?? null,
+    latestTimestamp: lastTick?.time ?? null,
+    ticks: live.ticks,
+    latestStraddle: live.latestStraddle,
+    straddles: live.straddles,
+  };
 }
