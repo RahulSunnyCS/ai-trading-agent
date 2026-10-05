@@ -237,3 +237,6 @@ To ask when this is started (workflow step 3):
   hand: no `date=2026-09-30` partition in `~/TradingData/lake/bars_1m` (latest is 1 Oct);
   `nifty50_membership.csv` has no 2026 changes; `holidays.csv` ends 2026-12-25. Takes
   over BL-011 Phases 2–4.
+- 2026-10-06 — new jobs to schedule once their items land: the Friday forward-journal write and
+  the weekly scoring (BL-024), the live-money rules check (BL-025), and the daily
+  realised-vs-backtest join for options (BL-026).

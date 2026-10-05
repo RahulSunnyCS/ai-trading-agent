@@ -400,3 +400,9 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   filings; applied to the shared database after a backup (owner approved). 41 new factors, 13
   in the Total Market; three filings still need a manual look. Six configs move −1.3 to +0.7
   points.
+- 2026-10-06 — note from the overnight review: themes added in a session on 2026-10-05 (Nuclear
+  Supply Chain, Battery Storage (BESS), Optic Fibre, Semiconductors and others — about 69 rows) sit
+  **uncommitted** in `categories/curated/category_extras.csv` and `stockscans_catalog.md` in the
+  main checkout. Like F2, they are 2026 themes with no launch date; under Phase 3 step 3 they must
+  get one before any backtest can use them, and until Phase 3 passes they are not searched. Forward
+  tracking (Phase 6) can start earlier than planned without touching this review — see BL-024.

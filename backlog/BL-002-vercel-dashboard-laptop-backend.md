@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Priority** | P2 — the code is built and tested; this is the owner-side set-up that makes it usable from anywhere |
+| **Priority** | P1 — friends get access in week 2 of the October plan; the code is built and tested, this is the owner-side set-up |
 | **Status** | Planned |
 | **Type** | chore |
 | **Area** | infra |
@@ -118,3 +118,6 @@ token is refused by Cloudflare.
 
 - 2026-10-04 — created from the remote-dashboard work (PR #2 merged, PR #3 open).
   Checked Vercel: no existing project for this repo.
+- 2026-10-06 — re-prioritised P2 → P1: the owner plans to give two or three friends access to
+  Momentum during week 2 of the October plan. Before sharing, decide which actions friends may
+  trigger (ingestion, weekly-signal sends, Fyers login) — see the review PR's approval list.
