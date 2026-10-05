@@ -53,3 +53,17 @@ Holdings within a week are now compared in name order: equal weights tie-broke d
 | broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
 | broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-06 (on top of `9ea65a6`)
+
+BL-010 E10 to E12. E10: a stock with no session in a week can be neither bought nor sold when circuit locks are respected. E11: a price series that has ended leaves the pool at once, not at the next quarter. E12: selling everything at the end of a taxed run pays one depository charge per stock, not per lot.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| etf_filter_taxed_itemised | 15.52% -> 15.52% | -42.00% -> -42.00% |
+| broad_default | 18.29% -> 18.67% | -26.72% -> -26.72% |
+| broad_category_mode_off | 37.62% -> 36.99% | -27.73% -> -28.58% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |
+| broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
+| broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
+| broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |

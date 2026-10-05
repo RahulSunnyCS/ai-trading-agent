@@ -68,7 +68,11 @@ def lock_masks(
     that week (the day a weekly trade fills) sits inside a same-direction band-edge run of at
     least `min_days` sessions. The whole run counts, from its first day, because that is known
     only in hindsight -- which is the point: this is a what-would-have-been-impossible check,
-    not something a live rule could see coming."""
+    not something a live rule could see coming.
+
+    Both are also True in a week the stock did not trade at all, between its first and last
+    session (a suspension, or FORCEMOT's 3.5 months off NSE in 2023-24): with no session there
+    is nobody to buy from or sell to, and the only price is a stale one."""
     from .. import db_read  # noqa: PLC0415 (avoid an import cycle at module load)
 
     symbols = sorted(set(column_to_base.values()))
@@ -97,13 +101,27 @@ def lock_masks(
       from d d2 left join t on t.symbol = d2.symbol and t.date = d2.date)
     group by 1, 2"""
     start = (pd.Timestamp(weeks.min()) - pd.Timedelta(days=14)).date()
+    traded_sql = """
+    select i.symbol, cast(b.date + ((5 - dayofweek(b.date) + 7) % 7) * interval 1 day as date) as wk
+    from bars_1d_stock b join instruments i using (instrument_id)
+    where i.symbol in (select unnest(?)) group by 1, 2"""
     with connect(root or data_root(), read_only=True) as con:
         frame = con.execute(sql, [symbols, start]).df()
+        traded = con.execute(traded_sql, [symbols]).df()
     frame["wk"] = pd.to_datetime(frame["wk"])
+    traded["wk"] = pd.to_datetime(traded["wk"])
+    # Weeks ending Friday in which the stock had any session, in any series.
+    active = (
+        traded.assign(on=True)
+        .pivot_table(index="wk", columns="symbol", values="on", aggfunc="max")
+        .reindex(columns=symbols)
+    )
+    listed = active.ffill().notna() & active.bfill().notna()  # between first and last session
+    halted = (listed & active.isna()).reindex(index=weeks).fillna(False).astype(bool)
     out = []
     for field in ("up", "down"):
         wide = frame.pivot_table(index="wk", columns="symbol", values=field, aggfunc="max")
-        wide = wide.reindex(index=weeks, columns=symbols).fillna(0).astype(bool)
+        wide = wide.reindex(index=weeks, columns=symbols).fillna(0).astype(bool) | halted
         out.append(pd.DataFrame({col: wide[base] for col, base in column_to_base.items()}))
     if len(_mask_cache) > 4:
         _mask_cache.clear()

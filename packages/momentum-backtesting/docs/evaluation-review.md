@@ -265,3 +265,25 @@ uv run mbt audit outside $B/{aggressive,midway,conservative,median1,median2,medi
   --day NEULANDLAB:2023-05-11 --day POLYCAB:2024-01-11 --day RECLTD:2024-06-04 \
   --day RVNL:2022-12-23 --out $A
 ```
+
+## Phase 2 follow-up — fixes E10 to E12 (2026-10-06)
+
+Each has a test that fails on the old code (`tests/test_phase2_fixes.py`) and went through the
+frozen-results accept step (`tests/golden/CHANGELOG.md`). All twelve re-runs below still
+reconcile in the independent replay.
+
+| Config | As searched: before → after | ₹5 lakh after tax: before → after |
+|---|---|---|
+| Aggressive winner | 52.17% → 52.17% | 40.16% → 40.16% |
+| Midway winner | 52.86% → 52.94% | 42.32% → 42.42% |
+| Conservative winner | 45.99% → 45.92% | 37.15% → 37.09% |
+| Median 1 | 34.87% → 34.69% | 28.11% → 27.98% |
+| Median 2 | 32.53% → 32.53% | 24.77% → 24.77% |
+| Median 3 | 32.40% → 32.91% | 26.34% → 26.74% |
+
+- **E10:** with circuit locks respected, a stock that had no session in a week can be neither
+  bought nor sold. FORCEMOT is now held through its 3.5 months off NSE; no order fills at a
+  stale price in five of the six runs.
+- **E11:** a price series that has ended leaves the pool the week after its last real price.
+- **E12:** one depository charge per stock when a taxed run sells everything at the end.
+- **E13 (Monday-fill option) is not done.** It is a new execution mode, not a fix.
