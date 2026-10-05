@@ -243,6 +243,10 @@ contract, not a shared service).
   pass/kill thresholds for the evaluation review (BL-010). Never edit after results are seen;
   supersede with a new file. A step added later gets its own `bl010_criteria_addendum_N.json`,
   committed before that step runs (addendum 1: Monday-open repricing).
+- `audit/` — `mbt audit bundle|replay|study|outside` (BL-010 Phase 2). `bundle.py` writes a
+  run's orders and the backtest's claims; `replay.py` rebuilds the result from the orders and
+  the lake's raw bars and compares. `replay.py`, `studies.py` and `outside.py` must never import
+  from the rest of the package (a test enforces it): shared code would hide a shared mistake.
 - `search.py` + `search_spaces/*.toml` — `mbt search run|analyze`: resumable parallel parameter search over
   Broad Momentum (TODO 3.9.25). Parameters are *heavy* (change the global ranking; one
   `broad.compute_universe_base` per combination) or *light* (everything after, incl. the pool cut via
