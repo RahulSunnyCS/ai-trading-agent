@@ -13,36 +13,64 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { DEFAULT_CUTS, useAnatomy } from '../../hooks/useLegwise';
-import { formatNumber, formatPct } from '../../lib/format';
+import { useAnatomy } from '../../hooks/useLegwise';
+import { formatDay, formatInt, formatMultiple, formatNumber, formatPct } from '../../lib/format';
 import { styleProxies, zscore } from '../../lib/legwiseJoin';
+import { regimeMeta } from '../../lib/regimeMeta';
 import {
+  type ExpiryFilter,
   type Label,
   associationTest,
   baseRates,
   crossTab,
+  expiryCounts,
+  filterByExpiry,
+  matchesExpiry,
   meanRunLength,
   permutationTest,
   rollingShare,
-  stayRate,
-  transitions,
+  stayRateInto,
+  transitionsInto,
 } from '../../lib/regimeStats';
+import {
+  MAX_CUTS,
+  MIN_CUTS,
+  isDefaultCuts,
+  sameCuts,
+  segmentNames,
+  useRegimeCuts,
+  useRegimeCutsStore,
+  validateCuts,
+} from '../../store/regimeCuts';
 import type { AnatomyResponse, DayAnatomy } from '../../types/legwise';
+import { Accordion } from '../ui/Accordion';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { CodeBlock } from '../ui/CodeBlock';
+import { InfoTooltip } from '../ui/InfoTooltip';
+import { SegmentedControl } from '../ui/SegmentedControl';
+import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import {
   CalendarHeatmap,
   CrossTabTable,
   HeatmapLegend,
   LabelMixTable,
+  LiftLegend,
   STATES,
   TransitionMatrix,
 } from './RegimeViews';
+import { CommandHint } from './regimes/CommandHint';
+import { RegimeBadge } from './regimes/RegimeBadge';
+import { ShareChart } from './regimes/ShareChart';
 import { CumulativeLines, Field, Select, TextInput } from './shared';
 
-const CUTS_KEY = 'optionslab.cuts';
+// The cuts live in store/regimeCuts.ts now; this name is kept for existing importers.
+export { validateCuts };
+
 const MIN_DAYS_FOR_CLAIMS = 60;
+const SHARE_WINDOW = 20;
+const PROXY_WINDOW = 10;
 const RANGES = [
   { value: 'all', label: 'All history' },
   { value: '1y', label: 'Last 1 year' },
@@ -51,16 +79,11 @@ const RANGES = [
 ] as const;
 type RangeKey = (typeof RANGES)[number]['value'];
 
-function loadCuts(): string[] {
-  try {
-    const raw = window.localStorage.getItem(CUTS_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(parsed) && parsed.every((c) => typeof c === 'string')) return parsed;
-  } catch {
-    // storage blocked or corrupt: fall back to the defaults
-  }
-  return [...DEFAULT_CUTS];
-}
+const EXPIRY_TEXT: Record<ExpiryFilter, string> = {
+  all: 'all days',
+  expiry: 'expiry days',
+  non_expiry: 'non-expiry days',
+};
 
 function fromDate(range: RangeKey): string | undefined {
   if (range === 'all') return undefined;
@@ -69,34 +92,28 @@ function fromDate(range: RangeKey): string | undefined {
   return d.toISOString().slice(0, 10);
 }
 
-/** Client-side mirror of anatomy.parse_cuts, so a typo never costs a round trip. */
-export function validateCuts(cuts: string[]): string | null {
-  if (cuts.length === 0 || cuts.length > 4) return 'Use between 1 and 4 cut times.';
-  if (cuts.some((c) => !/^\d{2}:\d{2}$/.test(c))) return 'Cut times must look like 10:30.';
-  const minutes = cuts.map((c) => Number(c.slice(0, 2)) * 60 + Number(c.slice(3)));
-  if (minutes.some((m) => m <= 9 * 60 + 15 || m >= 15 * 60 + 30)) {
-    return 'Cuts must fall inside the session (09:16–15:29).';
-  }
-  if (minutes.some((m, i) => i > 0 && m <= (minutes[i - 1] ?? 0))) {
-    return 'Cuts must be in increasing order.';
-  }
-  return null;
-}
-
 /** One label per day for a series (-1 = whole day, else a segment index); null = unknown. */
 function labelsFor(days: DayAnatomy[], idx: number): Label[] {
   return days.map((d) => (idx < 0 ? d.whole?.label : d.segments[idx]?.label) ?? null);
 }
 
-function segmentNames(cuts: string[]): string[] {
-  const edges = ['09:15', ...cuts, '15:30'];
-  return edges.slice(1).map((e, i) => `${edges[i]}–${e}`);
+/** A card title with its longer explanation behind an (i). */
+function TitleWithInfo({ title, info }: { title: string; info: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {title}
+      <InfoTooltip text={info} label={`About ${title}`} />
+    </span>
+  );
 }
 
 export function RegimesPanel() {
-  const [cuts, setCuts] = useState<string[]>(loadCuts);
-  const [draft, setDraft] = useState<string[]>(cuts);
+  const cuts = useRegimeCuts();
+  const setCuts = useRegimeCutsStore((s) => s.setCuts);
+  const resetCuts = useRegimeCutsStore((s) => s.resetCuts);
+  const [draft, setDraft] = useState<string[]>(() => [...cuts]);
   const [range, setRange] = useState<RangeKey>('all');
+  const [expiry, setExpiry] = useState<ExpiryFilter>('all');
   const [series, setSeries] = useState(-1); // -1 = whole day
   const [from, setFrom] = useState(0);
   const [to, setTo] = useState(1);
@@ -106,12 +123,9 @@ export function RegimesPanel() {
   const names = useMemo(() => segmentNames(cuts), [cuts]);
   const draftError = validateCuts(draft);
 
+  // Follow the shared cuts when they change elsewhere (stored cuts arriving, a reset).
   useEffect(() => {
-    try {
-      window.localStorage.setItem(CUTS_KEY, JSON.stringify(cuts));
-    } catch {
-      // not persisted: the tab still works
-    }
+    setDraft([...cuts]);
   }, [cuts]);
   // Keep the selectors inside the segment list when the number of cuts changes.
   useEffect(() => {
@@ -120,19 +134,25 @@ export function RegimesPanel() {
     setTo((t) => Math.min(Math.max(t, 1), names.length - 1));
   }, [names.length]);
 
-  const days = useMemo(() => data?.days ?? [], [data]);
-  const labels = useMemo(() => labelsFor(days, series), [days, series]);
+  const allDays = useMemo(() => data?.days ?? [], [data]);
+  const counts = useMemo(() => expiryCounts(allDays), [allDays]);
+  const hasExpiryFlags = counts.expiry + counts.nonExpiry > 0;
+  // Never leave the panel on a filter the data cannot answer.
+  const filter: ExpiryFilter = hasExpiryFlags ? expiry : 'all';
+  /** The days the statistics are about; the calendar still draws every day. */
+  const days = useMemo(() => filterByExpiry(allDays, filter), [allDays, filter]);
 
   const analysis = useMemo(() => {
-    const t = transitions(labels, STATES);
-    const base = baseRates(labels);
+    // Real day-to-day adjacency over ALL days; a pair counts when its next day is in the filter.
+    const labels = labelsFor(allDays, series);
+    const keep = allDays.map((d) => matchesExpiry(d, filter));
     return {
-      t,
-      base,
-      stay: permutationTest(labels, stayRate),
-      run: permutationTest(labels, meanRunLength),
+      t: transitionsInto(labels, STATES, keep),
+      base: baseRates(labelsFor(days, series)),
+      stay: permutationTest(labels, (ls) => stayRateInto(ls, keep)),
+      run: filter === 'all' ? permutationTest(labels, meanRunLength) : null,
     };
-  }, [labels]);
+  }, [allDays, days, series, filter]);
 
   const mixRows = useMemo(
     () =>
@@ -148,9 +168,7 @@ export function RegimesPanel() {
   );
 
   const rolling = useMemo(() => {
-    const pick = (idx: number) => (d: (typeof days)[number]) =>
-      idx < 0 ? d.whole : d.segments[idx];
-    const seg = pick(series);
+    const seg = (d: DayAnatomy) => (series < 0 ? d.whole : d.segments[series]);
     const trend = days.map((d) => {
       const s = seg(d);
       return { day: d.day, value: s ? s.label === 'TREND_UP' || s.label === 'TREND_DOWN' : null };
@@ -163,22 +181,17 @@ export function RegimesPanel() {
       };
     });
     return [
-      { id: 'trend days %', points: rollingShare(trend, 20) },
-      { id: 'realised < implied %', points: rollingShare(calm, 20) },
+      { id: 'Trend days', points: rollingShare(trend, SHARE_WINDOW) },
+      { id: 'Moved less than VIX implied', points: rollingShare(calm, SHARE_WINDOW) },
     ];
   }, [days, series]);
+  const rollingReady = rolling.some((line) => line.points.length > 0);
 
   const proxies = useMemo(() => {
-    const p = styleProxies(days, series, 10);
+    const p = styleProxies(days, series, PROXY_WINDOW);
     return [
-      {
-        id: 'short-premium proxy',
-        points: p.premium.map((x) => ({ time: x.time, value: x.value })),
-      },
-      {
-        id: 'directional proxy',
-        points: p.directional.map((x) => ({ time: x.time, value: x.value })),
-      },
+      { id: 'short-premium proxy', points: zscore(p.premium) },
+      { id: 'directional proxy', points: zscore(p.directional) },
     ];
   }, [days, series]);
 
@@ -213,23 +226,33 @@ export function RegimesPanel() {
     ...names.map((n, i) => ({ value: String(i), label: n })),
   ];
   const segOptions = names.map((n, i) => ({ value: String(i), label: n }));
+  const seriesName = series < 0 ? 'Whole day' : (names[series] ?? '');
+  const nAll = allDays.length;
   const nDays = days.length;
   const thin = nDays < MIN_DAYS_FOR_CLAIMS;
+  const quietCut = formatMultiple(data?.thresholds.quiet_range_over_implied, 1);
+  const trendCut = formatMultiple(data?.thresholds.trend_strength, 1);
+  const draftChanged = !sameCuts(draft, cuts);
 
-  function apply() {
-    if (draftError === null) setCuts(draft);
-  }
+  const seriesSelect = (
+    <Select value={String(series)} options={seriesOptions} onChange={(v) => setSeries(Number(v))} />
+  );
 
   return (
     <div className="space-y-5">
       <Card>
         <CardHeader
-          title="Market regimes"
-          description="How the index behaved inside each part of the session, from NIFTY 1-minute bars and India VIX. A label is only known after the day — read persistence lag-1 (yesterday → today) before using it for anything."
+          title={
+            <TitleWithInfo
+              title="Market regimes"
+              info="A label is only known once its day is over. A pattern found here is usable only when read one day late: yesterday's label against today's outcome."
+            />
+          }
+          description="How the index behaved inside each part of the session, from NIFTY 1-minute bars and India VIX."
         />
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Cut times (segment edges)">
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {draft.map((c, i) => (
                 <TextInput
                   // biome-ignore lint/suspicious/noArrayIndexKey: positional inputs, edited in place
@@ -245,25 +268,63 @@ export function RegimesPanel() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => draft.length < 4 && setDraft([...draft, '14:30'])}
+            disabled={draft.length >= MAX_CUTS}
+            onClick={() => setDraft([...draft, '14:30'])}
           >
             + cut
           </Button>
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => draft.length > 1 && setDraft(draft.slice(0, -1))}
+            disabled={draft.length <= MIN_CUTS}
+            onClick={() => setDraft(draft.slice(0, -1))}
           >
             − cut
           </Button>
-          <Button size="sm" variant="primary" disabled={draftError !== null} onClick={apply}>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={draftError !== null || !draftChanged}
+            onClick={() => setCuts(draft)}
+          >
             Apply
           </Button>
+          {!isDefaultCuts(cuts) && (
+            <Button size="sm" variant="ghost" onClick={resetCuts}>
+              Reset cuts
+            </Button>
+          )}
           <Field label="Range">
             <Select value={range} options={RANGES} onChange={setRange} />
           </Field>
+          <Field label="Days">
+            <SegmentedControl
+              ariaLabel="Expiry or non-expiry days"
+              size="sm"
+              value={filter}
+              onChange={setExpiry}
+              options={[
+                { value: 'all', label: `All (${formatInt(nAll)})` },
+                {
+                  value: 'expiry',
+                  label: `Expiry days (${formatInt(counts.expiry)})`,
+                  disabled: !hasExpiryFlags,
+                },
+                {
+                  value: 'non_expiry',
+                  label: `Non-expiry days (${formatInt(counts.nonExpiry)})`,
+                  disabled: !hasExpiryFlags,
+                },
+              ]}
+            />
+          </Field>
         </div>
         {draftError && <p className="mt-2 text-xs text-negative">{draftError}</p>}
+        <p className="mt-2 text-xs text-faint">
+          These cut times are shared: Daily results and the day replay split the session the same
+          way.
+        </p>
+        {res.loading && !data && <SkeletonRows rows={3} className="mt-3" />}
         {res.error && !data && (
           <div className="mt-3">
             <StateMessage
@@ -273,46 +334,96 @@ export function RegimesPanel() {
             />
           </div>
         )}
-        {data && nDays === 0 && (
+        {data && nAll === 0 && (
           <div className="mt-3">
             <StateMessage
               variant="empty"
               title="No index history yet"
-              description="Run `uv run obt fyers history` (from packages/option-backtesting, with a Fyers login) to backfill NIFTY and India VIX."
+              description={
+                <CommandHint
+                  command="uv run obt fyers history"
+                  where="from packages/option-backtesting"
+                >
+                  The NIFTY and India VIX minute history has not been downloaded for this range.
+                  Downloading it once needs today's Fyers login; after that this tab fills in.
+                </CommandHint>
+              }
             />
           </div>
         )}
-        {nDays > 0 && (
-          <p className="mt-3 text-xs text-muted">
-            {nDays} days · {days[0]?.day} → {days[nDays - 1]?.day} · QUIET = range under{' '}
-            {data?.thresholds.quiet_range_over_implied}× the VIX-implied range, TREND = at least{' '}
-            {data?.thresholds.trend_strength}× as directional as a random walk would be. These
-            thresholds are first guesses — check the label mix below before trusting a pattern.
-            {thin && (
-              <span className="text-warning">
-                {' '}
-                Fewer than {MIN_DAYS_FOR_CLAIMS} days: read the calendar, not the statistics.
-              </span>
-            )}
-          </p>
+        {nAll > 0 && (
+          <>
+            <p className="mt-3 text-xs text-muted">
+              {formatInt(nDays)} {EXPIRY_TEXT[filter]} · {formatDay(allDays[0]?.day)} →{' '}
+              {formatDay(allDays[nAll - 1]?.day)}
+              {filter !== 'all' && counts.unknown > 0 && (
+                <>
+                  {' '}
+                  · {formatInt(counts.unknown)} days before {formatDay(data?.dte_reliable_from)}{' '}
+                  have no expiry flag and are left out
+                </>
+              )}
+              {thin && (
+                <span className="text-warning">
+                  {' '}
+                  · Fewer than {MIN_DAYS_FOR_CLAIMS} days: read the calendar, not the statistics.
+                </span>
+              )}
+            </p>
+            <Accordion title="How this is computed" defaultOpen={false} className="mt-3">
+              <dl className="space-y-2 text-sm text-muted">
+                {STATES.map((s) => (
+                  <div key={s} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <dt>
+                      <RegimeBadge regime={s} />
+                    </dt>
+                    <dd className="min-w-0 flex-1 basis-64">{regimeMeta(s).definition}</dd>
+                  </div>
+                ))}
+              </dl>
+              <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted">
+                <li>
+                  Quiet means the range stayed under {quietCut} the range India VIX implied for that
+                  stretch. Above that, a move at least {trendCut} as directional as a random walk is
+                  a trend; anything else is chop.
+                </li>
+                <li>
+                  These two thresholds are first guesses. If one label dominates the label mix, the
+                  threshold is off, not the market.
+                </li>
+                <li>
+                  Every "by chance" figure comes from shuffling the order of the days 1,000 times,
+                  which keeps the label mix and destroys any sequence. p is the share of shuffles
+                  that did at least as well.
+                </li>
+                <li>
+                  With Expiry days or Non-expiry days selected, the mix, the share chart, the style
+                  proxies and the within-day table use only those days. The persistence table still
+                  pairs each day with the trading day before it and counts the pair when the later
+                  day is in the selection.
+                </li>
+              </ul>
+            </Accordion>
+          </>
         )}
       </Card>
 
-      {nDays > 0 && (
+      {nAll > 0 && (
         <>
           <Card>
             <CardHeader
               title="Calendar"
-              description="One cell per trading day (columns = weeks, rows = Mon–Fri). Runs of one colour are the 'periods'."
+              description="One cell per trading day. Runs of one colour are the periods."
               actions={<HeatmapLegend />}
             />
-            <div className="space-y-3">
+            <div className="space-y-4">
               {[-1, ...names.map((_, i) => i)].map((idx) => (
                 <CalendarHeatmap
                   key={idx}
-                  days={days}
+                  days={allDays}
                   series={idx}
                   caption={idx < 0 ? 'Whole day' : (names[idx] ?? '')}
+                  isDimmed={filter === 'all' ? undefined : (d) => !matchesExpiry(d, filter)}
                 />
               ))}
             </div>
@@ -320,25 +431,36 @@ export function RegimesPanel() {
 
           <Card>
             <CardHeader
-              title="Label mix"
-              description="Share of days in each state, per segment. If one state dominates, the threshold is wrong, not the market."
+              title={
+                <TitleWithInfo
+                  title="Label mix"
+                  info="Share of days in each state, per segment. If one state dominates, the threshold is wrong, not the market."
+                />
+              }
+              description={`Share of ${EXPIRY_TEXT[filter]} in each state.`}
             />
             <LabelMixTable rows={mixRows} />
           </Card>
 
           <Card>
             <CardHeader
-              title="Do regimes persist?"
-              description="Today's label → next day's label, beside the base rate. Bold green / red = at least 10 points above / below base with 5+ cases behind the cell; faded rows have under 20 days."
-              actions={
-                <Select
-                  value={String(series)}
-                  options={seriesOptions}
-                  onChange={(v) => setSeries(Number(v))}
+              title={
+                <TitleWithInfo
+                  title="Do regimes persist?"
+                  info="Each row is today's label; each cell is how often the next trading day got that column's label, with the number of days in brackets. A cell is tinted only with 5 or more days behind it; rows with under 20 days are faded."
                 />
               }
+              description={
+                filter === 'all'
+                  ? "Today's label against the next day's, beside the base rate."
+                  : `Yesterday's label against the label of the ${EXPIRY_TEXT[filter]} that followed, beside their base rate.`
+              }
+              actions={seriesSelect}
             />
             <TransitionMatrix t={analysis.t} base={analysis.base} />
+            <div className="mt-3">
+              <LiftLegend />
+            </div>
             <div className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <Verdict
                 title="Stays in the same state"
@@ -351,46 +473,91 @@ export function RegimesPanel() {
                 test={analysis.run}
                 fmt={(v) => formatNumber(v, 2)}
                 thin={thin}
+                unavailable={
+                  filter === 'all'
+                    ? undefined
+                    : 'A run needs adjacent days, so this is measured across all days only.'
+                }
               />
             </div>
           </Card>
 
           <Card>
             <CardHeader
-              title="Rolling 20-day share"
-              description="Share of the last 20 days that were trend days, and that realised less range than VIX implied (above 50% ≈ a premium-selling climate)."
+              title={
+                <TitleWithInfo
+                  title={`Rolling ${SHARE_WINDOW}-day share`}
+                  info={`Of the last ${SHARE_WINDOW} ${EXPIRY_TEXT[filter]}: the share that were trend days, and the share where the index moved less than India VIX implied. The second line above 50% is roughly a premium-selling climate.`}
+                />
+              }
+              description={`${seriesName}, ${EXPIRY_TEXT[filter]}. The dashed line is 50%.`}
+              actions={seriesSelect}
             />
-            <CumulativeLines lines={rolling} />
+            {rollingReady ? (
+              <ShareChart
+                lines={rolling}
+                ariaLabel={`Rolling ${SHARE_WINDOW}-day share of trend days and of days that moved less than India VIX implied`}
+              />
+            ) : (
+              <p className="text-sm text-muted">
+                This needs at least {SHARE_WINDOW} {EXPIRY_TEXT[filter]} with a label;{' '}
+                {formatInt(nDays)} so far.
+              </p>
+            )}
           </Card>
 
           <Card>
             <CardHeader
-              title="Which style suited the period?"
-              description="Rolling 10-day sums over the full index history, each line standardised against its own history (above 0 = better than that style's usual). PROXIES, not P&L: short-premium = VIX-implied move − realised move (a straddle seller's payoff shape); directional = efficiency × realised move (a big move that stayed clean). Compare with the calendar: do the two take turns?"
+              title={
+                <TitleWithInfo
+                  title="Which style suited the period?"
+                  info={`Rolling ${PROXY_WINDOW}-day sums, each line standardised against its own history (above 0 = better than that style's usual). These are stand-ins, not P&L. Short premium = the move India VIX implied minus the move that happened (a straddle seller's payoff shape). Directional = how clean the move was times how big it was.`}
+                />
+              }
+              description="Market-only stand-ins for two styles, not P&L. Compare with the calendar: do the two take turns?"
             />
             <CumulativeLines lines={proxies} />
           </Card>
 
-          {data && data.t33.status !== 'ok' && data.t33.status !== 'empty' && (
-            <p className="text-xs text-muted">
-              T-33 cross-check unavailable
-              {data.t33.status === 'unavailable'
-                ? ': export DATABASE_URL in the process running obt-api to compare with the live regime tagger.'
-                : `: ${data.t33.message ?? 'unknown error'}`}
-            </p>
+          {data && data.t33.status === 'unavailable' && (
+            <Card>
+              <CardHeader title="Comparison with the live regime tagger" />
+              <CommandHint
+                command="DATABASE_URL=<your Postgres URL> bun run py:api"
+                where="from the repo root, in place of the usual start command"
+              >
+                This comparison is not shown because the Options Lab service is not connected to the
+                trading database, where the live tagger stores its daily regimes. Start the service
+                with the database address set:
+              </CommandHint>
+            </Card>
+          )}
+          {data && data.t33.status === 'error' && (
+            <Card>
+              <CardHeader title="Comparison with the live regime tagger" />
+              <CommandHint command="docker compose up -d" where="from the repo root">
+                This comparison is not shown because the trading database, where the live tagger
+                stores its daily regimes, could not be reached. It is usually just not running:
+              </CommandHint>
+              {data.t33.message && (
+                <Accordion title="Technical detail" defaultOpen={false} className="mt-3">
+                  <CodeBlock className="whitespace-pre-wrap">{data.t33.message}</CodeBlock>
+                </Accordion>
+              )}
+            </Card>
           )}
           {t33Tab && (
             <Card>
               <CardHeader
-                title="Cross-check vs the live regime tagger (T-33)"
-                description={`How this tab's whole-day label lines up with apps/server's daily_regime_tags on ${t33Tab.n} days. Different inputs (straddle snapshots to 14:30 vs index + VIX all day), so expect partial agreement — a TRENDING_STRONG tag that never lands on Trend days would mean one of the two is off.`}
+                title={
+                  <TitleWithInfo
+                    title="Comparison with the live regime tagger"
+                    info="The two use different inputs: the live tagger reads straddle snapshots up to 14:30, this tab reads the index and India VIX for the whole day. Expect partial agreement. A Strong trend tag that never lands on trend days would mean one of the two is off."
+                  />
+                }
+                description={`How this tab's whole-day label lines up with the live tagger's regime on ${formatInt(t33Tab.n)} days.`}
               />
-              <CrossTabTable
-                t={t33Tab.table}
-                aName="This tab"
-                bName="T-33"
-                colLabel={(c) => c.replaceAll('_', ' ').toLowerCase()}
-              />
+              <CrossTabTable t={t33Tab.table} aName="This tab" bName="Live tagger" />
             </Card>
           )}
 
@@ -398,7 +565,7 @@ export function RegimesPanel() {
             <Card>
               <CardHeader
                 title="Within the day"
-                description="Does one part of the day predict another — e.g. a trending open followed by a quiet close?"
+                description="Does one part of the day predict another, such as a trending open followed by a quiet close?"
                 actions={
                   <div className="flex items-center gap-2 text-xs text-muted">
                     <Select
@@ -437,13 +604,23 @@ function Verdict({
   test,
   fmt,
   thin,
+  unavailable,
 }: {
   title: string;
   test: { observed: number; chanceMean: number; p: number; iterations: number } | null;
   fmt: (v: number) => string;
   thin: boolean;
+  /** Why there is no test, when that is by design rather than for lack of days. */
+  unavailable?: string | undefined;
 }) {
-  if (!test) return <div className="text-muted">{title}: not enough days.</div>;
+  if (!test) {
+    return (
+      <div className="rounded-lg border border-border bg-surface-2/50 px-3 py-2.5">
+        <div className="text-xs font-medium uppercase tracking-wider text-faint">{title}</div>
+        <div className="mt-1 text-muted">{unavailable ?? 'Not enough days.'}</div>
+      </div>
+    );
+  }
   const significant = test.p < 0.05 && !thin;
   return (
     <div className="rounded-lg border border-border bg-surface-2/50 px-3 py-2.5">
@@ -452,8 +629,10 @@ function Verdict({
         <span className="text-lg font-semibold">{fmt(test.observed)}</span>
         <span className="ml-2 text-muted">by chance {fmt(test.chanceMean)}</span>
       </div>
-      <div className={`mt-0.5 text-xs ${significant ? 'text-positive' : 'text-muted'}`}>
-        p = {formatNumber(test.p, 3)} (shuffled day order, {test.iterations} runs) ·{' '}
+      <div
+        className={`mt-0.5 text-xs ${significant ? 'font-medium text-foreground' : 'text-muted'}`}
+      >
+        p = {formatNumber(test.p, 3)} (shuffled day order, {formatInt(test.iterations)} runs) ·{' '}
         {thin
           ? 'too few days to call'
           : significant

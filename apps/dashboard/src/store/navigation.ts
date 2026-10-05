@@ -23,6 +23,10 @@ export const DEFAULT_NAVIGATION_PREFERENCES: NavigationPreferences = {
  * migration and no new storage key when the groups change: hidden tabs stay
  * hidden and any two tabs that share a group keep their relative order.
  *
+ * An id that is no longer a tab (`backtest`, which became Options Lab › Builder › YAML) is
+ * dropped from both lists. It is not mapped onto another tab: a user who hid the YAML
+ * backtest did not ask to hide Options Lab.
+ *
  * A tab the stored value has never seen is placed where the default order has it:
  * straight after the tab that precedes it there, or first when nothing does. So a
  * newly added first tab (Overview) leads a stored order too, and becomes the

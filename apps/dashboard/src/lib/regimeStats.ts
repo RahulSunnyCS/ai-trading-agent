@@ -255,3 +255,175 @@ export function associationTest(
 export const MIN_ROW_N = 20;
 /** A cell is only called out when at least this many cases are behind it. */
 export const MIN_CELL_COUNT = 5;
+
+// ---------------------------------------------------------------------------
+// Expiry vs non-expiry days
+// ---------------------------------------------------------------------------
+
+export type ExpiryFilter = 'all' | 'expiry' | 'non_expiry';
+
+/** Anything carrying the anatomy payload's `is_expiry` (null = the calendar is not trusted that far back). */
+export interface ExpiryFlagged {
+  is_expiry?: boolean | null | undefined;
+}
+
+/** Whether a day belongs to the filter. A day with no expiry flag belongs only to 'all'. */
+export function matchesExpiry(day: ExpiryFlagged, filter: ExpiryFilter): boolean {
+  if (filter === 'all') return true;
+  if (day.is_expiry === null || day.is_expiry === undefined) return false;
+  return filter === 'expiry' ? day.is_expiry : !day.is_expiry;
+}
+
+/** The days inside the filter, in their original order ('all' returns the same array). */
+export function filterByExpiry<T extends ExpiryFlagged>(days: T[], filter: ExpiryFilter): T[] {
+  return filter === 'all' ? days : days.filter((d) => matchesExpiry(d, filter));
+}
+
+export interface ExpiryCounts {
+  expiry: number;
+  nonExpiry: number;
+  /** Days with no expiry flag: left out of both 'expiry' and 'non_expiry'. */
+  unknown: number;
+}
+
+export function expiryCounts(days: ExpiryFlagged[]): ExpiryCounts {
+  const out: ExpiryCounts = { expiry: 0, nonExpiry: 0, unknown: 0 };
+  for (const d of days) {
+    if (d.is_expiry === true) out.expiry++;
+    else if (d.is_expiry === false) out.nonExpiry++;
+    else out.unknown++;
+  }
+  return out;
+}
+
+/**
+ * Day-to-day transitions where only pairs whose NEXT day is kept count (`keep[i]` is for
+ * `labels[i]`). Filtering the day list first would be wrong: two expiry days a week apart
+ * would look consecutive. This keeps real adjacency and asks "given yesterday's label, what
+ * did a kept day turn out as?". With every day kept it equals `transitions`.
+ */
+export function transitionsInto(
+  labels: Label[],
+  states: string[],
+  keep: readonly boolean[],
+): Transitions {
+  const counts: Record<string, Record<string, number>> = {};
+  const fromTotals: Record<string, number> = {};
+  for (const s of states) {
+    counts[s] = Object.fromEntries(states.map((t) => [t, 0]));
+    fromTotals[s] = 0;
+  }
+  for (let i = 1; i < labels.length; i++) {
+    if (!keep[i]) continue;
+    const a = labels[i - 1];
+    const b = labels[i];
+    if (!known(a) || !known(b) || !counts[a] || counts[a][b] === undefined) continue;
+    counts[a][b] += 1;
+    fromTotals[a] = (fromTotals[a] ?? 0) + 1;
+  }
+  const probs: Record<string, Record<string, number>> = {};
+  for (const s of states) {
+    probs[s] = {};
+    const total = fromTotals[s] ?? 0;
+    if (total > 0) for (const t of states) probs[s][t] = (counts[s]?.[t] ?? 0) / total;
+  }
+  return { states, counts, probs, fromTotals };
+}
+
+/** `stayRate` over the pairs whose next day is kept; a statistic for `permutationTest`. */
+export function stayRateInto(labels: Label[], keep: readonly boolean[]): number | null {
+  let same = 0;
+  let pairs = 0;
+  for (let i = 1; i < labels.length; i++) {
+    if (!keep[i]) continue;
+    const a = labels[i - 1];
+    const b = labels[i];
+    if (!known(a) || !known(b)) continue;
+    pairs++;
+    if (a === b) same++;
+  }
+  return pairs ? same / pairs : null;
+}
+
+// ---------------------------------------------------------------------------
+// Lift against the base rate
+// ---------------------------------------------------------------------------
+
+/** A cell is tinted from this many percentage points away from the base rate… */
+export const LIFT_STEP = 0.1;
+/** …and tinted strongly from this many. */
+export const LIFT_STRONG = 0.2;
+
+export type LiftBand = -2 | -1 | 0 | 1 | 2;
+
+/**
+ * How far a conditional share sits from the base rate, as a band for a diverging tint:
+ * ±1 from 10 points, ±2 from 20 points, 0 inside that or when either number is missing.
+ */
+export function liftBand(p: number | null | undefined, base: number | null | undefined): LiftBand {
+  if (p === null || p === undefined || base === null || base === undefined) return 0;
+  const lift = p - base;
+  if (!Number.isFinite(lift)) return 0;
+  const size = Math.abs(lift) + 1e-9; // 0.3 - 0.2 must count as 10 points
+  const band = size >= LIFT_STRONG ? 2 : size >= LIFT_STEP ? 1 : 0;
+  return (lift < 0 ? -band : band) as LiftBand;
+}
+
+// ---------------------------------------------------------------------------
+// Calendar layout (columns = weeks, rows = Mon..Fri)
+// ---------------------------------------------------------------------------
+
+function utcDay(day: string): Date {
+  return new Date(`${day.slice(0, 10)}T00:00:00Z`);
+}
+
+/** 0 = Monday … 6 = Sunday, for a 'YYYY-MM-DD' day. */
+export function weekdayIndex(day: string): number {
+  return (utcDay(day).getUTCDay() + 6) % 7;
+}
+
+/** The Monday ('YYYY-MM-DD') of the week a day falls in. */
+export function weekStart(day: string): string {
+  const d = utcDay(day);
+  d.setUTCDate(d.getUTCDate() - weekdayIndex(day));
+  return d.toISOString().slice(0, 10);
+}
+
+export interface CalendarWeek {
+  /** Monday of the week. */
+  week: string;
+  /**
+   * Set on the first column that holds a day of a new month: that day ('YYYY-MM-DD'), for the
+   * column's month label. Null for every other column.
+   */
+  monthStart: string | null;
+  /** True when `monthStart` also begins a new year (or is the very first column). */
+  yearStart: boolean;
+}
+
+/** One column per week that has at least one day, oldest first, with month boundaries marked. */
+export function calendarWeeks(days: readonly string[]): CalendarWeek[] {
+  const sorted = [...days].sort();
+  const out: CalendarWeek[] = [];
+  let lastMonth = '';
+  let lastYear = '';
+  for (const day of sorted) {
+    const week = weekStart(day);
+    let col = out[out.length - 1];
+    if (!col || col.week !== week) {
+      col = { week, monthStart: null, yearStart: false };
+      out.push(col);
+    }
+    const month = day.slice(0, 7);
+    if (month !== lastMonth && col.monthStart === null) {
+      col.monthStart = day;
+      col.yearStart = day.slice(0, 4) !== lastYear;
+    }
+    // A month that begins mid-column behind another month's label waits for the next column.
+    if (col.monthStart === day || month === lastMonth) {
+      lastMonth = month;
+      lastYear = day.slice(0, 4);
+    }
+  }
+  return out;
+}

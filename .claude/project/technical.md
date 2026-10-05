@@ -218,9 +218,10 @@ ai-trading-agent/
 │       ├── tailwind.config.ts · postcss.config.js
 │       ├── e2e/                     # Playwright specs
 │       └── src/                     # App.tsx, components/, hooks/, lib/, store/, types/
-│                                     # components/BacktestView.tsx + hooks/useBacktest{Presets,Runs,Validate}.ts
-│                                     # + types/backtest.ts — the options-backtesting research tab (M-4),
-│                                     # fed entirely through /api/backtest/* (never the Python service directly)
+│                                     # components/optionslab/ + hooks/useBacktest*.ts, useLegwise*.ts — Options
+│                                     # Lab (Strategies, Builder with Form | YAML modes, Runs, Daily results,
+│                                     # Regimes); the YAML engine's tab (M-4) is now the Builder's YAML mode.
+│                                     # Fed entirely through /api/backtest/* (never the Python service directly)
 └── packages/
     ├── notify/                      # @trading/notify — outbound notifications plus the
     │                                 # never-emit secret registry. Imported by the Node/Bun

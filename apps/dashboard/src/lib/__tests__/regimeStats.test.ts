@@ -3,8 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   associationTest,
   baseRates,
+  calendarWeeks,
   chiSquare,
   crossTab,
+  expiryCounts,
+  filterByExpiry,
+  liftBand,
+  matchesExpiry,
   meanRunLength,
   permutationTest,
   rollingShare,
@@ -12,7 +17,11 @@ import {
   seededRandom,
   shuffled,
   stayRate,
+  stayRateInto,
   transitions,
+  transitionsInto,
+  weekStart,
+  weekdayIndex,
 } from '../regimeStats';
 
 const rep = (xs: string[], n: number) => Array.from({ length: n }).flatMap(() => xs);
@@ -139,5 +148,133 @@ describe('crossTab / chiSquare / associationTest', () => {
     const rand = seededRandom(11);
     const noise = Array.from({ length: 80 }, () => (rand() < 0.5 ? 'Q' : 'C'));
     expect(associationTest(a, noise, rows, cols, 400, 3)?.p).toBeGreaterThan(0.05);
+  });
+});
+
+describe('expiry filter', () => {
+  const days = [
+    { day: 'd0', is_expiry: null },
+    { day: 'd1', is_expiry: false },
+    { day: 'd2', is_expiry: true },
+    { day: 'd3', is_expiry: false },
+    { day: 'd4' },
+  ];
+
+  it("'all' keeps every day (the same array), the others only days with a flag", () => {
+    expect(filterByExpiry(days, 'all')).toBe(days);
+    expect(filterByExpiry(days, 'expiry').map((d) => d.day)).toEqual(['d2']);
+    expect(filterByExpiry(days, 'non_expiry').map((d) => d.day)).toEqual(['d1', 'd3']);
+  });
+
+  it('a day with no flag matches neither side', () => {
+    expect(matchesExpiry({ is_expiry: null }, 'all')).toBe(true);
+    expect(matchesExpiry({ is_expiry: null }, 'expiry')).toBe(false);
+    expect(matchesExpiry({}, 'non_expiry')).toBe(false);
+  });
+
+  it('counts each kind', () => {
+    expect(expiryCounts(days)).toEqual({ expiry: 1, nonExpiry: 2, unknown: 2 });
+    expect(expiryCounts([])).toEqual({ expiry: 0, nonExpiry: 0, unknown: 0 });
+  });
+});
+
+describe('transitionsInto / stayRateInto', () => {
+  const labels = ['A', 'A', 'B', 'B', null, 'A', 'A'];
+  const all = labels.map(() => true);
+
+  it('equals transitions / stayRate when every day is kept', () => {
+    expect(transitionsInto(labels, ['A', 'B'], all)).toEqual(transitions(labels, ['A', 'B']));
+    expect(stayRateInto(labels, all)).toBe(stayRate(labels));
+  });
+
+  it('counts only pairs whose next day is kept, on real adjacency', () => {
+    // keep days 2 and 6: pairs (1→2) = A→B and (5→6) = A→A
+    const keep = labels.map((_, i) => i === 2 || i === 6);
+    const t = transitionsInto(labels, ['A', 'B'], keep);
+    expect(t.counts.A).toEqual({ A: 1, B: 1 });
+    expect(t.fromTotals).toEqual({ A: 2, B: 0 });
+    expect(t.probs.B).toEqual({});
+    expect(stayRateInto(labels, keep)).toBe(0.5);
+  });
+
+  it('skips a kept day whose previous day is unknown, and returns null with no pairs', () => {
+    const keep = labels.map((_, i) => i === 5);
+    expect(transitionsInto(labels, ['A', 'B'], keep).fromTotals).toEqual({ A: 0, B: 0 });
+    expect(stayRateInto(labels, keep)).toBeNull();
+    expect(
+      stayRateInto(
+        labels,
+        labels.map(() => false),
+      ),
+    ).toBeNull();
+  });
+
+  it('works as a permutation-test statistic', () => {
+    const clustered = [...Array(40).fill('A'), ...Array(40).fill('B')];
+    const keep = clustered.map((_, i) => i % 2 === 0);
+    const test = permutationTest(clustered, (ls) => stayRateInto(ls, keep), 300, 7);
+    expect(test?.observed).toBeGreaterThan(0.95);
+    expect(test?.p).toBeLessThan(0.01);
+  });
+});
+
+describe('liftBand', () => {
+  it('bands the distance from the base rate at 10 and 20 points, both ways', () => {
+    expect(liftBand(0.5, 0.45)).toBe(0);
+    expect(liftBand(0.3, 0.2)).toBe(1);
+    expect(liftBand(0.2, 0.3)).toBe(-1);
+    expect(liftBand(0.55, 0.3)).toBe(2);
+    expect(liftBand(0.05, 0.3)).toBe(-2);
+    expect(liftBand(0.3, 0.3)).toBe(0);
+  });
+
+  it('is 0 when either number is missing', () => {
+    expect(liftBand(undefined, 0.3)).toBe(0);
+    expect(liftBand(0.3, undefined)).toBe(0);
+    expect(liftBand(null, null)).toBe(0);
+    expect(liftBand(Number.NaN, 0.3)).toBe(0);
+  });
+});
+
+describe('calendar layout', () => {
+  it('finds the weekday and the Monday of a day', () => {
+    expect(weekdayIndex('2026-09-21')).toBe(0); // Monday
+    expect(weekdayIndex('2026-09-23')).toBe(2);
+    expect(weekdayIndex('2026-09-27')).toBe(6);
+    expect(weekStart('2026-09-23')).toBe('2026-09-21');
+    expect(weekStart('2026-10-01')).toBe('2026-09-28');
+    expect(weekStart('2026-09-21')).toBe('2026-09-21');
+  });
+
+  it('makes one column per week with days and marks where each month starts', () => {
+    const weeks = calendarWeeks([
+      '2026-09-23',
+      '2026-09-24',
+      '2026-09-29',
+      '2026-10-01',
+      '2026-10-05',
+      '2026-10-20',
+    ]);
+    expect(weeks).toEqual([
+      { week: '2026-09-21', monthStart: '2026-09-23', yearStart: true },
+      { week: '2026-09-28', monthStart: '2026-10-01', yearStart: false },
+      { week: '2026-10-05', monthStart: null, yearStart: false },
+      { week: '2026-10-19', monthStart: null, yearStart: false },
+    ]);
+  });
+
+  it('moves a month label to the next column when its first week already carries one', () => {
+    const weeks = calendarWeeks(['2026-09-30', '2026-10-01', '2026-10-06']);
+    expect(weeks).toEqual([
+      { week: '2026-09-28', monthStart: '2026-09-30', yearStart: true },
+      { week: '2026-10-05', monthStart: '2026-10-06', yearStart: false },
+    ]);
+  });
+
+  it('flags a new year, sorts its input and handles no days', () => {
+    const weeks = calendarWeeks(['2027-01-04', '2026-12-28']);
+    expect(weeks.map((w) => w.yearStart)).toEqual([true, true]);
+    expect(weeks[1]?.monthStart).toBe('2027-01-04');
+    expect(calendarWeeks([])).toEqual([]);
   });
 });

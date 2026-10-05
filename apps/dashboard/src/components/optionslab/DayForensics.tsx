@@ -8,15 +8,20 @@
 
 import { createChart } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi, SeriesMarker, Time, UTCTimestamp } from 'lightweight-charts';
+import { X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
-import { DEFAULT_CUTS, useDayForensics } from '../../hooks/useLegwise';
+import { useDayForensics } from '../../hooks/useLegwise';
 import { getChartTheme, getSeriesPalette, pickSeries, withAlpha } from '../../lib/chartTheme';
-import { formatMultiple, formatNumber, formatPct, formatPnl } from '../../lib/format';
+import { formatDay, formatMultiple, formatNumber, formatPct, formatPnl } from '../../lib/format';
+import { useRegimeCuts } from '../../store/regimeCuts';
 import { useThemeStore } from '../../store/theme';
 import type { DayForensics as Forensics, TimedValue } from '../../types/legwise';
 import { Badge } from '../ui/Badge';
-import { Card, CardHeader } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { InfoTooltip } from '../ui/InfoTooltip';
+import { Skeleton } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { LABEL_TEXT, LABEL_TONE, describeSegment } from './anatomy';
@@ -237,7 +242,7 @@ function Anatomy({ f }: { f: Forensics }) {
           gap{' '}
           {a.gap_pct === null ? 'n/a' : formatPct(a.gap_pct, 2, { sign: true, unit: 'percent' })}
         </span>
-        <span>VIX open {a.vix_open ?? 'n/a'}</span>
+        <span>VIX open {a.vix_open === null ? 'n/a' : formatNumber(a.vix_open, 2)}</span>
         <span>{a.dte === null ? 'DTE n/a' : a.is_expiry ? 'expiry day' : `${a.dte} DTE`}</span>
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -267,6 +272,41 @@ function Anatomy({ f }: { f: Forensics }) {
   );
 }
 
+function Frame({ embedded, children }: { embedded: boolean; children: ReactNode }) {
+  return embedded ? <div className="space-y-4">{children}</div> : <Card>{children}</Card>;
+}
+
+function Header({
+  title,
+  onClose,
+  children,
+}: { title: string; onClose?: (() => void) | undefined; children?: ReactNode }) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="truncate text-base font-semibold tracking-tight text-foreground">{title}</h3>
+        {children}
+      </div>
+      {onClose ? (
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label={`Close ${title}`}>
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+          Close
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function Fact({ label, value, help }: { label: string; value: ReactNode; help?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="text-faint">{label}</span>
+      {help ? <InfoTooltip text={help} label={`About ${label}`} /> : null}
+      <span className="metric">{value}</span>
+    </span>
+  );
+}
+
 export function DayForensics({
   strategy,
   day,
@@ -274,6 +314,7 @@ export function DayForensics({
   stale,
   onClose,
   fallback,
+  embedded = false,
 }: {
   strategy: string;
   day: string;
@@ -282,45 +323,69 @@ export function DayForensics({
   onClose?: () => void;
   /** Shown under the error when the replay fails (e.g. the day's option data was moved). */
   fallback?: ReactNode;
+  /** Render without the card frame, for use inside another surface (an expanded table row). */
+  embedded?: boolean;
 }) {
-  const res = useDayForensics(strategy, day, sha, DEFAULT_CUTS);
+  const cuts = useRegimeCuts();
+  const res = useDayForensics(strategy, day, sha, cuts);
   const f = res.data;
+  const title = `${strategy} · ${formatDay(day)}`;
 
   if (res.error && !f) {
     return (
-      <div className="space-y-3">
-        <StateMessage variant="error" title="Couldn't replay this day" description={res.error} />
-        {fallback}
-      </div>
+      <Frame embedded={embedded}>
+        <Header title={title} onClose={onClose} />
+        <div className="space-y-3">
+          <StateMessage variant="error" title="Couldn't replay this day" description={res.error} />
+          {fallback}
+        </div>
+      </Frame>
     );
   }
-  if (!f) return <p className="text-sm text-muted">Replaying {day}…</p>;
+  if (!f) {
+    return (
+      <Frame embedded={embedded}>
+        <Header title={title} onClose={onClose}>
+          <p className="mt-0.5 text-sm text-muted">Replaying the day…</p>
+        </Header>
+        <output aria-busy="true" aria-label="Replaying the day" className="block space-y-3">
+          <Skeleton className="h-4 w-72 max-w-full" />
+          <Skeleton className="h-72 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </output>
+      </Frame>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader
-        title={`${f.strategy_id} · ${f.day}`}
-        description={[
-          `net ${formatPnl(f.net)}${f.lots > 1 ? ` (${formatPnl(f.net_per_lot)} per lot)` : ''}`,
-          `worst MTM ${formatPnl(f.worst_mtm)}`,
-          `best MTM ${formatPnl(f.best_mtm)}`,
-          f.stopped_by,
-          stale ? 'replayed with the older version that produced this result' : null,
-        ]
-          .filter(Boolean)
-          .join(' · ')}
-        actions={
-          onClose ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-xs text-muted hover:text-foreground"
-            >
-              Close
-            </button>
-          ) : null
-        }
-      />
+    <Frame embedded={embedded}>
+      <Header title={`${f.strategy_id} · ${formatDay(f.day)}`} onClose={onClose}>
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+          <Fact
+            label="Net"
+            value={
+              <span className={pnlClass(f.net)}>
+                {formatPnl(f.net)}
+                {f.lots > 1 ? ` (${formatPnl(f.net_per_lot)} per lot)` : ''}
+              </span>
+            }
+          />
+          <Fact
+            label="Worst MTM"
+            help="The lowest the position's mark-to-market went during the day, in ₹ for the whole position: how far underwater it was before the close, even if it recovered."
+            value={<span className={pnlClass(f.worst_mtm)}>{formatPnl(f.worst_mtm)}</span>}
+          />
+          <Fact
+            label="Best MTM"
+            value={<span className={pnlClass(f.best_mtm)}>{formatPnl(f.best_mtm)}</span>}
+          />
+          <Fact label="Version" value={f.sha.slice(0, 7)} />
+          {f.stopped_by ? <Badge status="attention">{f.stopped_by}</Badge> : null}
+          {stale ? (
+            <Badge tone="neutral">Replayed with the older version that produced this result</Badge>
+          ) : null}
+        </div>
+      </Header>
       <div className="space-y-5">
         <div>
           <p className="mb-1 text-xs font-medium uppercase tracking-wider text-faint">
@@ -387,6 +452,6 @@ export function DayForensics({
           </p>
         ))}
       </div>
-    </Card>
+    </Frame>
   );
 }

@@ -4,7 +4,6 @@ import {
   CalendarClock,
   CreditCard,
   Database,
-  FlaskConical,
   Layers,
   LayoutDashboard,
   LineChart,
@@ -27,7 +26,6 @@ export type Tab =
   | 'regime'
   | 'backfill'
   | 'replay'
-  | 'backtest'
   | 'optionslab'
   | 'momentum'
   | 'brokerLogins'
@@ -47,9 +45,11 @@ export interface NavItem {
   icon: LucideIcon;
   /**
    * The tab's sub-routes, shown nested under it while it is the active tab.
-   * The first child is the one the view opens when the URL names none.
+   * The view opens `defaultSegment` when the URL names none, else the first child.
    */
   children?: NavChild[];
+  /** The child the bare tab path opens, when that is not the first one listed. */
+  defaultSegment?: string;
 }
 
 export type NavGroupId = 'overview' | 'live' | 'optionslab' | 'momentum' | 'data' | 'account';
@@ -68,9 +68,10 @@ export interface NavGroup {
  *
  * Tab ids and URLs are unchanged from the old Trading / Research / Account
  * grouping; only the grouping and two labels moved. Overview (the landing view)
- * is its own first group. Screens the plan adds later (Options Lab
- * strategies/runs, a merged Data coverage page, Billing) are deliberately absent
- * until they exist.
+ * is its own first group. The YAML backtest is no longer a tab: it is the
+ * Options Lab builder's YAML mode (/optionslab/builder/yaml), and /backtest
+ * redirects there. Screens the plan adds later (a merged Data coverage page,
+ * Billing) are deliberately absent until they exist.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -100,13 +101,16 @@ export const NAV_GROUPS: NavGroup[] = [
         id: 'optionslab',
         label: 'Options Lab',
         icon: Layers,
+        // /optionslab keeps opening Daily results, as it did before Strategies and Runs existed.
+        defaultSegment: 'results',
         children: [
+          { segment: 'strategies', label: 'Strategies' },
+          { segment: 'builder', label: 'Builder' },
+          { segment: 'runs', label: 'Runs' },
           { segment: 'results', label: 'Daily results' },
-          { segment: 'regimes', label: 'Market regimes' },
-          { segment: 'builder', label: 'Strategy builder' },
+          { segment: 'regimes', label: 'Regimes' },
         ],
       },
-      { id: 'backtest', label: 'YAML backtest', icon: FlaskConical },
     ],
   },
   {
@@ -175,10 +179,12 @@ export function tabGroupId(tab: Tab): NavGroupId | undefined {
 
 /**
  * The child a route points at: the one named by the first segment after the
- * tab, else the first child (the view's default). Undefined for a tab with no
- * sub-routes.
+ * tab, else the view's default (`defaultSegment`, or the first child). Undefined
+ * for a tab with no sub-routes.
  */
 export function activeNavChild(item: NavItem, rest: readonly string[]): NavChild | undefined {
   if (!item.children) return undefined;
-  return item.children.find((child) => child.segment === rest[0]) ?? item.children[0];
+  const find = (segment: string | undefined) =>
+    item.children?.find((child) => child.segment === segment);
+  return find(rest[0]) ?? find(item.defaultSegment) ?? item.children[0];
 }

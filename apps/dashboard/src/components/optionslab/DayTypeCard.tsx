@@ -11,13 +11,15 @@
 
 import { useMemo, useState } from 'react';
 
-import { formatPct, formatPnl } from '../../lib/format';
+import { EMPTY, formatInt, formatPct, formatPnl } from '../../lib/format';
 import { MIN_BUCKET_N, type PnlDay, bucketByLabel, scatterPoints } from '../../lib/legwiseJoin';
 import type { DayAnatomy } from '../../types/legwise';
 import { Card, CardHeader } from '../ui/Card';
+import { InfoTooltip } from '../ui/InfoTooltip';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { PnlScatter } from './PnlScatter';
 import { LabelChip, STATES } from './RegimeViews';
+import { CommandHint } from './regimes/CommandHint';
 import { Select, pnlClass } from './shared';
 
 export function DayTypeCard({
@@ -51,10 +53,11 @@ export function DayTypeCard({
     return (
       <Card>
         <CardHeader title="When does it work?" />
-        <p className="text-sm text-muted">
-          No index history to classify days against. Run <code>obt fyers history</code> — or, until
-          then, the days the evening run has collected are enough for a first look.
-        </p>
+        <CommandHint command="uv run obt fyers history" where="from packages/option-backtesting">
+          There is no index history to classify days against yet, so results cannot be grouped by
+          day type. Downloading the NIFTY and India VIX minute history once (it needs today's Fyers
+          login) fills this in; days the evening run collects from now on also count.
+        </CommandHint>
       </Card>
     );
   }
@@ -62,8 +65,16 @@ export function DayTypeCard({
   return (
     <Card>
       <CardHeader
-        title="When does it work?"
-        description="₹ per lot by the market's day type. 'Previous day' is the lens you could act on in advance; 'same day' only explains what happened. Greyed = fewer than 5 days."
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            When does it work?
+            <InfoTooltip
+              label="About the two lenses"
+              text={`Previous day groups each result by the day type of the trading day before it: the only lens you could act on in advance. Same day groups by the day's own type, which is known only once the day is over, so it explains but cannot be traded. Cells with fewer than ${MIN_BUCKET_N} days are greyed.`}
+            />
+          </span>
+        }
+        description="₹ per lot by the market's day type."
         actions={
           <Select value={String(series)} options={options} onChange={(v) => setSeries(Number(v))} />
         }
@@ -76,7 +87,10 @@ export function DayTypeCard({
           return (
             <div key={id}>
               <p className="mb-1 truncate text-sm font-medium" title={id}>
-                {id} <span className="text-xs font-normal text-faint">n={rows.length}</span>
+                {id}{' '}
+                <span className="text-xs font-normal text-faint">
+                  {formatInt(rows.length)} days
+                </span>
               </p>
               <Table>
                 <THead>
@@ -92,11 +106,11 @@ export function DayTypeCard({
                     const b = lag[i];
                     const cell = (x: typeof a) =>
                       !x || x.n === 0 ? (
-                        <span className="text-faint">—</span>
+                        <span className="text-faint">{EMPTY}</span>
                       ) : (
                         <span className={x.n < MIN_BUCKET_N ? 'text-faint' : pnlClass(x.mean ?? 0)}>
                           {formatPnl(x.mean ?? 0)}
-                          <span className="ml-1 text-[10px] text-faint">n={x.n}</span>
+                          <span className="ml-1 text-[10px] text-faint">{formatInt(x.n)} days</span>
                         </span>
                       );
                     return (

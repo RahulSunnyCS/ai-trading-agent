@@ -78,10 +78,14 @@ describe('navigation preferences', () => {
       }),
     );
 
-    // Overview did not exist when this value was stored: it is added first, and nothing
+    // Overview did not exist when this value was stored: it is added first. `backtest` is no
+    // longer a tab (it is Options Lab › Builder › YAML), so it leaves both lists. Nothing
     // else about the value changes.
     const preferences = normalizeNavigationPreferences(stored);
-    expect(preferences).toEqual({ hidden: stored.hidden, order: ['overview', ...stored.order] });
+    expect(preferences).toEqual({
+      hidden: ['personalities', 'pricing'],
+      order: ['overview', ...stored.order.filter((id: string) => id !== 'backtest')],
+    });
 
     const groups = visibleNavigationGroups(preferences);
     expect(groups.map((group) => [group.id, group.items.map((item) => item.id)])).toEqual([
@@ -94,6 +98,30 @@ describe('navigation preferences', () => {
     ]);
     // Overview is the landing tab even for a browser whose stored order began with another.
     expect(firstVisibleTab(preferences)).toBe('overview');
+  });
+
+  // The YAML backtest tab was retired into Options Lab. A browser that hid it, or ranked it
+  // first, must load without error and must not lose Options Lab.
+  it('drops the retired backtest tab from stored preferences', () => {
+    const hiddenOnly = normalizeNavigationPreferences({ hidden: ['backtest'], order: [] });
+    expect(hiddenOnly).toEqual(DEFAULT_NAVIGATION_PREFERENCES);
+
+    const preferences = normalizeNavigationPreferences({
+      hidden: ['backtest', 'replay'],
+      order: ['backtest', 'optionslab', 'live', 'backtest'],
+    });
+    expect(preferences.hidden).toEqual(['replay']);
+    expect(preferences.order as string[]).not.toContain('backtest');
+    expect(new Set(preferences.order)).toEqual(new Set(DEFAULT_NAVIGATION_PREFERENCES.order));
+    expect(preferences.order.indexOf('optionslab')).toBeLessThan(preferences.order.indexOf('live'));
+
+    const ids = visibleNavigationGroups(preferences).flatMap((group) =>
+      group.items.map((item) => item.id),
+    );
+    expect(ids).toContain('optionslab');
+    expect(ids as string[]).not.toContain('backtest');
+    // Normalising what was just normalised changes nothing.
+    expect(normalizeNavigationPreferences(preferences)).toEqual(preferences);
   });
 
   it('lands on Overview by default, and on the next tab in order when Overview is hidden', () => {
@@ -150,7 +178,6 @@ describe('navigation preferences', () => {
       'personalities',
       'regime',
       'optionslab',
-      'backtest',
       'momentum',
       'backfill',
       'replay',
