@@ -35,6 +35,7 @@
       "**/.next/**",
       "**/.venv/**",
       "packages/momentum-backtesting/data/**",
+      "packages/momentum-backtesting/tests/golden/**",
       "dist",
       "coverage",
       "bun.lock",

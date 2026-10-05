@@ -487,6 +487,15 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | 3.13.4 | Phase 3: point-in-time universe, launch-dated taxonomy, data fixes; step-by-step CAGR loss table | claude | Open |
 | 3.13.5 | Phases 4–7 | claude | Open — see the backlog item |
 
+### 3.14 Momentum result integrity — [BL-001](backlog/BL-001-momentum-result-integrity.md)
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.14.1 | Phase 1: frozen results on frozen data | claude | **Done 2026-10-05.** `packages/momentum-backtesting/tests/golden/` (16 scenarios, 14.7 MB fixture); accept with `scripts/update-goldens.py --accept-results --reason`; pre-push hook |
+| 3.14.2 | Phase 2: settings coverage and the look-ahead test | claude | **Done 2026-10-05** except the always-true checks and nightly runs. Look-ahead passes at three cut dates on all four datasets |
+| 3.14.3 | Phase 3: code and data stamp on every saved run | claude | Open |
+| 3.14.4 | Phase 4: weekly favourites check | claude | Open — three owner questions in the backlog item |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

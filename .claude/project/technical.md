@@ -123,6 +123,7 @@ uv run mbt fetch            # daily history from 2016 -> data/weekly_closes.csv 
 uv run mbt fetch --no-fyers # only the public sources (cash NAV, silver)
 uv run mbt compare         # rank-and-rotate backtest, off/ranked/filter modes -> data/backtests/
 uv run mbt serve           # private Momentum API on 127.0.0.1:8765
+uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
 uv run mbt stocks fetch --skip-download  # rebuild the Nifty 50 stock data layer from the raw cache, no network
 uv run mbt stocks pin-manifest           # commit the raw cache + events as the new reproducibility baseline
 

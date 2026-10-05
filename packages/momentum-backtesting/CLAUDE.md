@@ -243,6 +243,12 @@ contract, not a shared service).
   pass/kill thresholds for the evaluation review (BL-010). Never edit after results are seen;
   supersede with a new file. A step added later gets its own `bl010_criteria_addendum_N.json`,
   committed before that step runs (addendum 1: Monday-open repricing).
+- `tests/golden/` — frozen backtest results (BL-001). 16 scenarios run through the real API on
+  a frozen slice of real data (`fixture/`, rebuilt only by `scripts/build-golden-fixture.py`).
+  A code change that moves any result fails `test_golden.py`; if the move was intended, run
+  `uv run python scripts/update-goldens.py --accept-results --reason "..."` and commit the
+  changelog entry it writes. A new request field needs a scenario (`test_coverage.py`).
+  `test_lookahead.py` re-runs each dataset on data cut off at a date; never weaken it.
 - `audit/` — `mbt audit bundle|replay|study|outside` (BL-010 Phase 2). `bundle.py` writes a
   run's orders and the backtest's claims; `replay.py` rebuilds the result from the orders and
   the lake's raw bars and compares. `replay.py`, `studies.py` and `outside.py` must never import
