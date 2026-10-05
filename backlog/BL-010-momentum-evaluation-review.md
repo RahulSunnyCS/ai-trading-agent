@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phase 0 done; Phase 1 engine fixes in review) |
+| **Status** | In progress (Phases 0 and 1a done; Phase 1b waits on the 12-week check; Phase 2 in progress) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -165,6 +165,10 @@ A session cannot change its own model, so the split is done with helper agents.
 If the owner prefers BL-001 first, each E-fix is accepted into the goldens with a logged reason
 instead; more ceremony, same end state.
 
+**Changed 2026-10-05 (owner):** Phase 2 starts before BL-001's harness. Its measure-only steps
+(1–3 and 5–7) change no engine code, so they give the goldens nothing to freeze. The harness is
+built before step 4, and an engine bug that Phase 2 finds is fixed only once the harness exists.
+
 ## Plan
 
 ### Phase 0 — Freeze and pre-register
@@ -177,8 +181,9 @@ instead; more ceremony, same end state.
 ### Phase 1 — Engine fixes and live-signal parity
 - **Tasks:** fix E1–E7, each with a failing-then-passing unit test; add `units`, `fill_price`,
   `cost_rs`, `prev_units` to the trade record (E8); one series-break policy everywhere, `legacy`
-  removed as a default (F11); API, CLI and search defaults made identical — delay 1, verified
-  series, circuits on, `min_ranked=1`, ₹2L (E9); a test that the live preview's holdings for
+  removed as a default (F11); API, CLI and search defaults made identical — verified series,
+  circuits on, `min_ranked=1`, ₹2L (E9; the delay is the exception — new runs default to 0 while
+  the search spaces pin 1, see Answered); a test that the live preview's holdings for
   week t equal the backtest's; shadow check over the last 12 weeks. Re-run the three tier
   winners and three median configs: report each fix alone and all together.
 - **Deliverables:** fixes + tests, an impact table, the parity test.
@@ -186,6 +191,8 @@ instead; more ceremony, same end state.
   impact table is written.
 
 ### Phase 2 — Prove the arithmetic
+Run on the six configs of Phase 1a's impact table (three round 7 tier winners, three nearest the
+median), re-run on the fixed engine. Steps 1–3 and 5–7 first; step 4 after BL-001's harness.
 1. **Independent ledger replay** — a separate script sharing no code with `engine.py`. Inputs:
    the trade log's dates, symbols and directions only; raw closes from `bars_1d_stock`
    (`NOT synthetic_close`) adjusted by `stock_action_candidates.confirmed_factor`. It derives
@@ -195,7 +202,8 @@ instead; more ceremony, same end state.
    within 0.2 pt. *Fail:* name the first diverging week and symbol; stop everything else.
 2. **Ten trades checked by hand against an outside source** (NSE, Screener, TradingView): top 5
    contributors by rupee P&L, 2 holdings spanning a corporate action, 1 sale blocked by a lower
-   circuit, 2 random. *Pass:* all ten within 0.5%.
+   circuit, 2 random. Claude checks all ten against an independent public source and writes a
+   worksheet with links; the owner re-checks two or three by hand. *Pass:* all ten within 0.5%.
 3. **Unexplained-jump scan** over every holding period: any day with |close/prev − 1| > 20%
    where bhavcopy `prevclose` ≈ prior close. Recompute CAGR with those days zeroed.
    *Kill:* a top-20 contributor has a flagged day, or CAGR moves more than 2 pts.
@@ -203,8 +211,16 @@ instead; more ceremony, same end state.
    *Kill:* any difference before the cut date.
 5. **Contribution profile** — P&L by stock, calendar year, financial year, category.
    *Flag:* top-5 stocks > 50% of total log return, or one year > 40%.
-6. **Realism at ₹2L** — integer shares, price cap, participation (position ÷ 60-day median
+6. **Realism at ₹5 lakh** — integer shares, price cap, participation (position ÷ 60-day median
    turnover) per fill. *Flag:* any fill above 5%; report CAGR at a 1% participation cap.
+7. **Monday-open repricing** — the six configs re-run with signal delay 0, then the same
+   decisions filled twice: at the Friday close, as the backtest assumes, and at the next
+   trading day's open, which is when a Broad signal can first be traded (Friday's stock data
+   arrives at 19:30 IST). Report the change in CAGR and max DD per config; the same pair on the
+   delay-1 runs is shown for reference only.
+   *Flag:* more than 1 pt of CAGR on any of the six → Broad gets a Monday-fill option and
+   results are quoted on it; a week's signal delay is not the fix. Threshold committed in
+   `search_spaces/bl010_criteria_addendum_1.json` before the step ran.
 - **Done when:** steps 1–4 pass on the 3 tier winners and 3 median configs.
 
 ### Phase 3 — Remove the point-in-time leaks, then re-measure
@@ -297,11 +313,9 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
 
 ## Open questions
 
-1. Broad defaults in the API and dashboard: signal delay 0 and circuit locks off, against the
-   search's 1 and on. Switch them (changes what a default dashboard run shows)?
-2. For a delay-1 strategy the Rebalance preview targets last week's ranking, as backtested.
+1. For a delay-1 strategy the Rebalance preview targets last week's ranking, as backtested.
    When trading live, act on that or on the freshest ranking?
-3. Which strategy will be followed with real money (ETF signal or a Broad candidate) — not yet decided.
+2. Which strategy will be followed with real money (ETF signal or a Broad candidate) — not yet decided.
 
 ### Answered
 
@@ -317,6 +331,16 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   All of it is pre-fix.
 - **Capital (2026-10-05):** ₹5 lakh for realism checks.
 - **Bar (2026-10-05):** the three baskets above; beating the benchmark by a clear margin is a minimum.
+- **Broad defaults (2026-10-05):** circuit-lock fills and the tradability filter are on for a
+  new run (PR #19). The signal delay stays 0: a new run trades on the newest ranking, as the ETF
+  signal does. Search results and saved favourites keep their own delay of 1. Phase 2 step 7
+  measures what trading on Monday instead of at Friday's close costs; if it matters, the fix is
+  a Monday fill, not a week's delay.
+- **Phase 2 before BL-001's harness (2026-10-05):** yes, for the measure-only steps — see
+  "Order against BL-001".
+- **Ten trades (2026-10-05):** Claude checks all ten against an independent public source; the
+  owner re-checks two or three.
+- **Phase 2 configs (2026-10-05):** the six from Phase 1a's impact table.
 
 ## Log
 
@@ -340,4 +364,8 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   one-week signal delay; 40.4% with locks + filter; 40.3% with all three (Nifty200 Momentum 30
   TRI 17.0%). Broad and Custom Index results now show an "upper bound, not an expected return"
   note citing F1/F2 until Phase 3 re-measures point-in-time. Signal delay left at 0.
+- 2026-10-05 — Phase 2 started (Fable session). Owner answers recorded: delay stays 0 and
+  Phase 2 gains step 7 (Monday-open repricing); the measure-only steps run before BL-001's
+  harness; Claude checks the ten trades and the owner spot-checks. Step 6 corrected to ₹5 lakh,
+  which the owner had already set. PRs #4, #19 and #20 merged; CI on `main` is green.
 
