@@ -82,7 +82,7 @@ needs to be shared with the server, it is currently hand-duplicated in
 - `src/store/settings.ts` — density, defaults, notifications and the developer flag
   (Settings tab); `src/store/theme.ts` — Zustand theme store; `src/store/navigation.ts` owns the
   locally persisted tab visibility/order preferences; `src/store/momentumView.ts` the Momentum
-  result layout (full-width results, open chart sections, open details tab). Personality/live state is
+  result layout (full-width results, open chart sections, the chart's advanced tooltip, open details tab). Personality/live state is
   fetched via hooks, not centralized in a store.
 - `src/types/` — `backtest.ts` etc. — hand-kept in sync with `apps/server`'s
   API response shapes (see Cross-package links above)

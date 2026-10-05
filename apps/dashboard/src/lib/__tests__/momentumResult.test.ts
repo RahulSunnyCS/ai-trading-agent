@@ -6,6 +6,7 @@ import {
   drawdownStats,
   fitNames,
   fittedNamesText,
+  headroomRange,
   heatLevel,
   isInactiveSignalAction,
   isRealRotation,
@@ -19,11 +20,13 @@ import {
   rangeStartIndex,
   rebaseFactor,
   rebaseSeries,
+  rotationKind,
+  rotationMarkersShown,
   rotationOnOrBefore,
-  rotationSymbol,
   signalActionTone,
   sliceSeries,
   thinRotations,
+  tooltipPlacement,
   weekChangeCounts,
   weekReturn,
   weekSummary,
@@ -338,15 +341,117 @@ describe('weekSummary', () => {
   });
 });
 
-describe('rotationSymbol', () => {
+describe('rotationKind', () => {
   const base = { outs: [], ins: [], trims: [], parked: false };
-  it('picks the marker by what happened', () => {
-    expect(rotationSymbol({ ...base, ins: [{ top_up: false }] })).toBe('triangle-up');
-    expect(rotationSymbol({ ...base, outs: [{}] })).toBe('triangle-down');
-    expect(rotationSymbol({ ...base, outs: [{}], ins: [{ top_up: false }] })).toBe('diamond');
-    expect(rotationSymbol({ ...base, ins: [{ top_up: true }] })).toBe('circle');
-    expect(rotationSymbol({ ...base, parked: true })).toBe('circle');
-    expect(rotationSymbol({ ...base, outs: [{}], ins: [{ top_up: true }] })).toBe('triangle-down');
+  it('colours the marker by what happened', () => {
+    expect(rotationKind({ ...base, ins: [{ top_up: false }] })).toBe('added');
+    expect(rotationKind({ ...base, outs: [{}] })).toBe('out');
+    expect(rotationKind({ ...base, outs: [{}], ins: [{ top_up: false }] })).toBe('both');
+    expect(rotationKind({ ...base, ins: [{ top_up: true }] })).toBe('other');
+    expect(rotationKind({ ...base, parked: true })).toBe('other');
+    // A top-up is not an entry.
+    expect(rotationKind({ ...base, outs: [{}], ins: [{ top_up: true }] })).toBe('out');
+  });
+
+  it('draws Broad markers only at a year or less', () => {
+    expect(rotationMarkersShown(false, 900)).toBe(true);
+    expect(rotationMarkersShown(true, 53)).toBe(true);
+    expect(rotationMarkersShown(true, 52)).toBe(true);
+    expect(rotationMarkersShown(true, 54)).toBe(false);
+  });
+});
+
+describe('headroomRange', () => {
+  const dates = ['2024-01-05', '2024-01-12', '2024-01-19', '2024-01-26'];
+
+  it('linear: from zero to 1.28 × the highest visible value of every line', () => {
+    const range = headroomRange(
+      [
+        { dates, values: [1, 2, 3, 2] },
+        { dates, values: [1, 1.5, 4, 1] },
+      ],
+      null,
+      null,
+      false,
+    );
+    expect(range?.[0]).toBe(0);
+    expect(range?.[1]).toBeCloseTo(4 * 1.28);
+  });
+
+  it('keeps a negative low and only counts the window plus its edge neighbours', () => {
+    const line = { dates, values: [-1, 2, 9, 3] };
+    // Window 12 Jan..12 Jan: the neighbours 5 Jan (-1) and 19 Jan (9) are drawn too.
+    const range = headroomRange([line], '2024-01-12', '2024-01-12 18:00', false);
+    expect(range?.[0]).toBe(-1);
+    expect(range?.[1]).toBeCloseTo(9 * 1.28);
+    // Window 26 Jan on: only 19 Jan (9) and 26 Jan (3).
+    expect(headroomRange([line], '2024-01-26', null, false)?.[1]).toBeCloseTo(9 * 1.28);
+    // A window between two points still sees the segment through it.
+    const between = headroomRange([line], '2024-01-14', '2024-01-16', false);
+    expect(between?.[1]).toBeCloseTo(9 * 1.28);
+  });
+
+  it('log: extends the top by log10(1.35) and pads the floor by 2 % of the span', () => {
+    const range = headroomRange([{ dates, values: [1, 10, 100, 0] }], null, null, true);
+    expect(range?.[1]).toBeCloseTo(2 + Math.log10(1.35));
+    // Zero is skipped on a log axis; the span 0..2 gives a 0.04 floor pad.
+    expect(range?.[0]).toBeCloseTo(-0.04);
+  });
+
+  it('skips nulls and gives null when nothing is visible', () => {
+    expect(
+      headroomRange([{ dates, values: [null, 2, undefined, null] }], null, null, false)?.[1],
+    ).toBeCloseTo(2.56);
+    expect(headroomRange([], null, null, false)).toBeNull();
+    expect(
+      headroomRange([{ dates, values: [null, null, null, null] }], null, null, true),
+    ).toBeNull();
+    expect(headroomRange([{ dates, values: [0, -1, 0, 0] }], null, null, true)).toBeNull();
+    expect(headroomRange([{ dates, values: [0, 0, 0, 0] }], null, null, false)).toBeNull();
+  });
+});
+
+describe('tooltipPlacement', () => {
+  const bounds = { left: 0, top: 0, right: 1000, bottom: 800 };
+  const size = { width: 300, height: 200 };
+
+  it('sits 56 px below and 16 px right of the cursor', () => {
+    expect(tooltipPlacement({ x: 100, y: 100 }, size, bounds)).toEqual({
+      left: 116,
+      top: 156,
+      above: false,
+      leftOfCursor: false,
+    });
+  });
+
+  it('flips above the cursor when below would overflow the bottom', () => {
+    expect(tooltipPlacement({ x: 100, y: 600 }, size, bounds)).toEqual({
+      left: 116,
+      top: 344,
+      above: true,
+      leftOfCursor: false,
+    });
+  });
+
+  it('flips left of the cursor when right would overflow the right edge', () => {
+    expect(tooltipPlacement({ x: 800, y: 100 }, size, bounds)).toEqual({
+      left: 484,
+      top: 156,
+      above: false,
+      leftOfCursor: true,
+    });
+  });
+
+  it('flips both ways in the bottom-right corner, and stays inside the top-left', () => {
+    expect(tooltipPlacement({ x: 800, y: 600 }, size, bounds)).toEqual({
+      left: 484,
+      top: 344,
+      above: true,
+      leftOfCursor: true,
+    });
+    expect(
+      tooltipPlacement({ x: 20, y: 20 }, { width: 300, height: 900 }, { ...bounds, right: 200 }),
+    ).toEqual({ left: 0, top: 0, above: true, leftOfCursor: true });
   });
 });
 

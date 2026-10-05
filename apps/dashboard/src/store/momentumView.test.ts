@@ -19,6 +19,7 @@ describe('momentum view preferences', () => {
       resultsExpanded: false,
       weekChangesOpen: false,
       drawdownOpen: false,
+      advancedTooltip: false,
       detailsTab: null,
     });
   });
@@ -35,6 +36,7 @@ describe('momentum view preferences', () => {
       resultsExpanded: true,
       weekChangesOpen: true,
       drawdownOpen: true,
+      advancedTooltip: true,
       detailsTab: 'trades',
     };
     expect(parseStoredMomentumView(JSON.stringify(stored))).toEqual(stored);
@@ -46,18 +48,26 @@ describe('momentum view preferences', () => {
         resultsExpanded: 'yes',
         weekChangesOpen: true,
         drawdownOpen: 1,
+        advancedTooltip: 'on',
         detailsTab: 'removed-tab',
       }),
     ).toEqual({ ...DEFAULT_MOMENTUM_VIEW, weekChangesOpen: true });
+    // A value stored before the advanced tooltip existed: it stays off.
+    expect(normalizeMomentumView({ drawdownOpen: true })).toEqual({
+      ...DEFAULT_MOMENTUM_VIEW,
+      drawdownOpen: true,
+    });
   });
 
   it('the store updates one preference at a time', () => {
     useMomentumViewStore.setState(DEFAULT_MOMENTUM_VIEW);
     useMomentumViewStore.getState().setDetailsTab('risk');
     useMomentumViewStore.getState().setResultsExpanded(true);
+    useMomentumViewStore.getState().setAdvancedTooltip(true);
     const state = useMomentumViewStore.getState();
     expect(state.detailsTab).toBe('risk');
     expect(state.resultsExpanded).toBe(true);
+    expect(state.advancedTooltip).toBe(true);
     expect(state.drawdownOpen).toBe(false);
     useMomentumViewStore.setState(DEFAULT_MOMENTUM_VIEW);
   });

@@ -1308,6 +1308,7 @@ export function MomentumBacktestingView() {
                       overlays={overlays}
                       comparisons={result.comparisons ?? []}
                       flashKey={finishedAt}
+                      broad={shownRun?.dataset === 'broad'}
                     />
                     <MomentumResultDetails
                       result={result}

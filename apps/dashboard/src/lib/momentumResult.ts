@@ -138,24 +138,149 @@ export function countVisibleWeeks(
   return count;
 }
 
-/** Plotly marker symbols for a rotation: entries only, exits only, both, or neither. */
-export type RotationSymbol = 'triangle-up' | 'triangle-down' | 'diamond' | 'circle';
-
 /**
- * What a week's marker looks like. An entry is a NEW name (a top-up of a name already held is
- * not one); a week with only top-ups, trims or a park gets the plain circle.
+ * What happened in a rotation week, which colours its (circular) marker: names only added,
+ * names only taken out, both, or neither (only top-ups, trims or a park).
  */
-export function rotationSymbol(rotation: RotationLike): RotationSymbol {
+export type RotationKind = 'added' | 'out' | 'both' | 'other';
+
+/** An entry is a NEW name: a top-up of a name already held is not one. */
+export function rotationKind(rotation: RotationLike): RotationKind {
   const entered = rotation.ins.some((row) => !row.top_up);
   const exited = rotation.outs.length > 0;
-  if (entered && exited) return 'diamond';
-  if (entered) return 'triangle-up';
-  if (exited) return 'triangle-down';
-  return 'circle';
+  if (entered && exited) return 'both';
+  if (entered) return 'added';
+  if (exited) return 'out';
+  return 'other';
+}
+
+/**
+ * Broad Momentum swaps names in and out almost every week, so its markers only add noise until
+ * the chart shows a year or less: this many weekly points (a 1Y range is 52 or 53 of them).
+ */
+export const BROAD_MARKERS_MAX_WEEKS = 53;
+
+/** Whether the chart draws rotation markers at all; other datasets always do (then thinned). */
+export function rotationMarkersShown(broad: boolean, visibleWeeks: number): boolean {
+  return !broad || visibleWeeks <= BROAD_MARKERS_MAX_WEEKS;
 }
 
 // ---------------------------------------------------------------------------
-// Equity chart: the week line above the plot
+// Equity chart: y-axis headroom (room for the week box in the plot's top-left corner)
+// ---------------------------------------------------------------------------
+
+/** Linear axis: the top is the highest visible value × this, so about 22 % of the plot is empty. */
+export const HEADROOM_LINEAR = 1.28;
+/** Log axis: the top is the highest visible value × this (log10(1.35) in log units). */
+export const HEADROOM_LOG = 1.35;
+/** Log axis: the bottom sits this share of the visible span below the lowest value. */
+const LOG_FLOOR_PAD = 0.02;
+
+export interface RangeLine {
+  dates: ReadonlyArray<string>;
+  values: Series;
+}
+
+/**
+ * The main y-axis range for the visible window, with headroom on top. Every line's points inside
+ * [from, to] count (ISO days, either end open when null), plus the neighbour just outside each
+ * edge, since the segment to it is drawn too. Linear: [min(0, lowest), highest × 1.28]. Log
+ * (Plotly takes log10 units): [log10(lowest) − 2 % of the span, log10(highest × 1.35)], counting
+ * only positive values. Null (let Plotly autorange) when no line has a usable visible value.
+ */
+export function headroomRange(
+  lines: ReadonlyArray<RangeLine>,
+  from: string | null,
+  to: string | null,
+  log: boolean,
+): [number, number] | null {
+  const start = from?.slice(0, 10) ?? null;
+  const end = to?.slice(0, 10) ?? null;
+  const overlaps = (a: string, b: string): boolean =>
+    (end === null || a <= end) && (start === null || b >= start);
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (const line of lines) {
+    const days = line.dates.map((date) => date.slice(0, 10));
+    for (let i = 0; i < days.length; i += 1) {
+      const day = days[i];
+      const value = line.values[i];
+      if (day === undefined || typeof value !== 'number' || !Number.isFinite(value)) continue;
+      if (log && value <= 0) continue;
+      const before = days[i - 1];
+      const after = days[i + 1];
+      const shown =
+        overlaps(day, day) ||
+        (before !== undefined && overlaps(before, day)) ||
+        (after !== undefined && overlaps(day, after));
+      if (!shown) continue;
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  if (log) {
+    const low = Math.log10(min);
+    const high = Math.log10(max);
+    return [low - (high - low) * LOG_FLOOR_PAD, high + Math.log10(HEADROOM_LOG)];
+  }
+  const low = Math.min(0, min);
+  const high = max > 0 ? max * HEADROOM_LINEAR : 0;
+  return high > low ? [low, high] : null;
+}
+
+// ---------------------------------------------------------------------------
+// Equity chart: the advanced tooltip's placement
+// ---------------------------------------------------------------------------
+
+/** How far below (or above) the cursor the tooltip sits: about 1.5 cm. */
+export const TOOLTIP_OFFSET_Y = 56;
+/** The horizontal gap between the cursor and the tooltip's near edge. */
+export const TOOLTIP_GAP_X = 16;
+
+export interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface TooltipPlacement {
+  left: number;
+  top: number;
+  /** Placed above the cursor because below would overflow the bottom. */
+  above: boolean;
+  /** Placed left of the cursor because right would overflow the right edge. */
+  leftOfCursor: boolean;
+}
+
+/**
+ * Where the floating tooltip goes, in the same coordinates as `cursor` and `bounds`: 56 px
+ * below the cursor and 16 px right of it, so the next points to the right stay in view. If that
+ * overflows the bottom of `bounds` it goes 56 px above instead; if it overflows the right edge,
+ * its right edge sits 16 px left of the cursor. Finally it is kept inside the top-left corner.
+ */
+export function tooltipPlacement(
+  cursor: { x: number; y: number },
+  size: { width: number; height: number },
+  bounds: Box,
+): TooltipPlacement {
+  let top = cursor.y + TOOLTIP_OFFSET_Y;
+  const above = top + size.height > bounds.bottom;
+  if (above) top = cursor.y - TOOLTIP_OFFSET_Y - size.height;
+  let left = cursor.x + TOOLTIP_GAP_X;
+  const leftOfCursor = left + size.width > bounds.right;
+  if (leftOfCursor) left = cursor.x - TOOLTIP_GAP_X - size.width;
+  return {
+    left: Math.max(left, bounds.left),
+    top: Math.max(top, bounds.top),
+    above,
+    leftOfCursor,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Equity chart: the week box in the plot's corner
 // ---------------------------------------------------------------------------
 
 export interface FittedNames {

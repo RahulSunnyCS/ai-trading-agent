@@ -100,14 +100,25 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
 
   const chart = page.getByRole('img', { name: /Strategy, benchmark and cash values/ });
   await expect(chart.locator('.main-svg').first()).toBeVisible();
-  // The legend is our own header above the plot: one toggle per line, with its value.
+  // The line key is our own row under the plot: one toggle per line, with its value.
   const strategy = page
     .getByRole('group', { name: 'Chart series' })
     .getByRole('button', { name: /^Strategy/ });
   await expect(strategy).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('region', { name: 'Week readout' })).toContainText(
-    'Week of 19 Jan 2024',
-  );
+  await strategy.click();
+  await expect(strategy).toHaveAttribute('aria-pressed', 'false');
+  await strategy.click();
+  await expect(
+    page.getByRole('group', { name: 'Chart series' }).getByRole('button', { name: /added/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  // The week box sits in the plot's top-left corner.
+  const readout = page.getByRole('region', { name: 'Week readout' });
+  await expect(readout).toContainText('Latest');
+  await expect(readout).toContainText('Week of 19 Jan 2024');
+  const advanced = page.getByRole('button', { name: 'Advanced tooltip' });
+  await expect(advanced).toHaveAttribute('aria-pressed', 'false');
+  await advanced.click();
+  await expect(advanced).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: /Week changes/ })).toHaveAttribute(
     'aria-expanded',
     'false',
