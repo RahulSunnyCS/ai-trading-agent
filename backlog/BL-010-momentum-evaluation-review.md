@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0 and 1a done; Phase 1b waits on the 12-week check; Phase 2 in progress) |
+| **Status** | In progress (Phases 0 and 1a done; Phase 1b and Phase 2 step 4 wait on BL-001's harness; Phase 2's other steps done) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -91,6 +91,21 @@ independently re-verified** — Phase 0 records the queries that reproduce them.
    C1/C2 (running on 2026-10-04) finish but are read as pre-fix results.
 10. Effort figures are the review session's estimates and look optimistic; treat them as a
     lower bound.
+
+### Found in Phase 2 (2026-10-05)
+
+Evidence and numbers: `packages/momentum-backtesting/docs/evaluation-review.md`.
+
+| # | Finding | Direction |
+|---|---|---|
+| E10 | **A holding whose stock stops trading is sold at its last close.** FORCEMOT did not trade on NSE for 3.5 months; four of six runs sold it in the gap. Should block the sale, like a lower-circuit lock. | Either way |
+| E11 | **A retired price series stays buyable until the next quarterly pool refresh.** One run added to pre-demerger `VEDL` at a frozen price for 11 weeks. | Distorts picks |
+| E12 | A taxed run's final sell-off charges the ₹16 depository fee per lot, not per stock. | Under 0.001 pt |
+| E13 | **Broad fills at Friday's close; the first real fill is Monday's open.** Costs a delay-0 run 1.0 pt of CAGR on average, over 1 pt on two of six. Add a Monday-fill option (committed rule, addendum 1). | Optimistic |
+| F9a | F9 confirmed and sized: 15 of 292 filed splits and bonuses in the universe since 2016 are not adjusted, all small bonuses. Held ones cost 0.1–0.3 pt. Fix in Phase 3 step 2. | Pessimistic |
+| F17 | **Concentration.** The top five companies are 42–81% of the compounded return; CUPID alone is 17–33% in every one of the six runs. | Fragile |
+| F18 | Unverified assumptions seen while reading: zero brokerage (not true at every broker), trims sell every tax lot pro rata (the rule is first-in-first-out), index-level instruments pay equity costs. | Small |
+| F15 | Withdrawn at ₹5 lakh: the largest order is 7.5% of a day's trade, and a 1% cap changes little. | — |
 
 ## Goal
 
@@ -368,4 +383,10 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   Phase 2 gains step 7 (Monday-open repricing); the measure-only steps run before BL-001's
   harness; Claude checks the ten trades and the owner spot-checks. Step 6 corrected to ₹5 lakh,
   which the owner had already set. PRs #4, #19 and #20 merged; CI on `main` is green.
+- 2026-10-05 — Phase 2 steps 1–3 and 5–7 run on six configs (`audit/`, `mbt audit`). Step 1
+  passes 24 of 24. Step 2: 9 of 10 against Yahoo Finance; PFC fails on a missed bonus. Step 3's
+  test was redefined on the adjusted series because the plan's version cannot discriminate;
+  every flagged day is real. Step 5's flag trips in five runs (CUPID). Step 6 is fine at
+  ₹5 lakh. Step 7's flag trips. New findings E10–E13, F9a, F17, F18 above. Step 4 and every
+  engine fix wait for BL-001's harness. The owner's spot-check of two or three holdings is open.
 
