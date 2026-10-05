@@ -2,8 +2,8 @@ import { create } from 'zustand';
 
 /**
  * How the Momentum backtest result is laid out, remembered in this browser: whether the results
- * take the full width, which collapsible parts of the chart are open, and which details tab was
- * last open.
+ * take the full width, which collapsible parts of the chart are open, whether the chart's
+ * advanced tooltip is on, and which details tab was last open.
  *
  * SSR-safe in the same way as `store/settings.ts`: fixed defaults on the server and on the
  * client's first render; `hydrateMomentumViewFromStorage()` applies the stored values from an
@@ -15,10 +15,12 @@ export type DetailsTab = (typeof DETAILS_TABS)[number];
 export interface MomentumViewPrefs {
   /** Results across the whole width, settings column hidden (from the xl breakpoint). */
   resultsExpanded: boolean;
-  /** The "Week changes" list above the plot. */
+  /** The "Week changes" list under the plot. */
   weekChangesOpen: boolean;
   /** The drawdown and 52-week-edge sub-panels of the chart. */
   drawdownOpen: boolean;
+  /** The floating tooltip with the hovered week's full detail, following the cursor. */
+  advancedTooltip: boolean;
   /** The open details tab; null = all collapsed. */
   detailsTab: DetailsTab | null;
 }
@@ -29,6 +31,7 @@ export const DEFAULT_MOMENTUM_VIEW: MomentumViewPrefs = {
   resultsExpanded: false,
   weekChangesOpen: false,
   drawdownOpen: false,
+  advancedTooltip: false,
   detailsTab: null,
 };
 
@@ -46,6 +49,7 @@ export function normalizeMomentumView(value: unknown): MomentumViewPrefs {
     resultsExpanded: raw.resultsExpanded === true,
     weekChangesOpen: raw.weekChangesOpen === true,
     drawdownOpen: raw.drawdownOpen === true,
+    advancedTooltip: raw.advancedTooltip === true,
     detailsTab: isDetailsTab(raw.detailsTab) ? raw.detailsTab : null,
   };
 }
@@ -73,6 +77,7 @@ interface MomentumViewState extends MomentumViewPrefs {
   setResultsExpanded: (expanded: boolean) => void;
   setWeekChangesOpen: (open: boolean) => void;
   setDrawdownOpen: (open: boolean) => void;
+  setAdvancedTooltip: (on: boolean) => void;
   setDetailsTab: (tab: DetailsTab | null) => void;
 }
 
@@ -84,6 +89,7 @@ export const useMomentumViewStore = create<MomentumViewState>((set, get) => {
       resultsExpanded: state.resultsExpanded,
       weekChangesOpen: state.weekChangesOpen,
       drawdownOpen: state.drawdownOpen,
+      advancedTooltip: state.advancedTooltip,
       detailsTab: state.detailsTab,
     });
   }
@@ -92,6 +98,7 @@ export const useMomentumViewStore = create<MomentumViewState>((set, get) => {
     setResultsExpanded: (resultsExpanded) => update({ resultsExpanded }),
     setWeekChangesOpen: (weekChangesOpen) => update({ weekChangesOpen }),
     setDrawdownOpen: (drawdownOpen) => update({ drawdownOpen }),
+    setAdvancedTooltip: (advancedTooltip) => update({ advancedTooltip }),
     setDetailsTab: (detailsTab) => update({ detailsTab }),
   };
 });

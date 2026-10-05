@@ -1298,9 +1298,6 @@ export function MomentumBacktestingView() {
                         runInfo={runInfo}
                       />
                     </div>
-                    {/* Broad only (renders nothing otherwise): how real the fills were, kept
-                        with the performance numbers it qualifies. */}
-                    <MomentumCircuitExposureCard exposure={result.circuit_exposure} />
                     <MomentumEquityChart
                       series={result.series}
                       benchmarkName={result.benchmark_name}
@@ -1308,7 +1305,11 @@ export function MomentumBacktestingView() {
                       overlays={overlays}
                       comparisons={result.comparisons ?? []}
                       flashKey={finishedAt}
+                      broad={shownRun?.dataset === 'broad'}
                     />
+                    {/* Broad only (renders nothing otherwise): the worst circuit-lock situations,
+                        after the chart so the overview leads straight into it. */}
+                    <MomentumCircuitExposureCard exposure={result.circuit_exposure} />
                     <MomentumResultDetails
                       result={result}
                       config={shownConfig ?? {}}
