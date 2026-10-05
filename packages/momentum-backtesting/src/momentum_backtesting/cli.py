@@ -1324,6 +1324,45 @@ def search_category_shuffle(
         )
 
 
+@search_app.command("score")
+def search_score(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    dest: Path = typer.Option(None, "--dest", help="Output folder (default <out>/scored)."),
+    workers: int = typer.Option(4, help="Worker processes (~1 GB each)."),
+    universe: str = typer.Option(None, help="Score on another universe, e.g. turnover_rank."),
+    tags: str = typer.Option(None, help="Category tags to use: curated or extended."),
+    limit: int = typer.Option(None, help="Only the first N configs of each ranking (a trial run)."),
+) -> None:
+    """Re-score every config of a finished search on all its rebalance phases and keep the
+    weekly curves (BL-010 Phase 4), then report the probability of backtest overfitting.
+    Resumable: a ranking already scored is skipped."""
+    from . import method, reference_benchmarks
+
+    dest = dest or out / "scored"
+    runner = {}
+    if universe:
+        runner["universe_kind"] = universe
+    if tags:
+        runner["category_tags"] = tags
+    method.score_search(
+        space, out, dest, workers=workers, runner=runner, limit=limit, echo=typer.echo
+    )
+    scores, curves = method.load_scores(dest)
+    refs = reference_benchmarks.load_references()
+    excess = method.excess_log_returns(curves, refs["Nifty200 Momentum 30 TRI"])
+    result = method.pbo(excess.to_numpy())
+    typer.echo(
+        f"{len(scores)} configs scored; median CAGR {scores['cagr'].median():.1%}, "
+        f"best {scores['cagr'].max():.1%}"
+    )
+    typer.echo(
+        f"PBO {result['pbo']:.2f} over {result['splits']} splits of {result['configs']} configs "
+        f"(kill above {method.PBO_KILL}); the in-sample best is below the benchmark out of "
+        f"sample in {result['picked_oos_negative']:.0%} of splits; slope {result['slope']:.2f}"
+    )
+
+
 @search_app.command("analyze")
 def search_analyze(
     out: Path = typer.Argument(..., help="A results folder from `mbt search run`."),

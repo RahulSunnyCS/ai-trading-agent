@@ -61,3 +61,38 @@ def test_shuffle_summary_reads_the_real_run_against_the_dealt_ones(tmp_path):
     assert row["real"] == 0.30 and row["shuffles"] == 20
     assert round(row["shuffled_max"], 6) == 0.29
     assert row["beaten_by"] == 0 and row["beats_p95"]
+
+
+# --- Phase 4: probability of backtest overfitting ----------------------------------------------
+
+
+def test_pbo_is_a_coin_flip_on_noise_and_near_zero_when_one_config_is_really_better():
+    import numpy as np
+
+    from momentum_backtesting import method
+
+    rng = np.random.default_rng(11)
+    noise = rng.normal(0.0, 0.03, size=(480, 200))
+    result = method.pbo(noise)
+    assert result["splits"] == 12870 and result["configs"] == 200
+    assert 0.35 < result["pbo"] < 0.65  # the in-sample winner is no better than chance later
+
+    skilled = noise.copy()
+    skilled[:, 7] += 0.01  # one config with a real edge every week
+    result = method.pbo(skilled)
+    assert result["pbo"] < 0.02 and result["picked_oos_negative"] < 0.02
+    assert result["picked_oos_median"] > 0
+
+
+def test_excess_log_returns_are_measured_against_the_benchmark():
+    import numpy as np
+    import pandas as pd
+
+    from momentum_backtesting import method
+
+    weeks = pd.date_range("2021-01-01", periods=5, freq="W-FRI")
+    curves = pd.DataFrame({"a": [1.0, 1.1, 1.21, 1.331, 1.4641], "b": [1.0] * 5}, index=weeks)
+    bench = pd.Series([100.0, 110.0, 121.0, 133.1, 146.41], index=weeks)
+    excess = method.excess_log_returns(curves, bench)
+    assert np.allclose(excess["a"], 0.0)  # grew exactly with the benchmark
+    assert np.allclose(excess["b"], -np.log(1.1))

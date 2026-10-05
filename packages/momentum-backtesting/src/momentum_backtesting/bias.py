@@ -104,6 +104,7 @@ class Runner:
             categories_data_dir=api.DATA_DIR / "categories",
         )
         self.refs = reference_benchmarks.load_references()
+        self._tilt_cache: dict[tuple, Any] = {}
 
     def heavy_args(self, heavy: dict[str, Any], **override: Any) -> tuple[dict[str, Any], Any]:
         from .categories.liquidity import LiquidityConfig
@@ -169,6 +170,25 @@ class Runner:
         if kwargs.pop("respect_circuits", False):
             kwargs["uc_locked"], kwargs["lc_locked"] = locks or self.locks(ranking)
         heavy_kwargs, _ = self.heavy_args(heavy)
+        tilt = merged.get("stock_tilt", 0.0)
+        if tilt > 0 and "stock_tilt_ranks" not in kwargs:
+            # The tilted ranking depends only on the prices, the lookbacks and the tilt, and
+            # costs two full ranking passes: keep it across the runs that share a base.
+            from .engine import Config
+            from .levers import grouped_momentum_ranks
+
+            screen = merged.get("stock_tilt_screen_pct", 0.0)
+            key = (id(base.full_frame), heavy_kwargs["lookbacks"], tilt, screen)
+            if key not in self._tilt_cache:
+                if len(self._tilt_cache) >= 4:
+                    self._tilt_cache.pop(next(iter(self._tilt_cache)))
+                self._tilt_cache[key] = grouped_momentum_ranks(
+                    ranking.prices,
+                    Config(lookbacks=heavy_kwargs["lookbacks"]),
+                    tilt=tilt,
+                    screen_top_pct=screen,
+                )
+            kwargs["stock_tilt_ranks"] = self._tilt_cache[key]
         outcome = broad.run_broad_backtest(
             **self.common,
             curated_dir=curated_dir or self.api.CATEGORIES_CURATED_DIR,
