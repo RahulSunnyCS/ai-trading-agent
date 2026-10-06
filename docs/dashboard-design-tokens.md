@@ -39,9 +39,12 @@ mapped in `apps/dashboard/tailwind.config.ts`.
 
 ## Type
 
-IBM Plex Sans (body) and IBM Plex Mono (figures) are loaded by `next/font` in
-`src/app/layout.tsx`: self-hosted at build time, exposed as `--font-sans` / `--font-mono`, and
-read by Tailwind's `font-sans` / `font-mono`. There is no serif face.
+IBM Plex Sans (body) and IBM Plex Mono (figures) are loaded by `next/font/local` in
+`src/app/layout.tsx` from woff2 files committed under `src/app/fonts/` (latin subset; Sans
+400/500/600/700, Mono 400/500/600; SIL OFL licences alongside). The build makes no network
+request for fonts. They are exposed as `--font-sans` / `--font-mono` and read by Tailwind's
+`font-sans` / `font-mono`. There is no serif face. `next/font/google` is not used: it fetched
+CSS from fonts.googleapis.com at build time and failed intermittently in CI.
 
 ## Themes
 
