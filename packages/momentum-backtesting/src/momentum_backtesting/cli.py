@@ -1506,9 +1506,18 @@ def search_ensemble(
     for path in sorted(scored.glob("*")):
         digest.update(path.name.encode())
         digest.update(path.read_bytes())
-    commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True, cwd=SPACES
-    ).stdout.strip()
+
+    def git(*args: str) -> str:
+        done = subprocess.run(
+            ["git", *args], capture_output=True, text=True, check=True, cwd=SPACES
+        )
+        return done.stdout.strip()
+
+    # The record names the commit that produced the pick, so that commit must be the code.
+    if git("status", "--porcelain", "--", "../src", "bl010_criteria*.json"):
+        typer.echo("uncommitted changes to the code or the criteria: commit them, then freeze")
+        raise typer.Exit(1)
+    commit = git("rev-parse", "HEAD")
     target = SPACES / "bl010_phase6_frozen.json"
     phase6.freeze(
         report,
