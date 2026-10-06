@@ -42,4 +42,6 @@ index/banknifty ts 2023-03-16 → 2026-08-25; finnifty 2023-09-01 → 2026-08-25
 
 ## Reproducing
 
-Scratch scripts (not in the repo yet): `options_to_parquet.py` (download/verify/convert, resumable via `_done.jsonl`), `reconcile_zip.py` (superseded by the zip step inside the converter). Drive listings are cached in `_remote/`.
+`options_to_parquet.py` in this folder (download / verify / convert, resumable via `_done.jsonl`);
+see `README.md` for how to run it and what to override. Drive listings are cached in `_remote/`.
+The earlier `reconcile_zip.py` pass is superseded by the converter's zip step and was removed.

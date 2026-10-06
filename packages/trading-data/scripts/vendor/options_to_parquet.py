@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -19,10 +20,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 import duckdb
 
-ROOT = "/Volumes/RAHUL'S SSD/Stock Market Data"
-STAGE = f"{ROOT}/options"
-OUT = f"{ROOT}/parquet/options"
-DRIVE_ROOT = "1TR3HCVvV35q63fZ5DA4SE-cKkrZArJ2N"
+# Where things are. The defaults are what ran; override for another disk or another share.
+ROOT = os.environ.get("BL034_ROOT", "/Volumes/RAHUL'S SSD/Stock Market Data")
+STAGE = f"{ROOT}/options"                      # CSVs are staged here one expiry folder at a time
+OUT = f"{ROOT}/parquet/options"                # the Parquet staging set + _done.jsonl + caches
+DRIVE_ROOT = os.environ.get("BL034_DRIVE_ROOT", "1TR3HCVvV35q63fZ5DA4SE-cKkrZArJ2N")
 MIN_FREE_GB = 8
 JUNK = ("._", ".DS_Store")
 # Files the owner decided to drop (differs from its original; owner chose the original). key = section/unit/folder/file
@@ -34,7 +36,14 @@ def log(msg):
     print(time.strftime("%H:%M:%S"), msg, flush=True)
 
 
+TRANSIENT = ("ratelimit", "quota exceeded", "error 429", "error 500", "error 502", "error 503",
+             "error 504", "timeout", "timed out", "connection reset", "temporary", "eof")
+
+
 def rc(args, retries=6, filt=True):
+    """Run rclone; retry (with growing sleeps) only the failures that can pass on their own —
+    rate limits, 5xx, network blips. A wrong remote name, an expired token or a missing path
+    fails at once instead of sleeping for minutes per call."""
     cmd = ["rclone", *args, f"--drive-root-folder-id={DRIVE_ROOT}"]
     if filt:
         cmd += ["--exclude", "._*", "--exclude", ".DS_Store", "--exclude", "__MACOSX/**"]
@@ -42,13 +51,10 @@ def rc(args, retries=6, filt=True):
         p = subprocess.run(cmd, capture_output=True, text=True)
         if p.returncode == 0:
             return p.stdout
+        if not any(t in p.stderr.lower() for t in TRANSIENT):
+            break
         time.sleep(10 * (i + 1))
     raise RuntimeError(f"rclone failed: {' '.join(args)}\n{p.stderr[-600:]}")
-
-
-def lsd(path):
-    out = rc(["lsf", f"gdrive:{path}", "--dirs-only"])
-    return sorted(x.rstrip("/") for x in out.splitlines() if x.strip())
 
 
 def remote_files(path, depth_limited=False):
@@ -89,13 +95,10 @@ def count_rows(path):
     return lines - 1 - blank
 
 
-SQL_PARSE = r"""
-  regexp_extract(filename, '([^/]+)[.]csv$', 1) AS contract
-"""
-
-
 def convert(files, base, out_path):
-    """files: list of relative paths. Returns (rows, parquet_bytes)."""
+    """files: list of relative paths. Returns (rows, unparsed contract rows, temp parquet
+    path, relative paths of all-NUL files that were skipped). The corrupt list is returned,
+    not stashed on the function: workers run in parallel threads."""
     groups = {}
     corrupt = []
     for rel in files:
@@ -109,7 +112,6 @@ def convert(files, base, out_path):
             continue
         hdr = head.decode("utf-8-sig", errors="replace").split("\n", 1)[0].strip().lower().replace(" ", "")
         groups.setdefault(hdr, []).append(p)
-    convert.last_corrupt = corrupt
     if not groups:
         raise RuntimeError("no non-empty CSVs")
     con = duckdb.connect()
@@ -158,10 +160,10 @@ def convert(files, base, out_path):
         f"count(*) FILTER (WHERE underlying = '' OR expiry IS NULL) FROM read_parquet('{t}')").fetchone()
     if null_ts:
         raise RuntimeError(f"{null_ts} rows with NULL ts")
-    return rows, unparsed, tmp
+    return rows, unparsed, tmp, corrupt
 
 
-ZIP_PATH = f"{ROOT}/_zip_check/stocks/stock options.zip"
+ZIP_PATH = os.environ.get("BL034_ZIP", f"{ROOT}/_zip_check/stocks/stock options.zip")
 ZIPIDX = {}
 
 
@@ -333,8 +335,7 @@ def process(task, done, deadline, errfile):
                 raise RuntimeError(f"unrecognised/non-identical file name: {k}")
         csvs = [k for k in csvs if k not in dups]
         out_path = f"{OUT}/{section}/{unit}/{folder}.parquet"
-        rows, unparsed, tmp = convert(csvs, base, out_path)
-        corrupt = list(getattr(convert, 'last_corrupt', []))
+        rows, unparsed, tmp, corrupt = convert(csvs, base, out_path)
         csv_rows = sum(count_rows(os.path.join(base, k)) for k in csvs if k not in corrupt)
         if rows != csv_rows:
             raise RuntimeError(f"row mismatch: csv {csv_rows} parquet {rows}")
@@ -376,12 +377,19 @@ def main():
     ap.add_argument("--max-minutes", type=float, default=105)
     ap.add_argument("--only", help="key prefix, e.g. index/banknifty/2026-02-24")
     ap.add_argument("--list", action="store_true", help="only list tasks")
-    ap.add_argument("--refresh", action="store_true", help="rebuild the cached task list from Drive")
+    ap.add_argument("--refresh", action="store_true",
+                    help="rebuild the cached task list AND the per-unit Drive listings")
+    ap.add_argument("--redo", help="key prefix (e.g. stocks/RELIANCE) whose folders are converted "
+                    "again even though _done.jsonl lists them - after new files arrive")
     a = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
     done = set()
     if os.path.exists(f"{OUT}/_done.jsonl"):
         done = {json.loads(l)["key"] for l in open(f"{OUT}/_done.jsonl") if l.strip()}
+    if a.redo:
+        done = {k for k in done if not k.startswith(a.redo)}
+    if a.refresh:  # the cached listings would otherwise hide whatever changed on Drive
+        shutil.rmtree(f"{OUT}/_remote", ignore_errors=True)
     errfile = f"{OUT}/_errors.log"
     if os.path.exists(ZIP_PATH):
         ZIPIDX.update(build_zip_index())
