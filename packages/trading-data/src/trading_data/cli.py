@@ -8,13 +8,15 @@ from pathlib import Path
 
 import typer
 
-from . import reference
+from . import quality, reference
 from .backup import backup as run_backup
 from .db import LAKE_VIEWS, catalog_path, check_mounted, connect, data_root
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 ref_app = typer.Typer(no_args_is_help=True, help="Lot sizes, strike steps, calendars, margins.")
 app.add_typer(ref_app, name="reference")
+quality_app = typer.Typer(no_args_is_help=True, help="Per-day quality verdicts for the lake.")
+app.add_typer(quality_app, name="quality")
 
 
 def _size(path: Path) -> int:
@@ -164,3 +166,50 @@ def mount() -> None:
     subprocess.run(["hdiutil", "attach", image], check=True, capture_output=True)
     check_mounted(root)  # attached under another name ("TradingData 1") still fails here
     typer.echo(f"{root}: attached {image}")
+
+
+@quality_app.command("rebuild")
+def quality_rebuild(
+    asset: str = typer.Option(None, help="option, future or index (default: all)."),
+    name: str = typer.Option(None, help="One underlying / symbol, e.g. NIFTY."),
+    days: str = typer.Option(None, help="Only days in A..B, e.g. 2026-09-01..2026-09-30."),
+) -> None:
+    """Re-judge lake partitions from the Parquet files and refresh `data_quality`."""
+    if asset and asset not in quality.ASSETS:
+        raise typer.BadParameter(f"asset must be one of {', '.join(quality.ASSETS)}")
+    try:
+        window = quality.parse_days(days) if days else None
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    done = quality.rebuild(data_root(), asset=asset, name=name, days=window, log=typer.echo)
+    typer.echo(
+        f"rebuilt {sum(v for k, v in done.items() if '/' in k):,} day verdicts; "
+        f"{done['no_spot_changes']} no_spot labels changed"
+    )
+
+
+@quality_app.command("status")
+def quality_status() -> None:
+    """Days, range and verdicts per (asset, name), with the reasons for exclusions."""
+    with connect(data_root(), read_only=True) as con:
+        rows = con.execute(
+            "SELECT asset, name, count(*), min(trading_day), max(trading_day), "
+            "count(*) FILTER (WHERE verdict = 'usable'), "
+            "count(*) FILTER (WHERE verdict = 'excluded') "
+            "FROM data_quality GROUP BY 1, 2 ORDER BY 1, 2"
+        ).fetchall()
+        reasons = con.execute(
+            "SELECT asset, name, split_part(reason, ':', 1), count(*) FROM data_quality "
+            "WHERE verdict = 'excluded' GROUP BY 1, 2, 3 ORDER BY 1, 2, 4 DESC"
+        ).fetchall()
+    if not rows:
+        typer.echo("no verdicts yet — run `tdata quality rebuild`")
+        return
+    why: dict[tuple[str, str], list[str]] = {}
+    for asset, name, reason, n in reasons:
+        why.setdefault((asset, name), []).append(f"{reason} {n}")
+    for asset, name, days, lo, hi, ok, bad in rows:
+        line = f"{asset:<7} {name:<12} {days:>5} days  {lo} .. {hi}  usable {ok}  excluded {bad}"
+        if bad:
+            line += f"  ({', '.join(why[(asset, name)])})"
+        typer.echo(line)

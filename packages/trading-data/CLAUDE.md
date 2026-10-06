@@ -27,6 +27,9 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `007_momentum_forward_journal.sql`: `momentum_forward_journal`, the append-only,
     hash-chained record of every weekly momentum signal (BL-024; written only by
     momentum-backtesting's `forward_journal.record`)
+  - `008_data_quality.sql`: `data_quality`, one verdict per lake partition (asset, name,
+    day) — usable, or excluded and why; mirrors the Parquet files, rebuilt from them by
+    `tdata quality rebuild` (BL-034)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
@@ -64,6 +67,10 @@ table instead.
   apps/server) and the Python `ReferenceData` loader read them. Change data with
   `tdata reference sql "..."` (edits + re-exports); `tdata reference check` / the
   test suite fail on drift.
+- **`data_quality` mirrors the lake.** One row per bars_1m file, written when a file is
+  written and regenerable with `tdata quality rebuild`; a day is never dropped from the lake
+  for a bad verdict — the label says why, readers decide. Fetch timestamps from DuckDB as
+  epoch seconds, not `TIMESTAMPTZ` (that import needs `pytz`, which is not a dependency).
 - **Partition values live in folder names only** (`asset=`, `underlying=`/`symbol=`,
   `date=`) — never repeat them as columns inside the Parquet.
 - Tests use `tmp_path` roots; never point a test at the real `~/TradingData`.
@@ -78,6 +85,7 @@ table instead.
 ```bash
 uv sync && uv run pytest
 uv run tdata init | status | backup --to <dir> | mount
+uv run tdata quality rebuild [--asset option] [--name NIFTY] [--days A..B] | status
 uv run tdata reference export | check | sql "<statement>"
 uv run mbt local migrate   # from packages/momentum-backtesting/: (re-)import its data
 ```
