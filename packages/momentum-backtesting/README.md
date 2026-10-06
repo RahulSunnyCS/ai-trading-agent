@@ -158,8 +158,8 @@ index's) and undone.
 `mbt weekly --run preview|final` refreshes prices and evaluates every favourited strategy from
 one shared snapshot. The dashboard shows every result; only the one globally active favourite
 is sent to Telegram. Until a favourite exists, the checked-in `live_config.toml` strategy is
-the fallback. It runs from a `launchd` job on the owner's own laptop (`scripts/install-
-launchd.sh`; see "Scheduling" below) — it used to run from GitHub Actions
+the fallback. It runs from the repo's scheduler on the owner's own laptop (`apps/scheduler`;
+see "Scheduling" below) — it used to run from GitHub Actions
 (`MOMENTUM_DATABASE_URL`/Neon), retired 2026-09-30. It can also be triggered manually any
 time from the dashboard's Momentum tab ("Weekly signal") or the CLI directly:
 
@@ -205,13 +205,13 @@ uv run mbt weekly --run final --no-db --no-send   # try it locally, printed not 
 uv run mbt sources-check                  # can this machine reach every source?
 ```
 
-**Scheduling.** `scripts/install-launchd.sh` installs two `launchd` LaunchAgents (Friday
-14:40 preview, 16:45 final IST — assumes the Mac's clock is set to IST; see the plists'
-own comments) into `~/Library/LaunchAgents` and loads them. `scripts/uninstall-launchd.sh`
-removes them. `launchd` only fires while the machine is awake — a missed run (laptop
-asleep) has no catch-up; re-run manually via the dashboard's Momentum tab ("Weekly signal")
-or `mbt weekly --run <preview|final>` on the CLI. Logs land in
-`data/launchd-weekly-<preview|final>.log`.
+**Scheduling.** The repo's scheduler (`apps/scheduler`, installed by
+`deploy/launchd/install.sh`) runs the Friday jobs: 14:40 preview, 16:45 final, 19:30 stock
+ingest and 21:00 journal check, in IST whatever the Mac's timezone. A slot missed while the
+laptop slept is caught up on wake within that job's window, otherwise it alerts on Telegram;
+re-run by hand via the dashboard's Momentum tab ("Weekly signal"), `mbt weekly --run
+<preview|final>`, or `bun run --filter @ata/scheduler jobs run momentum-final`. Logs land in
+`data/launchd-weekly-<run>.log`.
 
 **Fyers.** The dashboard login is preferred when available; `mbt login` (browser) or
 `FYERS_ACCESS_TOKEN` remains a standalone fallback. The job falls
@@ -219,8 +219,7 @@ back to public sources (niftyindices.com, Yahoo) if none is available or it's re
 see "Sources, best first" above. No CI secrets needed any more; this all runs locally.
 
 **Telegram.** Set `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` in the environment `mbt weekly`
-runs in (e.g. your shell profile, or the plist's own `EnvironmentVariables` if launchd's
-inherited environment doesn't already have them) — unset, it prints the message instead of
+runs in — the repo `.env` for scheduled runs — unset, it prints the message instead of
 sending it.
 
 Use a Fyers API app dedicated to this job. On the Fyers dashboard, either keep order placement

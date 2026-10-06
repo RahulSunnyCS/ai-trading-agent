@@ -61,6 +61,16 @@ describe('runJob', () => {
     expect(readFileSync(result.logPath, 'utf8')).not.toContain('$ /bin/sh -c echo should-not-run');
   });
 
+  it('writes to a fixed log file when the job names one', async () => {
+    const result = await runJob(
+      job('fixed', 'echo kept', { logFile: 'data/x.log' }),
+      ctx,
+      'manual',
+    );
+    expect(result.logPath).toBe(join(ctx.repoRoot, 'data/x.log'));
+    expect(readFileSync(result.logPath, 'utf8')).toContain('kept');
+  });
+
   it('reports a missing executable instead of throwing', async () => {
     const result = await runJob(
       { ...job('missing', ''), steps: [['no-such-binary-xyz']] },

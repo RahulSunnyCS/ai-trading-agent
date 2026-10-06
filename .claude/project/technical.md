@@ -75,8 +75,8 @@ bun run --filter '*' typecheck     # packages only — NOT the root app
 bun run --filter @ata/scheduler jobs status    # every job: schedule, last run, next run
 bun run --filter @ata/scheduler jobs run <id>  # run one job now
 
-# Laptop scheduler (launchd) — see deploy/launchd/README.md
-deploy/launchd/install.sh    # (re)install every job in deploy/launchd/jobs/
+# Laptop scheduler (launchd keeps apps/scheduler alive) — see deploy/launchd/README.md
+deploy/launchd/install.sh    # (re)install the scheduler agent; retires the old per-job plists
 deploy/launchd/uninstall.sh
 
 # Git hooks (lefthook, installed by `bun install`). pre-push runs Biome on the changed files,
@@ -133,7 +133,7 @@ uv run mbt compare         # rank-and-rotate backtest, off/ranked/filter modes -
 uv run mbt serve           # private Momentum API on 127.0.0.1:8765
 uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
-uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 launchd job)
+uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 scheduler job)
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
 uv run mbt stocks fetch --skip-download  # rebuild the Nifty 50 stock data layer from the raw cache, no network
 uv run mbt stocks pin-manifest           # commit the raw cache + events as the new reproducibility baseline
@@ -195,7 +195,7 @@ ai-trading-agent/
 ├── .mcp.json                        # registers the "option-backtesting" MCP server (obt-mcp, stdio)
 ├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
 ├── deploy/cloudflared/              # tunnel config template for serving the research APIs from a laptop (docs/remote-dashboard.md)
-├── deploy/launchd/                  # laptop-as-scheduler LaunchAgents (jobs/*.plist) + install/uninstall (BL-011)
+├── deploy/launchd/                  # the one LaunchAgent that keeps apps/scheduler running + install/uninstall (BL-012)
 ├── apps/
 │   ├── server/                      # @ata/server — the Fastify/Bun backend
 │   │   ├── package.json · tsconfig.json · vitest.config.ts · vitest.workspace.ts

@@ -26,8 +26,12 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
 - Simulation mode (`SIMULATE=true`) — fully self-contained, no broker credentials needed
 - **`packages/broker-login`** — daily Playwright job that logs the brokers into
   AlgoTest. Runs on GitHub Actions; since 2026-10-05 the owner's laptop triggers it
-  at 08:00 IST weekdays (`deploy/launchd/`, BL-011) because GitHub's own 08:15/08:45
+  at 08:00 IST trading days (`apps/scheduler`, BL-012) because GitHub's own 08:15/08:45
   cron arrived hours late — that cron stays only as a backstop
+- **`apps/scheduler`** — runs every recurring job (logins, Friday momentum, the 09:00
+  morning summary; later the evening options collection, backups and checks) from one
+  launchd-kept process, records every run, catches up slots missed while asleep and alerts
+  on Telegram (BL-012)
 - **`packages/contract-notes`** — daily job turning broker contract-note emails
   into realised F&O P&L in a Google Sheet. Schedule currently disabled pending
   cutover; the `trade-analytics` repo still owns the live cron
@@ -47,9 +51,9 @@ Originally a personal / small-team **research tool**; now a **commercial SaaS pr
   optional category selection) and the Momentum Scores page in the Next.js
   dashboard's Momentum tab (TODO.md §3.9, §3.11.8).
   Weekly Friday signal to Telegram (`mbt weekly`, 14:40 IST live-price preview + 16:45 IST
-  final, + 19:30 IST stock-data ingest since 2026-10-02), scheduled via three `launchd` jobs
-  on the owner's own laptop since 2026-09-30/2026-10-02 (`scripts/install-launchd.sh` — TODO
-  3.11.5/3.11.16, retired the old GitHub Actions workflow and Neon/`MOMENTUM_DATABASE_URL`;
+  final, + 19:30 IST stock-data ingest since 2026-10-02), run on the owner's own laptop by
+  `apps/scheduler` (BL-012; launchd plists 2026-09-30 → BL-012 PR 5 — TODO 3.11.5/3.11.16
+  retired the old GitHub Actions workflow and Neon/`MOMENTUM_DATABASE_URL`;
   history now lives in the shared local database's `momentum_prices`/`momentum_signals`
   tables). A blocked or missing active favourite now sends a Telegram warning instead of
   failing silently (TODO 3.11.16). Also triggerable on demand from the dashboard's Momentum

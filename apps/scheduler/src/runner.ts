@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import type { History, Trigger } from './history.js';
 import { JOBS, type Job } from './jobs.js';
 import { formatIst, istDay } from './schedule.js';
@@ -130,9 +130,10 @@ export function runJob(
 ): Promise<RunResult> {
   return withGroup(job.group, async () => {
     const now = ctx.now ?? (() => new Date());
-    const dir = join(ctx.logDir, job.id);
-    mkdirSync(dir, { recursive: true });
-    const logPath = join(dir, `${istDay(now())}.log`);
+    const logPath = job.logFile
+      ? join(ctx.repoRoot, job.logFile)
+      : join(ctx.logDir, job.id, `${istDay(now())}.log`);
+    mkdirSync(dirname(logPath), { recursive: true });
     const cwd = join(ctx.repoRoot, job.cwd);
 
     const blocked = await waitForGroup(job, ctx, now);

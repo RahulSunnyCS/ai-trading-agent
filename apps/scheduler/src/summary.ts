@@ -154,6 +154,21 @@ function optionsDataCheck(ctx: BuiltinContext): Check {
       };
 }
 
+/**
+ * Jobs run from this checkout's working tree, so whatever branch is checked out
+ * here is the code that runs — a feature branch left checked out runs at 08:00.
+ */
+function checkoutCheck(ctx: BuiltinContext): Check {
+  const branch = capture('git', ['rev-parse', '--abbrev-ref', 'HEAD'], ctx.repoRoot, ctx.env);
+  return branch === 'main'
+    ? { ok: true, label: 'Checkout', detail: 'on main' }
+    : {
+        ok: false,
+        label: 'Checkout',
+        detail: `jobs run from ${ctx.repoRoot}, which is on '${branch}' → git switch main`,
+      };
+}
+
 function diskCheck(): Check {
   const stats = statfsSync(homedir());
   const freeGb = (stats.bavail * stats.bsize) / 1e9;
@@ -182,6 +197,7 @@ export function morningSummary(sink?: AlertSink): Builtin {
       algotestCheck(ctx),
       fyersCheck(ctx),
       optionsDataCheck(ctx),
+      checkoutCheck(ctx),
       diskCheck(),
       ...recentFailures(ctx, jobs),
     ];

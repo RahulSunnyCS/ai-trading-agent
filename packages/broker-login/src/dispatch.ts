@@ -1,6 +1,6 @@
 /**
  * Triggers the "Daily broker login" GitHub workflow from the owner's laptop
- * (launchd, 08:00 IST weekdays - deploy/launchd/). GitHub's own `schedule:` trigger
+ * (apps/scheduler, 08:00 IST trading days). GitHub's own `schedule:` trigger
  * delivers that workflow hours late; a workflow_dispatch starts within seconds. The
  * login itself still runs on GitHub with GitHub's secrets - this only starts it.
  */

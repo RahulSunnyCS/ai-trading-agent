@@ -41,6 +41,13 @@ export interface Job {
    * out or could not start, because then the job never got the chance.
    */
   alertsItself?: boolean;
+  /**
+   * Write the run log to this fixed file (repo-relative) instead of
+   * `<logDir>/<job>/<date>.log`. The Momentum dashboard reads the Friday jobs'
+   * `data/launchd-weekly-*.log` for "when did it last run" — kept until that
+   * panel reads the scheduler API instead (BL-012 PR 16).
+   */
+  logFile?: string;
   /** Run an in-process job (see runner's `builtins`) instead of `steps`. */
   builtin?: 'morning-summary';
 }
@@ -89,6 +96,7 @@ export const JOBS: Job[] = [
     catchUpHours: 0.5, // a preview after ~15:15 is too late to trade on
     group: 'catalog',
     alertsItself: true,
+    logFile: `${MOMENTUM}/data/launchd-weekly-preview.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt weekly --run preview',
   },
   {
@@ -103,6 +111,7 @@ export const JOBS: Job[] = [
     catchUpHours: 48,
     group: 'catalog',
     alertsItself: true,
+    logFile: `${MOMENTUM}/data/launchd-weekly-final.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt weekly --run final',
   },
   {
@@ -133,6 +142,7 @@ export const JOBS: Job[] = [
     catchUpHours: 48,
     group: 'catalog',
     needs: ['home', 'gui'],
+    logFile: `${MOMENTUM}/data/launchd-weekly-stock-ingest.log`,
     fixHint:
       'cd packages/momentum-backtesting && uv run mbt stocks sync && uv run mbt weekly --run final --only-dataset stock --only-dataset custom_index --only-dataset broad',
   },
@@ -148,6 +158,7 @@ export const JOBS: Job[] = [
     catchUpHours: 48,
     group: 'catalog',
     alertsItself: true,
+    logFile: `${MOMENTUM}/data/launchd-weekly-journal-check.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt journal check --send',
   },
   {
