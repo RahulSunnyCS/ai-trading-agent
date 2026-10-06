@@ -1671,6 +1671,7 @@ def journal_check(
                     "error",
                     "Forward journal check could not run",
                     f"{message}\nRerun it: mbt journal check --send",
+                    type="momentum.problem",
                 )
             )
         raise typer.Exit(1) from error
@@ -1679,7 +1680,11 @@ def journal_check(
     if send:
         notify.send(
             notify.Notification(
-                "momentum-journal", "info" if result["ok"] else "warning", title, body
+                "momentum-journal",
+                "info" if result["ok"] else "warn",
+                title,
+                body,
+                type="momentum.journal",
             )
         )
     if not result["ok"]:
@@ -2401,6 +2406,7 @@ def weekly(
             f"Momentum {run}: the job failed",
             notify.redact(f"{type(error).__name__}: {error}"),
             notify.run_url(),
+            type="momentum.problem",
         )
         notify.send(note) if send else typer.echo(notify.render(note))
         raise
