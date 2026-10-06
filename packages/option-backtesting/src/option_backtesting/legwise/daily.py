@@ -165,6 +165,7 @@ def telegram_summary(
         severity="warn" if problems else "info",
         title=f"Options daily {day:%a %d %b}: {day_total:+,.0f}",
         body="\n".join(lines) if lines else "No strategies in strategies/legwise/.",
+        type="options.daily",
     )
 
 
@@ -181,4 +182,5 @@ def telegram_failure(day: date, reason: str) -> Notification:
             if login
             else ""
         ),
+        type="options.problem",
     )

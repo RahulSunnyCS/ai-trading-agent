@@ -81,6 +81,11 @@ jobs:
         run: bun run test && bun run typecheck
         working-directory: apps/scheduler
 
+      # BL-012: per-type Telegram switches — fail open, untagged always sends.
+      - name: Notify tests
+        run: bun run test
+        working-directory: packages/notify
+
       - name: Server unit tests
         run: bun run test:unit
 

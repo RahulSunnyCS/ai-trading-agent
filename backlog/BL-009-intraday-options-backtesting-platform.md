@@ -97,6 +97,10 @@ query. A vendor-layout exporter is cheap to add if the owner still wants the fil
   (target: same strikes and minutes; price within one tick), or every remaining gap has a written cause.
 
 ### Phase 2 — Vendor data layer
+**Superseded by [BL-034](BL-034-options-history-lake.md) (2026-10-06):** the vendor's full
+history was obtained and is being loaded into the `trading-data` lake there (two-year scope
+first, NIFTY + SENSEX derived tables). The tasks below stay as the original checklist; the
+"before buying" items no longer apply.
 - **Tasks:** before buying — get from the vendor: NIFTY/BANKNIFTY/SENSEX spot + futures 1m, an
   overlap week (23 Sep–1 Oct 2026), the VIX gap answer, coverage list, update frequency;
   `tdata`/`obt vendor import` (layout detection, dedupe, session clip, timezone, `traded` flag
@@ -269,3 +273,6 @@ more, not less. V11 replaces "median CAGR" as the first number to read.
   Realised-vs-backtest for the strategies that trade live is split out as BL-026.
 - 2026-10-06 — validation checklist added (V1–V13), carried over from the BL-010 momentum
   review: the checks every options result must pass, mapped to the phases that build them.
+- 2026-10-06 — Phase 2 superseded by BL-034: the vendor's full history (the same provider as the
+  sample) is on the SSD and is being loaded into the `trading-data` lake there. Scope note: the
+  owner now wants NIFTY **and SENSEX** derived tables (was NIFTY only on 2026-10-05).

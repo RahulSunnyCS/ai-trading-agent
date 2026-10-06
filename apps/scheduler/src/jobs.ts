@@ -77,8 +77,11 @@ export const JOBS: Job[] = [
     steps: [['node_modules/.bin/tsx', 'src/fyers.ts', '--store']],
     cwd: BROKER_LOGIN,
     timeoutMinutes: 10,
-    retries: 1, // fyers.ts does not retry a rejected PIN, so a second run is safe
-    retryDelayMinutes: 5,
+    // No scheduler retry: fyers.ts retries a transient failure itself but deliberately stops on
+    // a rejected PIN or blocked account, because each wrong attempt counts toward a lockout.
+    // Re-running it here would submit that PIN again.
+    retries: 0,
+    retryDelayMinutes: 0,
     catchUpHours: 10,
     needs: ['postgres'],
     alertsItself: true,

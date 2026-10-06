@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { telegramSink } from './alerts.js';
 import { jobEnv } from './env.js';
-import { History } from './history.js';
+import { History, pidAlive } from './history.js';
 import { JOBS, findJob } from './jobs.js';
 import { startLoop } from './loop.js';
 import { type RunContext, runJob } from './runner.js';
@@ -81,7 +81,28 @@ async function runNow(id: string | undefined): Promise<number> {
   return result.ok ? 0 : 1;
 }
 
+/** One scheduler per machine: a second loop would run every slot twice. */
+function claimInstance(): boolean {
+  mkdirSync(stateDir(), { recursive: true });
+  const lock = join(stateDir(), 'scheduler.pid');
+  try {
+    const other = Number(readFileSync(lock, 'utf8'));
+    if (other && other !== process.pid && pidAlive(other)) {
+      console.error(`another scheduler is already running (pid ${other}); exiting`);
+      return false;
+    }
+  } catch {
+    // No lock file yet.
+  }
+  writeFileSync(lock, String(process.pid));
+  return true;
+}
+
 function serve(): void {
+  if (!claimInstance()) {
+    process.exitCode = 1;
+    return;
+  }
   const ctx = context(openHistory());
   console.log(
     `scheduler started ${formatIst(new Date())} IST — ${JOBS.length} jobs, logs in ${logDir()}`,

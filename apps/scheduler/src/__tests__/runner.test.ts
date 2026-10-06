@@ -102,4 +102,28 @@ describe('runJob', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain("group 'catalog' still busy with other");
   });
+
+  it('waits only for older rows, so two processes starting together cannot deadlock', () => {
+    const first = ctx.history.start('a', 'manual', null, '', new Date());
+    const second = ctx.history.start('b', 'manual', null, '', new Date());
+    expect(ctx.history.runningBefore(['a', 'b'], first)).toEqual([]);
+    expect(ctx.history.runningBefore(['a', 'b'], second).map((r) => r.job)).toEqual(['a']);
+  });
+
+  it('closes the row and returns a result when the log cannot be written', async () => {
+    const result = await runJob(job('nolog', 'true'), { ...ctx, logDir: '/dev/null/x' }, 'manual');
+    expect(result.ok).toBe(false);
+    expect(ctx.history.last('nolog')?.ended_at).not.toBeNull();
+  });
+});
+
+describe('orphaned runs', () => {
+  it('reapDead closes a run whose process is gone and leaves a live one alone', () => {
+    const history = new History(':memory:');
+    history.start('a', 'manual', null, '', new Date()); // carries this process's pid
+    expect(history.reapDead(new Date())).toBe(0);
+    expect(history.reapDead(new Date(), () => false)).toBe(1);
+    expect(history.last('a')).toMatchObject({ exit_code: -2 });
+    history.close();
+  });
 });

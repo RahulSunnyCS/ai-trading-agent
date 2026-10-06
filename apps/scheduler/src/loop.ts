@@ -47,22 +47,31 @@ export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): 
   const tick = () => {
     for (const job of jobs) {
       if (inFlight.has(job.id)) continue;
-      const decision = decide(job, now(), ctx.history, firstStart);
-      if (decision.kind === 'missed') {
-        const reason = `missed: the scheduler was not running at ${formatIst(decision.slot)} IST`;
-        ctx.history.recordMissed(job.id, decision.slot, now(), reason);
-        void alertMissed(alerts, job, decision.slot);
-      } else if (decision.kind === 'run') {
-        inFlight.add(job.id);
-        console.log(`${formatIst(now())} start ${job.id} (${decision.trigger})`);
-        runJob(job, ctx, decision.trigger, decision.slot)
-          .then(async (result) => {
-            console.log(`${formatIst(now())} ${job.id}: ${result.ok ? 'ok' : result.error}`);
-            await alertResult(alerts, job, result, ctx.history);
-          })
-          .catch((error: unknown) => console.error(`${job.id}: ${String(error)}`))
-          .finally(() => inFlight.delete(job.id));
+      try {
+        handle(job);
+      } catch (error) {
+        // A bookkeeping failure (say a locked database) must not take the whole scheduler down.
+        console.error(`${job.id}: tick failed: ${String(error)}`);
       }
+    }
+  };
+
+  const handle = (job: Job) => {
+    const decision = decide(job, now(), ctx.history, firstStart);
+    if (decision.kind === 'missed') {
+      const reason = `missed: the scheduler was not running at ${formatIst(decision.slot)} IST`;
+      ctx.history.recordMissed(job.id, decision.slot, now(), reason);
+      void alertMissed(alerts, job, decision.slot);
+    } else if (decision.kind === 'run') {
+      inFlight.add(job.id);
+      console.log(`${formatIst(now())} start ${job.id} (${decision.trigger})`);
+      runJob(job, ctx, decision.trigger, decision.slot)
+        .then(async (result) => {
+          console.log(`${formatIst(now())} ${job.id}: ${result.ok ? 'ok' : result.error}`);
+          await alertResult(alerts, job, result, ctx.history);
+        })
+        .catch((error: unknown) => console.error(`${job.id}: ${String(error)}`))
+        .finally(() => inFlight.delete(job.id));
     }
   };
 

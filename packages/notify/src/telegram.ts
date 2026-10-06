@@ -1,3 +1,4 @@
+import { isEnabled } from './prefs.js';
 import { redact } from './secrets.js';
 import type { Action, Notification, Severity, TelegramConfig } from './types.js';
 
@@ -66,6 +67,10 @@ async function post(config: TelegramConfig, body: Record<string, unknown>): Prom
 /** Structured send. Prefer this — it renders consistently across every caller. */
 export async function send(config: TelegramConfig | null, n: Notification): Promise<void> {
   const text = redact(render(n));
+  if (!isEnabled(n.type)) {
+    console.log(`\n[telegram: '${n.type}' is switched off, message below]\n${text}`);
+    return;
+  }
   if (!config) {
     console.log(`\n[telegram not configured, message below]\n${text}`);
     return;
@@ -77,8 +82,16 @@ export async function send(config: TelegramConfig | null, n: Notification): Prom
  * Escape hatch for a caller that builds its own layout — broker-login's report
  * is a sorted multi-broker table that does not fit title/body. Still redacted.
  */
-export async function sendText(config: TelegramConfig | null, text: string): Promise<void> {
+export async function sendText(
+  config: TelegramConfig | null,
+  text: string,
+  type?: string,
+): Promise<void> {
   const safe = redact(text);
+  if (!isEnabled(type)) {
+    console.log(`\n[telegram: '${type}' is switched off, message below]\n${safe}`);
+    return;
+  }
   if (!config) {
     console.log(`\n[telegram not configured, message below]\n${safe}`);
     return;

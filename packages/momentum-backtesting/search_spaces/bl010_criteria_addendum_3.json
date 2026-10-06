@@ -1,0 +1,54 @@
+{
+  "written_before_running": "2026-10-06T21:00:00+05:30",
+  "name": "BL-010 criteria, addendum 3: how Phase 5 chooses",
+  "adds_to": "bl010_criteria.json, addenda 1 and 2 - unchanged; this file only adds the Phase 5 choice rule",
+  "rule": "Committed before any Phase 5 window, walk-forward or choice is computed. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
+  "reason": "Owner's answers, 2026-10-06. Phase 4 found PBO 0.69 on the point-in-time universe (0.53 inside the 40% drawdown ceiling): ranking by CAGR picks luck, so the rank used to choose is fixed here, in advance.",
+  "phase_5": {
+    "inputs": {
+      "configs": "All 8,003 round 7 arm A configs as re-scored on the point-in-time universe (data/search/round7_A/scored_pit: universe turnover_rank, curated tags, every rebalance phase blended as equal tranches).",
+      "returns": "Pre-tax, Rs 2 lakh, itemised costs, as searched. After-tax at Rs 5 lakh is deferred (BL-010 Phase 7); every rebalance interval here is 1 to 4 weeks, so gains are short-term throughout and tax is expected to lower all configs by a similar share. So the minimum bar in bl010_criteria.json (5 points over Nifty200 Momentum 30 TRI, after tax) is not judged in Phase 5: the pre-tax margin is reported, and the bar is judged on the after-tax re-check of the chosen configs.",
+      "categories": "Today's curated tags. Results carry taxonomy hindsight (open question 3) and are reported as an upper estimate until that check is done.",
+      "benchmark": "Nifty200 Momentum 30 TRI for excess return; Nifty Midcap 150 TRI and Nifty Smallcap 250 TRI for the drawdown baskets."
+    },
+    "baskets": "All three (Conservative, Medium, Aggressive), as defined in bl010_criteria.json; one choice, or 'none', per basket. A config belongs to a basket if criteria.basket_passes holds on its blended weekly curve.",
+    "rank_by": {
+      "measure": "25th percentile of the config's nine financial-year excess returns over Nifty200 Momentum 30 TRI, FY2018 to FY2026 (April to March; FY2027 to date is reported, not used). Excess = config FY return minus index FY return, in points.",
+      "plain": "Its third-worst financial year against the momentum index.",
+      "ties": "Within 0.5 points: the higher Martin ratio (CAGR over Ulcer index), then the simpler config."
+    },
+    "clusters": {
+      "how": "Configs in a basket are grouped by the correlation of their weekly returns: a config joins a cluster when its correlation with the cluster's medoid is at least 0.9.",
+      "score": "A cluster is scored by the rank_by measure of its 25th-percentile member; the chosen config is the medoid of the best-scoring cluster, not its best member."
+    },
+    "holdings": {
+      "nominal": "category_top_n x picks_per_category, capped by pool_top_n: the most stocks the config can hold at once.",
+      "preference": "Prefer 8 to 12 nominal holdings: among clusters whose score is within 1 point of the best, take the one whose medoid holds 8 to 12. A medoid outside 8 to 12 is chosen only if it beats the best 8-to-12 cluster by more than 1 point.",
+      "kill_of_the_preference": "If, in the walk-forward, configs with 2 to 6 nominal holdings beat those with 8 to 12 by more than 3 points a year at a similar Ulcer index, the preference is dropped and that is reported."
+    },
+    "rebalance_every": "Any of 1, 2 or 4 weeks; not restricted.",
+    "walk_forward": {
+      "how": "For each year Y from FY2019 to FY2026: apply this same rule (basket, rank_by, clusters, holdings) to data ending 13 weeks before Y starts, hold the chosen config through Y, and join the years.",
+      "kill": "The joined result is not at least 3 points a year above the joined median config of the same basket, or not above Nifty200 Momentum 30 TRI."
+    },
+    "windows": {
+      "financial_years": "FY2018 to FY2026.",
+      "events": [
+        "2018-01-01 to 2019-08-31 small-cap bear",
+        "2020-02-01 to 2020-03-31 Covid fall",
+        "2020-04-01 to 2021-12-31 recovery",
+        "2022-01-01 to 2022-12-31",
+        "2023-01-01 to 2024-09-30 run-up",
+        "2024-10-01 to 2025-03-31 fall",
+        "2025-04-01 to latest"
+      ],
+      "rolling": "Every two-year and three-year window starting each quarter.",
+      "pass_for_a_config": "In the top half of the whole space (all 8,003) in at least 70% of financial years, and no financial year more than 10 points behind Nifty200 Momentum 30 TRI.",
+      "kill_top_configs_are_special": "The top 100 of a basket beat 100 random configs of the same basket in fewer than 60% of financial years, or their edge comes mostly from FY2024 and FY2025."
+    },
+    "factor_check": {
+      "how": "Weekly excess returns regressed on Nifty 50 TRI, a size spread (Smallcap 250 TRI minus Nifty 50 TRI) and a momentum spread (Nifty200 Momentum 30 TRI minus Nifty 50 TRI); stationary block bootstrap with 13 to 26 week blocks for CAGR and max drawdown intervals.",
+      "kill": "Alpha below 5% a year or |t| below 2: the result is small-cap momentum exposure, and a momentum index fund is the honest alternative."
+    }
+  }
+}
