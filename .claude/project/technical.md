@@ -131,6 +131,7 @@ uv run mbt journal show    # forward-signal journal (BL-024): every weekly signa
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
 uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 launchd job)
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
+uv run python scripts/result-baseline.py capture --data-dir <data> --out <dir>   # snapshot every result on LIVE data; `compare --baseline <dir>` after a change meant to keep them
 uv run mbt stocks fetch --skip-download  # rebuild the Nifty 50 stock data layer from the raw cache, no network
 uv run mbt stocks pin-manifest           # commit the raw cache + events as the new reproducibility baseline
 
