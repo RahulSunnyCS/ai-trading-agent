@@ -448,8 +448,42 @@ worse it did later. **Kill tripped: stop selecting a single winner**; Phase 5 pi
 and a lower bound instead. Within the drawdown ceiling the baskets impose, selection is less
 overfit (0.20), which is a reason to select inside a basket, not across the whole space.
 
-These are on today's stock list. The same scoring on the point-in-time universe is the honest
-version and has not been run (another ~6 hours).
+These are on today's stock list. The honest version, on the point-in-time universe, follows.
+
+**The same scoring on the point-in-time universe** (`--universe turnover_rank --tags curated`,
+`data/search/round7_A/scored_pit/`, finished 2026-10-06, about 12 hours on four workers). All
+8,003 configs, every rebalance phase blended, pre-tax, as searched:
+
+| | Today's list | Point in time |
+|---|---|---|
+| Median CAGR | 33.4% | **28.1%** |
+| 90th percentile | 42.1% | 35.5% |
+| Best | 77.3% | 56.0% |
+| PBO, all 8,003 | 0.48 | **0.69** (kill above 0.30) |
+| In-sample best below the index out of sample | 16% of splits | 45% |
+| Slope | −0.58 | −1.02 |
+| Configs within the 40% drawdown ceiling | 2,924 | 3,011 |
+| PBO within the ceiling | 0.20 | **0.53** |
+| … in-sample best below the index | 3% | 17% |
+| … slope | −0.40 | −0.88 |
+
+Nifty200 Momentum 30 TRI over the same weeks (2017-01-06 to 2026-10-02): 17.0%.
+
+- **Every config loses, the best lose most.** The median config loses 5.4 points; the 50 best
+  on today's list lose a median 23.7 (46 of 50 lose more than 10), as Phase 3 found on its
+  sample. Rank agreement between the two lists is 0.55; of the top 100 on each, 16 are the
+  same configs.
+- **Selection is worse than a coin flip on the honest list.** The best half-history pick lands
+  below the median config in 69% of splits, below the index in 45%, and the slope says the
+  better it looked the worse it did. Inside the drawdown ceiling it is still 0.53: the basket
+  alone does not make single-winner selection safe on the honest universe.
+- **The category of strategy still has an edge.** 82% of configs beat the momentum index by 5
+  points pre-tax; the typical config is 28% against 17%. What is not there is a way to tell,
+  in advance, which config will be the good one.
+
+Consequence for Phase 5: choose by cluster and by a lower bound, as planned, and judge the
+choice by walking the selection rule forward, not by its in-sample rank. Expect the honest
+answer to sit near the median config, not near the best.
 
 ### Steps 4 to 6 — built (2026-10-06)
 
@@ -470,5 +504,5 @@ version and has not been run (another ~6 hours).
   window used to select may not meet one used to validate (13-week embargo), and the
   2012–2016 hold-out is sealed until Phase 6.
 
-**Phase 4 is done as built, except** the re-scoring on the point-in-time universe (the honest
-version of the PBO above). It is running; results will be added here.
+**Phase 4 is done (2026-10-06).** The point-in-time PBO is 0.69 (0.53 within the drawdown
+ceiling); the single-winner rule stays killed on both universes.
