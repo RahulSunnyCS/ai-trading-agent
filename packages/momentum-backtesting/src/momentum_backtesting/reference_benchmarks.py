@@ -11,10 +11,18 @@ the strategy beats the obvious off-the-shelf momentum product. These two lines a
 - Nifty200 Momentum 30 TRI: a buyable factor index (an ETF tracks it). Back-calculated by NSE
   before 2020-08-11 - a backtest of the index methodology, not live history.
 
-Both come from `data/stocks/benchmarks_weekly.csv` (`mbt stocks fetch`, niftyindices.com),
-or the shared database's `momentum_prices` once those rows are migrated there. When neither
-exists the comparisons are simply absent - never an error, since every dataset can run
-without them.
+Four more TRIs are loaded too (`EXTRA_REFERENCES`, BL-010 Phase 5) for judging a basket
+against the broader market or its own factor family, by name, via
+`criteria.basket_passes(..., indices=...)`. `compare()` and everything that displays comparison
+lines still show only `REFERENCES`, so adding these changed no existing output:
+
+- Nifty Midcap 150 TRI, Nifty Smallcap 250 TRI
+- Nifty Midcap150 Momentum 50 TRI, Nifty500 Momentum 50 TRI
+
+All of them come from `data/stocks/benchmarks_weekly.csv` (`mbt stocks fetch`, or for just the
+four extras `mbt stocks fetch-benchmarks`; niftyindices.com), or the shared database's
+`stock_weekly_series` once those rows are migrated there. When neither exists the comparisons
+are simply absent - never an error, since every dataset can run without them.
 """
 
 from __future__ import annotations
@@ -25,13 +33,34 @@ import pandas as pd
 
 from . import metrics
 from .config import DATA_DIR
-from .stocks.ui_data import NIFTY50_TRI, NIFTY200_MOMENTUM30_TRI
+from .stocks.ui_data import (
+    NIFTY50_TRI,
+    NIFTY200_MOMENTUM30_TRI,
+    NIFTY500_MOMENTUM50_TRI,
+    NIFTY_MIDCAP150_MOMENTUM50_TRI,
+    NIFTY_MIDCAP150_TRI,
+    NIFTY_SMALLCAP250_TRI,
+    REFERENCE_ONLY_COLUMNS,
+)
 
+#: The comparison lines every backtest payload shows (`compare`).
 REFERENCES = (NIFTY50_TRI, NIFTY200_MOMENTUM30_TRI)
+#: Loaded by `load_references` but never displayed by `compare`.
+EXTRA_REFERENCES = (
+    NIFTY_MIDCAP150_TRI,
+    NIFTY_SMALLCAP250_TRI,
+    NIFTY_MIDCAP150_MOMENTUM50_TRI,
+    NIFTY500_MOMENTUM50_TRI,
+)
+LOADED = REFERENCES + EXTRA_REFERENCES
 #: First live (not back-calculated) week of the Nifty200 Momentum 30 index.
 MOMENTUM30_LIVE_FROM = pd.Timestamp("2020-08-11")
 
-_CSV_COLUMNS = {"nifty50_tri": NIFTY50_TRI, "nifty200_momentum30_tri": NIFTY200_MOMENTUM30_TRI}
+_CSV_COLUMNS = {
+    "nifty50_tri": NIFTY50_TRI,
+    "nifty200_momentum30_tri": NIFTY200_MOMENTUM30_TRI,
+    **REFERENCE_ONLY_COLUMNS,
+}
 
 
 def _from_db() -> pd.DataFrame | None:
@@ -50,23 +79,23 @@ def _from_db() -> pd.DataFrame | None:
         rows = con.execute(
             "SELECT week, series, close FROM stock_weekly_series "
             "WHERE series IN (SELECT unnest(?)) ORDER BY week",
-            [list(REFERENCES)],
+            [list(LOADED)],
         ).fetchall()
     return db_read._pivot_weekly(rows, "close") if rows else None
 
 
 def load_references(data_dir: Path | None = None) -> pd.DataFrame:
-    """Weekly closes for REFERENCES (Friday-labelled, like every other weekly frame): the
-    shared database first, then `<data_dir>/stocks/benchmarks_weekly.csv`. Empty frame when no
-    source has them."""
+    """Weekly closes for REFERENCES + EXTRA_REFERENCES (Friday-labelled, like every other weekly
+    frame): the shared database first, then `<data_dir>/stocks/benchmarks_weekly.csv`. Empty
+    frame when no source has them."""
     frame = _from_db()
     if frame is None:
         path = (data_dir or DATA_DIR) / "stocks" / "benchmarks_weekly.csv"
         if not path.exists():
-            return pd.DataFrame(columns=list(REFERENCES), dtype=float)
+            return pd.DataFrame(columns=list(LOADED), dtype=float)
         raw = pd.read_csv(path, index_col=0, parse_dates=True)
         frame = raw[[c for c in _CSV_COLUMNS if c in raw]].rename(columns=_CSV_COLUMNS)
-    return frame[[c for c in REFERENCES if c in frame]].sort_index()
+    return frame[[c for c in LOADED if c in frame]].sort_index()
 
 
 def aligned(reference: pd.Series, span: pd.DatetimeIndex) -> pd.Series | None:

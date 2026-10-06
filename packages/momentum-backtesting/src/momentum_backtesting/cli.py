@@ -7,6 +7,7 @@ import typer
 
 from . import fyers
 from .config import DATA_DIR, load_repo_env
+from .stocks.benchmarks import EXTRA_TRI_INDICES
 
 app = typer.Typer(no_args_is_help=True, help="Weekly momentum rotation backtester.")
 
@@ -642,13 +643,17 @@ def _stocks_curated_dir() -> Path:
     return Path(__file__).parent / "stocks" / "curated"
 
 
-#: niftyindices.com index name -> raw TRI snapshot filename (matches the names
+#: raw TRI snapshot filename -> niftyindices.com index name (matches the names
 #: adjust.load_tri_local / build_benchmarks_weekly already read).
 _BENCHMARK_TRI_FILES = {
     "NIFTY_50_TRI.json": "NIFTY 50",
     "NIFTY200_MOMENTUM_30_TRI.json": "NIFTY200 MOMENTUM 30",
     "NIFTY50_EQUAL_WEIGHT_TRI.json": "NIFTY50 EQUAL WEIGHT",
 }
+#: Comparison-only TRIs (BL-010 Phase 5): same snapshot shape, kept apart so the narrow
+#: `mbt stocks fetch-benchmarks` can refresh just these.
+_EXTRA_BENCHMARK_TRI_FILES = {filename: name for name, filename in EXTRA_TRI_INDICES.values()}
+_BENCHMARK_TRI_FILES.update(_EXTRA_BENCHMARK_TRI_FILES)
 
 
 def _fetch_niftyindices_tri_raw(name: str, start, end) -> list[dict]:
@@ -702,9 +707,9 @@ def _fetch_niftyindices_tri_raw(name: str, start, end) -> list[dict]:
 
 
 def _refresh_benchmark_raw_files(raw_dir: Path, start, end) -> None:
-    """Refresh raw/benchmarks/*.json (TRI x3) + NIFTY50_EQUAL_WEIGHT_PRICE.csv.
+    """Refresh raw/benchmarks/*.json (TRI x7) + NIFTY50_EQUAL_WEIGHT_PRICE.csv.
 
-    The three TRI snapshots are written as raw JSON rows (adjust.load_tri_local's
+    The TRI snapshots are written as raw JSON rows (adjust.load_tri_local's
     expected shape). The EW *price* file is written already-parsed as a plain
     date,close CSV -- matching the shape of the out-of-band file it replaces
     (see benchmarks.fetch_equal_weight_price / adjust.load_ew_price_local's
@@ -786,7 +791,7 @@ def stocks_fetch(
 
     if not skip_download:
         client = NseClient()
-        typer.echo("refreshing benchmark raw files (TRI x3 + EW price)...")
+        typer.echo("refreshing benchmark raw files (TRI x7 + EW price)...")
         _refresh_benchmark_raw_files(raw_dir, start, date_cls.today())
 
         typer.echo("fetching the corporate-actions history (quarterly snapshots)...")
@@ -833,6 +838,65 @@ def stocks_fetch(
 
     if report.n_failures() > 0:
         raise typer.Exit(1)
+
+
+@stocks_app.command("fetch-benchmarks")
+def stocks_fetch_benchmarks(
+    from_: str = typer.Option("2011-01-01", "--from", help="Start date (YYYY-MM-DD)."),
+    skip_download: bool = typer.Option(
+        False, "--skip-download", help="No network -- rebuild from the raw snapshots on disk."
+    ),
+    skip_catalog: bool = typer.Option(
+        False, "--skip-catalog", help="Write the raw snapshots and the CSV only."
+    ),
+) -> None:
+    """Fetch ONLY the comparison-only TRIs (Nifty Midcap 150, Smallcap 250, Midcap150 Momentum
+    50, Nifty500 Momentum 50) and add them to data/stocks/benchmarks_weekly.csv and the shared
+    catalog's stock_weekly_series. Touches no other column, series or table, so it is safe
+    without the full `mbt stocks fetch` rebuild (which needs NSE bhavcopies)."""
+    from datetime import date as date_cls
+
+    from .stocks import adjust
+    from .stocks.nse import atomic_write_bytes
+    from .stocks.ui_data import REFERENCE_ONLY_COLUMNS
+
+    start = date_cls.fromisoformat(from_)
+    data_dir = _stocks_data_dir()
+    bench_dir = data_dir / "raw" / "benchmarks"
+
+    if not skip_download:
+        bench_dir.mkdir(parents=True, exist_ok=True)
+        for filename, index_name in _EXTRA_BENCHMARK_TRI_FILES.items():
+            rows = _fetch_niftyindices_tri_raw(index_name, start, date_cls.today())
+            atomic_write_bytes(bench_dir / filename, json.dumps(rows).encode("utf-8"))
+            typer.echo(f"  {index_name}: {len(rows)} daily rows")
+
+    try:
+        extra = adjust.merge_extra_benchmarks_csv(data_dir)
+    except FileNotFoundError as error:
+        typer.echo(f"{error} -- run `mbt stocks fetch` first.")
+        raise typer.Exit(1) from None
+    if extra.empty:
+        typer.echo("No raw snapshots for the comparison TRIs -- run without --skip-download.")
+        raise typer.Exit(1)
+    for column, name in REFERENCE_ONLY_COLUMNS.items():
+        if column in extra:
+            series = extra[column].dropna()
+            typer.echo(
+                f"  {name}: {len(series)} weeks, {series.index[0]:%Y-%m-%d} .. "
+                f"{series.index[-1]:%Y-%m-%d}"
+            )
+    typer.echo(f"wrote {data_dir / 'benchmarks_weekly.csv'}")
+
+    if skip_catalog:
+        return
+    from trading_data.db import connect, data_root
+
+    from . import db_migrate
+
+    with connect(data_root()) as con:
+        n_rows = db_migrate.import_extra_benchmarks(con, extra)
+    typer.echo(f"catalog stock_weekly_series: {n_rows:,} rows written ({data_root()})")
 
 
 @stocks_app.command("sync")
