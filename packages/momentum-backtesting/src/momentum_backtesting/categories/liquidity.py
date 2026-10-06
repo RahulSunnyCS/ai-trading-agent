@@ -135,13 +135,13 @@ def weekly_features(symbols: list[str], root: Path | None = None) -> pd.DataFram
     """One row per (symbol, week-ending Friday): the as-of-that-week liquidity features."""
     from .. import db_read  # noqa: PLC0415 (avoid an import cycle at module load)
 
-    mtime = db_read.catalog_mtime(root)
-    key = (mtime, tuple(sorted(symbols)))
+    version = db_read.data_version(root)
+    key = (version, tuple(sorted(symbols)))
     with _lock:
         hit = _cache.get(key)
     if hit is not None:
         return hit
-    if mtime is None or not symbols:
+    if version is None or not symbols:
         return pd.DataFrame()
     frame = compute_weekly_features(symbols, root)
     with _lock:

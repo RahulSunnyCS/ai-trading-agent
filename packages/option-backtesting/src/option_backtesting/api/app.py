@@ -38,6 +38,9 @@ app = create_app()
 
 
 def main() -> None:
+    from ..fyers.auth import load_dotenv
+
+    load_dotenv()  # TRADING_DATA_ROOT etc. when started outside dev-stack (`bun run py:api`)
     uvicorn.run(app, host="127.0.0.1", port=8000)
 
 

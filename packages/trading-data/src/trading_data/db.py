@@ -61,9 +61,30 @@ LAKE_VIEWS: dict[str, tuple[str, str]] = {
 }
 
 
-def data_root() -> Path:
+def data_root(*, require_mounted: bool = True) -> Path:
+    """TRADING_DATA_ROOT, else ~/TradingData. On the owner's laptop that is an APFS disk
+    image on the external SSD (`tdata mount`); `require_mounted` refuses a root on a
+    volume that is not mounted, so no process silently writes somewhere else."""
     override = os.environ.get("TRADING_DATA_ROOT", "").strip()
-    return Path(override).expanduser() if override else DEFAULT_ROOT
+    root = Path(override).expanduser() if override else DEFAULT_ROOT
+    if require_mounted:
+        check_mounted(root)
+    return root
+
+
+def check_mounted(root: Path) -> None:
+    """Raise if `root` lives on /Volumes/<name> and that volume is not mounted. Catches
+    the image not being attached (the SSD unplugged, or not mounted yet after login) and
+    it being attached under another name ("TradingData 1"). `~/TradingData` may be a
+    symlink to the image: resolving it checks the target, so a dangling link also fails
+    here instead of `mkdir` creating a fresh, empty root."""
+    resolved = root.expanduser().resolve(strict=False)
+    parts = resolved.parts
+    if len(parts) >= 3 and parts[1] == "Volumes" and not os.path.ismount(Path(*parts[:3])):
+        raise RuntimeError(
+            f"the trading data root {root} is on {Path(*parts[:3])}, which is not mounted "
+            "— run `tdata mount` (attaches TRADING_DATA_IMAGE), or connect the SSD"
+        )
 
 
 def catalog_path(root: Path | None = None) -> Path:
@@ -166,14 +187,17 @@ def _open(path: Path, read_only: bool, attempts: int = 40) -> duckdb.DuckDBPyCon
 
 @contextmanager
 def connect(
-    root: Path | None = None, *, read_only: bool = False
+    root: Path | None = None, *, read_only: bool = False, lock_wait: float = 10.0
 ) -> Iterator[duckdb.DuckDBPyConnection]:
+    """`lock_wait`: seconds to keep retrying while another process holds the catalog. 10 s
+    suits an interactive command; a long import that has already written files and only
+    needs to record them passes minutes (a crash between the two leaves unrecorded days)."""
     root = root or data_root()
     path = catalog_path(root)
     if read_only and not path.exists():
         raise FileNotFoundError(f"no catalog at {path} — run `tdata init` first")
     root.mkdir(parents=True, exist_ok=True)
-    con = _open(path, read_only)
+    con = _open(path, read_only, attempts=max(1, round(lock_wait / 0.25)))
     try:
         if not read_only:
             migrate(con)

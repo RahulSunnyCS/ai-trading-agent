@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { telegramSink } from './alerts.js';
+import { backupJob } from './backup.js';
 import { jobEnv } from './env.js';
 import { History, pidAlive } from './history.js';
 import { JOBS, findJob } from './jobs.js';
@@ -37,7 +38,7 @@ function context(history: History): RunContext {
     env: jobEnv(REPO_ROOT),
     logDir: logDir(),
     history,
-    builtins: { 'morning-summary': morningSummary() },
+    builtins: { 'morning-summary': morningSummary(), backup: backupJob() },
   };
 }
 

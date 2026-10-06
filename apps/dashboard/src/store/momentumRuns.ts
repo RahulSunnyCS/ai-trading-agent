@@ -63,7 +63,9 @@ interface JobView {
 }
 
 const STORAGE_KEY = 'ata-momentum-runs';
-const POLL_MS = 2000;
+/** Delay before each poll after a run starts: quick at first, so a fast or cached run shows at
+ * once, then every 2 s (BL-005). The last entry repeats. */
+export const POLL_SCHEDULE_MS = [300, 700, 1500, 2000] as const;
 
 const isActive = (run: MomentumRun): boolean => run.status === 'queued' || run.status === 'running';
 
@@ -86,7 +88,11 @@ function persist(runs: MomentumRun[], activeId: string | null): void {
 }
 
 let nextSeq = 1;
-let timer: ReturnType<typeof setInterval> | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let pollIndex = 0;
+let pollInFlight = false;
+/** Bumped by the test seam so a poll still in flight from before a reset cannot restart the loop. */
+let pollEpoch = 0;
 const saving = new Set<string>();
 
 export const useMomentumRunsStore = create<MomentumRunsState>((set, get) => ({
@@ -119,7 +125,7 @@ export const useMomentumRunsStore = create<MomentumRunsState>((set, get) => ({
     };
     set((state) => ({ runs: [...state.runs, run], activeId: run.id }));
     persist(get().runs, run.id);
-    ensurePolling();
+    ensurePolling(true);
     return null;
   },
 
@@ -199,21 +205,41 @@ async function pollOnce(run: MomentumRun): Promise<void> {
   }
 }
 
-/** Polls every in-flight run until none are left, then stops itself. */
-function ensurePolling(): void {
-  if (timer !== null) return;
-  timer = setInterval(() => {
+function schedulePoll(epoch: number): void {
+  const delay = POLL_SCHEDULE_MS[Math.min(pollIndex, POLL_SCHEDULE_MS.length - 1)];
+  pollIndex += 1;
+  timer = setTimeout(() => {
+    timer = null;
     const active = useMomentumRunsStore.getState().runs.filter(isActive);
-    if (active.length === 0) {
-      if (timer !== null) clearInterval(timer);
-      timer = null;
-      return;
-    }
-    void Promise.all(active.map(pollOnce)).then(() => {
+    if (active.length === 0) return;
+    // The next poll is scheduled only once this one has answered, so polls never overlap.
+    pollInFlight = true;
+    // A run whose poll throws (an answer with no job in it, say) must not end polling for the
+    // others, or for itself next time: it is retried on the next tick like any other failure.
+    void Promise.all(active.map((run) => pollOnce(run).catch(() => undefined))).then(() => {
+      if (epoch !== pollEpoch) return; // the test seam reset the store while this was in flight
+      pollInFlight = false;
       const { runs, activeId } = useMomentumRunsStore.getState();
       persist(runs, activeId);
+      schedulePoll(epoch);
     });
-  }, POLL_MS);
+  }, delay);
+}
+
+/** Polls every in-flight run until none are left, then stops itself. `restart` (a run just
+ * started) goes back to the quick first polls. If a poll is in flight when that happens, the
+ * answer to it schedules the next one at the quick pace, so a restart never overlaps polls. */
+function ensurePolling(restart = false): void {
+  if (pollInFlight) {
+    if (restart) pollIndex = 0;
+    return;
+  }
+  if (timer !== null) {
+    if (!restart) return;
+    clearTimeout(timer);
+  }
+  pollIndex = 0;
+  schedulePoll(pollEpoch);
 }
 
 let hydrated = false;
@@ -254,8 +280,11 @@ export function hydrateMomentumRuns(): void {
 
 /** Test seam: forget module state between tests. */
 export function resetMomentumRunsForTests(): void {
-  if (timer !== null) clearInterval(timer);
+  if (timer !== null) clearTimeout(timer);
   timer = null;
+  pollIndex = 0;
+  pollInFlight = false;
+  pollEpoch += 1;
   hydrated = false;
   nextSeq = 1;
   saving.clear();

@@ -1,4 +1,4 @@
-import { type Schedule, onWeekdays, tradingDays } from './schedule.js';
+import { type Schedule, firstWeekdayOfMonth, onWeekdays, tradingDays } from './schedule.js';
 
 /**
  * Every recurring job, in one place (BL-012). Adding a job means adding an
@@ -49,7 +49,7 @@ export interface Job {
    */
   logFile?: string;
   /** Run an in-process job (see runner's `builtins`) instead of `steps`. */
-  builtin?: 'morning-summary';
+  builtin?: 'morning-summary' | 'backup';
 }
 
 const MOMENTUM = 'packages/momentum-backtesting';
@@ -182,6 +182,21 @@ export const JOBS: Job[] = [
     group: 'catalog',
     alertsItself: true,
     fixHint: 'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily',
+  },
+  {
+    id: 'backup',
+    description: 'Copy the research database (TRADING_DATA_ROOT) to the external SSD',
+    schedule: { at: '10:00', on: firstWeekdayOfMonth(0), label: '1st Sunday of the month 10:00' },
+    steps: [],
+    builtin: 'backup',
+    cwd: '.',
+    timeoutMinutes: 120,
+    retries: 1,
+    retryDelayMinutes: 60,
+    catchUpHours: 7 * 24, // any time that week
+    group: 'catalog', // tdata backup CHECKPOINTs the catalog
+    fixHint:
+      'Plug in the SSD, then: cd packages/trading-data && uv run tdata backup --to "/Volumes/RAHUL\'S SSD/TradingData"',
   },
   {
     id: 'morning-summary',

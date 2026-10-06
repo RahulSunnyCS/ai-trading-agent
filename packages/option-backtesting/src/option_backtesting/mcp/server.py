@@ -126,7 +126,6 @@ def run_backtest(
     with connect() as con:
         run_id = record_run(con, loaded.strategy, start, end, result, yaml_text)
 
-
     out: dict = {
         "run_id": run_id,
         "net_inr": result.net_inr,
@@ -462,6 +461,9 @@ def propose_strategy(base_preset: str, changes: dict) -> dict:
 
 
 def main() -> None:
+    from ..fyers.auth import load_dotenv
+
+    load_dotenv()  # Claude Code starts this without the repo .env (TRADING_DATA_ROOT)
     mcp.run()
 
 

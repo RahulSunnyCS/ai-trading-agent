@@ -110,6 +110,9 @@ uv run tdata init           # create TRADING_DATA_ROOT (~/TradingData) + catalog
 uv run tdata status         # where it lives, rows/days per view, ingest runs, reference-CSV drift
 uv run tdata reference sql "INSERT INTO ref_lot_sizes VALUES ('NIFTY', 75, DATE '2027-01-01')"  # edit + re-export CSVs
 uv run tdata backup --to /Volumes/<disk>/TradingData   # monthly; copies only new lake/raw files
+uv run tdata mount          # attach TRADING_DATA_IMAGE if the root's volume is not mounted (idempotent)
+uv run tdata vendor import --from "/Volumes/RAHUL'S SSD/Stock Market Data/parquet/options" --unit nifty  # BL-034: vendor options history -> lake (resumable; Fyers days never overwritten); import-index <csv> --symbol NIFTY for spot / INDIAVIX
+uv run tdata quality rebuild  # re-judge every lake day -> data_quality (usable / excluded + why); `quality status` summarises
 uv run obt legwise run strategies/legwise/*.yaml [--trades]   # AlgoTest-style leg-wise backtests over that data
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
 uv run obt daily            # the evening routine: fetch the last closed session, run every strategies/legwise/*.yaml, save, summarise + Telegram (--no-telegram)
@@ -135,6 +138,7 @@ uv run mbt journal show    # forward-signal journal (BL-024): every weekly signa
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
 uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 scheduler job)
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
+uv run python scripts/result-baseline.py capture --data-dir <data> --out <dir>   # snapshot every result on LIVE data; `compare --baseline <dir>` after a change meant to keep them
 uv run mbt stocks fetch --skip-download  # rebuild the Nifty 50 stock data layer from the raw cache, no network
 uv run mbt stocks pin-manifest           # commit the raw cache + events as the new reproducibility baseline
 
@@ -164,7 +168,7 @@ rule below.
 | `packages/contract-notes` | Daily Gmail → PDF → Google Sheet F&O P&L pipeline | — (leaf; Node 20/CommonJS, reimplements the `Notification` shape itself instead of importing the ESM `@trading/notify`) | none |
 | `packages/momentum-backtesting` | Python weekly momentum-rotation research tool (`mbt` CLI) | private FastAPI service (`mbt serve`) | `apps/dashboard` through Fastify's `/api/momentum/*` proxy; still no code imports from `option-backtesting` |
 | `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below); since 2026-09-30 those CSVs are EXPORTED from `trading-data`'s catalog (`tdata reference export`), which is the master | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
-| `packages/trading-data` | Python/uv: the local research database — DuckDB catalog (instruments, reference data, ingest runs, strategies, backtest results, companies/corporate actions/index+category membership, momentum's cross-instrument price series) + Parquet lake (`bars_1m_*`, `bars_1d_stock`) + raw vendor copies under `TRADING_DATA_ROOT`; `tdata init/status/backup/reference` | `db.connect`, `lake.*` paths/writers and the bars_1m schemas, `instruments.register`, `ingest.start_run/finish_run`, `reference.export_csvs/check` | `packages/option-backtesting` and `packages/momentum-backtesting` (both editable path dependencies) |
+| `packages/trading-data` | Python/uv: the local research database — DuckDB catalog (instruments, reference data, ingest runs, strategies, backtest results, companies/corporate actions/index+category membership, momentum's cross-instrument price series) + Parquet lake (`bars_1m_*`, `bars_1d_stock`) + raw vendor copies under `TRADING_DATA_ROOT`; `tdata init/status/backup/reference` | `db.connect`, `lake.*` paths/writers and the bars_1m schemas, `instruments.register`, `ingest.start_run/finish_run`, `quality.rebuild/verdict`, `reference.export_csvs/check` | `packages/option-backtesting` and `packages/momentum-backtesting` (both editable path dependencies) |
 | `apps/server` (`@ata/server`) | Fastify/Bun trading backend | — | `apps/dashboard` (HTTP only) |
 | `apps/scheduler` (`@ata/scheduler`) | Runs every recurring job (BL-012): registry, IST schedules, runner, SQLite run history | — | none — leaf; runs the other packages' CLIs as child processes |
 | `apps/dashboard` (`@ata/dashboard`) | Next.js/React frontend | — | none — leaf; talks to `apps/server` over HTTP only, imports no internal package |
@@ -411,7 +415,7 @@ The system is a **real-time event-driven pipeline** in four layers:
   push to `main` that changes anything but `*.md` outside `packages/*/src/`. Add `reviewed` only
   after `/code-review` has run and its result is on the PR
 - **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
-  the chart palette helpers (`lib/chartTheme.ts`) and the font setup (`next/font`, IBM Plex
+  the chart palette helpers (`lib/chartTheme.ts`) and the font setup (self-hosted `next/font/local`, IBM Plex
   Sans / Mono) are in `docs/dashboard-design-tokens.md`
 - **Dashboard display formatting lives in `apps/dashboard/src/lib/format.ts`** — components
   never call `Intl.*`, `toFixed` or `toLocaleString`. Use `formatInr`, `formatPct` (takes a
@@ -481,8 +485,10 @@ Critical variables whose misconfiguration causes real pain:
 | ~~`MOMENTUM_DATABASE_URL`~~ | **Retired 2026-09-30** (TODO 3.11.5) — `packages/momentum-backtesting`'s price history and weekly signals now live in the shared `momentum_prices`/`momentum_signals` tables (`TRADING_DATA_ROOT`), not a separate Neon Postgres. `DATABASE_URL` (unrelated, still live) is what momentum's `fyers.py` reads for `broker_tokens` |
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after the dashboard token and `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
 | `NOTIFY_PREFS_FILE` | Optional override for the notification preferences file (default `~/.config/ai-trading-agent/notifications.json`, `{"disabled": [type, ...]}`) that `@trading/notify` and both Python `notify.py` copies read before every Telegram send (BL-012). Missing or broken = everything on |
-| `TRADING_DATA_ROOT` | The local research database (`packages/trading-data`): `catalog.duckdb` + the Parquet `lake/` + gzipped `raw/` vendor responses. Default `~/TradingData`; point it at the external disk to move everything. Replaced `FYERS_DATA_DIR` (2026-09-30). The Fyers 1-minute data in it cannot be re-downloaded once contracts expire — back it up monthly with `tdata backup --to <disk>` |
+| `TRADING_DATA_ROOT` | The local research database (`packages/trading-data`): `catalog.duckdb` + the Parquet `lake/` + gzipped `raw/` vendor responses. Default `~/TradingData`. On the owner's laptop it is `/Volumes/TradingData`, an APFS disk image on the external SSD (BL-034: ~110k day files would cost 2×256 KiB each on ExFAT). Every process refuses a root on a `/Volumes/<name>` that is not mounted (`trading_data.db.check_mounted`) rather than writing elsewhere; `tdata mount` attaches it. `obt`, `obt-api` and `obt-mcp` load the repo `.env` at start, `mbt` already did; `tdata` reads the environment only. Replaced `FYERS_DATA_DIR` (2026-09-30). The Fyers 1-minute data in it cannot be re-downloaded once contracts expire — back it up monthly with `tdata backup --to <disk>` |
+| `TRADING_DATA_IMAGE` | Path of the disk image `tdata mount` attaches (and the `trading-data-mount` LaunchAgent at login / when a volume appears). Must be double-quoted in `.env`: the launchd jobs `source` it with bash and the SSD's name contains an apostrophe and a space |
 | `SCHEDULER_STATE_DIR` / `SCHEDULER_LOG_DIR` | `apps/scheduler`'s run history (`scheduler.db`) and per-job logs. Defaults `~/Library/Application Support/ai-trading-agent` and `~/Library/Logs/ai-trading-agent` |
+| `BACKUP_VOLUME` | Mount point of the external disk the scheduler's monthly `backup` job copies `TRADING_DATA_ROOT` to (default `/Volumes/RAHUL'S SSD`). Not mounted → `~/Downloads/TradingData-backup` plus a Telegram warning |
 | `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet bar cache (`<dir>/cache`). Defaults to `packages/option-backtesting`'s own `data/` when unset. The run registry no longer lives under this — it's in the shared `trading_data` catalog, rooted at `TRADING_DATA_ROOT` |
 
 ## Common Tasks

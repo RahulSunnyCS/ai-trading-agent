@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the slowest step in the research loop. Every Broad iteration waits 20–55 s |
-| **Status** | Planned |
+| **Status** | In progress (Phase 1) |
 | **Type** | improvement |
 | **Area** | momentum (+ dashboard for polling and lazy cards) |
 | **Created** | 2026-10-05 |
-| **Depends on** | **BL-001** for Phase 3: any engine change must be proven result-identical by the golden suite first. Phases 1–2 do not change results |
-| **TODO.md row** | — (filled in when started) |
+| **Depends on** | **BL-001** for Phase 3: any engine change must be proven result-identical by the golden suite first (BL-001 Phase 1, the goldens, is done). Phases 1–2 do not change results |
+| **TODO.md row** | 3.18 |
 
 ## Context
 
@@ -33,8 +33,9 @@ proportions hold):
 - **~20%** in `api._circuit_realism`: `circuit_exposure._runs` and `lc_outcomes`. This is a
   second pass for the "Worst circuit situations" card, which concluded "about 0 CAGR points"
   on that run.
-- `PerformanceWarning: DataFrame is highly fragmented` at `categories/broad.py:1170-1171` and
-  `api.py:1601`.
+- `PerformanceWarning: DataFrame is highly fragmented` at `categories/broad.py:1227-1229` and
+  `api.py:1607` (line numbers as of 2026-10-06). The likely source is the per-column
+  `frame[col] = frame[col].ffill()` loop in `categories/prices.py`.
 
 The browser side is not the bottleneck. Rendering a finished 1.6 MB result took ~0.5 s, and
 typing in settings stayed under 50 ms. But `store/momentumRuns.ts` first polls the job 2 s
@@ -43,6 +44,22 @@ after Run (`POLL_MS = 2000`), so results land up to 2 s after the server finishe
 The Python API does not compress responses: scores are 300 KB raw against 76 KB gzipped.
 Once BL-002 puts the dashboard on Vercel, every response crosses the Cloudflare tunnel, so
 compression matters more.
+
+## Result check on live data
+
+Besides the goldens (frozen 2018–2025 slice), every phase is checked against a snapshot of
+**today's real results**, taken on 2026-10-06 before any code change (owner's request):
+`packages/momentum-backtesting/scripts/result-baseline.py` runs all 16 golden scenarios and every
+saved favourite through the real API and stores each full response under
+`data/baselines/2026-10-06-before-bl005/` in the main checkout (gitignored). After each phase:
+
+    uv run python scripts/result-baseline.py compare \
+      --data-dir <main checkout>/packages/momentum-backtesting/data \
+      --baseline <main checkout>/packages/momentum-backtesting/data/baselines/2026-10-06-before-bl005
+
+It reports any difference, whether the data changed since the snapshot (a Friday ingest moves
+results without any code change), and each run's time and size then and now. From Phase 2,
+`--via jobs` also checks the job routes, with the lazy sections reassembled.
 
 ## Goal
 
@@ -57,6 +74,13 @@ under ~400 KB, all with byte-identical results (BL-001 goldens).
 ## Plan
 
 ### Phase 1 — Cheap wins, no change to results
+- **Found when starting (2026-10-06):** every cache in `api._Data`, `liquidity._cache` and
+  `circuit_exposure._mask_cache` is keyed on the catalog file's mtime, and the dashboard saves
+  every finished run into that catalog (`POST /api/saved-runs`). So in normal dashboard use each
+  run throws away the caches the next one needs; the 21 s "warm" figure above was measured on
+  the stateless endpoint, which saves nothing. Fix: key them on `db_read.data_version()` (a
+  content hash of the tables a backtest reads plus the stock lake files' sizes and times,
+  recomputed only when the catalog mtime moves), not on the mtime itself.
 - **Tasks:**
   - Poll at 300 ms, 700 ms, 1.5 s and then every 2 s (`store/momentumRuns.ts`).
   - Add `GZipMiddleware(minimum_size=1024)` to the FastAPI app.
@@ -97,11 +121,36 @@ under ~400 KB, all with byte-identical results (BL-001 goldens).
 - A stale result cache: key on the data version, and test that an ingest invalidates it.
 - Memory use of the result LRU: cap by count (e.g. 8) and drop the largest sections first.
 
-## Open questions
+## Decisions (owner, 2026-10-06)
 
-- Is the circuit-realism card worth computing on every run, or only on demand?
-- Target for a *cold* Broad run? (The first-run cost is building category rankings.)
+- **Circuit-realism card: lazy.** It is not computed as part of the run; the card fetches its
+  own section once the main result has landed and shows a `Shimmer` until then. Same numbers.
+- **No cold-run target.** A cold Broad run is the ranking build (cached per Step-2 settings)
+  plus a warm run. Only the warm (≤ ~5 s) and identical re-run (< 1 s) targets apply; Phase 3
+  may speed the ranking build as a side effect.
+- **All four phases, in order,** one PR each, with the goldens green at every step. No golden
+  is ever accepted under this item: a golden diff means the change is wrong.
 
 ## Log
 
 - 2026-10-05 — created from the Momentum UI performance review (2026-10-04 session).
+- 2026-10-06 — started. Owner answered the two open questions (Decisions above); TODO §3.18.
+  Phase 1 begun.
+- 2026-10-06 — live-data snapshot taken before any code change (owner's request): 28 runs (16
+  golden scenarios + 12 saved favourites). Re-running it on the unchanged code matched 28 of 28,
+  so the check is deterministic.
+- 2026-10-06 — Phase 1 code done: `data_version` cache key (the saved-run bug above), whole-result
+  cache, gzip, quick first polls. Results: goldens clean (no accept), 28 of 28 live runs identical,
+  on both a first and a cached pass. An identical re-run takes 0.07–0.2 s (was 1.5–20 s). The new
+  version checks add ~0.01 s per request. First-run times could not be measured fairly that day:
+  the machine ran at load ~14 with other sessions' backtests, and another session was writing the
+  live catalog (`stock_weekly_series` 6,573 → 7,395 rows, `benchmarks_weekly.csv`), so the Phase 3
+  benchmark measures speed on the frozen fixture instead. Because the live data has since moved,
+  later phases compare against a fresh snapshot taken from `main`'s code on the new data.
+- 2026-10-06 — `/code-review` of PR #56: 9 findings. Fixed: the poll loop stopped for every run when
+  one poll threw; a run started mid-poll overlapped polls; a locked catalog changed the cache key
+  (emptying the Broad ranking twice); gzip level 9 (3x the CPU of level 5 for ~4% more bytes);
+  favourites with the same name collided in the snapshot; the snapshot tool's weaker data check and
+  copied missing-category retry now reuse `db_read.table_fingerprints` and the harness helper;
+  tests added for every input folder and the cache bound. Not fixed: two identical requests sent
+  at once still both compute (Phase 2 reworks the job manager, where shared in-flight work fits).

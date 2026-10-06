@@ -11,12 +11,25 @@ not in plists. See [`apps/scheduler/CLAUDE.md`](../../apps/scheduler/CLAUDE.md).
 | `fyers-login` | 08:05 trading days | Headless Fyers login, token stored in `broker_tokens` (needs Postgres) |
 | `morning-summary` | 09:00 trading days | One Telegram message: logins, Fyers token, last options day collected, checkout branch, disk, last-24h failures |
 | `options-daily` | 16:15 trading days, retried 17:45 and 19:15 | `obt daily`: collect the day's 1-minute option data (expiring contracts are gone tomorrow) and run every leg-wise strategy; Telegram summary |
+| `backup` | 1st Sunday of the month 10:00 (catch-up all week) | `tdata backup` to `/Volumes/RAHUL'S SSD/TradingData`; to `~/Downloads/TradingData-backup` with a Telegram warning when the SSD isn't plugged in |
 | `momentum-preview` / `-final` | Fri 14:40 / 16:45 | `mbt weekly --run preview|final` |
 | `momentum-stock-ingest` | Fri 19:30 | `mbt stocks sync`, then the stock/Custom Index/Broad final (needs the GUI session) |
 | `momentum-journal-check` | Fri 21:00 | `mbt journal check --send` |
 
 Failures and missed runs reach Telegram immediately; successes only appear in the morning
 summary.
+
+## The data-root mount agent
+
+`com.ai-trading-agent.trading-data-mount` is a second LaunchAgent, deliberately **not** a
+scheduler job: the scheduler's own jobs read and write the research database, so the volume
+holding it must be attached first. `TRADING_DATA_ROOT` is `/Volumes/TradingData`, an APFS disk
+image on the external SSD (BL-034). The agent runs `tdata mount` (idempotent: already mounted is
+a no-op) at login and whenever a volume appears under `/Volumes`, so plugging the SSD in is
+enough. With the SSD unplugged it logs why (`~/Library/Logs/ai-trading-agent/trading-data-mount.log`)
+and every reader and writer refuses the unmounted root instead of writing elsewhere. It needs
+`TRADING_DATA_ROOT` and `TRADING_DATA_IMAGE` in the repo `.env`; `install.sh` installs it with
+the scheduler.
 
 ## Commands
 

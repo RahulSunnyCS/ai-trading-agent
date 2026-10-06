@@ -32,6 +32,11 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+# scripts/vendor/ are the one-off conversion scripts exactly as they ran (provenance, see its
+# README) — kept close to the original rather than restyled.
+[tool.ruff.lint.per-file-ignores]
+"scripts/vendor/*" = ["E401", "E501", "E701", "E702", "E741", "SIM115", "SIM117"]
+
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["typer.Option", "typer.Argument"]
 
