@@ -409,3 +409,8 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   baseline) passes six of six. Step 3's full re-score is running.
 - **For the owner:** the category-layer decision, and whether to build the launch-dated
   taxonomy (launch dates for 113 themes) or drop to the long-standing NSE sectors.
+- 2026-10-06 — Phase 4 steps 1 and 3 measured on all 8,003 configs (today's list). PBO 0.48:
+  **the single-winner rule is killed**; within the 40% drawdown ceiling PBO is 0.20. The
+  aggressive winner is 5.8 points below its phase average (killed as a finalist). Steps 4 to 6
+  (criteria as code, generic nudges, the window rule) are not done; the point-in-time scoring
+  is not run.
