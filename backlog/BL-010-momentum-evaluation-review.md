@@ -414,3 +414,7 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   aggressive winner is 5.8 points below its phase average (killed as a finalist). Steps 4 to 6
   (criteria as code, generic nudges, the window rule) are not done; the point-in-time scoring
   is not run.
+- 2026-10-06 — Phase 4 steps 4 to 6 built: criteria as code (`criteria.py`, baskets and the
+  window rule), data-stamped run ids, generic nudges (fixes F13 and the B/C2 KeyError),
+  addendum 2 (selection and validation windows never meet; hold-out sealed). The point-in-time
+  re-score is running.
