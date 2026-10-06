@@ -10,6 +10,7 @@ not in plists. See [`apps/scheduler/CLAUDE.md`](../../apps/scheduler/CLAUDE.md).
 | `broker-login` | 08:00 trading days | Triggers the "Daily broker login" GitHub workflow (`packages/broker-login/src/dispatch.ts`); GitHub's own late cron stays as a backstop |
 | `fyers-login` | 08:05 trading days | Headless Fyers login, token stored in `broker_tokens` (needs Postgres) |
 | `morning-summary` | 09:00 trading days | One Telegram message: logins, Fyers token, last options day collected, checkout branch, disk, last-24h failures |
+| `options-daily` | 16:15 trading days, retried 17:45 and 19:15 | `obt daily`: collect the day's 1-minute option data (expiring contracts are gone tomorrow) and run every leg-wise strategy; Telegram summary |
 | `momentum-preview` / `-final` | Fri 14:40 / 16:45 | `mbt weekly --run preview|final` |
 | `momentum-stock-ingest` | Fri 19:30 | `mbt stocks sync`, then the stock/Custom Index/Broad final (needs the GUI session) |
 | `momentum-journal-check` | Fri 21:00 | `mbt journal check --send` |
