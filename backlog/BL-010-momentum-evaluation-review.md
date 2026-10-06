@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0, 1a, 2, 4 done; Phase 3 measured, arm A's headline killed; Phase 5 not started) |
+| **Status** | In progress (Phases 0, 1a, 2, 4 done; Phase 3 measured, arm A's headline killed; Phase 5 started) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -315,6 +315,14 @@ median), re-run on the fixed engine. Steps 1–3 and 5–7 first; step 4 after B
 F14 (circuit-lock mask, session-counted windows, Fyers prevclose), F15 (share-count engine and
 capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after Phase 6.
 
+Also parked here (owner, 2026-10-06), priority P3:
+- **After-tax re-check at ₹5 lakh** of the Phase 5 choices and their basket's median config.
+  Phase 5 runs pre-tax at ₹2 lakh; the minimum bar (5 points over Mom30 TRI after tax) is
+  judged here.
+- **Fair category check** (open question 3): re-run the Phase 5 choices with stocks grouped by
+  the exchange's own industry classification, applied to every year, and compare with today's
+  tags.
+
 ## Risks
 
 - **The honest number may be far below 55–63%**, possibly below the index alternative. That is
@@ -336,8 +344,24 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
    dated by each index's official launch date — published and checkable, whereas dating
    hand-made themes is itself a hindsight call; custom and own-research themes (incl.
    `pending_themes.csv`) tracked forward only through BL-024. A proposal, not a decision.
+   Revised recommendation (2026-10-06, after the owner noted that new categories such as Sugar
+   must stay usable going forward): the hindsight is in *which groups exist and who is in them*,
+   not in labelling backwards. The fair backtest check is the exchange's own industry
+   classification (every company by what it does, losers included), applied to every year;
+   live, any category may be added and is tracked from the day it is added. Not needed for
+   Phase 5; parked in Phase 7. Still the owner's decision.
 
 ### Answered
+
+- **Phase 5 (owner, 2026-10-06):** choose for all three baskets; rank by each config's
+  third-worst financial year against Mom30 TRI (25th percentile of FY2018–FY2026 excess);
+  prefer 8–12 holdings; rebalance every 1, 2 or 4 weeks, unrestricted. Committed as
+  `search_spaces/bl010_criteria_addendum_3.json` before any Phase 5 result.
+- **Phase 5 inputs (owner, 2026-10-06):** pre-tax at ₹2 lakh, as scored (after-tax deferred to
+  Phase 7, P3); today's curated tags, results flagged as carrying taxonomy hindsight.
+- **Models for Phase 5 (owner, 2026-10-06):** main session stays on Opus 5.5; Sonnet helpers for
+  data loading and runs; a Fable helper checks the selection rule before the choice is frozen.
+  Replaces the Phase 5 row of "Model per phase".
 
 - **E5, parked cash (2026-10-05):** keep the change — under the itemised model the liquid fund
   pays stamp duty going in and nothing coming out.
@@ -446,3 +470,7 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   ceiling (today's list 0.48 / 0.20); the in-sample best lands below the index out of sample in
   45% of splits. 82% of configs still beat Mom30 TRI by 5 points pre-tax. Phase 5 waits on the
   owner's go-ahead and on loading Nifty Midcap 150 TRI and Smallcap 250 TRI.
+- 2026-10-06 — Phase 5 started. Owner's answers recorded and committed as criteria addendum 3
+  (baskets, rank by third-worst FY against Mom30, 8–12 holdings preferred, any rebalance
+  interval; pre-tax, today's tags). Loading Midcap 150, Smallcap 250, Midcap150 Momentum 50 and
+  Nifty500 Momentum 50 TRI.
