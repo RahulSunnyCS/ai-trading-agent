@@ -188,3 +188,67 @@ def test_phase5_report_runs_end_to_end(tmp_path):
     }
     assert 2019 in agg["walk_forward"]["with_fy2019_partial"]["years"]
     assert 2019 not in agg["walk_forward"]["committed"]["years"]
+
+
+def test_ensemble_group_keeps_8_to_12_holdings_every_2_or_4_weeks():
+    facts = pd.DataFrame(
+        {
+            "holdings": {"a": 10, "b": 10, "c": 6, "d": 12},
+            "every": {"a": 2, "b": 1, "c": 4, "d": 4},
+        }
+    )
+    assert choose.ensemble_group(["a", "b", "c", "d"], facts) == ["a", "d"]
+
+
+def test_typical_set_takes_typical_configs_that_differ_and_skips_weak_ones():
+    rng = np.random.default_rng(4)
+    common = rng.normal(0, 0.02, len(WEEKS))
+    own = {k: rng.normal(0, 0.02, len(WEEKS)) for k in "abcde"}
+    curves = pd.DataFrame(
+        {
+            # a and a2 are near-copies: only one may be taken.
+            "a": _curve(0.004, common + 0.5 * own["a"]),
+            "a2": _curve(0.004, common + 0.5 * own["a"] + rng.normal(0, 0.001, len(WEEKS))),
+            "b": _curve(0.004, common + 0.6 * own["b"]),
+            "c": _curve(0.004, common + 0.7 * own["c"]),
+            # weak: a much worse drift, so its third-worst year is below the group median.
+            "weak": _curve(-0.004, common + 0.5 * own["d"]),
+        }
+    )
+    bench = _curve(0.002)
+    windows = [choose.fy_bounds(f) for f in choose.complete_fys(WEEKS)]
+    picks = choose.typical_set(curves, list(curves), bench, windows, size=4)
+    assert "weak" not in picks
+    assert not {"a", "a2"} <= set(picks)
+    assert len(picks) == 3
+
+
+def test_ensemble_curve_resets_to_equal_capital_each_april():
+    up = pd.Series(np.exp(np.linspace(0, 1, len(WEEKS))), index=WEEKS)
+    flat = pd.Series(1.0, index=WEEKS)
+    line = choose.ensemble_curve(pd.DataFrame({"up": up, "flat": flat}), ["up", "flat"])
+    start, end = choose.fy_bounds(2020)
+    before = WEEKS[start > WEEKS][-1]
+    last = WEEKS[end >= WEEKS][-1]
+    # Within a financial year the ensemble's growth is the mean of its members' growth from
+    # the week before the FY starts, where capital was reset to equal.
+    assert line[last] / line[before] == pytest.approx(
+        (up[last] / up[before] + flat[last] / flat[before]) / 2
+    )
+    # ... and it matches the financial-year return the walk-forward uses.
+    assert line[last] / line[before] - 1 == pytest.approx(
+        choose.ensemble_window_return(
+            pd.DataFrame({"up": up, "flat": flat}), ["up", "flat"], start, end
+        )
+    )
+
+
+def test_rebalance_phases_spread_the_fridays():
+    facts = pd.DataFrame({"every": {"a": 4, "b": 4, "c": 2, "d": 4}})
+    phases = choose.rebalance_phases(["a", "b", "c", "d"], facts)
+    assert phases["a"] != phases["b"]
+    load = [0, 0, 0, 0]
+    for cid, offset in phases.items():
+        for w in range(offset, 4, int(facts.at[cid, "every"])):
+            load[w] += 1
+    assert max(load) == 2  # 3 monthly + 1 fortnightly config: no Friday carries more than two

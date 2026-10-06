@@ -1473,6 +1473,26 @@ def search_choose(
     phase5.run(curves, scores, facts, series, dest, echo=typer.echo)
 
 
+@search_app.command("ensemble")
+def search_ensemble(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
+    dest: Path = typer.Option(None, "--dest", help="Report folder (default <out>/phase6)."),
+) -> None:
+    """BL-010 Phase 6 step 0: the ensemble criteria addendum 4 picks, after its own
+    walk-forward. Reads stored curves only; writes ensemble.json and ensemble.md."""
+    from . import bias, choose, method, phase5, phase6, reference_benchmarks
+
+    scored = scored or out / "scored_pit"
+    dest = dest or out / "phase6"
+    _, curves = method.load_scores(scored)
+    records = bias.load_records(out, set(curves.columns))
+    facts = choose.config_facts(records)
+    refs = reference_benchmarks.load_references()
+    series = {name: refs[name] for name in (phase5.MOM30, phase5.MIDCAP, phase5.SMALLCAP)}
+    phase6.run(curves, facts, records, series, dest, echo=typer.echo)
+
+
 @search_app.command("fair-placebo")
 def search_fair_placebo(
     out: Path = typer.Argument(..., help="A finished search's results folder."),

@@ -424,3 +424,145 @@ def block_bootstrap(
         "mdd_p50": float(np.percentile(dds, 50)),
         "mean_block_weeks": mean_block,
     }
+
+
+# --- the Phase 6 ensemble (criteria addendum 4) ------------------------------------------------
+
+
+def ensemble_group(members: list[str], facts: pd.DataFrame) -> list[str]:
+    """The basket members addendum 4 may pick from: 8-12 nominal holdings, rebalancing every 2
+    or 4 weeks."""
+    spec = criteria.load()["phase_6_ensemble"]["eligible"]
+    low, high = spec["nominal_holdings"]
+    every = set(spec["rebalance_every_weeks"])
+    return [
+        c
+        for c in members
+        if low <= facts.at[c, "holdings"] <= high and int(facts.at[c, "every"]) in every
+    ]
+
+
+def typical_set(
+    curves: pd.DataFrame,
+    group: list[str],
+    bench: pd.Series,
+    windows: list[tuple],
+    *,
+    size: int = 4,
+    corr: float = CLUSTER_CORR,
+) -> list[str]:
+    """Addendum 4's pick: drop configs whose rank measure is below the group's median, then
+    take the most typical (highest mean weekly-return correlation with the rest), skipping any
+    correlated `corr` or more with one already taken, until `size` are taken."""
+    if not group:
+        return []
+    sub = curves[group]
+    rank = lower_bound(window_excess(sub, bench, windows))
+    screened = list(rank.index[rank >= rank.median()])
+    z = _standardised(np.log(sub[screened].astype(float)).diff().iloc[1:])
+    pairwise = np.nan_to_num(z.T @ z, nan=0.0)
+    typical = pairwise.mean(axis=1)
+    taken: list[int] = []
+    for i in np.argsort(-typical, kind="stable"):
+        if all(pairwise[i, j] < corr for j in taken):
+            taken.append(int(i))
+        if len(taken) == size:
+            break
+    return [screened[i] for i in taken]
+
+
+def ensemble_window_return(curves: pd.DataFrame, picks: list[str], start, end) -> float:
+    """Equal capital in each pick at the window's start, no transfers inside it."""
+    if not picks:
+        return math.nan
+    return float(window_returns(curves[picks], start, end).mean())
+
+
+def ensemble_curve(curves: pd.DataFrame, picks: list[str]) -> pd.Series:
+    """The weekly value of equal capital in `picks`, reset to equal each April (addendum 4)."""
+    weeks = curves.index
+    out, level = [], 1.0
+    # Reset where each financial year's window starts: the last week before 1 April.
+    aprils = [pd.Timestamp(f"{y}-04-01") for y in range(weeks[0].year, weeks[-1].year + 1)]
+    resets = [weeks[0]] + [weeks[weeks < a][-1] for a in aprils if weeks[0] < a <= weeks[-1]]
+    resets = sorted(set(resets))
+    for i, start in enumerate(resets):
+        end = resets[i + 1] if i + 1 < len(resets) else weeks[-1]
+        span = curves.loc[start:end, picks]
+        part = (span / span.iloc[0]).mean(axis=1) * level
+        out.append(part.iloc[1:] if out else part)
+        level = float(part.iloc[-1])
+    return pd.concat(out)
+
+
+def walk_forward_ensemble(
+    curves: pd.DataFrame,
+    indices: dict[str, pd.Series],
+    bench: pd.Series,
+    facts: pd.DataFrame,
+    *,
+    first_fy: int = 2019,
+    partial_first: bool = False,
+    membership: dict | None = None,
+    echo=print,
+) -> pd.DataFrame:
+    """Addendum 4's walk-forward: each FY, pick on data ending 13 weeks before it, hold equal
+    capital in the picks through the FY, next to the eligible group's median config and the
+    benchmark. Same cuts, embargo and FY2019 handling as `walk_forward`."""
+    basket = criteria.load()["phase_6_ensemble"]["eligible"]["basket"]
+    membership = {} if membership is None else membership
+    rows = []
+    for fy in range(first_fy, complete_fys(curves.index)[-1] + 1):
+        start, end = fy_bounds(fy)
+        cut = start - pd.Timedelta(weeks=EMBARGO_WEEKS)
+        past = curves.loc[:cut]
+        known = complete_fys(past.index)
+        windows = [fy_bounds(f) for f in known]
+        selected_on = f"FY{known[0]}-FY{known[-1]}" if known else None
+        if not known and partial_first:
+            windows = [(past.index[0] + pd.Timedelta(days=1), past.index[-1])]
+            selected_on = f"{past.index[0].date()}..{past.index[-1].date()} (partial)"
+        if not windows:
+            echo(f"FY{fy}: no complete financial year before {cut.date()}, skipped")
+            continue
+        if cut not in membership:
+            membership[cut] = basket_members(past, {k: v.loc[:cut] for k, v in indices.items()})
+        group = ensemble_group(membership[cut][basket], facts)
+        picks = typical_set(past, group, bench.loc[:cut], windows)
+        year = window_returns(curves[group], start, end) if group else pd.Series(dtype=float)
+        row = {
+            "fy": fy,
+            "selected_on": selected_on,
+            "group": len(group),
+            "picks": picks,
+            "ensemble_return": ensemble_window_return(curves, picks, start, end),
+            "median_return": float(year.median()) if len(year) else math.nan,
+            "bench_return": float(window_returns(bench, start, end)),
+        }
+        rows.append(row)
+        echo(
+            f"FY{fy}: {row['group']} eligible, picked {len(picks)} -> "
+            f"{row['ensemble_return']:.1%} (median {row['median_return']:.1%}, "
+            f"index {row['bench_return']:.1%})"
+        )
+    return pd.DataFrame(rows).set_index("fy") if rows else pd.DataFrame()
+
+
+def rebalance_phases(picks: list[str], facts: pd.DataFrame) -> dict[str, int]:
+    """Addendum 4: one rebalance phase per pick, spreading their rebalance Fridays over a
+    four-week cycle (fewest picks trading on the busiest Friday); never by performance. Picks
+    are placed in the given order; ties go to the earliest phase."""
+    load = [0, 0, 0, 0]
+    out = {}
+    for cid in picks:
+        every = int(facts.at[cid, "every"])
+        best, best_load = 0, None
+        for offset in range(every):
+            weeks = range(offset, 4, every)
+            peak = max(load[w] + 1 for w in weeks)
+            if best_load is None or peak < best_load:
+                best, best_load = offset, peak
+        for w in range(best, 4, every):
+            load[w] += 1
+        out[cid] = best
+    return out
