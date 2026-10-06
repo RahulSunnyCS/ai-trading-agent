@@ -18,6 +18,18 @@ not in plists. See [`apps/scheduler/CLAUDE.md`](../../apps/scheduler/CLAUDE.md).
 Failures and missed runs reach Telegram immediately; successes only appear in the morning
 summary.
 
+## The data-root mount agent
+
+`com.ai-trading-agent.trading-data-mount` is a second LaunchAgent, deliberately **not** a
+scheduler job: the scheduler's own jobs read and write the research database, so the volume
+holding it must be attached first. `TRADING_DATA_ROOT` is `/Volumes/TradingData`, an APFS disk
+image on the external SSD (BL-034). The agent runs `tdata mount` (idempotent: already mounted is
+a no-op) at login and whenever a volume appears under `/Volumes`, so plugging the SSD in is
+enough. With the SSD unplugged it logs why (`~/Library/Logs/ai-trading-agent/trading-data-mount.log`)
+and every reader and writer refuses the unmounted root instead of writing elsewhere. It needs
+`TRADING_DATA_ROOT` and `TRADING_DATA_IMAGE` in the repo `.env`; `install.sh` installs it with
+the scheduler.
+
 ## Commands
 
 ```bash
