@@ -1,140 +1,75 @@
 # Project Overview
 
-**AI Trading Agent** (`ai-trading-agent`) is a paper-trading research platform for weekly index options strategies on Indian markets (NSE/BSE). It runs 10 parallel "trading personalities" simultaneously, tracks their performance against each other and against a frozen Clockwork benchmark, and evolves tunable parameters automatically based on regime-tagged retrospection data. This is a research and simulation tool only — it does not execute real trades.
+**AI Trading Agent** (`ai-trading-agent`) is a personal research workbench for Indian markets
+(NSE/BSE): weekly momentum rotation, and intraday index-options strategies backtested on
+collected 1-minute data. It does not place orders. Real trades are placed by hand or by the
+owner's own strategies on AlgoTest. This repo logs the brokers into AlgoTest, records realised
+P&L from contract notes, and measures strategies against it.
 
-## Core Feature Areas
+## Who uses it
 
-- **Data Ingestion** — Real-time market tick ingestion via Fyers WebSocket (or a built-in random-walk simulator); ATM straddle calculation every 15 seconds; India VIX feed; Redis Streams as the event bus
-- **Signal Generation** — Momentum exhaustion peak detection engine (rate-of-change + second derivative + EMA crossover); scheduled fallback entries; probability scoring adjusted for VIX, time of day, and day of week; Phase 2 will add S/R-level signal detection
-- **10-Personality Decision Engine** — Each personality independently filters every signal through 5 stages (hard filters → state checks → context checks → signal quality → optional profit gate) and then executes or skips the paper trade
-- **Paper Trade Execution** — Simulated straddle entries and exits recorded to PostgreSQL; Quantiply API integration for paper trade tracking; 3 management styles: Hold, Roll (Adjuster), Cut + Re-enter (Reducer)
-- **EOD Retrospection Engine** — BullMQ batch job computes per-personality daily metrics, Beat-Clockwork deltas, signal calibration scores, management effectiveness, and queues rule-based parameter suggestions; all results are regime-tagged (RANGING / TRENDING_STRONG / VOLATILE_REVERTING / EVENT_DAY)
-- **Parameter Evolution** — Phase 1: rule-based adjustments with minimum sample sizes, cooldown periods, and approval gates; Phase 2: Bayesian optimization; Phase 3: genetic algorithms; Phase 4: RL (if data warrants)
-- **React Dashboard** — Grouped by product (redesigned under BL-013, 2026-10-05): an Overview home (market session, feed, token, paper P&L, weekly signal, evening job, credits); Live, Trades, P&L, Personalities and Regimes; Options Lab (strategies, builder with Form and YAML modes, runs, daily results, market regimes); Momentum; Data › Coverage (backfill and replay); Broker logins, Billing and Settings; behind a `/login` page when hosted remotely; served via Next.js; uses Lightweight Charts, Plotly and Zustand
+The owner, plus two or three friends who see the Momentum results. There are no paying users,
+and none are planned for now (`business.md`).
 
-## Target Users
+- **This month (from 2026-10-06):** finish the Momentum strategy to a standard the owner will
+  put real money behind (BL-010, BL-001, BL-024, BL-025).
+- **Next 2–3 months:** the options and momentum research workbench, used by the same few
+  people, to learn what to improve (BL-028 decides whether it goes further).
+- **Later, undecided:** personalities running over the backtest data (BL-023).
 
-Originally a personal / small-team **research tool**; now a **commercial SaaS product** with India-only subscription billing (see `business.md` for billing details). Primary users are quant-oriented options traders who want data-driven evidence on Indian weekly index strategies (Nifty, BankNifty, Sensex). Access is gated by Razorpay UPI payment.
+## Active
 
-## Secondary Surfaces
+| Area | Where | What it is |
+|---|---|---|
+| Momentum | `packages/momentum-backtesting` | Weekly rotation across indices, ETFs and survivorship-free Nifty 50 stocks; Custom Index and Broad Momentum; Friday Telegram signal; forward-signal journal. Detail: the package's `CLAUDE.md` |
+| Options research | `packages/option-backtesting` | YAML strategy DSL and bar-by-bar engine (golden-verified to the rupee); leg-wise AlgoTest-style backtests over daily-collected Fyers 1-minute data (`obt daily`); walk-forward, sweeps, overfitting guard; FastAPI + MCP server |
+| Research database | `packages/trading-data` | DuckDB catalog + Parquet lake under `TRADING_DATA_ROOT`, shared by both research packages |
+| Dashboard | `apps/dashboard` | Next.js: Overview, Options Lab, Momentum, Data › Coverage, Broker logins, Settings; behind `/login` when hosted remotely. Talks to the research APIs through Fastify proxies or direct rewrites |
+| Broker login | `packages/broker-login` | Daily AlgoTest login (Angel One, Finvasia) and headless Fyers token, triggered from the laptop at 08:00/08:05 IST |
+| Contract notes | `packages/contract-notes` | Gmail → PDF → Google Sheet realised F&O P&L. Cutover from the `trade-analytics` repo pending (TODO §2) |
+| Scheduler | `apps/scheduler` (BL-012, in progress) | Runs every recurring job from one launchd-kept process — logins, the 09:00 morning summary, Friday momentum — with run history, catch-up after sleep and Telegram alerts; replaced the per-job launchd plists in `deploy/launchd/` |
 
-- Fastify REST API (port 3000) — signal management, personality CRUD, paper-trade queries, retrospection triggers, live dashboard data, payment/order endpoints
-- WebSocket endpoint (`/ws/ticks`) — live tick stream for the React frontend
-- Payment routes — `POST /payment/create-order`, `POST /payment/webhook`, `GET /payment/balance`; access-gate middleware for subscription + credit checks
-- Backtest proxy routes (`/api/backtest/*`) — proxies to the loopback-only Python FastAPI service (`packages/option-backtesting`); `POST /runs` is access-gated and credit-consuming (feature `backtest_run`), `validate`/`presets`/`coverage`/`health` are free
-- Docker Compose — development infrastructure (TimescaleDB + Redis)
-- Simulation mode (`SIMULATE=true`) — fully self-contained, no broker credentials needed
-- **`packages/broker-login`** — daily Playwright job that logs the brokers into
-  AlgoTest. Runs on GitHub Actions; since 2026-10-05 the owner's laptop triggers it
-  at 08:00 IST trading days (`apps/scheduler`, BL-012) because GitHub's own 08:15/08:45
-  cron arrived hours late — that cron stays only as a backstop
-- **`apps/scheduler`** — runs every recurring job (logins, Friday momentum, the 09:00
-  morning summary; later the evening options collection, backups and checks) from one
-  launchd-kept process, records every run, catches up slots missed while asleep and alerts
-  on Telegram (BL-012)
-- **`packages/contract-notes`** — daily job turning broker contract-note emails
-  into realised F&O P&L in a Google Sheet. Schedule currently disabled pending
-  cutover; the `trade-analytics` repo still owns the live cron
-- **`packages/momentum-backtesting`** — Python/uv research tool for weekly
-  momentum rotation across Indian indices, commodities and international ETFs,
-  from 2017. Data layer (`mbt fetch`), backtest engine and a private API (`mbt serve`) built.
-  Also has a separate, from-scratch survivorship-free Nifty 50 stock-level data layer
-  (`stocks/`, `mbt stocks fetch`/`pin-manifest`/`validate`) — corporate-action-adjusted
-  daily/weekly price and total-return history for every ever-member company, including
-  delisted/merged/renamed ones; wired into the ranking engine and the dashboard's
-  stock mode, with gold/silver/debt ranked alongside the 95 stocks. A further, separate
-  "category momentum" layer (`categories/`, `mbt categories fetch|resolve|backtest`) ranks
-  sector/thematic categories exactly as the existing ETF engine does, but substitutes the
-  top-K individual stocks currently tagged to an investable category for its ETF via an
-  inner backtest — wired into the UI as the "Custom Index" tab (outer category-vs-category
-  ranking) and, via `categories/broad.py`, the "Broad Momentum" tab (Total Market pool with
-  optional category selection) and the Momentum Scores page in the Next.js
-  dashboard's Momentum tab (TODO.md §3.9, §3.11.8).
-  Weekly Friday signal to Telegram (`mbt weekly`, 14:40 IST live-price preview + 16:45 IST
-  final, + 19:30 IST stock-data ingest since 2026-10-02), run on the owner's own laptop by
-  `apps/scheduler` (BL-012; launchd plists 2026-09-30 → BL-012 PR 5 — TODO 3.11.5/3.11.16
-  retired the old GitHub Actions workflow and Neon/`MOMENTUM_DATABASE_URL`;
-  history now lives in the shared local database's `momentum_prices`/`momentum_signals`
-  tables). A blocked or missing active favourite now sends a Telegram warning instead of
-  failing silently (TODO 3.11.16). Also triggerable on demand from the dashboard's Momentum
-  tab ("Weekly signal" — runs in the background, with an ingestion-status panel showing how
-  current each dataset is) or the CLI directly
+`apps/server` stays active only as the host of the Fastify proxies (`/api/backtest/*`,
+`/api/momentum/*`) and the Fyers OAuth routes; its trading engine is frozen (below).
 
-## Implementation Phases
+## Frozen
 
-- **Phase 1 (complete):**
-  - M0/M0.5: Bun scaffolding, Docker infra, DB/Redis clients, Vitest + CI, injectable Clock
-  - M1: Live/sim paper-trade loop, Fyers/Angel One/simulator brokers, straddle pipeline, trigger engine, Fastify API, React dashboard. Phase A (2026-05-25): Hardened Fyers integration with socketFactory DI, reconnect circuit breaker, AUTH_FAILURE detection, real broker-factory wiring (safe default-throw), synthetic ATM CE/PE option-leg ticks in simulator, /ws/ticks + /api/meta endpoints with max-connection cap, OAuth state CSRF validation, pre-market token-validity check job, broker-status state for frontend. Token refresh-grant, broker_tokens at-rest encryption, FYERS_PIN deferred to Phase B.
-  - M2: Peak detection, probability scoring, 10-personality engine, 5-stage filter, Holder/Adjuster/Reducer management, portfolio risk rules, Personalities dashboard tab
-  - M3a: Fyers historical REST client, idempotent backfill, straddle reconstruction, deterministic replay harness, regime tagging (T-33)
-  - M7: Razorpay UPI payment system — order creation, HMAC webhook verification, credit consumption, geolocation, access-gate middleware, pricing page
-  - **M3 (2026-09): T-51 landed** — `apps/server/src/backtesting/`
-    (`backtest-runner.ts`, `backtest-report.ts`, `stats.ts`). T-58 per-regime
-    statistical reporting is only partly covered: `packages/option-backtesting`
-    M-5 added regime bucketing (`analytics/regime_source.py`,
-    `features/regime.py`), but it is bucketing for analysis only and is not
-    wired as a live strategy-DSL condition — see that package's `DECISIONS.md`
-  - **M4 (2026-09): landed** — BullMQ EOD job (`jobs/eod-retrospection-job.ts`)
-    plus `apps/server/src/retrospection/` (`daily-metrics.ts`, `brier-score.ts`,
-    `management-effectiveness.ts`, `evolution-engine.ts`). T-34–T-38 and
-    T-40–T-42 are implemented; this records the modules' presence, not an audit
-    of their completeness
-- **Phase 2:** S/R signal detection engine, Levelhead personality, BankNifty/Sensex expansion, Bayesian optimisation
-- **Phase 3:** Strategies 2 & 3, genetic algorithms, microstructure-aware slippage
-- **Phase 4:** Reinforcement learning, live trading readiness assessment
+Kept, type-checked and tested in CI (Razorpay included), bug fixes only, **not extended**. Unfreeze
+only when a research result gives a validated edge to build on, and record that decision in
+`TODO.md`.
 
-**`packages/option-backtesting` epic** (own M-0..M-5 numbering, distinct from the Phase/M-numbers
-above, which describe the TS trading engine) is **done, M-0 through M-5**: M-0 (monorepo move),
-M-1 (data layer + 90-day real backfill), M-2 (strategy DSL + feature registry), M-3 (bar-by-bar
-engine, golden-fixture-verified to the rupee), and M-4 (FastAPI service, Fastify proxy, React
-"Backtest" dashboard tab, MCP server). **M-5 (this milestone) is done:** margin model + return on
-peak margin (`engine/margin.py`); walk-forward analysis (`analytics/walkforward.py`, `obt
-walkforward`); parameter sweeps (`analytics/sweep.py`, `obt sweep`); an overfitting guard — CSCV/
-PBO + a simplified Deflated Sharpe Ratio (`analytics/overfit.py`, `obt sweep --overfit`); regime
-buckets read from the trading DB when `DATABASE_URL` is set, gracefully omitted otherwise
-(`analytics/regime_source.py` + `features/regime.py`) — bucketing only, not wired as a live
-strategy-DSL condition (see `DECISIONS.md`); personality export to a `PersonalityConfigM2`
-candidate with unrepresentable DSL constructs listed under `manual_review`, never guessed
-(`export/personality.py`, `obt export-personality <run_id>`); and a nightly ingest Routine
-(self-bound to a session rather than fresh-per-fire — this org's Routines don't support granting
-MCP connectors to a fresh session; see `DECISIONS.md`). The MCP server (`obt-mcp`) now also
-exposes `run_walkforward`/`run_sweep`/`check_overfit`/`export_personality`. The `packages/
-option-backtesting` epic itself is now feature-complete per its original scope; further work is
-tracked as ordinary follow-ups, not a new milestone number.
+- **Personality engine** — `apps/server/src/trading/`: the 10 personalities, 5-stage filter,
+  peak detection, paper-trade execution, Clockwork benchmark.
+- **Retrospection and evolution** — `apps/server/src/retrospection/`,
+  `jobs/eod-retrospection-job.ts`; T-51 replay in `src/backtesting/`. Built, but only their
+  presence is recorded, not an audit of their completeness (TODO 3.3.0).
+- **Payments** — Razorpay orders, webhook, credits and the access gate (`business.md`).
+- **The AlgoTest execution loop built on the personalities** — Telegram approval gate,
+  strategy activation, signal measurement and live execution (TODO §3.1–3.4), and the later
+  personality milestones (§3.7).
 
-## Work in flight — AlgoTest execution loop
+Delivery history for these parts: `docs/epics.md`. Task catalogue: `docs/roadmap.md`.
 
-The repo was consolidated into a Bun-workspace monorepo (2026-09-19):
-`algo-automation` → `packages/broker-login` and `trade-analytics` →
-`packages/contract-notes`, both via `git subtree` with history preserved.
-
-The goal is to close the loop: a signal from this agent triggers a real
-strategy on AlgoTest, and the resulting contract note comes back as realised
-P&L to measure the signal against. Execution runs through Playwright behind a
-Telegram approval gate — the paid AlgoTest Signals API (₹1,299/mo) was
-evaluated and declined.
-
-**Start here:**
+## Start here
 
 | Document | What it holds |
 |---|---|
-| **`TODO.md`** (repo root) | **The single source of truth for every open work item** — priorities, what is blocked on the repo owner vs codeable, and the task contracts for in-flight work. If it is not there, it is not committed to. |
-| `docs/algotest-execution.md` | Reference only: the verified AlgoTest API contract (do not re-derive), the decision log, and the contract-notes cutover runbook with rollback |
-| `docs/roadmap.md` | Reference only: the T-number task catalogue (what each covers, depends on, and what "done" meant) plus the full case for and against each uncommitted idea |
+| **`TODO.md`** | The single source of truth for every open work item |
+| `backlog/INDEX.md` | Ideas and plans not yet committed to |
+| `docs/algotest-execution.md` | Reference: the verified AlgoTest API contract, decision log, contract-notes cutover runbook |
+| `docs/roadmap.md` | Reference: the T-number task catalogue and the case for and against each uncommitted idea |
+| `docs/epics.md` | Permanent delivery record |
 
-Nothing trades live yet. The measurement layer this depends on **does** exist —
-`apps/server/src/backtesting/` (T-51), `apps/server/src/retrospection/`
-(daily metrics, Brier scores, evolution engine), `jobs/eod-retrospection-job.ts`,
-and the `packages/option-backtesting` engine above. What remains before live
-execution is running the signal through them: probability scores are still not
-empirically calibrated, so the edge is unmeasured rather than unmeasurable.
+Nothing trades live from this repo. Probability scores in the frozen engine are not calibrated;
+Momentum and options results count only once their validation (BL-010, BL-001) passes.
 
 ## Project File Maintenance
 
-Update the relevant `.claude/project/` file in the same commit as the code change that affects it. Specifically:
+Update the relevant `.claude/project/` file in the same commit as the code change that affects it:
 
-- **`overview.md` (this file):** Update when a milestone or epic completes — revise the Implementation Phases section to mark it done and note any remaining gaps. Also update Target Users or Secondary Surfaces if the product surface changes.
-- **`business.md`:** Update when billing tiers, payment processors, compliance obligations, or Pipeline Scope notes change.
-- **`technical.md`:** Update when the tech stack, essential commands, repository structure, key patterns/conventions, or environment variables change.
+- **`overview.md` (this file):** when the product, its users, or the active/frozen split changes.
+- **`business.md`:** when users, pricing, payment processors or compliance obligations change.
+- **`technical.md`:** when the tech stack, commands, repository structure, conventions or
+  environment variables change.
 
-One fact lives in exactly one file. Never duplicate across the three files.
+One fact lives in one file. Never duplicate across the three files.

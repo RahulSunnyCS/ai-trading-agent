@@ -11,4 +11,6 @@
  */
 export { send, sendText, istTimestamp } from './telegram.js';
 export { registerSecret, redact } from './secrets.js';
+export { NOTIFICATION_TYPES, disabledTypes, isEnabled, prefsPath } from './prefs.js';
+export type { NotificationType } from './prefs.js';
 export type { Action, Notification, Severity, TelegramConfig } from './types.js';

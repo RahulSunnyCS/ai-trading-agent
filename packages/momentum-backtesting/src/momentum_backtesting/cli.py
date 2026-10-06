@@ -642,13 +642,22 @@ def _stocks_curated_dir() -> Path:
     return Path(__file__).parent / "stocks" / "curated"
 
 
-#: niftyindices.com index name -> raw TRI snapshot filename (matches the names
+#: raw TRI snapshot filename -> niftyindices.com index name (matches the names
 #: adjust.load_tri_local / build_benchmarks_weekly already read).
 _BENCHMARK_TRI_FILES = {
     "NIFTY_50_TRI.json": "NIFTY 50",
     "NIFTY200_MOMENTUM_30_TRI.json": "NIFTY200 MOMENTUM 30",
     "NIFTY50_EQUAL_WEIGHT_TRI.json": "NIFTY50 EQUAL WEIGHT",
 }
+
+
+def _extra_benchmark_tri_files() -> dict[str, str]:
+    """Comparison-only TRIs (BL-010 Phase 5), filename -> niftyindices name: same snapshot
+    shape as the three above, kept apart because they are optional - a failure fetching one
+    never stops a stock-data refresh. Imported lazily, like every heavy module here."""
+    from .stocks.benchmarks import EXTRA_TRI_INDICES
+
+    return {filename: name for name, filename in EXTRA_TRI_INDICES.values()}
 
 
 def _fetch_niftyindices_tri_raw(name: str, start, end) -> list[dict]:
@@ -702,9 +711,9 @@ def _fetch_niftyindices_tri_raw(name: str, start, end) -> list[dict]:
 
 
 def _refresh_benchmark_raw_files(raw_dir: Path, start, end) -> None:
-    """Refresh raw/benchmarks/*.json (TRI x3) + NIFTY50_EQUAL_WEIGHT_PRICE.csv.
+    """Refresh raw/benchmarks/*.json (TRI x7) + NIFTY50_EQUAL_WEIGHT_PRICE.csv.
 
-    The three TRI snapshots are written as raw JSON rows (adjust.load_tri_local's
+    The TRI snapshots are written as raw JSON rows (adjust.load_tri_local's
     expected shape). The EW *price* file is written already-parsed as a plain
     date,close CSV -- matching the shape of the out-of-band file it replaces
     (see benchmarks.fetch_equal_weight_price / adjust.load_ew_price_local's
@@ -721,6 +730,13 @@ def _refresh_benchmark_raw_files(raw_dir: Path, start, end) -> None:
 
     for filename, index_name in _BENCHMARK_TRI_FILES.items():
         rows = _fetch_niftyindices_tri_raw(index_name, start, end)
+        atomic_write_bytes(bench_dir / filename, json.dumps(rows).encode("utf-8"))
+    for filename, index_name in _extra_benchmark_tri_files().items():
+        try:
+            rows = _fetch_niftyindices_tri_raw(index_name, start, end)
+        except Exception as error:  # noqa: BLE001 (optional series: warn, keep the old snapshot)
+            typer.echo(f"  warning: {index_name} not refreshed ({error}); keeping the old snapshot")
+            continue
         atomic_write_bytes(bench_dir / filename, json.dumps(rows).encode("utf-8"))
 
     price = benchmarks.fetch_equal_weight_price(start, end)
@@ -786,7 +802,7 @@ def stocks_fetch(
 
     if not skip_download:
         client = NseClient()
-        typer.echo("refreshing benchmark raw files (TRI x3 + EW price)...")
+        typer.echo("refreshing benchmark raw files (TRI x7 + EW price)...")
         _refresh_benchmark_raw_files(raw_dir, start, date_cls.today())
 
         typer.echo("fetching the corporate-actions history (quarterly snapshots)...")
@@ -833,6 +849,65 @@ def stocks_fetch(
 
     if report.n_failures() > 0:
         raise typer.Exit(1)
+
+
+@stocks_app.command("fetch-benchmarks")
+def stocks_fetch_benchmarks(
+    from_: str = typer.Option("2011-01-01", "--from", help="Start date (YYYY-MM-DD)."),
+    skip_download: bool = typer.Option(
+        False, "--skip-download", help="No network -- rebuild from the raw snapshots on disk."
+    ),
+    skip_catalog: bool = typer.Option(
+        False, "--skip-catalog", help="Write the raw snapshots and the CSV only."
+    ),
+) -> None:
+    """Fetch ONLY the comparison-only TRIs (Nifty Midcap 150, Smallcap 250, Midcap150 Momentum
+    50, Nifty500 Momentum 50) and add them to data/stocks/benchmarks_weekly.csv and the shared
+    catalog's stock_weekly_series. Touches no other column, series or table, so it is safe
+    without the full `mbt stocks fetch` rebuild (which needs NSE bhavcopies)."""
+    from datetime import date as date_cls
+
+    from .stocks import adjust
+    from .stocks.nse import atomic_write_bytes
+    from .stocks.ui_data import REFERENCE_ONLY_COLUMNS
+
+    start = date_cls.fromisoformat(from_)
+    data_dir = _stocks_data_dir()
+    bench_dir = data_dir / "raw" / "benchmarks"
+
+    if not skip_download:
+        bench_dir.mkdir(parents=True, exist_ok=True)
+        for filename, index_name in _extra_benchmark_tri_files().items():
+            rows = _fetch_niftyindices_tri_raw(index_name, start, date_cls.today())
+            atomic_write_bytes(bench_dir / filename, json.dumps(rows).encode("utf-8"))
+            typer.echo(f"  {index_name}: {len(rows)} daily rows")
+
+    try:
+        extra = adjust.merge_extra_benchmarks_csv(data_dir)
+    except FileNotFoundError as error:
+        typer.echo(f"{error} -- run `mbt stocks fetch` first.")
+        raise typer.Exit(1) from None
+    if extra.empty:
+        typer.echo("No raw snapshots for the comparison TRIs -- run without --skip-download.")
+        raise typer.Exit(1)
+    for column, name in REFERENCE_ONLY_COLUMNS.items():
+        if column in extra:
+            series = extra[column].dropna()
+            typer.echo(
+                f"  {name}: {len(series)} weeks, {series.index[0]:%Y-%m-%d} .. "
+                f"{series.index[-1]:%Y-%m-%d}"
+            )
+    typer.echo(f"wrote {data_dir / 'benchmarks_weekly.csv'}")
+
+    if skip_catalog:
+        return
+    from trading_data.db import connect, data_root
+
+    from . import db_migrate
+
+    with connect(data_root()) as con:
+        n_rows = db_migrate.import_extra_benchmarks(con, extra)
+    typer.echo(f"catalog stock_weekly_series: {n_rows:,} rows written ({data_root()})")
 
 
 @stocks_app.command("sync")
@@ -1372,6 +1447,110 @@ def search_score(
     )
 
 
+@search_app.command("choose")
+def search_choose(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
+    dest: Path = typer.Option(None, "--dest", help="Report folder (default <out>/phase5)."),
+) -> None:
+    """BL-010 Phase 5: robustness over financial years, the walk-forward of the choice rule,
+    the factor check and the choice per drawdown basket, as committed in criteria addendum 3.
+    Reads stored curves only; writes report.json and report.md."""
+    from . import bias, choose, db_read, method, phase5, reference_benchmarks
+
+    scored = scored or out / "scored_pit"
+    dest = dest or out / "phase5"
+    scores, curves = method.load_scores(scored)
+    facts = choose.config_facts(bias.load_records(out, set(curves.columns)))
+    refs = reference_benchmarks.load_references()
+    closes = db_read.weekly_closes_from_db_or_none()
+    if closes is None:
+        closes = pd.read_csv(DATA_DIR / "weekly_closes.csv", index_col=0, parse_dates=True)
+    series = {
+        name: refs[name] for name in (phase5.MOM30, phase5.NIFTY50, phase5.MIDCAP, phase5.SMALLCAP)
+    }
+    series[phase5.CASH] = closes["Cash (liquid fund)"]
+    phase5.run(curves, scores, facts, series, dest, echo=typer.echo)
+
+
+@search_app.command("ensemble")
+def search_ensemble(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
+    dest: Path = typer.Option(None, "--dest", help="Report folder (default <out>/phase6)."),
+    freeze: bool = typer.Option(
+        False, "--freeze", help="Write search_spaces/bl010_phase6_frozen.json if the rule passes."
+    ),
+) -> None:
+    """BL-010 Phase 6 step 0: the ensemble criteria addendum 4 picks, after its own
+    walk-forward. Reads stored curves only; writes ensemble.json and ensemble.md, and with
+    --freeze the frozen record of what Phase 6 follows."""
+    import hashlib
+    import subprocess
+
+    from . import bias, choose, method, phase5, phase6, reference_benchmarks, search
+    from .criteria import SPACES
+
+    scored = scored or out / "scored_pit"
+    dest = dest or out / "phase6"
+    scores, curves = method.load_scores(scored)
+    records = bias.load_records(out, set(curves.columns))
+    facts = choose.config_facts(records)
+    refs = reference_benchmarks.load_references()
+    series = {name: refs[name] for name in (phase5.MOM30, phase5.MIDCAP, phase5.SMALLCAP)}
+    report = phase6.run(curves, scores, facts, records, series, dest, echo=typer.echo)
+    if not freeze:
+        return
+    digest = hashlib.sha256()
+    for path in sorted(scored.glob("*")):
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+
+    def git(*args: str) -> str:
+        done = subprocess.run(
+            ["git", *args], capture_output=True, text=True, check=True, cwd=SPACES
+        )
+        return done.stdout.strip()
+
+    # The record names the commit that produced the pick, so that commit must be the code.
+    if git("status", "--porcelain", "--", "../src", "bl010_criteria*.json"):
+        typer.echo("uncommitted changes to the code or the criteria: commit them, then freeze")
+        raise typer.Exit(1)
+    commit = git("rev-parse", "HEAD")
+    target = SPACES / "bl010_phase6_frozen.json"
+    phase6.freeze(
+        report,
+        target,
+        commit=commit,
+        snapshot=search.data_snapshot(through=curves.index[-1].date().isoformat()),
+        scored_digest=digest.hexdigest(),
+        fixed=search.load_space(space).fixed,
+    )
+    typer.echo(f"froze {target}")
+
+
+@search_app.command("backcast")
+def search_backcast(
+    space: Path = typer.Option(..., "--space", help="search_spaces/round7_A.toml"),
+    frozen: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "search_spaces" / "bl010_phase6_frozen.json",
+        "--frozen",
+        help="The frozen Phase 6 record.",
+    ),
+    dest: Path = typer.Option(..., "--dest", help="Output folder."),
+    dry_run: str = typer.Option(
+        None, "--dry-run", help="START:END of an already-seen window, to test the harness."
+    ),
+) -> None:
+    """BL-010 Phase 6 step 2: the one-shot 2012-2016 backcast of the frozen ensemble
+    (criteria addendum 5). Without --dry-run it runs the sealed hold-out, once."""
+    from . import holdout
+
+    window = tuple(dry_run.split(":")) if dry_run else None
+    holdout.run(frozen, space, dest, window=window, echo=typer.echo)
+
+
 @search_app.command("fair-placebo")
 def search_fair_placebo(
     out: Path = typer.Argument(..., help="A finished search's results folder."),
@@ -1513,6 +1692,7 @@ def journal_check(
                     "error",
                     "Forward journal check could not run",
                     f"{message}\nRerun it: mbt journal check --send",
+                    type="momentum.problem",
                 )
             )
         raise typer.Exit(1) from error
@@ -1521,7 +1701,11 @@ def journal_check(
     if send:
         notify.send(
             notify.Notification(
-                "momentum-journal", "info" if result["ok"] else "warning", title, body
+                "momentum-journal",
+                "info" if result["ok"] else "warn",
+                title,
+                body,
+                type="momentum.journal",
             )
         )
     if not result["ok"]:
@@ -2243,6 +2427,7 @@ def weekly(
             f"Momentum {run}: the job failed",
             notify.redact(f"{type(error).__name__}: {error}"),
             notify.run_url(),
+            type="momentum.problem",
         )
         notify.send(note) if send else typer.echo(notify.render(note))
         raise

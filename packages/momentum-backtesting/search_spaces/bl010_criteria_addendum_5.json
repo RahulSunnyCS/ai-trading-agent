@@ -1,0 +1,50 @@
+{
+  "written_before_running": "2026-10-06T22:30:00+05:30",
+  "name": "BL-010 criteria, addendum 5: how the 2012-2016 backcast and the paper tracking of the frozen ensemble are run and judged",
+  "adds_to": "bl010_criteria.json (phase_6_holdout, unchanged) and addenda 1 to 4; this file fixes the details phase_6_holdout leaves open",
+  "rule": "Committed before the backcast runs and before paper tracking starts. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
+  "reason": "Owner, 2026-10-06: 'complete Phase 6'. The backcast may run once only, so everything about it is fixed here first. Data findings that shape it: stock bars, corporate-action factors and the point-in-time universe exist from 2011; the main weekly table's cash series starts in 2016 but the stock layer's cash series (stocks/cash_weekly.csv, UTI Liquid) runs from 2011 and equals it from 2016-01-01; gold, silver, Nasdaq 100 and Hang Seng have no data before 2016.",
+  "backcast": {
+    "what": "The four configs in search_spaces/bl010_phase6_frozen.json, exactly as frozen: bias.Runner with search_spaces/round7_A.toml's fixed settings, universe_kind turnover_rank, category_tags curated, each config's heavy and light parameters with rebalance_offset set to the record's top-level value, Rs 2 lakh each, pre-tax. Only start and end change.",
+    "window": {
+      "start": "2012-01-01",
+      "end": "2016-12-31",
+      "measured_from": "the first Friday of 2012 (2012-01-06) to the last Friday of 2016 (2016-12-30), including the weeks the configs hold cash while their rankings warm up and the first quarterly pool forms (about January to April 2012)"
+    },
+    "data_patches": [
+      "The weekly table's 'Cash (liquid fund)' column takes the stock layer's cash series for weeks before 2016-01-01 (the two are identical from that date).",
+      "The weekly table's 'Nifty 50' column, used by the engine only as the run's own benchmark line, takes Nifty 50 TRI for the whole window. Judging uses the benchmarks below, never this column.",
+      "Gold, silver, Nasdaq 100 and Hang Seng have no prices before 2016, so they never compete as categories in the backcast (they did in 2017-2026).",
+      "No corporate-action data is reviewed or changed for 2011-2016 before the run."
+    ],
+    "ensemble": "Equal capital in the four at the first week, reset to equal at the last week before each 1 April (choose.ensemble_curve), as addendum 4.",
+    "benchmarks": ["Nifty 500 TRI", "Nifty Midcap 150 TRI"],
+    "pass": "Against EACH benchmark over the measured window: ensemble CAGR at least the benchmark's CAGR + 5 points, AND ensemble max drawdown no deeper than 1.5 x the benchmark's max drawdown (bl010_criteria.json phase_6_holdout.backcast). It passes only if it passes against both.",
+    "reported_not_judged": [
+      "each config alone",
+      "Nifty200 Momentum 30 TRI and Nifty Smallcap 250 TRI over the same weeks",
+      "the jump scan of BL-010 Phase 2: days inside a holding with a move over 20% and no exchange adjustment, and the ensemble CAGR with those days' returns set to zero",
+      "the number of names the configs could pick from each year (point-in-time members that are tagged and pass the liquidity gate)"
+    ],
+    "known_biases": [
+      "Survivorship through the tags: only stocks in today's curated tag list can be picked, and that list holds today's names. This favours the backcast, so a pass is weaker evidence than a fail.",
+      "About half as many pickable names in 2012-2013 as in 2017; today's cost and tax rates; delisted names valued at their last close."
+    ],
+    "runs_allowed": 1,
+    "how_enforced": "The harness writes its result once and refuses to run if a result already exists; the result is committed. A fail is reported to the owner, not tuned around."
+  },
+  "paper_tracking": {
+    "start": "The first Friday after live-signal parity is merged on which all four configs' signals are recorded in the forward journal (BL-024); the date is written in the tracking record when tracking starts.",
+    "tracked": [
+      "the ensemble: equal capital in the four frozen configs at the start, reset to equal each April",
+      "the median companion: the config of addendum 4's eligible group (full history) whose full-history CAGR is closest to the group median (ties: the lower config id)",
+      "Nifty200 Momentum 30 TRI"
+    ],
+    "how": "Each Friday after the data for that week is in, each config's model portfolio is the engine's (the frozen request, its own rebalance Fridays, pre-tax, Rs 2 lakh), run through the latest week; returns are measured from the start week only. The forward journal's hash-chained signal rows are the evidence that the signals were recorded before the outcome.",
+    "fail": {
+      "trailing_index": "At 26 weeks from the start: the ensemble's return minus Nifty200 Momentum 30 TRI's return over those weeks below -10 points.",
+      "drawdown": "At any time: the ensemble's fall from its peak since the start deeper than 1.3 x 43.9% = 57.1%, where 43.9% is the 1-in-20 max drawdown of the frozen ensemble's full-history curve in a stationary block bootstrap with 13-week mean blocks (choose.block_bootstrap, seed 0, 2,000 draws)."
+    },
+    "review": "At 26 and 52 weeks the result is written up and the owner decides; a fail at any time is reported the week it happens."
+  }
+}

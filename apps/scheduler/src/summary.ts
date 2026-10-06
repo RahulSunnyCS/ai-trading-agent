@@ -6,7 +6,7 @@ import { isTradingDay } from '@trading/market-reference';
 import { type AlertSink, telegramSink } from './alerts.js';
 import { JOBS } from './jobs.js';
 import type { Builtin, BuiltinContext } from './runner.js';
-import { addDays, formatIst, istDay, previousDue } from './schedule.js';
+import { addDays, formatIst, istAt, istDay, previousDue } from './schedule.js';
 
 /** One line of the summary: ok, or a problem with what to do about it. */
 export interface Check {
@@ -178,7 +178,11 @@ function diskCheck(): Check {
 /** Failures and misses in the last 24 h that are not today's slots (those are listed above). */
 function recentFailures(ctx: BuiltinContext, today: Check[]): Check[] {
   const listed = new Set(today.map((c) => c.label));
-  const since = new Date(ctx.now().getTime() - 86_400_000);
+  // From the start of the previous trading day, so Monday's summary still lists a Friday
+  // evening failure (self-alerting jobs stay silent when they die before alerting).
+  let previousDay = addDays(istDay(ctx.now()), -1);
+  while (!isTradingDay(previousDay)) previousDay = addDays(previousDay, -1);
+  const since = istAt(previousDay, '00:00');
   return ctx.history
     .failuresSince(since)
     .filter((r) => !listed.has(r.job))

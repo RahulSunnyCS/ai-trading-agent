@@ -28,6 +28,20 @@ NIFTY200_MOMENTUM_30_TRI = "NIFTY200 MOMENTUM 30"
 NIFTY_50_EQUAL_WEIGHT_TRI = "NIFTY50 EQUAL WEIGHT"
 NIFTY_50_EQUAL_WEIGHT_PRICE = "NIFTY50 EQUAL WEIGHT"
 
+#: Comparison-only TRIs (BL-010 Phase 5), keyed by their benchmarks_weekly.csv column:
+#: (niftyindices.com index name, raw snapshot filename under raw/benchmarks/). The display
+#: names for the same columns are ui_data.REFERENCE_ONLY_COLUMNS - one place per fact.
+EXTRA_TRI_INDICES = {
+    "nifty_midcap150_tri": ("NIFTY MIDCAP 150", "NIFTY_MIDCAP_150_TRI.json"),
+    "nifty_smallcap250_tri": ("NIFTY SMALLCAP 250", "NIFTY_SMALLCAP_250_TRI.json"),
+    "nifty_midcap150_momentum50_tri": (
+        "NIFTY MIDCAP150 MOMENTUM 50",
+        "NIFTY_MIDCAP150_MOMENTUM_50_TRI.json",
+    ),
+    "nifty500_momentum50_tri": ("NIFTY500 MOMENTUM 50", "NIFTY500_MOMENTUM_50_TRI.json"),
+    "nifty500_tri": ("NIFTY 500", "NIFTY_500_TRI.json"),
+}
+
 #: NSE's publicly documented launch date for the Nifty200 Momentum 30 Index. The TRI
 #: feed returns history back to 2011 regardless (plan.md §1), but every value dated
 #: before this is NSE's own back-calculation, not an observed index level — callers

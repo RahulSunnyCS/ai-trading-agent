@@ -26,7 +26,16 @@ From `src/index.ts`:
   masking GitHub Actions logs too, not just Telegram messages).
 - `redact(text)` — strips every registered secret from a string before it's
   logged or sent anywhere.
-- Types: `Action`, `Notification`, `Severity`, `TelegramConfig`.
+- `NOTIFICATION_TYPES` / `isEnabled(type)` / `disabledTypes()` / `prefsPath()` —
+  per-type Telegram switches (BL-012). A sender tags a message with
+  `Notification.type` (or `sendText`'s third argument); `send`/`sendText` skip
+  it when that type is listed in `{"disabled": [...]}` at `prefsPath()`
+  (`~/.config/ai-trading-agent/notifications.json`, or `NOTIFY_PREFS_FILE`).
+  Untagged messages always send. A missing or broken file means everything is
+  on — a bad preferences file must never be what silences a failure alert. The
+  Python `notify.py` copies read the same file with the same rules and use the
+  same type strings; add a new type to `NOTIFICATION_TYPES` first.
+- Types: `Action`, `Notification`, `NotificationType`, `Severity`, `TelegramConfig`.
 
 ## Cross-package links
 
@@ -45,5 +54,6 @@ From `src/index.ts`:
 ## Commands
 
 ```bash
-bun run typecheck    # tsc --noEmit — no dedicated test script; exercised via its importers' own tests
+bun run typecheck    # tsc --noEmit
+bun run test         # vitest — notification preferences
 ```

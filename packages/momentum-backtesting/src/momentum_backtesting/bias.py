@@ -204,7 +204,10 @@ class Runner:
 
     def hurdles(self, equity: pd.Series) -> dict[str, float]:
         out = {}
-        for name in self.refs.columns:
+        # REFERENCES only: the extra comparison TRIs are loaded for criteria, not for this report.
+        for name in reference_benchmarks.REFERENCES:
+            if name not in self.refs:
+                continue
             aligned = reference_benchmarks.aligned(self.refs[name], equity.index)
             if aligned is not None:
                 out[name] = round(float(metrics.cagr(aligned)), 4)
