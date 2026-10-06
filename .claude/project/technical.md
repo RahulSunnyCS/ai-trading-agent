@@ -75,8 +75,8 @@ bun run --filter '*' typecheck     # packages only — NOT the root app
 bun run --filter @ata/scheduler jobs status    # every job: schedule, last run, next run
 bun run --filter @ata/scheduler jobs run <id>  # run one job now
 
-# Laptop scheduler (launchd) — see deploy/launchd/README.md
-deploy/launchd/install.sh    # (re)install every job in deploy/launchd/jobs/
+# Laptop scheduler (launchd keeps apps/scheduler alive) — see deploy/launchd/README.md
+deploy/launchd/install.sh    # (re)install the scheduler agent; retires the old per-job plists
 deploy/launchd/uninstall.sh
 
 # Git hooks (lefthook, installed by `bun install`). pre-push runs Biome on the changed files,
@@ -133,7 +133,7 @@ uv run mbt compare         # rank-and-rotate backtest, off/ranked/filter modes -
 uv run mbt serve           # private Momentum API on 127.0.0.1:8765
 uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
-uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 launchd job)
+uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 scheduler job)
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
 uv run python scripts/result-baseline.py capture --data-dir <data> --out <dir>   # snapshot every result on LIVE data; `compare --baseline <dir>` after a change meant to keep them
 uv run mbt stocks fetch --skip-download  # rebuild the Nifty 50 stock data layer from the raw cache, no network
@@ -165,7 +165,7 @@ rule below.
 | `packages/contract-notes` | Daily Gmail → PDF → Google Sheet F&O P&L pipeline | — (leaf; Node 20/CommonJS, reimplements the `Notification` shape itself instead of importing the ESM `@trading/notify`) | none |
 | `packages/momentum-backtesting` | Python weekly momentum-rotation research tool (`mbt` CLI) | private FastAPI service (`mbt serve`) | `apps/dashboard` through Fastify's `/api/momentum/*` proxy; still no code imports from `option-backtesting` |
 | `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below); since 2026-09-30 those CSVs are EXPORTED from `trading-data`'s catalog (`tdata reference export`), which is the master | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
-| `packages/trading-data` | Python/uv: the local research database — DuckDB catalog (instruments, reference data, ingest runs, strategies, backtest results, companies/corporate actions/index+category membership, momentum's cross-instrument price series) + Parquet lake (`bars_1m_*`, `bars_1d_stock`) + raw vendor copies under `TRADING_DATA_ROOT`; `tdata init/status/backup/reference` | `db.connect`, `lake.*` paths/writers, `instruments.register`, `ingest.start_run/finish_run`, `reference.export_csvs/check` | `packages/option-backtesting` and `packages/momentum-backtesting` (both editable path dependencies) |
+| `packages/trading-data` | Python/uv: the local research database — DuckDB catalog (instruments, reference data, ingest runs, strategies, backtest results, companies/corporate actions/index+category membership, momentum's cross-instrument price series) + Parquet lake (`bars_1m_*`, `bars_1d_stock`) + raw vendor copies under `TRADING_DATA_ROOT`; `tdata init/status/backup/reference` | `db.connect`, `lake.*` paths/writers and the bars_1m schemas, `instruments.register`, `ingest.start_run/finish_run`, `reference.export_csvs/check` | `packages/option-backtesting` and `packages/momentum-backtesting` (both editable path dependencies) |
 | `apps/server` (`@ata/server`) | Fastify/Bun trading backend | — | `apps/dashboard` (HTTP only) |
 | `apps/scheduler` (`@ata/scheduler`) | Runs every recurring job (BL-012): registry, IST schedules, runner, SQLite run history | — | none — leaf; runs the other packages' CLIs as child processes |
 | `apps/dashboard` (`@ata/dashboard`) | Next.js/React frontend | — | none — leaf; talks to `apps/server` over HTTP only, imports no internal package |
@@ -196,7 +196,7 @@ ai-trading-agent/
 ├── .mcp.json                        # registers the "option-backtesting" MCP server (obt-mcp, stdio)
 ├── scripts/install-biome.sh         # root-level tooling (downloads the Biome binary), not app code
 ├── deploy/cloudflared/              # tunnel config template for serving the research APIs from a laptop (docs/remote-dashboard.md)
-├── deploy/launchd/                  # laptop-as-scheduler LaunchAgents (jobs/*.plist) + install/uninstall (BL-011)
+├── deploy/launchd/                  # the one LaunchAgent that keeps apps/scheduler running + install/uninstall (BL-012)
 ├── apps/
 │   ├── server/                      # @ata/server — the Fastify/Bun backend
 │   │   ├── package.json · tsconfig.json · vitest.config.ts · vitest.workspace.ts

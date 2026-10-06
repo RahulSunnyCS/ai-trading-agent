@@ -2,7 +2,7 @@ import { type AlertSink, alertMissed, alertResult } from './alerts.js';
 import type { History } from './history.js';
 import type { Job } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
-import { formatIst, previousDue } from './schedule.js';
+import { formatIst, istDay, previousDue } from './schedule.js';
 
 /** A slot started within this long of its time counts as on time, not a catch-up. */
 const ON_TIME_MS = 5 * 60_000;
@@ -25,6 +25,26 @@ export function decide(job: Job, now: Date, history: History, firstStart: Date):
   if (late <= ON_TIME_MS) return { kind: 'run', slot, trigger: 'schedule' };
   if (late <= job.catchUpHours * 3_600_000) return { kind: 'run', slot, trigger: 'catch-up' };
   return { kind: 'missed', slot, lateByMs: late };
+}
+
+/**
+ * Today's slots that have already passed with no run recorded. Slots before the
+ * scheduler's first start are never run (they belonged to whatever scheduled the job
+ * before), so this is what a fresh install tells the owner to run by hand.
+ */
+export function skippedToday(
+  jobs: Job[],
+  now: Date,
+  history: History,
+): Array<{ job: Job; slot: Date }> {
+  const today = istDay(now);
+  const out: Array<{ job: Job; slot: Date }> = [];
+  for (const job of jobs) {
+    if (job.builtin) continue; // the morning summary needs no catch-up
+    const slot = previousDue(job.schedule, now);
+    if (slot && istDay(slot) === today && !history.forSlot(job.id, slot)) out.push({ job, slot });
+  }
+  return out;
 }
 
 export interface LoopOptions {

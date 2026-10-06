@@ -7,8 +7,10 @@ Guidance for coding agents working in `apps/scheduler` (`@ata/scheduler`).
 One home for every recurring job (BL-012): broker logins, the Friday momentum runs and,
 in later PRs, the evening options collection, backups and maintenance checks. It replaces
 the one-plist-per-job launchd setup. Every run is recorded, and missed or failed runs
-raise a Telegram alert at once. Until the launchd cut-over (BL-012 PR 5) the old plists
-still do the scheduling.
+raise a Telegram alert at once. launchd only keeps this process alive
+(`deploy/launchd/jobs/com.ai-trading-agent.scheduler.plist`); jobs run from the main
+checkout's working tree, so its checked-out branch is the code that runs (the morning
+summary flags anything but `main`).
 
 ## Layout
 

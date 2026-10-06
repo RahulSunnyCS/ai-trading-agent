@@ -85,13 +85,11 @@ to `DATABASE_URL`'s `broker_tokens` table only as one of several places `fyers.p
 a Fyers access token (see the precedence order in root `technical.md`'s Environment
 Variables table) — that connection is unrelated and still live.
 
-The weekly job (`mbt weekly`) itself now runs from `launchd` LaunchAgents on the owner's own
-laptop (`scripts/install-launchd.sh`/`uninstall-launchd.sh`, four plists — Friday 14:40
-preview, 16:45 final, since 2026-10-02 19:30 stock-data ingest, and since 2026-10-06 21:00
-forward-journal check IST), replacing the retired
-`.github/workflows/momentum-weekly.yml`. The plists explicitly `source` the repo root `.env`
-before running — launchd's own environment does not inherit it the way an interactive shell's
-profile usually does. The CLI's `weekly()` command is a thin wrapper around
+The weekly job (`mbt weekly`) itself runs from the repo's scheduler (`apps/scheduler`,
+BL-012 — four jobs: Friday 14:40 preview, 16:45 final, 19:30 stock-data ingest, 21:00
+forward-journal check IST), replacing first the retired `.github/workflows/momentum-weekly.yml`
+and then the per-job launchd plists. The scheduler passes the repo root `.env` to each run
+and still writes `data/launchd-weekly-<run>.log`, which `GET /api/weekly/status` reads. The CLI's `weekly()` command is a thin wrapper around
 `api._execute_weekly_run` (the same function the API route calls) — there is exactly one
 orchestration, not two copies that can drift.
 
@@ -139,8 +137,7 @@ survives the browser tab closing or the user switching sections — the Momentum
 shows a pulsing dot while one is in flight. `GET /api/weekly/status` reports, per dataset, the
 date it's ingested through vs. the week a final run needs, the last few saved signals, and
 each scheduled job's last-run time (flagging one that fired >10 minutes late — typically the
-laptop was asleep at 14:40/16:45/19:30, and launchd has no catch-up marker of its own when
-that happens).
+laptop was asleep at 14:40/16:45/19:30 and the scheduler caught the slot up on wake).
 
 ETF strategies share one refreshed Fyers/public-source snapshot and are always current. Stock,
 Custom Index and Broad strategies are gated on the processed bhavcopy-backed dataset reaching
