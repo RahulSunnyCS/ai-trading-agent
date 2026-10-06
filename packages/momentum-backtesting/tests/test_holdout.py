@@ -58,3 +58,22 @@ def test_the_hold_out_runs_once(tmp_path):
     (tmp_path / "backcast.json").write_text("{}")
     with pytest.raises(RuntimeError, match="runs once"):
         holdout.run(tmp_path / "frozen.json", tmp_path / "space.toml", tmp_path)
+
+
+def test_a_started_hold_out_cannot_be_started_again(tmp_path, monkeypatch):
+    """The run is claimed before it starts: a crash after the numbers were seen still blocks
+    a second run."""
+    monkeypatch.setattr(holdout, "_dirty", lambda: False)
+    monkeypatch.setattr(holdout, "_commit", lambda: "abc123")
+    with pytest.raises(FileNotFoundError):  # no frozen record here: the run gets past the claim
+        holdout.run(tmp_path / "frozen.json", tmp_path / "space.toml", tmp_path)
+    assert (tmp_path / "backcast.claimed").read_text() == "started on abc123\n"
+    with pytest.raises(RuntimeError, match="already started"):
+        holdout.run(tmp_path / "frozen.json", tmp_path / "space.toml", tmp_path)
+
+
+def test_a_dirty_tree_cannot_run_the_hold_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(holdout, "_dirty", lambda: True)
+    with pytest.raises(RuntimeError, match="uncommitted"):
+        holdout.run(tmp_path / "frozen.json", tmp_path / "space.toml", tmp_path)
+    assert not (tmp_path / "backcast.claimed").exists()

@@ -16,7 +16,7 @@ from . import choose, criteria, metrics, reference_benchmarks
 from .engine import CASH
 
 HOLDOUT = ("2012-01-01", "2016-12-31")
-MEASURED = ("2012-01-06", "2016-12-30")
+MEASURED = ("2012-01-06", "2016-12-30")  # addendum 5: first and last Friday measured
 BENCHMARKS = ("Nifty 500 TRI", "Nifty Midcap 150 TRI")
 REPORTED = ("Nifty200 Momentum 30 TRI", "Nifty Smallcap 250 TRI")
 OUTER_BENCHMARK = "Nifty 50"
@@ -84,8 +84,22 @@ def run(
     start, end = window or HOLDOUT
     out.mkdir(parents=True, exist_ok=True)
     result_path = out / ("dry_run.json" if dry else "backcast.json")
-    if not dry and result_path.exists():
-        raise RuntimeError(f"{result_path} exists: the backcast runs once (criteria addendum 5)")
+    commit = _commit()
+    if not dry:
+        # The run is claimed before it starts, so a crash after the numbers were echoed cannot
+        # be followed by a second run: the owner has to remove the claim in writing.
+        if result_path.exists():
+            raise RuntimeError(f"{result_path} exists: the backcast runs once (addendum 5)")
+        if _dirty():
+            raise RuntimeError("uncommitted changes to the code: commit them, then run")
+        try:
+            with (out / "backcast.claimed").open("x") as claim:
+                claim.write(f"started on {commit}\n")
+        except FileExistsError:
+            raise RuntimeError(
+                f"{out / 'backcast.claimed'} exists: a backcast was already started (addendum 5 "
+                "allows one run). Report it to the owner; do not re-run."
+            ) from None
 
     frozen = json.loads(Path(frozen_path).read_text())
     space = search.load_space(space_path)
@@ -174,7 +188,12 @@ def run(
         "window": [start, end],
         "measured": [str(ensemble.index[0].date()), str(ensemble.index[-1].date())],
         "frozen": str(frozen_path),
-        "code_commit": _commit(),
+        "code_commit": commit,
+        "window_matches_addendum": [
+            str(ensemble.index[0].date()),
+            str(ensemble.index[-1].date()),
+        ]
+        == list(MEASURED),
         "data_snapshot": search.data_snapshot(through=end),
         "configs": configs,
         "verdict": verdict,
@@ -188,6 +207,19 @@ def run(
     (out / result_path.with_suffix(".md").name).write_text(markdown(report))
     echo(f"wrote {result_path}")
     return report
+
+
+def _dirty() -> bool:
+    import subprocess
+
+    done = subprocess.run(
+        ["git", "status", "--porcelain", "--", "../../src", "../../search_spaces"],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=Path(__file__).parent,
+    )
+    return bool(done.stdout.strip())
 
 
 def _commit() -> str:
