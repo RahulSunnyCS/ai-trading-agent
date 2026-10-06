@@ -189,6 +189,35 @@ re-entry / re-execute / journey on candle close, premium matching on candle clos
   the day view, sweep heatmaps, data-quality page.
 - **Done when:** every CLI result above is viewable without the terminal.
 
+## Validation checklist (from the momentum review, BL-010)
+
+BL-010 found that a momentum search's headline (55–63% CAGR) came mostly from hindsight and from
+picking the luckiest config: on honest inputs the best configs lost a median 22–25 points, and
+choosing the single best config was worse than a coin flip (PBO 0.68). The same traps exist for
+options. Every result this platform reports as "a result" passes the checks below; each phase
+that adds a capability adds its check in the same change.
+
+| # | Check | Options form | Where | Built? |
+|---|---|---|---|---|
+| V1 | **Criteria first** | Pass/kill levels for a study are committed in a file before it runs; a change is a new file that says what it supersedes (BL-015) | Before Phase 6 | No |
+| V2 | **Independent replay** | Separate code rebuilds each leg's fill prices, quantities, costs and P&L from the raw 1-minute bars and compares with the engine's trade log, to the rupee | Phase 1 | No (the engine is pinned to a reference implementation, which is not independent of it) |
+| V3 | **Outside source** | Ten sampled trades checked against AlgoTest / Stockmock / the exchange, chosen by rule before looking | Phase 1 | No |
+| V4 | **Frozen results** | Golden scenarios; any code change that moves a result fails until accepted with a reason | All | Yes, 30 leg-wise scenarios (TODO 3.10.17) |
+| V5 | **Look-ahead test** | A decision at minute t must not change when every bar after t is deleted: run each strategy on data cut at several times of day and dates | Phase 1, then every new trigger in Phase 5 | No |
+| V6 | **Point in time** | Lot size, strike step, expiry weekday and holiday calendar as they were on the day (dated tables); a contract is selectable only if it was listed that day; regime and day-type labels used for decisions are computed from data up to the decision, never from the whole day | Phases 2–3, 5 | Partly (lot size and strike step are dated) |
+| V7 | **Fair random baseline** | The same strategy with random entry times, or random strikes, matched for trade count and holding time; it must beat the baseline's 95th percentile by a committed margin | Phase 6 | No |
+| V8 | **Overfitting score** | PBO and deflated Sharpe over every config a sweep tried, not only the shortlisted ones; a high PBO stops single-winner selection | Phase 6 | Yes for the YAML engine (`analytics/overfit.py`); not yet for leg-wise sweeps |
+| V9 | **Time windows** | Results by year, by expiry regime (NSE changed weekly expiries in 2023–25), by VIX bucket and DTE; rolling windows; the worst window reported first | Phase 6 | Partly (day type, `legwise/anatomy.py`) |
+| V10 | **Realism** | Slippage scaled by premium and traded volume, fills only inside the bar's range, SL before target within a bar, margin as the broker computes it, STT on exercise; the result at the account's real size | Phases 3, 6 | Partly (margin model, fill modes) |
+| V11 | **Tail view** | Worst day, worst week, longest losing streak, largest gap loss, as a share of margin: option selling earns small amounts often and loses big rarely, so averages hide the risk | Phase 6 | No |
+| V12 | **Sealed hold-out** | The most recent period (proposed: the last 6 months of vendor data) is not read by any sweep; one run, once, on the frozen choice | Before Phase 6 | No |
+| V13 | **Live against backtest** | Realised P&L of every live trade against the backtest of the same day (BL-026); a gap above a committed level stops trading | After go-live | Planned in BL-026 |
+
+**Different from momentum:** survivorship is small (index options do not delist), so V6 is about
+calendars and labels rather than the stock list. History runs back to 2019 on vendor data, but an
+intraday strategy's independent observations are days grouped by regime, so V8 and V12 matter
+more, not less. V11 replaces "median CAGR" as the first number to read.
+
 ## Risks
 
 - **AlgoTest's own results are not ground truth** — its data and rules can differ. Where we
@@ -238,3 +267,5 @@ re-entry / re-execute / journey on candle close, premium matching on candle clos
   also settles the bar-timestamp convention); (2) engine — the four strategies against AlgoTest's
   trade logs (still owed); (3) regression — the 30 golden scenarios plus new ones from (2).
   Realised-vs-backtest for the strategies that trade live is split out as BL-026.
+- 2026-10-06 — validation checklist added (V1–V13), carried over from the BL-010 momentum
+  review: the checks every options result must pass, mapped to the phases that build them.
