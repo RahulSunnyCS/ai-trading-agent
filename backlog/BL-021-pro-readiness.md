@@ -43,3 +43,4 @@ short Pro session.
 
 - 2026-10-06 — created from the month-plan discussion.
 - 2026-10-06 — owner decisions on PR #27: approved; status Ready.
+- 2026-10-06 — BL-019 done: root `CLAUDE.md` + `.claude/project/*.md` now 735 lines (was ~830); `technical.md` at 552 is the rest of the gap to 400.

@@ -81,6 +81,8 @@ Full procedure and rollback: `docs/algotest-execution.md` → Runbook.
 
 ### 3.1 Telegram approval gate
 
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
+
 Signal fires → Telegram message with Approve/Reject buttons → owner taps →
 `repository_dispatch` fires the (not-yet-built) `activate-strategy.yml`.
 Scoped and decided; contracts below are ready to implement.
@@ -218,6 +220,8 @@ Scoped and decided; contracts below are ready to implement.
 
 ### 3.2 Playwright strategy activation
 
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
+
 Consumes the `repository_dispatch` T-74 fires. **Must land before the gate is
 anything but a dry run.**
 
@@ -233,6 +237,8 @@ anything but a dry run.**
 
 ### 3.3 Measure the signal — the gate before anything fires for real
 
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
+
 Probability scores are still uncalibrated, so the edge is unmeasured. **Do not
 enable live execution until this shows one.**
 
@@ -246,6 +252,8 @@ enable live execution until this shows one.**
 | 3.3.5 | **Gate:** do not start 3.4 until the signal shows a measured edge | owner | |
 
 ### 3.4 Live execution (hard-gated behind 3.3)
+
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
 
 | # | Task | Who |
 |---|---|---|
@@ -291,6 +299,8 @@ pass to save computation; the full review is deferred here, not skipped.
 | 3.6.4 | Wire the stock data into the engine | claude | Deliberately deferred from this run: index-membership-aware ranking, itemised per-trade costs, `ranksum`/`voladj`/`blend` scoring, weekly/monthly rebalance. Decision record: the grill-me at the top of this session; not yet turned into its own plan. |
 
 ### 3.7 Later milestones — not started, not sequenced
+
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
 
 Acceptance detail for every `T-` number below is in `docs/roadmap.md`.
 
@@ -509,6 +519,13 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 | 3.15.2 | Install the 19:30 `momentum-weekly-stock-ingest` LaunchAgent (without it no Stock/Broad favourite is evaluated or journalled) | owner | **Done 2026-10-06** (installed with the owner's go-ahead) |
 | 3.15.3 | Phase 2: weekly scoring, Forward page, Telegram line | claude | Open — after four Fridays are recorded |
 | 3.15.4 | Phase 3: real fills | owner→claude | Open — when real money is in |
+
+### 3.16 Product focus — [BL-019](backlog/BL-019-product-focus-and-freeze.md)
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.16.1 | Phase 1: rewrite `overview.md` and `business.md` for the real product | claude | **Done 2026-10-06.** Overview is 75 lines with Active and Frozen lists; business.md is a personal tool, billing kept under "Frozen: SaaS billing", retired Pipeline Scope removed, SEBI note added |
+| 3.16.2 | Phase 2: mark the frozen parts | claude | **Done 2026-10-06.** Note at the top of `apps/server/CLAUDE.md`; §3.1–3.4 and 3.7 above marked frozen |
 
 ## Reference — where detail lives
 
