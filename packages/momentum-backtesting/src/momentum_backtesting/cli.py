@@ -1530,23 +1530,37 @@ def search_ensemble(
     typer.echo(f"froze {target}")
 
 
-<<<<<<< HEAD
-@search_app.command("track")
-def search_track(
-    out: Path = typer.Argument(..., help="A finished search's results folder."),
-    space: Path = typer.Option(..., "--space", help="search_spaces/round7_A.toml"),
-    since: str = typer.Option(..., "--since", help="The Friday tracking starts from (YYYY-MM-DD)."),
-=======
 @search_app.command("backcast")
 def search_backcast(
     space: Path = typer.Option(..., "--space", help="search_spaces/round7_A.toml"),
->>>>>>> origin/main
     frozen: Path = typer.Option(
         Path(__file__).parent.parent.parent / "search_spaces" / "bl010_phase6_frozen.json",
         "--frozen",
         help="The frozen Phase 6 record.",
     ),
-<<<<<<< HEAD
+    dest: Path = typer.Option(..., "--dest", help="Output folder."),
+    dry_run: str = typer.Option(
+        None, "--dry-run", help="START:END of an already-seen window, to test the harness."
+    ),
+) -> None:
+    """BL-010 Phase 6 step 2: the one-shot 2012-2016 backcast of the frozen ensemble
+    (criteria addendum 5). Without --dry-run it runs the sealed hold-out, once."""
+    from . import holdout
+
+    window = tuple(dry_run.split(":")) if dry_run else None
+    holdout.run(frozen, space, dest, window=window, echo=typer.echo)
+
+
+@search_app.command("track")
+def search_track(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="search_spaces/round7_A.toml"),
+    since: str = typer.Option(..., "--since", help="The Friday tracking starts from (YYYY-MM-DD)."),
+    frozen: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "search_spaces" / "bl010_phase6_frozen.json",
+        "--frozen",
+        help="The frozen Phase 6 record.",
+    ),
     scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
     dest: Path = typer.Option(
         None, "--dest", help="Report folder (default <out>/phase6/tracking)."
@@ -1568,19 +1582,6 @@ def search_backcast(
         echo=typer.echo,
     )
     typer.echo(tracker.markdown(report))
-=======
-    dest: Path = typer.Option(..., "--dest", help="Output folder."),
-    dry_run: str = typer.Option(
-        None, "--dry-run", help="START:END of an already-seen window, to test the harness."
-    ),
-) -> None:
-    """BL-010 Phase 6 step 2: the one-shot 2012-2016 backcast of the frozen ensemble
-    (criteria addendum 5). Without --dry-run it runs the sealed hold-out, once."""
-    from . import holdout
-
-    window = tuple(dry_run.split(":")) if dry_run else None
-    holdout.run(frozen, space, dest, window=window, echo=typer.echo)
->>>>>>> origin/main
 
 
 @search_app.command("fair-placebo")
