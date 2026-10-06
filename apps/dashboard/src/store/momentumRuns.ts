@@ -90,7 +90,9 @@ function persist(runs: MomentumRun[], activeId: string | null): void {
 let nextSeq = 1;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let pollIndex = 0;
-let pollGeneration = 0;
+let pollInFlight = false;
+/** Bumped by the test seam so a poll still in flight from before a reset cannot restart the loop. */
+let pollEpoch = 0;
 const saving = new Set<string>();
 
 export const useMomentumRunsStore = create<MomentumRunsState>((set, get) => ({
@@ -203,33 +205,41 @@ async function pollOnce(run: MomentumRun): Promise<void> {
   }
 }
 
-function schedulePoll(generation: number): void {
+function schedulePoll(epoch: number): void {
   const delay = POLL_SCHEDULE_MS[Math.min(pollIndex, POLL_SCHEDULE_MS.length - 1)];
   pollIndex += 1;
   timer = setTimeout(() => {
+    timer = null;
     const active = useMomentumRunsStore.getState().runs.filter(isActive);
-    if (active.length === 0) {
-      timer = null;
-      return;
-    }
-    // The next poll is scheduled only once this one has answered, so a slow response never
-    // overlaps the next request. A restart while this one was in flight owns the loop now.
-    void Promise.all(active.map(pollOnce)).then(() => {
+    if (active.length === 0) return;
+    // The next poll is scheduled only once this one has answered, so polls never overlap.
+    pollInFlight = true;
+    // A run whose poll throws (an answer with no job in it, say) must not end polling for the
+    // others, or for itself next time: it is retried on the next tick like any other failure.
+    void Promise.all(active.map((run) => pollOnce(run).catch(() => undefined))).then(() => {
+      if (epoch !== pollEpoch) return; // the test seam reset the store while this was in flight
+      pollInFlight = false;
       const { runs, activeId } = useMomentumRunsStore.getState();
       persist(runs, activeId);
-      if (generation === pollGeneration) schedulePoll(generation);
+      schedulePoll(epoch);
     });
   }, delay);
 }
 
 /** Polls every in-flight run until none are left, then stops itself. `restart` (a run just
- * started) goes back to the quick first polls. */
+ * started) goes back to the quick first polls. If a poll is in flight when that happens, the
+ * answer to it schedules the next one at the quick pace, so a restart never overlaps polls. */
 function ensurePolling(restart = false): void {
-  if (timer !== null && !restart) return;
-  if (timer !== null) clearTimeout(timer);
-  pollGeneration += 1;
+  if (pollInFlight) {
+    if (restart) pollIndex = 0;
+    return;
+  }
+  if (timer !== null) {
+    if (!restart) return;
+    clearTimeout(timer);
+  }
   pollIndex = 0;
-  schedulePoll(pollGeneration);
+  schedulePoll(pollEpoch);
 }
 
 let hydrated = false;
@@ -273,7 +283,8 @@ export function resetMomentumRunsForTests(): void {
   if (timer !== null) clearTimeout(timer);
   timer = null;
   pollIndex = 0;
-  pollGeneration += 1;
+  pollInFlight = false;
+  pollEpoch += 1;
   hydrated = false;
   nextSeq = 1;
   saving.clear();

@@ -40,18 +40,6 @@ from pathlib import Path
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PACKAGE_ROOT))
 
-#: Catalog tables a backtest reads, with the date column whose newest value is recorded.
-TABLES = {
-    "momentum_prices": "date",
-    "stock_weekly_prices": "week",
-    "stock_weekly_series": "week",
-    "stock_membership_weekly": "week",
-    "stock_action_candidates": "ex_date",
-    "stock_action_reviews": "ex_date",
-    "category_membership": None,
-    "corporate_actions": None,
-    "instruments": None,
-}
 #: Folders under the data directory whose files a backtest reads (top level only).
 DATA_FOLDERS = (".", "daily", "daily_etf", "categories", "stocks")
 
@@ -70,22 +58,18 @@ def _git() -> dict:
 
 
 def data_fingerprint(data_dir: Path) -> dict:
-    """What the data looked like: per table its row count and newest date; per input file its
-    size and modification time. Content, not the catalog file's own timestamp, which moves on
-    any write (a saved run, for one)."""
-    from trading_data.db import connect, data_root
+    """What the data looked like: per table its row count and a hash of every row (the same
+    `db_read.table_fingerprints` the server's caches are keyed on); per input file its size and
+    modification time. Content, not the catalog file's own timestamp, which moves on any write
+    (a saved run, for one)."""
+    from trading_data.db import data_root
 
-    tables: dict[str, list] = {}
+    from momentum_backtesting import db_read
+
     root = data_root()
-    with connect(root, read_only=True) as con:
-        for table, column in TABLES.items():
-            newest = f", max({column})::VARCHAR" if column else ", NULL"
-            try:
-                tables[table] = list(
-                    con.execute(f"SELECT count(*){newest} FROM {table}").fetchone()
-                )
-            except Exception as error:  # a table an older catalog does not have
-                tables[table] = [f"unavailable: {type(error).__name__}"]
+    tables = {
+        name: [count, str(digest)] for name, count, digest in db_read.table_fingerprints(root)
+    }
     files: dict[str, list] = {}
     folders = [data_dir / folder for folder in DATA_FOLDERS]
     folders.append(root / "lake" / "bars_1d" / "asset=stock")
@@ -97,7 +81,7 @@ def data_fingerprint(data_dir: Path) -> dict:
             if path.is_file() and not path.name.endswith(".log"):
                 stat = path.stat()
                 files[str(path)] = [stat.st_size, stat.st_mtime]
-    return {"tables": tables, "files": files}
+    return {"format": 2, "tables": tables, "files": files}
 
 
 def _requests(client) -> dict[str, dict]:
@@ -113,18 +97,11 @@ def _requests(client) -> dict[str, dict]:
         favourites = runs_store.list_favorites(con)
     for favourite in favourites:
         config = {k: v for k, v in favourite["config"].items() if k != "fresh"}
-        requests[f"favourite:{favourite['name']}"] = config
+        key = f"favourite:{favourite['name']}"
+        if key in requests:  # names are only unique within a dataset
+            key = f"{key} ({config.get('dataset')}, {favourite['id'][:6]})"
+        requests[key] = config
     return requests
-
-
-def _missing(status: int, body: dict) -> set[str]:
-    """The categories a 422 says have no weekly closes, or an empty set."""
-    detail = body.get("detail") if status == 422 else None
-    if not (isinstance(detail, str) and detail.startswith("weekly closes are missing [")):
-        return set()
-    import ast
-
-    return set(ast.literal_eval(detail[detail.index("[") : detail.rindex("]") + 1]))
 
 
 def _run(client, request: dict, via: str) -> tuple[int, dict]:
@@ -145,7 +122,7 @@ def _run(client, request: dict, via: str) -> tuple[int, dict]:
 
 
 def _execute(requests: dict[str, dict], via: str) -> dict[str, dict]:
-    from tests.golden.harness import normalise
+    from tests.golden.harness import missing_categories, normalise, without_universe
 
     client = _client()
     results = {}
@@ -154,10 +131,10 @@ def _execute(requests: dict[str, dict], via: str) -> dict[str, dict]:
         # work on the machine barely moves, so compare that when the machine is busy.
         began, cpu_began = time.perf_counter(), time.process_time()
         status, body = _run(client, request, via)
-        if missing := _missing(status, body):
+        if missing := missing_categories(status, body):
             # As the goldens do: some categories have no prices for this universe. Run on the
             # rest; the request actually used is what is recorded and re-sent by `compare`.
-            request = {**request, "universe": [n for n in request["universe"] if n not in missing]}
+            request = without_universe(request, missing)
             began, cpu_began = time.perf_counter(), time.process_time()
             status, body = _run(client, request, via)
         seconds = round(time.perf_counter() - began, 2)
@@ -240,11 +217,19 @@ def capture(data_dir: Path, out: Path, via: str, only: list[str]) -> int:
 
 def _data_changes(before: dict, after: dict) -> list[str]:
     lines = []
+    # Snapshots taken before row hashes were recorded (no "format") held [count, newest date]:
+    # for those only the row count can be compared.
+    exact = before.get("format") == after["format"]
+    if not exact:
+        lines.append("snapshot predates row hashes: only table row counts are compared")
     for table in sorted(set(before["tables"]) | set(after["tables"])):
-        if before["tables"].get(table) != after["tables"].get(table):
-            lines.append(
-                f"table {table}: {before['tables'].get(table)} -> {after['tables'].get(table)}"
-            )
+        old, new = before["tables"].get(table), after["tables"].get(table)
+        if not exact:
+            if not (old and new):  # a table the old snapshot never recorded
+                continue
+            old, new = old[:1], new[:1]
+        if old != new:
+            lines.append(f"table {table}: {old} -> {new}")
     for path in sorted(set(before["files"]) | set(after["files"])):
         if before["files"].get(path) != after["files"].get(path):
             lines.append(f"file {path}: changed")

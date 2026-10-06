@@ -1628,3 +1628,39 @@ def test_responses_are_gzipped_when_the_client_accepts_it(client):
     assert res.status_code == 200
     assert res.headers["content-encoding"] == "gzip"
     assert res.json()["kpis"]  # the client decompresses transparently
+
+
+@pytest.mark.parametrize("folder", ["daily", "daily_etf", "categories", "stocks"])
+def test_a_new_file_in_any_input_folder_is_computed_again(client, folder):
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    assert client.post("/api/backtest", json=body).json()["cache"]["hit"] is False
+    assert client.post("/api/backtest", json=body).json()["cache"]["hit"] is True
+    (api.DATA_DIR / folder).mkdir(exist_ok=True)
+    (api.DATA_DIR / folder / "refreshed.csv").write_text("x")
+    assert client.post("/api/backtest", json=body).json()["cache"]["hit"] is False
+
+
+@pytest.mark.parametrize("constant", ["CATEGORIES_CURATED_DIR", "STOCKS_CURATED_DIR"])
+def test_an_edit_in_a_curated_folder_is_computed_again(client, tmp_path, monkeypatch, constant):
+    curated = tmp_path / "curated"
+    curated.mkdir()
+    (curated / "tags.csv").write_text("a")
+    monkeypatch.setattr(api, constant, curated)
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    client.post("/api/backtest", json=body)
+    assert client.post("/api/backtest", json=body).json()["cache"]["hit"] is True
+    (curated / "tags.csv").write_text("a, edited")
+    assert client.post("/api/backtest", json=body).json()["cache"]["hit"] is False
+
+
+def test_the_result_cache_keeps_only_the_most_recent_results(client, monkeypatch):
+    monkeypatch.setattr(api.DATA, "RESULT_CACHE_SIZE", 2)
+    body = {"universe": core(client), "start": "2017-01-06"}
+
+    def run(top_n: int) -> bool:
+        return client.post("/api/backtest", json={**body, "top_n": top_n}).json()["cache"]["hit"]
+
+    assert [run(2), run(3), run(4)] == [False, False, False]
+    assert len(api.DATA.result_cache) == 2
+    assert run(4) is True  # the newest are kept
+    assert run(2) is False  # the oldest was evicted

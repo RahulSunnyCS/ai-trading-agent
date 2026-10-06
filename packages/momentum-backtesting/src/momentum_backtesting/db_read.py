@@ -74,21 +74,33 @@ def data_version(root: Path | None = None) -> tuple | None:
         memo = _version_memo.get(root)
         if memo is None or memo[0] != mtime:
             try:
-                memo = (mtime, _table_hashes(root))
-            except Exception:  # e.g. another process holds the write lock right now
-                # Fall back to the mtime alone (the old key): a cache miss, never a failure.
-                return (("catalog_mtime", mtime),)
+                memo = (mtime, table_fingerprints(root))
+            except Exception:  # e.g. the catalog is open for writing right now
+                if memo is not None:
+                    # Keep the last known version: the usual writer is a saved run (not market
+                    # data), and a different key here would empty every cache and then empty
+                    # them again when the lock clears. If market data did change, the next
+                    # successful read sees it.
+                    return memo[1] + _lake_files(root)
+                return (("catalog_mtime", mtime),)  # nothing known yet: a miss, never a failure
             _version_memo[root] = memo
+    return memo[1] + _lake_files(root)
+
+
+def _lake_files(root: Path) -> tuple:
     lake = root / "lake" / "bars_1d" / "asset=stock"
-    files = tuple(
-        (path.parent.name, path.stat().st_size, path.stat().st_mtime)
-        for path in sorted(lake.glob("year=*/*.parquet"))
-    )
-    return memo[1] + files
+    files = []
+    for path in sorted(lake.glob("year=*/*.parquet")):
+        stat = path.stat()
+        files.append((path.parent.name, stat.st_size, stat.st_mtime))
+    return tuple(files)
 
 
-def _table_hashes(root: Path) -> tuple:
-    with connect(root, read_only=True) as con:
+def table_fingerprints(root: Path | None = None) -> tuple:
+    """(table, row count, order-independent hash of every row) for each catalog table except
+    `RUN_RECORD_TABLES`: what `data_version` is made of, and what a snapshot of "the data" should
+    compare."""
+    with connect(root or data_root(), read_only=True) as con:
         names = [
             name
             for (name,) in con.execute(

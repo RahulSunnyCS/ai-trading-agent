@@ -118,6 +118,20 @@ def expand(client, scenario: dict) -> dict:
     }
 
 
+def missing_categories(status: int, body: dict) -> set[str]:
+    """The names a 422 says have no weekly closes, or an empty set for any other answer."""
+    detail = body.get("detail") if status == 422 else None
+    if not (isinstance(detail, str) and detail.startswith("weekly closes are missing [")):
+        return set()
+    import ast
+
+    return set(ast.literal_eval(detail[detail.index("[") : detail.rindex("]") + 1]))
+
+
+def without_universe(request: dict, names: set[str]) -> dict:
+    return {**request, "universe": [n for n in request["universe"] if n not in names]}
+
+
 def _child(scenario_file: Path, out_file: Path) -> None:
     from fastapi.testclient import TestClient
 
@@ -132,14 +146,10 @@ def _child(scenario_file: Path, out_file: Path) -> None:
     for name, scenario in json.loads(scenario_file.read_text()).items():
         request = expand(client, scenario)
         response = client.post("/api/backtest", json=request)
-        detail = response.json().get("detail") if response.status_code == 422 else None
-        if isinstance(detail, str) and detail.startswith("weekly closes are missing ["):
+        if missing := missing_categories(response.status_code, response.json()):
             # The trimmed fixture cannot price every category the full data can. Drop the ones
             # the API names and run on the rest; the request actually used is what is recorded.
-            import ast
-
-            missing = set(ast.literal_eval(detail[detail.index("[") : detail.rindex("]") + 1]))
-            request = {**request, "universe": [n for n in request["universe"] if n not in missing]}
+            request = without_universe(request, missing)
             response = client.post("/api/backtest", json=request)
         results[name] = {
             "request": request,

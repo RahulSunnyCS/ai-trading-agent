@@ -66,6 +66,8 @@ from .trade_prices import build_trade_prices
 #: Package's own committed curated/ dir (mirrors cli.py's `_categories_curated_dir`) -- the
 #: manual category/symbol tag overlay (category_extras.csv) ships with the package, not data/.
 CATEGORIES_CURATED_DIR = Path(__file__).parent / "categories" / "curated"
+#: The stock layer's committed curated/ dir: company identity, membership, manual actions.
+STOCKS_CURATED_DIR = Path(__file__).parent / "stocks" / "curated"
 
 #: "Custom Index" dataset: label (AllCategoriesResult.labels' values) -> (rank-eligibility
 #: tag, UI group name). "debt" (Cash/Gilt) is "defensive": only rankable when
@@ -470,7 +472,7 @@ def input_version() -> tuple:
     folders. Wider than any one dataset needs (an ETF fetch also invalidates a cached Broad
     result), which costs only a re-run; it must never be narrower."""
     folders = [DATA_DIR / name for name in _INPUT_FOLDERS]
-    folders += [CATEGORIES_CURATED_DIR, Path(__file__).parent / "stocks" / "curated"]
+    folders += [CATEGORIES_CURATED_DIR, STOCKS_CURATED_DIR]
     files = []
     for folder in folders:
         if not folder.is_dir():
@@ -2573,7 +2575,9 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Momentum backtest", docs_url="/api/docs")
     # Results are 0.4-2 MB of JSON that compresses ~4x; it matters once the dashboard reaches
     # this service over the tunnel (BL-002). The Fastify proxy's fetch() decompresses for itself.
-    app.add_middleware(GZipMiddleware, minimum_size=1024)
+    # Level 5, not Starlette's default 9: on a real 1.8 MB Broad result level 9 took 233 ms for
+    # 0.25 MB and level 6 took 69 ms for 0.26 MB, and a cached re-run pays it on every response.
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 
     # Local direct-mode dashboard preview: the normal Fastify OAuth flow stores
     # its token in broker_tokens. This API can run without Postgres, so it

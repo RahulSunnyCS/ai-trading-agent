@@ -71,14 +71,31 @@ def test_a_lake_write_alone_moves_the_data_version(tmp_path):
     assert db_read.data_version(tmp_path) != before
 
 
-def test_a_locked_catalog_falls_back_to_the_mtime_instead_of_failing(tmp_path, monkeypatch):
+def test_a_locked_catalog_keeps_the_last_known_version(tmp_path, monkeypatch):
+    """A writer holding the catalog (the usual one is a saved run) must not change the version:
+    a different key would empty every cache, and again when the lock clears."""
+    with connect(tmp_path):
+        pass
+    known = db_read.data_version(tmp_path)
+    _save_run(tmp_path, 1)
+    _bump_mtime(tmp_path / "catalog.duckdb")
+
+    def locked(root):
+        raise OSError("Could not set lock on file")
+
+    monkeypatch.setattr(db_read, "table_fingerprints", locked)
+    assert db_read.data_version(tmp_path) == known
+    monkeypatch.undo()
+    assert db_read.data_version(tmp_path) == known  # and the same once the lock clears
+
+
+def test_a_locked_catalog_with_nothing_known_falls_back_to_the_mtime(tmp_path, monkeypatch):
     with connect(tmp_path):
         pass
 
     def locked(root):
         raise OSError("Could not set lock on file")
 
-    monkeypatch.setattr(db_read, "_table_hashes", locked)
-    version = db_read.data_version(tmp_path)
-    assert version == (("catalog_mtime", db_read.catalog_mtime(tmp_path)),)
+    monkeypatch.setattr(db_read, "table_fingerprints", locked)
+    assert db_read.data_version(tmp_path) == (("catalog_mtime", db_read.catalog_mtime(tmp_path)),)
     assert tmp_path not in db_read._version_memo  # the fallback is never remembered

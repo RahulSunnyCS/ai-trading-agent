@@ -113,7 +113,8 @@ every write, and the dashboard saves each finished run into it (`POST /api/saved
 mtime key emptied every cache (prices, rank tables, the ~20 s Broad ranking, liquidity features,
 circuit masks) before the next run. `data_version` is a content hash of every table except the
 run-record ones (`RUN_RECORD_TABLES`), recomputed only when the mtime moves (~0.1 s), plus the
-stock lake files' sizes and times; `catalog_mtime` stays only as the "is there a catalog" check.
+stock lake files' sizes and times (`db_read.table_fingerprints`); if the catalog is locked it keeps the last
+known version instead of changing the key; `catalog_mtime` stays only as the "is there a catalog" check.
 On top of those caches, `_dispatch_backtest` keeps the last 8 whole results
 (`DATA.result_cache`), keyed on the canonical request (`request_key`) and `input_version()`
 (`data_version` plus every input file under `data/` and the curated folders). Every response

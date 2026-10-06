@@ -147,3 +147,10 @@ under ~400 KB, all with byte-identical results (BL-001 goldens).
   live catalog (`stock_weekly_series` 6,573 → 7,395 rows, `benchmarks_weekly.csv`), so the Phase 3
   benchmark measures speed on the frozen fixture instead. Because the live data has since moved,
   later phases compare against a fresh snapshot taken from `main`'s code on the new data.
+- 2026-10-06 — `/code-review` of PR #56: 9 findings. Fixed: the poll loop stopped for every run when
+  one poll threw; a run started mid-poll overlapped polls; a locked catalog changed the cache key
+  (emptying the Broad ranking twice); gzip level 9 (3x the CPU of level 5 for ~4% more bytes);
+  favourites with the same name collided in the snapshot; the snapshot tool's weaker data check and
+  copied missing-category retry now reuse `db_read.table_fingerprints` and the harness helper;
+  tests added for every input folder and the cache bound. Not fixed: two identical requests sent
+  at once still both compute (Phase 2 reworks the job manager, where shared in-flight work fits).
