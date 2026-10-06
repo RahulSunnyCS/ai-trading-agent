@@ -29,11 +29,12 @@ export function formatSummary(day: string, checks: Check[]): { ok: boolean; text
 export function jobChecks(ctx: BuiltinContext): Check[] {
   const now = ctx.now();
   const today = istDay(now);
+  const firstStart = ctx.history.firstStart(now); // slots before it belonged to launchd
   const checks: Check[] = [];
   for (const job of ctx.jobs ?? JOBS) {
     if (job.builtin === 'morning-summary') continue;
     const slot = previousDue(job.schedule, now);
-    if (!slot || istDay(slot) !== today) continue;
+    if (!slot || istDay(slot) !== today || slot < firstStart) continue;
     const run = ctx.history.forSlot(job.id, slot);
     if (!run) checks.push({ ok: false, label: job.id, detail: 'has not run yet' });
     else if (run.ended_at === null) checks.push({ ok: true, label: job.id, detail: 'running' });
@@ -70,7 +71,7 @@ function algotestCheck(ctx: BuiltinContext): Check {
       '--workflow',
       'daily-broker-login.yml',
       '--limit',
-      '1',
+      '10',
       '--json',
       'conclusion,status,createdAt,url',
     ],
@@ -78,13 +79,17 @@ function algotestCheck(ctx: BuiltinContext): Check {
     ctx.env,
   );
   try {
-    const [run] = JSON.parse(raw) as Array<{
+    const runs = JSON.parse(raw) as Array<{
       conclusion: string;
       status: string;
       createdAt: string;
       url: string;
     }>;
-    if (!run || istDay(new Date(run.createdAt)) !== istDay(ctx.now())) {
+    // Any successful run today counts: GitHub's late backstop cron can fail hours after
+    // the 08:00 dispatch already logged both brokers in.
+    const today = runs.filter((r) => istDay(new Date(r.createdAt)) === istDay(ctx.now()));
+    const run = today.find((r) => r.conclusion === 'success') ?? today[0];
+    if (!run) {
       return {
         ok: false,
         label,

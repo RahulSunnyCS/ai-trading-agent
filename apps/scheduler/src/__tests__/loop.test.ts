@@ -132,6 +132,7 @@ describe('morning summary', () => {
     const now = istAt('2026-10-06', '09:00');
     const late = { ...job, id: 'late', schedule: { ...job.schedule, at: '08:30' } };
     const jobs = [job, { ...job, id: 'broken' }, late];
+    history.firstStart(longAgo); // the scheduler was already running at 08:00
     const okRun = history.start('login', 'schedule', istAt('2026-10-06', '08:00'), '', now);
     history.finish(okRun, 0, 1, now);
     const badRun = history.start('broken', 'schedule', istAt('2026-10-06', '08:00'), '', now);
