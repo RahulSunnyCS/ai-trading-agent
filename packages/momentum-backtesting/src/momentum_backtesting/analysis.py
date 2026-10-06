@@ -3,6 +3,7 @@ behind each chart marker, closed trades, per-instrument attribution, a holdings 
 this week's signal. Values are plain JSON types (NaN -> None, dates -> ISO strings)."""
 
 import math
+from collections.abc import Callable
 
 import pandas as pd
 
@@ -353,7 +354,7 @@ def _proxied(proxy: pd.DataFrame | None, asset: str, *weeks) -> bool:
     return any(w in proxy.index and bool(proxy.at[w, asset]) for w in weeks if pd.notna(w))
 
 
-def payload(
+def payload_parts(
     result: Result,
     prices: pd.DataFrame,
     config: Config,
@@ -365,7 +366,14 @@ def payload(
     references: pd.DataFrame | None = None,
     no_buy: pd.DataFrame | None = None,
 ) -> dict:
-    """`share_prices` adds each open position's last-week price (`open_positions[].price`) so the
+    """The same payload as `payload()`, split in two: (core, lazy). `core` is what every view needs
+    the moment a run finishes (KPIs, chart series, rotations, yearly, crashes, comparisons, open
+    positions); `lazy` maps each of the four heavy sections (`trades`, `instruments`, `timeline`,
+    `latest`: ~60% of a Broad response, and `instrument_table` alone ~4 s) to a function that
+    builds it, cleaned, on demand. The functions read the objects they were given, so build them
+    only for a result that is kept; each returns what `payload()` puts under that key.
+
+    `share_prices` adds each open position's last-week price (`open_positions[].price`) so the
     UI's "Trade split" tab can turn a rupee amount into whole shares. Off by default: only pass
     True where the frame's columns are the raw traded prices of what you'd actually buy (Broad
     Momentum's stocks) - an ETF ranked on its index, or a category's synthetic equity curve, has
@@ -429,7 +437,7 @@ def payload(
                 "proxy": _proxied(proxy, r.asset, r.entry_week),
             }
         )
-    return _clean(
+    core = _clean(
         {
             "benchmark_name": config.benchmark,
             "kpis": kpis(result, closed),
@@ -446,7 +454,6 @@ def payload(
             ],
             "series": series,
             "rotations": rotations(result),
-            "trades": trade_rows,
             "fills": {
                 "track": config.track,
                 "execution": config.execution,
@@ -454,11 +461,22 @@ def payload(
                 "warnings": fill_warnings or [],
             },
             "open_positions": open_rows,
-            "instruments": instrument_table(result, closed, groups),
-            "timeline": timeline(result, closed),
             "yearly": yearly.to_dict("records"),
             "crashes": metrics.crash_table(result).to_dict("records"),
-            "latest": latest_signal(result, prices, config, membership, no_buy),
             "universe": result.ranked_names,
         }
     )
+    lazy: dict[str, Callable[[], object]] = {
+        "trades": lambda: _clean(trade_rows),
+        "instruments": lambda: _clean(instrument_table(result, closed, groups)),
+        "timeline": lambda: _clean(timeline(result, closed)),
+        "latest": lambda: _clean(latest_signal(result, prices, config, membership, no_buy)),
+    }
+    return core, lazy
+
+
+def payload(*args, **kwargs) -> dict:
+    """Everything the UI shows for one backtest, in one dict (see `payload_parts` for the
+    arguments and for the same result split into what is needed at once and what can wait)."""
+    core, lazy = payload_parts(*args, **kwargs)
+    return {**core, **{name: build() for name, build in lazy.items()}}

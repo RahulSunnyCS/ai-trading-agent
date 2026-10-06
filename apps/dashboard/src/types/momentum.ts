@@ -140,28 +140,42 @@ export interface MomentumCircuitExposure {
   lc_trapped_sold_during: number;
 }
 
+/** The heavy parts of a result a background run leaves out until something asks for them. */
+export type MomentumSectionName =
+  | 'trades'
+  | 'instruments'
+  | 'timeline'
+  | 'latest'
+  | 'circuit_exposure';
+
+export interface MomentumLatest {
+  week: string;
+  explain: string;
+  rows: Array<{
+    asset: string;
+    rank: number | null;
+    score: number | null;
+    action: string;
+    held: boolean;
+    returns: Record<string, number | null>;
+  }>;
+}
+
 export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
   comparisons?: MomentumComparison[];
   series: MomentumSeries;
   rotations: MomentumRotation[];
-  latest: {
-    week: string;
-    explain: string;
-    rows: Array<{
-      asset: string;
-      rank: number | null;
-      score: number | null;
-      action: string;
-      held: boolean;
-      returns: Record<string, number | null>;
-    }>;
-  };
+  /** A background run's result holds the core only: each section below is `undefined` until
+   * fetched (its name is in `sections_available`). A whole result from the synchronous endpoint
+   * has them all. */
+  sections_available?: MomentumSectionName[];
+  latest?: MomentumLatest;
   open_positions: Array<Record<string, unknown>>;
-  trades: Array<Record<string, unknown>>;
-  instruments: Array<Record<string, unknown>>;
-  timeline: Array<Record<string, unknown>>;
+  trades?: Array<Record<string, unknown>>;
+  instruments?: Array<Record<string, unknown>>;
+  timeline?: Array<Record<string, unknown>>;
   yearly: Array<Record<string, unknown>>;
   crashes: Array<Record<string, unknown>>;
   held_categories?: Array<{ position: number; status: string; category: string; picks: string[] }>;

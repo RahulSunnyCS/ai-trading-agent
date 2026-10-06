@@ -297,6 +297,40 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards one section of a finished job', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { section: 'trades', data: [] }));
+
+    const response = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/backtest/jobs/ab12/sections/trades',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/backtest/jobs/ab12/sections/trades',
+      expect.anything(),
+    );
+    await server.close();
+  });
+
+  it('only forwards section names it knows, and hex job ids', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+
+    for (const url of [
+      '/api/momentum/backtest/jobs/ab12/sections/..%2Fsaved-runs',
+      '/api/momentum/backtest/jobs/ab12/sections/nonsense',
+      '/api/momentum/backtest/jobs/..%2Fx/sections/trades',
+    ]) {
+      const response = await server.inject({ method: 'GET', url });
+      expect(response.statusCode).toBe(400);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    await server.close();
+  });
+
   it('rejects a job id that is not hex before it reaches the upstream path', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

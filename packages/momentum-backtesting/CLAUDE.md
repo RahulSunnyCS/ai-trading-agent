@@ -121,6 +121,23 @@ On top of those caches, `_dispatch_backtest` keeps the last 8 whole results
 carries `cache: {hit, computed_at}`; `fresh: true` clears it with everything else. Responses are
 gzipped (`GZipMiddleware`).
 
+**A background job's result is the core only; the heavy sections are fetched on their own
+(BL-005 Phase 2).** `analysis.payload_parts` / each dataset's `_*_parts` return `(core, lazy)`:
+`lazy` maps `trades`, `instruments`, `timeline`, `latest` (and, Broad only, `circuit_exposure`,
+which costs a second engine run) to builders. `run_parts.RunParts` holds them, builds each once on
+first use and drops the builder (it holds the run's frames). The result cache stores `RunParts`;
+`_dispatch_backtest` (the synchronous `POST /api/backtest`) and the `_*_backtest(req)` functions the
+weekly job calls still return the **whole** payload (`core + every section`), so goldens, journals
+and `payload["latest"]` readers see no change. A job's `result` is `core + cache +
+sections_available`, and `GET /api/backtest/jobs/{id}/sections/{name}` returns `{section, data}`
+(404 unknown job or a section the run lacks, 409 not finished, 410 released: only the newest
+`_BacktestJobs.MAX_PARTS` = 6 finished jobs keep their sections). A section is built from what the
+run used (`outer_prices` is captured for the circuit card), never from whatever is loaded when it
+is opened. Dashboard: `store/momentumRuns.ts` `loadSection` merges a section into the run's result;
+`hooks/useRunSection.ts` asks for it when the tab or card that shows it mounts. A new section needs
+its name in `api.BacktestSection`, the Fastify proxy's `BACKTEST_SECTIONS`, the Next rewrite, and
+`MomentumSectionName` in `types/momentum.ts`.
+
 **Checking that a change leaves results alone on live data:**
 `scripts/result-baseline.py capture` stores every golden scenario and every saved favourite as
 the real API returns them today; `compare` re-runs them and reports differences, whether the data

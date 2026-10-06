@@ -1664,3 +1664,151 @@ def test_the_result_cache_keeps_only_the_most_recent_results(client, monkeypatch
     assert len(api.DATA.result_cache) == 2
     assert run(4) is True  # the newest are kept
     assert run(2) is False  # the oldest was evicted
+
+
+# --- Sections fetched on their own (BL-005 Phase 2) ---------------------------------------------
+
+LAZY = ("trades", "instruments", "timeline", "latest")
+
+
+def _job(client, body, **extra):
+    started = client.post("/api/backtest/jobs", json={**body, **extra})
+    assert started.status_code == 202, started.text
+    job = _wait_for(started.json()["job"]["id"], client, "done", "failed", timeout=60)
+    assert job["status"] == "done", job
+    return job
+
+
+def _as_json(value) -> str:
+    return json.dumps(value, sort_keys=True)
+
+
+def test_a_job_result_leaves_the_heavy_sections_out_and_names_them(client):
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    result = _job(client, body)["result"]
+    assert result["kpis"] and result["series"] and result["rotations"] is not None
+    assert not set(LAZY) & set(result)
+    assert result["sections_available"] == list(LAZY)
+
+
+def test_each_section_equals_the_synchronous_result_built_separately(client):
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    job = _job(client, body, fresh=True)
+    # `fresh` drops the caches, so this builds the whole result again, independently.
+    whole = client.post("/api/backtest", json={**body, "fresh": True}).json()
+    drop = ("cache", "sections_available")
+    assert {k: v for k, v in job["result"].items() if k not in drop} == {
+        k: v for k, v in whole.items() if k not in ("cache", *LAZY)
+    }
+    for name in LAZY:
+        res = client.get(f"/api/backtest/jobs/{job['id']}/sections/{name}")
+        assert res.status_code == 200, res.text
+        assert res.json()["section"] == name
+        assert _as_json(res.json()["data"]) == _as_json(whole[name]), name
+
+
+def test_a_section_is_built_when_first_asked_for_and_only_once(client, monkeypatch):
+    from momentum_backtesting import analysis
+
+    calls = []
+    real = analysis.instrument_table
+    monkeypatch.setattr(
+        analysis, "instrument_table", lambda *a, **k: calls.append(1) or real(*a, **k)
+    )
+    job = _job(client, {"universe": core(client), "start": "2017-01-06", "top_n": 4})
+    assert calls == []  # the run finished without building it
+    for _ in range(2):
+        res = client.get(f"/api/backtest/jobs/{job['id']}/sections/instruments")
+        assert res.status_code == 200
+    assert calls == [1]
+
+
+def test_a_cached_run_keeps_the_sections_it_already_built(client, monkeypatch):
+    from momentum_backtesting import analysis
+
+    calls = []
+    real = analysis.timeline
+    monkeypatch.setattr(analysis, "timeline", lambda *a, **k: calls.append(1) or real(*a, **k))
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    first = _job(client, body)
+    client.get(f"/api/backtest/jobs/{first['id']}/sections/timeline")
+    second = _job(client, body)  # identical request: served from the result cache
+    assert second["result"]["cache"]["hit"] is True
+    client.get(f"/api/backtest/jobs/{second['id']}/sections/timeline")
+    assert calls == [1]
+
+
+def test_the_synchronous_result_still_has_every_section(client):
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    whole = client.post("/api/backtest", json=body).json()
+    assert set(LAZY) <= set(whole) and "sections_available" not in whole
+
+
+def test_asking_for_a_section_that_cannot_be_served_says_why(client, monkeypatch):
+    import threading
+
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    job = _job(client, body)
+    assert client.get("/api/backtest/jobs/deadbeef/sections/trades").status_code == 404
+    assert client.get(f"/api/backtest/jobs/{job['id']}/sections/nonsense").status_code == 422
+    # circuit_exposure exists only for Broad Momentum runs
+    res = client.get(f"/api/backtest/jobs/{job['id']}/sections/circuit_exposure")
+    assert res.status_code == 404
+
+    jobs = api._BacktestJobs()
+    monkeypatch.setattr(api, "BACKTEST_JOBS", jobs)
+    release = threading.Event()
+    running = jobs.start(lambda: release.wait(5) and {"kpis": {}}, False, {})["id"]
+    assert client.get(f"/api/backtest/jobs/{running}/sections/trades").status_code == 409
+    release.set()
+    _wait_for(running, client, "done")
+    # a job whose work produced no sections (or whose sections were released)
+    assert client.get(f"/api/backtest/jobs/{running}/sections/trades").status_code == 410
+
+
+def test_only_the_newest_finished_jobs_keep_their_sections(client, monkeypatch):
+    jobs = api._BacktestJobs()
+    jobs.MAX_PARTS = 1
+    monkeypatch.setattr(api, "BACKTEST_JOBS", jobs)
+    body = {"universe": core(client), "start": "2017-01-06"}
+    older = _job(client, {**body, "top_n": 3})
+    newer = _job(client, {**body, "top_n": 4})
+    assert client.get(f"/api/backtest/jobs/{older['id']}/sections/trades").status_code == 410
+    assert client.get(f"/api/backtest/jobs/{newer['id']}/sections/trades").status_code == 200
+    assert older["result"]["kpis"]  # the core result of the older job is still there
+
+
+def test_broad_circuit_card_is_a_section_built_from_the_runs_own_prices(broad_client, monkeypatch):
+    """The synthetic fixture has no daily bars, so the real card is empty (None): stub it, to give
+    the section content, and check what matters here: it is built from the prices the run used,
+    not whatever is loaded when the card is opened, and equals the synchronous result's."""
+    seen = {}
+    monkeypatch.setattr(
+        api.circuit_exposure_mod, "circuit_exposure", lambda result, mapping: {"lc": [{"n": 1}]}
+    )
+    monkeypatch.setattr(
+        api,
+        "_circuit_realism",
+        lambda req, ranking, outcome, outer_prices: (
+            seen.update(outer=outer_prices) or {"cagr_impact": 0.5}
+        ),
+    )
+    body = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    job = _job(broad_client, body, fresh=True)
+    assert "circuit_exposure" not in job["result"]
+    assert set(job["result"]["sections_available"]) == {*LAZY, "circuit_exposure"}
+    at_run = api.DATA.get()
+    api.DATA.reset()  # later, newer data is loaded: a different frame
+    assert api.DATA.get() is not at_run
+
+    res = broad_client.get(f"/api/backtest/jobs/{job['id']}/sections/circuit_exposure")
+    assert res.status_code == 200, res.text
+    assert res.json()["data"] == {"lc": [{"n": 1}], "realism": {"cagr_impact": 0.5}}
+    assert seen["outer"] is at_run
+
+    whole = broad_client.post("/api/backtest", json={**body, "fresh": True}).json()
+    assert whole["circuit_exposure"] == res.json()["data"]
+    for name in LAZY:
+        res = broad_client.get(f"/api/backtest/jobs/{job['id']}/sections/{name}")
+        assert res.status_code == 200, (name, res.text)
+        assert _as_json(res.json()["data"]) == _as_json(whole[name]), name
