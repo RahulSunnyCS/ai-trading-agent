@@ -24,6 +24,8 @@ export interface FyersAuthStatus {
   connected: boolean;
   degraded: boolean;
   needsReauth: boolean;
+  /** Fyers rejected a token whose expiry date had not passed (revoked or reset early). */
+  revoked?: boolean;
   expiresAt?: string;
   appId?: string;
 }

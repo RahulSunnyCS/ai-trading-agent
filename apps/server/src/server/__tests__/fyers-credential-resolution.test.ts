@@ -1,7 +1,12 @@
 import type { Pool } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveFyersCredentials, saveToken } from '../services/fyers-auth.js';
+import {
+  loadStoredToken,
+  probeFyersToken,
+  resolveFyersCredentials,
+  saveToken,
+} from '../services/fyers-auth.js';
 
 function tokenPool(row: Record<string, unknown> | null): Pool {
   return {
@@ -132,5 +137,60 @@ describe('Fyers token persistence', () => {
     ]);
     if (previous === undefined) delete process.env.FYERS_APP_SECRET;
     else process.env.FYERS_APP_SECRET = previous;
+  });
+});
+
+describe('Fyers token expiry', () => {
+  it('caps a stored 24h expiry at the 06:00 IST reset that follows the login', async () => {
+    // Logged in 15:00 IST on 6 Oct; the old code stored now+24h (15:00 IST on 7 Oct).
+    const stored = await loadStoredToken(
+      tokenPool({
+        app_id: 'APP-100',
+        access_token: 'tok',
+        refresh_token: null,
+        expires_at: new Date('2026-10-07T09:30:00Z'),
+        updated_at: new Date('2026-10-06T09:30:00Z'),
+      }),
+    );
+    expect(stored?.expiresAt.toISOString()).toBe('2026-10-07T00:30:00.000Z');
+  });
+
+  it('keeps the stored expiry when no issue time is known', async () => {
+    const stored = await loadStoredToken(
+      tokenPool({
+        app_id: 'APP-100',
+        access_token: 'tok',
+        refresh_token: null,
+        expires_at: new Date('2026-10-07T09:30:00Z'),
+      }),
+    );
+    expect(stored?.expiresAt.toISOString()).toBe('2026-10-07T09:30:00.000Z');
+  });
+});
+
+describe('probeFyersToken', () => {
+  const respond = (status: number, body: unknown): typeof fetch =>
+    (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+
+  it('reports a token Fyers refuses as rejected', async () => {
+    const result = await probeFyersToken(
+      'APP-1',
+      'dead-token-aaaaaaaaaaaa',
+      respond(401, { s: 'error', code: -16, message: 'Could not authenticate the user' }),
+    );
+    expect(result).toBe('rejected');
+  });
+
+  it('reports an accepted token as valid', async () => {
+    expect(
+      await probeFyersToken('APP-1', 'good-token-bbbbbbbbbbbb', respond(200, { s: 'ok' })),
+    ).toBe('valid');
+  });
+
+  it('never reads an outage as a logout', async () => {
+    const down = (async () => {
+      throw new Error('offline');
+    }) as unknown as typeof fetch;
+    expect(await probeFyersToken('APP-1', 'unknown-token-cccccccccc', down)).toBe('unknown');
   });
 });

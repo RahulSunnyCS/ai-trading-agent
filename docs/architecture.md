@@ -1172,7 +1172,7 @@ fly logs
 
 #### Fyers Token Refresh (Critical)
 
-**The Fyers access token expires every day at midnight IST.** If the token is stale, the WebSocket silently disconnects with no retry. This is the most common cause of production outages.
+**The Fyers access token expires every day at 06:00 IST** (Fyers' daily reset, whatever `expires_in` says; `fyersTokenExpiry` in `packages/broker-identity` is the one implementation). If the token is stale, the WebSocket silently disconnects with no retry. This is the most common cause of production outages.
 
 ##### Manual Daily Process (Pre-automation)
 

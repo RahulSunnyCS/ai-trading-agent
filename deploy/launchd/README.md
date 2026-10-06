@@ -6,6 +6,7 @@ Plan and later phases: [`backlog/BL-011-laptop-scheduler.md`](../../backlog/BL-0
 | Job | When (IST) | What |
 |---|---|---|
 | `com.ai-trading-agent.broker-login` | 08:00 Mon–Fri | Triggers the "Daily broker login" GitHub workflow (`packages/broker-login/src/dispatch.ts`). The workflow waits until 08:16 and logs both brokers into AlgoTest. GitHub's own cron for it arrives hours late and stays only as a backstop |
+| `com.ai-trading-agent.fyers-login` | 08:05 Mon–Fri | Logs Fyers in headlessly (`packages/broker-login/src/fyers.ts --store`) and stores the token in `broker_tokens`. Separate from the AlgoTest login so neither blocks the other. Needs `FYERS_CLIENT_ID`, `FYERS_PIN`, `FYERS_TOTP_SECRET` in `.env` |
 
 The Friday momentum jobs still live in `packages/momentum-backtesting/scripts/`
 until Phase 2 moves them here.

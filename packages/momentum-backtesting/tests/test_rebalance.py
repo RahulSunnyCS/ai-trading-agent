@@ -300,6 +300,8 @@ def test_local_browser_oauth_caches_token_only_after_valid_state(monkeypatch):
     saved = []
     monkeypatch.setattr(fyers, "exchange_auth_code", lambda code: ("token", code))
     monkeypatch.setattr(fyers, "save_token", lambda token: saved.append(token))
+    stored_in_db = []
+    monkeypatch.setattr(fyers, "save_token_to_db", lambda token: stored_in_db.append(token))
     client = TestClient(api.create_app())
 
     assert client.get("/api/auth/fyers/status").json()["connected"] is False
@@ -311,4 +313,56 @@ def test_local_browser_oauth_caches_token_only_after_valid_state(monkeypatch):
     accepted = client.get("/callback?state=test-state&auth_code=A")
     assert accepted.status_code == 200
     assert saved == [("token", "A")]
+    assert stored_in_db == [("token", "A")]
     assert client.get("/api/auth/fyers/callback?state=test-state&auth_code=A").status_code == 400
+
+
+def test_fyers_start_does_not_loop_when_redirect_uri_is_the_dashboard(monkeypatch):
+    # FYERS_REDIRECT_URI pointing at the dashboard (no Fastify server) used to bounce
+    # start -> dashboard start -> start forever, leaving the browser on a blank page.
+    monkeypatch.setattr(api, "load_repo_env", lambda: None)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example/db")
+    monkeypatch.setattr(
+        fyers, "_oauth_config", lambda: ("APP-100", "secret", "http://127.0.0.1:5190/cb")
+    )
+    monkeypatch.setattr(fyers, "build_auth_url", lambda: ("https://api-t1.fyers.in/login", "s"))
+    client = TestClient(api.create_app())
+
+    first = client.get("/api/auth/fyers/start", follow_redirects=False)
+    assert first.headers["location"] == "http://127.0.0.1:5190/api/auth/fyers/start?handoff=1"
+    returned = client.get("/api/auth/fyers/start?handoff=1", follow_redirects=False)
+    assert returned.headers["location"] == "https://api-t1.fyers.in/login"
+
+
+def test_fyers_status_reports_a_token_fyers_rejects_as_expired(monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    monkeypatch.setattr(api, "load_repo_env", lambda: None)
+    monkeypatch.setattr(fyers, "_oauth_config", lambda: ("APP-100", "secret", "callback"))
+    creds = fyers.Credentials("APP-100", "tok", "test", datetime.now(UTC) + timedelta(hours=5))
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda **_: creds)
+    client = TestClient(api.create_app())
+
+    monkeypatch.setattr(fyers, "probe_token", lambda _c: "valid")
+    ok = client.get("/api/auth/fyers/status").json()
+    assert ok["connected"] is True and "revoked" not in ok
+
+    monkeypatch.setattr(fyers, "probe_token", lambda _c: "rejected")
+    dead = client.get("/api/auth/fyers/status").json()
+    assert dead["connected"] is False and dead["needsReauth"] is True and dead["revoked"] is True
+
+    monkeypatch.setattr(fyers, "probe_token", lambda _c: "unknown")  # Fyers unreachable
+    assert client.get("/api/auth/fyers/status").json()["connected"] is True
+
+
+def test_fyers_token_expiry_is_the_next_0600_ist():
+    from datetime import UTC, datetime
+
+    # 15:00 IST login dies at 06:00 IST the next morning (15h later), not 24h later.
+    login = datetime(2026, 10, 6, 9, 30, tzinfo=UTC)
+    assert fyers.token_expiry(login, 86_400) == datetime(2026, 10, 7, 0, 30, tzinfo=UTC)
+    # Logged in 05:00 IST: the same morning's 06:00 reset.
+    early = datetime(2026, 10, 5, 23, 30, tzinfo=UTC)
+    assert fyers.token_expiry(early) == datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
+    # A shorter expires_in from Fyers still wins.
+    assert fyers.token_expiry(login, 3_600) == datetime(2026, 10, 6, 10, 30, tzinfo=UTC)

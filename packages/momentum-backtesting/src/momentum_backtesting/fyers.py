@@ -19,7 +19,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import time as dt_time
 
 import pandas as pd
 
@@ -32,6 +33,24 @@ TOKEN_CACHE = DATA_DIR / ".fyers_token.json"
 # Fyers' gateway rejects Python's default "Python-urllib" User-Agent with an HTTP 403
 # ("error code: 1010") before the request reaches the API.
 USER_AGENT = "Mozilla/5.0 (momentum-backtesting)"
+
+
+_IST = timezone(timedelta(hours=5, minutes=30))
+# Fyers invalidates every access token at its daily reset, whatever expires_in says.
+TOKEN_RESET_IST = dt_time(6, 0)
+
+
+def token_expiry(issued_at: datetime, expires_in: float | None = None) -> datetime:
+    """When a token minted at `issued_at` really stops working: the next 06:00 IST reset,
+    or earlier if Fyers states a shorter expires_in."""
+    local = issued_at.astimezone(_IST)
+    reset = datetime.combine(local.date(), TOKEN_RESET_IST, tzinfo=_IST)
+    if reset <= local:
+        reset += timedelta(days=1)
+    expiry = reset.astimezone(UTC)
+    if expires_in:
+        expiry = min(expiry, issued_at + timedelta(seconds=expires_in))
+    return expiry
 
 
 def _error_body(error: urllib.error.HTTPError) -> dict:
@@ -113,7 +132,7 @@ def exchange_auth_code(auth_code: str) -> Credentials:
         # Never echo the body - a partial success could contain a token.
         detail = body.get("message") or f"s={body.get('s')} code={body.get('code')}"
         raise FyersCredentialsError(f"Fyers token exchange failed: {detail}")
-    expires_at = datetime.now(UTC) + timedelta(seconds=body.get("expires_in") or 24 * 3600)
+    expires_at = token_expiry(datetime.now(UTC), body.get("expires_in"))
     return Credentials(app_id, body["access_token"], "mbt login", expires_at)
 
 
@@ -131,11 +150,77 @@ def save_token(creds: Credentials) -> None:
     TOKEN_CACHE.chmod(0o600)
 
 
+PROFILE_URL = "https://api-t1.fyers.in/api/v3/profile"
+_PROBE_TTL_S = 300.0
+_probe_cache: dict[str, tuple[float, str]] = {}
+
+
+def probe_token(creds: Credentials) -> str:
+    """'valid', 'rejected' or 'unknown' - whether Fyers accepts the token right now.
+
+    The expiry date cannot see a revoked token. Only an explicit rejection counts; a network
+    failure is 'unknown' so an outage never reads as a logout. Cached for five minutes."""
+    key = f"{creds.app_id}:{creds.access_token[-12:]}"
+    hit = _probe_cache.get(key)
+    if hit and time.monotonic() - hit[0] < _PROBE_TTL_S:
+        return hit[1]
+    request = urllib.request.Request(
+        PROFILE_URL,
+        headers={
+            "Authorization": f"{creds.app_id}:{creds.access_token}",
+            "User-Agent": USER_AGENT,
+        },
+    )
+    result = "unknown"
+    try:
+        body = json.load(urllib.request.urlopen(request, timeout=5))
+        if body.get("s") == "ok":
+            result = "valid"
+    except urllib.error.HTTPError as error:
+        if error.code in (401, 403):
+            result = "rejected"
+    except (OSError, ValueError):
+        pass
+    if result != "unknown":
+        _probe_cache[key] = (time.monotonic(), result)
+    return result
+
+
+def save_token_to_db(creds: Credentials) -> bool:
+    """Store the token where the dashboard and `resolve_credentials` read it (encrypted
+    `broker_tokens` row, same SQL as apps/server's saveToken). False when there is no
+    reachable database - the 0600 cache from `save_token` is then the only copy."""
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    passphrase = os.environ.get("FYERS_APP_SECRET", "")
+    if not (database_url and passphrase and creds.expires_at):
+        return False
+    import psycopg
+
+    try:
+        with psycopg.connect(database_url, connect_timeout=10) as conn:
+            conn.execute(
+                "INSERT INTO broker_tokens "
+                "(broker, app_id, access_token, refresh_token, expires_at, updated_at, "
+                "token_encrypted) VALUES ('fyers', %s, "
+                "armor(pgp_sym_encrypt(%s, %s, 'cipher-algo=aes256')), NULL, %s, NOW(), TRUE) "
+                "ON CONFLICT (broker) DO UPDATE SET app_id = EXCLUDED.app_id, "
+                "access_token = EXCLUDED.access_token, refresh_token = NULL, "
+                "expires_at = EXCLUDED.expires_at, token_encrypted = TRUE, updated_at = NOW()",
+                (creds.app_id, creds.access_token, passphrase, creds.expires_at),
+            )
+    except psycopg.Error:
+        return False
+    return True
+
+
 def _cached_token() -> Credentials | None:
     if not TOKEN_CACHE.exists():
         return None
     data = json.loads(TOKEN_CACHE.read_text())
     expires_at = datetime.fromisoformat(data["expires_at"])
+    # Caches written before the 06:00 IST rule carry now+24h; the file's mtime is the issue time.
+    issued_at = datetime.fromtimestamp(TOKEN_CACHE.stat().st_mtime, UTC)
+    expires_at = min(expires_at, token_expiry(issued_at))
     if expires_at <= datetime.now(UTC):
         return None
     return Credentials(data["app_id"], data["access_token"], "mbt login cache", expires_at)
@@ -156,7 +241,7 @@ def _dashboard_credentials() -> Credentials:
                 "SELECT app_id, "
                 "CASE WHEN token_encrypted "
                 "THEN pgp_sym_decrypt(dearmor(access_token), %s) "
-                "ELSE access_token END AS access_token, expires_at FROM broker_tokens "
+                "ELSE access_token END AS access_token, expires_at, updated_at FROM broker_tokens "
                 "WHERE broker = 'fyers' LIMIT 1",
                 (passphrase,),
             ).fetchone()
@@ -168,7 +253,9 @@ def _dashboard_credentials() -> Credentials:
         raise FyersCredentialsError(
             "No Fyers token stored yet - log in with the dashboard's 'Login with Fyers' button."
         )
-    stored_app_id, stored_token, expires_at = row
+    stored_app_id, stored_token, expires_at, updated_at = row
+    # Rows stored before the 06:00 IST rule carry now+24h; updated_at is when it was issued.
+    expires_at = min(expires_at, token_expiry(updated_at))
     if expires_at <= datetime.now(UTC):
         raise FyersCredentialsError(
             f"The stored Fyers token expired at {expires_at:%Y-%m-%d %H:%M %Z} - "

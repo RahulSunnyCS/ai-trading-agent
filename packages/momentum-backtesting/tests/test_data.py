@@ -36,7 +36,8 @@ def test_dashboard_token_wins_over_environment_for_regular_jobs(monkeypatch):
     monkeypatch.setenv("FYERS_APP_ID", "APP-100")
     monkeypatch.setenv("FYERS_ACCESS_TOKEN", "stale-env")
     monkeypatch.setenv("DATABASE_URL", "postgres://fake")
-    expires = datetime.now(UTC) + timedelta(hours=2)
+    issued = datetime.now(UTC)
+    expires = fyers.token_expiry(issued)  # always future, whatever the clock time
 
     class FakeConn:
         def __enter__(self):
@@ -49,7 +50,7 @@ def test_dashboard_token_wins_over_environment_for_regular_jobs(monkeypatch):
             return self
 
         def fetchone(self):
-            return ("DASHBOARD-100", "fresh-dashboard", expires)
+            return ("DASHBOARD-100", "fresh-dashboard", expires, issued)
 
     import psycopg
 
@@ -118,7 +119,8 @@ def test_dashboard_preview_prefers_cached_oauth_token_over_env(monkeypatch):
     monkeypatch.setenv("FYERS_APP_ID", "APP-100")
     monkeypatch.setenv("FYERS_ACCESS_TOKEN", "stale-env")
     monkeypatch.setenv("DATABASE_URL", "postgres://fake")
-    expires = datetime.now(UTC) + timedelta(hours=2)
+    issued = datetime.now(UTC)
+    expires = fyers.token_expiry(issued)
 
     class FakeConn:
         def __enter__(self):
@@ -131,13 +133,44 @@ def test_dashboard_preview_prefers_cached_oauth_token_over_env(monkeypatch):
             return self
 
         def fetchone(self):
-            return ("APP-100", "fresh-dashboard", expires)
+            return ("APP-100", "fresh-dashboard", expires, issued)
 
     import psycopg
 
     monkeypatch.setattr(psycopg, "connect", lambda *a, **k: FakeConn())
     creds = fyers.resolve_credentials(prefer_dashboard=True)
     assert (creds.access_token, creds.source) == ("fresh-dashboard", "broker_tokens")
+
+
+def test_database_token_stored_with_a_24h_expiry_is_cut_at_the_0600_ist_reset(
+    monkeypatch, tmp_path
+):
+    monkeypatch.delenv("FYERS_ACCESS_TOKEN", raising=False)
+    monkeypatch.setattr(fyers, "TOKEN_CACHE", tmp_path / "none.json")
+    monkeypatch.setenv("DATABASE_URL", "postgres://fake")
+    # The pre-fix dashboard stored now+24h, so a login long before today's reset still looks
+    # valid by date. It was issued 30h ago, so the reset since then has killed it.
+    issued = datetime.now(UTC) - timedelta(hours=30)
+    claimed = issued + timedelta(hours=24)
+
+    class FakeConn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, _sql, _params=None):
+            return self
+
+        def fetchone(self):
+            return ("APP-100", "dead-by-reset", claimed + timedelta(days=2), issued)
+
+    import psycopg
+
+    monkeypatch.setattr(psycopg, "connect", lambda *a, **k: FakeConn())
+    with pytest.raises(fyers.FyersCredentialsError, match="expired"):
+        fyers.resolve_credentials()
 
 
 def test_standalone_preview_uses_local_oauth_cache_when_dashboard_db_is_down(monkeypatch):
@@ -182,7 +215,7 @@ def test_expired_database_token_is_rejected(monkeypatch, tmp_path):
             return self
 
         def fetchone(self):
-            return ("APP-100", "stale", expired)
+            return ("APP-100", "stale", expired, expired - timedelta(hours=1))
 
     import psycopg
 

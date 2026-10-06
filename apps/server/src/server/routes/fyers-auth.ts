@@ -26,6 +26,7 @@ import {
   exchangeAuthCode,
   loadFyersOAuthConfig,
   loadStoredToken,
+  probeFyersToken,
   redactToken,
   saveToken,
 } from '../services/fyers-auth.js';
@@ -216,18 +217,27 @@ export const fyersAuthRoutes: FastifyPluginAsync = async (server: FastifyInstanc
     // A token minted for a different Fyers app must never appear connected,
     // even when its timestamp is still in the future.
     const appMismatch = token.appId !== cfg.appId;
-    const needsReauth = flags.needsReauth || appMismatch;
+
+    // A token inside its date window can still be dead (revoked, or Fyers reset early), so
+    // ask Fyers. Only a clear "rejected" counts; an unreachable Fyers leaves the date verdict.
+    const revoked =
+      !flags.needsReauth &&
+      !appMismatch &&
+      (await probeFyersToken(token.appId, token.accessToken)) === 'rejected';
+    const needsReauth = flags.needsReauth || appMismatch || revoked;
 
     return reply.send({
       configured: true,
       // connected reflects whether the token is usable right now:
       // near-expiry tokens are still technically valid, so connected=true.
-      // Only missing/expired tokens make connected=false.
+      // Only missing/expired/revoked tokens make connected=false.
       connected: !needsReauth,
-      expiresAt: token.expiresAt.toISOString(),
+      // A revoked token reports "expired now" so the dashboard shows Expired, not a countdown.
+      expiresAt: (revoked ? new Date() : token.expiresAt).toISOString(),
       appId: token.appId,
-      degraded: flags.degraded || appMismatch,
+      degraded: flags.degraded || appMismatch || revoked,
       needsReauth,
+      ...(revoked ? { revoked: true } : {}),
     });
   });
 };
