@@ -50,3 +50,40 @@ def test_mount_explains_what_is_missing(monkeypatch, tmp_path):
     result = CliRunner().invoke(app, ["mount"])
     assert result.exit_code == 1
     assert "is the SSD connected" in result.output
+
+
+def test_connect_waits_for_another_process_holding_the_catalog(tmp_path):
+    """DuckDB allows one writing process. While another process holds the catalog a short
+    lock_wait gives up; a long one outlasts the holder — a long import must not die between
+    writing its files and recording them."""
+    import subprocess
+    import sys
+    import time
+
+    import duckdb
+
+    root = tmp_path / "data"
+    with connect(root):
+        pass
+    code = (
+        "import duckdb, sys, time; c = duckdb.connect(sys.argv[1]); "
+        "print('held', flush=True); time.sleep(float(sys.argv[2]))"
+    )
+
+    def holder(seconds: float) -> subprocess.Popen:
+        p = subprocess.Popen(
+            [sys.executable, "-c", code, str(root / "catalog.duckdb"), str(seconds)],
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        assert p.stdout.readline().strip() == "held"
+        return p
+
+    p = holder(3)
+    with pytest.raises(duckdb.IOException):
+        connect(root, lock_wait=0.5).__enter__()
+    start = time.monotonic()
+    with connect(root, lock_wait=30):  # the holder lets go after ~3 s
+        pass
+    assert time.monotonic() - start > 1
+    p.wait()

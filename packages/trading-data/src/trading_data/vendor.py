@@ -37,7 +37,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from . import ingest, lake, quality
-from .db import connect
+from .db import connect as _connect_catalog
 from .instruments import InstrumentSpec, instrument_key, register
 
 VENDOR = "drive-vendor"
@@ -46,6 +46,8 @@ INDEX_UNITS = ("nifty", "sensex", "banknifty", "finnifty", "midcpnifty", "niftyn
 #: A chunk is cut so that about this many rows are in memory at once (~100 B/row in DuckDB).
 CHUNK_TARGET_ROWS = 8_000_000
 TZ = "Asia/Kolkata"
+#: Seconds to wait for the catalog's single writer before giving up (see db.connect).
+LOCK_WAIT = 600.0
 
 OPTION_COLUMNS = (
     "instrument_id, ts, open, high, low, close, volume, oi, expiry, strike, option_type, "
@@ -81,6 +83,10 @@ class UnitReport:
     rows_written: int = 0
     rows_unparsed: int = 0
     excluded: dict[str, int] = field(default_factory=dict)
+
+
+def _connect(root: Path, *, read_only: bool = False):
+    return _connect_catalog(root, read_only=read_only, lock_wait=LOCK_WAIT)
 
 
 def exchange_for(symbol: str) -> str:
@@ -262,7 +268,7 @@ def _write_days(
 
 
 def _holidays(root: Path) -> set[date]:
-    with connect(root, read_only=True) as con:
+    with _connect(root, read_only=True) as con:
         return {r[0] for r in con.execute("SELECT date FROM ref_holidays").fetchall()}
 
 
@@ -270,7 +276,7 @@ def _chunk_done(root: Path, scope: str) -> bool:
     """A chunk is done once a run finished — `partial` means it finished with issues (rows
     dropped, duplicates) that were recorded, not that it should be redone. A crashed run is
     `running`/`failed` and is retried."""
-    with connect(root, read_only=True) as con:
+    with _connect(root, read_only=True) as con:
         return bool(
             con.execute(
                 "SELECT 1 FROM ingest_runs WHERE source = 'vendor' AND dataset = 'bars_1m' "
@@ -282,7 +288,7 @@ def _chunk_done(root: Path, scope: str) -> bool:
 
 def _fail_stale_runs(root: Path, prefix: str) -> None:
     """A crashed import leaves `running` rows; mark them so they are not mistaken for live."""
-    with connect(root) as con:
+    with _connect(root) as con:
         con.execute(
             "UPDATE ingest_runs SET status = 'failed', finished_at = now() "
             "WHERE source = 'vendor' AND status = 'running' AND starts_with(scope, ?)",
@@ -303,7 +309,7 @@ def _record_chunk(
     details: dict,
     issues: list[tuple[str, str, date | None]],
 ) -> None:
-    with connect(root) as con:
+    with _connect(root) as con:
         run_id = ingest.start_run(con, "vendor", "bars_1m", None, scope)
         quality.upsert(con, written, holidays, run_id)
         for check, detail, day in issues:
@@ -369,7 +375,7 @@ def _register_unit(
         raise VendorError(
             f"{symbol}: instrument keys collide ('{{:g}}' strike formatting) — nothing written"
         )
-    with connect(root) as catalog:
+    with _connect(root) as catalog:
         ids = register(catalog, specs)
     return symbol, {s.vendor_symbol: ids[s.key] for s in specs}
 
@@ -473,7 +479,7 @@ def import_unit(
                 f"{scope}: {len(written)} days written, {skipped} existing, "
                 f"{sum(s.n_rows for s in written):,} rows ({time.monotonic() - started:.0f}s)"
             )
-        with connect(root) as catalog:
+        with _connect(root) as catalog:
             quality.cross_check(catalog, [symbol])
         return report
     finally:
@@ -500,7 +506,7 @@ def import_index_csv(
     symbol = symbol.upper()
     window = days or (date.min, date.max)
     exchange = exchange_for(symbol)
-    with connect(root) as catalog:
+    with _connect(root) as catalog:
         key = instrument_key(exchange, "index", symbol)
         ids = register(
             catalog,
@@ -576,7 +582,7 @@ def import_index_csv(
             report.days_skipped_existing += skipped
             report.rows_written += sum(s.n_rows for s in written)
             log(f"{scope}: {len(written)} days written, {skipped} existing")
-        with connect(root) as catalog:
+        with _connect(root) as catalog:
             quality.cross_check(catalog, [symbol])
         return report
     finally:

@@ -268,7 +268,7 @@ def rebuild(
 ) -> dict[str, int]:
     """Re-judge partitions from the Parquet files. The scan runs outside the catalog
     connection; each (asset, name) is written in one short connect()."""
-    with connect(root, read_only=True) as con:
+    with connect(root, read_only=True, lock_wait=300) as con:
         holidays = {r[0] for r in con.execute("SELECT date FROM ref_holidays").fetchall()}
     lo, hi = days or (date.min, date.max)
     judged: dict[str, int] = {}
@@ -280,12 +280,12 @@ def rebuild(
                 by_name.setdefault(n, []).append(path)
         for n, files in sorted(by_name.items()):
             stats = file_stats(a, n, files)
-            with connect(root) as con:
+            with connect(root, lock_wait=300) as con:
                 upsert(con, stats, holidays)
             judged[f"{a}/{n}"] = len(stats)
             names_touched.add(n)
             log(f"{a}/{n}: judged {len(stats)} days")
-    with connect(root) as con:
+    with connect(root, lock_wait=300) as con:
         changed = cross_check(con, sorted(names_touched) or None)
     judged["no_spot_changes"] = changed
     return judged
