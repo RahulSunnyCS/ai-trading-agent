@@ -69,7 +69,7 @@ pre-push:
         files=$(git diff --name-only --diff-filter=d origin/main...HEAD | grep -E '\.(ts|tsx|js|jsx|json|jsonc|css)$')
         [ -z "$files" ] && exit 0
         biome=./tools/biome; [ -x "$biome" ] || biome=node_modules/.bin/biome
-        echo "$files" | xargs "$biome" check --no-errors-on-unmatched
+        echo "$files" | tr '\n' '\0' | xargs -0 "$biome" check --no-errors-on-unmatched
 
     ruff:
       run: |

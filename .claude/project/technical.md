@@ -397,7 +397,7 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `apps/server/src/types/fyers-api-v3.d.ts` covers the SDK surface we use
 - **No default exports:** Use named exports throughout
 - **Merges into `main` go through green CI (BL-014).** Branch protection requires the four
-  CI jobs that run on every PR. In Claude Code, `.claude/hooks/merge-guard.sh` (a `PreToolUse`
+  CI jobs that run on every PR. In Claude Code, `.claude/hooks/merge-guard.py` (a `PreToolUse`
   hook on Bash) refuses `gh pr merge` while any check is failing or pending, `--admin`, a PR over
   500 changed lines (data, fixtures and lockfiles excluded) without the `reviewed` label, and a
   push to `main` that changes anything but `*.md` outside `packages/*/src/`. Add `reviewed` only

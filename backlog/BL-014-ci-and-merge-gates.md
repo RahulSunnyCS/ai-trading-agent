@@ -94,7 +94,7 @@ the failures CI catches are caught on the laptop before a push.
 - 2026-10-06 — created from the process review of the week 2026-09-29 → 2026-10-05.
 - 2026-10-06 — owner decisions on PR #27: both open questions answered (take everything); status Ready.
 - 2026-10-06 — started. Questions 3–5 answered (owner approved the recommendations). Phase 3
-  built: `.claude/hooks/merge-guard.sh` + `.claude/settings.json`, tested against real PRs —
+  built: `.claude/hooks/merge-guard.py` + `.claude/settings.json`, tested against real PRs —
   #8 and #17 (merged over red builds) are refused, naming the failing job; #29 and #27 are
   refused for size without the label; #23 passes (its 90k lines are fixture CSVs). Phase 2
   built: `lefthook.yml` pre-push runs Biome on the changed files, Ruff, and the server,
@@ -103,3 +103,12 @@ the failures CI catches are caught on the laptop before a push.
   output fails the formatter. pytest stays in CI (momentum's full suite takes ~4 min). The
   existing BL-001 `momentum-goldens` pre-push test took ~6 min on a momentum change, well over
   this item's one-minute aim — left as is, flagged to the owner. Phase 1 settings above.
+- 2026-10-06 — `/code-review` on PR #31 found that the first, bash version split the command on
+  whitespace: `gh pr merge` quoted in a commit message was refused, a quoted `-t "two words"`
+  broke the PR lookup, `git push origin HEAD` on main slipped through, and a missing `jq` failed
+  open. Rewritten in Python (`shlex` tokenising, `bash -c`, `git -C`, `cd`, `HEAD`/`@`, `--all`
+  handled; no `jq`); all cases re-tested. Kept: `--auto` is still refused while checks are
+  pending, because without branch protection GitHub may merge it at once. Pre-push still reads
+  `origin/main...HEAD` rather than the refs being pushed. Phase 1 (branch protection and the
+  label) could not be applied from the session — the auto-mode permission check refused it, so
+  it stays with the owner.
