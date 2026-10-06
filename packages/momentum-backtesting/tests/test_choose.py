@@ -146,3 +146,45 @@ def test_walk_forward_partial_first_year_is_opt_in():
     assert 2019 not in committed["aggressive"].index
     assert partial["aggressive"].at[2019, "selected_on"].endswith("(partial)")
     assert "2017-12-29" in partial["aggressive"].at[2019, "selected_on"]
+
+
+def test_phase5_report_runs_end_to_end(tmp_path):
+    from momentum_backtesting import phase5
+
+    rng = np.random.default_rng(3)
+    names = [f"c{i}" for i in range(12)]
+    curves = pd.DataFrame(
+        {
+            n: _curve(0.002 + 0.0003 * i, rng.normal(0, 0.01, len(WEEKS)))
+            for i, n in enumerate(names)
+        }
+    )
+    scores = pd.DataFrame({"cagr": choose.cagr(curves), "mdd": -0.2})
+    facts = pd.DataFrame(
+        {
+            "holdings": {n: 4 + i for i, n in enumerate(names)},
+            "simplicity": {n: (3, 4, False, False) for n in names},
+            "every": {n: 2 for n in names},
+        }
+    )
+    flat = pd.Series(1.0, index=WEEKS)
+    series = {
+        phase5.MOM30: _curve(0.002),
+        phase5.MIDCAP: flat,
+        phase5.SMALLCAP: _curve(0.0015, rng.normal(0, 0.01, len(WEEKS))),
+        phase5.NIFTY50: _curve(0.0012, rng.normal(0, 0.01, len(WEEKS))),
+        phase5.CASH: _curve(0.001),
+    }
+    report = phase5.run(curves, scores, facts, series, tmp_path, echo=lambda *_: None)
+    assert set(report["baskets"]) == {"conservative", "medium", "aggressive"}
+    text = (tmp_path / "report.md").read_text()
+    assert "Walk-forward of the rule" in text
+    agg = report["baskets"]["aggressive"]
+    assert set(agg["walk_forward"]) == {
+        "committed",
+        "with_fy2019_partial",
+        "holdings_2_6",
+        "holdings_8_12",
+    }
+    assert 2019 in agg["walk_forward"]["with_fy2019_partial"]["years"]
+    assert 2019 not in agg["walk_forward"]["committed"]["years"]

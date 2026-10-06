@@ -570,13 +570,13 @@ finding (PBO 0.69); the walk-forward confirms it with the rule chosen to resist 
 
 | Basket | Config | Holdings, rebalance | CAGR | Max DD | Third-worst FY vs index | Worst FY vs index | Alpha (t) |
 |---|---|---|---|---|---|---|---|
-| Conservative | `ce6723a197b9` | 7, every 2 weeks | 44.8% | −32.3% | +12.5 | −11.0 | 24.3% (3.9) |
-| Medium | `981d611037eb` | 3, weekly | 39.6% | −36.6% | +21.0 | −16.2 | 21.0% (3.1) |
-| Aggressive | `fc31a2912213` | 3, weekly | 45.7% | −39.3% | +13.0 | −20.0 | 26.1% (3.4) |
+| Conservative | `ce6723a197b9` | 7, every 2 weeks | 44.8% | −32.3% | +12.5 | −11.0 | 23.5% (3.8) |
+| Medium | `981d611037eb` | 3, weekly | 39.6% | −36.6% | +21.0 | −16.2 | 20.7% (3.0) |
+| Aggressive | `fc31a2912213` | 3, weekly | 45.7% | −39.3% | +13.0 | −20.0 | 25.6% (3.3) |
 
 All three **fail** the per-config test: each has a financial year more than 10 points behind
 the index. The factor check passes for all three (alpha well above 5% a year, |t| > 2, with
-market, size and momentum betas of about 0.9, 0.5–0.65 and 0.45–0.55), but they are in-sample
+market, size and momentum betas of about 0.9, 0.55–0.7 and 0.4–0.55), but they are in-sample
 picks, so their alpha is inflated by the selection. The bootstrap's 1-in-20 drawdown is 44–53%,
 deeper than every basket's 40% ceiling.
 

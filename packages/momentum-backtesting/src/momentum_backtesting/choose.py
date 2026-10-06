@@ -277,6 +277,7 @@ def walk_forward(
     first_fy: int = 2019,
     holdings: tuple[int, int] | None = None,
     partial_first: bool = False,
+    membership: dict | None = None,
     echo=print,
 ) -> dict[str, pd.DataFrame]:
     """For each FY from `first_fy`, choose per basket using only data up to 13 weeks before the
@@ -286,7 +287,10 @@ def walk_forward(
     week to the cut), as a labelled sensitivity.
 
     `holdings` restricts the eligible configs to that range of nominal holdings (for the
-    2-6 vs 8-12 check); None applies the rule as committed."""
+    2-6 vs 8-12 check); None applies the rule as committed. `membership` caches each cut's
+    basket membership across calls: whether a config passes a basket depends on its own curve
+    only, so a restricted run can reuse the full one's."""
+    membership = {} if membership is None else membership
     last_fy = complete_fys(curves.index)[-1]
     rows: dict[str, list[dict]] = {name: [] for name in criteria.load()["baskets"]}
     for fy in range(first_fy, last_fy + 1):
@@ -303,14 +307,17 @@ def walk_forward(
         if not windows:
             echo(f"FY{fy}: no complete financial year before {cut.date()}, skipped")
             continue
+        if cut not in membership:
+            cut_indices = {k: v.loc[:cut] for k, v in indices.items()}
+            membership[cut] = basket_members(past, cut_indices)
         eligible = past
+        baskets = membership[cut]
         if holdings is not None:
-            keep = facts.index[
-                (facts["holdings"] >= holdings[0]) & (facts["holdings"] <= holdings[1])
-            ]
+            keep = set(
+                facts.index[(facts["holdings"] >= holdings[0]) & (facts["holdings"] <= holdings[1])]
+            )
             eligible = past[[c for c in past.columns if c in keep]]
-        cut_indices = {k: v.loc[:cut] for k, v in indices.items()}
-        baskets = basket_members(eligible, cut_indices)
+            baskets = {k: [c for c in v if c in keep] for k, v in baskets.items()}
         year = window_returns(curves, start, end)
         bench_year = window_returns(bench, start, end)
         for name, members in baskets.items():
@@ -357,9 +364,11 @@ def factor_regression(
     """Weekly return over cash regressed on the Nifty 50's return over cash, a size spread
     (Smallcap 250 minus Nifty 50) and a momentum spread (Momentum 30 minus Nifty 50).
     Alpha is annualised (x52); t uses Newey-West standard errors with 4 lags."""
-    frame = pd.concat(
-        {"y": curve, "cash": cash, "n50": nifty50, "small": smallcap, "mom": mom30}, axis=1
-    ).ffill()
+    parts = {"y": curve, "cash": cash, "n50": nifty50, "small": smallcap, "mom": mom30}
+    # Up to the last week every series really has: carrying a series past its last bar
+    # would add zero-return weeks to it alone.
+    end = min(s.dropna().index[-1] for s in parts.values())
+    frame = pd.concat(parts, axis=1).loc[:end].ffill()
     r = frame.pct_change().dropna()
     y = (r["y"] - r["cash"]).to_numpy()
     x = np.column_stack(

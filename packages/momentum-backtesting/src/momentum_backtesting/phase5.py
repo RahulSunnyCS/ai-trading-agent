@@ -230,6 +230,7 @@ def run(
 
     # Step 2: walk the rule forward; then the same restricted to 2-6 and to 8-12 holdings.
     wf_kill = p5["walk_forward"]
+    membership: dict = {}  # basket membership per cut, shared by the four walk-forwards
     # "with_fy2019_partial" is a labelled sensitivity, not the committed rule: FY2019 has no
     # complete FY before its cut, so the committed rule skips it; here it is ranked on the one
     # partial window there is (January to December 2017).
@@ -241,7 +242,14 @@ def run(
     ):
         echo(f"walk-forward: {label} ...")
         tables = choose.walk_forward(
-            curves, indices, bench, facts, holdings=holdings, partial_first=partial, echo=echo
+            curves,
+            indices,
+            bench,
+            facts,
+            holdings=holdings,
+            partial_first=partial,
+            membership=membership,
+            echo=echo,
         )
         for name, table in tables.items():
             summary = choose.joined(table)
