@@ -140,6 +140,20 @@ when it is opened, so a data refresh in between can move it slightly. Dashboard:
 its name in `api.BacktestSection` and `MomentumSectionName` in `types/momentum.ts` (the Fastify
 proxy and the Next rewrite take any well-formed name; the service rejects unknown ones).
 
+**Speed work and how it is checked (BL-005 Phase 3).** `scripts/bench-backtest.py` times a golden
+scenario cold, warm (result cache cleared), cached and through the job route, with inclusive
+seconds per stage; it builds its data from the golden fixture so two runs are comparable
+(`--live` for real data, `--profile` for cProfile). The engine reads its tables through
+`engine._Grid` (an array and two dicts: ~10 µs a `DataFrame.at` call became a dict lookup), and
+`top_names` finds the end of the sorted top-N prefix with `searchsorted`. Each such rewrite is
+pinned against a verbatim copy of the original on random data (`tests/test_engine_grid.py`,
+`test_analysis_rotations.py`, `test_circuit_runs_equivalence.py`,
+`categories/test_effective_ranks_equivalence.py`, `categories/test_forward_filled.py`): the goldens
+prove a result did not move on 16 scenarios, these prove the replaced code still does the same
+thing on the cases the scenarios miss (ties, gaps, missing values). Building a DataFrame from an
+object array infers a string dtype in this pandas: pass `dtype=object` where object is meant.
+Replacing many columns one at a time (`frame[col] = ...`) fragments the frame: build it in one step.
+
 **Checking that a change leaves results alone on live data:**
 `scripts/result-baseline.py capture` stores every golden scenario and every saved favourite as
 the real API returns them today; `compare` re-runs them and reports differences, whether the data

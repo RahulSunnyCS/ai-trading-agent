@@ -166,7 +166,35 @@ under ~400 KB, all with byte-identical results (BL-001 goldens).
   core under ~400 KB is not met**: `rotations` alone is 515 KB (every traded week embeds its full
   holdings list) and the chart reads it at once. Shrinking it needs the chart to fetch a week's
   holdings when asked (a "Phase 2b", left for the owner to rank). Decision: a job keeps its sections only while it
-  is one of the newest 6 finished (a run's builders hold its price frames); asking later gives 410
+  is one of the newest 4 finished (a run's builders hold its price frames); asking later gives 410
   and the card says to run it again. Single-flight for identical concurrent requests was not added:
   the second request now finishes quickly from the cached run once the first is done, and the
   duplicate work only happens in the window while the first is still computing.
+- 2026-10-07 — Phase 2 merged as PR #70 (776c62c) after a `/code-review`: unbuilt sections hold a
+  run's frames, so only the newest 4 cached results keep them (`RunParts.release`, older ones
+  are dropped from the cache), jobs release by finish order, and the docs now say the circuit card
+  reads daily bars from the database when opened.
+- 2026-10-07 — Phase 3 code done. Measured on the golden fixture (`scripts/bench-backtest.py`,
+  `broad_default`, the same machine, best of 3, which was under load from other sessions):
+
+  | | before Phase 3 | after |
+  |---|---|---|
+  | warm whole request | 4.3 s | 1.9 s |
+  | job route, core result | 2.4 s | 0.4 s |
+  | `engine.run_backtest` (2 per request) | 1.60 s | 0.3 s |
+  | `analysis.rotations` | 0.74 s | 0.07 s |
+  | circuit card (job route) | 2.8 s | 1.3 s |
+  | `build_effective_stock_ranks` (2) | 0.28 s | 0.08 s |
+
+  What changed: `_Sim` reads its tables through `_Grid` (an array and two dicts) instead of
+  `DataFrame.at`; `top_names` finds the end of the sorted top-N prefix with `searchsorted`;
+  `rotations` works on lists; the circuit runs are classified with NumPy and the per-holding date
+  windows are slices; the effective-rank tables are filled as arrays; the stale-column fill is one
+  `concat` (14 blocks to 3), which is what raised the "highly fragmented" warning. Every one is
+  pinned by a test against a verbatim copy of the code it replaced on random data built to hit the
+  edges, and the goldens pass with nothing accepted; one such test caught a dtype difference
+  (building the groups table from an object array infers a string dtype in this pandas).
+  Not measured on live data: the catalog was write-locked by another process that night, so the
+  live warm time (12.7 s before) is still to be re-taken. Left alone: the weekly job builds the full
+  payload (including the circuit card) and reads only the core and `latest`; reading just those
+  would save about a card per favourite, but means changing tests other work depends on.

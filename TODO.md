@@ -543,8 +543,8 @@ Every result must stay identical (BL-001 goldens); the owner's decisions live in
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.18.1 | Phase 1: gzip responses, whole-result cache, faster first polls; caches no longer emptied by every saved run | claude | **Done 2026-10-07** (PR #56): goldens clean, 28/28 live runs identical, identical re-run 0.07–0.2 s |
-| 3.18.2 | Phase 2: heavy sections (trades, instruments, latest, timeline, circuit card) load when opened | claude | **Code done 2026-10-07**: a job's result is the core; sections come from `GET /api/backtest/jobs/{id}/sections/{name}`; goldens unchanged. Closes when the PR merges |
-| 3.18.3 | Phase 3: engine reads NumPy arrays, not one pandas cell at a time; benchmark script | claude | Open |
+| 3.18.2 | Phase 2: heavy sections (trades, instruments, latest, timeline, circuit card) load when opened | claude | **Done 2026-10-07** (PR #70): a job's result is the core; sections come from `GET /api/backtest/jobs/{id}/sections/{name}`; goldens unchanged. The core is 593 KB (106 KB gzipped) on a real Broad result, not under 400 KB: `rotations` alone is 515 KB |
+| 3.18.3 | Phase 3: engine reads NumPy arrays, not one pandas cell at a time; benchmark script | claude | **Code done 2026-10-07**: goldens unchanged with nothing accepted. On the golden fixture a warm Broad request 4.3 s to ~1.9 s and the job route's core result 2.4 s to 0.4 s (live numbers: see the BL-005 log). Closes when the PR merges |
 | 3.18.4 | Phase 4: run banner shows the stage and the usual duration | claude | Open |
 
 ## Reference — where detail lives
