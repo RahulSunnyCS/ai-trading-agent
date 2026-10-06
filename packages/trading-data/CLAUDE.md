@@ -28,7 +28,9 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
     hash-chained record of every weekly momentum signal (BL-024; written only by
     momentum-backtesting's `forward_journal.record`)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
-  `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`)
+  `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
+  (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
+  every bars_1m writer casts to (the Fyers collector imports them)
 - `raw/` — gzipped verbatim vendor responses
 
 A stock's identity is its literal exchange symbol at the time (one `instruments` row

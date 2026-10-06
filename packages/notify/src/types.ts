@@ -19,6 +19,11 @@ export interface Action {
 export interface Notification {
   /** Which system is speaking, e.g. 'broker-login'. */
   source: string;
+  /**
+   * Which switch on the Notifications page controls this message — a key of
+   * NOTIFICATION_TYPES (prefs.ts). Omit it and the message is always sent.
+   */
+  type?: string;
   severity: Severity;
   /** First line — this is what shows on a lock screen. Keep it short. */
   title: string;

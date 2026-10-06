@@ -478,7 +478,9 @@ def format_message(
         lines += ["", "⏰ Sent after 15:15 IST - likely too late to trade before today's close."]
     title = f"Momentum {run.upper()} — week of {pd.Timestamp(signal['week']):%d %b %Y}"
     severity = "action_required" if trades else "info"
-    return Notification("momentum-weekly", severity, title, "\n".join(lines))
+    return Notification(
+        "momentum-weekly", severity, title, "\n".join(lines), type=f"momentum.{run}"
+    )
 
 
 def _health_line(health: Health, live_how: dict[str, str] | None) -> str:
@@ -717,6 +719,7 @@ def _closed(today: date, health: Health, preview: bool = False) -> Notification:
         f"Momentum: no signal for {today:%d %b} - market closed?",
         f"{what.capitalize()} (a holiday, or the sources haven't published yet).\n"
         + _health_line(health, None),
+        type="momentum.problem",
     )
 
 
@@ -727,4 +730,5 @@ def _stale_alert(today: date, stale: list[str], health: Health) -> Notification:
         "Momentum: data too stale for a signal",
         f"{len(stale)} series have no close for {today:%d %b}: {', '.join(stale)}.\n"
         + _health_line(health, None),
+        type="momentum.problem",
     )

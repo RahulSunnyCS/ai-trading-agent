@@ -144,6 +144,7 @@ async function main(): Promise<number> {
   const alert = async (detail: string) =>
     send(telegram, {
       source: 'fyers-login',
+      type: 'broker.fyers',
       severity: 'error',
       title: store
         ? 'Fyers login failed - log in from the dashboard'

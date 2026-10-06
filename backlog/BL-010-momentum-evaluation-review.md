@@ -504,3 +504,9 @@ Also parked here (owner, 2026-10-06), priority P3:
   `search_spaces/bl010_phase6_frozen.json`: `1281e8ed6824`, `08c4307d7aa9`, `535b17b44ba5`
   (every 4 weeks) and `bad83df3821a` (every 2 weeks), equal capital reset each April; full
   history 32.3% a year, max drawdown −31.5%.
+- 2026-10-07 — Phase 6 step 3 tooling built: `mbt search track` (tracker.py), read-only paper
+  tracking of the frozen ensemble against its median companion and Nifty200 Momentum 30 TRI from
+  a start Friday, testing addendum 5's two fail lines (more than 10 points behind Mom30 at 26
+  weeks; a fall deeper than 57.1%). Not started: starting it saves the four configs as favourites
+  (journal evidence) and adds them to the Friday job, so it waits for the owner, who also has to
+  decide whether to follow a strategy that failed its hold-out.
