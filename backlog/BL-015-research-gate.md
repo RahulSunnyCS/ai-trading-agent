@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — protects every future result from the problems BL-010 had to undo after the fact |
-| **Status** | Planned |
+| **Status** | Ready |
 | **Type** | chore |
 | **Area** | cross-cutting |
 | **Created** | 2026-10-06 |
@@ -54,9 +54,11 @@ and any deviation is written down with a reason.
 
 ## Open questions
 
-1. Should a pass/kill rule be editable after a run if the owner logs why, or only replaced by a
-   new, dated rule (BL-010's convention)?
+1. ~~Editable after a run, or replaced by a new dated rule?~~ **Replaced only** (owner took the
+   recommendation, 2026-10-06): a rule is never edited after a run; a new, dated rule supersedes
+   it with a logged reason, and both stay in the file.
 
 ## Log
 
 - 2026-10-06 — created from the process review.
+- 2026-10-06 — owner decisions on PR #27: recommendation taken; status Ready.

@@ -406,3 +406,6 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   main checkout. Like F2, they are 2026 themes with no launch date; under Phase 3 step 3 they must
   get one before any backtest can use them, and until Phase 3 passes they are not searched. Forward
   tracking (Phase 6) can start earlier than planned without touching this review — see BL-024.
+- 2026-10-06 — owner decisions on PR #27: set the 69 theme rows aside. They are committed as
+  `categories/curated/pending_themes.csv` + `pending_themes.md`, which no code reads; they move
+  into `category_extras.csv` only with launch dates, under Phase 3 step 3.

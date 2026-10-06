@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Priority** | P2 — promising for option sellers but speculative; needs BL-009's clean data first |
+| **Priority** | P1 — owner wants it in week 3 of the October plan; still needs BL-009's clean data first |
 | **Status** | Idea |
 | **Type** | research |
 | **Area** | options (+ trading-data, dashboard) |
@@ -86,3 +86,4 @@ than a simple baseline.
 - 2026-10-06 — created from the owner's idea and the discussion of it.
 - 2026-10-06 — owner: make it generic over the time of day (e.g. every 30 minutes, including a
   first-half → second-half prediction) rather than one fixed cut-off; grid to be discussed.
+- 2026-10-06 — owner decisions on PR #27: raised to P1.

@@ -199,6 +199,12 @@ A Bun/TypeScript app in this monorepo, not a part of `apps/server`.
   - credential rotation reminders, plus `credentials.md`.
 - **Done when:** each check has a test that makes it fire, and a forced failure of each reaches Telegram with its fix command.
 
+### Phase 3b — Weekly health digest (owner-approved 2026-10-06)
+- **Tasks:** one Telegram message every Saturday morning: CI state on `main`, every job's last
+  run and any misses, data freshness per dataset, the forward journal against the backtest
+  (BL-024), and any live-money rule close to its limit (BL-025). Green items collapse to one line.
+- **Done when:** two Saturdays' digests arrive and match `gh run list` and the Jobs records.
+
 ### Phase 4 — Dashboard Jobs page
 - **Tasks:** list jobs with next run, last result and duration; run now; tail the latest log.
 - **Done when:** every job can be checked and re-run from the dashboard.
@@ -240,3 +246,4 @@ To ask when this is started (workflow step 3):
 - 2026-10-06 — new jobs to schedule once their items land: the Friday forward-journal write and
   the weekly scoring (BL-024), the live-money rules check (BL-025), and the daily
   realised-vs-backtest join for options (BL-026).
+- 2026-10-06 — owner decisions on PR #27: weekly Telegram health digest approved — added as Phase 3b.

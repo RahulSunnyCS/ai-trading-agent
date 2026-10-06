@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — time-bound: the owner moves from Max to Pro after about a month, and Pro's limits are much lower |
-| **Status** | Planned |
+| **Status** | Ready |
 | **Type** | chore |
 | **Area** | cross-cutting |
 | **Created** | 2026-10-06 |
@@ -36,8 +36,10 @@ short Pro session.
 
 ## Open questions
 
-1. What size target for the always-loaded context?
+1. ~~Size target?~~ **About 400 lines combined** for root `CLAUDE.md` + `.claude/project/*.md`
+   (owner took the recommendation, 2026-10-06; about 830 today, `technical.md` alone is 539).
 
 ## Log
 
 - 2026-10-06 — created from the month-plan discussion.
+- 2026-10-06 — owner decisions on PR #27: approved; status Ready.

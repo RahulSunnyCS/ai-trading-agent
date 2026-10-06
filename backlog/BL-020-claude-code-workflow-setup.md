@@ -45,6 +45,14 @@ short and on one topic.
   overnight requests open PRs and leave a summary, never merge.
 - **Done when:** the section is in place.
 
+### Phase 4 — Credentials (owner-approved 2026-10-06)
+- **Tasks:** rotate the credentials whose values passed through Claude sessions (broker logins and
+  TOTP secrets, Fyers app secret, Telegram bot token, AlgoTest), since transcripts keep them on
+  disk under `~/.claude/projects/`; then do TODO 1.2 — move the broker secrets into a GitHub
+  Environment with required reviewers.
+- **Done when:** each rotated secret is updated in GitHub and `.env`, and the next broker-login
+  run passes.
+
 ## Open questions
 
 1. Which model for the implementer by default: Sonnet 5.5 or Fable?
@@ -52,3 +60,4 @@ short and on one topic.
 ## Log
 
 - 2026-10-06 — created from the process review.
+- 2026-10-06 — owner decisions on PR #27: credential rotation and TODO 1.2 approved — added as Phase 4.

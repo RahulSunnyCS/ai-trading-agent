@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — `main` CI failed 50 of 56 runs from 2026-09-29 to 2026-10-05; a red build stops warning about anything |
-| **Status** | Planned |
+| **Status** | Ready |
 | **Type** | chore |
 | **Area** | infra |
 | **Created** | 2026-10-06 |
@@ -58,9 +58,14 @@ the failures CI catches are caught on the laptop before a push.
 
 ## Open questions
 
-1. Allow direct pushes to `main` for docs-only commits, or PR everything?
-2. Should the merge guard also require a `/code-review` pass on PRs above a size threshold?
+1. ~~Allow direct pushes to `main` for docs-only commits?~~ **Yes** (owner, 2026-10-06): a push
+   that touches only `*.md` outside `packages/*/src` may go straight to `main`; everything else
+   through a PR.
+2. ~~Require a `/code-review` pass above a size threshold?~~ **Yes** (owner, 2026-10-06): PRs
+   over about 500 changed lines, excluding data and fixtures, need a review note in the PR
+   before the merge guard lets them through.
 
 ## Log
 
 - 2026-10-06 — created from the process review of the week 2026-09-29 → 2026-10-05.
+- 2026-10-06 — owner decisions on PR #27: both open questions answered (take everything); status Ready.

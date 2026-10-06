@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Priority** | P1 — friends will use the Momentum tab this month; a number shown without its caveats reads as validated |
+| **Priority** | P2 — friends do not need access next week (owner, 2026-10-06); still needed before they do |
 | **Status** | Planned |
 | **Type** | improvement |
 | **Area** | momentum, dashboard |
@@ -50,8 +50,10 @@ assumptions that affect it, in plain English.
 
 ## Open questions
 
-1. Should the weekly Telegram signal carry the same status line?
+1. ~~Telegram status line?~~ **Yes** (owner, 2026-10-06): the weekly signal message carries the
+   same status and assumption list.
 
 ## Log
 
 - 2026-10-06 — created from the process review.
+- 2026-10-06 — owner decisions on PR #27: lowered to P2; Telegram status line approved.

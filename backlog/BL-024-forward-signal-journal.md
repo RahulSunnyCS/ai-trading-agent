@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — time-critical: every Friday not recorded is out-of-sample evidence lost for good, and real money is planned |
-| **Status** | Planned |
+| **Status** | Ready |
 | **Type** | feature |
 | **Area** | momentum (+ trading-data) |
 | **Created** | 2026-10-06 |
@@ -59,8 +59,10 @@ the benchmark.
 
 ## Open questions
 
-1. Which configs to journal (the favourites, or a fixed shortlist)?
+1. ~~Which configs to journal?~~ **Both** (owner, 2026-10-06): every saved favourite, plus the
+   fixed shortlist in Phase 1 (BL-010 median config, Nifty200 Momentum 30).
 
 ## Log
 
 - 2026-10-06 — created in the overnight review; not discussed with the owner yet.
+- 2026-10-06 — owner decisions on PR #27: approved in full; status Ready. Phase 1 is due before Friday 2026-10-09.

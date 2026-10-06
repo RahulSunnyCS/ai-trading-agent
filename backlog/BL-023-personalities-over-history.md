@@ -36,3 +36,4 @@ To be set when the item is planned.
 ## Log
 
 - 2026-10-06 — created as an idea from the product discussion.
+- 2026-10-06 — owner decisions on PR #27: revisit at the end of the Max month (about 2026-11-06).

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — every session reads `overview.md` first, and it describes a product that is not the one being built |
-| **Status** | Planned |
+| **Status** | Ready |
 | **Type** | chore |
 | **Area** | docs |
 | **Created** | 2026-10-06 |
@@ -55,8 +55,9 @@ marked frozen, so sessions and readers stop treating them as in flight.
 
 ## Open questions
 
-1. Keep the Razorpay code path tested in CI while frozen, or skip it?
+1. ~~Keep Razorpay tested in CI while frozen?~~ **Yes** (owner, 2026-10-06).
 
 ## Log
 
 - 2026-10-06 — created from the product discussion.
+- 2026-10-06 — owner decisions on PR #27: approved; status Ready.
