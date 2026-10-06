@@ -36,7 +36,9 @@ const services = {
     targetPort: 5190,
     command: 'bun',
     args: ['run', '--bun', 'next', 'dev', '--port', '5190'],
-    env: { MOMENTUM_DIRECT: '1', OBT_DIRECT: '1' },
+    // SCHEDULER_DIRECT only proxies to the scheduler launchd already keeps running; this
+    // stack never starts a second scheduler loop (it would run every job twice).
+    env: { MOMENTUM_DIRECT: '1', OBT_DIRECT: '1', SCHEDULER_DIRECT: '1' },
     matches: /(?:^|[\s/])next(?:\.js)?(?:\s|\/|$)|(?:^|\s)bun\s+run\s+dev(?:\s|$)/,
   },
 };

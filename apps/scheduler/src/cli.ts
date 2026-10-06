@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { telegramSink } from './alerts.js';
+import { startApi } from './api.js';
 import { backupJob } from './backup.js';
 import { jobEnv } from './env.js';
 import { History, pidAlive } from './history.js';
@@ -122,6 +123,7 @@ function serve(): void {
   console.log(
     `scheduler started ${formatIst(new Date())} IST — ${JOBS.length} jobs, logs in ${logDir()}`,
   );
+  startApi({ ctx, jobs: JOBS, logRoots: [join(REPO_ROOT, 'packages/momentum-backtesting/data')] });
   startLoop({ ctx, jobs: JOBS, alerts: telegramSink(ctx.env) });
 }
 

@@ -11,6 +11,7 @@ const momentumDirectOrigin = process.env.MOMENTUM_DIRECT_API_URL ?? 'http://127.
 // Both direct origins may be a Cloudflare Tunnel hostname when the dashboard runs off the
 // backend laptop (docs/remote-dashboard.md); middleware.ts adds the Access service token.
 const optionsDirectOrigin = process.env.OBT_DIRECT_API_URL ?? 'http://127.0.0.1:8000';
+const schedulerDirectOrigin = process.env.SCHEDULER_DIRECT_API_URL ?? 'http://127.0.0.1:8790';
 
 const nextConfig: NextConfig = {
   // A cold whole-market Broad Momentum run (or Custom Index) takes about a minute; Next's default
@@ -103,6 +104,16 @@ const nextConfig: NextConfig = {
             {
               source: '/api/momentum/rebalance-preview',
               destination: `${momentumDirectOrigin}/api/rebalance-preview`,
+            },
+          ]
+        : []),
+      // The scheduler's loopback API (apps/scheduler, BL-012): Jobs and Notifications pages.
+      // Must stay before the catch-all below. Never enabled in a plain production build.
+      ...(process.env.SCHEDULER_DIRECT === '1'
+        ? [
+            {
+              source: '/api/scheduler/:path*',
+              destination: `${schedulerDirectOrigin}/:path*`,
             },
           ]
         : []),
