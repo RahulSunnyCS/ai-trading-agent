@@ -255,7 +255,8 @@ contract, not a shared service).
 - `search_spaces/bl010_criteria.json` — the pre-registered objective, drawdown baskets and
   pass/kill thresholds for the evaluation review (BL-010). Never edit after results are seen;
   supersede with a new file. A step added later gets its own `bl010_criteria_addendum_N.json`,
-  committed before that step runs (addendum 1: Monday-open repricing).
+  committed before that step runs (addendum 1: Monday-open repricing; addendum 2: selection and
+  validation windows never meet). `criteria.py` reads them all; code never restates a threshold.
 - `tests/golden/` — frozen backtest results (BL-001). 16 scenarios run through the real API on
   a frozen slice of real data (`fixture/`, rebuilt only by `scripts/build-golden-fixture.py`).
   A code change that moves any result fails `test_golden.py`; if the move was intended, run
