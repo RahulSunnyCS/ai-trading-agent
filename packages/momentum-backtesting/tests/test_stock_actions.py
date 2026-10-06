@@ -239,3 +239,55 @@ def test_a_small_bonus_the_drop_scan_cannot_see_is_adjusted_from_its_filing(tmp_
     week_before, week_of = adjusted["PFC"].iloc[0], adjusted["PFC"].iloc[1]
     assert week_before == pytest.approx(300.0 / 1.25)  # not a 20% fall any more
     assert week_of / week_before - 1 == pytest.approx(246.0 / 240.0 - 1)
+
+
+def test_a_split_filed_under_the_new_symbol_adjusts_the_old_symbols_prices(tmp_path, monkeypatch):
+    """BL-010 F9: MCDOWELL-N's 2018 split is filed under UNITDSPR. The two share an ISIN."""
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    with connect(tmp_path) as con:
+        ids = {
+            symbol: con.execute(
+                "INSERT INTO instruments (instrument_key, asset_class, exchange, symbol) "
+                "VALUES (?, 'stock', 'NSE', ?) RETURNING instrument_id",
+                [f"stock:NSE:{symbol}", symbol],
+            ).fetchone()[0]
+            for symbol in ("OLDNAME", "NEWNAME")
+        }
+    bars = pd.DataFrame(
+        [
+            (ids["OLDNAME"], "2018-06-14", 3455.0, 100, 345500.0, "INE1"),
+            (ids["OLDNAME"], "2018-06-15", 677.0, 520, 352040.0, "INE2"),  # 5-for-1 split
+            (ids["OLDNAME"], "2018-06-18", 680.0, 500, 340000.0, "INE2"),
+            (ids["NEWNAME"], "2019-01-02", 600.0, 500, 300000.0, "INE2"),  # renamed later
+        ],
+        columns=["instrument_id", "date", "close", "volume", "turnover", "isin"],
+    )
+    bars["date"] = pd.to_datetime(bars["date"])
+    for year, part in bars.groupby(bars["date"].dt.year):
+        path = tmp_path / "lake" / "bars_1d" / "asset=stock" / f"year={year}" / "data.parquet"
+        path.parent.mkdir(parents=True)
+        part.to_parquet(path, index=False)
+    ca_dir = tmp_path / "raw" / "corporate_actions"
+    ca_dir.mkdir(parents=True)
+    (ca_dir / "ca_2018.json").write_text(
+        json.dumps(
+            [
+                {
+                    "symbol": "NEWNAME",
+                    "series": "EQ",
+                    "isin": "INE2",
+                    "faceVal": "2",
+                    "exDate": "15-Jun-2018",
+                    "recDate": "18-Jun-2018",
+                    "subject": "Face Value Split (Sub-Division) - From Rs 10/- Per Share "
+                    "To Rs 2/- Per Share",
+                }
+            ]
+        )
+    )
+    with connect(tmp_path) as con:
+        scan_and_store(con, tmp_path / "raw")
+        rows = con.execute(
+            "SELECT symbol, ex_date, confirmed_factor, status FROM stock_action_candidates"
+        ).fetchall()
+    assert rows == [("OLDNAME", date(2018, 6, 15), 5.0, "confirmed")]

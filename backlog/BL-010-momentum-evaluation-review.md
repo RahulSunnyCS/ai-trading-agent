@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0, 1a and 2 done; Phase 1b's 12-week check and engine fixes E10–E13 are next; then Phase 3) |
+| **Status** | In progress (Phases 0, 1a, 2 done; Phase 3 measured, arm A's headline killed; Phase 4 partly done) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -400,6 +400,20 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   filings; applied to the shared database after a backup (owner approved). 41 new factors, 13
   in the Total Market; three filings still need a manual look. Six configs move −1.3 to +0.7
   points.
+- 2026-10-06 — Phase 3 measured. Renamed-symbol filings matched (61 more confirmed actions,
+  shared database, backup taken). The 50 best configs on a point-in-time universe lose a
+  median 22 to 25 points of CAGR; 45 of 50 lose more than 10. **Arm A's headline is killed by
+  the committed rule.** The typical top config still returns 31–34% pre-tax there against 17.1%
+  for the momentum index. Label shuffle: four of six beat the 95th percentile; the launch-dated
+  taxonomy is not built, so the category-layer kill is undecided. Phase 4 step 2 (fair random
+  baseline) passes six of six. Step 3's full re-score is running.
+- **For the owner:** the category-layer decision, and whether to build the launch-dated
+  taxonomy (launch dates for 113 themes) or drop to the long-standing NSE sectors.
+- 2026-10-06 — Phase 4 steps 1 and 3 measured on all 8,003 configs (today's list). PBO 0.48:
+  **the single-winner rule is killed**; within the 40% drawdown ceiling PBO is 0.20. The
+  aggressive winner is 5.8 points below its phase average (killed as a finalist). Steps 4 to 6
+  (criteria as code, generic nudges, the window rule) are not done; the point-in-time scoring
+  is not run.
 - 2026-10-06 — note from the overnight review: themes added in a session on 2026-10-05 (Nuclear
   Supply Chain, Battery Storage (BESS), Optic Fibre, Semiconductors and others — about 69 rows) sit
   **uncommitted** in `categories/curated/category_extras.csv` and `stockscans_catalog.md` in the

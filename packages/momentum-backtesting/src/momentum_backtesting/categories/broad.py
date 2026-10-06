@@ -341,7 +341,7 @@ def load_stock_universe_frame(
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
-    universe: Literal["total_market", "all_liquid"] = "total_market",
+    universe: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
     series_breaks: Literal["legacy", "verified"] = "verified",
 ) -> StockUniverseFrame:
     """The 755-name Total Market weekly price frame + point-in-time membership gate, computed
@@ -353,6 +353,9 @@ def load_stock_universe_frame(
         if liquidity is None:
             raise ValueError("The whole-market universe needs the tradability filter on.")
         members_by_year = liquidity_mod.market_members_by_year()
+    elif universe == "turnover_rank":
+        # The index's membership as it could have been known each January (BL-010 F1).
+        members_by_year = liquidity_mod.turnover_rank_members_by_year()
     else:
         members_by_year = total_market_members_by_year(categories_data_dir)
     all_symbols = sorted(set().union(*members_by_year.values()))
@@ -504,7 +507,7 @@ def compute_universe_base(
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
-    universe_kind: Literal["total_market", "all_liquid"] = "total_market",
+    universe_kind: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
     series_breaks: Literal["legacy", "verified"] = "verified",
 ) -> UniverseBase:
     """The expensive half of Step 2 -- everything that does not depend on the pool size.

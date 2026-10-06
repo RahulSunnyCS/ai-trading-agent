@@ -83,17 +83,28 @@ def load_records(out_dir: Path, ids: set[str]) -> dict[str, dict[str, Any]]:
 class Runner:
     """Builds rankings and runs backtests for one space, with small caches."""
 
-    def __init__(self, space: search.Space) -> None:
+    def __init__(
+        self,
+        space: search.Space,
+        *,
+        universe_kind: str | None = None,
+        category_tags: str | None = None,
+    ) -> None:
+        """`universe_kind` / `category_tags` run the space's configs on another universe or
+        tag file than its arm names (BL-010 Phase 3: the same configs, point-in-time)."""
         from . import api
 
         self.api = api
         self.space = space
+        self.universe_kind = universe_kind or search.ARMS[space.arm][0]
+        self.category_tags = category_tags
         self.common = dict(
             outer_prices=api.DATA.get(),
             stocks_data_dir=api.DATA_DIR / "stocks",
             categories_data_dir=api.DATA_DIR / "categories",
         )
         self.refs = reference_benchmarks.load_references()
+        self._tilt_cache: dict[tuple, Any] = {}
 
     def heavy_args(self, heavy: dict[str, Any], **override: Any) -> tuple[dict[str, Any], Any]:
         from .categories.liquidity import LiquidityConfig
@@ -120,13 +131,12 @@ class Runner:
         from .categories import broad
 
         kwargs, liquidity = self.heavy_args(heavy, **override)
-        universe_kind = search.ARMS[self.space.arm][0]
         h = {**heavy, **override}
         return broad.compute_universe_base(
             **self.common,
             **kwargs,
             liquidity=liquidity,
-            universe_kind=universe_kind,
+            universe_kind=self.universe_kind,
             series_breaks=h.get("series_break_policy", "verified"),
         )
 
@@ -144,21 +154,44 @@ class Runner:
         locks=None,
         extra_no_buy: pd.DataFrame | None = None,
         tax=None,
+        curated_dir: Path | None = None,
         **window: Any,
     ):
-        """One backtest on `base` (any UniverseBase, including a placebo one)."""
+        """One backtest on `base` (any UniverseBase, including a placebo one). `curated_dir`
+        swaps the folder the category tags are read from (the label-shuffle placebo)."""
         from .categories import broad
 
         merged = {**self.space.fixed, **light, **window}
         pool = (merged.get("pool_top_n", 200), merged.get("pool_exit_rank", 250))
         ranking = broad.finish_universe_ranking(base, pool_top_n=pool[0], pool_exit_rank=pool[1])
         kwargs = search._split_light(self.space, merged)
+        if self.category_tags is not None:
+            kwargs["category_tags"] = self.category_tags
         if kwargs.pop("respect_circuits", False):
             kwargs["uc_locked"], kwargs["lc_locked"] = locks or self.locks(ranking)
         heavy_kwargs, _ = self.heavy_args(heavy)
+        tilt = merged.get("stock_tilt", 0.0)
+        if tilt > 0 and "stock_tilt_ranks" not in kwargs:
+            # The tilted ranking depends only on the prices, the lookbacks and the tilt, and
+            # costs two full ranking passes: keep it across the runs that share a base.
+            from .engine import Config
+            from .levers import grouped_momentum_ranks
+
+            screen = merged.get("stock_tilt_screen_pct", 0.0)
+            key = (id(base.full_frame), heavy_kwargs["lookbacks"], tilt, screen)
+            if key not in self._tilt_cache:
+                if len(self._tilt_cache) >= 4:
+                    self._tilt_cache.pop(next(iter(self._tilt_cache)))
+                self._tilt_cache[key] = grouped_momentum_ranks(
+                    ranking.prices,
+                    Config(lookbacks=heavy_kwargs["lookbacks"]),
+                    tilt=tilt,
+                    screen_top_pct=screen,
+                )
+            kwargs["stock_tilt_ranks"] = self._tilt_cache[key]
         outcome = broad.run_broad_backtest(
             **self.common,
-            curated_dir=self.api.CATEGORIES_CURATED_DIR,
+            curated_dir=curated_dir or self.api.CATEGORIES_CURATED_DIR,
             **heavy_kwargs,
             pool_top_n=pool[0],
             pool_exit_rank=pool[1],
