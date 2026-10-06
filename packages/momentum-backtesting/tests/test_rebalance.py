@@ -366,3 +366,23 @@ def test_fyers_token_expiry_is_the_next_0600_ist():
     assert fyers.token_expiry(early) == datetime(2026, 10, 6, 0, 30, tzinfo=UTC)
     # A shorter expires_in from Fyers still wins.
     assert fyers.token_expiry(login, 3_600) == datetime(2026, 10, 6, 10, 30, tzinfo=UTC)
+
+
+def test_fyers_probe_treats_a_gateway_403_as_unknown_not_rejected(monkeypatch):
+    import io
+    import urllib.error
+
+    creds = fyers.Credentials("APP-100", "tok-probe-403-aaaa", "test")
+
+    def fake_urlopen(_request, timeout=0):
+        raise urllib.error.HTTPError("u", 403, "Forbidden", {}, io.BytesIO(b"blocked"))
+
+    monkeypatch.setattr(fyers.urllib.request, "urlopen", fake_urlopen)
+    assert fyers.probe_token(creds) == "unknown"
+    creds401 = fyers.Credentials("APP-100", "tok-probe-401-bbbb", "test")
+
+    def unauthorized(_request, timeout=0):
+        raise urllib.error.HTTPError("u", 401, "Unauthorized", {}, io.BytesIO(b"{}"))
+
+    monkeypatch.setattr(fyers.urllib.request, "urlopen", unauthorized)
+    assert fyers.probe_token(creds401) == "rejected"

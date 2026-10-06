@@ -181,6 +181,12 @@ describe('probeFyersToken', () => {
     expect(result).toBe('rejected');
   });
 
+  it('does not log a token out because the gateway answered 403', async () => {
+    expect(
+      await probeFyersToken('APP-1', 'gateway-token-dddddddddd', respond(403, { s: 'error' })),
+    ).toBe('unknown');
+  });
+
   it('reports an accepted token as valid', async () => {
     expect(
       await probeFyersToken('APP-1', 'good-token-bbbbbbbbbbbb', respond(200, { s: 'ok' })),

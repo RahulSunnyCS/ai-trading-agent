@@ -13,6 +13,7 @@ Fyers tokens expire daily, so the cache and DB paths check expires_at first.
 import hashlib
 import json
 import os
+import re
 import secrets
 import time
 import urllib.error
@@ -176,8 +177,13 @@ def probe_token(creds: Credentials) -> str:
         body = json.load(urllib.request.urlopen(request, timeout=5))
         if body.get("s") == "ok":
             result = "valid"
+        elif body.get("s") == "error" and re.search(
+            r"authenticat|token|expired", str(body.get("message", "")), re.I
+        ):
+            result = "rejected"
     except urllib.error.HTTPError as error:
-        if error.code in (401, 403):
+        # Only 401. A 403 is Fyers' gateway turning the client away, not a verdict on the token.
+        if error.code == 401:
             result = "rejected"
     except (OSError, ValueError):
         pass

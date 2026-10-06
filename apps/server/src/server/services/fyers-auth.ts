@@ -209,11 +209,17 @@ export async function probeFyersToken(
   let result: FyersTokenProbe = 'unknown';
   try {
     const res = await fetchImpl(FYERS_PROFILE_URL, {
-      headers: { Authorization: `${appId}:${accessToken}` },
+      headers: {
+        Authorization: `${appId}:${accessToken}`,
+        // Fyers' gateway answers 403 to unrecognised clients, so identify as a browser-ish UA.
+        'User-Agent': 'Mozilla/5.0 (ata-server)',
+      },
       signal: AbortSignal.timeout(5_000),
     });
     const body = (await res.json().catch(() => ({}))) as { s?: string; message?: string };
-    if (res.status === 401 || res.status === 403) result = 'rejected';
+    // Only 401 or an explicit token message counts. A 403 is the gateway turning the client
+    // away, not Fyers judging the token, and must never log a valid token out.
+    if (res.status === 401) result = 'rejected';
     else if (body.s === 'ok') result = 'valid';
     else if (body.s === 'error' && /authenticat|token|expired/i.test(body.message ?? '')) {
       result = 'rejected';
