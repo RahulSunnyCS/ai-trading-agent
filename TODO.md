@@ -527,6 +527,13 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 | 3.16.1 | Phase 1: rewrite `overview.md` and `business.md` for the real product | claude | **Done 2026-10-06.** Overview is 75 lines with Active and Frozen lists; business.md is a personal tool, billing kept under "Frozen: SaaS billing", retired Pipeline Scope removed, SEBI note added |
 | 3.16.2 | Phase 2: mark the frozen parts | claude | **Done 2026-10-06.** Note at the top of `apps/server/CLAUDE.md`; §3.1–3.4 and 3.7 above marked frozen |
 
+### 3.17 Research gate — [BL-015](backlog/BL-015-research-gate.md)
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.17.1 | Phase 1: pre-registration in the backlog template + `_EXPERIMENT.md` | claude | **Built 2026-10-06.** Closes when the next research item is created from it |
+| 3.17.2 | Phase 2: research-gate rule in root `CLAUDE.md` (`override: <reason>`) | claude | **Done 2026-10-06** |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

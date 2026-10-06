@@ -13,7 +13,8 @@ to its backlog file; the plan detail stays here (one fact, one file).
 |---|---|
 | `INDEX.md` | The table of every item — ID, title, priority, status, type, area. Always kept in sync with the item files |
 | `BL-NNN-short-slug.md` | One item: context, plan in phases, open questions, log |
-| `_TEMPLATE.md` | Copy this for a new item |
+| `_TEMPLATE.md` | Copy this for a new item. `research` items fill in its Phase 0 — Pre-register before any run |
+| `_EXPERIMENT.md` | The pre-registration block for a single test, pasted into the parent item's `## Experiments` section |
 
 IDs are sequential and never reused (`BL-001`, `BL-002`, …), even for dropped items.
 
