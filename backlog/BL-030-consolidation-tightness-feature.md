@@ -7,7 +7,7 @@
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
-| **Depends on** | BL-010 (trust the evaluation arithmetic first), BL-015 (pre-registration) |
+| **Depends on** | BL-010 **and the dashboard changes that follow from it** — the owner wants both finished before this starts (2026-10-06); BL-015 (pre-registration) |
 | **TODO.md row** | — (filled in when started) |
 
 ## Context
@@ -76,3 +76,5 @@ consolidation tightness pick better than momentum alone?
 ## Log
 
 - 2026-10-06 — created from the owner's chart-pattern idea; split out as the cheap first test.
+- 2026-10-06 — owner: a hard prerequisite is BL-010 (momentum evaluation review) *and* the UI
+  changes that come out of it; only then start this.
