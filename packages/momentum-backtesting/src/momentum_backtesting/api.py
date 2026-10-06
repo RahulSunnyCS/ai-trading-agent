@@ -1865,21 +1865,23 @@ def _no_active_signal_notification(
     if active is None:
         return Notification(
             "momentum-weekly",
-            "warning",
+            "warn",
             f"Momentum {run}: no active favourite selected",
             "No saved favourite is marked active, so there is nothing to send to Telegram. "
             "Mark one active in the dashboard's Saved strategies list.",
+            type="momentum.problem",
         )
     reasons = "\n".join(
         f"• {outcome['name']}: {outcome['blocked']}" for outcome in outcomes if outcome["blocked"]
     )
     return Notification(
         "momentum-weekly",
-        "warning",
+        "warn",
         f"Momentum {run}: active favourite could not produce a signal",
         f"'{active['name']}' is the active favourite but is blocked this week.\n\n"
         + (reasons or "No reason was recorded.")
         + "\n\nNo trade signal was sent to Telegram.",
+        type="momentum.problem",
     )
 
 
@@ -2132,6 +2134,7 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
                 "error" if journal["error"] else "info",
                 f"Momentum {body.run}: forward journal",
                 journal_line,
+                type="momentum.journal",
             )
         )
     return {
@@ -2516,6 +2519,7 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
         "action_required" if actionable else "info",
         f"Momentum FINAL — {favorite['name']} — week of {target_week:%d %b %Y}",
         "\n".join(lines),
+        type="momentum.final",
     )
     return RunResult(note, signal), None
 

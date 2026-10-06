@@ -1281,7 +1281,41 @@ def build_benchmarks_weekly(raw_dir: Path) -> pd.DataFrame:
     out["nifty200_momentum30_back_calculated"] = (
         weekly(back_calc.astype(float)).round().astype("boolean")
     )
-    return out
+    extra = build_extra_benchmarks_weekly(raw_dir)
+    return out.join(extra, how="outer") if not extra.empty else out
+
+
+def build_extra_benchmarks_weekly(raw_dir: Path, as_of: date | None = None) -> pd.DataFrame:
+    """The comparison-only TRI columns (benchmarks.EXTRA_TRI_INDICES) as Friday-labelled weekly
+    closes, from whichever raw_dir/benchmarks/*.json snapshots exist - a missing file just means
+    that column is absent (never an error; the series are optional everywhere downstream).
+
+    Weeks labelled after `as_of` (default today) are dropped: `weekly()` labels a part-week by
+    its coming Friday, and a half-finished week must not read as a completed weekly close.
+    """
+    from momentum_backtesting.sources import weekly
+
+    cutoff = pd.Timestamp(as_of or date.today())
+    columns = {}
+    for column, (_name, filename) in benchmarks.EXTRA_TRI_INDICES.items():
+        if not (raw_dir / "benchmarks" / filename).exists():
+            continue
+        series = weekly(load_tri_local(raw_dir, filename))
+        columns[column] = series[series.index <= cutoff]
+    return pd.DataFrame(columns)
+
+
+def merge_extra_benchmarks_csv(data_dir: Path, as_of: date | None = None) -> pd.DataFrame:
+    """Add (or refresh) only the comparison-only TRI columns in data_dir/benchmarks_weekly.csv
+    from the raw snapshots, leaving every other column as it was. Returns the extra columns."""
+    extra = build_extra_benchmarks_weekly(data_dir / "raw", as_of)
+    if extra.empty:
+        return extra
+    path = data_dir / "benchmarks_weekly.csv"
+    existing = pd.read_csv(path, index_col=0, parse_dates=True)
+    kept = existing.drop(columns=[c for c in extra.columns if c in existing.columns])
+    kept.join(extra, how="outer").to_csv(path)
+    return extra
 
 
 # --------------------------------------------------------------------------

@@ -87,17 +87,19 @@ function withGroup<T>(group: string | undefined, fn: () => Promise<T>): Promise<
  * Wait while another process (e.g. `jobs run` next to the running scheduler)
  * has a job of the same group in flight. Gives up after the job's own timeout.
  */
-async function waitForGroup(job: Job, ctx: RunContext, now: () => Date): Promise<string | null> {
+async function waitForGroup(
+  job: Job,
+  runId: number,
+  ctx: RunContext,
+  now: () => Date,
+): Promise<string | null> {
   if (!job.group) return null;
   const jobs = ctx.jobs ?? JOBS;
-  const members = jobs.filter((j) => j.group === job.group);
-  const longest = Math.max(...members.map((j) => j.timeoutMinutes)) * 60_000;
+  const members = jobs.filter((j) => j.group === job.group).map((j) => j.id);
   const deadline = now().getTime() + job.timeoutMinutes * 60_000;
   for (;;) {
-    const busy = ctx.history.running(
-      members.map((j) => j.id),
-      new Date(now().getTime() - longest),
-    );
+    ctx.history.reapDead(now());
+    const busy = ctx.history.runningBefore(members, runId);
     if (busy.length === 0) return null;
     if (now().getTime() >= deadline) {
       return `group '${job.group}' still busy with ${busy.map((r) => r.job).join(', ')}`;
@@ -120,38 +122,46 @@ export function runJob(
   return withGroup(job.group, async () => {
     const now = ctx.now ?? (() => new Date());
     const dir = join(ctx.logDir, job.id);
-    mkdirSync(dir, { recursive: true });
     const logPath = join(dir, `${istDay(now())}.log`);
     const cwd = join(ctx.repoRoot, job.cwd);
 
-    const blocked = await waitForGroup(job, ctx, now);
+    // The row goes in first: waiting for the group is then ordered by id, and a crash
+    // while waiting or running leaves a row that reapDead can close.
     const runId = ctx.history.start(job.id, trigger, scheduledFor, logPath, now());
-    if (blocked) {
-      ctx.history.finish(runId, 1, 0, now(), blocked);
-      return { runId, ok: false, exitCode: 1, attempts: 0, logPath, error: blocked };
-    }
-
-    const fd = openSync(logPath, 'a');
+    let fd: number | null = null;
     let result = { code: 1, error: null as string | null };
     let attempts = 0;
     try {
+      mkdirSync(dir, { recursive: true });
+      const blocked = await waitForGroup(job, runId, ctx, now);
+      if (blocked) {
+        ctx.history.finish(runId, 1, 0, now(), blocked);
+        return { runId, ok: false, exitCode: 1, attempts: 0, logPath, error: blocked };
+      }
+      fd = openSync(logPath, 'a');
+      const logFd = fd;
       for (attempts = 1; attempts <= job.retries + 1; attempts++) {
         writeSync(
-          fd,
+          logFd,
           `\n=== ${job.id} · ${trigger} · attempt ${attempts} · ${formatIst(now())} IST\n`,
         );
         for (const step of job.steps) {
-          writeSync(fd, `$ ${step.join(' ')}\n`);
-          result = await runStep(step, cwd, ctx.env, fd, job.timeoutMinutes * 60_000);
-          if (result.error) writeSync(fd, `! ${result.error}\n`);
+          writeSync(logFd, `$ ${step.join(' ')}\n`);
+          result = await runStep(step, cwd, ctx.env, logFd, job.timeoutMinutes * 60_000);
+          if (result.error) writeSync(logFd, `! ${result.error}\n`);
           if (result.code !== 0) break;
         }
-        writeSync(fd, `=== exit ${result.code}\n`);
+        writeSync(logFd, `=== exit ${result.code}\n`);
         if (result.code === 0 || attempts > job.retries) break;
         await sleep(job.retryDelayMinutes * 60_000);
       }
+    } catch (error) {
+      // Never throw: say what happened and close the row so it cannot block its group.
+      const message = error instanceof Error ? error.message : String(error);
+      ctx.history.finish(runId, 1, attempts, now(), message);
+      return { runId, ok: false, exitCode: 1, attempts, logPath, error: message };
     } finally {
-      closeSync(fd);
+      if (fd !== null) closeSync(fd);
     }
     attempts = Math.min(attempts, job.retries + 1);
     const error = result.code === 0 ? null : (result.error ?? `exit ${result.code}`);

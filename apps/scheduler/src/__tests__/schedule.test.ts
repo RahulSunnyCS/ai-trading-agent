@@ -41,6 +41,10 @@ describe('schedules', () => {
 describe('job registry', () => {
   const repoRoot = resolve(import.meta.dirname, '../../../..');
 
+  it('does not retry fyers-login: fyers.ts stops on a wrong PIN to avoid a lockout', () => {
+    expect(JOBS.find((j) => j.id === 'fyers-login')?.retries).toBe(0);
+  });
+
   it('has unique ids, real working directories and a fix hint for every job', () => {
     expect(new Set(JOBS.map((j) => j.id)).size).toBe(JOBS.length);
     for (const job of JOBS) {
@@ -64,5 +68,9 @@ describe('.env parsing', () => {
       ].join('\n'),
     );
     expect(env).toEqual({ A: '1', B: 'two words', C: 'x#y', D: 'plain' });
+  });
+
+  it('drops the quotes when a quoted value is followed by an inline comment', () => {
+    expect(parseDotenv('A="abc-100" # app id\nB=\'x y\'  # c')).toEqual({ A: 'abc-100', B: 'x y' });
   });
 });

@@ -353,7 +353,7 @@ def test_cli_check_exits_nonzero_and_sends_when_asked(monkeypatch):
     # No favourites saved in this catalog, so only the benchmark is expected — and missing.
     assert result.exit_code == 1, result.output
     assert "0 of 1 expected entries recorded" in result.output
-    assert sent[0].severity == "warning" and sent[0].title.endswith("PROBLEMS")
+    assert sent[0].severity == "warn" and sent[0].title.endswith("PROBLEMS")
 
 
 # --- review fixes (BL-014 pre-merge review) ------------------------------------------------------

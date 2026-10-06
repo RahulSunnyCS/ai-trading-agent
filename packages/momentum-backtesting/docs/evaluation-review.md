@@ -506,3 +506,160 @@ answer to sit near the median config, not near the best.
 
 **Phase 4 is done (2026-10-06).** The point-in-time PBO is 0.69 (0.53 within the drawdown
 ceiling); the single-winner rule stays killed on both universes.
+
+## Phase 5 — robustness over time, then choose (2026-10-06)
+
+`mbt search choose data/search/round7_A` (`choose.py`, `phase5.py`) applies the rule committed
+in `search_spaces/bl010_criteria_addendum_3.json` before any Phase 5 number was computed: per
+drawdown basket, rank each config by its third-worst financial year against Nifty200 Momentum
+30 TRI, group configs whose weekly returns correlate at 0.9 or more, take the medoid of the
+best-scoring group, prefer 8–12 holdings. All 8,003 configs on the point-in-time universe,
+pre-tax at ₹2 lakh, today's curated tags, every rebalance phase blended. The full report is
+`data/search/round7_A/phase5/report.md`.
+
+**Process notes.** A timing run on 800 configs, with the Midcap 150 and Smallcap 250 *price*
+indices standing in for the TRIs, was looked at before the full run; the rule was not changed
+after it. A Fable model checked the code against the criteria files without seeing results: no
+look-ahead in the walk-forward, the rule implemented as written, and five report-side
+corrections (all applied): FY2019 was silently missing from the walk-forward, the latest event
+window was blank, the factor kill was not coded, the random sample excluded the top configs,
+and the holdings check reported one reading of an unspecified test.
+
+### The walk-forward of the rule: killed in all three baskets
+
+Each year from FY2020, the rule is applied to the data that ended 13 weeks before the year
+started, and its pick is held through the year:
+
+| Basket | The rule's picks | Median config | Nifty200 Momentum 30 TRI | Kill |
+|---|---|---|---|---|
+| Conservative | 18.6% | 31.2% | 15.0% | **killed** |
+| Medium | 28.5% | 31.9% | 15.0% | **killed** |
+| Aggressive | 28.5% | 31.9% | 15.0% | **killed** |
+
+FY2020–FY2026, annualised, pre-tax. The kill is "not 3 points a year above the median config,
+or not above the index". The picks beat the index in every basket, but the median config beats
+the picks. The committed rule cannot rank FY2019 (no complete financial year ends before its
+cut). Adding it, ranked on January–December 2017, as a sensitivity: picks 17.6% / 26.1% /
+26.1%, median 26.1% / 26.8% / 26.8%, index 14.6%. FY2019 was the small-cap bear: the index
++11.6%, the median config −4.0%.
+
+**Choosing a config on its past does not beat picking a typical one.** That was Phase 4's
+finding (PBO 0.69); the walk-forward confirms it with the rule chosen to resist it.
+
+### The other checks
+
+| Check | Conservative | Medium | Aggressive |
+|---|---|---|---|
+| Configs in the basket | 409 | 1,960 | 2,761 |
+| Clusters (single-config) | 146 (106) | 416 (293) | 628 (437) |
+| Top 100 by CAGR beat 100 random, share of FYs | 77% | 77% | 79% |
+| Rank top-50 also in CAGR top-50 (kill below 20%) | 42% | **14%, killed** | **18%, killed** |
+| Holdings: 8–12 preference (2–6 must win by 3 pts at similar Ulcer) | holds | holds | holds |
+
+- **Top 100 vs random** passes, but it is the full-history top 100 scored on the same history:
+  a consistency check, not evidence (the walk-forward is the evidence).
+- **Ranking by CAGR is noise** in two baskets: the configs that hold up best in their bad
+  years are mostly not the ones with the best CAGR.
+- **Clusters are mostly single configs** (73–78%). At 0.9 correlation the space does not
+  form families, so the clustering adds little protection beyond the third-worst-year rank.
+- **Fewer holdings buy nothing.** Within each basket the median 8–12-holding config earns
+  more than the median 2–6-holding one (by 1.2 to 3.0 points a year), and the rule's 8–12
+  picks fell far less than its 2–6 picks (Ulcer index 9–12% against 16–17%).
+
+### What the rule picks on the full history (reported, not frozen)
+
+| Basket | Config | Holdings, rebalance | CAGR | Max DD | Third-worst FY vs index | Worst FY vs index | Alpha (t) |
+|---|---|---|---|---|---|---|---|
+| Conservative | `ce6723a197b9` | 7, every 2 weeks | 44.8% | −32.3% | +12.5 | −11.0 | 23.5% (3.8) |
+| Medium | `981d611037eb` | 3, weekly | 39.6% | −36.6% | +21.0 | −16.2 | 20.7% (3.0) |
+| Aggressive | `fc31a2912213` | 3, weekly | 45.7% | −39.3% | +13.0 | −20.0 | 25.6% (3.3) |
+
+All three **fail** the per-config test: each has a financial year more than 10 points behind
+the index. The factor check passes for all three (alpha well above 5% a year, |t| > 2, with
+market, size and momentum betas of about 0.9, 0.55–0.7 and 0.4–0.55), but they are in-sample
+picks, so their alpha is inflated by the selection. The bootstrap's 1-in-20 drawdown is 44–53%,
+deeper than every basket's 40% ceiling.
+
+### Verdict
+
+**Phase 5 names no config.** The committed rule fails its own walk-forward. What survives:
+
+- The strategy family has an edge. The median config of each basket earned about 31–32% a
+  year pre-tax over FY2020–FY2026 (about 26–27% including FY2019), against 15% for Nifty200
+  Momentum 30 TRI. This is an upper estimate: before tax, on today's curated tags, inside a
+  search space whose bounds were set after seeing earlier results.
+- No rule tried here picks a better-than-typical config in advance.
+- 8–12 holdings is as good as 2–6 in return, with much shallower falls.
+
+What to follow is now the owner's decision (BL-010 open question 4), not a ranking result.
+
+## Phase 6 step 0 — what Phase 6 follows (2026-10-06)
+
+Phase 5 named no config, so the owner chose what to follow instead: money split equally
+across 3–4 typical Medium-basket configs with 8–12 holdings, rebalancing every 2 or 4 weeks.
+The rule (`search_spaces/bl010_criteria_addendum_4.json`, committed before the pick was
+computed):
+1. Skip configs whose third-worst financial year against the index is below the group's median.
+2. Take the most typical of the rest (highest average weekly-return correlation with the
+   others), each correlated below 0.9 with those already taken, up to four.
+3. Split capital equally and reset it each April.
+
+The rule had to pass its own walk-forward before anything was frozen. `mbt search ensemble
+data/search/round7_A --space search_spaces/round7_A.toml --freeze` (`choose.py`, `phase6.py`).
+
+### Walk-forward of the picking rule: passes
+
+| | FY2020–FY2026 | With FY2019 (sensitivity) |
+|---|---|---|
+| The ensemble, picked each year on data ending 13 weeks earlier | **36.7%** | 30.9% |
+| Median config of the same group | 32.6% | 27.5% |
+| Nifty200 Momentum 30 TRI | 15.0% | 14.6% |
+
+Annualised, pre-tax. Pass: no more than 2 points below the group median (bar 30.6%) and at
+least 5 points above the index (bar 20.0%). The ensemble beat the group median in 6 of 7
+years; the miss is FY2026 (3.7% against 9.8%). It fell less than the median in FY2020 (−19.2%
+against −23.0%).
+
+A Fable model checked the code against the addendum: no look-ahead, every unspecified
+judgement neutral, and the same four picks re-derived independently. Its fixes are in:
+- a flag when fewer than three configs are found;
+- a missing year fails rather than counting as 0%;
+- each pick's range across rebalance phases is reported;
+- the freeze records what a phase means for live trading;
+- a look-ahead test.
+
+### Frozen: `search_spaces/bl010_phase6_frozen.json`
+
+| Config | Holdings | Rebalance | Phase (rebalance_offset) | CAGR, phases blended | Worst to best phase |
+|---|---|---|---|---|---|
+| `1281e8ed6824` | 12 | every 4 weeks | 0 | 34.2% | 30.9% to 36.2% |
+| `08c4307d7aa9` | 8 | every 4 weeks | 1 | 32.9% | 29.8% to 35.4% |
+| `535b17b44ba5` | 12 | every 4 weeks | 2 | 31.6% | 26.3% to 36.2% |
+| `bad83df3821a` | 12 | every 2 weeks | 1 | 28.4% | 26.8% to 29.8% |
+
+Ensemble, equal capital reset each April, full history (2017-01 to 2026-10, pre-tax, ₹2
+lakh): CAGR 32.3%, max drawdown −31.5%, Ulcer index 10.4%. Over the same period the group's
+median config made 31.0% and Nifty200 Momentum 30 TRI 17.0%.
+
+The record holds:
+- each config's full parameters and the space's fixed settings;
+- the code commit (`d21141c`);
+- the data snapshot (last bar 2026-10-01, factor digest `4d066205752f`);
+- a SHA-256 of the scored curves.
+
+A phase is the engine's `rebalance_offset`: the Fridays whose week number since 2016-01-01
+equals the phase mod `rebalance_every`. The phases were assigned to spread trading days, never
+by performance; no Friday has more than two configs trading.
+
+**What to expect, honestly.** The four configs are correlated 0.85–0.89 with each other, so
+the split smooths results only modestly. Phase 6 trades one phase per config, and single
+phases ranged several points either side of the blended figures. All of it is pre-tax, on
+today's curated tags, inside a search space designed with hindsight: an upper estimate. The
+after-tax re-check and the fair category check are in Phase 7.
+
+**Next (Phase 6):**
+1. Live-signal parity: the API, CLI and live preview use the frozen settings, and the last 12
+   weeks of live signals equal the backtest's.
+2. The one-shot 2012–2016 backcast of the frozen ensemble.
+3. Paper-track it for 6–12 months next to the group's median config and Nifty200 Momentum 30
+   TRI, with failure defined in advance in `bl010_criteria.json` `phase_6_holdout`.

@@ -17,12 +17,8 @@ export function parseDotenv(text: string): Record<string, string> {
     if (!match) continue;
     const [, key = '', rest = ''] = match;
     let value = rest.trim();
-    const quote = value[0];
-    if ((quote === '"' || quote === "'") && value.endsWith(quote) && value.length >= 2) {
-      value = value.slice(1, -1);
-    } else {
-      value = value.replace(/\s+#.*$/, '');
-    }
+    const quoted = /^(["'])(.*?)\1(?:\s+#.*)?$/.exec(value);
+    value = quoted ? (quoted[2] ?? '') : value.replace(/\s+#.*$/, '');
     out[key] = value;
   }
   return out;
