@@ -174,21 +174,23 @@ class Runner:
         if tilt > 0 and "stock_tilt_ranks" not in kwargs:
             # The tilted ranking depends only on the prices, the lookbacks and the tilt, and
             # costs two full ranking passes: keep it across the runs that share a base.
+            from . import levers
             from .engine import Config
             from .levers import grouped_momentum_ranks
 
             screen = merged.get("stock_tilt_screen_pct", 0.0)
-            key = (id(base.full_frame), heavy_kwargs["lookbacks"], tilt, screen)
-            if key not in self._tilt_cache:
-                if len(self._tilt_cache) >= 4:
-                    self._tilt_cache.pop(next(iter(self._tilt_cache)))
-                self._tilt_cache[key] = grouped_momentum_ranks(
-                    ranking.prices,
-                    Config(lookbacks=heavy_kwargs["lookbacks"]),
-                    tilt=tilt,
-                    screen_top_pct=screen,
+            lookbacks = heavy_kwargs["lookbacks"]
+            ranks = levers.tilt_cache_get(
+                self._tilt_cache, base.full_frame, lookbacks, tilt, screen
+            )
+            if ranks is None:
+                ranks = grouped_momentum_ranks(
+                    ranking.prices, Config(lookbacks=lookbacks), tilt=tilt, screen_top_pct=screen
                 )
-            kwargs["stock_tilt_ranks"] = self._tilt_cache[key]
+                levers.tilt_cache_put(
+                    self._tilt_cache, base.full_frame, lookbacks, tilt, screen, ranks, limit=4
+                )
+            kwargs["stock_tilt_ranks"] = ranks
         outcome = broad.run_broad_backtest(
             **self.common,
             curated_dir=curated_dir or self.api.CATEGORIES_CURATED_DIR,
