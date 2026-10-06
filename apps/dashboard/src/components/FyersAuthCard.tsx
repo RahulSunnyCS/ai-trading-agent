@@ -147,7 +147,7 @@ export function FyersAuthCard() {
               Expired
             </Badge>
             {appId}
-            {status.expiresAt && (
+            {status.expiresAt && !status.revoked && (
               <span className="text-sm text-muted">
                 Expired{' '}
                 <span className="tabular-nums text-foreground">
@@ -156,7 +156,9 @@ export function FyersAuthCard() {
               </span>
             )}
             <p className="basis-full text-sm text-muted">
-              Fyers tokens last one day. Click "Login with Fyers" to store a fresh one.
+              {status.revoked
+                ? 'Fyers no longer accepts this token. Click "Login with Fyers" to store a fresh one.'
+                : 'Fyers tokens last until 06:00 IST the next morning. Click "Login with Fyers" to store a fresh one.'}
             </p>
           </>
         )}

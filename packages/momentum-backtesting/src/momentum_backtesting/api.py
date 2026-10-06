@@ -2327,27 +2327,37 @@ def create_app() -> FastAPI:
                 credentials = fyers.resolve_credentials(prefer_dashboard=True)
             except fyers.FyersCredentialsError:
                 credentials = None
-        connected = credentials is not None
+        # A token inside its date window can still be dead (revoked, or reset early).
+        revoked = credentials is not None and fyers.probe_token(credentials) == "rejected"
+        connected = credentials is not None and not revoked
+        expires_at = credentials.expires_at if credentials else None
+        if revoked:
+            expires_at = datetime.now(IST)  # shows "Expired", not a countdown
         return {
             "configured": configured,
             "connected": connected,
             "degraded": not connected,
             "needsReauth": not connected,
-            "expiresAt": credentials.expires_at.isoformat() if credentials else None,
+            "expiresAt": expires_at.isoformat() if expires_at else None,
             "appId": credentials.app_id if credentials else None,
+            **({"revoked": True} if revoked else {}),
         }
 
     @app.get("/api/auth/fyers/start")
-    def local_fyers_start() -> RedirectResponse:
+    def local_fyers_start(handoff: str = "") -> RedirectResponse:
         load_repo_env()
         try:
             _app_id, _secret, redirect_uri = fyers._oauth_config()
         except fyers.FyersCredentialsError as error:
             raise HTTPException(503, str(error)) from None
-        if os.environ.get("DATABASE_URL", "").strip():
+        # `handoff` marks a request that already came back from the central start URL. When
+        # FYERS_REDIRECT_URI is the dashboard itself (no Fastify server running) that URL is
+        # forwarded straight back here; without the marker the two redirected forever and the
+        # browser showed a blank page. A returned request runs the local flow instead.
+        if os.environ.get("DATABASE_URL", "").strip() and not handoff:
             callback = urllib.parse.urlparse(redirect_uri)
             central_start = urllib.parse.urlunparse(
-                (callback.scheme, callback.netloc, "/api/auth/fyers/start", "", "", "")
+                (callback.scheme, callback.netloc, "/api/auth/fyers/start", "", "handoff=1", "")
             )
             return RedirectResponse(
                 central_start, status_code=302, headers={"Cache-Control": "no-store"}
@@ -2374,7 +2384,11 @@ def create_app() -> FastAPI:
             raise HTTPException(400, "Fyers did not return an authorization code.")
         load_repo_env()
         try:
-            fyers.save_token(fyers.exchange_auth_code(actual_code))
+            creds = fyers.exchange_auth_code(actual_code)
+            fyers.save_token(creds)
+            # The dashboard card and resolve_credentials read broker_tokens first; without this
+            # row a fresh login here would be invisible whenever DATABASE_URL is set.
+            fyers.save_token_to_db(creds)
         except fyers.FyersCredentialsError as error:
             raise HTTPException(502, str(error)) from None
         return HTMLResponse(

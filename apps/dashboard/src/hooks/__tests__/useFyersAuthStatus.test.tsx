@@ -165,4 +165,11 @@ describe('fyersTokenState', () => {
       fyersTokenState({ ...connected(at(10)), connected: false, needsReauth: true }, now),
     ).toBe('missing');
   });
+
+  it('is expired for a revoked token even when the browser clock is behind the server', () => {
+    // The server stamps a revoked token "expired now"; a client clock a minute slow sees that
+    // instant as still in the future, which used to read as "missing / different app".
+    const revoked = { ...connected(at(0.02)), connected: false, needsReauth: true, revoked: true };
+    expect(fyersTokenState(revoked, now)).toBe('expired');
+  });
 });

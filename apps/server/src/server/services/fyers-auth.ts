@@ -13,6 +13,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { fyersTokenExpiry } from '@trading/broker-identity';
 import type { Pool } from 'pg';
 
 // ---------------------------------------------------------------------------
@@ -108,10 +109,7 @@ export async function exchangeAuthCode(
     throw new Error(`Fyers token exchange failed: ${safeDetail}`);
   }
 
-  // Fyers v3 access tokens expire ~24h; expires_in is seconds. Fall back to 24h
-  // if the field is missing so we still write a sensible expires_at.
-  const expiresInSec = body.expires_in ?? 24 * 60 * 60;
-  const expiresAt = new Date(Date.now() + expiresInSec * 1000);
+  const expiresAt = fyersTokenExpiry(new Date(), body.expires_in);
 
   return {
     appId: cfg.appId,
@@ -154,6 +152,7 @@ export async function loadStoredToken(db: Pool): Promise<StoredToken | null> {
     access_token: string;
     refresh_token: string | null;
     expires_at: Date;
+    updated_at?: Date | null;
   }>(
     `SELECT app_id,
             CASE WHEN token_encrypted
@@ -162,7 +161,7 @@ export async function loadStoredToken(db: Pool): Promise<StoredToken | null> {
             CASE WHEN refresh_token IS NULL THEN NULL
                  WHEN token_encrypted THEN pgp_sym_decrypt(dearmor(refresh_token), $1)
                  ELSE refresh_token END AS refresh_token,
-            expires_at
+            expires_at, updated_at
        FROM broker_tokens
       WHERE broker = 'fyers'
       LIMIT 1`,
@@ -170,12 +169,66 @@ export async function loadStoredToken(db: Pool): Promise<StoredToken | null> {
   );
   const row = result.rows[0];
   if (!row) return null;
+  let expiresAt = new Date(row.expires_at);
+  // Rows stored before the 06:00 IST rule carry now+24h; updated_at is when they were issued.
+  if (row.updated_at) {
+    const cap = fyersTokenExpiry(new Date(row.updated_at));
+    if (cap < expiresAt) expiresAt = cap;
+  }
   return {
     appId: row.app_id,
     accessToken: row.access_token,
     refreshToken: row.refresh_token,
-    expiresAt: new Date(row.expires_at),
+    expiresAt,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Live token check — the expiry date alone cannot see a revoked token
+// ---------------------------------------------------------------------------
+
+export type FyersTokenProbe = 'valid' | 'rejected' | 'unknown';
+
+const FYERS_PROFILE_URL = 'https://api-t1.fyers.in/api/v3/profile';
+const PROBE_TTL_MS = 5 * 60 * 1000;
+const probeCache = new Map<string, { at: number; result: FyersTokenProbe }>();
+
+/**
+ * Asks Fyers whether the token is accepted right now. 'rejected' only when Fyers says the
+ * token is no good; network trouble is 'unknown' so an outage never reads as a logout.
+ * Cached for a few minutes because the dashboard polls the status every minute.
+ */
+export async function probeFyersToken(
+  appId: string,
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<FyersTokenProbe> {
+  const key = `${appId}:${accessToken.slice(-12)}`;
+  const hit = probeCache.get(key);
+  if (hit && Date.now() - hit.at < PROBE_TTL_MS) return hit.result;
+  let result: FyersTokenProbe = 'unknown';
+  try {
+    const res = await fetchImpl(FYERS_PROFILE_URL, {
+      headers: {
+        Authorization: `${appId}:${accessToken}`,
+        // Fyers' gateway answers 403 to unrecognised clients, so identify as a browser-ish UA.
+        'User-Agent': 'Mozilla/5.0 (ata-server)',
+      },
+      signal: AbortSignal.timeout(5_000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { s?: string; message?: string };
+    // Only 401 or an explicit token message counts. A 403 is the gateway turning the client
+    // away, not Fyers judging the token, and must never log a valid token out.
+    if (res.status === 401) result = 'rejected';
+    else if (body.s === 'ok') result = 'valid';
+    else if (body.s === 'error' && /authenticat|token|expired/i.test(body.message ?? '')) {
+      result = 'rejected';
+    }
+  } catch {
+    result = 'unknown';
+  }
+  if (result !== 'unknown') probeCache.set(key, { at: Date.now(), result });
+  return result;
 }
 
 export interface FyersCredentialResolution {

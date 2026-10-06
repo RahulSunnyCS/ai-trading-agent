@@ -14,16 +14,19 @@
     "record": "tsx scripts/record.ts",
     "typecheck": "tsc --noEmit",
     "fyers-token": "tsx src/fyers.ts",
+    "fyers-login": "tsx src/fyers.ts --store",
     "dispatch": "tsx src/dispatch.ts",
     "test": "tsx --test src/*.test.ts"
   },
   "dependencies": {
-    "playwright": "1.63.0",
     "@trading/broker-identity": "workspace:*",
-    "@trading/notify": "workspace:*"
+    "@trading/notify": "workspace:*",
+    "pg": "^8.13.0",
+    "playwright": "1.63.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/pg": "8.11.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.0"
   }
