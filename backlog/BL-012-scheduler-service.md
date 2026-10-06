@@ -247,3 +247,4 @@ To ask when this is started (workflow step 3):
   the weekly scoring (BL-024), the live-money rules check (BL-025), and the daily
   realised-vs-backtest join for options (BL-026).
 - 2026-10-06 — owner decisions on PR #27: weekly Telegram health digest approved — added as Phase 3b.
+- 2026-10-07 — Phase 0: Nifty 50 Sep-2026 review applied (BSE in, Wipro out, effective 2026-09-30; confirmed against the live niftyindices list). BSE's 15 corporate-action rows reviewed and accepted, baseline advanced, three stock goldens re-accepted (BSE appears in the companies list; no number moved).

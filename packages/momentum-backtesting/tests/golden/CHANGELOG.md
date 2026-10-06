@@ -67,3 +67,13 @@ BL-010 E10 to E12. E10: a stock with no session in a week can be neither bought 
 | broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
 | broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-06 (on top of `d88066d`)
+
+Nifty 50 Sep-2026 review (BSE in, Wipro out, effective 2026-09-30): BSE (C0096) now appears in the stock-mode companies list; no numeric result moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| stock_default | 10.78% -> 10.78% | -28.97% -> -28.97% |
+| stock_voladj_monthly | 13.70% -> 13.70% | -16.00% -> -16.00% |
+| stock_blend_slots | 6.77% -> 6.77% | -29.50% -> -29.50% |
