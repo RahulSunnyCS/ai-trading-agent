@@ -255,3 +255,25 @@ start (before, only commands resolving Fyers credentials did, so `obt daily --no
 the default root). `TRADING_DATA_IMAGE` must be double-quoted in `.env` because the launchd
 jobs `source` it and the SSD's name has an apostrophe and a space.
 
+## `data_quality`: one verdict per lake file, labels not deletions — 2026-10-06
+
+BL-034 loads ~110k day files from a vendor whose data has real defects (sessions that are
+too short, Muhurat evenings, days without spot). Rather than have importers drop what looks
+wrong — and lose it silently — every bars_1m file gets a `data_quality` row: **usable**, or
+**excluded** with a reason (`off_session_only`, `short_session:<n>`, `thin_chain:<n>`,
+`duplicate_bars:<n>`, `no_spot`), plus a `session_kind` (`regular`, `special` for weekend or
+holiday sessions, `off_session`). The table mirrors the files one-to-one, so it can always be
+rebuilt (`tdata quality rebuild`); the importers write rows as they write files.
+
+Rules, in order, from the busiest instrument's count of regular-session bars (09:15–15:29,
+bar start; 375 is a full day): 0 → off-session only; < 300 → short session (the same cut
+`fyers/history.py` always used); an option day with < 10 contracts → thin chain; > 375 →
+duplicate bars. `off_session_rows` (Fyers' own files keep the 15:30–15:39 closing bars) never
+count as bars. `no_spot` is a cross-check: an option day whose underlying has an index series
+in the lake but no usable index day. It is set and cleared whichever side arrives last, and
+stocks (no index series at all) are left alone. Verified on the eight real Fyers days: all
+usable, 375 bars, ~10 off-session rows per contract.
+
+Nothing reads the table yet — legwise's `available_days` still enumerates files — so Phase 1
+changes no behaviour; Phase 2 can let readers skip excluded days.
+
