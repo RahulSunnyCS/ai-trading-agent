@@ -20,12 +20,17 @@ from .phase5 import MIDCAP, MOM30, SMALLCAP, _pct
 
 
 def _joined(table: pd.DataFrame, column: str) -> float:
+    """Annualised chained return; NaN if any year is missing (a missing year is a failure,
+    never a 0% year)."""
     years = len(table)
-    return float((1 + table[column].fillna(0.0)).prod()) ** (1 / years) - 1 if years else math.nan
+    if not years or table[column].isna().any():
+        return math.nan
+    return float((1 + table[column]).prod()) ** (1 / years) - 1
 
 
 def run(
     curves: pd.DataFrame,
+    scores: pd.DataFrame,
     facts: pd.DataFrame,
     records: dict[str, dict],
     series: dict[str, pd.Series],
@@ -55,10 +60,19 @@ def run(
             "table": json.loads(table.to_json(orient="index")),
         }
         if label == "committed":
+            short = [int(y) for y, r in table.iterrows() if r["too_few"]]
+            complete = not any(math.isnan(summary[k]) for k in ("ensemble", "median", "bench"))
+            summary["too_few_years"] = short
             summary["passes"] = bool(
-                summary["ensemble"] >= summary["median"] - 0.02
+                complete
+                and not short
+                and summary["ensemble"] >= summary["median"] - 0.02
                 and summary["ensemble"] >= summary["bench"] + 0.05
             )
+            if not complete:
+                summary["why_not"] = "a year has no ensemble, median or index return"
+            elif short:
+                summary["why_not"] = f"fewer than {choose.MIN_PICKS} picks in FY{short}"
         report[label] = summary
 
     echo("the pick on the full history ...")
@@ -81,6 +95,7 @@ def run(
     np.fill_diagonal(pairwise, np.nan)
     report["pick"] = {
         "group": len(group),
+        "too_few": len(picks) < choose.MIN_PICKS,
         "configs": [
             {
                 "id": cid,
@@ -88,6 +103,9 @@ def run(
                 "rebalance_every": int(facts.at[cid, "every"]),
                 "phase_slot": phases[cid],
                 "cagr": float(choose.cagr(curves[cid])),
+                # The curves blend every phase; Phase 6 trades one, somewhere in this range.
+                "cagr_worst_phase": float(scores.at[cid, "cagr_worst_phase"]),
+                "cagr_best_phase": float(scores.at[cid, "cagr_best_phase"]),
                 "heavy": records[cid]["heavy"],
                 "light": records[cid]["light"],
             }
@@ -129,8 +147,9 @@ def markdown(report: dict) -> str:
         )
     lines += [
         "",
-        "Pass: the ensemble within 2 points a year of the group median and at least 5 points "
-        f"above Mom30 TRI. **{'Passes' if c['passes'] else 'Killed'}.**",
+        "Pass: the ensemble no more than 2 points a year below the group median and at least 5 "
+        f"points above Mom30 TRI. **{'Passes' if c['passes'] else 'Killed'}.**"
+        + (f" ({c['why_not']})" if c.get("why_not") else ""),
         "",
         "| FY | Picked on | Group | Ensemble | Group median | Mom30 TRI |",
         "|---|---|---|---|---|---|",
@@ -144,13 +163,15 @@ def markdown(report: dict) -> str:
         "",
         f"## The pick on the full history ({p['group']} configs eligible)",
         "",
-        "| Config | Holdings | Every | Phase slot | CAGR |",
-        "|---|---|---|---|---|",
+        "| Config | Holdings | Every | Phase (rebalance_offset) | CAGR, phases blended "
+        "| CAGR, worst to best phase |",
+        "|---|---|---|---|---|---|",
     ]
     for cfg in p["configs"]:
         lines.append(
             f"| `{cfg['id']}` | {cfg['holdings']} | {cfg['rebalance_every']} weeks | "
-            f"{cfg['phase_slot']} | {_pct(cfg['cagr'])} |"
+            f"{cfg['phase_slot']} | {_pct(cfg['cagr'])} | "
+            f"{_pct(cfg['cagr_worst_phase'])} to {_pct(cfg['cagr_best_phase'])} |"
         )
     lines += [
         "",
@@ -158,6 +179,11 @@ def markdown(report: dict) -> str:
         f"drawdown {_pct(p['ensemble_mdd'])}, Ulcer {_pct(p['ensemble_ulcer'])}. Group median "
         f"config {_pct(p['group_median_cagr'])}; Mom30 TRI {_pct(p['bench_cagr'])}. Highest "
         f"correlation between two picks: {p['max_pairwise_corr']:.2f}.",
+        "",
+        "The figures blend every rebalance phase. Phase 6 trades each config on one phase (its "
+        "`rebalance_offset`: Fridays whose week number since 2016-01-01 is the phase mod "
+        "`rebalance_every`), so a live result can sit several points either side.",
+        "" + ("**Fewer than 3 configs were found; the owner decides.**" if p["too_few"] else ""),
         "",
         "| FY | Ensemble | Group median | Mom30 TRI |",
         "|---|---|---|---|",
@@ -168,3 +194,39 @@ def markdown(report: dict) -> str:
             f"{_pct(row['bench'])} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def freeze(
+    report: dict, path: Path, *, commit: str, snapshot: dict | None, scored_digest: str, fixed: dict
+) -> dict:
+    """Addendum 4's freeze record: what Phase 6 follows, exactly, and what it was picked on.
+    Refuses to freeze a pick whose walk-forward did not pass."""
+    if not report["committed"]["passes"]:
+        raise ValueError("the walk-forward did not pass; addendum 4 says report it, not freeze it")
+    p = report["pick"]
+    record = {
+        "frozen": pd.Timestamp.now(tz="Asia/Kolkata").isoformat(timespec="seconds"),
+        "rule": "search_spaces/bl010_criteria_addendum_4.json",
+        "code_commit": commit,
+        "data_snapshot": snapshot,
+        "scored_curves_sha256": scored_digest,
+        "basket": report["basket"],
+        "capital": "equal per config, reset to equal at the last week before each 1 April",
+        "phase_meaning": "rebalance_offset: trade on Fridays whose week number since "
+        "engine.CADENCE_EPOCH (2016-01-01) is the offset mod rebalance_every",
+        "fixed_settings": fixed,
+        "configs": [
+            {k: cfg[k] for k in ("id", "holdings", "rebalance_every", "heavy", "light")}
+            | {"rebalance_offset": cfg["phase_slot"]}
+            for cfg in p["configs"]
+        ],
+        "expected_pre_tax": {
+            "ensemble_cagr": p["ensemble_cagr"],
+            "ensemble_max_drawdown": p["ensemble_mdd"],
+            "walk_forward_cagr_fy2020_fy2026": report["committed"]["ensemble"],
+            "group_median_walk_forward": report["committed"]["median"],
+            "mom30_walk_forward": report["committed"]["bench"],
+        },
+    }
+    path.write_text(json.dumps(record, indent=2, default=float) + "\n")
+    return record

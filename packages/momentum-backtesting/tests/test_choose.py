@@ -252,3 +252,54 @@ def test_rebalance_phases_spread_the_fridays():
         for w in range(offset, 4, int(facts.at[cid, "every"])):
             load[w] += 1
     assert max(load) == 2  # 3 monthly + 1 fortnightly config: no Friday carries more than two
+
+
+def _ensemble_facts(names: list[str]) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "holdings": dict.fromkeys(names, 10),
+            "every": dict.fromkeys(names, 4),
+            "simplicity": dict.fromkeys(names, (3, 4, False, False)),
+        }
+    )
+
+
+def test_walk_forward_ensemble_never_reads_the_year_it_picks_for():
+    """Changing everything after a cut must not change that year's picks."""
+    rng = np.random.default_rng(5)
+    names = [f"c{i}" for i in range(8)]
+    common = rng.normal(0, 0.01, len(WEEKS))
+    curves = pd.DataFrame(
+        {n: _curve(0.003, common + rng.normal(0, 0.01, len(WEEKS))) for n in names}
+    )
+    flat = pd.Series(1.0, index=WEEKS)
+    indices = {"Nifty Midcap 150 TRI": flat, "Nifty Smallcap 250 TRI": flat}
+    facts = _ensemble_facts(names)
+    base = choose.walk_forward_ensemble(curves, indices, flat, facts, echo=lambda *_: None)
+    cut = choose.fy_bounds(2023)[0] - pd.Timedelta(weeks=choose.EMBARGO_WEEKS)
+    scrambled = curves.copy()
+    late = scrambled.index > cut
+    scrambled.loc[late] = scrambled.loc[late].to_numpy() * rng.uniform(0.5, 1.5, (late.sum(), 8))
+    after = choose.walk_forward_ensemble(scrambled, indices, flat, facts, echo=lambda *_: None)
+    for fy in (2020, 2021, 2022, 2023):
+        assert after.at[fy, "picks"] == base.at[fy, "picks"]
+
+
+def test_too_few_picks_are_flagged_and_a_missing_year_fails():
+    rng = np.random.default_rng(6)
+    common = rng.normal(0, 0.02, len(WEEKS))
+    # Two near-identical configs: only one can be picked, so every year is "too few".
+    curves = pd.DataFrame(
+        {
+            "a": _curve(0.003, common),
+            "b": _curve(0.003, common + rng.normal(0, 0.0005, len(WEEKS))),
+        }
+    )
+    flat = pd.Series(1.0, index=WEEKS)
+    indices = {"Nifty Midcap 150 TRI": flat, "Nifty Smallcap 250 TRI": flat}
+    table = choose.walk_forward_ensemble(
+        curves, indices, flat, _ensemble_facts(["a", "b"]), echo=lambda *_: None
+    )
+    assert table["too_few"].all()
+    start, end = choose.fy_bounds(2027)
+    assert np.isnan(choose.ensemble_window_return(curves, ["a"], start, end))

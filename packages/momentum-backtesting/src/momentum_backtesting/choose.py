@@ -37,6 +37,7 @@ NEAR_BEST_PTS = 0.01  # clusters within 1 point of the best are broken toward 8-
 TIE_PTS = 0.005  # within half a point: higher Martin ratio, then the simpler config
 EMBARGO_WEEKS = 13
 RANK_PERCENTILE = 25
+MIN_PICKS = 3  # addendum 4: fewer than this is reported to the owner
 
 
 # --- windows ---------------------------------------------------------------------------------
@@ -475,7 +476,9 @@ def ensemble_window_return(curves: pd.DataFrame, picks: list[str], start, end) -
     """Equal capital in each pick at the window's start, no transfers inside it."""
     if not picks:
         return math.nan
-    return float(window_returns(curves[picks], start, end).mean())
+    returns = window_returns(curves[picks], start, end)
+    # A pick the window does not cover is a failed year, never silently dropped.
+    return float(returns.mean()) if returns.notna().all() else math.nan
 
 
 def ensemble_curve(curves: pd.DataFrame, picks: list[str]) -> pd.Series:
@@ -535,6 +538,7 @@ def walk_forward_ensemble(
             "selected_on": selected_on,
             "group": len(group),
             "picks": picks,
+            "too_few": len(picks) < MIN_PICKS,
             "ensemble_return": ensemble_window_return(curves, picks, start, end),
             "median_return": float(year.median()) if len(year) else math.nan,
             "bench_return": float(window_returns(bench, start, end)),
@@ -550,18 +554,22 @@ def walk_forward_ensemble(
 
 def rebalance_phases(picks: list[str], facts: pd.DataFrame) -> dict[str, int]:
     """Addendum 4: one rebalance phase per pick, spreading their rebalance Fridays over a
-    four-week cycle (fewest picks trading on the busiest Friday); never by performance. Picks
-    are placed in the given order; ties go to the earliest phase."""
+    four-week cycle; never by performance. Each pick, in the given order, takes the phase that
+    keeps the busiest Friday least busy, then the load most even, then the earliest phase.
+
+    A phase is the engine's `rebalance_offset`: the pick trades on Fridays whose week number
+    since `engine.CADENCE_EPOCH` is the phase mod its `rebalance_every`. Calendar-anchored, so
+    a 4-weekly phase 0 or 2 shares its Fridays with a 2-weekly phase 0."""
     load = [0, 0, 0, 0]
     out = {}
     for cid in picks:
         every = int(facts.at[cid, "every"])
-        best, best_load = 0, None
+        best, best_key = 0, None
         for offset in range(every):
-            weeks = range(offset, 4, every)
-            peak = max(load[w] + 1 for w in weeks)
-            if best_load is None or peak < best_load:
-                best, best_load = offset, peak
+            trial = [n + (1 if w % every == offset else 0) for w, n in enumerate(load)]
+            key = (max(trial), sum(n * n for n in trial))
+            if best_key is None or key < best_key:
+                best, best_key = offset, key
         for w in range(best, 4, every):
             load[w] += 1
         out[cid] = best
