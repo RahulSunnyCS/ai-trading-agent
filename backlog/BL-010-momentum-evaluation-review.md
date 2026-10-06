@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0, 1a, 2, 4, 5 done; Phase 3 measured, arm A's headline killed; Phase 5 names no config — owner decision pending) |
+| **Status** | In progress (Phases 0, 1a, 2, 4, 5 done; Phase 3 measured; Phase 6 step 0 done — a four-config ensemble frozen; Phase 6 parity, backcast and paper tracking next) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -357,16 +357,18 @@ Also parked here (owner, 2026-10-06), priority P3:
    classification (every company by what it does, losers included), applied to every year;
    live, any category may be added and is tracked from the day it is added. Not needed for
    Phase 5; parked in Phase 7. Still the owner's decision.
-4. **Pending — Phase 5 named no config (2026-10-06).** The committed choice rule failed its
-   walk-forward in all three baskets: its picks earned 18.6% / 28.5% / 28.5% a year
-   (FY2020–FY2026, pre-tax) against 31–32% for the basket's median config and 15% for Nifty200
-   Momentum 30 TRI. What to follow in Phase 6 is the owner's call. Claude's recommendation: a
-   simple, typical config with 8–12 holdings, rebalanced every 2 or 4 weeks, inside the basket
-   the owner wants — or the same capital split across three or four such configs — paper-
-   tracked against a Nifty200 Momentum 30 index fund. Whichever is chosen is written into a
-   criteria addendum before Phase 6 runs. A proposal, not a decision.
+4. **Answered 2026-10-06** (Phase 5 named no config; Phase 6 follows an ensemble of 3–4
+   typical configs) — see "Answered" below.
 
 ### Answered
+
+- **What Phase 6 follows (owner, 2026-10-06):** money split equally across 3–4 configs, each
+  holding 8–12 stocks and rebalancing every 2 or 4 weeks, from the Medium basket; picked as
+  the most typical configs that differ from each other (weekly-return correlation below 0.9),
+  after skipping those whose third-worst year is below the group's median. Equal capital,
+  reset each April. The picking rule must first pass its own walk-forward (within 2 points of
+  the group's median config and 5 points above Mom30 TRI, pre-tax). Committed as
+  `search_spaces/bl010_criteria_addendum_4.json` before the pick was computed.
 
 - **Phase 5 (owner, 2026-10-06):** choose for all three baskets; rank by each config's
   third-worst financial year against Mom30 TRI (25th percentile of FY2018–FY2026 excess);
@@ -496,3 +498,9 @@ Also parked here (owner, 2026-10-06), priority P3:
   baskets; 8–12 holdings matches 2–6 on return with far shallower falls. **No config named**;
   open question 4 asks the owner what to follow. Midcap 150, Smallcap 250 and two momentum
   TRIs loaded (PR #39).
+- 2026-10-06 — Phase 6 step 0 done. The owner's ensemble rule (criteria addendum 4) passes
+  its walk-forward: 36.7% a year against 32.6% for the group's median config and 15.0% for
+  Mom30 TRI (FY2020–FY2026, pre-tax). Fable-checked. Frozen in
+  `search_spaces/bl010_phase6_frozen.json`: `1281e8ed6824`, `08c4307d7aa9`, `535b17b44ba5`
+  (every 4 weeks) and `bad83df3821a` (every 2 weeks), equal capital reset each April; full
+  history 32.3% a year, max drawdown −31.5%.
