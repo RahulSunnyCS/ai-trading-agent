@@ -233,3 +233,36 @@ def test_underwater_stats_measure_depth_duration_and_recovery():
     assert flat_up["max_underwater_weeks"] == 0 and flat_up["ulcer"] == 0
     never = metrics.underwater_stats(pd.Series([1.0, 1.2, 0.8, 0.85, 0.9]))
     assert never["recovered"] == 0.0 and never["recovery_weeks"] == 2
+
+
+def test_a_run_id_changes_with_the_data_and_old_ids_stay_put():
+    from momentum_backtesting import search as sr
+
+    args = ("A", {"score": "voladj"}, {"pool_top_n": 100}, {"start": "2017-01-01"})
+    old = sr.run_id(*args)
+    assert sr.run_id(*args, None) == old  # searches written before snapshots keep their ids
+    one = sr.run_id(*args, {"last_bar": "2026-10-01", "last_week": "2026-10-02", "factors": "a"})
+    two = sr.run_id(*args, {"last_bar": "2026-10-08", "last_week": "2026-10-09", "factors": "a"})
+    assert len({old, one, two}) == 3
+
+
+def test_data_snapshot_reads_the_catalog(tmp_path, monkeypatch):
+    import pandas as pd
+    from trading_data.db import connect
+
+    from momentum_backtesting import search as sr
+
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    assert sr.data_snapshot(tmp_path) is None
+    with connect(tmp_path) as con:
+        con.execute(
+            "INSERT INTO momentum_prices VALUES ('Nifty 50', 'weekly', DATE '2026-10-02', NULL, 1)"
+        )
+    bars = pd.DataFrame(
+        {"instrument_id": [1], "date": [pd.Timestamp("2026-10-01")], "close": [1.0]}
+    )
+    path = tmp_path / "lake" / "bars_1d" / "asset=stock" / "year=2026" / "data.parquet"
+    path.parent.mkdir(parents=True)
+    bars.to_parquet(path, index=False)
+    snap = sr.data_snapshot(tmp_path)
+    assert snap["last_bar"] == "2026-10-01" and snap["last_week"] == "2026-10-02"
