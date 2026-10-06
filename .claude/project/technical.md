@@ -75,6 +75,10 @@ bun run --filter '*' typecheck     # packages only — NOT the root app
 deploy/launchd/install.sh    # (re)install every job in deploy/launchd/jobs/
 deploy/launchd/uninstall.sh
 
+# Git hooks (lefthook, installed by `bun install`). pre-push runs Biome on the changed files,
+# Ruff, and the unit tests of each package the branch changes (BL-014); pytest stays in CI
+node_modules/.bin/lefthook run pre-push   # run the pre-push checks without pushing
+
 # Tests
 bun run test                # unit tests in every workspace package
 bun run test:unit           # server unit tests only
@@ -392,6 +396,12 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`
 - **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `apps/server/src/types/fyers-api-v3.d.ts` covers the SDK surface we use
 - **No default exports:** Use named exports throughout
+- **Merges into `main` go through green CI (BL-014).** Branch protection requires the four
+  CI jobs that run on every PR. In Claude Code, `.claude/hooks/merge-guard.sh` (a `PreToolUse`
+  hook on Bash) refuses `gh pr merge` while any check is failing or pending, `--admin`, a PR over
+  500 changed lines (data, fixtures and lockfiles excluded) without the `reviewed` label, and a
+  push to `main` that changes anything but `*.md` outside `packages/*/src/`. Add `reviewed` only
+  after `/code-review` has run and its result is on the PR
 - **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
   the chart palette helpers (`lib/chartTheme.ts`) and the font setup (`next/font`, IBM Plex
   Sans / Mono) are in `docs/dashboard-design-tokens.md`

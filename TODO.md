@@ -265,6 +265,7 @@ enable live execution until this shows one.**
 | 3.5.5 | Fail CI on undeclared dependencies | claude | Four latent bugs surfaced during the merge; nothing stops a fifth. Roadmap Ideas #5. |
 | 3.5.6 | Guard against documentation drift | claude | Roadmap Ideas #9. |
 | 3.5.7 | Run E2E against a real backend | claude | Roadmap Ideas #7. |
+| 3.5.8 | CI and merge gates — [BL-014](backlog/BL-014-ci-and-merge-gates.md) | owner→claude | **In progress 2026-10-06.** Done: the Claude merge guard (`.claude/hooks/merge-guard.sh`) refuses `gh pr merge` while a check is failing or pending, `--admin`, PRs over 500 changed lines without the `reviewed` label, and a Claude push to `main` that is not docs-only; `lefthook.yml` pre-push runs Biome, Ruff and the unit tests for the packages a branch changes; CI's `pull_request` trigger runs on every PR so required checks always report. **Owner:** turn on branch protection for `main` and create the `reviewed` label (commands in BL-014 Phase 1). |
 
 ### 3.6 Nifty 50 stock momentum data layer — thorough review owed
 

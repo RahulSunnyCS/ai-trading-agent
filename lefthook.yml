@@ -57,7 +57,50 @@ pre-commit:
 # must be rejected at code review.
 
 pre-push:
+  # BL-014: the CI checks that take seconds, run only for the packages this branch changes
+  # (`git diff origin/main...HEAD`). pytest stays in CI — the full Python suites take minutes,
+  # and the real-data tests there depend on what is in ~/TradingData.
+  parallel: true
   commands:
+    biome:
+      # The files this branch changes, not `.` — the working tree can hold untracked files
+      # (Playwright's test-results/) that CI never sees.
+      run: |
+        files=$(git diff --name-only --diff-filter=d origin/main...HEAD | grep -E '\.(ts|tsx|js|jsx|json|jsonc|css)$')
+        [ -z "$files" ] && exit 0
+        biome=./tools/biome; [ -x "$biome" ] || biome=node_modules/.bin/biome
+        echo "$files" | xargs "$biome" check --no-errors-on-unmatched
+
+    ruff:
+      run: |
+        changed=$(git diff --name-only origin/main...HEAD)
+        if echo "$changed" | grep -q '^packages/option-backtesting/'; then
+          (cd packages/option-backtesting && uv run ruff check .) || exit 1
+        fi
+        if echo "$changed" | grep -q '^packages/momentum-backtesting/'; then
+          (cd packages/momentum-backtesting && uv run ruff check . && uv run ruff format --check .) || exit 1
+        fi
+
+    server-unit:
+      run: |
+        if git diff --name-only origin/main...HEAD | grep -qE '^(apps/server|packages/(market-reference|broker-identity|notify))/|^(bun\.lock|tsconfig\.base\.json)$'; then
+          bun run test:unit
+        fi
+
+    shared-packages:
+      run: |
+        for pkg in market-reference broker-identity; do
+          if git diff --name-only origin/main...HEAD | grep -q "^packages/$pkg/"; then
+            (cd "packages/$pkg" && bun run test) || exit 1
+          fi
+        done
+
+    dashboard-unit:
+      run: |
+        if git diff --name-only origin/main...HEAD | grep -q '^apps/dashboard/'; then
+          bun run --filter @ata/dashboard test
+        fi
+
     momentum-goldens:
       # BL-001: a change that moves any frozen momentum backtest result may not be pushed
       # without accepting it (packages/momentum-backtesting/scripts/update-goldens.py).
