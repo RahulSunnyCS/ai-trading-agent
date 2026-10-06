@@ -15,9 +15,7 @@ from collections.abc import Callable
 
 
 class RunParts:
-    def __init__(
-        self, core: dict, lazy: dict[str, Callable[[], object]], computed_at: str
-    ) -> None:
+    def __init__(self, core: dict, lazy: dict[str, Callable[[], object]], computed_at: str) -> None:
         self.core = core
         self.computed_at = computed_at
         self.names: tuple[str, ...] = tuple(lazy)
