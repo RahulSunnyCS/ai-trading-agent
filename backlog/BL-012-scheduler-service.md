@@ -284,3 +284,5 @@ PR 5 the single launchd cut-over · then one PR per later job, check group and d
 - 2026-10-06 — PR 8: monthly `backup` job (1st Sunday 10:00, catch-up all week): SSD, else
   `~/Downloads` with a warning. First backup taken through it: 188 files, 280 MB.
 - 2026-10-07 — Phase 0: Nifty 50 Sep-2026 review applied (BSE in, Wipro out, effective 2026-09-30; confirmed against the live niftyindices list). BSE's 15 corporate-action rows reviewed and accepted, baseline advanced, three stock goldens re-accepted (BSE appears in the companies list; no number moved).
+- 2026-10-07 — Phase 3b: `weekly-digest` (Saturday 09:00 IST): CI on main, each job's runs over the last 7 days, last options day in the lake, last backup; green items collapse to one line. Journal-vs-backtest (BL-024) and live-money rules (BL-025) join when those ship.
+
