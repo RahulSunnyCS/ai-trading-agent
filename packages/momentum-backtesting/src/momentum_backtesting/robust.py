@@ -21,6 +21,11 @@ is nudged and no table needs updating when a space changes (BL-010 F13):
 A nudge the arm cannot run (`search.feasible`) is skipped. The kind of a nudge is the name of
 the dimension it moved.
 
+Since 2026-10-06 (BL-010) these replaced hand-written tables for Round 2's space (two steps of
+coverage_floor, pool x0.75/x1.25, two swapped dimensions). `verdicts` keeps the thresholds set
+for those tables, so a verdict from before that date is not comparable with one after it:
+re-run the nudges rather than compare.
+
 Results append to `<out>/robust-<pid>.jsonl`. `report` turns them into one verdict per candidate.
 """
 
@@ -104,8 +109,9 @@ def _current(dim_name: str, heavy: dict, light: dict, fixed: dict) -> Any:
     """A dimension's value in a stored run (bands are stored as the exit rank they set)."""
     if dim_name in BANDS:
         top, exit_ = BANDS[dim_name]
-        if top in light and exit_ in light:
-            return light[exit_] - light[top]
+        both = {**fixed, **light}
+        if top in both and exit_ in both:
+            return both[exit_] - both[top]
         return _ABSENT
     for source in (light, heavy, fixed):
         if dim_name in source:
@@ -150,14 +156,14 @@ def nudges(rec: dict[str, Any], space: search.Space) -> list[dict[str, Any]]:
         value = _current(dim.name, heavy, light, fixed)
         if value is _ABSENT:
             continue
+        both = {**fixed, **light}
         for new in _neighbours(dim, value):
             if dim.name in BANDS:
                 top, exit_ = BANDS[dim.name]
-                edit = {exit_: light[top] + new}
-            elif dim.name in TOPS:
-                band_name, exit_ = TOPS[dim.name]
-                band = light.get(exit_, new) - light[dim.name]
-                edit = {dim.name: new, exit_: new + band}
+                edit = {exit_: both[top] + new}
+            elif dim.name in TOPS and TOPS[dim.name][1] in both:
+                _band_name, exit_ = TOPS[dim.name]
+                edit = {dim.name: new, exit_: new + both[exit_] - value}
             elif dim.name == "rebalance_every":
                 edit = {dim.name: new, "rebalance_offset": light.get("rebalance_offset", 0) % new}
             else:

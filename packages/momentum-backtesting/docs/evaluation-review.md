@@ -456,8 +456,13 @@ version and has not been run (another ~6 hours).
 - **Step 4:** `criteria.py` reads `bl010_criteria.json` and its addenda; the drawdown baskets
   are code (`basket_passes`: each fall within the fixed limit, or within the index's own fall
   over the same window, never past the 40% ceiling). A search run's id now includes a data
-  snapshot (last bar, last weekly close, a digest of the confirmed split factors), so a
-  search resumed on new data re-runs instead of mixing histories.
+  snapshot (last bar, last weekly close, a digest of the confirmed split factors, all capped
+  at the space's fixed end date), and a results folder records the snapshot it was started
+  on: resuming it on different data stops with a message instead of adding a second copy of
+  every config. The drawdown baskets need Nifty Midcap 150 TRI and Nifty Smallcap 250 TRI,
+  which `reference_benchmarks` does not load yet: a Phase 5 prerequisite.
+- An addendum may change an existing threshold only if it says what it `supersedes`;
+  otherwise loading the criteria raises.
 - **Step 5:** `robust.nudges` reads the neighbours of every searched dimension from the space
   file. Round 7's winners are now nudged on entry, stock tilt, weight scheme and the bands,
   which the Round 2 tables never covered; arms B and C2 no longer raise a KeyError.

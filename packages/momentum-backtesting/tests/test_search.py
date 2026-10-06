@@ -266,3 +266,37 @@ def test_data_snapshot_reads_the_catalog(tmp_path, monkeypatch):
     bars.to_parquet(path, index=False)
     snap = sr.data_snapshot(tmp_path)
     assert snap["last_bar"] == "2026-10-01" and snap["last_week"] == "2026-10-02"
+
+
+def test_a_results_folder_holds_one_history(tmp_path):
+    from momentum_backtesting import search as sr
+
+    first = {"last_bar": "2026-10-01", "last_week": "2026-10-02", "factors": "a"}
+    sr._check_same_data(tmp_path, first)
+    sr._check_same_data(tmp_path, first)  # resuming on the same data is fine
+    with pytest.raises(SystemExit, match="new results folder"):
+        sr._check_same_data(tmp_path, {**first, "last_bar": "2026-10-08"})
+
+
+def test_an_end_dated_snapshot_ignores_data_after_the_end(tmp_path, monkeypatch):
+    import pandas as pd
+    from trading_data.db import connect
+
+    from momentum_backtesting import search as sr
+
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(tmp_path))
+    with connect(tmp_path) as con:
+        for day in ("2022-12-30", "2026-10-02"):
+            con.execute(
+                "INSERT INTO momentum_prices "
+                "VALUES ('Nifty 50', 'weekly', CAST(? AS DATE), NULL, 1)",
+                [day],
+            )
+    days = pd.to_datetime(["2022-12-29", "2026-10-01"])
+    bars = pd.DataFrame({"instrument_id": [1, 1], "date": days, "close": [1.0, 2.0]})
+    for day, part in bars.groupby(bars.date.dt.year):
+        path = tmp_path / "lake" / "bars_1d" / "asset=stock" / f"year={day}" / "data.parquet"
+        path.parent.mkdir(parents=True)
+        part.to_parquet(path, index=False)
+    capped = sr.data_snapshot(tmp_path, through="2022-12-31")
+    assert capped["last_bar"] == "2022-12-29" and capped["last_week"] == "2022-12-30"

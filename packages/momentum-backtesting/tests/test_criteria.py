@@ -55,3 +55,30 @@ def test_selection_and_validation_windows_may_not_meet():
         criteria.check_windows([("2017-01-01", "2020-12-31")], [("2021-01-29", "2023-12-31")])
     with pytest.raises(ValueError, match="hold-out"):
         criteria.check_windows([("2015-01-01", "2020-12-31")], [("2022-01-01", "2023-12-31")])
+
+
+def test_an_addendum_changes_a_rule_only_when_it_says_it_supersedes(tmp_path, monkeypatch):
+    import json
+
+    base = {"phase_4_method": {"pbo": {"kill_above": 0.3}}}
+    (tmp_path / "bl010_criteria.json").write_text(json.dumps(base))
+    change = {"name": "x", "phase_4_method": {"pbo": {"kill_above": 0.25}}}
+    (tmp_path / "bl010_criteria_addendum_1.json").write_text(json.dumps(change))
+    monkeypatch.setattr(criteria, "SPACES", tmp_path)
+    criteria.load.cache_clear()
+    try:
+        with pytest.raises(ValueError, match="supersedes"):
+            criteria.load()
+        change["supersedes"] = "kill_above 0.3: too loose, see BL-010 log 2026-10-07"
+        (tmp_path / "bl010_criteria_addendum_1.json").write_text(json.dumps(change))
+        criteria.load.cache_clear()
+        assert criteria.load()["phase_4_method"]["pbo"]["kill_above"] == 0.25
+    finally:
+        criteria.load.cache_clear()
+
+
+def test_a_basket_without_its_index_says_which_is_missing():
+    with pytest.raises(KeyError, match="Nifty Midcap 150 TRI"):
+        criteria.basket_passes(
+            _curve([100, 90, 95]), {"Nifty 50 TRI": _curve([1, 1, 1])}, "conservative"
+        )

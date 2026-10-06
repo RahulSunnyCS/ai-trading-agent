@@ -270,9 +270,11 @@ def run_id(arm: str, heavy: dict, light: dict, fixed: dict, snapshot: dict | Non
     return hashlib.sha1(blob.encode()).hexdigest()[:12]
 
 
-def data_snapshot(root: Path | None = None) -> dict[str, Any] | None:
+def data_snapshot(root: Path | None = None, through: str | None = None) -> dict[str, Any] | None:
     """What the data looked like: the last daily stock bar and weekly close, and a digest of
-    the confirmed split and bonus factors. None when there is no catalog."""
+    the confirmed split and bonus factors. With `through` (a run's fixed end date) only data up
+    to that date counts, so a new week beyond an end-dated run does not change its snapshot.
+    None when there is no catalog."""
     from trading_data.db import connect, data_root
 
     from . import db_read
@@ -280,13 +282,20 @@ def data_snapshot(root: Path | None = None) -> dict[str, Any] | None:
     if db_read.catalog_mtime(root) is None:
         return None
     with connect(root or data_root(), read_only=True) as con:
-        last_bar = con.execute("SELECT CAST(max(date) AS DATE) FROM bars_1d_stock").fetchone()[0]
+        cap = through or "9999-12-31"
+        last_bar = con.execute(
+            "SELECT CAST(max(date) AS DATE) FROM bars_1d_stock WHERE date <= CAST(? AS DATE)",
+            [cap],
+        ).fetchone()[0]
         last_week = con.execute(
-            "SELECT max(date) FROM momentum_prices WHERE kind = 'weekly'"
+            "SELECT max(date) FROM momentum_prices WHERE kind = 'weekly' "
+            "AND date <= CAST(? AS DATE)",
+            [cap],
         ).fetchone()[0]
         factors = con.execute(
             "SELECT symbol, ex_date, confirmed_factor FROM stock_action_candidates "
-            "WHERE status = 'confirmed' ORDER BY symbol, ex_date"
+            "WHERE status = 'confirmed' AND ex_date <= CAST(? AS DATE) ORDER BY symbol, ex_date",
+            [cap],
         ).fetchall()
     digest = hashlib.sha1(json.dumps(factors, default=str).encode()).hexdigest()[:12]
     return {"last_bar": str(last_bar), "last_week": str(last_week), "factors": digest}
@@ -484,6 +493,26 @@ def completed_ids(out_dir: Path) -> set[str]:
     return ids
 
 
+SNAPSHOT_FILE = "data_snapshot.json"
+
+
+def _check_same_data(out_dir: Path, snapshot: dict | None) -> None:
+    """A results folder holds one history. The first run records its data snapshot; a resume
+    on different data stops here instead of adding a second copy of every config (their ids
+    differ, so `load_results` would keep both)."""
+    path = out_dir / SNAPSHOT_FILE
+    if not path.exists():
+        if snapshot is not None:
+            path.write_text(json.dumps(snapshot, indent=1) + "\n")
+        return
+    recorded = json.loads(path.read_text())
+    if snapshot is not None and recorded != snapshot:
+        raise SystemExit(
+            f"{out_dir} was searched on data {recorded}; the data is now {snapshot}. "
+            "Start a new results folder (--out) rather than mixing two histories in one."
+        )
+
+
 def run_search(
     space_path: Path,
     out_dir: Path,
@@ -498,7 +527,8 @@ def run_search(
     space = load_space(space_path)
     out_dir.mkdir(parents=True, exist_ok=True)
     seen = completed_ids(out_dir)
-    snapshot = data_snapshot()
+    snapshot = data_snapshot(through=space.fixed.get("end"))
+    _check_same_data(out_dir, snapshot)
     tasks = []
     for group in plan(space, heavy_count, light_count, seed, snapshot)[:limit_groups]:
         runs = [r for r in group["runs"] if r["id"] not in seen]

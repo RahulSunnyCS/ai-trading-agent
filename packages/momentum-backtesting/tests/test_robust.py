@@ -199,3 +199,27 @@ def test_verdict_flags_a_candidate_that_collapses_when_nudged():
     by = v.set_index("cid")
     assert bool(by.loc["steady", "survives"]) and not bool(by.loc["lucky", "survives"])
     assert by.loc["steady", "nudge_p25"] > by.loc["lucky", "nudge_p25"]
+
+
+def test_bands_and_tops_use_values_the_space_fixed():
+    space = search.Space(
+        name="f",
+        arm="A",
+        fixed={"category_top_n": 4, "pool_exit_rank": 300},
+        heavy=(),
+        light=(
+            search.Dim("category_band", "int", (0, 8)),
+            search.Dim("pool_top_n", "int", (30, 350)),
+        ),
+    )
+    rec = {
+        "id": "f",
+        "heavy": {},
+        "light": {"category_exit_rank": 7, "pool_top_n": 200, "picks_per_category": 1},
+    }
+    found = {}
+    for n in robust.nudges(rec, space):
+        found.setdefault(n["kind"], []).append(n["light"])
+    assert sorted(light["category_exit_rank"] for light in found["category_band"]) == [6, 8]
+    for light in found["pool_top_n"]:  # the fixed band of 100 is kept
+        assert light["pool_exit_rank"] - light["pool_top_n"] == 100

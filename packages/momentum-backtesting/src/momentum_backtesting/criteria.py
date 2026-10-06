@@ -22,16 +22,34 @@ SPACES = PACKAGE_ROOT / "search_spaces"
 def load() -> dict:
     """The original criteria with each addendum merged in, in file order."""
     merged = json.loads((SPACES / "bl010_criteria.json").read_text())
-    for path in sorted(SPACES.glob("bl010_criteria_addendum_*.json")):
-        _merge(merged, json.loads(path.read_text()))
+    for path in sorted(SPACES.glob("bl010_criteria_addendum_*.json"), key=_number):
+        extra = json.loads(path.read_text())
+        _merge(merged, extra, supersedes=bool(extra.get("supersedes")))
     return merged
 
 
-def _merge(into: dict, extra: dict) -> None:
+def _number(path) -> int:
+    return int(path.stem.rsplit("_", 1)[1])
+
+
+#: Keys every criteria file has that describe the file, not a rule.
+_ABOUT = {"written_before_running", "name", "rule", "reason", "adds_to", "revised", "supersedes"}
+
+
+def _merge(into: dict, extra: dict, supersedes: bool, where: str = "") -> None:
+    """Add `extra`'s rules to `into`. Changing an existing value needs an addendum that says
+    `"supersedes": ...` with its reason; otherwise it is a mistake and raises."""
     for key, value in extra.items():
+        if not where and key in _ABOUT:
+            continue
         if isinstance(value, dict) and isinstance(into.get(key), dict):
-            _merge(into[key], value)
-        elif key not in into:
+            _merge(into[key], value, supersedes, f"{where}{key}.")
+        elif key in into and into[key] != value and not supersedes:
+            raise ValueError(
+                f"criteria addendum changes {where}{key} ({into[key]!r} -> {value!r}) without "
+                "a 'supersedes' entry naming what it replaces and why"
+            )
+        else:
             into[key] = value
 
 
@@ -78,6 +96,11 @@ def basket_passes(curve: pd.Series, indices: dict[str, pd.Series], basket: str) 
     `indices` maps index name (as the criteria file spells it) to its curve."""
     spec = load()["baskets"][basket]
     relative = spec["or_relative"]
+    if relative["index"] not in indices:
+        raise KeyError(
+            f"the {basket} basket is judged against {relative['index']}, which was not given "
+            f"(have: {sorted(indices)}). reference_benchmarks does not load it yet."
+        )
     for episode in episodes(curve, indices[relative["index"]]):
         if episode.depth < spec["hard_ceiling"]:
             return False
