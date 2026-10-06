@@ -8,6 +8,7 @@ Layout out: OUT/<section>/<unit>/<expiry-folder>.parquet
 A batch's CSVs are deleted only after: (1) remote file list == local file list (names+sizes),
 (2) parquet row count == independent CSV line count, (3) parquet read-back is clean.
 """
+
 import argparse
 import json
 import os
@@ -22,8 +23,8 @@ import duckdb
 
 # Where things are. The defaults are what ran; override for another disk or another share.
 ROOT = os.environ.get("BL034_ROOT", "/Volumes/RAHUL'S SSD/Stock Market Data")
-STAGE = f"{ROOT}/options"                      # CSVs are staged here one expiry folder at a time
-OUT = f"{ROOT}/parquet/options"                # the Parquet staging set + _done.jsonl + caches
+STAGE = f"{ROOT}/options"  # CSVs are staged here one expiry folder at a time
+OUT = f"{ROOT}/parquet/options"  # the Parquet staging set + _done.jsonl + caches
 DRIVE_ROOT = os.environ.get("BL034_DRIVE_ROOT", "1TR3HCVvV35q63fZ5DA4SE-cKkrZArJ2N")
 MIN_FREE_GB = 8
 JUNK = ("._", ".DS_Store")
@@ -36,8 +37,20 @@ def log(msg):
     print(time.strftime("%H:%M:%S"), msg, flush=True)
 
 
-TRANSIENT = ("ratelimit", "quota exceeded", "error 429", "error 500", "error 502", "error 503",
-             "error 504", "timeout", "timed out", "connection reset", "temporary", "eof")
+TRANSIENT = (
+    "ratelimit",
+    "quota exceeded",
+    "error 429",
+    "error 500",
+    "error 502",
+    "error 503",
+    "error 504",
+    "timeout",
+    "timed out",
+    "connection reset",
+    "temporary",
+    "eof",
+)
 
 
 def rc(args, retries=6, filt=True):
@@ -108,9 +121,17 @@ def convert(files, base, out_path):
         with open(p, "rb") as f:
             head = f.read(4096)
         if head.strip(b"\x00") == b"":
-            corrupt.append(rel)      # all-NUL file: corrupt at source (seen identical in Drive and the zip)
+            corrupt.append(
+                rel
+            )  # all-NUL file: corrupt at source (seen identical in Drive and the zip)
             continue
-        hdr = head.decode("utf-8-sig", errors="replace").split("\n", 1)[0].strip().lower().replace(" ", "")
+        hdr = (
+            head.decode("utf-8-sig", errors="replace")
+            .split("\n", 1)[0]
+            .strip()
+            .lower()
+            .replace(" ", "")
+        )
         groups.setdefault(hdr, []).append(p)
     if not groups:
         raise RuntimeError("no non-empty CSVs")
@@ -157,7 +178,8 @@ def convert(files, base, out_path):
     con.execute(f"COPY batch TO '{t}' (FORMAT parquet, COMPRESSION zstd, COMPRESSION_LEVEL 6)")
     rows, null_ts, unparsed = con.execute(
         f"SELECT count(*), count(*) FILTER (WHERE ts IS NULL), "
-        f"count(*) FILTER (WHERE underlying = '' OR expiry IS NULL) FROM read_parquet('{t}')").fetchone()
+        f"count(*) FILTER (WHERE underlying = '' OR expiry IS NULL) FROM read_parquet('{t}')"
+    ).fetchone()
     if null_ts:
         raise RuntimeError(f"{null_ts} rows with NULL ts")
     return rows, unparsed, tmp, corrupt
@@ -169,26 +191,43 @@ ZIPIDX = {}
 
 def build_zip_index():
     import zipfile
+
     d = {}
     with zipfile.ZipFile(ZIP_PATH) as z:
         for i in z.infolist():
             n = i.filename
             p = n.split("/")
-            if n.endswith("/") or "__MACOSX" in n or p[-1].startswith("._") or len(p) != 3 or not n.lower().endswith(".csv"):
+            if (
+                n.endswith("/")
+                or "__MACOSX" in n
+                or p[-1].startswith("._")
+                or len(p) != 3
+                or not n.lower().endswith(".csv")
+            ):
                 continue
             d.setdefault((p[0], p[1]), {})[p[2]] = n
     return d
 
 
 def remote_files_h(path):
-    args = ["lsf", f"gdrive:{path}", "--files-only", "-R", "--format", "psh", "--hash", "MD5", "--separator", ";"]
+    args = [
+        "lsf",
+        f"gdrive:{path}",
+        "--files-only",
+        "-R",
+        "--format",
+        "psh",
+        "--hash",
+        "MD5",
+        "--separator",
+        ";",
+    ]
     d = {}
     for line in rc(args).splitlines():
         if line.strip():
             name, size, h = line.rsplit(";", 2)
             d[name] = (int(size), h)
     return d
-
 
 
 _unit_locks = {}
@@ -209,8 +248,20 @@ def unit_listing(section, unit):
         if os.path.exists(cf):
             _unit_cache[k] = json.load(open(cf))
             return _unit_cache[k]
-        out = rc(["lsf", f"gdrive:{section}/{unit}", "--files-only", "-R", "--format", "psh",
-                  "--hash", "MD5", "--separator", ";"])
+        out = rc(
+            [
+                "lsf",
+                f"gdrive:{section}/{unit}",
+                "--files-only",
+                "-R",
+                "--format",
+                "psh",
+                "--hash",
+                "MD5",
+                "--separator",
+                ";",
+            ]
+        )
         d = {}
         for line in out.splitlines():
             if not line.strip():
@@ -228,14 +279,30 @@ def unit_listing(section, unit):
 def stage_from_drive(rpath, base):
     remote = remote_files(rpath)
     os.makedirs(base, exist_ok=True)
-    rc(["copy", f"gdrive:{rpath}", base, "--transfers", "8", "--checkers", "8",
-        "--retries", "5", "--low-level-retries", "20"], retries=3)
+    rc(
+        [
+            "copy",
+            f"gdrive:{rpath}",
+            base,
+            "--transfers",
+            "8",
+            "--checkers",
+            "8",
+            "--retries",
+            "5",
+            "--low-level-retries",
+            "20",
+        ],
+        retries=3,
+    )
     local = local_files(base)
     if local != remote:
         miss = set(remote) - set(local)
         extra = set(local) - set(remote)
-        raise RuntimeError(f"file mismatch: missing {len(miss)} extra {len(extra)} "
-                           f"size-diff {sum(1 for k in set(local)&set(remote) if local[k]!=remote[k])}")
+        raise RuntimeError(
+            f"file mismatch: missing {len(miss)} extra {len(extra)} "
+            f"size-diff {sum(1 for k in set(local) & set(remote) if local[k] != remote[k])}"
+        )
     return dict(source="drive")
 
 
@@ -244,9 +311,10 @@ def stage_from_zip(unit, folder, rpath, base):
     the Drive files whose MD5 differs from the zip's (or that the zip lacks)."""
     import hashlib
     import zipfile
-    remote = {n: tuple(v) for n, v in unit_listing('stocks', unit).get(folder, {}).items()}
+
+    remote = {n: tuple(v) for n, v in unit_listing("stocks", unit).get(folder, {}).items()}
     if not remote:
-        raise RuntimeError('empty Drive listing for folder (unit listing incomplete?)')
+        raise RuntimeError("empty Drive listing for folder (unit listing incomplete?)")
     zmap = ZIPIDX[(unit, folder)]
     dl_dir = f"{STAGE}/_dl/{unit}__{folder}"
     subprocess.run(["rm", "-rf", dl_dir, base], capture_output=True)
@@ -256,37 +324,75 @@ def stage_from_zip(unit, folder, rpath, base):
     with zipfile.ZipFile(ZIP_PATH) as z:
         for name, zn in zmap.items():
             raw = z.read(zn)
-            zb[name] = raw.rstrip(b"\x00") if raw.rstrip(b"\x00") else raw   # zip pads some files with NULs to a 256 KiB block
+            zb[name] = (
+                raw.rstrip(b"\x00") if raw.rstrip(b"\x00") else raw
+            )  # zip pads some files with NULs to a 256 KiB block
             if len(zb[name]) != len(raw):
                 notes_pad.append(name)
-    need = [n for n, (sz, h) in remote.items() if n not in zb or hashlib.md5(zb[n]).hexdigest() != h]
+    need = [
+        n for n, (sz, h) in remote.items() if n not in zb or hashlib.md5(zb[n]).hexdigest() != h
+    ]
     drv = {}
     if need:
         os.makedirs(dl_dir, exist_ok=True)
         lst = f"{dl_dir}/_list.txt"
         with open(lst, "w") as f:
             f.write("\n".join(need) + "\n")
-        rc(["copy", f"gdrive:{rpath}", dl_dir, "--files-from", lst, "--no-traverse", "--transfers", "8",
-            "--retries", "5", "--low-level-retries", "20"], retries=3, filt=False)
+        rc(
+            [
+                "copy",
+                f"gdrive:{rpath}",
+                dl_dir,
+                "--files-from",
+                lst,
+                "--no-traverse",
+                "--transfers",
+                "8",
+                "--retries",
+                "5",
+                "--low-level-retries",
+                "20",
+            ],
+            retries=3,
+            filt=False,
+        )
         for n in need:
             data = open(os.path.join(dl_dir, n), "rb").read()
             if hashlib.md5(data).hexdigest() != remote[n][1]:
                 raise RuntimeError(f"md5 mismatch after download: {n}")
             drv[n] = data.rstrip(b"\x00") or data
-    notes = dict(source="zip+drive", zip_nul_padded=len(notes_pad), from_zip=0, from_drive=0, zip_longer=0, drive_longer=0, tie_differ=0, zip_only=0)
+    notes = dict(
+        source="zip+drive",
+        zip_nul_padded=len(notes_pad),
+        from_zip=0,
+        from_drive=0,
+        zip_longer=0,
+        drive_longer=0,
+        tie_differ=0,
+        zip_only=0,
+    )
     for name in set(zb) | set(remote):
         zd, dd = zb.get(name), drv.get(name)
-        if name in remote and dd is None:        # identical to zip (md5 equal) -> use zip bytes
-            pick = zd; notes["from_zip"] += 1
+        if name in remote and dd is None:  # identical to zip (md5 equal) -> use zip bytes
+            pick = zd
+            notes["from_zip"] += 1
         elif zd is not None and dd is not None:
             rz, rd = count_rows_bytes(zd), count_rows_bytes(dd)
-            if rz > rd: pick = zd; notes["zip_longer"] += 1
-            elif rd > rz: pick = dd; notes["drive_longer"] += 1
-            else: pick = dd; notes["tie_differ"] += 1
+            if rz > rd:
+                pick = zd
+                notes["zip_longer"] += 1
+            elif rd > rz:
+                pick = dd
+                notes["drive_longer"] += 1
+            else:
+                pick = dd
+                notes["tie_differ"] += 1
         elif dd is not None:
-            pick = dd; notes["from_drive"] += 1
+            pick = dd
+            notes["from_drive"] += 1
         else:
-            pick = zd; notes["zip_only"] += 1
+            pick = zd
+            notes["zip_only"] += 1
         with open(os.path.join(base, name), "wb") as f:
             f.write(pick)
     subprocess.run(["rm", "-rf", dl_dir], capture_output=True)
@@ -329,8 +435,13 @@ def process(task, done, deadline, errfile):
         dups = []
         for k in [k for k in csvs if not name_ok.match(os.path.basename(k))]:
             orig = re.sub(r"\s*(-\s*Copy|\(\d+\))(\s*\(\d+\))?\.csv$", ".csv", k, flags=re.I)
-            if orig != k and orig in local and open(os.path.join(base, k), "rb").read() == open(os.path.join(base, orig), "rb").read():
-                dups.append(k)   # byte-identical copy of another file in the same folder
+            if (
+                orig != k
+                and orig in local
+                and open(os.path.join(base, k), "rb").read()
+                == open(os.path.join(base, orig), "rb").read()
+            ):
+                dups.append(k)  # byte-identical copy of another file in the same folder
             else:
                 raise RuntimeError(f"unrecognised/non-identical file name: {k}")
         csvs = [k for k in csvs if k not in dups]
@@ -349,20 +460,36 @@ def process(task, done, deadline, errfile):
             time.sleep(1)
         else:
             log(f"WARN could not fully remove {base}")
-        rec = dict(key=key, files=len(csvs), identical_copies_skipped=len(dups), owner_skipped=skipped, corrupt_skipped=corrupt, rows=rows, csv_bytes=csv_bytes,
-                   parquet_bytes=size, unparsed_contract_rows=unparsed, t=int(time.time()), **notes)
+        rec = dict(
+            key=key,
+            files=len(csvs),
+            identical_copies_skipped=len(dups),
+            owner_skipped=skipped,
+            corrupt_skipped=corrupt,
+            rows=rows,
+            csv_bytes=csv_bytes,
+            parquet_bytes=size,
+            unparsed_contract_rows=unparsed,
+            t=int(time.time()),
+            **notes,
+        )
         with lock:
             with open(f"{OUT}/_done.jsonl", "a") as f:
                 f.write(json.dumps(rec) + "\n")
             done.add(key)
         extra = ""
         if notes.get("source") == "zip+drive":
-            extra = (f" [zip {notes['from_zip']}, drive-dl {notes['from_drive']}, zip-longer {notes['zip_longer']}, "
-                     f"drive-longer {notes['drive_longer']}, zip-only {notes['zip_only']}]")
+            extra = (
+                f" [zip {notes['from_zip']}, drive-dl {notes['from_drive']}, zip-longer {notes['zip_longer']}, "
+                f"drive-longer {notes['drive_longer']}, zip-only {notes['zip_only']}]"
+            )
         if corrupt:
             extra += f" [CORRUPT (all-NUL) skipped: {corrupt}]"
-        log(f"OK {key}: {len(csvs)} files, {rows} rows, {csv_bytes/2**20:.1f} MiB csv -> {size/2**20:.1f} MiB parquet" + extra
-            + (f"  [unparsed contract names: {unparsed}]" if unparsed else ""))
+        log(
+            f"OK {key}: {len(csvs)} files, {rows} rows, {csv_bytes / 2**20:.1f} MiB csv -> {size / 2**20:.1f} MiB parquet"
+            + extra
+            + (f"  [unparsed contract names: {unparsed}]" if unparsed else "")
+        )
         return "ok"
     except Exception as e:
         with lock, open(errfile, "a") as f:
@@ -377,10 +504,16 @@ def main():
     ap.add_argument("--max-minutes", type=float, default=105)
     ap.add_argument("--only", help="key prefix, e.g. index/banknifty/2026-02-24")
     ap.add_argument("--list", action="store_true", help="only list tasks")
-    ap.add_argument("--refresh", action="store_true",
-                    help="rebuild the cached task list AND the per-unit Drive listings")
-    ap.add_argument("--redo", help="key prefix (e.g. stocks/RELIANCE) whose folders are converted "
-                    "again even though _done.jsonl lists them - after new files arrive")
+    ap.add_argument(
+        "--refresh",
+        action="store_true",
+        help="rebuild the cached task list AND the per-unit Drive listings",
+    )
+    ap.add_argument(
+        "--redo",
+        help="key prefix (e.g. stocks/RELIANCE) whose folders are converted "
+        "again even though _done.jsonl lists them - after new files arrive",
+    )
     a = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
     done = set()
@@ -404,19 +537,23 @@ def main():
         for section in ("index", "stocks"):
             out = rc(["lsf", f"gdrive:{section}", "--dirs-only", "-R", "--max-depth", "2"])
             dirs = sorted(x.rstrip("/") for x in out.splitlines() if x.strip())
-            loose = rc(["lsf", f"gdrive:{section}", "--files-only", "-R", "--max-depth", "2"]).split()
+            loose = rc(
+                ["lsf", f"gdrive:{section}", "--files-only", "-R", "--max-depth", "2"]
+            ).split()
             if loose:
-                log(f"WARNING: {len(loose)} loose files at depth<=2 under {section}/ e.g. {loose[:3]}")
+                log(
+                    f"WARNING: {len(loose)} loose files at depth<=2 under {section}/ e.g. {loose[:3]}"
+                )
             for d in dirs:
                 if d.count("/") == 1:
                     unit, folder = d.split("/")
                     tasks.append((section, unit, folder))
-            log(f"{section}: {len([t for t in tasks if t[0]==section])} expiry folders")
+            log(f"{section}: {len([t for t in tasks if t[0] == section])} expiry folders")
         json.dump(tasks, open(cache, "w"))
     if a.only:
         tasks = [t for t in tasks if "/".join(t).startswith(a.only)]
     todo = [t for t in tasks if "/".join(t) not in done]
-    log(f"{len(tasks)} expiry folders total, {len(tasks)-len(todo)} done, {len(todo)} to do")
+    log(f"{len(tasks)} expiry folders total, {len(tasks) - len(todo)} done, {len(todo)} to do")
     if a.list:
         return
     res = {}

@@ -499,3 +499,43 @@ def test_import_index_csv_window_force_odd_names_and_duplicates(root, tmp_path):
     vendor.import_index_csv(root, dup, "SENSEX", log=lambda _: None)
     table = pq.read_table(lake.bars_1m_path(root, "index", "SENSEX", date(2026, 3, 12)))
     assert table["close"].to_pylist() == [2.0, 3.0]  # the higher-volume duplicate won
+
+
+def test_a_renamed_stock_is_split_into_one_family_per_symbol(root, tmp_path):
+    """The vendor keeps a renamed stock's old and new contracts in one folder (ZOMATO ->
+    ETERNAL, GMRINFRA -> GMRAIRPORT, LTIM -> LTM, TATAMOTORS -> TMPV). Each symbol is its own
+    partition family and instrument set, with its own resume chunks; nothing is rejected."""
+    s = tmp_path / "staging"
+    old = _rows("ZOMATO", TUE)
+    new = _rows("ETERNAL", WED)
+    _write(s / "stocks" / "ZOMATO" / "2026-03-26.parquet", old + new)
+    (report,) = _import(root, s)
+    assert report.name == "ETERNAL+ZOMATO"
+    assert report.rows_written == len(old) + len(new) and report.days_written == 2
+    assert lake.available_days(root, "option", "ZOMATO") == [TUE]
+    assert lake.available_days(root, "option", "ETERNAL") == [WED]
+    assert len(pq.read_table(lake.bars_1m_path(root, "option", "ZOMATO", TUE))) == len(old)
+    assert _fetch(
+        root,
+        "SELECT u.instrument_key FROM instruments o JOIN instruments u "
+        "ON o.underlying_id = u.instrument_id WHERE o.instrument_key = ?",
+        "NSE:OPT:ETERNAL:2026-03-26:22000:CE",
+    ) == [("NSE:STK:ETERNAL",)]
+    assert {r[0] for r in _fetch(root, "SELECT DISTINCT name FROM data_quality")} == {
+        "ZOMATO",
+        "ETERNAL",
+    }
+    scopes = {r[0].split(" ")[0] for r in _fetch(root, "SELECT scope FROM ingest_runs")}
+    assert scopes == {"ZOMATO", "ETERNAL"}
+    (again,) = _import(root, s)  # every chunk of both symbols is done
+    assert again.chunks_run == 0 and again.chunks_skipped == 2
+
+
+def test_a_unit_with_no_parseable_underlying_is_an_error_not_a_silent_skip(root, tmp_path):
+    s = tmp_path / "staging"
+    junk = [
+        ("", "WEIRD", None, "", None, datetime(2026, 3, 10, 10, tzinfo=IST), 1, 1, 1, 1, 1, 1.0)
+    ]
+    _write(s / "stocks" / "JUNK" / "2026-03-26.parquet", junk)
+    with pytest.raises(vendor.VendorError, match="no contract has a parseable underlying"):
+        _import(root, s)

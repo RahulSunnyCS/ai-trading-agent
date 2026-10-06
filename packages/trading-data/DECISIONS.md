@@ -313,6 +313,11 @@ spot and India VIX CSVs.
   vendor-written ones among them a verdict — a crash after writing but before recording used to
   leave those days unjudged. Collector-written days are judged by `tdata quality rebuild`.
   One unit failing (`tdata vendor import`) is reported and the rest continue; exit status 1.
+- **A renamed stock is split by its underlying.** The vendor keeps old and new contracts in one
+  folder (`GMRINFRA`→`GMRAIRPORT`, `LTIM`→`LTM`, `TATAMOTORS`→`TMPV`, `ZOMATO`→`ETERNAL`; found
+  when the first stock batch aborted on `GMRINFRA`). Each symbol becomes its own partition
+  family, instrument set and resume chunks — the catalog already keeps a stock under its
+  symbol at the time — rather than being rejected or forced under one name.
 - **Duplicates are resolved deterministically**: two names for one instrument at the same
   minute keep the higher-volume row, then the lower vendor name — never an arbitrary one.
 - **Verified:** a vendor-imported day and a Fyers-written day with the same prices give identical
