@@ -348,6 +348,21 @@ def test_big_days_see_the_adjusted_series_not_the_raw_one(small_market):
     assert [d["day"] for d in flagged] == [str(SPLIT_DAY)] and flagged[0]["move"] < -0.4
 
 
+def test_big_days_stop_at_the_runs_last_week_for_an_open_holding(small_market):
+    """A run that ends early must not count the days after it (BL-010 Phase 6 backcast)."""
+    made, market = _run(small_market)
+    mine = replay.replay(made, market)
+    market.stocks["AAA"].factors.clear()  # the split day becomes a big day, as above
+    assert [d for d in studies.big_days(made, market, mine) if d["symbol"] == "AAA"]
+    # The same run stopped before the split: AAA is still held at its end.
+    weeks = [w for w in made["weeks"] if w < str(SPLIT_DAY)]
+    orders = [o for o in made["orders"] if o["week"] < weeks[-1]]
+    cut = dict(made, weeks=weeks, orders=orders)
+    held = replay.replay(cut, market)
+    assert any(end is None for _, end in studies.holding_spans(held).get("AAA", []))
+    assert not [d for d in studies.big_days(cut, market, held) if d["symbol"] == "AAA"]
+
+
 def test_action_feed_reads_share_count_changes(tmp_path):
     split = "Face Value Split (Sub-Division) - From Rs 10/- Per Share To Rs {to}/- Per Share"
     subjects = {

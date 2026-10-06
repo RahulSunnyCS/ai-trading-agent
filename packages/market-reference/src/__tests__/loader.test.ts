@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lotSize, strikeStep } from '../loader.js';
+import { isHoliday, isTradingDay, lotSize, strikeStep } from '../loader.js';
 
 /**
  * Mirrors packages/option-backtesting/tests/unit/test_reference.py so the two
@@ -38,5 +38,22 @@ describe('effective dating', () => {
     // silently return today's value for a historical backtest.
     expect(() => lotSize('NIFTY', new Date('2025-12-31T00:00:00Z'))).toThrow();
     expect(lotSize('NIFTY', new Date('2026-01-01T00:00:00Z'))).toBe(65);
+  });
+});
+
+describe('trading days', () => {
+  it('treats a listed holiday as closed', () => {
+    expect(isHoliday('2026-10-02')).toBe(true);
+    expect(isTradingDay('2026-10-02')).toBe(false); // Gandhi Jayanti, a Friday
+  });
+
+  it('treats weekends as closed and ordinary weekdays as open', () => {
+    expect(isTradingDay('2026-10-03')).toBe(false); // Saturday
+    expect(isTradingDay('2026-10-04')).toBe(false); // Sunday
+    expect(isTradingDay('2026-10-05')).toBe(true); // Monday
+  });
+
+  it('counts weekdays past the end of holidays.csv as trading, like Python', () => {
+    expect(isTradingDay('2027-01-04')).toBe(true);
   });
 });

@@ -28,6 +28,7 @@ from momentum_backtesting.stocks import adjust, benchmarks
 from momentum_backtesting.stocks.ui_data import (
     _BENCHMARK_COLUMNS,
     NIFTY500_MOMENTUM50_TRI,
+    NIFTY500_TRI,
     NIFTY_MIDCAP150_MOMENTUM50_TRI,
     NIFTY_MIDCAP150_TRI,
     NIFTY_SMALLCAP250_TRI,
@@ -40,6 +41,7 @@ EXPECTED_NAMES = {
     "nifty_smallcap250_tri": "Nifty Smallcap 250 TRI",
     "nifty_midcap150_momentum50_tri": "Nifty Midcap150 Momentum 50 TRI",
     "nifty500_momentum50_tri": "Nifty500 Momentum 50 TRI",
+    "nifty500_tri": "Nifty 500 TRI",  # the Phase 6 backcast benchmark
 }
 
 
@@ -111,7 +113,7 @@ def test_each_extra_is_requested_from_niftyindices_under_its_index_name(monkeypa
 
 def test_cli_fetches_each_extra_to_a_distinct_raw_file():
     files = cli._extra_benchmark_tri_files()
-    assert len(files) == 4 and len(set(files)) == 4
+    assert len(files) == len(set(files)) == len(benchmarks.EXTRA_TRI_INDICES)
     # Kept apart from the required three, so an optional series can never stop a refresh.
     assert not set(files) & set(cli._BENCHMARK_TRI_FILES)
     assert {"NIFTY_50_TRI.json", "NIFTY200_MOMENTUM_30_TRI.json"} <= set(cli._BENCHMARK_TRI_FILES)
@@ -234,12 +236,13 @@ def _csv_with_extras(data_dir, weeks):
             "nifty_smallcap250_tri": [float(i + 31) for i in range(n)],
             "nifty_midcap150_momentum50_tri": [float(i + 41) for i in range(n)],
             "nifty500_momentum50_tri": [float(i + 51) for i in range(n)],
+            "nifty500_tri": [float(i + 61) for i in range(n)],
         },
         index=weeks,
     ).to_csv(stocks / "benchmarks_weekly.csv")
 
 
-def test_load_references_returns_the_four_new_columns_after_the_original_two(tmp_path):
+def test_load_references_returns_the_extra_columns_after_the_original_two(tmp_path):
     weeks = pd.date_range("2016-01-01", periods=4, freq="W-FRI")
     _csv_with_extras(tmp_path, weeks)
 
@@ -252,6 +255,7 @@ def test_load_references_returns_the_four_new_columns_after_the_original_two(tmp
         NIFTY_SMALLCAP250_TRI,
         NIFTY_MIDCAP150_MOMENTUM50_TRI,
         NIFTY500_MOMENTUM50_TRI,
+        NIFTY500_TRI,
     ]
     assert list(refs[NIFTY_SMALLCAP250_TRI]) == [31.0, 32.0, 33.0, 34.0]
 
@@ -390,7 +394,8 @@ def test_full_migrate_carries_the_extra_series_across(tmp_path):
         rows = con.execute("SELECT DISTINCT series FROM stock_weekly_series").fetchall()
         names = {r[0] for r in rows}
 
-    assert n_extra == 3 * (3 + 4 + 1)  # 3 stock benchmarks + 4 extras + cash, 3 weeks each
+    # 3 stock benchmarks + the extras + cash, 3 weeks each
+    assert n_extra == 3 * (3 + len(EXPECTED_NAMES) + 1)
     assert set(EXPECTED_NAMES.values()) <= names
 
 
