@@ -6,7 +6,7 @@ import { telegramSink } from './alerts.js';
 import { jobEnv } from './env.js';
 import { History, pidAlive } from './history.js';
 import { JOBS, findJob } from './jobs.js';
-import { startLoop } from './loop.js';
+import { skippedToday, startLoop } from './loop.js';
 import { type RunContext, runJob } from './runner.js';
 import { formatIst, nextDue } from './schedule.js';
 import { morningSummary } from './summary.js';
@@ -98,6 +98,20 @@ function claimInstance(): boolean {
   return true;
 }
 
+/** `jobs skipped` — today's slots already past, which a first start will not run. */
+function skipped(): void {
+  const history = openHistory();
+  const list = skippedToday(JOBS, new Date(), history);
+  history.close();
+  if (list.length === 0) return;
+  console.log("Today's slots already past (a fresh scheduler skips them; run by hand if needed):");
+  for (const { job, slot } of list) {
+    console.log(
+      `  ${job.id} was due ${formatIst(slot)} IST → bun run --filter @ata/scheduler jobs run ${job.id}`,
+    );
+  }
+}
+
 function serve(): void {
   if (!claimInstance()) {
     process.exitCode = 1;
@@ -115,8 +129,9 @@ if (import.meta.main) {
   if (command === 'status' || command === undefined) status();
   else if (command === 'run') process.exitCode = await runNow(arg);
   else if (command === 'serve') serve();
+  else if (command === 'skipped') skipped();
   else {
-    console.error('usage: bun run jobs [status | run <job> | serve]');
+    console.error('usage: bun run jobs [status | run <job> | serve | skipped]');
     process.exitCode = 2;
   }
 }
