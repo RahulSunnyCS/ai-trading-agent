@@ -16,6 +16,7 @@ export interface RunRow {
   ended_at: string | null;
   exit_code: number | null;
   attempts: number;
+  pid: number | null;
   log_path: string;
   error: string | null;
 }
@@ -35,6 +36,7 @@ export class History {
       ended_at TEXT,
       exit_code INTEGER,
       attempts INTEGER NOT NULL DEFAULT 0,
+      pid INTEGER,
       log_path TEXT NOT NULL,
       error TEXT
     )`);
@@ -91,10 +93,17 @@ export class History {
   ): number {
     const row = this.db
       .query(
-        `INSERT INTO runs (job, trigger, scheduled_for, started_at, log_path)
-         VALUES (?, ?, ?, ?, ?) RETURNING id`,
+        `INSERT INTO runs (job, trigger, scheduled_for, started_at, pid, log_path)
+         VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       )
-      .get(job, trigger, scheduledFor?.toISOString() ?? null, at.toISOString(), logPath) as {
+      .get(
+        job,
+        trigger,
+        scheduledFor?.toISOString() ?? null,
+        at.toISOString(),
+        process.pid,
+        logPath,
+      ) as {
       id: number;
     };
     return row.id;
@@ -119,13 +128,35 @@ export class History {
       .get(job, scheduledFor.toISOString()) ?? null) as RunRow | null;
   }
 
-  /** Unfinished runs of these jobs that started after `since` (older ones are presumed dead). */
-  running(jobs: string[], since: Date): RunRow[] {
+  /**
+   * Unfinished runs of these jobs with a lower id than `beforeId`. Waiting only for older
+   * rows means two processes that start together order themselves by id instead of both
+   * seeing nothing, or both waiting for each other.
+   */
+  runningBefore(jobs: string[], beforeId: number): RunRow[] {
     if (jobs.length === 0) return [];
     const marks = jobs.map(() => '?').join(', ');
     return this.db
-      .query(`SELECT * FROM runs WHERE ended_at IS NULL AND started_at > ? AND job IN (${marks})`)
-      .all(since.toISOString(), ...jobs) as RunRow[];
+      .query(`SELECT * FROM runs WHERE ended_at IS NULL AND id < ? AND job IN (${marks})`)
+      .all(beforeId, ...jobs) as RunRow[];
+  }
+
+  /**
+   * Close rows whose process no longer exists (the scheduler was killed or crashed mid-run),
+   * so they stop blocking their group and stop showing as running. Returns how many.
+   */
+  reapDead(at: Date, alive: (pid: number) => boolean = pidAlive): number {
+    const rows = this.db.query('SELECT id, pid FROM runs WHERE ended_at IS NULL').all() as Array<{
+      id: number;
+      pid: number | null;
+    }>;
+    let reaped = 0;
+    for (const row of rows) {
+      if (row.pid !== null && alive(row.pid)) continue;
+      this.finish(row.id, -2, 0, at, 'interrupted: the scheduler stopped while this was running');
+      reaped++;
+    }
+    return reaped;
   }
 
   recent(limit = 50, job?: string): RunRow[] {
@@ -138,5 +169,14 @@ export class History {
 
   close(): void {
     this.db.close();
+  }
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
   }
 }

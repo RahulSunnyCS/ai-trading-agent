@@ -263,7 +263,16 @@ contract, not a shared service).
   pass/kill thresholds for the evaluation review (BL-010). Never edit after results are seen;
   supersede with a new file. A step added later gets its own `bl010_criteria_addendum_N.json`,
   committed before that step runs (addendum 1: Monday-open repricing; addendum 2: selection and
-  validation windows never meet). `criteria.py` reads them all; code never restates a threshold.
+  validation windows never meet; addendum 3: the Phase 5 choice rule). `criteria.py` reads them
+  all; code never restates a threshold.
+- `choose.py` / `phase5.py` (`mbt search choose <results>`) — BL-010 Phase 5 from stored curves:
+  drawdown baskets, the third-worst-FY rank, correlation clusters, the walk-forward of the
+  choice rule (selects only on data 13 weeks before each FY), factor regression and bootstrap.
+  The walk-forward must never read past its cut; `tests/test_choose.py` pins that.
+- `phase6.py` (`mbt search ensemble <results> --space <toml> [--freeze]`) — addendum 4's
+  ensemble pick and its walk-forward; `--freeze` writes `search_spaces/bl010_phase6_frozen.json`
+  (configs, rebalance offsets, code commit, data snapshot) only if the rule passed. That file
+  is what BL-010 Phase 6 tracks: never edit it, supersede it.
 - `tests/golden/` — frozen backtest results (BL-001). 16 scenarios run through the real API on
   a frozen slice of real data (`fixture/`, rebuilt only by `scripts/build-golden-fixture.py`).
   A code change that moves any result fails `test_golden.py`; if the move was intended, run
@@ -306,7 +315,11 @@ contract, not a shared service).
   liquidity gate, removing the top-profit stocks, shifted/cut windows (never opens a sealed period). Re-runs
   `run_broad_backtest` with one thing changed; writes `<results>/bias.json` only.
 - `reference_benchmarks.py` — Nifty 50 TRI and Nifty200 Momentum 30 TRI comparison lines
-  (`load_references`, `compare`), added to every backtest payload as `comparisons`. Use it,
+  (`load_references`, `compare`), added to every backtest payload as `comparisons`. Four more
+  comparison-only TRIs (Midcap 150, Smallcap 250, Midcap150 Momentum 50, Nifty500 Momentum 50;
+  `EXTRA_REFERENCES`, BL-010 Phase 5) are loaded by `load_references` but never displayed by
+  `compare`, and stay out of `ui_data._BENCHMARK_COLUMNS` (the stock dataset); `mbt stocks
+  fetch-benchmarks` refreshes just them, `mbt stocks fetch`/`local migrate` carry them too. Use it,
   not the dataset's own `benchmark`, when judging edge: index-mode benchmarks are price-only
   (TODO 3.9.23).
 - `tranches.py` — overlapping tranches (K sub-portfolios on staggered `rebalance_every`

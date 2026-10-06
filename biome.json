@@ -36,6 +36,7 @@
       "**/.venv/**",
       "packages/momentum-backtesting/data/**",
       "packages/momentum-backtesting/tests/golden/**",
+      "packages/momentum-backtesting/search_spaces/bl010_phase6_frozen.json",
       "dist",
       "coverage",
       "bun.lock",
