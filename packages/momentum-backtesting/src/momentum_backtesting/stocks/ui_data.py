@@ -37,6 +37,7 @@ NIFTY_MIDCAP150_TRI = "Nifty Midcap 150 TRI"
 NIFTY_SMALLCAP250_TRI = "Nifty Smallcap 250 TRI"
 NIFTY_MIDCAP150_MOMENTUM50_TRI = "Nifty Midcap150 Momentum 50 TRI"
 NIFTY500_MOMENTUM50_TRI = "Nifty500 Momentum 50 TRI"
+NIFTY500_TRI = "Nifty 500 TRI"
 
 # benchmarks_weekly.csv column -> display name, for the comparison-only TRIs above.
 REFERENCE_ONLY_COLUMNS = {
@@ -44,6 +45,7 @@ REFERENCE_ONLY_COLUMNS = {
     "nifty_smallcap250_tri": NIFTY_SMALLCAP250_TRI,
     "nifty_midcap150_momentum50_tri": NIFTY_MIDCAP150_MOMENTUM50_TRI,
     "nifty500_momentum50_tri": NIFTY500_MOMENTUM50_TRI,
+    "nifty500_tri": NIFTY500_TRI,
 }
 
 _COMPANIES_CSV = Path(__file__).with_name("curated") / "companies.csv"
