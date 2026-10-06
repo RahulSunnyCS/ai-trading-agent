@@ -60,3 +60,4 @@ nodes.
 ## Log
 
 - 2026-10-05 — created from the Momentum UI performance review (2026-10-04 session).
+- 2026-10-06 — owner decisions on PR #27: parked until after the Max month (about 2026-11-06); priority unchanged.

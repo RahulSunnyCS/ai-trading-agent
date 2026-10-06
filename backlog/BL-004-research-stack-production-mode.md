@@ -99,3 +99,4 @@ with every Momentum page ready in ~1 s. A restart with no code changes skips the
 ## Log
 
 - 2026-10-05 — created from the Momentum UI performance review (2026-10-04 session).
+- 2026-10-06 — owner decisions on PR #27: keep it — not dropped, even with BL-002 coming.
