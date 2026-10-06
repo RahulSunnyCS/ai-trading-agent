@@ -356,26 +356,33 @@ def _record_chunk(
 # ---------------------------------------------------------------------------
 
 
+def unit_symbols(con: duckdb.DuckDBPyConnection, unit: Unit) -> list[str]:
+    """The underlyings the unit's contracts are named for. Almost always one; a renamed stock
+    (GMRINFRA -> GMRAIRPORT, LTIM -> LTM, TATAMOTORS -> TMPV, ZOMATO -> ETERNAL) has its old
+    and new contracts in one vendor folder. Each symbol is its own lake partition and
+    instrument family, as the catalog already keeps a stock under its symbol at the time."""
+    rows = con.execute(
+        "SELECT DISTINCT underlying FROM read_parquet(?) WHERE underlying <> '' ORDER BY 1",
+        [[str(f) for f in unit.files]],
+    ).fetchall()
+    symbols = [r[0] for r in rows]
+    if not symbols:
+        raise VendorError(f"{unit.section}/{unit.folder}: no contract has a parseable underlying")
+    return symbols
+
+
 def _register_unit(
-    root: Path, con: duckdb.DuckDBPyConnection, unit: Unit
-) -> tuple[str, dict[str, int]]:
-    """Register every contract of the unit; returns (underlying symbol, {contract: id})."""
+    root: Path, con: duckdb.DuckDBPyConnection, unit: Unit, symbol: str
+) -> dict[str, int]:
+    """Register every contract of `symbol` in the unit; returns {contract: instrument_id}."""
     files = [str(f) for f in unit.files]
-    symbols = [
-        r[0]
-        for r in con.execute(
-            "SELECT DISTINCT underlying FROM read_parquet(?) WHERE underlying <> ''", [files]
-        ).fetchall()
-    ]
-    if len(symbols) != 1:
-        raise VendorError(f"{unit.section}/{unit.folder}: expected one underlying, got {symbols}")
-    symbol = symbols[0]
     exchange = exchange_for(symbol)
     underlying_key = instrument_key(exchange, unit.asset_class, symbol)
     contracts = con.execute(
         "SELECT DISTINCT contract, expiry, strike, option_type FROM read_parquet(?) "
-        "WHERE expiry IS NOT NULL AND strike IS NOT NULL AND option_type IN ('CE', 'PE')",
-        [files],
+        "WHERE underlying = ? AND expiry IS NOT NULL AND strike IS NOT NULL "
+        "AND option_type IN ('CE', 'PE')",
+        [files, symbol],
     ).fetchall()
     specs = [
         InstrumentSpec(
@@ -398,7 +405,7 @@ def _register_unit(
         )
     with _connect(root) as catalog:
         ids = register(catalog, specs)
-    return symbol, {s.vendor_symbol: ids[s.key] for s in specs}
+    return {s.vendor_symbol: ids[s.key] for s in specs}
 
 
 def import_unit(
@@ -409,11 +416,48 @@ def import_unit(
     force: bool = False,
     log: Callable[[str], None] = print,
 ) -> UnitReport:
-    """Import one underlying's options (all its staged expiry files) into the lake."""
-    window = days or (date.min, date.max)
+    """Import a unit's options (all its staged expiry files) into the lake — one underlying
+    at a time (see `unit_symbols`); the report adds them up."""
     con, tmp = _open_duck()
     try:
-        symbol, ids = _register_unit(root, con, unit)
+        symbols = unit_symbols(con, unit)
+    finally:
+        con.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+    total = UnitReport("+".join(symbols))
+    for symbol in symbols:
+        part = _import_symbol(
+            root, unit, symbol, days=days, force=force, log=log, split=len(symbols) > 1
+        )
+        for field_name in (
+            "chunks_run", "chunks_skipped", "days_written", "days_skipped_existing",
+            "rows_written", "rows_unparsed",
+        ):  # fmt: skip
+            setattr(total, field_name, getattr(total, field_name) + getattr(part, field_name))
+        for reason, n in part.excluded.items():
+            total.excluded[reason] = total.excluded.get(reason, 0) + n
+    return total
+
+
+def _import_symbol(
+    root: Path,
+    unit: Unit,
+    symbol: str,
+    *,
+    days: tuple[date, date] | None,
+    force: bool,
+    log: Callable[[str], None],
+    split: bool,
+) -> UnitReport:
+    """One underlying of a unit. `split`: the unit holds several, so every read of the staged
+    files is restricted to this symbol (otherwise rows with an unparseable contract name,
+    whose underlying is empty, are still counted and reported — once)."""
+    window = days or (date.min, date.max)
+    only = "AND s.underlying = ?" if split else ""
+    only_args = [symbol] if split else []
+    con, tmp = _open_duck()
+    try:
+        ids = _register_unit(root, con, unit, symbol)
         report = UnitReport(symbol)
         con.register(
             "ids",
@@ -426,9 +470,9 @@ def import_unit(
         )
         files = [str(f) for f in unit.files]
         monthly = con.execute(
-            "SELECT CAST(date_trunc('month', ts AT TIME ZONE 'Asia/Kolkata') AS DATE), count(*) "
-            "FROM read_parquet(?) GROUP BY 1",
-            [files],
+            "SELECT CAST(date_trunc('month', s.ts AT TIME ZONE 'Asia/Kolkata') AS DATE), count(*) "
+            f"FROM read_parquet(?) s WHERE true {only} GROUP BY 1",
+            [files, *only_args],
         ).fetchall()
         holidays = _holidays(root)
         _fail_stale_runs(root, rf"^{re.escape(symbol)} \d{{4}}-\d{{2}}-\d{{2}}\.\.")
@@ -450,10 +494,10 @@ def import_unit(
                        CAST(s.ts AT TIME ZONE 'Asia/Kolkata' AS DATE) AS day,
                        {quality.IN_SESSION_SQL} AS ins
                 FROM read_parquet(?) s LEFT JOIN ids i ON s.contract = i.contract
-                WHERE s.ts >= CAST(? AS TIMESTAMPTZ) AND s.ts < CAST(? AS TIMESTAMPTZ)
+                WHERE s.ts >= CAST(? AS TIMESTAMPTZ) AND s.ts < CAST(? AS TIMESTAMPTZ) {only}
                 ORDER BY day, instrument_id, ts
                 """,
-                [files, _ts_param(lo), _ts_param(hi)],
+                [files, _ts_param(lo), _ts_param(hi), *only_args],
             )
             # one pass: rows whose contract name could not be parsed have no instrument
             rows_in, unparsed = con.execute(
