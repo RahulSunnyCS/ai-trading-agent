@@ -330,10 +330,14 @@ def import_stock_weekly(con: duckdb.DuckDBPyConnection, stocks_dir: Path) -> tup
     con.execute("DELETE FROM stock_weekly_series")
     n_extra = 0
     if benchmarks is not None:
-        from .stocks.ui_data import _BENCHMARK_COLUMNS  # noqa: PLC0415 (avoid a hard import cycle)
+        from .stocks.ui_data import (  # noqa: PLC0415 (avoid a hard import cycle)
+            _BENCHMARK_COLUMNS,
+            REFERENCE_ONLY_COLUMNS,
+        )
 
-        renamed = benchmarks[[c for c in _BENCHMARK_COLUMNS if c in benchmarks.columns]].rename(
-            columns=_BENCHMARK_COLUMNS
+        columns = {**_BENCHMARK_COLUMNS, **REFERENCE_ONLY_COLUMNS}
+        renamed = benchmarks[[c for c in columns if c in benchmarks.columns]].rename(
+            columns=columns
         )
         n_extra += _insert_series(con, renamed)
     if cash is not None:
@@ -341,6 +345,33 @@ def import_stock_weekly(con: duckdb.DuckDBPyConnection, stocks_dir: Path) -> tup
 
         n_extra += _insert_series(con, cash.rename(columns={"close": CASH}))
     return n_prices, n_membership, n_extra
+
+
+def import_extra_benchmarks(con: duckdb.DuckDBPyConnection, extra: pd.DataFrame) -> int:
+    """Upsert just the comparison-only TRIs (`ui_data.REFERENCE_ONLY_COLUMNS`, columns named as
+    in benchmarks_weekly.csv) into `stock_weekly_series`: those series' rows are replaced, every
+    other series and every other table is left alone - unlike `import_stock_weekly`, which
+    replaces the whole table. Returns rows written."""
+    from .stocks.ui_data import REFERENCE_ONLY_COLUMNS  # noqa: PLC0415
+
+    renamed = extra[[c for c in REFERENCE_ONLY_COLUMNS if c in extra.columns]].rename(
+        columns=REFERENCE_ONLY_COLUMNS
+    )
+    if renamed.empty:
+        return 0
+    names = list(renamed.columns)
+    con.execute("BEGIN TRANSACTION")  # all or nothing: never leave the series deleted
+    try:
+        con.execute(
+            f"DELETE FROM stock_weekly_series WHERE series IN ({','.join('?' * len(names))})",  # noqa: S608
+            names,
+        )
+        written = _insert_series(con, renamed)
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")
+    return written
 
 
 def _insert_series(con: duckdb.DuckDBPyConnection, frame: pd.DataFrame) -> int:

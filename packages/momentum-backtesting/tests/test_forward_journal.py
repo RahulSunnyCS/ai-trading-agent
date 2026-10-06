@@ -9,7 +9,15 @@ import pytest
 from fastapi.testclient import TestClient
 from trading_data.db import connect
 
-from momentum_backtesting import api, forward_journal, fyers, notify, reference_benchmarks, weekly
+from momentum_backtesting import (
+    api,
+    forward_journal,
+    fyers,
+    notify,
+    reference_benchmarks,
+    search,
+    weekly,
+)
 from momentum_backtesting.notify import IST, Notification
 from momentum_backtesting.stocks.ui_data import NIFTY200_MOMENTUM30_TRI
 
@@ -256,7 +264,30 @@ def test_the_stock_ingest_rerun_witnesses_new_broad_entries_without_resending_th
     with connect() as con:
         broad = [r for r in forward_journal.entries(con) if r["config_id"] == "broad-1"]
     fingerprint = broad[0]["data_fingerprint"]
-    assert fingerprint.startswith("weekly_closes:") and ";stock_prices:sha256:" in fingerprint
+    # Broad's inputs are the lake and the confirmed split factors, not the Nifty-50 frame.
+    assert fingerprint.startswith("weekly_closes:") and "stock_prices" not in fingerprint
+    assert ";broad:" in fingerprint and fingerprint.endswith(";universe:total_market")
+
+
+def test_a_broad_signals_fingerprint_names_the_lake_snapshot_and_the_universe(monkeypatch):
+    snapshot = {"last_bar": "2026-10-01", "last_week": "2026-10-02", "factors": "4d066205752f"}
+    monkeypatch.setattr(search, "data_snapshot", lambda *a, **k: snapshot)
+    monkeypatch.setattr(api.DATA, "get_stock", lambda: pytest.fail("Broad must not hash this"))
+    broad = _outcome("b", "Broad", "broad", False, _signal(weights={"INFY": 1.0}))
+    etf = _outcome("e", "ETF", "etf", True, _signal())
+    favourites = {"b": {"config": {"dataset": "broad", "broad_universe": "turnover_rank"}}}
+    now = datetime(2026, 10, 9, 19, 30, tzinfo=IST)
+    entries, _ = api._journal_entries("final", [broad, etf], favourites, now, None)
+    by_id = {e.config_id: e.data_fingerprint for e in entries}
+    assert by_id["b"].endswith(
+        ";broad:last_bar=2026-10-01,last_week=2026-10-02,factors=4d066205752f;"
+        "universe:turnover_rank"
+    )
+    assert "broad:" not in by_id["e"]  # other datasets keep their own fingerprint
+    changed = dict(snapshot, last_bar="2026-10-02")
+    monkeypatch.setattr(search, "data_snapshot", lambda *a, **k: changed)
+    entries, _ = api._journal_entries("final", [broad], favourites, now, None)
+    assert entries[0].data_fingerprint != by_id["b"]
 
 
 # --- the after-Friday check and the dashboard endpoint ------------------------------------------
@@ -353,7 +384,7 @@ def test_cli_check_exits_nonzero_and_sends_when_asked(monkeypatch):
     # No favourites saved in this catalog, so only the benchmark is expected — and missing.
     assert result.exit_code == 1, result.output
     assert "0 of 1 expected entries recorded" in result.output
-    assert sent[0].severity == "warning" and sent[0].title.endswith("PROBLEMS")
+    assert sent[0].severity == "warn" and sent[0].title.endswith("PROBLEMS")
 
 
 # --- review fixes (BL-014 pre-merge review) ------------------------------------------------------
@@ -417,6 +448,7 @@ def test_research_signals_carry_holdings_as_portfolio_weights(monkeypatch):
     }
     monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
     monkeypatch.setattr(api, "_broad_backtest", lambda req: payload)
+    monkeypatch.setattr(api, "_broad_engine_signal", lambda req: payload["latest"])
     favourite = {"name": "Broad A", "config": {"dataset": "broad", "universe": ["INFY"]}}
     result, blocked = api._research_weekly_result(favourite, pd.Timestamp("2026-10-09"))
     assert blocked is None

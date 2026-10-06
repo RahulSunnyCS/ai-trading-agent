@@ -32,6 +32,12 @@ deploy/launchd/uninstall.sh
 
 ## Things to know
 
+- **Install before 07:55 on a trading day**, or run what `install.sh` lists afterwards. The
+  scheduler never runs a slot that fell before its first start (those belonged to the old
+  plists, which `install.sh` removes), so installing at 08:03 would otherwise skip that
+  day's broker-login. `install.sh` prints the slots that are already past, with the command
+  to run each (`bun run --filter @ata/scheduler jobs skipped` shows the same).
+
 - **Jobs run from `~/Projects/ai-trading-agent`'s working tree**, so whatever branch is
   checked out there is the code that runs. The morning summary flags a branch other than
   `main`. Restart after pulling a scheduler change:

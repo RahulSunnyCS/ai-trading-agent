@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { telegramSink } from './alerts.js';
 import { backupJob } from './backup.js';
 import { jobEnv } from './env.js';
-import { History } from './history.js';
+import { History, pidAlive } from './history.js';
 import { JOBS, findJob } from './jobs.js';
-import { startLoop } from './loop.js';
+import { skippedToday, startLoop } from './loop.js';
 import { type RunContext, runJob } from './runner.js';
 import { formatIst, nextDue } from './schedule.js';
 import { morningSummary } from './summary.js';
@@ -82,7 +82,42 @@ async function runNow(id: string | undefined): Promise<number> {
   return result.ok ? 0 : 1;
 }
 
+/** One scheduler per machine: a second loop would run every slot twice. */
+function claimInstance(): boolean {
+  mkdirSync(stateDir(), { recursive: true });
+  const lock = join(stateDir(), 'scheduler.pid');
+  try {
+    const other = Number(readFileSync(lock, 'utf8'));
+    if (other && other !== process.pid && pidAlive(other)) {
+      console.error(`another scheduler is already running (pid ${other}); exiting`);
+      return false;
+    }
+  } catch {
+    // No lock file yet.
+  }
+  writeFileSync(lock, String(process.pid));
+  return true;
+}
+
+/** `jobs skipped` — today's slots already past, which a first start will not run. */
+function skipped(): void {
+  const history = openHistory();
+  const list = skippedToday(JOBS, new Date(), history);
+  history.close();
+  if (list.length === 0) return;
+  console.log("Today's slots already past (a fresh scheduler skips them; run by hand if needed):");
+  for (const { job, slot } of list) {
+    console.log(
+      `  ${job.id} was due ${formatIst(slot)} IST → bun run --filter @ata/scheduler jobs run ${job.id}`,
+    );
+  }
+}
+
 function serve(): void {
+  if (!claimInstance()) {
+    process.exitCode = 1;
+    return;
+  }
   const ctx = context(openHistory());
   console.log(
     `scheduler started ${formatIst(new Date())} IST — ${JOBS.length} jobs, logs in ${logDir()}`,
@@ -95,8 +130,9 @@ if (import.meta.main) {
   if (command === 'status' || command === undefined) status();
   else if (command === 'run') process.exitCode = await runNow(arg);
   else if (command === 'serve') serve();
+  else if (command === 'skipped') skipped();
   else {
-    console.error('usage: bun run jobs [status | run <job> | serve]');
+    console.error('usage: bun run jobs [status | run <job> | serve | skipped]');
     process.exitCode = 2;
   }
 }

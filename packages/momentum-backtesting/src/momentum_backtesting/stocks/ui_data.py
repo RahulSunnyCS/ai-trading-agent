@@ -28,6 +28,26 @@ _BENCHMARK_COLUMNS = {
     "nifty50_ew_tri": NIFTY50_EQUAL_WEIGHT_TRI,
 }
 
+# Comparison-only TRIs (BL-010 Phase 5): the broader-market and factor indices a momentum basket
+# is judged against. They live in benchmarks_weekly.csv / stock_weekly_series next to the three
+# above but are deliberately NOT in `_BENCHMARK_COLUMNS` - the stock dataset's price frame (and so
+# every ranking, backtest and API payload built on it) must not gain columns because of them.
+# Only reference_benchmarks.load_references reads them; db_migrate carries them across.
+NIFTY_MIDCAP150_TRI = "Nifty Midcap 150 TRI"
+NIFTY_SMALLCAP250_TRI = "Nifty Smallcap 250 TRI"
+NIFTY_MIDCAP150_MOMENTUM50_TRI = "Nifty Midcap150 Momentum 50 TRI"
+NIFTY500_MOMENTUM50_TRI = "Nifty500 Momentum 50 TRI"
+NIFTY500_TRI = "Nifty 500 TRI"
+
+# benchmarks_weekly.csv column -> display name, for the comparison-only TRIs above.
+REFERENCE_ONLY_COLUMNS = {
+    "nifty_midcap150_tri": NIFTY_MIDCAP150_TRI,
+    "nifty_smallcap250_tri": NIFTY_SMALLCAP250_TRI,
+    "nifty_midcap150_momentum50_tri": NIFTY_MIDCAP150_MOMENTUM50_TRI,
+    "nifty500_momentum50_tri": NIFTY500_MOMENTUM50_TRI,
+    "nifty500_tri": NIFTY500_TRI,
+}
+
 _COMPANIES_CSV = Path(__file__).with_name("curated") / "companies.csv"
 
 # The five data/stocks/ files this loader reads. last_trade.csv isn't needed here - it's a

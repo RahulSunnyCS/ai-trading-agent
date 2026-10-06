@@ -2,7 +2,7 @@ import { type AlertSink, alertMissed, alertResult } from './alerts.js';
 import type { History } from './history.js';
 import type { Job } from './jobs.js';
 import { type RunContext, runJob } from './runner.js';
-import { formatIst, previousDue } from './schedule.js';
+import { formatIst, istDay, previousDue } from './schedule.js';
 
 /** A slot started within this long of its time counts as on time, not a catch-up. */
 const ON_TIME_MS = 5 * 60_000;
@@ -27,6 +27,26 @@ export function decide(job: Job, now: Date, history: History, firstStart: Date):
   return { kind: 'missed', slot, lateByMs: late };
 }
 
+/**
+ * Today's slots that have already passed with no run recorded. Slots before the
+ * scheduler's first start are never run (they belonged to whatever scheduled the job
+ * before), so this is what a fresh install tells the owner to run by hand.
+ */
+export function skippedToday(
+  jobs: Job[],
+  now: Date,
+  history: History,
+): Array<{ job: Job; slot: Date }> {
+  const today = istDay(now);
+  const out: Array<{ job: Job; slot: Date }> = [];
+  for (const job of jobs) {
+    if (job.builtin) continue; // the morning summary needs no catch-up
+    const slot = previousDue(job.schedule, now);
+    if (slot && istDay(slot) === today && !history.forSlot(job.id, slot)) out.push({ job, slot });
+  }
+  return out;
+}
+
 export interface LoopOptions {
   ctx: RunContext;
   jobs: Job[];
@@ -47,22 +67,31 @@ export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): 
   const tick = () => {
     for (const job of jobs) {
       if (inFlight.has(job.id)) continue;
-      const decision = decide(job, now(), ctx.history, firstStart);
-      if (decision.kind === 'missed') {
-        const reason = `missed: the scheduler was not running at ${formatIst(decision.slot)} IST`;
-        ctx.history.recordMissed(job.id, decision.slot, now(), reason);
-        void alertMissed(alerts, job, decision.slot);
-      } else if (decision.kind === 'run') {
-        inFlight.add(job.id);
-        console.log(`${formatIst(now())} start ${job.id} (${decision.trigger})`);
-        runJob(job, ctx, decision.trigger, decision.slot)
-          .then(async (result) => {
-            console.log(`${formatIst(now())} ${job.id}: ${result.ok ? 'ok' : result.error}`);
-            await alertResult(alerts, job, result, ctx.history);
-          })
-          .catch((error: unknown) => console.error(`${job.id}: ${String(error)}`))
-          .finally(() => inFlight.delete(job.id));
+      try {
+        handle(job);
+      } catch (error) {
+        // A bookkeeping failure (say a locked database) must not take the whole scheduler down.
+        console.error(`${job.id}: tick failed: ${String(error)}`);
       }
+    }
+  };
+
+  const handle = (job: Job) => {
+    const decision = decide(job, now(), ctx.history, firstStart);
+    if (decision.kind === 'missed') {
+      const reason = `missed: the scheduler was not running at ${formatIst(decision.slot)} IST`;
+      ctx.history.recordMissed(job.id, decision.slot, now(), reason);
+      void alertMissed(alerts, job, decision.slot);
+    } else if (decision.kind === 'run') {
+      inFlight.add(job.id);
+      console.log(`${formatIst(now())} start ${job.id} (${decision.trigger})`);
+      runJob(job, ctx, decision.trigger, decision.slot)
+        .then(async (result) => {
+          console.log(`${formatIst(now())} ${job.id}: ${result.ok ? 'ok' : result.error}`);
+          await alertResult(alerts, job, result, ctx.history);
+        })
+        .catch((error: unknown) => console.error(`${job.id}: ${String(error)}`))
+        .finally(() => inFlight.delete(job.id));
     }
   };
 

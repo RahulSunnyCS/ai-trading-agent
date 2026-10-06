@@ -90,21 +90,26 @@ def _episode(index: pd.Series, peak: pd.Timestamp, trough: pd.Timestamp, depth: 
     return Episode(peak, trough, float(depth), fall)
 
 
-def basket_passes(curve: pd.Series, indices: dict[str, pd.Series], basket: str) -> bool:
+def basket_passes(
+    curve: pd.Series, indices: dict[str, pd.Series], basket: str, *, loosen: float = 0.0
+) -> bool:
     """Whether every drawdown of `curve` passes the basket: within its fixed limit, or within
     `multiple` x the named index's fall over the same window, and always within the ceiling.
-    `indices` maps index name (as the criteria file spells it) to its curve."""
+    `indices` maps index name (as the criteria file spells it) to its curve. `loosen` moves the
+    fixed limit (0.05 = five points more room, -0.05 = five fewer) for the threshold-stability
+    check; the hard ceiling never moves."""
     spec = load()["baskets"][basket]
     relative = spec["or_relative"]
     if relative["index"] not in indices:
         raise KeyError(
             f"the {basket} basket is judged against {relative['index']}, which was not given "
-            f"(have: {sorted(indices)}). reference_benchmarks does not load it yet."
+            f"(have: {sorted(indices)}). reference_benchmarks.load_references() carries it once "
+            "`mbt stocks fetch-benchmarks` has run."
         )
     for episode in episodes(curve, indices[relative["index"]]):
         if episode.depth < spec["hard_ceiling"]:
             return False
-        if episode.depth >= spec["max_drawdown"]:
+        if episode.depth >= spec["max_drawdown"] - loosen:
             continue
         if episode.depth < relative["multiple"] * episode.index_fall:
             return False
