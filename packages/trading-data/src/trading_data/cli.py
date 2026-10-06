@@ -59,7 +59,8 @@ def status() -> None:
             n = con.execute(f"SELECT count(*) FROM {view}").fetchone()[0]
             if n == 0:
                 continue
-            has_date = "date" in con.execute(f"DESCRIBE {view}").df()["column_name"].tolist()
+            # fetchall, not .df(): pandas/numpy are not dependencies of this package
+            has_date = "date" in [r[0] for r in con.execute(f"DESCRIBE {view}").fetchall()]
             if has_date:
                 days, lo, hi = con.execute(
                     f"SELECT count(DISTINCT date), min(date), max(date) FROM {view}"
