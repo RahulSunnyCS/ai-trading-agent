@@ -109,3 +109,4 @@ C0092,VEDL,2015-05-07,,auto: prevclose+isin match
 C0093,WIPRO,2011-01-03,,auto: single symbol in daily.parquet
 C0094,YESBANK,2011-01-03,,auto: single symbol in daily.parquet
 C0095,ZEEL,2011-01-03,,auto: single symbol in daily.parquet
+C0096,BSE,2017-02-03,,manual: Nifty 50 inclusion Sep-2026; listing date
