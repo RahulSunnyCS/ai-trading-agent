@@ -93,6 +93,45 @@ def build_inputs(root: Path, data_dir: Path, cutoff: str | None = None) -> None:
         frame[pd.to_datetime(frame.iloc[:, 0]) <= pd.Timestamp(cutoff)].to_csv(target, index=False)
 
 
+def expand(client, scenario: dict) -> dict:
+    """The full request a scenario stands for. `$meta` means "what a fresh dashboard run of this
+    dataset sends": the API's own defaults and default universe, with `with` applied on top."""
+    if "$meta" not in scenario:
+        return scenario
+    dataset = scenario["$meta"]
+    meta = client.get("/api/meta", params={"dataset": dataset}).json()
+    # The universe the dashboard sends for a fresh run of this dataset.
+    universe = (
+        ["broad_momentum"]
+        if dataset == "broad"
+        else [
+            item["name"]
+            for item in meta["instruments"]
+            if item["has_data"] and item["include"] != "optional"
+        ]
+    )
+    return {
+        **meta["defaults"],
+        "dataset": dataset,
+        "universe": universe,
+        **scenario.get("with", {}),
+    }
+
+
+def missing_categories(status: int, body: dict) -> set[str]:
+    """The names a 422 says have no weekly closes, or an empty set for any other answer."""
+    detail = body.get("detail") if status == 422 else None
+    if not (isinstance(detail, str) and detail.startswith("weekly closes are missing [")):
+        return set()
+    import ast
+
+    return set(ast.literal_eval(detail[detail.index("[") : detail.rindex("]") + 1]))
+
+
+def without_universe(request: dict, names: set[str]) -> dict:
+    return {**request, "universe": [n for n in request["universe"] if n not in names]}
+
+
 def _child(scenario_file: Path, out_file: Path) -> None:
     from fastapi.testclient import TestClient
 
@@ -104,35 +143,13 @@ def _child(scenario_file: Path, out_file: Path) -> None:
     )
     client = TestClient(api.create_app())
     results = {}
-    for name, request in json.loads(scenario_file.read_text()).items():
-        if "$meta" in request:  # "what a fresh dashboard run of this dataset shows"
-            dataset = request["$meta"]
-            meta = client.get("/api/meta", params={"dataset": dataset}).json()
-            # The universe the dashboard sends for a fresh run of this dataset.
-            universe = (
-                ["broad_momentum"]
-                if dataset == "broad"
-                else [
-                    item["name"]
-                    for item in meta["instruments"]
-                    if item["has_data"] and item["include"] != "optional"
-                ]
-            )
-            request = {
-                **meta["defaults"],
-                "dataset": dataset,
-                "universe": universe,
-                **request.get("with", {}),
-            }
+    for name, scenario in json.loads(scenario_file.read_text()).items():
+        request = expand(client, scenario)
         response = client.post("/api/backtest", json=request)
-        detail = response.json().get("detail") if response.status_code == 422 else None
-        if isinstance(detail, str) and detail.startswith("weekly closes are missing ["):
+        if missing := missing_categories(response.status_code, response.json()):
             # The trimmed fixture cannot price every category the full data can. Drop the ones
             # the API names and run on the rest; the request actually used is what is recorded.
-            import ast
-
-            missing = set(ast.literal_eval(detail[detail.index("[") : detail.rindex("]") + 1]))
-            request = {**request, "universe": [n for n in request["universe"] if n not in missing]}
+            request = without_universe(request, missing)
             response = client.post("/api/backtest", json=request)
         results[name] = {
             "request": request,

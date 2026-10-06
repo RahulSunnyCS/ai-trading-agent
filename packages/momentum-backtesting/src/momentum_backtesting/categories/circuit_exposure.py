@@ -76,7 +76,7 @@ def lock_masks(
     from .. import db_read  # noqa: PLC0415 (avoid an import cycle at module load)
 
     symbols = sorted(set(column_to_base.values()))
-    key = (db_read.catalog_mtime(root), tuple(symbols), tuple(weeks), min_days)
+    key = (db_read.data_version(root), tuple(symbols), tuple(weeks), min_days)
     hit = _mask_cache.get(key)
     if hit is not None:
         return hit

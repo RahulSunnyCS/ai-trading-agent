@@ -74,6 +74,93 @@ describe('momentumRuns store', () => {
     expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('failed');
   });
 
+  it('polls quickly at first, so a fast or cached run shows within half a second', async () => {
+    mockPost.mockResolvedValue({
+      ok: true,
+      data: { job: { id: 'a', status: 'running' } },
+    } as never);
+    jobs({ a: { id: 'a', status: 'done', result, error: null } });
+    await useMomentumRunsStore.getState().startRun('etf', {}, false);
+    await vi.advanceTimersByTimeAsync(299);
+    expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('running');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('done');
+  });
+
+  it('never sends a poll while the previous one is unanswered', async () => {
+    mockPost.mockResolvedValue({
+      ok: true,
+      data: { job: { id: 'a', status: 'running' } },
+    } as never);
+    let release: (() => void) | null = null;
+    mockGet.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ ok: true, data: { job: { id: 'a', status: 'running' } } } as never);
+        }),
+    );
+    await useMomentumRunsStore.getState().startRun('etf', {}, false);
+    await vi.advanceTimersByTimeAsync(10_000); // the first poll hangs for 10 s
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    (release as unknown as () => void)();
+    await vi.advanceTimersByTimeAsync(700); // answered: the next poll follows on the schedule
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('never overlaps polls when a run starts while one is in flight', async () => {
+    let n = 0;
+    mockPost.mockImplementation(
+      async () => ({ ok: true, data: { job: { id: `r${++n}`, status: 'running' } } }) as never,
+    );
+    let answerFirst: (() => void) | null = null;
+    mockGet.mockImplementation((url: string) => {
+      const reply = { ok: true, data: { job: { id: url.split('/').pop(), status: 'running' } } };
+      if (mockGet.mock.calls.length === 1) {
+        return new Promise((resolve) => {
+          answerFirst = () => resolve(reply as never);
+        });
+      }
+      return Promise.resolve(reply as never);
+    });
+    const { startRun } = useMomentumRunsStore.getState();
+    await startRun('etf', {}, false);
+    await vi.advanceTimersByTimeAsync(300); // first poll sent, not answered
+    await startRun('etf', {}, false); // a second run starts mid-poll
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(mockGet).toHaveBeenCalledTimes(1); // nothing new went out while it was unanswered
+    (answerFirst as unknown as () => void)();
+    await vi.advanceTimersByTimeAsync(299);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1); // the answer restarted the quick pace: both runs
+    expect(mockGet).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps polling every run after one run answers with something unusable', async () => {
+    mockPost.mockImplementation(async (url: string) => {
+      if (url.includes('saved-runs')) return { ok: true, data: { name: 'Run 5' } } as never;
+      const id = mockPost.mock.calls.filter(([u]) => u.includes('jobs')).length === 1 ? 'a' : 'b';
+      return { ok: true, data: { job: { id, status: 'running' } } } as never;
+    });
+    const { startRun } = useMomentumRunsStore.getState();
+    await startRun('etf', {}, false);
+    await startRun('etf', {}, false);
+    let aAnswer: unknown = {}; // 200 with no job in it: reading `job.status` throws
+    mockGet.mockImplementation(async (url: string) => {
+      if (url.includes('saved-runs')) return { ok: true, data: [{ n: 4 }] } as never;
+      return url.endsWith('/a')
+        ? ({ ok: true, data: aAnswer } as never)
+        : ({ ok: true, data: { job: { id: 'b', status: 'done', result, error: null } } } as never);
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    const [a1, b1] = useMomentumRunsStore.getState().runs;
+    expect(b1?.status).toBe('done'); // the healthy run is not held up by the broken one
+    expect(a1?.status).toBe('running');
+    aAnswer = { job: { id: 'a', status: 'done', result, error: null } };
+    await vi.advanceTimersByTimeAsync(700); // the loop is still alive
+    expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('done');
+  });
+
   it('reports a start failure without adding a tab', async () => {
     mockPost.mockResolvedValue({ ok: false, error: 'bad input' } as never);
     expect(await useMomentumRunsStore.getState().startRun('etf', {}, false)).toBe('bad input');

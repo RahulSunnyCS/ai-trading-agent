@@ -23,6 +23,7 @@ database-first read path; see TODO 3.11.8.
 
 from __future__ import annotations
 
+import threading
 from datetime import date
 from pathlib import Path
 
@@ -35,6 +36,83 @@ def catalog_mtime(root: Path | None = None) -> float | None:
     at all, distinct from "the catalog exists but has no momentum_prices rows yet"."""
     path = catalog_path(root or data_root())
     return path.stat().st_mtime if path.exists() else None
+
+
+#: Catalog tables that record runs rather than hold market data: a backtest never reads them, and
+#: the dashboard writes `backtest_runs` after every finished run (BL-005).
+RUN_RECORD_TABLES = frozenset(
+    {
+        "backtest_runs",
+        "backtest_days",
+        "backtest_trades",
+        "strategies",
+        "strategy_versions",
+        "momentum_signals",
+        "momentum_forward_journal",
+        "ingest_runs",
+        "schema_migrations",
+    }
+)
+_version_lock = threading.Lock()
+_version_memo: dict[Path, tuple[float, tuple]] = {}
+
+
+def data_version(root: Path | None = None) -> tuple | None:
+    """What a cache of anything computed from the shared database should be keyed on: None when
+    there is no catalog, else a value that changes exactly when the market data does.
+
+    Not the catalog file's mtime: that moves on every write, including the saved run the
+    dashboard stores after each backtest, which used to empty every cache before the next run
+    (BL-005). This is a content hash of every table except `RUN_RECORD_TABLES` (~0.1 s on the
+    live catalog), recomputed only when the mtime moves, plus the size and mtime of each stock
+    daily-bar lake file (written without touching the catalog by the Fyers top-up)."""
+    root = root or data_root()
+    mtime = catalog_mtime(root)
+    if mtime is None:
+        return None
+    with _version_lock:
+        memo = _version_memo.get(root)
+        if memo is None or memo[0] != mtime:
+            try:
+                memo = (mtime, table_fingerprints(root))
+            except Exception:  # e.g. the catalog is open for writing right now
+                if memo is not None:
+                    # Keep the last known version: the usual writer is a saved run (not market
+                    # data), and a different key here would empty every cache and then empty
+                    # them again when the lock clears. If market data did change, the next
+                    # successful read sees it.
+                    return memo[1] + _lake_files(root)
+                return (("catalog_mtime", mtime),)  # nothing known yet: a miss, never a failure
+            _version_memo[root] = memo
+    return memo[1] + _lake_files(root)
+
+
+def _lake_files(root: Path) -> tuple:
+    lake = root / "lake" / "bars_1d" / "asset=stock"
+    files = []
+    for path in sorted(lake.glob("year=*/*.parquet")):
+        stat = path.stat()
+        files.append((path.parent.name, stat.st_size, stat.st_mtime))
+    return tuple(files)
+
+
+def table_fingerprints(root: Path | None = None) -> tuple:
+    """(table, row count, order-independent hash of every row) for each catalog table except
+    `RUN_RECORD_TABLES`: what `data_version` is made of, and what a snapshot of "the data" should
+    compare."""
+    with connect(root or data_root(), read_only=True) as con:
+        names = [
+            name
+            for (name,) in con.execute(
+                "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'main' "
+                "ORDER BY table_name"
+            ).fetchall()
+            if name not in RUN_RECORD_TABLES
+        ]
+        return tuple(
+            (name, *con.execute(f'SELECT count(*), sum(hash(t)) FROM "{name}" t').fetchone())
+            for name in names
+        )
 
 
 def weekly_closes_from_db(root: Path | None = None) -> pd.DataFrame:
