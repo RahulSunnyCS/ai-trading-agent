@@ -1,0 +1,132 @@
+{
+  "dry_run": false,
+  "window": ["2012-01-01", "2016-12-31"],
+  "measured": ["2012-04-06", "2016-12-30"],
+  "frozen": "/private/tmp/claude-501/-Users-rahul-Projects-ai-trading-agent/bc8f57ea-e8b1-4628-b261-36c9401cebf0/scratchpad/wt-bl010-docs/packages/momentum-backtesting/search_spaces/bl010_phase6_frozen.json",
+  "code_commit": "4ed44d8c46a6e0160a113ad4acf932f35afafc41",
+  "data_snapshot": {
+    "last_bar": "2016-12-30",
+    "last_week": "2016-12-30",
+    "factors": "c988ebab380e"
+  },
+  "configs": [
+    {
+      "id": "1281e8ed6824",
+      "cagr": 0.18053977083221762,
+      "mdd": -0.26502948517790537,
+      "first_trade": "2012-04-27",
+      "trades": 732,
+      "replay_reconciles": true,
+      "big_days": 0,
+      "cagr_without_big_days": 0.18053977083221717
+    },
+    {
+      "id": "08c4307d7aa9",
+      "cagr": 0.22072577672151295,
+      "mdd": -0.3136992140678314,
+      "first_trade": "2012-04-06",
+      "trades": 688,
+      "replay_reconciles": true,
+      "big_days": 0,
+      "cagr_without_big_days": 0.22072577672151272
+    },
+    {
+      "id": "535b17b44ba5",
+      "cagr": 0.24044030231658198,
+      "mdd": -0.25184101398893477,
+      "first_trade": "2012-04-13",
+      "trades": 968,
+      "replay_reconciles": true,
+      "big_days": 0,
+      "cagr_without_big_days": 0.24044030231658198
+    },
+    {
+      "id": "bad83df3821a",
+      "cagr": 0.15100119690716896,
+      "mdd": -0.27744264368428484,
+      "first_trade": "2012-04-06",
+      "trades": 1568,
+      "replay_reconciles": true,
+      "big_days": 1,
+      "cagr_without_big_days": 0.1513609346480389
+    }
+  ],
+  "verdict": {
+    "ensemble": {
+      "cagr": 0.20129627025113983,
+      "mdd": -0.24041105345153235
+    },
+    "benchmarks": {
+      "Nifty 500 TRI": {
+        "cagr": 0.12280479878494299,
+        "mdd": -0.1939672679026624,
+        "excess_pts": 7.849147146619684,
+        "dd_multiple": 1.2394413554980659,
+        "passes": true
+      },
+      "Nifty Midcap 150 TRI": {
+        "cagr": 0.1765981149029976,
+        "mdd": -0.2271923626690283,
+        "excess_pts": 2.4698155348142237,
+        "dd_multiple": 1.058182813133384,
+        "passes": false
+      }
+    },
+    "reported": {
+      "Nifty200 Momentum 30 TRI": {
+        "cagr": 0.21093430418454884,
+        "mdd": -0.21513609494167718
+      },
+      "Nifty Smallcap 250 TRI": {
+        "cagr": 0.15893109381543247,
+        "mdd": -0.3009210317883664
+      }
+    },
+    "passes": false
+  },
+  "jump_scan": {
+    "ensemble_cagr_replayed": 0.20129627025113983,
+    "ensemble_cagr_big_days_zeroed": 0.20139070173289375
+  },
+  "pickable_names_by_year": {
+    "2012": 282,
+    "2013": 294,
+    "2014": 311,
+    "2015": 328,
+    "2016": 328
+  },
+  "window_matches_addendum": false,
+  "note_on_window": "The harness measured from the first equity week, 2012-04-06 (the configs hold nothing until their first quarterly pool forms), and aligned each benchmark to those weeks. Addendum 5 says measured from the first Friday of 2012, counting the cash weeks. 'literal_window' below is that version, computed with no new strategy run: the ensemble's stored result with the liquid fund's own growth (+2.43%) over 2012-01-06..2012-04-06 prepended, against each benchmark over 2012-01-06..2016-12-30. The verdict is a fail under both.",
+  "literal_window": {
+    "window": ["2012-01-06", "2016-12-30"],
+    "ensemble": {
+      "cagr": 0.1961,
+      "mdd": -0.2404
+    },
+    "benchmarks": {
+      "Nifty 500 TRI": {
+        "cagr": 0.1491,
+        "mdd": -0.194,
+        "excess_pts": 4.7,
+        "dd_multiple": 1.24,
+        "passes": false
+      },
+      "Nifty Midcap 150 TRI": {
+        "cagr": 0.2188,
+        "mdd": -0.2272,
+        "excess_pts": -2.3,
+        "dd_multiple": 1.06,
+        "passes": false
+      }
+    },
+    "reported": {
+      "Nifty200 Momentum 30 TRI": {
+        "cagr": 0.2346,
+        "mdd": -0.2151,
+        "excess_pts": -3.9
+      }
+    },
+    "passes": false
+  },
+  "recorded_verdict": "FAIL. Reported to the owner; not tuned around (criteria addendum 5)."
+}

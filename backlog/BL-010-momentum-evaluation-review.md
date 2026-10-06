@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0, 1a, 2, 4, 5 done; Phase 3 measured; Phase 6 step 0 done — a four-config ensemble frozen; Phase 6 parity, backcast and paper tracking next) |
+| **Status** | In progress (Phases 0, 1a, 2, 4, 5 done; Phase 3 measured; Phase 6: ensemble frozen, live parity built, the one-shot 2012–2016 backcast FAILED; paper tracking awaits the owner's go) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -311,6 +311,12 @@ median), re-run on the fixed engine. Steps 1–3 and 5–7 first; step 4 after B
    bootstrap 95th percentile).
 - **Done when:** the backcast result is recorded and paper tracking is running.
 
+**Outcome of step 2 (2026-10-07):** the backcast fails the pre-registered rule (20.1% a year
+against Nifty 500 TRI 12.3% and Midcap 150 TRI 17.7%: +7.8 and +2.5, needs +5 against both;
+−24.0% worst fall, within 1.5×). Recorded in `search_spaces/bl010_phase6_backcast_result.json`,
+not tuned around. Paper tracking is not blocked by it, but starting it saves four favourites
+into the shared database and adds them to the Friday job, so it waits for the owner.
+
 ### Last task — dashboard changes (owner, 2026-10-06)
 When the analysis is complete, write a plan of what the dashboard should change because of
 BL-010's findings, if anything: for example the point-in-time universe (BL-029), the Monday-open
@@ -504,3 +510,9 @@ Also parked here (owner, 2026-10-06), priority P3:
   `search_spaces/bl010_phase6_frozen.json`: `1281e8ed6824`, `08c4307d7aa9`, `535b17b44ba5`
   (every 4 weeks) and `bad83df3821a` (every 2 weeks), equal capital reset each April; full
   history 32.3% a year, max drawdown −31.5%.
+- 2026-10-07 — Phase 6 step 2 done: the one-shot 2012–2016 backcast of the frozen ensemble
+  (criteria addendum 5, committed first) **fails**. Ensemble 20.1% a year, worst fall −24.0%,
+  against Nifty 500 TRI 12.3% / −19.4% (+7.8, passes) and Nifty Midcap 150 TRI 17.7% / −22.7%
+  (+2.5, fails; +5 needed against both). Counting the cash weeks as the rules say: 19.6% against
+  14.9% and 21.9%, also a fail. In-sample 32% a year, unseen 20%, against 21% for Nifty200
+  Momentum 30 TRI. Reported, not tuned around. Live-signal parity built in parallel (own PR).
