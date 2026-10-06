@@ -67,6 +67,12 @@ table instead.
   apps/server) and the Python `ReferenceData` loader read them. Change data with
   `tdata reference sql "..."` (edits + re-exports); `tdata reference check` / the
   test suite fail on drift.
+- **Vendor imports keep every row and never overwrite the collector.** `vendor.import_unit` /
+  `import_index_csv` (BL-034) write one file per (asset, name, day) in the Fyers shape,
+  including closing bars, weekend sessions and Muhurat evenings; `data_quality` labels them.
+  A day file the Fyers collector wrote is never replaced, even with `--force`. Work is cut
+  into date chunks, each one `ingest_runs` row (`scope = 'NIFTY 2025-06-01..2025-06-30'`); a
+  chunk that finished (`ok` or `partial`) is skipped on a re-run.
 - **`data_quality` mirrors the lake.** One row per bars_1m file, written when a file is
   written and regenerable with `tdata quality rebuild`; a day is never dropped from the lake
   for a bad verdict — the label says why, readers decide. Fetch timestamps from DuckDB as
@@ -86,6 +92,8 @@ table instead.
 uv sync && uv run pytest
 uv run tdata init | status | backup --to <dir> | mount
 uv run tdata quality rebuild [--asset option] [--name NIFTY] [--days A..B] | status
+uv run tdata vendor import --from <staging> [--unit nifty] [--section index|stocks] [--days A..B] [--force] [--dry-run]
+uv run tdata vendor import-index <csv> --symbol NIFTY|BANKNIFTY|SENSEX|INDIAVIX [--days A..B]
 uv run tdata reference export | check | sql "<statement>"
 uv run mbt local migrate   # from packages/momentum-backtesting/: (re-)import its data
 ```

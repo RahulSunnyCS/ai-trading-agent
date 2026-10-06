@@ -107,6 +107,7 @@ uv run tdata status         # where it lives, rows/days per view, ingest runs, r
 uv run tdata reference sql "INSERT INTO ref_lot_sizes VALUES ('NIFTY', 75, DATE '2027-01-01')"  # edit + re-export CSVs
 uv run tdata backup --to /Volumes/<disk>/TradingData   # monthly; copies only new lake/raw files
 uv run tdata mount          # attach TRADING_DATA_IMAGE if the root's volume is not mounted (idempotent)
+uv run tdata vendor import --from "/Volumes/RAHUL'S SSD/Stock Market Data/parquet/options" --unit nifty  # BL-034: vendor options history -> lake (resumable; Fyers days never overwritten); import-index <csv> --symbol NIFTY for spot / INDIAVIX
 uv run tdata quality rebuild  # re-judge every lake day -> data_quality (usable / excluded + why); `quality status` summarises
 uv run obt legwise run strategies/legwise/*.yaml [--trades]   # AlgoTest-style leg-wise backtests over that data
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)

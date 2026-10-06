@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from . import quality, reference
+from . import quality, reference, vendor
 from .backup import backup as run_backup
 from .db import LAKE_VIEWS, catalog_path, check_mounted, connect, data_root
 
@@ -17,6 +17,8 @@ ref_app = typer.Typer(no_args_is_help=True, help="Lot sizes, strike steps, calen
 app.add_typer(ref_app, name="reference")
 quality_app = typer.Typer(no_args_is_help=True, help="Per-day quality verdicts for the lake.")
 app.add_typer(quality_app, name="quality")
+vendor_app = typer.Typer(no_args_is_help=True, help="Load the vendor's history (BL-034).")
+app.add_typer(vendor_app, name="vendor")
 
 
 def _size(path: Path) -> int:
@@ -213,3 +215,66 @@ def quality_status() -> None:
         if bad:
             line += f"  ({', '.join(why[(asset, name)])})"
         typer.echo(line)
+
+
+@vendor_app.command("import")
+def vendor_import(
+    from_: Path = typer.Option(
+        ..., "--from", help="The staging set: <dir>/<index|stocks>/<unit>/*.parquet."
+    ),
+    unit: list[str] = typer.Option(
+        None, "--unit", help="Only these units (repeatable), e.g. nifty."
+    ),
+    section: str = typer.Option("all", help="index, stocks or all."),
+    days: str = typer.Option(None, help="Only days in A..B, e.g. 2024-10-01..2026-09-17."),
+    force: bool = typer.Option(False, help="Rewrite days an earlier vendor import wrote."),
+    dry_run: bool = typer.Option(False, help="List what would be imported and stop."),
+) -> None:
+    """Load the vendor's staged options history into the lake (BL-034). Resumable; the Fyers
+    collector's days are never overwritten."""
+    if section not in ("all", "index", "stocks"):
+        raise typer.BadParameter("section must be index, stocks or all")
+    try:
+        window = quality.parse_days(days) if days else None
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    units = vendor.list_units(from_.expanduser(), units=unit, section=section)
+    if not units:
+        typer.echo("nothing to import — no matching units with data", err=True)
+        raise typer.Exit(1)
+    root = data_root()
+    typer.echo(f"{len(units)} units, {sum(u.rows for u in units):,} rows -> {root}")
+    if dry_run:
+        for u in units:
+            typer.echo(f"  {u.section}/{u.folder}: {len(u.files)} files, {u.rows:,} rows")
+        return
+    for u in units:
+        report = vendor.import_unit(root, u, days=window, force=force, log=typer.echo)
+        excluded = ", ".join(f"{k} {v}" for k, v in sorted(report.excluded.items())) or "none"
+        typer.echo(
+            f"== {report.name}: {report.days_written} days written, "
+            f"{report.days_skipped_existing} existing, {report.rows_written:,} rows; "
+            f"chunks run {report.chunks_run}, skipped {report.chunks_skipped}; "
+            f"unparsed rows {report.rows_unparsed}; excluded days: {excluded}"
+        )
+
+
+@vendor_app.command("import-index")
+def vendor_import_index(
+    csv: Path = typer.Argument(..., help="A Date,Open,High,Low,Close,Volume 1-minute CSV."),
+    symbol: str = typer.Option(..., help="NIFTY, BANKNIFTY, SENSEX, INDIAVIX, ..."),
+    days: str = typer.Option(None, help="Only days in A..B."),
+    force: bool = typer.Option(False, help="Rewrite days an earlier vendor import wrote."),
+) -> None:
+    """Load an index spot (or India VIX) CSV as asset=index/symbol=<SYMBOL>."""
+    try:
+        window = quality.parse_days(days) if days else None
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    report = vendor.import_index_csv(
+        data_root(), csv.expanduser(), symbol, days=window, force=force, log=typer.echo
+    )
+    typer.echo(
+        f"== {report.name}: {report.days_written} days written, "
+        f"{report.days_skipped_existing} existing, {report.rows_written:,} rows"
+    )
