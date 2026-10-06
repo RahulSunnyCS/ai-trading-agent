@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Priority** | P2 — the code is built and tested; this is the owner-side set-up that makes it usable from anywhere |
+| **Priority** | P2 — not needed for friends next week (owner, 2026-10-06); the code is built and tested, this is the owner-side set-up |
 | **Status** | Planned |
 | **Type** | chore |
 | **Area** | infra |
@@ -91,6 +91,13 @@ token is refused by Cloudflare.
 - **Deliverables:** whichever of those the owner opts into.
 - **Done when:** a morning with the laptop untouched leaves the dashboard usable.
 
+### Phase 5 — Friends' access (owner-approved 2026-10-06)
+- **Tasks:** a viewer role: friends can view and run backtests; ingestion, the weekly-signal
+  Telegram send, Fyers login and job triggers are hidden and refused by the API. One password per
+  person (so one can be revoked without signing everyone out), replacing the single
+  `DASHBOARD_PASSWORD` for viewers.
+- **Done when:** a viewer login cannot trigger any of the refused actions, tested per route.
+
 ## Risks
 
 - **Laptop asleep/offline** → every proxied call errors. Mitigate with Phase 4.
@@ -118,3 +125,8 @@ token is refused by Cloudflare.
 
 - 2026-10-04 — created from the remote-dashboard work (PR #2 merged, PR #3 open).
   Checked Vercel: no existing project for this repo.
+- 2026-10-06 — re-prioritised P2 → P1: the owner plans to give two or three friends access to
+  Momentum during week 2 of the October plan. Before sharing, decide which actions friends may
+  trigger (ingestion, weekly-signal sends, Fyers login) — see the review PR's approval list.
+- 2026-10-06 — owner decisions on PR #27: back to P2 — friends do not need access next week. Viewer role and per-person
+  passwords approved — added as Phase 5.

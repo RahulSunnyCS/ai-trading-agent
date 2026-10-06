@@ -331,6 +331,11 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
 1. For a delay-1 strategy the Rebalance preview targets last week's ranking, as backtested.
    When trading live, act on that or on the freshest ranking?
 2. Which strategy will be followed with real money (ETF signal or a Broad candidate) — not yet decided.
+3. **Pending — discuss when this item is picked up.** The category layer: build launch dates for the 113 themes, or fall back to
+   NSE's sectoral and thematic indices? Claude's recommendation (2026-10-06): the NSE indices,
+   dated by each index's official launch date — published and checkable, whereas dating
+   hand-made themes is itself a hindsight call; custom and own-research themes (incl.
+   `pending_themes.csv`) tracked forward only through BL-024. A proposal, not a decision.
 
 ### Answered
 
@@ -414,3 +419,21 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   aggressive winner is 5.8 points below its phase average (killed as a finalist). Steps 4 to 6
   (criteria as code, generic nudges, the window rule) are not done; the point-in-time scoring
   is not run.
+- 2026-10-06 — note from the overnight review: themes added in a session on 2026-10-05 (Nuclear
+  Supply Chain, Battery Storage (BESS), Optic Fibre, Semiconductors and others — about 69 rows) sit
+  **uncommitted** in `categories/curated/category_extras.csv` and `stockscans_catalog.md` in the
+  main checkout. Like F2, they are 2026 themes with no launch date; under Phase 3 step 3 they must
+  get one before any backtest can use them, and until Phase 3 passes they are not searched. Forward
+  tracking (Phase 6) can start earlier than planned without touching this review — see BL-024.
+- 2026-10-06 — owner decisions on PR #27: set the 69 theme rows aside. They are committed as
+  `categories/curated/pending_themes.csv` + `pending_themes.md`, which no code reads; they move
+  into `category_extras.csv` only with launch dates, under Phase 3 step 3.
+- 2026-10-06 — owner delegated open decisions to Claude's recommendations (PR #27). On "launch
+  dates for 113 themes, or the NSE sectors": **recommended default — NSE sectoral and thematic
+  indices, dated by each index's official launch date.** Those dates are published and checkable,
+  while dating 113 hand-made themes means judging when each "became" a theme, which is itself a
+  hindsight call. Custom and own-research themes (including `pending_themes.csv`) stay out of
+  backtests and are tracked forward only, through BL-024's journal. Applies unless the owner
+  objects; the session running this review should confirm with the owner before building on it.
+- 2026-10-06 — owner: pending decisions stay here as open questions and are settled when the item is picked up; the "recommended default" in the entry above is
+  only a proposal — see open question 3.

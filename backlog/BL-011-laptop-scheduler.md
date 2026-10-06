@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the morning broker login is the prerequisite for any AlgoTest execution, and GitHub's scheduler was delivering it hours late |
-| **Status** | In progress (Phase 1 done) |
+| **Status** | Done — Phase 1 verified 2026-10-06; Phases 2–4 continue as BL-012 |
 | **Type** | feature |
 | **Area** | infra |
 | **Created** | 2026-10-05 |
@@ -121,3 +121,6 @@ For Phase 2 onwards:
   dispatched during verification.
 - 2026-10-05 — corrected the first-fire date (Mon 5 Oct, not Tue 6 Oct). Phases 2–4
   superseded by BL-012; this item closes once Phase 1's first real run is confirmed.
+- 2026-10-06 — closed (owner asked to check and close). `gh run list` shows `workflow_dispatch`
+  runs created at 08:00 IST on Mon 2026-10-05 and Tue 2026-10-06, both successful; the LaunchAgent
+  `com.ai-trading-agent.broker-login` is loaded. Phases 2–4 live on in BL-012.

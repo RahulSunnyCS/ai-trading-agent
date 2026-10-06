@@ -229,3 +229,12 @@ re-entry / re-execute / journey on candle close, premium matching on candle clos
   to follow. Quantiply docs read; Phase 3 rewritten as a feature matrix with Stockmock conventions.
   Phase 1 waits on the AlgoTest logs; Phase 3 and the Phase 2 importer (on the sample) do not.
 - 2026-10-05 — owner: has Stockmock; vendor data will be complete, details later; test back to 2019.
+- 2026-10-06 — vendor data now on the owner's SSD (`/Volumes/RAHUL'S SSD/Stock Market Data`):
+  `2014-2024/` (37 GB) and `options/` (32 GB), about 221k CSV files. `2014-2024/spot_data/` has
+  1-minute NIFTY, BANKNIFTY and SENSEX spot (`Date,Open,High,Low,Close,Volume`, ISO timestamps
+  with +0530; NIFTY from 2015-01-09, 1.06M rows) — this clears the "no NIFTY spot" blocker above.
+  India VIX not found in that folder yet. Accuracy, as three checks: (1) data — vendor spot against
+  Fyers index history (`obt fyers history`; index history never expires, so the two overlap, which
+  also settles the bar-timestamp convention); (2) engine — the four strategies against AlgoTest's
+  trade logs (still owed); (3) regression — the 30 golden scenarios plus new ones from (2).
+  Realised-vs-backtest for the strategies that trade live is split out as BL-026.
