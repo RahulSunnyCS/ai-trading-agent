@@ -187,14 +187,17 @@ def _open(path: Path, read_only: bool, attempts: int = 40) -> duckdb.DuckDBPyCon
 
 @contextmanager
 def connect(
-    root: Path | None = None, *, read_only: bool = False
+    root: Path | None = None, *, read_only: bool = False, lock_wait: float = 10.0
 ) -> Iterator[duckdb.DuckDBPyConnection]:
+    """`lock_wait`: seconds to keep retrying while another process holds the catalog. 10 s
+    suits an interactive command; a long import that has already written files and only
+    needs to record them passes minutes (a crash between the two leaves unrecorded days)."""
     root = root or data_root()
     path = catalog_path(root)
     if read_only and not path.exists():
         raise FileNotFoundError(f"no catalog at {path} — run `tdata init` first")
     root.mkdir(parents=True, exist_ok=True)
-    con = _open(path, read_only)
+    con = _open(path, read_only, attempts=max(1, round(lock_wait / 0.25)))
     try:
         if not read_only:
             migrate(con)

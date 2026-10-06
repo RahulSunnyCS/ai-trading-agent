@@ -184,7 +184,8 @@ def quality_rebuild(
     done = quality.rebuild(data_root(), asset=asset, name=name, days=window, log=typer.echo)
     typer.echo(
         f"rebuilt {sum(v for k, v in done.items() if '/' in k):,} day verdicts; "
-        f"{done['no_spot_changes']} no_spot labels changed"
+        f"{done['no_spot_changes']} no_spot labels changed, "
+        f"{done['rows_pruned']} stale rows removed"
     )
 
 
@@ -192,6 +193,11 @@ def quality_rebuild(
 def quality_status() -> None:
     """Days, range and verdicts per (asset, name), with the reasons for exclusions."""
     with connect(data_root(), read_only=True) as con:
+        if not con.execute(
+            "SELECT count(*) FROM information_schema.tables WHERE table_name = 'data_quality'"
+        ).fetchone()[0]:  # a catalog nothing has opened read-write since 008 was added
+            typer.echo("no verdicts yet — run `tdata quality rebuild`")
+            return
         rows = con.execute(
             "SELECT asset, name, count(*), min(trading_day), max(trading_day), "
             "count(*) FILTER (WHERE verdict = 'usable'), "

@@ -7,7 +7,7 @@ rebuilt. Nothing is dropped from the lake on a bad verdict — the label says wh
 excluded, and readers decide.
 
 A day is described by the instrument with the most bars in the regular session
-(09:15-15:29, bar start, IST): 375 on a full day. Fyers files also keep the 15:30-15:39
+(09:15 up to 15:30, bar start, IST): 375 on a full day. Fyers files also keep the 15:30-15:39
 closing bars and some vendor days have rows after hours (Muhurat evenings); those count as
 `off_session_rows`, never as bars.
 """
@@ -34,10 +34,10 @@ FULL_DAY_BARS = 375
 #: An option day with fewer contracts than this is not a chain.
 MIN_CONTRACTS = 10
 
-#: Bar-start times of the regular session, IST, inclusive.
-IN_SESSION_SQL = (
-    "(CAST(ts AT TIME ZONE 'Asia/Kolkata' AS TIME) BETWEEN TIME '09:15' AND TIME '15:29')"
-)
+#: Bar-start times of the regular session, IST: 09:15:00 up to but not including 15:30:00.
+#: Half-open on purpose — a bar stamped 15:29:30 belongs to minute 15:29, as in legwise's grid.
+_IST_TIME = "CAST(ts AT TIME ZONE 'Asia/Kolkata' AS TIME)"
+IN_SESSION_SQL = f"({_IST_TIME} >= TIME '09:15' AND {_IST_TIME} < TIME '15:30')"
 
 IST = ZoneInfo("Asia/Kolkata")
 ASSETS = ("option", "future", "index")
@@ -100,30 +100,29 @@ def parse_days(spec: str) -> tuple[date, date]:
 
 _DAY_FROM_PATH = re.compile(r"date=(\d{4}-\d{2}-\d{2})/data\.parquet$")
 
-# One scan per (asset, name): stats per file. max_bars needs a per-instrument count first.
+# One scan per (asset, name): aggregate each (file, instrument) once — an instrument has one
+# expiry, so any_value is exact — then roll that small intermediate up per file.
 _STATS_SQL = f"""
-WITH r AS (
-    SELECT filename, instrument_id, ts, vendor_symbol, {{expiry}} AS expiry,
-           {IN_SESSION_SQL} AS ins
-    FROM read_parquet(?, filename = true)
-), per AS (
+WITH per AS (
     SELECT filename, instrument_id,
-           count(*) FILTER (WHERE ins) AS bars
-    FROM r GROUP BY 1, 2
-), mx AS (
-    SELECT filename, max(bars) AS max_bars FROM per GROUP BY 1
+           count(*) AS n,
+           count(*) FILTER (WHERE {IN_SESSION_SQL}) AS bars,
+           min(ts) AS first_ts, max(ts) AS last_ts,
+           any_value({{expiry}}) AS expiry, any_value(vendor_symbol) AS vendor_symbol
+    FROM read_parquet(?, filename = true)
+    GROUP BY 1, 2
 )
-SELECT r.filename,
-       count(*) AS n_rows,
-       count(DISTINCT r.instrument_id) AS contracts,
-       count(DISTINCT r.expiry) AS expiries,
-       any_value(mx.max_bars) AS max_bars,
-       count(*) FILTER (WHERE NOT r.ins) AS off_rows,
-       epoch(min(r.ts)) AS first_epoch,   -- epoch, not TIMESTAMPTZ: fetching one needs pytz
-       epoch(max(r.ts)) AS last_epoch,
-       any_value(r.vendor_symbol) AS vendor_symbol
-FROM r JOIN mx USING (filename)
-GROUP BY r.filename
+SELECT filename,
+       sum(n) AS n_rows,
+       count(*) AS contracts,
+       count(DISTINCT expiry) AS expiries,
+       max(bars) AS max_bars,
+       sum(n - bars) AS off_rows,
+       epoch(min(first_ts)) AS first_epoch,   -- epoch, not TIMESTAMPTZ: fetching one needs pytz
+       epoch(max(last_ts)) AS last_epoch,
+       any_value(vendor_symbol) AS vendor_symbol
+FROM per
+GROUP BY filename
 """
 
 
@@ -229,12 +228,35 @@ def upsert(
         con.unregister("_dq")
 
 
+def prune(
+    con: duckdb.DuckDBPyConnection,
+    asset: str,
+    name: str,
+    window: tuple[date, date],
+    keep: set[date],
+) -> int:
+    """Delete verdicts of days in `window` that no longer have a lake file, so the table
+    keeps mirroring the files after a partition is removed. Returns the rows deleted."""
+    con.register("_keep", pa.table({"d": pa.array(sorted(keep), pa.date32())}))
+    try:
+        return con.execute(
+            "DELETE FROM data_quality WHERE asset = ? AND name = ? "
+            "AND trading_day BETWEEN ? AND ? AND trading_day NOT IN (SELECT d FROM _keep)",
+            [asset, name, *window],
+        ).fetchone()[0]
+    finally:
+        con.unregister("_keep")
+
+
 def cross_check(con: duckdb.DuckDBPyConnection, names: list[str] | None = None) -> int:
     """An option day whose underlying has index data in the lake, but none usable for that
     day, cannot be backtested (strikes are picked from spot): label it `no_spot`. Clears
     the label when the spot day arrives, so import order does not matter. Underlyings with
     no index data at all (the stocks) are left alone — they never have a spot series.
-    Returns the number of rows changed."""
+    Returns the number of rows changed. `names=None` checks every underlying; an empty list
+    checks none."""
+    if names is not None and not names:
+        return 0
     flt = "" if names is None else f" AND o.name IN ({','.join('?' for _ in names)})"
     args = list(names or [])
     usable_spot = (
@@ -272,20 +294,27 @@ def rebuild(
         holidays = {r[0] for r in con.execute("SELECT date FROM ref_holidays").fetchall()}
     lo, hi = days or (date.min, date.max)
     judged: dict[str, int] = {}
-    names_touched: set[str] = set()
+    changed = pruned = 0
     for a in [asset] if asset else ASSETS:
         by_name: dict[str, list[Path]] = {}
         for n, day, path in lake.partitions(root, a):
             if (name is None or n == name) and lo <= day <= hi:
                 by_name.setdefault(n, []).append(path)
-        for n, files in sorted(by_name.items()):
-            stats = file_stats(a, n, files)
-            with connect(root) as con:
+        with connect(root, read_only=True, lock_wait=300) as con:
+            known = {r[0] for r in con.execute(
+                "SELECT DISTINCT name FROM data_quality WHERE asset = ?", [a]).fetchall()
+            }  # fmt: skip
+        # a name whose files are all gone still has rows to prune
+        for n in sorted(set(by_name) | {k for k in known if name in (None, k)}):
+            stats = file_stats(a, n, by_name.get(n, []))
+            with connect(root, lock_wait=300) as con:
                 upsert(con, stats, holidays)
+                pruned += prune(con, a, n, (lo, hi), keep={s.day for s in stats})
+                # per name, in the same connection: upsert resets every option day to usable,
+                # so the no_spot labels must not stay wiped while later names are scanned
+                changed += cross_check(con, [n])
             judged[f"{a}/{n}"] = len(stats)
-            names_touched.add(n)
             log(f"{a}/{n}: judged {len(stats)} days")
-    with connect(root) as con:
-        changed = cross_check(con, sorted(names_touched) or None)
     judged["no_spot_changes"] = changed
+    judged["rows_pruned"] = pruned
     return judged

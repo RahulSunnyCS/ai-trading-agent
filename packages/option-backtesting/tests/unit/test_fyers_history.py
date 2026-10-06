@@ -72,3 +72,13 @@ def test_unknown_history_stops_after_consecutive_empty_chunks(root):
     history.backfill_index(client, root, "NIFTY", end=date(2026, 9, 30), log=lambda _: None)
     # 1 chunk with data + EMPTY_CHUNKS_TO_STOP empty ones, x2 series each — not a walk to 2015
     assert client.calls <= 2 * (1 + history.EMPTY_CHUNKS_TO_STOP)
+
+
+def test_the_short_session_threshold_is_shared_with_data_quality():
+    """Two definitions of 'too few bars to be a day' would let the backfill and the
+    data_quality verdict disagree; there is one, in trading_data.quality."""
+    from trading_data import quality
+
+    from option_backtesting.fyers import history
+
+    assert history.MIN_BARS is quality.MIN_BARS
