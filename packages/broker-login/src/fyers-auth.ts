@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { fyersTokenExpiry } from '@trading/broker-identity';
 import { registerSecret } from './secrets.js';
 
 /**
@@ -126,9 +127,11 @@ export async function exchangeAuthCode(
     const detail = typeof body.message === 'string' ? body.message : `s=${String(body.s)}`;
     throw new Error(`Fyers token exchange failed: ${detail}`);
   }
-  // Fyers tokens die at the next ~06:00 IST whatever expires_in says; 12 hours is a
-  // safe upper bound for a job that uses it within minutes.
-  const expiresAt = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
+  // Fyers tokens die at the next 06:00 IST whatever expires_in says.
+  const expiresAt = fyersTokenExpiry(
+    new Date(),
+    typeof body.expires_in === 'number' ? body.expires_in : null,
+  ).toISOString();
   return { appId: config.appId, accessToken: token, expiresAt };
 }
 

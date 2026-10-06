@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from pathlib import Path
 
@@ -1442,6 +1443,114 @@ def _categories_curated_dir() -> Path:
     return Path(__file__).parent / "categories" / "curated"
 
 
+journal_app = typer.Typer(
+    no_args_is_help=True,
+    help="The forward-signal journal (BL-024): every weekly signal as recorded, unchangeable.",
+)
+app.add_typer(journal_app, name="journal")
+
+
+@journal_app.command("show")
+def journal_show(
+    week: str = typer.Option(None, help="Only this signal week (YYYY-MM-DD)."),
+) -> None:
+    """List journal entries, oldest first."""
+    from trading_data.db import connect
+
+    from . import forward_journal
+
+    with connect() as con:
+        rows = forward_journal.entries(con, week)
+    if not rows:
+        typer.echo("The journal is empty." if week is None else f"No entries for {week}.")
+        return
+    for row in rows:
+        weights = json.loads(row["holdings_before"])
+        top = ", ".join(
+            f"{name} {weight:.0%}"
+            for name, weight in sorted(weights.items(), key=lambda kv: -kv[1])
+        )
+        correction = f" (corrects #{row['supersedes']})" if row["supersedes"] else ""
+        typer.echo(
+            f"#{row['entry_id']} {row['week']} {row['run_kind']:<7} {row['config_name']}"
+            f"{correction}\n    recorded {row['recorded_at']} · {row['code_commit'][:12]}"
+            f" · held before: {top or 'nothing'}"
+        )
+
+
+@journal_app.command("check")
+def journal_check(
+    week: str = typer.Option(
+        None, help="Signal week (YYYY-MM-DD); default the latest Friday on or before today."
+    ),
+    send: bool = typer.Option(False, help="Also send the summary to Telegram."),
+) -> None:
+    """After Friday's runs: did every favourite (and the benchmark) get recorded for the week,
+    under the right week, and is the chain intact? Exits 1 when anything is missing or broken.
+    Scheduled for Fridays 20:15 IST by the momentum-weekly-journal-check LaunchAgent."""
+    from datetime import datetime
+
+    from trading_data.db import connect
+
+    from . import forward_journal, notify, runs_store
+    from .stocks.ui_data import NIFTY200_MOMENTUM30_TRI
+    from .weekly import week_ending_on_or_before
+
+    target = week or week_ending_on_or_before(datetime.now(notify.IST).date())
+    try:
+        with connect() as con:
+            result = forward_journal.check(
+                con, target, runs_store.list_favorites(con), (NIFTY200_MOMENTUM30_TRI,)
+            )
+    except Exception as error:
+        # e.g. the catalog still locked by a long 19:30 run: say so, never fail silently.
+        message = notify.redact(f"{type(error).__name__}: {error}")
+        typer.echo(f"journal check FAILED: {message}")
+        if send:
+            notify.send(
+                notify.Notification(
+                    "momentum-journal",
+                    "error",
+                    "Forward journal check could not run",
+                    f"{message}\nRerun it: mbt journal check --send",
+                )
+            )
+        raise typer.Exit(1) from error
+    title, body = forward_journal.summary(result)
+    typer.echo(f"{title}\n{body}")
+    if send:
+        notify.send(
+            notify.Notification(
+                "momentum-journal", "info" if result["ok"] else "warning", title, body
+            )
+        )
+    if not result["ok"]:
+        raise typer.Exit(1)
+
+
+@journal_app.command("verify")
+def journal_verify() -> None:
+    """Check that no entry was changed, removed or reordered since it was recorded."""
+    from trading_data.db import connect
+
+    from . import forward_journal
+
+    with connect() as con:
+        problems = forward_journal.verify(con)
+        chain = forward_journal.head(con)
+    if problems:
+        for problem in problems:
+            typer.echo(f"FAIL {problem}")
+        raise typer.Exit(1)
+    if chain is None:
+        typer.echo("OK: the journal is empty.")
+    else:
+        typer.echo(
+            f"OK: {chain[0]} entries, chain intact; head {chain[1][:16]} "
+            "(compare with the latest Telegram 'Forward journal' line)."
+        )
+
+
 audit_app = typer.Typer(
     no_args_is_help=True,
     help="Check a backtest against raw exchange data (BL-010): bundle a run's orders and "
@@ -2146,6 +2255,14 @@ def weekly(
         typer.echo(f"\n{result['title']}: {result['body']}")
     elif not any(s["active"] and s["body"] is not None for s in result["strategies"]):
         typer.echo(f"\nSent warning to Telegram: {result['title']}")
+    journal = result["journal"]
+    if journal["error"]:
+        typer.echo(f"\nforward journal FAILED: {journal['error']}")
+    else:
+        recorded = ", ".join(journal["recorded"]) or "nothing new"
+        typer.echo(f"\nforward journal: {recorded}")
+        for note in journal["notes"]:
+            typer.echo(f"  note: {note}")
 
 
 @app.command()

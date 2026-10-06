@@ -2,19 +2,19 @@
 
 | | |
 |---|---|
-| **Priority** | P2 — only meaningful once at least one of BL-030/031/032 passes its test |
+| **Priority** | P2 — only meaningful once at least one of BL-035/031/032 passes its test |
 | **Status** | Idea |
 | **Type** | feature |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
-| **Depends on** | a passed test in BL-030, BL-031 or BL-032; BL-010; BL-025 (live-money rules) before the weekly signal changes |
+| **Depends on** | a passed test in BL-035, BL-031 or BL-032; BL-010; BL-025 (live-money rules) before the weekly signal changes |
 | **TODO.md row** | — (filled in when started) |
 
 ## Context
 
 The owner's idea (2026-10-06): once pattern or analog work shows something, include it in the
 backtesting ranking as an additional input for a better stock pick. Split from the same
-discussion as BL-030, BL-031 and BL-032.
+discussion as BL-035, BL-031 and BL-032.
 
 Assessment: fine, as a feature with a pre-registered incremental test — never as a new scoring
 rule added because a chart looked good. The ranking must stay reproducible under BL-001's

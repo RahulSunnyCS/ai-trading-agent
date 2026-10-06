@@ -1397,7 +1397,7 @@ wiring test (broker-factory routing). Real-tick confirmation is a manual owner s
 no workaround without valid credentials and market hours.
 
 **The Fyers daily access token still requires manual daily regeneration.**
-The token expires every 24 hours and Fyers does not issue a long-lived refresh grant
+The token expires at the next 06:00 IST reset (not 24 hours after login) and Fyers does not issue a long-lived refresh grant
 via their data API. Automating the re-authentication (FYERS_PIN-based headless flow)
 was deliberately deferred to Phase B. The rationale: implementing automated PIN
 handling introduces a stored-PIN risk surface that deserves its own dedicated security

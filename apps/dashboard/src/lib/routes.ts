@@ -6,7 +6,7 @@
  *   /live  /trades  /personalities  /pnl  /regime
  *   /optionslab/{strategies|builder|runs|results|regimes}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
- *   /momentum/{backtest|scores|saved|weekly|rebalance}
+ *   /momentum/{backtest|scores|saved|weekly|rebalance|journal}
  *   /momentum/backtest/{etf|stock|custom_index|broad}
  *   /momentum/scores/{stocks|sectors}
  *   /coverage/{backfill|replay}
@@ -72,7 +72,14 @@ export type CoverageSection = (typeof COVERAGE_SECTIONS)[number];
 /** What `/coverage` opens. */
 export const COVERAGE_DEFAULT_SECTION: CoverageSection = 'backfill';
 
-export const MOMENTUM_SECTIONS = ['backtest', 'scores', 'saved', 'weekly', 'rebalance'] as const;
+export const MOMENTUM_SECTIONS = [
+  'backtest',
+  'scores',
+  'saved',
+  'weekly',
+  'rebalance',
+  'journal',
+] as const;
 export type MomentumSection = (typeof MOMENTUM_SECTIONS)[number];
 
 export const MOMENTUM_DATASETS = ['etf', 'stock', 'custom_index', 'broad'] as const;

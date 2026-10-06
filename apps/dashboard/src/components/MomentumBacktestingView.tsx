@@ -50,6 +50,7 @@ import {
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
 import { MomentumCircuitExposureCard } from './momentum/MomentumCircuitExposure';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
+import { MomentumJournalView } from './momentum/MomentumJournalView';
 import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
 import {
   MomentumPerformanceCard,
@@ -105,6 +106,11 @@ const SECTIONS: Array<{ id: MomentumSection; label: string; description: string 
     id: 'rebalance',
     label: 'Rebalance preview',
     description: 'Compare your holdings with a live model target.',
+  },
+  {
+    id: 'journal',
+    label: 'Journal',
+    description: 'Every weekly signal as recorded, and whether this week was recorded in full.',
   },
 ];
 
@@ -928,6 +934,8 @@ export function MomentumBacktestingView() {
           <MomentumScoresView />
         ) : section === 'weekly' ? (
           <MomentumWeeklyView weekly={weekly} />
+        ) : section === 'journal' ? (
+          <MomentumJournalView />
         ) : section === 'rebalance' ? (
           <MomentumRebalanceView currentBroadConfig={dataset === 'broad' ? currentConfig : null} />
         ) : section === 'saved' ? (

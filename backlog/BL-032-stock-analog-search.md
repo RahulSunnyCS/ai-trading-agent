@@ -14,7 +14,7 @@
 
 The owner's idea (2026-10-06): the morning-to-evening analog idea for options (BL-022) applied
 to stocks — if a stock's recent path looks like past paths, what did those do over the next six
-months, and what shape usually precedes a run-up? Split from the same discussion as BL-030,
+months, and what shape usually precedes a run-up? Split from the same discussion as BL-035,
 BL-031 and BL-033.
 
 Assessment: this is nearest-neighbour forecasting over normalised return paths. The

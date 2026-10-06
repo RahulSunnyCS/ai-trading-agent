@@ -2,19 +2,19 @@
 
 | | |
 |---|---|
-| **Priority** | P2 — achievable, but subjective definitions, thin samples and weak published evidence; do after BL-030 |
+| **Priority** | P2 — achievable, but subjective definitions, thin samples and weak published evidence; do after BL-035 |
 | **Status** | Idea |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
-| **Depends on** | BL-030 (shows whether the cheap version carries anything), BL-015 |
+| **Depends on** | BL-035 (shows whether the cheap version carries anything), BL-015 |
 | **TODO.md row** | — (filled in when started) |
 
 ## Context
 
 The owner's idea (2026-10-06): detect head and shoulders, inverse head and shoulders, tight
 flags and cup and handle on weekly or daily (not hourly) stock data. Split from the same
-discussion as BL-030, BL-032 and BL-033.
+discussion as BL-035, BL-032 and BL-033.
 
 Assessment:
 

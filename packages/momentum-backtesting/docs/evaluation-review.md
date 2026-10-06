@@ -448,9 +448,61 @@ worse it did later. **Kill tripped: stop selecting a single winner**; Phase 5 pi
 and a lower bound instead. Within the drawdown ceiling the baskets impose, selection is less
 overfit (0.20), which is a reason to select inside a basket, not across the whole space.
 
-These are on today's stock list. The same scoring on the point-in-time universe is the honest
-version and has not been run (another ~6 hours).
+These are on today's stock list. The honest version, on the point-in-time universe, follows.
 
-### Not started
+**The same scoring on the point-in-time universe** (`--universe turnover_rank --tags curated`,
+`data/search/round7_A/scored_pit/`, finished 2026-10-06, about 12 hours on four workers). All
+8,003 configs, every rebalance phase blended, pre-tax, as searched:
 
-Step 4 (criteria as code, data snapshot in the run id), step 5 (generic nudges), step 6.
+| | Today's list | Point in time |
+|---|---|---|
+| Median CAGR | 33.4% | **28.1%** |
+| 90th percentile | 42.1% | 35.5% |
+| Best | 77.3% | 56.0% |
+| PBO, all 8,003 | 0.48 | **0.69** (kill above 0.30) |
+| In-sample best below the index out of sample | 16% of splits | 45% |
+| Slope | −0.58 | −1.02 |
+| Configs within the 40% drawdown ceiling | 2,924 | 3,011 |
+| PBO within the ceiling | 0.20 | **0.53** |
+| … in-sample best below the index | 3% | 17% |
+| … slope | −0.40 | −0.88 |
+
+Nifty200 Momentum 30 TRI over the same weeks (2017-01-06 to 2026-10-02): 17.0%.
+
+- **Every config loses, the best lose most.** The median config loses 5.4 points; the 50 best
+  on today's list lose a median 23.7 (46 of 50 lose more than 10), as Phase 3 found on its
+  sample. Rank agreement between the two lists is 0.55; of the top 100 on each, 16 are the
+  same configs.
+- **Selection is worse than a coin flip on the honest list.** The best half-history pick lands
+  below the median config in 69% of splits, below the index in 45%, and the slope says the
+  better it looked the worse it did. Inside the drawdown ceiling it is still 0.53: the basket
+  alone does not make single-winner selection safe on the honest universe.
+- **The category of strategy still has an edge.** 82% of configs beat the momentum index by 5
+  points pre-tax; the typical config is 28% against 17%. What is not there is a way to tell,
+  in advance, which config will be the good one.
+
+Consequence for Phase 5: choose by cluster and by a lower bound, as planned, and judge the
+choice by walking the selection rule forward, not by its in-sample rank. Expect the honest
+answer to sit near the median config, not near the best.
+
+### Steps 4 to 6 — built (2026-10-06)
+
+- **Step 4:** `criteria.py` reads `bl010_criteria.json` and its addenda; the drawdown baskets
+  are code (`basket_passes`: each fall within the fixed limit, or within the index's own fall
+  over the same window, never past the 40% ceiling). A search run's id now includes a data
+  snapshot (last bar, last weekly close, a digest of the confirmed split factors, all capped
+  at the space's fixed end date), and a results folder records the snapshot it was started
+  on: resuming it on different data stops with a message instead of adding a second copy of
+  every config. The drawdown baskets need Nifty Midcap 150 TRI and Nifty Smallcap 250 TRI,
+  which `reference_benchmarks` does not load yet: a Phase 5 prerequisite.
+- An addendum may change an existing threshold only if it says what it `supersedes`;
+  otherwise loading the criteria raises.
+- **Step 5:** `robust.nudges` reads the neighbours of every searched dimension from the space
+  file. Round 7's winners are now nudged on entry, stock tilt, weight scheme and the bands,
+  which the Round 2 tables never covered; arms B and C2 no longer raise a KeyError.
+- **Step 6:** `search_spaces/bl010_criteria_addendum_2.json` and `criteria.check_windows`: a
+  window used to select may not meet one used to validate (13-week embargo), and the
+  2012–2016 hold-out is sealed until Phase 6.
+
+**Phase 4 is done (2026-10-06).** The point-in-time PBO is 0.69 (0.53 within the drawdown
+ceiling); the single-winner rule stays killed on both universes.

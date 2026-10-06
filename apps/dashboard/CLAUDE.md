@@ -27,7 +27,7 @@ renders the shell; `lib/routes.ts` holds the path grammar, `hooks/useAppRoute.ts
 it). Paths: `/<tab>`, `/optionslab/<strategies|builder|runs|results|regimes>`,
 `/optionslab/builder/yaml` (the YAML engine; `/backtest` redirects there),
 `/coverage/<backfill|replay>` (old `/backfill`, `/replay` redirect), `/billing` (`/pricing` redirects),
-`/momentum/<backtest|scores|saved|weekly|rebalance>`, `/momentum/backtest/<dataset>`,
+`/momentum/<backtest|scores|saved|weekly|rebalance|journal>`, `/momentum/backtest/<dataset>`,
 `/momentum/scores/<stocks|sectors>`. A new sub-tab = add its ids to `lib/routes.ts` and derive
 state from `useAppRoute().rest` — don't add another `useState` for navigation. `useAppRoute`
 moves with `window.history.pushState`/`replaceState`, never `router.push`: every path is the same

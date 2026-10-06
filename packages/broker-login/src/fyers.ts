@@ -16,6 +16,7 @@ import {
   parseRedirect,
 } from './fyers-auth.js';
 import { fyersLogin } from './selectors.js';
+import { storeFyersToken } from './store-token.js';
 import { freshTotp, waitForNextWindow } from './totp.js';
 
 /**
@@ -27,6 +28,11 @@ import { freshTotp, waitForNextWindow } from './totp.js';
  * never printed - @trading/notify's registerSecret masks it in Actions logs. The
  * redirect is intercepted, never loaded, so FYERS_REDIRECT_URI can be the localhost
  * URL the app is already registered with.
+ *
+ * With `--store` (the laptop's morning job) the token also goes into the encrypted
+ * `broker_tokens` row, so the dashboard card turns green without anyone clicking Login.
+ * Fyers is deliberately its own job, separate from the AlgoTest login that handles
+ * Angel One and Finvasia: neither can block the other.
  *
  * What this token can do is whatever the Fyers API app allows. Use a dedicated app
  * for this job, and keep order placement locked to a static IP on the Fyers side -
@@ -129,6 +135,7 @@ async function loginOnce(context: BrowserContext, config: FyersConfig): Promise<
 }
 
 async function main(): Promise<number> {
+  const store = process.argv.includes('--store');
   const telegram = readTelegramConfig();
   const runUrl =
     process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID
@@ -138,7 +145,9 @@ async function main(): Promise<number> {
     send(telegram, {
       source: 'fyers-login',
       severity: 'error',
-      title: 'Fyers login failed - weekly job falls back to public data',
+      title: store
+        ? 'Fyers login failed - log in from the dashboard'
+        : 'Fyers login failed - weekly job falls back to public data',
       body: detail,
       runUrl,
     });
@@ -184,6 +193,10 @@ async function main(): Promise<number> {
       { mode: 0o600 },
     );
     console.log(`ok: Fyers token written to ${outFile} (not shown)`);
+    if (store) {
+      await storeFyersToken(token);
+      console.log(`ok: Fyers token stored in broker_tokens, expires ${token.expiresAt}`);
+    }
     return 0;
   } catch (error) {
     const kind = error instanceof FyersLoginError ? ` [${error.kind}]` : '';

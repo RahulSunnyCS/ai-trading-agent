@@ -1,4 +1,4 @@
-# BL-030 — Consolidation tightness as a Momentum ranking feature (the cheap "flag")
+# BL-035 — Consolidation tightness as a Momentum ranking feature (the cheap "flag")
 
 | | |
 |---|---|
@@ -14,7 +14,7 @@
 
 The owner's idea (2026-10-06): famous chart patterns (head and shoulders, tight flags, cup and
 handle) on daily or weekly stock data, and "what shape does a stock make before it runs up".
-Discussion split it into four items: BL-030 (this), BL-031 (visual pattern detectors), BL-032
+Discussion split it into four items: BL-035 (this), BL-031 (visual pattern detectors), BL-032
 (stock analogues), BL-033 (feeding the results into the ranking).
 
 Assessment: a tight flag is momentum plus volatility contraction — a sharp run-up followed by a
