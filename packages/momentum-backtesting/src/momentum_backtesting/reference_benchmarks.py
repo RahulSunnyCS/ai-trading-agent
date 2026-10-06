@@ -18,6 +18,7 @@ lines still show only `REFERENCES`, so adding these changed no existing output:
 
 - Nifty Midcap 150 TRI, Nifty Smallcap 250 TRI
 - Nifty Midcap150 Momentum 50 TRI, Nifty500 Momentum 50 TRI
+- Nifty 500 TRI (BL-010 Phase 6 backcast benchmark)
 
 NSE back-calculates all four before each index's launch, as it does Mom30 before 2020-08-11;
 unlike Mom30 they carry no back-calculated flag yet, so read their early years as NSE's
@@ -41,6 +42,7 @@ from .stocks.ui_data import (
     NIFTY50_TRI,
     NIFTY200_MOMENTUM30_TRI,
     NIFTY500_MOMENTUM50_TRI,
+    NIFTY500_TRI,
     NIFTY_MIDCAP150_MOMENTUM50_TRI,
     NIFTY_MIDCAP150_TRI,
     NIFTY_SMALLCAP250_TRI,
@@ -55,6 +57,7 @@ EXTRA_REFERENCES = (
     NIFTY_SMALLCAP250_TRI,
     NIFTY_MIDCAP150_MOMENTUM50_TRI,
     NIFTY500_MOMENTUM50_TRI,
+    NIFTY500_TRI,
 )
 LOADED = REFERENCES + EXTRA_REFERENCES
 #: First live (not back-calculated) week of the Nifty200 Momentum 30 index.

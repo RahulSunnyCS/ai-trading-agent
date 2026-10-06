@@ -592,3 +592,74 @@ deeper than every basket's 40% ceiling.
 - 8–12 holdings is as good as 2–6 in return, with much shallower falls.
 
 What to follow is now the owner's decision (BL-010 open question 4), not a ranking result.
+
+## Phase 6 step 0 — what Phase 6 follows (2026-10-06)
+
+Phase 5 named no config, so the owner chose what to follow instead: money split equally
+across 3–4 typical Medium-basket configs with 8–12 holdings, rebalancing every 2 or 4 weeks.
+The rule (`search_spaces/bl010_criteria_addendum_4.json`, committed before the pick was
+computed):
+1. Skip configs whose third-worst financial year against the index is below the group's median.
+2. Take the most typical of the rest (highest average weekly-return correlation with the
+   others), each correlated below 0.9 with those already taken, up to four.
+3. Split capital equally and reset it each April.
+
+The rule had to pass its own walk-forward before anything was frozen. `mbt search ensemble
+data/search/round7_A --space search_spaces/round7_A.toml --freeze` (`choose.py`, `phase6.py`).
+
+### Walk-forward of the picking rule: passes
+
+| | FY2020–FY2026 | With FY2019 (sensitivity) |
+|---|---|---|
+| The ensemble, picked each year on data ending 13 weeks earlier | **36.7%** | 30.9% |
+| Median config of the same group | 32.6% | 27.5% |
+| Nifty200 Momentum 30 TRI | 15.0% | 14.6% |
+
+Annualised, pre-tax. Pass: no more than 2 points below the group median (bar 30.6%) and at
+least 5 points above the index (bar 20.0%). The ensemble beat the group median in 6 of 7
+years; the miss is FY2026 (3.7% against 9.8%). It fell less than the median in FY2020 (−19.2%
+against −23.0%).
+
+A Fable model checked the code against the addendum: no look-ahead, every unspecified
+judgement neutral, and the same four picks re-derived independently. Its fixes are in:
+- a flag when fewer than three configs are found;
+- a missing year fails rather than counting as 0%;
+- each pick's range across rebalance phases is reported;
+- the freeze records what a phase means for live trading;
+- a look-ahead test.
+
+### Frozen: `search_spaces/bl010_phase6_frozen.json`
+
+| Config | Holdings | Rebalance | Phase (rebalance_offset) | CAGR, phases blended | Worst to best phase |
+|---|---|---|---|---|---|
+| `1281e8ed6824` | 12 | every 4 weeks | 0 | 34.2% | 30.9% to 36.2% |
+| `08c4307d7aa9` | 8 | every 4 weeks | 1 | 32.9% | 29.8% to 35.4% |
+| `535b17b44ba5` | 12 | every 4 weeks | 2 | 31.6% | 26.3% to 36.2% |
+| `bad83df3821a` | 12 | every 2 weeks | 1 | 28.4% | 26.8% to 29.8% |
+
+Ensemble, equal capital reset each April, full history (2017-01 to 2026-10, pre-tax, ₹2
+lakh): CAGR 32.3%, max drawdown −31.5%, Ulcer index 10.4%. Over the same period the group's
+median config made 31.0% and Nifty200 Momentum 30 TRI 17.0%.
+
+The record holds:
+- each config's full parameters and the space's fixed settings;
+- the code commit (`d21141c`);
+- the data snapshot (last bar 2026-10-01, factor digest `4d066205752f`);
+- a SHA-256 of the scored curves.
+
+A phase is the engine's `rebalance_offset`: the Fridays whose week number since 2016-01-01
+equals the phase mod `rebalance_every`. The phases were assigned to spread trading days, never
+by performance; no Friday has more than two configs trading.
+
+**What to expect, honestly.** The four configs are correlated 0.85–0.89 with each other, so
+the split smooths results only modestly. Phase 6 trades one phase per config, and single
+phases ranged several points either side of the blended figures. All of it is pre-tax, on
+today's curated tags, inside a search space designed with hindsight: an upper estimate. The
+after-tax re-check and the fair category check are in Phase 7.
+
+**Next (Phase 6):**
+1. Live-signal parity: the API, CLI and live preview use the frozen settings, and the last 12
+   weeks of live signals equal the backtest's.
+2. The one-shot 2012–2016 backcast of the frozen ensemble.
+3. Paper-track it for 6–12 months next to the group's median config and Nifty200 Momentum 30
+   TRI, with failure defined in advance in `bl010_criteria.json` `phase_6_holdout`.

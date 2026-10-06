@@ -17,6 +17,9 @@ From `src/index.ts`:
 - `lotSize(underlying, date)` — effective-dated lot size for `'NIFTY' |
   'BANKNIFTY' | 'SENSEX'`.
 - `strikeStep(underlying, date)` — effective-dated strike interval.
+- `isTradingDay(day)` / `isHoliday(day)` — `day` is an IST calendar date
+  `'YYYY-MM-DD'`; read from `holidays.csv` in the same folder. Mirrors the
+  Python loader's `is_trading_day`. Used by `apps/scheduler` (BL-012).
 - Type: `Underlying`.
 
 **Never hard-code a lot size or strike interval anywhere in the TypeScript

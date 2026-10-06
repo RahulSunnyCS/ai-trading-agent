@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — missed evening runs lose expiring-option data for good (30 Sep 2026 is already gone from the lake), and several silent data-quality deadlines are approaching |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | feature |
 | **Area** | infra (cross-cutting: options, momentum, trading-data, broker-login, contract-notes, server) |
 | **Created** | 2026-10-05 |
 | **Depends on** | BL-011 Phase 1 (done). Supersedes BL-011 Phases 2–4. Related: BL-002 (hosting) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 1.10 |
 
 ## Context
 
@@ -209,6 +209,16 @@ A Bun/TypeScript app in this monorepo, not a part of `apps/server`.
 - **Tasks:** list jobs with next run, last result and duration; run now; tail the latest log.
 - **Done when:** every job can be checked and re-run from the dashboard.
 
+### Phase 4b — Notification preferences in the dashboard (owner request 2026-10-06)
+- **Tasks:**
+  - A **Notifications** page in Settings that lists every notification type (morning
+    summary, job failure, missed run, momentum preview/final, rebalance, data checks, weekly
+    digest) with a Telegram on/off switch per type.
+  - Preferences are stored by the scheduler and read before every send. Failure and
+    missed-run alerts stay on by default; turning one off asks for confirmation.
+- **Done when:** switching a type off stops that message the next time it would send, and
+  switching it back on restores it.
+
 ### Phase 5 — Ready to host
 - **Tasks:**
   - Dockerfile and persistent-volume layout.
@@ -227,15 +237,28 @@ A Bun/TypeScript app in this monorepo, not a part of `apps/server`.
 - **Noise:** too many Telegram alerts get ignored. Successes only go into the daily summary, and an unchanged failure repeats at most once a day.
 - **The laptop is still a single point of failure** until Phase 5. Missed-run catch-up and alerts reduce the damage; they don't remove it.
 
-## Open questions
+## Owner decisions (2026-10-06)
 
-To ask when this is started (workflow step 3):
-1. Separate `apps/scheduler` (recommended) or BullMQ inside `apps/server`?
-2. Hosting direction: a cloud platform (Railway/Fly) with the laptop as home runner, or a small always-on home machine such as a mini PC? The home machine avoids the IP and headed-browser problems entirely.
-3. Automate the daily Fyers login (D2), or keep it a manual morning step with a reminder?
-4. Backup destination for M1.
-5. Telegram: daily summary every morning, or only when something is wrong?
-6. Which Phase 3 checks matter most, and should any of them repair the data automatically instead of alerting?
+1. **Separate `apps/scheduler`**, as recommended.
+2. **Hosting:** the laptop for now, a **Mac mini (always-on home machine)** later. Design for
+   the home machine first. Cloud hosting is considered only after the proof of concept
+   works, so Phase 5 keeps the container and runner mode but they come after everything else.
+3. **Automate the daily Fyers login (D2).** The headless login already runs at 08:05 from
+   launchd (TODO 1.9); it moves into the scheduler like the other jobs.
+4. **Backup (M1):** to `/Volumes/RAHUL'S SSD/TradingData` when it is mounted. When it isn't, write to
+   `~/Downloads` as a fallback and say so in the alert. (That copy sits on the same disk, so
+   it guards against a broken database, not a lost laptop.)
+5. **Telegram:**
+   - one **morning summary between 08:00 and 09:15 IST** once the AlgoTest and Fyers logins
+     and the other morning jobs have finished, saying everything worked;
+   - an **immediate** message the moment anything fails;
+   - a dashboard page to choose which notifications reach Telegram (Phase 4b).
+6. **Phase 3 checks:** all four groups (data-source drift, calendar upkeep, stock-data
+   deadlines, credential reminders). **Alert only**: no check changes data by itself.
+
+**Delivery:** small PRs, one concern each. PR 1 trading-day calendar · PR 2 notification
+types and preferences · PR 3 scheduler core · PR 4 loop, catch-up, alerts, morning summary ·
+PR 5 the single launchd cut-over · then one PR per later job, check group and dashboard page.
 
 ## Log
 
@@ -247,4 +270,15 @@ To ask when this is started (workflow step 3):
   the weekly scoring (BL-024), the live-money rules check (BL-025), and the daily
   realised-vs-backtest join for options (BL-026).
 - 2026-10-06 — owner decisions on PR #27: weekly Telegram health digest approved — added as Phase 3b.
+- 2026-10-06 — started. Owner answered questions 1–5 (see Owner decisions) and asked for a
+  notification preferences page, added as Phase 4b. Question 6 answered the same day. PR 1:
+  `isTradingDay`/`isHoliday` in `@trading/market-reference`.
+- 2026-10-06 — PRs 2–5 opened: notification types + preferences (and the momentum `"warning"`
+  fix), the scheduler core, the loop with catch-up/alerts/morning summary, and the launchd
+  cut-over (one `KeepAlive` agent; the six per-job plists retired by `install.sh`). The
+  Friday jobs keep writing `data/launchd-weekly-*.log` because the Momentum status panel
+  reads them. Found: GitHub's backstop broker-login cron fails every afternoon (~15:55 IST,
+  after AlgoTest's window) — PR 10.
+- 2026-10-06 — PR 7: `options-daily` (`obt daily`) at 16:15 IST trading days, retries at
+  17:45 and 19:15, catch-up until 23:00, `catalog` group.
 - 2026-10-07 — Phase 0: Nifty 50 Sep-2026 review applied (BSE in, Wipro out, effective 2026-09-30; confirmed against the live niftyindices list). BSE's 15 corporate-action rows reviewed and accepted, baseline advanced, three stock goldens re-accepted (BSE appears in the companies list; no number moved).

@@ -75,6 +75,17 @@ jobs:
         run: bun run test
         working-directory: packages/broker-identity
 
+      # BL-012: schedule maths (IST, trading days), the runner's retries/timeouts and the
+      # one-writer group lock. bun test, not vitest: the run history uses bun:sqlite.
+      - name: Scheduler tests
+        run: bun run test && bun run typecheck
+        working-directory: apps/scheduler
+
+      # BL-012: per-type Telegram switches — fail open, untagged always sends.
+      - name: Notify tests
+        run: bun run test
+        working-directory: packages/notify
+
       - name: Server unit tests
         run: bun run test:unit
 

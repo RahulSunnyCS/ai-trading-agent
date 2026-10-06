@@ -313,7 +313,7 @@ def test_a_blocked_active_favorite_sends_a_telegram_warning_instead_of_nothing(c
     assert response.status_code == 202 and job["status"] == "done"
     assert job["result"]["sent_to_telegram"] is True
     assert len(sent) == 1
-    assert sent[0].severity == "warning"
+    assert sent[0].severity == "warn"
     assert "Active" in sent[0].body
     assert "tax needs tax_classes" in sent[0].body
 
