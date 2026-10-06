@@ -135,6 +135,19 @@ reruns the weekly orchestration with `--only-dataset stock --only-dataset custom
 otherwise it would resend (or misreport as "blocked") an ETF favourite the 16:45 job already
 handled.
 
+**Forward-signal journal (BL-024, 2026-10-06).** Every weekly run also appends each signal it
+produced to `momentum_forward_journal` (`forward_journal.py`; trading-data migration 007): every
+favourite's final, ETF previews only on a Friday, and the Nifty200 Momentum 30 TRI level once its
+data covers the week (so in practice from the 19:30 job). Append-only and hash-chained — DuckDB
+has no triggers, so an edit cannot be refused, only detected (`mbt journal verify`); the chain
+head goes into that run's Telegram message (or a separate "forward journal" message when the
+run sends nothing else, e.g. the 19:30 rerun) as an outside witness. A rerun with an identical
+signal writes nothing; a changed one is a new row with `supersedes`. `holdings_before` is the
+model portfolio **before** the signal's own actions — `run_backtest` never trades its newest
+week (`trade_weeks` excludes it), so the post-trade portfolio first appears in next week's row.
+Use `momentum_signals` for the latest signal (it is overwritten on rerun); use the journal for
+evidence. A journal failure never blocks the signal and is reported in Telegram.
+
 **Gotcha found live, not by a test:** `stocks_fetch`/`local_migrate` are Typer commands whose
 parameters default to `typer.Option(...)` sentinel objects — Typer only resolves those into
 real values (e.g. `"2011-01-01"`) when its own CLI runner invokes the function. Calling them
