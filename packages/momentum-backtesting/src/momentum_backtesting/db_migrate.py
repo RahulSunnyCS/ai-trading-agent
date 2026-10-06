@@ -360,11 +360,18 @@ def import_extra_benchmarks(con: duckdb.DuckDBPyConnection, extra: pd.DataFrame)
     if renamed.empty:
         return 0
     names = list(renamed.columns)
-    con.execute(
-        f"DELETE FROM stock_weekly_series WHERE series IN ({','.join('?' * len(names))})",  # noqa: S608
-        names,
-    )
-    return _insert_series(con, renamed)
+    con.execute("BEGIN TRANSACTION")  # all or nothing: never leave the series deleted
+    try:
+        con.execute(
+            f"DELETE FROM stock_weekly_series WHERE series IN ({','.join('?' * len(names))})",  # noqa: S608
+            names,
+        )
+        written = _insert_series(con, renamed)
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")
+    return written
 
 
 def _insert_series(con: duckdb.DuckDBPyConnection, frame: pd.DataFrame) -> int:

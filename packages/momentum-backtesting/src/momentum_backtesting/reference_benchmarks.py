@@ -19,6 +19,10 @@ lines still show only `REFERENCES`, so adding these changed no existing output:
 - Nifty Midcap 150 TRI, Nifty Smallcap 250 TRI
 - Nifty Midcap150 Momentum 50 TRI, Nifty500 Momentum 50 TRI
 
+NSE back-calculates all four before each index's launch, as it does Mom30 before 2020-08-11;
+unlike Mom30 they carry no back-calculated flag yet, so read their early years as NSE's
+backtest of the index method, not investable history.
+
 All of them come from `data/stocks/benchmarks_weekly.csv` (`mbt stocks fetch`, or for just the
 four extras `mbt stocks fetch-benchmarks`; niftyindices.com), or the shared database's
 `stock_weekly_series` once those rows are migrated there. When neither exists the comparisons
@@ -89,12 +93,20 @@ def load_references(data_dir: Path | None = None) -> pd.DataFrame:
     frame): the shared database first, then `<data_dir>/stocks/benchmarks_weekly.csv`. Empty
     frame when no source has them."""
     frame = _from_db()
-    if frame is None:
+    if frame is None or any(name not in frame for name in LOADED):
+        # The CSV fills whatever the database lacks (e.g. extras written with --skip-catalog,
+        # or a catalog migrated before they existed); the database wins where both have it.
         path = (data_dir or DATA_DIR) / "stocks" / "benchmarks_weekly.csv"
-        if not path.exists():
-            return pd.DataFrame(columns=list(LOADED), dtype=float)
-        raw = pd.read_csv(path, index_col=0, parse_dates=True)
-        frame = raw[[c for c in _CSV_COLUMNS if c in raw]].rename(columns=_CSV_COLUMNS)
+        if path.exists():
+            raw = pd.read_csv(path, index_col=0, parse_dates=True)
+            csv = raw[[c for c in _CSV_COLUMNS if c in raw]].rename(columns=_CSV_COLUMNS)
+            if frame is None:
+                frame = csv
+            else:
+                missing = [c for c in csv if c not in frame]
+                frame = frame.join(csv[missing], how="outer") if missing else frame
+    if frame is None:
+        return pd.DataFrame(columns=list(LOADED), dtype=float)
     return frame[[c for c in LOADED if c in frame]].sort_index()
 
 

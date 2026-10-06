@@ -7,7 +7,6 @@ import typer
 
 from . import fyers
 from .config import DATA_DIR, load_repo_env
-from .stocks.benchmarks import EXTRA_TRI_INDICES
 
 app = typer.Typer(no_args_is_help=True, help="Weekly momentum rotation backtester.")
 
@@ -650,10 +649,15 @@ _BENCHMARK_TRI_FILES = {
     "NIFTY200_MOMENTUM_30_TRI.json": "NIFTY200 MOMENTUM 30",
     "NIFTY50_EQUAL_WEIGHT_TRI.json": "NIFTY50 EQUAL WEIGHT",
 }
-#: Comparison-only TRIs (BL-010 Phase 5): same snapshot shape, kept apart so the narrow
-#: `mbt stocks fetch-benchmarks` can refresh just these.
-_EXTRA_BENCHMARK_TRI_FILES = {filename: name for name, filename in EXTRA_TRI_INDICES.values()}
-_BENCHMARK_TRI_FILES.update(_EXTRA_BENCHMARK_TRI_FILES)
+
+
+def _extra_benchmark_tri_files() -> dict[str, str]:
+    """Comparison-only TRIs (BL-010 Phase 5), filename -> niftyindices name: same snapshot
+    shape as the three above, kept apart because they are optional - a failure fetching one
+    never stops a stock-data refresh. Imported lazily, like every heavy module here."""
+    from .stocks.benchmarks import EXTRA_TRI_INDICES
+
+    return {filename: name for name, filename in EXTRA_TRI_INDICES.values()}
 
 
 def _fetch_niftyindices_tri_raw(name: str, start, end) -> list[dict]:
@@ -726,6 +730,13 @@ def _refresh_benchmark_raw_files(raw_dir: Path, start, end) -> None:
 
     for filename, index_name in _BENCHMARK_TRI_FILES.items():
         rows = _fetch_niftyindices_tri_raw(index_name, start, end)
+        atomic_write_bytes(bench_dir / filename, json.dumps(rows).encode("utf-8"))
+    for filename, index_name in _extra_benchmark_tri_files().items():
+        try:
+            rows = _fetch_niftyindices_tri_raw(index_name, start, end)
+        except Exception as error:  # noqa: BLE001 (optional series: warn, keep the old snapshot)
+            typer.echo(f"  warning: {index_name} not refreshed ({error}); keeping the old snapshot")
+            continue
         atomic_write_bytes(bench_dir / filename, json.dumps(rows).encode("utf-8"))
 
     price = benchmarks.fetch_equal_weight_price(start, end)
@@ -866,7 +877,7 @@ def stocks_fetch_benchmarks(
 
     if not skip_download:
         bench_dir.mkdir(parents=True, exist_ok=True)
-        for filename, index_name in _EXTRA_BENCHMARK_TRI_FILES.items():
+        for filename, index_name in _extra_benchmark_tri_files().items():
             rows = _fetch_niftyindices_tri_raw(index_name, start, date_cls.today())
             atomic_write_bytes(bench_dir / filename, json.dumps(rows).encode("utf-8"))
             typer.echo(f"  {index_name}: {len(rows)} daily rows")

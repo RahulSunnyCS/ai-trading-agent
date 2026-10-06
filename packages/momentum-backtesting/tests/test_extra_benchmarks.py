@@ -110,10 +110,27 @@ def test_each_extra_is_requested_from_niftyindices_under_its_index_name(monkeypa
 
 
 def test_cli_fetches_each_extra_to_a_distinct_raw_file():
-    files = cli._EXTRA_BENCHMARK_TRI_FILES
+    files = cli._extra_benchmark_tri_files()
     assert len(files) == 4 and len(set(files)) == 4
-    assert set(files.items()) <= set(cli._BENCHMARK_TRI_FILES.items())
+    # Kept apart from the required three, so an optional series can never stop a refresh.
+    assert not set(files) & set(cli._BENCHMARK_TRI_FILES)
     assert {"NIFTY_50_TRI.json", "NIFTY200_MOMENTUM_30_TRI.json"} <= set(cli._BENCHMARK_TRI_FILES)
+
+
+def test_a_failed_optional_tri_does_not_stop_the_refresh(tmp_path, monkeypatch):
+    from momentum_backtesting.stocks import benchmarks as bm
+
+    optional = set(cli._extra_benchmark_tri_files().values())
+
+    def fake_fetch(name, start, end):
+        if name in optional:
+            raise OSError("niftyindices down")
+        return [{"Date": "01 Jan 2024", "TotalReturnsIndex": "1"}]
+
+    monkeypatch.setattr(cli, "_fetch_niftyindices_tri_raw", fake_fetch)
+    monkeypatch.setattr(bm, "fetch_equal_weight_price", lambda s, e: pd.Series([1.0], name="x"))
+    cli._refresh_benchmark_raw_files(tmp_path, date(2024, 1, 1), date(2024, 1, 2))
+    assert (tmp_path / "benchmarks" / "NIFTY_50_TRI.json").exists()
 
 
 def test_build_extra_benchmarks_weekly_is_friday_labelled_and_drops_the_unfinished_week(
@@ -430,3 +447,19 @@ def test_fetch_benchmarks_command_writes_only_the_extra_columns_and_series(tmp_p
         )
     assert got[NIFTY50_TRI] == 1  # untouched
     assert {got[n] for n in EXPECTED_NAMES.values()} == {2}
+
+
+def test_load_references_fills_series_the_database_lacks_from_the_csv(tmp_path, monkeypatch):
+    weeks = pd.date_range("2024-01-05", periods=3, freq="W-FRI")
+    in_db = pd.DataFrame(
+        {"Nifty 50 TRI": [1.0, 2.0, 3.0], "Nifty200 Momentum 30 TRI": [4.0, 5.0, 6.0]},
+        index=weeks,
+    )
+    monkeypatch.setattr(reference_benchmarks, "_from_db", lambda: in_db)
+    (tmp_path / "stocks").mkdir()
+    pd.DataFrame(
+        {"nifty50_tri": [9.0, 9.0, 9.0], "nifty_midcap150_tri": [7.0, 8.0, 9.0]}, index=weeks
+    ).to_csv(tmp_path / "stocks" / "benchmarks_weekly.csv")
+    out = reference_benchmarks.load_references(tmp_path)
+    assert list(out["Nifty 50 TRI"]) == [1.0, 2.0, 3.0]  # the database wins where both have it
+    assert list(out["Nifty Midcap 150 TRI"]) == [7.0, 8.0, 9.0]  # the CSV fills the gap
