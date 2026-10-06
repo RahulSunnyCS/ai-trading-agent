@@ -411,7 +411,45 @@ ranking beats random ranking among survivors, nothing about the survivorship.
 
 ### Steps 1 and 3 — every config on all its rebalance phases, and the overfitting measure
 
-`mbt search score` is running over all 8,003 configs. Results are added when it finishes.
+`mbt search score`: all 8,003 round 7 arm A configs re-run on the fixed engine and corrected
+data, each on every rebalance phase it could have traded on (one, two or four), as equal
+tranches; the blended weekly curves are kept in `data/search/round7_A/scored/`. Today's stock
+list, pre-tax, as searched. About 5.5 hours on four workers.
+
+**Averaging out the rebalance week** (step 1). 5,322 configs trade every two or four weeks.
+Their best and worst phase differ by a median 5.0 points of CAGR. 656 configs (8%) score
+more than 3 points above their phase average on the phase the search drew; the committed kill
+for a finalist is exactly that gap.
+
+| Config | Stored (round 7) | Its own phase, now | All phases blended | Best / worst phase |
+|---|---|---|---|---|
+| Aggressive winner | 63.4% | 51.9% | **46.1%** (killed: 5.8 pts below) | 51.9% / 39.4% |
+| Midway winner | 61.3% | 53.5% | 52.8% | 53.5% / 52.2% |
+| Conservative winner | 55.6% | 44.6% | 44.1% | 44.6% / 43.7% |
+| Median 1 | 32.1% | 35.2% | 35.0% | 35.2% / 34.8% |
+| Median 2 | 32.1% | 31.4% | 30.7% | 31.4% / 30.0% |
+| Median 3 | 32.1% | 31.5% | 31.3% | 31.5% / 30.9% |
+
+The aggressive winner trades every four weeks and the search drew its best Friday; on the
+average Friday it is a 46% config, not a 52% one. Of the ten best configs by their own phase,
+four lose 7 to 12 points when blended and four gain.
+
+**Probability of backtest overfitting** (step 3), on weekly log excess return over Nifty200
+Momentum 30 TRI, 16 blocks, 12,870 splits:
+
+| Configs | PBO | In-sample best is below the index out of sample | Slope |
+|---|---|---|---|
+| All 8,003 | **0.48** (kill above 0.30) | 16% of splits | −0.58 |
+| The 2,924 within the 40% drawdown ceiling | 0.20 | 3% | −0.40 |
+
+Picking the single best config on half the history lands below the median config on the other
+half in 48% of splits: a coin flip. The slope is negative: the better the best looked, the
+worse it did later. **Kill tripped: stop selecting a single winner**; Phase 5 picks a cluster
+and a lower bound instead. Within the drawdown ceiling the baskets impose, selection is less
+overfit (0.20), which is a reason to select inside a basket, not across the whole space.
+
+These are on today's stock list. The same scoring on the point-in-time universe is the honest
+version and has not been run (another ~6 hours).
 
 ### Not started
 
