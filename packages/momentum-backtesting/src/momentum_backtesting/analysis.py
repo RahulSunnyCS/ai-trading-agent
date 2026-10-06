@@ -2,6 +2,7 @@
 behind each chart marker, closed trades, per-instrument attribution, a holdings timeline and
 this week's signal. Values are plain JSON types (NaN -> None, dates -> ISO strings)."""
 
+import itertools
 import math
 from collections.abc import Callable
 
@@ -67,35 +68,51 @@ def _holdings_on(result: Result, week) -> list[dict]:
 
 
 def rotations(result: Result) -> list[dict]:
-    """One entry per week that traded: what went out, what came in, what's held after."""
+    """One entry per week that traded: what went out, what came in, what's held after.
+
+    Works on the trade log's columns as plain lists, in the log's own order within each week:
+    cutting a DataFrame into per-week, per-action sub-frames (three boolean filters and an
+    `itertuples` each) was over a second of a Broad run for what is a few thousand rows."""
     trades = result.trades
     if trades.empty:
         return []
+    n = len(trades)
+
+    def column(name: str) -> list:
+        # `weeks_held` and `position_return` exist only once something has been sold.
+        return trades[name].tolist() if name in trades else [None] * n
+
+    weeks, actions, assets = column("week"), column("action"), column("asset")
+    ranks, reasons = column("rank"), column("reason")
+    held, returns = column("weeks_held"), column("position_return")
+    # sorted() is stable, so rows keep the trade log's order inside a week, as groupby does.
+    rows = sorted(range(n), key=weeks.__getitem__)
     out = []
-    for week, group in trades.groupby("week", sort=True):
-        sells = group[group["action"] == "SELL"]
-        ins = group[group["action"].isin(["BUY", "ADD"])]
-        trims = group[group["action"] == "TRIM"]
+    for week, members in itertools.groupby(rows, key=weeks.__getitem__):
+        idx = list(members)
+        sells = [i for i in idx if actions[i] == "SELL"]
+        ins = [i for i in idx if actions[i] in ("BUY", "ADD")]
+        trims = [i for i in idx if actions[i] == "TRIM"]
         out.append(
             {
                 "week": week,
                 "value": result.equity.get(week, float("nan")) * CAPITAL,
                 "outs": [
                     {
-                        "asset": r.asset,
-                        "rank": r.rank,
-                        "reason": r.reason,
-                        "weeks_held": r.weeks_held,
-                        "return": r.position_return,
+                        "asset": assets[i],
+                        "rank": ranks[i],
+                        "reason": reasons[i],
+                        "weeks_held": held[i],
+                        "return": returns[i],
                     }
-                    for r in sells.itertuples()
+                    for i in sells
                 ],
                 "ins": [
-                    {"asset": r.asset, "rank": r.rank, "top_up": r.action == "ADD"}
-                    for r in ins.itertuples()
+                    {"asset": assets[i], "rank": ranks[i], "top_up": actions[i] == "ADD"}
+                    for i in ins
                 ],
-                "trims": [{"asset": r.asset, "reason": r.reason} for r in trims.itertuples()],
-                "parked": bool((group["action"] == "PARK").any()),
+                "trims": [{"asset": assets[i], "reason": reasons[i]} for i in trims],
+                "parked": any(actions[i] == "PARK" for i in idx),
                 "holdings": _holdings_on(result, week),
             }
         )

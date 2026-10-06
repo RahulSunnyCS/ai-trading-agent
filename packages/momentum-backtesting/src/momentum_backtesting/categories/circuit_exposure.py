@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from trading_data.db import connect, data_root
 
@@ -41,13 +42,6 @@ LOCK_MIN_DAYS = 3
 MIN_LOCK_DAYS = 2
 #: A stock sold up to this long before an LC run began counts as "got out in time".
 ESCAPE_WINDOW_DAYS = 56
-
-
-def _band_of(abs_move: float) -> float | None:
-    for (lo, hi), label in zip(_BANDS, _BAND_LABELS, strict=True):
-        if lo <= abs_move <= hi:
-            return label
-    return None
 
 
 def _band_sql() -> str:
@@ -161,44 +155,70 @@ def holding_periods(result: Result, column_to_base: dict[str, str]) -> pd.DataFr
     return pd.DataFrame(rows)
 
 
+def _between(frame: pd.DataFrame, start: pd.Timestamp | None, end: pd.Timestamp | None):
+    """The rows dated from `start` to `end`, both inclusive (None = no limit). A stock's bars come
+    sorted by date, so this is a slice found by bisection rather than a comparison of every row,
+    which was a fifth of the circuit card's time; an unsorted frame gets the comparison."""
+    dates = frame["date"]
+    if not dates.is_monotonic_increasing:
+        keep = pd.Series(True, index=frame.index)
+        if start is not None:
+            keep &= dates >= start
+        if end is not None:
+            keep &= dates <= end
+        return frame[keep]
+    low = 0 if start is None else int(dates.searchsorted(start, side="left"))
+    high = len(frame) if end is None else int(dates.searchsorted(end, side="right"))
+    return frame.iloc[low:high]
+
+
 def _runs(bars: pd.DataFrame) -> list[dict]:
-    """Same-direction band-edge runs inside one stock's already-windowed daily bars."""
+    """Same-direction band-edge runs inside one stock's already-windowed daily bars.
+
+    A run is consecutive sessions that each closed on a band edge in the same direction; a session
+    that closed anywhere else, or on the other side, ends it. Every bar is classified at once and
+    only the (few) edge sessions are walked: this used to test each of a stock's thousands of bars
+    in a Python loop, which was most of the circuit card's time (BL-005 Phase 3)."""
+    if bars.empty:
+        return []
+    move = bars["move"].to_numpy(dtype=float)
+    size = np.abs(move)
+    band = np.full(len(move), np.nan)
+    for (low, high), label in zip(_BANDS, _BAND_LABELS, strict=True):  # the bands do not overlap
+        band[(size >= low) & (size <= high)] = label
+    sign = np.where(np.isnan(band), 0, np.where(move > 0, 1, -1))
+    edge = np.flatnonzero(sign != 0)
+    if not len(edge):
+        return []
+    # A new run starts at an edge session unless the session just before it was an edge session
+    # in the same direction.
+    starts = np.ones(len(edge), dtype=bool)
+    starts[1:] = (edge[1:] != edge[:-1] + 1) | (sign[edge[1:]] != sign[edge[:-1]])
+    first = np.flatnonzero(starts)
+    last = [*first[1:], len(edge)]
+    dates = bars["date"]
     out: list[dict] = []
-    current: list[tuple[pd.Timestamp, int, float, float]] = []
-    prev_sign = 0
-    for row in bars.itertuples():
-        move = float(row.move)
-        band = _band_of(abs(move))
-        sign = 0 if band is None else (1 if move > 0 else -1)
-        if sign != 0 and sign == prev_sign:
-            current.append((row.date, sign, move, band))
-        else:
-            if current:
-                out.append(_summarise(current))
-            current = [(row.date, sign, move, band)] if sign != 0 else []
-        prev_sign = sign
-    if current:
-        out.append(_summarise(current))
+    for begin, stop in zip(first, last, strict=True):
+        members = edge[begin:stop]
+        cumulative = 1.0
+        for k in members:  # in order, one multiplication at a time, as the loop always did
+            cumulative *= 1 + float(move[k])
+        out.append(
+            {
+                "start": dates.iloc[members[0]],
+                "end": dates.iloc[members[-1]],
+                "days": len(members),
+                "direction": "UC" if sign[members[0]] > 0 else "LC",
+                "band": float(band[members].max()),
+                "move": cumulative - 1,
+            }
+        )
     return out
-
-
-def _summarise(run: list[tuple[pd.Timestamp, int, float, float]]) -> dict:
-    cumulative = 1.0
-    for _, _, move, _ in run:
-        cumulative *= 1 + move
-    return {
-        "start": run[0][0],
-        "end": run[-1][0],
-        "days": len(run),
-        "direction": "UC" if run[0][1] > 0 else "LC",
-        "band": max(b for _, _, _, b in run),
-        "move": cumulative - 1,
-    }
 
 
 def _realised_move(frame: pd.DataFrame, start: pd.Timestamp, until: pd.Timestamp) -> float:
     """Compounded close-to-close move from the first locked day through `until` (inclusive)."""
-    window = frame[(frame["date"] >= start) & (frame["date"] <= until)].dropna(subset=["move"])
+    window = _between(frame, start, until).dropna(subset=["move"])
     value = 1.0
     for move in window["move"]:
         value *= 1 + float(move)
@@ -225,7 +245,7 @@ def lc_outcomes(
             for p in held.itertuples()
         ]
         first_buy = min(buy for buy, *_ in spans)
-        scan = frame[frame["date"] >= first_buy - pd.Timedelta(days=ESCAPE_WINDOW_DAYS)]
+        scan = _between(frame, first_buy - pd.Timedelta(days=ESCAPE_WINDOW_DAYS), None)
         for run in _runs(scan.dropna(subset=["move"]).reset_index(drop=True)):
             if run["direction"] != "LC" or run["days"] < MIN_LOCK_DAYS:
                 continue
@@ -318,7 +338,7 @@ def circuit_exposure(
             continue
         buy = pd.Timestamp(period.buy)
         sell = last_day if pd.isna(period.sell) else pd.Timestamp(period.sell)
-        window = frame[(frame["date"] >= buy) & (frame["date"] <= sell)].dropna(subset=["move"])
+        window = _between(frame, buy, sell).dropna(subset=["move"])
         runs = _runs(window)
         if runs:
             touched += 1
