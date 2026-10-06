@@ -161,6 +161,10 @@ export class History {
     return reaped;
   }
 
+  get(id: number): RunRow | null {
+    return (this.db.query('SELECT * FROM runs WHERE id = ?').get(id) ?? null) as RunRow | null;
+  }
+
   recent(limit = 50, job?: string): RunRow[] {
     return (
       job
