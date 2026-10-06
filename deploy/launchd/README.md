@@ -11,6 +11,7 @@ not in plists. See [`apps/scheduler/CLAUDE.md`](../../apps/scheduler/CLAUDE.md).
 | `fyers-login` | 08:05 trading days | Headless Fyers login, token stored in `broker_tokens` (needs Postgres) |
 | `morning-summary` | 09:00 trading days | One Telegram message: logins, Fyers token, last options day collected, checkout branch, disk, last-24h failures |
 | `options-daily` | 16:15 trading days, retried 17:45 and 19:15 | `obt daily`: collect the day's 1-minute option data (expiring contracts are gone tomorrow) and run every leg-wise strategy; Telegram summary |
+| `backup` | 1st Sunday of the month 10:00 (catch-up all week) | `tdata backup` to `/Volumes/RAHUL'S SSD/TradingData`; to `~/Downloads/TradingData-backup` with a Telegram warning when the SSD isn't plugged in |
 | `momentum-preview` / `-final` | Fri 14:40 / 16:45 | `mbt weekly --run preview|final` |
 | `momentum-stock-ingest` | Fri 19:30 | `mbt stocks sync`, then the stock/Custom Index/Broad final (needs the GUI session) |
 | `momentum-journal-check` | Fri 21:00 | `mbt journal check --send` |

@@ -482,6 +482,7 @@ Critical variables whose misconfiguration causes real pain:
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after the dashboard token and `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
 | `TRADING_DATA_ROOT` | The local research database (`packages/trading-data`): `catalog.duckdb` + the Parquet `lake/` + gzipped `raw/` vendor responses. Default `~/TradingData`; point it at the external disk to move everything. Replaced `FYERS_DATA_DIR` (2026-09-30). The Fyers 1-minute data in it cannot be re-downloaded once contracts expire — back it up monthly with `tdata backup --to <disk>` |
 | `SCHEDULER_STATE_DIR` / `SCHEDULER_LOG_DIR` | `apps/scheduler`'s run history (`scheduler.db`) and per-job logs. Defaults `~/Library/Application Support/ai-trading-agent` and `~/Library/Logs/ai-trading-agent` |
+| `BACKUP_VOLUME` | Mount point of the external disk the scheduler's monthly `backup` job copies `TRADING_DATA_ROOT` to (default `/Volumes/RAHUL'S SSD`). Not mounted → `~/Downloads/TradingData-backup` plus a Telegram warning |
 | `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet bar cache (`<dir>/cache`). Defaults to `packages/option-backtesting`'s own `data/` when unset. The run registry no longer lives under this — it's in the shared `trading_data` catalog, rooted at `TRADING_DATA_ROOT` |
 
 ## Common Tasks
