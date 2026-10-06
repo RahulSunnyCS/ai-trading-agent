@@ -663,3 +663,50 @@ after-tax re-check and the fair category check are in Phase 7.
 2. The one-shot 2012–2016 backcast of the frozen ensemble.
 3. Paper-track it for 6–12 months next to the group's median config and Nifty200 Momentum 30
    TRI, with failure defined in advance in `bl010_criteria.json` `phase_6_holdout`.
+
+## Phase 6 step 2 — the one-shot 2012–2016 backcast: fails (2026-10-07)
+
+The four frozen configs were run once on 2012–2016, years nothing had been tuned on, exactly
+as criteria addendum 5 fixes it (committed before the run). Pre-tax, ₹2 lakh per config, equal
+capital reset each April. The result is recorded in
+`search_spaces/bl010_phase6_backcast_result.json`; `mbt search backcast` refuses to run again.
+
+| | Yearly return | Worst fall | Excess (pts) | Fall vs benchmark | Verdict |
+|---|---|---|---|---|---|
+| **Ensemble** | 20.1% | −24.0% | | | **fails** |
+| Nifty 500 TRI | 12.3% | −19.4% | +7.8 | 1.24× | passes |
+| Nifty Midcap 150 TRI | 17.7% | −22.7% | +2.5 | 1.06× | fails |
+| Nifty200 Momentum 30 TRI (reported) | 21.1% | −21.5% | | | |
+| Nifty Smallcap 250 TRI (reported) | 15.9% | −30.1% | | | |
+
+Pass: at least 5 points a year ahead of **each** benchmark and no deeper a fall than 1.5× its
+own. The ensemble beat the broad market by 7.8 points but the Midcap 150 by only 2.5, so it
+fails. The Nifty200 Momentum 30 index fund, which needs no stock picking, made as much.
+
+**The window.** The rules say to measure from the first Friday of 2012. The harness measured
+from the first week with an equity value, 6 April 2012 (the configs hold nothing until their
+first quarterly pool forms). Counting the cash weeks as the rules say, with no new run: the
+ensemble 19.6% against Nifty 500 TRI 14.9% (+4.7) and Midcap 150 TRI 21.9% (−2.3). **A fail
+under either window.**
+
+| Config | Yearly return | Worst fall |
+|---|---|---|
+| `1281e8ed6824` | 18.1% | −26.5% |
+| `08c4307d7aa9` | 22.1% | −31.4% |
+| `535b17b44ba5` | 24.0% | −25.2% |
+| `bad83df3821a` | 15.1% | −27.7% |
+
+All four replay-reconcile against raw data; the jump scan changes nothing (the ensemble is
+20.1% either way). The configs could pick from about 280–330 tagged names a year; the first
+trades came between 6 and 27 April 2012.
+
+**What it means.**
+- In 2017–2026 the same four made 32% a year against 17% for the momentum index fund. In the
+  five unseen years they made 20% against 21% for it. The edge seen in-sample did not show up
+  out of sample, though the unseen window is short and was a different market.
+- Biases in the backcast favour the strategy (tags are survivors; today's category list), so
+  this is, if anything, flattering.
+- Caveats that cut the other way: about half as many pickable names in 2012–13; one five-year
+  window is one draw.
+- The pre-registered rule says this is reported, not tuned around. Paper tracking is not
+  blocked by it, but the owner should decide whether to follow these configs with money.

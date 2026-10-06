@@ -143,6 +143,18 @@ def frame_fingerprint(frame: pd.DataFrame) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def broad_fingerprint(snapshot: dict | None, universe: str) -> str:
+    """What a Broad Momentum signal was computed from: the last daily bar and weekly close in the
+    shared database, a digest of the confirmed split/bonus factors (`search.data_snapshot`), and
+    the universe kind. Broad does not read the Nifty-50 weekly frame, so that would say nothing."""
+    if snapshot is None:
+        return f"broad:no-catalog;universe:{universe}"
+    return (
+        f"broad:last_bar={snapshot['last_bar']},last_week={snapshot['last_week']},"
+        f"factors={snapshot['factors']};universe:{universe}"
+    )
+
+
 #: Ranked rows kept in a journalled signal beyond those that act or are held: enough context to
 #: see what nearly made it, without storing a Broad signal's hundreds of ranked names (~144 KB).
 KEEP_RANKS = 30

@@ -39,6 +39,7 @@ EXTRA_TRI_INDICES = {
         "NIFTY_MIDCAP150_MOMENTUM_50_TRI.json",
     ),
     "nifty500_momentum50_tri": ("NIFTY500 MOMENTUM 50", "NIFTY500_MOMENTUM_50_TRI.json"),
+    "nifty500_tri": ("NIFTY 500", "NIFTY_500_TRI.json"),
 }
 
 #: NSE's publicly documented launch date for the Nifty200 Momentum 30 Index. The TRI

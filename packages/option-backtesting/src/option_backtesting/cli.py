@@ -29,6 +29,16 @@ legwise_app = typer.Typer(no_args_is_help=True, help="AlgoTest-style leg-wise ba
 app.add_typer(legwise_app, name="legwise")
 
 
+@app.callback()
+def _load_env() -> None:
+    """Fill unset env vars from the repo-root .env before any command. Without this only
+    the commands that resolve Fyers credentials saw it, so `obt daily --no-fetch` or
+    `obt legwise run` silently used the default TRADING_DATA_ROOT."""
+    from .fyers.auth import load_dotenv
+
+    load_dotenv()
+
+
 def _underlyings(value: str) -> list[str]:
     return [u.strip().upper() for u in value.split(",") if u.strip()]
 
@@ -438,7 +448,7 @@ def fyers_history(
         raise typer.Exit(1) from None
     typer.echo(
         f"done: {client.calls} requests; wrote {result['written_days']} days"
-        f"{f', oldest {result['oldest']}' if result['oldest'] else ''}; "
+        f"{f', oldest {result["oldest"]}' if result['oldest'] else ''}; "
         f"{len(result['short_days'])} short days skipped -> {data_dir()}"
     )
 

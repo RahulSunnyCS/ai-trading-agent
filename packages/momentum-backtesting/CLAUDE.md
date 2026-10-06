@@ -85,13 +85,11 @@ to `DATABASE_URL`'s `broker_tokens` table only as one of several places `fyers.p
 a Fyers access token (see the precedence order in root `technical.md`'s Environment
 Variables table) — that connection is unrelated and still live.
 
-The weekly job (`mbt weekly`) itself now runs from `launchd` LaunchAgents on the owner's own
-laptop (`scripts/install-launchd.sh`/`uninstall-launchd.sh`, four plists — Friday 14:40
-preview, 16:45 final, since 2026-10-02 19:30 stock-data ingest, and since 2026-10-06 21:00
-forward-journal check IST), replacing the retired
-`.github/workflows/momentum-weekly.yml`. The plists explicitly `source` the repo root `.env`
-before running — launchd's own environment does not inherit it the way an interactive shell's
-profile usually does. The CLI's `weekly()` command is a thin wrapper around
+The weekly job (`mbt weekly`) itself runs from the repo's scheduler (`apps/scheduler`,
+BL-012 — four jobs: Friday 14:40 preview, 16:45 final, 19:30 stock-data ingest, 21:00
+forward-journal check IST), replacing first the retired `.github/workflows/momentum-weekly.yml`
+and then the per-job launchd plists. The scheduler passes the repo root `.env` to each run
+and still writes `data/launchd-weekly-<run>.log`, which `GET /api/weekly/status` reads. The CLI's `weekly()` command is a thin wrapper around
 `api._execute_weekly_run` (the same function the API route calls) — there is exactly one
 orchestration, not two copies that can drift.
 
@@ -125,18 +123,22 @@ gzipped (`GZipMiddleware`).
 (BL-005 Phase 2).** `analysis.payload_parts` / each dataset's `_*_parts` return `(core, lazy)`:
 `lazy` maps `trades`, `instruments`, `timeline`, `latest` (and, Broad only, `circuit_exposure`,
 which costs a second engine run) to builders. `run_parts.RunParts` holds them, builds each once on
-first use and drops the builder (it holds the run's frames). The result cache stores `RunParts`;
+first use and drops the builder (it holds the run's frames, and for Broad its whole ranking). The
+result cache stores `RunParts`; only the newest `DATA.LIVE_RESULTS` = 4 keep sections they have not
+built (`RunParts.release()`), so memory does not grow with how many settings a session tries.
 `_dispatch_backtest` (the synchronous `POST /api/backtest`) and the `_*_backtest(req)` functions the
 weekly job calls still return the **whole** payload (`core + every section`), so goldens, journals
 and `payload["latest"]` readers see no change. A job's `result` is `core + cache +
 sections_available`, and `GET /api/backtest/jobs/{id}/sections/{name}` returns `{section, data}`
-(404 unknown job or a section the run lacks, 409 not finished, 410 released: only the newest
-`_BacktestJobs.MAX_PARTS` = 6 finished jobs keep their sections). A section is built from what the
-run used (`outer_prices` is captured for the circuit card), never from whatever is loaded when it
-is opened. Dashboard: `store/momentumRuns.ts` `loadSection` merges a section into the run's result;
+(404 unknown job or a section the run lacks, 409 not finished or failed, 410 released: only the 4
+jobs that finished most recently, `_BacktestJobs.MAX_PARTS`, keep their sections, and a `fresh`
+run releases them all). The weekly prices a section needs are held from the run (`outer_prices`
+for the circuit card); the circuit card also reads daily bars and lock masks from the database
+when it is opened, so a data refresh in between can move it slightly. Dashboard:
+`store/momentumRuns.ts` `loadSection` merges a section into the run's result;
 `hooks/useRunSection.ts` asks for it when the tab or card that shows it mounts. A new section needs
-its name in `api.BacktestSection`, the Fastify proxy's `BACKTEST_SECTIONS`, the Next rewrite, and
-`MomentumSectionName` in `types/momentum.ts`.
+its name in `api.BacktestSection` and `MomentumSectionName` in `types/momentum.ts` (the Fastify
+proxy and the Next rewrite take any well-formed name; the service rejects unknown ones).
 
 **Checking that a change leaves results alone on live data:**
 `scripts/result-baseline.py capture` stores every golden scenario and every saved favourite as
@@ -156,8 +158,7 @@ survives the browser tab closing or the user switching sections — the Momentum
 shows a pulsing dot while one is in flight. `GET /api/weekly/status` reports, per dataset, the
 date it's ingested through vs. the week a final run needs, the last few saved signals, and
 each scheduled job's last-run time (flagging one that fired >10 minutes late — typically the
-laptop was asleep at 14:40/16:45/19:30, and launchd has no catch-up marker of its own when
-that happens).
+laptop was asleep at 14:40/16:45/19:30 and the scheduler caught the slot up on wake).
 
 ETF strategies share one refreshed Fyers/public-source snapshot and are always current. Stock,
 Custom Index and Broad strategies are gated on the processed bhavcopy-backed dataset reaching
@@ -261,7 +262,8 @@ contract, not a shared service).
   expensive SQL features are cached per catalog version, so thresholds are cheap to change. The
   newest bhavcopy day can lag the Fyers top-up (which covers only the Total Market pool), so
   `preview` reports the last *full* week and a warning. `rebalance.live_broad_ranking` accepts the
-  gate, but the API refuses the whole-market universe there. Keep new Broad request fields in
+  gate, but the API refuses the whole-market and `turnover_rank` universes there (they preview from the
+  latest stored close). Keep new Broad request fields in
   `get_broad_ranking`'s cache key, or stale rankings will be served.
 - `categories/circuit_exposure.py` — post-hoc, display-only: walks a Broad backtest's holding periods
   (`holding_periods`) over the daily bars and reports the worst lower/upper-circuit runs it held
@@ -309,7 +311,22 @@ contract, not a shared service).
 - `phase6.py` (`mbt search ensemble <results> --space <toml> [--freeze]`) — addendum 4's
   ensemble pick and its walk-forward; `--freeze` writes `search_spaces/bl010_phase6_frozen.json`
   (configs, rebalance offsets, code commit, data snapshot) only if the rule passed. That file
-  is what BL-010 Phase 6 tracks: never edit it, supersede it.
+  is what BL-010 Phase 6 tracks: never edit it, supersede it. `phase6.favourite_requests(frozen)`
+  turns each frozen config into the complete `BacktestRequest` dict the live path needs
+  (`broad_universe="turnover_rank"`, gated like the search). **Trap:** a config's effective
+  offset is the TOP-LEVEL `rebalance_offset`; `light.rebalance_offset` is the search's raw
+  sample and is never used. The Broad weekly signal (`api._broad_engine_signal`, used by
+  `_research_weekly_result`) is the engine's own decision from a flat sentinel week appended
+  after the newest week (as `rebalance_preview` does), not `analysis.latest_signal`, which
+  ignores cadence, `sell_every_week`, the price ceiling and circuit locks.
+  `tests/test_broad_parity.py` pins both paths to identical engine arguments and trades. The
+  tilt-rank caches (`levers.tilt_cache_get/put`) hold the keyed frame so a recycled `id()`
+  cannot serve another frame's ranks.
+- `holdout.py` (`mbt search backcast`) — the one-shot 2012–2016 backcast (criteria addendum 5):
+  claims the run before it starts and writes its result once; never run it twice, never edit
+  `search_spaces/bl010_phase6_backcast_result.json`. `tracker.py` (`mbt search track <results>
+  --space <toml> --since <Friday>`) — read-only paper tracking of the frozen ensemble against its
+  median companion and Nifty200 Momentum 30 TRI, with addendum 5's two fail lines; it saves nothing.
 - `tests/golden/` — frozen backtest results (BL-001). 16 scenarios run through the real API on
   a frozen slice of real data (`fixture/`, rebuilt only by `scripts/build-golden-fixture.py`).
   A code change that moves any result fails `test_golden.py`; if the move was intended, run

@@ -273,3 +273,13 @@ PR 5 the single launchd cut-over · then one PR per later job, check group and d
 - 2026-10-06 — started. Owner answered questions 1–5 (see Owner decisions) and asked for a
   notification preferences page, added as Phase 4b. Question 6 answered the same day. PR 1:
   `isTradingDay`/`isHoliday` in `@trading/market-reference`.
+- 2026-10-06 — PRs 2–5 opened: notification types + preferences (and the momentum `"warning"`
+  fix), the scheduler core, the loop with catch-up/alerts/morning summary, and the launchd
+  cut-over (one `KeepAlive` agent; the six per-job plists retired by `install.sh`). The
+  Friday jobs keep writing `data/launchd-weekly-*.log` because the Momentum status panel
+  reads them. Found: GitHub's backstop broker-login cron fails every afternoon (~15:55 IST,
+  after AlgoTest's window) — PR 10.
+- 2026-10-06 — PR 7: `options-daily` (`obt daily`) at 16:15 IST trading days, retries at
+  17:45 and 19:15, catch-up until 23:00, `catalog` group.
+- 2026-10-06 — PR 8: monthly `backup` job (1st Sunday 10:00, catch-up all week): SSD, else
+  `~/Downloads` with a warning. First backup taken through it: 188 files, 280 MB.

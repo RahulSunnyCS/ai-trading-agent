@@ -926,7 +926,7 @@ def stocks_sync(
     shared database has been migrated once, `stock_dataset_from_db_or_none`/
     `daily_prices_from_db_or_none` keep serving that catalog's rows indefinitely, so a fetch
     that only touches data/stocks/*.csv never reaches a reader that prefers the database. Used
-    by the Friday ~19:30 IST stock-ingest job (scripts/install-launchd.sh); safe to run by hand.
+    by the Friday ~19:30 IST stock-ingest job (apps/scheduler); safe to run by hand.
     """
     # Typer only resolves a command's `typer.Option(...)` defaults when invoked through its
     # CLI runner; calling the function directly (as here) gets the raw OptionInfo sentinel
@@ -1528,6 +1528,60 @@ def search_ensemble(
         fixed=search.load_space(space).fixed,
     )
     typer.echo(f"froze {target}")
+
+
+@search_app.command("backcast")
+def search_backcast(
+    space: Path = typer.Option(..., "--space", help="search_spaces/round7_A.toml"),
+    frozen: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "search_spaces" / "bl010_phase6_frozen.json",
+        "--frozen",
+        help="The frozen Phase 6 record.",
+    ),
+    dest: Path = typer.Option(..., "--dest", help="Output folder."),
+    dry_run: str = typer.Option(
+        None, "--dry-run", help="START:END of an already-seen window, to test the harness."
+    ),
+) -> None:
+    """BL-010 Phase 6 step 2: the one-shot 2012-2016 backcast of the frozen ensemble
+    (criteria addendum 5). Without --dry-run it runs the sealed hold-out, once."""
+    from . import holdout
+
+    window = tuple(dry_run.split(":")) if dry_run else None
+    holdout.run(frozen, space, dest, window=window, echo=typer.echo)
+
+
+@search_app.command("track")
+def search_track(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="search_spaces/round7_A.toml"),
+    since: str = typer.Option(..., "--since", help="The Friday tracking starts from (YYYY-MM-DD)."),
+    frozen: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "search_spaces" / "bl010_phase6_frozen.json",
+        "--frozen",
+        help="The frozen Phase 6 record.",
+    ),
+    scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
+    dest: Path = typer.Option(
+        None, "--dest", help="Report folder (default <out>/phase6/tracking)."
+    ),
+) -> None:
+    """BL-010 Phase 6 step 3: paper-track the frozen ensemble against its median companion and
+    Nifty200 Momentum 30 TRI from `--since`, and test criteria addendum 5's two fail lines.
+    Read-only: runs the model portfolios, saves nothing to the database."""
+    from . import reference_benchmarks, tracker
+
+    report = tracker.track(
+        frozen,
+        space,
+        out,
+        scored or out / "scored_pit",
+        reference_benchmarks.load_references(),
+        since,
+        dest or out / "phase6" / "tracking",
+        echo=typer.echo,
+    )
+    typer.echo(tracker.markdown(report))
 
 
 @search_app.command("fair-placebo")
