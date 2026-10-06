@@ -72,6 +72,32 @@ export function lotSize(underlying: Underlying, asOf: Date = new Date()): number
   return mostRecentAsOf(lotSizeRows, underlying, asOf, 'lot_sizes');
 }
 
+let holidaySet: Set<string> | null = null;
+
+function loadHolidays(): Set<string> {
+  const text = readFileSync(join(REFERENCE_DIR, 'holidays.csv'), 'utf8').trim();
+  const [, ...rows] = text.split('\n');
+  // Only the first column is read, so a comma inside a quoted description is harmless.
+  return new Set(rows.map((line) => (line.split(',')[0] ?? '').trim()).filter(Boolean));
+}
+
+/** True when `day` ('YYYY-MM-DD', an IST calendar date) is an NSE trading holiday. */
+export function isHoliday(day: string): boolean {
+  holidaySet ??= loadHolidays();
+  return holidaySet.has(day);
+}
+
+/**
+ * True when `day` ('YYYY-MM-DD', an IST calendar date) is a weekday and not a
+ * holiday. Mirrors `is_trading_day` in the Python reference loader. A date past
+ * the end of holidays.csv counts every weekday as trading, as Python does — the
+ * scheduler's yearly check is what catches a missing year.
+ */
+export function isTradingDay(day: string): boolean {
+  const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
+  return weekday !== 0 && weekday !== 6 && !isHoliday(day);
+}
+
 /** ATM strike interval in force on `asOf`. */
 export function strikeStep(underlying: Underlying, asOf: Date = new Date()): number {
   strikeStepRows ??= parseCsv('strike_step.csv', 'step');
