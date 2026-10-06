@@ -1,0 +1,185 @@
+{
+  "frozen": "2026-10-06T21:25:05+05:30",
+  "rule": "search_spaces/bl010_criteria_addendum_4.json",
+  "code_commit": "d21141cbcd8b248980f0f989ae3729dd17168519",
+  "data_snapshot": {
+    "last_bar": "2026-10-01",
+    "last_week": "2026-10-02",
+    "factors": "4d066205752f"
+  },
+  "scored_curves_sha256": "58f14f5d033e22e8a5797cfbc79025518afb04d49bd95e6fb43eeb87155185ba",
+  "basket": "medium",
+  "capital": "equal per config, reset to equal at the last week before each 1 April",
+  "phase_meaning": "rebalance_offset: trade on Fridays whose week number since engine.CADENCE_EPOCH (2016-01-01) is the offset mod rebalance_every",
+  "fixed_settings": {
+    "series_break_policy": "verified",
+    "start": "2017-01-01",
+    "cost_model": "itemised",
+    "slippage_bps": 15.0,
+    "capital": 200000,
+    "respect_circuits": true,
+    "min_ranked": 1,
+    "momentum_sizing": false,
+    "signal_delay": 1,
+    "cap_band": 0.05,
+    "max_stock_price": 10000,
+    "sell_every_week": false,
+    "liq_min_turnover_cr": 2.0,
+    "liq_min_price": 30.0,
+    "liq_floor_ratio": 0.25,
+    "liq_circuit": true,
+    "liq_circuit_run": 3,
+    "voladj_skip_recent_month": true
+  },
+  "configs": [
+    {
+      "id": "1281e8ed6824",
+      "holdings": 12,
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [
+          4,
+          13,
+          26,
+          52
+        ],
+        "weight_scheme": "recent",
+        "score": "voladj"
+      },
+      "light": {
+        "coverage_floor": 0.0132,
+        "pool_top_n": 335,
+        "category_top_n": 6,
+        "picks_per_category": 2,
+        "max_position": 0.25,
+        "rebalance_every": 4,
+        "entry": "make_room",
+        "stock_tilt": 0.0,
+        "pool_exit_rank": 399,
+        "category_exit_rank": 7,
+        "rebalance_offset": 3
+      },
+      "rebalance_offset": 0
+    },
+    {
+      "id": "08c4307d7aa9",
+      "holdings": 8,
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [
+          13,
+          26,
+          52
+        ],
+        "weight_scheme": "long",
+        "score": "blend"
+      },
+      "light": {
+        "coverage_floor": 0.1168,
+        "pool_top_n": 146,
+        "category_top_n": 8,
+        "picks_per_category": 1,
+        "max_position": 0.2,
+        "rebalance_every": 4,
+        "entry": "make_room",
+        "stock_tilt": 1.0,
+        "pool_exit_rank": 343,
+        "category_exit_rank": 13,
+        "rebalance_offset": 1
+      },
+      "rebalance_offset": 1
+    },
+    {
+      "id": "535b17b44ba5",
+      "holdings": 12,
+      "rebalance_every": 4,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [
+          4,
+          13,
+          26
+        ],
+        "weight_scheme": "long",
+        "score": "voladj"
+      },
+      "light": {
+        "coverage_floor": 0.1501,
+        "pool_top_n": 117,
+        "category_top_n": 6,
+        "picks_per_category": 2,
+        "max_position": null,
+        "rebalance_every": 4,
+        "entry": "make_room",
+        "stock_tilt": 0.5,
+        "pool_exit_rank": 286,
+        "category_exit_rank": 11,
+        "rebalance_offset": 1
+      },
+      "rebalance_offset": 2
+    },
+    {
+      "id": "bad83df3821a",
+      "holdings": 12,
+      "rebalance_every": 2,
+      "heavy": {
+        "series_break_policy": "verified",
+        "liq_min_turnover_cr": 2.0,
+        "liq_min_price": 30.0,
+        "liq_floor_ratio": 0.25,
+        "liq_circuit": true,
+        "liq_circuit_run": 3,
+        "voladj_skip_recent_month": true,
+        "lookbacks": [
+          4,
+          13,
+          26,
+          52
+        ],
+        "weight_scheme": "recent",
+        "score": "voladj"
+      },
+      "light": {
+        "coverage_floor": 0.1702,
+        "pool_top_n": 291,
+        "category_top_n": 6,
+        "picks_per_category": 2,
+        "max_position": 0.35,
+        "rebalance_every": 2,
+        "entry": "wait",
+        "stock_tilt": 0.5,
+        "pool_exit_rank": 392,
+        "category_exit_rank": 12,
+        "rebalance_offset": 0
+      },
+      "rebalance_offset": 1
+    }
+  ],
+  "expected_pre_tax": {
+    "ensemble_cagr": 0.32296109199523926,
+    "ensemble_max_drawdown": -0.31522631645202637,
+    "walk_forward_cagr_fy2020_fy2026": 0.3669524862684599,
+    "group_median_walk_forward": 0.32613054068686,
+    "mom30_walk_forward": 0.1498392306814944
+  }
+}

@@ -269,6 +269,10 @@ contract, not a shared service).
   drawdown baskets, the third-worst-FY rank, correlation clusters, the walk-forward of the
   choice rule (selects only on data 13 weeks before each FY), factor regression and bootstrap.
   The walk-forward must never read past its cut; `tests/test_choose.py` pins that.
+- `phase6.py` (`mbt search ensemble <results> --space <toml> [--freeze]`) — addendum 4's
+  ensemble pick and its walk-forward; `--freeze` writes `search_spaces/bl010_phase6_frozen.json`
+  (configs, rebalance offsets, code commit, data snapshot) only if the rule passed. That file
+  is what BL-010 Phase 6 tracks: never edit it, supersede it.
 - `tests/golden/` — frozen backtest results (BL-001). 16 scenarios run through the real API on
   a frozen slice of real data (`fixture/`, rebuilt only by `scripts/build-golden-fixture.py`).
   A code change that moves any result fails `test_golden.py`; if the move was intended, run
