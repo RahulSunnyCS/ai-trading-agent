@@ -33,6 +33,7 @@ import pyarrow.parquet as pq
 from trading_data import ingest, lake
 from trading_data.db import connect, data_root
 from trading_data.instruments import InstrumentSpec, instrument_key, register
+from trading_data.lake import BAR_SCHEMA, OPT_SCHEMA
 
 from .auth import FyersCredentialsError
 from .client import Candle, FyersClient
@@ -158,37 +159,10 @@ def collect_chain(
 
 # ---------------------------------------------------------------------------
 # Parquet tables (partition values — asset, underlying/symbol, date — live in the
-# folder names, not in the files; see trading_data.lake)
+# folder names, not in the files). BAR_SCHEMA and OPT_SCHEMA are owned by
+# trading_data.lake, so the vendor importer writes the same shape.
 # ---------------------------------------------------------------------------
 
-_TS = pa.timestamp("s", tz="Asia/Kolkata")
-_OHLC_FIELDS = [
-    pa.field("open", pa.float64()),
-    pa.field("high", pa.float64()),
-    pa.field("low", pa.float64()),
-    pa.field("close", pa.float64()),
-    pa.field("volume", pa.float64()),
-    pa.field("oi", pa.float64()),
-]
-BAR_SCHEMA = pa.schema(
-    [
-        pa.field("instrument_id", pa.int64()),
-        pa.field("ts", _TS),
-        *_OHLC_FIELDS,
-        pa.field("vendor_symbol", pa.string()),
-    ]
-)
-OPT_SCHEMA = pa.schema(
-    [
-        pa.field("instrument_id", pa.int64()),
-        pa.field("ts", _TS),
-        *_OHLC_FIELDS,
-        pa.field("expiry", pa.date32()),
-        pa.field("strike", pa.float64()),
-        pa.field("option_type", pa.string()),
-        pa.field("vendor_symbol", pa.string()),
-    ]
-)
 SYMBOL_SCHEMA = pa.schema(
     [
         pa.field("vendor_symbol", pa.string()),
