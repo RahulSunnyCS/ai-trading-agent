@@ -401,7 +401,7 @@ def test_stock_meta_returns_companies_and_benchmarks(stock_client):
     # roster (has_data is always True for stocks; see _stock_meta) - plus the 4 extra
     # instruments (Gold/Silver/Cash (liquid fund)/Gilt 8-13 yr; see test_stock_meta_lists_the_
     # four_extra_instruments for their own group/include/defaults assertions).
-    assert len(meta["instruments"]) == 95 + 4
+    assert len(meta["instruments"]) == 96 + 4
     by_id = {i["name"]: i for i in meta["instruments"]}
     assert set(STOCK_IDS) <= set(by_id)
     assert set(EXTRA_NAMES) <= set(by_id)
@@ -442,7 +442,7 @@ def test_stock_meta_lists_the_four_extra_instruments(stock_client):
 
 def test_stock_defensive_ranked_lets_gold_fill_a_portfolio_slot(stock_client):
     """The literal ask this task implements: with defensive="ranked" (now the stock default),
-    Gold competes in the SAME rank table as the 95 stocks, and when it ranks within top_n it
+    Gold competes in the SAME rank table as the 96 stocks, and when it ranks within top_n it
     fills a normal portfolio slot exactly like a stock would - not a separate side-allocation.
     Gold's deterministic uptrend in this fixture (see stock_client) makes it rank #1 for nearly
     the whole backtest once eligible, so it should end up an open position."""
