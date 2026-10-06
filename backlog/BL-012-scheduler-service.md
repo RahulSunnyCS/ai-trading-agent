@@ -10,6 +10,24 @@
 | **Depends on** | BL-011 Phase 1 (done). Supersedes BL-011 Phases 2–4. Related: BL-002 (hosting) |
 | **TODO.md row** | 1.10 |
 
+## Status — 2026-10-07
+
+**Built and merged:** the scheduler (registry, IST schedules, runner, SQLite history, catch-up,
+alerts, 09:00 morning summary), the launchd cut-over code, `obt daily` 16:15, the monthly backup,
+per-type Telegram switches, the loopback API, the alert-only checks (lot sizes, Nifty 50
+membership, holidays/RBI/margin upkeep, stock-data baseline age and review queue, `gh` auth and
+the yearly credential reminder), the Saturday health digest, the dashboard Jobs page and the
+Telegram-alerts card in Settings, and `docs/mac-mini.md`. 18 jobs; 96 scheduler tests.
+
+**Owner steps still open:** `deploy/launchd/install.sh` (nothing runs through the scheduler until
+then), `sudo pmset repeat wakeorpoweron MTWRF 07:55:00`, and whether Postgres :5433 should run.
+
+**Remaining (not built):**
+- Regime-tag CLI + 16:30 job (D5) — needs Postgres.
+- A check that EOD retrospection ran (D6), reminders for S3 (Total Market universe refresh), Y3
+  (`BLOCKED_DATES`) and Y4 (expiry calendar), and the D4 contract-notes cutover.
+- Phase 5 beyond the guide: Docker image and home-runner mode, only if a cloud host is chosen.
+
 ## Context
 
 The owner wants every recurring ingestion job in one service that runs on the laptop
@@ -286,3 +304,4 @@ PR 5 the single launchd cut-over · then one PR per later job, check group and d
 - 2026-10-07 — Phase 0: Nifty 50 Sep-2026 review applied (BSE in, Wipro out, effective 2026-09-30; confirmed against the live niftyindices list). BSE's 15 corporate-action rows reviewed and accepted, baseline advanced, three stock goldens re-accepted (BSE appears in the companies list; no number moved).
 - 2026-10-07 — Phase 3b: `weekly-digest` (Saturday 09:00 IST): CI on main, each job's runs over the last 7 days, last options day in the lake, last backup; green items collapse to one line. Journal-vs-backtest (BL-024) and live-money rules (BL-025) join when those ship.
 - 2026-10-07 — `docs/mac-mini.md`: the checklist for moving the scheduler to an always-on Mac mini (stay-awake and auto-login settings, tools, secrets, copying `~/TradingData`, dry runs, hard cut-over so two machines never both schedule).
+- 2026-10-07 — Built through Phase 4b and the Phase 5 guide; remaining items listed under Status. Item stays In progress until the owner installs it and the remaining checks are decided.
