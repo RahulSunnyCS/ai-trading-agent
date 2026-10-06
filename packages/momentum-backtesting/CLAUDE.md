@@ -224,7 +224,8 @@ contract, not a shared service).
   expensive SQL features are cached per catalog version, so thresholds are cheap to change. The
   newest bhavcopy day can lag the Fyers top-up (which covers only the Total Market pool), so
   `preview` reports the last *full* week and a warning. `rebalance.live_broad_ranking` accepts the
-  gate, but the API refuses the whole-market universe there. Keep new Broad request fields in
+  gate, but the API refuses the whole-market and `turnover_rank` universes there (they preview from the
+  latest stored close). Keep new Broad request fields in
   `get_broad_ranking`'s cache key, or stale rankings will be served.
 - `categories/circuit_exposure.py` — post-hoc, display-only: walks a Broad backtest's holding periods
   (`holding_periods`) over the daily bars and reports the worst lower/upper-circuit runs it held
@@ -272,7 +273,17 @@ contract, not a shared service).
 - `phase6.py` (`mbt search ensemble <results> --space <toml> [--freeze]`) — addendum 4's
   ensemble pick and its walk-forward; `--freeze` writes `search_spaces/bl010_phase6_frozen.json`
   (configs, rebalance offsets, code commit, data snapshot) only if the rule passed. That file
-  is what BL-010 Phase 6 tracks: never edit it, supersede it.
+  is what BL-010 Phase 6 tracks: never edit it, supersede it. `phase6.favourite_requests(frozen)`
+  turns each frozen config into the complete `BacktestRequest` dict the live path needs
+  (`broad_universe="turnover_rank"`, gated like the search). **Trap:** a config's effective
+  offset is the TOP-LEVEL `rebalance_offset`; `light.rebalance_offset` is the search's raw
+  sample and is never used. The Broad weekly signal (`api._broad_engine_signal`, used by
+  `_research_weekly_result`) is the engine's own decision from a flat sentinel week appended
+  after the newest week (as `rebalance_preview` does), not `analysis.latest_signal`, which
+  ignores cadence, `sell_every_week`, the price ceiling and circuit locks.
+  `tests/test_broad_parity.py` pins both paths to identical engine arguments and trades. The
+  tilt-rank caches (`levers.tilt_cache_get/put`) hold the keyed frame so a recycled `id()`
+  cannot serve another frame's ranks.
 - `tests/golden/` — frozen backtest results (BL-001). 16 scenarios run through the real API on
   a frozen slice of real data (`fixture/`, rebuilt only by `scripts/build-golden-fixture.py`).
   A code change that moves any result fails `test_golden.py`; if the move was intended, run
