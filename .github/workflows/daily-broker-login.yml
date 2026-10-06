@@ -4,7 +4,8 @@ on:
   # PRIMARY TRIGGER IS NOT HERE: since 2026-10-05 the owner's laptop dispatches this
   # workflow at 08:00 IST trading days (apps/scheduler, packages/broker-login/src/dispatch.ts),
   # because GitHub delivered these crons ~6 hours late. They stay as a late backstop
-  # for days the laptop is off; brokers already logged in are reported SKIPPED.
+  # for days the laptop is off, and skip entirely once a run succeeded that day
+  # (backstop-check below); brokers already logged in are reported SKIPPED.
   #
   # 02:45 UTC = 08:15 IST, weekdays only. AlgoTest opens broker logins at 08:15 IST;
   # if the scheduler fires a minute early, main.ts's window guard waits it out. The
@@ -38,9 +39,37 @@ concurrency:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
+  # GitHub delivers the backstop crons hours late (15:55 IST on 5 and 6 Oct), after
+  # AlgoTest's login window, so they failed and sent a false "login failed" alert even
+  # though the 08:00 laptop dispatch had already logged both brokers in. A scheduled run
+  # now stops here when a run of this workflow already succeeded today (UTC date, which
+  # is the IST date for every run between 05:30 and 23:59 IST).
+  backstop-check:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          skip=false
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            today=$(date -u +%Y-%m-%d)
+            ok=$(gh api "repos/${{ github.repository }}/actions/workflows/daily-broker-login.yml/runs?status=success&created=>=${today}" --jq '.total_count')
+            if [ "${ok:-0}" -gt 0 ]; then
+              skip=true
+              echo "Already logged in today (${ok} successful run(s)); backstop not needed."
+            fi
+          fi
+          echo "skip=${skip}" >> "$GITHUB_OUTPUT"
+
   login:
+    needs: backstop-check
+    if: needs.backstop-check.outputs.skip != 'true'
     runs-on: ubuntu-latest
     # Browsers are preinstalled here, so there is no download step and no cache to
     # invalidate. The tag must stay in lockstep with the playwright version in
