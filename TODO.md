@@ -498,6 +498,18 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | 3.14.3 | Phase 3: code and data stamp on every saved run | claude | Open |
 | 3.14.4 | Phase 4: weekly favourites check | claude | Open — three owner questions in the backlog item |
 
+### 3.15 Forward-signal journal — [BL-024](backlog/BL-024-forward-signal-journal.md)
+
+The plan and the owner's decisions live in the backlog item; this table only tracks where each phase stands.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.15.1 | Phase 1: append-only, hash-chained journal written by every weekly run | claude | **Code done 2026-10-06** (migration 007, `forward_journal.py`, `mbt journal show/verify`). Closes when Friday 2026-10-09's runs write their rows and `mbt journal verify` passes; needs this merged and the laptop checkout on `main` before 14:40 that day |
+| 3.15.5 | Phase 1b: Friday 21:00 `mbt journal check --send` job + Momentum › Journal page | claude | **Code done 2026-10-06.** Closes with 3.15.1 on Friday 2026-10-09 |
+| 3.15.2 | Install the 19:30 `momentum-weekly-stock-ingest` LaunchAgent (without it no Stock/Broad favourite is evaluated or journalled) | owner | **Done 2026-10-06** (installed with the owner's go-ahead) |
+| 3.15.3 | Phase 2: weekly scoring, Forward page, Telegram line | claude | Open — after four Fridays are recorded |
+| 3.15.4 | Phase 3: real fills | owner→claude | Open — when real money is in |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

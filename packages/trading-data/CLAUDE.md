@@ -24,6 +24,9 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
     large-drop review candidates, persistent split/bonus/crash decisions,
     cumulative share factors, and the baseline after which new events need
     user review
+  - `007_momentum_forward_journal.sql`: `momentum_forward_journal`, the append-only,
+    hash-chained record of every weekly momentum signal (BL-024; written only by
+    momentum-backtesting's `forward_journal.record`)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`)
 - `raw/` — gzipped verbatim vendor responses

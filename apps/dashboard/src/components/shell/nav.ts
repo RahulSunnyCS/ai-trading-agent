@@ -126,6 +126,7 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'saved', label: 'Saved runs' },
           { segment: 'weekly', label: 'Weekly signal' },
           { segment: 'rebalance', label: 'Rebalance' },
+          { segment: 'journal', label: 'Journal' },
         ],
       },
     ],

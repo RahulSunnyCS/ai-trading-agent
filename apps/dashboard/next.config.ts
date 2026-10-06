@@ -92,6 +92,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/favorite-strategies`,
             },
             {
+              source: '/api/momentum/journal',
+              destination: `${momentumDirectOrigin}/api/journal`,
+            },
+            {
               // run, jobs/latest and status
               source: '/api/momentum/weekly/:path*',
               destination: `${momentumDirectOrigin}/api/weekly/:path*`,
