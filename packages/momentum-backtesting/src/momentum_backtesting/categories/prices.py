@@ -179,6 +179,20 @@ def build_symbol_segments(
     return segments, boundary_names, non_terminal_names
 
 
+def _forward_filled(frame: pd.DataFrame, columns: Iterable[str]) -> pd.DataFrame:
+    """`frame` with each of `columns` forward-filled, every other column untouched, in the same
+    column order. Done in one step: replacing hundreds of columns one at a time
+    (`frame[col] = frame[col].ffill()`) splits pandas' internal storage into one block per
+    column, and the next column added to such a frame raises 'DataFrame is highly fragmented'
+    (BL-005). Here the filled columns are one new block, put back in their original places."""
+    wanted = set(columns)
+    stale = [c for c in frame.columns if c in wanted]
+    if not stale:
+        return frame
+    kept = frame.drop(columns=stale)
+    return pd.concat([kept, frame[stale].ffill()], axis=1)[list(frame.columns)]
+
+
 def build_stock_weekly_prices(
     symbols: Iterable[str],
     *,
@@ -363,8 +377,7 @@ def build_stock_weekly_prices(
     stale_columns_to_fill = set(non_terminal_columns) | set(stale_columns)
 
     if carry_forward_stopped_segments:
-        for col in stale_columns_to_fill:
-            frame[col] = frame[col].ffill()
+        frame = _forward_filled(frame, stale_columns_to_fill)
 
     if events.empty:
         events_out = pd.DataFrame(columns=list(EVENT_COLUMNS))
@@ -379,7 +392,6 @@ def build_stock_weekly_prices(
     if return_raw_weekly:
         raw_frame = pd.DataFrame(raw_weekly_columns).reindex(frame.index)
         if carry_forward_stopped_segments:
-            for col in stale_columns_to_fill:
-                raw_frame[col] = raw_frame[col].ffill()
+            raw_frame = _forward_filled(raw_frame, stale_columns_to_fill)
         return frame, events_out, stale_columns, raw_frame
     return frame, events_out, stale_columns
