@@ -169,7 +169,7 @@ def test_phase5_report_runs_end_to_end(tmp_path):
     )
     flat = pd.Series(1.0, index=WEEKS)
     series = {
-        phase5.MOM30: _curve(0.002),
+        phase5.MOM30: _curve(0.002, rng.normal(0, 0.01, len(WEEKS))),
         phase5.MIDCAP: flat,
         phase5.SMALLCAP: _curve(0.0015, rng.normal(0, 0.01, len(WEEKS))),
         phase5.NIFTY50: _curve(0.0012, rng.normal(0, 0.01, len(WEEKS))),

@@ -376,7 +376,7 @@ def factor_regression(
     )
     beta, *_ = np.linalg.lstsq(x, y, rcond=None)
     resid = y - x @ beta
-    xtx_inv = np.linalg.inv(x.T @ x)
+    xtx_inv = np.linalg.pinv(x.T @ x)  # pinv: a degenerate factor gives NaN-free output
     lags = 4
     s = (x * resid[:, None]).T @ (x * resid[:, None])
     for lag in range(1, lags + 1):
