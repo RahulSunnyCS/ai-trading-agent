@@ -1497,10 +1497,25 @@ def journal_check(
     from .weekly import week_ending_on_or_before
 
     target = week or week_ending_on_or_before(datetime.now(notify.IST).date())
-    with connect() as con:
-        result = forward_journal.check(
-            con, target, runs_store.list_favorites(con), (NIFTY200_MOMENTUM30_TRI,)
-        )
+    try:
+        with connect() as con:
+            result = forward_journal.check(
+                con, target, runs_store.list_favorites(con), (NIFTY200_MOMENTUM30_TRI,)
+            )
+    except Exception as error:
+        # e.g. the catalog still locked by a long 19:30 run: say so, never fail silently.
+        message = notify.redact(f"{type(error).__name__}: {error}")
+        typer.echo(f"journal check FAILED: {message}")
+        if send:
+            notify.send(
+                notify.Notification(
+                    "momentum-journal",
+                    "error",
+                    "Forward journal check could not run",
+                    f"{message}\nRerun it: mbt journal check --send",
+                )
+            )
+        raise typer.Exit(1) from error
     title, body = forward_journal.summary(result)
     typer.echo(f"{title}\n{body}")
     if send:

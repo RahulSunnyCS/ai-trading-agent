@@ -1926,7 +1926,7 @@ def _journal_entries(
                 dataset=outcome["dataset"],
                 settings=favorite["config"] if favorite else signal.get("config", {}),
                 holdings_before=signal.get("weights", {}),
-                signal=signal,
+                signal=journal.compact_signal(signal),
                 data_fingerprint=fingerprint,
                 code_commit=commit,
             )

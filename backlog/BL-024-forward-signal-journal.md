@@ -103,8 +103,9 @@ benchmark.
   row (its `holdings_before`), after checking that every recorded BUY appears there and every
   recorded SELL is gone (a mismatch is flagged, not scored); compute its realised return with the
   same cost and tax model as the backtest, at the fills in Decision 2; compare with what the backtest says for
-  the same weeks. Score the **earliest** row recorded before the fill; later rows are shown as
-  corrections, not scored in its place.
+  the same weeks. Score the **latest** row recorded before the fill (a Friday-morning dashboard
+  preview is a what-if; the 14:40 run that supersedes it is what gets traded at the close); rows
+  recorded after the fill are shown as corrections, never scored in its place.
 - **Deliverables:** weekly scoring job (BL-012), a Momentum "Forward" page, one Telegram line.
 - **Done when:** four weeks are scored and the live-vs-backtest gap is shown per config.
 
@@ -143,6 +144,10 @@ None for Phase 1.
 - 2026-10-06 — started. Owner answered the start questions (see Decisions); config choice split
   out as BL-030. Found that non-ETF favourites have no preview and that the 19:30 job was not
   installed. Status In progress, TODO.md 3.15.
+- 2026-10-06 — code review before merge (BL-014): journalled signals now keep only acting,
+  held and top-30 rows (a Broad signal was ~144 KB); Phase 2's rule changed from the earliest to
+  the latest row before the fill; the check skips the preview on a Friday holiday and reports
+  its own failure to Telegram.
 - 2026-10-06 — Phase 1b added at the owner's request: the after-Friday check job and the
   Momentum › Journal page, so the owner does not have to run the CLI checks by hand.
 - 2026-10-06 — Phase 1 code done: migration 007, `forward_journal.py`, wiring in

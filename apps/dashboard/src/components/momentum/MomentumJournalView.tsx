@@ -78,7 +78,7 @@ export function MomentumJournalView() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Select
             aria-label="Signal week"
-            value={data.week ?? ''}
+            value={week ?? data.week ?? ''}
             onChange={(event) => setWeek(event.target.value)}
             className="w-auto"
           >

@@ -354,3 +354,70 @@ def test_cli_check_exits_nonzero_and_sends_when_asked(monkeypatch):
     assert result.exit_code == 1, result.output
     assert "0 of 1 expected entries recorded" in result.output
     assert sent[0].severity == "warning" and sent[0].title.endswith("PROBLEMS")
+
+
+# --- review fixes (BL-014 pre-merge review) ------------------------------------------------------
+
+
+def test_a_journalled_signal_keeps_acting_held_and_top_ranked_rows_only():
+    rows = [{"asset": f"S{i}", "rank": i, "action": "", "held": False} for i in range(1, 501)]
+    rows[399]["action"] = "SELL"  # rank 400, acting
+    rows[449]["held"] = True  # rank 450, held
+    rows.append({"asset": "Unranked", "rank": float("nan"), "action": "", "held": False})
+    compact = forward_journal.compact_signal({"week": "2026-10-09", "rows": rows})
+    kept = [row["asset"] for row in compact["rows"]]
+    assert kept == [f"S{i}" for i in range(1, 31)] + ["S400", "S450"]
+    assert compact["rows_dropped"] == 501 - 32
+    assert forward_journal.compact_signal({"level": 1.0}) == {"level": 1.0}
+
+
+def test_check_does_not_expect_a_preview_on_a_friday_holiday():
+    favourites = [_favourite("etf-1", "ETF Core", "etf")]
+    with connect() as con:
+        con.execute("INSERT INTO ref_holidays VALUES (DATE '2026-10-09', 'test holiday')")
+        forward_journal.record(con, _entry(config_id="etf-1", run_kind="final"))
+        result = forward_journal.check(con, "2026-10-09", favourites)
+    assert [(i["run_kind"], i["status"]) for i in result["items"]] == [("final", "recorded")]
+    assert result["ok"] is True
+
+
+def test_cli_check_reports_its_own_failure_to_telegram(monkeypatch):
+    from typer.testing import CliRunner
+
+    from momentum_backtesting import cli
+
+    def locked(*args, **kwargs):
+        raise RuntimeError("Could not set lock on file catalog.duckdb")
+
+    sent = []
+    monkeypatch.setattr(notify, "send", sent.append)
+    monkeypatch.setattr(forward_journal, "check", locked)
+    result = CliRunner().invoke(cli.app, ["journal", "check", "--week", "2026-10-09", "--send"])
+    assert result.exit_code == 1
+    assert sent[0].severity == "error" and "Could not set lock" in sent[0].body
+
+
+def test_research_signals_carry_holdings_as_portfolio_weights(monkeypatch):
+    """The only source of holdings_before for Stock / Custom Index / Broad journal rows."""
+
+    class Stock:
+        last_week = pd.Timestamp("2026-10-09")
+
+    payload = {
+        "series": {"strategy": [100_000.0, 200_000.0]},
+        "open_positions": [
+            {"asset": "INFY", "value": 100_000.0},
+            {"asset": "TCS", "value": 60_000.0},
+            {"asset": "GONE", "value": 0.0},
+        ],
+        "latest": {
+            "week": "2026-10-09",
+            "rows": [{"asset": "INFY", "action": "HOLD", "rank": 1}],
+        },
+    }
+    monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
+    monkeypatch.setattr(api, "_broad_backtest", lambda req: payload)
+    favourite = {"name": "Broad A", "config": {"dataset": "broad", "universe": ["INFY"]}}
+    result, blocked = api._research_weekly_result(favourite, pd.Timestamp("2026-10-09"))
+    assert blocked is None
+    assert result.signal["weights"] == {"INFY": 0.5, "TCS": 0.3, api.IDLE: 0.2}

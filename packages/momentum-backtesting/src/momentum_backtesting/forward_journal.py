@@ -7,7 +7,7 @@ holds if the record cannot be quietly rewritten, so:
 
 - `record` is the only writer, and it only inserts. A rerun that produces the identical signal
   writes nothing; a rerun that produces a different one writes a new row whose `supersedes`
-  points at the old one. Phase 2 scores the earliest row recorded before the fill.
+  points at the old one. Phase 2 scores the latest row recorded before the fill.
 - DuckDB has no triggers, so the database cannot refuse an UPDATE or DELETE. Each row instead
   stores the hash of the previous row and of itself (a hash chain over the exact stored text):
   `verify` finds an edited row, a removed row, or a reordered one. Removing the *newest* rows
@@ -141,6 +141,27 @@ def frame_fingerprint(frame: pd.DataFrame) -> str:
     digest = hashlib.sha256(canonical([str(c) for c in frame.columns]).encode())
     digest.update(pd.util.hash_pandas_object(frame, index=True).to_numpy().tobytes())
     return "sha256:" + digest.hexdigest()
+
+
+#: Ranked rows kept in a journalled signal beyond those that act or are held: enough context to
+#: see what nearly made it, without storing a Broad signal's hundreds of ranked names (~144 KB).
+KEEP_RANKS = 30
+
+
+def compact_signal(signal: dict) -> dict:
+    """The signal as produced, with `rows` cut to those with an action, those held, and the top
+    KEEP_RANKS by rank. The full ranking is reproducible from the recorded code and data."""
+    rows = signal.get("rows")
+    if not isinstance(rows, list):
+        return signal
+
+    def keep(row: dict) -> bool:
+        rank = row.get("rank")
+        ranked_high = isinstance(rank, int | float) and not math.isnan(rank) and rank <= KEEP_RANKS
+        return bool(row.get("action")) or bool(row.get("held")) or ranked_high
+
+    kept = [row for row in rows if keep(row)]
+    return {**signal, "rows": kept, "rows_dropped": len(rows) - len(kept)}
 
 
 def record(con: duckdb.DuckDBPyConnection, entry: Entry, now: datetime | None = None) -> int | None:
@@ -283,10 +304,13 @@ def check(
             "corrections": corrections.get((run_kind, config_id), 0),
         }
 
+    # On a Friday market holiday the 14:40 preview finds no live session and records nothing.
+    holiday = con.execute("SELECT count(*) FROM ref_holidays WHERE date = ?", [week]).fetchone()[0]
+    etf_runs = ("final",) if holiday else ("preview", "final")
     items = []
     for favourite in favourites:
         dataset = favourite["config"].get("dataset", "etf")
-        for run_kind in ("preview", "final") if dataset == "etf" else ("final",):
+        for run_kind in etf_runs if dataset == "etf" else ("final",):
             items.append(item(favourite["id"], favourite["name"], dataset, run_kind))
     for name in benchmarks:
         items.append(item(name, name, "benchmark", "final"))
