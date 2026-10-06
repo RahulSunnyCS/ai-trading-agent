@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { alertMissed, alertResult } from '../alerts.js';
 import { History } from '../history.js';
 import type { Job } from '../jobs.js';
-import { decide } from '../loop.js';
+import { decide, skippedToday } from '../loop.js';
 import { type RunResult, runJob } from '../runner.js';
 import { istAt } from '../schedule.js';
 import { formatSummary, jobChecks } from '../summary.js';
@@ -205,5 +205,16 @@ describe('review fixes', () => {
     expect(() => b.start('y', 'manual', null, '', new Date())).not.toThrow();
     a.close();
     b.close();
+  });
+});
+
+describe('skippedToday', () => {
+  it("lists today's slots that already passed with no run, for the install message", () => {
+    const now = istAt('2026-10-06', '08:03');
+    const jobs = [job, { ...job, id: 'later', schedule: { ...job.schedule, at: '09:00' } }];
+    expect(skippedToday(jobs, now, history).map((x) => x.job.id)).toEqual(['login']);
+    const run = history.start('login', 'manual', istAt('2026-10-06', '08:00'), '', now);
+    history.finish(run, 0, 1, now);
+    expect(skippedToday(jobs, now, history)).toEqual([]);
   });
 });
