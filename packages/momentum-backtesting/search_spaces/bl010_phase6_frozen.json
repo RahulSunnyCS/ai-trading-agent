@@ -44,12 +44,7 @@
         "liq_circuit": true,
         "liq_circuit_run": 3,
         "voladj_skip_recent_month": true,
-        "lookbacks": [
-          4,
-          13,
-          26,
-          52
-        ],
+        "lookbacks": [4, 13, 26, 52],
         "weight_scheme": "recent",
         "score": "voladj"
       },
@@ -80,11 +75,7 @@
         "liq_circuit": true,
         "liq_circuit_run": 3,
         "voladj_skip_recent_month": true,
-        "lookbacks": [
-          13,
-          26,
-          52
-        ],
+        "lookbacks": [13, 26, 52],
         "weight_scheme": "long",
         "score": "blend"
       },
@@ -115,11 +106,7 @@
         "liq_circuit": true,
         "liq_circuit_run": 3,
         "voladj_skip_recent_month": true,
-        "lookbacks": [
-          4,
-          13,
-          26
-        ],
+        "lookbacks": [4, 13, 26],
         "weight_scheme": "long",
         "score": "voladj"
       },
@@ -150,12 +137,7 @@
         "liq_circuit": true,
         "liq_circuit_run": 3,
         "voladj_skip_recent_month": true,
-        "lookbacks": [
-          4,
-          13,
-          26,
-          52
-        ],
+        "lookbacks": [4, 13, 26, 52],
         "weight_scheme": "recent",
         "score": "voladj"
       },
