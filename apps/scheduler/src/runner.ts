@@ -159,7 +159,7 @@ export function runJob(
         if (job.builtin) {
           const builtin = ctx.builtins?.[job.builtin];
           result = builtin
-            ? await builtin({ ...ctx, now, log: (text) => writeSync(fd, `${text}\n`) }).catch(
+            ? await builtin({ ...ctx, now, log: (text) => writeSync(logFd, `${text}\n`) }).catch(
                 (error: unknown) => ({
                   code: 1,
                   error: error instanceof Error ? error.message : String(error),
