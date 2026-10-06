@@ -406,7 +406,7 @@ The system is a **real-time event-driven pipeline** in four layers:
   push to `main` that changes anything but `*.md` outside `packages/*/src/`. Add `reviewed` only
   after `/code-review` has run and its result is on the PR
 - **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
-  the chart palette helpers (`lib/chartTheme.ts`) and the font setup (`next/font`, IBM Plex
+  the chart palette helpers (`lib/chartTheme.ts`) and the font setup (self-hosted `next/font/local`, IBM Plex
   Sans / Mono) are in `docs/dashboard-design-tokens.md`
 - **Dashboard display formatting lives in `apps/dashboard/src/lib/format.ts`** — components
   never call `Intl.*`, `toFixed` or `toLocaleString`. Use `formatInr`, `formatPct` (takes a
