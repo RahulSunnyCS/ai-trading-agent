@@ -44,6 +44,9 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
 
 ## Open questions
 
+0. **Pending — discuss when this item is picked up.** The rule numbers: how far live may trail the
+   backtest and over how many weeks before a review; the drawdown at which to reduce and at which
+   to stop (within the stated 25/30/35% baskets and 40% ceiling); and what each breach triggers.
 1. ~~Friends and the rules?~~ **Shown for information only** (owner delegated to the recommendation, 2026-10-06): friends see the owner's rules as an
    example, and each friend's own money is their decision; the alerts go to the owner only.
 
@@ -52,3 +55,4 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
 - 2026-10-06 — created in the overnight review; not discussed with the owner yet.
 - 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: the draft carries the owner's own stated limits; friends see rules for information only.
   The remaining numbers still need the owner's sign-off before Phase 1 is done.
+- 2026-10-06 — owner: pending decisions stay here as open questions and are settled when the item is picked up; the rule numbers are open question 0.

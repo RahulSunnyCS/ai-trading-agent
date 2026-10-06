@@ -39,7 +39,7 @@ day, with the gap broken down into entry/exit price, costs and missed or extra t
 
 ## Open questions
 
-1. **Default** (owner delegated to the recommendation, 2026-10-06): start with the four strategies already transcribed in
+1. **Pending — discuss when this item is picked up.** **Proposed default** (owner delegated to the recommendation, 2026-10-06): start with the four strategies already transcribed in
    `packages/option-backtesting/strategies/legwise/` (the AlgoTest exports); owner to confirm which
    run live and on which accounts when the item starts. Original question: which strategies run live
    today, and on which broker accounts?
@@ -50,3 +50,4 @@ day, with the gap broken down into entry/exit price, costs and missed or extra t
 
 - 2026-10-06 — created in the overnight review; not discussed with the owner yet.
 - 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: start with the four legwise strategies; owner confirms the live set at start.
+- 2026-10-06 — owner: pending decisions stay here as open questions and are settled when the item is picked up; which strategies run live is open question 1.

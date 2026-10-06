@@ -72,7 +72,7 @@ than a simple baseline.
 
 ## Open questions
 
-1. **Cut-off times — proposed default, to confirm when the item starts** (owner delegated to the recommendation, 2026-10-06): a 30-minute grid,
+1. **Pending — discuss when this item is picked up.** **Cut-off times — proposed default** (owner delegated to the recommendation, 2026-10-06): a 30-minute grid,
    09:45 → 15:00 (11 cut-offs); 12:30 (first half → second half) is the **primary** test, named in
    advance; the other cut-offs are secondary and judged together with a multiple-testing correction
    (Holm), so one lucky cut-off cannot pass the item; the feature set stays the same at every

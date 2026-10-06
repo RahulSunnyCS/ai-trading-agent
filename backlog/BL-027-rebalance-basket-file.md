@@ -42,7 +42,7 @@ orders, with quantities computed from the owner's current holdings and capital.
 
 ## Open questions
 
-1. **Default** (owner delegated to the recommendation, 2026-10-06): the broker that holds the Momentum account, using its standard basket/bulk-order
+1. **Pending — discuss when this item is picked up.** **Proposed default** (owner delegated to the recommendation, 2026-10-06): the broker that holds the Momentum account, using its standard basket/bulk-order
    CSV; owner names the broker when the item starts. Original question: which broker and format?
 2. ~~Holdings input?~~ **The broker's holdings CSV export** (owner delegated to the recommendation, 2026-10-06): fewer typing errors than manual
    entry, and the same file every week.
@@ -51,3 +51,4 @@ orders, with quantities computed from the owner's current holdings and capital.
 
 - 2026-10-06 — created; owner approved the idea on PR #27.
 - 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: the Momentum account's broker and its basket CSV; holdings from the broker's export.
+- 2026-10-06 — owner: pending decisions stay here as open questions and are settled when the item is picked up; the broker is open question 1.
