@@ -6,19 +6,20 @@ portfolio rebalances on, and a lucky config's result moves a lot, while a config
 plateau barely changes. This module takes the best candidates from a finished search, re-runs each
 one with its parameters nudged one at a time, and reports how much the result moves.
 
-The nudges (per candidate), all inside the tuning window - a space that declares `sealed_from`
-cannot be run past it, and these runs honour that:
+The nudges (per candidate) come from the search's own space file, so every searched dimension
+is nudged and no table needs updating when a space changes (BL-010 F13):
 
-  floor      coverage_floor +-0.03 and +-0.06
-  pool       pool_top_n x0.75 and x1.25 (the band between top and exit rank is kept)
-  cats       category_top_n +-1
-  picks      picks_per_category +-1
-  reb        rebalance_every set to each of the other cadences
-  offset     every other rebalance_offset (which Friday of the cycle is the rebalance day)
-  maxpos     the neighbouring max_position values
-  score      the other score (voladj <-> blend)
-  lookbacks  [13, 26] <-> [13, 26, 52]
+  a number   one step either way, a tenth of its searched range (coverage_floor in [0, 0.3]
+             moves by 0.03; pool_top_n in [30, 350] by 32), clipped to the range
+  a choice   the neighbouring values when the choices are numbers (max_position 0.25 -> 0.2,
+             0.35), every other value when they are not (score, lookbacks, entry)
+  a band     pool/category/off bands move the exit rank and keep the top; moving the top
+             keeps the band, so the hysteresis width never changes by accident
+  offset     every other rebalance_offset of the cycle (which Friday it trades on)
   start      a later start date (2017-07, 2018-01, 2018-07, 2019-01)
+
+A nudge the arm cannot run (`search.feasible`) is skipped. The kind of a nudge is the name of
+the dimension it moved.
 
 Results append to `<out>/robust-<pid>.jsonl`. `report` turns them into one verdict per candidate.
 """
@@ -39,10 +40,15 @@ from . import bias, search
 from .engine import IDLE
 
 START_SHIFTS = ("2017-07-01", "2018-01-01", "2018-07-01", "2019-01-01")
-CADENCES = (1, 2, 4)
-MAX_POSITIONS = (0.15, 0.2, 0.25, 0.35, None)
-LOOKBACK_SWAP = {(13, 26): (13, 26, 52), (13, 26, 52): (13, 26)}
-SCORE_SWAP = {"voladj": "blend", "blend": "voladj"}
+#: A band dimension -> (the top it is measured from, the exit rank it sets).
+BANDS = {
+    "pool_band": ("pool_top_n", "pool_exit_rank"),
+    "category_band": ("category_top_n", "category_exit_rank"),
+    "off_band": ("off_top_n", "off_exit_rank"),
+}
+TOPS = {top: (band, exit_) for band, (top, exit_) in BANDS.items()}
+#: Kinds that are not a change to the config itself.
+NOT_PARAMETERS = ("base", "offset", "start")
 
 
 # --- choosing candidates --------------------------------------------------------------------
@@ -65,13 +71,54 @@ def pick_candidates(df: pd.DataFrame, top: int = 45) -> pd.DataFrame:
 # --- the nudges -----------------------------------------------------------------------------
 
 
-def _clip(value: float, lo: float, hi: float) -> float:
-    return min(max(value, lo), hi)
+def _same(a: Any, b: Any) -> bool:
+    as_tuple = lambda v: tuple(v) if isinstance(v, list | tuple) else v  # noqa: E731
+    return as_tuple(a) == as_tuple(b)
 
 
-def nudges(rec: dict[str, Any], arm: str = "A") -> list[dict[str, Any]]:
-    """[{kind, label, heavy, light, window}] - the base config is not included."""
+def _neighbours(dim: search.Dim, value: Any) -> list[Any]:
+    """The values one step away from `value` along `dim`."""
+    if dim.kind == "choice":
+        values = list(dim.values)
+        at = next((i for i, v in enumerate(values) if _same(v, value)), None)
+        if at is None:
+            return []
+        ordered = all(v is None or isinstance(v, int | float) for v in values)
+        if ordered:
+            return [values[j] for j in (at - 1, at + 1) if 0 <= j < len(values)]
+        return [v for j, v in enumerate(values) if j != at]
+    lo, hi = dim.values
+    step = (hi - lo) / 10
+    if dim.kind == "int":
+        step = max(1, round(step))
+    candidates = [min(max(value + sign * step, lo), hi) for sign in (-1, 1)]
+    if dim.kind == "float":
+        candidates = [round(v, 4) for v in candidates]
+    return [v for v in dict.fromkeys(candidates) if not _same(v, value)]
+
+
+_ABSENT = object()  # a dimension the stored run does not carry (None is a real value: no cap)
+
+
+def _current(dim_name: str, heavy: dict, light: dict, fixed: dict) -> Any:
+    """A dimension's value in a stored run (bands are stored as the exit rank they set)."""
+    if dim_name in BANDS:
+        top, exit_ = BANDS[dim_name]
+        if top in light and exit_ in light:
+            return light[exit_] - light[top]
+        return _ABSENT
+    for source in (light, heavy, fixed):
+        if dim_name in source:
+            return source[dim_name]
+    return _ABSENT
+
+
+def nudges(rec: dict[str, Any], space: search.Space) -> list[dict[str, Any]]:
+    """[{kind, label, heavy, light, window}] - every one-step neighbour of the stored run along
+    each dimension the space searched, plus the other rebalance phases and later starts. The
+    base config itself is never included."""
     heavy, light = rec["heavy"], rec["light"]
+    fixed = space.fixed
     out: list[dict[str, Any]] = []
 
     def add(kind: str, label: str, *, heavy_edit=None, light_edit=None, window=None) -> None:
@@ -79,7 +126,7 @@ def nudges(rec: dict[str, Any], arm: str = "A") -> list[dict[str, Any]]:
         new_heavy = {**heavy, **(heavy_edit or {})}
         if (new_light, new_heavy, window) == (light, heavy, None):
             return
-        if not search.feasible(arm, new_light):
+        if not search.feasible(space.arm, {**fixed, **new_light}):
             return
         out.append(
             {
@@ -91,70 +138,36 @@ def nudges(rec: dict[str, Any], arm: str = "A") -> list[dict[str, Any]]:
             }
         )
 
-    floor = light["coverage_floor"]
-    for delta in (-0.06, -0.03, 0.03, 0.06):
-        value = round(_clip(floor + delta, 0.05, 0.8), 4)
-        if value != floor:
-            add("floor", f"floor {value}", light_edit={"coverage_floor": value})
+    for dim in space.heavy:
+        value = heavy.get(dim.name, fixed.get(dim.name))
+        for new in _neighbours(dim, value):
+            add(dim.name, f"{dim.name} {new}", heavy_edit={dim.name: new})
 
-    top, exit_ = light["pool_top_n"], light["pool_exit_rank"]
-    for factor in (0.75, 1.25):
-        new_top = int(_clip(round(top * factor), 30, 400))
-        if new_top != top:
-            add(
-                "pool",
-                f"pool {new_top}",
-                light_edit={"pool_top_n": new_top, "pool_exit_rank": new_top + (exit_ - top)},
-            )
+    every = light.get("rebalance_every", fixed.get("rebalance_every", 1))
+    for dim in space.light:
+        if dim.name == "rebalance_offset_raw":
+            continue  # the phases are nudged together below
+        value = _current(dim.name, heavy, light, fixed)
+        if value is _ABSENT:
+            continue
+        for new in _neighbours(dim, value):
+            if dim.name in BANDS:
+                top, exit_ = BANDS[dim.name]
+                edit = {exit_: light[top] + new}
+            elif dim.name in TOPS:
+                band_name, exit_ = TOPS[dim.name]
+                band = light.get(exit_, new) - light[dim.name]
+                edit = {dim.name: new, exit_: new + band}
+            elif dim.name == "rebalance_every":
+                edit = {dim.name: new, "rebalance_offset": light.get("rebalance_offset", 0) % new}
+            else:
+                edit = {dim.name: new}
+            add(dim.name, f"{dim.name} {new}", light_edit=edit)
 
-    ctop, cexit = light["category_top_n"], light["category_exit_rank"]
-    for delta in (-1, 1):
-        new = ctop + delta
-        if 3 <= new <= 12:
-            add(
-                "cats",
-                f"categories {new}",
-                light_edit={"category_top_n": new, "category_exit_rank": new + (cexit - ctop)},
-            )
-
-    picks = light["picks_per_category"]
-    for new in (picks - 1, picks + 1):
-        if 1 <= new <= 3:
-            add("picks", f"picks {new}", light_edit={"picks_per_category": new})
-
-    every, offset = light["rebalance_every"], light.get("rebalance_offset", 0)
-    for new in CADENCES:
-        if new != every:
-            add(
-                "reb",
-                f"rebalance every {new}",
-                light_edit={"rebalance_every": new, "rebalance_offset": 0},
-            )
+    offset = light.get("rebalance_offset", 0)
     for new in range(every):
         if new != offset:
             add("offset", f"offset {new} of {every}", light_edit={"rebalance_offset": new})
-
-    cap = light.get("max_position")
-    if cap in MAX_POSITIONS:
-        i = MAX_POSITIONS.index(cap)
-        for j in (i - 1, i + 1):
-            if 0 <= j < len(MAX_POSITIONS):
-                add(
-                    "maxpos",
-                    f"max position {MAX_POSITIONS[j]}",
-                    light_edit={"max_position": MAX_POSITIONS[j]},
-                )
-
-    if heavy.get("score") in SCORE_SWAP:
-        add(
-            "score",
-            f"score {SCORE_SWAP[heavy['score']]}",
-            heavy_edit={"score": SCORE_SWAP[heavy["score"]]},
-        )
-    lookbacks = tuple(heavy["lookbacks"])
-    if lookbacks in LOOKBACK_SWAP:
-        new = list(LOOKBACK_SWAP[lookbacks])
-        add("lookbacks", f"lookbacks {new}", heavy_edit={"lookbacks": new})
 
     for start in START_SHIFTS:
         add("start", f"start {start}", window={"start": start})
@@ -184,7 +197,7 @@ def run_candidate(task: dict[str, Any]) -> dict[str, Any]:
             "window": {},
         }
     ]
-    plan += nudges(rec, space.arm)
+    plan += nudges(rec, space)
     bases: dict[str, Any] = {}
     locks: dict[str, Any] = {}
     out_path = Path(task["out_dir"]) / f"robust-{os.getpid()}.jsonl"
@@ -319,9 +332,7 @@ def verdicts(
         if base.empty:
             continue
         b = base.iloc[0]
-        near = g[
-            g.kind.isin(["floor", "pool", "cats", "picks", "reb", "maxpos", "score", "lookbacks"])
-        ]
+        near = g[~g.kind.isin(NOT_PARAMETERS)]
         offsets = g[g.kind == "offset"]
         starts = g[g.kind == "start"]
         both = pd.concat([near, offsets])
