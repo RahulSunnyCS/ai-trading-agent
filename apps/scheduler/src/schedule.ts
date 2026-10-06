@@ -47,6 +47,12 @@ export const onWeekdays =
   (day) =>
     days.includes(weekdayOf(day));
 
+/** The first `weekday` (0 = Sunday … 6 = Saturday) of every month. */
+export const firstWeekdayOfMonth =
+  (weekday: number): DayRule =>
+  (day) =>
+    weekdayOf(day) === weekday && Number(day.slice(8, 10)) <= 7;
+
 export interface Schedule {
   /** IST wall-clock time, 'HH:MM'. */
   at: string;

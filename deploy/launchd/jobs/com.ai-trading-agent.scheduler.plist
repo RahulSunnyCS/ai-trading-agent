@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The scheduler (BL-012, apps/scheduler): one always-running process that runs every
+  recurring job in apps/scheduler/src/jobs.ts, records each run, catches up slots missed
+  while the Mac slept, and alerts on Telegram. Replaces the per-job plists (broker-login,
+  fyers-login and the four Friday momentum jobs).
+
+  KeepAlive restarts it if it exits; RunAtLoad starts it at login. It parses the repo .env
+  itself and sets each job's PATH, so nothing is sourced here.
+
+  A LaunchAgent (not a LaunchDaemon) on purpose: the Friday stock sync needs the GUI
+  session for a headed browser (NSE's bot check rejects headless Chromium).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ai-trading-agent.scheduler</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/rahul/.bun/bin/bun</string>
+        <string>apps/scheduler/src/cli.ts</string>
+        <string>serve</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/rahul/Projects/ai-trading-agent</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/rahul/Library/Logs/ai-trading-agent/scheduler.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rahul/Library/Logs/ai-trading-agent/scheduler.log</string>
+</dict>
+</plist>

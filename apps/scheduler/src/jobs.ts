@@ -1,4 +1,4 @@
-import { type Schedule, onWeekdays, tradingDays } from './schedule.js';
+import { type Schedule, firstWeekdayOfMonth, onWeekdays, tradingDays } from './schedule.js';
 
 /**
  * Every recurring job, in one place (BL-012). Adding a job means adding an
@@ -41,11 +41,19 @@ export interface Job {
    * out or could not start, because then the job never got the chance.
    */
   alertsItself?: boolean;
+  /**
+   * Write the run log to this fixed file (repo-relative) instead of
+   * `<logDir>/<job>/<date>.log`. The Momentum dashboard reads the Friday jobs'
+   * `data/launchd-weekly-*.log` for "when did it last run" — kept until that
+   * panel reads the scheduler API instead (BL-012 PR 16).
+   */
+  logFile?: string;
   /** Run an in-process job (see runner's `builtins`) instead of `steps`. */
-  builtin?: 'morning-summary';
+  builtin?: 'morning-summary' | 'backup';
 }
 
 const MOMENTUM = 'packages/momentum-backtesting';
+const OPTIONS = 'packages/option-backtesting';
 const BROKER_LOGIN = 'packages/broker-login';
 const FRIDAY = onWeekdays(5);
 
@@ -92,6 +100,7 @@ export const JOBS: Job[] = [
     catchUpHours: 0.5, // a preview after ~15:15 is too late to trade on
     group: 'catalog',
     alertsItself: true,
+    logFile: `${MOMENTUM}/data/launchd-weekly-preview.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt weekly --run preview',
   },
   {
@@ -106,6 +115,7 @@ export const JOBS: Job[] = [
     catchUpHours: 48,
     group: 'catalog',
     alertsItself: true,
+    logFile: `${MOMENTUM}/data/launchd-weekly-final.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt weekly --run final',
   },
   {
@@ -136,6 +146,7 @@ export const JOBS: Job[] = [
     catchUpHours: 48,
     group: 'catalog',
     needs: ['home', 'gui'],
+    logFile: `${MOMENTUM}/data/launchd-weekly-stock-ingest.log`,
     fixHint:
       'cd packages/momentum-backtesting && uv run mbt stocks sync && uv run mbt weekly --run final --only-dataset stock --only-dataset custom_index --only-dataset broad',
   },
@@ -151,7 +162,41 @@ export const JOBS: Job[] = [
     catchUpHours: 48,
     group: 'catalog',
     alertsItself: true,
+    logFile: `${MOMENTUM}/data/launchd-weekly-journal-check.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt journal check --send',
+  },
+  {
+    id: 'options-daily',
+    description:
+      "Collect the day's 1-minute option data from Fyers and run every leg-wise strategy",
+    schedule: { at: '16:15', on: tradingDays, label: 'trading days 16:15' },
+    steps: [['uv', 'run', 'obt', 'daily']],
+    cwd: OPTIONS,
+    timeoutMinutes: 90,
+    // Contracts that expire today cannot be downloaded tomorrow, so keep trying through
+    // the evening (16:15, 17:45, 19:15) — usually it is waiting on a Fyers login. obt
+    // daily skips data already collected, so a retry is cheap.
+    retries: 2,
+    retryDelayMinutes: 90,
+    catchUpHours: 6.75, // until 23:00
+    group: 'catalog',
+    alertsItself: true,
+    fixHint: 'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily',
+  },
+  {
+    id: 'backup',
+    description: 'Copy the research database (TRADING_DATA_ROOT) to the external SSD',
+    schedule: { at: '10:00', on: firstWeekdayOfMonth(0), label: '1st Sunday of the month 10:00' },
+    steps: [],
+    builtin: 'backup',
+    cwd: '.',
+    timeoutMinutes: 120,
+    retries: 1,
+    retryDelayMinutes: 60,
+    catchUpHours: 7 * 24, // any time that week
+    group: 'catalog', // tdata backup CHECKPOINTs the catalog
+    fixHint:
+      'Plug in the SSD, then: cd packages/trading-data && uv run tdata backup --to "/Volumes/RAHUL\'S SSD/TradingData"',
   },
   {
     id: 'morning-summary',

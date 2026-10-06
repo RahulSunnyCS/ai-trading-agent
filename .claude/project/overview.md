@@ -27,7 +27,7 @@ and none are planned for now (`business.md`).
 | Dashboard | `apps/dashboard` | Next.js: Overview, Options Lab, Momentum, Data › Coverage, Broker logins, Settings; behind `/login` when hosted remotely. Talks to the research APIs through Fastify proxies or direct rewrites |
 | Broker login | `packages/broker-login` | Daily AlgoTest login (Angel One, Finvasia) and headless Fyers token, triggered from the laptop at 08:00/08:05 IST |
 | Contract notes | `packages/contract-notes` | Gmail → PDF → Google Sheet realised F&O P&L. Cutover from the `trade-analytics` repo pending (TODO §2) |
-| Scheduler | planned `apps/scheduler` (BL-012, in progress) | One home for every recurring job, replacing the per-job launchd plists in `deploy/launchd/` |
+| Scheduler | `apps/scheduler` (BL-012, in progress) | Runs every recurring job from one launchd-kept process — logins, the 09:00 morning summary, Friday momentum — with run history, catch-up after sleep and Telegram alerts; replaced the per-job launchd plists in `deploy/launchd/` |
 
 `apps/server` stays active only as the host of the Fastify proxies (`/api/backtest/*`,
 `/api/momentum/*`) and the Fyers OAuth routes; its trading engine is frozen (below).

@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner wants it started next (2026-10-06); it is the data every options backtest (BL-009, BL-022, BL-026) runs on, and without it the engine has six sessions of history |
-| **Status** | Planned |
+| **Status** | In progress (Phase 1) |
 | **Type** | feature |
 | **Area** | trading-data (+ options, infra) |
 | **Created** | 2026-10-06 |
 | **Depends on** | the SSD conversion job finishing (in progress 2026-10-06); BL-012 for the daily steps in Phase 4; replaces BL-009 Phase 2 (vendor data layer) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.11.18 |
 
 ## Context
 
@@ -105,10 +105,11 @@ Owner decisions (2026-10-06):
   loads `2014-2024/spot_data` and the VIX file into `asset=index/symbol=…`; dedupes the Oct 2024
   overlap in favour of the full-life source; **skips any (underlying, day) that the Fyers collector
   already wrote** (collector wins from 2026-09-23); session clip 09:15–15:29 with dropped-bar counts
-  logged; `data_quality` catalog table (migration `007_*.sql`) with one row per
-  (underlying, day): bars present vs 375, contracts, first/last ts, verdict + reason.
-- **Deliverables:** `tdata vendor import --from <staging> [--underlying U] [--only-days …]`,
-  migration 007, `LAKE_VIEWS` unchanged (same datasets), importer unit tests on a two-day fixture.
+  logged; `data_quality` catalog table (migration `008_data_quality.sql` — 007 was taken by
+  BL-024) with one row per (asset, name, day): bars present vs 375, contracts, first/last ts,
+  verdict + reason.
+- **Deliverables:** `tdata vendor import --from <staging> [--unit U] [--days A..B]`,
+  migration 008, `LAKE_VIEWS` unchanged (same datasets), importer unit tests on a two-day fixture.
 - **Done when:** `legwise` runs an existing strategy over a vendor day and a Fyers day with no code
   change; `tdata status` shows option days from 2022-03 (nifty) → today with no gap other than
   Aug 26 → Sep 22, 2026; `tdata backup` to a second location copies the new partitions.
@@ -185,6 +186,10 @@ Owner decisions (2026-10-06):
 
 ## Open questions
 
+Answered for Phase 1 (2026-10-06): image cap 200 GB; every vendor row is kept (no session
+clip — see Log); staging stays on the SSD; root via env var + mount guard + login auto-mount.
+Still open for Phase 3:
+
 - Which slippage assumption to use in backtests until spreads are recorded (fixed ticks vs % of
   premium scaled by volume)?
 - Should the derived tables also cover BANKNIFTY now that its data is loaded, or stay NIFTY+SENSEX?
@@ -200,3 +205,14 @@ Owner decisions (2026-10-06):
 - 2026-10-06 — re-prioritised P1 → P0 at the owner's request ("start it quickly"). Prerequisites:
   Phase 0 (conversion finishing) only; the disk image is a few-minute step inside Phase 1; BL-012
   is needed only for Phase 4.
+- 2026-10-06 — **Started** (owner handoff: "do till completion of Phase 1, small PRs"). Plan:
+  `~/.claude/plans/what-is-phase-1-luminous-matsumoto.md`, as a stack of PRs (schemas into
+  `trading_data.lake` → root guard → `data_quality` → vendor importer → provenance scripts →
+  close-out). Owner decisions taken while planning: **keep every vendor row** — the "weekend"
+  dates are real sessions (Budget Saturdays 2025-02-01 and 2026-02-01, NSE DR-drill Saturdays
+  2024-03-02 and 2024-05-18, Muhurat 2023-11-12) and Fyers' own files keep 15:30–15:39 closing
+  bars, so the lake keeps both and `data_quality` labels the days instead of the importer
+  dropping rows; the staging Parquet stays on the SSD as the vendor's raw copy; the root moves
+  via `TRADING_DATA_ROOT` with a mount guard. The schema layout (one file per underlying per
+  day) was re-chosen on its merits rather than inherited from the eight Fyers days. Vendor spot
+  ends 2026-06-29 (NIFTY) / 2026-07-23 (SENSEX); `obt fyers history` fills the index days after.

@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import choose, criteria
+from . import choose, criteria, search
 from .phase5 import MIDCAP, MOM30, SMALLCAP, _pct
 
 
@@ -230,3 +230,150 @@ def freeze(
     }
     path.write_text(json.dumps(record, indent=2, default=float) + "\n")
     return record
+
+
+# --- the frozen configs as live requests (BL-010 Phase 6, step 1) --------------------------------
+
+#: The search's parameter name -> the `BacktestRequest` field that carries it. Every parameter a
+#: frozen config can set must be here, or `favourite_requests` refuses: a parameter the live path
+#: cannot take would silently run on an API default instead.
+REQUEST_FIELDS = {
+    # fixed settings
+    "start": "start",
+    "cost_model": "cost_model",
+    "cost_pct": "cost_pct",
+    "slippage_bps": "slippage_bps",
+    "capital": "capital",
+    "respect_circuits": "broad_respect_circuits",
+    "min_ranked": "broad_every_week",  # 1 -> True, 0 -> False (the only two the API can say)
+    "momentum_sizing": "momentum_sizing",
+    "momentum_sizing_window": "momentum_sizing_window",
+    "momentum_sizing_floor": "momentum_sizing_floor",
+    "signal_delay": "signal_delay",
+    "cap_band": "cap_band",
+    "max_stock_price": "max_stock_price",
+    "sell_every_week": "sell_every_week",
+    # heavy (the ranking)
+    "series_break_policy": "broad_series_breaks",
+    "lookbacks": "lookbacks",
+    "weight_scheme": "weights",  # expanded with search.weights_for
+    "score": "score",
+    "voladj_skip_recent_month": "voladj_skip_recent_month",
+    "liq_min_turnover_cr": "broad_liq_min_turnover_cr",
+    "liq_floor_ratio": "broad_liq_floor_ratio",
+    "liq_min_price": "broad_liq_min_price",
+    "liq_circuit": "broad_liq_circuit",
+    "liq_circuit_run": "broad_liq_circuit_run",
+    "liq_max_circuit_days": "broad_liq_max_circuit_days",
+    # light (everything after the ranking)
+    "coverage_floor": "broad_coverage_floor",
+    "pool_top_n": "broad_pool_top_n",
+    "pool_exit_rank": "broad_pool_exit_rank",
+    "category_top_n": "broad_category_top_n",
+    "category_exit_rank": "broad_category_exit_rank",
+    "picks_per_category": "broad_picks_per_category",
+    "max_position": "max_position",
+    "max_category": "max_category",
+    "rebalance_every": "rebalance_every",
+    "rebalance_offset": "rebalance_offset",
+    "entry": "entry",
+    "stock_tilt": "broad_reversal_tilt",
+    "stock_tilt_screen_pct": "broad_reversal_screen_pct",
+}
+
+#: What the search runs with when a space says nothing (the defaults of `bias.Runner` and
+#: `run_broad_backtest`), written out so no request field is left to an API default that could
+#: differ. Keyed by search parameter. `tests/test_phase6_parity.py` compares the two paths' real
+#: arguments, so a drift in either set of defaults fails there.
+_SEARCH_DEFAULTS = {
+    "cost_model": "flat",
+    "cost_pct": 0.10,
+    "slippage_bps": 5.0,
+    "capital": 1_000_000.0,
+    "respect_circuits": False,
+    "min_ranked": 0,
+    "momentum_sizing": False,
+    "momentum_sizing_window": 10,
+    "momentum_sizing_floor": 0.0,
+    "signal_delay": 0,
+    "cap_band": 0.05,
+    "max_stock_price": None,
+    "sell_every_week": False,
+    "series_break_policy": "verified",
+    "weight_scheme": None,
+    "score": "ranksum",
+    "voladj_skip_recent_month": True,
+    "liq_min_turnover_cr": 1.0,
+    "liq_floor_ratio": 0.25,
+    "liq_min_price": 20.0,
+    "liq_circuit": True,
+    "liq_circuit_run": 3,
+    "liq_max_circuit_days": None,
+    "max_position": 0.35,
+    "max_category": None,
+    "rebalance_every": 1,
+    "rebalance_offset": 0,
+    "entry": "wait",
+    "stock_tilt": 0.0,
+    "stock_tilt_screen_pct": 0.0,
+}
+
+
+def effective_parameters(fixed: dict, config: dict) -> dict:
+    """Every parameter `bias.Runner(...).run(base, heavy, light, rebalance_offset=<top-level>)`
+    runs one frozen config with, merged the way the search merges them: the space's fixed
+    settings, then the config's light values, then the TOP-LEVEL `rebalance_offset`. The light
+    dict's own `rebalance_offset` is the search's raw sample and is never used; the heavy dict
+    (which repeats the fixed heavy settings) wins for the ranking-side ones."""
+    heavy = {**{k: v for k, v in fixed.items() if k in search.HEAVY_KEYS}, **config["heavy"]}
+    light = {k: v for k, v in config["light"].items() if k != "rebalance_offset"}
+    if light.get("rebalance_every", config["rebalance_every"]) != config["rebalance_every"]:
+        raise ValueError(f"config {config['id']}: rebalance_every differs between light and top")
+    rest = {k: v for k, v in fixed.items() if k not in search.HEAVY_KEYS}
+    return {**rest, **heavy, **light, "rebalance_offset": config["rebalance_offset"]}
+
+
+def favourite_request(fixed: dict, config: dict) -> dict:
+    """One frozen config as a complete `BacktestRequest` dict for the Broad dataset."""
+    params = effective_parameters(fixed, config)
+    unmapped = sorted(set(params) - set(REQUEST_FIELDS))
+    if unmapped:
+        raise ValueError(
+            f"config {config['id']}: no request field for {unmapped}; the live path cannot "
+            "reproduce it"
+        )
+    values = {**_SEARCH_DEFAULTS, **params}
+    request: dict = {
+        "dataset": "broad",
+        "universe": ["broad_momentum"],  # required by the model, ignored for Broad
+        "end": None,
+        "portfolio": "buffer",
+        "rebalance": "weekly",
+        "broad_category_mode": "on",
+        "broad_category_tags": "curated",
+        "broad_universe": "turnover_rank",
+        "broad_liquidity_filter": True,
+    }
+    for key, field in REQUEST_FIELDS.items():
+        if key not in values:
+            continue
+        value = values[key]
+        if key == "weight_scheme":
+            value = search.weights_for(value, len(values["lookbacks"]))
+            value = list(value) if value is not None else None
+        elif key == "lookbacks":
+            value = list(value)
+        elif key == "min_ranked":
+            if value not in (0, 1):
+                raise ValueError(f"config {config['id']}: min_ranked {value} has no request form")
+            value = bool(value)
+        request[field] = value
+    return request
+
+
+def favourite_requests(frozen: dict) -> list[dict]:
+    """The frozen record's configs as the `BacktestRequest` dicts the live weekly signal must run
+    to reproduce what the search measured: Broad, point-in-time `turnover_rank` universe behind
+    the tradability gate, curated tags, category mode on, every week simulated, and each config's
+    top-level `rebalance_offset`. Nothing is left to an API default."""
+    return [favourite_request(frozen["fixed_settings"], cfg) for cfg in frozen["configs"]]

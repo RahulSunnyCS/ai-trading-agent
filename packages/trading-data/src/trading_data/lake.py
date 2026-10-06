@@ -11,6 +11,10 @@ Partition values (asset, underlying/symbol, date) live in the folder names only 
 never duplicated as columns inside the file — so DuckDB's hive_partitioning adds
 them back without a name clash. Writes are atomic (tmp file + rename): a crash
 mid-write never leaves a half file that a reader would trust.
+
+The bar schemas live here too, so every writer (the Fyers collector, the vendor
+importer) produces one shape: one file per (asset, name, trading day), rows sorted
+by instrument_id then ts.
 """
 
 from __future__ import annotations
@@ -30,6 +34,39 @@ PARTITION_KEY = {
     "index": "symbol",
     "stock": "symbol",
 }
+
+#: Bar start, exchange time zone. Parquet has no seconds unit, so files read back as ms;
+#: readers normalise the unit (legwise.market._minutes casts to seconds).
+TS_TYPE = pa.timestamp("s", tz="Asia/Kolkata")
+OHLC_FIELDS = [
+    pa.field("open", pa.float64()),
+    pa.field("high", pa.float64()),
+    pa.field("low", pa.float64()),
+    pa.field("close", pa.float64()),
+    pa.field("volume", pa.float64()),
+    pa.field("oi", pa.float64()),
+]
+#: bars_1m for asset=index / asset=future.
+BAR_SCHEMA = pa.schema(
+    [
+        pa.field("instrument_id", pa.int64()),
+        pa.field("ts", TS_TYPE),
+        *OHLC_FIELDS,
+        pa.field("vendor_symbol", pa.string()),
+    ]
+)
+#: bars_1m for asset=option: every contract of one underlying on one day.
+OPT_SCHEMA = pa.schema(
+    [
+        pa.field("instrument_id", pa.int64()),
+        pa.field("ts", TS_TYPE),
+        *OHLC_FIELDS,
+        pa.field("expiry", pa.date32()),
+        pa.field("strike", pa.float64()),
+        pa.field("option_type", pa.string()),
+        pa.field("vendor_symbol", pa.string()),
+    ]
+)
 
 
 def bars_1m_path(root: Path, asset: str, name: str, day: date) -> Path:
@@ -73,6 +110,18 @@ def available_days(root: Path, asset: str, name: str) -> list[date]:
         date.fromisoformat(p.parent.name.removeprefix("date="))
         for p in folder.glob("date=*/data.parquet")
     )
+
+
+def partitions(root: Path, asset: str) -> list[tuple[str, date, Path]]:
+    """Every bars_1m file of one asset as (name, day, path), sorted. The name is the
+    partition value: an underlying for option/future, a symbol for index."""
+    key = PARTITION_KEY[asset]
+    folder = root / "lake" / "bars_1m" / f"asset={asset}"
+    out = []
+    for path in folder.glob(f"{key}=*/date=*/data.parquet"):
+        name = path.parent.parent.name.removeprefix(f"{key}=")
+        out.append((name, date.fromisoformat(path.parent.name.removeprefix("date=")), path))
+    return sorted(out)
 
 
 class RawSink:

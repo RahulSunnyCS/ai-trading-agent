@@ -1,7 +1,7 @@
 import gzip
 import threading
 import time
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pyarrow as pa
 import pytest
@@ -30,10 +30,11 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("005_stock_action_candidates",),
             ("006_stock_action_scan_state",),
             ("007_momentum_forward_journal",),
+            ("008_data_quality",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 7
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 8
 
 
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):
@@ -209,3 +210,58 @@ def test_backup_copies_new_files_only_and_always_the_catalog(root, tmp_path):
     assert (dest / catalog_path(root).name).exists()
     with pytest.raises(ValueError):
         backup(root, root / "inside")
+
+
+def test_bar_schemas_are_the_lake_contract():
+    """Every bars_1m writer (Fyers collector, vendor importer) casts to these; legwise
+    reads ts as an absolute instant, expiry as a date and option_type as CE/PE."""
+    assert lake.BAR_SCHEMA.names == [
+        "instrument_id",
+        "ts",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "oi",
+        "vendor_symbol",
+    ]
+    assert lake.OPT_SCHEMA.names == [
+        "instrument_id", "ts", "open", "high", "low", "close", "volume", "oi",
+        "expiry", "strike", "option_type", "vendor_symbol",
+    ]  # fmt: skip
+    assert lake.OPT_SCHEMA.field("ts").type == pa.timestamp("s", tz="Asia/Kolkata")
+    assert lake.OPT_SCHEMA.field("expiry").type == pa.date32()
+
+
+def test_partitions_lists_every_day_file_of_one_asset(root):
+    for name, day in (("NIFTY", DAY), ("M&M", DAY), ("NIFTY", date(2026, 9, 30))):
+        lake.write_parquet(pa.table({"x": [1]}), lake.bars_1m_path(root, "option", name, day))
+    lake.write_parquet(pa.table({"x": [1]}), lake.bars_1m_path(root, "index", "NIFTY", DAY))
+    got = [(name, day) for name, day, _ in lake.partitions(root, "option")]
+    assert got == [("M&M", DAY), ("NIFTY", DAY), ("NIFTY", date(2026, 9, 30))]
+    assert lake.partitions(root, "future") == []
+
+
+def test_status_runs_in_this_packages_own_environment(root, monkeypatch):
+    """`tdata status` once called DuckDB's `.df()`, which needs pandas/numpy — not
+    dependencies of this package — so it crashed here as soon as a view had rows."""
+    from typer.testing import CliRunner
+
+    from trading_data.cli import app
+
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    with connect(root):
+        pass
+    table = pa.table(
+        {
+            "instrument_id": pa.array([1], pa.int64()),
+            "ts": pa.array([datetime(2026, 9, 29, 9, 15, tzinfo=UTC)], lake.TS_TYPE),
+            **{f.name: pa.array([1.0], pa.float64()) for f in lake.OHLC_FIELDS},
+            "vendor_symbol": pa.array(["NSE:NIFTY50-INDEX"], pa.string()),
+        }
+    )
+    lake.write_parquet(table, lake.bars_1m_path(root, "index", "NIFTY", DAY))
+    result = CliRunner().invoke(app, ["status"])
+    assert result.exit_code == 0, result.output
+    assert "bars_1m_index" in result.output and "1 days" in result.output

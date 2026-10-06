@@ -16,8 +16,8 @@ preserved) on 2026-09-19. The merge is not yet a cutover:
 - **This package** (`packages/broker-login`) is where new work lands. Its
   daily workflow (`.github/workflows/daily-broker-login.yml` at this
   monorepo's root) is live. Since 2026-10-05 the owner's laptop starts it at
-  08:00 IST weekdays via `npm run dispatch` (`deploy/launchd/`,
-  `backlog/BL-011-laptop-scheduler.md`), because the workflow's own cron
+  08:00 IST trading days via `src/dispatch.ts` (`apps/scheduler`, BL-012), because the
+  workflow's own cron
   arrived hours late; that cron is now only a backstop.
 
 Its sibling package in this monorepo is `packages/contract-notes` (merged
@@ -47,7 +47,7 @@ npm run test-login     # tsx scripts/test-login.ts — connectivity + selector h
 npm run check         # tsx scripts/check.ts — RFC 6238 vectors, error classification, redaction, live TOTP codes + Telegram preflight (refuses to run in CI)
 npm run record        # tsx scripts/record.ts — interactive flow recorder for capturing new selectors
 npm run fyers-token   # tsx src/fyers.ts — headless Fyers login for the momentum weekly job; writes a 0600 token file (FYERS_TOKEN_FILE), never prints it
-npm run dispatch      # tsx src/dispatch.ts — triggers the GitHub workflow via `gh` (the laptop's 08:00 launchd job); DRY_RUN=1 only checks gh auth
+npm run dispatch      # tsx src/dispatch.ts — triggers the GitHub workflow via `gh` (the scheduler's 08:00 job); DRY_RUN=1 only checks gh auth
 npm run test          # node:test unit tests for the browser-free helpers (Fyers auth, dispatch rules)
 npm run typecheck
 ```

@@ -27,8 +27,13 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `007_momentum_forward_journal.sql`: `momentum_forward_journal`, the append-only,
     hash-chained record of every weekly momentum signal (BL-024; written only by
     momentum-backtesting's `forward_journal.record`)
+  - `008_data_quality.sql`: `data_quality`, one verdict per lake partition (asset, name,
+    day) — usable, or excluded and why; mirrors the Parquet files, rebuilt from them by
+    `tdata quality rebuild` (BL-034)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
-  `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`)
+  `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
+  (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
+  every bars_1m writer casts to (the Fyers collector imports them)
 - `raw/` — gzipped verbatim vendor responses
 
 A stock's identity is its literal exchange symbol at the time (one `instruments` row
@@ -43,6 +48,11 @@ table instead.
 
 ## Rules that matter
 
+- **The root may be an external volume.** On the owner's laptop `TRADING_DATA_ROOT` is
+  `/Volumes/TradingData`, an APFS disk image on the SSD. `data_root()` raises if a root on
+  `/Volumes/<name>` is not mounted (`check_mounted`) — never fall back to a default or let
+  `connect()` create a fresh root. `tdata mount` attaches `TRADING_DATA_IMAGE`; the
+  `deploy/launchd` job `trading-data-mount` runs it at login and when a volume appears.
 - **One writer.** DuckDB allows one read-write process; a read-write connection also
   blocks other processes' readers. Use `connect()` as a short context manager — never
   hold it across a long download (see how `fyers/daily.py` opens it only to register
@@ -57,6 +67,16 @@ table instead.
   apps/server) and the Python `ReferenceData` loader read them. Change data with
   `tdata reference sql "..."` (edits + re-exports); `tdata reference check` / the
   test suite fail on drift.
+- **Vendor imports keep every row and never overwrite the collector.** `vendor.import_unit` /
+  `import_index_csv` (BL-034) write one file per (asset, name, day) in the Fyers shape,
+  including closing bars, weekend sessions and Muhurat evenings; `data_quality` labels them.
+  A day file the Fyers collector wrote is never replaced, even with `--force`. Work is cut
+  into date chunks, each one `ingest_runs` row (`scope = 'NIFTY 2025-06-01..2025-06-30'`); a
+  chunk that finished (`ok` or `partial`) is skipped on a re-run.
+- **`data_quality` mirrors the lake.** One row per bars_1m file, written when a file is
+  written and regenerable with `tdata quality rebuild`; a day is never dropped from the lake
+  for a bad verdict — the label says why, readers decide. Fetch timestamps from DuckDB as
+  epoch seconds, not `TIMESTAMPTZ` (that import needs `pytz`, which is not a dependency).
 - **Partition values live in folder names only** (`asset=`, `underlying=`/`symbol=`,
   `date=`) — never repeat them as columns inside the Parquet.
 - Tests use `tmp_path` roots; never point a test at the real `~/TradingData`.
@@ -70,7 +90,10 @@ table instead.
 
 ```bash
 uv sync && uv run pytest
-uv run tdata init | status | backup --to <dir>
+uv run tdata init | status | backup --to <dir> | mount
+uv run tdata quality rebuild [--asset option] [--name NIFTY] [--days A..B] | status
+uv run tdata vendor import --from <staging> [--unit nifty] [--section index|stocks] [--days A..B] [--force] [--dry-run]
+uv run tdata vendor import-index <csv> --symbol NIFTY|BANKNIFTY|SENSEX|INDIAVIX [--days A..B]
 uv run tdata reference export | check | sql "<statement>"
 uv run mbt local migrate   # from packages/momentum-backtesting/: (re-)import its data
 ```

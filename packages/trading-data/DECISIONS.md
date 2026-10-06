@@ -234,3 +234,93 @@ it despite the script being required "on a fresh clone" per this package's own `
 Replaced both `date -d` calls with `python3 -c ...` one-liners (portable, and python3 is
 already a hard dependency of this whole repo) — behaviour unchanged, now works on both GNU and
 BSD userlands.
+
+## The data root moves onto an APFS disk image on the SSD, and refuses to run unmounted — owner decision 2026-10-06
+
+BL-034 loads two years of vendor 1-minute options history: ~110k day files, ~20 GB. The
+internal disk has ~39 GB free, and the external SSD is ExFAT with 256 KiB clusters, where
+macOS also writes an AppleDouble `._` file beside every file — two clusters per file, ~55 GB
+of overhead for this lake. A sparse APFS image on the SSD (`TradingData.sparsebundle`,
+200 GB ceiling) has neither cost and keeps atomic renames; the bundle itself is ~8 MB bands,
+which ExFAT handles fine.
+
+**Chosen: environment variable + mount guard + login auto-mount**, over hard-coding the path
+as `DEFAULT_ROOT` (it would put the owner's laptop layout in the repo, and still need the
+guard). The failure that matters is silent: with the image not attached, a process could
+create a fresh empty root (or, attached as "TradingData 1", a second one) and the evening
+collection would land there. So `data_root()` raises when a root on `/Volumes/<name>` is not
+a mount point — resolved through symlinks, so `~/TradingData` can point at the image and a
+dangling link fails the same way. `obt`, `obt-api` and `obt-mcp` now load the repo `.env` at
+start (before, only commands resolving Fyers credentials did, so `obt daily --no-fetch` used
+the default root). `TRADING_DATA_IMAGE` must be double-quoted in `.env` because the launchd
+jobs `source` it and the SSD's name has an apostrophe and a space.
+
+## `data_quality`: one verdict per lake file, labels not deletions — 2026-10-06
+
+BL-034 loads ~110k day files from a vendor whose data has real defects (sessions that are
+too short, Muhurat evenings, days without spot). Rather than have importers drop what looks
+wrong — and lose it silently — every bars_1m file gets a `data_quality` row: **usable**, or
+**excluded** with a reason (`off_session_only`, `short_session:<n>`, `thin_chain:<n>`,
+`duplicate_bars:<n>`, `no_spot`), plus a `session_kind` (`regular`, `special` for weekend or
+holiday sessions, `off_session`). The table mirrors the files one-to-one, so it can always be
+rebuilt (`tdata quality rebuild`); the importers write rows as they write files.
+
+Rules, in order, from the busiest instrument's count of regular-session bars (09:15–15:29,
+bar start; 375 is a full day): 0 → off-session only; < 300 → short session (the same cut
+`fyers/history.py` always used); an option day with < 10 contracts → thin chain; > 375 →
+duplicate bars. `off_session_rows` (Fyers' own files keep the 15:30–15:39 closing bars) never
+count as bars. `no_spot` is a cross-check: an option day whose underlying has an index series
+in the lake but no usable index day. It is set and cleared whichever side arrives last, and
+stocks (no index series at all) are left alone. Verified on the eight real Fyers days: all
+usable, 375 bars, ~10 off-session rows per contract.
+
+Nothing reads the table yet — legwise's `available_days` still enumerates files — so Phase 1
+changes no behaviour; Phase 2 can let readers skip excluded days.
+
+## The vendor importer: per-day pyarrow writes, every row kept, the collector wins — 2026-10-06
+
+`tdata vendor import` re-partitions the vendor's staged per-expiry Parquet (2.11 billion rows)
+into the lake's one-file-per-(underlying, day) layout; `import-index` does the same for the
+spot and India VIX CSVs.
+
+- **One file per (asset, name, day), sorted by instrument then time.** The daily collector adds
+  exactly one immutable file per underlying; a day's chain is read as one file with no filtering;
+  DuckDB prunes range scans by the `date=` folder. Rejected: month files (the daily top-up would
+  rewrite a growing file, and a crash mid-write risks the month) and per-expiry files (every
+  day-load would open five to ten files and filter them). Cost: ~110k small files, which is why
+  the lake lives on an APFS image (see the entry above).
+- **DuckDB scans, pyarrow writes.** A date chunk (about 8M rows, so ~1 month of NIFTY) is joined
+  to the contract→`instrument_id` table into a temp table sorted by (day, instrument, ts); each
+  day is then a zone-map-pruned query handed to `lake.write_parquet` — the writer the collector
+  uses (atomic tmp+rename, zstd), cast to `lake.OPT_SCHEMA`. This beat `COPY … PARTITION_BY` on
+  the points that matter: skip-existing is a `path.exists()`, no rename step, no open-file limit,
+  and the per-day quality stats come from the same temp table.
+- **Every vendor row is kept.** Closing bars (15:30–15:39; Fyers' own files have them) and the
+  special sessions are written; `data_quality` labels the days. Only rows whose contract name
+  could not be parsed have no instrument; they are counted in `ingest_runs.details` and
+  `quality_issues`, not written. Duplicate `(contract, ts)` rows, if a source ever has them, are
+  removed and recorded.
+- **The collector always wins.** A file whose `vendor_symbol` is a Fyers symbol is never replaced,
+  even with `--force`; a vendor file is replaced only with `--force`. The vendor's contracts reuse
+  the collector's `instrument_id` where both name the same instrument — the catalog key is
+  `NSE:OPT:<underlying>:<expiry>:<strike>:<CE|PE>`, and the vendor name is added as a second
+  alias (`drive-vendor`).
+- **Resumable by chunk, and aware of the data.** Each chunk is one `ingest_runs` row; `ok` and
+  `partial` (finished, with recorded issues) are done *only if the run saw the same number of
+  staged rows* — the scope string alone would swallow new data added to an imported month (the
+  missing Aug–Sep 2026 days will arrive that way). A crashed run (`running`) is marked `failed`
+  (only the importer's own scopes) and redone. A re-run skips existing day files, and gives the
+  vendor-written ones among them a verdict — a crash after writing but before recording used to
+  leave those days unjudged. Collector-written days are judged by `tdata quality rebuild`.
+  One unit failing (`tdata vendor import`) is reported and the rest continue; exit status 1.
+- **A renamed stock is split by its underlying.** The vendor keeps old and new contracts in one
+  folder (`GMRINFRA`→`GMRAIRPORT`, `LTIM`→`LTM`, `TATAMOTORS`→`TMPV`, `ZOMATO`→`ETERNAL`; found
+  when the first stock batch aborted on `GMRINFRA`). Each symbol becomes its own partition
+  family, instrument set and resume chunks — the catalog already keeps a stock under its
+  symbol at the time — rather than being rejected or forced under one name.
+- **Duplicates are resolved deterministically**: two names for one instrument at the same
+  minute keep the higher-volume row, then the lower vendor name — never an arbitrary one.
+- **Verified:** a vendor-imported day and a Fyers-written day with the same prices give identical
+  legwise trades, fills and MTM curve (`option-backtesting/tests/unit/test_vendor_day_legwise.py`);
+  on the real data, NIFTYNXT50's 3,700,483 staged rows came out as exactly 3,700,483 lake rows.
+
