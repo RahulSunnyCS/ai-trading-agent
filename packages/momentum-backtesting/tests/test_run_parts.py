@@ -71,6 +71,27 @@ def test_two_requests_for_the_same_section_build_it_once():
     assert results == ["value", "value"] and calls == [1]
 
 
+def test_release_gives_up_unbuilt_sections_and_keeps_built_ones():
+    from momentum_backtesting.run_parts import SectionReleased
+
+    parts = _parts(trades=lambda: [1], timeline=lambda: [2])
+    assert parts.section("trades") == [1]
+    assert parts.complete
+    parts.release()
+    assert not parts.complete
+    assert parts.section("trades") == [1]  # built: it is only data now
+    with pytest.raises(SectionReleased):
+        parts.section("timeline")
+    assert parts._builders == {}  # nothing left that holds the run's frames
+
+
+def test_release_of_a_fully_built_run_leaves_it_complete():
+    parts = _parts(trades=lambda: [1])
+    parts.full()
+    parts.release()
+    assert parts.complete and parts.full()["trades"] == [1]
+
+
 def test_unknown_sections_are_reported():
     parts = _parts(trades=lambda: [])
     assert parts.has("trades") and not parts.has("timeline")

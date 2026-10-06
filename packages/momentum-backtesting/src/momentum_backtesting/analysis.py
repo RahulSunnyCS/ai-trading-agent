@@ -475,8 +475,31 @@ def payload_parts(
     return core, lazy
 
 
-def payload(*args, **kwargs) -> dict:
-    """Everything the UI shows for one backtest, in one dict (see `payload_parts` for the
-    arguments and for the same result split into what is needed at once and what can wait)."""
-    core, lazy = payload_parts(*args, **kwargs)
+def payload(
+    result: Result,
+    prices: pd.DataFrame,
+    config: Config,
+    groups: dict[str, str],
+    proxy: pd.DataFrame | None = None,
+    fill_warnings: list[str] | None = None,
+    membership: pd.DataFrame | None = None,
+    share_prices: bool = False,
+    references: pd.DataFrame | None = None,
+    no_buy: pd.DataFrame | None = None,
+) -> dict:
+    """Everything the UI shows for one backtest, in one dict. The arguments are described on
+    `payload_parts`, which returns the same result split into what is needed at once and what
+    can wait."""
+    core, lazy = payload_parts(
+        result,
+        prices,
+        config,
+        groups,
+        proxy,
+        fill_warnings,
+        membership,
+        share_prices,
+        references,
+        no_buy,
+    )
     return {**core, **{name: build() for name, build in lazy.items()}}

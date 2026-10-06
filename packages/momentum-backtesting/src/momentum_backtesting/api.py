@@ -63,7 +63,7 @@ from .engine import (
 )
 from .fetch import load_universe
 from .notify import IST, Notification
-from .run_parts import RunParts
+from .run_parts import RunParts, SectionReleased
 from .stocks import ui_data
 from .stocks.ui_data import (
     NIFTY50_EQUAL_WEIGHT_TRI,
@@ -143,6 +143,8 @@ class _Data:
         self.result_cache: OrderedDict = OrderedDict()
 
     RESULT_CACHE_SIZE = 8
+    #: Of those, how many keep sections they have not built yet (see `store_result`).
+    LIVE_RESULTS = 4
 
     def reset(self) -> None:
         """Drop EVERYTHING this process has cached - rankings, trade-price tables, the loaded
@@ -168,7 +170,10 @@ class _Data:
             self.momentum_universe_cache = None
             self._references_mtimes = None
             self.references_cache = None
+            forgotten = list(self.result_cache.values())
             self.result_cache.clear()
+        for old in forgotten:  # outside the lock: releasing may wait for a build in progress
+            old.release()
 
     def cached_result(self, key: tuple) -> RunParts | None:
         """The result of an identical earlier request on the same inputs."""
@@ -179,10 +184,23 @@ class _Data:
             return hit
 
     def store_result(self, key: tuple, parts: RunParts) -> None:
+        """Keep the run. Only the newest `LIVE_RESULTS` keep their unbuilt sections: those hold
+        the run's frames and, for Broad, its whole ranking, which `broad_ranking_cache` otherwise
+        caps at 4. An older run that still has sections it can no longer build is no use as a
+        cache hit, so it is dropped; one whose sections are all built is only data and stays."""
         with self._lock:
             self.result_cache[key] = parts
+            self.result_cache.move_to_end(key)
+            dropped = []
             while len(self.result_cache) > self.RESULT_CACHE_SIZE:
-                self.result_cache.popitem(last=False)
+                dropped.append(self.result_cache.popitem(last=False)[1])
+            older = list(self.result_cache.values())[: -self.LIVE_RESULTS]
+        # Outside the lock: releasing waits for a section that is being built right now.
+        for old in [*dropped, *older]:
+            old.release()
+        with self._lock:
+            for stale in [k for k, p in self.result_cache.items() if not p.complete]:
+                del self.result_cache[stale]
 
     def get(self) -> pd.DataFrame:
         """Prefers the shared local database (`packages/trading-data`, populated by `mbt
@@ -1772,6 +1790,9 @@ def _broad_parts(req: BacktestRequest) -> Parts:
 
     def circuit_exposure() -> object:
         # Display-only "worst LC/UC you'd have walked into" card; never allowed to fail the run.
+        # Built when the card is opened, so it reads the daily bars (and the lock masks the
+        # opposite-setting run needs) from the database as they are THEN: only the weekly prices
+        # are held from the run. A Friday ingest in between can therefore move it slightly.
         try:
             exposure = circuit_exposure_mod.circuit_exposure(
                 result, outcome.ranking.column_to_base_symbol
@@ -2474,7 +2495,7 @@ class _BacktestJobs:
     MAX_KEPT = 30
     #: Finished jobs whose sections can still be fetched. A run's builders keep its result and
     #: price frames alive, so only the newest few do; older jobs keep their core result.
-    MAX_PARTS = 6
+    MAX_PARTS = 4
 
     def __init__(self) -> None:
         self._cond = threading.Condition()
@@ -2482,6 +2503,7 @@ class _BacktestJobs:
         self._active = 0
         self._fresh_waiting = 0
         self._fresh_running = False
+        self._finished = 0  # counts finishes, to tell which runs are the newest
 
     @staticmethod
     def _public(job: dict, with_result: bool) -> dict:
@@ -2576,6 +2598,8 @@ class _BacktestJobs:
             job["status"] = "failed" if error else "done"
             job["result"], job["error"], job["_parts"] = result, error, parts
             job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
+            self._finished += 1
+            job["_finished"] = self._finished
             self._release_old_parts()
             self._active -= 1
             if fresh:
@@ -2583,8 +2607,12 @@ class _BacktestJobs:
             self._cond.notify_all()
 
     def _release_old_parts(self) -> None:
-        """Keep the sections of the newest `MAX_PARTS` finished jobs only."""
-        holders = [j for j in self._jobs.values() if j.get("_parts") is not None]
+        """Keep the sections of the `MAX_PARTS` jobs that finished most recently. Ordered by when
+        they finished, not started: a slow run that ends last is the newest."""
+        holders = sorted(
+            (j for j in self._jobs.values() if j.get("_parts") is not None),
+            key=lambda j: j["_finished"],
+        )
         for job in holders[: max(0, len(holders) - self.MAX_PARTS)]:
             job["_parts"] = None
 
@@ -3002,11 +3030,20 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "backtest job not found (the service may have restarted)")
         if state == "gone":
             raise HTTPException(410, "this run's sections were released; run it again to load them")
+        if state == "failed":
+            raise HTTPException(409, "the run failed, so it has no sections")
         if parts is None:
-            raise HTTPException(409, f"the job is {state}; its sections exist once it is done")
+            raise HTTPException(
+                409, f"the run is still {state}; its sections exist once it is done"
+            )
         if not parts.has(section):
             raise HTTPException(404, f"this run has no {section!r} section")
-        return {"section": section, "data": parts.section(section)}
+        try:
+            return {"section": section, "data": parts.section(section)}
+        except SectionReleased:
+            raise HTTPException(
+                410, "this run's sections were released; run it again to load them"
+            ) from None
 
     @app.get("/api/saved-runs")
     def saved_runs(dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf") -> list[dict]:

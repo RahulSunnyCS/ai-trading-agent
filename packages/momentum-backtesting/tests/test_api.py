@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from momentum_backtesting import api
 from momentum_backtesting.fetch import load_universe
+from momentum_backtesting.run_parts import RunParts
 
 
 @pytest.fixture
@@ -1379,7 +1380,8 @@ def test_fresh_run_drops_every_server_cache_and_a_normal_run_keeps_them(client):
     api.DATA.broad_ranking_cache["sentinel"] = "x"
     api.DATA.broad_tilt_cache["sentinel"] = "x"
     api.DATA.fill_tables["sentinel"] = "x"
-    api.DATA.result_cache["sentinel"] = "x"
+    unbuilt = RunParts({}, {"trades": lambda: []}, "t")  # a cached run with a section not built
+    api.DATA.result_cache["sentinel"] = unbuilt
     sentinel_refs = pd.DataFrame()  # a real frame: a normal run reads it (`.empty`)
     api.DATA.references_cache = sentinel_refs
 
@@ -1399,6 +1401,7 @@ def test_fresh_run_drops_every_server_cache_and_a_normal_run_keeps_them(client):
     ):
         assert "sentinel" not in cache
     assert "sentinel" not in api.DATA.rank_cache
+    assert not unbuilt.complete  # a run dropped from the cache lets go of what it held
     assert len(api.DATA.rank_cache) == 1  # ...and the ranking was recomputed and cached again
     assert api.DATA.references_cache is not sentinel_refs  # reloaded
 
@@ -1694,17 +1697,21 @@ def test_a_job_result_leaves_the_heavy_sections_out_and_names_them(client):
 def test_each_section_equals_the_synchronous_result_built_separately(client):
     body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
     job = _job(client, body, fresh=True)
-    # `fresh` drops the caches, so this builds the whole result again, independently.
+    sections = {}
+    for name in LAZY:
+        res = client.get(f"/api/backtest/jobs/{job['id']}/sections/{name}")
+        assert res.status_code == 200, res.text
+        assert res.json()["section"] == name
+        sections[name] = res.json()["data"]
+    # `fresh` drops every cache (and releases unbuilt sections), so this builds the whole result
+    # again, independently of the job's.
     whole = client.post("/api/backtest", json={**body, "fresh": True}).json()
     drop = ("cache", "sections_available")
     assert {k: v for k, v in job["result"].items() if k not in drop} == {
         k: v for k, v in whole.items() if k not in ("cache", *LAZY)
     }
     for name in LAZY:
-        res = client.get(f"/api/backtest/jobs/{job['id']}/sections/{name}")
-        assert res.status_code == 200, res.text
-        assert res.json()["section"] == name
-        assert _as_json(res.json()["data"]) == _as_json(whole[name]), name
+        assert _as_json(sections[name]) == _as_json(whole[name]), name
 
 
 def test_a_section_is_built_when_first_asked_for_and_only_once(client, monkeypatch):
@@ -1778,6 +1785,138 @@ def test_only_the_newest_finished_jobs_keep_their_sections(client, monkeypatch):
     assert older["result"]["kpis"]  # the core result of the older job is still there
 
 
+def test_older_cached_runs_let_go_of_sections_they_have_not_built(client, monkeypatch):
+    """Unbuilt sections hold a run's frames (for Broad, its whole ranking): only the newest few
+    runs may keep them, or memory grows with every different setting tried."""
+    monkeypatch.setattr(api.DATA, "LIVE_RESULTS", 1)
+    body = {"universe": core(client), "start": "2017-01-06"}
+    first = _job(client, {**body, "top_n": 2})
+    second = _job(client, {**body, "top_n": 3})
+    third = _job(client, {**body, "top_n": 4})
+
+    def served(job):
+        return client.get(f"/api/backtest/jobs/{job['id']}/sections/trades").status_code
+
+    assert [served(first), served(second), served(third)] == [410, 410, 200]
+    # an older run that can no longer build its sections is no use as a cache hit
+    assert _job(client, {**body, "top_n": 2})["result"]["cache"]["hit"] is False
+
+
+def test_an_older_run_whose_sections_are_all_built_stays_cached(client, monkeypatch):
+    monkeypatch.setattr(api.DATA, "LIVE_RESULTS", 1)
+    body = {"universe": core(client), "start": "2017-01-06"}
+    assert client.post("/api/backtest", json={**body, "top_n": 2}).json()["cache"]["hit"] is False
+    _job(client, {**body, "top_n": 3})
+    _job(client, {**body, "top_n": 4})
+    assert client.post("/api/backtest", json={**body, "top_n": 2}).json()["cache"]["hit"] is True
+
+
+def test_a_fresh_run_releases_every_unbuilt_section(client):
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    job = _job(client, body)
+    _job(client, body, fresh=True)
+    res = client.get(f"/api/backtest/jobs/{job['id']}/sections/trades")
+    assert res.status_code == 410
+
+
+def test_the_newest_finished_job_keeps_its_sections_even_if_it_started_first():
+    """Ordered by when a job finished, not started: a slow run that ends last is the newest."""
+    import threading
+
+    from momentum_backtesting.run_parts import RunParts
+
+    jobs = api._BacktestJobs()
+    jobs.MAX_PARTS = 1
+    gate = threading.Event()
+
+    def parts():
+        return RunParts({"kpis": {}}, {"trades": lambda: []}, "t")
+
+    def slow():
+        gate.wait(5)
+        return {"kpis": {}}, parts()
+
+    slow_id = jobs.start(slow, False, {})["id"]
+    quick_id = jobs.start(lambda: ({"kpis": {}}, parts()), False, {})["id"]
+    import time
+
+    for _ in range(100):
+        if jobs.get(quick_id)["status"] == "done":
+            break
+        time.sleep(0.02)
+    gate.set()
+    for _ in range(100):
+        if jobs.get(slow_id)["status"] == "done":
+            break
+        time.sleep(0.02)
+    assert jobs.parts_for(slow_id)[0] == "ok"  # started first, finished last: the newest
+    assert jobs.parts_for(quick_id)[0] == "gone"
+
+
+def test_a_failed_job_says_it_failed(client, monkeypatch):
+    jobs = api._BacktestJobs()
+    monkeypatch.setattr(api, "BACKTEST_JOBS", jobs)
+
+    def boom():
+        raise RuntimeError("nope")
+
+    job_id = jobs.start(boom, False, {})["id"]
+    _wait_for(job_id, client, "failed")
+    res = client.get(f"/api/backtest/jobs/{job_id}/sections/trades")
+    assert res.status_code == 409 and "failed" in res.json()["detail"]
+
+
+def test_circuit_realism_runs_the_opposite_setting_on_the_prices_it_is_given(
+    broad_client, monkeypatch
+):
+    """The real second engine run (only the database read for lock masks is replaced). The run
+    being asked about is reported as it ran, and the opposite setting is what was run again."""
+    req = api.BacktestRequest(
+        **_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    )
+    ranking = api._broad_ranking(req)
+    outer = api.DATA.get()
+    outcome = api._run_broad(req, ranking, outer)
+    asked = []
+
+    def no_locks(column_to_base, weeks, **_):
+        asked.append(1)
+        empty = pd.DataFrame(False, index=weeks, columns=list(column_to_base))
+        return empty, empty
+
+    monkeypatch.setattr(api.circuit_exposure_mod, "lock_masks", no_locks)
+    realism = api._circuit_realism(req, ranking, outcome, outer)
+    assert asked == [1]  # this run ignored locks, so the other setting (respect) ran
+    assert realism["this_run_respects_locks"] is False
+    assert set(realism["ignoring_locks"]) == {"cagr", "max_drawdown", "total_return", "trades"}
+    assert realism["ignoring_locks"]["cagr"] == pytest.approx(
+        float(api.metrics.cagr(outcome.result.equity))
+    )
+    assert realism["cagr_impact"] == pytest.approx(
+        realism["respecting_locks"]["cagr"] - realism["ignoring_locks"]["cagr"]
+    )
+
+
+def test_the_circuit_section_builds_the_real_realism_comparison(broad_client, monkeypatch):
+    """Through the section route, with only the two database reads replaced."""
+
+    def no_locks(column_to_base, weeks, **_):
+        empty = pd.DataFrame(False, index=weeks, columns=list(column_to_base))
+        return empty, empty
+
+    monkeypatch.setattr(api.circuit_exposure_mod, "lock_masks", no_locks)
+    monkeypatch.setattr(
+        api.circuit_exposure_mod, "circuit_exposure", lambda result, mapping: {"lc": []}
+    )
+    body = _broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    job = _job(broad_client, body, fresh=True)
+    res = broad_client.get(f"/api/backtest/jobs/{job['id']}/sections/circuit_exposure")
+    assert res.status_code == 200, res.text
+    data = res.json()["data"]
+    assert data["lc"] == [] and data["realism"]["this_run_respects_locks"] is False
+    assert "respecting_locks" in data["realism"]
+
+
 def test_broad_circuit_card_is_a_section_built_from_the_runs_own_prices(broad_client, monkeypatch):
     """The synthetic fixture has no daily bars, so the real card is empty (None): stub it, to give
     the section content, and check what matters here: it is built from the prices the run used,
@@ -1798,17 +1937,21 @@ def test_broad_circuit_card_is_a_section_built_from_the_runs_own_prices(broad_cl
     assert "circuit_exposure" not in job["result"]
     assert set(job["result"]["sections_available"]) == {*LAZY, "circuit_exposure"}
     at_run = api.DATA.get()
-    api.DATA.reset()  # later, newer data is loaded: a different frame
+    api.DATA.prices = at_run.copy()  # later, newer data is loaded: a different frame
     assert api.DATA.get() is not at_run
 
     res = broad_client.get(f"/api/backtest/jobs/{job['id']}/sections/circuit_exposure")
     assert res.status_code == 200, res.text
     assert res.json()["data"] == {"lc": [{"n": 1}], "realism": {"cagr_impact": 0.5}}
     assert seen["outer"] is at_run
-
-    whole = broad_client.post("/api/backtest", json={**body, "fresh": True}).json()
-    assert whole["circuit_exposure"] == res.json()["data"]
+    sections = {}
     for name in LAZY:
         res = broad_client.get(f"/api/backtest/jobs/{job['id']}/sections/{name}")
         assert res.status_code == 200, (name, res.text)
-        assert _as_json(res.json()["data"]) == _as_json(whole[name]), name
+        sections[name] = res.json()["data"]
+
+    # a `fresh` run releases the job's sections, so compare after fetching them
+    whole = broad_client.post("/api/backtest", json={**body, "fresh": True}).json()
+    assert whole["circuit_exposure"] == {"lc": [{"n": 1}], "realism": {"cagr_impact": 0.5}}
+    for name in LAZY:
+        assert _as_json(sections[name]) == _as_json(whole[name]), name

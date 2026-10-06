@@ -123,18 +123,22 @@ gzipped (`GZipMiddleware`).
 (BL-005 Phase 2).** `analysis.payload_parts` / each dataset's `_*_parts` return `(core, lazy)`:
 `lazy` maps `trades`, `instruments`, `timeline`, `latest` (and, Broad only, `circuit_exposure`,
 which costs a second engine run) to builders. `run_parts.RunParts` holds them, builds each once on
-first use and drops the builder (it holds the run's frames). The result cache stores `RunParts`;
+first use and drops the builder (it holds the run's frames, and for Broad its whole ranking). The
+result cache stores `RunParts`; only the newest `DATA.LIVE_RESULTS` = 4 keep sections they have not
+built (`RunParts.release()`), so memory does not grow with how many settings a session tries.
 `_dispatch_backtest` (the synchronous `POST /api/backtest`) and the `_*_backtest(req)` functions the
 weekly job calls still return the **whole** payload (`core + every section`), so goldens, journals
 and `payload["latest"]` readers see no change. A job's `result` is `core + cache +
 sections_available`, and `GET /api/backtest/jobs/{id}/sections/{name}` returns `{section, data}`
-(404 unknown job or a section the run lacks, 409 not finished, 410 released: only the newest
-`_BacktestJobs.MAX_PARTS` = 6 finished jobs keep their sections). A section is built from what the
-run used (`outer_prices` is captured for the circuit card), never from whatever is loaded when it
-is opened. Dashboard: `store/momentumRuns.ts` `loadSection` merges a section into the run's result;
+(404 unknown job or a section the run lacks, 409 not finished or failed, 410 released: only the 4
+jobs that finished most recently, `_BacktestJobs.MAX_PARTS`, keep their sections, and a `fresh`
+run releases them all). The weekly prices a section needs are held from the run (`outer_prices`
+for the circuit card); the circuit card also reads daily bars and lock masks from the database
+when it is opened, so a data refresh in between can move it slightly. Dashboard:
+`store/momentumRuns.ts` `loadSection` merges a section into the run's result;
 `hooks/useRunSection.ts` asks for it when the tab or card that shows it mounts. A new section needs
-its name in `api.BacktestSection`, the Fastify proxy's `BACKTEST_SECTIONS`, the Next rewrite, and
-`MomentumSectionName` in `types/momentum.ts`.
+its name in `api.BacktestSection` and `MomentumSectionName` in `types/momentum.ts` (the Fastify
+proxy and the Next rewrite take any well-formed name; the service rejects unknown ones).
 
 **Checking that a change leaves results alone on live data:**
 `scripts/result-baseline.py capture` stores every golden scenario and every saved favourite as

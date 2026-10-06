@@ -14,14 +14,9 @@ const DEFAULT_MOMENTUM_API_URL = 'http://127.0.0.1:8765';
 // exceed 90 seconds on local research data.
 const PROXY_TIMEOUT_MS = 180_000;
 const BODY_LIMIT_BYTES = 64 * 1024;
-/** The parts of a finished backtest fetched on their own (the Python service's `BacktestSection`). */
-const BACKTEST_SECTIONS = [
-  'trades',
-  'instruments',
-  'timeline',
-  'latest',
-  'circuit_exposure',
-] as const;
+/** A section name is a short snake_case word. Which ones exist is the Python service's call (its
+ * `BacktestSection`), so this only keeps the path safe: nothing else reaches the upstream URL. */
+const SECTION_NAME_PATTERN = '^[a-z_]{1,32}$';
 
 function momentumApiUrl(): string {
   return process.env.MOMENTUM_API_URL || DEFAULT_MOMENTUM_API_URL;
@@ -172,7 +167,7 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
           type: 'object',
           properties: {
             id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' },
-            section: { type: 'string', enum: [...BACKTEST_SECTIONS] },
+            section: { type: 'string', pattern: SECTION_NAME_PATTERN },
           },
           required: ['id', 'section'],
         },
