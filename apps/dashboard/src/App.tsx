@@ -6,6 +6,7 @@ import { DEFAULT_TAB, aliasTarget, documentTitle } from './lib/routes';
 
 import { BrokerLoginsView } from './components/BrokerLoginsView';
 import { CoverageView } from './components/CoverageView';
+import { JobsView } from './components/JobsView';
 import { LiveView } from './components/LiveView';
 import { MomentumBacktestingView } from './components/MomentumBacktestingView';
 import { OptionsLabView } from './components/OptionsLabView';
@@ -44,6 +45,7 @@ const SUBTITLES: Record<Tab, string> = {
   pnl: 'Realized P&L across closed paper trades',
   regime: 'Daily market-regime classification history',
   coverage: 'Historical candle backfill, and the ranges it makes replayable',
+  jobs: 'Scheduled jobs: when they run next, how the last run went, and run one now',
   optionslab:
     'Build, backtest and track option strategies: leg-wise on 1-minute Fyers data, or the YAML engine',
   momentum: 'Weekly rotation research across ETFs, stocks and categories',
@@ -72,6 +74,8 @@ function renderView(
       return <RegimeView />;
     case 'coverage':
       return <CoverageView />;
+    case 'jobs':
+      return <JobsView />;
     case 'optionslab':
       return <OptionsLabView />;
     case 'momentum':

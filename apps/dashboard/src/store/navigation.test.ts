@@ -93,6 +93,7 @@ describe('navigation preferences', () => {
         'personalities',
         'regime',
         'coverage',
+        'jobs',
         'optionslab',
         'momentum',
         'brokerLogins',
@@ -106,7 +107,7 @@ describe('navigation preferences', () => {
       ['live', ['pnl', 'live', 'trades', 'regime']],
       ['optionslab', ['optionslab']],
       ['momentum', ['momentum']],
-      ['data', ['coverage']],
+      ['data', ['coverage', 'jobs']],
       ['account', ['brokerLogins', 'settings']],
     ]);
     // Overview is the landing tab even for a browser whose stored order began with another.
@@ -171,7 +172,7 @@ describe('navigation preferences', () => {
   it('drops a group whose tabs are all hidden', () => {
     const groups = visibleNavigationGroups({
       ...DEFAULT_NAVIGATION_PREFERENCES,
-      hidden: ['coverage'],
+      hidden: ['coverage', 'jobs'],
     });
     expect(groups.map((group) => group.id)).toEqual([
       'overview',
@@ -193,6 +194,7 @@ describe('navigation preferences', () => {
       'optionslab',
       'momentum',
       'coverage',
+      'jobs',
       'brokerLogins',
       'pricing',
     ]);
@@ -252,6 +254,7 @@ describe('navigation preferences', () => {
           'momentum',
           'backfill',
           'replay',
+          'jobs',
         ],
         order: [],
       });

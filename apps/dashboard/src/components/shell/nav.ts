@@ -1,6 +1,7 @@
 import {
   Activity,
   Building2,
+  CalendarClock,
   CreditCard,
   Database,
   Layers,
@@ -24,6 +25,7 @@ export type Tab =
   | 'pnl'
   | 'regime'
   | 'coverage'
+  | 'jobs'
   | 'optionslab'
   | 'momentum'
   | 'brokerLogins'
@@ -145,6 +147,7 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'replay', label: 'Replay' },
         ],
       },
+      { id: 'jobs', label: 'Jobs', icon: CalendarClock },
     ],
   },
   {
