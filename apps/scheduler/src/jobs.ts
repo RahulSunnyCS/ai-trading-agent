@@ -53,6 +53,7 @@ export interface Job {
 }
 
 const MOMENTUM = 'packages/momentum-backtesting';
+const OPTIONS = 'packages/option-backtesting';
 const BROKER_LOGIN = 'packages/broker-login';
 const FRIDAY = onWeekdays(5);
 
@@ -163,6 +164,24 @@ export const JOBS: Job[] = [
     alertsItself: true,
     logFile: `${MOMENTUM}/data/launchd-weekly-journal-check.log`,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt journal check --send',
+  },
+  {
+    id: 'options-daily',
+    description:
+      "Collect the day's 1-minute option data from Fyers and run every leg-wise strategy",
+    schedule: { at: '16:15', on: tradingDays, label: 'trading days 16:15' },
+    steps: [['uv', 'run', 'obt', 'daily']],
+    cwd: OPTIONS,
+    timeoutMinutes: 90,
+    // Contracts that expire today cannot be downloaded tomorrow, so keep trying through
+    // the evening (16:15, 17:45, 19:15) — usually it is waiting on a Fyers login. obt
+    // daily skips data already collected, so a retry is cheap.
+    retries: 2,
+    retryDelayMinutes: 90,
+    catchUpHours: 6.75, // until 23:00
+    group: 'catalog',
+    alertsItself: true,
+    fixHint: 'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily',
   },
   {
     id: 'morning-summary',

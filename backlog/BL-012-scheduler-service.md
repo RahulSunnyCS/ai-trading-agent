@@ -279,3 +279,5 @@ PR 5 the single launchd cut-over · then one PR per later job, check group and d
   Friday jobs keep writing `data/launchd-weekly-*.log` because the Momentum status panel
   reads them. Found: GitHub's backstop broker-login cron fails every afternoon (~15:55 IST,
   after AlgoTest's window) — PR 10.
+- 2026-10-06 — PR 7: `options-daily` (`obt daily`) at 16:15 IST trading days, retries at
+  17:45 and 19:15, catch-up until 23:00, `catalog` group.
