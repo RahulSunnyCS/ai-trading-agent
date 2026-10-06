@@ -2,15 +2,19 @@
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { telegramSink } from './alerts.js';
 import { jobEnv } from './env.js';
 import { History } from './history.js';
 import { JOBS, findJob } from './jobs.js';
-import { runJob } from './runner.js';
+import { startLoop } from './loop.js';
+import { type RunContext, runJob } from './runner.js';
 import { formatIst, nextDue } from './schedule.js';
+import { morningSummary } from './summary.js';
 
 /**
  * `bun run jobs status` — every job, its schedule, last run and next run.
  * `bun run jobs run <id>` — run one job now (recorded as a manual run).
+ * `bun run jobs serve` — the long-running scheduler (what launchd keeps alive).
  */
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 
@@ -25,6 +29,16 @@ export function logDir(): string {
   return (
     process.env.SCHEDULER_LOG_DIR?.trim() || join(homedir(), 'Library', 'Logs', 'ai-trading-agent')
   );
+}
+
+function context(history: History): RunContext {
+  return {
+    repoRoot: REPO_ROOT,
+    env: jobEnv(REPO_ROOT),
+    logDir: logDir(),
+    history,
+    builtins: { 'morning-summary': morningSummary() },
+  };
 }
 
 function openHistory(): History {
@@ -61,22 +75,27 @@ async function runNow(id: string | undefined): Promise<number> {
   }
   const history = openHistory();
   console.log(`running ${job.id} — log: ${join(logDir(), job.id)}/`);
-  const result = await runJob(
-    job,
-    { repoRoot: REPO_ROOT, env: jobEnv(REPO_ROOT), logDir: logDir(), history },
-    'manual',
-  );
+  const result = await runJob(job, context(history), 'manual');
   history.close();
   console.log(result.ok ? 'ok' : `FAILED: ${result.error}\nlog: ${result.logPath}`);
   return result.ok ? 0 : 1;
+}
+
+function serve(): void {
+  const ctx = context(openHistory());
+  console.log(
+    `scheduler started ${formatIst(new Date())} IST — ${JOBS.length} jobs, logs in ${logDir()}`,
+  );
+  startLoop({ ctx, jobs: JOBS, alerts: telegramSink(ctx.env) });
 }
 
 if (import.meta.main) {
   const [command, arg] = process.argv.slice(2);
   if (command === 'status' || command === undefined) status();
   else if (command === 'run') process.exitCode = await runNow(arg);
+  else if (command === 'serve') serve();
   else {
-    console.error('usage: bun run jobs [status | run <job>]');
+    console.error('usage: bun run jobs [status | run <job> | serve]');
     process.exitCode = 2;
   }
 }

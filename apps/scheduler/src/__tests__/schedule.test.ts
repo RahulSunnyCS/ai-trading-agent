@@ -46,7 +46,7 @@ describe('job registry', () => {
     for (const job of JOBS) {
       expect(existsSync(join(repoRoot, job.cwd))).toBe(true);
       expect(job.fixHint.length).toBeGreaterThan(0);
-      expect(job.steps.length).toBeGreaterThan(0);
+      expect(job.steps.length > 0 || job.builtin !== undefined).toBe(true);
     }
   });
 });

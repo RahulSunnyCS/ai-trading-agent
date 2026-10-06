@@ -39,6 +39,47 @@ export class History {
       error TEXT
     )`);
     this.db.exec('CREATE INDEX IF NOT EXISTS runs_job_started ON runs (job, started_at)');
+    this.db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  }
+
+  /**
+   * When the scheduler first ran on this machine. Slots before it are not
+   * "missed" — they belonged to whatever scheduled the job before.
+   */
+  firstStart(now: Date): Date {
+    this.db
+      .query('INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)')
+      .run('first_start', now.toISOString());
+    const row = this.db.query('SELECT value FROM meta WHERE key = ?').get('first_start') as {
+      value: string;
+    };
+    return new Date(row.value);
+  }
+
+  /** Record a slot that was too late to catch up, so it is reported once. */
+  recordMissed(job: string, scheduledFor: Date, at: Date, reason: string): void {
+    this.db
+      .query(
+        `INSERT INTO runs (job, trigger, scheduled_for, started_at, ended_at, exit_code, attempts, log_path, error)
+         VALUES (?, 'schedule', ?, ?, ?, -1, 0, '', ?)`,
+      )
+      .run(job, scheduledFor.toISOString(), at.toISOString(), at.toISOString(), reason);
+  }
+
+  /** Finished runs since `since` that failed or were missed. */
+  failuresSince(since: Date): RunRow[] {
+    return this.db
+      .query(
+        'SELECT * FROM runs WHERE started_at >= ? AND ended_at IS NOT NULL AND exit_code != 0 ORDER BY id',
+      )
+      .all(since.toISOString()) as RunRow[];
+  }
+
+  /** The run before `id` for the same job, to notice a recovery. */
+  previous(job: string, id: number): RunRow | null {
+    return (this.db
+      .query('SELECT * FROM runs WHERE job = ? AND id < ? ORDER BY id DESC LIMIT 1')
+      .get(job, id) ?? null) as RunRow | null;
   }
 
   start(
