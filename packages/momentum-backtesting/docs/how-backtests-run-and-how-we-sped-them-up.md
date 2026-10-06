@@ -1,5 +1,10 @@
 # How a momentum backtest runs on the backend, and how we made it faster
 
+> **As of 2026-10-07**, written against the code after BL-005 Phases 1-4 (PRs #56, #70, #73, #81).
+> The code and `packages/momentum-backtesting/CLAUDE.md` are the source of truth: schedule times,
+> defaults and table sizes below are accurate for that date and will drift. Figures that came from
+> the live data are labelled with their date.
+
 This document is for someone who knows the product from the outside and has never read the
 backend. It explains, in order:
 
@@ -532,9 +537,13 @@ database locked; the ratios above are the best guide to the live improvement unt
 
 **Before.** The dashboard only knew a job was "queued" or "running".
 **Now.** A job reports its step as it goes: `loading` → `ranking` → `simulating` → `analysing`.
-The job record carries it (`stage`), the dashboard shows "Step 2 of 4 · Ranking" and, once it has
-seen a few real runs of that dataset, "usually about 20 s" (the middle of the last five real
-computations, remembered in the browser; a result answered from the cache is not counted).
+The job record carries the current step (`stage`) and the ordered list of steps (`stages`, so the
+dashboard does not hard-code the order or the count), plus how long the computation took in
+milliseconds (`compute_ms`). The dashboard shows "Step 2 of 4 · Ranking" and, once it has seen a
+few real runs of that dataset, "usually about 20 s" (the middle of the last five real
+computations, remembered in the browser; a result answered from the cache is not counted). Because
+a cold run (rebuilding the rankings) can take several times longer than a warm one, the banner
+stops quoting the usual time once a run is past twice of it and explains why it is slow instead.
 
 ### 5.4 Things that were deliberately **not** done
 

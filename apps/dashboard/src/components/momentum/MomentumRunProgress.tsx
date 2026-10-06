@@ -10,19 +10,30 @@ import { Shimmer } from '../ui/Skeleton';
 
 const SLOW_DATASETS = new Set(['custom_index', 'broad']);
 
-/** The steps a run goes through on the server, in order, and what to call each. */
-const STAGES = [
-  ['loading', 'Loading prices'],
-  ['ranking', 'Ranking'],
-  ['simulating', 'Simulating the weekly trades'],
-  ['analysing', 'Preparing the results'],
-] as const;
+/** What to call each step a run goes through on the server. */
+const STAGE_LABELS: Record<string, string> = {
+  loading: 'Loading prices',
+  ranking: 'Ranking',
+  simulating: 'Simulating the weekly trades',
+  analysing: 'Preparing the results',
+};
 
-/** "Step 2 of 4 · Ranking" for a stage the server reported, or null for one we do not know. */
-export function describeStage(stage: string | null | undefined): string | null {
-  const index = STAGES.findIndex(([key]) => key === stage);
-  const found = STAGES[index];
-  return found ? `Step ${index + 1} of ${STAGES.length} · ${found[1]}` : null;
+/** The order to assume until the server sends its own (each job carries the ordered list). */
+const DEFAULT_STAGES = Object.keys(STAGE_LABELS);
+
+/**
+ * "Step 2 of 4 · Ranking" for a step the server reported, or null when there is none or it is not
+ * in the list. The order and the count come from the server's list, so a step added there is
+ * numbered correctly; only its label, if it has none here, falls back to its capitalised name.
+ */
+export function describeStage(
+  stage: string | null | undefined,
+  stages: readonly string[] = DEFAULT_STAGES,
+): string | null {
+  const index = stage ? stages.indexOf(stage) : -1;
+  if (!stage || index < 0) return null;
+  const label = STAGE_LABELS[stage] ?? `${stage.charAt(0).toUpperCase()}${stage.slice(1)}`;
+  return `Step ${index + 1} of ${stages.length} · ${label}`;
 }
 
 /**
@@ -48,6 +59,7 @@ export function MomentumRunBanner({
   hasPreviousResult,
   queued = false,
   stage = null,
+  stages,
   usualMs = null,
 }: {
   elapsedMs: number;
@@ -58,19 +70,29 @@ export function MomentumRunBanner({
   queued?: boolean;
   /** The step the server says it has reached ("ranking", …). */
   stage?: string | null;
+  /** The server's ordered list of steps, as the job reported it. */
+  stages?: readonly string[] | undefined;
   /** How long a real run of this dataset usually takes here, once one has been seen. */
   usualMs?: number | null;
 }) {
   const seconds = Math.floor(elapsedMs / 1000);
-  const step = queued ? null : describeStage(stage);
-  const usual = usualMs ? `Usually ${describeDuration(usualMs)}.` : null;
+  const step = queued ? null : describeStage(stage, stages);
+  const reason = SLOW_DATASETS.has(dataset)
+    ? 'The first run of this strategy builds category rankings and can take up to a minute. Repeat runs reuse them and return in seconds.'
+    : 'Still working — longer periods and bigger universes take a little longer.';
+  // The usual time is the middle of recent runs, cached ones and cold ones together, so a run that
+  // needs to rebuild its rankings can take several times longer. Past twice the usual time, say why
+  // instead of repeating an estimate that is plainly wrong.
+  const usualTime = usualMs ? describeDuration(usualMs) : null;
+  const overrun = usualMs !== null && elapsedMs > usualMs * 2;
   const hint =
     seconds < 5
       ? null
-      : (usual ??
-        (SLOW_DATASETS.has(dataset)
-          ? 'The first run of this strategy builds category rankings and can take up to a minute. Repeat runs reuse them and return in seconds.'
-          : 'Still working — longer periods and bigger universes take a little longer.'));
+      : usualTime && !overrun
+        ? `Usually ${usualTime}.`
+        : usualTime
+          ? `Taking longer than the usual ${usualTime}. ${reason}`
+          : reason;
 
   return (
     <output

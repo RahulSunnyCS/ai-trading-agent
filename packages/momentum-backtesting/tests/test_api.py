@@ -1892,6 +1892,49 @@ def test_a_running_job_says_which_step_it_has_reached():
     assert jobs.get(job_id)["stage"] is None  # nothing left to report once it is done
 
 
+def test_a_job_carries_the_ordered_steps_and_how_long_it_took_in_milliseconds():
+    import time
+
+    jobs = api._BacktestJobs()
+
+    def work(report):
+        report("loading")
+        time.sleep(0.05)
+        return {"kpis": {}}
+
+    job_id = jobs.start(work, False, {})["id"]
+    assert jobs.get(job_id)["stages"] == list(api.JOB_STAGES)
+    assert jobs.get(job_id)["compute_ms"] is None  # not known until it ends
+    for _ in range(100):
+        if jobs.get(job_id)["status"] == "done":
+            break
+        time.sleep(0.02)
+    assert 40 <= jobs.get(job_id)["compute_ms"] < 5000  # milliseconds, not whole seconds
+
+
+def test_the_runner_only_hands_a_reporter_to_work_that_asks_for_one():
+    import time
+
+    jobs = api._BacktestJobs()
+    seen = {}
+
+    def optional_argument(retries=3):
+        seen["retries"] = retries
+        return {"kpis": {}}
+
+    ids = [
+        jobs.start(optional_argument, False, {})["id"],  # an optional parameter is not a reporter
+        jobs.start(dict, False, {})["id"],  # a callable whose signature cannot be read
+    ]
+    for job_id in ids:
+        for _ in range(100):
+            if jobs.get(job_id)["status"] in ("done", "failed"):
+                break
+            time.sleep(0.02)
+        assert jobs.get(job_id)["status"] == "done", jobs.get(job_id)["error"]
+    assert seen["retries"] == 3
+
+
 def test_a_job_that_fails_ends_with_no_stage():
     jobs = api._BacktestJobs()
 
@@ -1914,6 +1957,7 @@ def test_the_etf_builder_reports_its_steps_in_order(client):
     req = api.BacktestRequest(universe=core(client), start="2017-01-06", top_n=4)
     api._etf_parts(req, seen.append)
     assert seen == ["loading", "simulating", "analysing"]
+    assert seen == [step for step in api.JOB_STAGES if step in seen]  # known steps, in job order
     seen.clear()  # the synchronous callers say nothing, and still work
     api._etf_parts(req)
     assert seen == []
@@ -1925,7 +1969,7 @@ def test_the_broad_builder_reports_its_steps_in_order(broad_client):
         **_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
     )
     api._broad_parts(broad, seen.append)
-    assert seen == ["loading", "ranking", "simulating", "analysing"]
+    assert seen == ["loading", "ranking", "simulating", "analysing"] == list(api.JOB_STAGES)
 
 
 def test_the_job_route_runs_the_builders_with_a_reporter(client, monkeypatch):

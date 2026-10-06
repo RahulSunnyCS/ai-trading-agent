@@ -26,6 +26,14 @@ describe('describeStage', () => {
     expect(describeStage(null)).toBeNull();
     expect(describeStage(undefined)).toBeNull();
   });
+
+  it('takes the order and the count from the list the server sent', () => {
+    const server = ['loading', 'fetching', 'ranking', 'simulating', 'analysing'];
+    expect(describeStage('ranking', server)).toBe('Step 3 of 5 · Ranking');
+    // a step this client has no label for still gets numbered, under its own name
+    expect(describeStage('fetching', server)).toBe('Step 2 of 5 · Fetching');
+    expect(describeStage('loading', ['ranking'])).toBeNull(); // not in the server's list
+  });
 });
 
 describe('MomentumRunBanner', () => {
@@ -44,6 +52,23 @@ describe('MomentumRunBanner', () => {
   it('says how long such a run usually takes, once a few seconds have passed', () => {
     render(<MomentumRunBanner {...base} usualMs={19_600} />);
     expect(screen.getByText('Usually about 20 s.')).toBeTruthy();
+  });
+
+  it('numbers the step from the server list passed to the banner', () => {
+    render(<MomentumRunBanner {...base} stage="ranking" stages={['loading', 'x', 'ranking']} />);
+    expect(screen.getByText(/Step 3 of 3 · Ranking/)).toBeTruthy();
+  });
+
+  it('stops quoting the usual time once a run is well past it, and says why', () => {
+    render(<MomentumRunBanner {...base} elapsedMs={25_000} usualMs={5_000} />);
+    expect(screen.queryByText('Usually about 5 s.')).toBeNull();
+    expect(screen.getByText(/Taking longer than the usual about 5 s\./)).toBeTruthy();
+    expect(screen.getByText(/builds category rankings/)).toBeTruthy();
+  });
+
+  it('keeps the usual time while a run is within twice of it', () => {
+    render(<MomentumRunBanner {...base} elapsedMs={9_000} usualMs={5_000} />);
+    expect(screen.getByText('Usually about 5 s.')).toBeTruthy();
   });
 
   it('keeps the old hint for a dataset it has not seen run here yet', () => {

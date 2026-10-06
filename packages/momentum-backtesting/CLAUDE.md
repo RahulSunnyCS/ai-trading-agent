@@ -159,11 +159,14 @@ Replacing many columns one at a time (`frame[col] = ...`) fragments the frame: b
 signature); `_dispatch_parts(req, report)` passes it to `_etf_parts` / `_stock_parts` /
 `_custom_index_parts` / `_broad_parts`, which call it with `loading` -> `ranking` (Custom Index's
 category build, Broad's Step 2) -> `simulating` -> `analysing`. The job record carries `stage` (None
-before and after, and in the job list), the dashboard shows "Step 2 of 4 · Ranking", and keeps the
-median of the last five real (non-cache-hit) computation times per dataset in localStorage to say
-"usually about 20 s" (`lib/momentumDurations.ts`). A new stage name needs an entry in
-`describeStage` in `MomentumRunProgress.tsx`; an unknown one is simply not shown. The synchronous
-callers (`_*_backtest(req)`) pass nothing.
+before and after, and in the job list) and `stages` (`api.JOB_STAGES`, the ordered list: the
+dashboard numbers "Step 2 of 4 · Ranking" from it, so a new step needs adding there and to
+`STAGE_LABELS` in `MomentumRunProgress.tsx` only for a nicer label), and `compute_ms`, the
+computation time in milliseconds (the `*_at` timestamps are whole seconds). The dashboard keeps the
+median of the last five real (non-cache-hit) `compute_ms` per dataset in localStorage to say
+"usually about 20 s" (`lib/momentumDurations.ts`), and past twice that it explains the slow run
+instead (cold runs rebuild rankings). A job's work takes `report` only if it declares a required
+positional parameter (`_takes_report`). The synchronous callers (`_*_backtest(req)`) pass nothing.
 
 **Checking that a change leaves results alone on live data:**
 `scripts/result-baseline.py capture` stores every golden scenario and every saved favourite as

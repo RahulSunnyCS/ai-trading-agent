@@ -187,6 +187,40 @@ describe('momentumRuns store', () => {
       expect(run()?.status).toBe('done');
     });
 
+    it('prefers the millisecond duration the server measured over the whole-second timestamps', async () => {
+      await started();
+      jobs({
+        a: {
+          id: 'a',
+          status: 'done',
+          result,
+          // whole-second timestamps would say 0 s for a run that took 1.4 s
+          compute_started_at: '2026-10-07T02:00:00+05:30',
+          finished_at: '2026-10-07T02:00:00+05:30',
+          compute_ms: 1_400,
+          error: null,
+        },
+      });
+      await vi.advanceTimersByTimeAsync(300);
+      expect(usualDuration('broad')).toBe(1_400);
+    });
+
+    it('keeps the server list of steps on the run', async () => {
+      await started();
+      jobs({
+        a: {
+          id: 'a',
+          status: 'running',
+          stage: 'ranking',
+          stages: ['loading', 'ranking', 'simulating', 'analysing'],
+          result: null,
+          error: null,
+        },
+      });
+      await vi.advanceTimersByTimeAsync(300);
+      expect(run()?.stages).toEqual(['loading', 'ranking', 'simulating', 'analysing']);
+    });
+
     it('remembers how long a real run took, from the server times', async () => {
       await started();
       jobs({

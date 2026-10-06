@@ -10,6 +10,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from time import perf_counter
 from typing import Literal
 
 import pandas as pd
@@ -961,9 +962,25 @@ Parts = tuple[dict, dict[str, Callable[[], object]]]
 #: "analysing"), so the dashboard can show more than a clock. The synchronous callers pass nothing.
 Report = Callable[[str], None]
 
+#: The steps a job goes through, in order. Every name a builder reports is one of these, and each
+#: job carries the list so the dashboard does not hard-code the order or the count.
+JOB_STAGES = ("loading", "ranking", "simulating", "analysing")
+
 
 def _no_report(stage: str) -> None:
     return None
+
+
+def _takes_report(work: Callable[..., object]) -> bool:
+    """True when `work` declares a required positional parameter, which is where the job runner
+    puts its reporter. A callable with no parameters, only optional ones, or no readable signature
+    (some builtins) is called with nothing."""
+    try:
+        parameters = inspect.signature(work).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    positional = (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    return any(p.default is inspect.Parameter.empty and p.kind in positional for p in parameters)
 
 
 def _full(core: dict, lazy: dict[str, Callable[[], object]]) -> dict:
@@ -2574,6 +2591,9 @@ class _BacktestJobs:
                 "error": None,
                 # The step a running job has reached (see `Report`); None before and after.
                 "stage": None,
+                "stages": list(JOB_STAGES),
+                # How long the computation took, in milliseconds (the timestamps are whole seconds).
+                "compute_ms": None,
                 "_parts": None,
                 **extra_fields,
             }
@@ -2613,6 +2633,7 @@ class _BacktestJobs:
                 self._fresh_running = True
             job["status"] = "running"
             job["compute_started_at"] = datetime.now(IST).isoformat(timespec="seconds")
+        began = perf_counter()
         parts = None
 
         def report(stage: str) -> None:
@@ -2621,7 +2642,7 @@ class _BacktestJobs:
 
         try:
             # A job that wants to say how far it has got takes `report`; a plain callable does not.
-            out = work(report) if inspect.signature(work).parameters else work()
+            out = work(report) if _takes_report(work) else work()
             result, parts = out if isinstance(out, tuple) else (out, None)
             error = None
         except Exception as exc:  # the job must always finish, or the UI spins forever
@@ -2629,6 +2650,7 @@ class _BacktestJobs:
         with self._cond:
             job["status"] = "failed" if error else "done"
             job["stage"] = None
+            job["compute_ms"] = round((perf_counter() - began) * 1000)
             job["result"], job["error"], job["_parts"] = result, error, parts
             job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
             self._finished += 1

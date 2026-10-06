@@ -1248,6 +1248,7 @@ export function MomentumBacktestingView() {
                       hasPreviousResult={result !== null}
                       queued={activeRun?.status === 'queued'}
                       stage={activeRun?.stage ?? null}
+                      stages={activeRun?.stages}
                       usualMs={usualMs}
                     />
                   </div>
