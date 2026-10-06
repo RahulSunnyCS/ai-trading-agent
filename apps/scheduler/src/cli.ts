@@ -3,14 +3,13 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { telegramSink } from './alerts.js';
-import { backupJob } from './backup.js';
+import { allBuiltins } from './builtins.js';
 import { jobEnv } from './env.js';
 import { History, pidAlive } from './history.js';
 import { JOBS, findJob } from './jobs.js';
 import { skippedToday, startLoop } from './loop.js';
 import { type RunContext, runJob } from './runner.js';
 import { formatIst, nextDue } from './schedule.js';
-import { morningSummary } from './summary.js';
 
 /**
  * `bun run jobs status` — every job, its schedule, last run and next run.
@@ -38,7 +37,7 @@ function context(history: History): RunContext {
     env: jobEnv(REPO_ROOT),
     logDir: logDir(),
     history,
-    builtins: { 'morning-summary': morningSummary(), backup: backupJob() },
+    builtins: allBuiltins(),
   };
 }
 
