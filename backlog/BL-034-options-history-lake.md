@@ -254,3 +254,13 @@ Still open for Phase 3:
   unchanged); NIFTY's usable range starts ~Sep 2024. Scope narrowed by the owner: stocks are not
   loaded further (BL-037, P3), and their forward collection from Fyers on monthly expiry days is
   BL-038 (P1).
+- 2026-10-07 — **Value-level verification passed.** Row counts and checksums already matched, but
+  that cannot catch a systematic value error, so every row of 158 randomly drawn ORIGINAL vendor CSVs
+  (NIFTY 2025/2026 and stocks from the vendor's zips; SENSEX, BANKNIFTY, FINNIFTY, MIDCPNIFTY,
+  NIFTYNXT50 re-downloaded from Drive) and of 25 random days per spot/VIX series was compared with
+  the lake cell by cell: 957,290 option rows + 37,160 spot/VIX rows, zero differences, nothing
+  missing on either side. A put-call-parity cross-check of the vendor spot against its own
+  options agrees too (NIFTY 2025-03-12 within +-5 points all day; longer expiries differ by
+  the cost of carry). Scripts: `packages/trading-data/scripts/vendor/verify_lake.py` and
+  `verify_values.py` (BL-037's first task is to promote them to `tdata vendor verify`).
+

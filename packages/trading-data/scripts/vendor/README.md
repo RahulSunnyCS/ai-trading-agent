@@ -49,6 +49,22 @@ has the counts and every anomaly found.
   the zip comparison now happens inside the converter, per folder, before anything is written.
   It is in git history.
 
+## Checking a load
+
+Two scripts check the lake against the vendor's data; run them from `packages/trading-data`
+with `TRADING_DATA_ROOT` set (they need `duckdb`; `verify_values.py` also an `rclone` remote
+`gdrive:` and the vendor zips on the SSD):
+
+- `verify_lake.py [folder ...]` — **completeness**: for each staged unit, the lake's vendor-written
+  rows must equal the staging rows, read from the Parquet footers (works while an import runs;
+  skips days the Fyers collector wrote; sums a renamed stock's symbols).
+- `verify_values.py` — **values**: draws random contract CSVs from sources that did not go through
+  the conversion (the vendor's zips, Drive via rclone) and 25 random days of each spot/VIX CSV,
+  and compares every row cell by cell (open, high, low, close, volume, oi per minute) with the
+  lake. `SEED=...` gives another sample. Run on 2026-10-07: 957,290 option rows (158 files across
+  NIFTY, SENSEX, BANKNIFTY, FINNIFTY, MIDCPNIFTY, NIFTYNXT50 and stocks) and 37,160 spot/VIX
+  rows, **0 differing, 0 only in the CSV, 0 only in the lake**.
+
 ## Findings that shaped the importer
 
 Where the zip and Drive disagreed each held 147 / 160 contracts that were longer than the other's
