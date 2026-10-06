@@ -63,7 +63,9 @@ interface JobView {
 }
 
 const STORAGE_KEY = 'ata-momentum-runs';
-const POLL_MS = 2000;
+/** Delay before each poll after a run starts: quick at first, so a fast or cached run shows at
+ * once, then every 2 s (BL-005). The last entry repeats. */
+export const POLL_SCHEDULE_MS = [300, 700, 1500, 2000] as const;
 
 const isActive = (run: MomentumRun): boolean => run.status === 'queued' || run.status === 'running';
 
@@ -86,7 +88,9 @@ function persist(runs: MomentumRun[], activeId: string | null): void {
 }
 
 let nextSeq = 1;
-let timer: ReturnType<typeof setInterval> | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let pollIndex = 0;
+let pollGeneration = 0;
 const saving = new Set<string>();
 
 export const useMomentumRunsStore = create<MomentumRunsState>((set, get) => ({
@@ -119,7 +123,7 @@ export const useMomentumRunsStore = create<MomentumRunsState>((set, get) => ({
     };
     set((state) => ({ runs: [...state.runs, run], activeId: run.id }));
     persist(get().runs, run.id);
-    ensurePolling();
+    ensurePolling(true);
     return null;
   },
 
@@ -199,21 +203,33 @@ async function pollOnce(run: MomentumRun): Promise<void> {
   }
 }
 
-/** Polls every in-flight run until none are left, then stops itself. */
-function ensurePolling(): void {
-  if (timer !== null) return;
-  timer = setInterval(() => {
+function schedulePoll(generation: number): void {
+  const delay = POLL_SCHEDULE_MS[Math.min(pollIndex, POLL_SCHEDULE_MS.length - 1)];
+  pollIndex += 1;
+  timer = setTimeout(() => {
     const active = useMomentumRunsStore.getState().runs.filter(isActive);
     if (active.length === 0) {
-      if (timer !== null) clearInterval(timer);
       timer = null;
       return;
     }
+    // The next poll is scheduled only once this one has answered, so a slow response never
+    // overlaps the next request. A restart while this one was in flight owns the loop now.
     void Promise.all(active.map(pollOnce)).then(() => {
       const { runs, activeId } = useMomentumRunsStore.getState();
       persist(runs, activeId);
+      if (generation === pollGeneration) schedulePoll(generation);
     });
-  }, POLL_MS);
+  }, delay);
+}
+
+/** Polls every in-flight run until none are left, then stops itself. `restart` (a run just
+ * started) goes back to the quick first polls. */
+function ensurePolling(restart = false): void {
+  if (timer !== null && !restart) return;
+  if (timer !== null) clearTimeout(timer);
+  pollGeneration += 1;
+  pollIndex = 0;
+  schedulePoll(pollGeneration);
 }
 
 let hydrated = false;
@@ -254,8 +270,10 @@ export function hydrateMomentumRuns(): void {
 
 /** Test seam: forget module state between tests. */
 export function resetMomentumRunsForTests(): void {
-  if (timer !== null) clearInterval(timer);
+  if (timer !== null) clearTimeout(timer);
   timer = null;
+  pollIndex = 0;
+  pollGeneration += 1;
   hydrated = false;
   nextSeq = 1;
   saving.clear();

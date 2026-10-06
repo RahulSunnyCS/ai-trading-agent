@@ -13,6 +13,7 @@ from typing import Literal
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from trading_data.db import connect
@@ -124,6 +125,11 @@ class _Data:
         self.momentum_universe_cache: broad.StockUniverseFrame | None = None
         self._references_mtimes: tuple | None = None
         self.references_cache: pd.DataFrame | None = None
+        # BL-005: whole backtest results, keyed on the request and `input_version()`, so an
+        # identical re-run (another tab, the same settings after a look elsewhere) is instant.
+        self.result_cache: OrderedDict = OrderedDict()
+
+    RESULT_CACHE_SIZE = 8
 
     def reset(self) -> None:
         """Drop EVERYTHING this process has cached - rankings, trade-price tables, the loaded
@@ -149,6 +155,21 @@ class _Data:
             self.momentum_universe_cache = None
             self._references_mtimes = None
             self.references_cache = None
+            self.result_cache.clear()
+
+    def cached_result(self, key: tuple) -> tuple[dict, str] | None:
+        """(payload, computed_at) for an identical earlier request on the same inputs."""
+        with self._lock:
+            hit = self.result_cache.get(key)
+            if hit is not None:
+                self.result_cache.move_to_end(key)
+            return hit
+
+    def store_result(self, key: tuple, payload: dict, computed_at: str) -> None:
+        with self._lock:
+            self.result_cache[key] = (payload, computed_at)
+            while len(self.result_cache) > self.RESULT_CACHE_SIZE:
+                self.result_cache.popitem(last=False)
 
     def get(self) -> pd.DataFrame:
         """Prefers the shared local database (`packages/trading-data`, populated by `mbt
@@ -157,14 +178,16 @@ class _Data:
         wrote the file, so this stays correct either way. Cache key is whichever source
         was actually used last time, so a write to EITHER invalidates it."""
         path = DATA_DIR / "weekly_closes.csv"
-        db_mtime = db_read.catalog_mtime()
+        db_version = db_read.data_version()
         csv_mtime = path.stat().st_mtime if path.exists() else None
-        if db_mtime is None and csv_mtime is None:
+        if db_version is None and csv_mtime is None:
             raise HTTPException(409, "No data yet - run `mbt login` then `mbt fetch`.")
         with self._lock:
-            mtime = (db_mtime, csv_mtime)
+            mtime = (db_version, csv_mtime)
             if mtime != self._mtime:
-                from_db = db_read.weekly_closes_from_db_or_none() if db_mtime is not None else None
+                from_db = (
+                    db_read.weekly_closes_from_db_or_none() if db_version is not None else None
+                )
                 if from_db is None and csv_mtime is None:
                     # A catalog exists but holds no weekly prices (anything that opens it for
                     # writing creates it - e.g. the dashboard's first saved-runs call) and there
@@ -191,12 +214,12 @@ class _Data:
         every other stocks/ series is reindexed onto."""
         base = DATA_DIR / "stocks"
         path = base / "nifty50_weekly_tr.csv"
-        db_mtime = db_read.catalog_mtime()
+        db_version = db_read.data_version()
         csv_mtime = path.stat().st_mtime if path.exists() else None
-        if db_mtime is None and csv_mtime is None:
+        if db_version is None and csv_mtime is None:
             raise HTTPException(409, "No stock data yet - run `mbt stocks fetch`.")
         with self._lock:
-            mtime = (db_mtime, csv_mtime)
+            mtime = (db_version, csv_mtime)
             if mtime != self._stock_mtime:
                 try:
                     self.stock = ui_data.load_stock_dataset(base)
@@ -225,7 +248,7 @@ class _Data:
         """Nifty 50 TRI / Nifty200 Momentum 30 TRI comparison lines (reference_benchmarks),
         reloaded when either source changes. Empty, never an error, when neither has them."""
         path = DATA_DIR / "stocks" / "benchmarks_weekly.csv"
-        mtimes = (db_read.catalog_mtime(), path.stat().st_mtime if path.exists() else None)
+        mtimes = (db_read.data_version(), path.stat().st_mtime if path.exists() else None)
         with self._lock:
             if mtimes != self._references_mtimes or self.references_cache is None:
                 self.references_cache = reference_benchmarks.load_references(DATA_DIR)
@@ -295,7 +318,7 @@ class _Data:
             CATEGORIES_CURATED_DIR / "category_extras.csv",
         ]
         mtimes = tuple(p.stat().st_mtime if p.exists() else None for p in watch_paths)
-        mtimes += (db_read.catalog_mtime(),)
+        mtimes += (db_read.data_version(),)
         key = (
             inner_top_n,
             inner_exit_rank,
@@ -359,7 +382,7 @@ class _Data:
             DATA_DIR / "stocks" / "daily.parquet",
         ]
         mtimes = tuple(p.stat().st_mtime if p.exists() else None for p in watch_paths)
-        mtimes += (db_read.catalog_mtime(),)
+        mtimes += (db_read.data_version(),)
         key = (
             tuple(lookbacks),
             tuple(weights) if weights else None,
@@ -419,7 +442,7 @@ class _Data:
             DATA_DIR / "stocks" / "daily.parquet",
         ]
         mtimes = tuple(p.stat().st_mtime if p.exists() else None for p in watch_paths)
-        mtimes += (db_read.catalog_mtime(),)
+        mtimes += (db_read.data_version(),)
         with self._lock:
             fresh = mtimes == self._momentum_universe_mtimes
             if fresh and self.momentum_universe_cache is not None:
@@ -436,6 +459,32 @@ class _Data:
 
 
 DATA = _Data()
+
+#: Folders whose files a backtest reads (top level only), besides the shared database.
+_INPUT_FOLDERS = ("", "daily", "daily_etf", "categories", "stocks")
+
+
+def input_version() -> tuple:
+    """Everything a backtest result depends on apart from its request: the shared database's
+    `data_version()` and the size and mtime of every input file under data/ and the curated
+    folders. Wider than any one dataset needs (an ETF fetch also invalidates a cached Broad
+    result), which costs only a re-run; it must never be narrower."""
+    folders = [DATA_DIR / name for name in _INPUT_FOLDERS]
+    folders += [CATEGORIES_CURATED_DIR, Path(__file__).parent / "stocks" / "curated"]
+    files = []
+    for folder in folders:
+        if not folder.is_dir():
+            continue
+        for entry in os.scandir(folder):
+            if entry.is_file() and not entry.name.endswith(".log"):
+                stat = entry.stat()
+                files.append((entry.path, stat.st_size, stat.st_mtime_ns))
+    return (db_read.data_version(), tuple(sorted(files)))
+
+
+def request_key(req: BaseModel) -> str:
+    """The request as canonical JSON: field order never matters, `fresh` is not a setting."""
+    return json.dumps(req.model_dump(mode="json", exclude={"fresh"}), sort_keys=True)
 
 
 class BacktestRequest(BaseModel):
@@ -2522,6 +2571,9 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Momentum backtest", docs_url="/api/docs")
+    # Results are 0.4-2 MB of JSON that compresses ~4x; it matters once the dashboard reaches
+    # this service over the tunnel (BL-002). The Fastify proxy's fetch() decompresses for itself.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     # Local direct-mode dashboard preview: the normal Fastify OAuth flow stores
     # its token in broker_tokens. This API can run without Postgres, so it
@@ -2656,13 +2708,22 @@ def create_app() -> FastAPI:
     def _dispatch_backtest(req: BacktestRequest) -> dict:
         if req.fresh:
             DATA.reset()
+        key = (input_version(), request_key(req))
+        hit = DATA.cached_result(key)
+        if hit is not None:
+            payload, computed_at = hit
+            return {**payload, "cache": {"hit": True, "computed_at": computed_at}}
         if req.dataset == "stock":
-            return _stock_backtest(req)
-        if req.dataset == "broad":
-            return _broad_backtest(req)
-        if req.dataset == "custom_index":
-            return _custom_index_backtest(req)
-        return _etf_backtest(req)
+            payload = _stock_backtest(req)
+        elif req.dataset == "broad":
+            payload = _broad_backtest(req)
+        elif req.dataset == "custom_index":
+            payload = _custom_index_backtest(req)
+        else:
+            payload = _etf_backtest(req)
+        computed_at = datetime.now(IST).isoformat(timespec="seconds")
+        DATA.store_result(key, payload, computed_at)
+        return {**payload, "cache": {"hit": False, "computed_at": computed_at}}
 
     @app.post("/api/backtest")
     def backtest(req: BacktestRequest) -> dict:

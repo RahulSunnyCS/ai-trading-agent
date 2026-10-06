@@ -105,7 +105,26 @@ run, for over a week, before anyone noticed.
 `/api/momentum/backtest/jobs*`. `_BacktestJobs` in `api.py` keeps many jobs in memory (30 max,
 lost on restart), runs at most 3 at once (CPU-bound — more only slows each) and queues the
 rest; a `fresh: true` run (`DATA.reset()`) runs alone so it never wipes caches under another
-run. The synchronous `POST /api/backtest` still exists (tests, scripts). The dashboard side is
+run. The synchronous `POST /api/backtest` still exists (tests, scripts).
+
+**Caching rule (BL-005, 2026-10-06): key any cache of shared-database data on
+`db_read.data_version()`, never on `db_read.catalog_mtime()`.** The catalog file's mtime moves on
+every write, and the dashboard saves each finished run into it (`POST /api/saved-runs`), so an
+mtime key emptied every cache (prices, rank tables, the ~20 s Broad ranking, liquidity features,
+circuit masks) before the next run. `data_version` is a content hash of every table except the
+run-record ones (`RUN_RECORD_TABLES`), recomputed only when the mtime moves (~0.1 s), plus the
+stock lake files' sizes and times; `catalog_mtime` stays only as the "is there a catalog" check.
+On top of those caches, `_dispatch_backtest` keeps the last 8 whole results
+(`DATA.result_cache`), keyed on the canonical request (`request_key`) and `input_version()`
+(`data_version` plus every input file under `data/` and the curated folders). Every response
+carries `cache: {hit, computed_at}`; `fresh: true` clears it with everything else. Responses are
+gzipped (`GZipMiddleware`).
+
+**Checking that a change leaves results alone on live data:**
+`scripts/result-baseline.py capture` stores every golden scenario and every saved favourite as
+the real API returns them today; `compare` re-runs them and reports differences, whether the data
+changed since, and each run's time and size then and now. The goldens cover frozen data; this
+covers the real data and the real favourites. The dashboard side is
 `apps/dashboard/src/store/momentumRuns.ts`: a module-level store + poller (so runs survive
 leaving the page; in-flight ones are mirrored to localStorage) rendered as one tab per run in
 `MomentumBacktestingView.tsx`; finished runs are auto-saved as Saved runs by the store.

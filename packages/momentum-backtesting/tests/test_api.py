@@ -1,6 +1,7 @@
 """The Momentum API, on generated prices so it doesn't depend on downloaded data."""
 
 import json
+import os
 
 import numpy as np
 import pandas as pd
@@ -1378,6 +1379,7 @@ def test_fresh_run_drops_every_server_cache_and_a_normal_run_keeps_them(client):
     api.DATA.broad_ranking_cache["sentinel"] = "x"
     api.DATA.broad_tilt_cache["sentinel"] = "x"
     api.DATA.fill_tables["sentinel"] = "x"
+    api.DATA.result_cache["sentinel"] = "x"
     sentinel_refs = pd.DataFrame()  # a real frame: a normal run reads it (`.empty`)
     api.DATA.references_cache = sentinel_refs
 
@@ -1393,6 +1395,7 @@ def test_fresh_run_drops_every_server_cache_and_a_normal_run_keeps_them(client):
         api.DATA.broad_ranking_cache,
         api.DATA.broad_tilt_cache,
         api.DATA.fill_tables,
+        api.DATA.result_cache,
     ):
         assert "sentinel" not in cache
     assert "sentinel" not in api.DATA.rank_cache
@@ -1423,14 +1426,14 @@ def test_get_momentum_universe_invalidates_when_only_the_catalog_changes(monkeyp
         return object()
 
     monkeypatch.setattr(api.broad, "load_stock_universe_frame", fake_load)
-    monkeypatch.setattr(db_read, "catalog_mtime", lambda: 1.0)
+    monkeypatch.setattr(db_read, "data_version", lambda root=None: ("v1",))
 
     first = data.get_momentum_universe()
     assert len(calls) == 1
 
-    # The watched files are unchanged; only the catalog's own mtime moved (a write
+    # The watched files are unchanged; only the shared database's data changed (a write
     # elsewhere, e.g. the Fyers top-up) — this must still trigger a rebuild.
-    monkeypatch.setattr(db_read, "catalog_mtime", lambda: 2.0)
+    monkeypatch.setattr(db_read, "data_version", lambda root=None: ("v2",))
     second = data.get_momentum_universe()
 
     assert len(calls) == 2
@@ -1532,3 +1535,96 @@ def test_fresh_backtest_job_runs_alone():
         time.sleep(0.02)
     assert log == ["slow-start", "slow-end", "fresh"]
     assert jobs.get(first)["status"] == "done"
+
+
+# --- Whole-result cache and compression (BL-005) -----------------------------------------------
+
+
+def _without_cache(payload: dict) -> dict:
+    return {k: v for k, v in payload.items() if k != "cache"}
+
+
+def _counting_engine(monkeypatch) -> list:
+    calls: list = []
+    real = api.run_backtest
+
+    def counting(*args, **kwargs):
+        calls.append(1)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(api, "run_backtest", counting)
+    return calls
+
+
+def test_an_identical_request_is_served_from_the_result_cache(client, monkeypatch):
+    calls = _counting_engine(monkeypatch)
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    first = client.post("/api/backtest", json=body).json()
+    ran = len(calls)
+    assert ran >= 1 and first["cache"]["hit"] is False
+
+    # The same settings in another order are the same request.
+    second = client.post("/api/backtest", json=dict(reversed(list(body.items())))).json()
+    assert len(calls) == ran  # nothing recomputed
+    assert second["cache"] == {"hit": True, "computed_at": first["cache"]["computed_at"]}
+    assert _without_cache(second) == _without_cache(first)
+
+
+def test_a_changed_setting_or_a_fresh_run_is_computed_again(client, monkeypatch):
+    calls = _counting_engine(monkeypatch)
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    client.post("/api/backtest", json=body)
+    ran = len(calls)
+    other = client.post("/api/backtest", json={**body, "top_n": 3}).json()
+    assert other["cache"]["hit"] is False and len(calls) > ran
+    ran = len(calls)
+    fresh = client.post("/api/backtest", json={**body, "fresh": True}).json()
+    assert fresh["cache"]["hit"] is False and len(calls) > ran
+
+
+def test_a_changed_input_file_is_computed_again(client):
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    client.post("/api/backtest", json=body)
+    path = api.DATA_DIR / "weekly_closes.csv"
+    stat = path.stat()
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 60_000_000_000))
+    assert client.post("/api/backtest", json=body).json()["cache"]["hit"] is False
+
+
+def test_saving_a_run_keeps_every_cache_for_the_next_run(client, monkeypatch):
+    """The bug BL-005 found: the dashboard saves each finished run into the catalog, and every
+    cache used to be keyed on the catalog file's mtime, so the next run started cold."""
+    from trading_data.db import catalog_path
+
+    calls = _counting_engine(monkeypatch)
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    saved = {
+        "dataset": "etf",
+        "name": "Run",
+        "config": body,
+        "kpis": {},
+        "dates": [],
+        "strategy": [],
+    }
+    assert client.post("/api/saved-runs", json=saved).status_code == 200  # creates the catalog
+    client.post("/api/backtest", json=body)
+    prices = api.DATA.prices
+    ran = len(calls)
+
+    assert client.post("/api/saved-runs", json=saved).status_code == 200
+    catalog = catalog_path()
+    stat = catalog.stat()
+    os.utime(catalog, ns=(stat.st_atime_ns, stat.st_mtime_ns + 60_000_000_000))
+
+    again = client.post("/api/backtest", json=body).json()
+    assert again["cache"]["hit"] is True and len(calls) == ran
+    assert client.post("/api/backtest", json={**body, "top_n": 3}).status_code == 200
+    assert api.DATA.prices is prices  # the loaded prices survived the save as well
+
+
+def test_responses_are_gzipped_when_the_client_accepts_it(client):
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    res = client.post("/api/backtest", json=body, headers={"Accept-Encoding": "gzip"})
+    assert res.status_code == 200
+    assert res.headers["content-encoding"] == "gzip"
+    assert res.json()["kpis"]  # the client decompresses transparently

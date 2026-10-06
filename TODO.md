@@ -510,6 +510,17 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 | 3.15.3 | Phase 2: weekly scoring, Forward page, Telegram line | claude | Open — after four Fridays are recorded |
 | 3.15.4 | Phase 3: real fills | owner→claude | Open — when real money is in |
 
+### 3.18 Faster Momentum backtests — [BL-005](backlog/BL-005-faster-momentum-backtests.md)
+
+Every result must stay identical (BL-001 goldens); the owner's decisions live in the backlog item.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.18.1 | Phase 1: gzip responses, whole-result cache, faster first polls; caches no longer emptied by every saved run | claude | **Code done 2026-10-06**: goldens clean, 28/28 live runs identical, identical re-run 0.07–0.2 s. Closes when the PR merges |
+| 3.18.2 | Phase 2: heavy sections (trades, instruments, latest, timeline, circuit card) load when opened | claude | Open |
+| 3.18.3 | Phase 3: engine reads NumPy arrays, not one pandas cell at a time; benchmark script | claude | Open |
+| 3.18.4 | Phase 4: run banner shows the stage and the usual duration | claude | Open |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

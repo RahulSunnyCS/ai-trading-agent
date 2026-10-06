@@ -23,6 +23,7 @@ database-first read path; see TODO 3.11.8.
 
 from __future__ import annotations
 
+import threading
 from datetime import date
 from pathlib import Path
 
@@ -35,6 +36,71 @@ def catalog_mtime(root: Path | None = None) -> float | None:
     at all, distinct from "the catalog exists but has no momentum_prices rows yet"."""
     path = catalog_path(root or data_root())
     return path.stat().st_mtime if path.exists() else None
+
+
+#: Catalog tables that record runs rather than hold market data: a backtest never reads them, and
+#: the dashboard writes `backtest_runs` after every finished run (BL-005).
+RUN_RECORD_TABLES = frozenset(
+    {
+        "backtest_runs",
+        "backtest_days",
+        "backtest_trades",
+        "strategies",
+        "strategy_versions",
+        "momentum_signals",
+        "momentum_forward_journal",
+        "ingest_runs",
+        "schema_migrations",
+    }
+)
+_version_lock = threading.Lock()
+_version_memo: dict[Path, tuple[float, tuple]] = {}
+
+
+def data_version(root: Path | None = None) -> tuple | None:
+    """What a cache of anything computed from the shared database should be keyed on: None when
+    there is no catalog, else a value that changes exactly when the market data does.
+
+    Not the catalog file's mtime: that moves on every write, including the saved run the
+    dashboard stores after each backtest, which used to empty every cache before the next run
+    (BL-005). This is a content hash of every table except `RUN_RECORD_TABLES` (~0.1 s on the
+    live catalog), recomputed only when the mtime moves, plus the size and mtime of each stock
+    daily-bar lake file (written without touching the catalog by the Fyers top-up)."""
+    root = root or data_root()
+    mtime = catalog_mtime(root)
+    if mtime is None:
+        return None
+    with _version_lock:
+        memo = _version_memo.get(root)
+        if memo is None or memo[0] != mtime:
+            try:
+                memo = (mtime, _table_hashes(root))
+            except Exception:  # e.g. another process holds the write lock right now
+                # Fall back to the mtime alone (the old key): a cache miss, never a failure.
+                return (("catalog_mtime", mtime),)
+            _version_memo[root] = memo
+    lake = root / "lake" / "bars_1d" / "asset=stock"
+    files = tuple(
+        (path.parent.name, path.stat().st_size, path.stat().st_mtime)
+        for path in sorted(lake.glob("year=*/*.parquet"))
+    )
+    return memo[1] + files
+
+
+def _table_hashes(root: Path) -> tuple:
+    with connect(root, read_only=True) as con:
+        names = [
+            name
+            for (name,) in con.execute(
+                "SELECT table_name FROM duckdb_tables() WHERE schema_name = 'main' "
+                "ORDER BY table_name"
+            ).fetchall()
+            if name not in RUN_RECORD_TABLES
+        ]
+        return tuple(
+            (name, *con.execute(f'SELECT count(*), sum(hash(t)) FROM "{name}" t').fetchone())
+            for name in names
+        )
 
 
 def weekly_closes_from_db(root: Path | None = None) -> pd.DataFrame:

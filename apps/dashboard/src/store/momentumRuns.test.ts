@@ -74,6 +74,67 @@ describe('momentumRuns store', () => {
     expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('failed');
   });
 
+  it('polls quickly at first, so a fast or cached run shows within half a second', async () => {
+    mockPost.mockResolvedValue({
+      ok: true,
+      data: { job: { id: 'a', status: 'running' } },
+    } as never);
+    jobs({ a: { id: 'a', status: 'done', result, error: null } });
+    await useMomentumRunsStore.getState().startRun('etf', {}, false);
+    await vi.advanceTimersByTimeAsync(299);
+    expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('running');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('done');
+  });
+
+  it('never sends a poll while the previous one is unanswered', async () => {
+    mockPost.mockResolvedValue({
+      ok: true,
+      data: { job: { id: 'a', status: 'running' } },
+    } as never);
+    let release: (() => void) | null = null;
+    mockGet.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ ok: true, data: { job: { id: 'a', status: 'running' } } } as never);
+        }),
+    );
+    await useMomentumRunsStore.getState().startRun('etf', {}, false);
+    await vi.advanceTimersByTimeAsync(10_000); // the first poll hangs for 10 s
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    (release as unknown as () => void)();
+    await vi.advanceTimersByTimeAsync(700); // answered: the next poll follows on the schedule
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps one polling loop when a run starts while a poll is in flight', async () => {
+    let n = 0;
+    mockPost.mockImplementation(
+      async () => ({ ok: true, data: { job: { id: `r${++n}`, status: 'running' } } }) as never,
+    );
+    let answerFirst: (() => void) | null = null;
+    mockGet.mockImplementation((url: string) => {
+      const reply = { ok: true, data: { job: { id: url.split('/').pop(), status: 'running' } } };
+      if (mockGet.mock.calls.length === 1) {
+        return new Promise((resolve) => {
+          answerFirst = () => resolve(reply as never);
+        });
+      }
+      return Promise.resolve(reply as never);
+    });
+    const { startRun } = useMomentumRunsStore.getState();
+    await startRun('etf', {}, false);
+    await vi.advanceTimersByTimeAsync(300); // first poll sent, not answered
+    await startRun('etf', {}, false); // restarts the quick polls
+    (answerFirst as unknown as () => void)(); // the old poll answers late
+    const before = mockGet.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(4000);
+    // One loop polls both runs at +300, +1000 and +2500 ms: 6 requests. A second loop left
+    // running by the late answer would add more.
+    expect(mockGet.mock.calls.length - before).toBe(6);
+  });
+
   it('reports a start failure without adding a tab', async () => {
     mockPost.mockResolvedValue({ ok: false, error: 'bad input' } as never);
     expect(await useMomentumRunsStore.getState().startRun('etf', {}, false)).toBe('bad input');
