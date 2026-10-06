@@ -86,8 +86,9 @@ a Fyers access token (see the precedence order in root `technical.md`'s Environm
 Variables table) — that connection is unrelated and still live.
 
 The weekly job (`mbt weekly`) itself now runs from `launchd` LaunchAgents on the owner's own
-laptop (`scripts/install-launchd.sh`/`uninstall-launchd.sh`, three plists — Friday 14:40
-preview, 16:45 final, and since 2026-10-02 19:30 stock-data ingest IST), replacing the retired
+laptop (`scripts/install-launchd.sh`/`uninstall-launchd.sh`, four plists — Friday 14:40
+preview, 16:45 final, since 2026-10-02 19:30 stock-data ingest, and since 2026-10-06 21:00
+forward-journal check IST), replacing the retired
 `.github/workflows/momentum-weekly.yml`. The plists explicitly `source` the repo root `.env`
 before running — launchd's own environment does not inherit it the way an interactive shell's
 profile usually does. The CLI's `weekly()` command is a thin wrapper around
@@ -147,6 +148,12 @@ model portfolio **before** the signal's own actions — `run_backtest` never tra
 week (`trade_weeks` excludes it), so the post-trade portfolio first appears in next week's row.
 Use `momentum_signals` for the latest signal (it is overwritten on rerun); use the journal for
 evidence. A journal failure never blocks the signal and is reported in Telegram.
+After the Friday runs, a 4th LaunchAgent (21:00 IST, `momentum-weekly-journal-check`) runs
+`mbt journal check --send`: every favourite's final, each ETF favourite's Friday preview and the
+benchmark level should be in under this week; a favourite whose signal is labelled an earlier
+week is reported as "wrong week", not missing. The dashboard's **Momentum › Journal** page
+(`MomentumJournalView.tsx`, `GET /api/journal` → Fastify `/api/momentum/journal`) shows the
+same check, the chain status and every entry by week.
 
 **Gotcha found live, not by a test:** `stocks_fetch`/`local_migrate` are Typer commands whose
 parameters default to `typer.Option(...)` sentinel objects — Typer only resolves those into

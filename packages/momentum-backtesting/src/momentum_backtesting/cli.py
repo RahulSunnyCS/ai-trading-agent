@@ -1478,6 +1478,41 @@ def journal_show(
         )
 
 
+@journal_app.command("check")
+def journal_check(
+    week: str = typer.Option(
+        None, help="Signal week (YYYY-MM-DD); default the latest Friday on or before today."
+    ),
+    send: bool = typer.Option(False, help="Also send the summary to Telegram."),
+) -> None:
+    """After Friday's runs: did every favourite (and the benchmark) get recorded for the week,
+    under the right week, and is the chain intact? Exits 1 when anything is missing or broken.
+    Scheduled for Fridays 20:15 IST by the momentum-weekly-journal-check LaunchAgent."""
+    from datetime import datetime
+
+    from trading_data.db import connect
+
+    from . import forward_journal, notify, runs_store
+    from .stocks.ui_data import NIFTY200_MOMENTUM30_TRI
+    from .weekly import week_ending_on_or_before
+
+    target = week or week_ending_on_or_before(datetime.now(notify.IST).date())
+    with connect() as con:
+        result = forward_journal.check(
+            con, target, runs_store.list_favorites(con), (NIFTY200_MOMENTUM30_TRI,)
+        )
+    title, body = forward_journal.summary(result)
+    typer.echo(f"{title}\n{body}")
+    if send:
+        notify.send(
+            notify.Notification(
+                "momentum-journal", "info" if result["ok"] else "warning", title, body
+            )
+        )
+    if not result["ok"]:
+        raise typer.Exit(1)
+
+
 @journal_app.command("verify")
 def journal_verify() -> None:
     """Check that no entry was changed, removed or reordered since it was recorded."""

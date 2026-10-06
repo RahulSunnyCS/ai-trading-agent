@@ -91,6 +91,13 @@ benchmark.
 - **Done when:** Friday 2026-10-09's runs write one row per favourite (preview for ETF, final for
   all 12) plus the benchmark, and `mbt journal verify` passes.
 
+### Phase 1b — Check and Journal page (added 2026-10-06, owner request)
+- **Tasks:** `mbt journal check [--send]` (expected vs recorded for the week, wrong-week labels,
+  chain, uncommitted-code warning) on a Friday 21:00 LaunchAgent that sends one Telegram
+  summary; a **Momentum › Journal** dashboard page showing the same check, the chain fingerprint
+  and every entry by week (`GET /api/journal`).
+- **Done when:** Friday 2026-10-09's 21:00 summary arrives and the page shows that week.
+
 ### Phase 2 — Score
 - **Tasks:** each week, take the portfolio each journalled signal led to from the *next* week's
   row (its `holdings_before`), after checking that every recorded BUY appears there and every
@@ -136,6 +143,8 @@ None for Phase 1.
 - 2026-10-06 — started. Owner answered the start questions (see Decisions); config choice split
   out as BL-030. Found that non-ETF favourites have no preview and that the 19:30 job was not
   installed. Status In progress, TODO.md 3.15.
+- 2026-10-06 — Phase 1b added at the owner's request: the after-Friday check job and the
+  Momentum › Journal page, so the owner does not have to run the CLI checks by hand.
 - 2026-10-06 — Phase 1 code done: migration 007, `forward_journal.py`, wiring in
   `_execute_weekly_run`, `mbt journal show|verify`, 14 tests. Dry run on a copy of the real
   catalog recorded all 12 favourites, a rerun recorded nothing, verify passed. Awaiting the

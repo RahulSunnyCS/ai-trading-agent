@@ -237,3 +237,113 @@ def head(con: duckdb.DuckDBPyConnection) -> tuple[int, str] | None:
         f"SELECT entry_id, row_hash FROM {TABLE} ORDER BY entry_id DESC LIMIT 1"
     ).fetchone()
     return (int(row[0]), row[1]) if row else None
+
+
+def check(
+    con: duckdb.DuckDBPyConnection,
+    week: str,
+    favourites: list[dict],
+    benchmarks: tuple[str, ...] = (),
+) -> dict:
+    """What the week's runs should have recorded against what they did: every favourite's final,
+    each ETF favourite's Friday preview (only ETF favourites have one), and each benchmark level.
+    A favourite whose newest row since the week began is labelled an *earlier* week is reported
+    as such (its signal lagged), not as missing. Also re-verifies the whole chain."""
+    week = week_string(week)
+    week_rows = _rows(con, "WHERE week = ?", [week])
+    latest: dict[tuple[str, str], dict] = {}
+    corrections: dict[tuple[str, str], int] = {}
+    for row in week_rows:
+        key = (row["run_kind"], row["config_id"])
+        latest[key] = row
+        corrections[key] = corrections.get(key, 0) + (row["supersedes"] is not None)
+    # Rows recorded since the week's Friday but labelled with an older week.
+    lagged: dict[tuple[str, str], dict] = {}
+    for row in _rows(con, "WHERE week < ? AND recorded_at >= ?", [week, week]):
+        lagged[(row["run_kind"], row["config_id"])] = row
+
+    def item(config_id: str, name: str, dataset: str, run_kind: str) -> dict:
+        row = latest.get((run_kind, config_id))
+        late = lagged.get((run_kind, config_id))
+        if row is not None:
+            status, entry = "recorded", row
+        elif late is not None:
+            status, entry = "wrong_week", late
+        else:
+            status, entry = "missing", None
+        return {
+            "config_id": config_id,
+            "name": name,
+            "dataset": dataset,
+            "run_kind": run_kind,
+            "status": status,
+            "entry_id": entry["entry_id"] if entry else None,
+            "week": entry["week"] if entry else None,
+            "recorded_at": entry["recorded_at"] if entry else None,
+            "corrections": corrections.get((run_kind, config_id), 0),
+        }
+
+    items = []
+    for favourite in favourites:
+        dataset = favourite["config"].get("dataset", "etf")
+        for run_kind in ("preview", "final") if dataset == "etf" else ("final",):
+            items.append(item(favourite["id"], favourite["name"], dataset, run_kind))
+    for name in benchmarks:
+        items.append(item(name, name, "benchmark", "final"))
+
+    # One line, not one per entry: a run from a dirty checkout marks every row it wrote.
+    unpinned = [
+        row
+        for row in week_rows
+        if row["code_commit"].endswith("+dirty") or row["code_commit"] == "unknown"
+    ]
+    warnings = (
+        [
+            f"{len(unpinned)} "
+            + ("entry was" if len(unpinned) == 1 else "entries were")
+            + " recorded from uncommitted code, so cannot be reproduced from git history: "
+            + ", ".join(f"#{row['entry_id']} {row['config_name']}" for row in unpinned[:3])
+            + (f" and {len(unpinned) - 3} more" if len(unpinned) > 3 else "")
+        ]
+        if unpinned
+        else []
+    )
+    problems = verify(con)
+    chain = head(con)
+    recorded = sum(1 for i in items if i["status"] == "recorded")
+    return {
+        "week": week,
+        "expected": len(items),
+        "recorded": recorded,
+        "items": items,
+        "chain": {
+            "entries": chain[0] if chain else 0,
+            "head": chain[1] if chain else None,
+            "problems": problems,
+        },
+        "warnings": warnings,
+        "ok": recorded == len(items) and not problems,
+    }
+
+
+def summary(result: dict) -> tuple[str, str]:
+    """(title, body) for the Telegram message `mbt journal check --send` posts."""
+    day = pd.Timestamp(result["week"]).strftime("%d %b %Y")
+    chain = result["chain"]
+    lines = [f"{result['recorded']} of {result['expected']} expected entries recorded."]
+    for item in result["items"]:
+        if item["status"] == "missing":
+            lines.append(f"• MISSING {item['run_kind']}: {item['name']}")
+        elif item["status"] == "wrong_week":
+            lines.append(
+                f"• {item['run_kind']} for {item['name']} is labelled week of {item['week']}"
+            )
+    if chain["problems"]:
+        lines.append("Chain BROKEN:")
+        lines.extend(f"• {problem}" for problem in chain["problems"])
+    else:
+        head_hash = (chain["head"] or "")[:16]
+        lines.append(f"Chain intact: {chain['entries']} entries, head {head_hash}.")
+    lines.extend(f"• {warning}" for warning in result["warnings"])
+    title = f"Forward journal check — week of {day}: " + ("OK" if result["ok"] else "PROBLEMS")
+    return title, "\n".join(lines)

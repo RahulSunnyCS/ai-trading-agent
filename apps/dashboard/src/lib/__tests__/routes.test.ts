@@ -84,6 +84,7 @@ describe('routes', () => {
     ['/momentum/saved', 'momentum', ['saved']],
     ['/momentum/weekly', 'momentum', ['weekly']],
     ['/momentum/rebalance', 'momentum', ['rebalance']],
+    ['/momentum/journal', 'momentum', ['journal']],
     ['/brokerLogins', 'brokerLogins', []],
     ['/billing', 'pricing', []],
     ['/settings', 'settings', []],

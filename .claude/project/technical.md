@@ -129,6 +129,7 @@ uv run mbt compare         # rank-and-rotate backtest, off/ranked/filter modes -
 uv run mbt serve           # private Momentum API on 127.0.0.1:8765
 uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
+uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 launchd job)
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
 uv run mbt stocks fetch --skip-download  # rebuild the Nifty 50 stock data layer from the raw cache, no network
 uv run mbt stocks pin-manifest           # commit the raw cache + events as the new reproducibility baseline

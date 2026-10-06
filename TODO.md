@@ -504,7 +504,8 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.15.1 | Phase 1: append-only, hash-chained journal written by every weekly run | claude | **Code done 2026-10-06** (migration 007, `forward_journal.py`, `mbt journal show/verify`). Closes when Friday 2026-10-09's runs write their rows and `mbt journal verify` passes; needs this merged and the laptop checkout on `main` before 14:40 that day |
-| 3.15.2 | Install the 19:30 `momentum-weekly-stock-ingest` LaunchAgent (without it no Stock/Broad favourite is evaluated or journalled) | owner | Open |
+| 3.15.5 | Phase 1b: Friday 21:00 `mbt journal check --send` job + Momentum › Journal page | claude | **Code done 2026-10-06.** Closes with 3.15.1 on Friday 2026-10-09 |
+| 3.15.2 | Install the 19:30 `momentum-weekly-stock-ingest` LaunchAgent (without it no Stock/Broad favourite is evaluated or journalled) | owner | **Done 2026-10-06** (installed with the owner's go-ahead) |
 | 3.15.3 | Phase 2: weekly scoring, Forward page, Telegram line | claude | Open — after four Fridays are recorded |
 | 3.15.4 | Phase 3: real fills | owner→claude | Open — when real money is in |
 

@@ -1994,6 +1994,54 @@ def _journal_weekly(
     }
 
 
+def _journal_entry_view(row: dict) -> dict:
+    """One journal row for the dashboard: the stored text parsed, and the signal cut down to its
+    actions (a Broad signal ranks hundreds of names; the page needs the ones it acts on)."""
+    signal = json.loads(row["signal"])
+    return {
+        **{key: row[key] for key in row if key not in ("signal", "holdings_before", "settings")},
+        "holdings_before": json.loads(row["holdings_before"]),
+        "actions": [
+            {"asset": r.get("asset"), "action": r.get("action"), "rank": r.get("rank")}
+            for r in signal.get("rows", [])
+            if r.get("action")
+        ],
+        "level": signal.get("level"),
+    }
+
+
+def _journal_view(week: str | None) -> dict:
+    """GET /api/journal: the weeks recorded, one week's entries, and that week's check."""
+    from . import forward_journal as journal
+    from .weekly import week_ending_on_or_before
+
+    try:
+        with connect(read_only=True) as con:
+            if not db_read._has_table(con, journal.TABLE):
+                return {"available": False, "weeks": [], "week": None, "entries": [], "check": None}
+            weeks = [
+                {"week": w, "entries": n}
+                for w, n in con.execute(
+                    f"SELECT strftime(week, '%Y-%m-%d'), count(*) FROM {journal.TABLE} "
+                    "GROUP BY 1 ORDER BY 1 DESC"
+                ).fetchall()
+            ]
+            selected = journal.week_string(
+                week
+                or (
+                    weeks[0]["week"]
+                    if weeks
+                    else week_ending_on_or_before(datetime.now(IST).date())
+                )
+            )
+            favourites = runs_store.list_favorites(con)
+            entries = [_journal_entry_view(row) for row in journal.entries(con, selected)]
+            check = journal.check(con, selected, favourites, (NIFTY200_MOMENTUM30_TRI,))
+    except FileNotFoundError:
+        return {"available": False, "weeks": [], "week": None, "entries": [], "check": None}
+    return {"available": True, "weeks": weeks, "week": selected, "entries": entries, "check": check}
+
+
 def _journal_line(journal: dict) -> str | None:
     """The Telegram line that witnesses the journal: Telegram's own timestamp then proves how
     long the chain was, and its newest hash, when this message went out."""
@@ -2291,6 +2339,7 @@ _SCHEDULED_RUNS = (
     ("preview", "Fri 14:40 IST", 14, 40, "launchd-weekly-preview.log"),
     ("final", "Fri 16:45 IST", 16, 45, "launchd-weekly-final.log"),
     ("stock-ingest", "Fri 19:30 IST", 19, 30, "launchd-weekly-stock-ingest.log"),
+    ("journal-check", "Fri 21:00 IST", 21, 0, "launchd-weekly-journal-check.log"),
 )
 # A scheduled job fired more than this many minutes after its scheduled time (typically the
 # laptop was asleep, per TODO.md 3.11.5's launchd caveat) is flagged "ran late" rather than
@@ -2695,6 +2744,13 @@ def create_app() -> FastAPI:
     @app.get("/api/weekly/status")
     def weekly_status() -> dict:
         return _weekly_status()
+
+    @app.get("/api/journal")
+    def forward_journal_view(week: str | None = None) -> dict:
+        try:
+            return _journal_view(week)
+        except ValueError as error:  # an unparseable ?week=
+            raise HTTPException(422, str(error)) from error
 
     @app.post("/api/weekly/stock-sync", status_code=202)
     def weekly_stock_sync() -> dict:

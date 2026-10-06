@@ -469,6 +469,7 @@ def test_weekly_status_says_how_far_each_dataset_is_ingested(client, tmp_path, m
         "preview",
         "final",
         "stock-ingest",
+        "journal-check",
     ]
     assert all(item["ran_late_by_minutes"] is None for item in status["schedule"])
 

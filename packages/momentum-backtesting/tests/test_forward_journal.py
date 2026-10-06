@@ -1,10 +1,12 @@
 """BL-024: the forward-signal journal is append-only, idempotent on reruns, and tamper-evident,
 and every weekly run records into it without ever losing the signal itself."""
 
+import dataclasses
 from datetime import datetime
 
 import pandas as pd
 import pytest
+from fastapi.testclient import TestClient
 from trading_data.db import connect
 
 from momentum_backtesting import api, forward_journal, fyers, notify, reference_benchmarks, weekly
@@ -255,3 +257,100 @@ def test_the_stock_ingest_rerun_witnesses_new_broad_entries_without_resending_th
         broad = [r for r in forward_journal.entries(con) if r["config_id"] == "broad-1"]
     fingerprint = broad[0]["data_fingerprint"]
     assert fingerprint.startswith("weekly_closes:") and ";stock_prices:sha256:" in fingerprint
+
+
+# --- the after-Friday check and the dashboard endpoint ------------------------------------------
+
+
+def _favourite(id_, name, dataset):
+    return {"id": id_, "name": name, "config": {"dataset": dataset}}
+
+
+def test_check_lists_what_each_favourite_should_have_recorded():
+    favourites = [_favourite("etf-1", "ETF Core", "etf"), _favourite("broad-1", "Broad A", "broad")]
+    with connect() as con:
+        forward_journal.record(con, _entry(config_id="etf-1", run_kind="preview"))
+        forward_journal.record(con, _entry(config_id="etf-1", run_kind="final"))
+        result = forward_journal.check(con, "2026-10-09", favourites, ("Bench",))
+    statuses = {(i["config_id"], i["run_kind"]): i["status"] for i in result["items"]}
+    assert statuses == {
+        ("etf-1", "preview"): "recorded",
+        ("etf-1", "final"): "recorded",
+        ("broad-1", "final"): "missing",  # Broad favourites have no preview
+        ("Bench", "final"): "missing",
+    }
+    assert (result["recorded"], result["expected"], result["ok"]) == (2, 4, False)
+    title, body = forward_journal.summary(result)
+    assert title.endswith("PROBLEMS")
+    assert "MISSING final: Broad A" in body and "Chain intact: 2 entries" in body
+
+
+def test_check_reports_a_signal_labelled_with_an_earlier_week():
+    """Seen in the 2026-10-06 dry run: Stock Weekly Core's signal came out a week behind."""
+    favourites = [_favourite("stock-1", "Stock Core", "stock")]
+    friday = datetime(2026, 10, 9, 14, 0)
+    with connect() as con:
+        forward_journal.record(con, _entry(week="2026-10-02", config_id="stock-1"), now=friday)
+        result = forward_journal.check(con, "2026-10-09", favourites)
+    (item,) = result["items"]
+    assert (item["status"], item["week"]) == ("wrong_week", "2026-10-02")
+    assert "labelled week of 2026-10-02" in forward_journal.summary(result)[1]
+
+
+def test_check_is_ok_when_everything_is_in_and_flags_uncommitted_code():
+    favourites = [_favourite("broad-1", "Broad A", "broad")]
+    with connect() as con:
+        forward_journal.record(con, _entry(config_id="broad-1"))
+        clean = forward_journal.check(con, "2026-10-09", favourites)
+        dirty = _entry(config_id="broad-1", weights={"Gold": 1.0})
+        forward_journal.record(con, dataclasses.replace(dirty, code_commit="abc+dirty"))
+        flagged = forward_journal.check(con, "2026-10-09", favourites)
+    assert clean["ok"] is True and clean["warnings"] == []
+    assert flagged["items"][0]["corrections"] == 1
+    assert flagged["warnings"] == [
+        "1 entry was recorded from uncommitted code, so cannot be reproduced from git history: "
+        "#2 ETF Weekly Core"
+    ]
+
+
+def test_journal_endpoint_before_anything_is_recorded():
+    client = TestClient(api.create_app())
+    body = client.get("/api/journal").json()
+    assert body["available"] is False and body["entries"] == []
+
+
+def test_journal_endpoint_returns_weeks_entries_and_the_check():
+    with connect() as con:
+        forward_journal.record(con, _entry(week="2026-10-02", config_id="a"))
+        forward_journal.record(con, _entry(week="2026-10-09", config_id="a"))
+    client = TestClient(api.create_app())
+    body = client.get("/api/journal").json()
+    assert body["available"] is True
+    assert body["weeks"] == [
+        {"week": "2026-10-09", "entries": 1},
+        {"week": "2026-10-02", "entries": 1},
+    ]
+    assert body["week"] == "2026-10-09"  # newest by default
+    (entry,) = body["entries"]
+    assert entry["holdings_before"] == {"Gold": 0.5, "Nifty IT": 0.5}
+    assert entry["actions"] == [{"asset": "Nifty IT", "action": "BUY", "rank": None}]
+    assert "signal" not in entry and body["check"]["chain"]["problems"] == []
+    older = client.get("/api/journal", params={"week": "2026-10-02"}).json()
+    assert older["week"] == "2026-10-02" and older["entries"][0]["entry_id"] == 1
+    assert client.get("/api/journal", params={"week": "not-a-date"}).status_code == 422
+
+
+def test_cli_check_exits_nonzero_and_sends_when_asked(monkeypatch):
+    from typer.testing import CliRunner
+
+    from momentum_backtesting import cli
+
+    sent = []
+    monkeypatch.setattr(notify, "send", sent.append)
+    with connect() as con:
+        forward_journal.record(con, _entry(config_id="etf-1"))
+    result = CliRunner().invoke(cli.app, ["journal", "check", "--week", "2026-10-09", "--send"])
+    # No favourites saved in this catalog, so only the benchmark is expected — and missing.
+    assert result.exit_code == 1, result.output
+    assert "0 of 1 expected entries recorded" in result.output
+    assert sent[0].severity == "warning" and sent[0].title.endswith("PROBLEMS")
