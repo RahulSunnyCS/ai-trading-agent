@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
 import typer
 
 from . import reference
 from .backup import backup as run_backup
-from .db import LAKE_VIEWS, catalog_path, connect, data_root
+from .db import LAKE_VIEWS, catalog_path, check_mounted, connect, data_root
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 ref_app = typer.Typer(no_args_is_help=True, help="Lot sizes, strike steps, calendars, margins.")
@@ -137,3 +139,28 @@ def backup(
         f"backup to {to}: {report.copied} files copied ({_mb(report.bytes_copied)}), "
         f"{report.skipped} already there"
     )
+
+
+@app.command()
+def mount() -> None:
+    """Attach the disk image holding the data root (TRADING_DATA_IMAGE) unless it is
+    already mounted. Safe to re-run; the login LaunchAgent runs it whenever a volume
+    appears, so plugging the SSD in is enough."""
+    root = data_root(require_mounted=False)
+    try:
+        check_mounted(root)
+    except RuntimeError:
+        pass
+    else:
+        typer.echo(f"{root}: mounted")
+        return
+    image = os.environ.get("TRADING_DATA_IMAGE", "").strip()
+    if not image:
+        typer.echo("TRADING_DATA_IMAGE is not set (see .env.example)", err=True)
+        raise typer.Exit(1)
+    if not Path(image).exists():
+        typer.echo(f"{image} not found — is the SSD connected?", err=True)
+        raise typer.Exit(1)
+    subprocess.run(["hdiutil", "attach", image], check=True, capture_output=True)
+    check_mounted(root)  # attached under another name ("TradingData 1") still fails here
+    typer.echo(f"{root}: attached {image}")

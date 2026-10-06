@@ -234,3 +234,24 @@ it despite the script being required "on a fresh clone" per this package's own `
 Replaced both `date -d` calls with `python3 -c ...` one-liners (portable, and python3 is
 already a hard dependency of this whole repo) — behaviour unchanged, now works on both GNU and
 BSD userlands.
+
+## The data root moves onto an APFS disk image on the SSD, and refuses to run unmounted — owner decision 2026-10-06
+
+BL-034 loads two years of vendor 1-minute options history: ~110k day files, ~20 GB. The
+internal disk has ~39 GB free, and the external SSD is ExFAT with 256 KiB clusters, where
+macOS also writes an AppleDouble `._` file beside every file — two clusters per file, ~55 GB
+of overhead for this lake. A sparse APFS image on the SSD (`TradingData.sparsebundle`,
+200 GB ceiling) has neither cost and keeps atomic renames; the bundle itself is ~8 MB bands,
+which ExFAT handles fine.
+
+**Chosen: environment variable + mount guard + login auto-mount**, over hard-coding the path
+as `DEFAULT_ROOT` (it would put the owner's laptop layout in the repo, and still need the
+guard). The failure that matters is silent: with the image not attached, a process could
+create a fresh empty root (or, attached as "TradingData 1", a second one) and the evening
+collection would land there. So `data_root()` raises when a root on `/Volumes/<name>` is not
+a mount point — resolved through symlinks, so `~/TradingData` can point at the image and a
+dangling link fails the same way. `obt`, `obt-api` and `obt-mcp` now load the repo `.env` at
+start (before, only commands resolving Fyers credentials did, so `obt daily --no-fetch` used
+the default root). `TRADING_DATA_IMAGE` must be double-quoted in `.env` because the launchd
+jobs `source` it and the SSD's name has an apostrophe and a space.
+

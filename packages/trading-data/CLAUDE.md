@@ -45,6 +45,11 @@ table instead.
 
 ## Rules that matter
 
+- **The root may be an external volume.** On the owner's laptop `TRADING_DATA_ROOT` is
+  `/Volumes/TradingData`, an APFS disk image on the SSD. `data_root()` raises if a root on
+  `/Volumes/<name>` is not mounted (`check_mounted`) — never fall back to a default or let
+  `connect()` create a fresh root. `tdata mount` attaches `TRADING_DATA_IMAGE`; the
+  `deploy/launchd` job `trading-data-mount` runs it at login and when a volume appears.
 - **One writer.** DuckDB allows one read-write process; a read-write connection also
   blocks other processes' readers. Use `connect()` as a short context manager — never
   hold it across a long download (see how `fyers/daily.py` opens it only to register
@@ -72,7 +77,7 @@ table instead.
 
 ```bash
 uv sync && uv run pytest
-uv run tdata init | status | backup --to <dir>
+uv run tdata init | status | backup --to <dir> | mount
 uv run tdata reference export | check | sql "<statement>"
 uv run mbt local migrate   # from packages/momentum-backtesting/: (re-)import its data
 ```
