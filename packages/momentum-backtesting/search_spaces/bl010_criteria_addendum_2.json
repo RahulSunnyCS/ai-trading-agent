@@ -1,0 +1,16 @@
+{
+  "written_before_running": "2026-10-06T09:30:00+05:30",
+  "name": "BL-010 criteria, addendum 2: windows used for selection are never used for validation (Phase 4 step 6)",
+  "adds_to": "bl010_criteria.json - unchanged; this file only adds a rule that file does not have",
+  "rule": "Committed before Phase 5 runs. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
+  "reason": "Finding F10: Round 4's Steady Winner test required blocks that had already been selection filters, so the validation could only agree with the selection. criteria.check_windows enforces this rule in code.",
+  "windows": {
+    "rule": "A date range that decides which configs go forward (a selection filter) may not overlap a date range that judges them (a validation block). A config chosen on data ending at D is validated only on data after D, or by a walk-forward that re-selects using data before each test year with the embargo below.",
+    "embargo_weeks": 13,
+    "holdout": {
+      "from": "2012-01-01",
+      "to": "2016-12-31",
+      "use": "Phase 6 only, once, on the frozen choice. No strategy backtest may read it before then."
+    }
+  }
+}

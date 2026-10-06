@@ -437,3 +437,7 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   objects; the session running this review should confirm with the owner before building on it.
 - 2026-10-06 — owner: pending decisions stay here as open questions and are settled when the item is picked up; the "recommended default" in the entry above is
   only a proposal — see open question 3.
+- 2026-10-06 — Phase 4 steps 4 to 6 built: criteria as code (`criteria.py`, baskets and the
+  window rule), data-stamped run ids, generic nudges (fixes F13 and the B/C2 KeyError),
+  addendum 2 (selection and validation windows never meet; hold-out sealed). The point-in-time
+  re-score is running.
