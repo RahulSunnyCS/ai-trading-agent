@@ -155,12 +155,21 @@ def holding_periods(result: Result, column_to_base: dict[str, str]) -> pd.DataFr
     return pd.DataFrame(rows)
 
 
-def _between(frame: pd.DataFrame, start: pd.Timestamp | None, end: pd.Timestamp | None):
+def _between(
+    frame: pd.DataFrame,
+    start: pd.Timestamp | None,
+    end: pd.Timestamp | None,
+    ordered: bool | None = None,
+):
     """The rows dated from `start` to `end`, both inclusive (None = no limit). A stock's bars come
     sorted by date, so this is a slice found by bisection rather than a comparison of every row,
-    which was a fifth of the circuit card's time; an unsorted frame gets the comparison."""
+    which was a fifth of the circuit card's time; an unsorted frame gets the comparison.
+    `ordered` says whether the frame's dates are sorted, for a caller that has already checked it
+    (the check reads the whole column, so it is made once per frame, not once per window)."""
     dates = frame["date"]
-    if not dates.is_monotonic_increasing:
+    if ordered is None:
+        ordered = bool(dates.is_monotonic_increasing)
+    if not ordered:
         keep = pd.Series(True, index=frame.index)
         if start is not None:
             keep &= dates >= start
@@ -244,8 +253,9 @@ def lc_outcomes(
             )
             for p in held.itertuples()
         ]
+        ordered = bool(frame["date"].is_monotonic_increasing)
         first_buy = min(buy for buy, *_ in spans)
-        scan = _between(frame, first_buy - pd.Timedelta(days=ESCAPE_WINDOW_DAYS), None)
+        scan = _between(frame, first_buy - pd.Timedelta(days=ESCAPE_WINDOW_DAYS), None, ordered)
         for run in _runs(scan.dropna(subset=["move"]).reset_index(drop=True)):
             if run["direction"] != "LC" or run["days"] < MIN_LOCK_DAYS:
                 continue
@@ -329,6 +339,7 @@ def circuit_exposure(
         ).df()
     bars["date"] = pd.to_datetime(bars["date"])
     by_symbol = {sym: grp.reset_index(drop=True) for sym, grp in bars.groupby("symbol")}
+    dated = {sym: bool(f["date"].is_monotonic_increasing) for sym, f in by_symbol.items()}
 
     episodes: list[dict] = []
     touched = 0
@@ -338,7 +349,7 @@ def circuit_exposure(
             continue
         buy = pd.Timestamp(period.buy)
         sell = last_day if pd.isna(period.sell) else pd.Timestamp(period.sell)
-        window = _between(frame, buy, sell).dropna(subset=["move"])
+        window = _between(frame, buy, sell, dated[period.symbol]).dropna(subset=["move"])
         runs = _runs(window)
         if runs:
             touched += 1

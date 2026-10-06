@@ -429,14 +429,12 @@ class _Grid:
     about 40% of its run time. This holds the same values as one array plus two label-to-position
     dicts, so `at` is two dict lookups and an index. It returns exactly what `.at` returns (the
     array's own scalar of the frame's dtype), so no result moves; a missing week or column raises
-    KeyError as `.at` does. Labels must be unique, as every table here already is (`.at` on a
-    duplicate returns a Series, which no caller could use)."""
+    KeyError as `.at` does. It needs unique labels (`_grid` falls back to `_FrameGrid` for a table
+    that has repeats, so such a table behaves as it always did)."""
 
     __slots__ = ("cols", "rows", "values")
 
     def __init__(self, frame: pd.DataFrame) -> None:
-        if not (frame.index.is_unique and frame.columns.is_unique):
-            raise ValueError("a simulation table needs unique week and column labels")
         self.values = frame.to_numpy()
         self.rows = {week: i for i, week in enumerate(frame.index)}
         self.cols = {name: j for j, name in enumerate(frame.columns)}
@@ -448,8 +446,29 @@ class _Grid:
         return name in self.cols
 
 
-def _grid(frame: pd.DataFrame | None) -> _Grid | None:
-    return None if frame is None else _Grid(frame)
+class _FrameGrid:
+    """The `_Grid` interface over the DataFrame itself, for a table with a repeated label. A
+    repeated label makes `.at` return a Series, which is only a problem if that label is read, so
+    the table must not be refused up front: an unread duplicate used to be harmless."""
+
+    __slots__ = ("frame",)
+
+    def __init__(self, frame: pd.DataFrame) -> None:
+        self.frame = frame
+
+    def at(self, week: pd.Timestamp, name: str):
+        return self.frame.at[week, name]
+
+    def has(self, name: str) -> bool:
+        return name in self.frame.columns
+
+
+def _grid(frame: pd.DataFrame | None) -> _Grid | _FrameGrid | None:
+    if frame is None:
+        return None
+    if frame.index.is_unique and frame.columns.is_unique:
+        return _Grid(frame)
+    return _FrameGrid(frame)
 
 
 @dataclass
@@ -491,19 +510,19 @@ class _Sim:
     lc_locked: pd.DataFrame | None = None
     # The tables above, read by position (see `_Grid`). Built once, here: nothing replaces a table
     # on a sim after it is made.
-    _prices: _Grid = field(init=False, repr=False)
-    _ranks: _Grid = field(init=False, repr=False)
-    _filter_ret: _Grid = field(init=False, repr=False)
-    _membership: _Grid | None = field(init=False, repr=False)
-    _groups: _Grid | None = field(init=False, repr=False)
-    _no_buy: _Grid | None = field(init=False, repr=False)
-    _uc_locked: _Grid | None = field(init=False, repr=False)
-    _lc_locked: _Grid | None = field(init=False, repr=False)
+    _prices: _Grid | _FrameGrid = field(init=False, repr=False)
+    _ranks: _Grid | _FrameGrid = field(init=False, repr=False)
+    _filter_ret: _Grid | _FrameGrid = field(init=False, repr=False)
+    _membership: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _groups: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _no_buy: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _uc_locked: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _lc_locked: _Grid | _FrameGrid | None = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._prices = _Grid(self.prices)
-        self._ranks = _Grid(self.ranks)
-        self._filter_ret = _Grid(self.filter_ret)
+        self._prices = _grid(self.prices)
+        self._ranks = _grid(self.ranks)
+        self._filter_ret = _grid(self.filter_ret)
         self._membership = _grid(self.membership)
         self._groups = _grid(self.groups)
         self._no_buy = _grid(self.no_buy)

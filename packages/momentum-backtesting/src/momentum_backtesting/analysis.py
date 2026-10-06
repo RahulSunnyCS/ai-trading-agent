@@ -85,8 +85,12 @@ def rotations(result: Result) -> list[dict]:
     weeks, actions, assets = column("week"), column("action"), column("asset")
     ranks, reasons = column("rank"), column("reason")
     held, returns = column("weeks_held"), column("position_return")
-    # sorted() is stable, so rows keep the trade log's order inside a week, as groupby does.
-    rows = sorted(range(n), key=weeks.__getitem__)
+    # A row with no week belongs to no group, as in groupby. The engine writes the log in week
+    # order, so the sort normally has nothing to do; when it does, sorted() is stable, so rows
+    # keep the log's order inside a week, as groupby does.
+    rows = [i for i in range(n) if not pd.isna(weeks[i])]
+    if any(weeks[b] < weeks[a] for a, b in itertools.pairwise(rows)):
+        rows.sort(key=weeks.__getitem__)
     out = []
     for week, members in itertools.groupby(rows, key=weeks.__getitem__):
         idx = list(members)

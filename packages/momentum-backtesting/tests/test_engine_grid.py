@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from momentum_backtesting.engine import CASH, Config, _Grid, _Sim
+from momentum_backtesting.engine import CASH, Config, _FrameGrid, _Grid, _grid, _Sim
 
 NAMES = [f"S{i}" for i in range(14)]
 WEEKS = pd.date_range("2024-01-05", periods=6, freq="W-FRI")
@@ -74,6 +74,11 @@ def random_sim(seed: int, *, defensive: str, gates: bool) -> _Sim:
 
     returns = pd.DataFrame(rng.normal(0, 0.1, (len(WEEKS), len(columns))), WEEKS, columns)
     returns = returns.mask(rng.random(returns.shape) < 0.1)
+    # which group each name counts toward each week: a label, or nothing (NaN)
+    labels = np.full((len(WEEKS), len(NAMES)), np.nan, dtype=object)
+    labels[rng.random(labels.shape) < 0.6] = "grp"
+    labels[rng.random(labels.shape) < 0.3] = "other"
+    groups = pd.DataFrame(labels, WEEKS, NAMES, dtype=object)
     return _Sim(
         prices=pd.DataFrame(100 + rng.random((len(WEEKS), len(columns))), WEEKS, columns),
         ranks=ranks,
@@ -81,6 +86,7 @@ def random_sim(seed: int, *, defensive: str, gates: bool) -> _Sim:
         config=Config(top_n=3, exit_rank=6, defensive=defensive),
         ledger=None,
         tax_classes={},
+        groups=groups if gates else None,
         membership=flags(0.7) if gates else None,
         no_buy=flags(0.3) if gates else None,
         uc_locked=flags(0.2) if gates else None,
@@ -123,6 +129,23 @@ def test_every_cell_reads_the_same_as_at():
     assert not sim.sell_blocked("not-a-column", WEEKS[0])
 
 
+@pytest.mark.parametrize("seed", range(10))
+def test_group_and_filter_reads_match_the_frames(seed):
+    """`passes_filter` and `group` read through the grids too: compare each to the frame itself,
+    not to anything that shares the code under test."""
+    sim = random_sim(seed, defensive="filter", gates=True)
+    for week in WEEKS:
+        for name in NAMES:
+            mine, cash = sim.filter_ret.at[week, name], sim.filter_ret.at[week, CASH]
+            expected = bool(pd.notna(mine) and pd.notna(cash) and mine > cash)
+            assert bool(sim.passes_filter(name, week)) == expected
+            label = sim.groups.at[week, name]
+            assert sim.group(week, name) == (label if isinstance(label, str) else None)
+    assert sim.group(WEEKS[0], "not-a-column") is None
+    plain = random_sim(seed, defensive="ranked", gates=False)  # no groups table at all
+    assert plain.group(WEEKS[0], NAMES[0]) is None
+
+
 def test_a_missing_week_or_column_raises_keyerror_like_at():
     grid = _Grid(pd.DataFrame([[1.0]], index=WEEKS[:1], columns=["A"]))
     assert grid.at(WEEKS[0], "A") == 1.0
@@ -132,7 +155,24 @@ def test_a_missing_week_or_column_raises_keyerror_like_at():
         grid.at(WEEKS[0], "B")
 
 
-def test_duplicate_labels_are_refused_rather_than_read_wrongly():
-    twice = pd.DataFrame([[1.0, 2.0]], index=WEEKS[:1], columns=["A", "A"])
-    with pytest.raises(ValueError):
-        _Grid(twice)
+def test_a_table_with_a_repeated_label_still_builds_and_reads_as_it_always_did():
+    """A repeated label only matters if it is read, so such a table must not stop a run up front
+    (it falls back to reading the DataFrame itself)."""
+    frame = pd.DataFrame([[1.0, 2.0, 3.0]], index=WEEKS[:1], columns=["A", "B", "B"])
+    assert isinstance(_grid(frame), _FrameGrid)
+    assert isinstance(_grid(frame[["A", "B"]].iloc[:, :2]), _Grid)
+    grid = _grid(frame)
+    assert grid.at(WEEKS[0], "A") == frame.at[WEEKS[0], "A"] == 1.0  # a unique label reads fine
+    assert grid.has("B") and not grid.has("C")
+    assert isinstance(grid.at(WEEKS[0], "B"), pd.Series)  # the repeated one: a Series, as `.at`
+    sim = random_sim(3, defensive="ranked", gates=False)
+    dup_prices = pd.concat([sim.prices, sim.prices[[NAMES[0]]]], axis=1)  # a repeated column
+    built = _Sim(
+        prices=dup_prices,
+        ranks=sim.ranks,
+        filter_ret=sim.filter_ret,
+        config=sim.config,
+        ledger=None,
+        tax_classes={},
+    )
+    assert built.price(NAMES[1], WEEKS[2]) == sim.prices.at[WEEKS[2], NAMES[1]]

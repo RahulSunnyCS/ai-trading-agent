@@ -90,6 +90,35 @@ def test_rotations_are_what_they_always_were(settings, seed):
         assert [h["asset"] for h in a["holdings"]] == [h["asset"] for h in b["holdings"]]
 
 
+def _result(seed: int = 4):
+    frame = prices(seed)
+    return run_backtest(
+        frame,
+        includes(frame),
+        Config(lookbacks=(4, 13), start="2018-01-01", portfolio="buffer", top_n=3, exit_rank=5),
+    )
+
+
+def test_a_trade_log_out_of_week_order_gives_the_same_rotations():
+    """The engine writes the log in week order, but nothing requires it."""
+    result = _result()
+    result.trades = result.trades.sample(frac=1, random_state=3)  # rows in any order
+    new, old = analysis.rotations(result), reference_rotations(result)
+    assert analysis._clean(new) == analysis._clean(old)
+    assert [r["week"] for r in new] == sorted(r["week"] for r in new)
+
+
+def test_a_row_with_no_week_is_left_out_as_groupby_left_it_out():
+    result = _result()
+    trades = result.trades.copy()
+    trades.loc[trades.index[5], "week"] = pd.NaT
+    trades.loc[trades.index[40], "week"] = pd.NaT
+    result.trades = trades
+    new, old = analysis.rotations(result), reference_rotations(result)
+    assert analysis._clean(new) == analysis._clean(old)
+    assert all(r["week"] is not pd.NaT for r in new)
+
+
 def test_a_run_that_never_sells_has_rotations_without_the_sell_columns():
     frame = prices(5).iloc[:40]
     result = run_backtest(
