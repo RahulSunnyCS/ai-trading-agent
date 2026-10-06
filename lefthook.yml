@@ -89,11 +89,17 @@ pre-push:
 
     shared-packages:
       run: |
-        for pkg in market-reference broker-identity; do
+        for pkg in market-reference broker-identity notify; do
           if git diff --name-only origin/main...HEAD | grep -q "^packages/$pkg/"; then
             (cd "packages/$pkg" && bun run test) || exit 1
           fi
         done
+
+    scheduler-unit:
+      run: |
+        if git diff --name-only origin/main...HEAD | grep -qE '^(apps/scheduler|packages/market-reference)/'; then
+          (cd apps/scheduler && bun run test && bun run typecheck)
+        fi
 
     dashboard-unit:
       run: |

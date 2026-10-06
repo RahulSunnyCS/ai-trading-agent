@@ -13,7 +13,8 @@ to its backlog file; the plan detail stays here (one fact, one file).
 |---|---|
 | `INDEX.md` | The table of every item — ID, title, priority, status, type, area. Always kept in sync with the item files |
 | `BL-NNN-short-slug.md` | One item: context, plan in phases, open questions, log |
-| `_TEMPLATE.md` | Copy this for a new item |
+| `_TEMPLATE.md` | Copy this for a new item. `research` items fill in its Phase 0 — Pre-register before any run |
+| `_EXPERIMENT.md` | The pre-registration block for a single test, pasted into the parent item's `## Experiments` section |
 
 IDs are sequential and never reused (`BL-001`, `BL-002`, …), even for dropped items.
 
@@ -41,7 +42,8 @@ Do **not** start coding straight away:
 
 Claude assigns it unless the owner states one. Judged against this project's
 goals (research-grade evidence on Indian weekly options/momentum strategies,
-nothing trades live until the signal is measured, commercial SaaS billing).
+finishing Momentum for real money, an options/momentum research workbench,
+nothing trades live until the signal is measured — see `.claude/project/overview.md`).
 
 | Priority | Meaning |
 |---|---|

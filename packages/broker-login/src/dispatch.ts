@@ -85,7 +85,7 @@ async function main(): Promise<number> {
 
   const message = `🚨 Broker login was not triggered\nLaptop scheduler, ${istTimestamp()} IST\n${describe(lastError)}\nStart "Daily broker login" by hand from GitHub Actions.`;
   console.error(message);
-  await sendText(readTelegramConfig(), message).catch(() => undefined);
+  await sendText(readTelegramConfig(), message, 'broker.algotest').catch(() => undefined);
   return 1;
 }
 

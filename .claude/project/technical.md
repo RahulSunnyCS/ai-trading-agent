@@ -71,6 +71,10 @@ bun run --filter '*' typecheck     # packages only — NOT the root app
 (cd packages/broker-login   && bun run typecheck)
 (cd packages/contract-notes && bun run test)   # Jest; needs Node 20 on PATH
 
+# Scheduler service (BL-012) — apps/scheduler; see its CLAUDE.md
+bun run --filter @ata/scheduler jobs status    # every job: schedule, last run, next run
+bun run --filter @ata/scheduler jobs run <id>  # run one job now
+
 # Laptop scheduler (launchd) — see deploy/launchd/README.md
 deploy/launchd/install.sh    # (re)install every job in deploy/launchd/jobs/
 deploy/launchd/uninstall.sh
@@ -163,6 +167,7 @@ rule below.
 | `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below); since 2026-09-30 those CSVs are EXPORTED from `trading-data`'s catalog (`tdata reference export`), which is the master | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
 | `packages/trading-data` | Python/uv: the local research database — DuckDB catalog (instruments, reference data, ingest runs, strategies, backtest results, companies/corporate actions/index+category membership, momentum's cross-instrument price series) + Parquet lake (`bars_1m_*`, `bars_1d_stock`) + raw vendor copies under `TRADING_DATA_ROOT`; `tdata init/status/backup/reference` | `db.connect`, `lake.*` paths/writers and the bars_1m schemas, `instruments.register`, `ingest.start_run/finish_run`, `reference.export_csvs/check` | `packages/option-backtesting` and `packages/momentum-backtesting` (both editable path dependencies) |
 | `apps/server` (`@ata/server`) | Fastify/Bun trading backend | — | `apps/dashboard` (HTTP only) |
+| `apps/scheduler` (`@ata/scheduler`) | Runs every recurring job (BL-012): registry, IST schedules, runner, SQLite run history | — | none — leaf; runs the other packages' CLIs as child processes |
 | `apps/dashboard` (`@ata/dashboard`) | Next.js/React frontend | — | none — leaf; talks to `apps/server` over HTTP only, imports no internal package |
 
 **The one filesystem-level (non-import) cross-package link, easy to miss:**
@@ -178,7 +183,7 @@ those CSVs.
 
 ## Repository Structure
 
-A Bun-workspaces monorepo: two apps — `apps/server` (Fastify/Bun backend) and `apps/dashboard` (Next.js/React frontend) — and eight packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The other three, `packages/option-backtesting`, `packages/momentum-backtesting` and `packages/trading-data` (the shared local research database both backtesting packages use), are Python/uv and not Bun workspace members. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
+A Bun-workspaces monorepo: three apps — `apps/server` (Fastify/Bun backend), `apps/dashboard` (Next.js/React frontend) and `apps/scheduler` (recurring jobs, BL-012) — and eight packages. Five are Bun/TypeScript workspace members: `packages/notify`, `packages/market-reference`, and `packages/broker-identity` (small, dependency-thin shared libraries imported by the apps and/or the other packages), plus `packages/broker-login` and `packages/contract-notes` (both Node 20, each with its own CI workflow — see below). The other three, `packages/option-backtesting`, `packages/momentum-backtesting` and `packages/trading-data` (the shared local research database both backtesting packages use), are Python/uv and not Bun workspace members. Shared config (biome, lefthook, docker-compose, CI) stays at the repo root.
 
 ```
 ai-trading-agent/
@@ -476,8 +481,10 @@ Critical variables whose misconfiguration causes real pain:
 | `UPSTREAM_ACCESS_CLIENT_ID` / `UPSTREAM_ACCESS_CLIENT_SECRET` | Cloudflare Access service token the dashboard's Next server adds to `/api/*` requests it forwards to the tunnel hostnames; client-supplied copies are always stripped. Set both or neither: one without the other (or one blank) makes every request 503 rather than letting every API call fail upstream |
 | ~~`MOMENTUM_DATABASE_URL`~~ | **Retired 2026-09-30** (TODO 3.11.5) — `packages/momentum-backtesting`'s price history and weekly signals now live in the shared `momentum_prices`/`momentum_signals` tables (`TRADING_DATA_ROOT`), not a separate Neon Postgres. `DATABASE_URL` (unrelated, still live) is what momentum's `fyers.py` reads for `broker_tokens` |
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after the dashboard token and `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
+| `NOTIFY_PREFS_FILE` | Optional override for the notification preferences file (default `~/.config/ai-trading-agent/notifications.json`, `{"disabled": [type, ...]}`) that `@trading/notify` and both Python `notify.py` copies read before every Telegram send (BL-012). Missing or broken = everything on |
 | `TRADING_DATA_ROOT` | The local research database (`packages/trading-data`): `catalog.duckdb` + the Parquet `lake/` + gzipped `raw/` vendor responses. Default `~/TradingData`. On the owner's laptop it is `/Volumes/TradingData`, an APFS disk image on the external SSD (BL-034: ~110k day files would cost 2×256 KiB each on ExFAT). Every process refuses a root on a `/Volumes/<name>` that is not mounted (`trading_data.db.check_mounted`) rather than writing elsewhere; `tdata mount` attaches it. `obt`, `obt-api` and `obt-mcp` load the repo `.env` at start, `mbt` already did; `tdata` reads the environment only. Replaced `FYERS_DATA_DIR` (2026-09-30). The Fyers 1-minute data in it cannot be re-downloaded once contracts expire — back it up monthly with `tdata backup --to <disk>` |
 | `TRADING_DATA_IMAGE` | Path of the disk image `tdata mount` attaches (and the `trading-data-mount` LaunchAgent at login / when a volume appears). Must be double-quoted in `.env`: the launchd jobs `source` it with bash and the SSD's name contains an apostrophe and a space |
+| `SCHEDULER_STATE_DIR` / `SCHEDULER_LOG_DIR` | `apps/scheduler`'s run history (`scheduler.db`) and per-job logs. Defaults `~/Library/Application Support/ai-trading-agent` and `~/Library/Logs/ai-trading-agent` |
 | `BACKTEST_DATA_DIR` | Optional override for where the FastAPI/MCP service reads its Parquet bar cache (`<dir>/cache`). Defaults to `packages/option-backtesting`'s own `data/` when unset. The run registry no longer lives under this — it's in the shared `trading_data` catalog, rooted at `TRADING_DATA_ROOT` |
 
 ## Common Tasks

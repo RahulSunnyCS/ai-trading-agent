@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — protects every future result from the problems BL-010 had to undo after the fact |
-| **Status** | Ready |
+| **Status** | In progress |
 | **Type** | chore |
 | **Area** | cross-cutting |
 | **Created** | 2026-10-06 |
 | **Depends on** | none (BL-010 is the worked example) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.17 |
 
 ## Context
 
@@ -57,8 +57,14 @@ and any deviation is written down with a reason.
 1. ~~Editable after a run, or replaced by a new dated rule?~~ **Replaced only** (owner took the
    recommendation, 2026-10-06): a rule is never edited after a run; a new, dated rule supersedes
    it with a logged reason, and both stay in the file.
+2. ~~Where does a filled-in single experiment live?~~ **Inside the parent BL item**, in a dated
+   `## Experiments` section (owner, 2026-10-06). `_EXPERIMENT.md` is only the block to paste.
 
 ## Log
 
 - 2026-10-06 — created from the process review.
 - 2026-10-06 — owner decisions on PR #27: recommendation taken; status Ready.
+- 2026-10-06 — started; owner answered question 2. Built: Phase 0 — Pre-register in
+  `_TEMPLATE.md`, `_EXPERIMENT.md`, both listed in `README.md`, and the research-gate paragraph
+  in root `CLAUDE.md`. Phase 2 done. Phase 1 stays open until the next research item is
+  created from the template.

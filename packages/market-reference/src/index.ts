@@ -9,5 +9,5 @@
  * a single year, and a number that was right last quarter is a wrong answer
  * dressed up as a constant.
  */
-export { lotSize, strikeStep } from './loader.js';
+export { isHoliday, isTradingDay, lotSize, strikeStep } from './loader.js';
 export type { Underlying } from './loader.js';
