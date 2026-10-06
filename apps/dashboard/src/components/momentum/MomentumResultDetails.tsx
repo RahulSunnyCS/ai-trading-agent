@@ -1,8 +1,9 @@
 'use client';
 
 import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, Download } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 
+import { type RunSection, useRunSection } from '../../hooks/useRunSection';
 import { cn } from '../../lib/cn';
 import { downloadCsv } from '../../lib/csv';
 import {
@@ -17,13 +18,14 @@ import {
 } from '../../lib/format';
 import { describeConfig, hindsightWarning } from '../../lib/momentumConfig';
 import { type DetailsTab, useMomentumViewStore } from '../../store/momentumView';
-import type { MomentumResult, MomentumSavedRun } from '../../types/momentum';
+import type { MomentumLatest, MomentumResult, MomentumSavedRun } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input } from '../ui/Input';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { SkeletonRows } from '../ui/Skeleton';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { TabPanel, Tabs } from '../ui/Tabs';
 import { MomentumCompare } from './MomentumCompare';
@@ -217,7 +219,7 @@ function DataTable({
 }
 
 function signalReason(
-  row: MomentumResult['latest']['rows'][number],
+  row: MomentumLatest['rows'][number],
   config: Record<string, unknown>,
 ): string {
   const action = row.action || '';
@@ -423,12 +425,166 @@ export function MomentumPerformanceCard({
  * is always there; a panel opens when its tab is clicked and closes when it is clicked again.
  * The open tab (none by default) is remembered in this browser.
  */
+/** A heavy section of the run while it loads, if it fails, and once it is here (BL-005). */
+function Loaded<T>({
+  section,
+  label,
+  children,
+}: {
+  section: RunSection<T>;
+  label: string;
+  children: (data: T) => ReactNode;
+}) {
+  if (section.error) {
+    return (
+      <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-muted">
+        <span>
+          Could not load {label}. {section.error}
+        </span>
+        <Button size="sm" onClick={section.retry}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+  if (section.data === undefined) return section.loading ? <SkeletonRows rows={6} /> : null;
+  if (section.data === null) return null;
+  return <>{children(section.data)}</>;
+}
+
+function WeekPanel({
+  runId,
+  result,
+  config,
+}: {
+  runId: string;
+  result: MomentumResult;
+  config: Record<string, unknown>;
+}) {
+  const latest = useRunSection(runId, 'latest');
+  const instruments = useRunSection(runId, 'instruments');
+  return (
+    <>
+      <Loaded section={latest} label="this week's signals">
+        {(week) => (
+          <ResultSection title={`Signals · ${formatDay(week.week)}`} description={week.explain}>
+            <SignalsTable
+              rows={week.rows.map((row) => ({ ...row, reason: signalReason(row, config) }))}
+            />
+          </ResultSection>
+        )}
+      </Loaded>
+      {result.held_categories?.length ? (
+        <ResultSection
+          title="Held categories"
+          description="Fresh selections and positions still held through the exit buffer"
+        >
+          <DataTable
+            rows={result.held_categories.map((row) => ({
+              ...row,
+              picks: row.picks.join(', '),
+            }))}
+            columns={[
+              ['position', '#'],
+              ['status', 'Status'],
+              ['category', 'Category'],
+              ['picks', 'Stock picks'],
+            ]}
+          />
+        </ResultSection>
+      ) : null}
+      <ResultSection title="Open positions">
+        <DataTable
+          rows={result.open_positions}
+          columns={[
+            ['asset', 'Asset'],
+            ['entry_week', 'Since'],
+            ['weeks_held', 'Weeks'],
+            ['rank', 'Rank'],
+            ['position_return', 'Return'],
+            ['value', 'Value'],
+            ['pnl', 'P&L'],
+          ]}
+          csvName="momentum-open-positions"
+        />
+      </ResultSection>
+      <ResultSection
+        title="Instrument attribution"
+        description="How each instrument contributed across the whole run"
+      >
+        <Loaded section={instruments} label="instrument attribution">
+          {(rows) => (
+            <DataTable rows={rows} columns={COLUMNS.holdings} csvName="momentum-instruments" />
+          )}
+        </Loaded>
+      </ResultSection>
+    </>
+  );
+}
+
+function TradesPanel({
+  runId,
+  filter,
+  onFilter,
+}: {
+  runId: string;
+  filter: string;
+  onFilter: (value: string) => void;
+}) {
+  const trades = useRunSection(runId, 'trades');
+  return (
+    <ResultSection
+      title="Closed trades"
+      description="Position returns include all purchases and top ups"
+      actions={
+        <Input
+          type="search"
+          aria-label="Filter trades"
+          placeholder="Filter asset or reason…"
+          value={filter}
+          onChange={(event) => onFilter(event.target.value)}
+          className="w-auto"
+        />
+      }
+    >
+      <Loaded section={trades} label="the trades">
+        {(rows) => (
+          <DataTable
+            rows={rows.filter((trade) =>
+              `${trade.asset ?? ''} ${trade.reason ?? ''}`
+                .toLowerCase()
+                .includes(filter.toLowerCase()),
+            )}
+            columns={COLUMNS.trades}
+            csvName="momentum-trades"
+          />
+        )}
+      </Loaded>
+    </ResultSection>
+  );
+}
+
+function TimelinePanel({ runId, result }: { runId: string; result: MomentumResult }) {
+  const timeline = useRunSection(runId, 'timeline');
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <Loaded section={timeline} label="the holdings timeline">
+        {(rows) => <MomentumTimelineChart rows={rows} />}
+      </Loaded>
+      <MomentumHoldingsSplit positions={result.open_positions} />
+    </div>
+  );
+}
+
 export function MomentumResultDetails({
+  runId,
   result,
   config,
   savedRuns = [],
   flashKey = null,
 }: {
+  /** The run the result belongs to: the heavy sections are fetched from it as tabs open. */
+  runId: string;
   result: MomentumResult;
   config: Record<string, unknown>;
   savedRuns?: MomentumSavedRun[];
@@ -439,13 +595,6 @@ export function MomentumResultDetails({
   const setPanel = useMomentumViewStore((state) => state.setDetailsTab);
   const [returnsView, setReturnsView] = useState<ReturnsView>('chart');
   const [tradeFilter, setTradeFilter] = useState('');
-  const trades = result.trades.filter((trade) =>
-    `${trade.asset ?? ''} ${trade.reason ?? ''}`.toLowerCase().includes(tradeFilter.toLowerCase()),
-  );
-  const signalRows = result.latest.rows.map((row) => ({
-    ...row,
-    reason: signalReason(row, config),
-  }));
   const [returnsTitle, returnsDescription] = RETURNS_COPY[returnsView];
 
   return (
@@ -499,87 +648,13 @@ export function MomentumResultDetails({
               </ResultSection>
             ) : null}
 
-            {panel === 'week' ? (
-              <>
-                <ResultSection
-                  title={`Signals · ${formatDay(result.latest.week)}`}
-                  description={result.latest.explain}
-                >
-                  <SignalsTable rows={signalRows} />
-                </ResultSection>
-                {result.held_categories?.length ? (
-                  <ResultSection
-                    title="Held categories"
-                    description="Fresh selections and positions still held through the exit buffer"
-                  >
-                    <DataTable
-                      rows={result.held_categories.map((row) => ({
-                        ...row,
-                        picks: row.picks.join(', '),
-                      }))}
-                      columns={[
-                        ['position', '#'],
-                        ['status', 'Status'],
-                        ['category', 'Category'],
-                        ['picks', 'Stock picks'],
-                      ]}
-                    />
-                  </ResultSection>
-                ) : null}
-                <ResultSection title="Open positions">
-                  <DataTable
-                    rows={result.open_positions}
-                    columns={[
-                      ['asset', 'Asset'],
-                      ['entry_week', 'Since'],
-                      ['weeks_held', 'Weeks'],
-                      ['rank', 'Rank'],
-                      ['position_return', 'Return'],
-                      ['value', 'Value'],
-                      ['pnl', 'P&L'],
-                    ]}
-                    csvName="momentum-open-positions"
-                  />
-                </ResultSection>
-                <ResultSection
-                  title="Instrument attribution"
-                  description="How each instrument contributed across the whole run"
-                >
-                  <DataTable
-                    rows={result.instruments}
-                    columns={COLUMNS.holdings}
-                    csvName="momentum-instruments"
-                  />
-                </ResultSection>
-              </>
-            ) : null}
+            {panel === 'week' ? <WeekPanel runId={runId} result={result} config={config} /> : null}
 
             {panel === 'trades' ? (
-              <ResultSection
-                title="Closed trades"
-                description="Position returns include all purchases and top ups"
-                actions={
-                  <Input
-                    type="search"
-                    aria-label="Filter trades"
-                    placeholder="Filter asset or reason…"
-                    value={tradeFilter}
-                    onChange={(event) => setTradeFilter(event.target.value)}
-                    className="w-auto"
-                  />
-                }
-              >
-                <DataTable rows={trades} columns={COLUMNS.trades} csvName="momentum-trades" />
-              </ResultSection>
+              <TradesPanel runId={runId} filter={tradeFilter} onFilter={setTradeFilter} />
             ) : null}
 
-            {panel === 'split' ? (
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <MomentumTimelineChart rows={result.timeline} />
-                <MomentumHoldingsSplit positions={result.open_positions} />
-              </div>
-            ) : null}
-
+            {panel === 'split' ? <TimelinePanel runId={runId} result={result} /> : null}
             {panel === 'risk' ? (
               <ResultSection
                 title="Worst benchmark falls"

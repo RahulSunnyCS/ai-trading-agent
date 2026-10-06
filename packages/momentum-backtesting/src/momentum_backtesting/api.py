@@ -63,6 +63,7 @@ from .engine import (
 )
 from .fetch import load_universe
 from .notify import IST, Notification
+from .run_parts import RunParts, SectionReleased
 from .stocks import ui_data
 from .stocks.ui_data import (
     NIFTY50_EQUAL_WEIGHT_TRI,
@@ -142,6 +143,8 @@ class _Data:
         self.result_cache: OrderedDict = OrderedDict()
 
     RESULT_CACHE_SIZE = 8
+    #: Of those, how many keep sections they have not built yet (see `store_result`).
+    LIVE_RESULTS = 4
 
     def reset(self) -> None:
         """Drop EVERYTHING this process has cached - rankings, trade-price tables, the loaded
@@ -167,21 +170,37 @@ class _Data:
             self.momentum_universe_cache = None
             self._references_mtimes = None
             self.references_cache = None
+            forgotten = list(self.result_cache.values())
             self.result_cache.clear()
+        for old in forgotten:  # outside the lock: releasing may wait for a build in progress
+            old.release()
 
-    def cached_result(self, key: tuple) -> tuple[dict, str] | None:
-        """(payload, computed_at) for an identical earlier request on the same inputs."""
+    def cached_result(self, key: tuple) -> RunParts | None:
+        """The result of an identical earlier request on the same inputs."""
         with self._lock:
             hit = self.result_cache.get(key)
             if hit is not None:
                 self.result_cache.move_to_end(key)
             return hit
 
-    def store_result(self, key: tuple, payload: dict, computed_at: str) -> None:
+    def store_result(self, key: tuple, parts: RunParts) -> None:
+        """Keep the run. Only the newest `LIVE_RESULTS` keep their unbuilt sections: those hold
+        the run's frames and, for Broad, its whole ranking, which `broad_ranking_cache` otherwise
+        caps at 4. An older run that still has sections it can no longer build is no use as a
+        cache hit, so it is dropped; one whose sections are all built is only data and stays."""
         with self._lock:
-            self.result_cache[key] = (payload, computed_at)
+            self.result_cache[key] = parts
+            self.result_cache.move_to_end(key)
+            dropped = []
             while len(self.result_cache) > self.RESULT_CACHE_SIZE:
-                self.result_cache.popitem(last=False)
+                dropped.append(self.result_cache.popitem(last=False)[1])
+            older = list(self.result_cache.values())[: -self.LIVE_RESULTS]
+        # Outside the lock: releasing waits for a section that is being built right now.
+        for old in [*dropped, *older]:
+            old.release()
+        with self._lock:
+            for stale in [k for k, p in self.result_cache.items() if not p.complete]:
+                del self.result_cache[stale]
 
     def get(self) -> pd.DataFrame:
         """Prefers the shared local database (`packages/trading-data`, populated by `mbt
@@ -504,6 +523,10 @@ def input_version() -> tuple:
 def request_key(req: BaseModel) -> str:
     """The request as canonical JSON: field order never matters, `fresh` is not a setting."""
     return json.dumps(req.model_dump(mode="json", exclude={"fresh"}), sort_keys=True)
+
+
+#: The parts of a finished backtest fetched on their own (run_parts.RunParts).
+BacktestSection = Literal["trades", "instruments", "timeline", "latest", "circuit_exposure"]
 
 
 class BacktestRequest(BaseModel):
@@ -928,7 +951,20 @@ def _stock_meta() -> dict:
     }
 
 
+#: What a dataset's backtest builds: (everything needed at once, {section: builder}). See
+#: run_parts.RunParts, and `_full` for the one dict the synchronous callers want.
+Parts = tuple[dict, dict[str, Callable[[], object]]]
+
+
+def _full(core: dict, lazy: dict[str, Callable[[], object]]) -> dict:
+    return {**core, **{name: build() for name, build in lazy.items()}}
+
+
 def _etf_backtest(req: BacktestRequest) -> dict:
+    return _full(*_etf_parts(req))
+
+
+def _etf_parts(req: BacktestRequest) -> Parts:
     prices = DATA.get()
     universe = {inst.name: inst for inst in load_universe()}
     includes = {name: inst.include for name, inst in universe.items()}
@@ -980,7 +1016,7 @@ def _etf_backtest(req: BacktestRequest) -> dict:
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
     groups = {name: inst.group for name, inst in universe.items()}
-    return analysis.payload(
+    return analysis.payload_parts(
         result,
         prices,
         config,
@@ -993,6 +1029,10 @@ def _etf_backtest(req: BacktestRequest) -> dict:
 
 
 def _stock_backtest(req: BacktestRequest) -> dict:
+    return _full(*_stock_parts(req))
+
+
+def _stock_parts(req: BacktestRequest) -> Parts:
     stock = DATA.get_stock()
     classification = _stock_classification(stock)
     includes = {cid: include for cid, (include, _group) in classification.items()}
@@ -1034,7 +1074,7 @@ def _stock_backtest(req: BacktestRequest) -> dict:
         raise HTTPException(422, str(error)) from None
     groups = dict.fromkeys(stock.companies, "Nifty 50")
     groups.update({name: extra["group"] for name, extra in stock.extra_instruments.items()})
-    payload = analysis.payload(
+    core, lazy = analysis.payload_parts(
         result,
         stock.prices,
         config,
@@ -1042,8 +1082,8 @@ def _stock_backtest(req: BacktestRequest) -> dict:
         membership=stock.membership,
         references=DATA.references(),
     )
-    payload["companies"] = stock.companies
-    return payload
+    core["companies"] = stock.companies
+    return core, lazy
 
 
 def _custom_index_meta() -> dict:
@@ -1257,6 +1297,10 @@ def _inner_category_detail(universe_result: AllCategoriesResult, result: Result)
 
 
 def _custom_index_backtest(req: BacktestRequest) -> dict:
+    return _full(*_custom_index_parts(req))
+
+
+def _custom_index_parts(req: BacktestRequest) -> Parts:
     if not (
         db_read.has_category_data()
         or (DATA_DIR / "categories" / "category_membership.csv").exists()
@@ -1329,16 +1373,18 @@ def _custom_index_backtest(req: BacktestRequest) -> dict:
         name: _CATEGORY_LABEL_INFO.get(label, ("core", "Custom"))[1]
         for name, label in universe_result.labels.items()
     }
-    payload = analysis.payload(result, prices, config, groups, references=DATA.references())
+    core, lazy = analysis.payload_parts(
+        result, prices, config, groups, references=DATA.references()
+    )
     if universe_result.skipped:
         # Surfaced for transparency (e.g. so the UI/report can note "N categories excluded this
         # run and why") - never fatal on its own, matching every other module in categories/'s
         # degrade-gracefully philosophy.
-        payload["skipped_categories"] = sorted(universe_result.skipped)
+        core["skipped_categories"] = sorted(universe_result.skipped)
     inner_detail = _inner_category_detail(universe_result, result)
     if inner_detail:
-        payload["inner_categories"] = inner_detail
-    return payload
+        core["inner_categories"] = inner_detail
+    return core, lazy
 
 
 def _membership_quality() -> dict:
@@ -1589,10 +1635,15 @@ def _run_broad(
 
 
 def _circuit_realism(
-    req: BacktestRequest, ranking: broad.UniverseRanking, outcome: broad.BroadBacktestResult
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outcome: broad.BroadBacktestResult,
+    outer_prices: pd.DataFrame,
 ) -> dict:
     """The same run with circuit locks ignored and with them respected, so the cost of locks is
-    visible whichever way this run was set. Costs one extra engine pass (ranking is cached)."""
+    visible whichever way this run was set. Costs one extra engine pass (ranking is cached).
+    `outer_prices` is what the run itself used: this can be asked for after the run, when newer
+    data may have been loaded."""
 
     def summary(result: Result) -> dict:
         equity = result.equity
@@ -1606,7 +1657,7 @@ def _circuit_realism(
     other = _run_broad(
         req.model_copy(update={"broad_respect_circuits": not req.broad_respect_circuits}),
         ranking,
-        DATA.get(),
+        outer_prices,
     )
     this_run, alternative = summary(outcome.result), summary(other.result)
     ignoring, respecting = (
@@ -1660,6 +1711,10 @@ def _broad_ranking(req: BacktestRequest) -> broad.UniverseRanking:
 
 
 def _broad_backtest(req: BacktestRequest) -> dict:
+    return _full(*_broad_parts(req))
+
+
+def _broad_parts(req: BacktestRequest) -> Parts:
     on = req.broad_category_mode == "on"
     if on and req.broad_category_top_n > req.broad_category_exit_rank:
         raise HTTPException(422, "Category top N can't be greater than the category exit rank.")
@@ -1677,7 +1732,8 @@ def _broad_backtest(req: BacktestRequest) -> dict:
 
     try:
         ranking = _broad_ranking(req)
-        outcome = _run_broad(req, ranking, DATA.get())
+        outer_prices = DATA.get()
+        outcome = _run_broad(req, ranking, outer_prices)
         DATA.trim_cache()
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
@@ -1688,7 +1744,7 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
-    payload = analysis.payload(
+    core, lazy = analysis.payload_parts(
         result,
         prices,
         result.config,
@@ -1705,38 +1761,51 @@ def _broad_backtest(req: BacktestRequest) -> dict:
         if on
         else {}
     )
-    payload["held_categories"] = broad.current_holdings_detail(
+    core["held_categories"] = broad.current_holdings_detail(
         outcome,
         group_members,
         category_top_n=req.broad_category_top_n,
         picks_per_category=req.broad_picks_per_category,
     )
-    payload["missing_symbols"] = outcome.ranking.missing_symbols
-    # Fill blank exit ranks and say WHY a holding was sold when it simply stopped being ranked
-    # (liquidity gate, left the pool, lost its category). Display-only; never fails the run.
-    with contextlib.suppress(Exception):
-        exit_reasons_mod.explain_exits(
-            payload["trades"],
-            ranking=outcome.ranking,
-            held_by_week=outcome.held_by_week,
-            group_members=group_members,
-            signal_delay=req.signal_delay,
-            pool_exit_rank=req.broad_pool_exit_rank,
-            picks_per_category=req.broad_picks_per_category,
-            liquidity_cfg=_liquidity_config(req),
-        )
-    # Display-only "worst LC/UC you'd have walked into" card; never allowed to fail the run.
-    try:
-        payload["circuit_exposure"] = circuit_exposure_mod.circuit_exposure(
-            result, outcome.ranking.column_to_base_symbol
-        )
-    except Exception:  # noqa: BLE001
-        payload["circuit_exposure"] = None
-    if payload["circuit_exposure"] is not None:
-        # The comparison is optional: if its second run fails, keep the rest of the card.
+    core["missing_symbols"] = outcome.ranking.missing_symbols
+    base_trades = lazy["trades"]
+
+    def trades() -> object:
+        rows = base_trades()
+        # Fill blank exit ranks and say WHY a holding was sold when it simply stopped being
+        # ranked (liquidity gate, left the pool, lost its category). Display-only; never fails
+        # the run.
         with contextlib.suppress(Exception):
-            payload["circuit_exposure"]["realism"] = _circuit_realism(req, ranking, outcome)
-    return payload
+            exit_reasons_mod.explain_exits(
+                rows,
+                ranking=outcome.ranking,
+                held_by_week=outcome.held_by_week,
+                group_members=group_members,
+                signal_delay=req.signal_delay,
+                pool_exit_rank=req.broad_pool_exit_rank,
+                picks_per_category=req.broad_picks_per_category,
+                liquidity_cfg=_liquidity_config(req),
+            )
+        return rows
+
+    def circuit_exposure() -> object:
+        # Display-only "worst LC/UC you'd have walked into" card; never allowed to fail the run.
+        # Built when the card is opened, so it reads the daily bars (and the lock masks the
+        # opposite-setting run needs) from the database as they are THEN: only the weekly prices
+        # are held from the run. A Friday ingest in between can therefore move it slightly.
+        try:
+            exposure = circuit_exposure_mod.circuit_exposure(
+                result, outcome.ranking.column_to_base_symbol
+            )
+        except Exception:  # noqa: BLE001
+            return None
+        if exposure is not None:
+            # The comparison is optional: if its second run fails, keep the rest of the card.
+            with contextlib.suppress(Exception):
+                exposure["realism"] = _circuit_realism(req, ranking, outcome, outer_prices)
+        return exposure
+
+    return core, {**lazy, "trades": trades, "circuit_exposure": circuit_exposure}
 
 
 def _outer_with_sentinel(week: pd.Timestamp, sentinel: pd.Timestamp) -> pd.DataFrame:
@@ -2424,6 +2493,9 @@ class _BacktestJobs:
 
     MAX_CONCURRENT = 3
     MAX_KEPT = 30
+    #: Finished jobs whose sections can still be fetched. A run's builders keep its result and
+    #: price frames alive, so only the newest few do; older jobs keep their core result.
+    MAX_PARTS = 4
 
     def __init__(self) -> None:
         self._cond = threading.Condition()
@@ -2431,10 +2503,11 @@ class _BacktestJobs:
         self._active = 0
         self._fresh_waiting = 0
         self._fresh_running = False
+        self._finished = 0  # counts finishes, to tell which runs are the newest
 
     @staticmethod
     def _public(job: dict, with_result: bool) -> dict:
-        view = {k: v for k, v in job.items() if k != "result"}
+        view = {k: v for k, v in job.items() if k != "result" and not k.startswith("_")}
         if with_result:
             view["result"] = job["result"]
         return view
@@ -2444,12 +2517,27 @@ class _BacktestJobs:
             job = self._jobs.get(job_id)
             return self._public(job, True) if job is not None else None
 
+    def parts_for(self, job_id: str) -> tuple[str, RunParts | None]:
+        """("ok", parts), or why there are none: "missing" (no such job), the job's own status
+        when it has not finished successfully, or "gone" (finished, but its sections were let
+        go to make room for newer runs)."""
+        with self._cond:
+            job = self._jobs.get(job_id)
+            if job is None:
+                return "missing", None
+            if job["status"] != "done":
+                return job["status"], None
+            parts = job.get("_parts")
+            return ("ok", parts) if parts is not None else ("gone", None)
+
     def list(self) -> list[dict]:
         """Newest first, without the (large) results."""
         with self._cond:
             return [self._public(job, False) for job in reversed(self._jobs.values())]
 
-    def start(self, work: Callable[[], dict], fresh: bool, extra_fields: dict) -> dict:
+    def start(
+        self, work: Callable[[], dict | tuple[dict, RunParts]], fresh: bool, extra_fields: dict
+    ) -> dict:
         with self._cond:
             job = {
                 "id": os.urandom(8).hex(),
@@ -2460,6 +2548,7 @@ class _BacktestJobs:
                 "finished_at": None,
                 "result": None,
                 "error": None,
+                "_parts": None,
                 **extra_fields,
             }
             self._jobs[job["id"]] = job
@@ -2484,7 +2573,12 @@ class _BacktestJobs:
             return self._active == 0
         return self._active < self.MAX_CONCURRENT and self._fresh_waiting == 0
 
-    def _execute(self, job: dict, work: Callable[[], dict], fresh: bool) -> None:
+    def _execute(
+        self,
+        job: dict,
+        work: Callable[[], dict | tuple[dict, RunParts]],
+        fresh: bool,
+    ) -> None:
         with self._cond:
             self._cond.wait_for(lambda: self._can_run(fresh))
             self._active += 1
@@ -2493,18 +2587,34 @@ class _BacktestJobs:
                 self._fresh_running = True
             job["status"] = "running"
             job["compute_started_at"] = datetime.now(IST).isoformat(timespec="seconds")
+        parts = None
         try:
-            result, error = work(), None
+            out = work()
+            result, parts = out if isinstance(out, tuple) else (out, None)
+            error = None
         except Exception as exc:  # the job must always finish, or the UI spins forever
             result, error = None, f"{type(exc).__name__}: {getattr(exc, 'detail', exc)}"
         with self._cond:
             job["status"] = "failed" if error else "done"
-            job["result"], job["error"] = result, error
+            job["result"], job["error"], job["_parts"] = result, error, parts
             job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
+            self._finished += 1
+            job["_finished"] = self._finished
+            self._release_old_parts()
             self._active -= 1
             if fresh:
                 self._fresh_running = False
             self._cond.notify_all()
+
+    def _release_old_parts(self) -> None:
+        """Keep the sections of the `MAX_PARTS` jobs that finished most recently. Ordered by when
+        they finished, not started: a slow run that ends last is the newest."""
+        holders = sorted(
+            (j for j in self._jobs.values() if j.get("_parts") is not None),
+            key=lambda j: j["_finished"],
+        )
+        for job in holders[: max(0, len(holders) - self.MAX_PARTS)]:
+            job["_parts"] = None
 
 
 BACKTEST_JOBS = _BacktestJobs()
@@ -2850,25 +2960,39 @@ def create_app() -> FastAPI:
             universe,
         )
 
-    def _dispatch_backtest(req: BacktestRequest) -> dict:
+    def _dispatch_parts(req: BacktestRequest) -> tuple[RunParts, bool]:
+        """The run for this request (built, or the identical earlier one) and whether it was an
+        earlier one. Nothing heavy beyond the core is built here: see run_parts.RunParts."""
         if req.fresh:
             DATA.reset()
         key = (input_version(), request_key(req))
         hit = DATA.cached_result(key)
         if hit is not None:
-            payload, computed_at = hit
-            return {**payload, "cache": {"hit": True, "computed_at": computed_at}}
-        if req.dataset == "stock":
-            payload = _stock_backtest(req)
-        elif req.dataset == "broad":
-            payload = _broad_backtest(req)
-        elif req.dataset == "custom_index":
-            payload = _custom_index_backtest(req)
-        else:
-            payload = _etf_backtest(req)
-        computed_at = datetime.now(IST).isoformat(timespec="seconds")
-        DATA.store_result(key, payload, computed_at)
-        return {**payload, "cache": {"hit": False, "computed_at": computed_at}}
+            return hit, True
+        builders = {
+            "stock": _stock_parts,
+            "broad": _broad_parts,
+            "custom_index": _custom_index_parts,
+        }
+        core, lazy = builders.get(req.dataset, _etf_parts)(req)
+        parts = RunParts(core, lazy, datetime.now(IST).isoformat(timespec="seconds"))
+        DATA.store_result(key, parts)
+        return parts, False
+
+    def _dispatch_backtest(req: BacktestRequest) -> dict:
+        """The whole result, every section included: what the synchronous endpoint returns."""
+        parts, hit = _dispatch_parts(req)
+        return {**parts.full(), "cache": {"hit": hit, "computed_at": parts.computed_at}}
+
+    def _dispatch_job(req: BacktestRequest) -> tuple[dict, RunParts]:
+        """A job's result is the core plus the names of the sections still to fetch."""
+        parts, hit = _dispatch_parts(req)
+        result = {
+            **parts.core,
+            "cache": {"hit": hit, "computed_at": parts.computed_at},
+            "sections_available": list(parts.names),
+        }
+        return result, parts
 
     @app.post("/api/backtest")
     def backtest(req: BacktestRequest) -> dict:
@@ -2880,7 +3004,7 @@ def create_app() -> FastAPI:
         the page or start more runs. Body validation (422) still happens here, up front; a failure
         during the computation lands in the job's `error`. Returns the job at once."""
         job = BACKTEST_JOBS.start(
-            lambda: _dispatch_backtest(req),
+            lambda: _dispatch_job(req),
             req.fresh,
             {"dataset": req.dataset},
         )
@@ -2896,6 +3020,30 @@ def create_app() -> FastAPI:
         if job is None:
             raise HTTPException(404, "backtest job not found (the service may have restarted)")
         return {"job": job}
+
+    @app.get("/api/backtest/jobs/{job_id}/sections/{section}")
+    def backtest_job_section(job_id: str, section: BacktestSection) -> dict:
+        """One heavy part of a finished job's result (see run_parts.RunParts), built on the
+        first request and kept: the same data the synchronous endpoint puts under that key."""
+        state, parts = BACKTEST_JOBS.parts_for(job_id)
+        if state == "missing":
+            raise HTTPException(404, "backtest job not found (the service may have restarted)")
+        if state == "gone":
+            raise HTTPException(410, "this run's sections were released; run it again to load them")
+        if state == "failed":
+            raise HTTPException(409, "the run failed, so it has no sections")
+        if parts is None:
+            raise HTTPException(
+                409, f"the run is still {state}; its sections exist once it is done"
+            )
+        if not parts.has(section):
+            raise HTTPException(404, f"this run has no {section!r} section")
+        try:
+            return {"section": section, "data": parts.section(section)}
+        except SectionReleased:
+            raise HTTPException(
+                410, "this run's sections were released; run it again to load them"
+            ) from None
 
     @app.get("/api/saved-runs")
     def saved_runs(dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf") -> list[dict]:

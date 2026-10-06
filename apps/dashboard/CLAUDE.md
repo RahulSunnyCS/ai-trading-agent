@@ -61,6 +61,12 @@ needs to be shared with the server, it is currently hand-duplicated in
   duplicated logic before the extraction). Pass `{ intervalMs }` for polling,
   omit it for fetch-once-with-manual-refresh; `{ cache: true }` is in root
   `technical.md`.
+- `src/hooks/useRunSection.ts` — a Momentum background run's result holds the core only; the
+  heavy parts (trades, instruments, timeline, this week's signals, the Broad circuit card) are
+  fetched when the tab or card showing them mounts: `useRunSection(runId, 'trades')` returns
+  `{data, loading, error, retry}`, backed by `loadSection` in `store/momentumRuns.ts`. Render with
+  `Loaded` in `MomentumResultDetails.tsx` (skeleton, error with retry, content) rather than reading
+  `result.trades` directly: it is `undefined` until fetched.
 - `src/lib/api.ts` — the one HTTP client wrapper; route new API calls through
   this rather than a fresh `fetch()` call site.
 - `src/lib/pnl.ts` / `src/lib/format.ts` — shared P&L and number/currency

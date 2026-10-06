@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { useRunSection } from '../../hooks/useRunSection';
 import { cn } from '../../lib/cn';
 import { formatDay, formatInt, formatNumber, formatPct } from '../../lib/format';
 import type {
@@ -13,7 +14,9 @@ import type {
   MomentumCircuitTrapped,
 } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
+import { Shimmer } from '../ui/Skeleton';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { TabPanel, Tabs } from '../ui/Tabs';
 
@@ -341,4 +344,41 @@ export function MomentumCircuitExposureCard({
       </div>
     </Card>
   );
+}
+
+/**
+ * The same card for a background run, whose circuit data is a section fetched once the result
+ * has landed (it costs a second engine run to build, BL-005): a placeholder while it is on its
+ * way, the card when it is here, nothing for runs that have none (every dataset but Broad).
+ */
+export function MomentumCircuitExposureLoader({ runId }: { runId: string }) {
+  const section = useRunSection(runId, 'circuit_exposure');
+  if (section.error) {
+    return (
+      <Card>
+        <CardHeader title="Worst circuit situations in this backtest" />
+        <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-muted">
+          <span>Could not load this. {section.error}</span>
+          <Button size="sm" onClick={section.retry}>
+            Try again
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+  if (section.loading) {
+    return (
+      <Card>
+        <CardHeader
+          title="Worst circuit situations in this backtest"
+          description="Working out how the price-band locks would have affected this run…"
+        />
+        <output aria-busy="true" aria-label="Loading" className="block space-y-3">
+          <Shimmer className="h-16 w-full" />
+          <Shimmer className="h-40 w-full" />
+        </output>
+      </Card>
+    );
+  }
+  return <MomentumCircuitExposureCard exposure={section.data} />;
 }

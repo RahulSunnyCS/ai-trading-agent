@@ -48,7 +48,7 @@ import {
   getDefaultMomentumDataset,
 } from '../store/settings';
 import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
-import { MomentumCircuitExposureCard } from './momentum/MomentumCircuitExposure';
+import { MomentumCircuitExposureLoader } from './momentum/MomentumCircuitExposure';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
 import { MomentumJournalView } from './momentum/MomentumJournalView';
 import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
@@ -1316,9 +1316,11 @@ export function MomentumBacktestingView() {
                       broad={shownRun?.dataset === 'broad'}
                     />
                     {/* Broad only (renders nothing otherwise): the worst circuit-lock situations,
-                        after the chart so the overview leads straight into it. */}
-                    <MomentumCircuitExposureCard exposure={result.circuit_exposure} />
+                        after the chart so the overview leads straight into it. Fetched after
+                        the result lands: it costs a second engine run to build. */}
+                    <MomentumCircuitExposureLoader runId={shownRun?.id ?? ''} />
                     <MomentumResultDetails
+                      runId={shownRun?.id ?? ''}
                       result={result}
                       config={shownConfig ?? {}}
                       savedRuns={savedRuns}

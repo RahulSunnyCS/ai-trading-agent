@@ -115,7 +115,15 @@ def _run(client, request: dict, via: str) -> tuple[int, dict]:
     while True:
         job = client.get(f"/api/backtest/jobs/{job_id}").json()["job"]
         if job["status"] == "done":
-            return 200, job["result"]
+            result = job["result"]
+            # A job's result holds the core only: fetch the sections it names, as the dashboard
+            # does as cards and tabs open, so what is compared is the whole result.
+            for name in result.pop("sections_available", []):
+                section = client.get(f"/api/backtest/jobs/{job_id}/sections/{name}")
+                if section.status_code != 200:
+                    return section.status_code, section.json()
+                result[name] = section.json()["data"]
+            return 200, result
         if job["status"] == "failed":
             return 500, {"job_error": job["error"]}
         time.sleep(0.05)

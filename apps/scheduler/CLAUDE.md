@@ -47,6 +47,16 @@ summary flags anything but `main`).
   `SCHEDULER_DIRECT` rewrite `/api/scheduler/*`. Never bind it beyond loopback.
 - `src/cli.ts` — `bun run jobs status | run <id> | serve`.
 
+## Adding a check
+
+A check looks for a slow-burning problem and **never changes data** (alert only). Put it in
+its group's file under `src/checks/` (`drift`, `calendar`, `stock`, `credentials`, `digest`):
+export `jobs` (use `checkJob({...})` from `checks/types.ts` for the shared defaults) and
+`builtins` (wrap the function in `checkBuiltin(...)`). A problem makes the job exit 1 with the
+detail as its error, so the normal failure alert goes out with the job's `fixHint`; the job runs
+daily, so an unfixed problem repeats at most once a day. Inject anything that touches the
+network or disk so the test needs neither. One group per file keeps parallel PRs from clashing.
+
 ## Gotchas
 
 - Tests use `bun test`, not vitest, because `bun:sqlite` only exists under Bun.
