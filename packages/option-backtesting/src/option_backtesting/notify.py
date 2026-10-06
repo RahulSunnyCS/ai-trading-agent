@@ -17,6 +17,7 @@ import os
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .fyers.auth import load_dotenv
@@ -44,12 +45,44 @@ def redact(text: str) -> str:
     return text
 
 
+def prefs_path() -> Path:
+    """Same file and override as @trading/notify's prefs.ts: `{"disabled": [type, ...]}`."""
+    override = os.environ.get("NOTIFY_PREFS_FILE", "").strip()
+    if override:
+        return Path(override)
+    return Path.home() / ".config" / "ai-trading-agent" / "notifications.json"
+
+
+def disabled_types(path: Path | None = None) -> set[str]:
+    """Switched-off types. Fails open: a missing or broken file means everything is on, so a
+    bad preferences file can never be what silences a failure alert."""
+    path = path or prefs_path()
+    try:
+        text = path.read_text()
+    except OSError:
+        return set()
+    try:
+        listed = json.loads(text).get("disabled")
+    except (ValueError, AttributeError):
+        print(f"  notification preferences at {path} are not valid JSON; sending everything")
+        return set()
+    return {t for t in listed if isinstance(t, str)} if isinstance(listed, list) else set()
+
+
+def is_enabled(kind: str | None, path: Path | None = None) -> bool:
+    """An untagged message (kind None) is always sent."""
+    return kind is None or kind not in disabled_types(path)
+
+
 @dataclass
 class Notification:
     source: str
     severity: str  # info | warn | error | action_required
     title: str
     body: str = ""
+    # Which switch on the dashboard's Notifications page controls this message (a key of
+    # NOTIFICATION_TYPES in packages/notify/src/prefs.ts). None means always sent.
+    type: str | None = None
 
 
 def render(n: Notification, now: datetime | None = None) -> str:
@@ -68,6 +101,9 @@ def send(n: Notification) -> tuple[bool, str]:
     Returns (delivered, text)."""
     load_dotenv()
     text = render(n)
+    if not is_enabled(n.type):
+        print(f"\n[telegram: '{n.type}' is switched off, message below]\n{text}")
+        return False, text
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     if not (token and chat):

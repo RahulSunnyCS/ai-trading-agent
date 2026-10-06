@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — every session reads `overview.md` first, and it describes a product that is not the one being built |
-| **Status** | Ready |
+| **Status** | Done |
 | **Type** | chore |
 | **Area** | docs |
 | **Created** | 2026-10-06 |
 | **Depends on** | none |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.16 |
 
 ## Context
 
@@ -56,8 +56,18 @@ marked frozen, so sessions and readers stop treating them as in flight.
 ## Open questions
 
 1. ~~Keep Razorpay tested in CI while frozen?~~ **Yes** (owner, 2026-10-06).
+2. ~~Freeze TODO §3.1–3.4 (approval gate, activation, signal measurement, live execution) too?~~
+   **Yes, and §3.7** (owner, 2026-10-06): all are built on the personality router's output.
+3. ~~What happens to `business.md`?~~ **Reframe as a personal tool, billing kept under a "Frozen:
+   SaaS billing" heading, the retired Pipeline Scope section removed, a SEBI note added**
+   (owner, 2026-10-06).
 
 ## Log
 
 - 2026-10-06 — created from the product discussion.
 - 2026-10-06 — owner decisions on PR #27: approved; status Ready.
+- 2026-10-06 — started; owner answered questions 2–3. Both phases done in one docs PR:
+  `overview.md` 136 → 75 lines (Active and Frozen lists; milestone history left to
+  `docs/epics.md`, Momentum detail to the package's `CLAUDE.md`), `business.md` reframed,
+  payment surface moved into its frozen section, frozen note in `apps/server/CLAUDE.md`,
+  TODO §3.1–3.4 and 3.7 marked frozen, `backlog/README.md` goals updated. Done.

@@ -1,0 +1,16 @@
+# Experiment block
+
+Paste this into the parent research item under a `## Experiments` section, one block per test,
+and commit it **before** the run. Fill in Result afterwards; never edit the rule lines after the
+run. A changed rule is a new, dated block that names the one it supersedes and why.
+
+```markdown
+### YYYY-MM-DD — Short name
+- **Hypothesis:** …
+- **Universe:** … (point-in-time source: …)
+- **Look-ahead check:** …
+- **Pass / kill rule:** … against …
+- **Hold-out:** data cut-off …; unseen period …
+- **Will not run:** …
+- **Result:** (after the run) pass / kill / inconclusive, with the numbers and the run ids
+```

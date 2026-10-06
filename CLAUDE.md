@@ -32,6 +32,13 @@ report templates for this repo; that entire ceremony is retired as of
 2026-09-29 (it used to live in this file). If you're unsure whether something
 needs a check-in first, just ask.
 
+**Research gate.** Before any search, sweep or new backtest comparison, red-team the
+evaluation for look-ahead, survivorship and data-snooping, and check that the item's
+pre-registration (`backlog/_TEMPLATE.md` Phase 0, or an `_EXPERIMENT.md` block) is committed.
+A test the spec gates off runs only after the owner writes `override: <reason>`; record that
+in the item's Log. Worked example: BL-010 and
+`packages/momentum-backtesting/search_spaces/bl010_criteria.json`.
+
 `TODO.md` (repo root) is the hand-maintained single source of truth for open
 work items — read it for context, and update the relevant row in the same
 commit as the code change that closes it.

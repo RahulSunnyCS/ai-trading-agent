@@ -1530,6 +1530,27 @@ def search_ensemble(
     typer.echo(f"froze {target}")
 
 
+@search_app.command("backcast")
+def search_backcast(
+    space: Path = typer.Option(..., "--space", help="search_spaces/round7_A.toml"),
+    frozen: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "search_spaces" / "bl010_phase6_frozen.json",
+        "--frozen",
+        help="The frozen Phase 6 record.",
+    ),
+    dest: Path = typer.Option(..., "--dest", help="Output folder."),
+    dry_run: str = typer.Option(
+        None, "--dry-run", help="START:END of an already-seen window, to test the harness."
+    ),
+) -> None:
+    """BL-010 Phase 6 step 2: the one-shot 2012-2016 backcast of the frozen ensemble
+    (criteria addendum 5). Without --dry-run it runs the sealed hold-out, once."""
+    from . import holdout
+
+    window = tuple(dry_run.split(":")) if dry_run else None
+    holdout.run(frozen, space, dest, window=window, echo=typer.echo)
+
+
 @search_app.command("fair-placebo")
 def search_fair_placebo(
     out: Path = typer.Argument(..., help="A finished search's results folder."),
@@ -1671,6 +1692,7 @@ def journal_check(
                     "error",
                     "Forward journal check could not run",
                     f"{message}\nRerun it: mbt journal check --send",
+                    type="momentum.problem",
                 )
             )
         raise typer.Exit(1) from error
@@ -1679,7 +1701,11 @@ def journal_check(
     if send:
         notify.send(
             notify.Notification(
-                "momentum-journal", "info" if result["ok"] else "warning", title, body
+                "momentum-journal",
+                "info" if result["ok"] else "warn",
+                title,
+                body,
+                type="momentum.journal",
             )
         )
     if not result["ok"]:
@@ -2401,6 +2427,7 @@ def weekly(
             f"Momentum {run}: the job failed",
             notify.redact(f"{type(error).__name__}: {error}"),
             notify.run_url(),
+            type="momentum.problem",
         )
         notify.send(note) if send else typer.echo(notify.render(note))
         raise
