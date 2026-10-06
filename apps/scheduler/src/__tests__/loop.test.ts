@@ -176,3 +176,34 @@ describe('morning summary', () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe('review fixes', () => {
+  it("lists a Friday failure on Monday's summary, not only the last 24 h", async () => {
+    const monday = istAt('2026-10-12', '09:00');
+    const friday = istAt('2026-10-09', '19:30');
+    const id = history.start('momentum-final', 'schedule', friday, '', friday);
+    history.finish(id, 1, 1, friday, 'exit 1');
+    const lines: string[] = [];
+    const { morningSummary } = await import('../summary.js');
+    await morningSummary(async () => undefined)({
+      repoRoot: '.',
+      env: { PATH: '/usr/bin:/bin' },
+      logDir: '/tmp',
+      history,
+      jobs: [],
+      now: () => monday,
+      log: (text) => lines.push(text),
+    });
+    expect(lines.join('\n')).toContain('momentum-final');
+  });
+
+  it('waits for another process to finish writing instead of failing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scheduler-db-'));
+    const a = new History(join(dir, 's.db'));
+    const b = new History(join(dir, 's.db'));
+    a.start('x', 'manual', null, '', new Date());
+    expect(() => b.start('y', 'manual', null, '', new Date())).not.toThrow();
+    a.close();
+    b.close();
+  });
+});

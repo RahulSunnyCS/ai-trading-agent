@@ -27,6 +27,8 @@ export class History {
   constructor(path: string) {
     this.db = new Database(path, { create: true });
     this.db.exec('PRAGMA journal_mode = WAL');
+    // Wait for another process's write instead of failing at once: bun:sqlite's default is 0.
+    this.db.exec('PRAGMA busy_timeout = 10000');
     this.db.exec(`CREATE TABLE IF NOT EXISTS runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       job TEXT NOT NULL,
@@ -172,7 +174,7 @@ export class History {
   }
 }
 
-function pidAlive(pid: number): boolean {
+export function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
