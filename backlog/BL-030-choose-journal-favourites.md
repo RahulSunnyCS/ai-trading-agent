@@ -1,4 +1,4 @@
-# BL-029 — Choose the ~8 favourites to track and trade
+# BL-030 — Choose the ~8 favourites to track and trade
 
 | | |
 |---|---|

@@ -7,7 +7,7 @@
 | **Type** | feature |
 | **Area** | momentum (+ trading-data) |
 | **Created** | 2026-10-06 |
-| **Depends on** | none; BL-010 Phase 6 uses it; BL-029 picks the configs that matter most |
+| **Depends on** | none; BL-010 Phase 6 uses it; BL-030 picks the configs that matter most |
 | **TODO.md row** | 3.15 |
 
 ## Context
@@ -39,7 +39,7 @@ benchmark.
 
 ## Out of scope
 
-- Choosing which configs to trade (BL-010, then BL-029).
+- Choosing which configs to trade (BL-010, then BL-030).
 - Broker integration or order placement.
 - Backfilling weeks before 2026-10-09: a reconstructed week is not forward evidence.
 
@@ -48,8 +48,8 @@ benchmark.
 1. **Which configs:** every saved favourite, whatever is a favourite that Friday (12 on
    2026-10-06: ETF Weekly Core, Stock Weekly Core and 10 Broad candidates), plus the Nifty200
    Momentum 30 TRI as a **benchmark level**, not as a set of holdings. The owner will narrow the
-   favourites to about 8 once BL-010 gives the context; that choice is **BL-029**. Removing a
-   favourite stops its new rows; its history stays. The "BL-010 median config" moved to BL-029.
+   favourites to about 8 once BL-010 gives the context; that choice is **BL-030**. Removing a
+   favourite stops its new rows; its history stays. The "BL-010 median config" moved to BL-030.
 2. **Which run:** the owner trades at **Friday's close**. The final run (16:45, and 19:30 for
    Stock/Broad) comes after the 15:30 close, so it cannot be traded at that close; the 14:40
    preview can. Recommendation accepted: journal the **preview where one exists** (today only ETF
@@ -134,7 +134,7 @@ None for Phase 1.
 - 2026-10-06 — created in the overnight review; not discussed with the owner yet.
 - 2026-10-06 — owner decisions on PR #27: approved in full; status Ready. Phase 1 is due before Friday 2026-10-09.
 - 2026-10-06 — started. Owner answered the start questions (see Decisions); config choice split
-  out as BL-029. Found that non-ETF favourites have no preview and that the 19:30 job was not
+  out as BL-030. Found that non-ETF favourites have no preview and that the 19:30 job was not
   installed. Status In progress, TODO.md 3.15.
 - 2026-10-06 — Phase 1 code done: migration 007, `forward_journal.py`, wiring in
   `_execute_weekly_run`, `mbt journal show|verify`, 14 tests. Dry run on a copy of the real
