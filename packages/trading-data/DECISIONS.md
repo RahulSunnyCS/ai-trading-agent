@@ -277,3 +277,45 @@ usable, 375 bars, ~10 off-session rows per contract.
 Nothing reads the table yet — legwise's `available_days` still enumerates files — so Phase 1
 changes no behaviour; Phase 2 can let readers skip excluded days.
 
+## The vendor importer: per-day pyarrow writes, every row kept, the collector wins — 2026-10-06
+
+`tdata vendor import` re-partitions the vendor's staged per-expiry Parquet (2.11 billion rows)
+into the lake's one-file-per-(underlying, day) layout; `import-index` does the same for the
+spot and India VIX CSVs.
+
+- **One file per (asset, name, day), sorted by instrument then time.** The daily collector adds
+  exactly one immutable file per underlying; a day's chain is read as one file with no filtering;
+  DuckDB prunes range scans by the `date=` folder. Rejected: month files (the daily top-up would
+  rewrite a growing file, and a crash mid-write risks the month) and per-expiry files (every
+  day-load would open five to ten files and filter them). Cost: ~110k small files, which is why
+  the lake lives on an APFS image (see the entry above).
+- **DuckDB scans, pyarrow writes.** A date chunk (about 8M rows, so ~1 month of NIFTY) is joined
+  to the contract→`instrument_id` table into a temp table sorted by (day, instrument, ts); each
+  day is then a zone-map-pruned query handed to `lake.write_parquet` — the writer the collector
+  uses (atomic tmp+rename, zstd), cast to `lake.OPT_SCHEMA`. This beat `COPY … PARTITION_BY` on
+  the points that matter: skip-existing is a `path.exists()`, no rename step, no open-file limit,
+  and the per-day quality stats come from the same temp table.
+- **Every vendor row is kept.** Closing bars (15:30–15:39; Fyers' own files have them) and the
+  special sessions are written; `data_quality` labels the days. Only rows whose contract name
+  could not be parsed have no instrument; they are counted in `ingest_runs.details` and
+  `quality_issues`, not written. Duplicate `(contract, ts)` rows, if a source ever has them, are
+  removed and recorded.
+- **The collector always wins.** A file whose `vendor_symbol` is a Fyers symbol is never replaced,
+  even with `--force`; a vendor file is replaced only with `--force`. The vendor's contracts reuse
+  the collector's `instrument_id` where both name the same instrument — the catalog key is
+  `NSE:OPT:<underlying>:<expiry>:<strike>:<CE|PE>`, and the vendor name is added as a second
+  alias (`drive-vendor`).
+- **Resumable by chunk, and aware of the data.** Each chunk is one `ingest_runs` row; `ok` and
+  `partial` (finished, with recorded issues) are done *only if the run saw the same number of
+  staged rows* — the scope string alone would swallow new data added to an imported month (the
+  missing Aug–Sep 2026 days will arrive that way). A crashed run (`running`) is marked `failed`
+  (only the importer's own scopes) and redone. A re-run skips existing day files, and gives the
+  vendor-written ones among them a verdict — a crash after writing but before recording used to
+  leave those days unjudged. Collector-written days are judged by `tdata quality rebuild`.
+  One unit failing (`tdata vendor import`) is reported and the rest continue; exit status 1.
+- **Duplicates are resolved deterministically**: two names for one instrument at the same
+  minute keep the higher-volume row, then the lower vendor name — never an arbitrary one.
+- **Verified:** a vendor-imported day and a Fyers-written day with the same prices give identical
+  legwise trades, fills and MTM curve (`option-backtesting/tests/unit/test_vendor_day_legwise.py`);
+  on the real data, NIFTYNXT50's 3,700,483 staged rows came out as exactly 3,700,483 lake rows.
+
