@@ -258,15 +258,58 @@ def feasible(arm: str, v: dict[str, Any]) -> bool:
     return True
 
 
-def run_id(arm: str, heavy: dict, light: dict, fixed: dict) -> str:
-    blob = json.dumps(
-        {"arm": arm, "h": heavy, "l": light, "f": fixed}, sort_keys=True, default=list
-    )
+def run_id(arm: str, heavy: dict, light: dict, fixed: dict, snapshot: dict | None = None) -> str:
+    """A hash of everything that decides a run's result. `snapshot` (see `data_snapshot`) ties
+    it to the data too, so a search resumed after new data arrives runs again instead of
+    mixing results from two different histories (BL-010 F12). Searches written before the
+    snapshot existed passed None and keep their ids."""
+    content = {"arm": arm, "h": heavy, "l": light, "f": fixed}
+    if snapshot is not None:
+        content["d"] = snapshot
+    blob = json.dumps(content, sort_keys=True, default=list)
     return hashlib.sha1(blob.encode()).hexdigest()[:12]
 
 
-def plan(space: Space, heavy_count: int, light_count: int, seed: int) -> list[dict[str, Any]]:
-    """The full list of groups: [{heavy, runs: [{id, light}]}]. Deterministic for a seed."""
+def data_snapshot(root: Path | None = None, through: str | None = None) -> dict[str, Any] | None:
+    """What the data looked like: the last daily stock bar and weekly close, and a digest of
+    the confirmed split and bonus factors. With `through` (a run's fixed end date) only data up
+    to that date counts, so a new week beyond an end-dated run does not change its snapshot.
+    None when there is no catalog."""
+    from trading_data.db import connect, data_root
+
+    from . import db_read
+
+    if db_read.catalog_mtime(root) is None:
+        return None
+    with connect(root or data_root(), read_only=True) as con:
+        cap = through or "9999-12-31"
+        last_bar = con.execute(
+            "SELECT CAST(max(date) AS DATE) FROM bars_1d_stock WHERE date <= CAST(? AS DATE)",
+            [cap],
+        ).fetchone()[0]
+        last_week = con.execute(
+            "SELECT max(date) FROM momentum_prices WHERE kind = 'weekly' "
+            "AND date <= CAST(? AS DATE)",
+            [cap],
+        ).fetchone()[0]
+        factors = con.execute(
+            "SELECT symbol, ex_date, confirmed_factor FROM stock_action_candidates "
+            "WHERE status = 'confirmed' AND ex_date <= CAST(? AS DATE) ORDER BY symbol, ex_date",
+            [cap],
+        ).fetchall()
+    digest = hashlib.sha1(json.dumps(factors, default=str).encode()).hexdigest()[:12]
+    return {"last_bar": str(last_bar), "last_week": str(last_week), "factors": digest}
+
+
+def plan(
+    space: Space,
+    heavy_count: int,
+    light_count: int,
+    seed: int,
+    snapshot: dict | None = None,
+) -> list[dict[str, Any]]:
+    """The full list of groups: [{heavy, runs: [{id, light}]}]. Deterministic for a seed and a
+    data snapshot."""
     groups = []
     for gi, heavy in enumerate(heavy_combinations(space, heavy_count, seed)):
         rng = np.random.default_rng([seed, 2, gi])
@@ -277,7 +320,8 @@ def plan(space: Space, heavy_count: int, light_count: int, seed: int) -> list[di
             light = resolve_light(space, sampled)
             if not feasible(space.arm, {**space.fixed, **light}):
                 continue
-            runs.append({"id": run_id(space.arm, heavy, light, space.fixed), "light": light})
+            run = run_id(space.arm, heavy, light, space.fixed, snapshot)
+            runs.append({"id": run, "light": light})
             if len(runs) == light_count:
                 break
         groups.append({"heavy": heavy, "runs": runs})
@@ -398,6 +442,7 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
                 "arm": space.arm,
                 "heavy": heavy,
                 "light": light,
+                "data": task.get("snapshot"),
             }
             try:
                 if pool not in pools:
@@ -448,6 +493,26 @@ def completed_ids(out_dir: Path) -> set[str]:
     return ids
 
 
+SNAPSHOT_FILE = "data_snapshot.json"
+
+
+def _check_same_data(out_dir: Path, snapshot: dict | None) -> None:
+    """A results folder holds one history. The first run records its data snapshot; a resume
+    on different data stops here instead of adding a second copy of every config (their ids
+    differ, so `load_results` would keep both)."""
+    path = out_dir / SNAPSHOT_FILE
+    if not path.exists():
+        if snapshot is not None:
+            path.write_text(json.dumps(snapshot, indent=1) + "\n")
+        return
+    recorded = json.loads(path.read_text())
+    if snapshot is not None and recorded != snapshot:
+        raise SystemExit(
+            f"{out_dir} was searched on data {recorded}; the data is now {snapshot}. "
+            "Start a new results folder (--out) rather than mixing two histories in one."
+        )
+
+
 def run_search(
     space_path: Path,
     out_dir: Path,
@@ -462,8 +527,10 @@ def run_search(
     space = load_space(space_path)
     out_dir.mkdir(parents=True, exist_ok=True)
     seen = completed_ids(out_dir)
+    snapshot = data_snapshot(through=space.fixed.get("end"))
+    _check_same_data(out_dir, snapshot)
     tasks = []
-    for group in plan(space, heavy_count, light_count, seed)[:limit_groups]:
+    for group in plan(space, heavy_count, light_count, seed, snapshot)[:limit_groups]:
         runs = [r for r in group["runs"] if r["id"] not in seen]
         if runs:
             tasks.append(
@@ -472,6 +539,7 @@ def run_search(
                     "out_dir": str(out_dir),
                     "heavy": group["heavy"],
                     "runs": runs,
+                    "snapshot": snapshot,
                 }
             )
     total = sum(len(t["runs"]) for t in tasks)
