@@ -44,6 +44,8 @@ deploy/launchd/uninstall.sh
 
 ## Things to know
 
+- Moving to a Mac mini: see [`docs/mac-mini.md`](../../docs/mac-mini.md).
+
 - **Install before 07:55 on a trading day**, or run what `install.sh` lists afterwards. The
   scheduler never runs a slot that fell before its first start (those belonged to the old
   plists, which `install.sh` removes), so installing at 08:03 would otherwise skip that
