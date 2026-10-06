@@ -281,3 +281,5 @@ PR 5 the single launchd cut-over · then one PR per later job, check group and d
   after AlgoTest's window) — PR 10.
 - 2026-10-06 — PR 7: `options-daily` (`obt daily`) at 16:15 IST trading days, retries at
   17:45 and 19:15, catch-up until 23:00, `catalog` group.
+- 2026-10-06 — PR 8: monthly `backup` job (1st Sunday 10:00, catch-up all week): SSD, else
+  `~/Downloads` with a warning. First backup taken through it: 188 files, 280 MB.
