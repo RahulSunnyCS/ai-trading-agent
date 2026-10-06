@@ -45,6 +45,7 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Add a safe server-driven backtest endpoint (M3b, deferred)',
     'Render replay results in the UI',
   ],
+  jobs: [],
   optionslab: [
     'Run `obt fyers history` once (live Fyers token needed) to unlock the market-regime study',
     'Calibrate the anatomy thresholds (QUIET / TREND) against the backfilled history (TODO 3.10.16)',
