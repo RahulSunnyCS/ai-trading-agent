@@ -126,7 +126,6 @@ def run_backtest(
     with connect() as con:
         run_id = record_run(con, loaded.strategy, start, end, result, yaml_text)
 
-
     out: dict = {
         "run_id": run_id,
         "net_inr": result.net_inr,

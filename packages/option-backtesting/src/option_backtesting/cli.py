@@ -448,7 +448,7 @@ def fyers_history(
         raise typer.Exit(1) from None
     typer.echo(
         f"done: {client.calls} requests; wrote {result['written_days']} days"
-        f"{f', oldest {result['oldest']}' if result['oldest'] else ''}; "
+        f"{f', oldest {result["oldest"]}' if result['oldest'] else ''}; "
         f"{len(result['short_days'])} short days skipped -> {data_dir()}"
     )
 
