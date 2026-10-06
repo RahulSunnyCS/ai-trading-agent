@@ -87,7 +87,7 @@ laptop's sleep or power state decides whether data exists.
 |---|---|---|---|---|---|
 | M1 | **Backup of the research database** | `tdata backup --to <disk>` | manual, never set up (TODO 3.11.6) | Lose the disk, lose expired-contract history for good | Monthly job once the destination is chosen; alert if the disk isn't mounted |
 | M2 | **Corporate-action baseline review** | Review `fetch_report.csv`, then `mbt stocks pin-manifest` or `--accept-ca-diff` | manual (last pinned 28–29 Sep) | ~30 days after the first new event, **every Friday sync fails** (`guards.check_ca_diff_age`) | Check job warns at 20 days with the list and the exact command |
-| M3 | Margin table | `tdata reference sql` on `ref_margin` (month-keyed; one row, 2026-08) | manual | Return on margin quietly uses a stale month | Monthly reminder; automate later if a SPAN source exists |
+| M3 | Margin table | `tdata reference sql` on `ref_margins` (month-keyed; one row, 2026-08) | manual | Return on margin quietly uses a stale month | Monthly reminder; automate later if a SPAN source exists |
 
 ### Semi-annual / quarterly
 
