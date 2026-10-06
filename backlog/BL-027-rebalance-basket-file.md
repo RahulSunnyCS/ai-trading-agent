@@ -42,9 +42,12 @@ orders, with quantities computed from the owner's current holdings and capital.
 
 ## Open questions
 
-1. Which broker, and which of its basket formats?
-2. How are current holdings entered: a holdings CSV from the broker, or typed in?
+1. **Default** (owner delegated to the recommendation, 2026-10-06): the broker that holds the Momentum account, using its standard basket/bulk-order
+   CSV; owner names the broker when the item starts. Original question: which broker and format?
+2. ~~Holdings input?~~ **The broker's holdings CSV export** (owner delegated to the recommendation, 2026-10-06): fewer typing errors than manual
+   entry, and the same file every week.
 
 ## Log
 
 - 2026-10-06 — created; owner approved the idea on PR #27.
+- 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: the Momentum account's broker and its basket CSV; holdings from the broker's export.

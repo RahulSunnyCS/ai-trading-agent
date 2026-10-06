@@ -29,9 +29,9 @@ Sorted by priority (P0 first), then ID.
 | [BL-004](BL-004-research-stack-production-mode.md) | Production-build mode for the local research stack (`bun run start:prod`) | P2 | Planned | improvement | infra |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
-| [BL-017](BL-017-momentum-settings-module.md) | Momentum: one settings module, and split `api.py` | P2 | Planned | improvement | momentum |
+| [BL-017](BL-017-momentum-settings-module.md) | Momentum: one settings module, and split `api.py` | P2 | Ready | improvement | momentum |
 | [BL-018](BL-018-brittle-benchmark-tests.md) | Momentum benchmark tests fail when the data is refreshed | P2 | Planned | bug | momentum |
-| [BL-020](BL-020-claude-code-workflow-setup.md) | Claude Code working set-up: model per role, saved commands, session habits | P2 | Planned | chore | cross-cutting |
+| [BL-020](BL-020-claude-code-workflow-setup.md) | Claude Code working set-up: model per role, saved commands, session habits | P2 | Ready | chore | cross-cutting |
 | [BL-027](BL-027-rebalance-basket-file.md) | Weekly rebalance as a broker basket-order file | P2 | Planned | feature | momentum |
 | [BL-006](BL-006-momentum-scores-table-responsiveness.md) | Momentum Scores table: responsive sort and filter | P3 | Planned | improvement | dashboard |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |

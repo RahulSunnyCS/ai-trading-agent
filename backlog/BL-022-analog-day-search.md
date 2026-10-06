@@ -72,7 +72,11 @@ than a simple baseline.
 
 ## Open questions
 
-1. **Cut-off times — to discuss.** Owner wants this generic rather than one fixed time: run the
+1. **Cut-off times — proposed default, to confirm when the item starts** (owner delegated to the recommendation, 2026-10-06): a 30-minute grid,
+   09:45 → 15:00 (11 cut-offs); 12:30 (first half → second half) is the **primary** test, named in
+   advance; the other cut-offs are secondary and judged together with a multiple-testing correction
+   (Holm), so one lucky cut-off cannot pass the item; the feature set stays the same at every
+   cut-off, with "minutes since open" as a feature. Original question, kept for the discussion: Owner wants this generic rather than one fixed time: run the
    search at a regular grid of cut-offs (e.g. every 30 minutes, 09:45 → 15:00) and predict the
    rest of the day from each, including a first-half → second-half view (about 12:30). Open
    points: the grid step (15 / 30 / 60 min); whether the pass rule is judged per cut-off or
@@ -87,3 +91,5 @@ than a simple baseline.
 - 2026-10-06 — owner: make it generic over the time of day (e.g. every 30 minutes, including a
   first-half → second-half prediction) rather than one fixed cut-off; grid to be discussed.
 - 2026-10-06 — owner decisions on PR #27: raised to P1.
+- 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: proposed default for the cut-off grid recorded (30-minute grid, 12:30 primary, Holm
+  correction); still to confirm in discussion when the item starts, as the owner asked.

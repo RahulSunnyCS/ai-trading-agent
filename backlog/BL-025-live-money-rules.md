@@ -28,6 +28,10 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
 ## Plan
 
 ### Phase 1 — Write the rules (owner, with Claude)
+- **Draft, from the owner's own statements in BL-010 (2026-10-04/05):** about ₹5 lakh, 10–20% of
+  the portfolio; drawdown limits per basket 25% / 30% / 35% with a hard ceiling of 40%. Every other
+  number (how far live may trail the backtest, over how many weeks, and what each breach triggers)
+  is still the owner's to set — Claude does not choose them.
 - **Tasks:** capital allocated; maximum drawdown before reducing and before stopping; how far
   live may trail the backtest (from BL-024) over how many weeks before review; what "review" means;
   which validation status (BL-016) is required before money goes in.
@@ -40,8 +44,11 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
 
 ## Open questions
 
-1. Should friends' use carry the same rules shown on screen, or are they on their own?
+1. ~~Friends and the rules?~~ **Shown for information only** (owner delegated to the recommendation, 2026-10-06): friends see the owner's rules as an
+   example, and each friend's own money is their decision; the alerts go to the owner only.
 
 ## Log
 
 - 2026-10-06 — created in the overnight review; not discussed with the owner yet.
+- 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: the draft carries the owner's own stated limits; friends see rules for information only.
+  The remaining numbers still need the owner's sign-off before Phase 1 is done.

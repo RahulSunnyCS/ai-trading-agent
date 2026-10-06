@@ -39,10 +39,14 @@ day, with the gap broken down into entry/exit price, costs and missed or extra t
 
 ## Open questions
 
-1. Which strategies run live today, and on which broker accounts?
+1. **Default** (owner delegated to the recommendation, 2026-10-06): start with the four strategies already transcribed in
+   `packages/option-backtesting/strategies/legwise/` (the AlgoTest exports); owner to confirm which
+   run live and on which accounts when the item starts. Original question: which strategies run live
+   today, and on which broker accounts?
 2. Can AlgoTest's own order log be exported, to tell "missed by AlgoTest" from "different in the
    backtest"?
 
 ## Log
 
 - 2026-10-06 — created in the overnight review; not discussed with the owner yet.
+- 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: start with the four legwise strategies; owner confirms the live set at start.

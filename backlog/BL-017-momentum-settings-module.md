@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — BL-010 fixes the current default mismatch (E9); this stops the next one |
-| **Status** | Planned |
+| **Status** | Ready |
 | **Type** | improvement |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
@@ -44,8 +44,10 @@ signal all read it. `api.py` is split by feature with no behaviour change.
 
 ## Open questions
 
-1. Pydantic model or a frozen dataclass for the settings?
+1. ~~Pydantic or a frozen dataclass?~~ **Pydantic** (owner delegated to the recommendation, 2026-10-06): the package already uses it in `api.py`
+   and `analysis.py`, and FastAPI validates requests with it, so one model serves both.
 
 ## Log
 
 - 2026-10-06 — created from the codebase review.
+- 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: Pydantic. Status Ready (still after BL-010 Phase 1).

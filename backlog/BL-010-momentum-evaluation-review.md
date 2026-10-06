@@ -423,3 +423,10 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
 - 2026-10-06 — owner decisions on PR #27: set the 69 theme rows aside. They are committed as
   `categories/curated/pending_themes.csv` + `pending_themes.md`, which no code reads; they move
   into `category_extras.csv` only with launch dates, under Phase 3 step 3.
+- 2026-10-06 — owner delegated open decisions to Claude's recommendations (PR #27). On "launch
+  dates for 113 themes, or the NSE sectors": **recommended default — NSE sectoral and thematic
+  indices, dated by each index's official launch date.** Those dates are published and checkable,
+  while dating 113 hand-made themes means judging when each "became" a theme, which is itself a
+  hindsight call. Custom and own-research themes (including `pending_themes.csv`) stay out of
+  backtests and are tracked forward only, through BL-024's journal. Applies unless the owner
+  objects; the session running this review should confirm with the owner before building on it.

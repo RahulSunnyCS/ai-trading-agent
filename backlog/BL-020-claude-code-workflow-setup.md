@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — makes the month on Max faster and cheaper; nothing breaks without it |
-| **Status** | Planned |
+| **Status** | Ready |
 | **Type** | chore |
 | **Area** | cross-cutting |
 | **Created** | 2026-10-06 |
@@ -55,9 +55,11 @@ short and on one topic.
 
 ## Open questions
 
-1. Which model for the implementer by default: Sonnet 5.5 or Fable?
+1. ~~Implementer model?~~ **Sonnet 5.5** (owner delegated to the recommendation, 2026-10-06): cheapest for bulk implementation; planning,
+   review and research red-teaming stay on Opus or Fable.
 
 ## Log
 
 - 2026-10-06 — created from the process review.
 - 2026-10-06 — owner decisions on PR #27: credential rotation and TODO 1.2 approved — added as Phase 4.
+- 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: Sonnet 5.5 for the implementer. Status Ready.
