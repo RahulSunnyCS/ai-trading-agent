@@ -108,3 +108,13 @@ describe('real reference data', () => {
     expect(checkRbiDates('2026-10-07', readers).ok).toBe(true);
   });
 });
+
+describe('fix hints', () => {
+  it('name the real catalog tables, which `tdata reference sql` needs', async () => {
+    const { jobs } = await import('../checks/calendar.js');
+    const hints = jobs.map((j) => j.fixHint).join('\n');
+    expect(hints).toContain('INSERT INTO ref_holidays');
+    expect(hints).toContain('INSERT INTO ref_margins ');
+    expect(hints).not.toMatch(/ref_margin\b/);
+  });
+});

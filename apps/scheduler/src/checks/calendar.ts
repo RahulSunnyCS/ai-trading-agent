@@ -121,7 +121,7 @@ export function firstTradingDayOfMonth(day: string): boolean {
 const HOLIDAY_FIX =
   "Add the dates from NSE's holiday circular: cd packages/trading-data && uv run tdata reference sql \"INSERT INTO ref_holidays VALUES (DATE 'YYYY-MM-DD', 'Name')\" (one per holiday). For RBI dates add a new apps/server/src/db/migrations/NNN_*.sql inserting into event_calendar (event_type RBI_POLICY), then bun run migrate";
 const MARGIN_FIX =
-  "Add this month's margin: cd packages/trading-data && uv run tdata reference sql \"INSERT INTO ref_margin VALUES ('NIFTY', 'short-straddle', 'YYYY-MM', 140000)\" using the broker's current SPAN figure";
+  "Add this month's margin: cd packages/trading-data && uv run tdata reference sql \"INSERT INTO ref_margins VALUES ('NIFTY', 'short-straddle', 'YYYY-MM', 140000)\" using the broker's current SPAN figure";
 
 export const jobs: Job[] = [
   checkJob({
