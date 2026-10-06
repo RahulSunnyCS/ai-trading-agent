@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@trading/market-reference": "workspace:*"
+    "@trading/market-reference": "workspace:*",
+    "@trading/notify": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "latest",

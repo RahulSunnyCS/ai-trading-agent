@@ -46,6 +46,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@trading/market-reference": "workspace:*",
+        "@trading/notify": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",

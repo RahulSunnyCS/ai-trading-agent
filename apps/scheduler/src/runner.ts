@@ -15,7 +15,18 @@ export interface RunContext {
   busyPollMs?: number;
   /** Override the job list used for group membership (tests). */
   jobs?: Job[];
+  /** In-process jobs (`Job.builtin`), e.g. the morning summary. */
+  builtins?: Record<string, Builtin>;
 }
+
+export interface BuiltinContext extends RunContext {
+  now: () => Date;
+  /** Append a line to the run's log. */
+  log: (text: string) => void;
+}
+
+/** An in-process job. Returns an exit code like a step would. */
+export type Builtin = (ctx: BuiltinContext) => Promise<{ code: number; error: string | null }>;
 
 export interface RunResult {
   runId: number;
@@ -145,6 +156,18 @@ export function runJob(
           logFd,
           `\n=== ${job.id} · ${trigger} · attempt ${attempts} · ${formatIst(now())} IST\n`,
         );
+        if (job.builtin) {
+          const builtin = ctx.builtins?.[job.builtin];
+          result = builtin
+            ? await builtin({ ...ctx, now, log: (text) => writeSync(logFd, `${text}\n`) }).catch(
+                (error: unknown) => ({
+                  code: 1,
+                  error: error instanceof Error ? error.message : String(error),
+                }),
+              )
+            : { code: NOT_FOUND, error: `builtin '${job.builtin}' is not registered` };
+          if (result.error) writeSync(fd, `! ${result.error}\n`);
+        }
         for (const step of job.steps) {
           writeSync(logFd, `$ ${step.join(' ')}\n`);
           result = await runStep(step, cwd, ctx.env, logFd, job.timeoutMinutes * 60_000);

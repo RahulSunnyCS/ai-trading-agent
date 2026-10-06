@@ -7,8 +7,8 @@ Guidance for coding agents working in `apps/scheduler` (`@ata/scheduler`).
 One home for every recurring job (BL-012): broker logins, the Friday momentum runs and,
 in later PRs, the evening options collection, backups and maintenance checks. It replaces
 the one-plist-per-job launchd setup. Every run is recorded, and missed or failed runs
-will raise Telegram alerts (catch-up and alerts land in BL-012 PR 4; until the launchd
-cut-over in PR 5, the old plists still do the scheduling).
+raise a Telegram alert at once. Until the launchd cut-over (BL-012 PR 5) the old plists
+still do the scheduling.
 
 ## Layout
 
@@ -25,7 +25,18 @@ cut-over in PR 5, the old plists still do the scheduling).
   a promise chain, across processes by unfinished rows in the history table.
 - `src/history.ts` — `bun:sqlite` run history (`runs` table). Deliberately not the DuckDB
   catalog, so recording a run never competes with a job for its single writer.
-- `src/cli.ts` — `bun run jobs status`, `bun run jobs run <id>`.
+- `src/loop.ts` — `bun run jobs serve`: every 30 s, `decide()` each job from the run
+  history alone: run a due slot, catch up a slot missed while the laptop slept (within the
+  job's `catchUpHours`), or record it as missed and alert. Because it reads history, no
+  wake detection is needed. Slots before the scheduler's first start are ignored.
+- `src/alerts.ts` — immediate Telegram on failure (skipped for `alertsItself` jobs unless
+  they timed out or could not start), on a missed slot, and on recovery. Successes stay
+  quiet.
+- `src/summary.ts` — the 09:00 trading-day morning summary (builtin job): today's job slots,
+  the AlgoTest workflow result (`gh run list`), Fyers token (`mbt token-status`), whether
+  the last trading day's options data is in the lake, disk space, and failures in the last
+  24 h.
+- `src/cli.ts` — `bun run jobs status | run <id> | serve`.
 
 ## Gotchas
 
@@ -39,6 +50,7 @@ cut-over in PR 5, the old plists still do the scheduling).
 ```bash
 bun run jobs status          # every job: schedule, last run, next run
 bun run jobs run <job-id>    # run one now (recorded as manual)
+bun run jobs serve           # the long-running scheduler
 bun run test                 # bun test
 bun run typecheck
 ```

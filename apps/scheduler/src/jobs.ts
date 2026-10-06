@@ -35,6 +35,14 @@ export interface Job {
   needs?: Array<'home' | 'gui' | 'postgres'>;
   /** The command to put in a failure alert, so the fix is one copy-paste. */
   fixHint: string;
+  /**
+   * The job sends its own Telegram alert when it fails, so the scheduler does
+   * not repeat it. The scheduler still alerts when the job was missed, timed
+   * out or could not start, because then the job never got the chance.
+   */
+  alertsItself?: boolean;
+  /** Run an in-process job (see runner's `builtins`) instead of `steps`. */
+  builtin?: 'morning-summary';
 }
 
 const MOMENTUM = 'packages/momentum-backtesting';
@@ -52,6 +60,7 @@ export const JOBS: Job[] = [
     retries: 0, // dispatch.ts retries itself and must never dispatch twice
     retryDelayMinutes: 0,
     catchUpHours: 7, // dispatch.ts itself refuses after 15:35
+    alertsItself: true,
     fixHint: 'Start "Daily broker login" by hand from GitHub Actions',
   },
   {
@@ -68,6 +77,7 @@ export const JOBS: Job[] = [
     retryDelayMinutes: 0,
     catchUpHours: 10,
     needs: ['postgres'],
+    alertsItself: true,
     fixHint: 'Log in from the dashboard (Broker logins), or: uv run mbt login',
   },
   {
@@ -81,6 +91,7 @@ export const JOBS: Job[] = [
     retryDelayMinutes: 5,
     catchUpHours: 0.5, // a preview after ~15:15 is too late to trade on
     group: 'catalog',
+    alertsItself: true,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt weekly --run preview',
   },
   {
@@ -94,6 +105,7 @@ export const JOBS: Job[] = [
     retryDelayMinutes: 10,
     catchUpHours: 48,
     group: 'catalog',
+    alertsItself: true,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt weekly --run final',
   },
   {
@@ -138,7 +150,21 @@ export const JOBS: Job[] = [
     retryDelayMinutes: 10,
     catchUpHours: 48,
     group: 'catalog',
+    alertsItself: true,
     fixHint: 'cd packages/momentum-backtesting && uv run mbt journal check --send',
+  },
+  {
+    id: 'morning-summary',
+    description: 'One Telegram message: did the morning logins work, is the data current',
+    schedule: { at: '09:00', on: tradingDays, label: 'trading days 09:00' },
+    steps: [],
+    builtin: 'morning-summary',
+    cwd: '.',
+    timeoutMinutes: 5,
+    retries: 0,
+    retryDelayMinutes: 0,
+    catchUpHours: 3,
+    fixHint: 'bun run --filter @ata/scheduler jobs run morning-summary',
   },
 ];
 
