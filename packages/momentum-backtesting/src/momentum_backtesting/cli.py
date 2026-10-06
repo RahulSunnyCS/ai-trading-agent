@@ -1551,6 +1551,39 @@ def search_backcast(
     holdout.run(frozen, space, dest, window=window, echo=typer.echo)
 
 
+@search_app.command("track")
+def search_track(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="search_spaces/round7_A.toml"),
+    since: str = typer.Option(..., "--since", help="The Friday tracking starts from (YYYY-MM-DD)."),
+    frozen: Path = typer.Option(
+        Path(__file__).parent.parent.parent / "search_spaces" / "bl010_phase6_frozen.json",
+        "--frozen",
+        help="The frozen Phase 6 record.",
+    ),
+    scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
+    dest: Path = typer.Option(
+        None, "--dest", help="Report folder (default <out>/phase6/tracking)."
+    ),
+) -> None:
+    """BL-010 Phase 6 step 3: paper-track the frozen ensemble against its median companion and
+    Nifty200 Momentum 30 TRI from `--since`, and test criteria addendum 5's two fail lines.
+    Read-only: runs the model portfolios, saves nothing to the database."""
+    from . import reference_benchmarks, tracker
+
+    report = tracker.track(
+        frozen,
+        space,
+        out,
+        scored or out / "scored_pit",
+        reference_benchmarks.load_references(),
+        since,
+        dest or out / "phase6" / "tracking",
+        echo=typer.echo,
+    )
+    typer.echo(tracker.markdown(report))
+
+
 @search_app.command("fair-placebo")
 def search_fair_placebo(
     out: Path = typer.Argument(..., help="A finished search's results folder."),

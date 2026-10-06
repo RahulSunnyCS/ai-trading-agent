@@ -281,6 +281,11 @@ contract, not a shared service).
   `tests/test_broad_parity.py` pins both paths to identical engine arguments and trades. The
   tilt-rank caches (`levers.tilt_cache_get/put`) hold the keyed frame so a recycled `id()`
   cannot serve another frame's ranks.
+- `holdout.py` (`mbt search backcast`) — the one-shot 2012–2016 backcast (criteria addendum 5):
+  claims the run before it starts and writes its result once; never run it twice, never edit
+  `search_spaces/bl010_phase6_backcast_result.json`. `tracker.py` (`mbt search track <results>
+  --space <toml> --since <Friday>`) — read-only paper tracking of the frozen ensemble against its
+  median companion and Nifty200 Momentum 30 TRI, with addendum 5's two fail lines; it saves nothing.
 - `tests/golden/` — frozen backtest results (BL-001). 16 scenarios run through the real API on
   a frozen slice of real data (`fixture/`, rebuilt only by `scripts/build-golden-fixture.py`).
   A code change that moves any result fails `test_golden.py`; if the move was intended, run

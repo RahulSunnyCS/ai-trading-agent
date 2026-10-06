@@ -516,3 +516,9 @@ Also parked here (owner, 2026-10-06), priority P3:
   (+2.5, fails; +5 needed against both). Counting the cash weeks as the rules say: 19.6% against
   14.9% and 21.9%, also a fail. In-sample 32% a year, unseen 20%, against 21% for Nifty200
   Momentum 30 TRI. Reported, not tuned around. Live-signal parity built in parallel (own PR).
+- 2026-10-07 — Phase 6 step 3 tooling built: `mbt search track` (tracker.py), read-only paper
+  tracking of the frozen ensemble against its median companion and Nifty200 Momentum 30 TRI from
+  a start Friday, testing addendum 5's two fail lines (more than 10 points behind Mom30 at 26
+  weeks; a fall deeper than 57.1%). Not started: starting it saves the four configs as favourites
+  (journal evidence) and adds them to the Friday job, so it waits for the owner, who also has to
+  decide whether to follow a strategy that failed its hold-out.
