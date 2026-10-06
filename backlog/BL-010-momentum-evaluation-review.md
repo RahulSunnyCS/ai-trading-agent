@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0, 1a, 2 done; Phase 3 measured, arm A's headline killed; Phase 4 partly done) |
+| **Status** | In progress (Phases 0, 1a, 2, 4 done; Phase 3 measured, arm A's headline killed; Phase 5 not started) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -441,3 +441,8 @@ capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after
   window rule), data-stamped run ids, generic nudges (fixes F13 and the B/C2 KeyError),
   addendum 2 (selection and validation windows never meet; hold-out sealed). The point-in-time
   re-score is running.
+- 2026-10-06 — Phase 4 done. Point-in-time re-score of all 8,003 configs: median 28.1%, best
+  56.0% (today's list 33.4% / 77.3%; Mom30 TRI 17.0%). PBO 0.69, 0.53 within the 40% drawdown
+  ceiling (today's list 0.48 / 0.20); the in-sample best lands below the index out of sample in
+  45% of splits. 82% of configs still beat Mom30 TRI by 5 points pre-tax. Phase 5 waits on the
+  owner's go-ahead and on loading Nifty Midcap 150 TRI and Smallcap 250 TRI.
