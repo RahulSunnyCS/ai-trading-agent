@@ -207,7 +207,7 @@ export function morningSummary(sink?: AlertSink): Builtin {
     ];
     const { text } = formatSummary(istDay(ctx.now()), checks);
     ctx.log(text);
-    await (sink ?? telegramSink(ctx.env))(text);
+    await (sink ?? telegramSink(ctx.env, 'scheduler.morning'))(text);
     return { code: 0, error: null };
   };
 }

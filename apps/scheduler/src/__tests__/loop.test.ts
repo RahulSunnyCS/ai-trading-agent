@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { alertMissed, alertResult } from '../alerts.js';
+import { alertMissed, alertResult, telegramSink } from '../alerts.js';
 import { History } from '../history.js';
 import type { Job } from '../jobs.js';
 import { decide, skippedToday } from '../loop.js';
@@ -216,5 +216,30 @@ describe('skippedToday', () => {
     const run = history.start('login', 'manual', istAt('2026-10-06', '08:00'), '', now);
     history.finish(run, 0, 1, now);
     expect(skippedToday(jobs, now, history)).toEqual([]);
+  });
+});
+
+describe('telegramSink types', () => {
+  it('skips a switched-off type but always sends an untyped alert', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scheduler-prefs-'));
+    const prefs = join(dir, 'notifications.json');
+    await Bun.write(prefs, '{"disabled": ["scheduler.morning"]}');
+    process.env.NOTIFY_PREFS_FILE = prefs;
+    const realFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      return new Response('{}');
+    }) as unknown as typeof fetch;
+    const env = { TELEGRAM_BOT_TOKEN: 'token-1234', TELEGRAM_CHAT_ID: '1' };
+    try {
+      await telegramSink(env, 'scheduler.morning')('summary');
+      expect(calls).toBe(0);
+      await telegramSink(env)('a failure alert');
+      expect(calls).toBe(1);
+    } finally {
+      globalThis.fetch = realFetch;
+      Reflect.deleteProperty(process.env, 'NOTIFY_PREFS_FILE');
+    }
   });
 });
