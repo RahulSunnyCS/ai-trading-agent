@@ -7,12 +7,17 @@ import { formatIst } from './schedule.js';
 /** Where alerts go. Telegram in production; an array in tests. */
 export type AlertSink = (text: string) => Promise<void>;
 
-export function telegramSink(env: Record<string, string>): AlertSink {
+/**
+ * `type` ties the message to a switch on the Notifications page (packages/notify prefs.ts).
+ * Failure, missed and recovered alerts pass none, so they always send: a switched-off
+ * preferences entry must never be what hides a broken job.
+ */
+export function telegramSink(env: Record<string, string>, type?: string): AlertSink {
   const botToken = env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = env.TELEGRAM_CHAT_ID?.trim();
   if (botToken) registerSecret(botToken);
   const config: TelegramConfig | null = botToken && chatId ? { botToken, chatId } : null;
-  return (text) => sendText(config, text);
+  return (text) => sendText(config, text, type);
 }
 
 /** Exit codes the runner itself produces: the job never got to report anything. */

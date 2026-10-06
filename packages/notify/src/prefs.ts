@@ -19,6 +19,9 @@ export const NOTIFICATION_TYPES = {
   'momentum.problem': 'Momentum: no signal, stale data, blocked favourite or failed job',
   'options.daily': 'Options evening collection and leg-wise P&L summary',
   'options.problem': 'Options evening collection could not run',
+  'scheduler.morning': 'Scheduler morning summary (09:00 on trading days)',
+  'scheduler.digest': 'Scheduler Saturday health digest',
+  'scheduler.backup': 'Monthly backup fell back to ~/Downloads (SSD not plugged in)',
 } as const;
 
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
