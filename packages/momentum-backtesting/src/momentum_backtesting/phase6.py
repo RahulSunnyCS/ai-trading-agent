@@ -77,7 +77,7 @@ def run(
             "group_median": float(choose.window_returns(curves[group], start, end).median()),
             "bench": float(choose.window_returns(bench, start, end)),
         }
-    pairwise = np.log(curves[picks].astype(float)).diff().corr().to_numpy()
+    pairwise = np.log(curves[picks].astype(float)).diff().corr().to_numpy(copy=True)
     np.fill_diagonal(pairwise, np.nan)
     report["pick"] = {
         "group": len(group),
