@@ -254,8 +254,16 @@ def vendor_import(
         for u in units:
             typer.echo(f"  {u.section}/{u.folder}: {len(u.files)} files, {u.rows:,} rows")
         return
+    failed: list[str] = []
     for u in units:
-        report = vendor.import_unit(root, u, days=window, force=force, log=typer.echo)
+        try:
+            report = vendor.import_unit(root, u, days=window, force=force, log=typer.echo)
+        except Exception as error:  # noqa: BLE001 - one bad unit must not stop the other 200
+            failed.append(f"{u.section}/{u.folder}")
+            typer.echo(
+                f"!! {u.section}/{u.folder} FAILED: {type(error).__name__}: {error}", err=True
+            )
+            continue
         excluded = ", ".join(f"{k} {v}" for k, v in sorted(report.excluded.items())) or "none"
         typer.echo(
             f"== {report.name}: {report.days_written} days written, "
@@ -263,6 +271,11 @@ def vendor_import(
             f"chunks run {report.chunks_run}, skipped {report.chunks_skipped}; "
             f"unparsed rows {report.rows_unparsed}; excluded days: {excluded}"
         )
+    if failed:
+        typer.echo(
+            f"{len(failed)} unit(s) failed (re-run resumes them): {', '.join(failed)}", err=True
+        )
+        raise typer.Exit(1)
 
 
 @vendor_app.command("import-index")

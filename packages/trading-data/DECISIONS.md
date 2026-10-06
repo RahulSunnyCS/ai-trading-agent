@@ -305,9 +305,16 @@ spot and India VIX CSVs.
   the collector's `instrument_id` where both name the same instrument — the catalog key is
   `NSE:OPT:<underlying>:<expiry>:<strike>:<CE|PE>`, and the vendor name is added as a second
   alias (`drive-vendor`).
-- **Resumable by chunk.** Each chunk is one `ingest_runs` row; `ok` and `partial` (finished,
-  with recorded issues) are done, a crashed run (`running`) is marked `failed` and redone. A
-  re-run skips existing day files regardless.
+- **Resumable by chunk, and aware of the data.** Each chunk is one `ingest_runs` row; `ok` and
+  `partial` (finished, with recorded issues) are done *only if the run saw the same number of
+  staged rows* — the scope string alone would swallow new data added to an imported month (the
+  missing Aug–Sep 2026 days will arrive that way). A crashed run (`running`) is marked `failed`
+  (only the importer's own scopes) and redone. A re-run skips existing day files, and gives the
+  vendor-written ones among them a verdict — a crash after writing but before recording used to
+  leave those days unjudged. Collector-written days are judged by `tdata quality rebuild`.
+  One unit failing (`tdata vendor import`) is reported and the rest continue; exit status 1.
+- **Duplicates are resolved deterministically**: two names for one instrument at the same
+  minute keep the higher-volume row, then the lower vendor name — never an arbitrary one.
 - **Verified:** a vendor-imported day and a Fyers-written day with the same prices give identical
   legwise trades, fills and MTM curve (`option-backtesting/tests/unit/test_vendor_day_legwise.py`);
   on the real data, NIFTYNXT50's 3,700,483 staged rows came out as exactly 3,700,483 lake rows.

@@ -40,7 +40,7 @@ def _rows(symbol, day, *, bars=375, start=(9, 15), strikes=STRIKES, expiry=EXPIR
     first = datetime(day.year, day.month, day.day, *start, tzinfo=IST)
     out = []
     for strike in strikes:
-        contract = f"{symbol}_{strike:g}_CE_26_MAR_26"
+        contract = f"{symbol}_{strike:g}_CE_{expiry:%d_%b_%y}".upper()  # as the vendor names them
         for m in range(bars):
             out.append(
                 (symbol, contract, strike, "CE", expiry, first + timedelta(minutes=m),
@@ -389,3 +389,113 @@ def test_cli_dry_run_import_and_status(root, staging, monkeypatch):
     assert missing.exit_code == 1
     bad = runner.invoke(app, ["vendor", "import", "--from", str(staging), "--days", "oops"])
     assert bad.exit_code != 0
+
+
+def test_days_a_crashed_run_wrote_but_never_recorded_are_judged_on_the_rerun(root, staging):
+    """The catalog lock that killed a real India VIX import after its day files were written:
+    on the re-run those files exist, are skipped, and used to stay unjudged for good."""
+    _import(root, staging, units=["nifty"])
+    with connect(root) as con:  # as if the run had died before recording anything
+        con.execute("DELETE FROM data_quality")
+        con.execute("DELETE FROM ingest_runs")
+    (second,) = _import(root, staging, units=["nifty"])
+    assert second.days_written == 0 and second.days_skipped_existing == 5
+    assert _fetch(root, "SELECT count(*) FROM data_quality WHERE asset = 'option'")[0][0] == 5
+
+
+def test_collector_days_are_skipped_but_not_judged_by_the_vendor_import(root, staging):
+    fyers = lake.bars_1m_path(root, "option", "NIFTY", TUE)
+    fyers.parent.mkdir(parents=True)
+    pq.write_table(
+        pa.table(
+            {
+                "instrument_id": pa.array([1], pa.int64()),
+                "vendor_symbol": pa.array(["NSE:NIFTY26MAR22000CE"], pa.string()),
+            }
+        ),
+        fyers,
+    )
+    _import(root, staging, units=["nifty"])
+    days = {r[0] for r in _fetch(root, "SELECT trading_day FROM data_quality")}
+    assert TUE not in days and WED in days  # `tdata quality rebuild` judges collector files
+
+
+def test_new_staging_data_in_an_already_imported_month_is_loaded(root, staging):
+    """The scope string of a finished chunk does not change when more data is added to it
+    (the missing Aug-Sep 2026 days will arrive that way); the row count does."""
+    _import(root, staging, units=["nifty"])
+    later = date(2026, 3, 12)
+    _write(
+        staging / "index" / "nifty" / "2026-04-02.parquet",
+        _rows("NIFTY", later, expiry=date(2026, 4, 2)),
+    )
+    (second,) = _import(root, staging, units=["nifty"])
+    assert second.chunks_skipped == 0 and second.days_written == 1
+    assert later in lake.available_days(root, "option", "NIFTY")
+    (third,) = _import(root, staging, units=["nifty"])
+    assert third.chunks_run == 0 and third.chunks_skipped == 1  # now it is done
+
+
+def test_a_duplicate_bar_keeps_the_higher_volume_row_every_time(root, tmp_path):
+    s = tmp_path / "staging"
+    base = _rows("NIFTY", TUE, strikes=[22000.0])
+    twin = [
+        (r[0], "NIFTY_22000.0_CE_26_MAR_26", *r[2:6], 200.0, 200.0, 200.0, 200.0, 99, r[11])
+        for r in base
+    ]  # a second name for the same instrument, a different price, a higher volume
+    _write(s / "index" / "nifty" / "2026-03-26.parquet", base + twin)
+    for _ in range(2):
+        (report,) = _import(root, s, force=True)
+        table = pq.read_table(lake.bars_1m_path(root, "option", "NIFTY", TUE))
+        assert len(table) == 375 and set(table["close"].to_pylist()) == {200.0}
+    assert _fetch(root, "SELECT check_name FROM quality_issues")[0] == ("duplicate_rows",)
+    assert report.rows_unparsed == 0
+
+
+def test_one_failing_unit_does_not_stop_the_others(root, tmp_path, monkeypatch):
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    s = tmp_path / "staging"
+    clash = _rows("NIFTY", TUE, strikes=[1234567.1]) + _rows("NIFTY", TUE, strikes=[1234567.2])
+    _write(s / "index" / "nifty" / "2026-03-26.parquet", clash)  # keys collide: aborts NIFTY
+    _write(s / "index" / "sensex" / "2026-03-26.parquet", _rows("SENSEX", TUE))
+    result = CliRunner().invoke(app, ["vendor", "import", "--from", str(s)])
+    assert result.exit_code == 1
+    assert "index/nifty FAILED" in result.output and "1 unit(s) failed" in result.output
+    assert lake.available_days(root, "option", "SENSEX") == [TUE]  # still imported
+
+
+def test_a_stale_running_run_is_failed_but_other_importers_runs_are_left_alone(root, staging):
+    with connect(root) as con:
+        con.execute(
+            "INSERT INTO ingest_runs (run_id, source, dataset, scope) VALUES "
+            "('a', 'vendor', 'bars_1m', 'NIFTY 2026-01-01..2026-01-31'), "
+            "('b', 'vendor', 'bars_1m', 'NIFTY nifty_spot.csv 2026-01-01..2026-12-31'), "
+            "('c', 'vendor', 'bars_1m', 'BANKNIFTY 2026-01-01..2026-01-31')"
+        )
+    _import(root, staging, units=["nifty"])
+    got = dict(_fetch(root, "SELECT run_id, status FROM ingest_runs WHERE run_id IN ('a','b','c')"))
+    assert got == {"a": "failed", "b": "running", "c": "running"}
+
+
+def test_import_index_csv_window_force_odd_names_and_duplicates(root, tmp_path):
+    csv = tmp_path / "nifty's spot.csv"  # an apostrophe in the file name must not reach the SQL
+    _spot_csv(csv, [TUE, WED])
+    vendor.import_index_csv(root, csv, "NIFTY", days=(WED, WED), log=lambda _: None)
+    assert lake.available_days(root, "index", "NIFTY") == [WED]
+    whole = vendor.import_index_csv(root, csv, "NIFTY", log=lambda _: None)
+    assert (whole.days_written, whole.days_skipped_existing) == (1, 1)  # TUE new, WED there
+    assert _fetch(root, "SELECT count(*) FROM data_quality WHERE asset = 'index'")[0][0] == 2
+    forced = vendor.import_index_csv(root, csv, "NIFTY", force=True, log=lambda _: None)
+    assert forced.days_written == 2
+    table = pq.read_table(lake.bars_1m_path(root, "index", "NIFTY", TUE))
+    assert table["vendor_symbol"][0].as_py() == "nifty's spot"
+
+    dup = tmp_path / "dup.csv"
+    dup.write_text(
+        "Date,Open,High,Low,Close,Volume\n"
+        "2026-03-12T09:15:00+0530,1,1,1,1,5\n2026-03-12T09:15:00+0530,2,2,2,2,50\n"
+        "2026-03-12T09:16:00+0530,3,3,3,3,1\n"
+    )
+    vendor.import_index_csv(root, dup, "SENSEX", log=lambda _: None)
+    table = pq.read_table(lake.bars_1m_path(root, "index", "SENSEX", date(2026, 3, 12)))
+    assert table["close"].to_pylist() == [2.0, 3.0]  # the higher-volume duplicate won
