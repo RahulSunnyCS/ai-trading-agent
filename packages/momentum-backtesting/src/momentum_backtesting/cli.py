@@ -1447,6 +1447,32 @@ def search_score(
     )
 
 
+@search_app.command("choose")
+def search_choose(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
+    dest: Path = typer.Option(None, "--dest", help="Report folder (default <out>/phase5)."),
+) -> None:
+    """BL-010 Phase 5: robustness over financial years, the walk-forward of the choice rule,
+    the factor check and the choice per drawdown basket, as committed in criteria addendum 3.
+    Reads stored curves only; writes report.json and report.md."""
+    from . import bias, choose, db_read, method, phase5, reference_benchmarks
+
+    scored = scored or out / "scored_pit"
+    dest = dest or out / "phase5"
+    scores, curves = method.load_scores(scored)
+    facts = choose.config_facts(bias.load_records(out, set(curves.columns)))
+    refs = reference_benchmarks.load_references()
+    closes = db_read.weekly_closes_from_db_or_none()
+    if closes is None:
+        closes = pd.read_csv(DATA_DIR / "weekly_closes.csv", index_col=0, parse_dates=True)
+    series = {
+        name: refs[name] for name in (phase5.MOM30, phase5.NIFTY50, phase5.MIDCAP, phase5.SMALLCAP)
+    }
+    series[phase5.CASH] = closes["Cash (liquid fund)"]
+    phase5.run(curves, scores, facts, series, dest, echo=typer.echo)
+
+
 @search_app.command("fair-placebo")
 def search_fair_placebo(
     out: Path = typer.Argument(..., help="A finished search's results folder."),

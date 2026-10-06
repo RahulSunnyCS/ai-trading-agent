@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — the 55–63% CAGR headline, the saved favourites and the weekly signal all rest on an evaluation with known leaks and engine bugs |
-| **Status** | In progress (Phases 0, 1a, 2, 4 done; Phase 3 measured, arm A's headline killed; Phase 5 started) |
+| **Status** | In progress (Phases 0, 1a, 2, 4, 5 done; Phase 3 measured, arm A's headline killed; Phase 5 names no config — owner decision pending) |
 | **Type** | research (+ bug fixes in the engine) |
 | **Area** | momentum (+ trading-data for corporate-action matching) |
 | **Created** | 2026-10-05 |
@@ -311,6 +311,13 @@ median), re-run on the fixed engine. Steps 1–3 and 5–7 first; step 4 after B
    bootstrap 95th percentile).
 - **Done when:** the backcast result is recorded and paper tracking is running.
 
+### Last task — dashboard changes (owner, 2026-10-06)
+When the analysis is complete, write a plan of what the dashboard should change because of
+BL-010's findings, if anything: for example the point-in-time universe (BL-029), the Monday-open
+fill, Midcap 150 / Smallcap 250 comparison lines, showing the chosen config(s) and their
+forward tracking, and the "upper bound" warning once the hindsight checks are done. A plan
+only; each change becomes its own item.
+
 ### Phase 7 — Optional accuracy items
 F14 (circuit-lock mask, session-counted windows, Fyers prevclose), F15 (share-count engine and
 capacity), F16 (dividends, historical tax rates, delisting exits). Pick up after Phase 6.
@@ -350,6 +357,14 @@ Also parked here (owner, 2026-10-06), priority P3:
    classification (every company by what it does, losers included), applied to every year;
    live, any category may be added and is tracked from the day it is added. Not needed for
    Phase 5; parked in Phase 7. Still the owner's decision.
+4. **Pending — Phase 5 named no config (2026-10-06).** The committed choice rule failed its
+   walk-forward in all three baskets: its picks earned 18.6% / 28.5% / 28.5% a year
+   (FY2020–FY2026, pre-tax) against 31–32% for the basket's median config and 15% for Nifty200
+   Momentum 30 TRI. What to follow in Phase 6 is the owner's call. Claude's recommendation: a
+   simple, typical config with 8–12 holdings, rebalanced every 2 or 4 weeks, inside the basket
+   the owner wants — or the same capital split across three or four such configs — paper-
+   tracked against a Nifty200 Momentum 30 index fund. Whichever is chosen is written into a
+   criteria addendum before Phase 6 runs. A proposal, not a decision.
 
 ### Answered
 
@@ -474,3 +489,10 @@ Also parked here (owner, 2026-10-06), priority P3:
   (baskets, rank by third-worst FY against Mom30, 8–12 holdings preferred, any rebalance
   interval; pre-tax, today's tags). Loading Midcap 150, Smallcap 250, Midcap150 Momentum 50 and
   Nifty500 Momentum 50 TRI.
+- 2026-10-06 — Phase 5 done (`choose.py`, `phase5.py`, `mbt search choose`; Fable-checked: no
+  look-ahead, rule as written, five report corrections applied). The committed rule's
+  walk-forward is killed in all three baskets: picks 18.6% / 28.5% / 28.5% against a median
+  config of 31–32% and Mom30 TRI 15% (FY2020–FY2026, pre-tax). Ranking by CAGR is noise in two
+  baskets; 8–12 holdings matches 2–6 on return with far shallower falls. **No config named**;
+  open question 4 asks the owner what to follow. Midcap 150, Smallcap 250 and two momentum
+  TRIs loaded (PR #39).
