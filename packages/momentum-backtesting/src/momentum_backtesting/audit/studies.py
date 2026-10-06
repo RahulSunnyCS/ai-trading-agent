@@ -194,6 +194,9 @@ def big_days(bundle: dict, market: Market, reconciled: Replayed) -> list[dict]:
     a stock with no price band, a restart after a demerger or suspension, a split or bonus the
     adjustment missed, or bad data. Each needs a look."""
     out = []
+    # A holding still open at the end is held only until the run's last week, not to the end
+    # of the data: a run that stops early must not count the days after it.
+    last_week = date.fromisoformat(bundle["weeks"][-1])
     for name, spans in holding_spans(reconciled).items():
         asset = bundle["assets"][name]
         if asset["kind"] != "stock":
@@ -205,7 +208,7 @@ def big_days(bundle: dict, market: Market, reconciled: Replayed) -> list[dict]:
         until = date.fromisoformat(asset["until"]) if asset.get("until") else None
         for start, end in spans:
             for previous, bar in zip(history.bars, history.bars[1:], strict=False):
-                if bar.day <= start or (end is not None and bar.day > end):
+                if bar.day <= start or bar.day > (end if end is not None else last_week):
                     continue
                 if (first and previous.day < first) or (until and bar.day >= until):
                     continue
