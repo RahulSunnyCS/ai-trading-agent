@@ -99,7 +99,8 @@ def basket_passes(curve: pd.Series, indices: dict[str, pd.Series], basket: str) 
     if relative["index"] not in indices:
         raise KeyError(
             f"the {basket} basket is judged against {relative['index']}, which was not given "
-            f"(have: {sorted(indices)}). reference_benchmarks does not load it yet."
+            f"(have: {sorted(indices)}). reference_benchmarks.load_references() carries it once "
+            "`mbt stocks fetch-benchmarks` has run."
         )
     for episode in episodes(curve, indices[relative["index"]]):
         if episode.depth < spec["hard_ceiling"]:

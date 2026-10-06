@@ -316,6 +316,7 @@ uv run mbt stocks fetch                          # full run: download + rebuild 
 uv run mbt stocks fetch --skip-download           # no network - rebuild from the raw cache only
 uv run mbt stocks fetch --from 2015-01-01         # shorter CA-history / bhavcopy window
 uv run mbt stocks fetch --accept-ca-diff reviewed.csv  # accept a reviewed >30-day-old CA diff
+uv run mbt stocks fetch-benchmarks               # only the 4 comparison TRIs -> benchmarks_weekly.csv + stock_weekly_series
 uv run mbt stocks pin-manifest                    # commit the current raw cache as the baseline
 uv run mbt stocks validate                        # re-run just the dividend verifier
 ```
@@ -334,7 +335,7 @@ written.
 |---|---|---|
 | NSE bhavcopy (`nsearchives.nseindia.com`) | Daily EQ/BE/BZ OHLC per symbol, 2011-. Old CM format until 2024-07-05, UDiFF format from 2024-07-08 | Cookie warm-up, ≥0.35s throttle, bounded retries |
 | NSE corporate actions API (`nseindia.com/api/corporates-corporateActions`) | Whole-market bonus/split/dividend/rights/demerger/... feed, fetched by calendar quarter | Same client, same throttle |
-| niftyindices.com (`getTotalReturnIndexString` / `getHistoricaldatatabletoString`) | Nifty 50 TRI, Nifty200 Momentum 30 TRI, Nifty50 Equal Weight TRI and price index | ≤1 year per request (the site's own limit) |
+| niftyindices.com (`getTotalReturnIndexString` / `getHistoricaldatatabletoString`) | Nifty 50 TRI, Nifty200 Momentum 30 TRI, Nifty50 Equal Weight TRI and price index; comparison-only TRIs: Nifty Midcap 150, Nifty Smallcap 250, Nifty Midcap150 Momentum 50, Nifty500 Momentum 50 | ≤1 year per request (the site's own limit) |
 | AMFI (`mfapi.in`) | UTI Liquid Fund NAV (Direct + Regular plan), spliced for the cash backfill to 2011 | via `fetch.backfill` |
 
 Raw responses are cached under `data/stocks/raw/` (gitignored, ~3,900 bhavcopy zips +
