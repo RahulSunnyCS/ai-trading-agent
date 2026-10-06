@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner wants it started next (2026-10-06); it is the data every options backtest (BL-009, BL-022, BL-026) runs on, and without it the engine has six sessions of history |
-| **Status** | In progress (Phase 1) |
+| **Status** | In progress (Phase 1 done 2026-10-07; Phase 2 next) |
 | **Type** | feature |
 | **Area** | trading-data (+ options, infra) |
 | **Created** | 2026-10-06 |
@@ -75,7 +75,10 @@ Owner decisions (2026-10-06):
 
 - Tick-level data, bid/ask/depth recording (P2, low priority; needs a bigger SSD and the
   `apps/server` live feed or a REST quote recorder — see Risks).
-- Stock options and the minor indices beyond loading their raw bars (no derived tables).
+- Stock options: the vendor's stock history is deferred to [BL-037](BL-037-stock-options-in-the-lake.md) (P3;
+  47 of 216 stocks were loaded when it was stopped) and the forward collection of stocks is
+  [BL-038](BL-038-monthly-expiry-stock-options-collection.md). The minor indices (BANKNIFTY,
+  FINNIFTY, MIDCPNIFTY, NIFTYNXT50) are loaded as raw bars only (no derived tables).
 - Backfilling Aug 26 → Sep 22, 2026 (owner is sourcing it; load it with the Phase 1 loader if it arrives).
 - Engine features (those are BL-009 Phases 3–6).
 - Delta-based strike selection, full IV-surface research (needs greeks on every strike every
@@ -113,6 +116,34 @@ Owner decisions (2026-10-06):
 - **Done when:** `legwise` runs an existing strategy over a vendor day and a Fyers day with no code
   change; `tdata status` shows option days from 2022-03 (nifty) → today with no gap other than
   Aug 26 → Sep 22, 2026; `tdata backup` to a second location copies the new partitions.
+
+**Phase 1 outcome (2026-10-07).** Done, in six PRs (#52, #55, #58, #61, #62, #63; two more
+fixes in #68 and the docs PR). Loaded into the lake on the disk image, each unit's rows
+verified equal to the staged rows from the Parquet footers:
+
+| | Days | Rows |
+|---|---|---|
+| NIFTY options | 1,005 (2022-03 → 2026-09-15; usable range starts ~Sep 2024) | 143,649,872 |
+| SENSEX options | 582 | 71,893,677 |
+| BANKNIFTY / FINNIFTY / MIDCPNIFTY / NIFTYNXT50 options | 684 / 647 / 669 / 666 | 68.4M / 21.1M / 31.1M / 3.7M |
+| Spot: NIFTY, BANKNIFTY, SENSEX; India VIX | 2,838 / 2,763 / 2,075 / 2,130 | 1.06M / 1.03M / 0.77M / 1.05M |
+| Stock options (deferred, BL-037) | 47 of 216 folders | 0.41B of 1.77B |
+
+Exit checks: the legwise engine, unchanged, backtests vendor days and Fyers days for NIFTY and
+SENSEX (e.g. NIFTY 2026-06-24 vendor, 2026-09-23 Fyers; SENSEX 2026-07-22 vendor, 2026-09-25
+Fyers), and a unit test proves a vendor-imported day equals a Fyers-written day trade for trade.
+Reading is fast: a month-long straddle series 1.1 s, a year's aggregate 1.3 s, a full scan of
+144M NIFTY rows 1.3 s. Differences from the plan above: every vendor row is kept (the quality
+table labels special sessions and after-hours rows; nothing is clipped), the Oct-2024 overlap
+with `2014-2024` does not arise yet (that set is Phase 5), and `data_quality` is migration 008.
+
+**Two owner-gated follow-ups remain from Phase 1:** (1) after a Fyers login,
+`obt fyers history --underlying <U>` for NIFTY (from 2026-06-30), SENSEX (from 2026-07-23),
+BANKNIFTY (from 2026-05-30), FINNIFTY and MIDCPNIFTY (their whole range) fills the index spot the
+vendor's CSVs lack, then `tdata quality rebuild --asset index` — until then 55 NIFTY, 39 SENSEX
+and 61 BANKNIFTY option days are labelled `no_spot`; (2) install the `trading-data-mount`
+LaunchAgent once the main checkout has the new code (`deploy/launchd/install.sh` also performs
+the BL-012 scheduler cut-over, which is the owner's call).
 
 ### Phase 2 — Reference data the backtests need
 - **Tasks:** `expiry_calendar_observed` — expiries derived from the data itself per underlying
@@ -216,3 +247,10 @@ Still open for Phase 3:
   via `TRADING_DATA_ROOT` with a mount guard. The schema layout (one file per underlying per
   day) was re-chosen on its merits rather than inherited from the eight Fyers days. Vendor spot
   ends 2026-06-29 (NIFTY) / 2026-07-23 (SENSEX); `obt fyers history` fills the index days after.
+- 2026-10-07 — **Phase 1 done** (outcome above). Learned on the way: the vendor groups a renamed
+  stock's old and new contracts in one folder (handled, PR #68); catalog lock contention with the
+  research servers can kill a long import after it wrote files (importer now waits up to 10
+  minutes, judges days left by a crashed run, and resumes only when the staged row count is
+  unchanged); NIFTY's usable range starts ~Sep 2024. Scope narrowed by the owner: stocks are not
+  loaded further (BL-037, P3), and their forward collection from Fyers on monthly expiry days is
+  BL-038 (P1).
