@@ -1,0 +1,20 @@
+{
+  "name": "@ata/scheduler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "One home for every recurring job: logins, Friday momentum, evening collection, backups and checks (BL-012)",
+  "scripts": {
+    "jobs": "bun src/cli.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@trading/market-reference": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -95,6 +95,12 @@ pre-push:
           fi
         done
 
+    scheduler-unit:
+      run: |
+        if git diff --name-only origin/main...HEAD | grep -qE '^(apps/scheduler|packages/market-reference)/'; then
+          (cd apps/scheduler && bun run test && bun run typecheck)
+        fi
+
     dashboard-unit:
       run: |
         if git diff --name-only origin/main...HEAD | grep -q '^apps/dashboard/'; then

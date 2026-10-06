@@ -1,0 +1,141 @@
+import { Database } from 'bun:sqlite';
+
+/**
+ * Run history in a local SQLite file — not the DuckDB catalog, so recording a
+ * run never competes with a job for the catalog's single writer.
+ */
+export type Trigger = 'schedule' | 'catch-up' | 'manual';
+
+export interface RunRow {
+  id: number;
+  job: string;
+  trigger: Trigger;
+  /** ISO instant of the schedule slot this run serves; null for a manual run. */
+  scheduled_for: string | null;
+  started_at: string;
+  ended_at: string | null;
+  exit_code: number | null;
+  attempts: number;
+  pid: number | null;
+  log_path: string;
+  error: string | null;
+}
+
+export class History {
+  private readonly db: Database;
+
+  constructor(path: string) {
+    this.db = new Database(path, { create: true });
+    this.db.exec('PRAGMA journal_mode = WAL');
+    this.db.exec(`CREATE TABLE IF NOT EXISTS runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job TEXT NOT NULL,
+      trigger TEXT NOT NULL,
+      scheduled_for TEXT,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      exit_code INTEGER,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      pid INTEGER,
+      log_path TEXT NOT NULL,
+      error TEXT
+    )`);
+    this.db.exec('CREATE INDEX IF NOT EXISTS runs_job_started ON runs (job, started_at)');
+  }
+
+  start(
+    job: string,
+    trigger: Trigger,
+    scheduledFor: Date | null,
+    logPath: string,
+    at: Date,
+  ): number {
+    const row = this.db
+      .query(
+        `INSERT INTO runs (job, trigger, scheduled_for, started_at, pid, log_path)
+         VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      )
+      .get(
+        job,
+        trigger,
+        scheduledFor?.toISOString() ?? null,
+        at.toISOString(),
+        process.pid,
+        logPath,
+      ) as {
+      id: number;
+    };
+    return row.id;
+  }
+
+  finish(id: number, exitCode: number, attempts: number, at: Date, error: string | null = null) {
+    this.db
+      .query('UPDATE runs SET ended_at = ?, exit_code = ?, attempts = ?, error = ? WHERE id = ?')
+      .run(at.toISOString(), exitCode, attempts, error, id);
+  }
+
+  last(job: string): RunRow | null {
+    return (this.db
+      .query('SELECT * FROM runs WHERE job = ? ORDER BY started_at DESC, id DESC LIMIT 1')
+      .get(job) ?? null) as RunRow | null;
+  }
+
+  /** Any run recorded for this schedule slot, whatever its outcome. */
+  forSlot(job: string, scheduledFor: Date): RunRow | null {
+    return (this.db
+      .query('SELECT * FROM runs WHERE job = ? AND scheduled_for = ? ORDER BY id DESC LIMIT 1')
+      .get(job, scheduledFor.toISOString()) ?? null) as RunRow | null;
+  }
+
+  /**
+   * Unfinished runs of these jobs with a lower id than `beforeId`. Waiting only for older
+   * rows means two processes that start together order themselves by id instead of both
+   * seeing nothing, or both waiting for each other.
+   */
+  runningBefore(jobs: string[], beforeId: number): RunRow[] {
+    if (jobs.length === 0) return [];
+    const marks = jobs.map(() => '?').join(', ');
+    return this.db
+      .query(`SELECT * FROM runs WHERE ended_at IS NULL AND id < ? AND job IN (${marks})`)
+      .all(beforeId, ...jobs) as RunRow[];
+  }
+
+  /**
+   * Close rows whose process no longer exists (the scheduler was killed or crashed mid-run),
+   * so they stop blocking their group and stop showing as running. Returns how many.
+   */
+  reapDead(at: Date, alive: (pid: number) => boolean = pidAlive): number {
+    const rows = this.db.query('SELECT id, pid FROM runs WHERE ended_at IS NULL').all() as Array<{
+      id: number;
+      pid: number | null;
+    }>;
+    let reaped = 0;
+    for (const row of rows) {
+      if (row.pid !== null && alive(row.pid)) continue;
+      this.finish(row.id, -2, 0, at, 'interrupted: the scheduler stopped while this was running');
+      reaped++;
+    }
+    return reaped;
+  }
+
+  recent(limit = 50, job?: string): RunRow[] {
+    return (
+      job
+        ? this.db.query('SELECT * FROM runs WHERE job = ? ORDER BY id DESC LIMIT ?').all(job, limit)
+        : this.db.query('SELECT * FROM runs ORDER BY id DESC LIMIT ?').all(limit)
+    ) as RunRow[];
+  }
+
+  close(): void {
+    this.db.close();
+  }
+}
+
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
