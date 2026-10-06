@@ -11,7 +11,9 @@ close, a slight understatement of the true intraday high.
 from __future__ import annotations
 
 import math
+from collections.abc import MutableMapping
 from dataclasses import dataclass, replace
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -121,6 +123,37 @@ def grouped_momentum_ranks(
         cut = short_pct.where(eligible).quantile(1 - screen_top_pct, axis=1)
         combined = combined.where(short_pct.ge(cut, axis=0))
     return rerank(-combined), combined
+
+
+def tilt_cache_get(
+    cache: MutableMapping,
+    frame: pd.DataFrame,
+    lookbacks: tuple[int, ...],
+    tilt: float,
+    screen: float,
+) -> tuple[pd.DataFrame, pd.DataFrame] | None:
+    """A tilted rank table cached by `tilt_cache_put`, or None. The key holds `id(frame)`, and an
+    entry is only used if it is for that very object: CPython reuses the id of a frame that has
+    been freed, so an id alone can serve another frame's ranks (found in BL-010 Phase 6)."""
+    entry = cache.get((id(frame), tuple(lookbacks), tilt, screen))
+    return entry[1] if entry is not None and entry[0] is frame else None
+
+
+def tilt_cache_put(
+    cache: MutableMapping,
+    frame: pd.DataFrame,
+    lookbacks: tuple[int, ...],
+    tilt: float,
+    screen: float,
+    ranks: Any,
+    *,
+    limit: int,
+) -> None:
+    """Store `ranks` for `frame`, oldest entry out beyond `limit`. The entry keeps a reference to
+    `frame`, so while it is cached the frame cannot be freed and its id cannot be reused."""
+    cache[(id(frame), tuple(lookbacks), tilt, screen)] = (frame, ranks)
+    while len(cache) > limit:
+        cache.pop(next(iter(cache)))
 
 
 def fresh_52w_low_mask(prices: pd.DataFrame, weeks: int = 52) -> pd.DataFrame:

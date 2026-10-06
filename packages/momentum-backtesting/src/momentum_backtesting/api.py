@@ -26,6 +26,7 @@ from . import (
     rebalance,
     reference_benchmarks,
     runs_store,
+    search,
     stock_actions,
 )
 from .categories import broad
@@ -49,7 +50,16 @@ from .categories.compose import (
     DEFAULT_TOP_N as CATEGORY_DEFAULT_TOP_N,
 )
 from .config import DATA_DIR, load_repo_env
-from .engine import BENCHMARK, CASH, IDLE, Config, Result, ranked_universe, run_backtest
+from .engine import (
+    BENCHMARK,
+    CASH,
+    IDLE,
+    Config,
+    Result,
+    cadence_weeks,
+    ranked_universe,
+    run_backtest,
+)
 from .fetch import load_universe
 from .notify import IST, Notification
 from .stocks import ui_data
@@ -239,9 +249,10 @@ class _Data:
         tilt: float,
         screen_top_pct: float,
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        key = (id(ranking), tuple(lookbacks), tilt, screen_top_pct)
         with self._lock:
-            cached = self.broad_tilt_cache.get(key)
+            cached = levers.tilt_cache_get(
+                self.broad_tilt_cache, ranking.prices, lookbacks, tilt, screen_top_pct
+            )
         if cached is not None:
             return cached
         ranks = levers.grouped_momentum_ranks(
@@ -251,9 +262,15 @@ class _Data:
             screen_top_pct=screen_top_pct,
         )
         with self._lock:
-            self.broad_tilt_cache[key] = ranks
-            while len(self.broad_tilt_cache) > 8:
-                self.broad_tilt_cache.popitem(last=False)
+            levers.tilt_cache_put(
+                self.broad_tilt_cache,
+                ranking.prices,
+                lookbacks,
+                tilt,
+                screen_top_pct,
+                ranks,
+                limit=8,
+            )
         return ranks
 
     def trim_cache(self, limit: int = 24) -> None:
@@ -344,7 +361,7 @@ class _Data:
         pool_top_n: int,
         pool_exit_rank: int,
         liquidity: liquidity_mod.LiquidityConfig | None = None,
-        universe_kind: Literal["total_market", "all_liquid"] = "total_market",
+        universe_kind: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
         series_breaks: Literal["legacy", "verified"] = "verified",
     ) -> broad.UniverseRanking:
         """Step 2 (categories/broad.py) for this exact parameter combination - cached the same
@@ -564,8 +581,10 @@ class BacktestRequest(BaseModel):
     # Optional point-in-time tradability gate on the pool (categories/liquidity.py, TODO 3.9.24).
     # Off = exactly the original Total Market pool.
     # "total_market" = the ~750-name Nifty Total Market pool (default, unchanged); "all_liquid" =
-    # every NSE equity, narrowed week by week by the tradability gate (which is then mandatory).
-    broad_universe: Literal["total_market", "all_liquid"] = "total_market"
+    # every NSE equity, narrowed week by week by the tradability gate (which is then mandatory);
+    # "turnover_rank" = the top 750 by turnover as known each January (point in time, BL-010 F1;
+    # what the Phase 3-6 searches ran on) - gated like all_liquid, because the search always gates.
+    broad_universe: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market"
     broad_liquidity_filter: bool = False
     # Fill as a live account would around circuit locks: no buying a stock locked at the upper
     # circuit, no selling one locked at the lower circuit. Off = fills ignore locks (the original
@@ -1379,11 +1398,12 @@ def _liquidity_preview_payload(
 ) -> dict:
     try:
         cfg.validate()
-        members = (
-            liquidity_mod.market_members_by_year()
-            if universe == "all_liquid"
-            else broad.total_market_members_by_year(DATA_DIR / "categories")
-        )
+        if universe == "all_liquid":
+            members = liquidity_mod.market_members_by_year()
+        elif universe == "turnover_rank":
+            members = liquidity_mod.turnover_rank_members_by_year()
+        else:
+            members = broad.total_market_members_by_year(DATA_DIR / "categories")
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
     latest_year = max(members)
@@ -1554,9 +1574,14 @@ def _circuit_realism(
     }
 
 
+#: Universes that are only meaningful behind the tradability gate: the whole market (the gate is
+#: what narrows it) and the point-in-time turnover rank (every search that used it gated).
+GATED_BROAD_UNIVERSES = ("all_liquid", "turnover_rank")
+
+
 def _liquidity_config(req: BacktestRequest) -> liquidity_mod.LiquidityConfig | None:
     """The request's liquidity gate, or None when it's off (the original, ungated pool)."""
-    if not (req.broad_liquidity_filter or req.broad_universe == "all_liquid"):
+    if not (req.broad_liquidity_filter or req.broad_universe in GATED_BROAD_UNIVERSES):
         return None
     return liquidity_mod.LiquidityConfig(
         min_turnover_cr=req.broad_liq_min_turnover_cr,
@@ -1565,6 +1590,21 @@ def _liquidity_config(req: BacktestRequest) -> liquidity_mod.LiquidityConfig | N
         circuit=req.broad_liq_circuit,
         circuit_run=req.broad_liq_circuit_run,
         max_circuit_days=req.broad_liq_max_circuit_days,
+    )
+
+
+def _broad_ranking(req: BacktestRequest) -> broad.UniverseRanking:
+    """Step 2 for this request's ranking-side settings (cached by `DATA.get_broad_ranking`)."""
+    return DATA.get_broad_ranking(
+        lookbacks=tuple(req.lookbacks),
+        weights=tuple(req.weights) if req.weights else None,
+        score=req.score,
+        voladj_skip_recent_month=req.voladj_skip_recent_month,
+        pool_top_n=req.broad_pool_top_n,
+        pool_exit_rank=req.broad_pool_exit_rank,
+        liquidity=_liquidity_config(req),
+        universe_kind=req.broad_universe,
+        series_breaks=req.broad_series_breaks,
     )
 
 
@@ -1584,19 +1624,8 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     ):
         raise HTTPException(409, "No Total Market data yet - run `mbt categories fetch-universe`.")
 
-    weights = tuple(req.weights) if req.weights else None
     try:
-        ranking = DATA.get_broad_ranking(
-            lookbacks=tuple(req.lookbacks),
-            weights=weights,
-            score=req.score,
-            voladj_skip_recent_month=req.voladj_skip_recent_month,
-            pool_top_n=req.broad_pool_top_n,
-            pool_exit_rank=req.broad_pool_exit_rank,
-            liquidity=_liquidity_config(req),
-            universe_kind=req.broad_universe,
-            series_breaks=req.broad_series_breaks,
-        )
+        ranking = _broad_ranking(req)
         outcome = _run_broad(req, ranking, DATA.get())
         DATA.trim_cache()
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
@@ -1657,6 +1686,119 @@ def _broad_backtest(req: BacktestRequest) -> dict:
         with contextlib.suppress(Exception):
             payload["circuit_exposure"]["realism"] = _circuit_realism(req, ranking, outcome)
     return payload
+
+
+def _outer_with_sentinel(week: pd.Timestamp, sentinel: pd.Timestamp) -> pd.DataFrame:
+    """The outer-market prices (CASH and the atomic assets) with `week` present and a flat
+    `sentinel` week after it, to match a ranking from `rebalance.persisted_broad_ranking`."""
+    outer = DATA.get().copy()
+    if week not in outer.index:
+        available = outer.loc[outer.index <= week]
+        if available.empty:
+            raise ValueError("No persisted outer-market data for the preview week.")
+        outer.loc[week] = available.iloc[-1]
+    outer.loc[sentinel] = outer.loc[week]
+    return outer
+
+
+def _broad_sentinel_run(req: BacktestRequest) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
+    """Run Broad on the stored data PLUS one flat sentinel week after the newest stored week, so
+    the engine - which never trades its newest week - decides the newest real one with every
+    rule it has: rebalance cadence and phase, sell_every_week, signal delay, the price ceiling,
+    the 52-week-low guard, circuit locks. Returns the outcome and that decision week."""
+    ranking = _broad_ranking(req)
+    week = ranking.prices.index[-1]
+    sentinel = week + pd.Timedelta(days=7)
+    outcome = _run_broad(
+        req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
+        rebalance.persisted_broad_ranking(ranking),
+        _outer_with_sentinel(week, sentinel),
+    )
+    return outcome, week
+
+
+def _model_holdings_or_idle(result: Result, week: pd.Timestamp) -> dict[str, float]:
+    """`rebalance.model_holdings`, except that a week the engine holds nothing (it writes no
+    weights row for one) is all idle cash rather than an error."""
+    if week in result.weights.index:
+        return rebalance.model_holdings(result, week)
+    return {IDLE: 1.0}
+
+
+def _broad_engine_signal(req: BacktestRequest) -> dict:
+    """This week's Broad signal as the engine itself would trade it (BL-010 Phase 6): same shape
+    as `analysis.latest_signal` (`week`, `rows`, `explain`), plus `target_weights`, the model's
+    portfolio after the week's trades. `analysis.latest_signal` is an advisory panel that does
+    not know the cadence, `sell_every_week`, the price ceiling or the circuit locks, so on a
+    4-weekly strategy it recommended trades the engine would not make on 3 weeks in 4."""
+    outcome, week = _broad_sentinel_run(req)
+    result = outcome.result
+    ranking = outcome.ranking
+    trades = result.trades
+    acted = trades[trades["week"] == week] if len(trades) else trades
+    actions: dict[str, tuple[str, str]] = {}
+    for trade in acted.itertuples():
+        if trade.asset not in (CASH, IDLE):
+            actions[trade.asset] = (str(trade.action), str(trade.reason))
+
+    # The engine records no weights row for a week it holds nothing, so "before" is the previous
+    # week's row only if there is one.
+    earlier = result.equity.index[result.equity.index < week]
+    previous = earlier[-1] if len(earlier) else None
+    held_before = (
+        {n for n, w in result.weights.loc[previous].items() if n != IDLE and w > 1e-9}
+        if previous is not None and previous in result.weights.index
+        else set()
+    )
+    ranks, scores = result.ranks.loc[week], result.scores.loc[week]
+    history = ranking.prices.loc[:week]
+    returns = {
+        k: history.iloc[-1] / history.iloc[-1 - k] - 1 for k in req.lookbacks if len(history) > k
+    }
+    rows = []
+    for name in dict.fromkeys([*result.ranked_names, *actions]):
+        action, reason = actions.get(name, ("HOLD" if name in held_before else "", ""))
+        rows.append(
+            {
+                "asset": name,
+                "rank": ranks.get(name),
+                "score": scores.get(name),
+                "returns": {str(k): r.get(name) for k, r in returns.items()},
+                "held": name in held_before,
+                "action": action,
+                "reason": reason,
+            }
+        )
+    rows.sort(key=lambda r: (pd.isna(r["rank"]), r["rank"] if pd.notna(r["rank"]) else 0))
+
+    if req.rebalance == "weekly" and req.rebalance_every > 1:
+        on_cadence = bool(cadence_weeks([week], req.rebalance_every, req.rebalance_offset))
+        explain = (
+            f"Rebalance week (every {req.rebalance_every} weeks, phase {req.rebalance_offset})."
+            if on_cadence
+            else f"Not a rebalance week (every {req.rebalance_every} weeks, phase "
+            f"{req.rebalance_offset}): "
+            + (
+                "only sells of names that dropped out are made."
+                if req.sell_every_week
+                else "no trades."
+            )
+        )
+    else:
+        explain = "Rebalance week."
+    if req.signal_delay:
+        explain += f" With a {req.signal_delay}-week signal delay, the ranks shown are that old."
+    return analysis._clean(
+        {
+            "week": week,
+            "rows": rows,
+            "explain": explain,
+            "target_weights": {
+                name: round(weight, 4)
+                for name, weight in _model_holdings_or_idle(result, week).items()
+            },
+        }
+    )
 
 
 def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> dict:
@@ -1753,24 +1895,14 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                 and req.broad_category_top_n > req.broad_category_exit_rank
             ):
                 raise ValueError("Category top N can't exceed category exit rank.")
-            ranking = DATA.get_broad_ranking(
-                lookbacks=tuple(req.lookbacks),
-                weights=tuple(req.weights) if req.weights else None,
-                score=req.score,
-                voladj_skip_recent_month=req.voladj_skip_recent_month,
-                pool_top_n=req.broad_pool_top_n,
-                pool_exit_rank=req.broad_pool_exit_rank,
-                liquidity=_liquidity_config(req),
-                universe_kind=req.broad_universe,
-                series_breaks=req.broad_series_breaks,
-            )
+            ranking = _broad_ranking(req)
             symbol_map = rebalance.broad_quote_symbols(ranking)
             unknown = set(req.holdings_pct) - set(symbol_map) - {IDLE}
             if unknown:
                 raise ValueError(f"Unknown or inactive holdings: {', '.join(sorted(unknown))}.")
             # Quoting every listed stock is intentionally avoided for the whole-market
             # universe. Its preview remains available from the latest database close.
-            if live and req.broad_universe == "all_liquid":
+            if live and req.broad_universe in GATED_BROAD_UNIVERSES:
                 live = False
             if live:
                 try:
@@ -1801,13 +1933,7 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                 ltp, symbols = rebalance.persisted_broad_prices(ranking, week.date())
             settlement_week = week + pd.Timedelta(days=7)
             model_req, schedule = model_request(week, settlement_week)
-            outer = DATA.get().copy()
-            if week not in outer.index:
-                available = outer.loc[outer.index <= week]
-                if available.empty:
-                    raise ValueError("No persisted outer-market data for the preview week.")
-                outer.loc[week] = available.iloc[-1]
-            outer.loc[settlement_week] = outer.loc[week]
+            outer = _outer_with_sentinel(week, settlement_week)
             outcome = _run_broad(model_req, preview_ranking, outer).result
             target = rebalance.model_holdings(outcome, week)
         current = dict(req.holdings_pct)
@@ -1865,21 +1991,23 @@ def _no_active_signal_notification(
     if active is None:
         return Notification(
             "momentum-weekly",
-            "warning",
+            "warn",
             f"Momentum {run}: no active favourite selected",
             "No saved favourite is marked active, so there is nothing to send to Telegram. "
             "Mark one active in the dashboard's Saved strategies list.",
+            type="momentum.problem",
         )
     reasons = "\n".join(
         f"• {outcome['name']}: {outcome['blocked']}" for outcome in outcomes if outcome["blocked"]
     )
     return Notification(
         "momentum-weekly",
-        "warning",
+        "warn",
         f"Momentum {run}: active favourite could not produce a signal",
         f"'{active['name']}' is the active favourite but is blocked this week.\n\n"
         + (reasons or "No reason was recorded.")
         + "\n\nNo trade signal was sent to Telegram.",
+        type="momentum.problem",
     )
 
 
@@ -1904,18 +2032,27 @@ def _journal_entries(
     commit = journal.code_commit()
     closes = journal.file_fingerprint(DATA_DIR / "weekly_closes.csv")
     stock_prices: str | None = None
+    broad_snapshot: tuple[dict | None] | None = None
     entries = []
     for outcome in outcomes:
         result = outcome["result"]
         if result is None or result.signal is None:
             continue
         signal = result.signal
+        favorite = favorites_by_id.get(outcome["id"])
+        settings = favorite["config"] if favorite else signal.get("config", {})
         if outcome["dataset"] == "etf":
             fingerprint = f"weekly_closes:{closes}"
+        elif outcome["dataset"] == "broad":
+            # Broad ranks the lake's stocks, not the Nifty-50 weekly frame.
+            broad_snapshot = broad_snapshot or (search.data_snapshot(),)
+            universe = settings.get("broad_universe", "total_market")
+            fingerprint = f"weekly_closes:{closes};" + journal.broad_fingerprint(
+                broad_snapshot[0], universe
+            )
         else:
             stock_prices = stock_prices or journal.frame_fingerprint(DATA.get_stock().prices)
             fingerprint = f"weekly_closes:{closes};stock_prices:{stock_prices}"
-        favorite = favorites_by_id.get(outcome["id"])
         entries.append(
             journal.Entry(
                 week=journal.week_string(signal["week"]),
@@ -1924,7 +2061,7 @@ def _journal_entries(
                 config_id=outcome["id"] or "default-live",
                 config_name=outcome["name"],
                 dataset=outcome["dataset"],
-                settings=favorite["config"] if favorite else signal.get("config", {}),
+                settings=settings,
                 holdings_before=signal.get("weights", {}),
                 signal=journal.compact_signal(signal),
                 data_fingerprint=fingerprint,
@@ -2132,6 +2269,7 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
                 "error" if journal["error"] else "info",
                 f"Momentum {body.run}: forward journal",
                 journal_line,
+                type="momentum.journal",
             )
         )
     return {
@@ -2472,6 +2610,8 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
         payload = _custom_index_backtest(req)
     elif req.dataset == "broad":
         payload = _broad_backtest(req)
+        # The engine's own decision for this week, not the advisory panel (see its docstring).
+        payload["latest"] = _broad_engine_signal(req)
     else:
         return None, f"Unsupported weekly dataset {req.dataset!r}."
 
@@ -2516,6 +2656,7 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
         "action_required" if actionable else "info",
         f"Momentum FINAL — {favorite['name']} — week of {target_week:%d %b %Y}",
         "\n".join(lines),
+        type="momentum.final",
     )
     return RunResult(note, signal), None
 
@@ -2636,7 +2777,7 @@ def create_app() -> FastAPI:
         circuit: bool = True,
         circuit_run: int = 3,
         max_circuit_days: int | None = None,
-        universe: Literal["total_market", "all_liquid"] = "total_market",
+        universe: Literal["total_market", "all_liquid", "turnover_rank"] = "total_market",
     ) -> dict:
         """What the Broad Momentum liquidity gate would do *right now* with these thresholds:
         how many Total Market stocks pass, and why each failing one failed. Cheap enough to call
