@@ -20,7 +20,7 @@ per-task acceptance detail. They no longer carry status or open items.
 - Status lives here. `.claude/project/overview.md` holds *what is built*; this
   file holds *what is left*.
 
-Last updated: 2026-09-29
+Last updated: 2026-10-06
 
 **Closed while consolidating** (they were still listed as open somewhere, but
 are done): the stray `yarn.lock` and `package-lock.json` are both gone; T-51
@@ -52,6 +52,7 @@ One takes, so a holiday refusal may read differently per broker.
 | 1.7 | Selector-drift canary | claude | A scheduled run that asserts the AlgoTest login selectors still resolve, so drift is caught before 08:15 on a trading day rather than during it. Case + cost: `docs/roadmap.md` → Ideas #4. |
 | 1.8 | Laptop scheduler — [BL-011](backlog/BL-011-laptop-scheduler.md) | claude | **Done 2026-10-06.** launchd job `com.ai-trading-agent.broker-login` (`deploy/launchd/`) runs `packages/broker-login/src/dispatch.ts` at 08:00 IST Mon–Fri, triggering `daily-broker-login.yml` via `gh` and alerting on Telegram if it can't. Verified: `workflow_dispatch` runs at 08:00 IST on 5 and 6 Oct, both green. The GitHub cron stays as a backstop. Remaining scheduling work is [BL-012](backlog/BL-012-scheduler-service.md). |
 | 1.9 | Fyers login: blank page, wrong token expiry, unattended login | claude | **Done 2026-10-06.** (1) The dashboard's Login opened a blank page in the standalone research stack: with `DATABASE_URL` set the Python `/api/auth/fyers/start` redirected to `FYERS_REDIRECT_URI`'s host, which was the dashboard itself, which forwarded back — an endless loop. A `handoff=1` marker now breaks it, and the local callback also writes `broker_tokens`. (2) The UI said hours remained on a token Fyers had already reset: expiry was now+24h, but Fyers kills every token at 06:00 IST. One rule (`fyersTokenExpiry` / `fyers.token_expiry`) now sets it at login, clamps stored rows on read, and both status endpoints probe Fyers so a revoked token shows Expired. (3) New launchd job `com.ai-trading-agent.fyers-login` (08:05 IST) runs headless Fyers login and stores the token — separate from the AlgoTest login. **Owner:** put `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` in `.env`, run `deploy/launchd/install.sh`, restart `bun run start:backend`. |
+| 1.10 | Scheduler service — [BL-012](backlog/BL-012-scheduler-service.md) | claude | **In progress (started 2026-10-06).** One `apps/scheduler` owns every recurring job (logins, Friday momentum, evening `obt daily`, backup, checks) with run history, missed-run catch-up and Telegram alerts; replaces the per-job launchd plists. Shipped as small PRs — see BL-012 "Delivery". PR 1: `isTradingDay` in `@trading/market-reference`. |
 
 ---
 
@@ -80,6 +81,8 @@ Full procedure and rollback: `docs/algotest-execution.md` → Runbook.
 ## Priority 3 — Everything else
 
 ### 3.1 Telegram approval gate
+
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
 
 Signal fires → Telegram message with Approve/Reject buttons → owner taps →
 `repository_dispatch` fires the (not-yet-built) `activate-strategy.yml`.
@@ -218,6 +221,8 @@ Scoped and decided; contracts below are ready to implement.
 
 ### 3.2 Playwright strategy activation
 
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
+
 Consumes the `repository_dispatch` T-74 fires. **Must land before the gate is
 anything but a dry run.**
 
@@ -233,6 +238,8 @@ anything but a dry run.**
 
 ### 3.3 Measure the signal — the gate before anything fires for real
 
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
+
 Probability scores are still uncalibrated, so the edge is unmeasured. **Do not
 enable live execution until this shows one.**
 
@@ -246,6 +253,8 @@ enable live execution until this shows one.**
 | 3.3.5 | **Gate:** do not start 3.4 until the signal shows a measured edge | owner | |
 
 ### 3.4 Live execution (hard-gated behind 3.3)
+
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
 
 | # | Task | Who |
 |---|---|---|
@@ -291,6 +300,8 @@ pass to save computation; the full review is deferred here, not skipped.
 | 3.6.4 | Wire the stock data into the engine | claude | Deliberately deferred from this run: index-membership-aware ranking, itemised per-trade costs, `ranksum`/`voladj`/`blend` scoring, weekly/monthly rebalance. Decision record: the grill-me at the top of this session; not yet turned into its own plan. |
 
 ### 3.7 Later milestones — not started, not sequenced
+
+> **Frozen with the personality engine** ([BL-019](backlog/BL-019-product-focus-and-freeze.md), 2026-10-06). Kept as written for when it unfreezes; not worked on until a research result gives a validated edge to build on.
 
 Acceptance detail for every `T-` number below is in `docs/roadmap.md`.
 
@@ -487,7 +498,7 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | 3.13.2 | Phase 1b: live preview = backtest (F11, E9) | claude | **Partly done 2026-10-05.** `verified` is the default price-series rule everywhere (owner approved; a saved run without the field now re-runs on it — the dashboard never sent it, so every dashboard Broad run moves to `verified`); the live Rebalance ranking rebuilds its pool with the ranking's own rule; `mbt categories broad-backtest` no longer skips thin weeks. **Decided 2026-10-05:** a new Broad run now starts with circuit-lock fills and the tradability filter on (owner decision; measured on the default run: 53.2% → 40.4% CAGR; the request model still defaults off, so saved runs re-run unchanged), and Broad / Custom Index results carry an "upper bound, not an expected return" warning until Phase 3. **Decided 2026-10-05:** the signal delay stays 0 for a new run (the search and saved favourites keep 1; with both switches on it moved the default run by 0.1 pt); Phase 2 measures the cost of a Monday fill instead. **Still open:** the 12-week shadow check needs Phase 2's truncation harness. Note: the Friday Telegram signal is the ETF strategy (`live_config.toml`), not Broad |
 | 3.13.3 | Phase 2: independent ledger replay, ten hand-checked trades, jump scan, truncation test, Monday-open repricing | claude | **Steps 1–3 and 5–7 done 2026-10-05** (`audit/`, `mbt audit`; results in `packages/momentum-backtesting/docs/evaluation-review.md`). Replay passes 24 of 24. 9 of 10 holdings match Yahoo Finance; PFC fails on a missed bonus. Monday-open flag trips. Step 4 (look-ahead on real data) passes 18 of 18, 2026-10-06. **Open:** engine fixes E10–E13; owner to spot-check two or three of the ten |
 | 3.13.4 | Phase 3: point-in-time universe, launch-dated taxonomy, data fixes; step-by-step CAGR loss table | claude | **Measured 2026-10-06.** Point-in-time universe (`turnover_rank`), small-bonus and renamed-symbol data fixes, label shuffle done. The 50 best configs lose a median 22–25 points; **arm A's headline is killed**. Still 31–34% pre-tax against 17.1% for the momentum index. **Open:** launch-dated taxonomy (owner to decide), 2,155 falls under review |
-| 3.13.5 | Phases 4–7 | claude | **Phase 4 done 2026-10-06**: fair random baseline passes 6 of 6; PBO 0.48 on today's list and **0.69 point in time** (0.53 within the drawdown ceiling) — **the single-winner rule is killed**; point-in-time median config 28.1% pre-tax against 17.0% for Mom30 TRI; criteria as code, data-stamped run ids, generic nudges, window rule. **Phase 5 started 2026-10-06**: rule committed in advance (criteria addendum 3: all three baskets, rank by third-worst FY against Mom30, prefer 8–12 holdings, pre-tax, today's tags); **Midcap 150 / Smallcap 250 / Midcap150 Momentum 50 / Nifty500 Momentum 50 TRI loaded** (`mbt stocks fetch-benchmarks`; `reference_benchmarks.load_references` returns them, `compare` still shows only the original two) |
+| 3.13.5 | Phases 4–7 | claude | **Phase 4 done 2026-10-06**: fair random baseline passes 6 of 6; PBO 0.48 on today's list and **0.69 point in time** (0.53 within the drawdown ceiling) — **the single-winner rule is killed**; point-in-time median config 28.1% pre-tax against 17.0% for Mom30 TRI; criteria as code, data-stamped run ids, generic nudges, window rule. **Phase 5 done 2026-10-06: no config named** — the committed rule's walk-forward is killed in all three baskets (picks 18.6–28.5% a year vs 31–32% for the median config and 15% for Mom30 TRI, pre-tax); 8–12 holdings as good as 2–6 with shallower falls. **Phase 6 step 0 done**: the owner's ensemble rule (criteria addendum 4) passes its walk-forward (36.7% vs 32.6% group median, 15.0% Mom30 TRI, pre-tax) and four configs are frozen in `search_spaces/bl010_phase6_frozen.json`. Next: live-signal parity, the 2012–2016 backcast, paper tracking |
 
 ### 3.14 Momentum result integrity — [BL-001](backlog/BL-001-momentum-result-integrity.md)
 
@@ -509,6 +520,20 @@ The plan and the owner's decisions live in the backlog item; this table only tra
 | 3.15.2 | Install the 19:30 `momentum-weekly-stock-ingest` LaunchAgent (without it no Stock/Broad favourite is evaluated or journalled) | owner | **Done 2026-10-06** (installed with the owner's go-ahead) |
 | 3.15.3 | Phase 2: weekly scoring, Forward page, Telegram line | claude | Open — after four Fridays are recorded |
 | 3.15.4 | Phase 3: real fills | owner→claude | Open — when real money is in |
+
+### 3.16 Product focus — [BL-019](backlog/BL-019-product-focus-and-freeze.md)
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.16.1 | Phase 1: rewrite `overview.md` and `business.md` for the real product | claude | **Done 2026-10-06.** Overview is 75 lines with Active and Frozen lists; business.md is a personal tool, billing kept under "Frozen: SaaS billing", retired Pipeline Scope removed, SEBI note added |
+| 3.16.2 | Phase 2: mark the frozen parts | claude | **Done 2026-10-06.** Note at the top of `apps/server/CLAUDE.md`; §3.1–3.4 and 3.7 above marked frozen |
+
+### 3.17 Research gate — [BL-015](backlog/BL-015-research-gate.md)
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.17.1 | Phase 1: pre-registration in the backlog template + `_EXPERIMENT.md` | claude | **Built 2026-10-06.** Closes when the next research item is created from it |
+| 3.17.2 | Phase 2: research-gate rule in root `CLAUDE.md` (`override: <reason>`) | claude | **Done 2026-10-06** |
 
 ### 3.18 Faster Momentum backtests — [BL-005](backlog/BL-005-faster-momentum-backtests.md)
 

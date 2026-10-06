@@ -1,0 +1,36 @@
+{
+  "written_before_running": "2026-10-06T21:00:00+05:30",
+  "name": "BL-010 criteria, addendum 4: what Phase 6 follows (an ensemble of typical configs)",
+  "adds_to": "bl010_criteria.json and addenda 1 to 3 - unchanged; this file only adds the rule that picks what Phase 6 tracks",
+  "rule": "Committed before the ensemble is picked or its walk-forward computed. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
+  "reason": "Owner's decision, 2026-10-06. Phase 5's single-config rule failed its walk-forward in all three baskets (picks 18.6-28.5% a year against 31-32% for the median config), so Phase 6 follows money split across several typical configs instead of one 'best'.",
+  "phase_6_ensemble": {
+    "inputs": "As Phase 5 (addendum 3): the 8,003 round 7 arm A configs re-scored on the point-in-time universe (data/search/round7_A/scored_pit), pre-tax, Rs 2 lakh, today's curated tags, every rebalance phase blended.",
+    "eligible": {
+      "basket": "medium",
+      "nominal_holdings": [8, 12],
+      "rebalance_every_weeks": [2, 4],
+      "screen": "Rank measure (the 25th percentile of financial-year excess over Nifty200 Momentum 30 TRI, as addendum 3) at least the median rank measure of the configs eligible so far. Plain: skip configs whose bad years were worse than the group's typical."
+    },
+    "pick": {
+      "typicality": "For each screened config, its mean correlation of weekly log returns with every screened config.",
+      "how": "In order of typicality, most typical first, take a config if its weekly-return correlation with every config already taken is below 0.9. Stop at 4.",
+      "too_few": "If fewer than 3 are found, report it; the owner decides.",
+      "plain": "The most 'average' configs of the group, each clearly different from the others."
+    },
+    "money": {
+      "split": "Equal capital per config.",
+      "reset": "Back to equal capital at the start of each financial year (April). No other transfers between configs.",
+      "rebalance_phase": "Each config trades on one rebalance phase. Phases are assigned to spread the configs' rebalance Fridays apart (fewer orders on one day), never by past performance."
+    },
+    "walk_forward": {
+      "how": "For each financial year from FY2020: apply this rule to the data ending 13 weeks before the year starts (addendum 2's embargo), hold the equal-capital ensemble through the year, and join the years. FY2019 is reported as a sensitivity ranked on January to December 2017, as in Phase 5.",
+      "compare": "The ensemble against the median config of the same eligible group (8-12 holdings, every 2 or 4 weeks, medium basket) and against Nifty200 Momentum 30 TRI.",
+      "pass": "Joined ensemble return at least the median config's minus 2 points a year, AND at least 5 points a year above Nifty200 Momentum 30 TRI (pre-tax; the after-tax bar is judged in the Phase 7 after-tax re-check).",
+      "if_killed": "Report it; Phase 6 then tracks Nifty200 Momentum 30 TRI alone unless the owner decides otherwise.",
+      "plain": "Before freezing, check that this way of picking would actually have done about as well as a typical config, year by year, without seeing the future."
+    },
+    "freeze": "If the walk-forward passes, the full-history pick is frozen with its config ids, rebalance phases, the code commit and the data snapshot (search.data_snapshot) before any Phase 6 step reads the hold-out or the live signal.",
+    "phase_6_then": "The frozen ensemble takes the place of 'the frozen choice' in bl010_criteria.json phase_6_holdout: one backcast on 2012-2016, then 6 to 12 months of paper tracking next to the basket's median config and Nifty200 Momentum 30 TRI."
+  }
+}

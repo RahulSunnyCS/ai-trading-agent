@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working in this app.
 
+> **Mostly frozen (BL-019, 2026-10-06).** The personality engine (`src/trading/`, signal
+> detection, paper execution), retrospection and evolution (`src/retrospection/`,
+> `src/jobs/eod-retrospection-job.ts`), the T-51 replay (`src/backtesting/`) and payments
+> (`src/payment/`, `src/server/routes/payment.ts`) are kept, type-checked and tested in CI
+> (Razorpay included), but get **bug fixes only, no new features**. They unfreeze only when a
+> research result gives a validated edge to build on, recorded in `TODO.md`. Still active: the
+> `/api/backtest/*` and `/api/momentum/*` proxies and the Fyers OAuth routes.
+
 For deep architecture/gotchas/env-var reference, see the monorepo root's
 `.claude/project/technical.md` — this file stays a short, package-local
 orientation pointer rather than duplicating that.

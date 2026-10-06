@@ -25,6 +25,16 @@ What this deliberately does not do.
 
 ## Plan
 
+### Phase 0 — Pre-register (`research` items only; delete for other types)
+Filled in and committed **before any run**. A rule is never edited after a run: a new, dated
+rule supersedes it with a logged reason, and both stay here.
+- **Hypothesis:** what should be true, in one sentence.
+- **Universe:** what is traded, and its point-in-time source (not today's list for past years).
+- **Look-ahead check:** how it is shown that no input uses data from after the decision date.
+- **Pass / kill rule:** the numbers that keep or kill the idea, and against which comparator.
+- **Hold-out:** data cut-off and the period kept unseen until the end.
+- **Will not run:** tests deliberately left out; running one needs `override: <reason>` in the Log.
+
 ### Phase 1 — Name
 - **Tasks:** …
 - **Deliverables:** …

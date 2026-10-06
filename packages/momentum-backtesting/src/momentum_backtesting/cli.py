@@ -1447,6 +1447,89 @@ def search_score(
     )
 
 
+@search_app.command("choose")
+def search_choose(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
+    dest: Path = typer.Option(None, "--dest", help="Report folder (default <out>/phase5)."),
+) -> None:
+    """BL-010 Phase 5: robustness over financial years, the walk-forward of the choice rule,
+    the factor check and the choice per drawdown basket, as committed in criteria addendum 3.
+    Reads stored curves only; writes report.json and report.md."""
+    from . import bias, choose, db_read, method, phase5, reference_benchmarks
+
+    scored = scored or out / "scored_pit"
+    dest = dest or out / "phase5"
+    scores, curves = method.load_scores(scored)
+    facts = choose.config_facts(bias.load_records(out, set(curves.columns)))
+    refs = reference_benchmarks.load_references()
+    closes = db_read.weekly_closes_from_db_or_none()
+    if closes is None:
+        closes = pd.read_csv(DATA_DIR / "weekly_closes.csv", index_col=0, parse_dates=True)
+    series = {
+        name: refs[name] for name in (phase5.MOM30, phase5.NIFTY50, phase5.MIDCAP, phase5.SMALLCAP)
+    }
+    series[phase5.CASH] = closes["Cash (liquid fund)"]
+    phase5.run(curves, scores, facts, series, dest, echo=typer.echo)
+
+
+@search_app.command("ensemble")
+def search_ensemble(
+    out: Path = typer.Argument(..., help="A finished search's results folder."),
+    space: Path = typer.Option(..., "--space", help="That search's space TOML."),
+    scored: Path = typer.Option(None, "--scored", help="Scored curves (default <out>/scored_pit)."),
+    dest: Path = typer.Option(None, "--dest", help="Report folder (default <out>/phase6)."),
+    freeze: bool = typer.Option(
+        False, "--freeze", help="Write search_spaces/bl010_phase6_frozen.json if the rule passes."
+    ),
+) -> None:
+    """BL-010 Phase 6 step 0: the ensemble criteria addendum 4 picks, after its own
+    walk-forward. Reads stored curves only; writes ensemble.json and ensemble.md, and with
+    --freeze the frozen record of what Phase 6 follows."""
+    import hashlib
+    import subprocess
+
+    from . import bias, choose, method, phase5, phase6, reference_benchmarks, search
+    from .criteria import SPACES
+
+    scored = scored or out / "scored_pit"
+    dest = dest or out / "phase6"
+    scores, curves = method.load_scores(scored)
+    records = bias.load_records(out, set(curves.columns))
+    facts = choose.config_facts(records)
+    refs = reference_benchmarks.load_references()
+    series = {name: refs[name] for name in (phase5.MOM30, phase5.MIDCAP, phase5.SMALLCAP)}
+    report = phase6.run(curves, scores, facts, records, series, dest, echo=typer.echo)
+    if not freeze:
+        return
+    digest = hashlib.sha256()
+    for path in sorted(scored.glob("*")):
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+
+    def git(*args: str) -> str:
+        done = subprocess.run(
+            ["git", *args], capture_output=True, text=True, check=True, cwd=SPACES
+        )
+        return done.stdout.strip()
+
+    # The record names the commit that produced the pick, so that commit must be the code.
+    if git("status", "--porcelain", "--", "../src", "bl010_criteria*.json"):
+        typer.echo("uncommitted changes to the code or the criteria: commit them, then freeze")
+        raise typer.Exit(1)
+    commit = git("rev-parse", "HEAD")
+    target = SPACES / "bl010_phase6_frozen.json"
+    phase6.freeze(
+        report,
+        target,
+        commit=commit,
+        snapshot=search.data_snapshot(through=curves.index[-1].date().isoformat()),
+        scored_digest=digest.hexdigest(),
+        fixed=search.load_space(space).fixed,
+    )
+    typer.echo(f"froze {target}")
+
+
 @search_app.command("fair-placebo")
 def search_fair_placebo(
     out: Path = typer.Argument(..., help="A finished search's results folder."),
