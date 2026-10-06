@@ -926,7 +926,7 @@ def stocks_sync(
     shared database has been migrated once, `stock_dataset_from_db_or_none`/
     `daily_prices_from_db_or_none` keep serving that catalog's rows indefinitely, so a fetch
     that only touches data/stocks/*.csv never reaches a reader that prefers the database. Used
-    by the Friday ~19:30 IST stock-ingest job (scripts/install-launchd.sh); safe to run by hand.
+    by the Friday ~19:30 IST stock-ingest job (apps/scheduler); safe to run by hand.
     """
     # Typer only resolves a command's `typer.Option(...)` defaults when invoked through its
     # CLI runner; calling the function directly (as here) gets the raw OptionInfo sentinel
