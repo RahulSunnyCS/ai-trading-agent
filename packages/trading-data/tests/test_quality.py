@@ -24,10 +24,10 @@ def _stats(**kw):
 
 
 def make_day(root, asset, name, day, *, contracts=12, bars=375, start=(9, 15), extra_after=0,
-             vendor_symbol="NIFTY_{i}_CE_01_JAN_26"):  # fmt: skip
+             seconds=0, vendor_symbol="NIFTY_{i}_CE_01_JAN_26"):  # fmt: skip
     """One lake file: `contracts` instruments with `bars` one-minute bars from `start`, plus
     `extra_after` more bars after them (closing bars or an evening session)."""
-    first = datetime(day.year, day.month, day.day, *start, tzinfo=IST)
+    first = datetime(day.year, day.month, day.day, *start, seconds, tzinfo=IST)
     rows = []
     for i in range(contracts):
         for m in range(bars + extra_after):
@@ -187,3 +187,101 @@ def test_cli_rebuild_and_status(root, monkeypatch):
     assert "usable 1  excluded 1  (short_session 1)" in status
     assert runner.invoke(app, ["quality", "rebuild", "--asset", "stock"]).exit_code != 0
     assert runner.invoke(app, ["quality", "rebuild", "--days", "nope"]).exit_code != 0
+
+
+def test_a_bar_stamped_inside_the_last_minute_is_in_session(root):
+    """Some 2015 vendor spot bars are stamped 15:29:01 or 09:15:30. The regular session is
+    [09:15:00, 15:30:00), the same minute grid legwise floors to — not BETWEEN 09:15 AND 15:29,
+    which counted a 15:29:30 bar as after hours."""
+    make_day(root, "option", "NIFTY", FRIDAY, seconds=30)
+    with connect(root):
+        pass
+    quality.rebuild(root, log=lambda _: None)
+    with connect(root, read_only=True) as con:
+        assert con.execute(
+            "SELECT max_bars, off_session_rows, verdict FROM data_quality"
+        ).fetchall() == [(375, 0, "usable")]
+
+
+def test_rebuild_removes_verdicts_of_partitions_that_no_longer_exist(root):
+    make_day(root, "option", "NIFTY", FRIDAY)
+    make_day(root, "option", "NIFTY", date(2026, 9, 28))
+    make_day(root, "option", "SENSEX", FRIDAY)
+    with connect(root):
+        pass
+    quality.rebuild(root, log=lambda _: None)
+    lake.bars_1m_path(root, "option", "NIFTY", date(2026, 9, 28)).unlink()
+    done = quality.rebuild(root, log=lambda _: None)
+    assert done["rows_pruned"] == 1
+    lake.bars_1m_path(root, "option", "SENSEX", FRIDAY).unlink()  # a name with no files left
+    done = quality.rebuild(root, log=lambda _: None)
+    assert done["rows_pruned"] == 1
+    with connect(root, read_only=True) as con:
+        assert con.execute("SELECT name, trading_day FROM data_quality").fetchall() == [
+            ("NIFTY", FRIDAY)
+        ]
+
+
+def test_a_narrowed_rebuild_only_prunes_inside_its_window(root):
+    make_day(root, "option", "NIFTY", FRIDAY)
+    make_day(root, "option", "NIFTY", date(2026, 9, 28))
+    with connect(root):
+        pass
+    quality.rebuild(root, log=lambda _: None)
+    lake.bars_1m_path(root, "option", "NIFTY", date(2026, 9, 28)).unlink()
+    quality.rebuild(root, days=(FRIDAY, FRIDAY), log=lambda _: None)  # window excludes the 28th
+    with connect(root, read_only=True) as con:
+        assert con.execute("SELECT count(*) FROM data_quality").fetchone()[0] == 2
+    quality.rebuild(root, days=(date(2026, 9, 28), date(2026, 9, 28)), log=lambda _: None)
+    with connect(root, read_only=True) as con:
+        assert con.execute("SELECT count(*) FROM data_quality").fetchone()[0] == 1
+
+
+# no timestamp columns: fetching a TIMESTAMPTZ makes DuckDB import pytz (not a dependency)
+ALL_ROWS_SQL = (
+    "SELECT asset, name, trading_day, source, verdict, reason, session_kind, n_rows, "
+    "contracts, max_bars FROM data_quality ORDER BY 1, 2, 3"
+)
+
+
+def test_rebuild_with_nothing_to_judge_leaves_the_table_alone(root):
+    make_day(root, "option", "NIFTY", FRIDAY)
+    make_day(root, "option", "NIFTY", date(2026, 9, 28))
+    make_day(root, "index", "NIFTY", FRIDAY, contracts=1)
+    with connect(root):
+        pass
+    quality.rebuild(root, log=lambda _: None)
+    with connect(root) as con:
+        before = con.execute(ALL_ROWS_SQL).fetchall()
+        assert quality.cross_check(con, []) == 0
+    done = quality.rebuild(root, name="NOPE", log=lambda _: None)
+    assert done["no_spot_changes"] == 0 and done["rows_pruned"] == 0
+    with connect(root, read_only=True) as con:
+        assert con.execute(ALL_ROWS_SQL).fetchall() == before
+
+
+def test_an_excluded_spot_day_does_not_count_as_spot_and_futures_need_no_chain(root):
+    make_day(root, "option", "NIFTY", FRIDAY)
+    make_day(root, "index", "NIFTY", FRIDAY, contracts=1, bars=50)  # spot exists but is unusable
+    make_day(root, "future", "NIFTY", FRIDAY, contracts=1)  # one contract is a fine future day
+    with connect(root):
+        pass
+    quality.rebuild(root, log=lambda _: None)
+    with connect(root, read_only=True) as con:
+        got = dict(
+            con.execute(
+                "SELECT asset, verdict || ':' || coalesce(reason, '') FROM data_quality"
+            ).fetchall()
+        )
+    assert got["option"] == "excluded:no_spot"
+    assert got["index"] == "excluded:short_session:50"
+    assert got["future"] == "usable:"
+
+
+def test_status_on_a_catalog_that_was_never_opened_read_write_since_008(root, monkeypatch):
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
+    with connect(root) as con:
+        con.execute("DROP TABLE data_quality")
+        con.execute("DELETE FROM schema_migrations WHERE version = '008_data_quality'")
+    result = CliRunner().invoke(app, ["quality", "status"])
+    assert result.exit_code == 0 and "no verdicts yet" in result.output

@@ -24,6 +24,7 @@ Rules:
 
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 import time
@@ -233,9 +234,11 @@ def _day_stats(con: duckdb.DuckDBPyConnection, asset: str, name: str) -> list[qu
 
 
 def _written_by_collector(path: Path) -> bool:
-    """The Fyers collector's files carry Fyers symbols (`NSE:…`) in vendor_symbol."""
-    first = pq.ParquetFile(path).read_row_group(0, columns=["vendor_symbol"])
-    return bool(first.num_rows) and quality.infer_source(first.column(0)[0].as_py()) == "fyers"
+    """The Fyers collector's files carry Fyers symbols (`NSE:…`) in vendor_symbol. Reads one
+    value, not the column: a day file's first row group can hold a million strings."""
+    for batch in pq.ParquetFile(path).iter_batches(batch_size=1, columns=["vendor_symbol"]):
+        return quality.infer_source(batch.column(0)[0].as_py()) == "fyers"
+    return False
 
 
 def _write_days(
@@ -246,17 +249,24 @@ def _write_days(
     stats: list[quality.DayStats],
     *,
     force: bool,
-) -> tuple[list[quality.DayStats], int]:
-    """Write one lake file per day of `chunk`. Returns (stats of files written, number of
-    days skipped because a file existed)."""
+) -> tuple[list[quality.DayStats], list[quality.DayStats], int]:
+    """Write one lake file per day of `chunk`. Returns (stats of the files written, stats of
+    days whose file was already there from an earlier VENDOR import, number of days skipped
+    in all). The second list matters after a crash: those files exist but were never judged,
+    so the chunk records a verdict for them too. Collector-written days are never judged here
+    (their stats are not the vendor's); `tdata quality rebuild` does that."""
     schema = lake.OPT_SCHEMA if asset == "option" else lake.BAR_SCHEMA
     columns = OPTION_COLUMNS if asset == "option" else BAR_COLUMNS
-    written, skipped = [], 0
+    written, existing_vendor, skipped = [], [], 0
     for s in stats:
         path = lake.bars_1m_path(root, asset, name, s.day)
-        if path.exists() and (not force or _written_by_collector(path)):
-            skipped += 1
-            continue
+        if path.exists():
+            collector = _written_by_collector(path)
+            if collector or not force:
+                skipped += 1
+                if not collector:
+                    existing_vendor.append(s)
+                continue
         table = _arrow(
             con.execute(
                 f"SELECT {columns} FROM chunk WHERE day = ? ORDER BY instrument_id, ts", [s.day]
@@ -264,7 +274,7 @@ def _write_days(
         )
         lake.write_parquet(table.select(schema.names).cast(schema), path)
         written.append(s)
-    return written, skipped
+    return written, existing_vendor, skipped
 
 
 def _holidays(root: Path) -> set[date]:
@@ -272,27 +282,35 @@ def _holidays(root: Path) -> set[date]:
         return {r[0] for r in con.execute("SELECT date FROM ref_holidays").fetchall()}
 
 
-def _chunk_done(root: Path, scope: str) -> bool:
+def _chunk_done(root: Path, scope: str, staging_rows: int | None) -> bool:
     """A chunk is done once a run finished — `partial` means it finished with issues (rows
     dropped, duplicates) that were recorded, not that it should be redone. A crashed run is
-    `running`/`failed` and is retried."""
+    `running`/`failed` and is retried. The run must also have seen the same number of staged
+    rows: if more data has since been added to a month already imported (the missing
+    Aug-Sep 2026 days, say), the scope string is unchanged but the chunk is not done.
+    `staging_rows=None` (a window that cuts a month, so no cheap count) is never done."""
+    if staging_rows is None:
+        return False
     with _connect(root, read_only=True) as con:
         return bool(
             con.execute(
                 "SELECT 1 FROM ingest_runs WHERE source = 'vendor' AND dataset = 'bars_1m' "
-                "AND scope = ? AND status IN ('ok', 'partial') LIMIT 1",
-                [scope],
+                "AND scope = ? AND status IN ('ok', 'partial') "
+                "AND CAST(json_extract_string(details, '$.rows_in') AS BIGINT) = ? LIMIT 1",
+                [scope, staging_rows],
             ).fetchone()
         )
 
 
-def _fail_stale_runs(root: Path, prefix: str) -> None:
-    """A crashed import leaves `running` rows; mark them so they are not mistaken for live."""
+def _fail_stale_runs(root: Path, scope_pattern: str) -> None:
+    """A crashed import leaves `running` rows; mark them so they are not mistaken for live.
+    `scope_pattern` is a regex that matches only this importer's own scopes — an options
+    import of NIFTY must not touch a live `import-index` of NIFTY's spot."""
     with _connect(root) as con:
         con.execute(
             "UPDATE ingest_runs SET status = 'failed', finished_at = now() "
-            "WHERE source = 'vendor' AND status = 'running' AND starts_with(scope, ?)",
-            [prefix],
+            "WHERE source = 'vendor' AND status = 'running' AND regexp_matches(scope, ?)",
+            [scope_pattern],
         )
 
 
@@ -308,10 +326,13 @@ def _record_chunk(
     skipped: int,
     details: dict,
     issues: list[tuple[str, str, date | None]],
+    judged: list[quality.DayStats] | None = None,
 ) -> None:
+    """One short catalog connection: the run row, the verdicts (`judged` = the days written
+    plus days an earlier vendor import left unjudged) and the issues."""
     with _connect(root) as con:
         run_id = ingest.start_run(con, "vendor", "bars_1m", None, scope)
-        quality.upsert(con, written, holidays, run_id)
+        quality.upsert(con, judged if judged is not None else written, holidays, run_id)
         for check, detail, day in issues:
             ingest.add_issue(con, run_id, check, detail, day=day)
         ingest.finish_run(
@@ -410,10 +431,13 @@ def import_unit(
             [files],
         ).fetchall()
         holidays = _holidays(root)
-        _fail_stale_runs(root, f"{symbol} ")
+        _fail_stale_runs(root, rf"^{re.escape(symbol)} \d{{4}}-\d{{2}}-\d{{2}}\.\.")
+        month_rows = dict(monthly)
         for lo, hi in plan_chunks(monthly, window):
             scope = f"{symbol} {lo}..{hi - timedelta(days=1)}"
-            if not force and _chunk_done(root, scope):
+            aligned = lo.day == 1 and hi.day == 1  # whole months: the monthly counts are exact
+            expected = sum(n for m, n in month_rows.items() if lo <= m < hi) if aligned else None
+            if not force and _chunk_done(root, scope, expected):
                 report.chunks_skipped += 1
                 continue
             started = time.monotonic()
@@ -425,21 +449,19 @@ def import_unit(
                        s.option_type, s.contract AS vendor_symbol,
                        CAST(s.ts AT TIME ZONE 'Asia/Kolkata' AS DATE) AS day,
                        {quality.IN_SESSION_SQL} AS ins
-                FROM read_parquet(?) s JOIN ids i ON s.contract = i.contract
+                FROM read_parquet(?) s LEFT JOIN ids i ON s.contract = i.contract
                 WHERE s.ts >= CAST(? AS TIMESTAMPTZ) AND s.ts < CAST(? AS TIMESTAMPTZ)
                 ORDER BY day, instrument_id, ts
                 """,
                 [files, _ts_param(lo), _ts_param(hi)],
             )
-            rows_in = con.execute(
-                "SELECT count(*) FROM read_parquet(?) "
-                "WHERE ts >= CAST(? AS TIMESTAMPTZ) AND ts < CAST(? AS TIMESTAMPTZ)",
-                [files, _ts_param(lo), _ts_param(hi)],
-            ).fetchone()[0]
-            rows_chunk = con.execute("SELECT count(*) FROM chunk").fetchone()[0]
+            # one pass: rows whose contract name could not be parsed have no instrument
+            rows_in, unparsed = con.execute(
+                "SELECT count(*), count(*) FILTER (WHERE instrument_id IS NULL) FROM chunk"
+            ).fetchone()
             issues = []
-            unparsed = rows_in - rows_chunk
             if unparsed:
+                con.execute("DELETE FROM chunk WHERE instrument_id IS NULL")
                 issues.append(("unparsed_contract", f"{unparsed} rows dropped, {scope}", None))
             dups = con.execute(
                 "SELECT count(*) - count(DISTINCT (instrument_id, ts)) FROM chunk"
@@ -448,11 +470,14 @@ def import_unit(
                 issues.append(("duplicate_rows", f"{dups} repeated (contract, ts), {scope}", None))
                 con.execute(
                     "CREATE OR REPLACE TEMP TABLE chunk AS SELECT * EXCLUDE (rn) FROM ("
-                    "SELECT *, row_number() OVER (PARTITION BY instrument_id, ts) AS rn "
+                    "SELECT *, row_number() OVER (PARTITION BY instrument_id, ts "
+                    "ORDER BY volume DESC NULLS LAST, vendor_symbol) AS rn "
                     "FROM chunk) WHERE rn = 1 ORDER BY day, instrument_id, ts"
                 )
             stats = _day_stats(con, "option", symbol)
-            written, skipped = _write_days(con, root, "option", symbol, stats, force=force)
+            written, existing, skipped = _write_days(
+                con, root, "option", symbol, stats, force=force
+            )
             _record_chunk(
                 root,
                 scope,
@@ -464,6 +489,7 @@ def import_unit(
                 skipped=skipped,
                 details={"duplicates_removed": dups, "chunk": [str(lo), str(hi)]},
                 issues=issues,
+                judged=written + existing,
             )
             report.chunks_run += 1
             report.days_written += len(written)
@@ -527,7 +553,7 @@ def import_index_csv(
         )
         report = UnitReport(symbol)
         holidays = _holidays(root)
-        _fail_stale_runs(root, f"{symbol} {csv.name}")
+        _fail_stale_runs(root, rf"^{re.escape(symbol)} {re.escape(csv.name)} ")
         years = con.execute(
             "SELECT DISTINCT year(ts AT TIME ZONE 'Asia/Kolkata') FROM raw ORDER BY 1"
         ).fetchall()
@@ -536,14 +562,19 @@ def import_index_csv(
             if lo >= hi:
                 continue
             scope = f"{symbol} {csv.name} {lo}..{hi - timedelta(days=1)}"
-            if not force and _chunk_done(root, scope):
+            staging_rows = con.execute(
+                "SELECT count(*) FROM raw WHERE ts >= CAST(? AS TIMESTAMPTZ) "
+                "AND ts < CAST(? AS TIMESTAMPTZ)",
+                [_ts_param(lo), _ts_param(hi)],
+            ).fetchone()[0]
+            if not force and _chunk_done(root, scope, staging_rows):
                 report.chunks_skipped += 1
                 continue
             con.execute(
                 f"""
                 CREATE OR REPLACE TEMP TABLE chunk AS
                 SELECT {instrument_id}::BIGINT AS instrument_id, ts, open, high, low, close,
-                       volume, CAST(NULL AS DOUBLE) AS oi, '{csv.stem}' AS vendor_symbol,
+                       volume, CAST(NULL AS DOUBLE) AS oi, ? AS vendor_symbol,
                        CAST(NULL AS DATE) AS expiry,
                        CAST(ts AT TIME ZONE 'Asia/Kolkata' AS DATE) AS day,
                        {quality.IN_SESSION_SQL} AS ins
@@ -551,7 +582,7 @@ def import_index_csv(
                 WHERE ts >= CAST(? AS TIMESTAMPTZ) AND ts < CAST(? AS TIMESTAMPTZ)
                 ORDER BY day, ts
                 """,
-                [_ts_param(lo), _ts_param(hi)],
+                [csv.stem, _ts_param(lo), _ts_param(hi)],
             )
             dups = con.execute("SELECT count(*) - count(DISTINCT ts) FROM chunk").fetchone()[0]
             issues = []
@@ -559,23 +590,24 @@ def import_index_csv(
                 issues.append(("duplicate_rows", f"{dups} repeated ts, {scope}", None))
                 con.execute(
                     "CREATE OR REPLACE TEMP TABLE chunk AS SELECT * EXCLUDE (rn) FROM ("
-                    "SELECT *, row_number() OVER (PARTITION BY ts) AS rn FROM chunk) "
+                    "SELECT *, row_number() OVER (PARTITION BY ts "
+                    "ORDER BY volume DESC NULLS LAST) AS rn FROM chunk) "
                     "WHERE rn = 1 ORDER BY day, ts"
                 )
             stats = _day_stats(con, "index", symbol)
-            written, skipped = _write_days(con, root, "index", symbol, stats, force=force)
-            rows_in = con.execute("SELECT count(*) FROM chunk").fetchone()[0]
+            written, existing, skipped = _write_days(con, root, "index", symbol, stats, force=force)
             _record_chunk(
                 root,
                 scope,
                 written,
                 holidays,
                 requests=1,
-                rows_in=rows_in,
+                rows_in=staging_rows,
                 unparsed=0,
                 skipped=skipped,
                 details={"csv": csv.name, "duplicates_removed": dups},
                 issues=issues,
+                judged=written + existing,
             )
             report.chunks_run += 1
             report.days_written += len(written)

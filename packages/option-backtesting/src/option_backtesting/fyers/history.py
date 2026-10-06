@@ -22,6 +22,7 @@ from pathlib import Path
 
 from trading_data import ingest, lake
 from trading_data.db import connect
+from trading_data.quality import MIN_BARS
 
 from .client import Candle, FyersClient
 from .daily import UNDERLYINGS, VIX_NAME, VIX_SYMBOL, bars_table, register_contracts
@@ -31,9 +32,9 @@ CHUNK_DAYS = 95
 #: Stop after this many consecutive chunks with no spot data at all — we have walked
 #: past the start of Fyers' history (or a very long outage).
 EMPTY_CHUNKS_TO_STOP = 3
-#: A normal session has 375 bars (09:15-15:29). Fewer means a half day (the Diwali
-#: muhurat hour) or a partial download; the anatomy needs whole days, so skip them.
-MIN_BARS = 300
+# A normal session has 375 bars (09:15-15:29). Fewer than MIN_BARS means a half day (the
+# Diwali muhurat hour) or a partial download; the anatomy needs whole days, so skip them.
+# The threshold is trading_data.quality.MIN_BARS: one definition, shared with data_quality.
 
 _IST = timezone(timedelta(hours=5, minutes=30))
 

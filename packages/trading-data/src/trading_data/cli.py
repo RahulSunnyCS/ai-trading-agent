@@ -186,7 +186,8 @@ def quality_rebuild(
     done = quality.rebuild(data_root(), asset=asset, name=name, days=window, log=typer.echo)
     typer.echo(
         f"rebuilt {sum(v for k, v in done.items() if '/' in k):,} day verdicts; "
-        f"{done['no_spot_changes']} no_spot labels changed"
+        f"{done['no_spot_changes']} no_spot labels changed, "
+        f"{done['rows_pruned']} stale rows removed"
     )
 
 
@@ -194,6 +195,11 @@ def quality_rebuild(
 def quality_status() -> None:
     """Days, range and verdicts per (asset, name), with the reasons for exclusions."""
     with connect(data_root(), read_only=True) as con:
+        if not con.execute(
+            "SELECT count(*) FROM information_schema.tables WHERE table_name = 'data_quality'"
+        ).fetchone()[0]:  # a catalog nothing has opened read-write since 008 was added
+            typer.echo("no verdicts yet — run `tdata quality rebuild`")
+            return
         rows = con.execute(
             "SELECT asset, name, count(*), min(trading_day), max(trading_day), "
             "count(*) FILTER (WHERE verdict = 'usable'), "
@@ -248,8 +254,16 @@ def vendor_import(
         for u in units:
             typer.echo(f"  {u.section}/{u.folder}: {len(u.files)} files, {u.rows:,} rows")
         return
+    failed: list[str] = []
     for u in units:
-        report = vendor.import_unit(root, u, days=window, force=force, log=typer.echo)
+        try:
+            report = vendor.import_unit(root, u, days=window, force=force, log=typer.echo)
+        except Exception as error:  # noqa: BLE001 - one bad unit must not stop the other 200
+            failed.append(f"{u.section}/{u.folder}")
+            typer.echo(
+                f"!! {u.section}/{u.folder} FAILED: {type(error).__name__}: {error}", err=True
+            )
+            continue
         excluded = ", ".join(f"{k} {v}" for k, v in sorted(report.excluded.items())) or "none"
         typer.echo(
             f"== {report.name}: {report.days_written} days written, "
@@ -257,6 +271,11 @@ def vendor_import(
             f"chunks run {report.chunks_run}, skipped {report.chunks_skipped}; "
             f"unparsed rows {report.rows_unparsed}; excluded days: {excluded}"
         )
+    if failed:
+        typer.echo(
+            f"{len(failed)} unit(s) failed (re-run resumes them): {', '.join(failed)}", err=True
+        )
+        raise typer.Exit(1)
 
 
 @vendor_app.command("import-index")
