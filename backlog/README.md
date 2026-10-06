@@ -41,7 +41,8 @@ Do **not** start coding straight away:
 
 Claude assigns it unless the owner states one. Judged against this project's
 goals (research-grade evidence on Indian weekly options/momentum strategies,
-nothing trades live until the signal is measured, commercial SaaS billing).
+finishing Momentum for real money, an options/momentum research workbench,
+nothing trades live until the signal is measured — see `.claude/project/overview.md`).
 
 | Priority | Meaning |
 |---|---|
