@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { allBuiltins } from '../builtins.js';
 import { parseDotenv } from '../env.js';
 import { JOBS } from '../jobs.js';
 import { istAt, istDay, nextDue, onWeekdays, previousDue, tradingDays } from '../schedule.js';
@@ -43,6 +44,11 @@ describe('job registry', () => {
 
   it('does not retry fyers-login: fyers.ts stops on a wrong PIN to avoid a lockout', () => {
     expect(JOBS.find((j) => j.id === 'fyers-login')?.retries).toBe(0);
+  });
+
+  it('has a registered builtin for every job that names one', () => {
+    const builtins = allBuiltins();
+    for (const job of JOBS) if (job.builtin) expect(builtins[job.builtin]).toBeDefined();
   });
 
   it('has unique ids, real working directories and a fix hint for every job', () => {

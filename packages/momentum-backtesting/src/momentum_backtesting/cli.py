@@ -980,6 +980,30 @@ def stocks_sync(
         typer.echo(f"  skipped (no fetchable price): {len(market_result.symbols_skipped)} symbols")
 
 
+def _derive_attached_events(data_dir: Path, curated_dir: Path):
+    """Re-derive this run's events from the already-downloaded raw cache (no network, no
+    writes), the same way adjust.build_all's steps 2-4 do. Returns (attached_events,
+    membership). Shared by `pin-manifest` and the read-only `deadlines` command."""
+    from .stocks import adjust
+
+    curated = adjust.load_curated(curated_dir)
+    aliases = curated["aliases.csv"]
+    membership = curated["nifty50_membership.csv"]
+    actions_manual = curated["actions_manual.csv"]
+
+    daily = pd.read_parquet(data_dir / "daily.parquet")
+    daily["company_id"] = adjust.resolve_daily_companies(daily, aliases)
+    isin_to_company, symbol_to_company_latest = adjust.build_ca_lookups(daily, aliases)
+    ca_raw = adjust.load_ca_feed_local(data_dir / "raw")
+    feed_result = adjust.build_feed_events(
+        ca_raw, isin_to_company, symbol_to_company_latest, aliases
+    )
+    manual_events = adjust.build_manual_events(actions_manual)
+    combined_events = adjust.combine_manual_over_feed(feed_result.events, manual_events, aliases)
+    attached_events, _failures = adjust.attach_events_tolerant(combined_events, daily)
+    return attached_events, membership
+
+
 @stocks_app.command("pin-manifest")
 def stocks_pin_manifest() -> None:
     """Pin the current raw cache as the reproducibility baseline: copy
@@ -1004,27 +1028,63 @@ def stocks_pin_manifest() -> None:
     shutil.copyfile(manifest_path, pinned_path)
     typer.echo(f"wrote {pinned_path}")
 
-    curated = adjust.load_curated(curated_dir)
-    aliases = curated["aliases.csv"]
-    membership = curated["nifty50_membership.csv"]
-    actions_manual = curated["actions_manual.csv"]
-
-    daily = pd.read_parquet(data_dir / "daily.parquet")
-    daily["company_id"] = adjust.resolve_daily_companies(daily, aliases)
-    isin_to_company, symbol_to_company_latest = adjust.build_ca_lookups(daily, aliases)
-    ca_raw = adjust.load_ca_feed_local(data_dir / "raw")
-    feed_result = adjust.build_feed_events(
-        ca_raw, isin_to_company, symbol_to_company_latest, aliases
-    )
-    manual_events = adjust.build_manual_events(actions_manual)
-    combined_events = adjust.combine_manual_over_feed(feed_result.events, manual_events, aliases)
-    attached_events, _failures = adjust.attach_events_tolerant(combined_events, daily)
+    attached_events, membership = _derive_attached_events(data_dir, curated_dir)
 
     # _write_events_baseline is adjust.py's private helper (underscore-prefixed);
     # called directly here rather than adding a new public wrapper to adjust.py,
     # since the T8 task contract permits only the one CA-snapshot edit there.
     adjust._write_events_baseline(curated_dir, attached_events, membership)  # noqa: SLF001
     typer.echo(f"wrote {curated_dir / 'events_baseline.csv.gz'} (advanced to current events)")
+
+
+@stocks_app.command("deadlines")
+def stocks_deadlines() -> None:
+    """Read-only JSON for the scheduler's stock-data deadline checks (BL-012): how old the
+    oldest corporate-action diff is (guards.check_ca_diff_age fails the Friday sync above 30
+    days) and how many split/bonus candidates await review. Writes nothing and never takes the
+    catalog write lock."""
+    from .stocks import adjust
+
+    out: dict = {"ca_diff": None, "reviews": None}
+    try:
+        baseline = adjust._load_events_baseline(_stocks_curated_dir())  # noqa: SLF001
+        if baseline is None:
+            out["ca_diff"] = {"baseline": False, "events": []}
+        else:
+            attached, _membership = _derive_attached_events(
+                _stocks_data_dir(), _stocks_curated_dir()
+            )
+            diff = adjust.diff_ca_events(attached, baseline)
+            diff = diff[diff["change"].isin(["added", "removed", "changed"])]
+            out["ca_diff"] = {
+                "baseline": True,
+                "events": [
+                    {
+                        "company_id": r.company_id,
+                        "ex_date": r.ex_date,
+                        "change": r.change,
+                        "age_days": int(r.age_days),
+                        "detail": r.detail,
+                    }
+                    for r in diff.sort_values("age_days", ascending=False).itertuples()
+                ],
+            }
+    except Exception as error:  # noqa: BLE001 - reported to the check, which says so
+        out["ca_diff"] = {"error": f"{type(error).__name__}: {error}"}
+    try:
+        from trading_data.db import connect
+
+        from . import stock_actions
+
+        with connect(read_only=True) as con:
+            snap = stock_actions.review_snapshot(con, limit=0)
+        out["reviews"] = {
+            "pending_count": snap["pending_count"],
+            "manual_review_after": snap["manual_review_after"],
+        }
+    except Exception as error:  # noqa: BLE001
+        out["reviews"] = {"error": f"{type(error).__name__}: {error}"}
+    typer.echo(json.dumps(out))
 
 
 @stocks_app.command("validate")

@@ -44,7 +44,7 @@ export function backupJob(sink?: AlertSink): Builtin {
     if (code !== 0) return { code, error: `tdata backup exited ${code}` };
     if (fallback) {
       const volume = ctx.env.BACKUP_VOLUME?.trim() || DEFAULT_BACKUP_VOLUME;
-      await (sink ?? telegramSink(ctx.env))(
+      await (sink ?? telegramSink(ctx.env, 'scheduler.backup'))(
         [
           '⚠️ Monthly backup went to ~/Downloads',
           '',

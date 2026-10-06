@@ -277,6 +277,73 @@ def test_pin_manifest_without_prior_fetch_fails_cleanly(stocks_dirs: tuple[Path,
 
 
 # --------------------------------------------------------------------------
+# BL-012: `mbt stocks deadlines` -- read-only JSON for the scheduler's checks.
+# --------------------------------------------------------------------------
+
+
+def test_deadlines_reports_ca_diff_ages_and_review_count(
+    stocks_dirs: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import contextlib
+    import json
+
+    import trading_data.db as tdb
+
+    from momentum_backtesting import stock_actions
+
+    _data_dir, curated_dir = stocks_dirs
+    curated_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(adjust, "_load_events_baseline", lambda _d: pd.DataFrame())
+    monkeypatch.setattr(
+        cli, "_derive_attached_events", lambda _d, _c: (pd.DataFrame(), pd.DataFrame())
+    )
+    diff = pd.DataFrame(
+        [
+            ("C1", "2026-09-01", "a", "added", "x", 36),
+            ("C2", "2026-09-20", "b", "changed", "y", 17),
+            ("C3", "2026-09-21", "c", "re-key", "z", 16),
+        ],
+        columns=["company_id", "ex_date", "subject_sha1", "change", "detail", "age_days"],
+    )
+    monkeypatch.setattr(adjust, "diff_ca_events", lambda _e, _b: diff)
+
+    @contextlib.contextmanager
+    def fake_connect(**_kw):
+        yield object()
+
+    monkeypatch.setattr(tdb, "connect", fake_connect)
+    monkeypatch.setattr(
+        stock_actions,
+        "review_snapshot",
+        lambda _con, limit=50: {"pending_count": 3, "manual_review_after": "2026-09-01"},
+    )
+
+    result = runner.invoke(cli.app, ["stocks", "deadlines"])
+
+    assert result.exit_code == 0, result.output
+    out = json.loads(result.output)
+    assert [e["age_days"] for e in out["ca_diff"]["events"]] == [36, 17]  # re-key excluded
+    assert out["reviews"]["pending_count"] == 3
+
+
+def test_deadlines_without_baseline_or_catalog_reports_errors_not_crashes(
+    stocks_dirs: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    _data_dir, curated_dir = stocks_dirs
+    curated_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("TRADING_DATA_ROOT", str(curated_dir / "nowhere"))
+
+    result = runner.invoke(cli.app, ["stocks", "deadlines"])
+
+    assert result.exit_code == 0, result.output
+    out = json.loads(result.output)
+    assert out["ca_diff"]["baseline"] is False
+    assert "error" in out["reviews"]
+
+
+# --------------------------------------------------------------------------
 # N06: the existing ETF-path CLI is unaffected by the additive `stocks` sub-app.
 # --------------------------------------------------------------------------
 

@@ -38,7 +38,24 @@ summary flags anything but `main`).
   the AlgoTest workflow result (`gh run list`), Fyers token (`mbt token-status`), whether
   the last trading day's options data is in the lake, disk space, and failures in the last
   24 h.
+- `src/api.ts` — loopback HTTP API (`127.0.0.1:8790`, `SCHEDULER_API_PORT`) started by
+  `serve` in the same process as the loop. `GET /jobs`, `GET /runs?job=&limit=`,
+  `GET /runs/:id/log?tail=200` (refuses paths outside the log dir and
+  `packages/momentum-backtesting/data`, symlinks resolved), `POST /jobs/:id/run` (manual run;
+  202 + run id, 409 if the job or its group is busy), `GET`/`PUT /notifications` (catalogue +
+  the prefs file from `@trading/notify`, written atomically). The dashboard reaches it through the
+  `SCHEDULER_DIRECT` rewrite `/api/scheduler/*`. Never bind it beyond loopback.
 - `src/cli.ts` — `bun run jobs status | run <id> | serve`.
+
+## Adding a check
+
+A check looks for a slow-burning problem and **never changes data** (alert only). Put it in
+its group's file under `src/checks/` (`drift`, `calendar`, `stock`, `credentials`, `digest`):
+export `jobs` (use `checkJob({...})` from `checks/types.ts` for the shared defaults) and
+`builtins` (wrap the function in `checkBuiltin(...)`). A problem makes the job exit 1 with the
+detail as its error, so the normal failure alert goes out with the job's `fixHint`; the job runs
+daily, so an unfixed problem repeats at most once a day. Inject anything that touches the
+network or disk so the test needs neither. One group per file keeps parallel PRs from clashing.
 
 ## Gotchas
 

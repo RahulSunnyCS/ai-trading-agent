@@ -1,3 +1,4 @@
+import { CHECK_JOBS } from './checks/index.js';
 import { type Schedule, firstWeekdayOfMonth, onWeekdays, tradingDays } from './schedule.js';
 
 /**
@@ -49,7 +50,7 @@ export interface Job {
    */
   logFile?: string;
   /** Run an in-process job (see runner's `builtins`) instead of `steps`. */
-  builtin?: 'morning-summary' | 'backup';
+  builtin?: string;
 }
 
 const MOMENTUM = 'packages/momentum-backtesting';
@@ -57,7 +58,7 @@ const OPTIONS = 'packages/option-backtesting';
 const BROKER_LOGIN = 'packages/broker-login';
 const FRIDAY = onWeekdays(5);
 
-export const JOBS: Job[] = [
+const BASE_JOBS: Job[] = [
   {
     id: 'broker-login',
     description: 'Trigger the AlgoTest broker login workflow on GitHub',
@@ -212,6 +213,9 @@ export const JOBS: Job[] = [
     fixHint: 'bun run --filter @ata/scheduler jobs run morning-summary',
   },
 ];
+
+/** Every job: the ones above plus each check group's (src/checks/). */
+export const JOBS: Job[] = [...BASE_JOBS, ...CHECK_JOBS];
 
 export function findJob(id: string): Job | undefined {
   return JOBS.find((job) => job.id === id);
