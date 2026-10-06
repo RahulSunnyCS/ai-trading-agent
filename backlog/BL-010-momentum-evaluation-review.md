@@ -317,7 +317,7 @@ against Nifty 500 TRI 12.3% and Midcap 150 TRI 17.7%: +7.8 and +2.5, needs +5 ag
 not tuned around. Paper tracking is not blocked by it, but starting it saves four favourites
 into the shared database and adds them to the Friday job, so it waits for the owner.
 
-### Last task — dashboard changes (owner, 2026-10-06)
+### Last task — dashboard changes (owner, 2026-10-06) — done 2026-10-07: planned in BL-036
 When the analysis is complete, write a plan of what the dashboard should change because of
 BL-010's findings, if anything: for example the point-in-time universe (BL-029), the Monday-open
 fill, Midcap 150 / Smallcap 250 comparison lines, showing the chosen config(s) and their
@@ -522,3 +522,5 @@ Also parked here (owner, 2026-10-06), priority P3:
   weeks; a fall deeper than 57.1%). Not started: starting it saves the four configs as favourites
   (journal evidence) and adds them to the Friday job, so it waits for the owner, who also has to
   decide whether to follow a strategy that failed its hold-out.
+- 2026-10-07 — the UI plan (BL-010's last task) is written as BL-036 (four phases: say what the
+  number is, execution realism, follow the frozen four, optional); BL-029 is its Phase 1 core.
