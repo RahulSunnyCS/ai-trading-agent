@@ -6,8 +6,15 @@ Samples random contract CSVs from sources that are independent of the conversion
 and, for spot and India VIX, random days of the vendor's CSVs.
 Every row of every sampled file is compared with the lake: same minute, same open/high/low/close/
 volume/oi. Reports rows compared, equal, different, only-in-CSV, only-in-lake — per source."""
-import os, random, re, subprocess, sys, tempfile, zipfile
+import os
+import random
+import re
+import shutil
+import subprocess
+import tempfile
+import zipfile
 from pathlib import Path
+
 import duckdb
 
 SEED = int(os.environ.get("SEED", "20261007"))
@@ -154,4 +161,4 @@ for sym, csv in specs:
                count(*) FILTER (WHERE ats IS NOT NULL AND lts IS NULL), count(*) FILTER (WHERE ats IS NULL AND lts IS NOT NULL) FROM j""").fetchone()
     con.execute("DROP TABLE pk")
     print(f"{sym:<12}{len(pick):>6}{r[0]:>14,}{r[1]:>8,}{r[2]:>10,}{r[3]:>11,}")
-import shutil; shutil.rmtree(tmp, ignore_errors=True)
+shutil.rmtree(tmp, ignore_errors=True)

@@ -1,11 +1,15 @@
 """Independent completeness check of the vendor import: staging rows vs lake rows, per unit.
 Reads Parquet footers only (no catalog), so it works while an import is running.
 usage: verify_lake.py [FOLDER ...]   (staging folder names, e.g. nifty ZOMATO; default all)"""
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import duckdb
 import pyarrow.parquet as pq
+
 from trading_data import vendor
+
 root = Path(os.environ.get("TRADING_DATA_ROOT", "/Volumes/TradingData"))
 staging = Path("/Volumes/RAHUL'S SSD/Stock Market Data/parquet/options")
 only = {a.lower() for a in sys.argv[1:]}
