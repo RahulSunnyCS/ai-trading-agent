@@ -154,3 +154,19 @@ under ~400 KB, all with byte-identical results (BL-001 goldens).
   copied missing-category retry now reuse `db_read.table_fingerprints` and the harness helper;
   tests added for every input folder and the cache bound. Not fixed: two identical requests sent
   at once still both compute (Phase 2 reworks the job manager, where shared in-flight work fits).
+- 2026-10-07 — Phase 1 merged as PR #56 (merge commit b283386).
+- 2026-10-07 — Phase 2 code done. A background job's `result` is now the core
+  plus `sections_available`; `trades`, `instruments`, `timeline`, `latest` and, for Broad,
+  `circuit_exposure` (the second engine run) come from `GET /api/backtest/jobs/{id}/sections/{name}`
+  when a tab or card opens. The synchronous endpoint, the weekly job and the goldens still get the
+  whole payload, so nothing they read moved. Rotations stay in the core (the chart's week summaries
+  read them). Through the job route with sections reassembled, ETF, Stock and Broad runs on live
+  data are identical to the pre-change snapshot. Sizes on the real Broad default: whole result
+  1,714 KB, core 593 KB (35%); gzipped, 259 KB whole against 106 KB core. **The Phase 2 goal of a
+  core under ~400 KB is not met**: `rotations` alone is 515 KB (every traded week embeds its full
+  holdings list) and the chart reads it at once. Shrinking it needs the chart to fetch a week's
+  holdings when asked (a "Phase 2b", left for the owner to rank). Decision: a job keeps its sections only while it
+  is one of the newest 6 finished (a run's builders hold its price frames); asking later gives 410
+  and the card says to run it again. Single-flight for identical concurrent requests was not added:
+  the second request now finishes quickly from the cached run once the first is done, and the
+  duplicate work only happens in the window while the first is still computing.

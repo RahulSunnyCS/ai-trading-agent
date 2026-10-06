@@ -8,12 +8,12 @@ import {
   lookbackLabel,
   signalActionTone,
 } from '../../../lib/momentumResult';
-import type { MomentumResult } from '../../../types/momentum';
+import type { MomentumLatest } from '../../../types/momentum';
 import { Badge } from '../../ui/Badge';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
 
-export type SignalRow = MomentumResult['latest']['rows'][number] & { reason: string };
+export type SignalRow = MomentumLatest['rows'][number] & { reason: string };
 
 /** A signal action as a Badge, toned by the one shared map in lib/momentumResult. */
 export function SignalActionBadge({ action }: { action: string | null | undefined }) {

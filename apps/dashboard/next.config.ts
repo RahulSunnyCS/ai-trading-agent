@@ -66,6 +66,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/backtest/jobs/:id`,
             },
             {
+              source: '/api/momentum/backtest/jobs/:id/sections/:section',
+              destination: `${momentumDirectOrigin}/api/backtest/jobs/:id/sections/:section`,
+            },
+            {
               source: '/api/momentum/liquidity-preview',
               destination: `${momentumDirectOrigin}/api/liquidity-preview`,
             },

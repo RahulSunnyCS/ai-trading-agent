@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { apiGet, apiPost } from '../lib/api';
-import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
+import type { MomentumResult, MomentumSavedRun, MomentumSectionName } from '../types/momentum';
 
 /**
  * Momentum backtest runs, held OUTSIDE the view so they outlive it.
@@ -15,6 +15,12 @@ import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
  */
 
 export type MomentumRunStatus = 'queued' | 'running' | 'done' | 'failed';
+
+/** Where a heavy section of a finished run stands. Its data, once loaded, sits in `result`. */
+export interface MomentumSectionState {
+  status: 'loading' | 'failed';
+  error?: string;
+}
 
 export interface MomentumRun {
   /** The server's job id. */
@@ -31,6 +37,8 @@ export interface MomentumRun {
   error: string | null;
   /** Name of the saved run created from this one, once the auto-save has landed. */
   savedAs: string | null;
+  /** Sections being fetched, or that failed to be. Absent once loaded (see `result`). */
+  sections?: Partial<Record<MomentumSectionName, MomentumSectionState>>;
 }
 
 interface PersistedRun {
@@ -53,6 +61,9 @@ interface MomentumRunsState {
     fresh: boolean,
   ) => Promise<string | null>;
   closeRun: (id: string) => void;
+  /** Fetches one heavy part of a finished run into its result. Does nothing when it is already
+   * loaded or on its way; after a failure it tries again. */
+  loadSection: (runId: string, name: MomentumSectionName) => Promise<void>;
 }
 
 interface JobView {
@@ -136,7 +147,47 @@ export const useMomentumRunsStore = create<MomentumRunsState>((set, get) => ({
     set({ runs: remaining, activeId: nextActive });
     persist(remaining, nextActive);
   },
+
+  loadSection: async (runId, name) => {
+    const run = get().runs.find((r) => r.id === runId);
+    if (!run?.result || run.result[name] !== undefined) return;
+    if (!run.result.sections_available?.includes(name)) return;
+    if (run.sections?.[name]?.status === 'loading') return;
+    markSection(runId, name, { status: 'loading' });
+    const response = await apiGet<{ section: string; data: unknown }>(
+      `/api/momentum/backtest/jobs/${runId}/sections/${name}`,
+    );
+    if (!response.ok) {
+      markSection(runId, name, {
+        status: 'failed',
+        error:
+          response.status === 410
+            ? 'This run was released to make room for newer ones. Run it again to see this.'
+            : response.error,
+      });
+      return;
+    }
+    // A null section (the circuit card when it could not be computed) is a real answer: it is
+    // stored as null, which stays distinct from "not loaded yet" (undefined).
+    const current = get().runs.find((r) => r.id === runId)?.result;
+    if (current) patchRun(runId, { result: { ...current, [name]: response.data.data } });
+    markSection(runId, name, null);
+  },
 }));
+
+function markSection(
+  runId: string,
+  name: MomentumSectionName,
+  state: MomentumSectionState | null,
+): void {
+  useMomentumRunsStore.setState((current) => ({
+    runs: current.runs.map((run) => {
+      if (run.id !== runId) return run;
+      const { [name]: _previous, ...others } = run.sections ?? {};
+      return { ...run, sections: state ? { ...others, [name]: state } : others };
+    }),
+  }));
+}
 
 function patchRun(id: string, patch: Partial<MomentumRun>): void {
   useMomentumRunsStore.setState((state) => ({

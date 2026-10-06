@@ -161,6 +161,101 @@ describe('momentumRuns store', () => {
     expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('done');
   });
 
+  describe('loadSection', () => {
+    const core = {
+      kpis: { cagr: 0.1 },
+      series: { dates: ['d'], strategy: [1] },
+      sections_available: ['trades', 'circuit_exposure'],
+    };
+
+    async function finishedRun(): Promise<string> {
+      mockPost.mockImplementation(async (url: string) =>
+        url.includes('saved-runs')
+          ? ({ ok: true, data: { name: 'Run 5' } } as never)
+          : ({ ok: true, data: { job: { id: 'a', status: 'running' } } } as never),
+      );
+      await useMomentumRunsStore.getState().startRun('broad', {}, false);
+      jobs({ a: { id: 'a', status: 'done', result: core, error: null } });
+      await vi.advanceTimersByTimeAsync(300);
+      expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('done');
+      await vi.advanceTimersByTimeAsync(0); // let the auto-save finish
+      mockGet.mockReset(); // the calls below are the ones each test is about
+      return 'a';
+    }
+
+    const sectionUrl = (name: string) => `/api/momentum/backtest/jobs/a/sections/${name}`;
+    const run = () => useMomentumRunsStore.getState().runs[0];
+
+    it('fetches a section into the run and clears its loading state', async () => {
+      const id = await finishedRun();
+      mockGet.mockResolvedValue({
+        ok: true,
+        data: { section: 'trades', data: [{ asset: 'X' }] },
+      } as never);
+      await useMomentumRunsStore.getState().loadSection(id, 'trades');
+      expect(mockGet).toHaveBeenLastCalledWith(sectionUrl('trades'));
+      expect(run()?.result?.trades).toEqual([{ asset: 'X' }]);
+      expect(run()?.result?.kpis).toEqual({ cagr: 0.1 }); // the rest of the result is untouched
+      expect(run()?.sections).toEqual({});
+    });
+
+    it('keeps a null section as the answer, distinct from not loaded', async () => {
+      const id = await finishedRun();
+      mockGet.mockResolvedValue({
+        ok: true,
+        data: { section: 'circuit_exposure', data: null },
+      } as never);
+      await useMomentumRunsStore.getState().loadSection(id, 'circuit_exposure');
+      expect(run()?.result?.circuit_exposure).toBeNull();
+    });
+
+    it('asks once for a section that is already on its way or loaded', async () => {
+      const id = await finishedRun();
+      let answer: (() => void) | null = null;
+      mockGet.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            answer = () => resolve({ ok: true, data: { section: 'trades', data: [] } } as never);
+          }),
+      );
+      const { loadSection } = useMomentumRunsStore.getState();
+      const first = loadSection(id, 'trades');
+      await loadSection(id, 'trades'); // in flight: ignored
+      expect(run()?.sections?.trades).toEqual({ status: 'loading' });
+      expect(mockGet).toHaveBeenCalledTimes(1);
+      (answer as unknown as () => void)();
+      await first;
+      await loadSection(id, 'trades'); // loaded: ignored
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores sections the run does not offer and runs it does not have', async () => {
+      const id = await finishedRun();
+      const { loadSection } = useMomentumRunsStore.getState();
+      await loadSection(id, 'timeline'); // not in sections_available
+      await loadSection('nope', 'trades');
+      expect(mockGet).not.toHaveBeenCalled();
+    });
+
+    it('records a failure, explains a released run, and tries again when asked', async () => {
+      const id = await finishedRun();
+      const { loadSection } = useMomentumRunsStore.getState();
+      mockGet.mockResolvedValue({ ok: false, error: 'boom', status: 500 } as never);
+      await loadSection(id, 'trades');
+      expect(run()?.sections?.trades).toEqual({ status: 'failed', error: 'boom' });
+      expect(run()?.result?.trades).toBeUndefined();
+
+      mockGet.mockResolvedValue({ ok: false, error: 'gone', status: 410 } as never);
+      await loadSection(id, 'trades');
+      expect(run()?.sections?.trades?.error).toMatch(/released/);
+
+      mockGet.mockResolvedValue({ ok: true, data: { section: 'trades', data: [1] } } as never);
+      await loadSection(id, 'trades');
+      expect(run()?.result?.trades).toEqual([1]);
+      expect(run()?.sections).toEqual({});
+    });
+  });
+
   it('reports a start failure without adding a tab', async () => {
     mockPost.mockResolvedValue({ ok: false, error: 'bad input' } as never);
     expect(await useMomentumRunsStore.getState().startRun('etf', {}, false)).toBe('bad input');

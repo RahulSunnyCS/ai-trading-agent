@@ -14,6 +14,9 @@ const DEFAULT_MOMENTUM_API_URL = 'http://127.0.0.1:8765';
 // exceed 90 seconds on local research data.
 const PROXY_TIMEOUT_MS = 180_000;
 const BODY_LIMIT_BYTES = 64 * 1024;
+/** A section name is a short snake_case word. Which ones exist is the Python service's call (its
+ * `BacktestSection`), so this only keeps the path safe: nothing else reaches the upstream URL. */
+const SECTION_NAME_PATTERN = '^[a-z_]{1,32}$';
 
 function momentumApiUrl(): string {
   return process.env.MOMENTUM_API_URL || DEFAULT_MOMENTUM_API_URL;
@@ -151,6 +154,28 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     async (request, reply) => {
       const { id } = request.params as { id: string };
       await forward(reply, `/api/backtest/jobs/${id}`);
+    },
+  );
+
+  // One heavy part of a finished job's result (trades, instruments, …), fetched when its card or
+  // tab opens: the job's own result carries the core only (BL-005).
+  fastify.get(
+    '/api/momentum/backtest/jobs/:id/sections/:section',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' },
+            section: { type: 'string', pattern: SECTION_NAME_PATTERN },
+          },
+          required: ['id', 'section'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id, section } = request.params as { id: string; section: string };
+      await forward(reply, `/api/backtest/jobs/${id}/sections/${section}`);
     },
   );
 
