@@ -71,3 +71,28 @@ export function runNowError(status: number | undefined, error: string): string {
   if (status === 404) return 'The scheduler does not know that job (is it an older build?).';
   return `Could not start the run: ${error}`;
 }
+
+export interface NotificationRow {
+  type: string;
+  description: string;
+  enabled: boolean;
+}
+
+/** The PUT body for a set of rows: every type that is switched off. */
+export function disabledTypes(rows: readonly NotificationRow[]): string[] {
+  return rows.filter((row) => !row.enabled).map((row) => row.type);
+}
+
+/** Failure alerts (`momentum.problem`, `options.problem`): silencing one hides a real fault. */
+export function isProblemType(type: string): boolean {
+  return type.endsWith('.problem');
+}
+
+/** `rows` with one type switched on or off. */
+export function withEnabled(
+  rows: readonly NotificationRow[],
+  type: string,
+  enabled: boolean,
+): NotificationRow[] {
+  return rows.map((row) => (row.type === type ? { ...row, enabled } : row));
+}

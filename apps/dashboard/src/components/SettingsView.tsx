@@ -15,6 +15,7 @@ import {
 } from '../store/settings';
 import { type ThemePreference, useThemeStore } from '../store/theme';
 import { NavigationSection } from './settings/NavigationSection';
+import { SchedulerNotificationsCard } from './settings/SchedulerNotificationsCard';
 import { SettingRow, SettingSwitch } from './settings/SettingSwitch';
 import { NAV_GROUPS, type Tab } from './shell/nav';
 import { Badge } from './ui/Badge';
@@ -182,8 +183,8 @@ function NotificationsSection() {
   return (
     <Card>
       <CardHeader
-        title="Notifications"
-        description="Alerts such as the weekly signal and broker login results go to Telegram. Delivery is configured on the server, so there is nothing to set up here."
+        title="Browser alerts"
+        description="Warnings shown in this dashboard. Telegram alerts are listed in the next card."
       />
       <SettingSwitch
         label="Warn me in the dashboard before the Fyers token expires"
@@ -280,6 +281,7 @@ export function SettingsView({ preferences, onChange }: SettingsViewProps) {
       <NavigationSection preferences={preferences} onChange={onChange} />
       <DefaultsSection preferences={preferences} />
       <NotificationsSection />
+      <SchedulerNotificationsCard />
       <AccountSection />
       <AboutSection />
     </div>
