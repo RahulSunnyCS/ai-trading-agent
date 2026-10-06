@@ -421,6 +421,56 @@ def _compute_ranks_blend(prices: pd.DataFrame, config: Config) -> tuple[pd.DataF
 RankCache = dict[tuple, tuple[pd.DataFrame, pd.DataFrame]]
 
 
+class _Grid:
+    """A week x column table read by position (BL-005 Phase 3).
+
+    `DataFrame.at[week, column]` costs about ten microseconds a call, and a Broad backtest makes
+    some 200,000 of them (a price, a rank, a lock flag, a group per holding per week), which was
+    about 40% of its run time. This holds the same values as one array plus two label-to-position
+    dicts, so `at` is two dict lookups and an index. It returns exactly what `.at` returns (the
+    array's own scalar of the frame's dtype), so no result moves; a missing week or column raises
+    KeyError as `.at` does. It needs unique labels (`_grid` falls back to `_FrameGrid` for a table
+    that has repeats, so such a table behaves as it always did)."""
+
+    __slots__ = ("cols", "rows", "values")
+
+    def __init__(self, frame: pd.DataFrame) -> None:
+        self.values = frame.to_numpy()
+        self.rows = {week: i for i, week in enumerate(frame.index)}
+        self.cols = {name: j for j, name in enumerate(frame.columns)}
+
+    def at(self, week: pd.Timestamp, name: str):
+        return self.values[self.rows[week], self.cols[name]]
+
+    def has(self, name: str) -> bool:
+        return name in self.cols
+
+
+class _FrameGrid:
+    """The `_Grid` interface over the DataFrame itself, for a table with a repeated label. A
+    repeated label makes `.at` return a Series, which is only a problem if that label is read, so
+    the table must not be refused up front: an unread duplicate used to be harmless."""
+
+    __slots__ = ("frame",)
+
+    def __init__(self, frame: pd.DataFrame) -> None:
+        self.frame = frame
+
+    def at(self, week: pd.Timestamp, name: str):
+        return self.frame.at[week, name]
+
+    def has(self, name: str) -> bool:
+        return name in self.frame.columns
+
+
+def _grid(frame: pd.DataFrame | None) -> _Grid | _FrameGrid | None:
+    if frame is None:
+        return None
+    if frame.index.is_unique and frame.columns.is_unique:
+        return _Grid(frame)
+    return _FrameGrid(frame)
+
+
 @dataclass
 class _Sim:
     """What both portfolio rules share: prices, ranks, costs, tax and the trade log."""
@@ -458,19 +508,39 @@ class _Sim:
     # (default) leave the engine exactly as before.
     uc_locked: pd.DataFrame | None = None
     lc_locked: pd.DataFrame | None = None
+    # The tables above, read by position (see `_Grid`). Built once, here: nothing replaces a table
+    # on a sim after it is made.
+    _prices: _Grid | _FrameGrid = field(init=False, repr=False)
+    _ranks: _Grid | _FrameGrid = field(init=False, repr=False)
+    _filter_ret: _Grid | _FrameGrid = field(init=False, repr=False)
+    _membership: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _groups: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _no_buy: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _uc_locked: _Grid | _FrameGrid | None = field(init=False, repr=False)
+    _lc_locked: _Grid | _FrameGrid | None = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._prices = _grid(self.prices)
+        self._ranks = _grid(self.ranks)
+        self._filter_ret = _grid(self.filter_ret)
+        self._membership = _grid(self.membership)
+        self._groups = _grid(self.groups)
+        self._no_buy = _grid(self.no_buy)
+        self._uc_locked = _grid(self.uc_locked)
+        self._lc_locked = _grid(self.lc_locked)
 
     def sell_blocked(self, asset: str, week: pd.Timestamp) -> bool:
         return (
-            self.lc_locked is not None
-            and asset in self.lc_locked.columns
-            and bool(self.lc_locked.at[week, asset])
+            self._lc_locked is not None
+            and self._lc_locked.has(asset)
+            and bool(self._lc_locked.at(week, asset))
         )
 
     def group(self, week: pd.Timestamp, asset: str) -> str | None:
         """The group `asset` counts toward that week, or None (ungrouped / no table supplied)."""
-        if self.groups is None or asset not in self.groups.columns:
+        if self._groups is None or not self._groups.has(asset):
             return None
-        label = self.groups.at[week, asset]
+        label = self._groups.at(week, asset)
         return label if isinstance(label, str) else None
 
     def buy_cost(self, value_fraction: float, asset: str | None = None) -> float:
@@ -503,15 +573,15 @@ class _Sim:
         return min(fraction, DP_CHARGE_FRACTION_CAP)
 
     def price(self, asset: str, week: pd.Timestamp) -> float:
-        return self.prices.at[week, CASH if asset in (_POOL, IDLE) else asset]
+        return self._prices.at(week, CASH if asset in (_POOL, IDLE) else asset)
 
     def rank(self, week: pd.Timestamp, asset: str) -> float:
-        return self.ranks.at[week, asset] if asset in self.ranks.columns else float("nan")
+        return self._ranks.at(week, asset) if self._ranks.has(asset) else float("nan")
 
     def passes_filter(self, name: str, week: pd.Timestamp) -> bool:
         if self.config.defensive != "filter":
             return True
-        mine, cash = self.filter_ret.at[week, name], self.filter_ret.at[week, CASH]
+        mine, cash = self._filter_ret.at(week, name), self._filter_ret.at(week, CASH)
         return pd.notna(mine) and pd.notna(cash) and mine > cash
 
     def exit_reason(self, asset: str, week: pd.Timestamp, slack: int = 0) -> str | None:
@@ -544,41 +614,36 @@ class _Sim:
         neither bought nor topped up. A held one keeps its top-N slot (no filler is bought in
         its place) but is left out of the returned list, so it receives no money that week."""
         ranks = self.ranks.loc[week].dropna().sort_values()
-        names = [
-            n for n in ranks.index if ranks[n] <= self.config.top_n and self.passes_filter(n, week)
-        ]
-        if self.membership is not None:
-            names = [
-                n
-                for n in names
-                if n not in self.membership.columns or bool(self.membership.at[week, n])
-            ]
-        gates = [g for g in (self.no_buy, self.uc_locked) if g is not None]
+        values = ranks.to_numpy()
+        # Sorted best first, so the names within the top N are a prefix: find where it ends
+        # instead of looking every ranked name up (there are ~760 for Broad, each week).
+        within = int(np.searchsorted(values, self.config.top_n, side="right"))
+        names = [n for n in ranks.index[:within] if self.passes_filter(n, week)]
+        membership = self._membership
+        if membership is not None:
+            names = [n for n in names if not membership.has(n) or bool(membership.at(week, n))]
+        gates = [g for g in (self._no_buy, self._uc_locked) if g is not None]
         if not gates:
             return names
 
         def blocked(n: str) -> bool:
-            return any(n in g.columns and bool(g.at[week, n]) for g in gates)
+            return any(g.has(n) and bool(g.at(week, n)) for g in gates)
 
         def unbuyable(n: str) -> bool:
-            locked = self.uc_locked
-            return locked is not None and n in locked.columns and bool(locked.at[week, n])
+            locked = self._uc_locked
+            return locked is not None and locked.has(n) and bool(locked.at(week, n))
 
         out = [n for n in names if n in held or not blocked(n)]
         if len(out) >= self.config.top_n:
             return [n for n in out if not unbuyable(n)]
-        for n in ranks.index:
+        for n, rank in zip(ranks.index, values, strict=True):
             if len(out) >= self.config.top_n:
                 break
             if n in out or blocked(n) or not self.passes_filter(n, week):
                 continue
-            if (
-                self.membership is not None
-                and n in self.membership.columns
-                and not bool(self.membership.at[week, n])
-            ):
+            if membership is not None and membership.has(n) and not bool(membership.at(week, n)):
                 continue
-            if ranks[n] > self.config.exit_rank:
+            if rank > self.config.exit_rank:
                 break
             out.append(n)
         return [n for n in out if not unbuyable(n)]

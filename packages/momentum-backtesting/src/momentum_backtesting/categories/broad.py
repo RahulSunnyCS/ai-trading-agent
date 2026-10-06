@@ -992,12 +992,16 @@ def build_effective_stock_ranks(
     drifting with how many real picks happened to exist that week. The returned `top_n`/
     `exit_rank` are exactly the two boundary numbers the caller must set on `engine.Config` for
     this to work as intended."""
-    ranks = pd.DataFrame(index=weeks, columns=columns, dtype=float)
-    groups = pd.DataFrame(index=weeks, columns=columns, dtype=object)
     top_n = category_top_n * picks_per_category
     exit_rank = category_exit_rank * picks_per_category
+    # Filled as arrays and turned into frames once at the end: a cell-by-cell `.at` write per pick
+    # per week was ~0.2 s of every Broad run (BL-005 Phase 3). An unset cell is NaN in both, as in
+    # the frames this used to build.
+    rank_values = np.full((len(weeks), len(columns)), np.nan)
+    group_values = np.full((len(weeks), len(columns)), np.nan, dtype=object)
+    column_at = {name: j for j, name in enumerate(columns)}
 
-    for w in weeks:
+    for i, w in enumerate(weeks):
         held = held_by_week.get(w, [])
         row = combined_pool_ranks.loc[w]
         for position, cid in enumerate(held, start=1):
@@ -1008,16 +1012,19 @@ def build_effective_stock_ranks(
             base = 0 if position <= category_top_n else top_n
             bucket_pos = position if position <= category_top_n else position - category_top_n
             for slot, name in enumerate(picks, start=1):
-                if name not in ranks.columns:
+                j = column_at.get(name)
+                if j is None:
                     continue
                 # A stock tagged to two held categories keeps the rank (and group) from the
                 # better-placed one. `held` is best-first, so that is whichever wrote it first;
                 # overwriting it here used to hand a top pick a lingering, unbuyable rank.
-                if pd.notna(ranks.at[w, name]):
+                if not np.isnan(rank_values[i, j]):
                     continue
-                ranks.at[w, name] = base + (bucket_pos - 1) * picks_per_category + slot
-                groups.at[w, name] = cid
+                rank_values[i, j] = base + (bucket_pos - 1) * picks_per_category + slot
+                group_values[i, j] = cid
 
+    ranks = pd.DataFrame(rank_values, index=weeks, columns=columns)
+    groups = pd.DataFrame(group_values, index=weeks, columns=columns, dtype=object)
     scores = -ranks  # informational only (analysis.py's "next actions" panel) -- see engine.py
     return EffectiveRanks(
         ranks=ranks, scores=scores, top_n=top_n, exit_rank=exit_rank, groups=groups
