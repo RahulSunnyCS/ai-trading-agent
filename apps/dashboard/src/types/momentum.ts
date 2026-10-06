@@ -233,7 +233,7 @@ export interface MomentumWeeklyStatus {
   }>;
   signals: Array<{ week: string; run: 'preview' | 'final'; label: string; generated_at: string }>;
   schedule: Array<{
-    run: 'preview' | 'final' | 'stock-ingest';
+    run: 'preview' | 'final' | 'stock-ingest' | 'journal-check';
     when: string;
     last_ran_at: string | null;
     last_line: string | null;
@@ -309,4 +309,61 @@ export interface MomentumRebalanceResult {
     indicative_quantity: number | null;
   }>;
   note: string;
+}
+
+/** GET /api/momentum/journal — the forward-signal journal (BL-024). */
+export interface MomentumJournalEntry {
+  entry_id: number;
+  /** ISO 8601 UTC. */
+  recorded_at: string;
+  week: string;
+  run_kind: 'preview' | 'final';
+  source: 'favourite' | 'benchmark';
+  config_id: string;
+  config_name: string;
+  dataset: string;
+  settings_hash: string;
+  /** git HEAD, with '+dirty' when the code had uncommitted changes. */
+  code_commit: string;
+  data_fingerprint: string;
+  /** entry_id of the row this one corrects, if any. */
+  supersedes: number | null;
+  prev_hash: string;
+  row_hash: string;
+  /** Model portfolio (fractions) at the signal's close, BEFORE the signal's own actions. */
+  holdings_before: Record<string, number>;
+  actions: Array<{ asset: string; action: string; rank: number | null }>;
+  /** Benchmark rows only: the index level recorded. */
+  level: number | null;
+}
+
+export interface MomentumJournalCheckItem {
+  config_id: string;
+  name: string;
+  dataset: string;
+  run_kind: 'preview' | 'final';
+  status: 'recorded' | 'wrong_week' | 'missing';
+  entry_id: number | null;
+  week: string | null;
+  recorded_at: string | null;
+  corrections: number;
+}
+
+export interface MomentumJournalCheck {
+  week: string;
+  expected: number;
+  recorded: number;
+  items: MomentumJournalCheckItem[];
+  chain: { entries: number; head: string | null; problems: string[] };
+  warnings: string[];
+  ok: boolean;
+}
+
+export interface MomentumJournal {
+  /** False until the first weekly run has created the journal. */
+  available: boolean;
+  weeks: Array<{ week: string; entries: number }>;
+  week: string | null;
+  entries: MomentumJournalEntry[];
+  check: MomentumJournalCheck | null;
 }

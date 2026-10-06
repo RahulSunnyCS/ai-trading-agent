@@ -24,6 +24,8 @@ export interface FyersAuthStatus {
   connected: boolean;
   degraded: boolean;
   needsReauth: boolean;
+  /** Fyers rejected a token whose expiry date had not passed (revoked or reset early). */
+  revoked?: boolean;
   expiresAt?: string;
   appId?: string;
 }
@@ -55,6 +57,8 @@ const CLOCK_TICK_MS = 30_000;
  */
 export function fyersTokenState(status: FyersAuthStatus | null, now: Date): TokenState {
   if (!status || !status.configured) return 'missing';
+  // Fyers refused a token the clock still calls valid; do not let a skewed clock hide that.
+  if (status.revoked) return 'expired';
   const byClock = tokenStateAt(status.expiresAt, now);
   if (byClock === 'missing' || byClock === 'expired') return byClock;
   if (status.needsReauth || !status.connected) return 'missing';

@@ -227,6 +227,8 @@ describe('momentum backtest proxy routes', () => {
   it.each([
     ['/api/momentum/weekly/jobs/latest', 'http://127.0.0.1:8765/api/weekly/jobs/latest'],
     ['/api/momentum/weekly/status', 'http://127.0.0.1:8765/api/weekly/status'],
+    ['/api/momentum/journal', 'http://127.0.0.1:8765/api/journal'],
+    ['/api/momentum/journal?week=2026-10-09', 'http://127.0.0.1:8765/api/journal?week=2026-10-09'],
     [
       '/api/momentum/weekly/stock-sync/jobs/latest',
       'http://127.0.0.1:8765/api/weekly/stock-sync/jobs/latest',
@@ -240,6 +242,17 @@ describe('momentum backtest proxy routes', () => {
 
     expect(response.statusCode).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith(upstream, expect.anything());
+    await server.close();
+  });
+
+  it('rejects a journal week that is not a date, without calling upstream', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+
+    const response = await server.inject({ method: 'GET', url: '/api/momentum/journal?week=x' });
+
+    expect(response.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
     await server.close();
   });
 

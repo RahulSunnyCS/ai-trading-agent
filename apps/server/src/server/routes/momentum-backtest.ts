@@ -278,6 +278,23 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, '/api/weekly/status');
   });
 
+  fastify.get(
+    '/api/momentum/journal',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { week: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { week } = request.query as { week?: string };
+      await forward(reply, week ? `/api/journal?week=${encodeURIComponent(week)}` : '/api/journal');
+    },
+  );
+
   fastify.post(
     '/api/momentum/rebalance-preview',
     { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },

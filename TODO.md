@@ -51,6 +51,7 @@ One takes, so a holiday refusal may read differently per broker.
 | 1.6 | CODEOWNERS on `packages/broker-login/` | claude | So execution-path changes always get a review. |
 | 1.7 | Selector-drift canary | claude | A scheduled run that asserts the AlgoTest login selectors still resolve, so drift is caught before 08:15 on a trading day rather than during it. Case + cost: `docs/roadmap.md` → Ideas #4. |
 | 1.8 | Laptop scheduler — [BL-011](backlog/BL-011-laptop-scheduler.md) | claude | **Done 2026-10-06.** launchd job `com.ai-trading-agent.broker-login` (`deploy/launchd/`) runs `packages/broker-login/src/dispatch.ts` at 08:00 IST Mon–Fri, triggering `daily-broker-login.yml` via `gh` and alerting on Telegram if it can't. Verified: `workflow_dispatch` runs at 08:00 IST on 5 and 6 Oct, both green. The GitHub cron stays as a backstop. Remaining scheduling work is [BL-012](backlog/BL-012-scheduler-service.md). |
+| 1.9 | Fyers login: blank page, wrong token expiry, unattended login | claude | **Done 2026-10-06.** (1) The dashboard's Login opened a blank page in the standalone research stack: with `DATABASE_URL` set the Python `/api/auth/fyers/start` redirected to `FYERS_REDIRECT_URI`'s host, which was the dashboard itself, which forwarded back — an endless loop. A `handoff=1` marker now breaks it, and the local callback also writes `broker_tokens`. (2) The UI said hours remained on a token Fyers had already reset: expiry was now+24h, but Fyers kills every token at 06:00 IST. One rule (`fyersTokenExpiry` / `fyers.token_expiry`) now sets it at login, clamps stored rows on read, and both status endpoints probe Fyers so a revoked token shows Expired. (3) New launchd job `com.ai-trading-agent.fyers-login` (08:05 IST) runs headless Fyers login and stores the token — separate from the AlgoTest login. **Owner:** put `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` in `.env`, run `deploy/launchd/install.sh`, restart `bun run start:backend`. |
 
 ---
 
@@ -486,7 +487,7 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | 3.13.2 | Phase 1b: live preview = backtest (F11, E9) | claude | **Partly done 2026-10-05.** `verified` is the default price-series rule everywhere (owner approved; a saved run without the field now re-runs on it — the dashboard never sent it, so every dashboard Broad run moves to `verified`); the live Rebalance ranking rebuilds its pool with the ranking's own rule; `mbt categories broad-backtest` no longer skips thin weeks. **Decided 2026-10-05:** a new Broad run now starts with circuit-lock fills and the tradability filter on (owner decision; measured on the default run: 53.2% → 40.4% CAGR; the request model still defaults off, so saved runs re-run unchanged), and Broad / Custom Index results carry an "upper bound, not an expected return" warning until Phase 3. **Decided 2026-10-05:** the signal delay stays 0 for a new run (the search and saved favourites keep 1; with both switches on it moved the default run by 0.1 pt); Phase 2 measures the cost of a Monday fill instead. **Still open:** the 12-week shadow check needs Phase 2's truncation harness. Note: the Friday Telegram signal is the ETF strategy (`live_config.toml`), not Broad |
 | 3.13.3 | Phase 2: independent ledger replay, ten hand-checked trades, jump scan, truncation test, Monday-open repricing | claude | **Steps 1–3 and 5–7 done 2026-10-05** (`audit/`, `mbt audit`; results in `packages/momentum-backtesting/docs/evaluation-review.md`). Replay passes 24 of 24. 9 of 10 holdings match Yahoo Finance; PFC fails on a missed bonus. Monday-open flag trips. Step 4 (look-ahead on real data) passes 18 of 18, 2026-10-06. **Open:** engine fixes E10–E13; owner to spot-check two or three of the ten |
 | 3.13.4 | Phase 3: point-in-time universe, launch-dated taxonomy, data fixes; step-by-step CAGR loss table | claude | **Measured 2026-10-06.** Point-in-time universe (`turnover_rank`), small-bonus and renamed-symbol data fixes, label shuffle done. The 50 best configs lose a median 22–25 points; **arm A's headline is killed**. Still 31–34% pre-tax against 17.1% for the momentum index. **Open:** launch-dated taxonomy (owner to decide), 2,155 falls under review |
-| 3.13.5 | Phases 4–7 | claude | **Phase 4 done 2026-10-06** except the point-in-time re-score (running): fair random baseline passes 6 of 6; PBO 0.48 on today's list — **the single-winner rule is killed**; criteria as code, data-stamped run ids, generic nudges, window rule. Next: Phase 5 (choose by cluster and lower bound, inside a basket) |
+| 3.13.5 | Phases 4–7 | claude | **Phase 4 done 2026-10-06**: fair random baseline passes 6 of 6; PBO 0.48 on today's list and **0.69 point in time** (0.53 within the drawdown ceiling) — **the single-winner rule is killed**; point-in-time median config 28.1% pre-tax against 17.0% for Mom30 TRI; criteria as code, data-stamped run ids, generic nudges, window rule. Next: Phase 5 (choose by cluster and lower bound, inside a basket), after the owner's go-ahead and loading Midcap 150 / Smallcap 250 TRI |
 
 ### 3.14 Momentum result integrity — [BL-001](backlog/BL-001-momentum-result-integrity.md)
 
@@ -496,6 +497,18 @@ where each phase stands. No momentum CAGR is a "result" until Phases 1–3 pass.
 | 3.14.2 | Phase 2: settings coverage and the look-ahead test | claude | **Done 2026-10-05** except the always-true checks and nightly runs. Look-ahead passes at three cut dates on all four datasets |
 | 3.14.3 | Phase 3: code and data stamp on every saved run | claude | Open |
 | 3.14.4 | Phase 4: weekly favourites check | claude | Open — three owner questions in the backlog item |
+
+### 3.15 Forward-signal journal — [BL-024](backlog/BL-024-forward-signal-journal.md)
+
+The plan and the owner's decisions live in the backlog item; this table only tracks where each phase stands.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.15.1 | Phase 1: append-only, hash-chained journal written by every weekly run | claude | **Code done 2026-10-06** (migration 007, `forward_journal.py`, `mbt journal show/verify`). Closes when Friday 2026-10-09's runs write their rows and `mbt journal verify` passes; needs this merged and the laptop checkout on `main` before 14:40 that day |
+| 3.15.5 | Phase 1b: Friday 21:00 `mbt journal check --send` job + Momentum › Journal page | claude | **Code done 2026-10-06.** Closes with 3.15.1 on Friday 2026-10-09 |
+| 3.15.2 | Install the 19:30 `momentum-weekly-stock-ingest` LaunchAgent (without it no Stock/Broad favourite is evaluated or journalled) | owner | **Done 2026-10-06** (installed with the owner's go-ahead) |
+| 3.15.3 | Phase 2: weekly scoring, Forward page, Telegram line | claude | Open — after four Fridays are recorded |
+| 3.15.4 | Phase 3: real fills | owner→claude | Open — when real money is in |
 
 ## Reference — where detail lives
 

@@ -86,8 +86,9 @@ a Fyers access token (see the precedence order in root `technical.md`'s Environm
 Variables table) — that connection is unrelated and still live.
 
 The weekly job (`mbt weekly`) itself now runs from `launchd` LaunchAgents on the owner's own
-laptop (`scripts/install-launchd.sh`/`uninstall-launchd.sh`, three plists — Friday 14:40
-preview, 16:45 final, and since 2026-10-02 19:30 stock-data ingest IST), replacing the retired
+laptop (`scripts/install-launchd.sh`/`uninstall-launchd.sh`, four plists — Friday 14:40
+preview, 16:45 final, since 2026-10-02 19:30 stock-data ingest, and since 2026-10-06 21:00
+forward-journal check IST), replacing the retired
 `.github/workflows/momentum-weekly.yml`. The plists explicitly `source` the repo root `.env`
 before running — launchd's own environment does not inherit it the way an interactive shell's
 profile usually does. The CLI's `weekly()` command is a thin wrapper around
@@ -134,6 +135,25 @@ reruns the weekly orchestration with `--only-dataset stock --only-dataset custom
 --only-dataset broad` so it only sends to Telegram if the active favourite is one of those —
 otherwise it would resend (or misreport as "blocked") an ETF favourite the 16:45 job already
 handled.
+
+**Forward-signal journal (BL-024, 2026-10-06).** Every weekly run also appends each signal it
+produced to `momentum_forward_journal` (`forward_journal.py`; trading-data migration 007): every
+favourite's final, ETF previews only on a Friday, and the Nifty200 Momentum 30 TRI level once its
+data covers the week (so in practice from the 19:30 job). Append-only and hash-chained — DuckDB
+has no triggers, so an edit cannot be refused, only detected (`mbt journal verify`); the chain
+head goes into that run's Telegram message (or a separate "forward journal" message when the
+run sends nothing else, e.g. the 19:30 rerun) as an outside witness. A rerun with an identical
+signal writes nothing; a changed one is a new row with `supersedes`. `holdings_before` is the
+model portfolio **before** the signal's own actions — `run_backtest` never trades its newest
+week (`trade_weeks` excludes it), so the post-trade portfolio first appears in next week's row.
+Use `momentum_signals` for the latest signal (it is overwritten on rerun); use the journal for
+evidence. A journal failure never blocks the signal and is reported in Telegram.
+After the Friday runs, a 4th LaunchAgent (21:00 IST, `momentum-weekly-journal-check`) runs
+`mbt journal check --send`: every favourite's final, each ETF favourite's Friday preview and the
+benchmark level should be in under this week; a favourite whose signal is labelled an earlier
+week is reported as "wrong week", not missing. The dashboard's **Momentum › Journal** page
+(`MomentumJournalView.tsx`, `GET /api/journal` → Fastify `/api/momentum/journal`) shows the
+same check, the chain status and every entry by week.
 
 **Gotcha found live, not by a test:** `stocks_fetch`/`local_migrate` are Typer commands whose
 parameters default to `typer.Option(...)` sentinel objects — Typer only resolves those into

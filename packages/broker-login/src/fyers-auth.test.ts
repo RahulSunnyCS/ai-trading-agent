@@ -93,3 +93,16 @@ test('config needs every variable and a 4-digit PIN', () => {
   assert.throws(() => loadFyersConfig({ ...env, FYERS_PIN: '' }), /FYERS_PIN/);
   assert.throws(() => loadFyersConfig({ ...env, FYERS_PIN: '12345' }), /4-digit/);
 });
+
+test('a Fyers token expires at the next 06:00 IST, not after expires_in', async () => {
+  const fetchImpl: typeof fetch = async () =>
+    new Response(JSON.stringify({ s: 'ok', access_token: 'tok-123456', expires_in: 86_400 }), {
+      status: 200,
+    });
+  const before = Date.now();
+  const token = await exchangeAuthCode(config, 'code', fetchImpl);
+  const ms = new Date(token.expiresAt).getTime() - before;
+  assert.ok(ms > 0 && ms <= 24 * 3600 * 1000, 'within one day');
+  // 06:00 IST == 00:30 UTC
+  assert.equal(new Date(token.expiresAt).toISOString().slice(11, 19), '00:30:00');
+});

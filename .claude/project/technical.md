@@ -127,6 +127,9 @@ uv run mbt fetch            # daily history from 2016 -> data/weekly_closes.csv 
 uv run mbt fetch --no-fyers # only the public sources (cash NAV, silver)
 uv run mbt compare         # rank-and-rotate backtest, off/ranked/filter modes -> data/backtests/
 uv run mbt serve           # private Momentum API on 127.0.0.1:8765
+uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
+uv run mbt journal verify  # check no journal entry was changed, removed or reordered
+uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 launchd job)
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
 uv run mbt stocks fetch --skip-download  # rebuild the Nifty 50 stock data layer from the raw cache, no network
 uv run mbt stocks pin-manifest           # commit the raw cache + events as the new reproducibility baseline
@@ -152,8 +155,8 @@ rule below.
 |---|---|---|---|
 | `packages/notify` (`@trading/notify`) | Outbound Telegram notifications + the never-emit secret registry | `send`, `sendText`, `istTimestamp`, `registerSecret`, `redact` | `packages/broker-identity`, `packages/broker-login` (Node/Bun only — Python callers reimplement the `Notification` shape rather than importing an ESM package) |
 | `packages/market-reference` (`@trading/market-reference`) | Effective-dated NSE/BSE lot-size / strike-step lookups | `lotSize`, `strikeStep` | `apps/server` (`trading/paper-trade-executor.ts`, `trading/portfolio-risk.ts`) |
-| `packages/broker-identity` (`@trading/broker-identity`) | Canonical `BrokerId` type + the one RFC 6238 TOTP generator | `BrokerId`, `generateTotp`, `freshTotp`, `waitForNextWindow` | `apps/server` (`ingestion/brokers/angelone.ts`), `packages/broker-login` |
-| `packages/broker-login` | Daily Playwright job — logs brokers into AlgoTest via TOTP | — (leaf; nothing in-repo imports it) | depends on `broker-identity` + `notify` |
+| `packages/broker-identity` (`@trading/broker-identity`) | Canonical `BrokerId` type + the one RFC 6238 TOTP generator + the Fyers 06:00 IST token-expiry rule | `BrokerId`, `generateTotp`, `freshTotp`, `waitForNextWindow`, `fyersTokenExpiry` | `apps/server` (`ingestion/brokers/angelone.ts`, `services/fyers-auth.ts`), `packages/broker-login` |
+| `packages/broker-login` | Daily Playwright jobs — logs Angel One/Finvasia into AlgoTest via TOTP; separately logs Fyers in headlessly (`fyers-login`, stores to `broker_tokens`) | — (leaf; nothing in-repo imports it) | depends on `broker-identity` + `notify` |
 | `packages/contract-notes` | Daily Gmail → PDF → Google Sheet F&O P&L pipeline | — (leaf; Node 20/CommonJS, reimplements the `Notification` shape itself instead of importing the ESM `@trading/notify`) | none |
 | `packages/momentum-backtesting` | Python weekly momentum-rotation research tool (`mbt` CLI) | private FastAPI service (`mbt serve`) | `apps/dashboard` through Fastify's `/api/momentum/*` proxy; still no code imports from `option-backtesting` |
 | `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below); since 2026-09-30 those CSVs are EXPORTED from `trading-data`'s catalog (`tdata reference export`), which is the master | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
@@ -505,7 +508,7 @@ Critical variables whose misconfiguration causes real pain:
   strike interval anywhere — always call `lotSize()`/`strikeStep()` from `@trading/market-reference`
   (TypeScript) or read the CSVs directly (Python); see that package's `CLAUDE.md` for the
   filesystem-level link between it and `option-backtesting`'s reference data.
-- **Fyers token expires daily** — there is no automatic refresh yet (deferred to Phase B). New dashboard-login tokens are AES-256 encrypted at rest in `broker_tokens` through PostgreSQL pgcrypto; the browser receives only app ID/status/expiry. Missing, expired, or app-ID-mismatched tokens surface as “No API token” and require re-login. A pre-market token-validity check job runs at 08:45 IST on weekdays (opt-in via TOKEN_VALIDITY_SCHEDULER_ENABLED).
+- **Fyers token dies at the next 06:00 IST, not 24h after login** — `expires_in` is ignored: `fyersTokenExpiry()` (`packages/broker-identity`; Python mirror `fyers.token_expiry`) sets the expiry, stored rows are clamped on read from `updated_at`, and `/api/auth/fyers/status` also probes Fyers' profile endpoint so a revoked token shows Expired. The laptop's `fyers-login` launchd job (08:05 IST) refreshes it unattended; the dashboard button is the manual fallback. Dashboard-login tokens are no longer "manual daily only". New dashboard-login tokens are AES-256 encrypted at rest in `broker_tokens` through PostgreSQL pgcrypto; the browser receives only app ID/status/expiry. Missing, expired, or app-ID-mismatched tokens surface as “No API token” and require re-login. A pre-market token-validity check job runs at 08:45 IST on weekdays (opt-in via TOKEN_VALIDITY_SCHEDULER_ENABLED).
 - **TimescaleDB is not optional** — the standard `postgres:16-alpine` image does NOT have TimescaleDB. The Docker Compose uses `timescale/timescaledb:latest-pg16`. Pointing the app at a vanilla PostgreSQL instance will fail on migration
 - **Hypertable full-table scans** — a query on `market_ticks` or `straddle_snapshots` without a `WHERE time > ...` filter will scan years of data. Always filter by time range
 - **Two test commands** — `bun run test:integration` requires Docker services running. Running it without them produces confusing connection errors, not a test-not-found error

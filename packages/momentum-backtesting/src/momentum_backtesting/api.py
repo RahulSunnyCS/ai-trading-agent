@@ -1883,6 +1883,183 @@ def _no_active_signal_notification(
     )
 
 
+def _journal_entries(
+    run: str,
+    outcomes: list[dict],
+    favorites_by_id: dict[str, dict],
+    now: datetime,
+    target_week: pd.Timestamp | None,
+) -> tuple[list, list[str]]:
+    """BL-024: one forward-journal entry per signal this run produced, plus the benchmark level
+    on a final run. Returns (entries, notes). Everything is read here, before the journal's
+    write connection opens: DuckDB refuses a read-only connection in the same process while a
+    read-write one is open."""
+    from . import forward_journal as journal
+
+    notes: list[str] = []
+    # A preview is the signal traded at Friday's close; one taken on any other day is a
+    # dashboard what-if, not a record of what would have been traded.
+    if run == "preview" and now.weekday() != 4:
+        return [], [f"preview on a {now:%A}: not journalled (only Friday previews are)"]
+    commit = journal.code_commit()
+    closes = journal.file_fingerprint(DATA_DIR / "weekly_closes.csv")
+    stock_prices: str | None = None
+    entries = []
+    for outcome in outcomes:
+        result = outcome["result"]
+        if result is None or result.signal is None:
+            continue
+        signal = result.signal
+        if outcome["dataset"] == "etf":
+            fingerprint = f"weekly_closes:{closes}"
+        else:
+            stock_prices = stock_prices or journal.frame_fingerprint(DATA.get_stock().prices)
+            fingerprint = f"weekly_closes:{closes};stock_prices:{stock_prices}"
+        favorite = favorites_by_id.get(outcome["id"])
+        entries.append(
+            journal.Entry(
+                week=journal.week_string(signal["week"]),
+                run_kind=run,
+                source="favourite",
+                config_id=outcome["id"] or "default-live",
+                config_name=outcome["name"],
+                dataset=outcome["dataset"],
+                settings=favorite["config"] if favorite else signal.get("config", {}),
+                holdings_before=signal.get("weights", {}),
+                signal=journal.compact_signal(signal),
+                data_fingerprint=fingerprint,
+                code_commit=commit,
+            )
+        )
+    if run == "final" and target_week is not None:
+        # The benchmark is a level to measure returns from, not a portfolio: recorded only once
+        # its data reaches this week (the 19:30 stock-ingest run, not the 16:45 one).
+        level = reference_benchmarks.load_references().get(NIFTY200_MOMENTUM30_TRI)
+        level = level.dropna().loc[:target_week] if level is not None else None
+        if level is None or level.empty or level.index[-1] <= target_week - pd.Timedelta(days=7):
+            notes.append(f"{NIFTY200_MOMENTUM30_TRI}: no level for this week yet")
+        else:
+            entries.append(
+                journal.Entry(
+                    week=journal.week_string(target_week),
+                    run_kind=run,
+                    source="benchmark",
+                    config_id=NIFTY200_MOMENTUM30_TRI,
+                    config_name=NIFTY200_MOMENTUM30_TRI,
+                    dataset="benchmark",
+                    settings={"benchmark": NIFTY200_MOMENTUM30_TRI},
+                    holdings_before={NIFTY200_MOMENTUM30_TRI: 1.0},
+                    signal={
+                        "level": float(level.iloc[-1]),
+                        "level_week": journal.week_string(level.index[-1]),
+                    },
+                    data_fingerprint=f"level:{float(level.iloc[-1])!r}",
+                    code_commit=commit,
+                )
+            )
+    return entries, notes
+
+
+def _journal_weekly(
+    run: str,
+    outcomes: list[dict],
+    favorites_by_id: dict[str, dict],
+    now: datetime,
+    target_week: pd.Timestamp | None,
+) -> dict:
+    """Record this run's signals in the forward journal. Never raises: a journal failure must not
+    cost the week's signal, and it is reported (see `_journal_line`), never swallowed."""
+    from . import forward_journal as journal
+
+    try:
+        entries, notes = _journal_entries(run, outcomes, favorites_by_id, now, target_week)
+        recorded = []
+        with connect() as con:
+            for entry in entries:
+                if journal.record(con, entry) is not None:
+                    recorded.append(entry.config_name)
+            chain = journal.head(con)
+    except Exception as error:  # reported to Telegram by the caller
+        return {
+            "recorded": [],
+            "head": None,
+            "notes": [],
+            "error": f"{type(error).__name__}: {error}",
+        }
+    return {
+        "recorded": recorded,
+        "head": {"entries": chain[0], "hash": chain[1]} if chain else None,
+        "notes": notes,
+        "error": None,
+    }
+
+
+def _journal_entry_view(row: dict) -> dict:
+    """One journal row for the dashboard: the stored text parsed, and the signal cut down to its
+    actions (a Broad signal ranks hundreds of names; the page needs the ones it acts on)."""
+    signal = json.loads(row["signal"])
+    return {
+        **{key: row[key] for key in row if key not in ("signal", "holdings_before", "settings")},
+        "holdings_before": json.loads(row["holdings_before"]),
+        "actions": [
+            {"asset": r.get("asset"), "action": r.get("action"), "rank": r.get("rank")}
+            for r in signal.get("rows", [])
+            if r.get("action")
+        ],
+        "level": signal.get("level"),
+    }
+
+
+def _journal_view(week: str | None) -> dict:
+    """GET /api/journal: the weeks recorded, one week's entries, and that week's check."""
+    from . import forward_journal as journal
+    from .weekly import week_ending_on_or_before
+
+    try:
+        with connect(read_only=True) as con:
+            if not db_read._has_table(con, journal.TABLE):
+                return {"available": False, "weeks": [], "week": None, "entries": [], "check": None}
+            weeks = [
+                {"week": w, "entries": n}
+                for w, n in con.execute(
+                    f"SELECT strftime(week, '%Y-%m-%d'), count(*) FROM {journal.TABLE} "
+                    "GROUP BY 1 ORDER BY 1 DESC"
+                ).fetchall()
+            ]
+            selected = journal.week_string(
+                week
+                or (
+                    weeks[0]["week"]
+                    if weeks
+                    else week_ending_on_or_before(datetime.now(IST).date())
+                )
+            )
+            favourites = runs_store.list_favorites(con)
+            entries = [_journal_entry_view(row) for row in journal.entries(con, selected)]
+            check = journal.check(con, selected, favourites, (NIFTY200_MOMENTUM30_TRI,))
+    except FileNotFoundError:
+        return {"available": False, "weeks": [], "week": None, "entries": [], "check": None}
+    return {"available": True, "weeks": weeks, "week": selected, "entries": entries, "check": check}
+
+
+def _journal_line(journal: dict) -> str | None:
+    """The Telegram line that witnesses the journal: Telegram's own timestamp then proves how
+    long the chain was, and its newest hash, when this message went out."""
+    if journal["error"]:
+        return (
+            f"Forward journal FAILED: {journal['error']}. "
+            "This week's signals may be unrecorded; rerun the job."
+        )
+    if not journal["recorded"]:
+        return None
+    count = len(journal["recorded"])
+    chain = journal["head"]
+    return (
+        f"Forward journal: {count} new entr{'y' if count == 1 else 'ies'} recorded; "
+        f"chain of {chain['entries']}, head {chain['hash'][:16]}."
+    )
+
+
 def _execute_weekly_run(body: WeeklyRunBody) -> dict:
     """Evaluate every favourite and send the active one; the body of a weekly job."""
     from . import notify
@@ -1897,8 +2074,12 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
         outcomes = run_favorite_strategies(
             body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None
         )
-    if body.run == "final":
-        target_week = pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date()))
+    target_week = (
+        pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date()))
+        if body.run == "final"
+        else None
+    )
+    if target_week is not None:
         for outcome in outcomes:
             if outcome["result"] is not None or outcome["dataset"] == "etf":
                 continue
@@ -1910,6 +2091,8 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
             except (HTTPException, ValueError, KeyError, FileNotFoundError) as error:
                 outcome["result"] = None
                 outcome["blocked"] = str(getattr(error, "detail", error))
+    journal = _journal_weekly(body.run, outcomes, favorites_by_id, datetime.now(IST), target_week)
+    journal_line = _journal_line(journal)
     active = next((outcome for outcome in outcomes if outcome["active"]), None)
     active_result = active["result"] if active is not None else None
     # B4: the Friday stock-ingest job re-runs this same orchestration after the regular
@@ -1922,17 +2105,35 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
         active is not None and active["dataset"] in body.only_if_active_dataset
     )
     blocked_note: Notification | None = None
+    sent_main = False
     if active_result is not None:
         active_result.notification.run_url = notify.run_url()
         if body.send and in_scope:
+            if journal_line:
+                active_result.notification.body += f"\n\n{journal_line}"
             notify.send(active_result.notification)
+            sent_main = True
     elif in_scope:
         # The silent-failure bug: previously this branch printed/returned a message but
         # never actually told anyone — a blocked active favourite meant no Telegram message
         # at all, scheduled or manual, with nothing to notice until a human went looking.
         blocked_note = _no_active_signal_notification(body.run, outcomes, active)
         if body.send:
+            if journal_line:
+                blocked_note.body += f"\n\n{journal_line}"
             notify.send(blocked_note)
+            sent_main = True
+    if body.send and journal_line and not sent_main:
+        # e.g. the 19:30 stock-ingest rerun, which records the Stock/Broad favourites but does
+        # not resend an ETF active favourite's signal: the new entries still need a witness.
+        notify.send(
+            Notification(
+                "momentum-weekly",
+                "error" if journal["error"] else "info",
+                f"Momentum {body.run}: forward journal",
+                journal_line,
+            )
+        )
     return {
         "title": (
             active_result.notification.title
@@ -1957,6 +2158,7 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
         ),
         "sent_to_telegram": body.send and in_scope,
         "signal": active_result.signal if active_result else None,
+        "journal": journal,
         "strategies": [
             {
                 "id": outcome["id"],
@@ -2137,6 +2339,7 @@ _SCHEDULED_RUNS = (
     ("preview", "Fri 14:40 IST", 14, 40, "launchd-weekly-preview.log"),
     ("final", "Fri 16:45 IST", 16, 45, "launchd-weekly-final.log"),
     ("stock-ingest", "Fri 19:30 IST", 19, 30, "launchd-weekly-stock-ingest.log"),
+    ("journal-check", "Fri 21:00 IST", 21, 0, "launchd-weekly-journal-check.log"),
 )
 # A scheduled job fired more than this many minutes after its scheduled time (typically the
 # laptop was asleep, per TODO.md 3.11.5's launchd caveat) is flagged "ran late" rather than
@@ -2289,10 +2492,23 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     else:
         lines.append("No trades this week.")
     lines.append(f"Data complete through {stock.last_week:%d %b %Y} (NSE bhavcopy).")
+    # BL-024: the model portfolio at this week's close as weights of the whole portfolio, like the
+    # ETF signal's `weights` - BEFORE this week's actions, which the engine never trades on its
+    # newest week. The rest is idle cash.
+    equity = (payload.get("series", {}).get("strategy") or [None])[-1]
+    weights = {}
+    if equity:
+        for position in payload.get("open_positions", []):
+            if position.get("value"):
+                weights[position["asset"]] = round(position["value"] / equity, 4)
+        idle = round(1 - sum(weights.values()), 4)
+        if idle > 1e-4:
+            weights[IDLE] = idle
     signal = {
         "week": latest.get("week", target_week.strftime("%Y-%m-%d")),
         "label": favorite["name"],
         "rows": rows,
+        "weights": weights,
         "config": config,
     }
     note = Notification(
@@ -2327,27 +2543,37 @@ def create_app() -> FastAPI:
                 credentials = fyers.resolve_credentials(prefer_dashboard=True)
             except fyers.FyersCredentialsError:
                 credentials = None
-        connected = credentials is not None
+        # A token inside its date window can still be dead (revoked, or reset early).
+        revoked = credentials is not None and fyers.probe_token(credentials) == "rejected"
+        connected = credentials is not None and not revoked
+        expires_at = credentials.expires_at if credentials else None
+        if revoked:
+            expires_at = datetime.now(IST)  # shows "Expired", not a countdown
         return {
             "configured": configured,
             "connected": connected,
             "degraded": not connected,
             "needsReauth": not connected,
-            "expiresAt": credentials.expires_at.isoformat() if credentials else None,
+            "expiresAt": expires_at.isoformat() if expires_at else None,
             "appId": credentials.app_id if credentials else None,
+            **({"revoked": True} if revoked else {}),
         }
 
     @app.get("/api/auth/fyers/start")
-    def local_fyers_start() -> RedirectResponse:
+    def local_fyers_start(handoff: str = "") -> RedirectResponse:
         load_repo_env()
         try:
             _app_id, _secret, redirect_uri = fyers._oauth_config()
         except fyers.FyersCredentialsError as error:
             raise HTTPException(503, str(error)) from None
-        if os.environ.get("DATABASE_URL", "").strip():
+        # `handoff` marks a request that already came back from the central start URL. When
+        # FYERS_REDIRECT_URI is the dashboard itself (no Fastify server running) that URL is
+        # forwarded straight back here; without the marker the two redirected forever and the
+        # browser showed a blank page. A returned request runs the local flow instead.
+        if os.environ.get("DATABASE_URL", "").strip() and not handoff:
             callback = urllib.parse.urlparse(redirect_uri)
             central_start = urllib.parse.urlunparse(
-                (callback.scheme, callback.netloc, "/api/auth/fyers/start", "", "", "")
+                (callback.scheme, callback.netloc, "/api/auth/fyers/start", "", "handoff=1", "")
             )
             return RedirectResponse(
                 central_start, status_code=302, headers={"Cache-Control": "no-store"}
@@ -2374,7 +2600,11 @@ def create_app() -> FastAPI:
             raise HTTPException(400, "Fyers did not return an authorization code.")
         load_repo_env()
         try:
-            fyers.save_token(fyers.exchange_auth_code(actual_code))
+            creds = fyers.exchange_auth_code(actual_code)
+            fyers.save_token(creds)
+            # The dashboard card and resolve_credentials read broker_tokens first; without this
+            # row a fresh login here would be invisible whenever DATABASE_URL is set.
+            fyers.save_token_to_db(creds)
         except fyers.FyersCredentialsError as error:
             raise HTTPException(502, str(error)) from None
         return HTMLResponse(
@@ -2528,6 +2758,13 @@ def create_app() -> FastAPI:
     @app.get("/api/weekly/status")
     def weekly_status() -> dict:
         return _weekly_status()
+
+    @app.get("/api/journal")
+    def forward_journal_view(week: str | None = None) -> dict:
+        try:
+            return _journal_view(week)
+        except ValueError as error:  # an unparseable ?week=
+            raise HTTPException(422, str(error)) from error
 
     @app.post("/api/weekly/stock-sync", status_code=202)
     def weekly_stock_sync() -> dict:

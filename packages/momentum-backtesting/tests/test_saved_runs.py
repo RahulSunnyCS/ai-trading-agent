@@ -339,7 +339,10 @@ def test_an_only_dataset_restriction_skips_telegram_for_an_out_of_scope_active_f
     doesn't resend an already-sent ETF favourite's signal."""
     active = client.post("/api/saved-runs", json=_payload("ETF Core")).json()
     client.patch(f"/api/saved-runs/{active['id']}", json={"active": True})
-    etf_result = weekly.RunResult(Notification("test", "info", "ETF Core", "A"), {"rows": []})
+    etf_result = weekly.RunResult(
+        Notification("test", "info", "ETF Core", "A"),
+        {"week": "2026-10-09", "rows": [], "weights": {}},
+    )
     monkeypatch.setattr(
         weekly,
         "run_favorite_strategies",
@@ -361,7 +364,8 @@ def test_an_only_dataset_restriction_skips_telegram_for_an_out_of_scope_active_f
     body = api.WeeklyRunBody(run="final", send=True, only_if_active_dataset=["stock", "broad"])
     result = api._execute_weekly_run(body)
     assert result["sent_to_telegram"] is False
-    assert sent == []
+    # The ETF signal is not resent; only the forward journal's witness line goes out (BL-024).
+    assert [note.title for note in sent] == ["Momentum final: forward journal"]
 
 
 def test_stocks_sync_calls_stocks_fetch_and_migrate_with_real_arguments(monkeypatch):
@@ -465,6 +469,7 @@ def test_weekly_status_says_how_far_each_dataset_is_ingested(client, tmp_path, m
         "preview",
         "final",
         "stock-ingest",
+        "journal-check",
     ]
     assert all(item["ran_late_by_minutes"] is None for item in status["schedule"])
 
