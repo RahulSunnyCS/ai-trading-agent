@@ -167,6 +167,9 @@ export interface MomentumResult {
   comparisons?: MomentumComparison[];
   series: MomentumSeries;
   rotations: MomentumRotation[];
+  /** Whether the server answered from its result cache (then `computed_at` is when it was
+   * actually computed), as opposed to computing it for this request. */
+  cache?: { hit: boolean; computed_at: string };
   /** A background run's result holds the core only: each section below is `undefined` until
    * fetched (its name is in `sections_available`). A whole result from the synchronous endpoint
    * has them all. */

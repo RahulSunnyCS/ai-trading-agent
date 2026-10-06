@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/api', () => ({ apiGet: vi.fn(), apiPost: vi.fn() }));
 
 import { apiGet, apiPost } from '../lib/api';
+import { usualDuration } from '../lib/momentumDurations';
 import {
   hydrateMomentumRuns,
   resetMomentumRunsForTests,
@@ -159,6 +160,64 @@ describe('momentumRuns store', () => {
     aAnswer = { job: { id: 'a', status: 'done', result, error: null } };
     await vi.advanceTimersByTimeAsync(700); // the loop is still alive
     expect(useMomentumRunsStore.getState().runs[0]?.status).toBe('done');
+  });
+
+  describe('stage and usual duration', () => {
+    async function started(): Promise<void> {
+      mockPost.mockImplementation(async (url: string) =>
+        url.includes('saved-runs')
+          ? ({ ok: true, data: { name: 'Run 5' } } as never)
+          : ({ ok: true, data: { job: { id: 'a', status: 'running' } } } as never),
+      );
+      await useMomentumRunsStore.getState().startRun('broad', {}, false);
+    }
+    const run = () => useMomentumRunsStore.getState().runs[0];
+
+    it('follows the step the server reports and clears it when the run is done', async () => {
+      await started();
+      jobs({ a: { id: 'a', status: 'running', stage: 'ranking', result: null, error: null } });
+      await vi.advanceTimersByTimeAsync(300);
+      expect(run()?.stage).toBe('ranking');
+      jobs({ a: { id: 'a', status: 'running', stage: 'simulating', result: null, error: null } });
+      await vi.advanceTimersByTimeAsync(700);
+      expect(run()?.stage).toBe('simulating');
+      jobs({ a: { id: 'a', status: 'done', stage: null, result, error: null } });
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(run()?.stage).toBeNull();
+      expect(run()?.status).toBe('done');
+    });
+
+    it('remembers how long a real run took, from the server times', async () => {
+      await started();
+      jobs({
+        a: {
+          id: 'a',
+          status: 'done',
+          result: { ...result, cache: { hit: false, computed_at: 'x' } },
+          compute_started_at: '2026-10-07T02:00:00+05:30',
+          finished_at: '2026-10-07T02:00:20+05:30',
+          error: null,
+        },
+      });
+      await vi.advanceTimersByTimeAsync(300);
+      expect(usualDuration('broad')).toBe(20_000);
+    });
+
+    it('does not count a run the server answered from its cache', async () => {
+      await started();
+      jobs({
+        a: {
+          id: 'a',
+          status: 'done',
+          result: { ...result, cache: { hit: true, computed_at: 'x' } },
+          compute_started_at: '2026-10-07T02:00:00+05:30',
+          finished_at: '2026-10-07T02:00:01+05:30',
+          error: null,
+        },
+      });
+      await vi.advanceTimersByTimeAsync(300);
+      expect(usualDuration('broad')).toBeNull();
+    });
   });
 
   describe('loadSection', () => {

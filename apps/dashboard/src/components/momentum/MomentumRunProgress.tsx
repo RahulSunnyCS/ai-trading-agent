@@ -4,10 +4,26 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { cn } from '../../lib/cn';
+import { describeDuration } from '../../lib/momentumDurations';
 import { Card } from '../ui/Card';
 import { Shimmer } from '../ui/Skeleton';
 
 const SLOW_DATASETS = new Set(['custom_index', 'broad']);
+
+/** The steps a run goes through on the server, in order, and what to call each. */
+const STAGES = [
+  ['loading', 'Loading prices'],
+  ['ranking', 'Ranking'],
+  ['simulating', 'Simulating the weekly trades'],
+  ['analysing', 'Preparing the results'],
+] as const;
+
+/** "Step 2 of 4 · Ranking" for a stage the server reported, or null for one we do not know. */
+export function describeStage(stage: string | null | undefined): string | null {
+  const index = STAGES.findIndex(([key]) => key === stage);
+  const found = STAGES[index];
+  return found ? `Step ${index + 1} of ${STAGES.length} · ${found[1]}` : null;
+}
 
 /**
  * True for ~2s after `key` changes (a run finishing). Every results card uses it, so whichever
@@ -31,6 +47,8 @@ export function MomentumRunBanner({
   dataset,
   hasPreviousResult,
   queued = false,
+  stage = null,
+  usualMs = null,
 }: {
   elapsedMs: number;
   datasetLabel: string;
@@ -38,14 +56,21 @@ export function MomentumRunBanner({
   hasPreviousResult: boolean;
   /** Waiting for a free slot behind other runs, not computing yet. */
   queued?: boolean;
+  /** The step the server says it has reached ("ranking", …). */
+  stage?: string | null;
+  /** How long a real run of this dataset usually takes here, once one has been seen. */
+  usualMs?: number | null;
 }) {
   const seconds = Math.floor(elapsedMs / 1000);
+  const step = queued ? null : describeStage(stage);
+  const usual = usualMs ? `Usually ${describeDuration(usualMs)}.` : null;
   const hint =
     seconds < 5
       ? null
-      : SLOW_DATASETS.has(dataset)
-        ? 'The first run of this strategy builds category rankings and can take up to a minute. Repeat runs reuse them and return in seconds.'
-        : 'Still working — longer periods and bigger universes take a little longer.';
+      : (usual ??
+        (SLOW_DATASETS.has(dataset)
+          ? 'The first run of this strategy builds category rankings and can take up to a minute. Repeat runs reuse them and return in seconds.'
+          : 'Still working — longer periods and bigger universes take a little longer.'));
 
   return (
     <output
@@ -58,6 +83,7 @@ export function MomentumRunBanner({
           {queued
             ? `Queued ${datasetLabel} backtest — waiting for other runs to finish`
             : `Running ${datasetLabel} backtest`}
+          {step ? <span className="text-xs font-normal text-muted">· {step}</span> : null}
           {hasPreviousResult ? (
             <span className="text-xs font-normal text-muted">
               · previous results shown faded until this finishes

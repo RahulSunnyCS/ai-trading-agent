@@ -1866,6 +1866,85 @@ def test_a_failed_job_says_it_failed(client, monkeypatch):
     assert res.status_code == 409 and "failed" in res.json()["detail"]
 
 
+def test_a_running_job_says_which_step_it_has_reached():
+    import threading
+    import time
+
+    jobs = api._BacktestJobs()
+    reached, release = threading.Event(), threading.Event()
+
+    def work(report):
+        report("loading")
+        report("ranking")
+        reached.set()
+        release.wait(5)
+        return {"kpis": {}}
+
+    job_id = jobs.start(work, False, {})["id"]
+    assert reached.wait(5)
+    assert jobs.get(job_id)["stage"] == "ranking"
+    assert jobs.list()[0]["stage"] == "ranking"  # the job list shows it too
+    release.set()
+    for _ in range(100):
+        if jobs.get(job_id)["status"] == "done":
+            break
+        time.sleep(0.02)
+    assert jobs.get(job_id)["stage"] is None  # nothing left to report once it is done
+
+
+def test_a_job_that_fails_ends_with_no_stage():
+    jobs = api._BacktestJobs()
+
+    def work(report):
+        report("simulating")
+        raise RuntimeError("boom")
+
+    job_id = jobs.start(work, False, {})["id"]
+    import time
+
+    for _ in range(100):
+        if jobs.get(job_id)["status"] == "failed":
+            break
+        time.sleep(0.02)
+    assert jobs.get(job_id)["stage"] is None and "boom" in jobs.get(job_id)["error"]
+
+
+def test_the_etf_builder_reports_its_steps_in_order(client):
+    seen: list[str] = []
+    req = api.BacktestRequest(universe=core(client), start="2017-01-06", top_n=4)
+    api._etf_parts(req, seen.append)
+    assert seen == ["loading", "simulating", "analysing"]
+    seen.clear()  # the synchronous callers say nothing, and still work
+    api._etf_parts(req)
+    assert seen == []
+
+
+def test_the_broad_builder_reports_its_steps_in_order(broad_client):
+    seen: list[str] = []
+    broad = api.BacktestRequest(
+        **_broad_request(broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10)
+    )
+    api._broad_parts(broad, seen.append)
+    assert seen == ["loading", "ranking", "simulating", "analysing"]
+
+
+def test_the_job_route_runs_the_builders_with_a_reporter(client, monkeypatch):
+    stages: list[str] = []
+    real = api._etf_parts
+
+    def recording(req, report=api._no_report):
+        def both(stage):
+            stages.append(stage)
+            report(stage)
+
+        return real(req, both)
+
+    monkeypatch.setattr(api, "_etf_parts", recording)
+    body = {"universe": core(client), "start": "2017-01-06", "top_n": 4}
+    job = _job(client, body, fresh=True)
+    assert stages == ["loading", "simulating", "analysing"] and job["stage"] is None
+
+
 def test_circuit_realism_runs_the_opposite_setting_on_the_prices_it_is_given(
     broad_client, monkeypatch
 ):
