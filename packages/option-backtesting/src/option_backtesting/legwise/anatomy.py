@@ -67,8 +67,9 @@ THRESHOLDS = {
 
 #: NSE moved NIFTY's weekly expiry to Tuesdays on 1 Sep 2025. The reference
 #: expiry_calendar.csv carries the CURRENT weekday back to 2018, so a days-to-
-#: expiry derived from it is wrong for any earlier day (NIFTY expired on
-#: Thursdays) — it is only emitted from this date on, and `None` before.
+#: expiry derived from that rule is wrong for any earlier day (NIFTY expired on
+#: Thursdays). Before this date DTE is emitted only where expiries_observed.csv
+#: (the real expiries, from the lake: 2024-10 on) covers the day, else `None`.
 DTE_RELIABLE_FROM = date(2025, 9, 1)
 
 _TRADING_MINUTES_PER_YEAR = 252 * 375
@@ -196,9 +197,9 @@ def segment_metrics(spot: Series, vix: Series | None, start: int, end: int) -> S
 def dte_for(underlying: str, day: date, reference: ReferenceData | None = None) -> int | None:
     """Calendar days to the current expiry, or None where the reference calendar
     cannot be trusted (see DTE_RELIABLE_FROM)."""
-    if day < DTE_RELIABLE_FROM:
-        return None
     reference = reference or default_reference_data()
+    if day < DTE_RELIABLE_FROM and not reference.observed_expiries_cover(underlying, day):
+        return None
     try:
         return (reference.current_expiry(underlying, day) - day).days
     except ValueError:

@@ -30,6 +30,9 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `008_data_quality.sql`: `data_quality`, one verdict per lake partition (asset, name,
     day) — usable, or excluded and why; mirrors the Parquet files, rebuilt from them by
     `tdata quality rebuild` (BL-034)
+  - `009_ref_expiries.sql`: `ref_expiries`, every expiry each index's options actually had
+    (from the lake, `tdata reference derive-expiries`; a few added by hand where the lake has
+    a hole), exported as `expiries_observed.csv`; days-to-expiry reads it (BL-034 Phase 2)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
@@ -94,6 +97,6 @@ uv run tdata init | status | backup --to <dir> | mount
 uv run tdata quality rebuild [--asset option] [--name NIFTY] [--days A..B] | status
 uv run tdata vendor import --from <staging> [--unit nifty] [--section index|stocks] [--days A..B] [--force] [--dry-run]
 uv run tdata vendor import-index <csv> --symbol NIFTY|BANKNIFTY|SENSEX|INDIAVIX [--days A..B]
-uv run tdata reference export | check | sql "<statement>"
+uv run tdata reference export | check | sql "<statement>" | derive-expiries
 uv run mbt local migrate   # from packages/momentum-backtesting/: (re-)import its data
 ```

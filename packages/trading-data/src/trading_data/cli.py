@@ -132,6 +132,25 @@ def reference_sql(statement: str) -> None:
     typer.echo("\n".join(f"wrote {p}" for p in written) or "no CSV changed")
 
 
+@ref_app.command("derive-expiries")
+def reference_derive_expiries(
+    underlying: list[str] = typer.Option(
+        None, "--underlying", help="Default: the six indices (reference.EXPIRY_UNDERLYINGS)."
+    ),
+) -> None:
+    """Rebuild ref_expiries' observed rows from the lake's option files, print any gap longer
+    than the cadence allows (a missing expiry to add by hand), then export the CSVs."""
+    names = tuple(underlying) if underlying else reference.EXPIRY_UNDERLYINGS
+    with connect() as con:
+        counts = reference.derive_expiries(con, data_root(), names)
+        gaps = reference.expiry_gaps(con, {"NIFTY": 8, "SENSEX": 9})
+        written = reference.export_csvs(con)
+    typer.echo(f"observed expiries: {counts}")
+    for u, a, b, days in gaps:
+        typer.echo(f"gap: {u} {a} -> {b} ({days} days) — is an expiry missing?")
+    typer.echo("\n".join(f"wrote {p}" for p in written) or "no CSV changed")
+
+
 @app.command()
 def backup(
     to: Path = typer.Option(..., "--to", help="Destination folder on the other disk."),

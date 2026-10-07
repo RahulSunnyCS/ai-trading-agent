@@ -55,12 +55,29 @@ TABLES = (
         "rowid",
     ),
     RefTable(
-        "ref_holidays", "holidays.csv", ("date", "description"), "rowid", quoted=("description",)
+        "ref_holidays",
+        "holidays.csv",
+        ("date", "description"),
+        "date, description",
+        quoted=("description",),
     ),
     RefTable(
         "ref_margins", "margin.csv", ("underlying", "strategy_type", "month", "margin_inr"), "rowid"
     ),
+    RefTable(
+        "ref_expiries",
+        "expiries_observed.csv",
+        ("underlying", "expiry", "source"),
+        "underlying, expiry",
+    ),
 )
+
+#: The indices whose expiries are derived from the lake. Stocks expire on the index monthly
+#: day and are not needed for days-to-expiry yet.
+EXPIRY_UNDERLYINGS = ("NIFTY", "SENSEX", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "NIFTYNXT50")
+#: Only contracts seen on days from here are used: the vendor's earlier history covers expiry
+#: weeks only (BL-034 Phase 5), so an expiry list built from it would have holes.
+EXPIRIES_FROM = "2024-10-01"
 
 
 def _fmt(value: object) -> str:
@@ -133,3 +150,50 @@ def diff_preview(con: duckdb.DuckDBPyConnection, name: str, folder: Path = REFER
     old = (folder / name).read_text().splitlines(keepends=True) if (folder / name).exists() else []
     new = io.StringIO(render_csv(con, t)).readlines()
     return "".join(difflib.unified_diff(old, new, f"{name} (file)", f"{name} (catalog)"))
+
+
+def derive_expiries(
+    con: duckdb.DuckDBPyConnection, root: Path, underlyings: tuple[str, ...] = EXPIRY_UNDERLYINGS
+) -> dict[str, int]:
+    """Replace the `observed` rows of ref_expiries with the distinct expiries of each
+    underlying's option files (days from EXPIRIES_FROM). `added` rows are kept, and an added
+    expiry that the lake now has becomes `observed`. Returns the observed count per underlying."""
+    counts = {}
+    for u in underlyings:
+        folder = root / "lake" / "bars_1m" / "asset=option" / f"underlying={u}"
+        if not any(folder.glob("date=*/data.parquet")):
+            continue
+        found = [
+            r[0]
+            for r in con.execute(
+                "SELECT DISTINCT expiry FROM read_parquet(?, hive_partitioning = true) "
+                "WHERE date >= CAST(? AS DATE) AND expiry IS NOT NULL ORDER BY 1",
+                [str(folder / "date=*" / "data.parquet"), EXPIRIES_FROM],
+            ).fetchall()
+        ]
+        con.execute("DELETE FROM ref_expiries WHERE underlying = ? AND source = 'observed'", [u])
+        con.execute(
+            "DELETE FROM ref_expiries WHERE underlying = ? AND expiry IN (SELECT unnest(?))",
+            [u, found],
+        )
+        con.executemany(
+            "INSERT INTO ref_expiries VALUES (?, ?, 'observed')", [[u, e] for e in found]
+        )
+        counts[u] = len(found)
+    return counts
+
+
+def expiry_gaps(con: duckdb.DuckDBPyConnection, max_days: dict[str, int]) -> list[tuple]:
+    """(underlying, expiry, next expiry, days) wherever two consecutive expiries are further
+    apart than the underlying's cadence allows — a hint that one is missing. Monthly-only
+    underlyings default to 38 days (five weeks plus a holiday shift)."""
+    rows = con.execute(
+        "SELECT underlying, expiry, lead(expiry) OVER (PARTITION BY underlying ORDER BY expiry) "
+        "FROM ref_expiries ORDER BY underlying, expiry"
+    ).fetchall()
+    return [
+        (u, a, b, (b - a).days)
+        for u, a, b in rows
+        if b is not None and (b - a).days > max_days.get(u, 38)
+    ]
+

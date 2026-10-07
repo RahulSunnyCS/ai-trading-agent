@@ -280,4 +280,7 @@ Still open for Phase 3:
   expiry. Before it, every legwise run on a day before 2026 raised "No lot_sizes row". Next:
   observed expiry calendar (and DTE back to 2024-10), the engine skipping `excluded` days,
   holidays audit, `ref_rates`.
+- 2026-10-07 — Phase 2: **observed expiry calendar** (migration 009, `expiries_observed.csv`,
+  `tdata reference derive-expiries`; three hand-added expiries for lake holes) — DTE now from
+  2024-10, TODO 3.10.15 closed; **holidays audited** against the lake (8 added, 3 fixed).
 

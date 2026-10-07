@@ -15,13 +15,19 @@ loader's "current" row must agree with it (see tests/unit/test_reference.py).
 
 from __future__ import annotations
 
+import bisect
 import csv
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
 
 REFERENCE_DIR = Path(__file__).parent
+
+
+#: A day this far before the first observed expiry still has it as its current expiry
+#: (the first contract was listed before the lake's first day).
+_OBSERVED_LEAD = timedelta(days=7)
 
 
 def _parse_date(s: str) -> date:
@@ -90,6 +96,7 @@ class ReferenceData:
         self._expiry_calendar = self._load_expiry_calendar()
         self._holidays = self._load_holidays()
         self._margins = self._load_margins()
+        self._observed_expiries = self._load_observed_expiries()
 
     # -- loading --------------------------------------------------------
 
@@ -122,6 +129,18 @@ class ReferenceData:
                 )
                 for row in csv.DictReader(f)
             ]
+
+    def _load_observed_expiries(self) -> dict[str, list[date]]:
+        """expiries_observed.csv: every expiry the lake's option files list per index (plus
+        the few it has no contracts for). Optional — a test reference_dir may omit it."""
+        path = self._dir / "expiries_observed.csv"
+        out: dict[str, list[date]] = {}
+        if not path.exists():
+            return out
+        with open(path, newline="") as f:
+            for row in csv.DictReader(f):
+                out.setdefault(row["underlying"], []).append(_parse_date(row["expiry"]))
+        return {u: sorted(v) for u, v in out.items()}
 
     def _load_holidays(self) -> frozenset[date]:
         with open(self._dir / "holidays.csv", newline="") as f:
@@ -194,12 +213,26 @@ class ReferenceData:
     def is_trading_day(self, d: date) -> bool:
         return d.weekday() < 5 and not self.is_holiday(d)
 
+    def observed_expiries_cover(self, underlying: str, as_of: date) -> bool:
+        """True when `as_of` lies inside the span of expiries_observed.csv for this
+        underlying, so current_expiry() answers from real expiries, not the weekday rule."""
+        obs = self._observed_expiries.get(underlying)
+        return bool(obs) and obs[0] - _OBSERVED_LEAD <= as_of <= obs[-1]
+
     def current_expiry(self, underlying: str, as_of: date) -> date:
-        """Nearest expiry date on or after `as_of`, per the effective cadence.
+        """Nearest expiry date on or after `as_of`.
+
+        Inside the observed span (expiries_observed.csv, derived from the lake) the answer is
+        the real expiry, holiday shifts and weekday changes included. Outside it, the
+        effective cadence rule — which is only right from the rule's effective date (NIFTY's
+        Tuesday from 2025-09-01; see legwise.anatomy.DTE_RELIABLE_FROM).
         Date-only — does not model the intraday 15:30 IST post-expiry rollover
         that `instrument-registry.ts`'s live-trading getCurrentExpiry() does;
         for backtesting we resolve DTE from calendar dates, not wall-clock time.
         """
+        if self.observed_expiries_cover(underlying, as_of):
+            obs = self._observed_expiries[underlying]
+            return obs[bisect.bisect_left(obs, as_of)]
         row = self.expiry_cadence(underlying, as_of)
         if row.cadence == "WEEKLY":
             return _nearest_weekday_on_or_after(as_of, row.weekday)

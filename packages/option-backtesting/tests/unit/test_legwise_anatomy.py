@@ -68,7 +68,8 @@ def test_day_anatomy_gap_segments_and_dte_guard():
     assert [s["start"] for s in out["segments"]] == ["09:15", "10:30", "13:30"]
     assert out["whole"]["label"] in {"TREND_UP", "QUIET", "CHOP"}
     # NIFTY's reference expiry weekday is only right from Sep 2025: earlier -> None
-    assert anatomy.dte_for("NIFTY", date(2024, 3, 5)) is None
+    assert anatomy.dte_for("NIFTY", date(2024, 3, 5)) is None  # before the observed expiries
+    assert anatomy.dte_for("NIFTY", date(2025, 1, 15)) == 1  # Thursday era, from the lake
     assert anatomy.dte_for("NIFTY", date(2026, 9, 29)) == 0  # a Tuesday: expiry day
 
 
