@@ -397,12 +397,25 @@ export function neighbours(page: GuidePage): {
   return { previous: GUIDE_PAGES[index - 1], next: GUIDE_PAGES[index + 1] };
 }
 
+/** A page's text as a reader sees it: link targets (`app:/…`, `guide:…`, `glossary:…`) dropped. */
+function readableText(body: string): string {
+  return body.replace(/\]\([^)]*\)/g, ']');
+}
+
+const HAYSTACKS = new Map<GuidePage, string>();
+
+function haystack(page: GuidePage): string {
+  let text = HAYSTACKS.get(page);
+  if (text === undefined) {
+    text = `${page.title}\n${page.summary}\n${readableText(page.body)}`.toLowerCase();
+    HAYSTACKS.set(page, text);
+  }
+  return text;
+}
+
 /** Pages whose title, summary or text contains every word of the query (case-insensitive). */
 export function searchGuide(query: string): GuidePage[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [...GUIDE_PAGES];
-  return GUIDE_PAGES.filter((page) => {
-    const haystack = `${page.title}\n${page.summary}\n${page.body}`.toLowerCase();
-    return words.every((word) => haystack.includes(word));
-  });
+  return GUIDE_PAGES.filter((page) => words.every((word) => haystack(page).includes(word)));
 }

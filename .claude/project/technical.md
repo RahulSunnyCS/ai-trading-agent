@@ -12,7 +12,7 @@
 | Message Queue / Event Bus | Redis 7 Streams — topics: `market.ticks`, `straddle.values`, `signals.generated` |
 | Background Jobs | BullMQ (Redis-backed) — EOD retrospection batch |
 | Cache | Redis 7 — sub-ms reads for price cache and personality state |
-| Frontend | Next.js 15 + React 18 + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts |
+| Frontend | Next.js 15 + React 18 + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts. The in-app Guide renders Markdown with `react-markdown` + `remark-gfm` (pages in `apps/dashboard/src/guide/content`, imported `?raw`) |
 | Testing | Vitest (unit + integration) + Playwright (E2E) |
 | Market Data | Fyers WebSocket via `fyers-api-v3` SDK (untyped — TypeScript shim in `apps/server/src/types/`) |
 | Paper Trading | Quantiply API (paper trade execution tracking) |
@@ -418,6 +418,9 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
   the chart palette helpers (`lib/chartTheme.ts`) and the font setup (self-hosted `next/font/local`, IBM Plex
   Sans / Mono) are in `docs/dashboard-design-tokens.md`
+- **Guide pages stay in step with their screens** — a change to a dashboard screen's controls, labels,
+  defaults or metrics updates its page in `apps/dashboard/src/guide/content/` in the same commit; a new
+  screen or sub-section gets a page and a `guide/registry.ts` entry (conventions in `apps/dashboard/CLAUDE.md`)
 - **Dashboard display formatting lives in `apps/dashboard/src/lib/format.ts`** — components
   never call `Intl.*`, `toFixed` or `toLocaleString`. Use `formatInr`, `formatPct` (takes a
   fraction; pass `{ unit: 'percent' }` otherwise), `formatPp`, `formatNumber`, `formatDay`

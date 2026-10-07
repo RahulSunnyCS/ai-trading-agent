@@ -28,9 +28,16 @@ two usually agree; when a name sits right at the edge of the top N, they can dif
 ## Reviewing a possible split or bonus
 
 A stock that halves overnight has usually split, not crashed. When the automatic check cannot
-match the drop to a filing, it appears here. Enter the **new shares per old share** (2 for a
-1:1 bonus or a 2-for-1 split) and an **evidence URL or note** (the exchange announcement).
-Until it is classified, the share adjustment is not applied.
+match the drop to a filing, it appears here and needs a person to **classify** it:
+
+| Classification | When to choose it | What else to enter |
+|---|---|---|
+| Split | The company split its shares. | The **new shares per old share** (2 for a 2-for-1 split). |
+| Bonus | The company issued bonus shares. | The **new shares per old share** (2 for a 1:1 bonus, which doubles the count). |
+| Genuine price fall | The price really fell; nothing happened to the share count. | No factor. |
+
+For a split or bonus, also give an **evidence URL or note** (the exchange announcement) and
+save. Until a move is classified, no share adjustment is applied.
 
 > [!WARNING]
 > Getting this wrong corrupts every backtest that includes the stock. If unsure, leave it and

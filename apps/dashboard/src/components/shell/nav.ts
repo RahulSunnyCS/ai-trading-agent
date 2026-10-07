@@ -195,7 +195,7 @@ export const NAV_GROUPS: NavGroup[] = [
  * Tabs that cannot be hidden: Settings, so users can always restore tabs they have hidden, and
  * the Guide, so the help is always one click away.
  */
-const PINNED_TABS: readonly Tab[] = ['settings', 'guide'];
+export const PINNED_TABS: readonly Tab[] = ['settings', 'guide'];
 
 export const CONFIGURABLE_TABS = NAV_GROUPS.flatMap((group) => group.items).filter(
   (item) => !PINNED_TABS.includes(item.id),

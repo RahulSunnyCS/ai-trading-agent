@@ -128,4 +128,13 @@ describe('guide routing helpers', () => {
     expect(searchGuide('zzzznotaword')).toEqual([]);
     expect(searchGuide('')).toHaveLength(GUIDE_PAGES.length);
   });
+
+  it("does not match the link syntax inside pages ('app', 'guide', 'glossary')", () => {
+    // Every page links with (app:/…), (guide:…) or (glossary:…); those are not text a reader sees.
+    for (const word of ['app:', 'guide:', 'glossary:']) {
+      expect(searchGuide(word), word).toEqual([]);
+    }
+    // The text of a link still counts.
+    expect(searchGuide('drawdown').length).toBeGreaterThan(0);
+  });
 });

@@ -41,7 +41,7 @@ Legs can be added, copied and removed.
 | Control | What it does |
 |---|---|
 | Overall max loss / max profit (₹) | Close everything when the whole position loses or makes this much. |
-| Slippage % | Charged against you on every fill. Try 0.5–1% for liquid ATM options; more for far strikes. |
+| Slippage % | Charged against you on every fill, as a % of the option's price. Far strikes and thin minutes fill worse than ATM, so a single number is a rough guess: try a few values and see how fast the result falls. |
 | Cost per order (₹) | A flat charge per entry and per exit (brokerage, taxes). |
 
 > [!WARNING]
