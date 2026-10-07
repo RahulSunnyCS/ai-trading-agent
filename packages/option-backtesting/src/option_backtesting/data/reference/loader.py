@@ -67,6 +67,11 @@ class MarginRow:
     margin_inr: float
 
 
+class MissingReferenceData(ValueError):
+    """No reference row covers the date asked for. A data gap to fix, never to guess through;
+    a backtest skips the day with this message rather than failing the whole run."""
+
+
 def _most_recent_as_of(rows: list, as_of: date, *, label: str, underlying: str):
     """Return the row with the latest effective_date <= as_of, for the given
     underlying. Raises rather than silently falling back to a wrong-era row —
@@ -74,7 +79,7 @@ def _most_recent_as_of(rows: list, as_of: date, *, label: str, underlying: str):
     fix, not something to guess through."""
     candidates = [r for r in rows if r.underlying == underlying and r.effective_date <= as_of]
     if not candidates:
-        raise ValueError(
+        raise MissingReferenceData(
             f"No {label} row for {underlying} effective on or before {as_of}. "
             f"Add one to data/reference/ rather than guessing."
         )

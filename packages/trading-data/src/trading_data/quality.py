@@ -14,6 +14,7 @@ closing bars and some vendor days have rows after hours (Muhurat evenings); thos
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -22,6 +23,7 @@ from zoneinfo import ZoneInfo
 
 import duckdb
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 from . import lake
 from .db import connect
@@ -315,6 +317,50 @@ def rebuild(
                 changed += cross_check(con, [n])
             judged[f"{a}/{n}"] = len(stats)
             log(f"{a}/{n}: judged {len(stats)} days")
+    with connect(root, lock_wait=300) as con:
+        export_snapshot(con, root)
     judged["no_spot_changes"] = changed
     judged["rows_pruned"] = pruned
     return judged
+
+
+#: A copy of data_quality's verdicts as one Parquet file, for readers that must not depend on
+#: the catalog's single-writer lock (the legwise engine: `mbt serve` can hold the catalog for
+#: hours). Rewritten after every rebuild and vendor import, and by `tdata quality export`.
+#: Outside lake/ (which is immutable, one file per day) and not backed up: it is regenerable.
+SNAPSHOT = Path("quality") / "data_quality.parquet"
+
+
+def export_snapshot(con: duckdb.DuckDBPyConnection, root: Path) -> Path:
+    path = root / SNAPSHOT
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    target = str(tmp).replace("'", "''")
+    con.execute(
+        "COPY (SELECT asset, name, trading_day, source, verdict, reason, session_kind "
+        "FROM data_quality ORDER BY asset, name, trading_day) "
+        f"TO '{target}' (FORMAT parquet)"
+    )
+    os.replace(tmp, path)
+    return path
+
+
+def excluded_days(root: Path, asset: str, name: str) -> dict[date, str] | None:
+    """{day: reason} for every day of (asset, name) that data_quality excludes, read from the
+    snapshot (no catalog lock). None when there is no snapshot yet (`tdata quality export`)."""
+    path = root / SNAPSHOT
+    if not path.exists():
+        return None
+    table = pq.read_table(
+        path,
+        columns=["trading_day", "reason"],
+        filters=[("asset", "=", asset), ("name", "=", name), ("verdict", "=", "excluded")],
+    )
+    return dict(
+        zip(
+            table.column("trading_day").to_pylist(),
+            table.column("reason").to_pylist(),
+            strict=True,
+        )
+    )
+

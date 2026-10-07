@@ -551,6 +551,7 @@ def _import_symbol(
             )
         with _connect(root) as catalog:
             quality.cross_check(catalog, [symbol])
+            quality.export_snapshot(catalog, root)
         return report
     finally:
         con.close()
@@ -660,6 +661,7 @@ def import_index_csv(
             log(f"{scope}: {len(written)} days written, {skipped} existing")
         with _connect(root) as catalog:
             quality.cross_check(catalog, [symbol])
+            quality.export_snapshot(catalog, root)
         return report
     finally:
         con.close()

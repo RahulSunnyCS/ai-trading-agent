@@ -296,3 +296,25 @@ def test_derive_expiries_reads_the_lake_and_keeps_added_rows(root):
         ("2025-01-30", "observed"),
         ("2025-02-06", "added"),  # kept
     ]
+
+
+def test_quality_snapshot_round_trip_without_the_catalog(root):
+    from trading_data import quality
+
+    assert quality.excluded_days(root, "option", "NIFTY") is None  # nothing exported yet
+    with connect(root) as con:
+        sql = (
+            "INSERT INTO data_quality (asset, name, trading_day, source, verdict, reason,"
+            " session_kind, n_rows, contracts, max_bars) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 20, ?)"
+        )
+        rows = [
+            ("option", "NIFTY", date(2025, 1, 1), "vendor", "usable", None, "regular", 375),
+            ("option", "NIFTY", date(2025, 1, 2), "vendor", "excluded", "short_session:120",
+             "regular", 120),
+            ("option", "SENSEX", date(2025, 1, 2), "vendor", "excluded", "no_spot", "regular", 375),
+        ]  # fmt: skip
+        con.executemany(sql, rows)
+    with connect(root, read_only=True) as con:  # a reader can refresh it too
+        quality.export_snapshot(con, root)
+    assert quality.excluded_days(root, "option", "NIFTY") == {date(2025, 1, 2): "short_session:120"}
+    assert quality.excluded_days(root, "option", "BANKNIFTY") == {}

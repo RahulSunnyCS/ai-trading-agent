@@ -80,6 +80,11 @@ table instead.
   written and regenerable with `tdata quality rebuild`; a day is never dropped from the lake
   for a bad verdict — the label says why, readers decide. Fetch timestamps from DuckDB as
   epoch seconds, not `TIMESTAMPTZ` (that import needs `pytz`, which is not a dependency).
+- **Readers get verdicts from a file, not the catalog.** `quality.SNAPSHOT`
+  (`$TRADING_DATA_ROOT/quality/data_quality.parquet`) is rewritten after every rebuild and vendor
+  import (and by `tdata quality export`); `quality.excluded_days()` reads it without the catalog
+  lock, which `mbt serve` can hold for hours. The legwise engine leaves out the days it lists
+  (`legwise.market.backtest_days`; `--include-excluded` to keep them). Not backed up: regenerable.
 - **Partition values live in folder names only** (`asset=`, `underlying=`/`symbol=`,
   `date=`) — never repeat them as columns inside the Parquet.
 - Tests use `tmp_path` roots; never point a test at the real `~/TradingData`.
@@ -94,7 +99,7 @@ table instead.
 ```bash
 uv sync && uv run pytest
 uv run tdata init | status | backup --to <dir> | mount
-uv run tdata quality rebuild [--asset option] [--name NIFTY] [--days A..B] | status
+uv run tdata quality rebuild [--asset option] [--name NIFTY] [--days A..B] | status | export
 uv run tdata vendor import --from <staging> [--unit nifty] [--section index|stocks] [--days A..B] [--force] [--dry-run]
 uv run tdata vendor import-index <csv> --symbol NIFTY|BANKNIFTY|SENSEX|INDIAVIX [--days A..B]
 uv run tdata reference export | check | sql "<statement>" | derive-expiries

@@ -518,10 +518,15 @@ def legwise_run(
     from_: str | None = typer.Option(None, "--from", help="First day, YYYY-MM-DD."),
     to: str | None = typer.Option(None, "--to", help="Last day, YYYY-MM-DD."),
     trades: bool = typer.Option(False, "--trades", help="List every trade."),
+    include_excluded: bool = typer.Option(
+        False,
+        "--include-excluded",
+        help="Also run days data_quality excludes (special/short sessions, thin chains, no spot).",
+    ),
 ) -> None:
-    """Backtest leg-wise strategies over the collected Fyers 1-minute days."""
+    """Backtest leg-wise strategies over the lake's 1-minute days (vendor history and Fyers)."""
     from .fyers.daily import data_dir
-    from .legwise.engine import run_legwise
+    from .legwise.engine import run_legwise, skipped_summary
     from .legwise.report import day_table
     from .legwise.schema import load_legwise
 
@@ -529,8 +534,13 @@ def legwise_run(
     end = date.fromisoformat(to) if to else None
     for path in strategies:
         strategy = load_legwise(path)
-        days = run_legwise(strategy, data_dir(), start, end)
+        skipped: dict[date, str] = {}
+        days = run_legwise(
+            strategy, data_dir(), start, end, include_excluded=include_excluded, skipped=skipped
+        )
         typer.echo(day_table(strategy.id, days, show_trades=trades))
+        if skipped:
+            typer.echo(skipped_summary(skipped))
         typer.echo("")
 
 

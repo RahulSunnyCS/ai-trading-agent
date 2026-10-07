@@ -50,14 +50,18 @@ from datetime import date
 from pathlib import Path
 
 from ..data.providers.base import Right
-from ..data.reference.loader import ReferenceData, default_reference_data
+from ..data.reference.loader import (
+    MissingReferenceData,
+    ReferenceData,
+    default_reference_data,
+)
 from ..data.resolver import resolve_strike
 from .market import (
     N_MINUTES,
     ContractKey,
     DayData,
     Series,
-    available_days,
+    backtest_days,
     load_day,
     minute_index,
     minute_label,
@@ -444,11 +448,38 @@ def run_legwise(
     start: date | None = None,
     end: date | None = None,
     reference: ReferenceData | None = None,
+    *,
+    include_excluded: bool = False,
+    skipped: dict[date, str] | None = None,
 ) -> list[DayResult]:
+    """Simulate every backtest day (market.backtest_days) in [start, end]. A day that cannot
+    be run — excluded by data_quality, no index file, or no reference row (a lot size before
+    the table starts) — is left out, never zero-filled; pass `skipped` to receive
+    {day: reason} for each."""
     reference = reference or default_reference_data()
+    days, left_out = backtest_days(root, strategy.underlying, start, end, include_excluded)
     results = []
-    for day in available_days(root, strategy.underlying):
-        if (start and day < start) or (end and day > end):
-            continue
-        results.append(simulate_day(strategy, load_day(root, strategy.underlying, day), reference))
+    for day in days:
+        try:
+            data = load_day(root, strategy.underlying, day)
+            results.append(simulate_day(strategy, data, reference))
+        except FileNotFoundError:
+            left_out[day] = "no index or option file"
+        except MissingReferenceData as error:
+            left_out[day] = f"reference: {error}"
+    if skipped is not None:
+        skipped.update(left_out)
     return results
+
+
+def skipped_summary(skipped: dict[date, str]) -> str:
+    """'3 days skipped: excluded short_session 2, reference 1' — reasons grouped by kind."""
+    if not skipped:
+        return ""
+    kinds: dict[str, int] = {}
+    for reason in skipped.values():
+        head, _, rest = reason.partition(": ")
+        kind = f"{head} {rest.split(':')[0]}" if head == "excluded" else head
+        kinds[kind] = kinds.get(kind, 0) + 1
+    parts = ", ".join(f"{k} {n}" for k, n in sorted(kinds.items()))
+    return f"{len(skipped)} day{'' if len(skipped) == 1 else 's'} skipped: {parts}"

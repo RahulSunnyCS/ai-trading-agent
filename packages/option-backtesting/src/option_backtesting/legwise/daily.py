@@ -15,9 +15,14 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from trading_data import quality
 from trading_data.db import connect
 
-from ..data.reference.loader import ReferenceData, default_reference_data
+from ..data.reference.loader import (
+    MissingReferenceData,
+    ReferenceData,
+    default_reference_data,
+)
 from ..notify import Notification
 from . import store
 from .engine import simulate_day
@@ -56,17 +61,27 @@ def run_day(
     for file in files:
         underlying = file.strategy.underlying
         if underlying not in loaded:
-            try:
-                loaded[underlying] = load_day(root, underlying, day)
-            except FileNotFoundError as error:
-                loaded[underlying] = error
+            excluded = quality.excluded_days(root, "option", underlying) or {}
+            if day in excluded:
+                loaded[underlying] = f"excluded by data_quality: {excluded[day]}"
+            else:
+                try:
+                    loaded[underlying] = load_day(root, underlying, day)
+                except FileNotFoundError as error:
+                    loaded[underlying] = str(error)
         data = loaded[underlying]
-        if isinstance(data, FileNotFoundError):
+        if isinstance(data, str):
             records.append(
-                {"strategy_id": file.strategy.id, "day": day.isoformat(), "skipped": str(data)}
+                {"strategy_id": file.strategy.id, "day": day.isoformat(), "skipped": data}
             )
             continue
-        result = simulate_day(file.strategy, data, reference)  # type: ignore[arg-type]
+        try:
+            result = simulate_day(file.strategy, data, reference)  # type: ignore[arg-type]
+        except MissingReferenceData as error:
+            records.append(
+                {"strategy_id": file.strategy.id, "day": day.isoformat(), "skipped": str(error)}
+            )
+            continue
         results.append((file.strategy, result))
         records.append(store.record(result, file.strategy))
     if results:

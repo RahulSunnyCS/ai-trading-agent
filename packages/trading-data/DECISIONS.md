@@ -383,3 +383,23 @@ span and falls back to the weekday rule outside it; days-to-expiry is emitted fr
   two Muhurat days stay listed: the normal session was closed, and `data_quality` labels them
   special. Rows after 2026-10-06 are still the published list, unverified.
 
+---
+
+## Backtests leave out excluded days, read from a lock-free file — 2026-10-07
+
+BL-034 Phase 2. `obt legwise run`, the dashboard's backtest route and the daily/rerun runner now
+skip the days `data_quality` excludes (special and short sessions, thin chains, option days
+without index spot), and report each skipped day with its reason instead of zero-filling it or
+crashing. `--include-excluded` keeps them.
+
+- **Why a Parquet copy of the verdicts.** The engine must not depend on the catalog: DuckDB has
+  one writer, and `mbt serve` holds the catalog for hours, so even a read-only open fails while it
+  runs. `quality/data_quality.parquet` (asset, name, day, verdict, reason, session kind; ~50 KB)
+  is rewritten atomically by every rebuild and vendor import and by `tdata quality export`. It is
+  outside `lake/`, whose files are immutable day partitions, and is regenerable, so not backed up.
+- **No verdict file → every day runs**, with a warning. A day with no verdict row (a Fyers day
+  collected after the last rebuild) runs: only an explicit `excluded` leaves a day out.
+- **Unrunnable days are named, not fatal.** A missing index or option file and a missing
+  reference row (`MissingReferenceData`, e.g. a lot size before 2024-10) used to stop the whole
+  run at the first such day; each is now a skipped day with its reason.
+
