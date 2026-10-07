@@ -1042,9 +1042,9 @@ export function MomentumBacktestingView() {
                   {dirty && lastRunConfig !== null ? (
                     'Run again'
                   ) : (
-                    <>
-                      Run<span className="hidden sm:inline">&nbsp;momentum backtest</span>
-                    </>
+                    <span>
+                      Run<span className="hidden sm:inline"> momentum backtest</span>
+                    </span>
                   )}
                 </Button>
                 <Button

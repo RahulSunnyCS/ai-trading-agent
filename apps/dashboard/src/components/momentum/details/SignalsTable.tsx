@@ -37,7 +37,8 @@ export function SignalsTable({ rows }: { rows: SignalRow[] }) {
   if (rows.length === 0) return <p className="text-sm text-muted">No signals for this week.</p>;
 
   return (
-    <Table maxHeight={560}>
+    // One line per row: a long reason is cut short and shows in full on hover.
+    <Table maxHeight={560} className="[&_td]:whitespace-nowrap [&_td]:py-1.5">
       <THead>
         <Th align="right">Rank</Th>
         <Th>Asset</Th>
@@ -69,7 +70,9 @@ export function SignalsTable({ rows }: { rows: SignalRow[] }) {
             <Td>
               <SignalActionBadge action={row.action} />
             </Td>
-            <Td className="text-muted">{row.reason}</Td>
+            <Td className="max-w-[16rem] truncate text-muted" title={row.reason}>
+              {row.reason}
+            </Td>
             <Td numeric align="right">
               {formatNumber(row.score, 2, { trim: true })}
             </Td>

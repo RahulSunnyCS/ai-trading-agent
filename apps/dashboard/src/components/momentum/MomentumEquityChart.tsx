@@ -371,7 +371,6 @@ function WeekTooltip({
       ) : null}
       <p className="mt-2 text-[11px] text-faint">
         {pinned ? 'Click to pin this week instead' : 'Click to pin the full detail'}
-        {rotation ? ' · ← → step through rebalances once pinned' : ''}
       </p>
     </div>
   );

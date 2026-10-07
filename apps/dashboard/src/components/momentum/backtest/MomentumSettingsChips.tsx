@@ -45,9 +45,12 @@ export function MomentumSettingsChips({
           {chip.label}
         </button>
       ))}
-      <span className="whitespace-nowrap px-1 text-xs text-faint">
-        prices through {formatDay(pricesThrough)}
-      </span>
+      {/* The headline names the run's last week; the run bar has no room for it. */}
+      {singleLine ? null : (
+        <span className="whitespace-nowrap px-1 text-xs text-faint">
+          prices through {formatDay(pricesThrough)}
+        </span>
+      )}
     </section>
   );
 }

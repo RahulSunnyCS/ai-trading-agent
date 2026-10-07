@@ -368,9 +368,9 @@ export function WeekPanel({
         <ResultSection padded={false} title="Open positions">
           <DataTable
             rows={result.open_positions}
+            // Narrow beside the signals: the entry week is in the CSV and the Trades widget.
             columns={[
               ['asset', 'Asset'],
-              ['entry_week', 'Since'],
               ['weeks_held', 'Weeks'],
               ['rank', 'Rank'],
               ['position_return', 'Return'],
