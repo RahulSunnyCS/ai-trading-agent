@@ -117,7 +117,8 @@ uv run obt run strategies/B_pyramid.yaml --from YYYY-MM-DD --to YYYY-MM-DD
 uv run obt fyers status                 # token source + data dir
 uv run obt fyers fetch                  # today's 1m data — run the SAME evening
 uv run obt fyers history                # backfill NIFTY + VIX index history (any time)
-uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades] [--include-excluded]
+uv run obt legwise run strategies/legwise/*.yaml [--from D] [--to D] [--trades] [--include-excluded] [--bars 5m]
+uv run python scripts/parity-5m.py --from D --to D   # same strategies on 1m vs 5m bars: agreement + timing
 uv run obt daily                        # evening routine: fetch + run strategies/legwise + summary
 uv run obt legwise rerun                # re-run every strategy over every collected day (after an edit)
 uv run pytest tests/golden/test_legwise_scenarios.py  # 30 frozen-input leg-wise regressions

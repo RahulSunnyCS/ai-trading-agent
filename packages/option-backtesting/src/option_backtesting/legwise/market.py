@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-from trading_data import lake, quality
+from trading_data import derived, lake, quality
 
 log = logging.getLogger(__name__)
 
@@ -203,3 +203,110 @@ def pick_expiry(day: DayData, kind: str) -> date | None:
         if not any(o > e and (o.year, o.month) == (e.year, e.month) for o in day.listed_expiries):
             return e
     return None
+
+
+#: Bars a backtest can run on: the raw 1-minute lake, or the 5-minute chain snapshots
+#: (trading_data.derived, BL-034 Phase 3).
+BAR_SIZES = ("1m", "5m")
+
+
+def snapshot_days(root: Path, underlying: str) -> set[date]:
+    return set(derived.available_days(root, "chain_snapshots_5m", underlying))
+
+
+class UnsupportedOn5m(ValueError):
+    """A strategy the 5-minute snapshots cannot run faithfully; use 1-minute bars."""
+
+
+def check_on_5m_marks(*times: str | None) -> None:
+    """5-minute bars can only decide on a window's start: every time must be a multiple of 5
+    minutes from 09:15."""
+    for t in times:
+        if t is not None and minute_index(t) % derived.BUCKET_MINUTES:
+            raise UnsupportedOn5m(
+                f"{t} is not on a 5-minute mark; 5-minute bars need :00, :05, …"
+            )
+
+
+def check_strikes_on_5m(legs: list) -> None:
+    """The snapshots hold only strikes that came within derived.STRIKES_EACH_SIDE steps of
+    the money, so a leg must not need one further out: closest-premium legs (the target may
+    sit anywhere in the chain) and OTM/ITM beyond that are refused rather than silently
+    resolved inside the band."""
+    for leg in legs:
+        if leg.strike.closest_premium is not None:
+            raise UnsupportedOn5m(
+                f"leg {leg.id!r}: closest premium searches the whole chain; 5-minute bars hold "
+                f"only ±{derived.STRIKES_EACH_SIDE} strikes — use --bars 1m"
+            )
+        rule = leg.strike.strike_type or ""
+        if rule[:3] in ("OTM", "ITM") and int(rule[3:] or 0) > derived.STRIKES_EACH_SIDE:
+            raise UnsupportedOn5m(
+                f"leg {leg.id!r}: {rule} is beyond the ±{derived.STRIKES_EACH_SIDE} strikes the "
+                "5-minute snapshots hold — use --bars 1m"
+            )
+
+
+def window_close_minute(minute: int) -> int:
+    """On 5-minute bars an action at a filler minute (5w+1..5w+4) fills at the window's close,
+    i.e. at 5w+5: the minute to report it at."""
+    rest = minute % derived.BUCKET_MINUTES
+    return minute if rest == 0 else minute - rest + derived.BUCKET_MINUTES
+
+
+def load_day_5m(root: Path, underlying: str, day: date) -> DayData:
+    """A DayData built from chain_snapshots_5m, for the unchanged legwise engine: each window
+    sits on its first minute (open = the price at the window's start, high/low/close the
+    window's), and its other four minutes hold the window's close. So an entry or exit at a
+    window start fills at the same price as on 1-minute bars, a stop is checked against the
+    whole window and fills at its trigger (or the window's open if it gapped through), and the
+    combined MTM is checked at the window's close. Only the ±10 strikes around each window's
+    ATM are present."""
+    path = derived.derived_path(root, "chain_snapshots_5m", underlying, day)
+    if not path.exists():
+        raise FileNotFoundError(f"no 5-minute snapshot for {underlying} on {day}")
+    table = pq.read_table(
+        path,
+        columns=[
+            "bucket", "expiry", "strike", "option_type", "open", "high", "low", "close",
+            "spot_open", "spot_high", "spot_low", "spot_close", "vix",
+        ],
+    )  # fmt: skip
+    cols = table.to_pydict()
+    as_ts = table.rename_columns(["ts" if n == "bucket" else n for n in table.column_names])
+    starts = [m - m % derived.BUCKET_MINUTES for m in _minutes(as_ts)]
+    spot, vix = Series.empty(), Series.empty()
+    chain: dict[ContractKey, Series] = {}
+
+    def place(series: Series, m: int, o, h, lo, c) -> None:
+        if c is None or c != c:  # None or NaN: nothing known yet
+            return
+        if o is not None and o == o:
+            series.open[m], series.high[m], series.low[m], series.close[m] = o, h, lo, c
+        for k in range(1, derived.BUCKET_MINUTES):
+            series.open[m + k] = series.high[m + k] = series.low[m + k] = c
+            series.close[m + k] = c
+
+    seen_spot: set[int] = set()
+    for r, m in enumerate(starts):
+        if m not in seen_spot:
+            seen_spot.add(m)
+            place(spot, m, cols["spot_open"][r], cols["spot_high"][r], cols["spot_low"][r],
+                  cols["spot_close"][r])  # fmt: skip
+            v = cols["vix"][r]
+            place(vix, m, v, v, v, v)
+        key = (cols["expiry"][r], float(cols["strike"][r]), cols["option_type"][r])
+        series = chain.get(key)
+        if series is None:
+            series = chain[key] = Series.empty()
+        place(series, m, cols["open"][r], cols["high"][r], cols["low"][r], cols["close"][r])
+    has_vix = any(v is not None for v in vix.close)
+    return DayData(
+        day=day,
+        underlying=underlying,
+        spot=spot.forward_fill(),
+        chain={k: v.forward_fill() for k, v in chain.items()},
+        listed_expiries=sorted({k[0] for k in chain}),
+        master_lot_size=None,
+        vix=vix.forward_fill() if has_vix else None,
+    )

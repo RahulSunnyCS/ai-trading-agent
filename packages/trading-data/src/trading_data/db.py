@@ -58,7 +58,55 @@ LAKE_VIEWS: dict[str, tuple[str, str]] = {
         "NULL::BIGINT AS volume, NULL::DOUBLE AS turnover, "
         "NULL::BOOLEAN AS synthetic_close, NULL::INTEGER AS year",
     ),
+    # BL-034 Phase 3 derived tables (trading_data.derived). tests/test_derived.py checks these
+    # placeholder columns against derived's schemas, so the two cannot drift.
+    "chain_snapshots_5m": (
+        "derived/chain_snapshots_5m/*/*/data.parquet",
+        "NULL::TIMESTAMPTZ AS bucket, NULL::DATE AS expiry, NULL::DOUBLE AS strike, "
+        "NULL::TEXT AS option_type, NULL::SMALLINT AS offset, NULL::DOUBLE AS open, "
+        "NULL::DOUBLE AS high, NULL::DOUBLE AS low, NULL::DOUBLE AS close, "
+        "NULL::DOUBLE AS volume, NULL::DOUBLE AS oi, NULL::BOOLEAN AS traded, "
+        "NULL::DOUBLE AS spot_open, NULL::DOUBLE AS spot_high, NULL::DOUBLE AS spot_low, "
+        "NULL::DOUBLE AS spot_close, NULL::DOUBLE AS vix, NULL::SMALLINT AS dte, "
+        "NULL::DOUBLE AS t_years, NULL::DOUBLE AS forward, NULL::TEXT AS forward_source, "
+        "NULL::DOUBLE AS iv, NULL::DOUBLE AS delta, NULL::DOUBLE AS gamma, "
+        "NULL::DOUBLE AS theta, NULL::DOUBLE AS vega, NULL::TEXT AS iv_quality, "
+        "NULL::TEXT AS underlying, NULL::DATE AS date",
+    ),
+    "straddle_series_5m": (
+        "derived/straddle_series_5m/*/*/data.parquet",
+        "NULL::TIMESTAMPTZ AS bucket, NULL::DATE AS expiry, NULL::SMALLINT AS dte, "
+        "NULL::DOUBLE AS spot_open, NULL::DOUBLE AS spot_close, NULL::DOUBLE AS vix, "
+        "NULL::DOUBLE AS atm, NULL::DOUBLE AS ce_close, NULL::DOUBLE AS pe_close, "
+        "NULL::DOUBLE AS straddle, NULL::DOUBLE AS atm_open, NULL::DOUBLE AS ce_open, "
+        "NULL::DOUBLE AS pe_open, NULL::DOUBLE AS straddle_open, NULL::DOUBLE AS forward, "
+        "NULL::DOUBLE AS atm_iv, NULL::DOUBLE AS skew, NULL::TEXT AS underlying, "
+        "NULL::DATE AS date",
+    ),
+    "contracts_daily": (
+        "derived/contracts_daily/*/*/data.parquet",
+        "NULL::BIGINT AS instrument_id, NULL::DATE AS expiry, NULL::DOUBLE AS strike, "
+        "NULL::TEXT AS option_type, NULL::SMALLINT AS dte, NULL::TIMESTAMPTZ AS first_ts, "
+        "NULL::TIMESTAMPTZ AS last_ts, NULL::INTEGER AS bars, "
+        "NULL::INTEGER AS traded_minutes, NULL::DOUBLE AS open, NULL::DOUBLE AS high, "
+        "NULL::DOUBLE AS low, NULL::DOUBLE AS close, NULL::DOUBLE AS volume, "
+        "NULL::DOUBLE AS oi, NULL::TEXT AS underlying, NULL::DATE AS date",
+    ),
+    "iv_daily": (
+        "derived/iv_daily/*/data.parquet",
+        "NULL::DATE AS trading_day, NULL::DATE AS expiry, NULL::SMALLINT AS expiry_rank, "
+        "NULL::SMALLINT AS dte, NULL::DOUBLE AS atm_iv_0920, NULL::DOUBLE AS atm_iv_1500, "
+        "NULL::DOUBLE AS skew_1500, NULL::DOUBLE AS straddle_1500, "
+        "NULL::DOUBLE AS forward_1500, NULL::DOUBLE AS spot_close, "
+        "NULL::DOUBLE AS vix_close, NULL::DOUBLE AS rv_20, NULL::DATE AS front_expiry, "
+        "NULL::DOUBLE AS front_iv_1500, NULL::DOUBLE AS vix_pct_1y, "
+        "NULL::DOUBLE AS vix_pct_2y, NULL::DOUBLE AS front_iv_pct_1y, "
+        "NULL::DOUBLE AS front_iv_pct_2y, NULL::DOUBLE AS iv_7d_1500, "
+        "NULL::DOUBLE AS iv_7d_pct_1y, NULL::DOUBLE AS iv_7d_pct_2y, "
+        "NULL::TEXT AS underlying",
+    ),
 }
+
 
 
 def data_root(*, require_mounted: bool = True) -> Path:
