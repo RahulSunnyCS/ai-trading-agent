@@ -456,42 +456,21 @@ def fyers_history(
 def _collect(
     trading_day: date, underlyings: str, premium_floor: float, max_extra: int, force: bool
 ) -> int:
-    """Shared by `fyers fetch` and `daily`: collect one day, return the per-symbol error
-    count. A token problem raises FyersCredentialsError for the caller to report."""
-    from trading_data import lake
+    """`fyers fetch`: collect one day, return the per-symbol error count. A token problem
+    raises FyersCredentialsError for the caller to report."""
+    from .legwise.evening import UnknownUnderlying, collect
 
-    from .fyers.auth import resolve_credentials
-    from .fyers.client import FyersClient
-    from .fyers.daily import UNDERLYINGS, collect_day, data_dir
-
-    names = _underlyings(underlyings)
-    unknown = [u for u in names if u not in UNDERLYINGS]
-    if unknown:
-        raise typer.BadParameter(f"unknown underlyings {unknown}; known: {sorted(UNDERLYINGS)}")
-    # Only worth saying when something will actually be downloaded: a re-run over an
-    # already-collected day (the usual after-midnight case) fetches nothing.
-    to_fetch = force or any(
-        not lake.bars_1m_path(data_dir(), "option", u, trading_day).exists() for u in names
-    )
-    if trading_day < date.today() and to_fetch:
-        typer.echo(
-            "warning: the symbol master only lists live contracts - anything that expired "
-            f"between {trading_day} and today is missing from this run."
+    try:
+        return collect(
+            trading_day,
+            _underlyings(underlyings),
+            premium_floor=premium_floor,
+            max_extra=max_extra,
+            force=force,
+            log=typer.echo,
         )
-    client = FyersClient(resolve_credentials())
-    manifest = collect_day(
-        client,
-        trading_day,
-        names,
-        data_dir(),
-        premium_floor=premium_floor,
-        max_extra=max_extra,
-        force=force,
-        log=typer.echo,
-    )
-    errors = sum(len(v.get("errors", [])) for v in manifest.values() if isinstance(v, dict))
-    typer.echo(f"done: {client.calls} requests, {errors} errors -> {data_dir()}")
-    return errors
+    except UnknownUnderlying as error:
+        raise typer.BadParameter(str(error)) from None
 
 
 @fyers_app.command("migrate")
@@ -660,44 +639,28 @@ def daily(
     results, print the day's P&L with running totals, the data verdicts and the IV percentile,
     and send it to Telegram."""
     from .fyers.auth import FyersCredentialsError
-    from .fyers.daily import data_dir
-    from .legwise.daily import (
-        load_history,
-        load_strategy_files,
-        refresh_day,
-        run_day,
-        summary,
-        telegram_failure,
-        telegram_summary,
-    )
+    from .legwise.daily import telegram_failure
+    from .legwise.evening import UnknownUnderlying, run_daily
     from .notify import send
 
     ist = timezone(timedelta(hours=5, minutes=30))
     trading_day = date.fromisoformat(day) if day else _last_closed_session(datetime.now(ist))
-    files = load_strategy_files(strategies_dir)
-    typer.echo(f"{trading_day}: {len(files)} strategies from {strategies_dir}")
-    errors = 0
-    if fetch:
-        try:
-            errors = _collect(trading_day, underlyings, 2.0, 60, force=False)
-        except FyersCredentialsError as error:
-            typer.echo(f"stopped: {error}")
-            if telegram:
-                send(telegram_failure(trading_day, str(error)))
-            raise typer.Exit(1) from None
-    root = data_dir()
-    # judge the day and build its derived tables first: the strategies skip an excluded day,
-    # and the summary reports both (BL-034 Phase 4)
-    check = refresh_day(root, trading_day, _underlyings(underlyings), log=typer.echo)
-    today = run_day(trading_day, root, files)
-    history = load_history(root)
-    typer.echo("")
-    typer.echo(summary(trading_day, today, history, files, check))
-    if telegram:
-        delivered, _ = send(
-            telegram_summary(trading_day, today, history, files, errors, check)
+    try:
+        run_daily(
+            trading_day,
+            _underlyings(underlyings),
+            strategies_dir,
+            fetch=fetch,
+            telegram=telegram,
+            log=typer.echo,
         )
-        typer.echo("telegram: sent" if delivered else "telegram: not sent")
+    except UnknownUnderlying as error:
+        raise typer.BadParameter(str(error)) from None
+    except FyersCredentialsError as error:
+        typer.echo(f"stopped: {error}")
+        if telegram:
+            send(telegram_failure(trading_day, str(error)))
+        raise typer.Exit(1) from None
 
 
 def main() -> None:

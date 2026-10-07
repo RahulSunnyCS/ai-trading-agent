@@ -34,14 +34,14 @@ def create_app(cache_dir: Path | None = None) -> FastAPI:
     return app
 
 
-app = create_app()
-
-
 def main() -> None:
     from ..fyers.auth import load_dotenv
 
-    load_dotenv()  # TRADING_DATA_ROOT etc. when started outside dev-stack (`bun run py:api`)
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # Before create_app: BACKTEST_DATA_DIR (read by resolve_cache_dir), TRADING_DATA_ROOT etc.
+    # may live only in the repo .env when started outside dev-stack (`bun run py:api`). No
+    # module-level app, so importing this module never resolves config before the .env loads.
+    load_dotenv()
+    uvicorn.run(create_app(), host="127.0.0.1", port=8000)
 
 
 if __name__ == "__main__":

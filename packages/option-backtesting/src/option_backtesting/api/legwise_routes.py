@@ -31,14 +31,8 @@ from trading_data.db import connect
 
 from ..analytics import regime_source
 from ..fyers.daily import UNDERLYINGS, data_dir
-from ..legwise import anatomy, forensics, store
-from ..legwise.daily import (
-    load_history,
-    load_strategy_files,
-    run_day,
-    telegram_failure,
-    telegram_summary,
-)
+from ..legwise import anatomy, evening, forensics, store
+from ..legwise.daily import load_history, load_strategy_files, telegram_failure
 from ..legwise.engine import DayResult, run_legwise, simulate_day
 from ..legwise.market import available_days, load_day, minute_label
 from ..legwise.schema import LegwiseStrategy
@@ -368,28 +362,10 @@ def _run_daily(day: date, fetch: bool, telegram: bool) -> None:
         _job.log.append(line)
 
     try:
-        root = data_dir()
-        errors = 0
-        if fetch:
-            from ..fyers.auth import resolve_credentials
-            from ..fyers.client import FyersClient
-            from ..fyers.daily import collect_day
-
-            client = FyersClient(resolve_credentials())
-            manifest = collect_day(client, day, list(UNDERLYINGS), root, log=log)
-            errors = sum(len(v.get("errors", [])) for v in manifest.values() if isinstance(v, dict))
-            log(f"collected: {client.calls} requests, {errors} errors")
-        files = load_strategy_files(LEGWISE_DIR)
-        saved = run_day(day, root, files)
-        for rec in saved:
-            if "skipped" in rec:
-                log(f"{rec['strategy_id']}: skipped — {rec['skipped']}")
-            else:
-                log(f"{rec['strategy_id']}: {rec['net']:+,.0f}")
-        if telegram:
-            summary = telegram_summary(day, saved, load_history(root), files, errors)
-            delivered, _ = send(summary)
-            log("telegram: sent" if delivered else "telegram: not sent (not configured?)")
+        # the same routine as `obt daily`: collect, judge + derived tables, run, summarise
+        evening.run_daily(
+            day, list(UNDERLYINGS), LEGWISE_DIR, fetch=fetch, telegram=telegram, log=log
+        )
         _job.state = "done"
     except Exception as error:  # surfaced to the UI, never swallowed
         log(f"failed: {error}")
