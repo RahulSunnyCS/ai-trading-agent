@@ -210,3 +210,22 @@ under ~400 KB, all with byte-identical results (BL-001 goldens).
   an explainer written for the owner (no backend background assumed): how the data is captured and
   stored, how the ranking, simulation, costs, tax and metrics are calculated, what each dataset
   does, and what BL-005 changed in each place, with the measurements.
+- 2026-10-07 — All four phases merged (#56, #70, #73, #81). Live check on a private copy of the
+  catalog (the owner's `mbt serve` holds the real one), old code against final code, same requests:
+  every Broad result (10 favourites, 6 goldens), the ETF favourite and 5 ETF goldens are identical;
+  the four Stock results differ only by one added `companies` entry (BSE Ltd., from the Nifty 50
+  Sep-2026 review, commit 4412bad: curated data, no number moved). Custom Index was not re-run
+  (about 100 min each on the old code); the goldens cover it. **The Broad warm-time target (≤ ~5 s)
+  is not met on the live data.** Identical re-run 62 s → 0.0 s and ETF/Stock runs 3–4× faster, but a
+  changed Broad request (only `cost_pct` altered, ranking reused) is 24 s → 19.5 s of CPU
+  (53–62 s → 55–59 s wall; the machine was shared). A cProfile of one such request shows the
+  engine at ~1.3 s for both runs and the time elsewhere: `liquidity.compute_weekly_features` for
+  the held stocks (called by `exit_reasons.explain_exits`, the Trades section) ~37 s, and
+  `db_read.has_total_market_data` ~15 s, i.e. opening a catalog connection is itself slow on the
+  real lake (BL-034's many day files). Neither is in the core result the dashboard waits for, but the
+  stateless API, the weekly job and the circuit card pay for them. The fixture is too small to show
+  this, which is why the goldens-based benchmark did not.
+  **Proposed Phase 5 (not started, owner to decide):** re-measure on the real running server first
+  (copy and lake symlink may exaggerate connection cost); then cache `compute_weekly_features` per
+  `data_version`, make `has_total_market_data` / connection set-up once-per-process, and have the
+  weekly job build only the core and `latest`. Results must stay identical, same gates as before.
