@@ -74,7 +74,8 @@ needs to be shared with the server, it is currently hand-duplicated in
   `technical.md`.
 - `src/hooks/useRunSection.ts` — a Momentum background run's result holds the core only; the
   heavy parts (trades, instruments, timeline, this week's signals, the Broad circuit card) are
-  fetched when the tab or card showing them mounts: `useRunSection(runId, 'trades')` returns
+  fetched when the widget showing them activates (`hooks/useWidgetActivation.ts`: near the screen,
+  or in the background after the chart, in `MomentumResultWidgets.tsx`'s order): `useRunSection(runId, 'trades')` returns
   `{data, loading, error, retry}`, backed by `loadSection` in `store/momentumRuns.ts`. Render with
   `Loaded` in `MomentumResultDetails.tsx` (skeleton, error with retry, content) rather than reading
   `result.trades` directly: it is `undefined` until fetched.
@@ -99,7 +100,7 @@ needs to be shared with the server, it is currently hand-duplicated in
 - `src/store/settings.ts` — density, defaults, notifications and the developer flag
   (Settings tab); `src/store/theme.ts` — Zustand theme store; `src/store/navigation.ts` owns the
   locally persisted tab visibility/order preferences; `src/store/momentumView.ts` the Momentum
-  result layout (full-width results, open chart sections, the chart's advanced tooltip, open details tab). Personality/live state is
+  result layout (the headline benchmark pick, the chart's drawdown pane and week list, the full metric set). Personality/live state is
   fetched via hooks, not centralized in a store.
 - `src/guide/` — the Guide's registry, glossary and Markdown pages; `components/guide/` renders them
 - `src/types/` — `backtest.ts` etc. — hand-kept in sync with `apps/server`'s

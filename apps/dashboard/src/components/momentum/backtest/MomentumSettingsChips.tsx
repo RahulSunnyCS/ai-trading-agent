@@ -1,5 +1,6 @@
 'use client';
 
+import { cn } from '../../../lib/cn';
 import { formatDay } from '../../../lib/format';
 import type { MomentumConfigChip, MomentumSettingsSection } from '../../../lib/momentumConfig';
 import { Badge } from '../../ui/Badge';
@@ -13,28 +14,40 @@ export function MomentumSettingsChips({
   chips,
   pricesThrough,
   onOpenSection,
+  singleLine = false,
 }: {
   datasetLabel: string;
   chips: readonly MomentumConfigChip[];
   /** Last week of price data ("2026-09-25"). */
   pricesThrough: string;
   onOpenSection: (section: MomentumSettingsSection) => void;
+  /** One row that clips at the edge (the run bar) instead of wrapping. */
+  singleLine?: boolean;
 }) {
   return (
-    <section className="flex flex-wrap items-center gap-1.5" aria-label="Current settings">
-      <Badge tone="primary">{datasetLabel}</Badge>
+    <section
+      className={cn(
+        'flex items-center gap-1.5',
+        singleLine ? 'flex-nowrap overflow-hidden [&>*]:shrink-0' : 'flex-wrap',
+      )}
+      aria-label="Current settings"
+    >
+      {/* In the run bar the dataset switch beside the chips already names it. */}
+      {singleLine ? null : <Badge tone="primary">{datasetLabel}</Badge>}
       {chips.map((chip) => (
         <button
           key={chip.id}
           type="button"
           onClick={() => onOpenSection(chip.section)}
           title="Open this setting"
-          className="rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="whitespace-nowrap rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-muted transition-colors hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {chip.label}
         </button>
       ))}
-      <span className="px-1 text-xs text-faint">prices through {formatDay(pricesThrough)}</span>
+      <span className="whitespace-nowrap px-1 text-xs text-faint">
+        prices through {formatDay(pricesThrough)}
+      </span>
     </section>
   );
 }

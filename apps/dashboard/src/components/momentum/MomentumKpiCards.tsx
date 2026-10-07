@@ -216,12 +216,29 @@ export function MomentumKpiCards({
   result,
   tax,
   expanded,
-}: { result: MomentumResult; tax: boolean; expanded: boolean }) {
+  detailOnly = false,
+}: {
+  result: MomentumResult;
+  tax: boolean;
+  expanded: boolean;
+  /** Only the detail tiles: the headline strip (MomentumHeadline) shows the rest. */
+  detailOnly?: boolean;
+}) {
   const k = result.kpis;
   const b = result.benchmark_name;
   const runs = useMomentumRunsStore((state) => state.runs);
   const previous = previousComparableRun(runs, result);
   const detail = tax ? [...DETAIL, TAX_PAID] : DETAIL;
+
+  if (detailOnly) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+        {detail.map((def) => (
+          <Tile key={def.label} def={def} k={k} benchmarkName={b} previous={null} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <>

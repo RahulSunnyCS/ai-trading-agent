@@ -130,7 +130,6 @@ export function describeConfig(
       label: config.portfolio === 'slots' ? 'Fixed slots' : 'Buffer rule',
       section: 'portfolio',
     },
-    { id: 'benchmark', label: `vs ${benchmark}`, section: 'period' },
     {
       id: 'costs',
       label:

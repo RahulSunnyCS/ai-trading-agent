@@ -111,7 +111,6 @@ describe('describeConfig chips', () => {
       ['selection', 'top 5 / exit >10', 'portfolio'],
       ['cadence', 'Weekly rebalance', 'portfolio'],
       ['portfolio', 'Buffer rule', 'portfolio'],
-      ['benchmark', 'vs Nifty 500', 'period'],
       ['costs', '0.1% cost per side', 'costs'],
       ['tax', 'Pre-tax', 'costs'],
     ]);
@@ -139,7 +138,6 @@ describe('describeConfig chips', () => {
       ['selection', 'top 4 categories × 2 / exit >8', 'selection'],
       ['cadence', 'Weekly rebalance', 'portfolio'],
       ['portfolio', 'Fixed slots', 'portfolio'],
-      ['benchmark', 'vs Nifty 500', 'period'],
       ['costs', 'Itemised costs', 'costs'],
     ]);
   });
@@ -178,7 +176,8 @@ describe('describeConfig chips', () => {
     expect(label('period')).toBe(d.period);
     expect(label('selection')).toBe(d.selectionShort);
     expect(label('cadence')).toBe(d.cadenceChip);
-    expect(label('benchmark')).toBe(`vs ${d.benchmark}`);
+    // The benchmark is picked on the result (the headline picker), not in the settings.
+    expect(label('benchmark')).toBeUndefined();
   });
 });
 

@@ -919,7 +919,6 @@ export function MomentumSettingsPanel({
   instruments,
   firstWeek,
   lastWeek,
-  benchmarks,
   core,
   onCoreChange,
   values,
@@ -932,7 +931,6 @@ export function MomentumSettingsPanel({
   instruments: Instrument[];
   firstWeek: string;
   lastWeek: string;
-  benchmarks: string[];
   core: CoreSettings;
   onCoreChange: (patch: Partial<CoreSettings>) => void;
   values: Values;
@@ -1005,8 +1003,6 @@ export function MomentumSettingsPanel({
     return hint;
   })();
 
-  const benchmarkName = str('benchmark', benchmarks[0] ?? '');
-
   return (
     <SectionContext.Provider value={sectionState}>
       <div className="space-y-3">
@@ -1058,8 +1054,8 @@ export function MomentumSettingsPanel({
 
         <Section
           id="period"
-          title="Period &amp; benchmark"
-          description={`${core.start || firstWeek} → ${core.end || lastWeek} · vs ${benchmarkName}`}
+          title="Period"
+          description={`${core.start || firstWeek} → ${core.end || lastWeek}`}
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="From">
@@ -1110,22 +1106,6 @@ export function MomentumSettingsPanel({
               {maxLookbackWeeks} weeks) — the strategy will have little or no history to rank on.
             </p>
           ) : null}
-          <Field
-            label="Benchmark"
-            help="What the strategy is compared against in the chart, the KPIs and the year-by-year table."
-          >
-            <Select
-              className="mt-1"
-              value={benchmarkName}
-              onChange={(event) => onChange('benchmark', event.target.value)}
-            >
-              {benchmarks.map((benchmark) => (
-                <option key={benchmark} value={benchmark}>
-                  {benchmark}
-                </option>
-              ))}
-            </Select>
-          </Field>
         </Section>
 
         <GroupTitle step={2}>Selection &amp; portfolio</GroupTitle>

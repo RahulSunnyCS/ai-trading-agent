@@ -5,18 +5,21 @@ rank, how to rank it, how to hold it and what it costs, then run.
 
 ## Before you start
 
-- Pick the dataset at the top: **ETF Rotation** or **Broad Momentum**. They have different
-  settings; saved runs are kept per dataset.
+- Pick the dataset in the run bar at the top: **ETF Rotation** or **Broad Momentum**. They
+  have different settings; saved runs are kept per dataset.
+- Press **Settings** in the run bar (or click any setting's chip) to open the settings drawer
+  from the right. **Run** is at the foot of the drawer and in the run bar; Ctrl/Cmd + Enter
+  runs from anywhere in the drawer. **Defaults** at the top of the drawer resets every setting.
 - No login is needed to backtest. Prices come from the research database, refreshed by the
   scheduled jobs.
 
 > [!TIP]
 > Start from the defaults. They are the settings the owner's validation has tested most; the
-> chips above the result show every setting you have changed from them.
+> chips in the run bar show what the next run tests.
 
 ## The controls, section by section
 
-The settings panel is grouped into sections. Hover the (i) next to any field on the screen for
+The settings drawer is grouped into sections. Hover the (i) next to any field on the screen for
 a one-line reminder.
 
 ### Universe & tradability
@@ -29,11 +32,12 @@ a one-line reminder.
 | Tradability filter | Keeps only stocks with enough daily turnover to buy and sell, that are not stuck at a [circuit limit](glossary:circuit). Uses only data known on each date. |
 | Respect circuit locks | When on, the backtest cannot buy a stock locked at the upper circuit or sell one locked at the lower circuit. More realistic. |
 
-### Period & benchmark
+### Period
 
-**From** and **To** set the test window. The **Benchmark** is what the result is compared with
-in the chart, the cards and the yearly table. A strategy should beat a cheap index fund after
-costs; otherwise there is no point.
+**From** and **To** set the test window. The benchmark is not a setting: it is picked on the
+result's headline card, and switching it does not need a re-run (see
+[Reading backtest results](guide:momentum/backtest-results)). A strategy should beat a cheap
+index fund after costs; otherwise there is no point.
 
 ### Selection (Broad only)
 

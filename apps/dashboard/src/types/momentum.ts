@@ -54,6 +54,34 @@ export interface MomentumComparison {
   series: Array<number | null>;
 }
 
+/**
+ * One of the five indices the headline benchmark picker offers (`reference_benchmarks.PICKER`),
+ * all dividend-inclusive. `series` is in rupees on `series.dates`, rebased to ₹1 lakh like the
+ * strategy; the statistics use the strategy's own definitions (Sharpe and Sortino vs cash). An
+ * index without data for this run is listed with `available` false and nothing else.
+ */
+export type MomentumBenchmarkChoice =
+  | { name: string; available: false }
+  | {
+      name: string;
+      available: true;
+      /** The index's last real close on or before the final week (it may be carried a week). */
+      as_of: string;
+      note: string | null;
+      series: Array<number | null>;
+      cagr: number | null;
+      excess_cagr: number | null;
+      total_return: number | null;
+      final_value: number | null;
+      volatility: number | null;
+      sharpe: number | null;
+      sortino: number | null;
+      max_drawdown: number | null;
+      max_drawdown_trough: string | null;
+      /** Calendar years the strategy beat this index. */
+      years_beating: number | null;
+    };
+
 /** An upper-circuit run a held stock went through in the backtest. */
 export interface MomentumCircuitEpisode {
   symbol: string;
@@ -165,6 +193,8 @@ export interface MomentumResult {
   benchmark_name: string;
   kpis: Record<string, number | string | null>;
   comparisons?: MomentumComparison[];
+  /** The headline picker's five indices; absent on results computed before 2026-10-07. */
+  benchmarks?: MomentumBenchmarkChoice[];
   series: MomentumSeries;
   rotations: MomentumRotation[];
   /** Whether the server answered from its result cache (then `computed_at` is when it was
