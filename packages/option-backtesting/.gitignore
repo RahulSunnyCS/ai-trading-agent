@@ -1,6 +1,5 @@
 # Derived from data/raw/ — never commit, regenerate via `obt ingest`.
 data/cache/
-data/registry.sqlite
 
 # Python
 __pycache__/
@@ -12,6 +11,6 @@ __pycache__/
 # uv
 uv.lock.bak
 
-# Fyers 1-minute collector output — cannot be re-downloaded once contracts expire.
-# Lives outside git; back it up (FYERS_DATA_DIR can point at an external disk).
+# The pre-database Fyers collector layout, moved into TRADING_DATA_ROOT on 2026-09-30.
+# A local copy may still exist; keep it out of git until it is deleted.
 data/fyers/
