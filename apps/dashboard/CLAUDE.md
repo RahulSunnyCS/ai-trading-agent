@@ -118,6 +118,6 @@ bun run --filter @ata/dashboard dev         # Next dev server (:5173), rewrites 
 # OBT_DIRECT=1 routes ONLY /api/backtest/legwise/* straight to it (dev-only,
 # off by default — the Fastify proxy stays the only production path)
 (cd apps/dashboard && OBT_DIRECT=1 bun run dev)
-bun run --filter @ata/dashboard typecheck   # NOT part of the root `bun run typecheck` — has one pre-existing error, run explicitly
+bun run --filter @ata/dashboard typecheck   # NOT part of the root `bun run typecheck` — run explicitly (CI runs it in the dashboard job)
 bun run test:e2e                            # Playwright suite — start the Next dev server first
 ```
