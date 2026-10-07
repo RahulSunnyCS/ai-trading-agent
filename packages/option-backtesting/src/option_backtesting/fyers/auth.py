@@ -9,7 +9,11 @@ Order (first hit wins):
      same JSON shape as (2). Read-only: one browser login each morning serves both
      tools, and this package imports no code from momentum-backtesting.
 
-Fyers tokens expire daily, so file sources are checked against `expires_at`.
+Fyers tokens expire daily, so file sources are checked against `expires_at`. A token dies at
+the next 06:00 IST after it was minted, whatever `expires_at` says, so the broker_tokens row is
+also clamped to that (`token_expiry`, the same rule as `@trading/broker-identity`'s
+`fyersTokenExpiry` and momentum-backtesting's `fyers.token_expiry` — implemented here, not
+imported, because the packages share no code).
 """
 
 from __future__ import annotations
@@ -17,13 +21,16 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
+from datetime import time as dt_time
 from pathlib import Path
 
 import psycopg
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
 MBT_TOKEN_CACHE = REPO_ROOT / "packages" / "momentum-backtesting" / "data" / ".fyers_token.json"
+_IST = timezone(timedelta(hours=5, minutes=30))
+TOKEN_RESET_IST = dt_time(6, 0)
 
 
 class FyersCredentialsError(RuntimeError):
@@ -41,8 +48,18 @@ class Credentials:
         return f"Credentials(app_id={self.app_id!r}, source={self.source!r})"
 
 
+def token_expiry(issued_at: datetime) -> datetime:
+    """When a token minted at `issued_at` really stops working: the next 06:00 IST reset."""
+    local = issued_at.astimezone(_IST)
+    reset = datetime.combine(local.date(), TOKEN_RESET_IST, tzinfo=_IST)
+    if reset <= local:
+        reset += timedelta(days=1)
+    return reset.astimezone(UTC)
+
+
 def load_dotenv() -> None:
-    """Fill unset env vars from the repo-root .env (the one both apps read)."""
+    """Fill unset env vars from the repo-root .env (the one both apps read). Tolerates a
+    leading `export ` and a trailing ` # comment`, like momentum-backtesting's loader."""
     path = REPO_ROOT / ".env"
     if not path.exists():
         return
@@ -51,7 +68,9 @@ def load_dotenv() -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        key = key.removeprefix("export ").strip()
+        value = value.split(" #", 1)[0].strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
 
 
 def _from_file(path: Path, source: str) -> Credentials | None:
@@ -71,13 +90,15 @@ def _from_dashboard(database_url: str) -> Credentials | None:
         row = conn.execute(
             "SELECT app_id, CASE WHEN token_encrypted "
             "THEN pgp_sym_decrypt(dearmor(access_token), %s) "
-            "ELSE access_token END AS access_token, expires_at FROM broker_tokens "
+            "ELSE access_token END AS access_token, expires_at, updated_at FROM broker_tokens "
             "WHERE broker = 'fyers' LIMIT 1",
             (passphrase,),
         ).fetchone()
     if row is None:
         return None
-    app_id, access_token, expires_at = row
+    app_id, access_token, expires_at, updated_at = row
+    # Rows stored before the 06:00 IST rule carry now+24h; updated_at is when it was issued.
+    expires_at = min(expires_at, token_expiry(updated_at))
     if expires_at <= datetime.now(UTC):
         return None
     return Credentials(app_id, access_token, "broker_tokens", expires_at)
