@@ -192,3 +192,81 @@ def test_portfolio_skips_disallowed_and_traded_bases():
         cands, trades, closes, allowed=allowed, start=dates[0], end=dates[-1]
     )
     assert sorted(log["symbol"]) == ["S10", "S11"]
+
+
+# --- Phases 3-5 ---------------------------------------------------------------------------------
+
+from momentum_backtesting.patterns.bars import split_symbols  # noqa: E402
+from momentum_backtesting.patterns.swing import research  # noqa: E402
+
+
+def test_score_counts_only_trades_that_had_exited():
+    days = pd.bdate_range("2015-01-01", periods=80)
+    n = 40
+    cands = pd.DataFrame(
+        {
+            "pattern": "flag",
+            "entry": "pullback",
+            "above_50dma": True,
+            "quality": 0.5,
+            "date": days[:n],
+            "base_id": [f"b{i}" for i in range(n)],
+        }
+    )
+    trades = pd.DataFrame({"r": 1.0, "exit_date": days[:n] + pd.Timedelta(days=10)})
+    first = pd.Series(True, index=cands.index)
+    third = pd.Series("mid", index=cands.index)
+    s = research.scores(cands, trades, first, third)
+    # the 39th signal (index 38): exits before it are trades 0..~30 (10 calendar days earlier)
+    assert s.iloc[5] == 50.0  # too few finished trades yet
+    later = cands.assign(date=days[-1])
+    s2 = research.scores(later, trades, first, third)
+    assert s2.iloc[0] == 100.0  # all 40 had exited, mean R +1 -> 100
+
+
+def test_health_switch_compares_to_its_own_past_median():
+    days = pd.bdate_range("2015-01-01", periods=300)
+    exits = days[::3]
+    r = np.where(np.arange(len(exits)) < 70, 1.0, -1.0)  # wins, then a losing streak
+    trades = pd.DataFrame({"r": r, "exit_date": exits})
+    cands = pd.DataFrame(index=trades.index)
+    first = pd.Series(True, index=trades.index)
+    h = research.health(cands, trades, first, days)
+    assert h.iloc[150] and not h.iloc[-1]
+
+
+def _long_market():
+    rng = np.random.default_rng(11)
+    frames = []
+    for k in range(5):
+        steps = rng.normal(0.0008, 0.02, 3300)
+        volume = rng.lognormal(13.8, 0.3, 3300)
+        for start in range(300 + k * 17, 3200, 120):
+            steps[start : start + 15] = 0.02
+            volume[start : start + 15] *= 2
+            steps[start + 15 : start + 30] = rng.normal(-0.001, 0.003, 15)
+            volume[start + 15 : start + 30] *= 0.5
+            steps[start + 30] = 0.05
+            volume[start + 30] *= 4
+        frames.append(_frame(500 * np.exp(np.cumsum(steps)), symbol=f"S{k}", volume=volume))
+    return pd.concat(frames)
+
+
+def test_stages_a_and_b_run_end_to_end_on_synthetic_data():
+    daily = adjust(_long_market(), {})
+    cands = candidates.scan(daily, workers=1)
+    bars = split_symbols(daily)
+    closes = daily.pivot_table(index="date", columns="symbol", values="close")
+    outcomes = {
+        f"{stop}|{target}": trader.trade_outcomes(cands, bars, stop_rule=stop, target_r=target)
+        for stop in ("base_low", "atr_1.5", "pct_8")
+        for target in (2.0, 3.0, None)
+    }
+    a = research.stage_a(cands, outcomes, echo=lambda *_: None)
+    assert set(a) == {"tight_range", "flag"}
+    assert all(len(v["walk_forward_picks"]) == 9 for v in a.values())
+    for v in a.values():
+        v["passes"] = True  # exercise stage B whatever stage A said
+    b = research.stage_b(cands, outcomes, closes, a, echo=lambda *_: None)
+    assert len(b["portfolios"]) == 6 and len(b["walk_forward_picks"]) == 9
+    assert all(np.isfinite(c.iloc[-1]) for c in b["curves"].values())
