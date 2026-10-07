@@ -168,3 +168,36 @@ class TestCurrentExpiry:
         self, rd: ReferenceData
     ) -> None:
         assert rd.current_expiry("BANKNIFTY", date(2026, 9, 30)) == date(2026, 10, 27)
+
+
+class TestObservedExpiries:
+    """expiries_observed.csv — the real expiries, from the lake (BL-034 Phase 2)."""
+
+    def test_nifty_thursday_era_is_right(self, rd: ReferenceData) -> None:
+        # Before 2025-09-01 NIFTY expired on Thursdays; the weekday rule says Tuesday.
+        assert rd.current_expiry("NIFTY", date(2025, 1, 15)) == date(2025, 1, 16)
+
+    def test_holiday_shift(self, rd: ReferenceData) -> None:
+        # Tuesday 21 Oct 2025 was Diwali (Muhurat only): that week's expiry was Monday the 20th.
+        assert rd.current_expiry("NIFTY", date(2025, 10, 17)) == date(2025, 10, 20)
+
+    def test_added_expiry_fills_a_hole_in_the_lake(self, rd: ReferenceData) -> None:
+        # The vendor has no SENSEX 25 Oct 2024 contracts; the expiry was added by hand.
+        assert rd.current_expiry("SENSEX", date(2024, 10, 21)) == date(2024, 10, 25)
+
+    def test_outside_the_observed_span_falls_back_to_the_rule(self, rd: ReferenceData) -> None:
+        assert not rd.observed_expiries_cover("NIFTY", date(2020, 1, 1))
+        assert rd.current_expiry("NIFTY", date(2020, 1, 1)) == date(2020, 1, 7)  # rule: Tue
+
+
+class TestHolidayCorrections:
+    """Checked against the lake: a weekday with no bars from any source was closed, and a
+    listed holiday with a full session was not (BL-034 Phase 2 audit)."""
+
+    def test_days_that_were_closed(self, rd: ReferenceData) -> None:
+        for d in (date(2024, 11, 20), date(2025, 10, 22), date(2026, 3, 26), date(2026, 9, 14)):
+            assert not rd.is_trading_day(d), d
+
+    def test_days_that_traded(self, rd: ReferenceData) -> None:
+        for d in (date(2025, 10, 20), date(2026, 3, 20), date(2026, 4, 2)):
+            assert rd.is_trading_day(d), d

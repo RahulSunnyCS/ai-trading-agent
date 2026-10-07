@@ -31,10 +31,11 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("006_stock_action_scan_state",),
             ("007_momentum_forward_journal",),
             ("008_data_quality",),
+            ("009_ref_expiries",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 8
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 9
 
 
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):
@@ -265,3 +266,33 @@ def test_status_runs_in_this_packages_own_environment(root, monkeypatch):
     result = CliRunner().invoke(app, ["status"])
     assert result.exit_code == 0, result.output
     assert "bars_1m_index" in result.output and "1 days" in result.output
+
+
+def test_derive_expiries_reads_the_lake_and_keeps_added_rows(root):
+    import pyarrow.parquet as pq
+
+    def day_file(day: str, expiries: list[str]) -> None:
+        path = root / "lake" / "bars_1m" / "asset=option" / "underlying=NIFTY" / f"date={day}"
+        path.mkdir(parents=True)
+        table = pa.table({"expiry": pa.array([date.fromisoformat(e) for e in expiries])})
+        pq.write_table(table, path / "data.parquet")
+
+    day_file("2024-09-20", ["2024-09-26"])  # before EXPIRIES_FROM: ignored
+    day_file("2025-01-15", ["2025-01-16", "2025-01-30"])
+    day_file("2025-01-16", ["2025-01-16", "2025-01-23"])
+    with connect(root) as con:
+        con.execute("DELETE FROM ref_expiries")
+        con.execute(
+            "INSERT INTO ref_expiries VALUES ('NIFTY', DATE '2025-01-23', 'added'),"
+            " ('NIFTY', DATE '2025-02-06', 'added')"
+        )
+        assert reference.derive_expiries(con, root, ("NIFTY",)) == {"NIFTY": 3}
+        rows = con.execute(
+            "SELECT expiry::VARCHAR, source FROM ref_expiries ORDER BY expiry"
+        ).fetchall()
+    assert rows == [
+        ("2025-01-16", "observed"),
+        ("2025-01-23", "observed"),  # was added; the lake has it now
+        ("2025-01-30", "observed"),
+        ("2025-02-06", "added"),  # kept
+    ]

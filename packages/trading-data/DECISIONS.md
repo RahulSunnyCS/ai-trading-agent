@@ -354,3 +354,32 @@ its `effective_date` means the **first expiry** a size applies to, not the first
 - **Rows before 2024-10** are deliberately absent: a day earlier than the first row raises
   ("No lot_sizes row") rather than guessing.
 
+---
+
+## Expiries come from the lake, and the holiday list was checked against it — 2026-10-07
+
+BL-034 Phase 2. `ref_expiries` (migration 009, `expiries_observed.csv`) lists every expiry each
+index's options actually had, taken from the lake's option files for days from 2024-10-01
+(`tdata reference derive-expiries`). `ReferenceData.current_expiry` answers from it inside its
+span and falls back to the weekday rule outside it; days-to-expiry is emitted from 2024-10.
+
+- **Why not fix the weekday rule.** Expiry weekdays changed more than once (NIFTY Thursday →
+  Tuesday on 2025-09-01; SENSEX Friday → Tuesday → Thursday) and every holiday moves one expiry
+  (NIFTY's 2025-10-20 Monday, SENSEX's 2024-10-31 Thursday). A list of the real dates is simpler
+  and exact; the rule stays for days beyond the lake.
+- **Only from 2024-10.** Earlier vendor history covers expiry weeks only (Phase 5), so a list
+  built from it would have holes.
+- **Holes the lake has, filled by hand (`source = 'added'`).** The derivation prints any gap
+  longer than the cadence (8 days weekly, 9 for SENSEX's weekday move, 38 monthly). Three were
+  real holes: NIFTY 2026-09-22 and SENSEX 2026-09-24 (inside the vendor gap, BL-040) and
+  SENSEX 2024-10-25 (absent from the vendor's files). The rest were genuine (SENSEX Tuesday →
+  Thursday, a Christmas-shifted BANKNIFTY monthly). A re-derivation keeps `added` rows and turns
+  them into `observed` once the lake has the contracts.
+- **Holidays, audited.** A weekday with no bars from any source (NIFTY spot, NIFTY options,
+  SENSEX spot) between 2024-10-01 and 2026-10-06 was closed; a listed holiday with a session was
+  not. Result: 8 closures added (2024-11-20 and 2026-01-15 elections, 2025-10-22, 2026-03-26,
+  03-31, 05-28, 06-26, 09-14), 3 wrong rows removed (2025-10-20 traded — the Muhurat day was
+  10-21; 2026-03-20 and 2026-04-02 traded), "(provisional)" dropped from the verified rows. The
+  two Muhurat days stay listed: the normal session was closed, and `data_quality` labels them
+  special. Rows after 2026-10-06 are still the published list, unverified.
+
