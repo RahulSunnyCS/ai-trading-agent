@@ -1,4 +1,4 @@
-"""The Broad Momentum ranking BL-041 measures against (bl041_criteria.json `universe` and
+"""The Broad Momentum ranking BL-042 measures against (bl042_criteria.json `universe` and
 `phase_5_ranking_test.baseline`), and per-symbol views of its rank tables.
 
 The ranking is built from the whole price history, as every Broad run is; its ranks only look

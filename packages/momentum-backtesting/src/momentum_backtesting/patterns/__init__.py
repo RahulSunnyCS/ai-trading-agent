@@ -1,9 +1,9 @@
-"""BL-041: chart-pattern POC (tight range, flag, cup and handle) for the Broad Momentum pool.
+"""BL-042: chart-pattern POC (tight range, flag, cup and handle) for the Broad Momentum pool.
 
 Research only. Nothing here is wired into `api.py`, `BacktestRequest`, the default ranking or the
 weekly signal; a pattern that passes its pre-registered test goes to BL-033 for that.
 
-Every rule and threshold lives in `search_spaces/bl041_criteria.json` (and its addenda); code
+Every rule and threshold lives in `search_spaces/bl042_criteria.json` (and its addenda); code
 reads them from there and never restates one. Nothing before Phase 6 may read a bar dated on or
 after the sealed hold-out's first day: `guard` enforces it for every loader.
 """
@@ -17,19 +17,19 @@ from pathlib import Path
 import pandas as pd
 
 SEARCH_SPACES = Path(__file__).resolve().parents[3] / "search_spaces"
-CRITERIA = SEARCH_SPACES / "bl041_criteria.json"
+CRITERIA = SEARCH_SPACES / "bl042_criteria.json"
 PATTERNS = ("tight_range", "flag", "cup_handle", "high_tight_flag")
 
 
 def _addenda() -> list[dict]:
-    paths = SEARCH_SPACES.glob("bl041_criteria_addendum_*.json")
+    paths = SEARCH_SPACES.glob("bl042_criteria_addendum_*.json")
     ordered = sorted(paths, key=lambda p: int(p.stem.rsplit("_", 1)[1]))
     return [json.loads(p.read_text()) for p in ordered]
 
 
 @cache
 def criteria() -> dict:
-    """bl041_criteria.json with every addendum applied in order:
+    """bl042_criteria.json with every addendum applied in order:
     - `detectors` replaces the starting values for the patterns it names;
     - `shapes` replaces the named fields of the Phase 5 shapes;
     - `quality` and `uses` are added as they are."""
@@ -70,7 +70,7 @@ def guard(through: str | pd.Timestamp, *, allow_holdout: bool = False) -> pd.Tim
     cut = pd.Timestamp(through)
     if cut >= holdout_start() and not allow_holdout:
         raise ValueError(
-            f"{cut.date()} reaches the sealed BL-041 hold-out (from {holdout_start().date()}); "
+            f"{cut.date()} reaches the sealed BL-042 hold-out (from {holdout_start().date()}); "
             "only the one Phase 6 run may read it"
         )
     return cut

@@ -1,4 +1,4 @@
-"""BL-041 Phase 2b (owner, 2026-10-07): does the momentum rank fall while a base forms?
+"""BL-042 Phase 2b (owner, 2026-10-07): does the momentum rank fall while a base forms?
 
 A base takes from a few weeks (a tight range) to over a year (a cup), and a stock that moves
 sideways loses momentum rank. If the stocks with the best patterns sit outside the top of the

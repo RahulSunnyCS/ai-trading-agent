@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from . import quality, reference, vendor
+from . import derived, quality, reference, vendor
 from .backup import backup as run_backup
 from .db import LAKE_VIEWS, catalog_path, check_mounted, connect, data_root
 
@@ -19,6 +19,10 @@ quality_app = typer.Typer(no_args_is_help=True, help="Per-day quality verdicts f
 app.add_typer(quality_app, name="quality")
 vendor_app = typer.Typer(no_args_is_help=True, help="Load the vendor's history (BL-034).")
 app.add_typer(vendor_app, name="vendor")
+derived_app = typer.Typer(
+    no_args_is_help=True, help="5-minute chain snapshots, straddle series, IV (BL-034 Phase 3)."
+)
+app.add_typer(derived_app, name="derived")
 
 
 def _size(path: Path) -> int:
@@ -149,6 +153,45 @@ def reference_derive_expiries(
     for u, a, b, days in gaps:
         typer.echo(f"gap: {u} {a} -> {b} ({days} days) — is an expiry missing?")
     typer.echo("\n".join(f"wrote {p}" for p in written) or "no CSV changed")
+
+
+@derived_app.command("rebuild")
+def derived_rebuild(
+    underlying: list[str] = typer.Option(
+        None, "--underlying", help="Default: NIFTY and SENSEX (derived.DEFAULT_UNDERLYINGS)."
+    ),
+    days: str = typer.Option(None, help="Only days in A..B, e.g. 2026-09-01..2026-09-30."),
+    day: str = typer.Option(None, "--day", help="One day, YYYY-MM-DD."),
+    force: bool = typer.Option(False, help="Rebuild files already at the current version."),
+    check: bool = typer.Option(
+        False, help="Rebuild in memory and compare with the stored files; writes nothing."
+    ),
+) -> None:
+    """Build the derived tables from the 1-minute lake: every missing or out-of-version day,
+    then iv_daily. Lock-free: reads the lake and the reference CSVs, never the catalog."""
+    from datetime import date as _date
+
+    names = tuple(underlying) if underlying else derived.DEFAULT_UNDERLYINGS
+    try:
+        window = (
+            (_date.fromisoformat(day),) * 2 if day else quality.parse_days(days) if days else None
+        )
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    root = data_root()
+    if check:
+        bad = 0
+        for u in names:
+            for d in derived.candidate_days(root, u, window):
+                problems = derived.check_day(root, u, d)
+                bad += bool(problems)
+                for p in problems:
+                    typer.echo(f"{u} {d}: {p}")
+        typer.echo("all stored days match a fresh rebuild" if not bad else f"{bad} day(s) differ")
+        if bad:
+            raise typer.Exit(1)
+        return
+    derived.rebuild(root, names, days=window, force=force, log=typer.echo)
 
 
 @app.command()

@@ -523,10 +523,17 @@ def legwise_run(
         "--include-excluded",
         help="Also run days data_quality excludes (special/short sessions, thin chains, no spot).",
     ),
+    bars: str = typer.Option(
+        "1m",
+        "--bars",
+        help="1m: the raw 1-minute lake. 5m: the 5-minute chain snapshots (tdata derived "
+        "rebuild) — much faster; strategy times must be on 5-minute marks.",
+    ),
 ) -> None:
-    """Backtest leg-wise strategies over the lake's 1-minute days (vendor history and Fyers)."""
+    """Backtest leg-wise strategies over the lake's days (vendor history and Fyers)."""
     from .fyers.daily import data_dir
     from .legwise.engine import run_legwise, skipped_summary
+    from .legwise.market import UnsupportedOn5m
     from .legwise.report import day_table
     from .legwise.schema import load_legwise
 
@@ -535,9 +542,18 @@ def legwise_run(
     for path in strategies:
         strategy = load_legwise(path)
         skipped: dict[date, str] = {}
-        days = run_legwise(
-            strategy, data_dir(), start, end, include_excluded=include_excluded, skipped=skipped
-        )
+        try:
+            days = run_legwise(
+                strategy,
+                data_dir(),
+                start,
+                end,
+                include_excluded=include_excluded,
+                skipped=skipped,
+                bars=bars,
+            )
+        except UnsupportedOn5m as error:
+            raise typer.BadParameter(str(error)) from error
         typer.echo(day_table(strategy.id, days, show_trades=trades))
         if skipped:
             typer.echo(skipped_summary(skipped))
@@ -600,13 +616,16 @@ def daily(
         True, "--telegram/--no-telegram", help="Send the summary to Telegram (TELEGRAM_* in .env)."
     ),
 ) -> None:
-    """The evening routine: collect the day's 1-minute data, run every leg-wise strategy on
-    it, save the results, print the day's P&L with running totals and send it to Telegram."""
+    """The evening routine: collect the day's 1-minute data, judge it (data_quality) and build
+    its derived tables (5-minute snapshots, IV), run every leg-wise strategy on it, save the
+    results, print the day's P&L with running totals, the data verdicts and the IV percentile,
+    and send it to Telegram."""
     from .fyers.auth import FyersCredentialsError
     from .fyers.daily import data_dir
     from .legwise.daily import (
         load_history,
         load_strategy_files,
+        refresh_day,
         run_day,
         summary,
         telegram_failure,
@@ -628,12 +647,17 @@ def daily(
                 send(telegram_failure(trading_day, str(error)))
             raise typer.Exit(1) from None
     root = data_dir()
+    # judge the day and build its derived tables first: the strategies skip an excluded day,
+    # and the summary reports both (BL-034 Phase 4)
+    check = refresh_day(root, trading_day, _underlyings(underlyings), log=typer.echo)
     today = run_day(trading_day, root, files)
     history = load_history(root)
     typer.echo("")
-    typer.echo(summary(trading_day, today, history, files))
+    typer.echo(summary(trading_day, today, history, files, check))
     if telegram:
-        delivered, _ = send(telegram_summary(trading_day, today, history, files, errors))
+        delivered, _ = send(
+            telegram_summary(trading_day, today, history, files, errors, check)
+        )
         typer.echo("telegram: sent" if delivered else "telegram: not sent")
 
 

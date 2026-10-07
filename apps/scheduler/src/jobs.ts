@@ -55,6 +55,7 @@ export interface Job {
 
 const MOMENTUM = 'packages/momentum-backtesting';
 const OPTIONS = 'packages/option-backtesting';
+const TRADING_DATA = 'packages/trading-data';
 const BROKER_LOGIN = 'packages/broker-login';
 const FRIDAY = onWeekdays(5);
 
@@ -183,6 +184,22 @@ const BASE_JOBS: Job[] = [
     group: 'catalog',
     alertsItself: true,
     fixHint: 'Log in to Fyers, then: cd packages/option-backtesting && uv run obt daily',
+  },
+  {
+    id: 'options-derived',
+    description:
+      'Catch up the derived 5-minute snapshots and IV tables for any day options-daily left unbuilt',
+    // options-daily builds the day's derived tables itself; this nightly pass rebuilds anything
+    // missing or out of version (e.g. after an interrupted evening or a DERIVED_VERSION bump).
+    // Lock-free (lake + reference CSVs only), so it needs no catalog group.
+    schedule: { at: '23:30', on: tradingDays, label: 'trading days 23:30' },
+    steps: [['uv', 'run', 'tdata', 'derived', 'rebuild']],
+    cwd: TRADING_DATA,
+    timeoutMinutes: 60,
+    retries: 1,
+    retryDelayMinutes: 30,
+    catchUpHours: 8,
+    fixHint: 'cd packages/trading-data && uv run tdata derived rebuild',
   },
   {
     id: 'backup',

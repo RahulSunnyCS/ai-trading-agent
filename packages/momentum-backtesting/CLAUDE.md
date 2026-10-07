@@ -367,9 +367,9 @@ contract, not a shared service).
   `uv run python scripts/update-goldens.py --accept-results --reason "..."` and commit the
   changelog entry it writes. A new request field needs a scenario (`test_coverage.py`).
   `test_lookahead.py` re-runs each dataset on data cut off at a date; never weaken it.
-- `patterns/` (`mbt patterns detect|formation|gallery|study|rank|holdout`) — BL-041's chart-pattern
+- `patterns/` (`mbt patterns detect|formation|gallery|study|rank|holdout`) — BL-042's chart-pattern
   POC (tight range, flag, cup and handle). Research only: nothing here reaches `api.py`, the
-  default ranking or the weekly signal. Rules live in `search_spaces/bl041_criteria.json` (+
+  default ranking or the weekly signal. Rules live in `search_spaces/bl042_criteria.json` (+
   addenda) and are read, never restated. Daily bars are forward-adjusted by the confirmed share
   factors so every bar depends only on events up to its own date; `patterns.guard` refuses any
   read of the sealed hold-out (2024-01-01 on), except the one-shot `holdout.run`, which claims

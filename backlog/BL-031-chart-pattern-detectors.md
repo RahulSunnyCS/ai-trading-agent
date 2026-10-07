@@ -76,5 +76,5 @@ pattern predicts the next 1–6 months of market-relative return better than no 
 
 - 2026-10-06 — created from the owner's chart-pattern idea.
 - 2026-10-07 — the flag, high tight flag and cup and handle detectors are built and tested under
-  [BL-041](BL-041-chart-pattern-poc.md) (POC). This item keeps head and shoulders and the rest of
-  BL-041's pattern catalogue.
+  [BL-042](BL-042-chart-pattern-poc.md) (POC). This item keeps head and shoulders and the rest of
+  BL-042's pattern catalogue.

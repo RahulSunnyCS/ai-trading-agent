@@ -1,4 +1,4 @@
-"""BL-041 Phase 6: the one run on the sealed hold-out (bl041_criteria.json `phase_6_holdout`).
+"""BL-042 Phase 6: the one run on the sealed hold-out (bl042_criteria.json `phase_6_holdout`).
 
 Only a pattern that passed Phase 3 (not dropped in addendum 1), Phase 4 (event study) and
 Phase 5 (walk-forward and PBO) enters, with the shape Phase 5 chose for it. The run is claimed
@@ -20,8 +20,8 @@ from .. import holdout as bl010_holdout
 from . import SEARCH_SPACES, criteria
 from .run import OUT_DIR
 
-RESULT = "bl041_holdout_result.json"
-CLAIM = "bl041_holdout.claimed"
+RESULT = "bl042_holdout_result.json"
+CLAIM = "bl042_holdout.claimed"
 
 
 def entrants() -> dict[str, str]:
@@ -32,8 +32,8 @@ def entrants() -> dict[str, str]:
     if spec is None:
         raise RuntimeError("the detectors are not frozen: Phases 3-5 come before the hold-out")
     dropped = set(spec.get("dropped_patterns", []))
-    study = json.loads((SEARCH_SPACES / "bl041_event_study_result.json").read_text())
-    dev = json.loads((SEARCH_SPACES / "bl041_dev_result.json").read_text())
+    study = json.loads((SEARCH_SPACES / "bl042_event_study_result.json").read_text())
+    dev = json.loads((SEARCH_SPACES / "bl042_dev_result.json").read_text())
     return {
         pattern: shape
         for pattern, shape in dev["holdout_choice"].items()
@@ -68,7 +68,7 @@ def judge(base: pd.Series, mine: pd.Series) -> dict:
 def _claim(out_dir: Path) -> Path:
     result = SEARCH_SPACES / RESULT
     if result.exists():
-        raise RuntimeError(f"{result.name} exists: the BL-041 hold-out runs once")
+        raise RuntimeError(f"{result.name} exists: the BL-042 hold-out runs once")
     if bl010_holdout._dirty():
         raise RuntimeError("uncommitted changes to the code: commit them, then run")
     out_dir.mkdir(parents=True, exist_ok=True)

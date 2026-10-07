@@ -1,4 +1,4 @@
-"""BL-041 Phase 5: the three ways a pattern can re-rank the Broad pool (bl041_criteria.json
+"""BL-042 Phase 5: the three ways a pattern can re-rank the Broad pool (bl042_criteria.json
 `phase_5_ranking_test.shapes`), and a backtest on the result.
 
 Every shape works on `UniverseRanking.stock_pool_ranks` (week x column, dense pool rank 1..N,

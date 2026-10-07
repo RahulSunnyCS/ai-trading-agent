@@ -1,4 +1,4 @@
-"""BL-041 Phase 4: does a pattern predict returns beyond momentum? (bl041_criteria.json
+"""BL-042 Phase 4: does a pattern predict returns beyond momentum? (bl042_criteria.json
 `phase_4_event_study`)
 
 For each Friday t in the development window and each stock in the Broad pool that week: the

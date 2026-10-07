@@ -12,7 +12,7 @@
 | Message Queue / Event Bus | Redis 7 Streams — topics: `market.ticks`, `straddle.values`, `signals.generated` |
 | Background Jobs | BullMQ (Redis-backed) — EOD retrospection batch |
 | Cache | Redis 7 — sub-ms reads for price cache and personality state |
-| Frontend | Next.js 15 + React 18 + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts |
+| Frontend | Next.js 15 + React 18 + Zustand (state) + Tailwind CSS 3.x + Lightweight Charts. The in-app Guide renders Markdown with `react-markdown` + `remark-gfm` (pages in `apps/dashboard/src/guide/content`, imported `?raw`) |
 | Testing | Vitest (unit + integration) + Playwright (E2E) |
 | Market Data | Fyers WebSocket via `fyers-api-v3` SDK (untyped — TypeScript shim in `apps/server/src/types/`) |
 | Paper Trading | Quantiply API (paper trade execution tracking) |
@@ -112,11 +112,12 @@ uv run tdata reference sql "INSERT INTO ref_lot_sizes VALUES ('NIFTY', 75, DATE 
 uv run tdata backup --to /Volumes/<disk>/TradingData   # monthly; copies only new lake/raw files
 uv run tdata mount          # attach TRADING_DATA_IMAGE if the root's volume is not mounted (idempotent)
 uv run tdata vendor import --from "/Volumes/RAHUL'S SSD/Stock Market Data/parquet/options" --unit nifty  # BL-034: vendor options history -> lake (resumable; Fyers days never overwritten); import-index <csv> --symbol NIFTY for spot / INDIAVIX
+uv run tdata derived rebuild [--day D] [--force] [--check]  # 5-minute chain snapshots, straddle series, IV tables from the lake (BL-034 Phase 3; NIFTY+SENSEX)
 uv run tdata reference derive-expiries  # rebuild the real expiry list per index from the lake (prints gaps) + re-export CSVs
 uv run tdata quality rebuild  # re-judge every lake day -> data_quality (usable / excluded + why); `quality status` summarises; `quality export` rewrites the lock-free verdict file the engine reads
-uv run obt legwise run strategies/legwise/*.yaml [--trades] [--include-excluded]   # AlgoTest-style leg-wise backtests over that data; skips (and counts) days data_quality excludes
+uv run obt legwise run strategies/legwise/*.yaml [--trades] [--include-excluded] [--bars 5m]   # AlgoTest-style leg-wise backtests over that data; skips (and counts) days data_quality excludes
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
-uv run obt daily            # the evening routine: fetch the last closed session, run every strategies/legwise/*.yaml, save, summarise + Telegram (--no-telegram)
+uv run obt daily            # the evening routine: fetch the last closed session (+ nearest/next futures), judge it (data_quality), build its derived tables, run every strategies/legwise/*.yaml, save, summarise + Telegram with verdicts and IV percentile (--no-telegram)
 uv run pytest tests/golden/test_legwise_scenarios.py  # 30 frozen-input exact-output scenarios
 uv run python scripts/update-legwise-goldens.py       # check-only; --accept-results after reviewing an intentional correction
 
@@ -170,7 +171,7 @@ rule below.
 | `packages/contract-notes` | Daily Gmail → PDF → Google Sheet F&O P&L pipeline | — (leaf; Node 20/CommonJS, reimplements the `Notification` shape itself instead of importing the ESM `@trading/notify`) | none |
 | `packages/momentum-backtesting` | Python weekly momentum-rotation research tool (`mbt` CLI) | private FastAPI service (`mbt serve`) | `apps/dashboard` through Fastify's `/api/momentum/*` proxy; still no code imports from `option-backtesting` |
 | `packages/option-backtesting` | Python options-strategy backtesting engine (`obt` CLI, FastAPI, MCP) | its `data/reference/*.csv` files are read directly off disk — not imported as code — by `market-reference`'s loader (see below); since 2026-09-30 those CSVs are EXPORTED from `trading-data`'s catalog (`tdata reference export`), which is the master | `apps/server`, via the Fastify proxy over HTTP only — never imported as a package |
-| `packages/trading-data` | Python/uv: the local research database — DuckDB catalog (instruments, reference data, ingest runs, strategies, backtest results, companies/corporate actions/index+category membership, momentum's cross-instrument price series) + Parquet lake (`bars_1m_*`, `bars_1d_stock`) + raw vendor copies under `TRADING_DATA_ROOT`; `tdata init/status/backup/reference` | `db.connect`, `lake.*` paths/writers and the bars_1m schemas, `instruments.register`, `ingest.start_run/finish_run`, `quality.rebuild/verdict`, `reference.export_csvs/check` | `packages/option-backtesting` and `packages/momentum-backtesting` (both editable path dependencies) |
+| `packages/trading-data` | Python/uv: the local research database — DuckDB catalog (instruments, reference data, ingest runs, strategies, backtest results, companies/corporate actions/index+category membership, momentum's cross-instrument price series) + Parquet lake (`bars_1m_*`, `bars_1d_stock`) + raw vendor copies under `TRADING_DATA_ROOT`; `tdata init/status/backup/reference` | `db.connect`, `lake.*` paths/writers and the bars_1m schemas, `instruments.register`, `ingest.start_run/finish_run`, `quality.rebuild/verdict/excluded_days`, `derived.rebuild/build_day`, `reference.export_csvs/check` | `packages/option-backtesting` and `packages/momentum-backtesting` (both editable path dependencies) |
 | `apps/server` (`@ata/server`) | Fastify/Bun trading backend | — | `apps/dashboard` (HTTP only) |
 | `apps/scheduler` (`@ata/scheduler`) | Runs every recurring job (BL-012): registry, IST schedules, runner, SQLite run history | — | none — leaf; runs the other packages' CLIs as child processes |
 | `apps/dashboard` (`@ata/dashboard`) | Next.js/React frontend | — | none — leaf; talks to `apps/server` over HTTP only, imports no internal package |
@@ -419,6 +420,9 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
   the chart palette helpers (`lib/chartTheme.ts`) and the font setup (self-hosted `next/font/local`, IBM Plex
   Sans / Mono) are in `docs/dashboard-design-tokens.md`
+- **Guide pages stay in step with their screens** — a change to a dashboard screen's controls, labels,
+  defaults or metrics updates its page in `apps/dashboard/src/guide/content/` in the same commit; a new
+  screen or sub-section gets a page and a `guide/registry.ts` entry (conventions in `apps/dashboard/CLAUDE.md`)
 - **Dashboard display formatting lives in `apps/dashboard/src/lib/format.ts`** — components
   never call `Intl.*`, `toFixed` or `toLocaleString`. Use `formatInr`, `formatPct` (takes a
   fraction; pass `{ unit: 'percent' }` otherwise), `formatPp`, `formatNumber`, `formatDay`

@@ -1,4 +1,4 @@
-"""How well-formed a detected base is: a 0-1 grade from its own geometry (bl041 addendum 1,
+"""How well-formed a detected base is: a 0-1 grade from its own geometry (bl042 addendum 1,
 `quality`). Each component is clipped to [0, 1] and the grade is their mean. Nothing here reads a
 bar after the detection week; it only reads the geometry the detector recorded.
 """

@@ -1,4 +1,10 @@
-import { CONFIGURABLE_TABS, NAV_GROUPS, type NavGroup, type Tab } from '../components/shell/nav';
+import {
+  CONFIGURABLE_TABS,
+  NAV_GROUPS,
+  type NavGroup,
+  PINNED_TABS,
+  type Tab,
+} from '../components/shell/nav';
 
 const STORAGE_KEY = 'ata.navigation.v1';
 const CONFIGURABLE_IDS = CONFIGURABLE_TABS.map((item) => item.id);
@@ -114,7 +120,7 @@ export function visibleNavigationGroups(preferences: NavigationPreferences): Nav
   return NAV_GROUPS.map((group) => ({
     ...group,
     items: [...group.items]
-      .filter((item) => item.id === 'settings' || !hidden.has(item.id))
+      .filter((item) => PINNED_TABS.includes(item.id) || !hidden.has(item.id))
       .sort((a, b) => {
         if (a.id === 'settings') return 1;
         if (b.id === 'settings') return -1;

@@ -1,4 +1,4 @@
-"""BL-041 Phase 3: a chart gallery the owner labels Correct / Wrong / Unsure.
+"""BL-042 Phase 3: a chart gallery the owner labels Correct / Wrong / Unsure.
 
 Samples (seeded, so the same detections give the same gallery):
 

@@ -2,7 +2,7 @@
 
 A detector looks at each week's close in turn, using only bars up to that week's last day, and
 returns a `Base` for each week its rules hold (else None). `states` then turns those into the
-pre-registered states (bl041_criteria.json `states`):
+pre-registered states (bl042_criteria.json `states`):
 
 - forming: the rules hold this week;
 - near_pivot: forming, and the close is within `NEAR_PIVOT` below the pivot;

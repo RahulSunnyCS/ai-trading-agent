@@ -33,10 +33,23 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `009_ref_expiries.sql`: `ref_expiries`, every expiry each index's options actually had
     (from the lake, `tdata reference derive-expiries`; a few added by hand where the lake has
     a hole), exported as `expiries_observed.csv`; days-to-expiry reads it (BL-034 Phase 2)
+  - `010_ref_rates.sql`: `ref_rates`, the RBI repo rate from each policy decision date
+    (`rates.csv`), the risk-free rate for implied volatility (`ReferenceData.risk_free_rate`)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
   every bars_1m writer casts to (the Fyers collector imports them)
+- `lake/derived/` — tables rebuilt from bars_1m by `tdata derived rebuild` (`derived.py`,
+  BL-034 Phase 3; NIFTY and SENSEX by default): `chain_snapshots_5m` (per 5-minute window:
+  ATM±10 strikes of every expiry within 45 days — OHLC, volume, OI, spot, VIX, DTE, implied
+  forward, Black-76 IV and greeks, `iv_quality`), `straddle_series_5m` (ATM straddle at each
+  window's start and close, ATM IV, 5-step skew), `contracts_daily` (per contract per day) — one
+  file per (underlying, day) — and `iv_daily` (one file per underlying: ATM IV at 09:20/15:00
+  per expiry, 7-day constant-maturity IV, VIX, 20-day realised vol, trailing 1y/2y percentiles —
+  rank `iv_7d_1500`). Views of the same names (static placeholder columns in `db.LAKE_VIEWS`,
+  checked against the schemas by a test, so `db` never imports numpy).
+  Each file carries `derived_version` in its Parquet metadata; a rebuild redoes only missing
+  or out-of-version files. `obt legwise run --bars 5m` runs the unchanged engine on them
 - `raw/` — gzipped verbatim vendor responses
 
 A stock's identity is its literal exchange symbol at the time (one `instruments` row
@@ -80,11 +93,21 @@ table instead.
   written and regenerable with `tdata quality rebuild`; a day is never dropped from the lake
   for a bad verdict — the label says why, readers decide. Fetch timestamps from DuckDB as
   epoch seconds, not `TIMESTAMPTZ` (that import needs `pytz`, which is not a dependency).
+- **The evening run judges one day with `quality.judge_day`** (one connection, ~20 s), not
+  `rebuild(days=...)` (a connection per known name — minutes, and it waits on every one while the
+  catalog is held).
 - **Readers get verdicts from a file, not the catalog.** `quality.SNAPSHOT`
   (`$TRADING_DATA_ROOT/quality/data_quality.parquet`) is rewritten after every rebuild and vendor
   import (and by `tdata quality export`); `quality.excluded_days()` reads it without the catalog
   lock, which `mbt serve` can hold for hours. The legwise engine leaves out the days it lists
   (`legwise.market.backtest_days`; `--include-excluded` to keep them). Not backed up: regenerable.
+- **A derived 5-minute row is known at the window's END.** Row `bucket` T covers [T, T+5):
+  its `open` is the price at T exactly as the 1-minute engine sees it (that minute's open, or
+  the last earlier close); everything else is the window's, and IV/greeks/forward come from
+  its close. Nothing is carried past the last minute that has an index bar.
+  `tests/test_derived.py::test_no_window_uses_later_bars` cuts a day short and requires every
+  earlier window to be unchanged — keep it passing when changing `derived.py`, and bump
+  `DERIVED_VERSION` with any formula or column change.
 - **Partition values live in folder names only** (`asset=`, `underlying=`/`symbol=`,
   `date=`) — never repeat them as columns inside the Parquet.
 - Tests use `tmp_path` roots; never point a test at the real `~/TradingData`.
@@ -100,6 +123,7 @@ table instead.
 uv sync && uv run pytest
 uv run tdata init | status | backup --to <dir> | mount
 uv run tdata quality rebuild [--asset option] [--name NIFTY] [--days A..B] | status | export
+uv run tdata derived rebuild [--underlying NIFTY] [--day D | --days A..B] [--force] [--check]
 uv run tdata vendor import --from <staging> [--unit nifty] [--section index|stocks] [--days A..B] [--force] [--dry-run]
 uv run tdata vendor import-index <csv> --symbol NIFTY|BANKNIFTY|SENSEX|INDIAVIX [--days A..B]
 uv run tdata reference export | check | sql "<statement>" | derive-expiries

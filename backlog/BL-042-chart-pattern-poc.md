@@ -1,4 +1,4 @@
-# BL-041 — Chart-pattern POC for Momentum: tight range, flag, cup and handle
+# BL-042 — Chart-pattern POC for Momentum: tight range, flag, cup and handle
 
 | | |
 |---|---|
@@ -8,7 +8,7 @@
 | **Area** | momentum |
 | **Created** | 2026-10-07 |
 | **Depends on** | BL-015 (pre-registration). BL-035's prerequisite (BL-010 + BL-036) is overridden for this POC, see Log |
-| **TODO.md row** | [§3.19](../TODO.md) |
+| **TODO.md row** | [§3.20](../TODO.md) |
 
 ## Context
 
@@ -97,7 +97,7 @@ once on the sealed data. A guess before seeing any data:
 ### Phase 0 — Pre-register (committed before any run)
 - **Tasks:**
   - Owner reviews the catalogue above and the proposed numbers below.
-  - Commit `packages/momentum-backtesting/search_spaces/bl041_criteria.json` (the shape of
+  - Commit `packages/momentum-backtesting/search_spaces/bl042_criteria.json` (the shape of
     `bl010_criteria.json`: `written_before_running`, `rule`, `supersedes`).
   - Add the first `## Experiments` block (from `_EXPERIMENT.md`) to this file.
 - **Proposed rules** (the owner confirms or changes them before commit):
@@ -199,13 +199,13 @@ once on the sealed data. A guess before seeing any data:
     `external_ranks` / `stock_tilt_ranks` hook, so the engine's selection logic is unchanged.
   - `scripts/pattern_poc.py` runs the 21 trials and the baseline: walk-forward with a 13-week
     gap, PBO with BL-010's CSCV code, data-stamped run ids.
-- **Deliverables:** `bl041_dev_result.json`.
+- **Deliverables:** `bl042_dev_result.json`.
 - **Done when:** one variant per surviving pattern has been chosen by the Phase 0 rule, or none
   survives.
 
 ### Phase 6 — Hold-out (one run)
 - **Tasks:** run each chosen variant once on 2024-01-01 → 2026-09-25.
-- **Deliverables:** `bl041_holdout_result.json`; the Result line of the Experiments block.
+- **Deliverables:** `bl042_holdout_result.json`; the Result line of the Experiments block.
 - **Done when:** recorded, and not tuned around.
 
 ### Phase 7 — Decision
@@ -247,7 +247,7 @@ once on the sealed data. A guess before seeing any data:
   after that Friday (truncation test at three cut dates); pivots exist only from the week that
   confirmed them; highs and lows are back-adjusted by NSE prevclose chaining, and every measure is
   a ratio inside its window.
-- **Pass / kill rule:** `packages/momentum-backtesting/search_spaces/bl041_criteria.json`.
+- **Pass / kill rule:** `packages/momentum-backtesting/search_spaces/bl042_criteria.json`.
   - Gallery precision ≥ 0.75 (drop below 0.6).
   - Event study: the 13-week test survives Holm across 9 tests, mean positive, ≥ 100 events in
     ≥ 52 weeks.
@@ -275,23 +275,23 @@ once on the sealed data. A guess before seeing any data:
   `override: owner wants an early POC; research only — default ranking, favourites, goldens and
   the weekly signal untouched; BL-010/BL-036 prerequisite of BL-035 waived for this item only.`
 - 2026-10-07 — owner approved the catalogue and the proposed numbers ("Yes I am good"). Phase 0:
-  `bl041_criteria.json` and the Experiments block committed before any detection or run. Owner
+  `bl042_criteria.json` and the Experiments block committed before any detection or run. Owner
   added a check (Phase 2b): does the momentum rank fall while a 10–30 week base forms? Reported
   only, no returns read.
 - 2026-10-07 — Phases 1–2 done: `mbt patterns detect` over 1,578 point-in-time Broad symbols,
   2011-01 → 2023-12-29 (55 s; 1,378 bad bars excluded). Phase 2b recorded above. Phase 3 gallery
   published (165 charts, 40 detected + 15 near misses per pattern, seed 41):
   https://claude.ai/artifact/AmbsNx8jkNsBij43qVVBnF. The manifest is
-  `search_spaces/bl041_gallery_manifest.json`. Waiting on the owner's labels. Phases 4–5 are
-  coded and refuse to run until `bl041_criteria_addendum_1.json` (the detector freeze) exists.
+  `search_spaces/bl042_gallery_manifest.json`. Waiting on the owner's labels. Phases 4–5 are
+  coded and refuse to run until `bl042_criteria_addendum_1.json` (the detector freeze) exists.
 - 2026-10-07 — Phase 6 runner built (`mbt patterns holdout`). Only patterns that pass Phases 3,
   4 and 5 enter, each with the shape Phase 5 chose. It claims the run before reading, writes
-  `search_spaces/bl041_holdout_result.json` once and refuses a second run. **Not built yet:** the
+  `search_spaces/bl042_holdout_result.json` once and refuses a second run. **Not built yet:** the
   reported-only line for the four BL-010 frozen configs with the shape applied to
   `combined_pool_ranks` (criteria `phase_6_holdout.reported`). Add it before Phase 6 runs.
   The owner kept the trial count at 21; no wider filter/bonus shape was added.
 - 2026-10-07 — owner decisions, all before any return was computed; recorded in
-  `search_spaces/bl041_criteria_addendum_1.json` (`returns_seen: false`):
+  `search_spaces/bl042_criteria_addendum_1.json` (`returns_seen: false`):
   - **Labelling:** the owner keeps labelling the gallery. They had offered to hand it to Claude,
     and were reminded it is a shape check, not a trading call.
   - **Quality score:** each base gets a 0–1 grade from textbook shape rules, using its own
@@ -308,3 +308,7 @@ once on the sealed data. A guess before seeing any data:
     next-month result. That is answered by the walk-forward (Phase 5) and the hold-out
     (Phase 6), never by keeping whatever did best over the whole period.
   - The detector freeze moves to addendum 2.
+- 2026-10-07 — renumbered BL-041 → BL-042 (TODO §3.19 → §3.20). A separate session merged
+  "In-app Guide" to `main` as BL-041 while this item was still on its branch, and IDs are never
+  reused. Files renamed `bl041_*` → `bl042_*`. Only the ID changed: no rule or value moved, and
+  no return had been computed.

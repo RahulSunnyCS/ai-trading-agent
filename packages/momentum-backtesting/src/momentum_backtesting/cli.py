@@ -2579,7 +2579,7 @@ def sources_check() -> None:
 
 patterns_app = typer.Typer(
     no_args_is_help=True,
-    help="BL-041 chart-pattern POC (research only): detect tight ranges, flags and cups.",
+    help="BL-042 chart-pattern POC (research only): detect tight ranges, flags and cups.",
 )
 app.add_typer(patterns_app, name="patterns")
 
@@ -2620,7 +2620,7 @@ def patterns_gallery() -> None:
 @patterns_app.command("study")
 def patterns_study() -> None:
     """Phase 4: the event study on the development window. Refuses to run before the detectors
-    are frozen (a bl041 addendum with detectors_frozen: true)."""
+    are frozen (a bl042 addendum with detectors_frozen: true)."""
     from .config import load_repo_env
     from .patterns import run
 

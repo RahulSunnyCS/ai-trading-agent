@@ -1,7 +1,7 @@
 {
   "written_before_running": "2026-10-07T16:25:00+05:30",
-  "name": "BL-041 criteria, addendum 1: a quality score for each base, and two ranking shapes swapped",
-  "adds_to": "bl041_criteria.json - unchanged except where this file says",
+  "name": "BL-042 criteria, addendum 1: a quality score for each base, and two ranking shapes swapped",
+  "adds_to": "bl042_criteria.json - unchanged except where this file says",
   "rule": "Committed before any forward return is computed (Phases 4-6 have not run). Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
   "returns_seen": false,
   "reason": "Owner's decisions, 2026-10-07. (1) Phase 2b (ranks only) showed that at detection only 1-2% of bases sit in the pool's top 20; most sit around pool rank 50-150. filter_20 and bonus_5 cannot move such a stock into the top 10 the baseline buys, so they test nothing; the owner chose to swap them for filter_100 and bonus_25, keeping 7 shapes and 21 trials. (2) The owner asked for each base to be graded by how well it is formed, from textbook rules fixed before any return is read.",

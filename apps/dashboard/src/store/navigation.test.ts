@@ -34,7 +34,20 @@ describe('navigation preferences', () => {
 
     expect(ids).not.toContain('live');
     expect(ids).not.toContain('pricing');
-    expect(ids.at(-1)).toBe('settings');
+    expect(ids.at(-2)).toBe('settings');
+  });
+
+  it('never lets the Guide be hidden or reordered away', () => {
+    const preferences = normalizeNavigationPreferences({
+      hidden: ['guide', 'settings'],
+      order: ['guide', 'overview'],
+    });
+    expect(preferences.hidden).toEqual([]);
+    expect(preferences.order as string[]).not.toContain('guide');
+    const ids = visibleNavigationGroups(preferences).flatMap((group) =>
+      group.items.map((item) => item.id),
+    );
+    expect(ids.at(-1)).toBe('guide');
   });
 
   it('reorders a tab before its drop target', () => {
@@ -109,6 +122,7 @@ describe('navigation preferences', () => {
       ['momentum', ['momentum']],
       ['data', ['coverage', 'jobs']],
       ['account', ['brokerLogins', 'settings']],
+      ['help', ['guide']],
     ]);
     // Overview is the landing tab even for a browser whose stored order began with another.
     expect(firstVisibleTab(preferences)).toBe('overview');
@@ -180,6 +194,7 @@ describe('navigation preferences', () => {
       'optionslab',
       'momentum',
       'account',
+      'help',
     ]);
   });
 

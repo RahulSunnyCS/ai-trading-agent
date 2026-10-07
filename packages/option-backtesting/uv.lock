@@ -1063,6 +1063,7 @@ version = "0.1.0"
 source = { editable = "../trading-data" }
 dependencies = [
     { name = "duckdb" },
+    { name = "numpy" },
     { name = "pyarrow" },
     { name = "typer" },
 ]
@@ -1070,6 +1071,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "duckdb", specifier = ">=1.1" },
+    { name = "numpy", specifier = ">=1.26" },
     { name = "pyarrow", specifier = ">=17.0" },
     { name = "typer", specifier = ">=0.13" },
 ]

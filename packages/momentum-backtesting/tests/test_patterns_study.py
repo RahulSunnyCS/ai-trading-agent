@@ -1,4 +1,4 @@
-"""BL-041 Phases 4-5: ranking shapes and the event-study statistics."""
+"""BL-042 Phases 4-5: ranking shapes and the event-study statistics."""
 
 from __future__ import annotations
 
@@ -104,15 +104,15 @@ def test_holdout_entrants_need_all_three_passes(tmp_path, monkeypatch):
     monkeypatch.setattr(holdout, "SEARCH_SPACES", tmp_path)
     monkeypatch.setattr(patterns, "SEARCH_SPACES", tmp_path)
     _write(
-        tmp_path / "bl041_criteria_addendum_2.json",
+        tmp_path / "bl042_criteria_addendum_2.json",
         {"detectors_frozen": True, "dropped_patterns": ["cup_handle"]},
     )
     _write(
-        tmp_path / "bl041_event_study_result.json",
+        tmp_path / "bl042_event_study_result.json",
         {"verdicts": {"tight_range": "pass", "flag": "kill", "cup_handle": "pass"}},
     )
     _write(
-        tmp_path / "bl041_dev_result.json",
+        tmp_path / "bl042_dev_result.json",
         {
             "verdicts": {"tight_range": "pass", "flag": "pass", "cup_handle": "pass"},
             "holdout_choice": {

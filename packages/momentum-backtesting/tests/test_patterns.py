@@ -1,4 +1,4 @@
-"""BL-041 pattern detectors: adjustment, causal pivots, the three shapes, and no look-ahead."""
+"""BL-042 pattern detectors: adjustment, causal pivots, the three shapes, and no look-ahead."""
 
 from __future__ import annotations
 

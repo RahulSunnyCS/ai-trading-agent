@@ -1,8 +1,8 @@
 {
   "written_before_running": "2026-10-07T11:20:00+05:30",
-  "name": "BL-041 chart-pattern POC: detectors, tests and pass/kill thresholds",
-  "source": "backlog/BL-041-chart-pattern-poc.md - the plan; this file is the machine-readable copy of its rules",
-  "rule": "Committed before any BL-041 detection, event study or backtest. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason. Detector thresholds are frozen in bl041_criteria_addendum_1.json after the gallery check and before Phase 4.",
+  "name": "BL-042 chart-pattern POC: detectors, tests and pass/kill thresholds",
+  "source": "backlog/BL-042-chart-pattern-poc.md - the plan; this file is the machine-readable copy of its rules",
+  "rule": "Committed before any BL-042 detection, event study or backtest. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason. Detector thresholds are frozen in bl042_criteria_addendum_1.json after the gallery check and before Phase 4.",
   "supersedes": null,
   "owner_approved": "2026-10-07, in the session that wrote the plan ('Yes I am good. Continue')",
   "patterns_tested": ["tight_range", "flag", "cup_handle"],

@@ -1,4 +1,4 @@
-"""BL-041 runs over real data: detections for the development window.
+"""BL-042 runs over real data: detections for the development window.
 
 Writes under `data/patterns/` (gitignored with the rest of `data/`).
 """
@@ -99,7 +99,7 @@ def _frozen_spec() -> dict:
     spec = frozen()
     if spec is None:
         raise RuntimeError(
-            "no bl041 addendum has detectors_frozen: true: Phase 3 (the gallery check) must "
+            "no bl042 addendum has detectors_frozen: true: Phase 3 (the gallery check) must "
             "freeze the detectors before Phases 4-5 read any return"
         )
     return spec
@@ -134,7 +134,7 @@ def _column_tables(ranking, detections: pd.DataFrame) -> dict[str, dict[str, pd.
 
 
 def event_study(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
-    """Phase 4 on the development window -> search_spaces/bl041_event_study_result.json."""
+    """Phase 4 on the development window -> search_spaces/bl042_event_study_result.json."""
     import json
 
     from . import SEARCH_SPACES, study
@@ -151,7 +151,7 @@ def event_study(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
         {p: t["state"] for p, t in tables.items()},
         quality={p: t["quality"] for p, t in tables.items()},
     )
-    path = SEARCH_SPACES / "bl041_event_study_result.json"
+    path = SEARCH_SPACES / "bl042_event_study_result.json"
     path.write_text(json.dumps(report, indent=1, default=str))
     for row in report["tests"]:
         echo(
@@ -165,7 +165,7 @@ def event_study(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
 
 def ranking_test(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
     """Phase 5 on the development window: baseline + every shape x pattern, walk-forward pick,
-    PBO -> search_spaces/bl041_dev_result.json (curves in data/patterns/)."""
+    PBO -> search_spaces/bl042_dev_result.json (curves in data/patterns/)."""
     import json
 
     import numpy as np
@@ -243,7 +243,7 @@ def ranking_test(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
         "verdicts": verdicts,
         "holdout_choice": holdout_choice,
     }
-    path = SEARCH_SPACES / "bl041_dev_result.json"
+    path = SEARCH_SPACES / "bl042_dev_result.json"
     path.write_text(json.dumps(report, indent=1, default=str))
     echo(json.dumps({"joined": joined, "pbo": pbo["pbo"], "verdicts": verdicts}, indent=1))
     echo(f"-> {path}")

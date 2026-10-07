@@ -1,4 +1,5 @@
 import { Menu } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { PendingInfo } from '../ui/PendingInfo';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -11,13 +12,15 @@ interface TopbarProps {
   pending: string[];
   /** Opens the mobile nav drawer (button only shown below lg). */
   onOpenMenu: () => void;
+  /** The "How this works" link to the active screen's guide page, when it has one. */
+  help?: ReactNode;
 }
 
 /**
  * Sticky page header: mobile menu trigger + current view title on the left,
- * live system status + theme toggle on the right.
+ * the screen's guide link, live system status + theme toggle on the right.
  */
-export function Topbar({ title, subtitle, pending, onOpenMenu }: TopbarProps) {
+export function Topbar({ title, subtitle, pending, onOpenMenu, help }: TopbarProps) {
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-background/85 px-4 backdrop-blur sm:px-6">
       <button
@@ -38,6 +41,7 @@ export function Topbar({ title, subtitle, pending, onOpenMenu }: TopbarProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        {help}
         <SystemStatus />
         <ThemeToggle />
       </div>
