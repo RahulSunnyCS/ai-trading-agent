@@ -38,6 +38,25 @@ signal all read it. `api.py` is split by feature with no behaviour change.
 - **Deliverables:** smaller modules, same routes.
 - **Done when:** the API tests pass unchanged and no module exceeds about 600 lines.
 
+### Phase 3 — Data cache, CLI split, research modules (added 2026-10-07 from the whole-repo audit)
+- **Tasks:**
+  - `_Data` in `api.py` (3,229 lines by now): run the loaders `get()`, `get_stock()`, `fills()`
+    and `references()` outside the single global `_Data._lock`, so one reload stops stalling
+    every other request. Lock only the swap.
+  - Bound `fill_tables` with an LRU.
+  - `api.py` imports the 2,665-line `cli.py` just to run `stocks_sync`. Move that function into a
+    module that both of them import.
+  - Split `cli.py` by sub-app.
+  - Move the CLI-only research modules (BL-010 records: `audit/*`, `phase5`, `phase6`, `robust`,
+    `final`, `rescore`, `steady`, `pit_rerun`, `category_shuffle`, `holdout`, `choose`, `bias`,
+    `method`, `tracker`, `sweep`; plus `tranches.py`, `reversal.py` and the 1 Oct experiment
+    scripts, which the owner chose to keep on 2026-10-07) into a `research/` sub-package. Moved,
+    not deleted.
+  - `patterns/` (BL-042/BL-043) reaches into `api.DATA`, `api.DATA_DIR` and the private
+    `holdout._dirty()`/`_commit()`. Give it a public data accessor and public holdout functions.
+- **Done when:** `api.py` doesn't import `cli`; no module outside `api/` reads `api.DATA`;
+  goldens are unchanged.
+
 ## Risks
 
 - A refactor during BL-010 changes results silently. Run BL-001's goldens before and after.
@@ -51,3 +70,5 @@ signal all read it. `api.py` is split by feature with no behaviour change.
 
 - 2026-10-06 — created from the codebase review.
 - 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: Pydantic. Status Ready (still after BL-010 Phase 1).
+- 2026-10-07: Phase 3 added from the whole-repo audit (data-cache lock, CLI split, `research/`
+  sub-package, the `patterns/` coupling).
