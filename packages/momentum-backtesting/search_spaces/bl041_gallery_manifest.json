@@ -1,0 +1,2921 @@
+{
+ "seed": 41,
+ "loosen": 1.3,
+ "items": [
+  {
+   "id": "s001",
+   "symbol": "CHAMBLFERT",
+   "week": "2019-01-25",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2018-08-27",
+   "geometry": {
+    "bottom": "2018-10-12",
+    "cup_weeks": 20,
+    "depth": 0.2672,
+    "handle_depth": 0.0803,
+    "handle_weeks": 1,
+    "left_lip": "2018-08-31",
+    "prior_advance": 0.387,
+    "right_lip": "2019-01-18",
+    "right_vs_left": -0.0092
+   }
+  },
+  {
+   "id": "s002",
+   "symbol": "FKONCO",
+   "week": "2013-01-11",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-11-27",
+   "geometry": {
+    "drop_from_pole_high": 0.0596,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.497,
+    "pole_days": 25,
+    "pole_rise": 0.2901,
+    "pole_top": "2013-01-03",
+    "retrace_of_pole": 0.265
+   }
+  },
+  {
+   "id": "s003",
+   "symbol": "HIKAL",
+   "week": "2014-01-17",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-11-25",
+   "geometry": {
+    "range": 0.0733,
+    "range_vs_own_median": 0.473,
+    "volume_10d_vs_50d": 1.177,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s004",
+   "symbol": "TEXRAIL",
+   "week": "2012-12-07",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-10-15",
+   "geometry": {
+    "range": 0.1207,
+    "range_vs_own_median": 0.401,
+    "volume_10d_vs_50d": 0.502,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s005",
+   "symbol": "CANTABIL",
+   "week": "2021-11-12",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2021-09-08",
+   "geometry": {
+    "drop_from_pole_high": 0.1125,
+    "flag_days": 20,
+    "flag_vs_pole_volume": 0.04,
+    "pole_days": 24,
+    "pole_rise": 0.5822,
+    "pole_top": "2021-10-13",
+    "retrace_of_pole": 0.306
+   }
+  },
+  {
+   "id": "s006",
+   "symbol": "CLNINDIA",
+   "week": "2020-01-17",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2019-12-11",
+   "geometry": {
+    "drop_from_pole_high": 0.0648,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.369,
+    "pole_days": 21,
+    "pole_rise": 0.384,
+    "pole_top": "2020-01-10",
+    "retrace_of_pole": 0.234
+   }
+  },
+  {
+   "id": "s007",
+   "symbol": "SCI",
+   "week": "2017-04-28",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2017-03-15",
+   "geometry": {
+    "drop_from_pole_high": 0.0715,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.908,
+    "pole_days": 25,
+    "pole_rise": 0.3437,
+    "pole_top": "2017-04-21",
+    "retrace_of_pole": 0.279
+   }
+  },
+  {
+   "id": "s008",
+   "symbol": "HBLPOWER",
+   "week": "2020-10-16",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2020-09-14",
+   "geometry": {
+    "range": 0.1277,
+    "range_vs_own_median": 0.547,
+    "volume_10d_vs_50d": 0.349,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s009",
+   "symbol": "BHARATFORG",
+   "week": "2021-07-23",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2021-06-18",
+   "geometry": {
+    "drop_from_pole_high": 0.0548,
+    "flag_days": 7,
+    "flag_vs_pole_volume": 0.416,
+    "pole_days": 17,
+    "pole_rise": 0.1775,
+    "pole_top": "2021-07-13",
+    "retrace_of_pole": 0.364
+   }
+  },
+  {
+   "id": "s010",
+   "symbol": "TBZ",
+   "week": "2012-12-07",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-10-29",
+   "geometry": {
+    "drop_from_pole_high": 0.1202,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.214,
+    "pole_days": 21,
+    "pole_rise": 0.6937,
+    "pole_top": "2012-11-29",
+    "retrace_of_pole": 0.293
+   }
+  },
+  {
+   "id": "s011",
+   "symbol": "ALKYLAMINE",
+   "week": "2013-12-20",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-10-23",
+   "geometry": {
+    "drop_from_pole_high": 0.0979,
+    "flag_days": 8,
+    "flag_vs_pole_volume": 0.154,
+    "pole_days": 25,
+    "pole_rise": 0.5301,
+    "pole_top": "2013-12-10",
+    "retrace_of_pole": 0.283
+   }
+  },
+  {
+   "id": "s012",
+   "symbol": "WHEELS",
+   "week": "2018-08-10",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2018-07-09",
+   "geometry": {
+    "range": 0.0972,
+    "range_vs_own_median": 0.63,
+    "volume_10d_vs_50d": 0.425,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s013",
+   "symbol": "SHK",
+   "week": "2021-10-15",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2021-09-27",
+   "geometry": {
+    "range": 0.0992,
+    "range_vs_own_median": 0.571,
+    "volume_10d_vs_50d": 0.688,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s014",
+   "symbol": "PAGEIND",
+   "week": "2017-11-24",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2017-10-12",
+   "geometry": {
+    "drop_from_pole_high": 0.1086,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.893,
+    "pole_days": 24,
+    "pole_rise": 0.3373,
+    "pole_top": "2017-11-16",
+    "retrace_of_pole": 0.43
+   }
+  },
+  {
+   "id": "s015",
+   "symbol": "NATHBIOGEN",
+   "week": "2018-04-20",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2018-01-22",
+   "geometry": {
+    "bottom": "2018-03-23",
+    "cup_weeks": 11,
+    "depth": 0.3086,
+    "handle_depth": 0.087,
+    "handle_weeks": 1,
+    "left_lip": "2018-01-25",
+    "prior_advance": 2.968,
+    "right_lip": "2018-04-13",
+    "right_vs_left": 0.0168
+   }
+  },
+  {
+   "id": "s016",
+   "symbol": "VESUVIUS",
+   "week": "2015-12-18",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-04-20",
+   "geometry": {
+    "bottom": "2015-08-28",
+    "cup_weeks": 33,
+    "depth": 0.2349,
+    "handle_depth": 0.0592,
+    "handle_weeks": 1,
+    "left_lip": "2015-04-24",
+    "prior_advance": 0.61,
+    "right_lip": "2015-12-11",
+    "right_vs_left": -0.0407
+   }
+  },
+  {
+   "id": "s017",
+   "symbol": "PAISALO",
+   "week": "2023-01-20",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2023-01-02",
+   "geometry": {
+    "range": 0.0443,
+    "range_vs_own_median": 0.254,
+    "volume_10d_vs_50d": 0.576,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s018",
+   "symbol": "TEAMLEASE",
+   "week": "2018-06-29",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2018-04-30",
+   "geometry": {
+    "bottom": "2018-05-25",
+    "cup_weeks": 7,
+    "depth": 0.1899,
+    "handle_depth": 0.1299,
+    "handle_weeks": 1,
+    "left_lip": "2018-05-04",
+    "prior_advance": 2.023,
+    "right_lip": "2018-06-22",
+    "right_vs_left": 0.0408
+   }
+  },
+  {
+   "id": "s019",
+   "symbol": "APOLLOHOSP",
+   "week": "2020-08-21",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2020-07-06",
+   "geometry": {
+    "drop_from_pole_high": 0.0736,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.633,
+    "pole_days": 25,
+    "pole_rise": 0.3014,
+    "pole_top": "2020-08-10",
+    "retrace_of_pole": 0.318
+   }
+  },
+  {
+   "id": "s020",
+   "symbol": "MCX",
+   "week": "2019-09-06",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2018-07-30",
+   "geometry": {
+    "bottom": "2019-02-22",
+    "cup_weeks": 56,
+    "depth": 0.2865,
+    "handle_depth": 0.1506,
+    "handle_weeks": 1,
+    "left_lip": "2018-08-03",
+    "prior_advance": 0.356,
+    "right_lip": "2019-08-30",
+    "right_vs_left": 0.0887
+   }
+  },
+  {
+   "id": "s021",
+   "symbol": "KCPSUGIND",
+   "week": "2022-11-25",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2022-07-18",
+   "geometry": {
+    "bottom": "2022-09-02",
+    "cup_weeks": 17,
+    "depth": 0.1452,
+    "handle_depth": 0.1027,
+    "handle_weeks": 1,
+    "left_lip": "2022-07-22",
+    "prior_advance": 0.303,
+    "right_lip": "2022-11-18",
+    "right_vs_left": 0.0913
+   }
+  },
+  {
+   "id": "s022",
+   "symbol": "TI",
+   "week": "2023-05-26",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2023-04-20",
+   "geometry": {
+    "drop_from_pole_high": 0.0788,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.592,
+    "pole_days": 20,
+    "pole_rise": 0.4244,
+    "pole_top": "2023-05-19",
+    "retrace_of_pole": 0.264
+   }
+  },
+  {
+   "id": "s023",
+   "symbol": "CENTUM",
+   "week": "2023-12-08",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2023-11-06",
+   "geometry": {
+    "range": 0.1136,
+    "range_vs_own_median": 0.436,
+    "volume_10d_vs_50d": 0.923,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s024",
+   "symbol": "HEG",
+   "week": "2016-08-12",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2015-12-28",
+   "geometry": {
+    "bottom": "2016-02-19",
+    "cup_weeks": 31,
+    "depth": 0.3806,
+    "handle_depth": 0.1913,
+    "handle_weeks": 1,
+    "left_lip": "2016-01-01",
+    "prior_advance": 0.383,
+    "right_lip": "2016-08-05",
+    "right_vs_left": 0.0558
+   }
+  },
+  {
+   "id": "s025",
+   "symbol": "IRB",
+   "week": "2012-02-24",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2011-07-18",
+   "geometry": {
+    "bottom": "2012-01-07",
+    "cup_weeks": 30,
+    "depth": 0.3708,
+    "handle_depth": 0.1777,
+    "handle_weeks": 1,
+    "left_lip": "2011-07-22",
+    "prior_advance": 0.336,
+    "right_lip": "2012-02-17",
+    "right_vs_left": 0.0856
+   }
+  },
+  {
+   "id": "s026",
+   "symbol": "KAMATHOTEL",
+   "week": "2022-04-01",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2021-10-11",
+   "geometry": {
+    "bottom": "2021-12-24",
+    "cup_weeks": 23,
+    "depth": 0.4036,
+    "handle_depth": 0.1047,
+    "handle_weeks": 1,
+    "left_lip": "2021-10-14",
+    "prior_advance": 1.744,
+    "right_lip": "2022-03-25",
+    "right_vs_left": 0.0066
+   }
+  },
+  {
+   "id": "s027",
+   "symbol": "CAPLIPOINT",
+   "week": "2017-11-10",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2017-10-09",
+   "geometry": {
+    "range": 0.094,
+    "range_vs_own_median": 0.377,
+    "volume_10d_vs_50d": 0.63,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s028",
+   "symbol": "ORIENTABRA",
+   "week": "2013-01-04",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-09-24",
+   "geometry": {
+    "bottom": "2012-10-26",
+    "cup_weeks": 13,
+    "depth": 0.1566,
+    "handle_depth": 0.0865,
+    "handle_weeks": 1,
+    "left_lip": "2012-09-28",
+    "prior_advance": 0.523,
+    "right_lip": "2012-12-28",
+    "right_vs_left": 0.0505
+   }
+  },
+  {
+   "id": "s029",
+   "symbol": "NH",
+   "week": "2017-01-06",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-12-05",
+   "geometry": {
+    "range": 0.0536,
+    "range_vs_own_median": 0.372,
+    "volume_10d_vs_50d": 0.604,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s030",
+   "symbol": "PGIL",
+   "week": "2014-10-03",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2014-08-25",
+   "geometry": {
+    "drop_from_pole_high": 0.0531,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.912,
+    "pole_days": 20,
+    "pole_rise": 0.4483,
+    "pole_top": "2014-09-23",
+    "retrace_of_pole": 0.172
+   }
+  },
+  {
+   "id": "s031",
+   "symbol": "SWANENERGY",
+   "week": "2023-09-08",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2023-03-06",
+   "geometry": {
+    "bottom": "2023-03-31",
+    "cup_weeks": 25,
+    "depth": 0.3612,
+    "handle_depth": 0.0804,
+    "handle_weeks": 1,
+    "left_lip": "2023-03-10",
+    "prior_advance": 0.93,
+    "right_lip": "2023-09-01",
+    "right_vs_left": 0.0534
+   }
+  },
+  {
+   "id": "s032",
+   "symbol": "ITC",
+   "week": "2017-04-21",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2017-03-20",
+   "geometry": {
+    "range": 0.0645,
+    "range_vs_own_median": 0.584,
+    "volume_10d_vs_50d": 0.615,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s033",
+   "symbol": "VGUARD",
+   "week": "2014-05-30",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2013-08-05",
+   "geometry": {
+    "bottom": "2014-03-07",
+    "cup_weeks": 41,
+    "depth": 0.2881,
+    "handle_depth": 0.0633,
+    "handle_weeks": 1,
+    "left_lip": "2013-08-08",
+    "prior_advance": 0.795,
+    "right_lip": "2014-05-23",
+    "right_vs_left": 0.0534
+   }
+  },
+  {
+   "id": "s034",
+   "symbol": "RBLBANK",
+   "week": "2019-04-05",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2019-02-20",
+   "geometry": {
+    "drop_from_pole_high": 0.0649,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.373,
+    "pole_days": 25,
+    "pole_rise": 0.2649,
+    "pole_top": "2019-03-29",
+    "retrace_of_pole": 0.31
+   }
+  },
+  {
+   "id": "s035",
+   "symbol": "WABAG",
+   "week": "2013-09-20",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-02-25",
+   "geometry": {
+    "bottom": "2013-08-02",
+    "cup_weeks": 28,
+    "depth": 0.32,
+    "handle_depth": 0.0542,
+    "handle_weeks": 1,
+    "left_lip": "2013-03-01",
+    "prior_advance": 0.486,
+    "right_lip": "2013-09-13",
+    "right_vs_left": -0.0984
+   }
+  },
+  {
+   "id": "s036",
+   "symbol": "DCBBANK",
+   "week": "2015-10-09",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-08-25",
+   "geometry": {
+    "drop_from_pole_high": 0.0593,
+    "flag_days": 7,
+    "flag_vs_pole_volume": 0.807,
+    "pole_days": 23,
+    "pole_rise": 0.3159,
+    "pole_top": "2015-09-29",
+    "retrace_of_pole": 0.247
+   }
+  },
+  {
+   "id": "s037",
+   "symbol": "VBL",
+   "week": "2020-12-04",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2020-02-03",
+   "geometry": {
+    "bottom": "2020-03-27",
+    "cup_weeks": 42,
+    "depth": 0.4327,
+    "handle_depth": 0.1106,
+    "handle_weeks": 1,
+    "left_lip": "2020-02-07",
+    "prior_advance": 0.735,
+    "right_lip": "2020-11-27",
+    "right_vs_left": 0.0871
+   }
+  },
+  {
+   "id": "s038",
+   "symbol": "IRCON",
+   "week": "2021-02-19",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2020-08-03",
+   "geometry": {
+    "bottom": "2020-10-16",
+    "cup_weeks": 27,
+    "depth": 0.2637,
+    "handle_depth": 0.1488,
+    "handle_weeks": 1,
+    "left_lip": "2020-08-07",
+    "prior_advance": 0.703,
+    "right_lip": "2021-02-12",
+    "right_vs_left": 0.0982
+   }
+  },
+  {
+   "id": "s039",
+   "symbol": "HEXAWARE",
+   "week": "2012-01-27",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2012-01-09",
+   "geometry": {
+    "range": 0.0929,
+    "range_vs_own_median": 0.59,
+    "volume_10d_vs_50d": 0.952,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s040",
+   "symbol": "WINDMACHIN",
+   "week": "2015-11-06",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2015-09-18",
+   "geometry": {
+    "drop_from_pole_high": 0.1781,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.511,
+    "pole_days": 23,
+    "pole_rise": 0.7217,
+    "pole_top": "2015-10-26",
+    "retrace_of_pole": 0.425
+   }
+  },
+  {
+   "id": "s041",
+   "symbol": "MARG",
+   "week": "2013-09-27",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2013-08-07",
+   "geometry": {
+    "drop_from_pole_high": 0.1061,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.351,
+    "pole_days": 25,
+    "pole_rise": 0.37,
+    "pole_top": "2013-09-16",
+    "retrace_of_pole": 0.393
+   }
+  },
+  {
+   "id": "s042",
+   "symbol": "3MINDIA",
+   "week": "2015-04-03",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-03-02",
+   "geometry": {
+    "range": 0.0748,
+    "range_vs_own_median": 0.441,
+    "volume_10d_vs_50d": 1.808,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s043",
+   "symbol": "BALKRISIND",
+   "week": "2015-01-23",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2014-12-17",
+   "geometry": {
+    "drop_from_pole_high": 0.0596,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.379,
+    "pole_days": 20,
+    "pole_rise": 0.2658,
+    "pole_top": "2015-01-15",
+    "retrace_of_pole": 0.284
+   }
+  },
+  {
+   "id": "s044",
+   "symbol": "CHOLAHLDNG",
+   "week": "2021-05-14",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2021-04-12",
+   "geometry": {
+    "range": 0.0909,
+    "range_vs_own_median": 0.414,
+    "volume_10d_vs_50d": 0.735,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s045",
+   "symbol": "RANBAXY",
+   "week": "2012-09-14",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-05-21",
+   "geometry": {
+    "bottom": "2012-06-15",
+    "cup_weeks": 15,
+    "depth": 0.1255,
+    "handle_depth": 0.0681,
+    "handle_weeks": 1,
+    "left_lip": "2012-05-25",
+    "prior_advance": 0.471,
+    "right_lip": "2012-09-08",
+    "right_vs_left": 0.0758
+   }
+  },
+  {
+   "id": "s046",
+   "symbol": "NEWGEN",
+   "week": "2021-04-02",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2021-03-01",
+   "geometry": {
+    "range": 0.1187,
+    "range_vs_own_median": 0.494,
+    "volume_10d_vs_50d": 0.478,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s047",
+   "symbol": "ANDHRSUGAR",
+   "week": "2021-06-04",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2021-03-31",
+   "geometry": {
+    "drop_from_pole_high": 0.1229,
+    "flag_days": 18,
+    "flag_vs_pole_volume": 0.383,
+    "pole_days": 25,
+    "pole_rise": 0.5998,
+    "pole_top": "2021-05-10",
+    "retrace_of_pole": 0.328
+   }
+  },
+  {
+   "id": "s048",
+   "symbol": "HESTERBIO",
+   "week": "2016-04-29",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-04-11",
+   "geometry": {
+    "range": 0.061,
+    "range_vs_own_median": 0.299,
+    "volume_10d_vs_50d": 0.44,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s049",
+   "symbol": "OFSS",
+   "week": "2013-09-06",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-01-21",
+   "geometry": {
+    "bottom": "2013-05-24",
+    "cup_weeks": 31,
+    "depth": 0.3006,
+    "handle_depth": 0.0316,
+    "handle_weeks": 1,
+    "left_lip": "2013-01-25",
+    "prior_advance": 0.741,
+    "right_lip": "2013-08-30",
+    "right_vs_left": -0.0961
+   }
+  },
+  {
+   "id": "s050",
+   "symbol": "VALECHAENG",
+   "week": "2016-03-25",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2016-02-12",
+   "geometry": {
+    "drop_from_pole_high": 0.1356,
+    "flag_days": 13,
+    "flag_vs_pole_volume": 0.199,
+    "pole_days": 14,
+    "pole_rise": 0.4721,
+    "pole_top": "2016-03-03",
+    "retrace_of_pole": 0.423
+   }
+  },
+  {
+   "id": "s051",
+   "symbol": "VALECHAENG",
+   "week": "2016-07-22",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-02-15",
+   "geometry": {
+    "bottom": "2016-06-10",
+    "cup_weeks": 21,
+    "depth": 0.3236,
+    "handle_depth": 0.0928,
+    "handle_weeks": 1,
+    "left_lip": "2016-02-19",
+    "prior_advance": 0.545,
+    "right_lip": "2016-07-15",
+    "right_vs_left": -0.0417
+   }
+  },
+  {
+   "id": "s052",
+   "symbol": "CENTRALBK",
+   "week": "2015-08-07",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2015-07-20",
+   "geometry": {
+    "range": 0.0618,
+    "range_vs_own_median": 0.502,
+    "volume_10d_vs_50d": 0.667,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s053",
+   "symbol": "IOB",
+   "week": "2019-01-11",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2018-12-24",
+   "geometry": {
+    "range": 0.0481,
+    "range_vs_own_median": 0.326,
+    "volume_10d_vs_50d": 0.961,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s054",
+   "symbol": "SHILPAMED",
+   "week": "2014-07-18",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2014-04-28",
+   "geometry": {
+    "bottom": "2014-05-23",
+    "cup_weeks": 10,
+    "depth": 0.1453,
+    "handle_depth": 0.1044,
+    "handle_weeks": 1,
+    "left_lip": "2014-05-02",
+    "prior_advance": 2.371,
+    "right_lip": "2014-07-11",
+    "right_vs_left": 0.0657
+   }
+  },
+  {
+   "id": "s055",
+   "symbol": "VBL",
+   "week": "2023-03-31",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2023-02-27",
+   "geometry": {
+    "range": 0.0924,
+    "range_vs_own_median": 0.474,
+    "volume_10d_vs_50d": 0.947,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s056",
+   "symbol": "IBVENTURES",
+   "week": "2018-09-07",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2018-07-20",
+   "geometry": {
+    "drop_from_pole_high": 0.1129,
+    "flag_days": 8,
+    "flag_vs_pole_volume": 0.637,
+    "pole_days": 25,
+    "pole_rise": 0.6562,
+    "pole_top": "2018-08-28",
+    "retrace_of_pole": 0.285
+   }
+  },
+  {
+   "id": "s057",
+   "symbol": "FCL",
+   "week": "2023-09-22",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2023-06-05",
+   "geometry": {
+    "bottom": "2023-07-14",
+    "cup_weeks": 14,
+    "depth": 0.1812,
+    "handle_depth": 0.1141,
+    "handle_weeks": 1,
+    "left_lip": "2023-06-09",
+    "prior_advance": 1.092,
+    "right_lip": "2023-09-15",
+    "right_vs_left": 0.0848
+   }
+  },
+  {
+   "id": "s058",
+   "symbol": "OAL",
+   "week": "2021-05-07",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2021-03-25",
+   "geometry": {
+    "drop_from_pole_high": 0.1435,
+    "flag_days": 7,
+    "flag_vs_pole_volume": 0.75,
+    "pole_days": 20,
+    "pole_rise": 0.8529,
+    "pole_top": "2021-04-28",
+    "retrace_of_pole": 0.312
+   }
+  },
+  {
+   "id": "s059",
+   "symbol": "ZEELEARN",
+   "week": "2013-12-20",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-11-18",
+   "geometry": {
+    "range": 0.0993,
+    "range_vs_own_median": 0.403,
+    "volume_10d_vs_50d": 0.486,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s060",
+   "symbol": "NCC",
+   "week": "2012-12-28",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-11-20",
+   "geometry": {
+    "drop_from_pole_high": 0.0923,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.722,
+    "pole_days": 21,
+    "pole_rise": 0.3968,
+    "pole_top": "2012-12-20",
+    "retrace_of_pole": 0.325
+   }
+  },
+  {
+   "id": "s061",
+   "symbol": "SUMEETINDS",
+   "week": "2012-10-26",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-08-31",
+   "geometry": {
+    "drop_from_pole_high": 0.0625,
+    "flag_days": 15,
+    "flag_vs_pole_volume": 0.409,
+    "pole_days": 23,
+    "pole_rise": 0.3746,
+    "pole_top": "2012-10-04",
+    "retrace_of_pole": 0.229
+   }
+  },
+  {
+   "id": "s062",
+   "symbol": "ZUARI",
+   "week": "2014-11-21",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2014-09-26",
+   "geometry": {
+    "drop_from_pole_high": 0.113,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.415,
+    "pole_days": 24,
+    "pole_rise": 0.6076,
+    "pole_top": "2014-11-10",
+    "retrace_of_pole": 0.299
+   }
+  },
+  {
+   "id": "s063",
+   "symbol": "KOLTEPATIL",
+   "week": "2012-04-20",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2012-04-02",
+   "geometry": {
+    "range": 0.0851,
+    "range_vs_own_median": 0.444,
+    "volume_10d_vs_50d": 0.491,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s064",
+   "symbol": "SRF",
+   "week": "2019-09-20",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2019-08-19",
+   "geometry": {
+    "range": 0.1014,
+    "range_vs_own_median": 0.586,
+    "volume_10d_vs_50d": 0.749,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s065",
+   "symbol": "RELINFRA",
+   "week": "2021-10-08",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2021-06-14",
+   "geometry": {
+    "bottom": "2021-08-27",
+    "cup_weeks": 15,
+    "depth": 0.4523,
+    "handle_depth": 0.1645,
+    "handle_weeks": 1,
+    "left_lip": "2021-06-18",
+    "prior_advance": 4.516,
+    "right_lip": "2021-10-01",
+    "right_vs_left": 0.085
+   }
+  },
+  {
+   "id": "s066",
+   "symbol": "ORIENTREF",
+   "week": "2020-11-06",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2020-09-14",
+   "geometry": {
+    "range": 0.1379,
+    "range_vs_own_median": 0.49,
+    "volume_10d_vs_50d": 1.19,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s067",
+   "symbol": "SELAN",
+   "week": "2013-11-01",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2012-12-10",
+   "geometry": {
+    "bottom": "2013-05-17",
+    "cup_weeks": 45,
+    "depth": 0.4169,
+    "handle_depth": 0.0743,
+    "handle_weeks": 1,
+    "left_lip": "2012-12-14",
+    "prior_advance": 0.504,
+    "right_lip": "2013-10-25",
+    "right_vs_left": -0.0474
+   }
+  },
+  {
+   "id": "s068",
+   "symbol": "SBILIFE",
+   "week": "2020-12-25",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2020-11-23",
+   "geometry": {
+    "range": 0.0639,
+    "range_vs_own_median": 0.47,
+    "volume_10d_vs_50d": 1.121,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s069",
+   "symbol": "DEEPAKNTR",
+   "week": "2017-09-08",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2017-08-11",
+   "geometry": {
+    "drop_from_pole_high": 0.07,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.558,
+    "pole_days": 13,
+    "pole_rise": 0.301,
+    "pole_top": "2017-09-01",
+    "retrace_of_pole": 0.303
+   }
+  },
+  {
+   "id": "s070",
+   "symbol": "SMSPHARMA",
+   "week": "2018-08-31",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2018-06-11",
+   "geometry": {
+    "bottom": "2018-07-27",
+    "cup_weeks": 10,
+    "depth": 0.2509,
+    "handle_depth": 0.1632,
+    "handle_weeks": 1,
+    "left_lip": "2018-06-15",
+    "prior_advance": 0.36,
+    "right_lip": "2018-08-24",
+    "right_vs_left": 0.0469
+   }
+  },
+  {
+   "id": "s071",
+   "symbol": "LALPATHLAB",
+   "week": "2020-01-24",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2019-10-22",
+   "geometry": {
+    "bottom": "2019-11-08",
+    "cup_weeks": 12,
+    "depth": 0.1424,
+    "handle_depth": 0.0854,
+    "handle_weeks": 1,
+    "left_lip": "2019-10-27",
+    "prior_advance": 1.028,
+    "right_lip": "2020-01-17",
+    "right_vs_left": 0.0485
+   }
+  },
+  {
+   "id": "s072",
+   "symbol": "XCHANGING",
+   "week": "2019-07-05",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2019-05-22",
+   "geometry": {
+    "drop_from_pole_high": 0.0957,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.211,
+    "pole_days": 22,
+    "pole_rise": 0.3239,
+    "pole_top": "2019-06-24",
+    "retrace_of_pole": 0.391
+   }
+  },
+  {
+   "id": "s073",
+   "symbol": "PRICOL",
+   "week": "2014-04-04",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2014-02-10",
+   "geometry": {
+    "range": 0.1764,
+    "range_vs_own_median": 0.574,
+    "volume_10d_vs_50d": 1.103,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s074",
+   "symbol": "RELIGARE",
+   "week": "2022-08-19",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2022-07-18",
+   "geometry": {
+    "range": 0.1018,
+    "range_vs_own_median": 0.41,
+    "volume_10d_vs_50d": 0.635,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s075",
+   "symbol": "LAKSHVILAS",
+   "week": "2014-10-31",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2014-09-16",
+   "geometry": {
+    "drop_from_pole_high": 0.0631,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.647,
+    "pole_days": 19,
+    "pole_rise": 0.3011,
+    "pole_top": "2014-10-17",
+    "retrace_of_pole": 0.272
+   }
+  },
+  {
+   "id": "s076",
+   "symbol": "SYRMA",
+   "week": "2023-07-07",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2023-05-25",
+   "geometry": {
+    "drop_from_pole_high": 0.0753,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.465,
+    "pole_days": 24,
+    "pole_rise": 0.3415,
+    "pole_top": "2023-06-28",
+    "retrace_of_pole": 0.296
+   }
+  },
+  {
+   "id": "s077",
+   "symbol": "SQSBFSI",
+   "week": "2015-06-19",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2015-04-13",
+   "geometry": {
+    "bottom": "2015-04-30",
+    "cup_weeks": 8,
+    "depth": 0.2425,
+    "handle_depth": 0.1143,
+    "handle_weeks": 1,
+    "left_lip": "2015-04-17",
+    "prior_advance": 0.351,
+    "right_lip": "2015-06-12",
+    "right_vs_left": 0.0256
+   }
+  },
+  {
+   "id": "s078",
+   "symbol": "BAJAJCORP",
+   "week": "2012-02-24",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2011-11-28",
+   "geometry": {
+    "bottom": "2011-12-23",
+    "cup_weeks": 11,
+    "depth": 0.1782,
+    "handle_depth": 0.0804,
+    "handle_weeks": 1,
+    "left_lip": "2011-12-02",
+    "prior_advance": 0.594,
+    "right_lip": "2012-02-17",
+    "right_vs_left": 0.0684
+   }
+  },
+  {
+   "id": "s079",
+   "symbol": "RAIN",
+   "week": "2016-12-16",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-11-09",
+   "geometry": {
+    "drop_from_pole_high": 0.0908,
+    "flag_days": 8,
+    "flag_vs_pole_volume": 0.843,
+    "pole_days": 18,
+    "pole_rise": 0.3905,
+    "pole_top": "2016-12-06",
+    "retrace_of_pole": 0.323
+   }
+  },
+  {
+   "id": "s080",
+   "symbol": "MERCK",
+   "week": "2014-11-14",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2014-10-13",
+   "geometry": {
+    "range": 0.0777,
+    "range_vs_own_median": 0.491,
+    "volume_10d_vs_50d": 0.736,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s081",
+   "symbol": "TATASTEEL",
+   "week": "2022-04-01",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2022-02-24",
+   "geometry": {
+    "drop_from_pole_high": 0.0483,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.427,
+    "pole_days": 19,
+    "pole_rise": 0.2801,
+    "pole_top": "2022-03-25",
+    "retrace_of_pole": 0.221
+   }
+  },
+  {
+   "id": "s082",
+   "symbol": "BHARATRAS",
+   "week": "2012-09-21",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2012-02-21",
+   "geometry": {
+    "bottom": "2012-06-08",
+    "cup_weeks": 29,
+    "depth": 0.284,
+    "handle_depth": 0.0844,
+    "handle_weeks": 1,
+    "left_lip": "2012-02-24",
+    "prior_advance": 1.157,
+    "right_lip": "2012-09-14",
+    "right_vs_left": -0.0494
+   }
+  },
+  {
+   "id": "s083",
+   "symbol": "SBT",
+   "week": "2017-02-24",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-11-15",
+   "geometry": {
+    "bottom": "2017-01-06",
+    "cup_weeks": 13,
+    "depth": 0.1447,
+    "handle_depth": 0.0595,
+    "handle_weeks": 1,
+    "left_lip": "2016-11-18",
+    "prior_advance": 0.675,
+    "right_lip": "2017-02-17",
+    "right_vs_left": 0.01
+   }
+  },
+  {
+   "id": "s084",
+   "symbol": "SMARTLINK",
+   "week": "2017-05-05",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2017-04-03",
+   "geometry": {
+    "range": 0.077,
+    "range_vs_own_median": 0.411,
+    "volume_10d_vs_50d": 0.637,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s085",
+   "symbol": "JBCHEPHARM",
+   "week": "2019-08-09",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2019-07-08",
+   "geometry": {
+    "range": 0.0534,
+    "range_vs_own_median": 0.362,
+    "volume_10d_vs_50d": 1.077,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s086",
+   "symbol": "TAJGVK",
+   "week": "2021-10-08",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2021-05-31",
+   "geometry": {
+    "bottom": "2021-08-27",
+    "cup_weeks": 17,
+    "depth": 0.2062,
+    "handle_depth": 0.0992,
+    "handle_weeks": 1,
+    "left_lip": "2021-06-04",
+    "prior_advance": 0.446,
+    "right_lip": "2021-10-01",
+    "right_vs_left": 0.0465
+   }
+  },
+  {
+   "id": "s087",
+   "symbol": "KPRMILL",
+   "week": "2015-04-24",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-03-27",
+   "geometry": {
+    "drop_from_pole_high": 0.0728,
+    "flag_days": 7,
+    "flag_vs_pole_volume": 0.466,
+    "pole_days": 10,
+    "pole_rise": 0.323,
+    "pole_top": "2015-04-15",
+    "retrace_of_pole": 0.298
+   }
+  },
+  {
+   "id": "s088",
+   "symbol": "SHRIRAMCIT",
+   "week": "2013-12-20",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2013-12-02",
+   "geometry": {
+    "range": 0.0516,
+    "range_vs_own_median": 0.421,
+    "volume_10d_vs_50d": 1.26,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s089",
+   "symbol": "JSWENERGY",
+   "week": "2023-07-21",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2022-12-26",
+   "geometry": {
+    "bottom": "2023-03-03",
+    "cup_weeks": 28,
+    "depth": 0.3025,
+    "handle_depth": 0.1147,
+    "handle_weeks": 1,
+    "left_lip": "2022-12-30",
+    "prior_advance": 0.612,
+    "right_lip": "2023-07-14",
+    "right_vs_left": 0.0905
+   }
+  },
+  {
+   "id": "s090",
+   "symbol": "APCOTEXIND",
+   "week": "2014-11-14",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2014-09-26",
+   "geometry": {
+    "drop_from_pole_high": 0.1196,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.743,
+    "pole_days": 22,
+    "pole_rise": 0.5432,
+    "pole_top": "2014-11-05",
+    "retrace_of_pole": 0.34
+   }
+  },
+  {
+   "id": "s091",
+   "symbol": "PIIND",
+   "week": "2022-08-26",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2022-07-12",
+   "geometry": {
+    "drop_from_pole_high": 0.0617,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.785,
+    "pole_days": 25,
+    "pole_rise": 0.2633,
+    "pole_top": "2022-08-18",
+    "retrace_of_pole": 0.296
+   }
+  },
+  {
+   "id": "s092",
+   "symbol": "SOBHA",
+   "week": "2022-09-09",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2022-08-08",
+   "geometry": {
+    "range": 0.1097,
+    "range_vs_own_median": 0.416,
+    "volume_10d_vs_50d": 0.566,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s093",
+   "symbol": "ESSARPORTS",
+   "week": "2012-08-24",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2012-07-23",
+   "geometry": {
+    "range": 0.1198,
+    "range_vs_own_median": 0.438,
+    "volume_10d_vs_50d": 0.601,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s094",
+   "symbol": "TIMKEN",
+   "week": "2016-12-16",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-11-09",
+   "geometry": {
+    "drop_from_pole_high": 0.0566,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.253,
+    "pole_days": 20,
+    "pole_rise": 0.2068,
+    "pole_top": "2016-12-08",
+    "retrace_of_pole": 0.33
+   }
+  },
+  {
+   "id": "s095",
+   "symbol": "ABBOTINDIA",
+   "week": "2018-01-05",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2017-11-06",
+   "geometry": {
+    "drop_from_pole_high": 0.0611,
+    "flag_days": 18,
+    "flag_vs_pole_volume": 0.191,
+    "pole_days": 25,
+    "pole_rise": 0.3146,
+    "pole_top": "2017-12-11",
+    "retrace_of_pole": 0.255
+   }
+  },
+  {
+   "id": "s096",
+   "symbol": "EVERESTIND",
+   "week": "2021-03-19",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2021-02-15",
+   "geometry": {
+    "range": 0.1187,
+    "range_vs_own_median": 0.49,
+    "volume_10d_vs_50d": 0.775,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s097",
+   "symbol": "HATHWAY",
+   "week": "2018-11-30",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2018-10-11",
+   "geometry": {
+    "drop_from_pole_high": 0.0302,
+    "flag_days": 8,
+    "flag_vs_pole_volume": 0.162,
+    "pole_days": 25,
+    "pole_rise": 0.2811,
+    "pole_top": "2018-11-19",
+    "retrace_of_pole": 0.138
+   }
+  },
+  {
+   "id": "s098",
+   "symbol": "AHLUCONT",
+   "week": "2018-05-04",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2018-04-16",
+   "geometry": {
+    "range": 0.0667,
+    "range_vs_own_median": 0.414,
+    "volume_10d_vs_50d": 0.331,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s099",
+   "symbol": "MOTHERSUMI",
+   "week": "2020-01-17",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2019-12-16",
+   "geometry": {
+    "range": 0.0944,
+    "range_vs_own_median": 0.399,
+    "volume_10d_vs_50d": 0.789,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s100",
+   "symbol": "SOTL",
+   "week": "2020-09-04",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2020-04-07",
+   "geometry": {
+    "bottom": "2020-05-29",
+    "cup_weeks": 20,
+    "depth": 0.1628,
+    "handle_depth": 0.1356,
+    "handle_weeks": 1,
+    "left_lip": "2020-04-09",
+    "prior_advance": 0.516,
+    "right_lip": "2020-08-28",
+    "right_vs_left": 0.0942
+   }
+  },
+  {
+   "id": "s101",
+   "symbol": "TATASTEEL",
+   "week": "2013-12-20",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-11-05",
+   "geometry": {
+    "drop_from_pole_high": 0.0601,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.693,
+    "pole_days": 23,
+    "pole_rise": 0.3024,
+    "pole_top": "2013-12-09",
+    "retrace_of_pole": 0.259
+   }
+  },
+  {
+   "id": "s102",
+   "symbol": "KOKUYOCMLN",
+   "week": "2022-09-02",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2021-06-28",
+   "geometry": {
+    "bottom": "2022-06-24",
+    "cup_weeks": 60,
+    "depth": 0.3467,
+    "handle_depth": 0.1157,
+    "handle_weeks": 1,
+    "left_lip": "2021-07-02",
+    "prior_advance": 0.531,
+    "right_lip": "2022-08-26",
+    "right_vs_left": 0.0847
+   }
+  },
+  {
+   "id": "s103",
+   "symbol": "NELCAST",
+   "week": "2017-04-28",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2016-10-17",
+   "geometry": {
+    "bottom": "2016-11-25",
+    "cup_weeks": 26,
+    "depth": 0.3558,
+    "handle_depth": 0.0621,
+    "handle_weeks": 1,
+    "left_lip": "2016-10-21",
+    "prior_advance": 0.348,
+    "right_lip": "2017-04-21",
+    "right_vs_left": -0.0337
+   }
+  },
+  {
+   "id": "s104",
+   "symbol": "HONAUT",
+   "week": "2016-07-22",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2016-07-04",
+   "geometry": {
+    "range": 0.059,
+    "range_vs_own_median": 0.635,
+    "volume_10d_vs_50d": 0.434,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s105",
+   "symbol": "AGCNET",
+   "week": "2020-11-06",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2020-10-16",
+   "geometry": {
+    "drop_from_pole_high": 0.139,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.234,
+    "pole_days": 9,
+    "pole_rise": 1.0408,
+    "pole_top": "2020-10-29",
+    "retrace_of_pole": 0.273
+   }
+  },
+  {
+   "id": "s106",
+   "symbol": "SINTEX",
+   "week": "2017-07-28",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2017-06-28",
+   "geometry": {
+    "drop_from_pole_high": 0.118,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.871,
+    "pole_days": 16,
+    "pole_rise": 0.6982,
+    "pole_top": "2017-07-20",
+    "retrace_of_pole": 0.287
+   }
+  },
+  {
+   "id": "s107",
+   "symbol": "UNIPLY",
+   "week": "2016-10-28",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-10-10",
+   "geometry": {
+    "range": 0.0696,
+    "range_vs_own_median": 0.274,
+    "volume_10d_vs_50d": 0.209,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s108",
+   "symbol": "REIAGROLTD",
+   "week": "2012-07-13",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2012-04-16",
+   "geometry": {
+    "bottom": "2012-05-25",
+    "cup_weeks": 11,
+    "depth": 0.4412,
+    "handle_depth": 0.1417,
+    "handle_weeks": 1,
+    "left_lip": "2012-04-20",
+    "prior_advance": 0.417,
+    "right_lip": "2012-07-06",
+    "right_vs_left": -0.0919
+   }
+  },
+  {
+   "id": "s109",
+   "symbol": "EVERONN",
+   "week": "2014-11-07",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2014-08-18",
+   "geometry": {
+    "bottom": "2014-10-10",
+    "cup_weeks": 10,
+    "depth": 0.292,
+    "handle_depth": 0.1595,
+    "handle_weeks": 1,
+    "left_lip": "2014-08-22",
+    "prior_advance": 0.932,
+    "right_lip": "2014-10-31",
+    "right_vs_left": 0.0744
+   }
+  },
+  {
+   "id": "s110",
+   "symbol": "UTIAMC",
+   "week": "2023-09-01",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2023-08-14",
+   "geometry": {
+    "range": 0.0613,
+    "range_vs_own_median": 0.501,
+    "volume_10d_vs_50d": 0.323,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s111",
+   "symbol": "HDFCBANK",
+   "week": "2014-05-09",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2014-03-18",
+   "geometry": {
+    "range": 0.0706,
+    "range_vs_own_median": 0.454,
+    "volume_10d_vs_50d": 0.846,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s112",
+   "symbol": "CESC",
+   "week": "2012-07-13",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-03-12",
+   "geometry": {
+    "bottom": "2012-05-04",
+    "cup_weeks": 16,
+    "depth": 0.223,
+    "handle_depth": 0.0479,
+    "handle_weeks": 1,
+    "left_lip": "2012-03-16",
+    "prior_advance": 0.665,
+    "right_lip": "2012-07-06",
+    "right_vs_left": -0.022
+   }
+  },
+  {
+   "id": "s113",
+   "symbol": "PANACEABIO",
+   "week": "2016-07-15",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2016-05-27",
+   "geometry": {
+    "drop_from_pole_high": 0.12,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.275,
+    "pole_days": 25,
+    "pole_rise": 0.7385,
+    "pole_top": "2016-07-01",
+    "retrace_of_pole": 0.282
+   }
+  },
+  {
+   "id": "s114",
+   "symbol": "TVSELECT",
+   "week": "2015-07-24",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2015-06-15",
+   "geometry": {
+    "drop_from_pole_high": 0.129,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.647,
+    "pole_days": 24,
+    "pole_rise": 0.9155,
+    "pole_top": "2015-07-17",
+    "retrace_of_pole": 0.27
+   }
+  },
+  {
+   "id": "s115",
+   "symbol": "KANORICHEM",
+   "week": "2013-01-11",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-12-24",
+   "geometry": {
+    "range": 0.0506,
+    "range_vs_own_median": 0.429,
+    "volume_10d_vs_50d": 0.277,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s116",
+   "symbol": "ARIHANTSUP",
+   "week": "2018-12-28",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2018-10-08",
+   "geometry": {
+    "bottom": "2018-11-30",
+    "cup_weeks": 10,
+    "depth": 0.2667,
+    "handle_depth": 0.1256,
+    "handle_weeks": 1,
+    "left_lip": "2018-10-12",
+    "prior_advance": 0.339,
+    "right_lip": "2018-12-21",
+    "right_vs_left": -0.0016
+   }
+  },
+  {
+   "id": "s117",
+   "symbol": "BRITANNIA",
+   "week": "2014-06-20",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2013-10-28",
+   "geometry": {
+    "bottom": "2014-03-28",
+    "cup_weeks": 32,
+    "depth": 0.1563,
+    "handle_depth": 0.0901,
+    "handle_weeks": 1,
+    "left_lip": "2013-11-03",
+    "prior_advance": 1.156,
+    "right_lip": "2014-06-13",
+    "right_vs_left": 0.0417
+   }
+  },
+  {
+   "id": "s118",
+   "symbol": "WHEELS",
+   "week": "2012-06-08",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2012-05-23",
+   "geometry": {
+    "drop_from_pole_high": 0.1518,
+    "flag_days": 7,
+    "flag_vs_pole_volume": 0.484,
+    "pole_days": 5,
+    "pole_rise": 0.646,
+    "pole_top": "2012-05-30",
+    "retrace_of_pole": 0.387
+   }
+  },
+  {
+   "id": "s119",
+   "symbol": "PGHL",
+   "week": "2023-02-17",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2023-01-02",
+   "geometry": {
+    "drop_from_pole_high": 0.0565,
+    "flag_days": 8,
+    "flag_vs_pole_volume": 0.53,
+    "pole_days": 25,
+    "pole_rise": 0.2274,
+    "pole_top": "2023-02-07",
+    "retrace_of_pole": 0.305
+   }
+  },
+  {
+   "id": "s120",
+   "symbol": "NRBBEARING",
+   "week": "2015-11-20",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-02-09",
+   "geometry": {
+    "bottom": "2015-06-12",
+    "cup_weeks": 39,
+    "depth": 0.3443,
+    "handle_depth": 0.0907,
+    "handle_weeks": 1,
+    "left_lip": "2015-02-13",
+    "prior_advance": 3.153,
+    "right_lip": "2015-11-13",
+    "right_vs_left": 0.054
+   }
+  },
+  {
+   "id": "s121",
+   "symbol": "DISHTV",
+   "week": "2014-07-18",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2013-12-02",
+   "geometry": {
+    "bottom": "2014-05-09",
+    "cup_weeks": 31,
+    "depth": 0.3029,
+    "handle_depth": 0.1636,
+    "handle_weeks": 1,
+    "left_lip": "2013-12-06",
+    "prior_advance": 0.567,
+    "right_lip": "2014-07-11",
+    "right_vs_left": 0.0468
+   }
+  },
+  {
+   "id": "s122",
+   "symbol": "BSLIMITED",
+   "week": "2013-02-22",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-01-17",
+   "geometry": {
+    "drop_from_pole_high": 0.1385,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.676,
+    "pole_days": 17,
+    "pole_rise": 0.7644,
+    "pole_top": "2013-02-11",
+    "retrace_of_pole": 0.32
+   }
+  },
+  {
+   "id": "s123",
+   "symbol": "WATERBASE",
+   "week": "2022-07-29",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2022-06-21",
+   "geometry": {
+    "drop_from_pole_high": 0.0947,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.996,
+    "pole_days": 23,
+    "pole_rise": 0.3108,
+    "pole_top": "2022-07-22",
+    "retrace_of_pole": 0.4
+   }
+  },
+  {
+   "id": "s124",
+   "symbol": "CANFINHOME",
+   "week": "2013-09-27",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2013-09-12",
+   "geometry": {
+    "drop_from_pole_high": 0.0863,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.5,
+    "pole_days": 6,
+    "pole_rise": 0.3235,
+    "pole_top": "2013-09-20",
+    "retrace_of_pole": 0.353
+   }
+  },
+  {
+   "id": "s125",
+   "symbol": "GENESYS",
+   "week": "2012-07-13",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2012-05-31",
+   "geometry": {
+    "drop_from_pole_high": 0.1561,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.831,
+    "pole_days": 25,
+    "pole_rise": 0.5875,
+    "pole_top": "2012-07-05",
+    "retrace_of_pole": 0.422
+   }
+  },
+  {
+   "id": "s126",
+   "symbol": "UTTAMSUGAR",
+   "week": "2020-01-24",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2019-09-09",
+   "geometry": {
+    "bottom": "2019-10-18",
+    "cup_weeks": 18,
+    "depth": 0.2789,
+    "handle_depth": 0.1135,
+    "handle_weeks": 1,
+    "left_lip": "2019-09-13",
+    "prior_advance": 0.463,
+    "right_lip": "2020-01-17",
+    "right_vs_left": 0.0561
+   }
+  },
+  {
+   "id": "s127",
+   "symbol": "ASTRAZEN",
+   "week": "2013-11-22",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2013-09-30",
+   "geometry": {
+    "range": 0.1317,
+    "range_vs_own_median": 0.389,
+    "volume_10d_vs_50d": 0.99,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s128",
+   "symbol": "ABAN",
+   "week": "2014-05-16",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2014-04-15",
+   "geometry": {
+    "range": 0.1195,
+    "range_vs_own_median": 0.529,
+    "volume_10d_vs_50d": 0.877,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s129",
+   "symbol": "SBT",
+   "week": "2015-02-27",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-01-05",
+   "geometry": {
+    "range": 0.103,
+    "range_vs_own_median": 0.427,
+    "volume_10d_vs_50d": 1.089,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s130",
+   "symbol": "ASSAMCO",
+   "week": "2015-11-20",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2015-04-06",
+   "geometry": {
+    "bottom": "2015-08-28",
+    "cup_weeks": 31,
+    "depth": 0.4227,
+    "handle_depth": 0.1383,
+    "handle_weeks": 1,
+    "left_lip": "2015-04-10",
+    "prior_advance": 0.311,
+    "right_lip": "2015-11-13",
+    "right_vs_left": -0.0309
+   }
+  },
+  {
+   "id": "s131",
+   "symbol": "BERGEPAINT",
+   "week": "2023-06-30",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2022-08-16",
+   "geometry": {
+    "bottom": "2023-02-03",
+    "cup_weeks": 44,
+    "depth": 0.2578,
+    "handle_depth": 0.0257,
+    "handle_weeks": 1,
+    "left_lip": "2022-08-19",
+    "prior_advance": 0.307,
+    "right_lip": "2023-06-23",
+    "right_vs_left": -0.03
+   }
+  },
+  {
+   "id": "s132",
+   "symbol": "JUBILANT",
+   "week": "2019-02-15",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2018-12-24",
+   "geometry": {
+    "range": 0.1022,
+    "range_vs_own_median": 0.411,
+    "volume_10d_vs_50d": 1.183,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s133",
+   "symbol": "UBL",
+   "week": "2013-07-12",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2012-12-24",
+   "geometry": {
+    "bottom": "2013-03-08",
+    "cup_weeks": 27,
+    "depth": 0.4192,
+    "handle_depth": 0.1325,
+    "handle_weeks": 1,
+    "left_lip": "2012-12-28",
+    "prior_advance": 1.563,
+    "right_lip": "2013-07-05",
+    "right_vs_left": -0.0397
+   }
+  },
+  {
+   "id": "s134",
+   "symbol": "SUPRAJIT",
+   "week": "2014-06-27",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2014-05-16",
+   "geometry": {
+    "drop_from_pole_high": 0.0892,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.387,
+    "pole_days": 25,
+    "pole_rise": 0.5027,
+    "pole_top": "2014-06-20",
+    "retrace_of_pole": 0.267
+   }
+  },
+  {
+   "id": "s135",
+   "symbol": "ENDURANCE",
+   "week": "2018-01-12",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2017-11-30",
+   "geometry": {
+    "drop_from_pole_high": 0.0535,
+    "flag_days": 9,
+    "flag_vs_pole_volume": 0.601,
+    "pole_days": 21,
+    "pole_rise": 0.1913,
+    "pole_top": "2018-01-01",
+    "retrace_of_pole": 0.333
+   }
+  },
+  {
+   "id": "s136",
+   "symbol": "WINDMACHIN",
+   "week": "2020-12-18",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "near_miss",
+   "base_start": "2020-11-13",
+   "geometry": {
+    "drop_from_pole_high": 0.1617,
+    "flag_days": 7,
+    "flag_vs_pole_volume": 0.513,
+    "pole_days": 17,
+    "pole_rise": 0.6848,
+    "pole_top": "2020-12-09",
+    "retrace_of_pole": 0.398
+   }
+  },
+  {
+   "id": "s137",
+   "symbol": "MRF",
+   "week": "2014-02-28",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2014-02-10",
+   "geometry": {
+    "range": 0.0287,
+    "range_vs_own_median": 0.213,
+    "volume_10d_vs_50d": 0.486,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s138",
+   "symbol": "DBL",
+   "week": "2018-03-30",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2018-02-26",
+   "geometry": {
+    "range": 0.1011,
+    "range_vs_own_median": 0.419,
+    "volume_10d_vs_50d": 0.904,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s139",
+   "symbol": "CANBK",
+   "week": "2014-04-18",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-12-23",
+   "geometry": {
+    "bottom": "2014-02-14",
+    "cup_weeks": 15,
+    "depth": 0.2903,
+    "handle_depth": 0.1127,
+    "handle_weeks": 1,
+    "left_lip": "2013-12-27",
+    "prior_advance": 0.555,
+    "right_lip": "2014-04-11",
+    "right_vs_left": -0.0088
+   }
+  },
+  {
+   "id": "s140",
+   "symbol": "DELTACORP",
+   "week": "2022-01-21",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2021-11-08",
+   "geometry": {
+    "bottom": "2021-12-03",
+    "cup_weeks": 9,
+    "depth": 0.2152,
+    "handle_depth": 0.0915,
+    "handle_weeks": 1,
+    "left_lip": "2021-11-12",
+    "prior_advance": 1.7,
+    "right_lip": "2022-01-14",
+    "right_vs_left": -0.006
+   }
+  },
+  {
+   "id": "s141",
+   "symbol": "GATI",
+   "week": "2019-10-25",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2019-09-06",
+   "geometry": {
+    "drop_from_pole_high": 0.0965,
+    "flag_days": 7,
+    "flag_vs_pole_volume": 0.242,
+    "pole_days": 25,
+    "pole_rise": 0.5162,
+    "pole_top": "2019-10-16",
+    "retrace_of_pole": 0.283
+   }
+  },
+  {
+   "id": "s142",
+   "symbol": "BUTTERFLY",
+   "week": "2019-11-15",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2019-09-09",
+   "geometry": {
+    "bottom": "2019-10-18",
+    "cup_weeks": 8,
+    "depth": 0.2298,
+    "handle_depth": 0.0757,
+    "handle_weeks": 1,
+    "left_lip": "2019-09-13",
+    "prior_advance": 0.327,
+    "right_lip": "2019-11-08",
+    "right_vs_left": 0.0949
+   }
+  },
+  {
+   "id": "s143",
+   "symbol": "RATNAMANI",
+   "week": "2015-10-02",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-09-14",
+   "geometry": {
+    "range": 0.0616,
+    "range_vs_own_median": 0.428,
+    "volume_10d_vs_50d": 0.386,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s144",
+   "symbol": "SESHAPAPER",
+   "week": "2016-05-06",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-04-18",
+   "geometry": {
+    "range": 0.0702,
+    "range_vs_own_median": 0.455,
+    "volume_10d_vs_50d": 0.06,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s145",
+   "symbol": "RUCHIRA",
+   "week": "2018-12-28",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2018-11-26",
+   "geometry": {
+    "range": 0.0941,
+    "range_vs_own_median": 0.408,
+    "volume_10d_vs_50d": 0.428,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s146",
+   "symbol": "UTTAMSTL",
+   "week": "2016-08-05",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-04-18",
+   "geometry": {
+    "bottom": "2016-06-03",
+    "cup_weeks": 14,
+    "depth": 0.2645,
+    "handle_depth": 0.1319,
+    "handle_weeks": 1,
+    "left_lip": "2016-04-22",
+    "prior_advance": 0.571,
+    "right_lip": "2016-07-29",
+    "right_vs_left": 0.0184
+   }
+  },
+  {
+   "id": "s147",
+   "symbol": "CIPLA",
+   "week": "2013-05-03",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2013-03-11",
+   "geometry": {
+    "range": 0.0938,
+    "range_vs_own_median": 0.62,
+    "volume_10d_vs_50d": 0.809,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s148",
+   "symbol": "DISHTV",
+   "week": "2013-01-11",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2012-12-10",
+   "geometry": {
+    "range": 0.0939,
+    "range_vs_own_median": 0.5,
+    "volume_10d_vs_50d": 0.795,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s149",
+   "symbol": "PIIND",
+   "week": "2017-02-10",
+   "pattern": "cup_handle",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2016-11-21",
+   "geometry": {
+    "bottom": "2016-12-23",
+    "cup_weeks": 10,
+    "depth": 0.1232,
+    "handle_depth": 0.0914,
+    "handle_weeks": 1,
+    "left_lip": "2016-11-25",
+    "prior_advance": 0.817,
+    "right_lip": "2017-02-03",
+    "right_vs_left": 0.0663
+   }
+  },
+  {
+   "id": "s150",
+   "symbol": "MCLEODRUSS",
+   "week": "2022-11-18",
+   "pattern": "tight_range",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2022-10-17",
+   "geometry": {
+    "range": 0.1085,
+    "range_vs_own_median": 0.4,
+    "volume_10d_vs_50d": 0.267,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s151",
+   "symbol": "MASTEK",
+   "week": "2013-09-20",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2013-04-22",
+   "geometry": {
+    "bottom": "2013-08-08",
+    "cup_weeks": 20,
+    "depth": 0.2918,
+    "handle_depth": 0.0678,
+    "handle_weeks": 1,
+    "left_lip": "2013-04-26",
+    "prior_advance": 0.627,
+    "right_lip": "2013-09-13",
+    "right_vs_left": -0.0658
+   }
+  },
+  {
+   "id": "s152",
+   "symbol": "LT",
+   "week": "2012-08-10",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-06-18",
+   "geometry": {
+    "range": 0.1025,
+    "range_vs_own_median": 0.428,
+    "volume_10d_vs_50d": 0.615,
+    "weeks": 8
+   }
+  },
+  {
+   "id": "s153",
+   "symbol": "NILKAMAL",
+   "week": "2016-09-16",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-04-11",
+   "geometry": {
+    "bottom": "2016-06-24",
+    "cup_weeks": 21,
+    "depth": 0.2171,
+    "handle_depth": 0.0752,
+    "handle_weeks": 1,
+    "left_lip": "2016-04-13",
+    "prior_advance": 2.345,
+    "right_lip": "2016-09-09",
+    "right_vs_left": 0.0186
+   }
+  },
+  {
+   "id": "s154",
+   "symbol": "KITEX",
+   "week": "2021-06-04",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2020-12-14",
+   "geometry": {
+    "bottom": "2021-04-16",
+    "cup_weeks": 23,
+    "depth": 0.2637,
+    "handle_depth": 0.0826,
+    "handle_weeks": 1,
+    "left_lip": "2020-12-18",
+    "prior_advance": 0.668,
+    "right_lip": "2021-05-28",
+    "right_vs_left": -0.0412
+   }
+  },
+  {
+   "id": "s155",
+   "symbol": "ZEELEARN",
+   "week": "2019-06-07",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2019-05-17",
+   "geometry": {
+    "drop_from_pole_high": 0.0793,
+    "flag_days": 6,
+    "flag_vs_pole_volume": 0.234,
+    "pole_days": 8,
+    "pole_rise": 0.3583,
+    "pole_top": "2019-05-29",
+    "retrace_of_pole": 0.301
+   }
+  },
+  {
+   "id": "s156",
+   "symbol": "VIVIMEDLAB",
+   "week": "2012-04-27",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2012-03-26",
+   "geometry": {
+    "range": 0.0964,
+    "range_vs_own_median": 0.468,
+    "volume_10d_vs_50d": 0.567,
+    "weeks": 5
+   }
+  },
+  {
+   "id": "s157",
+   "symbol": "DIAPOWER",
+   "week": "2012-01-20",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2011-12-21",
+   "geometry": {
+    "drop_from_pole_high": 0.0717,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.67,
+    "pole_days": 18,
+    "pole_rise": 0.5384,
+    "pole_top": "2012-01-13",
+    "retrace_of_pole": 0.205
+   }
+  },
+  {
+   "id": "s158",
+   "symbol": "HSIL",
+   "week": "2019-04-12",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2019-01-28",
+   "geometry": {
+    "bottom": "2019-02-22",
+    "cup_weeks": 9,
+    "depth": 0.2011,
+    "handle_depth": 0.0977,
+    "handle_weeks": 1,
+    "left_lip": "2019-02-01",
+    "prior_advance": 0.403,
+    "right_lip": "2019-04-05",
+    "right_vs_left": 0.1
+   }
+  },
+  {
+   "id": "s159",
+   "symbol": "SOUTHBANK",
+   "week": "2014-11-14",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2014-10-08",
+   "geometry": {
+    "drop_from_pole_high": 0.0643,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.991,
+    "pole_days": 18,
+    "pole_rise": 0.1856,
+    "pole_top": "2014-11-07",
+    "retrace_of_pole": 0.411
+   }
+  },
+  {
+   "id": "s160",
+   "symbol": "CAMLINFINE",
+   "week": "2022-11-18",
+   "pattern": "flag",
+   "state": "forming",
+   "kind": "detected",
+   "base_start": "2022-10-13",
+   "geometry": {
+    "drop_from_pole_high": 0.0965,
+    "flag_days": 5,
+    "flag_vs_pole_volume": 0.441,
+    "pole_days": 19,
+    "pole_rise": 0.4635,
+    "pole_top": "2022-11-11",
+    "retrace_of_pole": 0.305
+   }
+  },
+  {
+   "id": "s161",
+   "symbol": "VIJAYABANK",
+   "week": "2017-01-27",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2016-11-07",
+   "geometry": {
+    "bottom": "2016-11-25",
+    "cup_weeks": 10,
+    "depth": 0.2132,
+    "handle_depth": 0.0523,
+    "handle_weeks": 1,
+    "left_lip": "2016-11-11",
+    "prior_advance": 0.929,
+    "right_lip": "2017-01-20",
+    "right_vs_left": -0.0165
+   }
+  },
+  {
+   "id": "s162",
+   "symbol": "WABAG",
+   "week": "2015-01-30",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-01-12",
+   "geometry": {
+    "range": 0.0627,
+    "range_vs_own_median": 0.388,
+    "volume_10d_vs_50d": 0.778,
+    "weeks": 3
+   }
+  },
+  {
+   "id": "s163",
+   "symbol": "HDFCBANK",
+   "week": "2015-07-31",
+   "pattern": "cup_handle",
+   "state": "near_pivot",
+   "kind": "detected",
+   "base_start": "2015-03-02",
+   "geometry": {
+    "bottom": "2015-05-08",
+    "cup_weeks": 20,
+    "depth": 0.1488,
+    "handle_depth": 0.0514,
+    "handle_weeks": 1,
+    "left_lip": "2015-03-05",
+    "prior_advance": 0.674,
+    "right_lip": "2015-07-24",
+    "right_vs_left": 0.0169
+   }
+  },
+  {
+   "id": "s164",
+   "symbol": "VIPULLTD",
+   "week": "2023-01-13",
+   "pattern": "flag",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2022-11-30",
+   "geometry": {
+    "drop_from_pole_high": 0.1474,
+    "flag_days": 7,
+    "flag_vs_pole_volume": 0.48,
+    "pole_days": 25,
+    "pole_rise": 0.52,
+    "pole_top": "2023-01-04",
+    "retrace_of_pole": 0.431
+   }
+  },
+  {
+   "id": "s165",
+   "symbol": "HBLPOWER",
+   "week": "2022-04-08",
+   "pattern": "tight_range",
+   "state": "near_pivot",
+   "kind": "near_miss",
+   "base_start": "2022-03-21",
+   "geometry": {
+    "range": 0.1031,
+    "range_vs_own_median": 0.512,
+    "volume_10d_vs_50d": 0.754,
+    "weeks": 3
+   }
+  }
+ ]
+}

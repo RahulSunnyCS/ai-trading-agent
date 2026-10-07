@@ -555,9 +555,9 @@ and pass/kill rules live in the backlog item.
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.19.0 | Phase 0: owner reviews the pattern catalogue and the proposed thresholds; criteria committed | owner→claude | Open |
-| 3.19.1 | Phases 1–2: causal pivots, three detectors, truncation test | claude | Open |
-| 3.19.2 | Phase 3: chart gallery, owner labels, detector parameters frozen | owner→claude | Open |
+| 3.19.0 | Phase 0: owner reviews the pattern catalogue and the proposed thresholds; criteria committed | owner→claude | **Done 2026-10-07** (`bl041_criteria.json`) |
+| 3.19.1 | Phases 1–2: causal pivots, three detectors, truncation test | claude | **Done 2026-10-07**; Phase 2b (momentum rank while a base forms) recorded in the item |
+| 3.19.2 | Phase 3: chart gallery, owner labels, detector parameters frozen | owner→claude | **Gallery published 2026-10-07**; waiting on the owner's labels |
 | 3.19.3 | Phases 4–6: event study, ranking test, one hold-out run | claude | Open |
 
 ## Reference — where detail lives

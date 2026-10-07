@@ -153,6 +153,22 @@ once on the sealed data. A guess before seeing any data:
   midpoint and detection; report the share of detections inside pool top 10 / 20 / 40 / 200, per
   pattern and state. No returns are read.
 - **Done when:** the table is in this file before Phase 4.
+- **Result (2026-10-07, development window, ranks only):** an episode is one base, at its
+  first detected week. The rank percentile is among every ranked name (0 = best).
+
+  | Pattern | Episodes | Median base (wk) | Rank pct at start | at midpoint | at detection | Rank fell start→detection | In pool | Pool top 10 | top 20 | top 40 |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | Tight range | 12,947 | 4.6 | 0.29 | 0.35 | 0.37 | 62% | 32% | 0.4% | 1.1% | 3.7% |
+  | Bull flag | 6,583 | 6.0 (from pole start) | 0.54 | 0.19 | 0.24 | 20% | 27% | 0.7% | 2.2% | 5.9% |
+  | Cup and handle | 5,110 | 17.6 | 0.30 | 0.61 | 0.34 | 53% | 26% | 0.2% | 0.9% | 3.2% |
+  | High tight flag (reported) | 2,640 | 11.6 | 0.50 | 0.11 | 0.28 | 27% | 11% | 0.7% | 2.0% | 3.4% |
+
+  The owner's guess holds. While a base forms the stock drifts down the ranking (a cup is in
+  the bottom half at its midpoint), and at detection only 1–2% of bases are in the pool's top
+  20, the names Broad actually buys. Most pattern stocks sit in the upper third of the market
+  but outside the pool's top 40. So `filter_20`/`filter_40` and the 5/10-rank bonus will
+  rarely change a pick, and only a blend weight high enough to lift a name from rank ~50–150
+  into the top 10 can act. That is a property of the shapes, recorded before any return is read.
 
 ### Phase 3 — Gallery check (owner; no returns shown)
 - **Tasks:**
@@ -261,3 +277,9 @@ once on the sealed data. A guess before seeing any data:
   `bl041_criteria.json` and the Experiments block committed before any detection or run. Owner
   added a check (Phase 2b): does the momentum rank fall while a 10–30 week base forms? Reported
   only, no returns read.
+- 2026-10-07 — Phases 1–2 done: `mbt patterns detect` over 1,578 point-in-time Broad symbols,
+  2011-01 → 2023-12-29 (55 s; 1,378 bad bars excluded). Phase 2b recorded above. Phase 3 gallery
+  published (165 charts, 40 detected + 15 near misses per pattern, seed 41):
+  https://claude.ai/artifact/AmbsNx8jkNsBij43qVVBnF. The manifest is
+  `search_spaces/bl041_gallery_manifest.json`. Waiting on the owner's labels. Phases 4–5 are
+  coded and refuse to run until `bl041_criteria_addendum_1.json` (the detector freeze) exists.
