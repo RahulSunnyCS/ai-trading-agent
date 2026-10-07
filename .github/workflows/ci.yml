@@ -5,10 +5,12 @@ on:
   # toolchains, each covered by its own workflow (broker-login-ci.yml,
   # contract-notes-ci.yml), so a push there does not need the matrix below.
   # packages/option-backtesting is NOT ignored — its Python job lives in this
-  # file, so ignoring packages/** wholesale would skip its own CI.
+  # file, so ignoring packages/** wholesale would skip its own CI. Nor is
+  # packages/notify: apps/scheduler and packages/broker-identity import it, and
+  # its own tests run in the ts job below.
   push:
     branches: ['**']
-    paths-ignore: ['packages/broker-login/**', 'packages/contract-notes/**', 'packages/notify/**']
+    paths-ignore: ['packages/broker-login/**', 'packages/contract-notes/**']
   # No paths-ignore on pull_request (BL-014): branch protection requires this
   # workflow's jobs, and a workflow skipped by a path filter never reports them,
   # so the PR would wait on them forever.
@@ -41,12 +43,7 @@ jobs:
       - name: Verify lockfile not modified
         run: git diff --exit-code bun.lock
 
-      # The dashboard package is intentionally not typechecked here — it
-      # inherits the same exclusion the pre-split root tsconfig had (its
-      # frontend tree was never covered by CI typecheck). It has its own
-      # `bun run --filter @ata/dashboard typecheck` for local/opt-in use;
-      # wiring it into CI is tracked as a follow-up once its existing type
-      # errors are fixed.
+      # Server only: the dashboard is typechecked in its own job below.
       - name: TypeScript typecheck (server)
         run: bun run typecheck
 
@@ -98,6 +95,9 @@ jobs:
         with:
           bun-version: '1.2.x'
       - run: bun install --frozen-lockfile
+      # The job keeps its name (branch protection requires it) though it now typechecks too.
+      - name: Dashboard typecheck
+        run: bun run --filter @ata/dashboard typecheck
       - name: Vite build
         run: bun run --filter @ata/dashboard build
       - name: Dashboard unit tests
@@ -166,6 +166,17 @@ jobs:
 
       - name: Pytest
         run: uv run pytest
+
+      # packages/trading-data (the shared research database both Python packages depend on)
+      # has its own lockfile and suite; it rides in this job rather than adding a required
+      # check.
+      - name: trading-data — install
+        run: uv sync --frozen
+        working-directory: packages/trading-data
+
+      - name: trading-data — Pytest
+        run: uv run pytest
+        working-directory: packages/trading-data
 
   integration:
     name: Integration Tests

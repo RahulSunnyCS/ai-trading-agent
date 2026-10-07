@@ -14,39 +14,31 @@
  * and timestamp, and /api/meta no previous close or day open.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { useFyersAuthStatus } from '../hooks/useFyersAuthStatus';
 import { useLiveTicks } from '../hooks/useLiveTicks';
 import { useMeta } from '../hooks/useMeta';
-import { formatInt, formatIstTime, formatNumber, formatRelative } from '../lib/format';
+import { useNow } from '../hooks/useNow';
+import { formatInt, formatIstTime, formatNumber } from '../lib/format';
 import { type FeedView, liveFeedView, tokenBanner } from '../lib/live';
-import { type MarketState, describeMarketSession, marketSession } from '../lib/market';
+import { marketSession } from '../lib/market';
 import { type FeedHealth, feedHealth } from '../lib/overview';
+import { MarketSessionBadge, UpdatedAgo } from './live/LiveClock';
 import { LiveFeedBanner } from './live/LiveFeedBanner';
 import { LiveLineChart } from './live/LiveLineChart';
 import { StraddlePanel } from './live/StraddlePanel';
-import { Badge, type Tone } from './ui/Badge';
+import { Badge } from './ui/Badge';
 import { Card } from './ui/Card';
 import { StatusDot } from './ui/StatusDot';
 
-/** The same tones as the top bar's market item (shell/SystemStatus.tsx). */
-const MARKET_TONE: Record<MarketState, Tone> = {
-  open: 'positive',
-  pre_open: 'warning',
-  closed: 'neutral',
-};
-
-/** The clock, re-read every `intervalMs`; null until mounted (no server/client time mismatch). */
-function useNow(intervalMs: number): Date | null {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), intervalMs);
-    return () => clearInterval(timer);
-  }, [intervalMs]);
-  return now;
-}
+/**
+ * How often the page re-judges feed health (Live / Stale, market open). Stale means no tick for
+ * lib/overview.ts's FEED_STALE_AFTER_MS (45 s), so a few seconds' lag is invisible; the
+ * once-a-second clock lives in the leaves in live/LiveClock.tsx instead of re-rendering the
+ * whole page.
+ */
+const HEALTH_CLOCK_MS = 5000;
 
 function FeedBadge({ view }: { view: FeedView }) {
   return (
@@ -76,7 +68,7 @@ export function LiveView() {
   const { status, latestLtp, latestTimestamp, ticks, latestStraddle, straddles } = useLiveTicks();
   const { meta } = useMeta();
   const auth = useFyersAuthStatus();
-  const now = useNow(1000);
+  const now = useNow(HEALTH_CLOCK_MS);
 
   // A standalone Momentum preview also answers /api/meta, with a different payload: ignore it.
   const simulate = meta !== null && typeof meta.simulate === 'boolean' ? meta.simulate : null;
@@ -106,24 +98,13 @@ export function LiveView() {
   const indexView = indexHealth ? liveFeedView(indexHealth, simulate === true) : null;
   const straddleView = straddleHealth ? liveFeedView(straddleHealth, simulate === true) : null;
 
-  // Memoised: the clock re-renders this every second, and the chart re-sets its data on change.
+  // Memoised: the health clock and every tick re-render this, and the chart re-sets its data on change.
   const tickPoints = useMemo(() => ticks.map((t) => ({ time: t.time, value: t.ltp })), [ticks]);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        {now && session ? (
-          <Badge tone={MARKET_TONE[session.state]}>
-            <StatusDot
-              tone={MARKET_TONE[session.state]}
-              pulse={session.state === 'open'}
-              label={session.label}
-            />
-            {describeMarketSession(now)} IST
-          </Badge>
-        ) : (
-          <Badge tone="neutral">Market session…</Badge>
-        )}
+        <MarketSessionBadge />
       </div>
 
       {banner ? <LiveFeedBanner banner={banner} /> : null}
@@ -140,7 +121,7 @@ export function LiveView() {
                   {formatNumber(latestLtp, 2)}
                 </p>
                 <p className="mt-1 text-xs text-faint">
-                  Updated {now ? formatRelative(latestTimestamp, now) : '…'} ·{' '}
+                  Updated <UpdatedAgo at={latestTimestamp} /> ·{' '}
                   {formatIstTime(latestTimestamp, { seconds: true })} IST
                 </p>
               </>
@@ -170,7 +151,6 @@ export function LiveView() {
         history={straddles}
         health={straddleHealth}
         view={straddleView}
-        now={now}
       />
     </div>
   );

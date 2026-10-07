@@ -9,6 +9,7 @@ node_modules/
 # Build output
 dist/
 .next/
+.next-prod/
 
 # Bun binary lockfile (OLD format — bun.lock text format IS committed)
 # The text-format bun.lock must be committed so the repo is reproducible.

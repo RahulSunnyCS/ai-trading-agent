@@ -29,9 +29,11 @@ const BALANCE_POLL_MS = 60_000;
  * which is why `balance` is only reported alongside `enabled`.
  */
 export function usePaymentBalance(): PaymentBalanceState {
-  const status = usePolledResource<PaymentStatusResponse>('/api/payment/status');
+  // `cache`: mounted in several places at once, so a later mount starts from the last answer.
+  const status = usePolledResource<PaymentStatusResponse>('/api/payment/status', { cache: true });
   const balance = usePolledResource<PaymentBalanceResponse>('/api/payment/balance', {
     intervalMs: BALANCE_POLL_MS,
+    cache: true,
   });
 
   const enabled = status.data?.enabled === true;
