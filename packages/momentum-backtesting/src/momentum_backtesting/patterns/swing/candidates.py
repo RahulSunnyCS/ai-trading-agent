@@ -228,3 +228,49 @@ def scan(
     if since is not None:
         frame = frame[frame["date"] >= pd.Timestamp(since)]
     return frame.sort_values(["date", "symbol", "pattern", "entry"]).reset_index(drop=True)
+
+
+def control_days(bars: SymbolBars, members: dict[int, set[str]] | None) -> list[pd.Timestamp]:
+    """Sessions on which this stock could serve as a control (addendum 1): in the universe,
+    through the price and turnover gates, above its 150-session average, within 25% of its
+    260-session high, and no bad bar in the last 15 sessions."""
+    uni = criteria()["universe"]["tradable_on_signal_day"]
+    above, near, _ = _context(bars)
+    close = bars.close
+    turnover = pd.Series(close * bars.volume).rolling(60).median().to_numpy()
+    ok = (
+        above
+        & near
+        & (close / bars.scale >= uni["min_close_rs"])
+        & (turnover >= uni["min_median_turnover_cr_60d"] * 1e7)
+        & (pd.Series(bars.bad.astype(float)).rolling(15, min_periods=1).max().to_numpy() == 0)
+    )
+    if members is not None:
+        years = pd.DatetimeIndex(bars.dates).year
+        ok &= np.array([bars.symbol in members.get(int(y), ()) for y in years])
+    return [pd.Timestamp(d) for d in bars.dates[ok]]
+
+
+def _control_chunk(args) -> list[tuple]:
+    chunk, members = args
+    return [(d, b.symbol) for b in chunk for d in control_days(b, members)]
+
+
+def control_pool(
+    daily: pd.DataFrame, members: dict[int, set[str]] | None = None, *, workers: int | None = None
+) -> pd.DataFrame:
+    """(date, symbol) for every session a stock is eligible as a control."""
+    symbols = list(split_symbols(daily).values())
+    workers = workers if workers is not None else min(8, os.cpu_count() or 1)
+    if workers <= 1 or len(symbols) < 20:
+        rows = _control_chunk((symbols, members))
+    else:
+        parts = [symbols[i :: workers * 4] for i in range(workers * 4)]
+        with ProcessPoolExecutor(workers) as pool:
+            rows = [
+                r for part in pool.map(_control_chunk, [(c, members) for c in parts]) for r in part
+            ]
+    frame = pd.DataFrame(rows, columns=["date", "symbol"])
+    frame["date"] = pd.to_datetime(frame["date"]).astype("datetime64[ns]")
+    frame["symbol"] = frame["symbol"].astype(object)
+    return frame.sort_values(["date", "symbol"]).reset_index(drop=True)

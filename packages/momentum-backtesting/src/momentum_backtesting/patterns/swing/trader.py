@@ -73,17 +73,27 @@ def simulate_trade(
     atr: float,
     stop_rule: str,
     target_r: float | None,
+    stop_pct: float | None = None,
 ) -> dict | None:
     """The trade a candidate signalled at daily index `signal` makes, or None when there is no
-    next session or the risk is not in (0, skip_if_risk_above]."""
+    next session or the risk is outside [skip_if_risk_below, skip_if_risk_above] (the floor is
+    0 unless the criteria set one). `stop_pct` overrides the stop rule with a stop that far
+    below the fill (a control trade copies its candidate's stop distance)."""
     spec = criteria()["exits"]
     entry = signal + 1
     if entry >= len(bars.close):
         return None
     fill = float(bars.open[entry])
-    stop = stop_price(stop_rule, fill, base_low, atr)
+    stop = (
+        fill * (1 - stop_pct)
+        if stop_pct is not None
+        else stop_price(stop_rule, fill, base_low, atr)
+    )
     risk = (fill - stop) / fill
-    if not (0 < risk <= spec["skip_if_risk_above"]) or not math.isfinite(risk):
+    floor = spec.get("skip_if_risk_below", 0.0)
+    if not math.isfinite(risk) or not (0 < risk <= spec["skip_if_risk_above"]):
+        return None
+    if stop_pct is None and risk < floor:
         return None
     target = fill + target_r * (fill - stop) if target_r else math.inf
     last = min(entry + spec["time_stop_sessions"] - 1, len(bars.close) - 1)
@@ -164,6 +174,7 @@ def run_portfolio(
     allowed: pd.Series,
     start: str | pd.Timestamp,
     end: str | pd.Timestamp,
+    cash_growth: pd.Series | None = None,
 ) -> tuple[pd.Series, pd.DataFrame]:
     """Daily equity (starting at 1.0) and the trades taken.
 
@@ -190,7 +201,10 @@ def run_portfolio(
     traded_bases: set[str] = set()
     curve, log = [], []
     close_arr = closes.reindex(days).ffill()
+    growth = cash_growth.reindex(days).fillna(1.0) if cash_growth is not None else None
     for day in days:
+        if growth is not None:
+            cash *= float(growth.at[day])  # idle cash earns the liquid fund
         # entries at the open, sized on the previous close's equity; a position that exits
         # today still holds its slot this morning (its exit comes at or after the open)
         if day in by_entry:

@@ -287,3 +287,54 @@ def test_no_candidate_with_a_bad_bar_in_its_atr_window():
     again = candidates.scan(adjust(marked, {}), workers=1)
     same_day = again[(again["symbol"] == "S0") & (again["date"] == row["date"])]
     assert same_day.empty
+
+
+def test_retry_stages_run_end_to_end_with_controls():
+    from momentum_backtesting.patterns.swing import retry
+
+    daily = adjust(_long_market(), {})
+    cands = candidates.scan(daily, workers=1)
+    pool = candidates.control_pool(daily, workers=1)
+    assert len(pool) > 0
+    bars = split_symbols(daily)
+    closes = daily.pivot_table(index="date", columns="symbol", values="close")
+    first = research.first_per_base(cands)
+    positions = {
+        s: {np.datetime64(d, "ns"): i for i, d in enumerate(b.dates)} for s, b in bars.items()
+    }
+    controls = retry.sample_controls(cands, first, pool)
+    outcomes, nets = {}, {}
+    for stop in ("base_low", "atr_1.5", "pct_8"):
+        for target in (2.0, 3.0, None):
+            key = f"{stop}|{target}"
+            outcomes[key] = trader.trade_outcomes(cands, bars, stop_rule=stop, target_r=target)
+            nets[key] = retry.control_net(cands, outcomes[key], controls, bars, positions, target)
+    # controls never include the candidate's own stock or one with a candidate that day
+    busy = cands.groupby("date")["symbol"].apply(set)
+    for idx, syms in controls.items():
+        assert not set(syms) & busy[cands.at[idx, "date"]]
+    assert all(r >= 0.03 for t in outcomes.values() for r in t["risk"].dropna())
+    a = retry.stage_a(cands, outcomes, nets, echo=lambda *_: None)
+    for v in a.values():
+        v["passes"] = True
+    days = closes.index
+    growth = retry.cash_growth(
+        days,
+        pd.Series(
+            np.linspace(100, 160, 700), index=pd.date_range("2010-01-01", periods=700, freq="W-FRI")
+        ),
+    )
+    b = retry.stage_b(cands, outcomes, closes, growth, a, echo=lambda *_: None)
+    assert len(b["portfolios"]) == 6 and np.isfinite(b["walk_forward_cagr"])
+    assert b["wf_curve"].index[0] >= pd.Timestamp("2015-01-01")
+
+
+def test_idle_cash_grows_with_the_liquid_fund():
+    from momentum_backtesting.patterns.swing import retry
+
+    days = pd.bdate_range("2020-01-06", periods=10)
+    weekly = pd.Series(
+        [100.0, 101.0, 102.01], index=pd.to_datetime(["2020-01-03", "2020-01-10", "2020-01-17"])
+    )
+    g = retry.cash_growth(days, weekly)
+    assert g.prod() == pytest.approx(1.0201)

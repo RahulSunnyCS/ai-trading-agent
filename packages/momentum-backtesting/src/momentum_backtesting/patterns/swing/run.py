@@ -79,3 +79,45 @@ def research_dev(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
         )
     echo(f"development passes: {report['development_passes']}  -> {path}")
     return path
+
+
+def retry_dev(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
+    """Addendum 1, the one retry: candidates rebuilt (the ATR-window fix changes them), the
+    control pool, then stages A and B -> search_spaces/bl043_retry_dev_result.json."""
+    from .. import SEARCH_SPACES
+    from ..bars import split_symbols
+    from .candidates import control_pool, scan
+    from .retry import run_dev
+
+    daily, members = development_bars()
+    since = criteria()["windows"]["development"]["from"]
+    echo("candidates (with the ATR-window fix) ...")
+    cands = scan(daily, members, since=since)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cands.to_parquet(out_dir / "candidates_dev_retry.parquet", index=False)
+    echo(f"{len(cands):,} candidates; control pool ...")
+    pool = control_pool(daily, members)
+    pool = pool[pool["date"] >= pd.Timestamp(since)]
+    pool.to_parquet(out_dir / "control_pool_dev.parquet", index=False)
+    used = set(cands["symbol"]) | set(pool["symbol"])
+    daily = daily[daily["symbol"].isin(used)]
+    bars = split_symbols(daily)
+    closes = daily.pivot_table(index="date", columns="symbol", values="close", aggfunc="last")
+    from ...config import DATA_DIR
+
+    cash = pd.read_csv(DATA_DIR / "stocks" / "cash_weekly.csv", index_col="date", parse_dates=True)
+    path = SEARCH_SPACES / "bl043_retry_dev_result.json"
+    report = run_dev(cands, bars, closes, pool, cash["close"], path, out_dir, echo=echo)
+    b = report["stage_b"]
+    if b.get("patterns"):
+        bench = report["benchmarks_same_weeks"]
+        n500, mid = bench["Nifty 500 TRI"], bench["Nifty Midcap 150 TRI"]
+        echo(
+            f"walk-forward portfolio {b['walk_forward_cagr']:.1%} "
+            f"(max fall {b['walk_forward_mdd']:.1%}) vs Nifty 500 TRI {n500['cagr']:.1%}, "
+            f"Midcap 150 TRI {mid['cagr']:.1%} ({mid['mdd']:.1%}); PBO {b['pbo']['pbo']:.2f}"
+        )
+    else:
+        echo(b.get("note", ""))
+    echo(f"development passes: {report['development_passes']}  -> {path}")
+    return path
