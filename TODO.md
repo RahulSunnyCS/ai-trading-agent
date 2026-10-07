@@ -577,8 +577,8 @@ is BL-043 (Planned), a standalone daily pattern system. Detail lives in the back
 
 ### 3.21 Daily pattern trading system — [BL-043](backlog/BL-043-daily-pattern-trading-system.md)
 
-Research only: a separate swing system, signals only, nothing placed. The plan, the owner's
-answers and the pass/kill rules live in the backlog item.
+**Closed 2026-10-07: no edge after costs** (original and retry killed; hold-out unread). The plan,
+results and the owner's answers live in the backlog item.
 
 | # | Task | Owner | State |
 |---|---|---|---|
@@ -586,8 +586,8 @@ answers and the pass/kill rules live in the backlog item.
 | 3.21.1 | Phase 1: daily detection + truncation test | claude | **Done 2026-10-07** (`mbt swing candidates`; 16,261 candidates on 8,788 bases, 2012–2023) |
 | 3.21.2 | Phase 2: trade simulator (next-open fills, GTT-style stop/target, 10 × 10%, costs) | claude | **Done 2026-10-07** (tests + a real trade hand-checked) |
 | 3.21.3 | Phases 3–5: playbook, score, rules test on 2012–2023 | claude | **Done 2026-10-07: killed.** Portfolio 7.8% vs Nifty 500 TRI 13.5%, PBO 0.32. The mean-R metric favoured tiny stops; simple breakout portfolios ≈ mid-cap index exposure (see item) |
-| 3.21.4 | Phase 6: one hold-out run | claude | Not run (dev killed); hold-out still sealed |
-| 3.21.5 | Phase 7: daily Telegram scan + paper tracking | owner→claude | Open |
+| 3.21.4 | Phase 6: one hold-out run | claude | Not run: the original and the retry (addendum 1) were both killed on development data; the hold-out is still sealed |
+| 3.21.5 | Phase 7: daily Telegram scan + paper tracking | owner→claude | Dropped: BL-043 closed, no edge after costs |
 
 ## Reference — where detail lives
 
