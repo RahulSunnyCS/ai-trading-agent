@@ -270,7 +270,7 @@ enable live execution until this shows one.**
 |---|---|---|---|
 | 3.5.1 | Authorize the AlgoTest MCP connector | owner | Not optional: `packages/option-backtesting` ingests option bars *through MCP*. Without it the nightly ingest cannot run. |
 | 3.5.2 | Check the nightly ingest Routine is still alive | owner | M-5 bound it to a session rather than fresh-per-fire (this org cannot grant MCP connectors to fresh-session Routines). A session-bound Routine dies with its session. Verify or rebind. |
-| 3.5.3 | Fix the dashboard type error and enforce `typecheck` in CI | claude | One pre-existing error keeps the whole dashboard out of CI typecheck. Roadmap Ideas #6. |
+| 3.5.3 | Fix the dashboard type error and enforce `typecheck` in CI | claude | Done 2026-10-07. The error had already been fixed; `ci.yml`'s "Dashboard — Build" job now runs `bun run --filter @ata/dashboard typecheck` before the build (job name unchanged for branch protection). Roadmap Ideas #6. |
 | 3.5.4 | Fix `personality-router`'s unreclaimed pending messages | claude | `personality-router.ts:402` claims XAUTOCLAIM reclaims failed messages. It does not — `recoverPending()` has no caller for that consumer group, so a crash mid-signal strands the message forever. `position-monitor.ts:253` has the correct pattern. |
 | 3.5.5 | Fail CI on undeclared dependencies | claude | Four latent bugs surfaced during the merge; nothing stops a fifth. Roadmap Ideas #5. |
 | 3.5.6 | Guard against documentation drift | claude | Roadmap Ideas #9. |

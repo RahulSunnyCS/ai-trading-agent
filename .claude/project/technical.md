@@ -60,9 +60,9 @@ bun run stop:research        # stop this checkout's research processes
 # Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)
 bun run --filter @ata/dashboard dev
 
-# Type-check the server (root script is scoped to @ata/server only — the
-# dashboard has one pre-existing type error and isn't CI-enforced yet; run
-# its own check explicitly if you touch apps/dashboard)
+# Type-check the server (root script is scoped to @ata/server only; the
+# dashboard has its own check, which CI runs in the dashboard job — run it
+# explicitly if you touch apps/dashboard)
 bun run typecheck
 bun run --filter @ata/dashboard typecheck
 
