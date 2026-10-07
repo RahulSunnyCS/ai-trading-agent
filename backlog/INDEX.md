@@ -17,7 +17,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-014](BL-014-ci-and-merge-gates.md) | CI and merge gates: nothing reaches `main` while checks are red | P0 | In progress | chore | infra |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
 | [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data in `trading-data`, derived tables for straddle backtests, daily top-up | P0 | In progress | feature | trading-data |
-| [BL-005](BL-005-faster-momentum-backtests.md) | Faster Momentum backtests (Broad: 55 s cold, 21 s warm) | P1 | In progress | improvement | momentum |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
@@ -29,6 +28,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-035](BL-035-consolidation-tightness-feature.md) | Consolidation tightness as a Momentum ranking feature (the cheap "flag") | P1 | Idea | research | momentum |
 | [BL-038](BL-038-monthly-expiry-stock-options-collection.md) | Collect every F&O stock's options on its monthly expiry day, from Fyers, from October 2026 | P1 | Planned | feature | options |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
+| [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-036](BL-036-momentum-ui-from-bl010.md) | Momentum dashboard: what the BL-010 review changes on screen | P2 | Planned | improvement | dashboard |
 | [BL-003](BL-003-momentum-weekly-rebalance-loading.md) | Momentum: honest loading states on Weekly signal and Rebalance | P2 | Planned | improvement | dashboard |
 | [BL-004](BL-004-research-stack-production-mode.md) | Production-build mode for the local research stack (`bun run start:prod`) | P2 | Planned | improvement | infra |
@@ -51,6 +51,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-005](BL-005-faster-momentum-backtests.md) | Faster Momentum backtests (Broad: 55 s cold, 21 s warm) | Done: Phases 1–4 merged, results identical; identical re-run 62 s → 0.0 s, ETF/Stock 3–4× faster; the warm-Broad goal was missed on real data, so the rest moved to BL-039 | 2026-10-07 |
 | [BL-019](BL-019-product-focus-and-freeze.md) | Product focus: rewrite the overview, freeze the dormant parts | Done: overview and business rewritten; personality engine, payments and TODO §3.1–3.4, 3.7 marked frozen | 2026-10-06 |
 | [BL-011](BL-011-laptop-scheduler.md) | Laptop as scheduler: broker login at 08:00 (Phases 2–4 moved to BL-012) | Done: 08:00 IST dispatch verified on 5 and 6 Oct; the rest continues as BL-012 | 2026-10-06 |
 | [BL-013](BL-013-dashboard-redesign.md) | Dashboard redesign: design system, shell, and per-tab UX for Momentum and Options Lab | Done: Phases 1–8 shipped; Phase 9 parked | 2026-10-05 |

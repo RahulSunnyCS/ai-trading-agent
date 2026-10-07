@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the slowest step in the research loop. Every Broad iteration waits 20–55 s |
-| **Status** | In progress (Phase 1) |
+| **Status** | Done (Phases 1–4; the rest moved to [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md)) |
 | **Type** | improvement |
 | **Area** | momentum (+ dashboard for polling and lazy cards) |
 | **Created** | 2026-10-05 |
@@ -229,3 +229,13 @@ under ~400 KB, all with byte-identical results (BL-001 goldens).
   (copy and lake symlink may exaggerate connection cost); then cache `compute_weekly_features` per
   `data_version`, make `has_total_market_data` / connection set-up once-per-process, and have the
   weekly job build only the core and `latest`. Results must stay identical, same gates as before.
+- 2026-10-07 — **Closed.** Phases 1–4 are merged and every result is identical. Met: identical re-run
+  (62 s → 0.0 s on real data), ETF and Stock runs (3–4× faster), engine (1.6 s → 0.3 s), the stage
+  banner, gzip, lazy sections. **Not met, on purpose or by finding:** (1) the warm-Broad goal of about
+  5 s: a changed Broad request is still about 19.5 s of CPU on real data, the time being in the
+  Trades section's weekly features and in catalog connection set-up, not the engine; (2) the "core
+  under 400 KB" goal: 593 KB uncompressed, 106 KB gzipped, dropped (`rotations` is 515 KB; not worth
+  changing the chart and result shape). Owner decided (2026-10-07) to move the remainder to
+  [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) at P2: measure on the real server first,
+  then make the weekly job build only what it reads, then cache the weekly features and the catalog
+  connection if still needed. The "Phase 5" sketched in the entry above became BL-039.
