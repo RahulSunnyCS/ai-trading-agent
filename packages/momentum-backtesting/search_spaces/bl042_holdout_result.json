@@ -1,0 +1,5 @@
+{
+  "not_run": true,
+  "date": "2026-10-07",
+  "reason": "No pattern passed Phases 3-5 (event study kill x3; PBO 0.57). The owner closed BL-042 as informative, not adopted; the sealed 2024-01-01 hold-out passes unread to BL-043. This file exists so `mbt patterns holdout` refuses to run for BL-042."
+}

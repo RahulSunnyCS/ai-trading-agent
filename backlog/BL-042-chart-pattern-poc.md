@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner wants an early read on whether patterns add to the Momentum pick; research only, so nothing live is at risk |
-| **Status** | In progress |
+| **Status** | Done — informative, not adopted |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-07 |
@@ -394,3 +394,9 @@ once on the sealed data. A guess before seeing any data:
   - These are 27 post-hoc looks. A confirmation needs a new pre-registration, tested on the
     still-sealed 2024–26 hold-out, together with a true breakout-day entry with a stop
     (proposed to the owner as BL-043).
+- 2026-10-07 — **Phase 7, owner's decision: closed as informative, not adopted.** The owner's
+  next idea, a standalone daily pattern system with scored entries, stop-loss, target and a
+  60-day health switch, is BL-043. The sealed 2024–26 hold-out passes **unread** to BL-043.
+  `search_spaces/bl042_holdout_result.json` records "not run", so `mbt patterns holdout` refuses
+  to read it for BL-042. The detectors, quality and learned scores, gallery and test harness
+  stay in `momentum_backtesting/patterns/` for BL-043, BL-031 and BL-032.
