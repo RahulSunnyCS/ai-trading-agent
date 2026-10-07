@@ -11,7 +11,13 @@
     "dataset": "Broad Momentum",
     "universe_kind": "turnover_rank",
     "membership": "turnover_rank_members_by_year, as known each January",
-    "liquidity": { "min_turnover_cr": 2.0, "min_price": 30.0, "floor_ratio": 0.25, "circuit": true, "circuit_run": 3 },
+    "liquidity": {
+      "min_turnover_cr": 2.0,
+      "min_price": 30.0,
+      "floor_ratio": 0.25,
+      "circuit": true,
+      "circuit_run": 3
+    },
     "series_break_policy": "verified",
     "respect_circuits": true,
     "bars": "bars_1d_stock daily OHLCV; highs/lows/opens back-adjusted by chaining NSE prevclose (factor = prevclose_d / close_{d-1}); every pattern measure is a ratio inside its window"
@@ -43,7 +49,14 @@
     },
     "flag": {
       "pole": { "min_rise": 0.2, "min_days": 3, "max_days": 25 },
-      "flag": { "min_days": 5, "max_days": 20, "max_retrace_of_pole": 0.3333, "max_drop_from_pole_high": 0.15, "highs_not_rising": true, "volume_below_pole": true },
+      "flag": {
+        "min_days": 5,
+        "max_days": 20,
+        "max_retrace_of_pole": 0.3333,
+        "max_drop_from_pole_high": 0.15,
+        "highs_not_rising": true,
+        "volume_below_pole": true
+      },
       "pivot": "highest high of the flag"
     },
     "high_tight_flag": {
@@ -53,8 +66,20 @@
     "cup_handle": {
       "pivots": "causal zigzag on weekly closes, reversal 8%; a swing point exists only from the week that confirmed it",
       "prior_advance": 0.3,
-      "cup": { "min_weeks": 7, "max_weeks": 65, "min_depth": 0.12, "max_depth": 0.35, "min_weeks_in_lower_third": 3, "right_lip_within_of_left": 0.1 },
-      "handle": { "min_weeks": 1, "max_weeks": 4, "max_depth": 0.15, "must_be_in_upper_half": true },
+      "cup": {
+        "min_weeks": 7,
+        "max_weeks": 65,
+        "min_depth": 0.12,
+        "max_depth": 0.35,
+        "min_weeks_in_lower_third": 3,
+        "right_lip_within_of_left": 0.1
+      },
+      "handle": {
+        "min_weeks": 1,
+        "max_weeks": 4,
+        "max_depth": 0.15,
+        "must_be_in_upper_half": true
+      },
       "pivot": "highest high of the handle"
     }
   },
@@ -89,7 +114,11 @@
     "test": "one-sided t on the weekly statistic series with Newey-West standard errors, lags = horizon",
     "multiple_testing": "Holm across 3 patterns x 3 horizons, alpha 0.05",
     "pass": "the 13-week test survives Holm and its mean is positive",
-    "minimum_sample": { "events": 100, "distinct_weeks": 52, "below": "inconclusive - treated as not passing" }
+    "minimum_sample": {
+      "events": 100,
+      "distinct_weeks": 52,
+      "below": "inconclusive - treated as not passing"
+    }
   },
   "phase_5_ranking_test": {
     "baseline": {
@@ -116,9 +145,18 @@
     },
     "hook": "the pattern shape re-ranks UniverseRanking.stock_pool_ranks; run_broad_backtest runs unchanged on that ranking (category_mode off)",
     "shapes": {
-      "blend": { "weights": [0.25, 0.5, 0.75], "score": "(1-w) * momentum_pct + w * pattern_score, momentum_pct = 1 - (pool_rank-1)/(N-1); re-ranked, ties by pool rank" },
-      "filter": { "top_n": [20, 40], "how": "detected names with pool rank <= top_n first (in momentum order), then every other pool name in momentum order" },
-      "bonus": { "ranks": [5, 10], "how": "detected names move up B ranks; re-ranked, ties by pool rank" }
+      "blend": {
+        "weights": [0.25, 0.5, 0.75],
+        "score": "(1-w) * momentum_pct + w * pattern_score, momentum_pct = 1 - (pool_rank-1)/(N-1); re-ranked, ties by pool rank"
+      },
+      "filter": {
+        "top_n": [20, 40],
+        "how": "detected names with pool rank <= top_n first (in momentum order), then every other pool name in momentum order"
+      },
+      "bonus": {
+        "ranks": [5, 10],
+        "how": "detected names move up B ranks; re-ranked, ties by pool rank"
+      }
     },
     "trials": 21,
     "walk_forward": {
@@ -126,7 +164,11 @@
       "pick": "for each year, per pattern, the shape with the highest sum of weekly log excess return over the baseline from 2012-01-06 to 13 weeks before 1 January of that year",
       "hold": "that shape through the calendar year; years joined"
     },
-    "pbo": { "blocks": 16, "on": "weekly log excess return over the baseline, 21 trials, development window", "kill_above": 0.3 },
+    "pbo": {
+      "blocks": 16,
+      "on": "weekly log excess return over the baseline, 21 trials, development window",
+      "kill_above": 0.3
+    },
     "pass": "joined walk-forward excess CAGR over the baseline > 0, AND PBO <= 0.3",
     "holdout_choice": "per passing pattern, the shape with the highest development-window excess log return over the baseline"
   },
@@ -134,8 +176,14 @@
     "runs_allowed": 1,
     "window": { "from": "2024-01-01", "to": "2026-09-25" },
     "enters": "a pattern that passed Phase 3, Phase 4 and Phase 5",
-    "pass": { "excess_cagr_pts_over_baseline": 2.0, "max_drawdown_not_worse_than_baseline_by_pts": 3.0 },
-    "reported": ["Nifty200 Momentum 30 TRI", "the four bl010_phase6_frozen.json configs with the chosen shape applied to combined_pool_ranks"]
+    "pass": {
+      "excess_cagr_pts_over_baseline": 2.0,
+      "max_drawdown_not_worse_than_baseline_by_pts": 3.0
+    },
+    "reported": [
+      "Nifty200 Momentum 30 TRI",
+      "the four bl010_phase6_frozen.json configs with the chosen shape applied to combined_pool_ranks"
+    ]
   },
   "will_not_run": [
     "any detection, event study or backtest that reads 2024-01-01 or later before Phase 6",
