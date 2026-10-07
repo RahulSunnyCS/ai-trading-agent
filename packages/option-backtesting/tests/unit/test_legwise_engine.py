@@ -58,9 +58,10 @@ def sell_leg(**extra) -> dict:
     }
 
 
-def test_fixed_time_entry_and_exit_at_open_of_those_minutes():
+def test_fixed_time_entry_and_exit_at_the_close_of_the_bar_ending_then():
+    """09:20 is the close of the 09:19 bar, as AlgoTest reads it (BL-009 Phase 1)."""
     data = day(
-        {(22000.0, "CE"): bars(100, {"09:20": (101, 103, 99, 102), "15:00": (80, 81, 79, 80)})}
+        {(22000.0, "CE"): bars(100, {"09:19": (99, 103, 98, 101), "14:59": (81, 81, 79, 80)})}
     )
     result = simulate_day(strategy([sell_leg()]), data)
     [t] = result.trades
@@ -127,7 +128,7 @@ def test_range_breakout_enters_at_the_range_high_after_the_window():
                     "09:25": (50, 58, 49, 55),  # range high 58
                     "09:31": (55, 57, 54, 56),  # inside the range: no entry
                     "09:40": (56, 61, 30, 60),  # breaks 58; its low must not stop it out
-                    "15:00": (70, 70, 70, 70),
+                    "14:59": (70, 70, 70, 70),  # the exit at 15:00 is this bar's close
                 },
             )
         }
@@ -217,7 +218,7 @@ def test_schema_rejects_unsupported_or_inconsistent_settings():
 
 def test_lot_size_follows_each_legs_expiry_not_the_trading_day():
     """15 Jan 2025, after the 20 Nov 2024 revision: the 16 Jan weekly was listed at 75, but
-    the 30 Jan monthly was listed earlier and keeps 25 until it expires."""
+    the 30 Jan monthly was listed earlier and keeps 25 until it expires (historical sizing)."""
     weekly, monthly = date(2025, 1, 16), date(2025, 1, 30)
     data = DayData(
         day=date(2025, 1, 15),
@@ -234,6 +235,10 @@ def test_lot_size_follows_each_legs_expiry_not_the_trading_day():
         sell_leg(id="weekly_ce", expiry="weekly"),
         sell_leg(id="monthly_ce", expiry="monthly"),
     ]
-    result = simulate_day(strategy(legs), data)
+    historical = strategy(legs, execution={"lot_sizing": "historical"})
+    result = simulate_day(historical, data)
     qty = {t.leg_id: t.qty for t in result.trades}
     assert qty == {"weekly_ce": 75, "monthly_ce": 25}
+    # the default, "current" (owner's choice, like AlgoTest): today's lot on every leg
+    result = simulate_day(strategy(legs), data, sizing_date=date(2026, 10, 7))
+    assert {t.leg_id: t.qty for t in result.trades} == {"weekly_ce": 65, "monthly_ce": 65}
