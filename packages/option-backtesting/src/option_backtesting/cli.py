@@ -560,6 +560,45 @@ def legwise_run(
         typer.echo("")
 
 
+@legwise_app.command("compare")
+def legwise_compare(
+    strategy_path: Path = typer.Argument(..., help="Leg-wise strategy YAML."),
+    algotest_csv: Path = typer.Argument(..., help="AlgoTest trade-log export (Download Report)."),
+    from_: str | None = typer.Option(None, "--from", help="First day, YYYY-MM-DD."),
+    to: str | None = typer.Option(None, "--to", help="Last day, YYYY-MM-DD."),
+    out: Path | None = typer.Option(None, "--out", help="Write the Markdown report here."),
+) -> None:
+    """Run a strategy over the days of an AlgoTest backtest export and compare trade by trade:
+    strikes, exit reasons, minutes, prices, P&L (BL-009 Phase 1)."""
+    from .fyers.daily import data_dir
+    from .legwise.algotest import compare, load_algotest_csv, report
+    from .legwise.engine import run_legwise
+    from .legwise.schema import load_legwise
+
+    strategy = load_legwise(strategy_path)
+    theirs = load_algotest_csv(algotest_csv)
+    start = date.fromisoformat(from_) if from_ else None
+    end = date.fromisoformat(to) if to else None
+    theirs = [d for d in theirs if not ((start and d.day < start) or (end and d.day > end))]
+    if not theirs:
+        raise typer.BadParameter("no AlgoTest days in that range")
+    skipped: dict[date, str] = {}
+    ours = run_legwise(
+        strategy,
+        data_dir(),
+        theirs[0].day,
+        theirs[-1].day,
+        include_excluded=True,
+        skipped=skipped,
+        only_days={d.day for d in theirs},
+    )
+    text = report(compare(theirs, ours, strategy, skipped), strategy)
+    if out:
+        out.write_text(text)
+        typer.echo(f"wrote {out}")
+    typer.echo(text if not out else text.split("## Days that differ")[0])
+
+
 @legwise_app.command("rerun")
 def legwise_rerun(
     from_: str | None = typer.Option(None, "--from", help="First day, YYYY-MM-DD."),

@@ -9,10 +9,11 @@ Derived datasets (BL-034 Phase 3), rebuilt from the 1-minute lake — never edit
 **Time.** A 5-minute row with `bucket` T covers the window [T, T+5 min) of the session
 09:15-15:30 (75 windows; off-session bars are ignored). Its values use only the 1-minute bars
 that START inside the window (and, for carried prices, earlier ones), so a row is known at
-T+5. `open` is the price at the window's START exactly as the 1-minute legwise engine sees it
-(the open of the window's first minute, or the last earlier close when that minute had no
-trade); high/low/close/volume/oi are the window's. IV, greeks and the forward are computed from
-the window's CLOSE.
+T+5. `open` is the open of the window's first minute (the last earlier close when that minute
+had no trade) — the bar the engine checks a gap against. The price AT the window's start, which
+fills use (`Series.price_at`), is the previous window's close; at 09:15 it is this open.
+high/low/close/volume/oi are the window's. IV, greeks and the forward are computed from the
+window's CLOSE.
 
 **Contracts kept.** Every expiry within MAX_DTE_DAYS of the day; a strike from the first window
 it is within STRIKES_EACH_SIDE steps of that window's ATM (ATM = the spot at the window's start,
@@ -53,7 +54,9 @@ import pyarrow.parquet as pq
 from . import lake
 from .reference import REFERENCE_DIR
 
-DERIVED_VERSION = 1
+#: 3 (2026-10-07): back to the window's first trade as `open` after a short-lived 2 (the
+#: previous minute's close), which hid gaps from the engine's stop fills on 5-minute bars.
+DERIVED_VERSION = 3
 IST = ZoneInfo("Asia/Kolkata")
 BUCKET_MINUTES = 5
 N_BUCKETS = 75  # 09:15 .. 15:25 window starts

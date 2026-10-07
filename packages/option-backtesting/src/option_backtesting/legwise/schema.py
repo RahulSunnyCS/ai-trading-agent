@@ -157,6 +157,11 @@ class Execution(_Model):
     slippage_pct: float = Field(default=0.0, ge=0)
     #: Flat charge per order (entry and exit are one order each).
     cost_per_order_inr: float = Field(default=0.0, ge=0)
+    #: Lot size used for every leg. "current" (the owner's choice, 2026-10-07, matching
+    #: AlgoTest): today's lot for the whole history, so a rupee stop means the same on every
+    #: day. "historical": each contract's own lot at the time (lot_sizes.csv keyed by expiry —
+    #: what could actually have been traded).
+    lot_sizing: Literal["current", "historical"] = "current"
 
 
 class LegwiseStrategy(_Model):

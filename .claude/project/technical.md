@@ -52,10 +52,15 @@ bun run dev                 # watch mode with auto-reload (apps/server)
 bun run start:server         # production-style start (apps/server)
 
 # Standalone research stack (no Docker): both Python APIs + one dashboard
-bun run start                # restart Momentum :8765, Options :8000, dashboard :5190
+bun run start                # restart Momentum :8765, Options :8000, dashboard :5190 (next dev, for UI editing)
 bun run start:backend        # restart the two Python APIs only
 bun run start:frontend       # restart the dashboard only
 bun run stop:research        # stop this checkout's research processes
+# Same, with a production build of the dashboard (BL-004: pages ready in ~1 s, not 6-10 s).
+# Builds into apps/dashboard/.next-prod, skipped when nothing changed; refuses to start without
+# DASHBOARD_PASSWORD (env or apps/dashboard/.env.local). Both modes bind 127.0.0.1 only.
+bun run start:prod           # APIs + `next start` on :5190; sign in at /login
+bun run start:frontend:prod  # the production dashboard only; add `-- --rebuild` / `-- --port 5191`
 
 # Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)
 bun run --filter @ata/dashboard dev
@@ -528,7 +533,7 @@ Critical variables whose misconfiguration causes real pain:
   strike interval anywhere — always call `lotSize()`/`strikeStep()` from `@trading/market-reference`
   (TypeScript) or read the CSVs directly (Python); see that package's `CLAUDE.md` for the
   filesystem-level link between it and `option-backtesting`'s reference data.
-- **Lot size belongs to the contract's expiry, not the trading day** — the exchanges revise a lot size per contract, and a contract listed before a revision keeps its old size until it expires. On 2025-01-15 NIFTY's 16 Jan weekly is 75 while the 30 Jan monthly is still 25. `lot_sizes.csv`'s `effective_date` is therefore the first expiry a size applies to (history 2024-10 → today for all six indices, each value checked against the circulars and against the vendor volumes, whose per-minute quantities are multiples of the lot). Look it up with the leg's expiry (`ReferenceData.lot_size(underlying, expiry)`, `lotSize(underlying, expiry)`); the legwise engine does, per leg. A day-keyed lookup is 3× wrong for the weeklies between 2024-11-20 and 2025-01-01.
+- **Lot size belongs to the contract's expiry, not the trading day** — the exchanges revise a lot size per contract, and a contract listed before a revision keeps its old size until it expires. On 2025-01-15 NIFTY's 16 Jan weekly is 75 while the 30 Jan monthly is still 25. `lot_sizes.csv`'s `effective_date` is therefore the first expiry a size applies to (history 2024-10 → today for all six indices, each value checked against the circulars and against the vendor volumes, whose per-minute quantities are multiples of the lot). Look it up with the leg's expiry (`ReferenceData.lot_size(underlying, expiry)`, `lotSize(underlying, expiry)`) — the legwise engine's `execution.lot_sizing: historical`. Its default is `current` (owner, 2026-10-07, like AlgoTest): today's lot on every day, so a rupee stop means the same throughout. A day-keyed lookup is 3× wrong for the weeklies between 2024-11-20 and 2025-01-01.
 - **Fyers token dies at the next 06:00 IST, not 24h after login** — `expires_in` is ignored: `fyersTokenExpiry()` (`packages/broker-identity`; Python mirror `fyers.token_expiry`) sets the expiry, stored rows are clamped on read from `updated_at`, and `/api/auth/fyers/status` also probes Fyers' profile endpoint so a revoked token shows Expired. The laptop's `fyers-login` launchd job (08:05 IST) refreshes it unattended; the dashboard button is the manual fallback. Dashboard-login tokens are no longer "manual daily only". New dashboard-login tokens are AES-256 encrypted at rest in `broker_tokens` through PostgreSQL pgcrypto; the browser receives only app ID/status/expiry. Missing, expired, or app-ID-mismatched tokens surface as “No API token” and require re-login. A pre-market token-validity check job runs at 08:45 IST on weekdays (opt-in via TOKEN_VALIDITY_SCHEDULER_ENABLED).
 - **TimescaleDB is not optional** — the standard `postgres:16-alpine` image does NOT have TimescaleDB. The Docker Compose uses `timescale/timescaledb:latest-pg16`. Pointing the app at a vanilla PostgreSQL instance will fail on migration
 - **Hypertable full-table scans** — a query on `market_ticks` or `straddle_snapshots` without a `WHERE time > ...` filter will scan years of data. Always filter by time range

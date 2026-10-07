@@ -11,6 +11,8 @@
     "start": "bun scripts/dev-stack.mjs research",
     "start:backend": "bun scripts/dev-stack.mjs backends",
     "start:frontend": "bun scripts/dev-stack.mjs frontend",
+    "start:prod": "bun scripts/dev-stack.mjs research --prod",
+    "start:frontend:prod": "bun scripts/dev-stack.mjs frontend --prod",
     "stop:research": "bun scripts/dev-stack.mjs stop",
     "start:tunnel": "cloudflared tunnel run",
     "start:server": "bun run --filter @ata/server start",

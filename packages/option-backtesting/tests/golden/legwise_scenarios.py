@@ -204,6 +204,11 @@ def render_scenario(
     }
 
 
+#: Pinned so `lot_sizing: current` (today's lot) cannot move the snapshot when a new lot row
+#: becomes effective: the frozen days are sized as on the day the suite was accepted.
+SIZING_DATE = date(2026, 10, 7)
+
+
 def build_document() -> dict:
     # Windows overlap heavily. Leg-wise sessions are deliberately independent,
     # so load six Parquet days and simulate the 4x6 unique pairs once, then form
@@ -211,7 +216,7 @@ def build_document() -> dict:
     strategies = {filename: load_legwise(STRATEGIES_ROOT / filename) for filename in STRATEGY_FILES}
     market_days = {day: load_day(FIXTURE_ROOT, "NIFTY", day) for day in DAYS}
     matrix = {
-        (filename, day): simulate_day(strategy, market_days[day])
+        (filename, day): simulate_day(strategy, market_days[day], sizing_date=SIZING_DATE)
         for filename, strategy in strategies.items()
         for day in DAYS
     }

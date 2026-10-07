@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — the measurement layer for every options idea; nothing trades live until it is trusted |
-| **Status** | Planned |
+| **Status** | In progress (Phase 1) |
 | **Type** | feature |
 | **Area** | options (+ trading-data, dashboard) |
 | **Created** | 2026-10-04 |
 | **Depends on** | TODO 3.10.7 (AlgoTest sanity check — becomes Phase 1 here), TODO 3.10.15 (NIFTY pre-Sep-2025 expiry weekday); owner: vendor data purchase, Quantiply documents |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.10.7 |
 
 ## Context
 
@@ -236,7 +236,7 @@ more, not less. V11 replaces "median CAGR" as the first number to read.
 ## Open questions
 
 1. Vendor: name and price — owner will tell later.
-2. AlgoTest trade logs for the four strategies, 23 Sep–1 Oct 2026 — owner will give later.
+2. AlgoTest trade log for the range-breakout buy strategy — owner will add when ready (the other three arrived 2026-10-07).
 3. Confirm the four strike modes whose Quantiply pages did not load. Working definitions (the
    usual Stockmock/AlgoTest ones, to be checked on Stockmock before building):
    straddle width = ATM ± multiplier × ATM straddle price, rounded to a strike;
@@ -244,6 +244,12 @@ more, not less. V11 replaces "median CAGR" as the first number to read.
    specific strike = a fixed strike number; % of underlying = not yet understood.
 
 ### Answered
+
+- **Phase 1 start (2026-10-07):** start with `Nifty_Widesl_917_OTM1` (export 2025-01-01 →
+  2026-10-06, 436 days); the other three follow. **Lot size: today's lot for all history, like
+  AlgoTest** (`execution.lot_sizing: current`, the default; `historical` keeps BL-034's per-expiry
+  lots). **Match** = same strike and exit reason, exit minute within ±1 after aligning AlgoTest's
+  end-of-minute stamps, every price gap explained (data or rule).
 
 - **Scope (2026-10-05):** NIFTY only; intraday only at first, positional later.
 - **Quantiply docs (2026-10-05):** the public documentation site; everything in it must be
@@ -276,3 +282,25 @@ more, not less. V11 replaces "median CAGR" as the first number to read.
 - 2026-10-06 — Phase 2 superseded by BL-034: the vendor's full history (the same provider as the
   sample) is on the SSD and is being loaded into the `trading-data` lake there. Scope note: the
   owner now wants NIFTY **and SENSEX** derived tables (was NIFTY only on 2026-10-05).
+- 2026-10-07 — **Phase 1 started** with the owner's first export (`tests/fixtures/algotest/
+  nifty_widesl_917_otm1.csv`) and `obt legwise compare`. Findings, round 1 (details in
+  option-backtesting DECISIONS.md):
+  - The strategy YAML had the trail as points; AlgoTest's is **percentage** 15/10 — fixed.
+  - **Rule found and fixed:** AlgoTest's candle stamped T is our bar starting T−1, and its fills
+    at T use that candle's close (verified on AlgoTest's own candles for 2026-09-24: entry 92.25
+    and stop exit 64.00 are exactly our 09:16 and 13:42 closes). The engine filled at the OPEN of
+    the T bar; it now uses `Series.price_at` = close of the bar ending at T.
+  - Result over 436 days (429 both ran; 7 are lake holes): strikes 429/429 equal (was 420); exit
+    reasons equal on all but 5 days; exit minute within tolerance on all but 27; P&L engine
+    ₹1,30,906 vs AlgoTest ₹1,38,054 (was ₹1,23,413). Stop minutes: AlgoTest = ours + 1 on 253
+    legs (end-of-minute stamps).
+  - Remaining gaps look like data, not rules: prices differ by 1.19 on average (closes agree on
+    the Fyers day checked; opens/highs/lows differ slightly; 5.5% of Jan-2025 vendor closes are
+    off the 0.05 tick), and the 5 reason / 27 minute days are thresholds crossed a minute or a
+    few points apart (2026-05-14: our combined MTM −₹2,538 at 13:37, ₹38 past the stop). Next:
+    AlgoTest candles for the in-window differing days (2026-07-17, 09-11, 10-05, 10-06) to prove it.
+- 2026-10-07 — **Round 2**: exports for Dir_924 (RE COST), closest premium and the new SENSEX
+  OTM2 strategy; strategy files follow the owner's PDFs (closest premium ₹65; SENSEX file added).
+  Rule found: stop/target levels rounded to the nearest 0.05 tick (512/515 stop exits). SENSEX
+  now reproduces AlgoTest on 375 of 424 days (P&L −0.2%); NIFTY differs on prices even on Fyers
+  days because AlgoTest's NIFTY feed differs from Fyers' (7 of 25 closes equal) — data, not rules.

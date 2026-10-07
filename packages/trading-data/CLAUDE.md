@@ -102,9 +102,10 @@ table instead.
   lock, which `mbt serve` can hold for hours. The legwise engine leaves out the days it lists
   (`legwise.market.backtest_days`; `--include-excluded` to keep them). Not backed up: regenerable.
 - **A derived 5-minute row is known at the window's END.** Row `bucket` T covers [T, T+5):
-  its `open` is the price at T exactly as the 1-minute engine sees it (that minute's open, or
-  the last earlier close); everything else is the window's, and IV/greeks/forward come from
-  its close. Nothing is carried past the last minute that has an index bar.
+  its `open` is its first minute's open (the last earlier close when that minute had no trade) —
+  the bar a stop's gap is checked against; the price AT T, which fills use, is the previous
+  window's close (`Series.price_at`, BL-009). Everything else is the window's, and
+  IV/greeks/forward come from its close. Nothing is carried past the last minute that has an index bar.
   `tests/test_derived.py::test_no_window_uses_later_bars` cuts a day short and requires every
   earlier window to be unchanged — keep it passing when changing `derived.py`, and bump
   `DERIVED_VERSION` with any formula or column change.
