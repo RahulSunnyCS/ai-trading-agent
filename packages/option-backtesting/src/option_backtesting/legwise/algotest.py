@@ -2,10 +2,16 @@
 AlgoTest's backtest trade log, and a day-by-day comparison with the leg-wise engine
 (BL-009 Phase 1: prove the engine's intrabar rules against AlgoTest's own results).
 
-The export ("Download Report" on an AlgoTest backtest) is a CSV with one parent row per day
-(`Index` "12": day, VIX, day P/L) followed by one row per leg ("12.1", "12.2": entry/exit date
-and time, CE/PE, strike, Buy/Sell, quantity, prices, P/L). Times carry a leading space and
-seconds (" 09:17:00"); the file starts with a byte-order mark.
+Two export formats, both one parent row per day (`Index` "12") followed by one row per leg
+("12.1", "12.2"), told apart by their header:
+
+- **Report** ("Download Report"): `Entry Date`, `Entry Time`, `Type`, `Strike`, `B/S`, `Qty`,
+  `Entry Price`, `Exit Price`, `Vix`, `P/L`. Times carry a leading space (" 09:17:00"); the file
+  starts with a byte-order mark.
+- **Trades** ("Download trades"): `Entry-Date`, `Entry-Time`, `Instrument-Kind`, `StrikePrice`,
+  `Position`, `Quantity`, `Entry-Price`, `ExitPrice`, `ExpiryDate`, `Remarks`, `P/L`; the parent
+  row's prices are the index's. A leg that never entered (a range breakout that did not break)
+  has no row.
 
 **Minute stamps.** A fill at a scheduled time (entry, exit time) is stamped with that time on
 both sides. A stop exit or a re-entry is stamped by AlgoTest at the END of the minute that
@@ -51,6 +57,7 @@ class AlgoLeg:
     entry_price: float
     exit_price: float
     pnl: float
+    expiry: date | None = None  # only the Trades format has it
 
 
 @dataclass
@@ -66,35 +73,38 @@ def _minute(text: str) -> int:
 
 
 def load_algotest_csv(path: Path) -> list[AlgoDay]:
-    """Every day of an AlgoTest trade-log export, legs in file order."""
-    days: list[AlgoDay] = []
+    """Every day of an AlgoTest trade-log export (either format), legs in file order."""
     with path.open(newline="", encoding="utf-8-sig") as fh:
-        for row in csv.DictReader(fh):
-            index = row["Index"].strip()
-            if "." not in index:
-                days.append(
-                    AlgoDay(
-                        day=date.fromisoformat(row["Entry Date"].strip()),
-                        vix=float(row["Vix"]) if row["Vix"].strip() else None,
-                        pnl=float(row["P/L"]),
-                    )
-                )
-                continue
-            if not days:
-                raise ValueError(f"{path}: leg row {index} before any day row")
-            days[-1].legs.append(
-                AlgoLeg(
-                    option_type=row["Type"].strip(),
-                    strike=float(row["Strike"]),
-                    position=row["B/S"].strip().lower(),
-                    qty=int(float(row["Qty"])),
-                    entry_min=_minute(row["Entry Time"]),
-                    exit_min=_minute(row["Exit Time"]),
-                    entry_price=float(row["Entry Price"]),
-                    exit_price=float(row["Exit Price"]),
+        rows = list(csv.DictReader(fh))
+    if rows and "Entry-Date" in rows[0]:
+        return _load_trades_format(rows, path)
+    days: list[AlgoDay] = []
+    for row in rows:
+        index = row["Index"].strip()
+        if "." not in index:
+            days.append(
+                AlgoDay(
+                    day=date.fromisoformat(row["Entry Date"].strip()),
+                    vix=float(row["Vix"]) if row["Vix"].strip() else None,
                     pnl=float(row["P/L"]),
                 )
             )
+            continue
+        if not days:
+            raise ValueError(f"{path}: leg row {index} before any day row")
+        days[-1].legs.append(
+            AlgoLeg(
+                option_type=row["Type"].strip(),
+                strike=float(row["Strike"]),
+                position=row["B/S"].strip().lower(),
+                qty=int(float(row["Qty"])),
+                entry_min=_minute(row["Entry Time"]),
+                exit_min=_minute(row["Exit Time"]),
+                entry_price=float(row["Entry Price"]),
+                exit_price=float(row["Exit Price"]),
+                pnl=float(row["P/L"]),
+            )
+        )
     return days
 
 
@@ -199,8 +209,10 @@ def compare_day(
             qty=(leg.qty, trade.qty),
         )
         legs.append(diff)
-        if diff.strike[0] != diff.strike[1]:
-            cls = "strike"
+        if diff.strike[0] != diff.strike[1] or (
+            leg.expiry is not None and leg.expiry != trade.contract[0]
+        ):
+            cls = "strike"  # another contract: strike, or expiry where the export has it
         elif not _coarse(trade.exit_reason, reason, exits[trade.exit_min] >= 2):
             cls = "reason"
         elif not _entry_ok(diff, entry_min) or not _minute_ok(diff, reason):
@@ -300,3 +312,33 @@ def report(diffs: list[DayDiff], strategy: LegwiseStrategy) -> str:
                 f"| {leg.exit_price[0]:.2f}/{(leg.exit_price[1] or 0):.2f} | {d.note} |"
             )
     return "\n".join(lines) + "\n"
+
+
+def _load_trades_format(rows: list[dict], path: Path) -> list[AlgoDay]:
+    days: list[AlgoDay] = []
+    for row in rows:
+        index = row["Index"].strip()
+        if "." not in index:
+            days.append(
+                AlgoDay(day=date.fromisoformat(row["Entry-Date"].strip()), vix=None,
+                        pnl=float(row["P/L"]))
+            )  # fmt: skip
+            continue
+        if not days:
+            raise ValueError(f"{path}: leg row {index} before any day row")
+        expiry = row["ExpiryDate"].strip()
+        days[-1].legs.append(
+            AlgoLeg(
+                option_type=row["Instrument-Kind"].strip(),
+                strike=float(row["StrikePrice"]),
+                position=row["Position"].strip().lower(),
+                qty=int(float(row["Quantity"])),
+                entry_min=_minute(row["Entry-Time"]),
+                exit_min=_minute(row["ExitTime"]),
+                entry_price=float(row["Entry-Price"]),
+                exit_price=float(row["ExitPrice"]),
+                pnl=float(row["P/L"]),
+                expiry=date.fromisoformat(expiry) if expiry else None,
+            )
+        )
+    return days

@@ -147,3 +147,19 @@ def test_a_re_entry_is_stamped_at_the_end_of_its_minute():
         ROOT / "strategies" / "legwise" / "nifty_dir_924_itm1_sl21_recost.yaml"
     )
     assert compare_day(theirs, ours, dir_strategy).cls == "match"
+
+
+def test_the_trades_format_export_loads_with_expiries():
+    """AlgoTest's 'Download trades' format: index prices on the day row, an expiry per leg, and
+    no row for a leg that never entered (a range breakout that did not break)."""
+    days = load_algotest_csv(EXPORT.parent / "nifty_buy_range_breakout.csv")
+    assert len(days) == 244 and sum(len(d.legs) for d in days) == 372
+    assert sum(d.pnl for d in days) == pytest.approx(-4657.25, abs=0.01)
+    [pe] = days[1].legs  # the CE did not break out on 2025-10-08
+    assert (pe.option_type, pe.strike, pe.position, pe.expiry) == (
+        "PE",
+        25050,
+        "buy",
+        date(2025, 10, 14),
+    )
+    assert (pe.entry_min, pe.entry_price, pe.exit_price) == (minute_index("09:49"), 51.5, 101.6)
