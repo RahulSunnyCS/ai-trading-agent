@@ -570,6 +570,20 @@ is BL-043 (Planned), a standalone daily pattern system. Detail lives in the back
 | 3.20.2 | Phase 3: chart gallery, owner labels, detector parameters frozen | owner→claude | **Done 2026-10-07**: 159/165 labelled, second review by Claude, fixes and freeze in `bl042_criteria_addendum_2.json` |
 | 3.20.3 | Phases 4–6: event study, ranking test, one hold-out run | claude | **Done 2026-10-07: killed.** No pattern beats same-momentum peers (event study), and PBO is 0.57 over 24 trials; hold-out not run, still sealed. Phase 7 done: closed as informative, not adopted; follow-up BL-043 |
 
+### 3.21 Daily pattern trading system — [BL-043](backlog/BL-043-daily-pattern-trading-system.md)
+
+Research only: a separate swing system, signals only, nothing placed. The plan, the owner's
+answers and the pass/kill rules live in the backlog item.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.21.0 | Phase 0: pre-registration (criteria + Experiments block) | claude | **Done 2026-10-07** (`bl043_criteria.json`, 42 trials) |
+| 3.21.1 | Phase 1: daily detection + truncation test | claude | Open |
+| 3.21.2 | Phase 2: trade simulator (next-open fills, GTT-style stop/target, 10 × 10%, costs) | claude | Open |
+| 3.21.3 | Phases 3–5: playbook, score, rules test on 2012–2023 | claude | Open |
+| 3.21.4 | Phase 6: one hold-out run | claude | Open |
+| 3.21.5 | Phase 7: daily Telegram scan + paper tracking | owner→claude | Open |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

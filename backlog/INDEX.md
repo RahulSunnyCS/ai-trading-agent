@@ -43,7 +43,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-031](BL-031-chart-pattern-detectors.md) | Classical chart-pattern detectors on weekly and daily stock data | P2 | Idea | research | momentum |
 | [BL-032](BL-032-stock-analog-search.md) | "Stocks like this": analog-path search for six-month stock outcomes | P2 | Idea | research | momentum |
 | [BL-033](BL-033-pattern-features-in-ranking.md) | Pattern and analog features in the Momentum ranking | P2 | Idea | feature | momentum |
-| [BL-043](BL-043-daily-pattern-trading-system.md) | Daily pattern trading system: scored entries, stop-loss, target, a health switch | P2 | Planned | research | momentum |
+| [BL-043](BL-043-daily-pattern-trading-system.md) | Daily pattern trading system: scored entries, stop-loss, target, a health switch | P2 | In progress | research | momentum |
 | [BL-006](BL-006-momentum-scores-table-responsiveness.md) | Momentum Scores table: responsive sort and filter | P3 | Planned | improvement | dashboard |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
