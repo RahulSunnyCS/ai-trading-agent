@@ -87,7 +87,7 @@ class UnitReport:
 
 
 def _connect(root: Path, *, read_only: bool = False):
-    return _connect_catalog(root, read_only=read_only, lock_wait=LOCK_WAIT)
+    return _connect_catalog(root, read_only=read_only, lock_wait=LOCK_WAIT, views=())
 
 
 def exchange_for(symbol: str) -> str:

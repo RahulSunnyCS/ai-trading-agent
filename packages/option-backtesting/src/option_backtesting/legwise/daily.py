@@ -87,7 +87,7 @@ def run_day(
         results.append((file.strategy, result))
         records.append(store.record(result, file.strategy))
     if results:
-        with connect(root) as con:
+        with connect(root, views=()) as con:
             for strategy, result in results:
                 store.save_daily(con, strategy, result)
     return records
@@ -168,7 +168,7 @@ def _iv_line(iv: dict) -> str:
 
 def load_history(root: Path) -> list[dict]:
     try:
-        with connect(root, read_only=True) as con:
+        with connect(root, read_only=True, views=()) as con:
             return store.load_daily(con)
     except FileNotFoundError:  # no catalog yet
         return []

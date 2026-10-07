@@ -103,7 +103,7 @@ def create_run(body: RunRequest, request: Request) -> RunResponse:
         )
 
     result = aggregate(sessions)
-    with connect() as con:
+    with connect(views=()) as con:
         run_id = record_run(con, loaded.strategy, body.from_, body.to, result, body.yaml)
 
     bootstrap_out = None
@@ -175,7 +175,7 @@ def get_runs(limit: int = 20) -> list[RunSummaryOut]:
     # just returning no runs, rather than a 500.
     if not catalog_path(data_root()).exists():
         return []
-    with connect(read_only=True) as con:
+    with connect(read_only=True, views=()) as con:
         runs = list_runs(con, limit=limit)
     return [_to_summary(r) for r in runs]
 
@@ -184,7 +184,7 @@ def get_runs(limit: int = 20) -> list[RunSummaryOut]:
 def get_run_detail(run_id: str) -> RunSummaryOut:
     record = None
     if catalog_path(data_root()).exists():
-        with connect(read_only=True) as con:
+        with connect(read_only=True, views=()) as con:
             record = get_run(con, run_id)
     if record is None:
         raise HTTPException(status_code=404, detail=f"Unknown run_id {run_id!r}")

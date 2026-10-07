@@ -96,7 +96,26 @@ def raw_path(root: Path, vendor: str, day: date, name: str) -> Path:
     return root / "raw" / vendor / f"date={day}" / f"{name}.jsonl.gz"
 
 
+def _pinned_schema(path: Path) -> pa.Schema | None:
+    """The schema a lake/bars_1m file must have, from its path (None for any other file)."""
+    parts = path.parts
+    if "bars_1m" not in parts:
+        return None
+    asset = parts[parts.index("bars_1m") + 1].removeprefix("asset=")
+    return OPT_SCHEMA if asset == "option" else BAR_SCHEMA
+
+
 def write_parquet(table: pa.Table, path: Path) -> None:
+    """Atomic write. A bars_1m file must match BAR_SCHEMA / OPT_SCHEMA exactly: the catalog's
+    1-minute views bind without `union_by_name` (db.FIXED_SCHEMA_VIEWS), so DuckDB would read
+    a file with other columns or types by silently casting or dropping them."""
+    expected = _pinned_schema(path)
+    if expected is not None and not table.schema.equals(expected):
+        name = "OPT_SCHEMA" if expected is OPT_SCHEMA else "BAR_SCHEMA"
+        raise ValueError(
+            f"{path}: not lake.{name} — cast to it before writing\n"
+            f"got:\n{table.schema}\nexpected:\n{expected}"
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".parquet.tmp")
     pq.write_table(table, tmp, compression="zstd")

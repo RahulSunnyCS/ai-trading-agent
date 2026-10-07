@@ -175,7 +175,7 @@ def run(
         for regime_name in sorted(regime_buckets):
             typer.echo(f"  {regime_name}: {regime_buckets[regime_name]:.0f}")
 
-    with connect() as con:
+    with connect(views=()) as con:
         run_id = record_run(con, loaded.strategy, start, end, result, strategy_path.read_text())
     typer.echo(f"\nRecorded as run {run_id} in the shared catalog.")
 
@@ -202,7 +202,7 @@ def registry(
     if not catalog_path(data_root()).exists():
         typer.echo("No runs recorded yet — no catalog at that path (run `tdata init` first).")
         return
-    with connect(read_only=True) as con:
+    with connect(read_only=True, views=()) as con:
         runs = list_runs(con, limit=limit)
     if not runs:
         typer.echo("No runs recorded yet in the shared catalog.")
@@ -332,7 +332,7 @@ def export_personality_cmd(run_id: str) -> None:
 
     record = None
     if catalog_path(data_root()).exists():
-        with connect(read_only=True) as con:
+        with connect(read_only=True, views=()) as con:
             record = get_run(con, run_id)
     if record is None:
         typer.echo(f"Unknown run_id {run_id!r} in the shared catalog.")

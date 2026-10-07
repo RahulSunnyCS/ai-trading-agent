@@ -38,7 +38,10 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
-  every bars_1m writer casts to (the Fyers collector imports them)
+  every bars_1m writer casts to (the Fyers collector imports them). `lake.write_parquet` refuses
+  a bars_1m file with any other schema: the 1-minute and derived views bind from the first file
+  without `union_by_name` (`db.FIXED_SCHEMA_VIEWS`), which would silently cast or drop a later
+  file's differing columns
 - `lake/derived/` — tables rebuilt from bars_1m by `tdata derived rebuild` (`derived.py`,
   BL-034 Phase 3; NIFTY and SENSEX by default): `chain_snapshots_5m` (per 5-minute window:
   ATM±10 strikes of every expiry within 45 days — OHLC, volume, OI, spot, VIX, DTE, implied
@@ -80,11 +83,13 @@ table instead.
   over the Parquet instead (`refresh_views` works on any connection), with the catalog open only
   to copy the small table they join (momentum's `db_read.stock_bars`). On 2026-10-07 `mbt serve`
   broke this and `tdata` / `obt` timed out.
-- **`connect(views=...)` binds only the lake views a caller reads.** Binding a view reads the
-  footer of every file under it (`union_by_name`), with the catalog locked: on the live lake the
-  two 1-minute views took ~20-35 s per connection (2026-10-07; ~30k option, ~14k index files). The
-  default (None) still binds all of them; a caller that never reads them passes the ones it does
-  (momentum: `("bars_1d_stock",)`).
+- **`connect(views=...)` binds only the lake views a caller reads.** Binding runs with the
+  catalog locked: on the live lake all views took 21-33 s per connection before
+  `FIXED_SCHEMA_VIEWS`, ~1 s after (2026-10-07; timings in `db.py`). The default (None) still
+  binds all of them; a caller passes the ones it reads (momentum: `("bars_1d_stock",)`) or `()`.
+  Nothing in this package or `option-backtesting` reads a lake view through the catalog (the
+  readers open the Parquet directly; `tdata status` counts on an in-memory DuckDB), so every
+  `connect()` there passes `views=()`; a test in each package fails on one that does not.
 - **Migrations by filename**, like apps/server's runner: never edit an applied
   migration, add `NNN_name.sql`.
 - **No FOREIGN KEYs** (DuckDB checks them over-eagerly); relations are documented in
