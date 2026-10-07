@@ -555,7 +555,7 @@ the time on the real data is not in the engine at all. Profiling one such reques
 
 The core result the dashboard waits for skips the first of these (it is a lazy section) but the
 stateless API, the weekly job and the circuit card all pay for it. That is recorded as follow-up
-work in BL-005 (Phase 5) and is not done.
+work, BL-039 (P2, planned), and is not done.
 
 The numbers above come from a copy of the catalog because the owner's own `mbt serve` holds the
 real one open; on the real, running server the connection cost may differ, so re-measure there
