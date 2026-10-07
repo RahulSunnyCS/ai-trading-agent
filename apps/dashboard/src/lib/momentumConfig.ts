@@ -206,7 +206,6 @@ const KEYS: Record<string, KeyInfo> = {
 
   start: { section: 'period', label: 'From' },
   end: { section: 'period', label: 'To' },
-  benchmark: { section: 'period', label: 'Benchmark' },
 
   broad_category_mode: { section: 'selection', label: 'Rank categories', ...BROAD },
   broad_category_top_n: { section: 'selection', label: 'Categories held', ...BROAD },
@@ -385,8 +384,10 @@ export function diffConfigs(
     return [`Dataset ${shown('dataset', previous.dataset)} → ${shown('dataset', next.dataset)}`];
   }
   const known = Object.keys(KEYS);
+  // The engine's `benchmark` is not a setting any more (the headline picker owns the comparison,
+  // and the simulation never depended on it), so two runs differing only there are the same test.
   const extra = [...new Set([...Object.keys(previous), ...Object.keys(next)])]
-    .filter((key) => !(key in KEYS) && key !== 'dataset' && key !== 'fresh')
+    .filter((key) => !(key in KEYS) && key !== 'dataset' && key !== 'fresh' && key !== 'benchmark')
     .sort();
   const lines: string[] = [];
   for (const key of [...known, ...extra]) {

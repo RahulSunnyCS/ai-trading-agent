@@ -287,7 +287,7 @@ export function MomentumResultWidgets({
         {() => <WeekPanel runId={runId} result={result} config={config} />}
       </Widget>
       <Widget title="Yearly returns" meta={`Green years beat ${view.label}, red trailed it`}>
-        {() => <MomentumYearlyChart rows={yearly as never} benchmarkName={view.label} />}
+        {() => <MomentumYearlyChart rows={yearly} benchmarkName={view.label} />}
       </Widget>
       <Widget
         title="Rolling 1-year return"

@@ -182,8 +182,8 @@ describe('describeConfig chips', () => {
 });
 
 describe('settingsSectionOf', () => {
-  it('puts the benchmark with the period', () => {
-    expect(settingsSectionOf('benchmark', 'etf')).toBe('period');
+  it('puts the dates with the period, and the engine benchmark nowhere (the picker owns it)', () => {
+    expect(settingsSectionOf('benchmark', 'etf')).toBeNull();
     expect(settingsSectionOf('start', 'broad')).toBe('period');
   });
 
@@ -234,14 +234,8 @@ describe('modifiedSections', () => {
       DEFAULTS,
       'etf',
     );
-    expect([...modified].sort()).toEqual([
-      'costs',
-      'limits',
-      'period',
-      'portfolio',
-      'ranking',
-      'universe',
-    ]);
+    // The engine benchmark is not a setting any more: it marks no section.
+    expect([...modified].sort()).toEqual(['costs', 'limits', 'portfolio', 'ranking', 'universe']);
   });
 
   it('ignores keys the dataset does not use', () => {
@@ -297,7 +291,7 @@ describe('diffConfigs', () => {
         benchmark: 'Nifty 50',
       }),
     ).toEqual([
-      'Benchmark Nifty 500 → Nifty 50',
+      // No "Benchmark" line: the headline picker owns the comparison.
       'Lookbacks (weeks) 1/4/13 → 4/13',
       'Top N 5 → 8',
       'Max per holding 35% → 40%',

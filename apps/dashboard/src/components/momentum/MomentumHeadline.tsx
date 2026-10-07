@@ -1,7 +1,6 @@
 'use client';
 
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { AlertTriangle, Check, CheckCircle2, ChevronDown } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { cn } from '../../lib/cn';
@@ -29,6 +28,7 @@ import { useMomentumViewStore } from '../../store/momentumView';
 import type { MomentumResult, MomentumSeries } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
+import { RadioMenu } from '../ui/RadioMenu';
 import { MomentumInsights } from './MomentumInsights';
 import { MomentumKpiCards, previousComparableRun } from './MomentumKpiCards';
 import { type MomentumRunInfo, assumptionChips, dataNotes } from './MomentumResultDetails';
@@ -125,55 +125,22 @@ export function BenchmarkPicker({
     );
   }
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
-        <button
-          type="button"
-          aria-label={`Benchmark: ${view.label}. Change benchmark`}
-          className="inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-lg border border-border-strong bg-surface-2 px-3 text-xs transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <span className="text-muted">Benchmark</span>
-          <span aria-hidden="true" className="h-2 w-2 rounded-sm bg-foreground" />
-          <span className="font-semibold text-foreground">{view.label}</span>
-          <ChevronDown className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
-        </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          align="end"
-          sideOffset={6}
-          className="z-50 w-72 rounded-lg border border-border-strong bg-surface p-1 shadow-elevated"
-        >
-          <DropdownMenu.Label className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-faint">
-            Compare against · CAGR same period
-          </DropdownMenu.Label>
-          <DropdownMenu.RadioGroup value={view.fallback ? '' : view.name} onValueChange={onPick}>
-            {options.map((option) => (
-              <DropdownMenu.RadioItem
-                key={option.name}
-                value={option.name}
-                disabled={!option.available}
-                className="flex h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2.5 text-sm outline-none data-[disabled]:cursor-not-allowed data-[highlighted]:bg-surface-2 data-[disabled]:opacity-50"
-              >
-                <span className="w-3.5 text-primary">
-                  <DropdownMenu.ItemIndicator>
-                    <Check className="h-3.5 w-3.5" />
-                  </DropdownMenu.ItemIndicator>
-                </span>
-                <span className="flex-1 truncate text-foreground">{option.label}</span>
-                <span className="metric text-xs text-muted">
-                  {option.available ? formatPct(option.cagr) : 'no data'}
-                </span>
-              </DropdownMenu.RadioItem>
-            ))}
-          </DropdownMenu.RadioGroup>
-          <p className="border-t border-border px-2.5 pb-1 pt-1.5 text-[11px] leading-snug text-faint">
-            Dividends included (TRI). Switching re-compares the whole page; the backtest does not
-            run again.
-          </p>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+    <RadioMenu
+      ariaLabel={`Benchmark: ${view.label}. Change benchmark`}
+      prefix="Benchmark"
+      swatchClass="bg-foreground"
+      value={view.fallback ? '' : view.name}
+      valueLabel={view.label}
+      heading="Compare against · CAGR same period"
+      options={options.map((option) => ({
+        value: option.name,
+        label: option.label,
+        detail: option.available ? formatPct(option.cagr) : 'no data',
+        disabled: !option.available,
+      }))}
+      onChange={onPick}
+      footer="Dividends included (TRI). Switching re-compares the whole page; the backtest does not run again."
+    />
   );
 }
 
@@ -241,8 +208,8 @@ export function MomentumHeadline({
   const maxDd = num(k.max_drawdown);
   const sharpe = num(k.sharpe);
   const finalValue = num(k.final_value);
-  const last12 = trailingReturn(series.strategy);
-  const benchLast12 = trailingReturn(view.values);
+  const last12 = trailingReturn(dates, series.strategy);
+  const benchLast12 = trailingReturn(dates, view.values);
   const ytd = yearToDate(dates, series.strategy);
   const ddGap = maxDd !== null && view.maxDrawdown !== null ? maxDd - view.maxDrawdown : null;
   const sharpeGap = sharpe !== null && view.sharpe !== null ? sharpe - view.sharpe : null;
@@ -340,7 +307,7 @@ export function MomentumHeadline({
         />
         <Headline
           label="Last 12 months"
-          help="Return over the last 52 weeks of the run, and since the end of last year."
+          help="Return over the last 12 months of the run (by date), and since the end of last year."
           value={formatPct(last12, 1, { sign: true })}
           tone={toneOf(last12)}
           benchmark={formatPct(benchLast12, 1, { sign: true })}
@@ -412,7 +379,7 @@ export function MomentumHeadline({
             </p>
           ) : null}
           <MomentumInsights result={result} view={view} yearly={yearlyRows(series)} />
-          <MomentumKpiCards result={result} tax={Boolean(config.tax)} expanded detailOnly />
+          <MomentumKpiCards result={result} tax={Boolean(config.tax)} />
         </div>
       ) : null}
     </section>

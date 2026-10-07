@@ -107,6 +107,15 @@ export function resolveBenchmark(result: MomentumResult, picked: string): Benchm
   };
 }
 
+/**
+ * The strategy's CAGR edge over the picked index, for places that quote one number per run (the
+ * run tabs); the run's own edge when the index has no data or the result predates the picker.
+ */
+export function edgeAgainst(result: MomentumResult, picked: string): number | null {
+  const choice = result.benchmarks?.find((entry) => entry.name === picked);
+  return choice?.available ? num(choice.excess_cagr) : num(result.kpis.excess_cagr);
+}
+
 /** Peak-to-date fall: value / running max - 1. A gap keeps the running max and stays null. */
 export function drawdownSeries(values: Series): Array<number | null> {
   let peak = Number.NEGATIVE_INFINITY;
@@ -146,14 +155,34 @@ export function withBenchmark(series: MomentumSeries, view: BenchmarkView): Mome
   };
 }
 
-/** Return over the last `weeks` weeks (52 = the last 12 months); null when the run is shorter. */
-export function trailingReturn(values: Series, weeks = 52): number | null {
-  const last = values.length - 1;
-  if (last - weeks < 0) return null;
+/**
+ * Return over the last `days` calendar days (365 = the last 12 months): from the last week on or
+ * before that far back to the final week. By date, not by count, so a series with skipped weeks
+ * still measures a year. Null when the run is shorter.
+ */
+export function trailingReturn(
+  dates: ReadonlyArray<string>,
+  values: Series,
+  days = 365,
+): number | null {
+  const last = dates.length - 1;
+  const lastDay = dates[last];
+  if (last < 1 || !lastDay) return null;
+  const cutoff = new Date(Date.parse(`${lastDay.slice(0, 10)}T00:00:00Z`) - days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  let start = -1;
+  for (let i = last; i >= 0; i -= 1) {
+    if ((dates[i] ?? '').slice(0, 10) <= cutoff) {
+      start = i;
+      break;
+    }
+  }
+  if (start < 0) return null;
   const end = values[last];
-  const start = values[last - weeks];
-  if (end == null || start == null || start <= 0) return null;
-  return end / start - 1;
+  const from = values[start];
+  if (end == null || from == null || from <= 0) return null;
+  return end / from - 1;
 }
 
 /** Return since the last week of the previous calendar year; null in the run's first year. */
@@ -170,13 +199,15 @@ export function yearToDate(dates: ReadonlyArray<string>, values: Series): number
   return end / start - 1;
 }
 
-export interface YearlyRow {
+// A type, not an interface, so it is assignable to the Record<string, unknown> rows the result
+// tables and the yearly chart take.
+export type YearlyRow = {
   year: number;
   strategy: number | null;
   benchmark: number | null;
   cash: number | null;
   vs_benchmark: number | null;
-}
+};
 
 /**
  * Calendar-year returns of the strategy, the benchmark and cash, as the engine's

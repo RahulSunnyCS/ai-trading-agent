@@ -7,6 +7,7 @@ import {
   benchmarkOptions,
   changeBetween,
   drawdownSeries,
+  edgeAgainst,
   resolveBenchmark,
   rolling52Excess,
   trailingReturn,
@@ -98,6 +99,12 @@ describe('resolveBenchmark', () => {
     }
   });
 
+  it("quotes the edge against the picked index, else the run's own", () => {
+    expect(edgeAgainst(result({ benchmarks: [mom] }), DEFAULT_BENCHMARK)).toBe(0.06);
+    expect(edgeAgainst(result({ benchmarks: [mom] }), 'Nifty 50 TRI')).toBe(0.05);
+    expect(edgeAgainst(result(), DEFAULT_BENCHMARK)).toBe(0.05);
+  });
+
   it('lists the options in order, with availability', () => {
     expect(
       benchmarkOptions(
@@ -138,8 +145,10 @@ describe('derived series', () => {
   });
 
   it('measures the last N weeks and the year to date', () => {
-    expect(trailingReturn(series.strategy, 2)).toBeCloseTo(145.2 / 121 - 1);
-    expect(trailingReturn(series.strategy, 10)).toBeNull();
+    // A year back from 3 Jan 2025 is 3 Jan 2024; the last week on or before it is 29 Dec 2023,
+    // although the series has only five points (counting points would get this wrong).
+    expect(trailingReturn(series.dates, series.strategy)).toBeCloseTo(145.2 / 110 - 1);
+    expect(trailingReturn(series.dates, series.strategy, 3650)).toBeNull();
     expect(yearToDate(series.dates, series.strategy)).toBeCloseTo(145.2 / 132 - 1);
   });
 
