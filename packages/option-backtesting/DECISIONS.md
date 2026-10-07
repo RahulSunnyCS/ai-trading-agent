@@ -164,3 +164,35 @@ a run already covers" — and delivers the real analytical value (P&L broken dow
 the risk. Revisit if a strategy actually needs to gate entries on regime; the DSL's `==`/`in`/
 `not_in` operators and `Op` grammar already support a categorical condition, so the schema/loader
 side is a smaller lift than the evaluator's data-source problem.
+
+---
+
+## AlgoTest comparison, round 1: fills at the close of the bar ending at T — 2026-10-07
+
+BL-009 Phase 1. `obt legwise compare <strategy> <algotest.csv>` runs a strategy over the days of
+an AlgoTest trade-log export and classifies each day (`missing / strike / reason / minute /
+price / match`). First export: Nifty_Widesl_917_OTM1, 436 days.
+
+- **AlgoTest's candles are end-stamped.** Its 1-minute candle "09:17" is the bar that starts at
+  09:16 (fetched through the AlgoTest connector for 2026-09-24: its closes equal our Fyers bars'
+  closes exactly; opens/highs/lows differ slightly). Its fills at a scheduled time T use that
+  candle's close: the 09:17 entry 92.25 and the 13:43 combined-stop exit 64.00 are exactly our
+  09:16 and 13:42 closes. Across all 436 days the close of the bar ending at T is the nearest
+  of our prices to AlgoTest's (entry median gap 0.30 vs 0.45 for our 09:17 open; time exits 0.05
+  vs 0.10).
+- **So the engine's price at T is now the close of the bar ending at T** (`Series.price_at`),
+  used for fixed-time entries, exits at the exit time, strike selection from the index and
+  closest-premium selection. It was the open of the T bar. Stops are unchanged (checked on each
+  bar's high/low from the bar after the fill instant; filled at the trigger, or at a gapped
+  open). RE ASAP still enters at the next bar's open: no export with re-entries yet.
+- **Effect:** strike mismatches 9 → 0 days; legs within a tick 37 → 73; P&L gap to AlgoTest
+  ₹14,640 → ₹7,147 over 429 days. 22 golden scenarios (the fixed-time strategies) re-accepted.
+- **Lot size: today's lot for all history** (owner, 2026-10-07; `execution.lot_sizing: current`,
+  default) — AlgoTest sizes every day at the current lot (qty 65 in Jan 2025), and with a rupee
+  combined stop the lot decides the minute it fires. `historical` keeps the per-expiry lots.
+- **Reading AlgoTest's log:** it has no exit reasons; the comparator infers them (exit time;
+  legs out together = combined stop; a lone early exit = either stop) and accepts a leg SL that
+  fired in the minute the combined stop closed the rest. AlgoTest stamps stop exits at the END of
+  the triggering minute: its stop minutes read ours + 1 (253 legs).
+- **5-minute tables follow:** a window's `open` is now the previous minute's close
+  (`DERIVED_VERSION` 2, rebuilt).

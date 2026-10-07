@@ -5,10 +5,14 @@ Conventions forced by 1-minute bars — each is a guess at what AlgoTest does
 and is the first thing to check when a day disagrees with AlgoTest's own
 backtest (TODO.md 3.10.7):
 
-- **Time T means the start of minute T.** A fixed-time entry fills at the
-  OPEN of the T bar; strikes are chosen from the index open (Strike Type) or
-  each option's open (Closest Premium) of that same bar. Exit time T fills at
-  the OPEN of the T bar.
+- **The price at time T is the CLOSE of the bar that ends at T** (the T-1
+  bar, `Series.price_at`). A fixed-time entry fills there; strikes are chosen
+  from the index's price at T (Strike Type) or each option's (Closest
+  Premium); exit time T fills there too. Verified against AlgoTest (BL-009
+  Phase 1): its candle stamped T is our bar starting T-1, and its 09:17 entry
+  and 15:28 exit prices are that candle's close. (Until 2026-10-07 the engine
+  used the OPEN of the T bar.) AlgoTest stamps a stop exit at the END of the
+  minute that triggered it, so its stop times read one minute later than ours.
 - **Closest premium** — nearest to the target among the collected strikes of
   that expiry, by the option's open at the entry minute; an exact tie picks
   the LOWER premium (AlgoTest docs' example: premiums 49 and 52 for a 50
@@ -151,12 +155,20 @@ class _LegRun:
 
 
 class _DaySim:
-    def __init__(self, strategy: LegwiseStrategy, data: DayData, reference: ReferenceData) -> None:
+    def __init__(
+        self,
+        strategy: LegwiseStrategy,
+        data: DayData,
+        reference: ReferenceData,
+        sizing_date: date | None = None,
+    ) -> None:
         self.s = strategy
         self.data = data
         self.reference = reference
+        #: the date whose lot size "current" sizing uses (today unless a test pins it)
+        self.sizing_date = sizing_date or date.today()
         self.notes: list[str] = []
-        # Quantity is set per leg in _select: the lot size belongs to the contract's expiry.
+        # Quantity is set per leg in _select, once the leg's contract is known.
         self.legs = [_LegRun(leg, 0) for leg in strategy.legs]
         for run in self.legs:
             run.reentries_sl = leg_count(run.spec.reentry_on_sl)
@@ -242,8 +254,15 @@ class _DaySim:
         if series.price_at(minute) is None:
             self.notes.append(f"{spec.id}: {key} has not traded by {minute_label(minute)}")
             return False
-        lot = self.reference.lot_size(self.s.underlying, key[0])
-        if self.data.master_lot_size is not None and self.data.master_lot_size != lot:
+        historical = self.s.execution.lot_sizing == "historical"
+        lot = self.reference.lot_size(
+            self.s.underlying, key[0] if historical else self.sizing_date
+        )
+        if (
+            historical
+            and self.data.master_lot_size is not None
+            and self.data.master_lot_size != lot
+        ):
             self.notes.append(
                 f"lot size: reference CSV says {lot} for the {key[0]} expiry, Fyers symbol "
                 f"master says {self.data.master_lot_size} — using the CSV; update "
@@ -264,7 +283,7 @@ class _DaySim:
             run.range_end = minute_index(run.spec.range_breakout.until)
             return
         assert run.series is not None
-        self._enter(run, minute, run.series.open[minute], intrabar=False)  # type: ignore[arg-type]
+        self._enter(run, minute, run.series.price_at(minute), intrabar=False)  # type: ignore[arg-type]
 
     def _range_source(self, run: _LegRun) -> Series:
         assert run.series is not None and run.spec.range_breakout is not None
@@ -371,7 +390,10 @@ class _DaySim:
             if run.state == "open":
                 series = run.series
                 assert series is not None
-                price = getattr(series, price_of)[minute]
+                if price_of == "at":
+                    price = series.price_at(minute)
+                else:
+                    price = getattr(series, price_of)[minute]
                 self._exit(run, minute, price, reason)  # type: ignore[arg-type]
             elif run.state != "done":
                 run.state = "done"
@@ -422,7 +444,7 @@ class _DaySim:
                 break
         else:
             if end < N_MINUTES:
-                self._close_all(end, "open", "EXIT_TIME")
+                self._close_all(end, "at", "EXIT_TIME")
             else:
                 self._close_all(N_MINUTES - 1, "close", "EXIT_TIME")
         gross = sum(t.pnl for t in self.trades)
@@ -444,9 +466,12 @@ def leg_count(reentry: ReEntry | None) -> int:
 
 
 def simulate_day(
-    strategy: LegwiseStrategy, data: DayData, reference: ReferenceData | None = None
+    strategy: LegwiseStrategy,
+    data: DayData,
+    reference: ReferenceData | None = None,
+    sizing_date: date | None = None,
 ) -> DayResult:
-    return _DaySim(strategy, data, reference or default_reference_data()).run()
+    return _DaySim(strategy, data, reference or default_reference_data(), sizing_date).run()
 
 
 def run_legwise(

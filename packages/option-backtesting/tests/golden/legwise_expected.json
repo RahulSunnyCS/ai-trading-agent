@@ -41,7 +41,7 @@
       "id": "nifty_buy_range_breakout__2026_09_23",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
@@ -108,7 +108,7 @@
       "id": "nifty_buy_range_breakout__2026_09_24",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
@@ -159,7 +159,7 @@
       "id": "nifty_buy_range_breakout__2026_09_25",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
@@ -226,7 +226,7 @@
       "id": "nifty_buy_range_breakout__2026_09_28",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
@@ -277,7 +277,7 @@
       "id": "nifty_buy_range_breakout__2026_09_29",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
@@ -328,7 +328,7 @@
       "id": "nifty_buy_range_breakout__2026_10_01",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
@@ -395,7 +395,7 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_23",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
@@ -478,7 +478,7 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_24",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
@@ -545,7 +545,7 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_25",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
@@ -628,7 +628,7 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_28",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
@@ -695,7 +695,7 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_29",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
@@ -794,7 +794,7 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_10_01",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
@@ -877,7 +877,7 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_23",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "688772ef8ede",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
@@ -944,7 +944,7 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_24",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "688772ef8ede",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
@@ -1011,7 +1011,7 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_25",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "688772ef8ede",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
@@ -1078,7 +1078,7 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_28",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "688772ef8ede",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
@@ -1145,7 +1145,7 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_29",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "688772ef8ede",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
@@ -1212,7 +1212,7 @@
       "id": "nifty_widesl_917_closest_premium__2026_10_01",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "688772ef8ede",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
@@ -1279,7 +1279,7 @@
       "id": "nifty_widesl_917_otm1__2026_09_23",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
@@ -1346,7 +1346,7 @@
       "id": "nifty_widesl_917_otm1__2026_09_24",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
@@ -1413,7 +1413,7 @@
       "id": "nifty_widesl_917_otm1__2026_09_25",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
@@ -1480,7 +1480,7 @@
       "id": "nifty_widesl_917_otm1__2026_09_28",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
@@ -1547,7 +1547,7 @@
       "id": "nifty_widesl_917_otm1__2026_09_29",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
@@ -1614,7 +1614,7 @@
       "id": "nifty_widesl_917_otm1__2026_10_01",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
@@ -1681,7 +1681,7 @@
       "id": "nifty_buy_range_breakout__all_6d",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
@@ -1930,7 +1930,7 @@
       "id": "nifty_dir_924_itm1_sl21_recost__all_6d",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
@@ -2307,7 +2307,7 @@
       "id": "nifty_widesl_917_closest_premium__all_6d",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "688772ef8ede",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
@@ -2604,7 +2604,7 @@
       "id": "nifty_widesl_917_otm1__all_6d",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
@@ -2901,7 +2901,7 @@
       "id": "nifty_buy_range_breakout__early_3d",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-25"
@@ -3044,7 +3044,7 @@
       "id": "nifty_dir_924_itm1_sl21_recost__late_3d",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-28",
         "to": "2026-10-01"
