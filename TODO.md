@@ -548,6 +548,18 @@ Every result must stay identical (BL-001 goldens); the owner's decisions live in
 | 3.18.4 | Phase 4: run banner shows the stage and the usual duration | claude | **Done 2026-10-07** (PR #81): a job reports `loading` / `ranking` / `simulating` / `analysing`; the banner shows the step and, after a few real runs, "usually about N s". Also in this PR: the explainer `packages/momentum-backtesting/docs/how-backtests-run-and-how-we-sped-them-up.md` (how the backend works and what BL-005 changed) |
 | 3.18.5 | Phase 5 (live warm Broad still ~20 s CPU; time is in the Trades section's weekly features and catalog connection set-up, not the engine) | claude | **Moved to [BL-039](backlog/BL-039-broad-warm-path-and-weekly-job-cost.md) (P2, Planned) when BL-005 closed 2026-10-07** |
 
+### 3.19 Chart-pattern POC — [BL-041](backlog/BL-041-chart-pattern-poc.md)
+
+Research only: the default ranking, goldens and weekly signal stay untouched. The plan, catalogue
+and pass/kill rules live in the backlog item.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.19.0 | Phase 0: owner reviews the pattern catalogue and the proposed thresholds; criteria committed | owner→claude | Open |
+| 3.19.1 | Phases 1–2: causal pivots, three detectors, truncation test | claude | Open |
+| 3.19.2 | Phase 3: chart gallery, owner labels, detector parameters frozen | owner→claude | Open |
+| 3.19.3 | Phases 4–6: event study, ranking test, one hold-out run | claude | Open |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
