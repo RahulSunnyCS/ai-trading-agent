@@ -418,3 +418,57 @@ known when this was written: add a row if it changed the rate.
   the rate moves a price by paise, so a stepped policy rate is precise enough and is verifiable
   from the RBI's announcements.
 
+---
+
+## Derived tables: 5-minute windows the 1-minute engine agrees with — 2026-10-07
+
+BL-034 Phase 3. `derived.py` builds `chain_snapshots_5m`, `straddle_series_5m`,
+`contracts_daily` and `iv_daily` under `lake/derived/` from the 1-minute lake; `obt legwise run
+--bars 5m` runs the unchanged legwise engine on the snapshots.
+
+- **A window's `open` is the 1-minute engine's price at its start**, not the first trade inside
+  it: the open of the window's first minute, or the last earlier close. With that, an entry or
+  exit on a 5-minute mark fills at exactly the 1-minute price, so time-based strategies agree
+  trade for trade (`option-backtesting/tests/unit/test_legwise_5m.py`, on the six frozen Fyers
+  days). Stops are checked per window and fill at the trigger (or the window's open when it
+  gapped through); where a minute inside the window gapped through the stop, the 1-minute fill
+  is worse — `scripts/parity-5m.py` measures that on any month.
+- **Measured on real months** (`scripts/parity-5m.py`, ATM straddle sell 09:20 → 15:15):
+
+  | Window | Time-based: days identical | Stop 30% + one re-entry + combined stop: days identical | 1m s | 5m s |
+  |---|---|---|---|---|
+  | NIFTY Jun 2025 | 21 / 21 (gross 2,858 both) | 4 / 21 (gross 7,051 vs 7,754) | 7.2 | 1.5 |
+  | SENSEX Jun 2025 | 21 / 21 (8,256 both) | 2 / 21 (2,742 vs −1,101) | 3.6 | 1.0 |
+  | NIFTY Jan 2026 | 20 / 20 (−9,620 both) | 2 / 20 (−382 vs 1,729) | 10.0 | 2.3 |
+
+  So: **5-minute bars are exact for time-based rules and a screening tool for stop rules**.
+  Inspected divergences were granularity, not bugs: a combined stop fires at the first window
+  close past it (10:40 instead of 10:32), and a re-entry after a stop fills at the window's close
+  instead of the next minute. Final numbers for stop strategies come from `--bars 1m`.
+- **Rebuild time:** NIFTY and SENSEX, 2024-10-01 → 2026-10-06 (986 days), 9.4 minutes on the
+  laptop, 730 MB. Front-expiry IV at 15:00 vs India VIX over those days: mean 13.3% vs 14.1,
+  correlation 0.89 (NIFTY), 0.88 (SENSEX).
+- **The 5-minute backtest reuses the engine, not a copy of it.** `load_day_5m` puts each window
+  on its first minute and holds its close on the other four, so every rule (stops, trails,
+  re-entries, combined MTM, costs) is the same code. Strategy times must be on 5-minute marks.
+- **Nothing is carried past the data.** A window exists only up to the last one with an index
+  bar, so a short session is not padded to 15:25; a contract appears from its first trade.
+- **IV.** Black-76 on the implied forward from put-call parity at the strike nearest spot with
+  both prices (forward from spot when no pair exists), RBI repo rate, time to 15:30 on expiry day
+  in calendar years. Bisection, not Newton: it never diverges on deep or near-expiry options.
+  The normal CDF is Abramowitz–Stegun (error < 1.5e-7), so no SciPy. `iv_quality` names the
+  untrustworthy cases rather than dropping them.
+- **Kept contracts.** Expiries within 45 days (the current monthly and every weekly before it),
+  strikes from their first window within 10 steps of ATM to the end of the day (an open position
+  must keep a price however far the index moves — dropping it crashed a SENSEX backtest). Far expiries and wings are in `contracts_daily`
+  (every contract, daily) and the raw lake.
+- **iv_daily.** "IV at 15:00" is the window ending 15:00, before the last half hour. The front
+  expiry is the nearest at least 2 days away (expiry-day IV is noise). Percentiles are the share
+  of the trailing 252/504 days at or below today, NULL with under 60 days of history; a test
+  removes later days and requires earlier rows to be unchanged.
+- **Deviations from the plan.** `contracts_daily` is one file per (underlying, day), not per
+  year, so a daily top-up writes one new file instead of rewriting a year. The version lives in
+  each file's Parquet metadata, not a catalog table, so a rebuild needs no catalog lock and a
+  file says what built it. Derived files are rewritten on a version change, so `tdata backup`
+  (copies only new files) may hold an older version: they are regenerable.
+

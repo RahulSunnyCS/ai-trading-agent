@@ -57,15 +57,19 @@ from ..data.reference.loader import (
 )
 from ..data.resolver import resolve_strike
 from .market import (
+    BAR_SIZES,
     N_MINUTES,
     ContractKey,
     DayData,
     Series,
     backtest_days,
+    check_on_5m_marks,
     load_day,
+    load_day_5m,
     minute_index,
     minute_label,
     pick_expiry,
+    snapshot_days,
 )
 from .schema import Leg, LegwiseStrategy, ReEntry
 
@@ -451,17 +455,34 @@ def run_legwise(
     *,
     include_excluded: bool = False,
     skipped: dict[date, str] | None = None,
+    bars: str = "1m",
 ) -> list[DayResult]:
     """Simulate every backtest day (market.backtest_days) in [start, end]. A day that cannot
     be run — excluded by data_quality, no index file, or no reference row (a lot size before
     the table starts) — is left out, never zero-filled; pass `skipped` to receive
-    {day: reason} for each."""
+    {day: reason} for each. `bars="5m"` runs the same engine on the 5-minute chain snapshots
+    (market.load_day_5m); every strategy time must then be on a 5-minute mark."""
+    if bars not in BAR_SIZES:
+        raise ValueError(f"bars must be one of {BAR_SIZES}, got {bars!r}")
     reference = reference or default_reference_data()
     days, left_out = backtest_days(root, strategy.underlying, start, end, include_excluded)
+    loader = load_day
+    if bars == "5m":
+        check_on_5m_marks(
+            strategy.entry_time,
+            strategy.exit_time,
+            strategy.no_reentry_after,
+            *(leg.range_breakout.until for leg in strategy.legs if leg.range_breakout),
+        )
+        built = snapshot_days(root, strategy.underlying)
+        for day in [d for d in days if d not in built]:
+            left_out[day] = "no 5-minute snapshot (tdata derived rebuild)"
+        days = [d for d in days if d in built]
+        loader = load_day_5m
     results = []
     for day in days:
         try:
-            data = load_day(root, strategy.underlying, day)
+            data = loader(root, strategy.underlying, day)
             results.append(simulate_day(strategy, data, reference))
         except FileNotFoundError:
             left_out[day] = "no index or option file"

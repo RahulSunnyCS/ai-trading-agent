@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-from trading_data import lake, quality
+from trading_data import derived, lake, quality
 
 log = logging.getLogger(__name__)
 
@@ -203,3 +203,82 @@ def pick_expiry(day: DayData, kind: str) -> date | None:
         if not any(o > e and (o.year, o.month) == (e.year, e.month) for o in day.listed_expiries):
             return e
     return None
+
+
+#: Bars a backtest can run on: the raw 1-minute lake, or the 5-minute chain snapshots
+#: (trading_data.derived, BL-034 Phase 3).
+BAR_SIZES = ("1m", "5m")
+
+
+def snapshot_days(root: Path, underlying: str) -> set[date]:
+    folder = derived.derived_path(root, "chain_snapshots_5m", underlying, date.min).parent.parent
+    return {
+        date.fromisoformat(p.parent.name.removeprefix("date="))
+        for p in folder.glob("date=*/data.parquet")
+    }
+
+
+def check_on_5m_marks(*times: str | None) -> None:
+    """5-minute bars can only decide on a window's start: every time must be a multiple of 5
+    minutes from 09:15."""
+    for t in times:
+        if t is not None and minute_index(t) % derived.BUCKET_MINUTES:
+            raise ValueError(f"{t} is not on a 5-minute mark; 5-minute bars need :00, :05, …")
+
+
+def load_day_5m(root: Path, underlying: str, day: date) -> DayData:
+    """A DayData built from chain_snapshots_5m, for the unchanged legwise engine: each window
+    sits on its first minute (open = the price at the window's start, high/low/close the
+    window's), and its other four minutes hold the window's close. So an entry or exit at a
+    window start fills at the same price as on 1-minute bars, a stop is checked against the
+    whole window and fills at its trigger (or the window's open if it gapped through), and the
+    combined MTM is checked at the window's close. Only the ±10 strikes around each window's
+    ATM are present."""
+    path = derived.derived_path(root, "chain_snapshots_5m", underlying, day)
+    if not path.exists():
+        raise FileNotFoundError(f"no 5-minute snapshot for {underlying} on {day}")
+    table = pq.read_table(
+        path,
+        columns=[
+            "bucket", "expiry", "strike", "option_type", "open", "high", "low", "close",
+            "spot_open", "spot_high", "spot_low", "spot_close", "vix",
+        ],
+    )  # fmt: skip
+    cols = table.to_pydict()
+    as_ts = table.rename_columns(["ts" if n == "bucket" else n for n in table.column_names])
+    starts = [m - m % derived.BUCKET_MINUTES for m in _minutes(as_ts)]
+    spot, vix = Series.empty(), Series.empty()
+    chain: dict[ContractKey, Series] = {}
+
+    def place(series: Series, m: int, o, h, lo, c) -> None:
+        if c is None or c != c:  # None or NaN: nothing known yet
+            return
+        if o is not None and o == o:
+            series.open[m], series.high[m], series.low[m], series.close[m] = o, h, lo, c
+        for k in range(1, derived.BUCKET_MINUTES):
+            series.open[m + k] = series.high[m + k] = series.low[m + k] = c
+            series.close[m + k] = c
+
+    seen_spot: set[int] = set()
+    for r, m in enumerate(starts):
+        if m not in seen_spot:
+            seen_spot.add(m)
+            place(spot, m, cols["spot_open"][r], cols["spot_high"][r], cols["spot_low"][r],
+                  cols["spot_close"][r])  # fmt: skip
+            v = cols["vix"][r]
+            place(vix, m, v, v, v, v)
+        key = (cols["expiry"][r], float(cols["strike"][r]), cols["option_type"][r])
+        series = chain.get(key)
+        if series is None:
+            series = chain[key] = Series.empty()
+        place(series, m, cols["open"][r], cols["high"][r], cols["low"][r], cols["close"][r])
+    has_vix = any(v is not None for v in vix.close)
+    return DayData(
+        day=day,
+        underlying=underlying,
+        spot=spot.forward_fill(),
+        chain={k: v.forward_fill() for k, v in chain.items()},
+        listed_expiries=sorted({k[0] for k in chain}),
+        master_lot_size=None,
+        vix=vix.forward_fill() if has_vix else None,
+    )

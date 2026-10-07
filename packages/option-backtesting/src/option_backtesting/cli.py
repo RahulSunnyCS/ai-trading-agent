@@ -523,8 +523,14 @@ def legwise_run(
         "--include-excluded",
         help="Also run days data_quality excludes (special/short sessions, thin chains, no spot).",
     ),
+    bars: str = typer.Option(
+        "1m",
+        "--bars",
+        help="1m: the raw 1-minute lake. 5m: the 5-minute chain snapshots (tdata derived "
+        "rebuild) — much faster; strategy times must be on 5-minute marks.",
+    ),
 ) -> None:
-    """Backtest leg-wise strategies over the lake's 1-minute days (vendor history and Fyers)."""
+    """Backtest leg-wise strategies over the lake's days (vendor history and Fyers)."""
     from .fyers.daily import data_dir
     from .legwise.engine import run_legwise, skipped_summary
     from .legwise.report import day_table
@@ -535,9 +541,18 @@ def legwise_run(
     for path in strategies:
         strategy = load_legwise(path)
         skipped: dict[date, str] = {}
-        days = run_legwise(
-            strategy, data_dir(), start, end, include_excluded=include_excluded, skipped=skipped
-        )
+        try:
+            days = run_legwise(
+                strategy,
+                data_dir(),
+                start,
+                end,
+                include_excluded=include_excluded,
+                skipped=skipped,
+                bars=bars,
+            )
+        except ValueError as error:
+            raise typer.BadParameter(str(error)) from error
         typer.echo(day_table(strategy.id, days, show_trades=trades))
         if skipped:
             typer.echo(skipped_summary(skipped))

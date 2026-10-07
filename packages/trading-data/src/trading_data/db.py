@@ -61,6 +61,49 @@ LAKE_VIEWS: dict[str, tuple[str, str]] = {
 }
 
 
+
+def _empty_columns(schema, partitions: tuple[str, ...]) -> str:
+    sql = {
+        "timestamp[s, tz=Asia/Kolkata]": "TIMESTAMPTZ",
+        "date32[day]": "DATE",
+        "double": "DOUBLE",
+        "string": "TEXT",
+        "int16": "SMALLINT",
+        "int32": "INTEGER",
+        "int64": "BIGINT",
+        "bool": "BOOLEAN",
+    }
+    cols = [f"NULL::{sql[str(f.type)]} AS {f.name}" for f in schema]
+    cols += [f"NULL::{'DATE' if p == 'date' else 'TEXT'} AS {p}" for p in partitions]
+    return ", ".join(cols)
+
+
+def _derived_views() -> dict[str, tuple[str, str]]:
+    from . import derived  # BL-034 Phase 3 tables, rebuilt from the 1-minute lake
+
+    day = ("underlying", "date")
+    return {
+        "chain_snapshots_5m": (
+            "derived/chain_snapshots_5m/*/*/data.parquet",
+            _empty_columns(derived.CHAIN_SCHEMA, day),
+        ),
+        "straddle_series_5m": (
+            "derived/straddle_series_5m/*/*/data.parquet",
+            _empty_columns(derived.STRADDLE_SCHEMA, day),
+        ),
+        "contracts_daily": (
+            "derived/contracts_daily/*/*/data.parquet",
+            _empty_columns(derived.CONTRACTS_SCHEMA, day),
+        ),
+        "iv_daily": (
+            "derived/iv_daily/*/data.parquet",
+            _empty_columns(derived.IV_DAILY_SCHEMA, ("underlying",)),
+        ),
+    }
+
+
+LAKE_VIEWS.update(_derived_views())
+
 def data_root(*, require_mounted: bool = True) -> Path:
     """TRADING_DATA_ROOT, else ~/TradingData. On the owner's laptop that is an APFS disk
     image on the external SSD (`tdata mount`); `require_mounted` refuses a root on a
