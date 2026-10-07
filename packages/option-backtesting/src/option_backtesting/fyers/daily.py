@@ -290,7 +290,7 @@ def register_contracts(
 ) -> dict[str, int]:
     """Register everything; return {fyers_symbol: instrument_id}."""
     inst = instrument_specs(contracts, specs)
-    with connect(root) as con:
+    with connect(root, views=()) as con:
         ids = register(con, inst)
     return {s.vendor_symbol: ids[s.key] for s in inst if s.vendor_symbol}
 
@@ -347,7 +347,7 @@ def collect_day(
     contracts = [c for c in contracts if c.expiry >= day]
     write_symbol_master(root, day, contracts)
     ids = register_contracts(root, contracts, specs)
-    with connect(root) as con:
+    with connect(root, views=()) as con:
         run_id = ingest.start_run(con, "fyers", "bars_1m", day, ",".join(underlyings))
 
     raw = lake.RawSink(root, "fyers", day)
@@ -448,7 +448,7 @@ def collect_day(
             entry["requests"] = client.calls - calls_before
             log(f"{spec.name}: {table.num_rows} option bars, {entry['requests']} requests")
     except Exception:
-        with connect(root) as con:
+        with connect(root, views=()) as con:
             ingest.finish_run(
                 con,
                 run_id,
@@ -463,7 +463,7 @@ def collect_day(
         client.on_response = None
 
     errors = sum(len(v.get("errors", [])) for v in details.values() if isinstance(v, dict))
-    with connect(root) as con:
+    with connect(root, views=()) as con:
         ingest.finish_run(
             con,
             run_id,
@@ -534,7 +534,7 @@ def migrate_legacy(old: Path, root: Path, log: Callable[[str], None] = print) ->
                 rows_total += t.num_rows
         if rows_total:
             manifest = old / "manifest" / f"{d}.json"
-            with connect(root) as con:
+            with connect(root, views=()) as con:
                 run_id = ingest.start_run(
                     con, "migration", "bars_1m", day, ",".join(sorted(present))
                 )

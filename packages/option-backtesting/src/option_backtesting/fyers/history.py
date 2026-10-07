@@ -73,7 +73,7 @@ def backfill_index(
     ids = register_contracts(root, [], [spec])
     series = [(spec.name, spec.index_symbol), (VIX_NAME, VIX_SYMBOL)]
 
-    with connect(root) as con:
+    with connect(root, views=()) as con:
         run_id = ingest.start_run(con, "fyers", "bars_1m_index_history", None, underlying)
     calls_at_start = client.calls
     written = {name: 0 for name, _ in series}
@@ -104,7 +104,7 @@ def backfill_index(
                 log(f"no data in {EMPTY_CHUNKS_TO_STOP} consecutive chunks — reached the start")
                 break
     except Exception:
-        with connect(root) as con:
+        with connect(root, views=()) as con:
             ingest.finish_run(
                 con,
                 run_id,
@@ -115,7 +115,7 @@ def backfill_index(
                 failed=True,
             )
         raise
-    with connect(root) as con:
+    with connect(root, views=()) as con:
         ingest.finish_run(
             con,
             run_id,

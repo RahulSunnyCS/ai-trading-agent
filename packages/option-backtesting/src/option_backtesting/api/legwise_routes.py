@@ -181,7 +181,7 @@ def backtest(body: BacktestBody) -> Any:
         return _error(404, f"no collected {strategy.underlying} days in that range")
     # Kept as an `adhoc` run: every builder experiment stays queryable with the exact
     # settings that produced it.
-    with connect(root) as con:
+    with connect(root, views=()) as con:
         run_id = store.save_adhoc(con, strategy, results, {"from": body.from_, "to": body.to})
     return {
         "strategy_id": strategy.id,
@@ -235,7 +235,7 @@ def _stored_spec(strategy_id: str, sha: str | None) -> LegwiseStrategy | None:
 
     if sha:
         try:
-            with connect(data_dir(), read_only=True) as con:
+            with connect(data_dir(), read_only=True, views=()) as con:
                 row = con.execute(
                     "SELECT spec FROM strategy_versions WHERE strategy_id = ? AND spec_hash = ?",
                     [strategy_id, sha],

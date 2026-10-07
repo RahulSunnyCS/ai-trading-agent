@@ -292,7 +292,7 @@ def rebuild(
 ) -> dict[str, int]:
     """Re-judge partitions from the Parquet files. The scan runs outside the catalog
     connection; each (asset, name) is written in one short connect()."""
-    with connect(root, read_only=True) as con:
+    with connect(root, read_only=True, views=()) as con:
         holidays = {r[0] for r in con.execute("SELECT date FROM ref_holidays").fetchall()}
     lo, hi = days or (date.min, date.max)
     judged: dict[str, int] = {}
@@ -302,14 +302,14 @@ def rebuild(
         for n, day, path in lake.partitions(root, a):
             if (name is None or n == name) and lo <= day <= hi:
                 by_name.setdefault(n, []).append(path)
-        with connect(root, read_only=True, lock_wait=300) as con:
+        with connect(root, read_only=True, lock_wait=300, views=()) as con:
             known = {r[0] for r in con.execute(
                 "SELECT DISTINCT name FROM data_quality WHERE asset = ?", [a]).fetchall()
             }  # fmt: skip
         # a name whose files are all gone still has rows to prune
         for n in sorted(set(by_name) | {k for k in known if name in (None, k)}):
             stats = file_stats(a, n, by_name.get(n, []))
-            with connect(root, lock_wait=300) as con:
+            with connect(root, lock_wait=300, views=()) as con:
                 upsert(con, stats, holidays)
                 pruned += prune(con, a, n, (lo, hi), keep={s.day for s in stats})
                 # per name, in the same connection: upsert resets every option day to usable,
@@ -317,7 +317,7 @@ def rebuild(
                 changed += cross_check(con, [n])
             judged[f"{a}/{n}"] = len(stats)
             log(f"{a}/{n}: judged {len(stats)} days")
-    with connect(root, lock_wait=300) as con:
+    with connect(root, lock_wait=300, views=()) as con:
         export_snapshot(con, root)
     judged["no_spot_changes"] = changed
     judged["rows_pruned"] = pruned
@@ -396,10 +396,9 @@ def judge_day(
             path = lake.bars_1m_path(root, asset, name, day)
             if path.exists():
                 stats += file_stats(asset, name, [path])
-    with connect(root, lock_wait=lock_wait) as con:
+    with connect(root, lock_wait=lock_wait, views=()) as con:
         holidays = {r[0] for r in con.execute("SELECT date FROM ref_holidays").fetchall()}
         upsert(con, stats, holidays)
         cross_check(con, names)
         export_snapshot(con, root)
     return len(stats)
-
