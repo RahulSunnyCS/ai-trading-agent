@@ -1,0 +1,418 @@
+{
+  "stage_a": {
+    "tight_range": {
+      "combos": {
+        "breakout/base_low/2R": {
+          "trades": 1468,
+          "mean_r": 0.27837633608633927,
+          "win_rate": 0.4925068119891008,
+          "median_sessions": 26.0
+        },
+        "breakout/base_low/3R": {
+          "trades": 1468,
+          "mean_r": 0.3657837281380282,
+          "win_rate": 0.4659400544959128,
+          "median_sessions": 35.5
+        },
+        "breakout/base_low/none": {
+          "trades": 1468,
+          "mean_r": 0.510313790012242,
+          "win_rate": 0.45776566757493187,
+          "median_sessions": 65.0
+        },
+        "breakout/atr_1.5/2R": {
+          "trades": 1617,
+          "mean_r": -0.12036664514305587,
+          "win_rate": 0.34075448361162647,
+          "median_sessions": 5.0
+        },
+        "breakout/atr_1.5/3R": {
+          "trades": 1617,
+          "mean_r": -0.011128296550063912,
+          "win_rate": 0.2925170068027211,
+          "median_sessions": 6.0
+        },
+        "breakout/atr_1.5/none": {
+          "trades": 1617,
+          "mean_r": 0.5242268604327048,
+          "win_rate": 0.22263450834879406,
+          "median_sessions": 8.0
+        },
+        "breakout/pct_8/2R": {
+          "trades": 1617,
+          "mean_r": 0.21615809803614414,
+          "win_rate": 0.4483611626468769,
+          "median_sessions": 17.0
+        },
+        "breakout/pct_8/3R": {
+          "trades": 1617,
+          "mean_r": 0.32986240495922803,
+          "win_rate": 0.41620284477427333,
+          "median_sessions": 23.0
+        },
+        "breakout/pct_8/none": {
+          "trades": 1617,
+          "mean_r": 0.5925765252371945,
+          "win_rate": 0.4038342609771181,
+          "median_sessions": 38.0
+        },
+        "pullback/base_low/2R": {
+          "trades": 2340,
+          "mean_r": -0.36925317548362124,
+          "win_rate": 0.35341880341880344,
+          "median_sessions": 3.0
+        },
+        "pullback/base_low/3R": {
+          "trades": 2340,
+          "mean_r": -0.2742915436920498,
+          "win_rate": 0.297008547008547,
+          "median_sessions": 4.0
+        },
+        "pullback/base_low/none": {
+          "trades": 2340,
+          "mean_r": 0.724603907265147,
+          "win_rate": 0.1841880341880342,
+          "median_sessions": 6.0
+        },
+        "pullback/atr_1.5/2R": {
+          "trades": 2407,
+          "mean_r": -0.008374397220281904,
+          "win_rate": 0.3793103448275862,
+          "median_sessions": 6.0
+        },
+        "pullback/atr_1.5/3R": {
+          "trades": 2407,
+          "mean_r": 0.07609881389628245,
+          "win_rate": 0.3103448275862069,
+          "median_sessions": 8.0
+        },
+        "pullback/atr_1.5/none": {
+          "trades": 2407,
+          "mean_r": 0.5611811122593185,
+          "win_rate": 0.2393020357291234,
+          "median_sessions": 10.0
+        },
+        "pullback/pct_8/2R": {
+          "trades": 2407,
+          "mean_r": 0.11569490940595833,
+          "win_rate": 0.4142085583714167,
+          "median_sessions": 17.0
+        },
+        "pullback/pct_8/3R": {
+          "trades": 2407,
+          "mean_r": 0.19475803639783157,
+          "win_rate": 0.37806398005816366,
+          "median_sessions": 21.0
+        },
+        "pullback/pct_8/none": {
+          "trades": 2407,
+          "mean_r": 0.41865751814072,
+          "win_rate": 0.36393851267137517,
+          "median_sessions": 29.0
+        }
+      },
+      "walk_forward_picks": {
+        "2015": "breakout/pct_8/none",
+        "2016": "breakout/pct_8/none",
+        "2017": "breakout/pct_8/none",
+        "2018": "breakout/pct_8/none",
+        "2019": "breakout/atr_1.5/none",
+        "2020": "breakout/pct_8/none",
+        "2021": "breakout/pct_8/none",
+        "2022": "pullback/base_low/none",
+        "2023": "pullback/base_low/none"
+      },
+      "walk_forward_trades": 1509,
+      "walk_forward_mean_r": 0.6185483665519226,
+      "walk_forward_win_rate": 0.3127899271040424,
+      "pbo": {
+        "splits": 12870,
+        "configs": 18,
+        "weeks_used": 144,
+        "pbo": 0.03566433566433566,
+        "picked_oos_negative": 0.028593628593628594,
+        "slope": -0.7529311460056793,
+        "picked_oos_median": 40.82225019338823,
+        "picked_is_median": 49.287891211152655
+      },
+      "passes": true,
+      "full_window_choice": "pullback/base_low/none"
+    },
+    "flag": {
+      "combos": {
+        "breakout/base_low/2R": {
+          "trades": 632,
+          "mean_r": 0.0212452484251779,
+          "win_rate": 0.39556962025316456,
+          "median_sessions": 15.0
+        },
+        "breakout/base_low/3R": {
+          "trades": 632,
+          "mean_r": 0.14666270192072767,
+          "win_rate": 0.3639240506329114,
+          "median_sessions": 18.0
+        },
+        "breakout/base_low/none": {
+          "trades": 632,
+          "mean_r": 0.2979028816380106,
+          "win_rate": 0.3449367088607595,
+          "median_sessions": 21.0
+        },
+        "breakout/atr_1.5/2R": {
+          "trades": 697,
+          "mean_r": -0.12523335389593857,
+          "win_rate": 0.3314203730272597,
+          "median_sessions": 6.0
+        },
+        "breakout/atr_1.5/3R": {
+          "trades": 697,
+          "mean_r": -0.02147468833382955,
+          "win_rate": 0.28263988522238165,
+          "median_sessions": 8.0
+        },
+        "breakout/atr_1.5/none": {
+          "trades": 697,
+          "mean_r": 0.31900102587581314,
+          "win_rate": 0.2309899569583931,
+          "median_sessions": 10.0
+        },
+        "breakout/pct_8/2R": {
+          "trades": 697,
+          "mean_r": 0.027895073436099992,
+          "win_rate": 0.3916786226685796,
+          "median_sessions": 12.0
+        },
+        "breakout/pct_8/3R": {
+          "trades": 697,
+          "mean_r": 0.1459919690831804,
+          "win_rate": 0.35437589670014347,
+          "median_sessions": 15.0
+        },
+        "breakout/pct_8/none": {
+          "trades": 697,
+          "mean_r": 0.38834214699855096,
+          "win_rate": 0.3328550932568149,
+          "median_sessions": 19.0
+        },
+        "pullback/base_low/2R": {
+          "trades": 1945,
+          "mean_r": -0.784786053678535,
+          "win_rate": 0.3131105398457584,
+          "median_sessions": 1.0
+        },
+        "pullback/base_low/3R": {
+          "trades": 1945,
+          "mean_r": -0.7006659695157167,
+          "win_rate": 0.2580976863753213,
+          "median_sessions": 1.0
+        },
+        "pullback/base_low/none": {
+          "trades": 1945,
+          "mean_r": 0.6239998441032208,
+          "win_rate": 0.08946015424164525,
+          "median_sessions": 2.0
+        },
+        "pullback/atr_1.5/2R": {
+          "trades": 2064,
+          "mean_r": 0.06995996237708749,
+          "win_rate": 0.39341085271317827,
+          "median_sessions": 9.0
+        },
+        "pullback/atr_1.5/3R": {
+          "trades": 2064,
+          "mean_r": 0.17539007845719687,
+          "win_rate": 0.33478682170542634,
+          "median_sessions": 12.0
+        },
+        "pullback/atr_1.5/none": {
+          "trades": 2064,
+          "mean_r": 0.4997304704678029,
+          "win_rate": 0.2916666666666667,
+          "median_sessions": 16.0
+        },
+        "pullback/pct_8/2R": {
+          "trades": 2065,
+          "mean_r": 0.12808777742819383,
+          "win_rate": 0.41113801452784504,
+          "median_sessions": 12.0
+        },
+        "pullback/pct_8/3R": {
+          "trades": 2065,
+          "mean_r": 0.23181698703886425,
+          "win_rate": 0.362227602905569,
+          "median_sessions": 16.0
+        },
+        "pullback/pct_8/none": {
+          "trades": 2065,
+          "mean_r": 0.4596525369344781,
+          "win_rate": 0.33462469733656175,
+          "median_sessions": 22.0
+        }
+      },
+      "walk_forward_picks": {
+        "2015": "breakout/atr_1.5/none",
+        "2016": "breakout/atr_1.5/none",
+        "2017": "pullback/atr_1.5/none",
+        "2018": "pullback/atr_1.5/none",
+        "2019": "breakout/pct_8/none",
+        "2020": "breakout/pct_8/none",
+        "2021": "pullback/atr_1.5/none",
+        "2022": "pullback/atr_1.5/none",
+        "2023": "pullback/atr_1.5/none"
+      },
+      "walk_forward_trades": 1415,
+      "walk_forward_mean_r": 0.4434357186207023,
+      "walk_forward_win_rate": 0.2791519434628975,
+      "pbo": {
+        "splits": 12870,
+        "configs": 18,
+        "weeks_used": 144,
+        "pbo": 0.19992229992229993,
+        "picked_oos_negative": 0.24048174048174048,
+        "slope": -1.5423923677912785,
+        "picked_oos_median": 20.57567312974506,
+        "picked_is_median": 32.290992545109376
+      },
+      "passes": true,
+      "full_window_choice": "pullback/base_low/none"
+    }
+  },
+  "calibration": {
+    "tight_range": {
+      "combo": "pullback/base_low/none",
+      "buckets": {
+        "<40": {
+          "trades": 551,
+          "mean_r": 1.7366303178633509
+        },
+        "40-50": {
+          "trades": 542,
+          "mean_r": 0.4248196662312471
+        },
+        "50 (too few)": {
+          "trades": 196,
+          "mean_r": -0.006042512582979616
+        },
+        "50-60": {
+          "trades": 319,
+          "mean_r": 0.8507788621402779
+        },
+        "60-70": {
+          "trades": 300,
+          "mean_r": -0.14884209592025358
+        },
+        "70-80": {
+          "trades": 64,
+          "mean_r": 1.7138976920538336
+        },
+        ">=80": {
+          "trades": 368,
+          "mean_r": 0.4706158442623584
+        }
+      }
+    },
+    "flag": {
+      "combo": "pullback/base_low/none",
+      "buckets": {
+        "<40": {
+          "trades": 1173,
+          "mean_r": 0.8567185900239462
+        },
+        "40-50": {
+          "trades": 63,
+          "mean_r": -0.0669991262115076
+        },
+        "50 (too few)": {
+          "trades": 106,
+          "mean_r": -0.5610913248117072
+        },
+        "50-60": {
+          "trades": 108,
+          "mean_r": 1.7733904746238793
+        },
+        "60-70": {
+          "trades": 106,
+          "mean_r": 1.880967566566222
+        },
+        "70-80": {
+          "trades": 253,
+          "mean_r": 0.14082766379479567
+        },
+        ">=80": {
+          "trades": 136,
+          "mean_r": -1.1330346778782392
+        }
+      }
+    }
+  },
+  "stage_b": {
+    "patterns": ["tight_range", "flag"],
+    "portfolios": {
+      "score>=70 any day | health off": {
+        "cagr_2015_2023": 0.07079732823374685,
+        "mdd_2015_2023": -0.3797497971741328,
+        "trades": 480,
+        "win_rate": 0.2625
+      },
+      "score>=70 any day | health on": {
+        "cagr_2015_2023": 0.10143233723728917,
+        "mdd_2015_2023": -0.18072816646937306,
+        "trades": 275,
+        "win_rate": 0.32727272727272727
+      },
+      "score>=80 any day | health off": {
+        "cagr_2015_2023": 0.023727277839097116,
+        "mdd_2015_2023": -0.26300661340028664,
+        "trades": 383,
+        "win_rate": 0.2193211488250653
+      },
+      "score>=80 any day | health on": {
+        "cagr_2015_2023": 0.03144071347083943,
+        "mdd_2015_2023": -0.14718311833732078,
+        "trades": 231,
+        "win_rate": 0.26406926406926406
+      },
+      "friday: score>=70 on Fridays, score>=83 other days | health off": {
+        "cagr_2015_2023": 0.036983893540970314,
+        "mdd_2015_2023": -0.2692976138315143,
+        "trades": 393,
+        "win_rate": 0.21374045801526717
+      },
+      "friday: score>=70 on Fridays, score>=83 other days | health on": {
+        "cagr_2015_2023": 0.057619044194582525,
+        "mdd_2015_2023": -0.14725811982891668,
+        "trades": 235,
+        "win_rate": 0.28085106382978725
+      }
+    },
+    "walk_forward_picks": {
+      "2015": "friday: score>=70 on Fridays, score>=83 other days | health off",
+      "2016": "score>=70 any day | health off",
+      "2017": "score>=70 any day | health on",
+      "2018": "score>=70 any day | health on",
+      "2019": "score>=70 any day | health on",
+      "2020": "score>=70 any day | health on",
+      "2021": "score>=70 any day | health on",
+      "2022": "score>=70 any day | health on",
+      "2023": "score>=70 any day | health on"
+    },
+    "walk_forward_cagr": 0.07797873694014257,
+    "walk_forward_mdd": -0.24185650344953147,
+    "walk_forward_weeks": ["2015-01-02", "2023-12-29"],
+    "pbo": {
+      "splits": 12870,
+      "configs": 6,
+      "weeks_used": 464,
+      "pbo": 0.3177933177933178,
+      "picked_oos_negative": 0.19634809634809636,
+      "slope": -1.0147654733902003,
+      "picked_oos_median": 0.3095297767403625,
+      "picked_is_median": 0.43875150291383164
+    },
+    "passes_pbo": false,
+    "full_window_choice": "score>=70 any day | health on"
+  },
+  "nifty500_tri_cagr_same_weeks": 0.13542772925945012,
+  "development_passes": false,
+  "interpretation": "Stage B includes only the patterns that pass stage A. Portfolio years 2012-2014 use the 2015 stage-A choice and only train stage B's first walk-forward pick; the judged years are 2015-2023."
+}

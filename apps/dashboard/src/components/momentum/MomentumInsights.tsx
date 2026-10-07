@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react';
 
 import { EMPTY, formatDay, formatPct, formatPp } from '../../lib/format';
+import type { BenchmarkView, YearlyRow } from '../../lib/momentumBenchmark';
 import type { MomentumResult } from '../../types/momentum';
 
 function num(value: unknown): number | null {
@@ -17,17 +18,27 @@ function fmtDate(value: unknown): string {
  * the kind of summary the legacy UI's KPI cards implied but never stated as
  * a single sentence.
  */
-export function MomentumInsights({ result }: { result: MomentumResult }) {
+export function MomentumInsights({
+  result,
+  view,
+  yearly,
+}: {
+  result: MomentumResult;
+  /** The picked benchmark; the run's own when absent. */
+  view?: BenchmarkView;
+  /** Calendar-year rows against `view` (`yearlyRows`); the run's own when absent. */
+  yearly?: YearlyRow[];
+}) {
   const k = result.kpis;
-  const benchmarkName = result.benchmark_name;
-  const yearsBeating = num(k.years_beating_benchmark);
+  const benchmarkName = view?.label ?? result.benchmark_name;
+  const yearsBeating = view ? view.yearsBeating : num(k.years_beating_benchmark);
   const years = num(k.years);
-  const excessCagr = num(k.excess_cagr);
+  const excessCagr = view ? view.excessCagr : num(k.excess_cagr);
   const maxDrawdown = num(k.max_drawdown);
   const drawdownTrough = k.max_drawdown_trough;
   const winRate = num(k.win_rate);
 
-  const yearlyRows = result.yearly as Array<{
+  const yearlyRows = (yearly ?? result.yearly) as Array<{
     year: unknown;
     vs_benchmark: unknown;
     strategy: unknown;

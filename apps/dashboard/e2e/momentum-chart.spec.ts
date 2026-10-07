@@ -103,7 +103,13 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
   await page.goto('/momentum/backtest/etf');
   await page.getByRole('button', { name: 'Run momentum backtest' }).click();
 
-  const chart = page.getByRole('img', { name: /Strategy, benchmark and cash values/ });
+  // The headline strip: the deciding numbers against the benchmark. This result predates the
+  // benchmark picker (no `benchmarks`), so it shows the run's own benchmark, fixed.
+  const headline = page.getByRole('region', { name: 'Headline numbers' });
+  await expect(headline).toContainText('CAGR');
+  await expect(headline).toContainText('Benchmark Nifty 50');
+
+  const chart = page.getByRole('img', { name: /Strategy and benchmark values/ });
   await expect(chart.locator('.main-svg').first()).toBeVisible();
   // The line key is our own row under the plot: one toggle per line, with its value.
   const strategy = page
@@ -116,22 +122,16 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
   await expect(
     page.getByRole('group', { name: 'Chart series' }).getByRole('button', { name: /added/ }),
   ).toHaveAttribute('aria-pressed', 'true');
-  // The week box sits in the plot's top-left corner.
-  const readout = page.getByRole('region', { name: 'Week readout' });
-  await expect(readout).toContainText('Latest');
-  await expect(readout).toContainText('Week of 19 Jan 2024');
-  const advanced = page.getByRole('button', { name: 'Advanced tooltip' });
-  await expect(advanced).toHaveAttribute('aria-pressed', 'false');
-  await advanced.click();
-  await expect(advanced).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: /Week changes/ })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
-  await expect(page.getByRole('button', { name: 'Show drawdown & 52-week edge' })).toHaveAttribute(
-    'aria-expanded',
+  await expect(page.getByRole('button', { name: 'Drawdown pane' })).toHaveAttribute(
+    'aria-pressed',
     'false',
   );
+  // Below the chart: widgets, not tabs.
+  await expect(page.getByRole('region', { name: 'Drawdowns' })).toBeVisible();
 
   const zoom = page.getByRole('button', { name: 'Touchpad zoom off' });
   await expect(zoom).toHaveAttribute('aria-pressed', 'false');
@@ -183,7 +183,7 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
     }),
   );
 
-  await page.goto('/momentum/scores/stocks');
+  await page.goto('/momentum/scores');
   await expect(page.getByText('Test Company')).toBeVisible();
   // Raw returns sit beside each score pill; stock rows no longer expand.
   const stockRow = page.getByRole('row', { name: /Test Company/ });

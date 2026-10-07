@@ -415,43 +415,31 @@ describe('tooltipPlacement', () => {
   const bounds = { left: 0, top: 0, right: 1000, bottom: 800 };
   const size = { width: 300, height: 200 };
 
-  it('sits 56 px below and 16 px right of the cursor', () => {
-    expect(tooltipPlacement({ x: 100, y: 100 }, size, bounds)).toEqual({
-      left: 116,
-      top: 156,
+  it('sits centred, 40 px below the cursor', () => {
+    expect(tooltipPlacement({ x: 500, y: 100 }, size, bounds)).toEqual({
+      left: 350,
+      top: 140,
       above: false,
-      leftOfCursor: false,
     });
   });
 
   it('flips above the cursor when below would overflow the bottom', () => {
-    expect(tooltipPlacement({ x: 100, y: 600 }, size, bounds)).toEqual({
-      left: 116,
-      top: 344,
+    expect(tooltipPlacement({ x: 500, y: 600 }, size, bounds)).toEqual({
+      left: 350,
+      top: 360,
       above: true,
-      leftOfCursor: false,
     });
   });
 
-  it('flips left of the cursor when right would overflow the right edge', () => {
-    expect(tooltipPlacement({ x: 800, y: 100 }, size, bounds)).toEqual({
-      left: 484,
-      top: 156,
-      above: false,
-      leftOfCursor: true,
-    });
+  it('slides sideways to stay inside the edges', () => {
+    expect(tooltipPlacement({ x: 950, y: 100 }, size, bounds).left).toBe(700);
+    expect(tooltipPlacement({ x: 40, y: 100 }, size, bounds).left).toBe(0);
   });
 
-  it('flips both ways in the bottom-right corner, and stays inside the top-left', () => {
-    expect(tooltipPlacement({ x: 800, y: 600 }, size, bounds)).toEqual({
-      left: 484,
-      top: 344,
-      above: true,
-      leftOfCursor: true,
-    });
+  it('stays inside the top-left when nothing fits', () => {
     expect(
       tooltipPlacement({ x: 20, y: 20 }, { width: 300, height: 900 }, { ...bounds, right: 200 }),
-    ).toEqual({ left: 0, top: 0, above: true, leftOfCursor: true });
+    ).toEqual({ left: 0, top: 0, above: true });
   });
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Pin, X } from 'lucide-react';
 import {
   type ReactNode,
   type RefObject,
@@ -28,13 +28,10 @@ import {
   ROTATION_THIN_ABOVE_WEEKS,
   type RangeLine,
   type RotationKind,
-  type WeekSummary,
   countVisibleWeeks,
-  drawdownStats,
   fitNames,
   fittedNamesText,
   headroomRange,
-  latestValue,
   rangeStartIndex,
   rebaseFactor,
   rebaseSeries,
@@ -58,9 +55,8 @@ import type {
   MomentumSavedRun,
   MomentumSeries,
 } from '../../types/momentum';
-import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { Card, CardHeader } from '../ui/Card';
+import { Card } from '../ui/Card';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { useResultFlash } from './MomentumRunProgress';
@@ -79,7 +75,6 @@ const PLOT_EVENTS: PlotEvent[] = [
   'plotly_relayout',
 ];
 
-/** Plot height with only the value panel, and with the drawdown + 52-week-edge rows under it. */
 /** The held count at a week; a week the series leaves blank carries the last known count. */
 function heldAt(counts: ReadonlyArray<number | null>, index: number): number | null {
   for (let i = Math.min(index, counts.length - 1); i >= 0; i--) {
@@ -89,24 +84,35 @@ function heldAt(counts: ReadonlyArray<number | null>, index: number): number | n
   return null;
 }
 
-const PLOT_HEIGHT = 460;
-const PLOT_HEIGHT_WITH_RISK = 720;
-/** The plot's margins; the week box sits just inside the top-left corner of the plot area. */
+/**
+ * The value panel fills the rest of the first screen under the run bar and the headline numbers
+ * (the Analytics page pattern's hero chart), about 60% of the window; before it is measured it
+ * is assumed to start 40% down.
+ */
+const PLOT_SHARE_OF_WINDOW = 0.6;
+/** The legend row and the card's padding under the plot. */
+const PLOT_FOOTER_PX = 56;
+const PLOT_HEIGHT_MIN = 380;
+const PLOT_HEIGHT_MAX = 820;
+/** Before the window is measured (server render, first paint). */
+const PLOT_HEIGHT_FALLBACK = 560;
+/** Extra height for the drawdown and 52-week-edge panes: 30 px gap, 130 + 30 + 90. */
+const RISK_PANES_PX = 280;
+const RISK_DD_PX = 130;
+const RISK_EDGE_PX = 90;
+const RISK_GAP_PX = 30;
+/** The plot's margins; the pinned card sits just inside the top-left corner of the plot area. */
 const PLOT_MARGIN = { l: 66, r: 18, t: 8, b: 36 } as const;
-const BOX_INSET = 8;
-/** The week box takes at most this share of the plot's width, but never less than the minimum. */
-const BOX_SHARE = 0.45;
-const BOX_MIN_WIDTH = 200;
-/** Average width of a text-xs character (tickers are mostly capitals), and the box's padding. */
-const BOX_CHAR_PX = 7;
-const BOX_PADDING_PX = 18;
-/** Characters the "▲ 12 IN" / "▼ 12 OUT" label takes before the names. */
-const BOX_LABEL_CHARS = 10;
-/** Rows per list in the advanced tooltip before "+N more". */
-const TOOLTIP_MAX_ROWS = 10;
-/** Characters for the topped-up / trimmed name lists in the advanced tooltip. */
+const PIN_INSET = 8;
+/** Names per list in the follow tooltip before "+N more". */
+const TIP_ROWS = 4;
+/** Rows per list in the pinned card before "+N more". */
+const PINNED_MAX_ROWS = 10;
+/** Characters for the topped-up / trimmed name lists. */
 const TOOLTIP_NAME_CHARS = 48;
 const ROTATIONS_KEY = 'rotations';
+const CASH_KEY = 'cash';
+const comparisonKey = (name: string) => `comparison:${name}`;
 
 /** Marker colour per rotation kind (Plotly needs strings, so these come from the chart theme). */
 const KIND_COLOR: Record<RotationKind, 'positive' | 'negative' | 'warning' | 'text'> = {
@@ -130,6 +136,40 @@ function signTone(value: number | null | undefined): string {
   return value > 0 ? 'text-positive' : 'text-negative';
 }
 
+/**
+ * The plot height that ends the chart at the bottom of the first screen: the window's height
+ * less where the plot starts on the page (measured at the top of the page, so scrolling does not
+ * change it) and the legend row under it. Kept between the minimum and maximum, re-measured on
+ * resize.
+ */
+function usePlotHeight(plotRef: RefObject<HTMLElement>): number {
+  const [height, setHeight] = useState(PLOT_HEIGHT_FALLBACK);
+  useEffect(() => {
+    const measure = (): void => {
+      const top = plotRef.current
+        ? plotRef.current.getBoundingClientRect().top + window.scrollY
+        : window.innerHeight * (1 - PLOT_SHARE_OF_WINDOW);
+      const fit = window.innerHeight - top - PLOT_FOOTER_PX;
+      setHeight(Math.min(Math.max(Math.round(fit), PLOT_HEIGHT_MIN), PLOT_HEIGHT_MAX));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [plotRef]);
+  return height;
+}
+
+/** A key typed into a field, not at the page: the chart's shortcuts leave it alone. */
+function typingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT'
+  );
+}
+
 type Dash = 'solid' | 'dot' | 'dash' | 'dashdot';
 
 interface LegendItem {
@@ -140,6 +180,8 @@ interface LegendItem {
   /** A token class for the swatch colour, or a CSS colour for a series-palette line. */
   swatchClass?: string;
   swatchColor?: string;
+  /** A line the reader adds ("+ Nifty 50"), rather than one shown by default. */
+  optional?: boolean;
 }
 
 const DASH_CLASS: Record<Dash, string> = {
@@ -155,6 +197,19 @@ function LegendButton({
   hidden,
   onToggle,
 }: { item: LegendItem; hidden: boolean; onToggle: () => void }) {
+  if (item.optional && hidden) {
+    return (
+      <button
+        type="button"
+        aria-pressed={false}
+        onClick={onToggle}
+        title={`Add ${item.name} to the chart`}
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted transition-colors hover:border-border-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        + {item.name}
+      </button>
+    );
+  }
   return (
     <button
       type="button"
@@ -179,150 +234,171 @@ function LegendButton({
   );
 }
 
-type WeekStatus = 'Latest' | 'Pinned' | 'Hovered';
-
-/** "NAME +27%" for an exit; the name alone when its return is unknown. */
-function exitLabel(row: { asset: string; return: number | null }): string {
-  return row.return == null
-    ? row.asset
-    : `${row.asset} ${formatPct(row.return, 0, { sign: true })}`;
-}
-
-/** The week's return, signed and coloured, then "this week". */
-function WeekReturn({ value }: { value: number | null }) {
+/** The week's return, signed and coloured. */
+function WeekChange({ value }: { value: number | null }) {
   return (
-    <>
-      <span className={cn('font-mono font-medium tabular-nums', signTone(value))}>
-        {formatPct(value, 2, { sign: true })}
-      </span>
-      <span className="text-faint"> this week</span>
-    </>
+    <span className={cn('font-mono tabular-nums', signTone(value))}>
+      {formatPct(value, 1, { sign: true })}
+    </span>
   );
 }
 
-/**
- * The week in words, in the plot's top-left corner (TradingView style), one fact per line.
- * It ignores the pointer so hovering through it still reaches the chart, and as an overlay it
- * cannot move the plot when its height changes.
- */
-function WeekBox({
-  day,
-  status,
-  summary,
-  rotation,
-  idle,
-  weekReturnValue,
-  maxWidth,
-}: {
-  day: string;
-  status: WeekStatus;
-  summary: WeekSummary;
-  rotation: MomentumRotation | undefined;
-  idle: number;
-  weekReturnValue: number | null;
-  maxWidth: number;
-}) {
-  const nameChars = Math.max(
-    Math.floor((maxWidth - BOX_PADDING_PX) / BOX_CHAR_PX) - BOX_LABEL_CHARS,
-    0,
-  );
-  const ins = fitNames(
-    (rotation?.ins ?? []).filter((row) => !row.top_up).map((row) => row.asset),
-    nameChars,
-  );
-  const outs = rotation?.outs ?? [];
-  const outFit = fitNames(outs.map(exitLabel), nameChars);
-  const shownOuts = outs.slice(0, outFit.shown.length);
-  const adjustments = [
-    summary.toppedUp > 0 ? `Topped up ${formatInt(summary.toppedUp)}` : null,
-    summary.trimmed > 0 ? `Trimmed ${formatInt(summary.trimmed)}` : null,
-  ].filter((part): part is string => part !== null);
+/** Strategy and benchmark at the week: value and that week's change, one row each. */
+interface WeekValue {
+  key: string;
+  name: string;
+  value: number | null;
+  change: number | null;
+  swatchClass: string;
+}
 
+function WeekValues({ rows }: { rows: WeekValue[] }) {
   return (
-    <section
-      aria-label="Week readout"
-      className="pointer-events-none absolute z-10 space-y-0.5 rounded-lg border border-border bg-surface/80 px-2 py-1.5 text-xs shadow-card backdrop-blur-sm"
-      style={{ left: PLOT_MARGIN.l + BOX_INSET, top: PLOT_MARGIN.t + BOX_INSET, maxWidth }}
-    >
-      <p className="flex items-center gap-1.5 whitespace-nowrap">
-        <Badge tone={status === 'Latest' ? 'neutral' : 'primary'}>{status}</Badge>
-        <span className="text-faint">·</span>
-        <span className="font-semibold text-foreground">Week of {formatDay(day)}</span>
-      </p>
-      {summary.inCount > 0 ? (
-        <p className="truncate">
-          <span className="font-medium text-foreground">▲ {formatInt(summary.inCount)} IN</span>{' '}
-          <span className="text-muted">{fittedNamesText(ins)}</span>
-        </p>
-      ) : null}
-      {summary.outCount > 0 ? (
-        <p className="truncate">
-          <span className="font-medium text-foreground">▼ {formatInt(summary.outCount)} OUT</span>{' '}
-          {shownOuts.map((row, index) => (
-            <span key={row.asset} className="text-muted">
-              {index > 0 ? ', ' : ''}
-              {row.asset}
-              {row.return == null ? null : (
-                <span className={cn('tabular-nums', signTone(row.return))}>
-                  {' '}
-                  {formatPct(row.return, 0, { sign: true })}
-                </span>
-              )}
-            </span>
-          ))}
-          {outFit.more > 0 ? <span className="text-muted"> +{outFit.more} more</span> : null}
-        </p>
-      ) : null}
-      {adjustments.length > 0 ? (
-        <p className="whitespace-nowrap text-muted">{adjustments.join(' · ')}</p>
-      ) : null}
-      {summary.kind === 'none' ? <p className="text-muted">No change</p> : null}
-      <p className="whitespace-nowrap">
-        {summary.kind === 'parked' ? (
-          <span className="font-medium text-warning">Parked in the liquid fund</span>
-        ) : (
-          <span className="text-muted">
-            Held {summary.held === null ? EMPTY : formatInt(summary.held)}
-            {idle > 0.001 ? ` · ${formatPct(idle)} cash` : ''}
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-0.5">
+      {rows.map((row) => (
+        <div key={row.key} className="contents">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className={cn('h-2 w-2 shrink-0 rounded-sm', row.swatchClass)}
+            />
+            <span className="truncate text-muted">{row.name}</span>
           </span>
-        )}
-        <span className="text-faint"> · </span>
-        <WeekReturn value={weekReturnValue} />
-      </p>
-    </section>
+          <span className="text-right font-mono tabular-nums text-foreground">
+            {formatInr(row.value, { compact: true })}
+          </span>
+          <span className="w-14 text-right">
+            <WeekChange value={row.change} />
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
-function TipHeading({ children }: { children: ReactNode }) {
+function TipHeading({ tone, children }: { tone: string; children: ReactNode }) {
   return (
-    <p className="mb-0.5 mt-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint">
+    <p className={cn('mb-0.5 mt-2 text-[11px] font-semibold uppercase tracking-wider', tone)}>
       {children}
     </p>
   );
 }
 
 function TipMore({ count }: { count: number }) {
-  return count > 0 ? (
-    <p className="text-faint">+{formatInt(count)} more · click the week to pin the full list</p>
-  ) : null;
+  return count > 0 ? <p className="text-faint">+{formatInt(count)} more</p> : null;
 }
 
 /**
- * The advanced tooltip: the hovered week's full detail, floating by the cursor. The parent
- * positions it (through `innerRef`) after every render and on every mouse move.
+ * The follow tooltip: a short read of the hovered week (values, what came in and went out),
+ * centred about 1 cm below the cursor so the line either side of it stays clear. It ignores the
+ * pointer. The parent positions it (through `innerRef`) after every render and on every move.
  */
 function WeekTooltip({
   innerRef,
   day,
   rotation,
-  held,
-  weekReturnValue,
+  values,
+  pinned,
 }: {
   innerRef: RefObject<HTMLDivElement>;
   day: string;
   rotation: MomentumRotation | undefined;
+  values: WeekValue[];
+  pinned: boolean;
+}) {
+  const entries = (rotation?.ins ?? []).filter((row) => !row.top_up);
+  const outs = rotation?.outs ?? [];
+  const topUps = (rotation?.ins ?? []).filter((row) => row.top_up).length;
+  const trims = rotation?.trims.length ?? 0;
+  return (
+    <div
+      ref={innerRef}
+      role="tooltip"
+      className="pointer-events-none absolute left-0 top-0 z-30 w-[300px] rounded-lg border border-border-strong bg-surface px-3 py-2 text-xs shadow-elevated"
+    >
+      <p className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="font-semibold text-foreground">Week of {formatDay(day)}</span>
+        {rotation ? (
+          <span className="text-[11px] font-medium text-primary">Rebalance</span>
+        ) : (
+          <span className="text-[11px] text-faint">no trades</span>
+        )}
+      </p>
+      <WeekValues rows={values} />
+      {rotation?.parked ? (
+        <p className="mt-2 text-warning">Nothing qualified: the money went to the liquid fund.</p>
+      ) : null}
+      {outs.length > 0 ? (
+        <>
+          <TipHeading tone="text-negative">Sold · {formatInt(outs.length)}</TipHeading>
+          {outs.slice(0, TIP_ROWS).map((row) => (
+            <p key={row.asset} className="flex justify-between gap-3">
+              <span className="truncate text-foreground">↓ {row.asset}</span>
+              <span className="shrink-0 font-mono tabular-nums text-muted">
+                {row.weeks_held == null ? '' : `${formatInt(row.weeks_held)}w · `}
+                <span className={signTone(row.return)}>
+                  {formatPct(row.return, 1, { sign: true })}
+                </span>
+              </span>
+            </p>
+          ))}
+          <TipMore count={outs.length - TIP_ROWS} />
+        </>
+      ) : null}
+      {entries.length > 0 ? (
+        <>
+          <TipHeading tone="text-positive">Bought · {formatInt(entries.length)}</TipHeading>
+          {entries.slice(0, TIP_ROWS).map((row) => (
+            <p key={row.asset} className="flex justify-between gap-3">
+              <span className="truncate text-foreground">↑ {row.asset}</span>
+              <span className="shrink-0 font-mono tabular-nums text-muted">
+                {row.rank == null ? '' : `rank ${formatInt(row.rank)}`}
+              </span>
+            </p>
+          ))}
+          <TipMore count={entries.length - TIP_ROWS} />
+        </>
+      ) : null}
+      {topUps > 0 || trims > 0 ? (
+        <p className="mt-1.5 text-muted">
+          {[
+            topUps > 0 ? `Topped up ${formatInt(topUps)}` : null,
+            trims > 0 ? `Trimmed ${formatInt(trims)}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      ) : null}
+      <p className="mt-2 text-[11px] text-faint">
+        {pinned ? 'Click to pin this week instead' : 'Click to pin the full detail'}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The pinned week's full detail, in the plot's top-left corner (the curve rarely reaches it:
+ * the y axis keeps headroom above the lines). It stays while the cursor moves on, until it is
+ * closed (× or Esc) or another week is clicked; ‹ › and ← → step between rebalance weeks.
+ */
+function PinnedWeekCard({
+  day,
+  rotation,
+  held,
+  values,
+  maxHeight,
+  onPrevious,
+  onNext,
+  onClose,
+}: {
+  day: string;
+  rotation: MomentumRotation | undefined;
   held: number | null;
-  weekReturnValue: number | null;
+  values: WeekValue[];
+  maxHeight: number;
+  onPrevious: (() => void) | null;
+  onNext: (() => void) | null;
+  onClose: () => void;
 }) {
   const share = new Map((rotation?.holdings ?? []).map((row) => [row.asset, row.share]));
   const entries = (rotation?.ins ?? []).filter((row) => !row.top_up);
@@ -331,25 +407,82 @@ function WeekTooltip({
   const trims = (rotation?.trims ?? []).map((row) => row.asset);
   const parked = Boolean(rotation?.parked) || held === 0;
   return (
-    <div
-      ref={innerRef}
-      role="tooltip"
-      className="pointer-events-none absolute left-0 top-0 z-30 w-max max-w-[360px] rounded-lg border border-border bg-surface px-3 py-2 text-xs shadow-elevated"
+    <section
+      aria-label="Pinned week"
+      className="absolute z-20 w-[360px] overflow-y-auto rounded-lg border border-border-strong bg-surface/95 px-3 py-2 text-xs shadow-elevated backdrop-blur-sm"
+      style={{ left: PLOT_MARGIN.l + PIN_INSET, top: PLOT_MARGIN.t + PIN_INSET, maxHeight }}
     >
-      <p className="font-semibold text-foreground">Week of {formatDay(day)}</p>
-      {!rotation ? <p className="text-muted">No trades this week.</p> : null}
+      <div className="mb-1.5 flex items-center gap-1">
+        <Pin className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+        <span className="flex-1 font-semibold text-foreground">Week of {formatDay(day)}</span>
+        <button
+          type="button"
+          onClick={onPrevious ?? undefined}
+          disabled={!onPrevious}
+          aria-label="Previous rebalance"
+          title="Previous rebalance (←)"
+          className="rounded p-0.5 text-muted hover:bg-surface-2 hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onNext ?? undefined}
+          disabled={!onNext}
+          aria-label="Next rebalance"
+          title="Next rebalance (→)"
+          className="rounded p-0.5 text-muted hover:bg-surface-2 hover:text-foreground disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Unpin week"
+          title="Unpin (Esc)"
+          className="rounded p-0.5 text-muted hover:bg-surface-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <WeekValues rows={values} />
+      {!rotation ? <p className="mt-2 text-muted">No trades this week.</p> : null}
       {rotation?.parked ? (
-        <p className="text-warning">Nothing qualified: the money went to the liquid fund.</p>
+        <p className="mt-2 text-warning">Nothing qualified: the money went to the liquid fund.</p>
+      ) : null}
+      {outs.length > 0 ? (
+        <>
+          <TipHeading tone="text-negative">Sold · {formatInt(outs.length)}</TipHeading>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3">
+            {outs.slice(0, PINNED_MAX_ROWS).map((row) => (
+              <div key={row.asset} className="contents" title={row.reason || undefined}>
+                <span className="truncate text-foreground">↓ {row.asset}</span>
+                <span className="text-right font-mono tabular-nums text-muted">
+                  {row.weeks_held == null ? EMPTY : `${formatInt(row.weeks_held)} wk`}
+                </span>
+                <span className={cn('text-right font-mono tabular-nums', signTone(row.return))}>
+                  {formatPct(row.return, 1, { sign: true })}
+                </span>
+                {row.reason ? (
+                  <span className="col-span-3 -mt-0.5 mb-0.5 truncate pl-3 text-[11px] text-faint">
+                    {row.reason}
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <TipMore count={outs.length - PINNED_MAX_ROWS} />
+        </>
       ) : null}
       {entries.length > 0 ? (
         <>
-          <TipHeading>In · {formatInt(entries.length)}</TipHeading>
+          <TipHeading tone="text-positive">Bought · {formatInt(entries.length)}</TipHeading>
           <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3">
-            {entries.slice(0, TOOLTIP_MAX_ROWS).map((row) => (
+            {entries.slice(0, PINNED_MAX_ROWS).map((row) => (
               <div key={row.asset} className="contents">
-                <span className="truncate text-foreground">{row.asset}</span>
+                <span className="truncate text-foreground">↑ {row.asset}</span>
                 <span className="text-right font-mono tabular-nums text-muted">
-                  {row.rank == null ? EMPTY : `#${formatInt(row.rank)}`}
+                  {row.rank == null ? EMPTY : `rank ${formatInt(row.rank)}`}
                 </span>
                 <span className="text-right font-mono tabular-nums text-muted">
                   {formatPct(share.get(row.asset))}
@@ -357,27 +490,7 @@ function WeekTooltip({
               </div>
             ))}
           </div>
-          <TipMore count={entries.length - TOOLTIP_MAX_ROWS} />
-        </>
-      ) : null}
-      {outs.length > 0 ? (
-        <>
-          <TipHeading>Out · {formatInt(outs.length)}</TipHeading>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_minmax(0,8rem)] gap-x-3">
-            {outs.slice(0, TOOLTIP_MAX_ROWS).map((row) => (
-              <div key={row.asset} className="contents">
-                <span className="truncate text-foreground">{row.asset}</span>
-                <span className={cn('text-right font-mono tabular-nums', signTone(row.return))}>
-                  {formatPct(row.return, 1, { sign: true })}
-                </span>
-                <span className="text-right font-mono tabular-nums text-muted">
-                  {row.weeks_held == null ? EMPTY : `${formatInt(row.weeks_held)} wk`}
-                </span>
-                <span className="truncate text-muted">{row.reason || EMPTY}</span>
-              </div>
-            ))}
-          </div>
-          <TipMore count={outs.length - TOOLTIP_MAX_ROWS} />
+          <TipMore count={entries.length - PINNED_MAX_ROWS} />
         </>
       ) : null}
       {topUps.length > 0 ? (
@@ -394,16 +507,29 @@ function WeekTooltip({
           <span className="text-muted">{fittedNamesText(fitNames(trims, TOOLTIP_NAME_CHARS))}</span>
         </p>
       ) : null}
-      <p className="mt-1.5 border-t border-border pt-1.5">
+      {rotation?.holdings.length ? (
+        <>
+          <TipHeading tone="text-faint">
+            Holding after · {formatInt(rotation.holdings.length)}
+          </TipHeading>
+          <p className="text-muted">
+            {fittedNamesText(
+              fitNames(
+                rotation.holdings.map((row) => `${row.asset} ${formatPct(row.share, 0)}`),
+                TOOLTIP_NAME_CHARS * 3,
+              ),
+            )}
+          </p>
+        </>
+      ) : null}
+      <p className="mt-2 border-t border-border pt-1.5 text-muted">
         {parked ? (
           <span className="font-medium text-warning">Parked in the liquid fund</span>
         ) : (
-          <span className="text-muted">Held {held === null ? EMPTY : formatInt(held)}</span>
+          <>Held {held === null ? EMPTY : formatInt(held)}</>
         )}
-        <span className="text-faint"> · </span>
-        <WeekReturn value={weekReturnValue} />
       </p>
-    </div>
+    </section>
   );
 }
 
@@ -604,15 +730,15 @@ function WeekChanges({
   );
 }
 
-function Stat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <span className="whitespace-nowrap">
-      <span className="text-faint">{label}</span>{' '}
-      <span className="font-medium tabular-nums text-foreground">{children}</span>
-    </span>
-  );
-}
-
+/**
+ * The hero chart: portfolio value against the picked benchmark, about two-thirds of the first
+ * screen. Hovering shows the follow tooltip under the cursor; clicking pins a week's full detail
+ * in the plot's corner, and ← → then step from rebalance to rebalance. The drawdown and
+ * 52-week-edge panes are off by default (the Drawdowns widget below the chart has the numbers).
+ *
+ * `series` already carries the picked benchmark (`withBenchmark`); `comparisons` are the other
+ * indices, offered as "+ name" chips and drawn only once added.
+ */
 export function MomentumEquityChart({
   series,
   benchmarkName,
@@ -626,7 +752,7 @@ export function MomentumEquityChart({
   benchmarkName: string;
   rotations: MomentumRotation[];
   overlays?: MomentumSavedRun[];
-  comparisons?: MomentumComparison[];
+  comparisons?: Array<Pick<MomentumComparison, 'name' | 'series'>>;
   flashKey?: number | null;
   /** A Broad Momentum result: its rotation markers show only at a year or less. */
   broad?: boolean;
@@ -635,15 +761,16 @@ export function MomentumEquityChart({
   const chartRef = useRef<HTMLDivElement>(null);
   const plotlyRef = useRef<PlotlyBasic | null>(null);
   const [scrollZoom, setScrollZoom] = useState(false);
-  const [logScale, setLogScale] = useState(false);
+  // Log by default: ten years of compounding on a linear axis flattens the early years.
+  const [logScale, setLogScale] = useState(true);
   const [range, setRange] = useState<EquityRange>('all');
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [zoom, setZoom] = useState<{ key: string; from: string; to: string } | null>(null);
-  /** Legend entries switched off, by key. */
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
-  /** The card's inner width, null until measured. */
-  const [boxWidth, setBoxWidth] = useState<number | null>(null);
+  /** Default lines switched off, by key. The liquid fund starts off. */
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set([CASH_KEY]));
+  /** Optional lines (the other indices) the reader has added, by key. */
+  const [added, setAdded] = useState<ReadonlySet<string>>(() => new Set());
   const boxRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   /** The last mouse position over the plot (client coordinates); null once it leaves. */
@@ -653,16 +780,23 @@ export function MomentumEquityChart({
   const setWeekChangesOpen = useMomentumViewStore((state) => state.setWeekChangesOpen);
   const drawdownOpen = useMomentumViewStore((state) => state.drawdownOpen);
   const setDrawdownOpen = useMomentumViewStore((state) => state.setDrawdownOpen);
-  const advancedTooltip = useMomentumViewStore((state) => state.advancedTooltip);
-  const setAdvancedTooltip = useMomentumViewStore((state) => state.setAdvancedTooltip);
+  const plotHeight = usePlotHeight(chartRef);
+  const totalHeight = drawdownOpen ? plotHeight + RISK_PANES_PX : plotHeight;
+
+  const isHidden = useCallback(
+    (key: string): boolean => (key.startsWith('comparison:') ? !added.has(key) : hidden.has(key)),
+    [added, hidden],
+  );
 
   function toggleTrace(key: string): void {
-    setHidden((current) => {
+    const flip = (current: ReadonlySet<string>): ReadonlySet<string> => {
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
-    });
+    };
+    if (key.startsWith('comparison:')) setAdded(flip);
+    else setHidden(flip);
   }
 
   /** The visible window: lines re-based to ₹1 lakh at its first week, sub-panels sliced to it. */
@@ -723,6 +857,12 @@ export function MomentumEquityChart({
     return map;
   }, [rotations]);
 
+  /** Rebalance weeks in the visible window, oldest first: what ← → step through. */
+  const rotationDays = useMemo(
+    () => view.rotations.map((rotation) => rotation.week.slice(0, 10)).sort(),
+    [view.rotations],
+  );
+
   const rotationPoints = useMemo(
     () =>
       markersShown
@@ -735,33 +875,33 @@ export function MomentumEquityChart({
     [view, thinned, markersShown],
   );
 
-  // The main axis is ours: the visible window of every visible line, with ~22 % headroom on top
-  // so the curve rarely reaches the week box in the corner. Null leaves it to Plotly.
+  // The main axis is ours: the visible window of every visible line, with headroom on top so
+  // the curve rarely reaches the pinned card in the corner. Null leaves it to Plotly.
   const yRange = useMemo(() => {
     const lines: RangeLine[] = [];
     const add = (key: string, dates: ReadonlyArray<string>, values: Array<number | null>) => {
-      if (!hidden.has(key)) lines.push({ dates, values: values.map(lakh) });
+      if (!isHidden(key)) lines.push({ dates, values: values.map(lakh) });
     };
     const shownSeries = view.series;
     add('strategy', shownSeries.dates, shownSeries.strategy);
     add('benchmark', shownSeries.dates, shownSeries.benchmark);
-    add('cash', shownSeries.dates, shownSeries.cash);
-    view.comparisons.forEach((line, index) => {
-      add(`comparison:${index}`, shownSeries.dates, line.values);
-    });
+    add(CASH_KEY, shownSeries.dates, shownSeries.cash);
+    for (const line of view.comparisons) {
+      add(comparisonKey(line.name), shownSeries.dates, line.values);
+    }
     view.overlays.forEach((run, index) => {
       add(`overlay:${index}`, run.dates, run.values);
     });
     return headroomRange(lines, activeZoom?.from ?? null, activeZoom?.to ?? null, logScale);
-  }, [view, hidden, activeZoom, logScale]);
+  }, [view, isHidden, activeZoom, logScale]);
 
-  /** Puts the advanced tooltip by the cursor, inside the visible part of the card. */
+  /** Puts the follow tooltip under the cursor, inside the visible part of the card. */
   const placeTooltip = useCallback((): void => {
     const tip = tooltipRef.current;
     const host = boxRef.current;
     const cursor = cursorRef.current;
     if (!tip || !host) return;
-    // No mouse position (a tap on a touch screen): no floating tooltip; the corner box remains.
+    // No mouse position (a tap on a touch screen): no floating tooltip; a tap pins instead.
     tip.style.visibility = cursor ? 'visible' : 'hidden';
     if (!cursor) return;
     const rect = host.getBoundingClientRect();
@@ -805,6 +945,30 @@ export function MomentumEquityChart({
     placeTooltip();
   });
 
+  // ← → step the pinned week between rebalances; Esc unpins. Only while a week is pinned, and
+  // never while typing into a field.
+  useEffect(() => {
+    if (selectedDate === null) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || typingTarget(event.target)) return;
+      if (event.key === 'Escape') {
+        setSelectedDate(null);
+        return;
+      }
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      const next =
+        event.key === 'ArrowRight'
+          ? rotationDays.find((day) => day > selectedDate)
+          : [...rotationDays].reverse().find((day) => day < selectedDate);
+      if (next) {
+        event.preventDefault();
+        setSelectedDate(next);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedDate, rotationDays]);
+
   // Purge once, on unmount. The render effect below only ever calls Plotly.react(), so a
   // re-render (theme, thinned markers, an overlay) keeps the user's pan and zoom.
   useEffect(() => {
@@ -814,19 +978,16 @@ export function MomentumEquityChart({
     };
   }, []);
 
-  // The plot's own `responsive` only listens for window resizes. The card also changes width
-  // when the settings column is hidden or shown, so watch the box itself: redraw the plot to
-  // the new width and re-measure how many names the week box has room for.
+  // The plot's own `responsive` only listens for window resizes; the card can also change width
+  // on its own (the settings drawer, the sidebar), so watch the box itself.
   useEffect(() => {
     const node = boxRef.current;
     if (!node || typeof ResizeObserver === 'undefined') return;
     let frame = 0;
     const measure = (): void => {
       frame = 0;
-      const width = Math.round(node.clientWidth);
-      setBoxWidth(width);
       const element = chartRef.current;
-      if (width > 0 && element?.classList.contains('js-plotly-plot')) {
+      if (node.clientWidth > 0 && element?.classList.contains('js-plotly-plot')) {
         try {
           plotlyRef.current?.Plots.resize(element);
         } catch {
@@ -838,7 +999,6 @@ export function MomentumEquityChart({
       if (frame === 0) frame = requestAnimationFrame(measure);
     });
     observer.observe(node);
-    measure();
     return () => {
       observer.disconnect();
       if (frame !== 0) cancelAnimationFrame(frame);
@@ -858,7 +1018,7 @@ export function MomentumEquityChart({
       const palette = getSeriesPalette(theme);
       const shown = view.series;
       const visible = (key: string): boolean | 'legendonly' =>
-        hidden.has(key) ? 'legendonly' : true;
+        isHidden(key) ? 'legendonly' : true;
       const traces: Array<Record<string, unknown>> = [
         {
           x: shown.dates,
@@ -880,7 +1040,7 @@ export function MomentumEquityChart({
           mode: 'lines',
           visible: visible('benchmark'),
           // Foreground at a thinner width: clearly a reference line, not a disabled one.
-          line: { color: colors.foreground, width: 1.4 },
+          line: { color: colors.foreground, width: 1.6 },
           hoverinfo: 'none',
         },
         {
@@ -889,7 +1049,7 @@ export function MomentumEquityChart({
           name: 'Liquid fund',
           type: 'scatter',
           mode: 'lines',
-          visible: visible('cash'),
+          visible: visible(CASH_KEY),
           line: { color: colors.text, width: 1.4, dash: 'dot' },
           hoverinfo: 'none',
         },
@@ -899,7 +1059,7 @@ export function MomentumEquityChart({
           name: line.name,
           type: 'scatter',
           mode: 'lines',
-          visible: visible(`comparison:${index}`),
+          visible: visible(comparisonKey(line.name)),
           line: { color: pickSeries(palette, index), width: 1.3, dash: 'dashdot' },
           hoverinfo: 'none',
         })),
@@ -957,7 +1117,7 @@ export function MomentumEquityChart({
             type: 'scatter',
             mode: 'lines',
             yaxis: 'y2',
-            line: { color: colors.foreground, width: 1 },
+            line: { color: colors.foreground, width: 1, dash: 'dot' },
             hoverinfo: 'none',
           },
           {
@@ -975,8 +1135,10 @@ export function MomentumEquityChart({
           },
         );
       }
+      // Pane domains from pixel heights, so the value panel keeps its height with the panes open.
+      const share = (px: number) => px / totalHeight;
       const layout: Record<string, unknown> = {
-        height: drawdownOpen ? PLOT_HEIGHT_WITH_RISK : PLOT_HEIGHT,
+        height: totalHeight,
         margin: { ...PLOT_MARGIN },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
@@ -997,13 +1159,11 @@ export function MomentumEquityChart({
           spikecolor: colors.text,
         },
         yaxis: {
-          // With the risk rows open the plot is taller, so the value panel keeps its height.
-          domain: drawdownOpen ? [0.4, 1] : [0, 1],
+          domain: drawdownOpen ? [share(RISK_PANES_PX), 1] : [0, 1],
           gridcolor: colors.grid,
           tickprefix: '₹',
           ticksuffix: ' L',
           type: logScale ? 'log' : 'linear',
-          title: { text: 'Value of ₹1 lakh invested', font: { size: 11, color: colors.text } },
           // y follows the visible x window (with headroom), so dragging pans time only.
           fixedrange: true,
           ...(yRange ? { range: yRange, autorange: false } : { autorange: true }),
@@ -1011,13 +1171,16 @@ export function MomentumEquityChart({
         ...(drawdownOpen
           ? {
               yaxis2: {
-                domain: [0.2, 0.36],
+                domain: [
+                  share(RISK_EDGE_PX + RISK_GAP_PX),
+                  share(RISK_EDGE_PX + RISK_GAP_PX + RISK_DD_PX),
+                ],
                 gridcolor: colors.grid,
                 tickformat: '.0%',
                 title: { text: 'Drawdown', font: { size: 11, color: colors.text } },
               },
               yaxis3: {
-                domain: [0, 0.16],
+                domain: [0, share(RISK_EDGE_PX)],
                 gridcolor: colors.grid,
                 tickformat: '+.0%',
                 title: { text: '52w edge', font: { size: 11, color: colors.text } },
@@ -1028,7 +1191,7 @@ export function MomentumEquityChart({
       await plotly.react(element, traces, layout, {
         responsive: true,
         displaylogo: false,
-        displayModeBar: true,
+        displayModeBar: false,
         scrollZoom,
       });
       if (!mounted) return;
@@ -1043,10 +1206,10 @@ export function MomentumEquityChart({
         if (day) setHoverDate(day);
       });
       plotlyElement.on?.('plotly_unhover', () => setHoverDate(null));
-      // Traces are hoverinfo 'none', so a tap is the only readout a touch screen gets.
+      // Click pins the week; clicking the pinned week again unpins it.
       plotlyElement.on?.('plotly_click', (event) => {
         const day = eventDay(event);
-        if (day) setSelectedDate(day);
+        if (day) setSelectedDate((current) => (current === day ? null : day));
       });
       plotlyElement.on?.('plotly_relayout', (event) => {
         const pair = event['xaxis.range'] as unknown[] | undefined;
@@ -1080,9 +1243,10 @@ export function MomentumEquityChart({
     logScale,
     theme,
     revisionKey,
-    hidden,
+    isHidden,
     drawdownOpen,
     yRange,
+    totalHeight,
   ]);
 
   const shown = view.series;
@@ -1091,31 +1255,39 @@ export function MomentumEquityChart({
   const hoverIndex = indexOf(hoverDate);
   const pinnedIndex = indexOf(selectedDate);
   const latestIndex = shown.dates.length - 1;
-  // The week box follows the hovered week; the opened list only the pinned (or latest) one.
+  // The legend reads the hovered week, else the pinned one, else the latest.
   const listIndex = pinnedIndex >= 0 ? pinnedIndex : latestIndex;
   const activeIndex = hoverIndex >= 0 ? hoverIndex : listIndex;
   const activeDay = shown.dates[activeIndex]?.slice(0, 10) ?? null;
   const listDay = shown.dates[listIndex]?.slice(0, 10) ?? null;
   const hoverDay = hoverIndex >= 0 ? activeDay : null;
+  const pinnedDay = pinnedIndex >= 0 ? (shown.dates[pinnedIndex]?.slice(0, 10) ?? null) : null;
 
-  // About 45 % of the plot's width (the box fits the names to it), never under the minimum.
-  const plotWidth = boxWidth === null ? null : boxWidth - PLOT_MARGIN.l - PLOT_MARGIN.r;
-  const weekBoxWidth =
-    plotWidth === null
-      ? 320
-      : Math.max(
-          Math.min(Math.max(plotWidth * BOX_SHARE, BOX_MIN_WIDTH), plotWidth - 2 * BOX_INSET),
-          0,
-        );
-  const activeRotation = activeDay === null ? undefined : rotationByWeek.get(activeDay);
-  const activeHeld = heldAt(shown.holdings_count, activeIndex);
-  const activeSummary = weekSummary(activeRotation, activeHeld, 0);
-  const activeWeekReturn = weekReturn(shown.strategy, activeIndex);
-  const weekStatus: WeekStatus =
-    hoverIndex >= 0 ? 'Hovered' : pinnedIndex >= 0 ? 'Pinned' : 'Latest';
-  const tooltipShown = advancedTooltip && hoverDay !== null;
+  const weekValues = (index: number): WeekValue[] => [
+    {
+      key: 'strategy',
+      name: 'Strategy',
+      value: shown.strategy[index] ?? null,
+      change: weekReturn(shown.strategy, index),
+      swatchClass: 'bg-primary',
+    },
+    {
+      key: 'benchmark',
+      name: benchmarkName,
+      value: shown.benchmark[index] ?? null,
+      change: weekReturn(shown.benchmark, index),
+      swatchClass: 'bg-foreground',
+    },
+  ];
+
+  const hoverRotation = hoverDay === null ? undefined : rotationByWeek.get(hoverDay);
+  const pinnedRotation = pinnedDay === null ? undefined : rotationByWeek.get(pinnedDay);
   const listRotation = listDay === null ? undefined : rotationByWeek.get(listDay);
   const listSummary = weekSummary(listRotation, heldAt(shown.holdings_count, listIndex), 0);
+  const previousRebalance =
+    pinnedDay === null ? undefined : [...rotationDays].reverse().find((day) => day < pinnedDay);
+  const nextRebalance =
+    pinnedDay === null ? undefined : rotationDays.find((day) => day > pinnedDay);
 
   const legend: LegendItem[] = [
     {
@@ -1133,21 +1305,12 @@ export function MomentumEquityChart({
       swatchClass: 'border-foreground',
     },
     {
-      key: 'cash',
+      key: CASH_KEY,
       name: 'Liquid fund',
       value: shown.cash[activeIndex] ?? null,
       dash: 'dot',
       swatchClass: 'border-muted',
     },
-    ...view.comparisons.map(
-      (line, index): LegendItem => ({
-        key: `comparison:${index}`,
-        name: line.name,
-        value: line.values[activeIndex] ?? null,
-        dash: 'dashdot',
-        swatchColor: seriesCssColor(index),
-      }),
-    ),
     ...view.overlays.map((run, index): LegendItem => {
       const at = activeDay === null ? -1 : run.dates.findIndex((d) => d.slice(0, 10) === activeDay);
       return {
@@ -1158,13 +1321,19 @@ export function MomentumEquityChart({
         swatchColor: seriesCssColor(index + view.comparisons.length),
       };
     }),
+    ...view.comparisons.map(
+      (line, index): LegendItem => ({
+        key: comparisonKey(line.name),
+        name: line.name,
+        value: line.values[activeIndex] ?? null,
+        dash: 'dashdot',
+        swatchColor: seriesCssColor(index),
+        optional: true,
+      }),
+    ),
   ];
 
-  const risk = drawdownStats(shown.dates, shown.drawdown_strategy);
-  const latestEdge = latestValue(shown.dates, shown.rolling_52w_excess);
-  const activeEdge = shown.rolling_52w_excess[activeIndex] ?? null;
-  const rotationsHidden = hidden.has(ROTATIONS_KEY);
-
+  const rotationsHidden = isHidden(ROTATIONS_KEY);
   const markerHint = !markersShown
     ? '(shown at 1Y or closer)'
     : thinned
@@ -1172,57 +1341,49 @@ export function MomentumEquityChart({
       : null;
 
   return (
-    <Card className={flashing ? 'animate-result-flash' : ''}>
-      <CardHeader
-        title="Portfolio value"
-        description={
-          view.rebased && view.firstDay
-            ? `Every line re-based to ₹1 lakh on ${formatDay(view.firstDay)} · hover a week to read it in the plot's corner, click to pin it · drag to pan`
-            : "₹1 lakh starting value · hover a week to read it in the plot's corner, click to pin it · drag to pan"
-        }
-        className="flex-wrap"
-        actions={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {pinnedIndex >= 0 ? (
-              <Button size="sm" variant="ghost" onClick={() => setSelectedDate(null)}>
-                Back to latest
-              </Button>
-            ) : null}
-            <SegmentedControl
-              ariaLabel="Chart range"
-              size="sm"
-              value={range}
-              onChange={setRange}
-              options={EQUITY_RANGES}
-            />
-            <Button
-              size="sm"
-              variant={scrollZoom ? 'primary' : 'secondary'}
-              aria-pressed={scrollZoom}
-              onClick={() => setScrollZoom((value) => !value)}
-            >
-              Touchpad zoom {scrollZoom ? 'on' : 'off'}
-            </Button>
-            <Button
-              size="sm"
-              variant={logScale ? 'primary' : 'secondary'}
-              aria-pressed={logScale}
-              onClick={() => setLogScale((value) => !value)}
-            >
-              Log scale
-            </Button>
-            <Button
-              size="sm"
-              variant={advancedTooltip ? 'primary' : 'secondary'}
-              aria-pressed={advancedTooltip}
-              title="Show the hovered week's full detail in a tooltip by the cursor"
-              onClick={() => setAdvancedTooltip(!advancedTooltip)}
-            >
-              Advanced tooltip
-            </Button>
-          </div>
-        }
-      />
+    <Card className={cn('px-4 py-3', flashing && 'animate-result-flash')}>
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h3 className="text-sm font-semibold text-foreground">Equity curve</h3>
+        <p className="min-w-0 flex-1 truncate text-xs text-faint">
+          {view.rebased && view.firstDay
+            ? `Re-based to ₹1 lakh on ${formatDay(view.firstDay)} · hover a week, click to pin it, drag to pan`
+            : '₹1 lakh at the start · hover a week, click to pin it, drag to pan'}
+        </p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <SegmentedControl
+            ariaLabel="Chart range"
+            size="sm"
+            value={range}
+            onChange={setRange}
+            options={EQUITY_RANGES}
+          />
+          <Button
+            size="sm"
+            variant={logScale ? 'primary' : 'secondary'}
+            aria-pressed={logScale}
+            onClick={() => setLogScale((value) => !value)}
+          >
+            Log scale
+          </Button>
+          <Button
+            size="sm"
+            variant={drawdownOpen ? 'primary' : 'secondary'}
+            aria-pressed={drawdownOpen}
+            title="Show the drawdown and 52-week-edge panes under the curve"
+            onClick={() => setDrawdownOpen(!drawdownOpen)}
+          >
+            Drawdown pane
+          </Button>
+          <Button
+            size="sm"
+            variant={scrollZoom ? 'primary' : 'secondary'}
+            aria-pressed={scrollZoom}
+            onClick={() => setScrollZoom((value) => !value)}
+          >
+            Touchpad zoom {scrollZoom ? 'on' : 'off'}
+          </Button>
+        </div>
+      </div>
       <div ref={boxRef} className="relative min-w-0">
         {activeDay === null ? (
           <p className="mb-2 text-xs text-muted">No weeks in this run.</p>
@@ -1233,46 +1394,47 @@ export function MomentumEquityChart({
             role="img"
             aria-label={
               drawdownOpen
-                ? 'Strategy, benchmark and cash values with drawdown and trailing excess return'
-                : 'Strategy, benchmark and cash values'
+                ? 'Strategy and benchmark values with drawdown and trailing excess return'
+                : 'Strategy and benchmark values'
             }
             className="w-full"
             // Reserve the plot's height in the layout: Plotly positions its SVG absolutely after a
             // resize, so without this the box collapses and the rows below draw over the plot.
-            style={{ height: drawdownOpen ? PLOT_HEIGHT_WITH_RISK : PLOT_HEIGHT }}
+            style={{ height: totalHeight }}
           />
-          {activeDay !== null ? (
-            <WeekBox
-              day={activeDay}
-              status={weekStatus}
-              summary={activeSummary}
-              rotation={activeRotation}
-              idle={shown.idle_share[activeIndex] ?? 0}
-              weekReturnValue={activeWeekReturn}
-              maxWidth={weekBoxWidth}
+          {pinnedDay !== null ? (
+            <PinnedWeekCard
+              day={pinnedDay}
+              rotation={pinnedRotation}
+              held={heldAt(shown.holdings_count, pinnedIndex)}
+              values={weekValues(pinnedIndex)}
+              maxHeight={plotHeight - PLOT_MARGIN.t - PLOT_MARGIN.b - 2 * PIN_INSET}
+              onPrevious={previousRebalance ? () => setSelectedDate(previousRebalance) : null}
+              onNext={nextRebalance ? () => setSelectedDate(nextRebalance) : null}
+              onClose={() => setSelectedDate(null)}
             />
           ) : null}
         </div>
-        {tooltipShown && hoverDay !== null ? (
+        {hoverDay !== null ? (
           <WeekTooltip
             innerRef={tooltipRef}
             day={hoverDay}
-            rotation={activeRotation}
-            held={activeHeld}
-            weekReturnValue={activeWeekReturn}
+            rotation={hoverRotation}
+            values={weekValues(hoverIndex)}
+            pinned={pinnedDay !== null && pinnedDay !== hoverDay}
           />
         ) : null}
         {/* The line key, under the time axis: each line's value at the active week; click to hide
-            or show it. The marker key and its toggle close the row. */}
+            or show it, or to add one of the other indices. The marker key closes the row. */}
         <fieldset
           aria-label="Chart series"
-          className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5"
+          className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"
         >
           {legend.map((item) => (
             <LegendButton
               key={item.key}
               item={item}
-              hidden={hidden.has(item.key)}
+              hidden={isHidden(item.key)}
               onToggle={() => toggleTrace(item.key)}
             />
           ))}
@@ -1330,7 +1492,7 @@ export function MomentumEquityChart({
                   aria-hidden="true"
                 />
                 <span className="font-semibold text-foreground">Week changes</span>
-                <span className="text-muted">
+                <span className="truncate text-muted">
                   {formatDay(listDay)}: {weekChangeCounts(listSummary)}
                   {listSummary.kind === 'parked' ? ' · parked in the liquid fund' : ''}
                 </span>
@@ -1346,86 +1508,6 @@ export function MomentumEquityChart({
             </div>
           </div>
         )}
-        {/* Drawdown, collapsed to its numbers; the two sub-panels are one click away. */}
-        <section
-          aria-label="Drawdown"
-          className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-3"
-        >
-          <div className="min-w-0 space-y-1 text-xs">
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <Stat label="Max drawdown">
-                <span className="text-negative">{formatPct(risk.max)}</span>
-                {risk.troughDate ? (
-                  <span className="font-normal text-muted">
-                    {' '}
-                    (trough {formatDay(risk.troughDate)})
-                  </span>
-                ) : null}
-              </Stat>
-              <Stat label="Now">
-                <span className={signTone(risk.current)}>{formatPct(risk.current)}</span>
-              </Stat>
-              <Stat label="Longest under water">
-                {risk.underwater ? (
-                  <>
-                    {formatInt(risk.underwater.weeks)} wk
-                    <span className="font-normal text-muted">
-                      {' '}
-                      ({formatDay(risk.underwater.from)} →{' '}
-                      {risk.underwater.ongoing
-                        ? 'not yet recovered'
-                        : formatDay(risk.underwater.to)}
-                      )
-                    </span>
-                  </>
-                ) : (
-                  'never'
-                )}
-              </Stat>
-              {latestEdge ? (
-                <Stat label="52w edge">
-                  <span className={signTone(latestEdge.value)}>
-                    {formatPct(latestEdge.value, 1, { sign: true })}
-                  </span>
-                </Stat>
-              ) : null}
-            </div>
-            {activeDay !== null ? (
-              <p className="flex flex-wrap gap-x-3 text-faint">
-                <span>Week of {formatDay(activeDay)}:</span>
-                <span>
-                  drawdown{' '}
-                  <span className="tabular-nums text-muted">
-                    {formatPct(shown.drawdown_strategy[activeIndex])}
-                  </span>
-                </span>
-                <span>
-                  {benchmarkName}{' '}
-                  <span className="tabular-nums text-muted">
-                    {formatPct(shown.drawdown_benchmark[activeIndex])}
-                  </span>
-                </span>
-                <span>
-                  52w edge{' '}
-                  <span className={cn('tabular-nums', signTone(activeEdge))}>
-                    {formatPct(activeEdge, 1, { sign: true })}
-                  </span>
-                </span>
-              </p>
-            ) : null}
-          </div>
-          <Button
-            size="sm"
-            aria-expanded={drawdownOpen}
-            onClick={() => setDrawdownOpen(!drawdownOpen)}
-          >
-            <ChevronDown
-              className={cn('h-3.5 w-3.5 transition-transform', drawdownOpen && 'rotate-180')}
-              aria-hidden="true"
-            />
-            {drawdownOpen ? 'Hide drawdown & 52-week edge' : 'Show drawdown & 52-week edge'}
-          </Button>
-        </section>
       </div>
     </Card>
   );

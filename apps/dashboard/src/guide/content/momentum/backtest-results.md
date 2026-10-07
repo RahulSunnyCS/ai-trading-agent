@@ -1,45 +1,88 @@
 ## What it is for
 
 After a run, this part of the Backtest screen tells you how the rule did, how bumpy the ride
-was, and what it actually traded.
+was, and what it actually traded. The first screen answers "is this good?" without scrolling;
+everything else sits in sections below the chart.
 
-## The headline cards
+## The run bar
 
-| Card | What it means | What to look for |
+The line at the top: the dataset, every setting the next run tests as a chip (click a chip to
+open that setting), and the actions: reload prices, copy a shareable link, **Settings** (the
+settings open in a drawer from the right) and **Run momentum backtest**. The round arrow beside
+Run re-runs from scratch, dropping the server's caches.
+
+## The benchmark picker
+
+The headline card compares everything with one [benchmark](glossary:benchmark), picked on the
+card itself: **Nifty 200 Momentum 30** (the default), **Nifty 50**, **Nifty Next 50**,
+**Nifty Midcap 150** or **Nifty Smallcap 250**. All five include dividends, so they compare
+like for like, and each shows its own CAGR over the run's period in the menu. Switching
+re-compares the whole page (the headline, the chart, the yearly bars, the drawdowns) without
+running the backtest again; the strategy's own numbers do not change.
+
+Nifty 200 Momentum 30 is the default because it is a momentum index you can buy as an ETF:
+beating it is what makes running this strategy worth the effort.
+
+> [!NOTE]
+> Nifty 200 Momentum 30 before August 2020 is NSE's back-calculation, not live history. An
+> index without data for the run's period shows *no data* in the menu.
+
+## The headline numbers
+
+| Number | What it means | What to look for |
 |---|---|---|
-| ₹1 lakh became | The final value of ₹1 lakh invested at the start. | Compare with the benchmark's figure. |
-| [CAGR](glossary:cagr) | The average yearly return, compounded. | Meaningful only next to the benchmark and the drawdown. |
-| [Edge vs benchmark](glossary:edge) | Strategy CAGR minus benchmark CAGR. | Positive, and comfortably more than the costs you might have missed. |
-| [Max drawdown](glossary:max-drawdown) | The worst fall from a peak. Red when deeper than the benchmark's. | Could you have sat through it without selling? |
-| [Sharpe](glossary:sharpe) / [Sortino](glossary:sortino) | Return above cash per unit of risk. | Above 1 is good; above 2 is rare and worth doubting. |
-| [Churn](glossary:churn) | Share of the portfolio replaced per year. | High churn means more cost and short-term tax. |
-| Exits / year, Avg holding | How often positions are sold, and how long they are held. | Holdings under a year are taxed as short-term gains. |
-| [Win rate](glossary:win-rate), Best / worst exit | Share of closed positions that made money; the extremes. | Momentum often wins well under 60% of the time and makes it up with large winners. |
-| Largest position | The biggest share any holding reached. | A very large number means concentration risk. |
-| Time in cash/debt | Share of weeks not fully invested. | |
-| Tax paid | Capital-gains tax deducted, when tax is on. | |
+| [CAGR](glossary:cagr) | The average yearly return, compounded. The badge is the [edge](glossary:edge) over the benchmark. | Positive edge, comfortably more than costs you might have missed. |
+| [Max drawdown](glossary:max-drawdown) | The worst fall from a peak, with the benchmark's and how much shallower or deeper. | Could you have sat through it without selling? |
+| [Sharpe](glossary:sharpe) | Return above cash per unit of risk, for the strategy and the benchmark. | Above 1 is good; above 2 is rare and worth doubting. |
+| ₹1 lakh became | The final value of ₹1 lakh, and how many times the benchmark's. | |
+| Last 12 months | The return over the last 52 weeks, and since the end of last year. | |
+
+The line under them carries the rest at a glance: [Sortino](glossary:sortino), volatility,
+how many calendar years it beat the benchmark, exits per year, average holding, win rate and
+time in cash. **All metrics** opens the full set, the assumptions behind the run, any data
+notes and a one-sentence summary. Hover the (i) by a number for what it means and how it
+changed from your previous run.
 
 ## The equity chart
 
-The portfolio's value week by week against the benchmark. Markers show the weeks it bought,
-sold, topped up or trimmed. Look for *when* the edge was earned: steadily, or in one lucky
-stretch? A result that comes from one year is fragile.
+The portfolio's value week by week against the benchmark, about two-thirds of the first
+screen. Markers show the weeks it bought, sold, topped up or trimmed.
 
-## The detail tabs
+- **Hover** a week: a short tooltip sits about a centimetre below the cursor (above it near the
+  bottom edge), so the line to either side stays clear and you can slide straight to the next
+  week. It shows the strategy's and benchmark's value that week and what was sold and bought.
+- **Click** a week to pin its full detail in the chart's corner: everything sold (with how long
+  it was held, its return and why), everything bought, and the holdings after. **← →** step to
+  the previous or next rebalance; **Esc** or × unpins.
+- The legend under the plot toggles each line; **+ Nifty 50** and the like add the other
+  indices. **Drawdown pane** adds the drawdown and 52-week-edge panes under the curve.
 
-| Tab | What it shows |
+Look for *when* the edge was earned: steadily, or in one lucky stretch? A result that comes
+from one year is fragile.
+
+## The sections below the chart
+
+They load in the background once the chart is on screen, and any section you scroll to loads
+straight away.
+
+| Section | What it shows |
 |---|---|
-| Returns | Each calendar year against the benchmark, and a month-by-month heatmap. Count the losing years. |
-| This week | The latest ranking: every candidate's rank score and which are held. |
-| Trades | Open positions, every closed trade, and which instruments made or lost the money. |
-| Timeline & holdings | What was held, when, and in what share. |
-| Risk | The benchmark's worst falls and how the strategy did in the same weeks; for stocks, circuit situations. |
-| Compare | Put this run next to saved runs: CAGR, edge, drawdown, Sharpe, turnover, holdings. |
+| This week | The latest ranking with each candidate's score and action, beside the open positions. |
+| Yearly returns | Each calendar year against the benchmark. Count the losing years. |
+| Rolling 1-year return | The return over every trailing 52 weeks, and how often the strategy was ahead. |
+| Drawdowns | The deepest falls: when, how deep, how long, and what the benchmark did then. |
+| Monthly returns | A month-by-month heatmap with each year's total. |
+| Trades | Every closed trade, newest first, filterable. |
+| Benchmark's worst falls | The benchmark's deepest falls and what the strategy did in the same weeks. |
+| Compare runs | This run next to saved runs: CAGR, edge, drawdown, Sharpe, turnover, holdings. |
+| Holdings timeline | What was held, when, and in what share. |
+| Circuit exposure | Broad Momentum only: the circuit-lock situations the strategy ran into. |
+| Instrument attribution | How each instrument made or lost the money. |
 
 ## Reading a result honestly
 
 1. **Compare with the benchmark, not with zero.** 15% a year is poor if the index made 14%
-   with less pain.
+   with less pain. Try the other indices in the picker too.
 2. **Look at the drawdown before the return.** A strategy you abandon in its worst year earns
    nothing.
 3. **Check the years.** Several losing years in a row is normal for momentum; know how many.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P3 — usable today, but sorting and filtering lag by a third of a second |
-| **Status** | Planned |
+| **Status** | Dropped — superseded by [BL-049](BL-049-momentum-scores-redesign.md) |
 | **Type** | improvement |
 | **Area** | dashboard |
 | **Created** | 2026-10-05 |
@@ -61,3 +61,4 @@ nodes.
 
 - 2026-10-05 — created from the Momentum UI performance review (2026-10-04 session).
 - 2026-10-06 — owner decisions on PR #27: parked until after the Max month (about 2026-11-06); priority unchanged.
+- 2026-10-07 — dropped, superseded by BL-049: the Scores redesign pages the table, memoises rows and defers the filter in its Phase 1, with the same done-when (sort and filter under 100 ms, under 2,000 DOM nodes). The Ctrl+F question stays open there.
