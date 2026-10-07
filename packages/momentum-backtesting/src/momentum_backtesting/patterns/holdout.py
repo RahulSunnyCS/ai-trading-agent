@@ -18,7 +18,7 @@ import pandas as pd
 
 from .. import holdout as bl010_holdout
 from . import SEARCH_SPACES, criteria
-from .run import OUT_DIR
+from .run import OUT_DIR, learned_column, load_detections
 
 RESULT = "bl042_holdout_result.json"
 CLAIM = "bl042_holdout.claimed"
@@ -128,13 +128,17 @@ def run(out_dir: Path = OUT_DIR, *, echo=print) -> dict:
             name = variant.split("/", 1)[1]
             shape, value = next((s, v) for n, s, v in shapes.variants() if n == name)
             graded = with_quality(found)
-            state, blend = (
+            history = with_quality(pd.concat([load_detections(out_dir), found]))
+            graded["learned"] = learned_column(ranking, history, graded, end=end)
+            state, blend, learned = (
                 shapes.column_scores(
                     score_table(graded, pattern, weeks, names, value=column), ranking
                 )
-                for column in ("score", "blend_score")
+                for column in ("score", "blend_score", "learned")
             )
-            ranks = shapes.apply(shape, ranking.stock_pool_ranks, state, value, blend=blend)
+            ranks = shapes.apply(
+                shape, ranking.stock_pool_ranks, state, value, blend=blend, learned=learned
+            )
             mine = shapes.backtest(ranking, ranks, start=start, end=end, locks=locks).result.equity
             report["patterns"][pattern] = {"variant": name, **judge(base, mine)}
             echo(f"{pattern} {name}: {report['patterns'][pattern]}")

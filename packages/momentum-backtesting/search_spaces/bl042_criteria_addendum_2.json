@@ -1,0 +1,141 @@
+{
+  "written_before_running": "2026-10-07T16:50:00+05:30",
+  "name": "BL-042 criteria, addendum 2: detector fixes from the gallery check, the detector freeze, and a score learned from past outcomes",
+  "adds_to": "bl042_criteria.json and addendum 1 - unchanged except where this file says",
+  "rule": "Committed before any forward return is computed (Phases 4-6 have not run). Never edited after results are seen: a change is a new file that names this one as superseded, with the reason.",
+  "returns_seen": false,
+  "detectors_frozen": true,
+  "dropped_patterns": [],
+  "gallery_check": {
+    "labelled_by_owner": "159 of 165 (2026-10-07). Precision, correct / (correct + wrong), unsure left out:",
+    "owner_precision": {
+      "tight_range": {
+        "detected": "34/34",
+        "near_miss": "11/12"
+      },
+      "flag": {
+        "detected": "26/30",
+        "near_miss": "9/10"
+      },
+      "cup_handle": {
+        "detected": "19/23 (16 unsure)",
+        "near_miss": "6/7 (7 unsure)"
+      }
+    },
+    "owner_caveat": "The owner asked that their judgement not be taken as final, and that looking like a textbook pattern matters less than whether it pays (2026-10-07).",
+    "second_review": "Claude reviewed 56 charts (every Wrong/Unsure flag and tight range, every Wrong cup, 6 random Unsure cups, 5 random Correct per pattern) against the written rules. It agreed on tight ranges and most flags, and judged most cups doubtful.",
+    "consistent_findings": [
+      "Cup and handle: every sampled cup had a 1-week handle (the gallery shows the first detected week). The owner noted 'only cup / handle still forming' 14 times.",
+      "Cup and handle: many 'cups' are bounces inside a downtrend or a range, with a left lip that is no real top.",
+      "Flag: some 'poles' are rebounds after a crash (s041, s043, s050, s124), not a run from strength.",
+      "Data: one flag's pole starts on a single bad low print (s075), a wick far below that bar's open and close."
+    ],
+    "kill_gate": "No pattern is dropped. Given the owner's caveat, the gallery is used to find detector bugs, not to rule a pattern out; whether a pattern pays is left to Phases 4-6."
+  },
+  "bad_bar_wick": {
+    "plain": "Added to the bad-bar rule: a bar whose low is more than 15% below the lower of its open and close, or whose high is more than 15% above the higher, is a bad print. Detectors refuse a window containing one.",
+    "max_wick": 0.15
+  },
+  "detectors": {
+    "tight_range": {
+      "uptrend": {
+        "above_ma_weeks": 30,
+        "min_above_52w_low": 0.25
+      },
+      "near_high": {
+        "min_close_vs_52w_high": 0.75
+      },
+      "windows_weeks": [3, 5, 8],
+      "max_range": {
+        "3": 0.08,
+        "5": 0.12,
+        "8": 0.15
+      },
+      "max_range_vs_own_median": 0.5,
+      "own_median_lookback_weeks": 52,
+      "volume_dry_up": {
+        "short_days": 10,
+        "long_days": 50,
+        "max_ratio": 0.7,
+        "required": false
+      },
+      "pivot": "highest high of the tightest qualifying window",
+      "changed": "near_high added: the close within 25% of the 52-week high (a base near highs, not a pause in a slide)"
+    },
+    "flag": {
+      "pole": {
+        "min_rise": 0.2,
+        "min_days": 3,
+        "max_days": 25
+      },
+      "flag": {
+        "min_days": 5,
+        "max_days": 20,
+        "max_retrace_of_pole": 0.3333,
+        "max_drop_from_pole_high": 0.15,
+        "highs_not_rising": true,
+        "volume_below_pole": true
+      },
+      "near_high": {
+        "min_close_vs_52w_high": 0.75
+      },
+      "uptrend": {
+        "above_ma_weeks": 30
+      },
+      "pivot": "highest high of the flag",
+      "changed": "near_high and uptrend added: the pole must lift the stock into an uptrend near its 52-week high, so a rebound after a crash is not a flag"
+    },
+    "high_tight_flag": {
+      "pole": {
+        "min_rise": 0.9,
+        "max_weeks": 8
+      },
+      "flag": {
+        "min_weeks": 3,
+        "max_weeks": 5,
+        "max_drop_from_pole_high": 0.25
+      }
+    },
+    "cup_handle": {
+      "pivots": "causal zigzag on weekly closes, reversal 8%; a swing point exists only from the week that confirmed it",
+      "prior_advance": 0.3,
+      "left_lip_high_of_weeks": 26,
+      "cup": {
+        "min_weeks": 7,
+        "max_weeks": 65,
+        "min_depth": 0.12,
+        "max_depth": 0.35,
+        "min_weeks_in_lower_third": 3,
+        "right_lip_within_of_left": 0.1
+      },
+      "handle": {
+        "min_weeks": 2,
+        "max_weeks": 4,
+        "max_depth": 0.15,
+        "must_be_in_upper_half": true
+      },
+      "near_high": {
+        "min_close_vs_52w_high": 0.75
+      },
+      "pivot": "highest high of the handle",
+      "changed": "handle min_weeks 1 -> 2; the left lip must be the highest high of the 26 weeks up to it (a real top); near_high added"
+    }
+  },
+  "learned_score": {
+    "asked_by": "owner, 2026-10-07: rank a setup both by how textbook it looks (addendum 1's quality) and by how such setups paid before",
+    "plain": "For a detection at week t: the average 13-week excess return (over non-pattern pool stocks in the same momentum decile, as in the event study) of EARLIER detections in the same cell whose 13 weeks had fully ended by t. A cell is pattern x state x quality third (cut points from the development detections). Nothing after t is used.",
+    "cell": ["pattern", "state", "quality_third"],
+    "horizon_weeks": 13,
+    "min_past_cases": 30,
+    "too_few": "score 0.5 (neutral) until the cell has min_past_cases finished cases",
+    "to_score": "clip(0.5 + 0.5 * past_mean_excess / excess_for_full_score, 0, 1): +5% over 13 weeks = 1.0, -5% = 0.0",
+    "shape": {
+      "name": "learned_0.5",
+      "how": "blend at weight 0.5 with the learned score in place of the pattern score"
+    },
+    "trials_added": 3,
+    "trials_total": 24,
+    "holdout": "In Phase 6 the learned score keeps learning causally from development and earlier hold-out detections, exactly as a live system would.",
+    "excess_for_full_score": 0.05
+  }
+}

@@ -104,11 +104,11 @@ def test_wide_range_is_not_tight():
 
 
 def _flag_path(flag_end: float):
-    flat = np.full(60, 100.0)
+    lead = np.linspace(80, 100, 200)  # a slow uptrend, so the stock is near its highs
     pole = np.linspace(100, 130, 10)
     flag_days = np.linspace(129, flag_end, 8)
-    closes = np.r_[flat, pole, flag_days]
-    volume = np.r_[np.full(60, 1e6), np.full(10, 2e6), np.full(8, 5e5)]
+    closes = np.r_[lead, pole, flag_days]
+    volume = np.r_[np.full(200, 1e6), np.full(10, 2e6), np.full(8, 5e5)]
     # end on a Friday so the last bar closes a week
     return _frame(closes, volume=volume, end="2023-06-30")
 
@@ -233,3 +233,18 @@ def test_loosened_relaxes_every_float_threshold_and_nothing_else():
     assert loose["handle"]["must_be_in_upper_half"] is True  # switches stay
     tight = loosened(patterns.detector_params("tight_range"))
     assert tight["max_range"]["5"] == pytest.approx(0.12 * LOOSEN)
+
+
+def test_a_bad_print_wick_is_a_bad_bar():
+    frame = _frame([100, 101, 102, 103])
+    frame.loc[2, "low"] = 70.0  # a print 30% below the bar's open and close
+    assert adjust(frame, {})["bad"].tolist() == [False, False, True, False]
+
+
+def test_a_rebound_after_a_crash_is_not_a_flag():
+    crash = np.linspace(200, 100, 200)  # far below its 52-week high when the "pole" comes
+    pole = np.linspace(100, 130, 10)
+    flag_days = np.linspace(129, 124, 8)
+    volume = np.r_[np.full(200, 1e6), np.full(10, 2e6), np.full(8, 5e5)]
+    frame = _frame(np.r_[crash, pole, flag_days], volume=volume)
+    assert flag.scan(_bars(frame))[-1] is None

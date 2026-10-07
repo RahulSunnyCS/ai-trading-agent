@@ -15,7 +15,9 @@ on or before k; most recent first):
 - handle: `handle.min_weeks`..`handle.max_weeks` weeks, no high above the right lip, at most
   `handle.max_depth` deep, and (if `handle.must_be_in_upper_half`) its low in the upper half of
   the cup;
-- no bad bar from a to k.
+- no bad bar from a to k;
+- (addendum 2) the left lip is the highest high of the `left_lip_high_of_weeks` weeks up to
+  it, and the stock's setting passes `common.context` (near its 52-week high).
 
 The pivot is the handle's highest high.
 """
@@ -28,7 +30,7 @@ import numpy as np
 
 from . import detector_params
 from .bars import SymbolBars
-from .common import Base
+from .common import Base, context
 from .pivots import known_highs, zigzag
 
 PATTERN = "cup_handle"
@@ -47,7 +49,10 @@ def scan(bars: SymbolBars, params: dict | None = None) -> list[Base | None]:
     w = bars.weekly()
     pivots = zigzag(w.close, _reversal(p["pivots"]))
     out: list[Base | None] = [None] * len(w.close)
+    setting = context(w, p)
     for k in range(len(w.close)):
+        if not setting[k]:
+            continue
         for lip in known_highs(pivots, k):
             a = lip.index
             if k - a > cup["max_weeks"] + handle["max_weeks"]:
@@ -63,6 +68,9 @@ def _cup_at(w, bars: SymbolBars, a: int, k: int, p: dict) -> Base | None:
     cup, handle = p["cup"], p["handle"]
     if k - a < cup["min_weeks"] + handle["min_weeks"]:
         return None
+    top_weeks = p.get("left_lip_high_of_weeks")
+    if top_weeks and w.high[a] < w.high[max(0, a - top_weeks + 1) : a + 1].max():
+        return None  # the left lip must be a real top, not a bump inside a slide
     b = a + 1 + int(np.argmin(w.low[a + 1 : k + 1]))
     if b >= k - handle["min_weeks"]:
         return None

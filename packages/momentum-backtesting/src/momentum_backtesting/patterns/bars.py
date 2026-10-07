@@ -10,8 +10,9 @@ ratio inside its window, so the scale itself never matters; `scale` keeps the cu
 so a price can be shown as it traded on the day.
 
 A bar is `bad` when it is not trustworthy for shape-reading: the day after a gap of more than
-`MAX_GAP_DAYS` market days, or a one-day move beyond `MAX_UNEXPLAINED_MOVE` that no confirmed
-factor explains (an unconfirmed corporate action, or a data error). Detectors refuse a window
+`MAX_GAP_DAYS` market days, a one-day move beyond `MAX_UNEXPLAINED_MOVE` that no confirmed
+factor explains (an unconfirmed corporate action, or a data error), or (addendum 2) a wick more
+than `max_wick` beyond the bar's own open and close (a bad print). Detectors refuse a window
 that contains one.
 """
 
@@ -67,7 +68,7 @@ def adjust(
     close = frame["close"].to_numpy()
     move = np.r_[np.nan, close[1:] / close[:-1] - 1]
     jump = (np.abs(move) > MAX_UNEXPLAINED_MOVE) & ~first & ~explained
-    frame["bad"] = gap | jump
+    frame["bad"] = gap | jump | _wicks(frame)
     return frame
 
 
@@ -165,3 +166,18 @@ def split_symbols(frame: pd.DataFrame) -> dict[str, SymbolBars]:
         symbol: SymbolBars.from_frame(symbol, frame.iloc[rows])
         for symbol, rows in frame.groupby("symbol", sort=False).indices.items()
     }
+
+
+def _wicks(frame: pd.DataFrame) -> np.ndarray:
+    """A low far below (or a high far above) the bar's own open and close: a bad print. Off
+    unless the criteria set `bad_bar_wick.max_wick`."""
+    from . import criteria
+
+    limit = criteria().get("bad_bar_wick", {}).get("max_wick")
+    if limit is None:
+        return np.zeros(len(frame), dtype=bool)
+    body_lo = np.minimum(frame["open"].to_numpy(), frame["close"].to_numpy())
+    body_hi = np.maximum(frame["open"].to_numpy(), frame["close"].to_numpy())
+    return (frame["low"].to_numpy() < body_lo * (1 - limit)) | (
+        frame["high"].to_numpy() > body_hi * (1 + limit)
+    )

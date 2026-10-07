@@ -21,7 +21,7 @@ import pandas as pd
 
 from . import detector_params
 from .bars import SymbolBars
-from .common import Base
+from .common import Base, context
 
 PATTERN = "tight_range"
 
@@ -36,6 +36,8 @@ def scan(bars: SymbolBars, params: dict | None = None) -> list[Base | None]:
     uptrend = (close > close.rolling(up["above_ma_weeks"]).mean()) & (
         close >= (1 + up["min_above_52w_low"]) * low.rolling(52).min()
     )
+    if "near_high" in p:
+        uptrend &= context(w, {"near_high": p["near_high"]})
     best_rel = np.full(len(close), np.inf)
     best_n = np.zeros(len(close), dtype=int)
     best = {}

@@ -37,6 +37,22 @@ class Base:
     geometry: dict = field(default_factory=dict)
 
 
+def context(w, params: dict) -> np.ndarray:
+    """Per week: the stock's setting allows the pattern (addendum 2). `near_high`: close at
+    least `min_close_vs_52w_high` of the 52-week high; `uptrend.above_ma_weeks`: close above
+    that many weeks' average. A block the params lack is not checked."""
+    close = pd.Series(w.close)
+    ok = pd.Series(True, index=close.index)
+    near = params.get("near_high")
+    if near:
+        top = pd.Series(w.high).rolling(52, min_periods=26).max()
+        ok &= close >= near["min_close_vs_52w_high"] * top
+    trend = params.get("uptrend", {}).get("above_ma_weeks")
+    if trend:
+        ok &= close > close.rolling(trend).mean()
+    return ok.to_numpy()
+
+
 def average_volume(volume: np.ndarray, days: int = VOLUME_AVERAGE_DAYS) -> np.ndarray:
     """Mean volume of the `days` bars BEFORE each bar (NaN until there are that many)."""
     rolled = pd.Series(volume).rolling(days, min_periods=days).mean().shift(1)

@@ -42,9 +42,11 @@ def test_bonus_moves_up_by_ranks_with_ties_to_pool_rank():
 
 
 def test_seven_variants():
-    # addendum 1 swapped filter_20 -> filter_100 and bonus_5 -> bonus_25
+    # addendum 1 swapped filter_20 -> filter_100 and bonus_5 -> bonus_25; addendum 2 added
+    # the learned-score blend
     assert [v[0] for v in ranking.variants()] == [
         "blend_0.25", "blend_0.5", "blend_0.75", "filter_40", "filter_100", "bonus_10", "bonus_25",
+        "learned_0.5",
     ]  # fmt: skip
 
 
@@ -190,3 +192,34 @@ def test_weekly_statistic_excluded_names_are_not_controls():
     exclude = pd.DataFrame([[False, True, False]], index=weeks, columns=cols)
     assert study.weekly_statistic(rets, ranks, events).iloc[0] == pytest.approx(-0.15)
     assert study.weekly_statistic(rets, ranks, events, exclude).iloc[0] == pytest.approx(0.10)
+
+
+def test_learned_score_uses_only_outcomes_known_by_then(monkeypatch):
+    from momentum_backtesting.patterns import learned
+
+    weeks = pd.date_range("2015-01-02", periods=60, freq="W-FRI")
+    past = pd.DataFrame(
+        {
+            "pattern": "flag",
+            "state": "forming",
+            "quality": 0.9,
+            "excess": [0.05] * 40,  # each a +5% 13-week excess
+            "known": weeks[:40] + pd.Timedelta(weeks=13),
+        }
+    )
+    target = pd.DataFrame(
+        {"pattern": "flag", "state": "forming", "quality": 0.9, "week": [weeks[30], weeks[59]]}
+    )
+    cuts = {"flag": (0.3, 0.6)}  # quality 0.9 is the high third
+    out = learned.scores(target, past, cuts)
+    # week 30: only outcomes known by week 30 count (weeks 0..17 -> 18 < 30 cases): neutral
+    assert out.iloc[0] == 0.5
+    # week 59: all 40 known, mean +5% -> the full score
+    assert out.iloc[1] == pytest.approx(1.0)
+
+
+def test_learned_shape_reads_the_learned_table():
+    learned_table = _pool([[0, 0, 0, 1.0, 0]])
+    out = ranking.apply("learned", POOL, SCORE * 0, 0.5, learned=learned_table).iloc[0]
+    # D: 0.5 * 0 (last on momentum) + 0.5 * 1.0 = 0.5 ties A's 0.5 * 1 + 0; A wins on pool rank
+    assert list(out[["A", "D", "B", "C"]]) == [1, 2, 3, 4]

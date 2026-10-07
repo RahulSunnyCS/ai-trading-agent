@@ -110,25 +110,64 @@ def _patterns_in_play() -> list[str]:
     return [p for p in criteria()["patterns_tested"] if p not in dropped]
 
 
-def _column_tables(ranking, detections: pd.DataFrame) -> dict[str, dict[str, pd.DataFrame]]:
-    """pattern -> {"state": state score, "blend": state score x quality, "quality": quality},
-    each week x column on the ranking's own columns."""
+def column_resolver(ranking):
+    """(symbol, week) -> the ranking column the symbol traded under that week: the segment
+    with a pool rank that week, else one with a price, else None."""
+    by_symbol: dict[str, list[str]] = {}
+    for column, symbol in ranking.column_to_base_symbol.items():
+        by_symbol.setdefault(symbol, []).append(column)
+    pool, prices = ranking.stock_pool_ranks, ranking.prices
+
+    def column_of(symbol: str, week) -> str | None:
+        cols = by_symbol.get(symbol, [])
+        for table in (pool, prices):
+            for col in cols:
+                if col in table.columns and week in table.index and pd.notna(table.at[week, col]):
+                    return col
+        return None
+
+    return column_of
+
+
+def learned_column(ranking, history: pd.DataFrame, target: pd.DataFrame, *, end: str) -> pd.Series:
+    """Learned scores for `target` (graded detections) from the outcomes of `history` (graded
+    detections, development first) known by each target row's week. Forward returns never
+    read past `end`."""
+    from . import learned
+
+    stocks = list(ranking.stock_pool_ranks.columns)
+    past = learned.outcomes(
+        history,
+        ranking.prices[stocks].loc[:end],
+        ranking.stock_pool_ranks,
+        column_resolver(ranking),
+    )
+    dev = history[history["week"] <= dev_end()]
+    return learned.scores(target, past, learned.quality_cuts(dev))
+
+
+def _column_tables(
+    ranking, detections: pd.DataFrame, *, learned_end: str | None = None
+) -> dict[str, dict[str, pd.DataFrame]]:
+    """pattern -> {"state": state score, "blend": state score x quality, "quality": quality,
+    and with `learned_end` "learned": the learned score}, each week x column on the ranking's
+    own columns."""
     from .features import score_table
     from .quality import with_quality
     from .ranking import column_scores
 
     graded = with_quality(detections)
+    values = [("state", "score"), ("blend", "blend_score"), ("quality", "quality")]
+    if learned_end is not None:
+        graded["learned"] = learned_column(ranking, graded, graded, end=learned_end)
+        values.append(("learned", "learned"))
     weeks = ranking.stock_pool_ranks.index
     symbols = sorted(set(ranking.column_to_base_symbol.values()))
     out = {}
     for pattern in _patterns_in_play():
         out[pattern] = {
             name: column_scores(score_table(graded, pattern, weeks, symbols, value=value), ranking)
-            for name, value in (
-                ("state", "score"),
-                ("blend", "blend_score"),
-                ("quality", "quality"),
-            )
+            for name, value in values
         }
     return out
 
@@ -182,7 +221,7 @@ def ranking_test(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
     start, end = window["from"], window["to"]
     ranking = broad_ranking()
     locks = cx.lock_masks(ranking.column_to_base_symbol, ranking.prices.index)
-    tables = _column_tables(ranking, load_detections(out_dir))
+    tables = _column_tables(ranking, load_detections(out_dir), learned_end=end)
 
     echo("baseline ...")
     curves = {"baseline": shapes.backtest(ranking, None, start=start, end=end, locks=locks)}
@@ -191,7 +230,12 @@ def ranking_test(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
         for name, shape, value in shapes.variants():
             echo(f"{pattern} {name} ...")
             ranks = shapes.apply(
-                shape, ranking.stock_pool_ranks, table["state"], value, blend=table["blend"]
+                shape,
+                ranking.stock_pool_ranks,
+                table["state"],
+                value,
+                blend=table["blend"],
+                learned=table.get("learned"),
             )
             out = shapes.backtest(ranking, ranks, start=start, end=end, locks=locks)
             curves[f"{pattern}/{name}"] = out.result.equity

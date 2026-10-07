@@ -32,14 +32,15 @@ def criteria() -> dict:
     """bl042_criteria.json with every addendum applied in order:
     - `detectors` replaces the starting values for the patterns it names;
     - `shapes` replaces the named fields of the Phase 5 shapes;
-    - `quality` and `uses` are added as they are."""
+    - `quality`, `uses`, `learned_score`, `bad_bar_wick` and `gallery_check` are taken as
+      they are (a later addendum's block replaces an earlier one's)."""
     spec = json.loads(CRITERIA.read_text())
     for extra in _addenda():
         for name, values in extra.get("detectors", {}).items():
             spec["detectors_starting_values"][name] = values
         for shape, fields in extra.get("shapes", {}).items():
             spec["phase_5_ranking_test"]["shapes"][shape].update(fields)
-        for key in ("quality", "uses"):
+        for key in ("quality", "uses", "learned_score", "bad_bar_wick", "gallery_check"):
             if key in extra:
                 spec[key] = extra[key]
     return spec

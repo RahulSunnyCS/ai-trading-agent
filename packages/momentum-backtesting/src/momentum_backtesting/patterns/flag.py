@@ -25,7 +25,7 @@ import numpy as np
 
 from . import detector_params
 from .bars import SymbolBars
-from .common import Base
+from .common import Base, context
 
 PATTERN = "flag"
 HIGH_TIGHT = "high_tight_flag"
@@ -36,8 +36,11 @@ def scan(bars: SymbolBars, params: dict | None = None) -> list[Base | None]:
     pole, flag = p["pole"], p["flag"]
     high, low, vol, bad = bars.high, bars.low, bars.volume, bars.bad
     out: list[Base | None] = [None] * len(bars.week_end)
+    setting = context(bars.weekly(), p)
     for k, i in enumerate(bars.week_end):
         i = int(i)
+        if not setting[k]:
+            continue
         lo_h, hi_h = i - flag["max_days"], i - flag["min_days"]
         if lo_h - pole["max_days"] < 0:
             continue

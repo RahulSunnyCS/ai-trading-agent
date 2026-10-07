@@ -51,6 +51,10 @@ def variants() -> list[tuple[str, str, float]]:
     out = [(f"blend_{w}", "blend", w) for w in shapes["blend"]["weights"]]
     out += [(f"filter_{n}", "filter", n) for n in shapes["filter"]["top_n"]]
     out += [(f"bonus_{b}", "bonus", b) for b in shapes["bonus"]["ranks"]]
+    learned = criteria().get("learned_score")
+    if learned:  # addendum 2: blend with the score learned from earlier setups' outcomes
+        name = learned["shape"]["name"]
+        out.append((name, "learned", float(name.rsplit("_", 1)[1])))
     return out
 
 
@@ -61,11 +65,16 @@ def apply(
     value: float,
     *,
     blend: pd.DataFrame | None = None,
+    learned: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """`score` is the state score (>= 0.5 = detected) the filter and bonus read; the blend
     reads `blend` (state score x quality, addendum 1) when given, else `score`."""
     if shape == "blend":
         return globals()["blend"](pool, score if blend is None else blend, value)
+    if shape == "learned":
+        if learned is None:
+            raise ValueError("the learned shape needs the learned score table")
+        return globals()["blend"](pool, learned, value)
     if shape == "filter":
         return filter_top(pool, score, int(value))
     if shape == "bonus":
