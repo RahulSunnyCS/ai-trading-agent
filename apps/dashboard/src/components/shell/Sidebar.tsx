@@ -14,6 +14,8 @@ interface SidebarProps {
   preferences: NavigationPreferences;
   /** Called after a selection so the mobile drawer can close itself. */
   onNavigate?: () => void;
+  /** The icon rail of an analytics page: icons only (the name on hover), no nested links. */
+  compact?: boolean;
 }
 
 /** A plain left click navigates in place; modified clicks keep the browser's behaviour. */
@@ -34,6 +36,7 @@ export function Sidebar({
   onSelect,
   preferences,
   onNavigate,
+  compact = false,
 }: SidebarProps) {
   const groups = visibleNavigationGroups(preferences);
 
@@ -42,6 +45,57 @@ export function Sidebar({
     event.preventDefault();
     onSelect(tab, ...rest);
     onNavigate?.();
+  }
+
+  if (compact) {
+    return (
+      <div className="flex h-full flex-col items-center gap-4 overflow-y-auto py-4">
+        <span
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
+          title="AI Trading Agent"
+        >
+          <BrandIcon className="h-4 w-4" />
+        </span>
+        <nav aria-label="Primary" className="flex flex-col items-center gap-3">
+          {groups.map((group) => (
+            <div
+              key={group.id}
+              className="flex flex-col items-center gap-1 border-t border-border pt-3 first:border-t-0 first:pt-0"
+            >
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = item.id === activeTab;
+                return (
+                  <a
+                    key={item.id}
+                    href={buildPath(item.id)}
+                    onClick={(event) => {
+                      if (active && isPlainClick(event)) {
+                        event.preventDefault();
+                        return;
+                      }
+                      go(event, item.id);
+                    }}
+                    aria-label={item.label}
+                    title={item.label}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+                      FOCUS_RING,
+                      active
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-faint hover:bg-surface-2 hover:text-foreground',
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </a>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+      </div>
+    );
   }
 
   return (

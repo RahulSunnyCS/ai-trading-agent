@@ -2,7 +2,8 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
 
 import { useAppRoute } from './hooks/useAppRoute';
-import { DEFAULT_TAB, aliasTarget, documentTitle } from './lib/routes';
+import { cn } from './lib/cn';
+import { DEFAULT_TAB, aliasTarget, documentTitle, isAnalyticsPage } from './lib/routes';
 
 import { BrokerLoginsView } from './components/BrokerLoginsView';
 import { CoverageView } from './components/CoverageView';
@@ -117,6 +118,9 @@ export function App() {
   const defaultChild = activeItem ? activeNavChild(activeItem, routeRest)?.segment : undefined;
   const helpRest = routeRest.length || !defaultChild ? routeRest : [defaultChild];
   const setActiveTab = (next: Tab, ...nextRest: string[]) => navigate(next, ...nextRest);
+  // Analytics pages (the Analytics page pattern, apps/dashboard/CLAUDE.md) get the icon rail and
+  // the full width, so the page's hero chart is not squeezed into the centre column.
+  const analytics = isAnalyticsPage(tab, routeRest);
   const [menuOpen, setMenuOpen] = useState(false);
   const [navigationPreferences, setNavigationPreferences] = useState<NavigationPreferences>(
     DEFAULT_NAVIGATION_PREFERENCES,
@@ -193,12 +197,18 @@ export function App() {
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-border bg-surface/50 lg:block">
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-30 hidden border-r border-border bg-surface/50 lg:block',
+          analytics ? 'w-16' : 'w-64',
+        )}
+      >
         <Sidebar
           activeTab={activeTab}
           activeRest={rest}
           onSelect={setActiveTab}
           preferences={navigationPreferences}
+          compact={analytics}
         />
       </aside>
 
@@ -220,7 +230,7 @@ export function App() {
       </Dialog.Root>
 
       {/* Main column */}
-      <div className="lg:pl-64">
+      <div className={analytics ? 'lg:pl-16' : 'lg:pl-64'}>
         <Topbar
           title={tabLabel(activeTab)}
           subtitle={SUBTITLES[activeTab]}
@@ -233,7 +243,10 @@ export function App() {
         <main
           id={MAIN_ID}
           tabIndex={-1}
-          className="mx-auto max-w-7xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-6 focus:outline-none sm:px-6 md:pb-6"
+          className={cn(
+            'mx-auto px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] focus:outline-none sm:px-6 md:pb-6',
+            analytics ? 'max-w-none pt-4' : 'max-w-7xl pt-6',
+          )}
         >
           <div key={activeTab} className="animate-fade-in">
             {renderView(activeTab, navigationPreferences, updateNavigationPreferences)}

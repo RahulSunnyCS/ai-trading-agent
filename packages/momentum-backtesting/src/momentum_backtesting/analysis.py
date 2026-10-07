@@ -407,7 +407,10 @@ def payload_parts(
     recommending a trade the engine's own rules wouldn't have allowed.
 
     `references` (reference_benchmarks.load_references) adds `comparisons`: dividend-inclusive
-    lines the strategy is also measured against, whatever the dataset's own benchmark is."""
+    lines the strategy is also measured against, whatever the dataset's own benchmark is; and
+    `benchmarks`: the dashboard picker's five indices (`reference_benchmarks.picker`), each with
+    its curve on `series.dates` and headline statistics, so the page can switch benchmark
+    without a re-run."""
     closed = closed_trades(result)
     eq, bench, cash = result.equity, result.benchmark, result.cash
     rolling = (eq / eq.shift(52)) - (bench / bench.shift(52))
@@ -472,6 +475,16 @@ def payload_parts(
                     "series": (c["curve"] * CAPITAL).tolist(),
                 }
                 for c in reference_benchmarks.compare(eq, references)
+            ],
+            "benchmarks": [
+                {
+                    **{key: value for key, value in entry.items() if key != "curve"},
+                    "final_value": (entry["total_return"] + 1) * CAPITAL,
+                    "series": (entry["curve"] * CAPITAL).tolist(),
+                }
+                if entry["available"]
+                else entry
+                for entry in reference_benchmarks.picker(eq, cash, references)
             ],
             "series": series,
             "rotations": rotations(result),

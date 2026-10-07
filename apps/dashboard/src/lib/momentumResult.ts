@@ -230,13 +230,11 @@ export function headroomRange(
 }
 
 // ---------------------------------------------------------------------------
-// Equity chart: the advanced tooltip's placement
+// Equity chart: the follow tooltip's placement
 // ---------------------------------------------------------------------------
 
-/** How far below (or above) the cursor the tooltip sits: about 1.5 cm. */
-export const TOOLTIP_OFFSET_Y = 56;
-/** The horizontal gap between the cursor and the tooltip's near edge. */
-export const TOOLTIP_GAP_X = 16;
+/** How far below (or above) the cursor the tooltip's near edge sits: about 1 cm. */
+export const TOOLTIP_OFFSET_Y = 40;
 
 export interface Box {
   left: number;
@@ -250,15 +248,14 @@ export interface TooltipPlacement {
   top: number;
   /** Placed above the cursor because below would overflow the bottom. */
   above: boolean;
-  /** Placed left of the cursor because right would overflow the right edge. */
-  leftOfCursor: boolean;
 }
 
 /**
- * Where the floating tooltip goes, in the same coordinates as `cursor` and `bounds`: 56 px
- * below the cursor and 16 px right of it, so the next points to the right stay in view. If that
- * overflows the bottom of `bounds` it goes 56 px above instead; if it overflows the right edge,
- * its right edge sits 16 px left of the cursor. Finally it is kept inside the top-left corner.
+ * Where the follow tooltip goes, in the same coordinates as `cursor` and `bounds`: centred on
+ * the cursor, its top edge 40 px below it, so the line to the left and right of the cursor stays
+ * clear and the next point is always reachable. If that overflows the bottom of `bounds` its
+ * bottom edge sits 40 px above the cursor instead. Then it is slid sideways, and down if need
+ * be, to stay inside `bounds`.
  */
 export function tooltipPlacement(
   cursor: { x: number; y: number },
@@ -268,15 +265,9 @@ export function tooltipPlacement(
   let top = cursor.y + TOOLTIP_OFFSET_Y;
   const above = top + size.height > bounds.bottom;
   if (above) top = cursor.y - TOOLTIP_OFFSET_Y - size.height;
-  let left = cursor.x + TOOLTIP_GAP_X;
-  const leftOfCursor = left + size.width > bounds.right;
-  if (leftOfCursor) left = cursor.x - TOOLTIP_GAP_X - size.width;
-  return {
-    left: Math.max(left, bounds.left),
-    top: Math.max(top, bounds.top),
-    above,
-    leftOfCursor,
-  };
+  const centred = cursor.x - size.width / 2;
+  const left = Math.max(Math.min(centred, bounds.right - size.width), bounds.left);
+  return { left, top: Math.max(top, bounds.top), above };
 }
 
 // ---------------------------------------------------------------------------

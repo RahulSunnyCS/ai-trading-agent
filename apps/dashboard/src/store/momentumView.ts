@@ -1,43 +1,36 @@
 import { create } from 'zustand';
 
+import { DEFAULT_BENCHMARK } from '../lib/momentumBenchmark';
+
 /**
- * How the Momentum backtest result is laid out, remembered in this browser: whether the results
- * take the full width, which collapsible parts of the chart are open, whether the chart's
- * advanced tooltip is on, and which details tab was last open.
+ * How the Momentum backtest result is laid out, remembered in this browser: the benchmark the
+ * headline picker compares against, whether the chart's drawdown pane and its "Week changes"
+ * list are open, and whether the headline's full metric set is showing.
  *
  * SSR-safe in the same way as `store/settings.ts`: fixed defaults on the server and on the
  * client's first render; `hydrateMomentumViewFromStorage()` applies the stored values from an
- * effect after mount.
+ * effect after mount. Keys stored by the earlier layout (full-width results, the advanced
+ * tooltip toggle, the open details tab) are ignored.
  */
-export const DETAILS_TABS = ['returns', 'week', 'trades', 'split', 'risk', 'compare'] as const;
-export type DetailsTab = (typeof DETAILS_TABS)[number];
-
 export interface MomentumViewPrefs {
-  /** Results across the whole width, settings column hidden (from the xl breakpoint). */
-  resultsExpanded: boolean;
+  /** The picker's index (`result.benchmarks[].name`). */
+  benchmark: string;
   /** The "Week changes" list under the plot. */
   weekChangesOpen: boolean;
-  /** The drawdown and 52-week-edge sub-panels of the chart. */
+  /** The drawdown and 52-week-edge panes under the equity curve. */
   drawdownOpen: boolean;
-  /** The floating tooltip with the hovered week's full detail, following the cursor. */
-  advancedTooltip: boolean;
-  /** The open details tab; null = all collapsed. */
-  detailsTab: DetailsTab | null;
+  /** Every metric under the headline numbers, not just the one-line summary. */
+  metricsOpen: boolean;
 }
 
 export const MOMENTUM_VIEW_STORAGE_KEY = 'ata.momentumView.v1';
 
 export const DEFAULT_MOMENTUM_VIEW: MomentumViewPrefs = {
-  resultsExpanded: false,
+  benchmark: DEFAULT_BENCHMARK,
   weekChangesOpen: false,
   drawdownOpen: false,
-  advancedTooltip: false,
-  detailsTab: null,
+  metricsOpen: false,
 };
-
-function isDetailsTab(value: unknown): value is DetailsTab {
-  return typeof value === 'string' && (DETAILS_TABS as readonly string[]).includes(value);
-}
 
 /** Any stored value → valid preferences; each field falls back to its default on its own. */
 export function normalizeMomentumView(value: unknown): MomentumViewPrefs {
@@ -46,11 +39,13 @@ export function normalizeMomentumView(value: unknown): MomentumViewPrefs {
       ? (value as Record<string, unknown>)
       : {};
   return {
-    resultsExpanded: raw.resultsExpanded === true,
+    benchmark:
+      typeof raw.benchmark === 'string' && raw.benchmark.trim() !== ''
+        ? raw.benchmark
+        : DEFAULT_BENCHMARK,
     weekChangesOpen: raw.weekChangesOpen === true,
     drawdownOpen: raw.drawdownOpen === true,
-    advancedTooltip: raw.advancedTooltip === true,
-    detailsTab: isDetailsTab(raw.detailsTab) ? raw.detailsTab : null,
+    metricsOpen: raw.metricsOpen === true,
   };
 }
 
@@ -74,11 +69,10 @@ function persist(prefs: MomentumViewPrefs): void {
 }
 
 interface MomentumViewState extends MomentumViewPrefs {
-  setResultsExpanded: (expanded: boolean) => void;
+  setBenchmark: (name: string) => void;
   setWeekChangesOpen: (open: boolean) => void;
   setDrawdownOpen: (open: boolean) => void;
-  setAdvancedTooltip: (on: boolean) => void;
-  setDetailsTab: (tab: DetailsTab | null) => void;
+  setMetricsOpen: (open: boolean) => void;
 }
 
 export const useMomentumViewStore = create<MomentumViewState>((set, get) => {
@@ -86,20 +80,18 @@ export const useMomentumViewStore = create<MomentumViewState>((set, get) => {
     set(patch);
     const state = get();
     persist({
-      resultsExpanded: state.resultsExpanded,
+      benchmark: state.benchmark,
       weekChangesOpen: state.weekChangesOpen,
       drawdownOpen: state.drawdownOpen,
-      advancedTooltip: state.advancedTooltip,
-      detailsTab: state.detailsTab,
+      metricsOpen: state.metricsOpen,
     });
   }
   return {
     ...DEFAULT_MOMENTUM_VIEW,
-    setResultsExpanded: (resultsExpanded) => update({ resultsExpanded }),
+    setBenchmark: (benchmark) => update({ benchmark }),
     setWeekChangesOpen: (weekChangesOpen) => update({ weekChangesOpen }),
     setDrawdownOpen: (drawdownOpen) => update({ drawdownOpen }),
-    setAdvancedTooltip: (advancedTooltip) => update({ advancedTooltip }),
-    setDetailsTab: (detailsTab) => update({ detailsTab }),
+    setMetricsOpen: (metricsOpen) => update({ metricsOpen }),
   };
 });
 

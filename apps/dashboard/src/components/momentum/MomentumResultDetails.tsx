@@ -17,7 +17,6 @@ import {
   formatPp,
 } from '../../lib/format';
 import { describeConfig, hindsightWarning } from '../../lib/momentumConfig';
-import { type DetailsTab, useMomentumViewStore } from '../../store/momentumView';
 import type { MomentumLatest, MomentumResult, MomentumSavedRun } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -39,51 +38,7 @@ import { MomentumYearlyChart } from './MomentumYearlyChart';
 import { ResultSection } from './ResultSection';
 import { SignalsTable } from './details/SignalsTable';
 
-type Panel = DetailsTab;
-type ReturnsView = 'chart' | 'table' | 'monthly';
-
-const TABS: Array<{ value: Panel; label: string }> = [
-  { value: 'returns', label: 'Returns' },
-  { value: 'week', label: 'This week' },
-  { value: 'trades', label: 'Trades' },
-  { value: 'split', label: 'Timeline & holdings' },
-  { value: 'risk', label: 'Risk' },
-  { value: 'compare', label: 'Compare' },
-];
-
-const RETURNS_VIEWS: Array<[ReturnsView, string, string, string]> = [
-  [
-    'chart',
-    'Yearly chart',
-    'Year by year',
-    'Green bars beat the benchmark that calendar year, red trailed it',
-  ],
-  [
-    'table',
-    'Yearly table',
-    'Annual performance',
-    'Calendar-year returns against the benchmark and the liquid fund',
-  ],
-  [
-    'monthly',
-    'Monthly',
-    'Monthly returns',
-    'Return by calendar month with a yearly total — switch between the strategy, the benchmark and the difference',
-  ],
-];
-
-const RETURNS_COPY: Record<ReturnsView, [string, string]> = Object.fromEntries(
-  RETURNS_VIEWS.map(([id, , title, description]) => [id, [title, description]]),
-) as Record<ReturnsView, [string, string]>;
-
-const DATASET_LABELS: Record<string, string> = {
-  etf: 'ETF Rotation',
-  stock: 'Nifty 50 Stocks',
-  custom_index: 'Custom Index',
-  broad: 'Broad Momentum',
-};
-
-const COLUMNS: Record<'holdings' | 'trades' | 'risk', Array<[string, string]>> = {
+export const COLUMNS: Record<'holdings' | 'trades' | 'risk', Array<[string, string]>> = {
   holdings: [
     ['asset', 'Asset'],
     ['group', 'Group'],
@@ -144,14 +99,25 @@ function rowKey(row: Record<string, unknown>, index: number): string {
   return `${String(row.asset ?? row.year ?? row['benchmark peak'] ?? index)}-${index}`;
 }
 
-/** Sortable, CSV-exportable data table — replaces the old static DataTable everywhere. */
-function DataTable({
+/**
+ * Sortable, CSV-exportable data table. Rows stay on one line: a long cell is cut short with an
+ * ellipsis and shows in full on hover. `maxRows` shows the first rows (after sorting) with a
+ * "Show all" toggle, for a widget that should not grow the page by hundreds of rows.
+ */
+export function DataTable({
   rows,
   columns,
   csvName,
-}: { rows: Array<Record<string, unknown>>; columns: Array<[string, string]>; csvName?: string }) {
+  maxRows,
+}: {
+  rows: Array<Record<string, unknown>>;
+  columns: Array<[string, string]>;
+  csvName?: string;
+  maxRows?: number;
+}) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<1 | -1>(1);
+  const [showAll, setShowAll] = useState(false);
 
   const sorted = useMemo(() => {
     if (!sortKey) return rows;
@@ -172,19 +138,20 @@ function DataTable({
   }
 
   if (rows.length === 0) return <p className="text-sm text-muted">No rows for this run.</p>;
+  const limited = maxRows !== undefined && !showAll && sorted.length > maxRows;
+  // Figures read down a column right-aligned; a column is numeric when its first value is.
+  const numericColumn = new Set(
+    columns
+      .map(([key]) => key)
+      .filter((key) => typeof rows.find((row) => row[key] != null)?.[key] === 'number'),
+  );
+  const shown = limited ? sorted.slice(0, maxRows) : sorted;
   return (
     <div className="space-y-2">
-      {csvName ? (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => downloadCsv(csvName, columns, sorted)}>
-            <Download className="h-3.5 w-3.5" /> Download CSV
-          </Button>
-        </div>
-      ) : null}
-      <Table>
+      <Table className="[&_td]:max-w-[18rem] [&_td]:truncate [&_td]:whitespace-nowrap [&_td]:py-1.5">
         <THead>
           {columns.map(([key, title]) => (
-            <Th key={key}>
+            <Th key={key} align={numericColumn.has(key) ? 'right' : 'left'}>
               <button
                 type="button"
                 onClick={() => toggleSort(key)}
@@ -203,17 +170,41 @@ function DataTable({
           ))}
         </THead>
         <tbody>
-          {sorted.map((row, index) => (
+          {shown.map((row, index) => (
             <TRow key={rowKey(row, index)}>
-              {columns.map(([key]) => (
-                <Td key={key} numeric={typeof row[key] === 'number'}>
-                  {format(row[key], key)}
-                </Td>
-              ))}
+              {columns.map(([key]) => {
+                const text = format(row[key], key);
+                return (
+                  <Td
+                    key={key}
+                    numeric={typeof row[key] === 'number'}
+                    align={numericColumn.has(key) ? 'right' : 'left'}
+                    title={typeof row[key] === 'string' ? text : undefined}
+                  >
+                    {text}
+                  </Td>
+                );
+              })}
             </TRow>
           ))}
         </tbody>
       </Table>
+      {limited || csvName || showAll ? (
+        <div className="flex items-center justify-between gap-2">
+          {maxRows !== undefined && sorted.length > maxRows ? (
+            <Button size="sm" variant="ghost" onClick={() => setShowAll((value) => !value)}>
+              {showAll ? `Show the first ${maxRows}` : `Show all ${sorted.length}`}
+            </Button>
+          ) : (
+            <span />
+          )}
+          {csvName ? (
+            <Button size="sm" variant="ghost" onClick={() => downloadCsv(csvName, columns, sorted)}>
+              <Download className="h-3.5 w-3.5" /> CSV
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -255,7 +246,7 @@ function signalReason(
   return row.held ? 'Position remains open.' : 'Not selected for a position this week.';
 }
 
-function assumptionChips(result: MomentumResult, config: Record<string, unknown>): string[] {
+export function assumptionChips(config: Record<string, unknown>): string[] {
   const dataset = config.dataset;
   const execLabel: Record<string, string> = {
     fri_close: 'Friday close',
@@ -290,11 +281,10 @@ function assumptionChips(result: MomentumResult, config: Record<string, unknown>
     dataset === 'etf' ? (config.track === 'etf' ? 'ETF prices' : 'Index prices') : null,
     dataset === 'etf' ? (execLabel[String(config.execution)] ?? null) : null,
     config.tax ? 'After tax' : 'Pre-tax',
-    `vs ${result.benchmark_name}`,
   ].filter((value): value is string => Boolean(value));
 }
 
-function dataNotes(result: MomentumResult): string[] {
+export function dataNotes(result: MomentumResult): string[] {
   return [
     ...(result.fills?.warnings ?? []),
     ...(result.fills?.proxy_trades
@@ -309,10 +299,7 @@ function dataNotes(result: MomentumResult): string[] {
   ];
 }
 
-/**
- * The first thing shown after a run: what was tested, the headline numbers and the
- * one-sentence takeaway. Always visible — never hidden behind a results tab.
- */
+/** When and how the run on screen finished, for the headline strip. */
 export interface MomentumRunInfo {
   finishedAt: number;
   durationMs: number;
@@ -321,112 +308,8 @@ export interface MomentumRunInfo {
   fresh?: boolean;
 }
 
-export function MomentumPerformanceCard({
-  result,
-  config,
-  stale = false,
-  lastRunFailed = false,
-  runInfo = null,
-}: {
-  result: MomentumResult;
-  config: Record<string, unknown>;
-  stale?: boolean;
-  /** The last Run click failed, so these are the PREVIOUS run's results. */
-  lastRunFailed?: boolean;
-  runInfo?: MomentumRunInfo | null;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const flashing = useResultFlash(runInfo?.finishedAt ?? null);
-  const notes = dataNotes(result);
-  const warning = hindsightWarning(config);
-  const label = DATASET_LABELS[String(config.dataset)] ?? 'Backtest';
-
-  return (
-    <Card className={cn(flashing && 'animate-result-flash')}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-faint">Performance</p>
-          <h2 className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
-            {label} · {formatDay(result.series.dates[0])} → {formatDay(result.series.dates.at(-1))}
-          </h2>
-          {runInfo ? (
-            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-              <CheckCircle2 className="h-3.5 w-3.5 text-positive" />
-              Updated {formatIstTime(runInfo.finishedAt, { seconds: true })} · took{' '}
-              {formatDuration(runInfo.durationMs)}
-              {runInfo.fresh ? ' · recomputed from scratch' : ''}
-              {runInfo.savedAs ? ` · saved as ${runInfo.savedAs}` : ''}
-              <InfoTooltip text="Every run recomputes the backtest for exactly the settings shown. A run that finishes in a second or two just means the server already had this strategy's price data and rankings cached — the numbers are still fresh for these settings. To drop the caches and recompute everything anyway, use Re-run fresh beside the Run button." />
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {lastRunFailed ? (
-            <Badge tone="negative">Last run failed — these are the previous results</Badge>
-          ) : stale ? (
-            <Badge tone="warning">Results use previous settings</Badge>
-          ) : null}
-          <Button size="sm" onClick={() => setExpanded((value) => !value)}>
-            {expanded ? 'Hide detail metrics' : 'Show all metrics'}
-          </Button>
-        </div>
-      </div>
-      {warning ? (
-        <div
-          role="note"
-          className="mt-3 flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm"
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">{warning.headline}</p>
-            <p className="text-muted">{warning.detail}</p>
-            {warning.realismOff.length ? (
-              <p className="text-muted">
-                This run also ignores {warning.realismOff.join(' and ')}. On the default Broad
-                settings, turning both on takes about 13 points off the CAGR.
-              </p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-      <div className="mt-3 flex flex-wrap items-start gap-1.5">
-        {assumptionChips(result, config).map((chip) => (
-          <span
-            key={chip}
-            className="rounded-full border border-border bg-surface-2/50 px-2.5 py-1 text-xs text-muted"
-          >
-            {chip}
-          </span>
-        ))}
-        {notes.length ? (
-          <details className="text-xs open:w-full">
-            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-warning">
-              <AlertTriangle className="h-3 w-3" />
-              {notes.length} data {notes.length === 1 ? 'note' : 'notes'}
-            </summary>
-            <div className="mt-2 space-y-1 rounded-lg border border-warning/30 bg-warning/10 p-3 text-muted">
-              {notes.map((note) => (
-                <p key={note}>{note}</p>
-              ))}
-            </div>
-          </details>
-        ) : null}
-      </div>
-      <div className="mt-4 space-y-3">
-        <MomentumKpiCards result={result} tax={Boolean(config.tax)} expanded={expanded} />
-        <MomentumInsights result={result} />
-      </div>
-    </Card>
-  );
-}
-
-/**
- * Everything below the chart, as one card with tabs rather than a stack of cards. The tab bar
- * is always there; a panel opens when its tab is clicked and closes when it is clicked again.
- * The open tab (none by default) is remembered in this browser.
- */
 /** A heavy section of the run while it loads, if it fails, and once it is here (BL-005). */
-function Loaded<T>({
+export function Loaded<T>({
   section,
   label,
   children,
@@ -452,7 +335,11 @@ function Loaded<T>({
   return <>{children(section.data)}</>;
 }
 
-function WeekPanel({
+/**
+ * This week: the latest signals beside what the portfolio holds now. Signals is a fetched
+ * section (`latest`); the open positions and held categories come with the core result.
+ */
+export function WeekPanel({
   runId,
   result,
   config,
@@ -462,67 +349,81 @@ function WeekPanel({
   config: Record<string, unknown>;
 }) {
   const latest = useRunSection(runId, 'latest');
-  const instruments = useRunSection(runId, 'instruments');
   return (
-    <>
+    <div className="grid gap-x-6 gap-y-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <Loaded section={latest} label="this week's signals">
         {(week) => (
-          <ResultSection title={`Signals · ${formatDay(week.week)}`} description={week.explain}>
+          <ResultSection
+            padded={false}
+            title={`Signals · ${formatDay(week.week)}`}
+            description={week.explain}
+          >
             <SignalsTable
               rows={week.rows.map((row) => ({ ...row, reason: signalReason(row, config) }))}
             />
           </ResultSection>
         )}
       </Loaded>
-      {result.held_categories?.length ? (
-        <ResultSection
-          title="Held categories"
-          description="Fresh selections and positions still held through the exit buffer"
-        >
+      <div className="min-w-0 space-y-4">
+        <ResultSection padded={false} title="Open positions">
           <DataTable
-            rows={result.held_categories.map((row) => ({
-              ...row,
-              picks: row.picks.join(', '),
-            }))}
+            rows={result.open_positions}
+            // Narrow beside the signals: the entry week is in the CSV and the Trades widget.
             columns={[
-              ['position', '#'],
-              ['status', 'Status'],
-              ['category', 'Category'],
-              ['picks', 'Stock picks'],
+              ['asset', 'Asset'],
+              ['weeks_held', 'Weeks'],
+              ['rank', 'Rank'],
+              ['position_return', 'Return'],
+              ['value', 'Value'],
+              ['pnl', 'P&L'],
             ]}
+            csvName="momentum-open-positions"
           />
         </ResultSection>
-      ) : null}
-      <ResultSection title="Open positions">
-        <DataTable
-          rows={result.open_positions}
-          columns={[
-            ['asset', 'Asset'],
-            ['entry_week', 'Since'],
-            ['weeks_held', 'Weeks'],
-            ['rank', 'Rank'],
-            ['position_return', 'Return'],
-            ['value', 'Value'],
-            ['pnl', 'P&L'],
-          ]}
-          csvName="momentum-open-positions"
-        />
-      </ResultSection>
-      <ResultSection
-        title="Instrument attribution"
-        description="How each instrument contributed across the whole run"
-      >
-        <Loaded section={instruments} label="instrument attribution">
-          {(rows) => (
-            <DataTable rows={rows} columns={COLUMNS.holdings} csvName="momentum-instruments" />
-          )}
-        </Loaded>
-      </ResultSection>
-    </>
+        {result.held_categories?.length ? (
+          <ResultSection
+            padded={false}
+            title="Held categories"
+            description="Fresh selections and positions still held through the exit buffer"
+          >
+            <DataTable
+              rows={result.held_categories.map((row) => ({
+                ...row,
+                picks: row.picks.join(', '),
+              }))}
+              columns={[
+                ['position', '#'],
+                ['status', 'Status'],
+                ['category', 'Category'],
+                ['picks', 'Stock picks'],
+              ]}
+            />
+          </ResultSection>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
-function TradesPanel({
+/** How each instrument contributed across the whole run (a fetched section). */
+export function InstrumentsPanel({ runId }: { runId: string }) {
+  const instruments = useRunSection(runId, 'instruments');
+  return (
+    <Loaded section={instruments} label="instrument attribution">
+      {(rows) => (
+        <DataTable
+          rows={rows}
+          columns={COLUMNS.holdings}
+          csvName="momentum-instruments"
+          maxRows={12}
+        />
+      )}
+    </Loaded>
+  );
+}
+
+/** Every closed trade, filterable; the newest first. */
+export function TradesPanel({
   runId,
   filter,
   onFilter,
@@ -533,38 +434,36 @@ function TradesPanel({
 }) {
   const trades = useRunSection(runId, 'trades');
   return (
-    <ResultSection
-      title="Closed trades"
-      description="Position returns include all purchases and top ups"
-      actions={
-        <Input
-          type="search"
-          aria-label="Filter trades"
-          placeholder="Filter asset or reason…"
-          value={filter}
-          onChange={(event) => onFilter(event.target.value)}
-          className="w-auto"
-        />
-      }
-    >
+    <div className="space-y-2">
+      <Input
+        type="search"
+        aria-label="Filter trades"
+        placeholder="Filter asset or reason…"
+        value={filter}
+        onChange={(event) => onFilter(event.target.value)}
+        className="h-8 w-64 max-w-full"
+      />
       <Loaded section={trades} label="the trades">
         {(rows) => (
           <DataTable
-            rows={rows.filter((trade) =>
-              `${trade.asset ?? ''} ${trade.reason ?? ''}`
-                .toLowerCase()
-                .includes(filter.toLowerCase()),
-            )}
+            rows={[...rows]
+              .reverse()
+              .filter((trade) =>
+                `${trade.asset ?? ''} ${trade.reason ?? ''}`
+                  .toLowerCase()
+                  .includes(filter.toLowerCase()),
+              )}
             columns={COLUMNS.trades}
             csvName="momentum-trades"
+            maxRows={10}
           />
         )}
       </Loaded>
-    </ResultSection>
+    </div>
   );
 }
 
-function TimelinePanel({ runId, result }: { runId: string; result: MomentumResult }) {
+export function TimelinePanel({ runId, result }: { runId: string; result: MomentumResult }) {
   const timeline = useRunSection(runId, 'timeline');
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -573,105 +472,5 @@ function TimelinePanel({ runId, result }: { runId: string; result: MomentumResul
       </Loaded>
       <MomentumHoldingsSplit positions={result.open_positions} />
     </div>
-  );
-}
-
-export function MomentumResultDetails({
-  runId,
-  result,
-  config,
-  savedRuns = [],
-  flashKey = null,
-}: {
-  /** The run the result belongs to: the heavy sections are fetched from it as tabs open. */
-  runId: string;
-  result: MomentumResult;
-  config: Record<string, unknown>;
-  savedRuns?: MomentumSavedRun[];
-  flashKey?: number | null;
-}) {
-  const flashing = useResultFlash(flashKey);
-  const panel = useMomentumViewStore((state) => state.detailsTab);
-  const setPanel = useMomentumViewStore((state) => state.setDetailsTab);
-  const [returnsView, setReturnsView] = useState<ReturnsView>('chart');
-  const [tradeFilter, setTradeFilter] = useState('');
-  const [returnsTitle, returnsDescription] = RETURNS_COPY[returnsView];
-
-  return (
-    <Card flush className={cn(flashing && 'animate-result-flash')}>
-      <Tabs
-        ariaLabel="Result details"
-        value={panel}
-        items={TABS}
-        onChange={setPanel}
-        onCollapse={() => setPanel(null)}
-        className={cn('px-5', panel === null && '!border-b-0')}
-      >
-        {panel === null ? (
-          <p className="sr-only">Details are collapsed. Choose a tab to open one.</p>
-        ) : (
-          <TabPanel value={panel} className="divide-y divide-border p-5">
-            {panel === 'returns' ? (
-              <ResultSection
-                title={returnsTitle}
-                description={returnsDescription}
-                actions={
-                  <SegmentedControl
-                    ariaLabel="Returns view"
-                    size="sm"
-                    value={returnsView}
-                    onChange={setReturnsView}
-                    options={RETURNS_VIEWS.map(([id, label]) => ({ value: id, label }))}
-                  />
-                }
-              >
-                {returnsView === 'chart' ? (
-                  <MomentumYearlyChart rows={result.yearly} benchmarkName={result.benchmark_name} />
-                ) : returnsView === 'table' ? (
-                  <DataTable
-                    rows={result.yearly}
-                    columns={[
-                      ['year', 'Year'],
-                      ['strategy', 'Strategy'],
-                      ['benchmark', result.benchmark_name],
-                      ['cash', 'Liquid fund'],
-                      ['vs_benchmark', 'Difference'],
-                    ]}
-                    csvName="momentum-yearly"
-                  />
-                ) : (
-                  <MomentumMonthlyHeatmap
-                    series={result.series}
-                    benchmarkName={result.benchmark_name}
-                  />
-                )}
-              </ResultSection>
-            ) : null}
-
-            {panel === 'week' ? <WeekPanel runId={runId} result={result} config={config} /> : null}
-
-            {panel === 'trades' ? (
-              <TradesPanel runId={runId} filter={tradeFilter} onFilter={setTradeFilter} />
-            ) : null}
-
-            {panel === 'split' ? <TimelinePanel runId={runId} result={result} /> : null}
-            {panel === 'risk' ? (
-              <ResultSection
-                title="Worst benchmark falls"
-                description="Strategy and benchmark over the same peak-to-trough windows"
-              >
-                <DataTable
-                  rows={result.crashes}
-                  columns={COLUMNS.risk}
-                  csvName="momentum-crashes"
-                />
-              </ResultSection>
-            ) : null}
-
-            {panel === 'compare' ? <MomentumCompare runs={savedRuns} /> : null}
-          </TabPanel>
-        )}
-      </Tabs>
-    </Card>
   );
 }
