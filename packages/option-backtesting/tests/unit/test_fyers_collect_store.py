@@ -109,3 +109,16 @@ def test_symbol_master_merges_instead_of_overwriting(root):
     daily.write_symbol_master(root, DAY, sensex)
     saved = pq.read_table(lake.symbol_master_path(root, "fyers", DAY))
     assert saved.num_rows == len(nifty) + 1
+
+
+def test_collect_day_keeps_the_nearest_and_the_next_future(root, monkeypatch):
+    far = Contract("NSE:NIFTY26DECFUT", "NIFTY", date(2026, 12, 29), None, "FUT", 65)
+    nov = Contract("NSE:NIFTY26NOVFUT", "NIFTY", date(2026, 11, 24), None, "FUT", 65)
+    monkeypatch.setattr(daily, "parse_master", lambda text, names: [far, *_contracts(), nov])
+    daily.collect_day(FakeClient(), DAY, ["NIFTY"], root, premium_floor=30, log=lambda _: None)
+    fut = pq.read_table(lake.bars_1m_path(root, "future", "NIFTY", DAY))
+    assert sorted(set(fut.column("vendor_symbol").to_pylist())) == [
+        "NSE:NIFTY26NOVFUT",
+        "NSE:NIFTY26OCTFUT",
+    ]
+    assert fut.num_rows == 2 * 3

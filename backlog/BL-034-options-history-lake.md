@@ -199,6 +199,14 @@ setting (a backtest question, not a derived-table one).
 - **Done when:** the evening after a trading day, the derived tables include that day and the
   summary reports it, with no manual step.
 
+**Phase 4 outcome (2026-10-07).** `obt daily` keeps the nearest and next index futures, judges the
+day (`quality.judge_day`, 21 s), builds its derived tables and `iv_daily`, then runs the strategies;
+the summary and Telegram message carry a Data section (usable / missing / excluded per index, 7-day
+IV and VIX with 1-year percentiles) and warn on a missing or excluded day. Scheduler job
+`options-derived` (23:30 trading days) catches up any derived day left out. Checked on the real
+2026-10-06 run. **"No manual step" still needs the scheduler installed** (BL-012 cut-over, the
+owner's call); until then `obt daily` is run as today.
+
 ### Phase 5 — `2014-2024` (later, after the owner widens the window)
 - **Tasks:** the same loader on the expiry-week-only history with a `coverage='expiry_week'` mark
   in `data_quality`; monthly-only nifty before 2019; sparse-bar handling per BL-009's findings
@@ -303,4 +311,6 @@ Still open for Phase 3:
   2 excluded days named) with no code change.
 - 2026-10-07 — **Phase 3 done**: derived tables + `--bars 5m` (see the Phase 3 outcome). Owner:
   "do phase 3 and once done phase 4".
-
+- 2026-10-07 — **Phase 4 done**: evening top-up (futures x2, day verdict, derived tables, Data section
+  in the summary, `options-derived` catch-up job). Remaining: Phase 5 (2014-2024, later) and the
+  owner-gated scheduler install.

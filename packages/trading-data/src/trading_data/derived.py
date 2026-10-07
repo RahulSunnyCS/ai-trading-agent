@@ -918,6 +918,17 @@ def rebuild(
     return reports
 
 
+def iv_for_day(root: Path, underlying: str, day: date) -> dict | None:
+    """The day's iv_daily values for its nearest expiry (expiry_rank 0), or None."""
+    path = derived_path(root, "iv_daily", underlying)
+    if not path.exists():
+        return None
+    rows = pq.read_table(
+        path, filters=[("trading_day", "=", day), ("expiry_rank", "=", 0)]
+    ).to_pylist()
+    return rows[0] if rows else None
+
+
 def check_day(root: Path, underlying: str, day: date) -> list[str]:
     """Rebuild one day in memory and compare it with the stored files; [] when identical."""
     build = build_day(root, underlying, day)

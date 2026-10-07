@@ -488,3 +488,24 @@ BL-034 Phase 3. `derived.py` builds `chain_snapshots_5m`, `straddle_series_5m`,
   file says what built it. Derived files are rewritten on a version change, so `tdata backup`
   (copies only new files) may hold an older version: they are regenerable.
 
+---
+
+## The evening run judges the day and builds its derived tables — 2026-10-07
+
+BL-034 Phase 4. `obt daily` now: collects the day (plus the nearest **and next** index future,
+both in the day's `asset=future` file), runs `quality.judge_day` (the day's files for the
+collected indices and India VIX, in one catalog connection, then the lock-free verdict file),
+builds the day's derived tables and `iv_daily` (`derived.rebuild` for that day), runs the
+strategies (which skip an excluded day), and sends the summary with a **Data** section: which
+indices are usable, which are missing or excluded and why, and per NIFTY/SENSEX the 7-day IV and
+VIX with their 1-year percentiles. A missing or excluded index, or a failed step, makes the
+Telegram message a warning; a failed step never stops the message. A nightly scheduler job,
+`options-derived` (23:30), rebuilds any derived day the evening left out.
+
+- **Why `judge_day`, not `rebuild(days=...)`.** The general rebuild opens a catalog connection
+  per known name and asset (every stock included) and, when another process holds the catalog,
+  waits on each: the first real evening test ran 20 minutes and was stopped. `judge_day` takes
+  21 seconds on the full lake. If the catalog stays locked for 2 minutes it reports "the
+  catalog stayed busy" with the command to run later, and the evening continues.
+- **The day's quality comes before the strategies,** so an excluded day is skipped by the
+  strategies the same evening rather than run and then contradicted.
