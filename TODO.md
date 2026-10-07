@@ -575,6 +575,15 @@ is BL-043 (Planned), a standalone daily pattern system. Detail lives in the back
 | 3.20.2 | Phase 3: chart gallery, owner labels, detector parameters frozen | owner→claude | **Done 2026-10-07**: 159/165 labelled, second review by Claude, fixes and freeze in `bl042_criteria_addendum_2.json` |
 | 3.20.3 | Phases 4–6: event study, ranking test, one hold-out run | claude | **Done 2026-10-07: killed.** No pattern beats same-momentum peers (event study), and PBO is 0.57 over 24 trials; hold-out not run, still sealed. Phase 7 done: closed as informative, not adopted; follow-up BL-043 |
 
+### 3.22 Live-money rules for Momentum — [BL-025](backlog/BL-025-live-money-rules.md)
+
+The owner's numbers, written before the first rupee; nothing here trades.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.22.1 | Phase 1: rules file (`live_rules.toml`): paper first; cut half at 20%, exit at 30%; review at 5 pts behind over 13 weeks | owner→claude | **Drafted 2026-10-07**; awaiting the owner's sign-off of the drafted details |
+| 3.22.2 | Phase 2: weekly check after the Friday final run → Telegram alert naming the rule and its action | claude | Open |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |

@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — becomes P0 the week real money goes into the strategy |
-| **Status** | Planned |
+| **Status** | In progress (Phase 1: rules drafted, awaiting sign-off) |
 | **Type** | feature |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
 | **Depends on** | BL-024 (journal), BL-016 (validation status) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | [§3.22](../TODO.md) |
 
 ## Context
 
@@ -44,9 +44,20 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
 
 ## Open questions
 
-0. **Pending — discuss when this item is picked up.** The rule numbers: how far live may trail the
-   backtest and over how many weeks before a review; the drawdown at which to reduce and at which
-   to stop (within the stated 25/30/35% baskets and 40% ceiling); and what each breach triggers.
+0. ~~The rule numbers~~ **Answered when the item started (owner, 2026-10-07):**
+   - **Paper-track first.** BL-010's frozen ensemble failed its 2012–16 backcast (+7.8 points
+     over the Nifty 500 TRI, +2.5 over the Midcap 150 TRI; the bar was +5 over both). It is
+     tracked in the journal before any money goes in.
+   - **Drawdown:** cut half at a 20% fall from the peak, exit fully at 30%. These are stricter
+     than the 25–35% tolerance and 40% ceiling stated in BL-010.
+   - **Trailing:** review when live is 5 points behind the backtest over 13 weeks.
+   - **Claude's drafted details, for sign-off:**
+     - the money gate is at least 13 paper weeks, beating the Nifty200 Momentum 30 TRI, and
+       neither drawdown rule hit;
+     - after "cut half" the signal is followed at half size;
+     - re-entry after an exit only by a logged review;
+     - "review" means no new money, a check of what changed, and a logged decision (carry on,
+       pause or stop).
 1. ~~Friends and the rules?~~ **Shown for information only** (owner delegated to the recommendation, 2026-10-06): friends see the owner's rules as an
    example, and each friend's own money is their decision; the alerts go to the owner only.
 
@@ -56,3 +67,7 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
 - 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: the draft carries the owner's own stated limits; friends see rules for information only.
   The remaining numbers still need the owner's sign-off before Phase 1 is done.
 - 2026-10-06 — owner: pending decisions stay here as open questions and are settled when the item is picked up; the rule numbers are open question 0.
+- 2026-10-07 — started. Owner's answers under Open questions 0. Phase 1:
+  `packages/momentum-backtesting/src/momentum_backtesting/live_rules.toml` drafted with those
+  numbers (stage `paper`). It waits for the owner's sign-off of the drafted details, then
+  Phase 2 (the weekly check and alert, a BL-012 scheduler job).
