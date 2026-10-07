@@ -7,7 +7,8 @@
 #
 # It first removes the per-job plists the scheduler replaced, so no job runs twice.
 set -euo pipefail
-cd "$(dirname "$0")/jobs"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT/deploy/launchd/jobs"
 
 DEST="$HOME/Library/LaunchAgents"
 # launchd does not create the directory of StandardOutPath; a missing one means no log.
@@ -42,7 +43,7 @@ done
 echo
 # The scheduler ignores slots before its first start, and the old plists are gone: say which
 # of today's slots that leaves un-run, so the owner can start them by hand.
-(cd ../../apps/scheduler && "${BUN:-$(command -v bun || echo "$HOME/.bun/bin/bun")}" src/cli.ts skipped) || true
+(cd "$ROOT/apps/scheduler" && "${BUN:-$(command -v bun || echo "$HOME/.bun/bin/bun")}" src/cli.ts skipped) || true
 echo "Jobs:      bun run --filter @ata/scheduler jobs status"
 echo "Status:    launchctl print gui/\$(id -u)/com.ai-trading-agent.scheduler"
 echo "Logs:      ~/Library/Logs/ai-trading-agent/ (scheduler.log + one folder per job)"
