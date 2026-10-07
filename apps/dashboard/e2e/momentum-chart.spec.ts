@@ -4,47 +4,53 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
   page,
 }) => {
   const savedRuns: Array<Record<string, unknown>> = [];
-  await page.route('**/api/momentum/saved-runs*', async (route) => {
-    if (route.request().method() === 'POST') {
-      const body = route.request().postDataJSON();
-      const run = {
-        id: 'run-1',
-        n: 1,
-        created_at: '2024-01-19T12:00:00+05:30',
-        name: body.name,
-        config: body.config,
-        kpis: body.kpis,
-        dates: body.dates,
-        strategy: body.strategy,
-        overlay: false,
-        favorite: false,
-        active: false,
-      };
-      savedRuns.unshift(run);
-      await route.fulfill({
+  // URL predicates rather than globs: the app adds `?dataset=…` to these calls.
+  await page.route(
+    (url) => url.pathname === '/api/momentum/saved-runs',
+    async (route) => {
+      if (route.request().method() === 'POST') {
+        const body = route.request().postDataJSON();
+        const run = {
+          id: 'run-1',
+          n: 1,
+          created_at: '2024-01-19T12:00:00+05:30',
+          name: body.name,
+          config: body.config,
+          kpis: body.kpis,
+          dates: body.dates,
+          strategy: body.strategy,
+          overlay: false,
+          favorite: false,
+          active: false,
+        };
+        savedRuns.unshift(run);
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(run),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(savedRuns),
+        });
+      }
+    },
+  );
+  await page.route(
+    (url) => url.pathname === '/api/momentum/meta' && url.searchParams.get('dataset') === 'etf',
+    (route) =>
+      route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(run),
-      });
-    } else {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(savedRuns),
-      });
-    }
-  });
-  await page.route('**/api/momentum/meta?dataset=etf', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        instruments: [{ name: 'Nifty 50', include: 'core', group: 'Broad', has_data: true }],
-        first_week: '2024-01-05',
-        last_week: '2024-01-19',
-        defaults: { start: '2024-01-05', top_n: 1, exit_rank: 2, lookbacks: [1] },
+        body: JSON.stringify({
+          instruments: [{ name: 'Nifty 50', include: 'core', group: 'Broad', has_data: true }],
+          first_week: '2024-01-05',
+          last_week: '2024-01-19',
+          defaults: { start: '2024-01-05', top_n: 1, exit_rank: 2, lookbacks: [1] },
+        }),
       }),
-    }),
   );
   const result = {
     benchmark_name: 'Nifty 50',
@@ -94,8 +100,7 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
     }),
   );
 
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Momentum', exact: true }).click();
+  await page.goto('/momentum/backtest/etf');
   await page.getByRole('button', { name: 'Run momentum backtest' }).click();
 
   const chart = page.getByRole('img', { name: /Strategy, benchmark and cash values/ });
@@ -137,6 +142,8 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
   );
   await page.getByRole('tab', { name: 'Saved runs (1)' }).click();
   await expect(page.getByRole('heading', { name: /Saved runs/ })).toBeVisible();
+  // The name is plain text until Rename turns it into a field holding the current name.
+  await page.getByRole('button', { name: 'Rename Run 1' }).click();
   await expect(page.getByRole('textbox', { name: 'Name for run 1' })).toHaveValue('Run 1');
 });
 
@@ -176,9 +183,7 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
     }),
   );
 
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Momentum', exact: true }).click();
-  await page.getByRole('tab', { name: 'Momentum Scores' }).click();
+  await page.goto('/momentum/scores/stocks');
   await expect(page.getByText('Test Company')).toBeVisible();
   // Raw returns sit beside each score pill; stock rows no longer expand.
   const stockRow = page.getByRole('row', { name: /Test Company/ });
@@ -186,7 +191,8 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
   await expect(stockRow).toContainText('+2.00%');
   await page.getByRole('radio', { name: 'Sectors', exact: true }).click();
   await page.getByRole('button', { name: /Metals/ }).click();
-  const memberRow = page.getByRole('row', { name: /TEST · Test Company/ });
+  // Anchored: the sector's own row contains the member table, so its name includes this text too.
+  const memberRow = page.getByRole('row', { name: /^TEST · Test Company/ });
   await expect(memberRow).toContainText('₹120');
   await expect(memberRow).toContainText('+20.0%');
 });

@@ -1,17 +1,22 @@
 /**
- * E2E tests for the TradesView dashboard tab.
+ * E2E tests for the TradesView dashboard tab (/trades).
  *
  * Covers every QA-checklist item for TradesView (GET /api/trades polling,
  * P&L rendering, error/empty states, status badges, IST timestamps).
  *
- * All HTTP calls are intercepted via page.route() — no running backend is
- * required.  Only the Vite dev server (http://localhost:5173) must be up.
+ * Each test opens /trades directly — every view has its own URL (see
+ * src/lib/routes.ts), so no sidebar click is needed.
+ *
+ * The HTTP calls the assertions depend on (/api/trades, /api/personalities) are
+ * intercepted via page.route() with URL predicates, so a query string on either
+ * request still matches. No running backend is required — only the Next.js
+ * dashboard dev server (http://localhost:5173) must be up.
  *
  * Required env vars: none — all data is mocked.
  */
 
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { Locator, Page, Route } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
 // Shared mock data factories
@@ -39,41 +44,79 @@ function makeTrade(overrides: Record<string, unknown> = {}): Record<string, unkn
   };
 }
 
+function fulfillJson(route: Route, body: unknown): void {
+  void route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(body),
+  });
+}
+
 /**
- * Navigate to the app, install an /api/trades route intercept, and click the
- * Trades tab.  Returns after the tab heading is visible.
+ * Mock GET /api/personalities (TradesView maps personality ids to names). It may carry a
+ * query string, so match on the pathname.
+ */
+async function mockPersonalities(page: Page): Promise<void> {
+  await page.route(
+    (url) => url.pathname === '/api/personalities',
+    (route) => fulfillJson(route, { data: [] }),
+  );
+}
+
+/** Open /trades and wait for the card heading. */
+async function gotoTrades(page: Page): Promise<void> {
+  await page.goto('/trades');
+  await expect(page.getByRole('heading', { name: 'Paper Trades' })).toBeVisible();
+}
+
+/**
+ * Install an /api/trades route intercept and open /trades. Returns after the
+ * tab heading is visible.
  */
 async function openTradesTab(
   page: Page,
   tradesPayload: unknown = { data: [], message: 'no trades' },
 ): Promise<void> {
-  await page.route('**/api/trades', (route) => {
-    void route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(tradesPayload),
-    });
-  });
+  await page.route(
+    (url) => url.pathname === '/api/trades',
+    (route) => fulfillJson(route, tradesPayload),
+  );
+  await mockPersonalities(page);
+  await gotoTrades(page);
+}
 
-  // Intercept straddle polling so LiveView (initial tab) does not log errors.
-  await page.route('**/api/straddle/latest', (route) => {
-    void route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ data: null }),
-    });
-  });
+/**
+ * The page's error alerts. Next.js mounts an always-present, empty
+ * role="alert" route announcer (#__next-route-announcer__); it is not an app
+ * alert, so leave it out.
+ */
+function appAlerts(page: Page): Locator {
+  return page.getByRole('alert').and(page.locator(':not(#__next-route-announcer__)'));
+}
 
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Trades' }).click();
-  await expect(page.getByRole('heading', { name: 'Paper Trades' })).toBeVisible();
+/** Body rows of the trades table (the header row is excluded). */
+function bodyRows(page: Page): Locator {
+  return page.locator('tbody').getByRole('row');
+}
+
+/**
+ * The cell of `row` under the column headed `label`. Header text is read with
+ * textContent (innerText would apply the headers' CSS uppercase), and the column
+ * index is looked up rather than hard-coded because Contract/Regime/VIX columns
+ * appear only when some row carries the field.
+ */
+async function cellUnder(page: Page, row: Locator, label: string): Promise<Locator> {
+  const headers = await page.getByRole('columnheader').allTextContents();
+  const index = headers.findIndex((text) => text.trim().startsWith(label));
+  expect(index, `column "${label}" in ${JSON.stringify(headers)}`).toBeGreaterThanOrEqual(0);
+  return row.getByRole('cell').nth(index);
 }
 
 // ---------------------------------------------------------------------------
 // Checklist: NUMERIC string fields are parsed — @critical
 // ---------------------------------------------------------------------------
 
-test('NUMERIC string fields (gross_pnl, net_pnl, straddle_at_entry) render as formatted numbers, not raw strings @critical', async ({
+test('NUMERIC string fields (net_pnl, straddle_at_entry) render as formatted numbers, not raw strings @critical', async ({
   page,
 }) => {
   const trades = [
@@ -90,30 +133,21 @@ test('NUMERIC string fields (gross_pnl, net_pnl, straddle_at_entry) render as fo
   await openTradesTab(page, { data: trades });
 
   // The trade row must be visible.
-  const row = page
-    .getByRole('row')
-    .filter({ hasText: /Closed/i })
-    .first();
+  const row = bodyRows(page).filter({ hasText: 'Closed' }).first();
   await expect(row).toBeVisible();
 
-  // net_pnl "-45.00" must render as a formatted number, not a raw string.
-  // The cell shows "-45.00" (with formatting); it must NOT show "−45.00" as a raw
-  // unformatted string with quote marks or extra characters that indicate it was
-  // never parsed.
-  const netPnlCell = row.getByText(/45/, { exact: false });
-  await expect(netPnlCell).toBeVisible();
+  // net_pnl "-45.00" must be parsed and run through the rupee formatter
+  // (formatInr), not echoed back as the raw API string.
+  await expect(await cellUnder(page, row, 'Net P&L')).toHaveText('-₹45.00');
 
-  // Straddle at entry must be rendered as a formatted number.
-  // "22456.75" → "22,456.75" in en-IN locale, or plain "22456.75" — either is
-  // fine; what matters is the cell contains the digit sequence, not a raw
-  // string like '"22456.75"' with quotes.
-  const straddleCell = row.getByText(/22.*456/);
-  await expect(straddleCell).toBeVisible();
+  // straddle_at_entry "22456.75" → "₹22,456.75" with en-IN digit grouping.
+  await expect(await cellUnder(page, row, 'Straddle @ entry')).toHaveText('₹22,456.75');
 
-  // No cell in the row should display a raw JSON string (containing quotes).
+  // No cell in the row should display a raw JSON string (containing quotes) or
+  // the unformatted API value.
   const rowText = await row.innerText();
-  expect(rowText).not.toContain('"1234.50"');
-  expect(rowText).not.toContain('"−45.00"');
+  expect(rowText).not.toContain('"');
+  expect(rowText).not.toContain('22456.75');
 });
 
 // ---------------------------------------------------------------------------
@@ -144,16 +178,23 @@ test('Negative net_pnl is colored red and positive net_pnl is colored green @cri
   await openTradesTab(page, { data: trades });
 
   // Wait for both rows to appear.
-  const rows = page.getByRole('row').filter({ hasNotText: 'Entry Time' });
+  const rows = bodyRows(page);
   await expect(rows).toHaveCount(2);
 
-  // Red class (text-red-400) on the negative P&L span.
-  const negSpan = page.locator('span.text-red-400').filter({ hasText: /100/ });
-  await expect(negSpan.first()).toBeVisible();
+  // Colours come from design tokens: text-negative (red) / text-positive (green).
+  const negRow = rows.filter({ hasText: '-₹100.00' });
+  const negSpan = (await cellUnder(page, negRow, 'Net P&L')).locator('span', {
+    hasText: '-₹100.00',
+  });
+  await expect(negSpan).toHaveClass(/\btext-negative\b/);
+  await expect(negSpan).not.toHaveClass(/\btext-positive\b/);
 
-  // Green class (text-green-400) on the positive P&L span.
-  const posSpan = page.locator('span.text-green-400').filter({ hasText: /250/ });
-  await expect(posSpan.first()).toBeVisible();
+  const posRow = rows.filter({ hasText: '+₹250.00' });
+  const posSpan = (await cellUnder(page, posRow, 'Net P&L')).locator('span', {
+    hasText: '+₹250.00',
+  });
+  await expect(posSpan).toHaveClass(/\btext-positive\b/);
+  await expect(posSpan).not.toHaveClass(/\btext-negative\b/);
 });
 
 // ---------------------------------------------------------------------------
@@ -174,14 +215,13 @@ test('Open trades with null net_pnl show an em dash placeholder — never NaN or
   ];
   await openTradesTab(page, { data: trades });
 
-  // The Open badge must be present.
-  await expect(page.getByText('Open')).toBeVisible();
+  // The Open badge must be present in the trade row.
+  const row = bodyRows(page).first();
+  await expect(row.getByText('Open', { exact: true })).toBeVisible();
 
-  // Each P&L cell for an open trade should show the em dash placeholder.
-  // The component renders <span class="text-gray-500">—</span> for null values.
-  const emDashCells = page.locator('span.text-gray-500', { hasText: '—' });
-  // At minimum the net_pnl and gross_pnl cells should each be a dash.
-  await expect(emDashCells.first()).toBeVisible();
+  // The Net P&L and P&L % cells of an open trade show the em dash placeholder.
+  await expect(await cellUnder(page, row, 'Net P&L')).toHaveText('—');
+  await expect(await cellUnder(page, row, 'P&L %')).toHaveText('—');
 
   // The text "NaN" must not appear anywhere on the page.
   const bodyText = await page.locator('body').innerText();
@@ -203,12 +243,10 @@ test('When /api/trades returns an empty array TradesView shows a clear "No trade
 
   // Must NOT render a table with no rows and no message — the empty state
   // text is what distinguishes "no data" from a load failure.
+  await expect(appAlerts(page)).toHaveCount(0);
 
-  // No row elements beyond the header should be present.
-  // The table is not rendered in empty state, so we check for the absence of
-  // tbody rows.
+  // The table is not rendered in empty state — so no rows at all.
   const tableRows = page.getByRole('row');
-  // Table is not rendered in empty state — so no rows at all.
   await expect(tableRows).toHaveCount(0);
 });
 
@@ -224,23 +262,17 @@ test('When /api/trades returns HTTP 500 TradesView shows an error notice and doe
     pageErrors.push(err.message);
   });
 
-  await page.route('**/api/trades', (route) => {
-    void route.fulfill({ status: 500, body: 'Internal Server Error' });
-  });
-  await page.route('**/api/straddle/latest', (route) => {
-    void route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ data: null }),
-    });
-  });
-
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Trades' }).click();
-  await expect(page.getByRole('heading', { name: 'Paper Trades' })).toBeVisible();
+  await page.route(
+    (url) => url.pathname === '/api/trades',
+    (route) => {
+      void route.fulfill({ status: 500, body: 'Internal Server Error' });
+    },
+  );
+  await mockPersonalities(page);
+  await gotoTrades(page);
 
   // The error state uses role="alert"; wait for it to appear.
-  const alert = page.getByRole('alert');
+  const alert = appAlerts(page);
   await expect(alert).toBeVisible({ timeout: 8_000 });
 
   // The alert must mention a load failure (not a blank empty state).
@@ -268,16 +300,16 @@ test('Entry times are displayed in IST — 04:00 UTC renders as 09:30 IST @funct
   ];
   await openTradesTab(page, { data: trades });
 
-  // The formatted IST time should appear in the entry_time cell.
-  // formatIstDateTime produces something like "23/05/2026, 09:30:00" in en-IN.
+  // formatIstDateTimeShort renders the entry as "<IST date>, 09:30".
   // We assert the hour is 09 (IST) rather than 04 (UTC).
-  const row = page.getByRole('row').filter({ hasNotText: 'Entry Time' }).first();
+  const row = bodyRows(page).first();
   await expect(row).toBeVisible();
 
-  const rowText = await row.innerText();
-  // Should contain "09:30" (IST) and NOT "04:00" (UTC).
-  expect(rowText).toContain('09:30');
-  expect(rowText).not.toContain('04:00');
+  const entryCell = await cellUnder(page, row, 'Entry (IST)');
+  await expect(entryCell).toContainText('09:30');
+  const entryText = await entryCell.innerText();
+  expect(entryText).toContain('2026');
+  expect(entryText).not.toContain('04:00');
 });
 
 // ---------------------------------------------------------------------------
@@ -300,9 +332,14 @@ test('Status badges render for open and closed trade status values @functional',
   ];
   await openTradesTab(page, { data: trades });
 
-  // Both badge variants must be present.
-  await expect(page.getByText('Open')).toBeVisible();
-  await expect(page.getByText('Closed')).toBeVisible();
+  // Both badge variants must be present in the table (the toolbar's status
+  // filter and the summary cards also say Open/Closed, so scope to the rows).
+  const rows = bodyRows(page);
+  await expect(rows).toHaveCount(2);
+  const statuses = await Promise.all(
+    [0, 1].map(async (i) => (await cellUnder(page, rows.nth(i), 'Status')).innerText()),
+  );
+  expect(statuses.map((s) => s.trim()).sort()).toEqual(['Closed', 'Open']);
 
   // Neither badge should be blank or show "undefined".
   const bodyText = await page.locator('body').innerText();
@@ -316,23 +353,17 @@ test('Status badges render for open and closed trade status values @functional',
 test('When /api/trades returns HTTP 404 TradesView shows an error notice rather than an empty table @functional', async ({
   page,
 }) => {
-  await page.route('**/api/trades', (route) => {
-    void route.fulfill({ status: 404, body: 'Not Found' });
-  });
-  await page.route('**/api/straddle/latest', (route) => {
-    void route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ data: null }),
-    });
-  });
-
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Trades' }).click();
-  await expect(page.getByRole('heading', { name: 'Paper Trades' })).toBeVisible();
+  await page.route(
+    (url) => url.pathname === '/api/trades',
+    (route) => {
+      void route.fulfill({ status: 404, body: 'Not Found' });
+    },
+  );
+  await mockPersonalities(page);
+  await gotoTrades(page);
 
   // An error alert must appear — 404 should not be silently swallowed.
-  const alert = page.getByRole('alert');
+  const alert = appAlerts(page);
   await expect(alert).toBeVisible({ timeout: 8_000 });
 
   // Must NOT show the calm "No paper trades yet" message for a 404.
@@ -363,12 +394,18 @@ test('Exit reason is shown for closed trades and a dash for open trades @non-blo
   ];
   await openTradesTab(page, { data: trades });
 
-  // The closed trade row should contain the exit reason text.
-  const rows = page.getByRole('row').filter({ hasNotText: 'Entry Time' });
+  const rows = bodyRows(page);
   await expect(rows).toHaveCount(2);
 
-  const bodyText = await page.locator('body').innerText();
-  expect(bodyText).toContain('stop_loss');
+  // The raw exit reason is shown as a readable label ("stop_loss" → "Stop-loss"),
+  // with the raw code kept in the title attribute.
+  const closedReason = await cellUnder(page, rows.filter({ hasText: 'Closed' }), 'Exit reason');
+  await expect(closedReason).toHaveText('Stop-loss');
+  await expect(closedReason.locator('[title="stop_loss"]')).toBeVisible();
+
+  // An open trade has no exit reason yet: a dash.
+  const openReason = await cellUnder(page, rows.filter({ hasText: 'Open' }), 'Exit reason');
+  await expect(openReason).toHaveText('—');
 });
 
 // ---------------------------------------------------------------------------
@@ -389,6 +426,7 @@ test('Straddle-at-entry column shows a formatted decimal number, not scientific 
     }),
   ];
   await openTradesTab(page, { data: trades });
+  await expect(bodyRows(page)).toHaveCount(1);
 
   // Must not appear in scientific notation.
   const bodyText = await page.locator('body').innerText();
