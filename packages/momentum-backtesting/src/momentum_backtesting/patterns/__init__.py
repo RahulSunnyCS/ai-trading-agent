@@ -21,16 +21,35 @@ CRITERIA = SEARCH_SPACES / "bl041_criteria.json"
 PATTERNS = ("tight_range", "flag", "cup_handle", "high_tight_flag")
 
 
+def _addenda() -> list[dict]:
+    paths = SEARCH_SPACES.glob("bl041_criteria_addendum_*.json")
+    ordered = sorted(paths, key=lambda p: int(p.stem.rsplit("_", 1)[1]))
+    return [json.loads(p.read_text()) for p in ordered]
+
+
 @cache
 def criteria() -> dict:
-    """bl041_criteria.json with every addendum applied in order (an addendum's
-    `detectors` block replaces the starting values for the patterns it names)."""
+    """bl041_criteria.json with every addendum applied in order:
+    - `detectors` replaces the starting values for the patterns it names;
+    - `shapes` replaces the named fields of the Phase 5 shapes;
+    - `quality` and `uses` are added as they are."""
     spec = json.loads(CRITERIA.read_text())
-    for path in sorted(SEARCH_SPACES.glob("bl041_criteria_addendum_*.json")):
-        extra = json.loads(path.read_text())
+    for extra in _addenda():
         for name, values in extra.get("detectors", {}).items():
             spec["detectors_starting_values"][name] = values
+        for shape, fields in extra.get("shapes", {}).items():
+            spec["phase_5_ranking_test"]["shapes"][shape].update(fields)
+        for key in ("quality", "uses"):
+            if key in extra:
+                spec[key] = extra[key]
     return spec
+
+
+def frozen() -> dict | None:
+    """The addendum that freezes the detectors after the gallery check (`detectors_frozen:
+    true`), or None while Phase 3 is open. Phases 4-6 read no return without it."""
+    hits = [a for a in _addenda() if a.get("detectors_frozen") is True]
+    return hits[-1] if hits else None
 
 
 def detector_params(pattern: str) -> dict:

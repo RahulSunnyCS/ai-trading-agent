@@ -2620,7 +2620,7 @@ def patterns_gallery() -> None:
 @patterns_app.command("study")
 def patterns_study() -> None:
     """Phase 4: the event study on the development window. Refuses to run before the detectors
-    are frozen (bl041_criteria_addendum_1.json)."""
+    are frozen (a bl041 addendum with detectors_frozen: true)."""
     from .config import load_repo_env
     from .patterns import run
 

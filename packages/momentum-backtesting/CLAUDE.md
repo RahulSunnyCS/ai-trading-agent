@@ -373,8 +373,9 @@ contract, not a shared service).
   addenda) and are read, never restated. Daily bars are forward-adjusted by the confirmed share
   factors so every bar depends only on events up to its own date; `patterns.guard` refuses any
   read of the sealed hold-out (2024-01-01 on), except the one-shot `holdout.run`, which claims
-  itself before reading. `study`/`rank` refuse to run until `bl041_criteria_addendum_1.json` (the
-  detector freeze from the owner's gallery labels) is committed. `tests/test_patterns.py` pins the
+  itself before reading. `study`/`rank`/`holdout` refuse to run until an addendum with `detectors_frozen: true` (the
+  detector freeze from the owner's gallery labels) is committed. `quality.py` grades each base
+  0-1 from its own geometry (addendum 1); the blend shapes use state score x quality. `tests/test_patterns.py` pins the
   no-look-ahead property (detections up to a cut are identical with and without later bars).
 - `audit/` — `mbt audit bundle|replay|study|outside` (BL-010 Phase 2). `bundle.py` writes a
   run's orders and the backtest's claims; `replay.py` rebuilds the result from the orders and

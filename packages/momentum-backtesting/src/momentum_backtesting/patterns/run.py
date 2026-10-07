@@ -92,19 +92,17 @@ def gallery(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
 
 
 def _frozen_spec() -> dict:
-    """Addendum 1 (the detector freeze from the owner's gallery labels) must be committed before
-    any forward return is computed."""
-    import json
+    """The detector freeze (an addendum with `detectors_frozen: true`, written from the owner's
+    gallery labels) must be committed before any forward return is computed."""
+    from . import frozen
 
-    from . import SEARCH_SPACES
-
-    path = SEARCH_SPACES / "bl041_criteria_addendum_1.json"
-    if not path.exists():
+    spec = frozen()
+    if spec is None:
         raise RuntimeError(
-            f"{path.name} is not there: Phase 3 (the gallery check) must freeze the detectors "
-            "before Phases 4-5 read any return"
+            "no bl041 addendum has detectors_frozen: true: Phase 3 (the gallery check) must "
+            "freeze the detectors before Phases 4-5 read any return"
         )
-    return json.loads(path.read_text())
+    return spec
 
 
 def _patterns_in_play() -> list[str]:
@@ -112,16 +110,27 @@ def _patterns_in_play() -> list[str]:
     return [p for p in criteria()["patterns_tested"] if p not in dropped]
 
 
-def _column_scores(ranking, detections: pd.DataFrame) -> dict[str, pd.DataFrame]:
+def _column_tables(ranking, detections: pd.DataFrame) -> dict[str, dict[str, pd.DataFrame]]:
+    """pattern -> {"state": state score, "blend": state score x quality, "quality": quality},
+    each week x column on the ranking's own columns."""
     from .features import score_table
+    from .quality import with_quality
     from .ranking import column_scores
 
+    graded = with_quality(detections)
     weeks = ranking.stock_pool_ranks.index
     symbols = sorted(set(ranking.column_to_base_symbol.values()))
-    return {
-        pattern: column_scores(score_table(detections, pattern, weeks, symbols), ranking)
-        for pattern in _patterns_in_play()
-    }
+    out = {}
+    for pattern in _patterns_in_play():
+        out[pattern] = {
+            name: column_scores(score_table(graded, pattern, weeks, symbols, value=value), ranking)
+            for name, value in (
+                ("state", "score"),
+                ("blend", "blend_score"),
+                ("quality", "quality"),
+            )
+        }
+    return out
 
 
 def event_study(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
@@ -134,9 +143,14 @@ def event_study(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
     _frozen_spec()
     ranking = broad_ranking()
     detections = load_detections(out_dir)
-    scores = _column_scores(ranking, detections)
+    tables = _column_tables(ranking, detections)
     stocks = list(ranking.stock_pool_ranks.columns)
-    report = study.run(ranking.prices[stocks], ranking.stock_pool_ranks, scores)
+    report = study.run(
+        ranking.prices[stocks],
+        ranking.stock_pool_ranks,
+        {p: t["state"] for p, t in tables.items()},
+        quality={p: t["quality"] for p, t in tables.items()},
+    )
     path = SEARCH_SPACES / "bl041_event_study_result.json"
     path.write_text(json.dumps(report, indent=1, default=str))
     for row in report["tests"]:
@@ -168,15 +182,17 @@ def ranking_test(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
     start, end = window["from"], window["to"]
     ranking = broad_ranking()
     locks = cx.lock_masks(ranking.column_to_base_symbol, ranking.prices.index)
-    scores = _column_scores(ranking, load_detections(out_dir))
+    tables = _column_tables(ranking, load_detections(out_dir))
 
     echo("baseline ...")
     curves = {"baseline": shapes.backtest(ranking, None, start=start, end=end, locks=locks)}
     curves = {"baseline": curves["baseline"].result.equity}
-    for pattern, score in scores.items():
+    for pattern, table in tables.items():
         for name, shape, value in shapes.variants():
             echo(f"{pattern} {name} ...")
-            ranks = shapes.apply(shape, ranking.stock_pool_ranks, score, value)
+            ranks = shapes.apply(
+                shape, ranking.stock_pool_ranks, table["state"], value, blend=table["blend"]
+            )
             out = shapes.backtest(ranking, ranks, start=start, end=end, locks=locks)
             curves[f"{pattern}/{name}"] = out.result.equity
     frame = pd.DataFrame(curves).ffill()
@@ -187,7 +203,7 @@ def ranking_test(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
     wf = spec["walk_forward"]
     first = pd.Timestamp(start)
     picks, joined = {}, {}
-    for pattern in scores:
+    for pattern in tables:
         cols = [c for c in excess.columns if c.startswith(f"{pattern}/")]
         parts = []
         for year in wf["years"]:
@@ -205,7 +221,7 @@ def ranking_test(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
         }
     pbo = method.pbo(excess.to_numpy(), blocks=spec["pbo"]["blocks"])
     verdicts, holdout_choice = {}, {}
-    for pattern in scores:
+    for pattern in tables:
         cols = [c for c in excess.columns if c.startswith(f"{pattern}/")]
         ok = joined[pattern]["excess_cagr"] > 0 and pbo["pbo"] <= spec["pbo"]["kill_above"]
         verdicts[pattern] = "pass" if ok else "kill"

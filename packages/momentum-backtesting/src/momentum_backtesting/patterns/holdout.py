@@ -26,8 +26,12 @@ CLAIM = "bl041_holdout.claimed"
 
 def entrants() -> dict[str, str]:
     """pattern -> the shape Phase 5 chose, for every pattern that passed Phases 3-5."""
-    frozen = json.loads((SEARCH_SPACES / "bl041_criteria_addendum_1.json").read_text())
-    dropped = set(frozen.get("dropped_patterns", []))
+    from . import frozen
+
+    spec = frozen()
+    if spec is None:
+        raise RuntimeError("the detectors are not frozen: Phases 3-5 come before the hold-out")
+    dropped = set(spec.get("dropped_patterns", []))
     study = json.loads((SEARCH_SPACES / "bl041_event_study_result.json").read_text())
     dev = json.loads((SEARCH_SPACES / "bl041_dev_result.json").read_text())
     return {
@@ -86,6 +90,7 @@ def run(out_dir: Path = OUT_DIR, *, echo=print) -> dict:
     from . import ranking as shapes
     from .bars import load_daily
     from .features import detect, score_table
+    from .quality import with_quality
     from .universe import broad_ranking
 
     chosen = entrants()
@@ -122,8 +127,14 @@ def run(out_dir: Path = OUT_DIR, *, echo=print) -> dict:
         for pattern, variant in chosen.items():
             name = variant.split("/", 1)[1]
             shape, value = next((s, v) for n, s, v in shapes.variants() if n == name)
-            score = shapes.column_scores(score_table(found, pattern, weeks, names), ranking)
-            ranks = shapes.apply(shape, ranking.stock_pool_ranks, score, value)
+            graded = with_quality(found)
+            state, blend = (
+                shapes.column_scores(
+                    score_table(graded, pattern, weeks, names, value=column), ranking
+                )
+                for column in ("score", "blend_score")
+            )
+            ranks = shapes.apply(shape, ranking.stock_pool_ranks, state, value, blend=blend)
             mine = shapes.backtest(ranking, ranks, start=start, end=end, locks=locks).result.equity
             report["patterns"][pattern] = {"variant": name, **judge(base, mine)}
             echo(f"{pattern} {name}: {report['patterns'][pattern]}")

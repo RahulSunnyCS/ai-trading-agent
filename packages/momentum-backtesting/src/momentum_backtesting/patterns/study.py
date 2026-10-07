@@ -30,14 +30,20 @@ def forward_returns(prices: pd.DataFrame, horizon: int) -> pd.DataFrame:
 
 
 def weekly_statistic(
-    returns: pd.DataFrame, pool_ranks: pd.DataFrame, events: pd.DataFrame
+    returns: pd.DataFrame,
+    pool_ranks: pd.DataFrame,
+    events: pd.DataFrame,
+    exclude: pd.DataFrame | None = None,
 ) -> pd.Series:
-    """Per week: event-weighted mean of (event mean - control mean) over pool-rank deciles."""
+    """Per week: event-weighted mean of (event mean - control mean) over pool-rank deciles.
+    Names marked in `exclude` are neither events nor controls that week."""
     out = {}
     for week in returns.index:
         rank = pool_ranks.loc[week]
         ret = returns.loc[week]
         ok = rank.notna() & ret.notna()
+        if exclude is not None:
+            ok &= ~exclude.loc[week].reindex(ok.index).fillna(False).astype(bool)
         if not ok.any():
             continue
         r, f = rank[ok], ret[ok]
@@ -95,6 +101,7 @@ def run(
     scores: dict[str, pd.DataFrame],
     *,
     window: tuple[str, str] | None = None,
+    quality: dict[str, pd.DataFrame] | None = None,
 ) -> dict:
     """The whole Phase 4 judgement. `prices` / `pool_ranks` / each score table are week x column
     on the same columns (the Broad ranking's own); `scores` maps pattern -> score table."""
@@ -140,4 +147,52 @@ def run(
             if primary["holm_rejects"] and primary["mean_excess"] > 0
             else "kill"
         )
-    return {"window": [start, end], "tests": list(results.values()), "verdicts": verdicts}
+    thirds = {}
+    for pattern, grade in (quality or {}).items():
+        thirds[pattern] = by_quality_third(
+            prices, pool_ranks, scores[pattern], grade, start=start, end=end
+        )
+    return {
+        "window": [start, end],
+        "tests": list(results.values()),
+        "verdicts": verdicts,
+        "reported_by_quality_third": thirds,
+    }
+
+
+def by_quality_third(
+    prices: pd.DataFrame,
+    pool_ranks: pd.DataFrame,
+    score: pd.DataFrame,
+    grade: pd.DataFrame,
+    *,
+    start: str,
+    end: str,
+    horizon: int = 13,
+) -> dict:
+    """Reported only (addendum 1): the 13-week statistic for detections in each third of
+    quality, cut points from the window's detections. Controls are the same as the judged test:
+    non-detections in the same decile."""
+    events = score.reindex(index=prices.index, columns=prices.columns).fillna(0) >= 0.5
+    grade = grade.reindex(index=prices.index, columns=prices.columns)
+    fwd = forward_returns(prices, horizon).loc[start:end]
+    ranks = pool_ranks.reindex(index=fwd.index, columns=fwd.columns)
+    in_window = events.loc[fwd.index]
+    values = grade.loc[fwd.index].where(in_window).stack().dropna()
+    if values.empty:
+        return {}
+    cuts = values.quantile([1 / 3, 2 / 3]).to_list()
+    out = {}
+    bands = (("low", -1.0, cuts[0]), ("mid", cuts[0], cuts[1]), ("high", cuts[1], 2.0))
+    for name, lo, hi in bands:
+        g = grade.loc[fwd.index]
+        mine = in_window & (g > lo) & (g <= hi)
+        # controls: never a detection of this pattern; other thirds' detections sit out
+        stat = weekly_statistic(fwd, ranks, mine, exclude=in_window & ~mine)
+        out[name] = {
+            "quality_range": [float(max(lo, 0.0)), float(min(hi, 1.0))],
+            "events": int((mine & ranks.notna() & fwd.notna()).to_numpy().sum()),
+            "mean_excess": float(stat.mean()) if len(stat) else math.nan,
+            "t_newey_west": newey_west_t(stat, horizon),
+        }
+    return out

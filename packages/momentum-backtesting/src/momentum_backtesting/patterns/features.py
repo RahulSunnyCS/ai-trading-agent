@@ -77,9 +77,15 @@ def detect(
 
 
 def score_table(
-    detections: pd.DataFrame, pattern: str, weeks: pd.DatetimeIndex, symbols: list[str]
+    detections: pd.DataFrame,
+    pattern: str,
+    weeks: pd.DatetimeIndex,
+    symbols: list[str],
+    *,
+    value: str = "score",
 ) -> pd.DataFrame:
-    """week x symbol pattern score in [0, 1] for one pattern; 0 where nothing was detected."""
+    """week x symbol `value` (the state score by default; `blend_score` or `quality` once
+    graded) for one pattern, the highest row per week; 0 where nothing was detected."""
     rows = detections[detections["pattern"] == pattern]
-    table = rows.pivot_table(index="week", columns="symbol", values="score", aggfunc="max")
+    table = rows.pivot_table(index="week", columns="symbol", values=value, aggfunc="max")
     return table.reindex(index=weeks, columns=symbols).fillna(0.0)

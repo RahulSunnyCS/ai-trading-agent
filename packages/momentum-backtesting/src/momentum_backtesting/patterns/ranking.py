@@ -54,9 +54,18 @@ def variants() -> list[tuple[str, str, float]]:
     return out
 
 
-def apply(shape: str, pool: pd.DataFrame, score: pd.DataFrame, value: float) -> pd.DataFrame:
+def apply(
+    shape: str,
+    pool: pd.DataFrame,
+    score: pd.DataFrame,
+    value: float,
+    *,
+    blend: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """`score` is the state score (>= 0.5 = detected) the filter and bonus read; the blend
+    reads `blend` (state score x quality, addendum 1) when given, else `score`."""
     if shape == "blend":
-        return blend(pool, score, value)
+        return globals()["blend"](pool, score if blend is None else blend, value)
     if shape == "filter":
         return filter_top(pool, score, int(value))
     if shape == "bonus":

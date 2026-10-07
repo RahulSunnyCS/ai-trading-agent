@@ -178,8 +178,9 @@ once on the sealed data. A guess before seeing any data:
     - the base, pole or cup and the pivot outlined;
     - Correct / Wrong / Unsure buttons, with labels stored in the page's database.
   - Tune the geometry thresholds on those labels only.
-- **Deliverables:** precision per pattern; the frozen detector parameters in
-  `bl041_criteria_addendum_1.json`, committed before Phase 4.
+- **Deliverables:** precision per pattern; the frozen detector parameters in an addendum with
+  `detectors_frozen: true` (addendum 2, since addendum 1 holds the quality score and the shape
+  swap), committed before Phase 4.
 - **Done when:** precision is ≥ 75% per pattern. A pattern that cannot reach ~60% is dropped from
   the POC.
 
@@ -289,3 +290,21 @@ once on the sealed data. A guess before seeing any data:
   reported-only line for the four BL-010 frozen configs with the shape applied to
   `combined_pool_ranks` (criteria `phase_6_holdout.reported`). Add it before Phase 6 runs.
   The owner kept the trial count at 21; no wider filter/bonus shape was added.
+- 2026-10-07 — owner decisions, all before any return was computed; recorded in
+  `search_spaces/bl041_criteria_addendum_1.json` (`returns_seen: false`):
+  - **Labelling:** the owner keeps labelling the gallery. They had offered to hand it to Claude,
+    and were reminded it is a shape check, not a trading call.
+  - **Quality score:** each base gets a 0–1 grade from textbook shape rules, using its own
+    geometry only:
+    - tight range: contraction, tightness, volume dry-up;
+    - flag: shallow, quiet, strong pole;
+    - cup and handle: depth sweet spot, shallow handle, level lips, prior advance.
+    The blend shapes use state score × quality. The event study adds a reported-only 13-week
+    line per quality third.
+  - **Shapes (option A):** `filter_20` → `filter_100` and `bonus_5` → `bonus_25`. Phase 2b
+    showed the originals cannot move a pattern stock (pool rank ~50–150) into the top 10.
+    Still 21 trials.
+  - **Ranking on what came next:** the owner asked whether patterns could be ranked by their
+    next-month result. That is answered by the walk-forward (Phase 5) and the hold-out
+    (Phase 6), never by keeping whatever did best over the whole period.
+  - The detector freeze moves to addendum 2.
