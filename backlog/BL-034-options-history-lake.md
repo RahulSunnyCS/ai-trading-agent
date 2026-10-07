@@ -274,4 +274,10 @@ Still open for Phase 3:
   (`deploy/launchd/install.sh`); (5) owner chores: keep a second copy of the staged Parquet, delete
   `~/TradingData.pre-bl034` after Phase 2 passes. Parked: BL-037 (the other 169 stocks, P3) and
   BL-038 (monthly-expiry stock collection, P1, first window 2026-10-27, needs a Fyers login).
+- 2026-10-07 — **Phase 2 started** (owner: "lets go with BL-034 Phase 2"). First PR: lot sizes and
+  strike steps 2024-10 → today for all six indices, keyed by the contract's expiry (not the trading
+  day) and checked against the vendor volumes; the legwise engine sizes each leg from its own
+  expiry. Before it, every legwise run on a day before 2026 raised "No lot_sizes row". Next:
+  observed expiry calendar (and DTE back to 2024-10), the engine skipping `excluded` days,
+  holidays audit, `ref_rates`.
 

@@ -34,10 +34,13 @@ describe('strike steps', () => {
 
 describe('effective dating', () => {
   it('picks the row in force on the date, not the newest row', () => {
-    // Both CSVs start at 2026-01-01; a date before that must throw, not
-    // silently return today's value for a historical backtest.
-    expect(() => lotSize('NIFTY', new Date('2025-12-31T00:00:00Z'))).toThrow();
-    expect(lotSize('NIFTY', new Date('2026-01-01T00:00:00Z'))).toBe(65);
+    // lot_sizes.csv is keyed by the contract's EXPIRY and starts at 2024-10-03: an earlier date
+    // must throw, not silently return today's value for a historical backtest.
+    expect(() => lotSize('NIFTY', new Date('2024-10-02T00:00:00Z'))).toThrow();
+    expect(lotSize('NIFTY', new Date('2025-12-30T00:00:00Z'))).toBe(75);
+    expect(lotSize('NIFTY', new Date('2026-01-06T00:00:00Z'))).toBe(65);
+    // The 30 Jan 2025 monthly kept the old size while the weeklies around it were revised.
+    expect(lotSize('NIFTY', new Date('2025-01-30T00:00:00Z'))).toBe(25);
   });
 });
 

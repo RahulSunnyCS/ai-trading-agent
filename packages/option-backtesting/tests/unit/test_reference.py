@@ -47,6 +47,33 @@ class TestLotSize:
     def test_sensex_2026(self, rd: ReferenceData) -> None:
         assert rd.lot_size("SENSEX", date(2026, 9, 1)) == 20
 
+    def test_nifty_history_follows_the_contract_expiry(self, rd: ReferenceData) -> None:
+        """The exchange revises lot sizes per contract: contracts listed before the 20 Nov
+        2024 revision kept 25 until they expired, and the 30 Jan 2025 monthly outlived
+        the weeklies around it. Each value was cross-checked against the vendor volumes."""
+        expected = {
+            date(2024, 10, 3): 25,
+            date(2024, 12, 26): 25,
+            date(2025, 1, 2): 75,
+            date(2025, 1, 23): 75,
+            date(2025, 1, 30): 25,  # monthly, listed before the revision
+            date(2025, 2, 6): 75,
+            date(2025, 12, 30): 75,
+            date(2026, 1, 6): 65,
+        }
+        for expiry, lot in expected.items():
+            assert rd.lot_size("NIFTY", expiry) == lot, expiry
+
+    def test_other_indices_history(self, rd: ReferenceData) -> None:
+        assert rd.lot_size("SENSEX", date(2025, 1, 3)) == 10
+        assert rd.lot_size("SENSEX", date(2025, 1, 7)) == 20
+        assert rd.lot_size("SENSEX", date(2025, 1, 28)) == 10  # monthly, old size
+        assert rd.lot_size("BANKNIFTY", date(2025, 6, 26)) == 30
+        assert rd.lot_size("BANKNIFTY", date(2025, 7, 31)) == 35
+        assert rd.lot_size("FINNIFTY", date(2026, 1, 27)) == 60
+        assert rd.lot_size("MIDCPNIFTY", date(2025, 7, 31)) == 140
+        assert rd.lot_size("NIFTYNXT50", date(2025, 2, 27)) == 25
+
     def test_missing_era_raises(self, rd: ReferenceData) -> None:
         """No fabricated fallback for a date before any effective row."""
         with pytest.raises(ValueError, match="No lot_sizes row"):

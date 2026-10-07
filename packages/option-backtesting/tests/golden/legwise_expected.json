@@ -32,8 +32,8 @@
       "lake/symbol_master/vendor=fyers/date=2026-10-01/data.parquet": "553d6737e830f69ace266f697141a879d959e66fa386086cbffc16d5b74a0665"
     },
     "reference_files_sha256": {
-      "lot_sizes.csv": "7f46a02965e939c58c28618d2fb770a136cfa1d7353292759e9e6a334a97d7dc",
-      "strike_step.csv": "5c7ba7b1e7ca767022fb7ba7dcfa7a7fb93af484a2faf396b826c69e283cc826"
+      "lot_sizes.csv": "a205c54adcf9be134871b17f838edba96ba7b4a887748f287a5a7d8a4d7c5207",
+      "strike_step.csv": "57bc1bd1cd71a67353c27527ff6a0691423b0b5ffc30f110af774c7f2522cb9b"
     }
   },
   "scenarios": [

@@ -213,3 +213,27 @@ def test_schema_rejects_unsupported_or_inconsistent_settings():
         strategy([sell_leg(trail_sl={"points": [15, 10]})])  # trail without SL
     with pytest.raises(ValidationError):
         strategy([sell_leg(range_breakout={"until": "09:30", "side": "high", "on": "instrument"})])
+
+
+def test_lot_size_follows_each_legs_expiry_not_the_trading_day():
+    """15 Jan 2025, after the 20 Nov 2024 revision: the 16 Jan weekly was listed at 75, but
+    the 30 Jan monthly was listed earlier and keeps 25 until it expires."""
+    weekly, monthly = date(2025, 1, 16), date(2025, 1, 30)
+    data = DayData(
+        day=date(2025, 1, 15),
+        underlying="NIFTY",
+        spot=bars(23000.0),
+        chain={
+            (weekly, 23000.0, "CE"): bars(100),
+            (monthly, 23000.0, "CE"): bars(200),
+        },
+        listed_expiries=[weekly, date(2025, 1, 23), monthly],
+        master_lot_size=None,
+    )
+    legs = [
+        sell_leg(id="weekly_ce", expiry="weekly"),
+        sell_leg(id="monthly_ce", expiry="monthly"),
+    ]
+    result = simulate_day(strategy(legs), data)
+    qty = {t.leg_id: t.qty for t in result.trades}
+    assert qty == {"weekly_ce": 75, "monthly_ce": 25}

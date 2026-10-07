@@ -324,3 +324,33 @@ spot and India VIX CSVs.
   legwise trades, fills and MTM curve (`option-backtesting/tests/unit/test_vendor_day_legwise.py`);
   on the real data, NIFTYNXT50's 3,700,483 staged rows came out as exactly 3,700,483 lake rows.
 
+---
+
+## Lot sizes are keyed by the contract's expiry, and checked against the data — 2026-10-07
+
+BL-034 Phase 2. `ref_lot_sizes` now holds the history 2024-10 → today for all six indices, and
+its `effective_date` means the **first expiry** a size applies to, not the first trading day.
+
+- **Why per expiry.** NSE and BSE apply a revision to contracts listed from the revision date and
+  let the existing weekly and monthly contracts run to expiry on the old size. So on one trading
+  day two contracts of one underlying can differ (NIFTY on 2025-01-15: the 16 Jan weekly is 75,
+  the 30 Jan monthly 25), and the 30 Jan 2025 monthly sits between weeklies on the new size. A
+  day-keyed lookup would size every NIFTY weekly between 2024-11-20 and 2025-01-01 at 75 instead
+  of 25. The legwise engine now sizes each leg from its own expiry (`_DaySim._select`).
+- **Where the values come from, and the check.** Dates from the NSE/BSE circulars (revisions of
+  2024-11-20, 2025-04-25, 2025-10-28 and the SEBI index-derivative framework). Each expiry was then
+  checked against the lake: a contract's per-minute volume is a quantity, so its greatest common
+  divisor is the lot size. Every expiry of the six indices from 2024-10 to 2026-09 agrees with the
+  table (the probe over every day around each transition; the rest on every 9th day).
+  Two circular-derived dates were wrong by a day or two in the summaries read (BANKNIFTY/FINNIFTY/
+  MIDCPNIFTY monthly handover is the 2025-02-27 expiry, SENSEX weekly 2025-01-07): the data
+  decided.
+- **Known limit.** A quarterly-month expiry (Mar/Jun/Sep/Dec monthly) changed size mid-life at the
+  quarterly cut-over (NIFTY: after 2024-12-26 for the March 2025 expiry). The table gives the
+  size from the cut-over; a strategy that traded the 3-months-out contract before then would be
+  sized wrong. The "monthly" selector picks the nearest month, so it does not.
+- **Strike steps** for FINNIFTY (50), MIDCPNIFTY (25) and NIFTYNXT50 (100) were added; the modal
+  gap between the listed strikes near the money agrees for every month since 2024-10.
+- **Rows before 2024-10** are deliberately absent: a day earlier than the first row raises
+  ("No lot_sizes row") rather than guessing.
+

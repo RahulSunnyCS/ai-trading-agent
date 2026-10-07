@@ -14,8 +14,9 @@ the whole time because nothing compared the two.
 ## Exported utility functions (the whole public API)
 
 From `src/index.ts`:
-- `lotSize(underlying, date)` — effective-dated lot size for `'NIFTY' |
-  'BANKNIFTY' | 'SENSEX'`.
+- `lotSize(underlying, expiry)` — lot size of the contracts expiring on that date for `'NIFTY' |
+  'BANKNIFTY' | 'SENSEX'` (the exchanges revise per contract, so the date is the expiry; pass
+  today for a contract that expires soon).
 - `strikeStep(underlying, date)` — effective-dated strike interval.
 - `isTradingDay(day)` / `isHoliday(day)` — `day` is an IST calendar date
   `'YYYY-MM-DD'`; read from `holidays.csv` in the same folder. Mirrors the
