@@ -442,9 +442,13 @@ The system is a **real-time event-driven pipeline** in four layers:
   is already in flight, so a slow endpoint does not pile up overlapping
   requests. Pass `{ intervalMs }` for a polling hook (e.g. `usePaperTrades`);
   omit it for fetch-once-with-manual-refresh (most of the others). Add
-  `{ cache: true }` when a view re-mounts often (the Momentum sections): it
+  `{ cache: true }` when a view re-mounts often (the Momentum sections, the
+  global `useMeta` / `useFyersAuthStatus` / `usePaymentBalance`): it
   starts from the last response for that URL, kept in memory for the session,
-  and still revalidates; `fetchCached()` shares that cache for one-off reads
+  and still revalidates; `fetchCached()` shares that cache for one-off reads.
+  Instances share one in-flight request per URL (mount and poll ticks join it,
+  `refetch()` starts afresh). Poll ticks pause while the tab is hidden. Poll a
+  job's status only while it runs (`useMomentumWeeklyJob`, `useDailyJob`)
 
 ## Testing
 

@@ -7,20 +7,14 @@ import { Clock } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import type { StraddlePoint, StraddleSnapshot } from '../../hooks/useLiveTicks';
-import {
-  formatInt,
-  formatIstTime,
-  formatNumber,
-  formatPct,
-  formatPp,
-  formatRelative,
-} from '../../lib/format';
+import { formatInt, formatIstTime, formatNumber, formatPct, formatPp } from '../../lib/format';
 import { type FeedView, STRADDLE_INTERVAL_MS } from '../../lib/live';
 import type { FeedHealth } from '../../lib/overview';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { StatusDot } from '../ui/StatusDot';
+import { UpdatedAgo } from './LiveClock';
 import { LiveLineChart } from './LiveLineChart';
 
 const HINTS = {
@@ -88,14 +82,12 @@ export function StraddlePanel({
   history,
   health,
   view,
-  now,
 }: {
   straddle: StraddleSnapshot | null;
   history: readonly StraddlePoint[];
   /** Health of the straddle feed (null until the clock has started). */
   health: FeedHealth | null;
   view: FeedView | null;
-  now: Date | null;
 }) {
   const empty = emptyText(health);
   return (
@@ -125,7 +117,7 @@ export function StraddlePanel({
               {formatNumber(straddle.straddleValue, 2)}
             </p>
             <p className="text-xs text-faint">
-              Updated {now ? formatRelative(straddle.timestamp, now) : '…'} ·{' '}
+              Updated <UpdatedAgo at={straddle.timestamp} /> ·{' '}
               {formatIstTime(straddle.timestamp, { seconds: true })} IST
             </p>
           </div>

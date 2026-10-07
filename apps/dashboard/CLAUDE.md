@@ -72,6 +72,9 @@ needs to be shared with the server, it is currently hand-duplicated in
   duplicated logic before the extraction). Pass `{ intervalMs }` for polling,
   omit it for fetch-once-with-manual-refresh; `{ cache: true }` is in root
   `technical.md`.
+- `src/hooks/useNow.ts` — the one ticking clock (`Date | null`, null until mounted). Every caller
+  re-renders on each tick, so call a fast one in a small leaf (`components/live/LiveClock.tsx`),
+  not at the top of a view.
 - `src/hooks/useRunSection.ts` — a Momentum background run's result holds the core only; the
   heavy parts (trades, instruments, timeline, this week's signals, the Broad circuit card) are
   fetched when the tab or card showing them mounts: `useRunSection(runId, 'trades')` returns

@@ -25,6 +25,10 @@ const POLL_MS = 30_000;
  * whether the last poll reached the API.
  */
 export function useMeta(): MetaState {
-  const { data, loading, error } = usePolledResource<Meta>('/api/meta', { intervalMs: POLL_MS });
+  // `cache`: mounted in several places at once, so a later mount starts from the last answer.
+  const { data, loading, error } = usePolledResource<Meta>('/api/meta', {
+    intervalMs: POLL_MS,
+    cache: true,
+  });
   return { meta: data, loading, error };
 }

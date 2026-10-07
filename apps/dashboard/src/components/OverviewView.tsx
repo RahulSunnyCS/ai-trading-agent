@@ -29,6 +29,7 @@ import { useDailyJob, useLegwiseData } from '../hooks/useLegwise';
 import { useLiveTicks } from '../hooks/useLiveTicks';
 import { useMeta } from '../hooks/useMeta';
 import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
+import { useNow } from '../hooks/useNow';
 import { TRADES_WINDOW_CAPTION, usePaperTrades } from '../hooks/usePaperTrades';
 import { usePaymentBalance } from '../hooks/usePaymentBalance';
 import { usePolledResource } from '../hooks/usePolledResource';
@@ -64,20 +65,6 @@ const OPTIONS_UNREACHABLE = "Can't reach the Options Lab service right now.";
 // ---------------------------------------------------------------------------
 // Shared pieces
 // ---------------------------------------------------------------------------
-
-/**
- * The current time, re-read every `intervalMs`. Null until mounted: the shell is rendered on
- * the server first, and a clock rendered there would not match the browser's.
- */
-function useNow(intervalMs: number): Date | null {
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), intervalMs);
-    return () => clearInterval(timer);
-  }, [intervalMs]);
-  return now;
-}
 
 interface CardLink {
   label: string;
