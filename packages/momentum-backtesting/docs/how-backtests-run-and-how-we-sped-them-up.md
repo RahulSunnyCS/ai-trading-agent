@@ -529,9 +529,37 @@ pandas; a test caught exactly that). *Measured:* **0.28 s → 0.08 s**.
 | Circuit card (separate request) | 2.8 s | 1.3 s |
 | `build_effective_stock_ranks` (two) | 0.28 s | 0.08 s |
 
-On the **real data**, measured just before Phase 3: a warm Broad run took **12.7 s** (11 s of CPU)
-and the core 3.9 s. It could not be re-measured afterwards because another process had the
-database locked; the ratios above are the best guide to the live improvement until it can be.
+On the **real data** (measured 2026-10-07 on a private copy of the catalog, old code and new code
+side by side, same request, a laptop doing other work at the same time) the picture is different,
+and it matters to be plain about it:
+
+| Broad request on the real data | Old code | New code |
+|---|---|---|
+| Same request sent again | 62 s (24 s of CPU) | **0.0 s** (served from the cache) |
+| Same request with only the cost changed (ranking reused) | 53–62 s (24 s of CPU) | 55–59 s (19–20 s of CPU) |
+| First time (rankings built) | 175 s (79 s of CPU) | 205 s (81 s of CPU) |
+| ETF run | 1.0–1.7 s | 0.2–1.0 s |
+| Stock run | 0.7–2.2 s | 0.2–0.5 s |
+
+So the repeat case and the small runs are fixed, but a **changed Broad request is only about 20 %
+cheaper in CPU, nowhere near the 5 s goal.** The fixture numbers above do not carry over because
+the time on the real data is not in the engine at all. Profiling one such request shows the engine
+(both runs) at about 1.3 s, and the rest in two database reads that BL-005 never touched:
+
+- `compute_weekly_features` for the handful of held stocks, used to explain why each was sold (the
+  Trades section): **about 37 s**. It runs a DuckDB query over the daily-bars Parquet lake and is
+  not cached between requests.
+- `db_read.has_total_market_data`, a one-row existence check on the catalog: **about 15 s**, which
+  means opening a catalog connection itself is slow on the real lake (it holds many thousands of
+  day files since the vendor import).
+
+The core result the dashboard waits for skips the first of these (it is a lazy section) but the
+stateless API, the weekly job and the circuit card all pay for it. That is recorded as follow-up
+work in BL-005 (Phase 5) and is not done.
+
+The numbers above come from a copy of the catalog because the owner's own `mbt serve` holds the
+real one open; on the real, running server the connection cost may differ, so re-measure there
+before acting on it.
 
 #### Phase 4: show the user where a run is (backend part)
 
@@ -566,8 +594,13 @@ checks, from broad to narrow:
    result (to 10 significant digits). None was ever "accepted" during this work.
 2. **A live-data snapshot** (`scripts/result-baseline.py`). Before any code change we saved the
    full results of all 16 scenarios and all 12 saved favourites on the real data, then re-ran
-   them after each phase: **28 of 28 identical**. (Phase 3 could not be re-checked live because
-   the database was locked; the goldens and the tests below covered it.)
+   them after each phase: **28 of 28 identical** after Phase 1. For Phases 2–4 the whole set was
+   re-run on the final code against the original code, on a copy of the live catalog: every Broad
+   run (10 favourites, 6 goldens), the ETF favourite and the 5 ETF goldens are identical. The four
+   Stock results differ only by one added company entry, BSE Ltd., which came in with the
+   Nifty 50 September-2026 review (commit 4412bad, curated data), not from any number moving. The
+   two Custom Index scenarios were not re-run on the live data: the old code needs about 100
+   minutes for each, and the goldens plus the tests below cover them.
 3. **A twin test for every rewrite.** For each piece of replaced code, the test suite keeps a
    verbatim copy of the old version and compares it with the new one on **random data built to
    hit the edges**: ties in rankings, missing values, gaps, opposite-direction runs, every gate.
