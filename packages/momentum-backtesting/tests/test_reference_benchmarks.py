@@ -7,14 +7,17 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from momentum_backtesting import api, reference_benchmarks
+from momentum_backtesting import api, metrics, reference_benchmarks
 from momentum_backtesting.fetch import load_universe
 from momentum_backtesting.reference_benchmarks import (
     NIFTY50_TRI,
     NIFTY200_MOMENTUM30_TRI,
+    NIFTY_NEXT50_TRI,
+    PICKER,
     aligned,
     compare,
     load_references,
+    picker,
 )
 
 
@@ -101,7 +104,51 @@ def test_every_etf_backtest_payload_carries_the_comparisons(tmp_path, monkeypatc
     assert len(first["series"]) == len(body["series"]["dates"])
     assert first["series"][0] == pytest.approx(100_000)
     assert first["excess_cagr"] == pytest.approx(body["kpis"]["cagr"] - first["cagr"])
+    # The headline picker's five indices: the two in this CSV carry their curve, the rest are
+    # listed as unavailable rather than dropped.
+    picked = {b["name"]: b for b in body["benchmarks"]}
+    assert [b["name"] for b in body["benchmarks"]] == list(PICKER)
+    mom = picked[NIFTY200_MOMENTUM30_TRI]
+    assert mom["available"] and len(mom["series"]) == len(body["series"]["dates"])
+    assert mom["series"][0] == pytest.approx(100_000)
+    assert mom["final_value"] == pytest.approx(mom["series"][-1])
+    assert mom["excess_cagr"] == pytest.approx(body["kpis"]["cagr"] - mom["cagr"])
+    assert picked[NIFTY_NEXT50_TRI] == {"name": NIFTY_NEXT50_TRI, "available": False}
     json.dumps(body, allow_nan=False)
+
+
+def test_picker_measures_each_index_on_the_strategys_own_definitions():
+    weeks = pd.date_range("2019-01-04", periods=160, freq="W-FRI")
+    rng = np.random.default_rng(3)
+    equity = pd.Series(np.cumprod(1 + rng.normal(0.004, 0.02, len(weeks))), index=weeks)
+    cash = pd.Series(1.001 ** np.arange(len(weeks)), index=weeks)
+    level = pd.Series(100 * np.cumprod(1 + rng.normal(0.002, 0.03, len(weeks))), index=weeks)
+    refs = pd.DataFrame({NIFTY50_TRI: level, NIFTY200_MOMENTUM30_TRI: level * 3})
+    # The last week's close is missing (published late): carried forward, and `as_of` says so.
+    refs.iloc[-1, refs.columns.get_loc(NIFTY50_TRI)] = None
+
+    out = {entry["name"]: entry for entry in picker(equity, cash, refs)}
+
+    assert list(out) == list(PICKER)
+    nifty = out[NIFTY50_TRI]
+    assert nifty["as_of"] == f"{weeks[-2]:%Y-%m-%d}"
+    stats = metrics.curve_stats(nifty["curve"], cash)
+    assert nifty["cagr"] == pytest.approx(stats["CAGR"])
+    assert nifty["sharpe"] == pytest.approx(stats["Sharpe"])
+    assert nifty["max_drawdown"] == pytest.approx(stats["max drawdown"])
+    assert nifty["excess_cagr"] == pytest.approx(metrics.cagr(equity) - stats["CAGR"])
+    assert 0 <= nifty["years_beating"] <= 4
+    assert out[NIFTY200_MOMENTUM30_TRI]["as_of"] == f"{weeks[-1]:%Y-%m-%d}"
+    assert out[NIFTY200_MOMENTUM30_TRI]["note"].startswith("Back-calculated")
+    assert out[NIFTY_NEXT50_TRI] == {"name": NIFTY_NEXT50_TRI, "available": False}
+
+
+def test_picker_drops_an_index_that_stopped_more_than_a_week_early():
+    weeks = pd.date_range("2020-01-03", periods=10, freq="W-FRI")
+    equity = pd.Series(np.linspace(1, 2, 10), index=weeks)
+    refs = pd.DataFrame({NIFTY50_TRI: [100.0] * 8 + [None, None]}, index=weeks)
+    out = {entry["name"]: entry for entry in picker(equity, equity, refs)}
+    assert out[NIFTY50_TRI]["available"] is False
 
 
 def test_payload_without_reference_data_has_an_empty_list(tmp_path):

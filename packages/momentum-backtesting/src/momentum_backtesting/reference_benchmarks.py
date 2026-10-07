@@ -19,10 +19,16 @@ lines still show only `REFERENCES`, so adding these changed no existing output:
 - Nifty Midcap 150 TRI, Nifty Smallcap 250 TRI
 - Nifty Midcap150 Momentum 50 TRI, Nifty500 Momentum 50 TRI
 - Nifty 500 TRI (BL-010 Phase 6 backcast benchmark)
+- Nifty Next 50 TRI (the dashboard's benchmark picker)
 
 NSE back-calculates all four before each index's launch, as it does Mom30 before 2020-08-11;
 unlike Mom30 they carry no back-calculated flag yet, so read their early years as NSE's
 backtest of the index method, not investable history.
+
+`picker()` is the one place the dashboard reads several of them at once: the five indices its
+headline benchmark picker offers (`PICKER`), each with its curve and headline statistics, so the
+page can switch benchmark without running the backtest again. The benchmark never changes the
+simulation itself, only what the result is compared against.
 
 All of them come from `data/stocks/benchmarks_weekly.csv` (`mbt stocks fetch`, or for just the
 four extras `mbt stocks fetch-benchmarks`; niftyindices.com), or the shared database's
@@ -32,6 +38,7 @@ are simply absent - never an error, since every dataset can run without them.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -45,6 +52,7 @@ from .stocks.ui_data import (
     NIFTY500_TRI,
     NIFTY_MIDCAP150_MOMENTUM50_TRI,
     NIFTY_MIDCAP150_TRI,
+    NIFTY_NEXT50_TRI,
     NIFTY_SMALLCAP250_TRI,
     REFERENCE_ONLY_COLUMNS,
 )
@@ -58,8 +66,18 @@ EXTRA_REFERENCES = (
     NIFTY_MIDCAP150_MOMENTUM50_TRI,
     NIFTY500_MOMENTUM50_TRI,
     NIFTY500_TRI,
+    NIFTY_NEXT50_TRI,
 )
 LOADED = REFERENCES + EXTRA_REFERENCES
+#: The benchmarks the dashboard's headline picker offers, in menu order (owner, 2026-10-07): the
+#: buyable momentum index first. All dividend-inclusive, so any two compare like for like.
+PICKER = (
+    NIFTY200_MOMENTUM30_TRI,
+    NIFTY50_TRI,
+    NIFTY_NEXT50_TRI,
+    NIFTY_MIDCAP150_TRI,
+    NIFTY_SMALLCAP250_TRI,
+)
 #: First live (not back-calculated) week of the Nifty200 Momentum 30 index.
 MOMENTUM30_LIVE_FROM = pd.Timestamp("2020-08-11")
 
@@ -142,9 +160,7 @@ def compare(equity: pd.Series, references: pd.DataFrame) -> list[dict]:
             continue
         ref_cagr = metrics.cagr(line)
         depth, _, _ = metrics.max_drawdown(line)
-        note = None
-        if name == NIFTY200_MOMENTUM30_TRI and equity.index[0] < MOMENTUM30_LIVE_FROM:
-            note = "Back-calculated by NSE before 11 Aug 2020"
+        note = _back_calculated_note(name, equity.index[0])
         out.append(
             {
                 "name": name,
@@ -153,6 +169,66 @@ def compare(equity: pd.Series, references: pd.DataFrame) -> list[dict]:
                 "excess_cagr": strategy_cagr - ref_cagr,
                 "max_drawdown": depth,
                 "note": note,
+            }
+        )
+    return out
+
+
+def _back_calculated_note(name: str, start: pd.Timestamp) -> str | None:
+    if name == NIFTY200_MOMENTUM30_TRI and start < MOMENTUM30_LIVE_FROM:
+        return "Back-calculated by NSE before 11 Aug 2020"
+    return None
+
+
+def _year_end_returns(curve: pd.Series) -> pd.Series:
+    """Calendar-year returns, the first year from the curve's first week (as `metrics.yearly`)."""
+    year_end = curve.groupby(curve.index.year).last()
+    start = pd.Series([curve.iloc[0]], index=[curve.index[0].year - 1])
+    return pd.concat([start, year_end]).pct_change().dropna()
+
+
+def picker(equity: pd.Series, cash: pd.Series, references: pd.DataFrame | None) -> list[dict]:
+    """One entry per `PICKER` index, in menu order. An index that covers the backtest carries its
+    rebased `curve` and the statistics the strategy's own KPIs use, on the same definitions:
+    CAGR, volatility and Sharpe vs cash (`metrics.curve_stats`), Sortino as (CAGR - cash CAGR)
+    over annualised downside deviation, max drawdown, and how many calendar years the strategy
+    beat it. `as_of` is the index's last real close on or before the final week (`aligned` may
+    carry it one week forward). An index with no usable data is listed with `available` False,
+    so the menu can say so instead of dropping it."""
+    out: list[dict] = []
+    if len(equity) < 2:
+        return out
+    strategy_cagr = metrics.cagr(equity)
+    cash_cagr = metrics.cagr(cash)
+    strategy_years = _year_end_returns(equity)
+    for name in PICKER:
+        source = references[name] if references is not None and name in references else None
+        line = aligned(source, equity.index) if source is not None else None
+        if line is None:
+            out.append({"name": name, "available": False})
+            continue
+        stats = metrics.curve_stats(line, cash)
+        weekly = line.pct_change().dropna()
+        downside = weekly[weekly < 0].std() * math.sqrt(metrics.WEEKS_PER_YEAR)
+        closes = source.dropna()
+        as_of = closes.index[closes.index <= equity.index[-1]][-1]
+        years = _year_end_returns(line).reindex(strategy_years.index)
+        out.append(
+            {
+                "name": name,
+                "available": True,
+                "as_of": f"{as_of:%Y-%m-%d}",
+                "note": _back_calculated_note(name, equity.index[0]),
+                "curve": line,
+                "cagr": stats["CAGR"],
+                "excess_cagr": strategy_cagr - stats["CAGR"],
+                "total_return": line.iloc[-1] - 1,
+                "volatility": stats["volatility"],
+                "sharpe": stats["Sharpe"],
+                "sortino": (stats["CAGR"] - cash_cagr) / downside if downside else None,
+                "max_drawdown": stats["max drawdown"],
+                "max_drawdown_trough": stats["max drawdown trough"],
+                "years_beating": int((strategy_years > years).sum()),
             }
         )
     return out
