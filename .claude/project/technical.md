@@ -480,6 +480,8 @@ Critical variables whose misconfiguration causes real pain:
 | `QUANTIPLY_API_KEY` | Required in live mode. Missing → paper trade writes fail silently if error handling isn't tight |
 | `BROKER` | Selects the adapter: `fyers` (default), `angelone`, or `sim`. Omitting this AND omitting `SIMULATE=true` → safe default-throw error at startup (no silent fallback) |
 | `SIMULATE` | Set to `true` for credential-free development mode. When set, MarketDataSimulator is selected regardless of `BROKER` value |
+| `HOST` | Address `apps/server` listens on (default `127.0.0.1`, laptop only). Set `0.0.0.0` only where another machine or a container must reach it |
+| `CORS_ORIGIN` | Comma-separated browser origins `apps/server` allows (default the local dashboard: `http://localhost:5190`, `http://127.0.0.1:5190`, `:5173` likewise). Requests without an `Origin` header (curl, the dashboard's Next rewrites) are unaffected. The test-only `src/api/server.ts` reads it too, defaulting to `*` |
 | `MAX_WS_CONNECTIONS` | Max concurrent /ws/ticks WebSocket connections (default 50). Positive integers only; non-positive values silently fall back to 50 |
 | `EVOLUTION_REQUIRE_APPROVAL` | Should be `true` in any environment where the retrospection engine runs. Setting `false` allows the system to autonomously modify personality parameters without human review |
 | `TOKEN_VALIDITY_SCHEDULER_ENABLED` | When set to `true`, registers a BullMQ cron job that checks Fyers token expiry at 08:45 IST weekdays. Disabled by default; opt-in via this flag |

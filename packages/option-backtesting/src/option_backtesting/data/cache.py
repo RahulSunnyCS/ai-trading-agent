@@ -11,6 +11,7 @@ TimescaleDB hypertables (the same discipline the TS side applies to
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from pathlib import Path
 
@@ -18,6 +19,12 @@ import duckdb
 
 from .ingest import DEFAULT_CACHE_DIR, GreeksRow
 from .providers.base import Bar, SessionFlag
+
+_UNDERLYING_RE = re.compile(r"^[A-Z0-9_]{1,32}$")
+
+
+class InvalidUnderlyingError(ValueError):
+    """An underlying name that is not a plain symbol; it would build a path outside the cache."""
 
 
 class Cache:
@@ -98,6 +105,8 @@ class Cache:
         ingested underlying has). Used by the FastAPI service so a caller
         (dashboard/MCP) knows what date range it can actually request before
         calling `obt run` / `POST /runs`."""
+        if not _UNDERLYING_RE.fullmatch(underlying):
+            raise InvalidUnderlyingError(f"invalid underlying: {underlying[:40]!r}")
         result: dict[str, dict[str, str]] = {}
         underlying_dir = self._dir / underlying
         if not underlying_dir.exists():

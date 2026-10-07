@@ -13,7 +13,19 @@ const momentumDirectOrigin = process.env.MOMENTUM_DIRECT_API_URL ?? 'http://127.
 const optionsDirectOrigin = process.env.OBT_DIRECT_API_URL ?? 'http://127.0.0.1:8000';
 const schedulerDirectOrigin = process.env.SCHEDULER_DIRECT_API_URL ?? 'http://127.0.0.1:8790';
 
+// Sent on every response: no framing (clickjacking), no MIME sniffing, no cross-site referrer.
+const SECURITY_HEADERS = [
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+  { key: 'Referrer-Policy', value: 'same-origin' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+];
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: '/:path*', headers: SECURITY_HEADERS }];
+  },
   // A cold whole-market Broad Momentum run (or Custom Index) takes about a minute; Next's default
   // 30s rewrite-proxy timeout would drop it as a 500. Matches the Fastify proxy's 180s.
   experimental: { proxyTimeout: 180_000 },

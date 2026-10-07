@@ -10,6 +10,7 @@ import {
   clearFailures,
   clientIp,
   gateConfig,
+  isCrossSiteApiWrite,
   isPageRequest,
   lockoutSeconds,
   passwordMatches,
@@ -264,6 +265,37 @@ describe('wrong-password backoff', () => {
   });
 });
 
+describe('isCrossSiteApiWrite', () => {
+  const check = (method: string, path: string, headers: Record<string, string>) =>
+    isCrossSiteApiWrite(method, path, new Headers(headers), 'dash.test');
+
+  it('refuses a cross-site write by Sec-Fetch-Site, which wins over Origin', () => {
+    expect(check('POST', '/api/momentum/backtest', { 'sec-fetch-site': 'cross-site' })).toBe(true);
+    expect(
+      check('DELETE', '/api/x', { 'sec-fetch-site': 'same-origin', origin: 'http://evil.test' }),
+    ).toBe(false);
+    expect(check('POST', '/api/x', { 'sec-fetch-site': 'same-site' })).toBe(false);
+    expect(check('POST', '/api/x', { 'sec-fetch-site': 'none' })).toBe(false);
+  });
+
+  it('falls back to comparing the Origin host with ours', () => {
+    expect(check('POST', '/api/x', { origin: 'http://evil.test' })).toBe(true);
+    expect(check('POST', '/api/x', { origin: 'null' })).toBe(true);
+    expect(check('POST', '/api/x', { origin: 'http://dash.test' })).toBe(false);
+    expect(check('PATCH', '/api/x', { origin: 'https://pub.example', host: 'pub.example' })).toBe(
+      false,
+    );
+  });
+
+  it('lets reads, non-API paths and header-less clients through', () => {
+    const evil = { 'sec-fetch-site': 'cross-site' };
+    for (const method of ['GET', 'HEAD', 'OPTIONS'])
+      expect(check(method, '/api/x', evil)).toBe(false);
+    expect(check('POST', '/login', evil)).toBe(false);
+    expect(check('POST', '/api/x', {})).toBe(false);
+  });
+});
+
 describe('middleware', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -297,6 +329,17 @@ describe('middleware', () => {
     expect(url.origin).toBe('http://dash.test');
     return `${url.pathname}${url.search}`;
   };
+
+  it('refuses a cross-site API write with 403, even in open local dev', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('DASHBOARD_PASSWORD', '');
+    const post = (headers: Record<string, string>) =>
+      new NextRequest('http://dash.test/api/momentum/saved-runs', { method: 'POST', headers });
+    expect((await middleware(post({ 'sec-fetch-site': 'cross-site' }))).status).toBe(403);
+    expect((await middleware(post({ origin: 'https://evil.test' }))).status).toBe(403);
+    expect((await middleware(post({ 'sec-fetch-site': 'same-origin' }))).status).toBe(200);
+    expect((await middleware(post({}))).status).toBe(200);
+  });
 
   it('passes through in local dev with no env set', async () => {
     vi.stubEnv('NODE_ENV', 'development');

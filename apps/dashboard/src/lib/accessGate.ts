@@ -146,6 +146,34 @@ export function isApiPath(pathname: string): boolean {
   return pathname.startsWith('/api/') || pathname.startsWith('/retrospection/');
 }
 
+/**
+ * A state-changing API request another site's page started (CSRF): refused before anything
+ * else, password or not. `Sec-Fetch-Site` decides when the browser sends it (only `cross-site`
+ * is refused; same-site and `none` pass); otherwise an `Origin` whose host is not ours is
+ * refused, `Origin: null` included. No header at all (curl, scripts) passes.
+ */
+export function isCrossSiteApiWrite(
+  method: string,
+  pathname: string,
+  headers: Headers,
+  requestHost: string,
+): boolean {
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return false;
+  if (!isApiPath(pathname)) return false;
+  const site = headers.get('sec-fetch-site');
+  if (site !== null) return site.trim().toLowerCase() === 'cross-site';
+  const origin = headers.get('origin');
+  if (origin === null) return false;
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host.toLowerCase();
+  } catch {
+    return true;
+  }
+  const ours = [headers.get('host'), headers.get('x-forwarded-host')?.split(',')[0], requestHost];
+  return !ours.some((host) => host?.trim().toLowerCase() === originHost);
+}
+
 /** A browser navigating to a page: the only kind of request worth redirecting to /login. */
 export function isPageRequest(method: string, pathname: string, accept: string | null): boolean {
   if (method !== 'GET' && method !== 'HEAD') return false;

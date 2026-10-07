@@ -27,12 +27,27 @@ const TOKEN_PATTERN = /^v1\.(\d{1,12})\.(\d{1,12})\.([A-Za-z0-9_-]{43})$/;
 
 const encoder = new TextEncoder();
 
-async function signingKey(password: string): Promise<CryptoKey> {
+async function deriveKey(password: string): Promise<CryptoKey> {
   const material = await crypto.subtle.digest('SHA-256', encoder.encode(KEY_CONTEXT + password));
   return crypto.subtle.importKey('raw', material, { name: 'HMAC', hash: 'SHA-256' }, false, [
     'sign',
     'verify',
   ]);
+}
+
+/** One password is configured at a time, so a single memo saves re-deriving on every request. */
+let cachedKey: { password: string; key: Promise<CryptoKey> } | null = null;
+
+function signingKey(password: string): Promise<CryptoKey> {
+  if (cachedKey?.password !== password) {
+    const key = deriveKey(password);
+    cachedKey = { password, key };
+    // A failed derivation is not cached: the next request tries again.
+    key.catch(() => {
+      if (cachedKey?.key === key) cachedKey = null;
+    });
+  }
+  return cachedKey.key;
 }
 
 function toBase64Url(bytes: Uint8Array): string {

@@ -72,6 +72,15 @@ describe('signSession / verifySession', () => {
     expect(await verifySession(token, PASSWORD, NOW)).toBe(false);
   });
 
+  it('keys the cached signing key by password when the password changes back and forth', async () => {
+    const old = await signSession('the old password', NOW);
+    const current = await signSession(PASSWORD, NOW);
+    expect(await verifySession(old, 'the old password', NOW)).toBe(true);
+    expect(await verifySession(current, 'the old password', NOW)).toBe(false);
+    expect(await verifySession(current, PASSWORD, NOW)).toBe(true);
+    expect(await verifySession(old, PASSWORD, NOW)).toBe(false);
+  });
+
   it('rejects a token issued in the future or with too long a life', async () => {
     const future = await signSession(PASSWORD, NOW + 10 * 60 * 1000);
     expect(await verifySession(future, PASSWORD, NOW)).toBe(false);
