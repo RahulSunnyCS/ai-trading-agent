@@ -3,6 +3,8 @@
  * behind the Fastify proxy (/api/backtest/legwise/*).
  */
 
+import { useState } from 'react';
+
 import type {
   AnatomyResponse,
   DailyJob,
@@ -28,11 +30,18 @@ export function useLegwiseData() {
 }
 
 /**
- * Polls every 2s by default so the evening run's log streams in while it collects. A view
- * that only shows the job's state (Overview) passes a slower interval.
+ * The evening run's state. Fetched once on mount, then polled — every 2s by default, so the
+ * log streams in — only while a run is going. A view that only shows the job's state
+ * (Overview) passes a slower interval. After starting a run, call `refetch()`: the API marks
+ * the job running before it answers the POST, so that fetch sees it and polling resumes.
  */
 export function useDailyJob(intervalMs = 2000) {
-  return usePolledResource<DailyJob>(`${BASE}/daily`, { intervalMs });
+  const [polling, setPolling] = useState(false);
+  const resource = usePolledResource<DailyJob>(`${BASE}/daily`, polling ? { intervalMs } : {});
+  const running = resource.data?.state === 'running';
+  // React's "adjust state while rendering" pattern, as in useMomentumWeeklyJob.
+  if (polling !== running) setPolling(running);
+  return resource;
 }
 
 /** Cut times as the API wants them: '10:30,13:30'. */

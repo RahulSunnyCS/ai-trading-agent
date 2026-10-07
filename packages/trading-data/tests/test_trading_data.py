@@ -8,7 +8,7 @@ import pytest
 
 from trading_data import lake, reference
 from trading_data.backup import backup
-from trading_data.db import catalog_path, connect
+from trading_data.db import FIXED_SCHEMA_VIEWS, LAKE_VIEWS, catalog_path, connect
 from trading_data.instruments import InstrumentSpec, instrument_key, register
 
 DAY = date(2026, 9, 29)
@@ -100,6 +100,22 @@ def test_views_exist_and_are_empty_on_a_fresh_lake(root):
     with connect(root) as con:
         for view in ("bars_1m_option", "bars_1m_index", "bars_1m_future", "symbol_master"):
             assert con.execute(f"SELECT count(*) FROM {view}").fetchone()[0] == 0
+
+
+def test_views_limits_the_lake_views_a_connection_binds(root):
+    """Binding the 1-minute views takes tens of seconds on the live lake with the catalog
+    locked; a caller that never reads them must be able to skip them."""
+    with connect(root, views=("bars_1d_stock",)) as con:
+        assert con.execute("SELECT count(*) FROM bars_1d_stock").fetchone()[0] == 0
+        bound = {
+            name
+            for (name,) in con.execute(
+                "SELECT view_name FROM duckdb_views() WHERE temporary AND NOT internal"
+            ).fetchall()
+        }
+        assert bound & LAKE_VIEWS.keys() == {"bars_1d_stock"}
+    with pytest.raises(ValueError, match="bars_1m_nope"), connect(root, views=("bars_1m_nope",)):
+        pass
 
 
 def test_read_only_needs_an_existing_catalog(root):
@@ -203,8 +219,7 @@ def test_raw_sink_replaces_rather_than_appends(root):
 def test_backup_copies_new_files_only_and_always_the_catalog(root, tmp_path):
     with connect(root):
         pass
-    table = pa.table({"x": [1, 2, 3]})
-    lake.write_parquet(table, lake.bars_1m_path(root, "index", "NIFTY", DAY))
+    lake.write_parquet(_index_bars(1.0), lake.bars_1m_path(root, "index", "NIFTY", DAY))
     dest = tmp_path / "other_disk"
     first = backup(root, dest)
     second = backup(root, dest)
@@ -236,10 +251,48 @@ def test_bar_schemas_are_the_lake_contract():
     assert lake.OPT_SCHEMA.field("expiry").type == pa.date32()
 
 
+def _index_bars(close: float) -> pa.Table:
+    return pa.table(
+        {
+            "instrument_id": pa.array([1], pa.int64()),
+            "ts": pa.array([datetime(2026, 9, 29, 9, 15, tzinfo=UTC)], lake.TS_TYPE),
+            **{f.name: pa.array([close], pa.float64()) for f in lake.OHLC_FIELDS},
+            "vendor_symbol": pa.array(["NSE:NIFTY50-INDEX"], pa.string()),
+        }
+    )
+
+
+def test_a_bars_1m_file_must_have_the_lake_schema(root):
+    """The 1-minute views bind without union_by_name (FIXED_SCHEMA_VIEWS): DuckDB takes the first
+    file's columns and silently casts or drops a later file's, so no other shape may be written."""
+    path = lake.bars_1m_path(root, "index", "NIFTY", DAY)
+    wrong = _index_bars(1.0).set_column(0, "instrument_id", pa.array([1.0], pa.float64()))
+    with pytest.raises(ValueError, match="BAR_SCHEMA"):
+        lake.write_parquet(wrong, path)
+    with pytest.raises(ValueError, match="OPT_SCHEMA"):
+        lake.write_parquet(_index_bars(1.0), lake.bars_1m_path(root, "option", "NIFTY", DAY))
+    assert not path.exists()
+    lake.write_parquet(_index_bars(1.0), path)  # and the right one goes through
+    lake.write_parquet(pa.table({"x": [1]}), root / "lake" / "elsewhere" / "data.parquet")
+
+
+def test_fixed_schema_views_read_every_file(root):
+    """Bound from the first file only, the 1-minute views must still read every day's rows."""
+    for i, day in enumerate((DAY, date(2026, 9, 30), date(2026, 10, 1))):
+        lake.write_parquet(_index_bars(100.0 + i), lake.bars_1m_path(root, "index", "NIFTY", day))
+    with connect(root, views=("bars_1m_index",)) as con:
+        assert con.execute(
+            "SELECT count(*), count(DISTINCT date), sum(close) FROM bars_1m_index"
+        ).fetchone() == (3, 3, 303.0)
+    assert LAKE_VIEWS.keys() >= FIXED_SCHEMA_VIEWS
+    assert "bars_1d_stock" not in FIXED_SCHEMA_VIEWS  # its files differ in column order
+
+
 def test_partitions_lists_every_day_file_of_one_asset(root):
     for name, day in (("NIFTY", DAY), ("M&M", DAY), ("NIFTY", date(2026, 9, 30))):
-        lake.write_parquet(pa.table({"x": [1]}), lake.bars_1m_path(root, "option", name, day))
-    lake.write_parquet(pa.table({"x": [1]}), lake.bars_1m_path(root, "index", "NIFTY", DAY))
+        path = lake.bars_1m_path(root, "option", name, day)
+        lake.write_parquet(lake.OPT_SCHEMA.empty_table(), path)
+    lake.write_parquet(_index_bars(1.0), lake.bars_1m_path(root, "index", "NIFTY", DAY))
     got = [(name, day) for name, day, _ in lake.partitions(root, "option")]
     assert got == [("M&M", DAY), ("NIFTY", DAY), ("NIFTY", date(2026, 9, 30))]
     assert lake.partitions(root, "future") == []
@@ -255,15 +308,7 @@ def test_status_runs_in_this_packages_own_environment(root, monkeypatch):
     monkeypatch.setenv("TRADING_DATA_ROOT", str(root))
     with connect(root):
         pass
-    table = pa.table(
-        {
-            "instrument_id": pa.array([1], pa.int64()),
-            "ts": pa.array([datetime(2026, 9, 29, 9, 15, tzinfo=UTC)], lake.TS_TYPE),
-            **{f.name: pa.array([1.0], pa.float64()) for f in lake.OHLC_FIELDS},
-            "vendor_symbol": pa.array(["NSE:NIFTY50-INDEX"], pa.string()),
-        }
-    )
-    lake.write_parquet(table, lake.bars_1m_path(root, "index", "NIFTY", DAY))
+    lake.write_parquet(_index_bars(1.0), lake.bars_1m_path(root, "index", "NIFTY", DAY))
     result = CliRunner().invoke(app, ["status"])
     assert result.exit_code == 0, result.output
     assert "bars_1m_index" in result.output and "1 days" in result.output
@@ -319,3 +364,24 @@ def test_quality_snapshot_round_trip_without_the_catalog(root):
         quality.export_snapshot(con, root)
     assert quality.excluded_days(root, "option", "NIFTY") == {date(2025, 1, 2): "short_session:120"}
     assert quality.excluded_days(root, "option", "BANKNIFTY") == {}
+
+
+def test_no_catalog_connection_here_binds_lake_views():
+    """Binding views runs with the catalog locked, and no code in this package reads a lake view
+    through the catalog (heavy reads go to the Parquet directly; `tdata status` counts on an
+    in-memory DuckDB). So every connect() here says which views it needs — `()` so far."""
+    import ast
+    from pathlib import Path
+
+    src = Path(__file__).parents[1] / "src" / "trading_data"
+    missing = []
+    for path in sorted(src.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in ("connect", "_connect_catalog")
+                and not any(k.arg == "views" for k in node.keywords)
+            ):
+                missing.append(f"{path.name}:{node.lineno}")
+    assert missing == []

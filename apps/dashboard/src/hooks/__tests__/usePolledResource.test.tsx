@@ -324,4 +324,166 @@ describe('usePolledResource', () => {
     ctl.calls[1]!.resolve({ y: 1 });
     await expect(retried).resolves.toEqual({ ok: true, data: { y: 1 } });
   });
+
+  describe('hidden tab', () => {
+    let hidden = false;
+
+    function setHidden(value: boolean): void {
+      hidden = value;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+
+    beforeEach(() => {
+      hidden = false;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    });
+
+    afterEach(() => {
+      Reflect.deleteProperty(document, 'hidden'); // back to the prototype's getter
+      vi.useRealTimers();
+    });
+
+    it('skips poll ticks while hidden, then fetches at once when visible again', async () => {
+      vi.useFakeTimers();
+      const { result } = renderHook(() =>
+        usePolledResource<{ x: number }>('/api/x', { intervalMs: 1_000 }),
+      );
+      await vi.waitFor(() => expect(ctl.calls).toHaveLength(1));
+      await act(async () => {
+        ctl.calls[0]!.resolve({ x: 1 });
+        await Promise.resolve();
+      });
+      await vi.waitFor(() => expect(result.current.data).toEqual({ x: 1 }));
+
+      act(() => setHidden(true));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(ctl.calls).toHaveLength(1); // five ticks, no request
+
+      act(() => setHidden(false));
+      // Back in view: one request straight away, not at the next tick.
+      expect(ctl.calls).toHaveLength(2);
+      await act(async () => {
+        ctl.calls[1]!.resolve({ x: 2 });
+        await Promise.resolve();
+      });
+      await vi.waitFor(() => expect(result.current.data).toEqual({ x: 2 }));
+      // Showing the poll's answer, not a reload: loading never went back to true.
+      expect(result.current.loading).toBe(false);
+
+      await act(async () => {
+        // And the interval carries on.
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+      expect(ctl.calls).toHaveLength(3);
+    });
+
+    it('does not fetch on becoming visible when no tick was missed', async () => {
+      vi.useFakeTimers();
+      renderHook(() => usePolledResource<{ x: number }>('/api/x', { intervalMs: 10_000 }));
+      await vi.waitFor(() => expect(ctl.calls).toHaveLength(1));
+      await act(async () => {
+        ctl.calls[0]!.resolve({ x: 1 });
+        await Promise.resolve();
+      });
+
+      act(() => setHidden(true));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+      act(() => setHidden(false));
+      expect(ctl.calls).toHaveLength(1);
+    });
+
+    it('the mount fetch still runs in a hidden tab', async () => {
+      hidden = true;
+      renderHook(() => usePolledResource<{ x: number }>('/api/x', { intervalMs: 1_000 }));
+      await waitFor(() => expect(ctl.calls).toHaveLength(1));
+    });
+  });
+
+  describe('shared in-flight requests', () => {
+    it('instances mounting the same url share one request and all get its answer', async () => {
+      const a = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      const b = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      await waitFor(() => expect(ctl.calls).toHaveLength(1));
+
+      act(() => ctl.calls[0]!.resolve({ x: 1 }));
+      await waitFor(() => expect(a.result.current.data).toEqual({ x: 1 }));
+      await waitFor(() => expect(b.result.current.data).toEqual({ x: 1 }));
+      expect(ctl.calls).toHaveLength(1);
+    });
+
+    it('one instance unmounting does not abort a request another is waiting for', async () => {
+      const a = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      const b = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      await waitFor(() => expect(ctl.calls).toHaveLength(1));
+      const signal = ctl.calls[0]!.signal;
+
+      a.unmount();
+      expect(signal.aborted).toBe(false);
+      act(() => ctl.calls[0]!.resolve({ x: 3 }));
+      await waitFor(() => expect(b.result.current.data).toEqual({ x: 3 }));
+    });
+
+    it('the shared request is aborted once the last instance waiting for it unmounts', async () => {
+      const a = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      const b = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      await waitFor(() => expect(ctl.calls).toHaveLength(1));
+
+      a.unmount();
+      b.unmount();
+      expect(ctl.calls[0]!.signal.aborted).toBe(true);
+    });
+
+    it('refetch() starts a fresh request for its instance; the other keeps the shared one', async () => {
+      const a = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      const b = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      await waitFor(() => expect(ctl.calls).toHaveLength(1));
+
+      act(() => a.result.current.refetch());
+      await waitFor(() => expect(ctl.calls).toHaveLength(2));
+      // b is still waiting for the first request, so it was not cancelled.
+      expect(ctl.calls[0]!.signal.aborted).toBe(false);
+
+      act(() => ctl.calls[0]!.resolve({ x: 1 }));
+      await waitFor(() => expect(b.result.current.data).toEqual({ x: 1 }));
+      // a dropped the first request: its answer is not a's.
+      expect(a.result.current.data).toBeNull();
+      expect(a.result.current.loading).toBe(true);
+
+      act(() => ctl.calls[1]!.resolve({ x: 2 }));
+      await waitFor(() => expect(a.result.current.data).toEqual({ x: 2 }));
+    });
+
+    it('a poll tick joins a request another instance already has in flight', async () => {
+      vi.useFakeTimers();
+      const poller = renderHook(() =>
+        usePolledResource<{ x: number }>('/api/meta', { intervalMs: 1_000 }),
+      );
+      await vi.waitFor(() => expect(ctl.calls).toHaveLength(1));
+      await act(async () => {
+        ctl.calls[0]!.resolve({ x: 1 });
+        await Promise.resolve();
+      });
+      await vi.waitFor(() => expect(poller.result.current.data).toEqual({ x: 1 }));
+
+      const other = renderHook(() => usePolledResource<{ x: number }>('/api/meta'));
+      await vi.waitFor(() => expect(ctl.calls).toHaveLength(2));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+      // The tick rode along with the other instance's mount fetch.
+      expect(ctl.calls).toHaveLength(2);
+
+      await act(async () => {
+        ctl.calls[1]!.resolve({ x: 2 });
+        await Promise.resolve();
+      });
+      await vi.waitFor(() => expect(poller.result.current.data).toEqual({ x: 2 }));
+      await vi.waitFor(() => expect(other.result.current.data).toEqual({ x: 2 }));
+      vi.useRealTimers();
+    });
+  });
 });

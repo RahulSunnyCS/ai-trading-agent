@@ -53,7 +53,7 @@ def _get_run(run_id: str):
     a read_only connect() would raise on a fresh checkout with no `tdata init` run."""
     if not catalog_path(data_root()).exists():
         return None
-    with connect(read_only=True) as con:
+    with connect(read_only=True, views=()) as con:
         return get_run(con, run_id)
 
 
@@ -123,7 +123,7 @@ def run_backtest(
         }
 
     result = aggregate(sessions)
-    with connect() as con:
+    with connect(views=()) as con:
         run_id = record_run(con, loaded.strategy, start, end, result, yaml_text)
 
     out: dict = {
@@ -347,7 +347,7 @@ def list_runs(limit: int = 20) -> list[dict]:
     """List past backtest runs from the run registry, most recent first."""
     if not catalog_path(data_root()).exists():
         return []
-    with connect(read_only=True) as con:
+    with connect(read_only=True, views=()) as con:
         return [asdict(r) for r in _list_runs(con, limit=limit)]
 
 

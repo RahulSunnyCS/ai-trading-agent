@@ -113,7 +113,7 @@ def test_legwise_enumerates_and_loads_a_vendor_day(roots):
     _, vendored = roots
     assert available_days(vendored, "NIFTY") == [DAY]
     data = load_day(vendored, "NIFTY", DAY)
-    assert data.spot.price_at(5) == pytest.approx(22005.0)  # 09:20 open
+    assert data.spot.price_at(5) == pytest.approx(22004.0)  # 09:20 = the 09:19 bar's close
     assert sorted({k[0] for k in data.chain}) == [EXPIRY]  # expiries come from the day's own file
 
 

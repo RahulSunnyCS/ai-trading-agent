@@ -26,9 +26,44 @@ FIXTURES = Path(__file__).resolve().parents[2] / "data/stocks/raw/benchmarks"
 
 #: `data/` is not tracked in git (it is rebuilt by `mbt stocks fetch`), so a clean checkout - CI
 #: included - has no raw fixtures. The tests that read them skip there instead of failing.
+#: The bhavcopy manifest (same raw cache) is the session calendar the feeds are checked against.
+BHAVCOPY_MANIFEST = FIXTURES.parent / "bhavcopy_manifest.csv"
 needs_raw_fixtures = pytest.mark.skipif(
-    not FIXTURES.exists(), reason="data/stocks/raw/benchmarks not present (run `mbt stocks fetch`)"
+    not FIXTURES.exists() or not BHAVCOPY_MANIFEST.exists(),
+    reason="data/stocks/raw benchmarks or bhavcopy manifest not present (run `mbt stocks fetch`)",
 )
+
+
+#: plan.md §1 recorded 3,900 sessions from 2011-01-03 when the raw files were first fetched;
+#: every refresh adds sessions (BL-018), so that count is a floor, not an exact length.
+FIRST_SESSION = pd.Timestamp("2011-01-03")
+MIN_SESSIONS = 3900
+#: Longest closure in the history: 2014-10-01 -> 2014-10-07 (Gandhi Jayanti, Dussehra and Bakri
+#: Id around a weekend). Only bounds the days after the bhavcopy manifest ends.
+MAX_SESSION_GAP = pd.Timedelta(days=6)
+
+
+def _assert_full_session_history(index: pd.DatetimeIndex) -> None:
+    """Every NSE session from 2011-01-03, however recently the feed was refreshed.
+
+    Up to the bhavcopy manifest's last day the index must equal its `ok` days exactly - NSE's own
+    per-session cash-market files, independent of niftyindices - so a single missing ordinary
+    session fails. The feed can run a few days past the manifest (refreshed at different times);
+    those days only get the gap bound. Weekend sessions (Muhurat trading, budget days) are in
+    the manifest like any other."""
+    assert index.is_unique and index.is_monotonic_increasing
+    assert index[0] == FIRST_SESSION
+    assert len(index) >= MIN_SESSIONS
+    manifest = pd.read_csv(BHAVCOPY_MANIFEST, parse_dates=["date"])
+    calendar = pd.DatetimeIndex(manifest.loc[manifest["status"] == "ok", "date"])
+    covered = min(calendar.max(), index.max())
+    head, expected = index[index <= covered], calendar[calendar <= covered]
+    missing, extra = expected.difference(head), head.difference(expected)
+    assert missing.empty and extra.empty, (
+        f"missing sessions {list(missing[:5])}, extra {list(extra[:5])}"
+    )
+    tail = index[index >= covered]
+    assert len(tail) == 1 or tail.to_series().diff().max() <= MAX_SESSION_GAP
 
 
 def _fake_urlopen(rows: list[dict], seen: list):
@@ -111,19 +146,22 @@ def test_nifty_50_equal_weight_tri_and_price_share_an_identical_date_set():
     price_series = pd.Series(price_df["close"].to_numpy(), index=price_df["date"])
 
     benchmarks.assert_same_session_set(tri_series, price_series)  # must not raise
-    assert len(tri_series) == 3900
-    assert len(price_series) == 3900
+    _assert_full_session_history(tri_series.index)
 
 
 @needs_raw_fixtures
 def test_nifty_50_tri_and_nifty200_momentum_30_tri_fixtures_share_the_same_session_set():
-    """The three TRI feeds (plan.md §1) share one 3,900-date session set."""
+    """The three TRI feeds (plan.md §1) share one session set."""
     n50 = parse_niftyindices_tri(json.loads((FIXTURES / "NIFTY_50_TRI.json").read_text()))
     momentum30 = parse_niftyindices_tri(
         json.loads((FIXTURES / "NIFTY200_MOMENTUM_30_TRI.json").read_text())
     )
-    assert len(n50) == len(momentum30) == 3900
+    ew = parse_niftyindices_tri(
+        json.loads((FIXTURES / "NIFTY50_EQUAL_WEIGHT_TRI.json").read_text())
+    )
     assert n50.index.equals(momentum30.index)
+    assert n50.index.equals(ew.index)
+    _assert_full_session_history(n50.index)
 
 
 def test_is_back_calculated_flags_dates_before_the_nifty200_momentum_30_launch():

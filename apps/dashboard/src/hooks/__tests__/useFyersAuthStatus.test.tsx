@@ -8,6 +8,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type FyersAuthStatus, fyersTokenState, useFyersAuthStatus } from '../useFyersAuthStatus';
+import { clearPolledResourceCache } from '../usePolledResource';
 
 interface PendingCall {
   url: string;
@@ -64,6 +65,7 @@ describe('useFyersAuthStatus', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    clearPolledResourceCache(); // the hook caches its last status across mounts
   });
 
   it('is loading only until the first response, then keeps the status through a focus refetch', async () => {

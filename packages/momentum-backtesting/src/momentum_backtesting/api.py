@@ -18,7 +18,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
-from trading_data.db import connect
 
 from . import (
     analysis,
@@ -53,6 +52,7 @@ from .categories.compose import (
     DEFAULT_TOP_N as CATEGORY_DEFAULT_TOP_N,
 )
 from .config import DATA_DIR, load_repo_env
+from .db_read import open_catalog
 from .engine import (
     BENCHMARK,
     CASH,
@@ -2272,7 +2272,7 @@ def _journal_weekly(
     try:
         entries, notes = _journal_entries(run, outcomes, favorites_by_id, now, target_week)
         recorded = []
-        with connect() as con:
+        with open_catalog() as con:
             for entry in entries:
                 if journal.record(con, entry) is not None:
                     recorded.append(entry.config_name)
@@ -2314,7 +2314,7 @@ def _journal_view(week: str | None) -> dict:
     from .weekly import week_ending_on_or_before
 
     try:
-        with connect(read_only=True) as con:
+        with open_catalog(read_only=True) as con:
             if not db_read._has_table(con, journal.TABLE):
                 return {"available": False, "weeks": [], "week": None, "entries": [], "check": None}
             weeks = [
@@ -2367,11 +2367,13 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
         creds = fyers.resolve_credentials()
     except fyers.FyersCredentialsError:
         creds = None
-    with connect() as con:
+    with open_catalog() as con:
         favorites_by_id = {item["id"]: item for item in runs_store.list_favorites(con)}
-        outcomes = run_favorite_strategies(
-            body.run, DATA_DIR, creds=creds, conn=con, log=lambda _m: None
-        )
+    # `catalog`, not an open connection: the run refreshes prices over the network and runs a
+    # backtest per favourite, minutes in all, and opens the catalog only around each store.
+    outcomes = run_favorite_strategies(
+        body.run, DATA_DIR, creds=creds, catalog=open_catalog, log=lambda _m: None
+    )
     target_week = (
         pd.Timestamp(week_ending_on_or_before(datetime.now(IST).date()))
         if body.run == "final"
@@ -2749,7 +2751,7 @@ def _weekly_status(today: date | None = None) -> dict:
     import duckdb
 
     try:
-        with connect() as con:
+        with open_catalog() as con:
             # epoch() rather than the TIMESTAMPTZ itself: returning a TIMESTAMPTZ to Python
             # makes DuckDB import pytz, which this package does not depend on.
             rows = con.execute(
@@ -3102,12 +3104,12 @@ def create_app() -> FastAPI:
 
     @app.get("/api/saved-runs")
     def saved_runs(dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf") -> list[dict]:
-        with connect() as con:
+        with open_catalog() as con:
             return runs_store.list_runs(con, dataset)
 
     @app.post("/api/saved-runs")
     def create_saved_run(body: SavedRunBody) -> dict:
-        with connect() as con:
+        with open_catalog() as con:
             return runs_store.save_run(
                 con,
                 body.dataset,
@@ -3121,7 +3123,7 @@ def create_app() -> FastAPI:
 
     @app.patch("/api/saved-runs/{run_id}")
     def patch_saved_run(run_id: str, body: SavedRunUpdate) -> dict:
-        with connect() as con:
+        with open_catalog() as con:
             record = runs_store.update_run(
                 con,
                 run_id,
@@ -3137,12 +3139,12 @@ def create_app() -> FastAPI:
     @app.get("/api/favorite-strategies")
     def favorite_strategies() -> list[dict]:
         """The persisted candidates for the weekly scheduler and dashboard."""
-        with connect() as con:
+        with open_catalog() as con:
             return runs_store.list_favorites(con)
 
     @app.delete("/api/saved-runs/{run_id}")
     def remove_saved_run(run_id: str) -> dict:
-        with connect() as con:
+        with open_catalog() as con:
             found = runs_store.delete_run(con, run_id)
         if not found:
             raise HTTPException(404, "saved run not found")
@@ -3188,7 +3190,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/stock-actions")
     def stock_action_suggestions() -> dict:
-        with connect(read_only=True) as con:
+        with open_catalog(read_only=True) as con:
             return stock_actions.review_snapshot(con)
 
     @app.post("/api/stock-actions/review")
@@ -3197,7 +3199,7 @@ def create_app() -> FastAPI:
             raise HTTPException(422, "Enter the new-share multiplier for a split or bonus.")
         if body.decision != "crash" and not (body.source_url or body.note):
             raise HTTPException(422, "Add a source URL or a note for the confirmed factor.")
-        with connect() as con:
+        with open_catalog() as con:
             baseline = con.execute(
                 "SELECT manual_review_after FROM stock_action_scan_state WHERE id=1"
             ).fetchone()

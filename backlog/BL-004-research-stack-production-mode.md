@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — the single biggest page-load win (5–10×) for daily local use, and cheap |
-| **Status** | Planned |
+| **Status** | Done (Phases 1–3, 2026-10-07) |
 | **Type** | improvement |
 | **Area** | infra (+ dashboard config) |
 | **Created** | 2026-10-05 |
 | **Depends on** | none. Related: BL-002 (on Vercel the dashboard is already a production build, so this is only about local use) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.12.15 |
 
 ## Context
 
@@ -90,13 +90,54 @@ with every Momentum page ready in ~1 s. A restart with no code changes skips the
 
 ## Open questions
 
-- Should `bun run start` itself switch to production mode, keeping a `start:dev` for UI
-  editing? Or should production stay opt-in?
-- Is a password prompt acceptable locally? The alternative is an explicit loopback-only
-  exception in the gate (bind `-H 127.0.0.1` plus a flag). That weakens a fail-closed control
-  and needs its own review.
+None left. Both were answered by the owner on 2026-10-07 (see Decisions).
+
+## Decisions (owner, 2026-10-07)
+
+- **Production stays opt-in.** `bun run start:prod` is new; `bun run start` stays `next dev`
+  (no default switch, no `start:dev`).
+- **A local password prompt is acceptable.** `start:prod` refuses to start without
+  `DASHBOARD_PASSWORD` (environment, or `apps/dashboard/.env.local` /
+  `.env.production.local`); the message names the file and `openssl rand -base64 24`.
+  `lib/accessGate.ts` is not weakened: no loopback exception.
+- **Bind to loopback.** `next start -H 127.0.0.1`. The same `-H 127.0.0.1` goes on the existing
+  `next dev` in `scripts/dev-stack.mjs`: a security audit found `next dev` listening on every
+  interface with no password while proxying `/api/scheduler/*`, so anyone on the same Wi-Fi
+  could start scheduler jobs.
 
 ## Log
 
 - 2026-10-05 — created from the Momentum UI performance review (2026-10-04 session).
 - 2026-10-06 — owner decisions on PR #27: keep it — not dropped, even with BL-002 coming.
+- 2026-10-07 — owner decisions recorded above; started and finished the same day.
+  - **Phase 1:** `scripts/dev-stack.mjs --prod` builds the dashboard into `.next-prod`
+    (`NEXT_DIST_DIR`, the one `next.config.ts` change) with `MOMENTUM_DIRECT=1 OBT_DIRECT=1
+    SCHEDULER_DIRECT=1` baked in, then runs `next start --port 5190 -H 127.0.0.1`. Root scripts
+    `start:prod` and `start:frontend:prod`; `--rebuild` forces a build, `--port <n>` serves on
+    another port. `.next-prod` is in `.gitignore`, Biome's ignore and the dashboard
+    `tsconfig.json` include. `next build` rewrites the tracked `next-env.d.ts` to point at its
+    distDir; the script puts the file back after the build. `next dev` now binds 127.0.0.1 too.
+  - **Phase 2:** `.next-prod/research-stack.json` records the newest mtime across
+    `apps/dashboard/{src,public}` (directories included, so a deleted file counts), the
+    dashboard config and `.env*` files, the root `bun.lock`, `package.json` and
+    `tsconfig.base.json`, plus the baked env (`*_DIRECT`, the direct origins,
+    `DASHBOARD_API_URL`, `NEXT_PUBLIC_*`). A restart with nothing changed was ready in 4.2 s
+    (target < 5 s).
+  - **Phase 3:** `technical.md` Essential Commands, `docs/remote-dashboard.md`,
+    `apps/dashboard/CLAUDE.md`.
+  - **Measured** (Playwright, fresh browser context and cache disabled per load, median of 3
+    interleaved runs, dev = the owner's long-running `next dev` on :5190, prod = this build on
+    :5191, same Python APIs). Page shell loaded / first API call started: Overview 4.7 s →
+    0.11 s, Momentum Backtest 3.5 s → 0.11 s, Scores 3.5 s → 0.14 s, Weekly signal 3.7 s →
+    0.12 s, Options Lab 4.9 s → 0.13 s. JavaScript per page 4.8–5.8 MB transferred /
+    20.5–23.6 MB decoded in dev against 437 KB / 1.4 MB built. `next build` First Load JS:
+    `/[[...slug]]` 441 kB (338 kB page + 103 kB shared), `/login` 106 kB, middleware 36.5 kB.
+  - **Goal not fully met: "every Momentum page ready in ≤ 1.5 s".** The production shell is
+    ready in ~0.1 s, but the pages' first wave of API calls still ends 17–20 s after
+    navigation, because the Momentum API itself took 18–40 s per catalog-backed call that
+    evening (`/api/momentum-scores` 40 s, `/api/stock-actions` 31 s, `/api/weekly/status`,
+    `/api/favorite-strategies`, `/api/saved-runs` ~18 s each, measured straight against
+    :8765). That is the shared-catalog lock / view binding that PRs #101 and #104 address, not
+    the dashboard. Dev was 22–59 s on the same measure. The machine was heavily loaded during
+    the build (load average ~20–28 from parallel sessions): the first `next build` took 39 min
+    there, which is not representative.

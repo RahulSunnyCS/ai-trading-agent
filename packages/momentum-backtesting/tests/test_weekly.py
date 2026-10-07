@@ -1,5 +1,6 @@
 """The weekly Friday job end to end, on generated prices with every network source faked."""
 
+import contextlib
 import json
 from datetime import datetime
 
@@ -124,13 +125,52 @@ def test_final_run_ranks_on_todays_closes_and_says_what_to_do(data_dir, sources)
 def test_a_final_run_saves_the_favourites_display_name_alongside_the_signal(data_dir, sources):
     """B6: a reader of momentum_signals shouldn't have to decode the engine's config label
     to know which favourite produced a saved signal."""
-    from trading_data.db import connect
+    from momentum_backtesting.db_read import open_catalog
 
-    with connect() as conn:
-        weekly.run_weekly("final", data_dir, now=FINAL_AT, conn=conn, display_name="ETF Core")
-        label = weekly.load_live_config().config.label
+    weekly.run_weekly(
+        "final", data_dir, now=FINAL_AT, catalog=open_catalog, display_name="ETF Core"
+    )
+    label = weekly.load_live_config().config.label
+    with open_catalog() as conn:
         saved = local_store.load_signal(conn, "2026-09-25", "final", label)
-        assert saved["display_name"] == "ETF Core"
+    assert saved["display_name"] == "ETF Core"
+
+
+def test_a_weekly_run_never_holds_the_catalog_while_it_refreshes_or_computes(
+    data_dir, sources, monkeypatch
+):
+    """The run refreshes prices over the network and backtests every favourite (minutes); the
+    catalog may be open only around each store, or `obt daily` / `tdata` time out on its lock."""
+    from momentum_backtesting.db_read import open_catalog
+
+    open_now = []
+
+    @contextlib.contextmanager
+    def tracked():
+        with open_catalog() as conn:
+            open_now.append(conn)
+            try:
+                yield conn
+            finally:
+                open_now.remove(conn)
+
+    seen = []
+    real_refresh, real_compute = weekly.refresh, weekly.compute_signal
+
+    def refresh(*args, **kwargs):
+        seen.append(("refresh", len(open_now)))
+        return real_refresh(*args, **kwargs)
+
+    def compute_signal(*args, **kwargs):
+        seen.append(("compute", len(open_now)))
+        return real_compute(*args, **kwargs)
+
+    monkeypatch.setattr(weekly, "refresh", refresh)
+    monkeypatch.setattr(weekly, "compute_signal", compute_signal)
+    outcomes = weekly.run_favorite_strategies("final", data_dir, now=FINAL_AT, catalog=tracked)
+
+    assert outcomes[0]["result"].signal is not None
+    assert seen == [("refresh", 0), ("compute", 0)]
 
 
 def test_preview_uses_live_prices_but_never_stores_them(data_dir, sources):
@@ -185,7 +225,9 @@ def test_favorite_strategies_share_one_refresh_and_only_etf_is_eligible(monkeypa
         return weekly.RunResult(Notification("test", "info", "ok", "body"), {"week": "2026-09-25"})
 
     monkeypatch.setattr(weekly, "run_weekly", fake_run_weekly)
-    outcomes = weekly.run_favorite_strategies("final", tmp_path, now=FINAL_AT, conn=object())
+    outcomes = weekly.run_favorite_strategies(
+        "final", tmp_path, now=FINAL_AT, catalog=lambda: contextlib.nullcontext(object())
+    )
 
     assert [outcome["name"] for outcome in outcomes] == ["ETF A", "ETF B", "Stocks"]
     assert seen_snapshots == [snapshot, snapshot]

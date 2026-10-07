@@ -6,11 +6,12 @@ import os
 import subprocess
 from pathlib import Path
 
+import duckdb
 import typer
 
 from . import derived, quality, reference, vendor
 from .backup import backup as run_backup
-from .db import LAKE_VIEWS, catalog_path, check_mounted, connect, data_root
+from .db import LAKE_VIEWS, catalog_path, check_mounted, connect, data_root, refresh_views
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 ref_app = typer.Typer(no_args_is_help=True, help="Lot sizes, strike steps, calendars, margins.")
@@ -38,7 +39,8 @@ def init() -> None:
     """Create the data root and catalog (or apply pending migrations). On a fresh
     catalog, also loads the reference data from the committed CSVs."""
     root = data_root()
-    with connect(root) as con:  # migrates, and loads reference data into a new catalog
+    # migrates, and loads reference data into a new catalog
+    with connect(root, views=()) as con:
         applied = [r[0] for r in con.execute("SELECT version FROM schema_migrations").fetchall()]
         counts = {
             t.table: con.execute(f"SELECT count(*) FROM {t.table}").fetchone()[0]
@@ -60,24 +62,29 @@ def status() -> None:
         f"size: catalog {_mb(catalog_path(root).stat().st_size)}, "
         f"lake {_mb(_size(root / 'lake'))}, raw {_mb(_size(root / 'raw'))}"
     )
-    with connect(root, read_only=True) as con:
+    # The lake's row counts scan every day file: an in-memory DuckDB over the Parquet, so the
+    # catalog is not locked meanwhile (other processes wait on it; see db.connect).
+    lake_db = duckdb.connect()
+    refresh_views(lake_db, root)
+    for view in LAKE_VIEWS:
+        n = lake_db.execute(f"SELECT count(*) FROM {view}").fetchone()[0]
+        if n == 0:
+            continue
+        # fetchall, not .df(): pandas/numpy are not dependencies of this package
+        has_date = "date" in [r[0] for r in lake_db.execute(f"DESCRIBE {view}").fetchall()]
+        if has_date:
+            days, lo, hi = lake_db.execute(
+                f"SELECT count(DISTINCT date), min(date), max(date) FROM {view}"
+            ).fetchone()
+            typer.echo(f"{view:<15} {n:>12,} rows over {days} days ({lo} .. {hi})")
+        else:
+            typer.echo(f"{view:<15} {n:>12,} rows")
+    lake_db.close()
+    with connect(root, read_only=True, views=()) as con:
         for asset, n in con.execute(
             "SELECT asset_class, count(*) FROM instruments GROUP BY 1 ORDER BY 1"
         ).fetchall():
             typer.echo(f"instruments: {asset:<8} {n:>8,}")
-        for view in LAKE_VIEWS:
-            n = con.execute(f"SELECT count(*) FROM {view}").fetchone()[0]
-            if n == 0:
-                continue
-            # fetchall, not .df(): pandas/numpy are not dependencies of this package
-            has_date = "date" in [r[0] for r in con.execute(f"DESCRIBE {view}").fetchall()]
-            if has_date:
-                days, lo, hi = con.execute(
-                    f"SELECT count(DISTINCT date), min(date), max(date) FROM {view}"
-                ).fetchone()
-                typer.echo(f"{view:<15} {n:>12,} rows over {days} days ({lo} .. {hi})")
-            else:
-                typer.echo(f"{view:<15} {n:>12,} rows")
         # Every other catalog table with rows in it — generic, so a new migration's
         # tables (e.g. momentum's companies/corporate_actions) show up with no
         # changes needed here.
@@ -109,7 +116,7 @@ def status() -> None:
 @ref_app.command("export")
 def reference_export() -> None:
     """Write the reference CSVs (read by market-reference and ReferenceData) from the catalog."""
-    with connect() as con:
+    with connect(views=()) as con:
         written = reference.export_csvs(con)
     typer.echo("\n".join(f"wrote {p}" for p in written) or "already in sync")
 
@@ -117,7 +124,7 @@ def reference_export() -> None:
 @ref_app.command("check")
 def reference_check() -> None:
     """Exit 1 if any reference CSV differs from the catalog (shows the diff)."""
-    with connect(read_only=True) as con:
+    with connect(read_only=True, views=()) as con:
         drift = reference.check(con)
         for name in drift:
             typer.echo(reference.diff_preview(con, name))
@@ -130,7 +137,7 @@ def reference_check() -> None:
 def reference_sql(statement: str) -> None:
     """Run one SQL statement against the catalog (e.g. an INSERT into ref_lot_sizes),
     then export the CSVs. The way to change reference data now that the catalog is master."""
-    with connect() as con:
+    with connect(views=()) as con:
         con.execute(statement)
         written = reference.export_csvs(con)
     typer.echo("\n".join(f"wrote {p}" for p in written) or "no CSV changed")
@@ -145,7 +152,7 @@ def reference_derive_expiries(
     """Rebuild ref_expiries' observed rows from the lake's option files, print any gap longer
     than the cadence allows (a missing expiry to add by hand), then export the CSVs."""
     names = tuple(underlying) if underlying else reference.EXPIRY_UNDERLYINGS
-    with connect() as con:
+    with connect(views=()) as con:
         counts = reference.derive_expiries(con, data_root(), names)
         gaps = reference.expiry_gaps(con, {"NIFTY": 8, "SENSEX": 9})
         written = reference.export_csvs(con)
@@ -259,7 +266,7 @@ def quality_export() -> None:
     """Rewrite the lock-free verdict file the legwise engine reads (quality.SNAPSHOT) from
     data_quality. Rebuilds and vendor imports do this themselves."""
     root = data_root()
-    with connect(root, read_only=True, lock_wait=300) as con:
+    with connect(root, read_only=True, lock_wait=300, views=()) as con:
         path = quality.export_snapshot(con, root)
     typer.echo(f"wrote {path}")
 
@@ -267,7 +274,7 @@ def quality_export() -> None:
 @quality_app.command("status")
 def quality_status() -> None:
     """Days, range and verdicts per (asset, name), with the reasons for exclusions."""
-    with connect(data_root(), read_only=True) as con:
+    with connect(data_root(), read_only=True, views=()) as con:
         if not con.execute(
             "SELECT count(*) FROM information_schema.tables WHERE table_name = 'data_quality'"
         ).fetchone()[0]:  # a catalog nothing has opened read-write since 008 was added

@@ -38,7 +38,10 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition
-  every bars_1m writer casts to (the Fyers collector imports them)
+  every bars_1m writer casts to (the Fyers collector imports them). `lake.write_parquet` refuses
+  a bars_1m file with any other schema: the 1-minute and derived views bind from the first file
+  without `union_by_name` (`db.FIXED_SCHEMA_VIEWS`), which would silently cast or drop a later
+  file's differing columns
 - `lake/derived/` — tables rebuilt from bars_1m by `tdata derived rebuild` (`derived.py`,
   BL-034 Phase 3; NIFTY and SENSEX by default): `chain_snapshots_5m` (per 5-minute window:
   ATM±10 strikes of every expiry within 45 days — OHLC, volume, OI, spot, VIX, DTE, implied
@@ -73,6 +76,20 @@ table instead.
   blocks other processes' readers. Use `connect()` as a short context manager — never
   hold it across a long download (see how `fyers/daily.py` opens it only to register
   and to finish the run).
+- **Never hold a catalog connection across a request or a long computation.** Open, query,
+  close: not app-lifetime or module-level, not across a network fetch, a backtest, a streamed
+  response or a generator's `yield`. Every other process (`obt daily`'s save, `tdata`) waits on
+  it and gives up after `lock_wait` (10 s). Heavy reads of lake data run on an in-memory DuckDB
+  over the Parquet instead (`refresh_views` works on any connection), with the catalog open only
+  to copy the small table they join (momentum's `db_read.stock_bars`). On 2026-10-07 `mbt serve`
+  broke this and `tdata` / `obt` timed out.
+- **`connect(views=...)` binds only the lake views a caller reads.** Binding runs with the
+  catalog locked: on the live lake all views took 21-33 s per connection before
+  `FIXED_SCHEMA_VIEWS`, ~1 s after (2026-10-07; timings in `db.py`). The default (None) still
+  binds all of them; a caller passes the ones it reads (momentum: `("bars_1d_stock",)`) or `()`.
+  Nothing in this package or `option-backtesting` reads a lake view through the catalog (the
+  readers open the Parquet directly; `tdata status` counts on an in-memory DuckDB), so every
+  `connect()` there passes `views=()`; a test in each package fails on one that does not.
 - **Migrations by filename**, like apps/server's runner: never edit an applied
   migration, add `NNN_name.sql`.
 - **No FOREIGN KEYs** (DuckDB checks them over-eagerly); relations are documented in
@@ -102,9 +119,10 @@ table instead.
   lock, which `mbt serve` can hold for hours. The legwise engine leaves out the days it lists
   (`legwise.market.backtest_days`; `--include-excluded` to keep them). Not backed up: regenerable.
 - **A derived 5-minute row is known at the window's END.** Row `bucket` T covers [T, T+5):
-  its `open` is the price at T exactly as the 1-minute engine sees it (that minute's open, or
-  the last earlier close); everything else is the window's, and IV/greeks/forward come from
-  its close. Nothing is carried past the last minute that has an index bar.
+  its `open` is its first minute's open (the last earlier close when that minute had no trade) —
+  the bar a stop's gap is checked against; the price AT T, which fills use, is the previous
+  window's close (`Series.price_at`, BL-009). Everything else is the window's, and
+  IV/greeks/forward come from its close. Nothing is carried past the last minute that has an index bar.
   `tests/test_derived.py::test_no_window_uses_later_bars` cuts a day short and requires every
   earlier window to be unchanged — keep it passing when changing `derived.py`, and bump
   `DERIVED_VERSION` with any formula or column change.

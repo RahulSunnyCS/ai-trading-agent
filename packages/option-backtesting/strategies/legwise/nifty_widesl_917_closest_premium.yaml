@@ -1,5 +1,7 @@
-# AlgoTest "Nifty_Widesl_917_closest premium" (export 2026-09-29). Same as
-# Widesl_917_OTM1 but strikes chosen by premium closest to ₹60, out at 15:25.
+# AlgoTest "Nifty_Widesl_917_closest premium" — per the owner's backtest PDF of 2026-10-07 (the
+# source of truth; the 2026-09-29 export had a ₹60 premium): sell CE + PE weekly, strike by
+# premium closest to ₹65, 09:17 -> 15:25, 115% SL per leg trailed 15/10 in POINTS, ₹2,500
+# overall max loss, partial square-off, slippage 0.
 strategy:
   id: nifty_widesl_917_closest_premium
   underlying: NIFTY
@@ -12,7 +14,7 @@ strategy:
       position: sell
       option_type: CE
       expiry: weekly
-      strike: { closest_premium: 60 }
+      strike: { closest_premium: 65 }
       stop_loss: { percent: 115 }
       trail_sl: { points: [15, 10] }
     - id: pe
@@ -20,7 +22,7 @@ strategy:
       position: sell
       option_type: PE
       expiry: weekly
-      strike: { closest_premium: 60 }
+      strike: { closest_premium: 65 }
       stop_loss: { percent: 115 }
       trail_sl: { points: [15, 10] }
   overall:

@@ -51,7 +51,7 @@ def test_unrunnable_days_are_skipped_not_fatal(monkeypatch, tmp_path):
             raise FileNotFoundError("no index file")
         return day
 
-    def simulate_day(strategy, data, reference):
+    def simulate_day(strategy, data, reference, sizing_date=None):
         if data == D1:
             raise MissingReferenceData("No lot_sizes row for NIFTY effective on or before …")
         return "ok"

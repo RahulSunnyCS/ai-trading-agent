@@ -89,7 +89,9 @@ Otherwise:
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
-  1-minute-bar assumption), `report.py`, `daily.py` (the `obt daily` runner), `store.py` (strategies, versions and
+  1-minute-bar assumption), `report.py`, `daily.py` (the evening run's steps), `evening.py` (`run_daily` — the ONE evening
+  routine, collect → `refresh_day` → run → summary/Telegram, called by both `obt daily` and the
+  dashboard's `POST /legwise/daily` job; add a step here, never in one caller), `store.py` (strategies, versions and
   results in the trading-data catalog — a version is a hash of the validated spec). Separate from `engine/` on purpose — see `DECISIONS.md`.
   Also `anatomy.py` (per-day, per-segment index shape — QUIET/CHOP/TREND from spot + India VIX, descriptive only: lag it a day before using it for anything actionable; `DTE_RELIABLE_FROM` guards a wrong pre-Sep-2025 expiry calendar) and `forensics.py` (one saved day re-simulated for the dashboard; `DayResult.mtm` is the per-minute curve, never persisted). `fyers/history.py` backfills index + VIX history (`obt fyers history`).
 - `notify.py` — Telegram sender (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID), a deliberate copy of

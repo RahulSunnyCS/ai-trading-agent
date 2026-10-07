@@ -41,32 +41,32 @@
       "id": "nifty_buy_range_breakout__2026_09_23",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
       },
       "summary": {
         "days": 1,
-        "gross": -62.56,
+        "gross": -61.75,
         "costs": 0.0,
-        "net": -62.56,
+        "net": -61.75,
         "win_days": 0,
-        "max_drawdown": -62.56,
+        "max_drawdown": -61.75,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -62.56,
+          "gross": -61.75,
           "costs": 0.0,
-          "net": -62.56,
+          "net": -61.75,
           "worst_mtm": -728.0,
           "best_mtm": 598.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "mtm_sha256": "86f2ddac6ebbeb13dd7f11c553296109126b783c801e55d640f1a1a11a52c52f",
           "trades": [
             {
               "leg": "pe",
@@ -96,9 +96,9 @@
               "entry_time": "10:18",
               "entry_price": 44.65,
               "exit_time": "12:48",
-              "exit_price": 53.4875,
+              "exit_price": 53.5,
               "exit_reason": "SL",
-              "pnl": 574.44
+              "pnl": 575.25
             }
           ]
         }
@@ -108,32 +108,32 @@
       "id": "nifty_buy_range_breakout__2026_09_24",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
       },
       "summary": {
         "days": 1,
-        "gross": -726.37,
+        "gross": -724.75,
         "costs": 0.0,
-        "net": -726.37,
+        "net": -724.75,
         "win_days": 0,
-        "max_drawdown": -726.37,
+        "max_drawdown": -724.75,
         "trades": 1
       },
       "days": [
         {
           "day": "2026-09-24",
-          "gross": -726.37,
+          "gross": -724.75,
           "costs": 0.0,
-          "net": -726.37,
-          "worst_mtm": -726.37,
+          "net": -724.75,
+          "worst_mtm": -724.75,
           "best_mtm": 182.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "mtm_sha256": "a27c00714bfd948e539cc2e1df3fba2bc2c74749d6b80b4481e3a7813590d429",
           "trades": [
             {
               "leg": "pe",
@@ -147,9 +147,9 @@
               "entry_time": "09:45",
               "entry_price": 64.7,
               "exit_time": "10:09",
-              "exit_price": 53.525,
+              "exit_price": 53.55,
               "exit_reason": "SL",
-              "pnl": -726.37
+              "pnl": -724.75
             }
           ]
         }
@@ -159,16 +159,16 @@
       "id": "nifty_buy_range_breakout__2026_09_25",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
       },
       "summary": {
         "days": 1,
-        "gross": 138.12,
+        "gross": 139.75,
         "costs": 0.0,
-        "net": 138.12,
+        "net": 139.75,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -176,15 +176,15 @@
       "days": [
         {
           "day": "2026-09-25",
-          "gross": 138.12,
+          "gross": 139.75,
           "costs": 0.0,
-          "net": 138.12,
-          "worst_mtm": -1311.38,
-          "best_mtm": 489.12,
+          "net": 139.75,
+          "worst_mtm": -1309.75,
+          "best_mtm": 490.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "mtm_sha256": "3a4120d09ec0e262a40da58f17b2179f290f029b98316c998c7f5a6f104377c3",
           "trades": [
             {
               "leg": "pe",
@@ -198,9 +198,9 @@
               "entry_time": "09:52",
               "entry_price": 66.9,
               "exit_time": "10:07",
-              "exit_price": 50.175,
+              "exit_price": 50.2,
               "exit_reason": "SL",
-              "pnl": -1087.12
+              "pnl": -1085.5
             },
             {
               "leg": "ce",
@@ -226,32 +226,32 @@
       "id": "nifty_buy_range_breakout__2026_09_28",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
       },
       "summary": {
         "days": 1,
-        "gross": -637.81,
+        "gross": -637.0,
         "costs": 0.0,
-        "net": -637.81,
+        "net": -637.0,
         "win_days": 0,
-        "max_drawdown": -637.81,
+        "max_drawdown": -637.0,
         "trades": 1
       },
       "days": [
         {
           "day": "2026-09-28",
-          "gross": -637.81,
+          "gross": -637.0,
           "costs": 0.0,
-          "net": -637.81,
-          "worst_mtm": -637.81,
+          "net": -637.0,
+          "worst_mtm": -637.0,
           "best_mtm": 500.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "650d5efe81ed967f920f75ba7f08dc48a9516d80435003bc0f18ccb2257ff67e",
+          "mtm_sha256": "154fff69908f43063ae4a4845ef090a9061cdbd1aa3ef1643d878e79a49ae6bf",
           "trades": [
             {
               "leg": "pe",
@@ -265,9 +265,9 @@
               "entry_time": "10:17",
               "entry_price": 79.25,
               "exit_time": "11:40",
-              "exit_price": 69.4375,
+              "exit_price": 69.45,
               "exit_reason": "SL",
-              "pnl": -637.81
+              "pnl": -637.0
             }
           ]
         }
@@ -277,16 +277,16 @@
       "id": "nifty_buy_range_breakout__2026_09_29",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
       },
       "summary": {
         "days": 1,
-        "gross": 1776.94,
+        "gross": 1777.75,
         "costs": 0.0,
-        "net": 1776.94,
+        "net": 1777.75,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 1
@@ -294,15 +294,15 @@
       "days": [
         {
           "day": "2026-09-29",
-          "gross": 1776.94,
+          "gross": 1777.75,
           "costs": 0.0,
-          "net": 1776.94,
+          "net": 1777.75,
           "worst_mtm": 0.0,
           "best_mtm": 2044.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "9963bdc3342977696c7e3e1099298b294bf22cc09156a5a29019479a49ea616c",
+          "mtm_sha256": "b05e43aab717cfedc6c74494ad1f1b0417cb3a1ab8fad641abfc84fd5f7b4ce8",
           "trades": [
             {
               "leg": "ce",
@@ -316,9 +316,9 @@
               "entry_time": "11:10",
               "entry_price": 58.65,
               "exit_time": "11:16",
-              "exit_price": 85.9875,
+              "exit_price": 86.0,
               "exit_reason": "SL",
-              "pnl": 1776.94
+              "pnl": 1777.75
             }
           ]
         }
@@ -328,16 +328,16 @@
       "id": "nifty_buy_range_breakout__2026_10_01",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 1,
-        "gross": 6464.25,
+        "gross": 6461.0,
         "costs": 0.0,
-        "net": 6464.25,
+        "net": 6461.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -345,15 +345,15 @@
       "days": [
         {
           "day": "2026-10-01",
-          "gross": 6464.25,
+          "gross": 6461.0,
           "costs": 0.0,
-          "net": 6464.25,
+          "net": 6461.0,
           "worst_mtm": -494.0,
-          "best_mtm": 7096.38,
+          "best_mtm": 7094.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "361b1a7ecca510b354a144eaeda3483046aa2b188d6c7500503a3d74b3bdc111",
+          "mtm_sha256": "a545f377475d7340d939354059096e9c4a93614441ee52bd0e5dc777b1694b5e",
           "trades": [
             {
               "leg": "ce",
@@ -367,9 +367,9 @@
               "entry_time": "09:49",
               "entry_price": 53.3,
               "exit_time": "10:13",
-              "exit_price": 48.975,
+              "exit_price": 48.95,
               "exit_reason": "SL",
-              "pnl": -281.13
+              "pnl": -282.75
             },
             {
               "leg": "pe",
@@ -383,9 +383,9 @@
               "entry_time": "12:10",
               "entry_price": 56.9,
               "exit_time": "12:59",
-              "exit_price": 160.675,
+              "exit_price": 160.65,
               "exit_reason": "SL",
-              "pnl": 6745.38
+              "pnl": 6743.75
             }
           ]
         }
@@ -395,32 +395,32 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_23",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
       },
       "summary": {
         "days": 1,
-        "gross": -594.85,
+        "gross": -591.5,
         "costs": 0.0,
-        "net": -594.85,
+        "net": -591.5,
         "win_days": 0,
-        "max_drawdown": -594.85,
+        "max_drawdown": -591.5,
         "trades": 3
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -594.85,
+          "gross": -591.5,
           "costs": 0.0,
-          "net": -594.85,
-          "worst_mtm": -1215.6,
+          "net": -591.5,
+          "worst_mtm": -1199.25,
           "best_mtm": 663.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "47da2dc89324cbcbbd649cc30badde5dabf7edaf85314162bfeb7bc15a11856a",
+          "mtm_sha256": "6e55f16537d5360bbe2f574359b2644584b87c54879531991769ce76b2ecc95d",
           "trades": [
             {
               "leg": "ce",
@@ -432,11 +432,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 162.15,
+              "entry_price": 161.95,
               "exit_time": "12:06",
-              "exit_price": 196.2015,
+              "exit_price": 195.95,
               "exit_reason": "SL",
-              "pnl": -2213.35
+              "pnl": -2210.0
             },
             {
               "leg": "pe",
@@ -448,11 +448,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 134.85,
+              "entry_price": 135.05,
               "exit_time": "15:28",
-              "exit_price": 104.05,
+              "exit_price": 103.75,
               "exit_reason": "EXIT_TIME",
-              "pnl": 2002.0
+              "pnl": 2034.5
             },
             {
               "leg": "ce",
@@ -463,12 +463,12 @@
                 "strike": 23350.0,
                 "option_type": "CE"
               },
-              "entry_time": "14:48",
-              "entry_price": 162.0,
+              "entry_time": "14:58",
+              "entry_price": 161.95,
               "exit_time": "15:28",
-              "exit_price": 167.9,
+              "exit_price": 168.35,
               "exit_reason": "EXIT_TIME",
-              "pnl": -383.5
+              "pnl": -416.0
             }
           ]
         }
@@ -478,32 +478,32 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_24",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
       },
       "summary": {
         "days": 1,
-        "gross": 2467.4,
+        "gross": 663.0,
         "costs": 0.0,
-        "net": 2467.4,
+        "net": 663.0,
         "win_days": 1,
         "max_drawdown": 0.0,
-        "trades": 2
+        "trades": 3
       },
       "days": [
         {
           "day": "2026-09-24",
-          "gross": 2467.4,
+          "gross": 663.0,
           "costs": 0.0,
-          "net": 2467.4,
-          "worst_mtm": -1458.6,
-          "best_mtm": 2542.15,
+          "net": 663.0,
+          "worst_mtm": -2271.75,
+          "best_mtm": 757.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "9d6a174405ead83e3784d789fbafc3b673ebb443c543671f7d35c0ec35342d06",
+          "mtm_sha256": "46191910239216e4cc6774be74c9a89cdc5eb152232f6f98521d122a4760b97e",
           "trades": [
             {
               "leg": "ce",
@@ -515,11 +515,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 150.65,
+              "entry_price": 150.6,
               "exit_time": "15:28",
-              "exit_price": 85.6,
+              "exit_price": 85.9,
               "exit_reason": "EXIT_TIME",
-              "pnl": 4228.25
+              "pnl": 4205.5
             },
             {
               "leg": "pe",
@@ -531,11 +531,27 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 129.0,
-              "exit_time": "09:47",
-              "exit_price": 156.09,
+              "entry_price": 129.75,
+              "exit_time": "09:48",
+              "exit_price": 157.0,
               "exit_reason": "SL",
-              "pnl": -1760.85
+              "pnl": -1771.25
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "PE"
+              },
+              "entry_time": "10:55",
+              "entry_price": 129.75,
+              "exit_time": "11:32",
+              "exit_price": 157.0,
+              "exit_reason": "SL",
+              "pnl": -1771.25
             }
           ]
         }
@@ -545,32 +561,32 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_25",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
       },
       "summary": {
         "days": 1,
-        "gross": -3124.74,
+        "gross": -3051.75,
         "costs": 0.0,
-        "net": -3124.74,
+        "net": -3051.75,
         "win_days": 0,
-        "max_drawdown": -3124.74,
+        "max_drawdown": -3051.75,
         "trades": 3
       },
       "days": [
         {
           "day": "2026-09-25",
-          "gross": -3124.74,
+          "gross": -3051.75,
           "costs": 0.0,
-          "net": -3124.74,
-          "worst_mtm": -3124.74,
-          "best_mtm": 29.25,
+          "net": -3051.75,
+          "worst_mtm": -3051.75,
+          "best_mtm": 68.25,
           "stopped_by": "overall SL at 11:17",
           "notes": [],
           "mtm_points": 114,
-          "mtm_sha256": "06a44ff0406ee0eef5644f6af06fa72fdc311373b8d90851c30a29ab12bec053",
+          "mtm_sha256": "fb83e2842781782ecab4502cb17ed978a6d30026418dce658fda020b68949c66",
           "trades": [
             {
               "leg": "ce",
@@ -582,11 +598,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 162.0,
+              "entry_price": 162.9,
               "exit_time": "11:17",
               "exit_price": 160.45,
               "exit_reason": "OVERALL_SL",
-              "pnl": 100.75
+              "pnl": 159.25
             },
             {
               "leg": "pe",
@@ -598,11 +614,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 118.15,
+              "entry_price": 117.7,
               "exit_time": "09:42",
-              "exit_price": 142.9615,
+              "exit_price": 142.4,
               "exit_reason": "SL",
-              "pnl": -1612.75
+              "pnl": -1605.5
             },
             {
               "leg": "pe",
@@ -614,11 +630,11 @@
                 "option_type": "PE"
               },
               "entry_time": "10:08",
-              "entry_price": 118.15,
+              "entry_price": 117.7,
               "exit_time": "10:47",
-              "exit_price": 142.9615,
+              "exit_price": 142.4,
               "exit_reason": "SL",
-              "pnl": -1612.75
+              "pnl": -1605.5
             }
           ]
         }
@@ -628,16 +644,16 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_28",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
       },
       "summary": {
         "days": 1,
-        "gross": 3989.54,
+        "gross": 5382.0,
         "costs": 0.0,
-        "net": 3989.54,
+        "net": 5382.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -645,15 +661,15 @@
       "days": [
         {
           "day": "2026-09-28",
-          "gross": 3989.54,
+          "gross": 5382.0,
           "costs": 0.0,
-          "net": 3989.54,
-          "worst_mtm": -342.71,
-          "best_mtm": 4113.04,
+          "net": 5382.0,
+          "worst_mtm": 0.0,
+          "best_mtm": 5544.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "4db30a1fa564ce4dd766e1ec3496f669ef0f2b4716e21076acfbd73869535cc1",
+          "mtm_sha256": "6a9286510bcbecbdc4ccfb6c90ec385ed52932bc5d5f7e69ee6d0a2e9afc557f",
           "trades": [
             {
               "leg": "ce",
@@ -661,15 +677,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 22900.0,
+                "strike": 22850.0,
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 124.2,
+              "entry_price": 157.95,
               "exit_time": "15:28",
-              "exit_price": 40.3,
+              "exit_price": 57.9,
               "exit_reason": "EXIT_TIME",
-              "pnl": 5453.5
+              "pnl": 6503.25
             },
             {
               "leg": "pe",
@@ -677,15 +693,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23000.0,
+                "strike": 22950.0,
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 107.25,
+              "entry_price": 82.25,
               "exit_time": "09:33",
-              "exit_price": 129.7725,
+              "exit_price": 99.5,
               "exit_reason": "SL",
-              "pnl": -1463.96
+              "pnl": -1121.25
             }
           ]
         }
@@ -695,32 +711,32 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_09_29",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
       },
       "summary": {
         "days": 1,
-        "gross": -3622.48,
+        "gross": -3571.75,
         "costs": 0.0,
-        "net": -3622.48,
+        "net": -3571.75,
         "win_days": 0,
-        "max_drawdown": -3622.48,
+        "max_drawdown": -3571.75,
         "trades": 4
       },
       "days": [
         {
           "day": "2026-09-29",
-          "gross": -3622.48,
+          "gross": -3571.75,
           "costs": 0.0,
-          "net": -3622.48,
-          "worst_mtm": -3622.48,
-          "best_mtm": 3118.99,
+          "net": -3571.75,
+          "worst_mtm": -3571.75,
+          "best_mtm": 3185.0,
           "stopped_by": "overall SL at 12:41",
           "notes": [],
           "mtm_points": 198,
-          "mtm_sha256": "ed978cb128607a8db2ffb028b629cbadfaf89b20dfe59603392ab4ee94b9d713",
+          "mtm_sha256": "5c5781b9019f15a2bcf7a08a2f9a191823c0cc23d731f7c24e19e9a12a167da0",
           "trades": [
             {
               "leg": "ce",
@@ -732,11 +748,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 115.95,
+              "entry_price": 117.0,
               "exit_time": "11:30",
-              "exit_price": 140.2995,
+              "exit_price": 141.55,
               "exit_reason": "SL",
-              "pnl": -1582.72
+              "pnl": -1595.75
             },
             {
               "leg": "pe",
@@ -748,11 +764,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 70.55,
+              "entry_price": 70.7,
               "exit_time": "09:27",
-              "exit_price": 85.3655,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -963.01
+              "pnl": -965.25
             },
             {
               "leg": "pe",
@@ -764,11 +780,11 @@
                 "option_type": "PE"
               },
               "entry_time": "11:11",
-              "entry_price": 70.55,
+              "entry_price": 70.7,
               "exit_time": "12:32",
-              "exit_price": 85.3655,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -963.01
+              "pnl": -965.25
             },
             {
               "leg": "ce",
@@ -780,11 +796,11 @@
                 "option_type": "CE"
               },
               "entry_time": "12:27",
-              "entry_price": 115.95,
+              "entry_price": 117.0,
               "exit_time": "12:41",
               "exit_price": 117.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": -113.75
+              "pnl": -45.5
             }
           ]
         }
@@ -794,32 +810,32 @@
       "id": "nifty_dir_924_itm1_sl21_recost__2026_10_01",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 1,
-        "gross": -351.36,
+        "gross": -360.75,
         "costs": 0.0,
-        "net": -351.36,
+        "net": -360.75,
         "win_days": 0,
-        "max_drawdown": -351.36,
+        "max_drawdown": -360.75,
         "trades": 3
       },
       "days": [
         {
           "day": "2026-10-01",
-          "gross": -351.36,
+          "gross": -360.75,
           "costs": 0.0,
-          "net": -351.36,
-          "worst_mtm": -2669.26,
-          "best_mtm": 2992.89,
+          "net": -360.75,
+          "worst_mtm": -2629.25,
+          "best_mtm": 3003.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "f7ff5bd80a9f8b54cf28cce189e9a6176c018d97297cb64da1f32f385072b232",
+          "mtm_sha256": "cf0763737c6ac3fe90eb6ff584282c57eeed7053adae616a43373cb2d9de5903",
           "trades": [
             {
               "leg": "ce",
@@ -831,11 +847,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 190.55,
+              "entry_price": 190.8,
               "exit_time": "10:01",
-              "exit_price": 230.5655,
+              "exit_price": 230.85,
               "exit_reason": "SL",
-              "pnl": -2601.01
+              "pnl": -2603.25
             },
             {
               "leg": "pe",
@@ -847,11 +863,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 129.0,
-              "exit_time": "12:23",
-              "exit_price": 156.09,
+              "entry_price": 129.4,
+              "exit_time": "12:24",
+              "exit_price": 156.55,
               "exit_reason": "SL",
-              "pnl": -1760.85
+              "pnl": -1764.75
             },
             {
               "leg": "ce",
@@ -863,11 +879,11 @@
                 "option_type": "CE"
               },
               "entry_time": "11:23",
-              "entry_price": 190.55,
+              "entry_price": 190.8,
               "exit_time": "15:28",
-              "exit_price": 128.85,
+              "exit_price": 129.15,
               "exit_reason": "EXIT_TIME",
-              "pnl": 4010.5
+              "pnl": 4007.25
             }
           ]
         }
@@ -877,16 +893,16 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_23",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
       },
       "summary": {
         "days": 1,
-        "gross": 1134.25,
+        "gross": 962.0,
         "costs": 0.0,
-        "net": 1134.25,
+        "net": 962.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -894,15 +910,15 @@
       "days": [
         {
           "day": "2026-09-23",
-          "gross": 1134.25,
+          "gross": 962.0,
           "costs": 0.0,
-          "net": 1134.25,
-          "worst_mtm": -393.25,
-          "best_mtm": 1222.0,
+          "net": 962.0,
+          "worst_mtm": -747.5,
+          "best_mtm": 1069.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 368,
-          "mtm_sha256": "fe9b9a20ac2560ed6ee928e3a3c25f827b166180ec2527a27f2d50664ccf6188",
+          "mtm_sha256": "ab16989da5ea14794f861e7994c2b635da094986ef88771612446ef2dbc99479",
           "trades": [
             {
               "leg": "ce",
@@ -910,15 +926,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23550.0,
+                "strike": 23500.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 54.35,
+              "entry_price": 71.75,
               "exit_time": "15:25",
-              "exit_price": 61.85,
+              "exit_price": 82.4,
               "exit_reason": "EXIT_TIME",
-              "pnl": -487.5
+              "pnl": -692.25
             },
             {
               "leg": "pe",
@@ -930,11 +946,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 66.15,
+              "entry_price": 66.55,
               "exit_time": "15:25",
-              "exit_price": 41.2,
+              "exit_price": 41.1,
               "exit_reason": "EXIT_TIME",
-              "pnl": 1621.75
+              "pnl": 1654.25
             }
           ]
         }
@@ -944,32 +960,32 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_24",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
       },
       "summary": {
         "days": 1,
-        "gross": -2609.75,
+        "gross": -2590.25,
         "costs": 0.0,
-        "net": -2609.75,
+        "net": -2590.25,
         "win_days": 0,
-        "max_drawdown": -2609.75,
+        "max_drawdown": -2590.25,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-24",
-          "gross": -2609.75,
+          "gross": -2590.25,
           "costs": 0.0,
-          "net": -2609.75,
-          "worst_mtm": -2609.75,
+          "net": -2590.25,
+          "worst_mtm": -2590.25,
           "best_mtm": 0.0,
-          "stopped_by": "overall SL at 13:26",
+          "stopped_by": "overall SL at 13:42",
           "notes": [],
-          "mtm_points": 250,
-          "mtm_sha256": "3fcf74e043a07e7029c775fcaa0b8e0573c64f0508b53fe6a3591753494562b7",
+          "mtm_points": 266,
+          "mtm_sha256": "608e48bddbc295bb106ce8caaebe0f80221399c96d580d6617ac99fba78b649e",
           "trades": [
             {
               "leg": "ce",
@@ -977,15 +993,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23400.0,
+                "strike": 23350.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 52.7,
-              "exit_time": "13:26",
-              "exit_price": 38.3,
+              "entry_price": 70.5,
+              "exit_time": "13:42",
+              "exit_price": 49.35,
               "exit_reason": "OVERALL_SL",
-              "pnl": 936.0
+              "pnl": 1374.75
             },
             {
               "leg": "pe",
@@ -997,11 +1013,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 66.2,
-              "exit_time": "13:26",
-              "exit_price": 120.75,
+              "entry_price": 66.0,
+              "exit_time": "13:42",
+              "exit_price": 127.0,
               "exit_reason": "OVERALL_SL",
-              "pnl": -3545.75
+              "pnl": -3965.0
             }
           ]
         }
@@ -1011,16 +1027,16 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_25",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
       },
       "summary": {
         "days": 1,
-        "gross": 1647.75,
+        "gross": 1719.25,
         "costs": 0.0,
-        "net": 1647.75,
+        "net": 1719.25,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -1028,15 +1044,15 @@
       "days": [
         {
           "day": "2026-09-25",
-          "gross": 1647.75,
+          "gross": 1719.25,
           "costs": 0.0,
-          "net": 1647.75,
-          "worst_mtm": -510.25,
-          "best_mtm": 1742.0,
+          "net": 1719.25,
+          "worst_mtm": -451.75,
+          "best_mtm": 1800.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 368,
-          "mtm_sha256": "acec446c2c6708eb9bea4116e284d0dccb01aaeb3ba9a07912c0e1ed0aa5bf77",
+          "mtm_sha256": "da6c10a71ee9e864dcc17fe786ac01448d6c018d9c2286836fd7ab7443834588",
           "trades": [
             {
               "leg": "ce",
@@ -1048,11 +1064,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 65.9,
+              "entry_price": 65.75,
               "exit_time": "15:25",
-              "exit_price": 66.65,
+              "exit_price": 66.7,
               "exit_reason": "EXIT_TIME",
-              "pnl": -48.75
+              "pnl": -61.75
             },
             {
               "leg": "pe",
@@ -1064,11 +1080,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 59.55,
+              "entry_price": 60.6,
               "exit_time": "15:25",
-              "exit_price": 33.45,
+              "exit_price": 33.2,
               "exit_reason": "EXIT_TIME",
-              "pnl": 1696.5
+              "pnl": 1781.0
             }
           ]
         }
@@ -1078,32 +1094,32 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_28",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
       },
       "summary": {
         "days": 1,
-        "gross": -736.94,
+        "gross": -2600.0,
         "costs": 0.0,
-        "net": -736.94,
+        "net": -2600.0,
         "win_days": 0,
-        "max_drawdown": -736.94,
+        "max_drawdown": -2600.0,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-28",
-          "gross": -736.94,
+          "gross": -2600.0,
           "costs": 0.0,
-          "net": -736.94,
-          "worst_mtm": -2017.44,
-          "best_mtm": 354.25,
-          "stopped_by": null,
+          "net": -2600.0,
+          "worst_mtm": -2600.0,
+          "best_mtm": 364.0,
+          "stopped_by": "overall SL at 10:41",
           "notes": [],
-          "mtm_points": 368,
-          "mtm_sha256": "c923a6c50a80b0f65e9702eb1a5bc85ae7df841a867c469cf3fc6ea0fd5f798e",
+          "mtm_points": 85,
+          "mtm_sha256": "ec30550bed85a44260072f761948b67237c0f7eb765894b983f436ce4bbe3c3e",
           "trades": [
             {
               "leg": "ce",
@@ -1115,11 +1131,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 62.1,
-              "exit_time": "15:25",
-              "exit_price": 14.5,
-              "exit_reason": "EXIT_TIME",
-              "pnl": 3094.0
+              "entry_price": 63.25,
+              "exit_time": "10:41",
+              "exit_price": 30.35,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 2138.5
             },
             {
               "leg": "pe",
@@ -1127,15 +1143,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 22900.0,
+                "strike": 22950.0,
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 51.25,
+              "entry_price": 68.8,
               "exit_time": "10:41",
-              "exit_price": 110.1875,
-              "exit_reason": "SL",
-              "pnl": -3830.94
+              "exit_price": 141.7,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -4738.5
             }
           ]
         }
@@ -1145,32 +1161,32 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_29",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
       },
       "summary": {
         "days": 1,
-        "gross": -2764.12,
+        "gross": -2619.5,
         "costs": 0.0,
-        "net": -2764.12,
+        "net": -2619.5,
         "win_days": 0,
-        "max_drawdown": -2764.12,
+        "max_drawdown": -2619.5,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-29",
-          "gross": -2764.12,
+          "gross": -2619.5,
           "costs": 0.0,
-          "net": -2764.12,
-          "worst_mtm": -2764.12,
-          "best_mtm": 29.25,
+          "net": -2619.5,
+          "worst_mtm": -2619.5,
+          "best_mtm": 48.75,
           "stopped_by": "overall SL at 11:12",
           "notes": [],
           "mtm_points": 116,
-          "mtm_sha256": "10e9afa534828d7300c3cb361dddfb2655bbc20a4eb363a0f5d040aa083324a7",
+          "mtm_sha256": "2b96484beffbc090d6aaf6604b5d502fe42d580c469c3bbf3fc215969a887cda",
           "trades": [
             {
               "leg": "ce",
@@ -1182,11 +1198,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 51.65,
+              "entry_price": 52.85,
               "exit_time": "11:12",
               "exit_price": 30.35,
               "exit_reason": "OVERALL_SL",
-              "pnl": 1384.5
+              "pnl": 1462.5
             },
             {
               "leg": "pe",
@@ -1198,11 +1214,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 55.5,
+              "entry_price": 54.6,
               "exit_time": "09:35",
-              "exit_price": 119.325,
+              "exit_price": 117.4,
               "exit_reason": "SL",
-              "pnl": -4148.62
+              "pnl": -4082.0
             }
           ]
         }
@@ -1212,32 +1228,32 @@
       "id": "nifty_widesl_917_closest_premium__2026_10_01",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 1,
-        "gross": -2800.85,
+        "gross": -2700.75,
         "costs": 0.0,
-        "net": -2800.85,
+        "net": -2700.75,
         "win_days": 0,
-        "max_drawdown": -2800.85,
+        "max_drawdown": -2700.75,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-10-01",
-          "gross": -2800.85,
+          "gross": -2700.75,
           "costs": 0.0,
-          "net": -2800.85,
-          "worst_mtm": -2800.85,
-          "best_mtm": 591.5,
-          "stopped_by": "overall SL at 12:46",
+          "net": -2700.75,
+          "worst_mtm": -2700.75,
+          "best_mtm": 627.25,
+          "stopped_by": "overall SL at 12:45",
           "notes": [],
-          "mtm_points": 210,
-          "mtm_sha256": "a7a6a78caabe8b23402dbbd992dc74c02575a1caa7a48925b439cce596883e98",
+          "mtm_points": 209,
+          "mtm_sha256": "8b6f90d0f815198fee2fefa96e16a67d91e806e873aad4cf27ba54d848bb0873",
           "trades": [
             {
               "leg": "ce",
@@ -1245,15 +1261,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-10-06",
-                "strike": 22800.0,
+                "strike": 22750.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 53.3,
-              "exit_time": "12:46",
-              "exit_price": 30.15,
+              "entry_price": 67.55,
+              "exit_time": "12:45",
+              "exit_price": 35.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": 1504.75
+              "pnl": 2070.25
             },
             {
               "leg": "pe",
@@ -1261,15 +1277,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-10-06",
-                "strike": 22400.0,
+                "strike": 22450.0,
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 57.6,
-              "exit_time": "12:46",
-              "exit_price": 123.84,
-              "exit_reason": "SL",
-              "pnl": -4305.6
+              "entry_price": 70.8,
+              "exit_time": "12:45",
+              "exit_price": 144.2,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -4771.0
             }
           ]
         }
@@ -1279,16 +1295,16 @@
       "id": "nifty_widesl_917_otm1__2026_09_23",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
       },
       "summary": {
         "days": 1,
-        "gross": 786.5,
+        "gross": 822.25,
         "costs": 0.0,
-        "net": 786.5,
+        "net": 822.25,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -1296,15 +1312,15 @@
       "days": [
         {
           "day": "2026-09-23",
-          "gross": 786.5,
+          "gross": 822.25,
           "costs": 0.0,
-          "net": 786.5,
-          "worst_mtm": -1228.5,
-          "best_mtm": 906.75,
+          "net": 822.25,
+          "worst_mtm": -1179.75,
+          "best_mtm": 955.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 371,
-          "mtm_sha256": "92fc14d7d2940a35d0a8df1b36402e5daf34af1e27daa553e593738d1ce79a4a",
+          "mtm_sha256": "1180d6d6da3d51c94bf49d9f64180942abd644a105189df6317059de1245a89e",
           "trades": [
             {
               "leg": "ce",
@@ -1316,9 +1332,9 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 116.45,
+              "entry_price": 116.65,
               "exit_time": "15:28",
-              "exit_price": 135.15,
+              "exit_price": 135.35,
               "exit_reason": "EXIT_TIME",
               "pnl": -1215.5
             },
@@ -1332,11 +1348,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 82.6,
+              "entry_price": 83.15,
               "exit_time": "15:28",
               "exit_price": 51.8,
               "exit_reason": "EXIT_TIME",
-              "pnl": 2002.0
+              "pnl": 2037.75
             }
           ]
         }
@@ -1346,32 +1362,32 @@
       "id": "nifty_widesl_917_otm1__2026_09_24",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
       },
       "summary": {
         "days": 1,
-        "gross": -2596.75,
+        "gross": -2655.25,
         "costs": 0.0,
-        "net": -2596.75,
+        "net": -2655.25,
         "win_days": 0,
-        "max_drawdown": -2596.75,
+        "max_drawdown": -2655.25,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-24",
-          "gross": -2596.75,
+          "gross": -2655.25,
           "costs": 0.0,
-          "net": -2596.75,
-          "worst_mtm": -2596.75,
-          "best_mtm": 81.25,
+          "net": -2655.25,
+          "worst_mtm": -2655.25,
+          "best_mtm": 22.75,
           "stopped_by": "overall SL at 13:42",
           "notes": [],
           "mtm_points": 266,
-          "mtm_sha256": "fdce0e153fa96ba02132251c3171b9c3f91510a12886a8356d18a9eac3568fbf",
+          "mtm_sha256": "27e2952be94bc0879e63df18a6d74c465cf7d3b4b07204c8d73f73114499e1c9",
           "trades": [
             {
               "leg": "ce",
@@ -1383,11 +1399,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 92.8,
+              "entry_price": 92.25,
               "exit_time": "13:42",
               "exit_price": 64.0,
               "exit_reason": "OVERALL_SL",
-              "pnl": 1872.0
+              "pnl": 1836.25
             },
             {
               "leg": "pe",
@@ -1399,11 +1415,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 83.85,
+              "entry_price": 83.5,
               "exit_time": "13:42",
               "exit_price": 152.6,
               "exit_reason": "OVERALL_SL",
-              "pnl": -4468.75
+              "pnl": -4491.5
             }
           ]
         }
@@ -1413,16 +1429,16 @@
       "id": "nifty_widesl_917_otm1__2026_09_25",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
       },
       "summary": {
         "days": 1,
-        "gross": 1625.0,
+        "gross": 1556.75,
         "costs": 0.0,
-        "net": 1625.0,
+        "net": 1556.75,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -1430,15 +1446,15 @@
       "days": [
         {
           "day": "2026-09-25",
-          "gross": 1625.0,
+          "gross": 1556.75,
           "costs": 0.0,
-          "net": 1625.0,
-          "worst_mtm": -650.0,
-          "best_mtm": 1738.75,
+          "net": 1556.75,
+          "worst_mtm": -656.5,
+          "best_mtm": 1732.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 371,
-          "mtm_sha256": "986ce54ec9db674d13e784fec9a55a3ddf0d965d9bd8c127f39d9e493f962c1f",
+          "mtm_sha256": "857eb46515018df42f26cc416ae37198e9a1ad2af5212c8b38a0e1895f4e1a70",
           "trades": [
             {
               "leg": "ce",
@@ -1450,11 +1466,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 109.55,
+              "entry_price": 109.3,
               "exit_time": "15:28",
-              "exit_price": 116.4,
+              "exit_price": 117.5,
               "exit_reason": "EXIT_TIME",
-              "pnl": -445.25
+              "pnl": -533.0
             },
             {
               "leg": "pe",
@@ -1466,11 +1482,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 75.6,
+              "entry_price": 75.75,
               "exit_time": "15:28",
-              "exit_price": 43.75,
+              "exit_price": 43.6,
               "exit_reason": "EXIT_TIME",
-              "pnl": 2070.25
+              "pnl": 2089.75
             }
           ]
         }
@@ -1480,16 +1496,16 @@
       "id": "nifty_widesl_917_otm1__2026_09_28",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
       },
       "summary": {
         "days": 1,
-        "gross": 394.06,
+        "gross": 507.0,
         "costs": 0.0,
-        "net": 394.06,
+        "net": 507.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -1497,15 +1513,15 @@
       "days": [
         {
           "day": "2026-09-28",
-          "gross": 394.06,
+          "gross": 507.0,
           "costs": 0.0,
-          "net": 394.06,
-          "worst_mtm": -1380.44,
-          "best_mtm": 429.81,
+          "net": 507.0,
+          "worst_mtm": -1261.0,
+          "best_mtm": 549.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 371,
-          "mtm_sha256": "c8754aa57dd9ef10744fc1b3511eaa8bce71ca1ed5e18e20d7509a6442f6601b",
+          "mtm_sha256": "e3599739a0de60347a6f3b1a4b32960f2c3243b94ea931d3f4f10ee289a2646a",
           "trades": [
             {
               "leg": "ce",
@@ -1517,11 +1533,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 84.85,
+              "entry_price": 86.25,
               "exit_time": "15:28",
-              "exit_price": 19.85,
+              "exit_price": 19.95,
               "exit_reason": "EXIT_TIME",
-              "pnl": 4225.0
+              "pnl": 4309.5
             },
             {
               "leg": "pe",
@@ -1533,11 +1549,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 51.25,
+              "entry_price": 50.85,
               "exit_time": "10:41",
-              "exit_price": 110.1875,
+              "exit_price": 109.35,
               "exit_reason": "SL",
-              "pnl": -3830.94
+              "pnl": -3802.5
             }
           ]
         }
@@ -1547,32 +1563,32 @@
       "id": "nifty_widesl_917_otm1__2026_09_29",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
       },
       "summary": {
         "days": 1,
-        "gross": -2918.99,
+        "gross": -2827.5,
         "costs": 0.0,
-        "net": -2918.99,
+        "net": -2827.5,
         "win_days": 0,
-        "max_drawdown": -2918.99,
+        "max_drawdown": -2827.5,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-29",
-          "gross": -2918.99,
+          "gross": -2827.5,
           "costs": 0.0,
-          "net": -2918.99,
-          "worst_mtm": -2918.99,
-          "best_mtm": 276.25,
+          "net": -2827.5,
+          "worst_mtm": -2827.5,
+          "best_mtm": 341.25,
           "stopped_by": "overall SL at 11:30",
           "notes": [],
           "mtm_points": 134,
-          "mtm_sha256": "428612dd3752b2556ca4ec24b54250db5c24b0040b36c5f2eb21169140180277",
+          "mtm_sha256": "c7d4178828ede669ad3d5a6290bbfe6d7549627ebe98228d79489ae0b93244e4",
           "trades": [
             {
               "leg": "ce",
@@ -1584,11 +1600,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 51.65,
+              "entry_price": 52.85,
               "exit_time": "11:30",
               "exit_price": 55.1,
               "exit_reason": "OVERALL_SL",
-              "pnl": -224.25
+              "pnl": -146.25
             },
             {
               "leg": "pe",
@@ -1600,11 +1616,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 36.05,
+              "entry_price": 35.85,
               "exit_time": "09:32",
-              "exit_price": 77.5075,
+              "exit_price": 77.1,
               "exit_reason": "SL",
-              "pnl": -2694.74
+              "pnl": -2681.25
             }
           ]
         }
@@ -1614,32 +1630,32 @@
       "id": "nifty_widesl_917_otm1__2026_10_01",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 1,
-        "gross": -2912.0,
+        "gross": -2853.5,
         "costs": 0.0,
-        "net": -2912.0,
+        "net": -2853.5,
         "win_days": 0,
-        "max_drawdown": -2912.0,
+        "max_drawdown": -2853.5,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-10-01",
-          "gross": -2912.0,
+          "gross": -2853.5,
           "costs": 0.0,
-          "net": -2912.0,
-          "worst_mtm": -2912.0,
-          "best_mtm": 705.25,
+          "net": -2853.5,
+          "worst_mtm": -2853.5,
+          "best_mtm": 763.75,
           "stopped_by": "overall SL at 12:45",
           "notes": [],
           "mtm_points": 209,
-          "mtm_sha256": "ef0f92a11fd5cdf826078e73d4c67bedd2458a657d0ec45a704a502e4d3f2185",
+          "mtm_sha256": "604b08af8dd446f98b8956be52a8af22d38e871782059e03bf67b511f2572215",
           "trades": [
             {
               "leg": "ce",
@@ -1651,11 +1667,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 106.2,
+              "entry_price": 107.5,
               "exit_time": "12:45",
               "exit_price": 54.45,
               "exit_reason": "OVERALL_SL",
-              "pnl": 3363.75
+              "pnl": 3448.25
             },
             {
               "leg": "pe",
@@ -1667,11 +1683,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 106.15,
+              "entry_price": 105.75,
               "exit_time": "12:45",
               "exit_price": 202.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": -6275.75
+              "pnl": -6301.75
             }
           ]
         }
@@ -1681,32 +1697,32 @@
       "id": "nifty_buy_range_breakout__all_6d",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 6,
-        "gross": 6952.56,
+        "gross": 6955.0,
         "costs": 0.0,
-        "net": 6952.56,
+        "net": 6955.0,
         "win_days": 3,
-        "max_drawdown": -1288.62,
+        "max_drawdown": -1283.75,
         "trades": 9
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -62.56,
+          "gross": -61.75,
           "costs": 0.0,
-          "net": -62.56,
+          "net": -61.75,
           "worst_mtm": -728.0,
           "best_mtm": 598.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "mtm_sha256": "86f2ddac6ebbeb13dd7f11c553296109126b783c801e55d640f1a1a11a52c52f",
           "trades": [
             {
               "leg": "pe",
@@ -1736,23 +1752,23 @@
               "entry_time": "10:18",
               "entry_price": 44.65,
               "exit_time": "12:48",
-              "exit_price": 53.4875,
+              "exit_price": 53.5,
               "exit_reason": "SL",
-              "pnl": 574.44
+              "pnl": 575.25
             }
           ]
         },
         {
           "day": "2026-09-24",
-          "gross": -726.37,
+          "gross": -724.75,
           "costs": 0.0,
-          "net": -726.37,
-          "worst_mtm": -726.37,
+          "net": -724.75,
+          "worst_mtm": -724.75,
           "best_mtm": 182.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "mtm_sha256": "a27c00714bfd948e539cc2e1df3fba2bc2c74749d6b80b4481e3a7813590d429",
           "trades": [
             {
               "leg": "pe",
@@ -1766,23 +1782,23 @@
               "entry_time": "09:45",
               "entry_price": 64.7,
               "exit_time": "10:09",
-              "exit_price": 53.525,
+              "exit_price": 53.55,
               "exit_reason": "SL",
-              "pnl": -726.37
+              "pnl": -724.75
             }
           ]
         },
         {
           "day": "2026-09-25",
-          "gross": 138.12,
+          "gross": 139.75,
           "costs": 0.0,
-          "net": 138.12,
-          "worst_mtm": -1311.38,
-          "best_mtm": 489.12,
+          "net": 139.75,
+          "worst_mtm": -1309.75,
+          "best_mtm": 490.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "mtm_sha256": "3a4120d09ec0e262a40da58f17b2179f290f029b98316c998c7f5a6f104377c3",
           "trades": [
             {
               "leg": "pe",
@@ -1796,9 +1812,9 @@
               "entry_time": "09:52",
               "entry_price": 66.9,
               "exit_time": "10:07",
-              "exit_price": 50.175,
+              "exit_price": 50.2,
               "exit_reason": "SL",
-              "pnl": -1087.12
+              "pnl": -1085.5
             },
             {
               "leg": "ce",
@@ -1820,15 +1836,15 @@
         },
         {
           "day": "2026-09-28",
-          "gross": -637.81,
+          "gross": -637.0,
           "costs": 0.0,
-          "net": -637.81,
-          "worst_mtm": -637.81,
+          "net": -637.0,
+          "worst_mtm": -637.0,
           "best_mtm": 500.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "650d5efe81ed967f920f75ba7f08dc48a9516d80435003bc0f18ccb2257ff67e",
+          "mtm_sha256": "154fff69908f43063ae4a4845ef090a9061cdbd1aa3ef1643d878e79a49ae6bf",
           "trades": [
             {
               "leg": "pe",
@@ -1842,23 +1858,23 @@
               "entry_time": "10:17",
               "entry_price": 79.25,
               "exit_time": "11:40",
-              "exit_price": 69.4375,
+              "exit_price": 69.45,
               "exit_reason": "SL",
-              "pnl": -637.81
+              "pnl": -637.0
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": 1776.94,
+          "gross": 1777.75,
           "costs": 0.0,
-          "net": 1776.94,
+          "net": 1777.75,
           "worst_mtm": 0.0,
           "best_mtm": 2044.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "9963bdc3342977696c7e3e1099298b294bf22cc09156a5a29019479a49ea616c",
+          "mtm_sha256": "b05e43aab717cfedc6c74494ad1f1b0417cb3a1ab8fad641abfc84fd5f7b4ce8",
           "trades": [
             {
               "leg": "ce",
@@ -1872,23 +1888,23 @@
               "entry_time": "11:10",
               "entry_price": 58.65,
               "exit_time": "11:16",
-              "exit_price": 85.9875,
+              "exit_price": 86.0,
               "exit_reason": "SL",
-              "pnl": 1776.94
+              "pnl": 1777.75
             }
           ]
         },
         {
           "day": "2026-10-01",
-          "gross": 6464.25,
+          "gross": 6461.0,
           "costs": 0.0,
-          "net": 6464.25,
+          "net": 6461.0,
           "worst_mtm": -494.0,
-          "best_mtm": 7096.38,
+          "best_mtm": 7094.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "361b1a7ecca510b354a144eaeda3483046aa2b188d6c7500503a3d74b3bdc111",
+          "mtm_sha256": "a545f377475d7340d939354059096e9c4a93614441ee52bd0e5dc777b1694b5e",
           "trades": [
             {
               "leg": "ce",
@@ -1902,9 +1918,9 @@
               "entry_time": "09:49",
               "entry_price": 53.3,
               "exit_time": "10:13",
-              "exit_price": 48.975,
+              "exit_price": 48.95,
               "exit_reason": "SL",
-              "pnl": -281.13
+              "pnl": -282.75
             },
             {
               "leg": "pe",
@@ -1918,9 +1934,9 @@
               "entry_time": "12:10",
               "entry_price": 56.9,
               "exit_time": "12:59",
-              "exit_price": 160.675,
+              "exit_price": 160.65,
               "exit_reason": "SL",
-              "pnl": 6745.38
+              "pnl": 6743.75
             }
           ]
         }
@@ -1930,32 +1946,32 @@
       "id": "nifty_dir_924_itm1_sl21_recost__all_6d",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 6,
-        "gross": -1236.49,
+        "gross": -1530.75,
         "costs": 0.0,
-        "net": -1236.49,
+        "net": -1530.75,
         "win_days": 2,
-        "max_drawdown": -3973.84,
-        "trades": 17
+        "max_drawdown": -3932.5,
+        "trades": 18
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -594.85,
+          "gross": -591.5,
           "costs": 0.0,
-          "net": -594.85,
-          "worst_mtm": -1215.6,
+          "net": -591.5,
+          "worst_mtm": -1199.25,
           "best_mtm": 663.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "47da2dc89324cbcbbd649cc30badde5dabf7edaf85314162bfeb7bc15a11856a",
+          "mtm_sha256": "6e55f16537d5360bbe2f574359b2644584b87c54879531991769ce76b2ecc95d",
           "trades": [
             {
               "leg": "ce",
@@ -1967,11 +1983,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 162.15,
+              "entry_price": 161.95,
               "exit_time": "12:06",
-              "exit_price": 196.2015,
+              "exit_price": 195.95,
               "exit_reason": "SL",
-              "pnl": -2213.35
+              "pnl": -2210.0
             },
             {
               "leg": "pe",
@@ -1983,11 +1999,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 134.85,
+              "entry_price": 135.05,
               "exit_time": "15:28",
-              "exit_price": 104.05,
+              "exit_price": 103.75,
               "exit_reason": "EXIT_TIME",
-              "pnl": 2002.0
+              "pnl": 2034.5
             },
             {
               "leg": "ce",
@@ -1998,26 +2014,26 @@
                 "strike": 23350.0,
                 "option_type": "CE"
               },
-              "entry_time": "14:48",
-              "entry_price": 162.0,
+              "entry_time": "14:58",
+              "entry_price": 161.95,
               "exit_time": "15:28",
-              "exit_price": 167.9,
+              "exit_price": 168.35,
               "exit_reason": "EXIT_TIME",
-              "pnl": -383.5
+              "pnl": -416.0
             }
           ]
         },
         {
           "day": "2026-09-24",
-          "gross": 2467.4,
+          "gross": 663.0,
           "costs": 0.0,
-          "net": 2467.4,
-          "worst_mtm": -1458.6,
-          "best_mtm": 2542.15,
+          "net": 663.0,
+          "worst_mtm": -2271.75,
+          "best_mtm": 757.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "9d6a174405ead83e3784d789fbafc3b673ebb443c543671f7d35c0ec35342d06",
+          "mtm_sha256": "46191910239216e4cc6774be74c9a89cdc5eb152232f6f98521d122a4760b97e",
           "trades": [
             {
               "leg": "ce",
@@ -2029,11 +2045,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 150.65,
+              "entry_price": 150.6,
               "exit_time": "15:28",
-              "exit_price": 85.6,
+              "exit_price": 85.9,
               "exit_reason": "EXIT_TIME",
-              "pnl": 4228.25
+              "pnl": 4205.5
             },
             {
               "leg": "pe",
@@ -2045,25 +2061,41 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 129.0,
-              "exit_time": "09:47",
-              "exit_price": 156.09,
+              "entry_price": 129.75,
+              "exit_time": "09:48",
+              "exit_price": 157.0,
               "exit_reason": "SL",
-              "pnl": -1760.85
+              "pnl": -1771.25
+            },
+            {
+              "leg": "pe",
+              "position": "sell",
+              "quantity": 65,
+              "contract": {
+                "expiry": "2026-09-29",
+                "strike": 23300.0,
+                "option_type": "PE"
+              },
+              "entry_time": "10:55",
+              "entry_price": 129.75,
+              "exit_time": "11:32",
+              "exit_price": 157.0,
+              "exit_reason": "SL",
+              "pnl": -1771.25
             }
           ]
         },
         {
           "day": "2026-09-25",
-          "gross": -3124.74,
+          "gross": -3051.75,
           "costs": 0.0,
-          "net": -3124.74,
-          "worst_mtm": -3124.74,
-          "best_mtm": 29.25,
+          "net": -3051.75,
+          "worst_mtm": -3051.75,
+          "best_mtm": 68.25,
           "stopped_by": "overall SL at 11:17",
           "notes": [],
           "mtm_points": 114,
-          "mtm_sha256": "06a44ff0406ee0eef5644f6af06fa72fdc311373b8d90851c30a29ab12bec053",
+          "mtm_sha256": "fb83e2842781782ecab4502cb17ed978a6d30026418dce658fda020b68949c66",
           "trades": [
             {
               "leg": "ce",
@@ -2075,11 +2107,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 162.0,
+              "entry_price": 162.9,
               "exit_time": "11:17",
               "exit_price": 160.45,
               "exit_reason": "OVERALL_SL",
-              "pnl": 100.75
+              "pnl": 159.25
             },
             {
               "leg": "pe",
@@ -2091,11 +2123,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 118.15,
+              "entry_price": 117.7,
               "exit_time": "09:42",
-              "exit_price": 142.9615,
+              "exit_price": 142.4,
               "exit_reason": "SL",
-              "pnl": -1612.75
+              "pnl": -1605.5
             },
             {
               "leg": "pe",
@@ -2107,25 +2139,25 @@
                 "option_type": "PE"
               },
               "entry_time": "10:08",
-              "entry_price": 118.15,
+              "entry_price": 117.7,
               "exit_time": "10:47",
-              "exit_price": 142.9615,
+              "exit_price": 142.4,
               "exit_reason": "SL",
-              "pnl": -1612.75
+              "pnl": -1605.5
             }
           ]
         },
         {
           "day": "2026-09-28",
-          "gross": 3989.54,
+          "gross": 5382.0,
           "costs": 0.0,
-          "net": 3989.54,
-          "worst_mtm": -342.71,
-          "best_mtm": 4113.04,
+          "net": 5382.0,
+          "worst_mtm": 0.0,
+          "best_mtm": 5544.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "4db30a1fa564ce4dd766e1ec3496f669ef0f2b4716e21076acfbd73869535cc1",
+          "mtm_sha256": "6a9286510bcbecbdc4ccfb6c90ec385ed52932bc5d5f7e69ee6d0a2e9afc557f",
           "trades": [
             {
               "leg": "ce",
@@ -2133,15 +2165,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 22900.0,
+                "strike": 22850.0,
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 124.2,
+              "entry_price": 157.95,
               "exit_time": "15:28",
-              "exit_price": 40.3,
+              "exit_price": 57.9,
               "exit_reason": "EXIT_TIME",
-              "pnl": 5453.5
+              "pnl": 6503.25
             },
             {
               "leg": "pe",
@@ -2149,29 +2181,29 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23000.0,
+                "strike": 22950.0,
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 107.25,
+              "entry_price": 82.25,
               "exit_time": "09:33",
-              "exit_price": 129.7725,
+              "exit_price": 99.5,
               "exit_reason": "SL",
-              "pnl": -1463.96
+              "pnl": -1121.25
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": -3622.48,
+          "gross": -3571.75,
           "costs": 0.0,
-          "net": -3622.48,
-          "worst_mtm": -3622.48,
-          "best_mtm": 3118.99,
+          "net": -3571.75,
+          "worst_mtm": -3571.75,
+          "best_mtm": 3185.0,
           "stopped_by": "overall SL at 12:41",
           "notes": [],
           "mtm_points": 198,
-          "mtm_sha256": "ed978cb128607a8db2ffb028b629cbadfaf89b20dfe59603392ab4ee94b9d713",
+          "mtm_sha256": "5c5781b9019f15a2bcf7a08a2f9a191823c0cc23d731f7c24e19e9a12a167da0",
           "trades": [
             {
               "leg": "ce",
@@ -2183,11 +2215,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 115.95,
+              "entry_price": 117.0,
               "exit_time": "11:30",
-              "exit_price": 140.2995,
+              "exit_price": 141.55,
               "exit_reason": "SL",
-              "pnl": -1582.72
+              "pnl": -1595.75
             },
             {
               "leg": "pe",
@@ -2199,11 +2231,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 70.55,
+              "entry_price": 70.7,
               "exit_time": "09:27",
-              "exit_price": 85.3655,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -963.01
+              "pnl": -965.25
             },
             {
               "leg": "pe",
@@ -2215,11 +2247,11 @@
                 "option_type": "PE"
               },
               "entry_time": "11:11",
-              "entry_price": 70.55,
+              "entry_price": 70.7,
               "exit_time": "12:32",
-              "exit_price": 85.3655,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -963.01
+              "pnl": -965.25
             },
             {
               "leg": "ce",
@@ -2231,25 +2263,25 @@
                 "option_type": "CE"
               },
               "entry_time": "12:27",
-              "entry_price": 115.95,
+              "entry_price": 117.0,
               "exit_time": "12:41",
               "exit_price": 117.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": -113.75
+              "pnl": -45.5
             }
           ]
         },
         {
           "day": "2026-10-01",
-          "gross": -351.36,
+          "gross": -360.75,
           "costs": 0.0,
-          "net": -351.36,
-          "worst_mtm": -2669.26,
-          "best_mtm": 2992.89,
+          "net": -360.75,
+          "worst_mtm": -2629.25,
+          "best_mtm": 3003.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "f7ff5bd80a9f8b54cf28cce189e9a6176c018d97297cb64da1f32f385072b232",
+          "mtm_sha256": "cf0763737c6ac3fe90eb6ff584282c57eeed7053adae616a43373cb2d9de5903",
           "trades": [
             {
               "leg": "ce",
@@ -2261,11 +2293,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 190.55,
+              "entry_price": 190.8,
               "exit_time": "10:01",
-              "exit_price": 230.5655,
+              "exit_price": 230.85,
               "exit_reason": "SL",
-              "pnl": -2601.01
+              "pnl": -2603.25
             },
             {
               "leg": "pe",
@@ -2277,11 +2309,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 129.0,
-              "exit_time": "12:23",
-              "exit_price": 156.09,
+              "entry_price": 129.4,
+              "exit_time": "12:24",
+              "exit_price": 156.55,
               "exit_reason": "SL",
-              "pnl": -1760.85
+              "pnl": -1764.75
             },
             {
               "leg": "ce",
@@ -2293,11 +2325,11 @@
                 "option_type": "CE"
               },
               "entry_time": "11:23",
-              "entry_price": 190.55,
+              "entry_price": 190.8,
               "exit_time": "15:28",
-              "exit_price": 128.85,
+              "exit_price": 129.15,
               "exit_reason": "EXIT_TIME",
-              "pnl": 4010.5
+              "pnl": 4007.25
             }
           ]
         }
@@ -2307,32 +2339,32 @@
       "id": "nifty_widesl_917_closest_premium__all_6d",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "0d61a25b3902",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 6,
-        "gross": -6129.66,
+        "gross": -7829.25,
         "costs": 0.0,
-        "net": -6129.66,
+        "net": -7829.25,
         "win_days": 2,
-        "max_drawdown": -7263.91,
+        "max_drawdown": -8791.25,
         "trades": 12
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": 1134.25,
+          "gross": 962.0,
           "costs": 0.0,
-          "net": 1134.25,
-          "worst_mtm": -393.25,
-          "best_mtm": 1222.0,
+          "net": 962.0,
+          "worst_mtm": -747.5,
+          "best_mtm": 1069.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 368,
-          "mtm_sha256": "fe9b9a20ac2560ed6ee928e3a3c25f827b166180ec2527a27f2d50664ccf6188",
+          "mtm_sha256": "ab16989da5ea14794f861e7994c2b635da094986ef88771612446ef2dbc99479",
           "trades": [
             {
               "leg": "ce",
@@ -2340,15 +2372,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23550.0,
+                "strike": 23500.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 54.35,
+              "entry_price": 71.75,
               "exit_time": "15:25",
-              "exit_price": 61.85,
+              "exit_price": 82.4,
               "exit_reason": "EXIT_TIME",
-              "pnl": -487.5
+              "pnl": -692.25
             },
             {
               "leg": "pe",
@@ -2360,25 +2392,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 66.15,
+              "entry_price": 66.55,
               "exit_time": "15:25",
-              "exit_price": 41.2,
+              "exit_price": 41.1,
               "exit_reason": "EXIT_TIME",
-              "pnl": 1621.75
+              "pnl": 1654.25
             }
           ]
         },
         {
           "day": "2026-09-24",
-          "gross": -2609.75,
+          "gross": -2590.25,
           "costs": 0.0,
-          "net": -2609.75,
-          "worst_mtm": -2609.75,
+          "net": -2590.25,
+          "worst_mtm": -2590.25,
           "best_mtm": 0.0,
-          "stopped_by": "overall SL at 13:26",
+          "stopped_by": "overall SL at 13:42",
           "notes": [],
-          "mtm_points": 250,
-          "mtm_sha256": "3fcf74e043a07e7029c775fcaa0b8e0573c64f0508b53fe6a3591753494562b7",
+          "mtm_points": 266,
+          "mtm_sha256": "608e48bddbc295bb106ce8caaebe0f80221399c96d580d6617ac99fba78b649e",
           "trades": [
             {
               "leg": "ce",
@@ -2386,15 +2418,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23400.0,
+                "strike": 23350.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 52.7,
-              "exit_time": "13:26",
-              "exit_price": 38.3,
+              "entry_price": 70.5,
+              "exit_time": "13:42",
+              "exit_price": 49.35,
               "exit_reason": "OVERALL_SL",
-              "pnl": 936.0
+              "pnl": 1374.75
             },
             {
               "leg": "pe",
@@ -2406,25 +2438,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 66.2,
-              "exit_time": "13:26",
-              "exit_price": 120.75,
+              "entry_price": 66.0,
+              "exit_time": "13:42",
+              "exit_price": 127.0,
               "exit_reason": "OVERALL_SL",
-              "pnl": -3545.75
+              "pnl": -3965.0
             }
           ]
         },
         {
           "day": "2026-09-25",
-          "gross": 1647.75,
+          "gross": 1719.25,
           "costs": 0.0,
-          "net": 1647.75,
-          "worst_mtm": -510.25,
-          "best_mtm": 1742.0,
+          "net": 1719.25,
+          "worst_mtm": -451.75,
+          "best_mtm": 1800.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 368,
-          "mtm_sha256": "acec446c2c6708eb9bea4116e284d0dccb01aaeb3ba9a07912c0e1ed0aa5bf77",
+          "mtm_sha256": "da6c10a71ee9e864dcc17fe786ac01448d6c018d9c2286836fd7ab7443834588",
           "trades": [
             {
               "leg": "ce",
@@ -2436,11 +2468,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 65.9,
+              "entry_price": 65.75,
               "exit_time": "15:25",
-              "exit_price": 66.65,
+              "exit_price": 66.7,
               "exit_reason": "EXIT_TIME",
-              "pnl": -48.75
+              "pnl": -61.75
             },
             {
               "leg": "pe",
@@ -2452,25 +2484,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 59.55,
+              "entry_price": 60.6,
               "exit_time": "15:25",
-              "exit_price": 33.45,
+              "exit_price": 33.2,
               "exit_reason": "EXIT_TIME",
-              "pnl": 1696.5
+              "pnl": 1781.0
             }
           ]
         },
         {
           "day": "2026-09-28",
-          "gross": -736.94,
+          "gross": -2600.0,
           "costs": 0.0,
-          "net": -736.94,
-          "worst_mtm": -2017.44,
-          "best_mtm": 354.25,
-          "stopped_by": null,
+          "net": -2600.0,
+          "worst_mtm": -2600.0,
+          "best_mtm": 364.0,
+          "stopped_by": "overall SL at 10:41",
           "notes": [],
-          "mtm_points": 368,
-          "mtm_sha256": "c923a6c50a80b0f65e9702eb1a5bc85ae7df841a867c469cf3fc6ea0fd5f798e",
+          "mtm_points": 85,
+          "mtm_sha256": "ec30550bed85a44260072f761948b67237c0f7eb765894b983f436ce4bbe3c3e",
           "trades": [
             {
               "leg": "ce",
@@ -2482,11 +2514,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 62.1,
-              "exit_time": "15:25",
-              "exit_price": 14.5,
-              "exit_reason": "EXIT_TIME",
-              "pnl": 3094.0
+              "entry_price": 63.25,
+              "exit_time": "10:41",
+              "exit_price": 30.35,
+              "exit_reason": "OVERALL_SL",
+              "pnl": 2138.5
             },
             {
               "leg": "pe",
@@ -2494,29 +2526,29 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 22900.0,
+                "strike": 22950.0,
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 51.25,
+              "entry_price": 68.8,
               "exit_time": "10:41",
-              "exit_price": 110.1875,
-              "exit_reason": "SL",
-              "pnl": -3830.94
+              "exit_price": 141.7,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -4738.5
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": -2764.12,
+          "gross": -2619.5,
           "costs": 0.0,
-          "net": -2764.12,
-          "worst_mtm": -2764.12,
-          "best_mtm": 29.25,
+          "net": -2619.5,
+          "worst_mtm": -2619.5,
+          "best_mtm": 48.75,
           "stopped_by": "overall SL at 11:12",
           "notes": [],
           "mtm_points": 116,
-          "mtm_sha256": "10e9afa534828d7300c3cb361dddfb2655bbc20a4eb363a0f5d040aa083324a7",
+          "mtm_sha256": "2b96484beffbc090d6aaf6604b5d502fe42d580c469c3bbf3fc215969a887cda",
           "trades": [
             {
               "leg": "ce",
@@ -2528,11 +2560,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 51.65,
+              "entry_price": 52.85,
               "exit_time": "11:12",
               "exit_price": 30.35,
               "exit_reason": "OVERALL_SL",
-              "pnl": 1384.5
+              "pnl": 1462.5
             },
             {
               "leg": "pe",
@@ -2544,25 +2576,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 55.5,
+              "entry_price": 54.6,
               "exit_time": "09:35",
-              "exit_price": 119.325,
+              "exit_price": 117.4,
               "exit_reason": "SL",
-              "pnl": -4148.62
+              "pnl": -4082.0
             }
           ]
         },
         {
           "day": "2026-10-01",
-          "gross": -2800.85,
+          "gross": -2700.75,
           "costs": 0.0,
-          "net": -2800.85,
-          "worst_mtm": -2800.85,
-          "best_mtm": 591.5,
-          "stopped_by": "overall SL at 12:46",
+          "net": -2700.75,
+          "worst_mtm": -2700.75,
+          "best_mtm": 627.25,
+          "stopped_by": "overall SL at 12:45",
           "notes": [],
-          "mtm_points": 210,
-          "mtm_sha256": "a7a6a78caabe8b23402dbbd992dc74c02575a1caa7a48925b439cce596883e98",
+          "mtm_points": 209,
+          "mtm_sha256": "8b6f90d0f815198fee2fefa96e16a67d91e806e873aad4cf27ba54d848bb0873",
           "trades": [
             {
               "leg": "ce",
@@ -2570,15 +2602,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-10-06",
-                "strike": 22800.0,
+                "strike": 22750.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 53.3,
-              "exit_time": "12:46",
-              "exit_price": 30.15,
+              "entry_price": 67.55,
+              "exit_time": "12:45",
+              "exit_price": 35.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": 1504.75
+              "pnl": 2070.25
             },
             {
               "leg": "pe",
@@ -2586,15 +2618,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-10-06",
-                "strike": 22400.0,
+                "strike": 22450.0,
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 57.6,
-              "exit_time": "12:46",
-              "exit_price": 123.84,
-              "exit_reason": "SL",
-              "pnl": -4305.6
+              "entry_price": 70.8,
+              "exit_time": "12:45",
+              "exit_price": 144.2,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -4771.0
             }
           ]
         }
@@ -2604,32 +2636,32 @@
       "id": "nifty_widesl_917_otm1__all_6d",
       "strategy_file": "nifty_widesl_917_otm1.yaml",
       "strategy_id": "nifty_widesl_917_otm1",
-      "strategy_spec_hash": "5ea12a323ef3",
+      "strategy_spec_hash": "5eee51556241",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 6,
-        "gross": -5622.18,
+        "gross": -5450.25,
         "costs": 0.0,
-        "net": -5622.18,
+        "net": -5450.25,
         "win_days": 3,
-        "max_drawdown": -6408.67,
+        "max_drawdown": -6272.5,
         "trades": 12
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": 786.5,
+          "gross": 822.25,
           "costs": 0.0,
-          "net": 786.5,
-          "worst_mtm": -1228.5,
-          "best_mtm": 906.75,
+          "net": 822.25,
+          "worst_mtm": -1179.75,
+          "best_mtm": 955.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 371,
-          "mtm_sha256": "92fc14d7d2940a35d0a8df1b36402e5daf34af1e27daa553e593738d1ce79a4a",
+          "mtm_sha256": "1180d6d6da3d51c94bf49d9f64180942abd644a105189df6317059de1245a89e",
           "trades": [
             {
               "leg": "ce",
@@ -2641,9 +2673,9 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 116.45,
+              "entry_price": 116.65,
               "exit_time": "15:28",
-              "exit_price": 135.15,
+              "exit_price": 135.35,
               "exit_reason": "EXIT_TIME",
               "pnl": -1215.5
             },
@@ -2657,25 +2689,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 82.6,
+              "entry_price": 83.15,
               "exit_time": "15:28",
               "exit_price": 51.8,
               "exit_reason": "EXIT_TIME",
-              "pnl": 2002.0
+              "pnl": 2037.75
             }
           ]
         },
         {
           "day": "2026-09-24",
-          "gross": -2596.75,
+          "gross": -2655.25,
           "costs": 0.0,
-          "net": -2596.75,
-          "worst_mtm": -2596.75,
-          "best_mtm": 81.25,
+          "net": -2655.25,
+          "worst_mtm": -2655.25,
+          "best_mtm": 22.75,
           "stopped_by": "overall SL at 13:42",
           "notes": [],
           "mtm_points": 266,
-          "mtm_sha256": "fdce0e153fa96ba02132251c3171b9c3f91510a12886a8356d18a9eac3568fbf",
+          "mtm_sha256": "27e2952be94bc0879e63df18a6d74c465cf7d3b4b07204c8d73f73114499e1c9",
           "trades": [
             {
               "leg": "ce",
@@ -2687,11 +2719,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 92.8,
+              "entry_price": 92.25,
               "exit_time": "13:42",
               "exit_price": 64.0,
               "exit_reason": "OVERALL_SL",
-              "pnl": 1872.0
+              "pnl": 1836.25
             },
             {
               "leg": "pe",
@@ -2703,25 +2735,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 83.85,
+              "entry_price": 83.5,
               "exit_time": "13:42",
               "exit_price": 152.6,
               "exit_reason": "OVERALL_SL",
-              "pnl": -4468.75
+              "pnl": -4491.5
             }
           ]
         },
         {
           "day": "2026-09-25",
-          "gross": 1625.0,
+          "gross": 1556.75,
           "costs": 0.0,
-          "net": 1625.0,
-          "worst_mtm": -650.0,
-          "best_mtm": 1738.75,
+          "net": 1556.75,
+          "worst_mtm": -656.5,
+          "best_mtm": 1732.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 371,
-          "mtm_sha256": "986ce54ec9db674d13e784fec9a55a3ddf0d965d9bd8c127f39d9e493f962c1f",
+          "mtm_sha256": "857eb46515018df42f26cc416ae37198e9a1ad2af5212c8b38a0e1895f4e1a70",
           "trades": [
             {
               "leg": "ce",
@@ -2733,11 +2765,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 109.55,
+              "entry_price": 109.3,
               "exit_time": "15:28",
-              "exit_price": 116.4,
+              "exit_price": 117.5,
               "exit_reason": "EXIT_TIME",
-              "pnl": -445.25
+              "pnl": -533.0
             },
             {
               "leg": "pe",
@@ -2749,25 +2781,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 75.6,
+              "entry_price": 75.75,
               "exit_time": "15:28",
-              "exit_price": 43.75,
+              "exit_price": 43.6,
               "exit_reason": "EXIT_TIME",
-              "pnl": 2070.25
+              "pnl": 2089.75
             }
           ]
         },
         {
           "day": "2026-09-28",
-          "gross": 394.06,
+          "gross": 507.0,
           "costs": 0.0,
-          "net": 394.06,
-          "worst_mtm": -1380.44,
-          "best_mtm": 429.81,
+          "net": 507.0,
+          "worst_mtm": -1261.0,
+          "best_mtm": 549.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 371,
-          "mtm_sha256": "c8754aa57dd9ef10744fc1b3511eaa8bce71ca1ed5e18e20d7509a6442f6601b",
+          "mtm_sha256": "e3599739a0de60347a6f3b1a4b32960f2c3243b94ea931d3f4f10ee289a2646a",
           "trades": [
             {
               "leg": "ce",
@@ -2779,11 +2811,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 84.85,
+              "entry_price": 86.25,
               "exit_time": "15:28",
-              "exit_price": 19.85,
+              "exit_price": 19.95,
               "exit_reason": "EXIT_TIME",
-              "pnl": 4225.0
+              "pnl": 4309.5
             },
             {
               "leg": "pe",
@@ -2795,25 +2827,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 51.25,
+              "entry_price": 50.85,
               "exit_time": "10:41",
-              "exit_price": 110.1875,
+              "exit_price": 109.35,
               "exit_reason": "SL",
-              "pnl": -3830.94
+              "pnl": -3802.5
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": -2918.99,
+          "gross": -2827.5,
           "costs": 0.0,
-          "net": -2918.99,
-          "worst_mtm": -2918.99,
-          "best_mtm": 276.25,
+          "net": -2827.5,
+          "worst_mtm": -2827.5,
+          "best_mtm": 341.25,
           "stopped_by": "overall SL at 11:30",
           "notes": [],
           "mtm_points": 134,
-          "mtm_sha256": "428612dd3752b2556ca4ec24b54250db5c24b0040b36c5f2eb21169140180277",
+          "mtm_sha256": "c7d4178828ede669ad3d5a6290bbfe6d7549627ebe98228d79489ae0b93244e4",
           "trades": [
             {
               "leg": "ce",
@@ -2825,11 +2857,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 51.65,
+              "entry_price": 52.85,
               "exit_time": "11:30",
               "exit_price": 55.1,
               "exit_reason": "OVERALL_SL",
-              "pnl": -224.25
+              "pnl": -146.25
             },
             {
               "leg": "pe",
@@ -2841,25 +2873,25 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 36.05,
+              "entry_price": 35.85,
               "exit_time": "09:32",
-              "exit_price": 77.5075,
+              "exit_price": 77.1,
               "exit_reason": "SL",
-              "pnl": -2694.74
+              "pnl": -2681.25
             }
           ]
         },
         {
           "day": "2026-10-01",
-          "gross": -2912.0,
+          "gross": -2853.5,
           "costs": 0.0,
-          "net": -2912.0,
-          "worst_mtm": -2912.0,
-          "best_mtm": 705.25,
+          "net": -2853.5,
+          "worst_mtm": -2853.5,
+          "best_mtm": 763.75,
           "stopped_by": "overall SL at 12:45",
           "notes": [],
           "mtm_points": 209,
-          "mtm_sha256": "ef0f92a11fd5cdf826078e73d4c67bedd2458a657d0ec45a704a502e4d3f2185",
+          "mtm_sha256": "604b08af8dd446f98b8956be52a8af22d38e871782059e03bf67b511f2572215",
           "trades": [
             {
               "leg": "ce",
@@ -2871,11 +2903,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 106.2,
+              "entry_price": 107.5,
               "exit_time": "12:45",
               "exit_price": 54.45,
               "exit_reason": "OVERALL_SL",
-              "pnl": 3363.75
+              "pnl": 3448.25
             },
             {
               "leg": "pe",
@@ -2887,11 +2919,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 106.15,
+              "entry_price": 105.75,
               "exit_time": "12:45",
               "exit_price": 202.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": -6275.75
+              "pnl": -6301.75
             }
           ]
         }
@@ -2901,32 +2933,32 @@
       "id": "nifty_buy_range_breakout__early_3d",
       "strategy_file": "nifty_buy_range_breakout.yaml",
       "strategy_id": "nifty_buy_range_breakout",
-      "strategy_spec_hash": "c3c55d3dffd5",
+      "strategy_spec_hash": "5a2e24ef5aaf",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-25"
       },
       "summary": {
         "days": 3,
-        "gross": -650.81,
+        "gross": -646.75,
         "costs": 0.0,
-        "net": -650.81,
+        "net": -646.75,
         "win_days": 1,
-        "max_drawdown": -788.94,
+        "max_drawdown": -786.5,
         "trades": 5
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -62.56,
+          "gross": -61.75,
           "costs": 0.0,
-          "net": -62.56,
+          "net": -61.75,
           "worst_mtm": -728.0,
           "best_mtm": 598.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "mtm_sha256": "86f2ddac6ebbeb13dd7f11c553296109126b783c801e55d640f1a1a11a52c52f",
           "trades": [
             {
               "leg": "pe",
@@ -2956,23 +2988,23 @@
               "entry_time": "10:18",
               "entry_price": 44.65,
               "exit_time": "12:48",
-              "exit_price": 53.4875,
+              "exit_price": 53.5,
               "exit_reason": "SL",
-              "pnl": 574.44
+              "pnl": 575.25
             }
           ]
         },
         {
           "day": "2026-09-24",
-          "gross": -726.37,
+          "gross": -724.75,
           "costs": 0.0,
-          "net": -726.37,
-          "worst_mtm": -726.37,
+          "net": -724.75,
+          "worst_mtm": -724.75,
           "best_mtm": 182.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "mtm_sha256": "a27c00714bfd948e539cc2e1df3fba2bc2c74749d6b80b4481e3a7813590d429",
           "trades": [
             {
               "leg": "pe",
@@ -2986,23 +3018,23 @@
               "entry_time": "09:45",
               "entry_price": 64.7,
               "exit_time": "10:09",
-              "exit_price": 53.525,
+              "exit_price": 53.55,
               "exit_reason": "SL",
-              "pnl": -726.37
+              "pnl": -724.75
             }
           ]
         },
         {
           "day": "2026-09-25",
-          "gross": 138.12,
+          "gross": 139.75,
           "costs": 0.0,
-          "net": 138.12,
-          "worst_mtm": -1311.38,
-          "best_mtm": 489.12,
+          "net": 139.75,
+          "worst_mtm": -1309.75,
+          "best_mtm": 490.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "mtm_sha256": "3a4120d09ec0e262a40da58f17b2179f290f029b98316c998c7f5a6f104377c3",
           "trades": [
             {
               "leg": "pe",
@@ -3016,9 +3048,9 @@
               "entry_time": "09:52",
               "entry_price": 66.9,
               "exit_time": "10:07",
-              "exit_price": 50.175,
+              "exit_price": 50.2,
               "exit_reason": "SL",
-              "pnl": -1087.12
+              "pnl": -1085.5
             },
             {
               "leg": "ce",
@@ -3044,32 +3076,32 @@
       "id": "nifty_dir_924_itm1_sl21_recost__late_3d",
       "strategy_file": "nifty_dir_924_itm1_sl21_recost.yaml",
       "strategy_id": "nifty_dir_924_itm1_sl21_recost",
-      "strategy_spec_hash": "86c3168c238a",
+      "strategy_spec_hash": "ab993e42862a",
       "window": {
         "from": "2026-09-28",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 3,
-        "gross": 15.7,
+        "gross": 1449.5,
         "costs": 0.0,
-        "net": 15.7,
+        "net": 1449.5,
         "win_days": 1,
-        "max_drawdown": -3973.84,
+        "max_drawdown": -3932.5,
         "trades": 9
       },
       "days": [
         {
           "day": "2026-09-28",
-          "gross": 3989.54,
+          "gross": 5382.0,
           "costs": 0.0,
-          "net": 3989.54,
-          "worst_mtm": -342.71,
-          "best_mtm": 4113.04,
+          "net": 5382.0,
+          "worst_mtm": 0.0,
+          "best_mtm": 5544.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "4db30a1fa564ce4dd766e1ec3496f669ef0f2b4716e21076acfbd73869535cc1",
+          "mtm_sha256": "6a9286510bcbecbdc4ccfb6c90ec385ed52932bc5d5f7e69ee6d0a2e9afc557f",
           "trades": [
             {
               "leg": "ce",
@@ -3077,15 +3109,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 22900.0,
+                "strike": 22850.0,
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 124.2,
+              "entry_price": 157.95,
               "exit_time": "15:28",
-              "exit_price": 40.3,
+              "exit_price": 57.9,
               "exit_reason": "EXIT_TIME",
-              "pnl": 5453.5
+              "pnl": 6503.25
             },
             {
               "leg": "pe",
@@ -3093,29 +3125,29 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23000.0,
+                "strike": 22950.0,
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 107.25,
+              "entry_price": 82.25,
               "exit_time": "09:33",
-              "exit_price": 129.7725,
+              "exit_price": 99.5,
               "exit_reason": "SL",
-              "pnl": -1463.96
+              "pnl": -1121.25
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": -3622.48,
+          "gross": -3571.75,
           "costs": 0.0,
-          "net": -3622.48,
-          "worst_mtm": -3622.48,
-          "best_mtm": 3118.99,
+          "net": -3571.75,
+          "worst_mtm": -3571.75,
+          "best_mtm": 3185.0,
           "stopped_by": "overall SL at 12:41",
           "notes": [],
           "mtm_points": 198,
-          "mtm_sha256": "ed978cb128607a8db2ffb028b629cbadfaf89b20dfe59603392ab4ee94b9d713",
+          "mtm_sha256": "5c5781b9019f15a2bcf7a08a2f9a191823c0cc23d731f7c24e19e9a12a167da0",
           "trades": [
             {
               "leg": "ce",
@@ -3127,11 +3159,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 115.95,
+              "entry_price": 117.0,
               "exit_time": "11:30",
-              "exit_price": 140.2995,
+              "exit_price": 141.55,
               "exit_reason": "SL",
-              "pnl": -1582.72
+              "pnl": -1595.75
             },
             {
               "leg": "pe",
@@ -3143,11 +3175,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 70.55,
+              "entry_price": 70.7,
               "exit_time": "09:27",
-              "exit_price": 85.3655,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -963.01
+              "pnl": -965.25
             },
             {
               "leg": "pe",
@@ -3159,11 +3191,11 @@
                 "option_type": "PE"
               },
               "entry_time": "11:11",
-              "entry_price": 70.55,
+              "entry_price": 70.7,
               "exit_time": "12:32",
-              "exit_price": 85.3655,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -963.01
+              "pnl": -965.25
             },
             {
               "leg": "ce",
@@ -3175,25 +3207,25 @@
                 "option_type": "CE"
               },
               "entry_time": "12:27",
-              "entry_price": 115.95,
+              "entry_price": 117.0,
               "exit_time": "12:41",
               "exit_price": 117.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": -113.75
+              "pnl": -45.5
             }
           ]
         },
         {
           "day": "2026-10-01",
-          "gross": -351.36,
+          "gross": -360.75,
           "costs": 0.0,
-          "net": -351.36,
-          "worst_mtm": -2669.26,
-          "best_mtm": 2992.89,
+          "net": -360.75,
+          "worst_mtm": -2629.25,
+          "best_mtm": 3003.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "f7ff5bd80a9f8b54cf28cce189e9a6176c018d97297cb64da1f32f385072b232",
+          "mtm_sha256": "cf0763737c6ac3fe90eb6ff584282c57eeed7053adae616a43373cb2d9de5903",
           "trades": [
             {
               "leg": "ce",
@@ -3205,11 +3237,11 @@
                 "option_type": "CE"
               },
               "entry_time": "09:24",
-              "entry_price": 190.55,
+              "entry_price": 190.8,
               "exit_time": "10:01",
-              "exit_price": 230.5655,
+              "exit_price": 230.85,
               "exit_reason": "SL",
-              "pnl": -2601.01
+              "pnl": -2603.25
             },
             {
               "leg": "pe",
@@ -3221,11 +3253,11 @@
                 "option_type": "PE"
               },
               "entry_time": "09:24",
-              "entry_price": 129.0,
-              "exit_time": "12:23",
-              "exit_price": 156.09,
+              "entry_price": 129.4,
+              "exit_time": "12:24",
+              "exit_price": 156.55,
               "exit_reason": "SL",
-              "pnl": -1760.85
+              "pnl": -1764.75
             },
             {
               "leg": "ce",
@@ -3237,11 +3269,11 @@
                 "option_type": "CE"
               },
               "entry_time": "11:23",
-              "entry_price": 190.55,
+              "entry_price": 190.8,
               "exit_time": "15:28",
-              "exit_price": 128.85,
+              "exit_price": 129.15,
               "exit_reason": "EXIT_TIME",
-              "pnl": 4010.5
+              "pnl": 4007.25
             }
           ]
         }

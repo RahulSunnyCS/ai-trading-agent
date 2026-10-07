@@ -14,10 +14,13 @@ asking."
   server, with a "Backtest" tab in `apps/dashboard`. See the epic plan for the full rationale.
 - **AlgoTest transport: Claude Routine via MCP, not a REST/API-key client.** No AlgoTest REST
   credentials exist for this project; the AlgoTest MCP tools are available in a Claude Code
-  session today, at zero incremental cost. `data/providers/algotest.py` is written against the
-  same `MarketDataProvider` Protocol the original design specified, so a REST or Python-MCP-client
-  transport can be swapped in later without touching the resolver, engine, or anything downstream
-  of the cache.
+  session today, at zero incremental cost. `data/providers/base.py` keeps the `MarketDataProvider`
+  Protocol the original design specified, so a REST or Python-MCP-client transport can be swapped
+  in later without touching the resolver, engine, or anything downstream of the cache. Removed
+  2026-10-07 as dead code: the `AlgoTestProvider` and `DhanProvider` stubs (both only raised
+  `NotImplementedError`) and the Dhan parity harness (`compare`/`run_parity_suite`/`verdict`/
+  `GATES`), none of which anything called; recover them from git history if a second vendor is
+  ever wired.
 
 ## Phase-1 deviation: strike-relative ingest, not concrete-contract
 
@@ -164,3 +167,82 @@ a run already covers" — and delivers the real analytical value (P&L broken dow
 the risk. Revisit if a strategy actually needs to gate entries on regime; the DSL's `==`/`in`/
 `not_in` operators and `Op` grammar already support a categorical condition, so the schema/loader
 side is a smaller lift than the evaluator's data-source problem.
+
+---
+
+## AlgoTest comparison, round 1: fills at the close of the bar ending at T — 2026-10-07
+
+BL-009 Phase 1. `obt legwise compare <strategy> <algotest.csv>` runs a strategy over the days of
+an AlgoTest trade-log export and classifies each day (`missing / strike / reason / minute /
+price / match`). First export: Nifty_Widesl_917_OTM1, 436 days.
+
+- **AlgoTest's candles are end-stamped.** Its 1-minute candle "09:17" is the bar that starts at
+  09:16 (fetched through the AlgoTest connector for 2026-09-24: its closes equal our Fyers bars'
+  closes exactly; opens/highs/lows differ slightly). Its fills at a scheduled time T use that
+  candle's close: the 09:17 entry 92.25 and the 13:43 combined-stop exit 64.00 are exactly our
+  09:16 and 13:42 closes. Across all 436 days the close of the bar ending at T is the nearest
+  of our prices to AlgoTest's (entry median gap 0.30 vs 0.45 for our 09:17 open; time exits 0.05
+  vs 0.10).
+- **So the engine's price at T is now the close of the bar ending at T** (`Series.price_at`),
+  used for fixed-time entries, exits at the exit time, strike selection from the index and
+  closest-premium selection. It was the open of the T bar. Stops are unchanged (checked on each
+  bar's high/low from the bar after the fill instant; filled at the trigger, or at a gapped
+  open). RE ASAP still enters at the next bar's open: no export with re-entries yet.
+- **Effect:** strike mismatches 9 → 0 days; legs within a tick 37 → 73; P&L gap to AlgoTest
+  ₹14,640 → ₹7,147 over 429 days. 22 golden scenarios (the fixed-time strategies) re-accepted.
+- **Lot size: today's lot for all history** (owner, 2026-10-07; `execution.lot_sizing: current`,
+  default) — AlgoTest sizes every day at the current lot (qty 65 in Jan 2025), and with a rupee
+  combined stop the lot decides the minute it fires. `historical` keeps the per-expiry lots.
+- **Reading AlgoTest's log:** it has no exit reasons; the comparator infers them (exit time;
+  legs out together = combined stop; a lone early exit = either stop) and accepts a leg SL that
+  fired in the minute the combined stop closed the rest. AlgoTest stamps stop exits at the END of
+  the triggering minute: its stop minutes read ours + 1 (253 legs).
+- **5-minute tables:** a window's `open` stays its first minute's open — the engine checks a
+  stop's gap against it. The price at the window's start, which fills use, comes from the
+  previous window's close on the filler minutes (`load_day_5m`), so 5-minute fills follow the
+  new rule unchanged. (A short-lived version 2 made `open` the previous close, which hid gaps
+  from stop fills; the code review caught it; `DERIVED_VERSION` 3.)
+
+---
+
+## AlgoTest comparison, round 2: four strategies; stop levels on the tick; NIFTY data differs — 2026-10-07
+
+The owner exported all four strategies (fixtures in `tests/fixtures/algotest/`); each strategy
+file now follows the settings in the owner's PDF of the same day (the source of truth):
+closest premium ₹65 (was ₹60), a new `sensex_widesl_917_otm2` (SL 114% on the call, 115% on the
+put, as set in AlgoTest), Dir_924 unchanged.
+
+- **Rule: stop and target levels are rounded to the nearest 0.05 tick.** Across the four
+  exports, 512 of 515 untrailed stop exits equal entry × (1 + SL%) rounded to the nearest tick;
+  88 equal it unrounded, 261 rounded up. Trailed levels are rounded the same way. Golden
+  scenarios with stops re-accepted (stop prices move onto the tick, e.g. 53.4875 → 53.50).
+- **Comparator:** a re-entry (RE COST / RE ASAP) is an event AlgoTest stamps at the end of the
+  triggering minute, like a stop exit — its entry minute is now compared with the same 0..2
+  tolerance (Dir_924: "minute" days 145 → 38).
+- **Results** (days fully matching / P&L engine vs AlgoTest):
+
+  | Strategy | Days | Match | P&L engine | P&L AlgoTest |
+  |---|---|---|---|---|
+  | SENSEX OTM2 | 424 | 375 | ₹1,58,352 | ₹1,58,676 |
+  | NIFTY OTM1 | 429 | 6 | ₹1,30,911 | ₹1,38,054 |
+  | NIFTY ITM1 RE COST | 236 | 2 | ₹44,139 | ₹40,518 |
+  | NIFTY closest premium | 241 | 2 | ₹50,294 | ₹44,688 |
+
+- **Why NIFTY differs: AlgoTest's NIFTY prices come from a different feed.** SENSEX legs are
+  within a tick on 788 of 848 legs, vendor days and Fyers days alike, so the engine's rules
+  reproduce AlgoTest. NIFTY legs are not even on Fyers-collected days (1 of 18 legs within a
+  tick, 2026-09-23 → 10-06); AlgoTest's own 15-minute candles for NIFTY 23200 PE on 2026-09-24
+  equal our Fyers closes at only 7 of 25 marks (gaps up to ~1 point). With tight thresholds (21%
+  stops, ₹2,500–3,000 combined stops) those gaps move exit minutes and, on some days, exit
+  reasons and closest-premium strikes. Remaining NIFTY differences are data, not rules.
+- **Not settled yet:** RE COST's fill when a bar gaps through the cost price (AlgoTest
+  re-entries in the Dir_924 export are at the cost price; none of ours gapped differently in the
+  days inspected), RE ASAP (no export uses it).
+- **Range breakout (2026-10-07, fifth export, AlgoTest's "Download trades" format, now parsed
+  too — it adds each leg's expiry, which the comparator checks):** 168 of 244 days match, 280 of
+  361 legs within a tick — far closer than the other NIFTY strategies because a breakout fills
+  at the range level, not at a feed-dependent close. The P&L gap (AlgoTest ₹260, engine ₹8,132)
+  sits mostly on 8 days where a 1/1-point trailed stop is decided by a fraction of a point:
+  2026-09-29 (Fyers day) needs AlgoTest's 11:11 high ≥ 77.75 against our 77.15 for its 63.05
+  exit; the 5-minute candle around it agrees with ours (high 101.15). 2026-09-03 is a thin
+  vendor day (its put's range differs wholesale). Trail rule unchanged: data, not rules.

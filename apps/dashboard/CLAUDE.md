@@ -72,6 +72,9 @@ needs to be shared with the server, it is currently hand-duplicated in
   duplicated logic before the extraction). Pass `{ intervalMs }` for polling,
   omit it for fetch-once-with-manual-refresh; `{ cache: true }` is in root
   `technical.md`.
+- `src/hooks/useNow.ts` — the one ticking clock (`Date | null`, null until mounted). Every caller
+  re-renders on each tick, so call a fast one in a small leaf (`components/live/LiveClock.tsx`),
+  not at the top of a view.
 - `src/hooks/useRunSection.ts` — a Momentum background run's result holds the core only; the
   heavy parts (trades, instruments, timeline, this week's signals, the Broad circuit card) are
   fetched when the tab or card showing them mounts: `useRunSection(runId, 'trades')` returns
@@ -110,11 +113,14 @@ needs to be shared with the server, it is currently hand-duplicated in
 
 Run from the repo root unless noted:
 ```bash
+bun run start                               # research stack: APIs + `next dev` on 127.0.0.1:5190 (UI editing)
+bun run start:prod                          # same with a production build (.next-prod, BL-004): ~1 s pages;
+                                            # needs DASHBOARD_PASSWORD in apps/dashboard/.env.local; rebuilds only on change
 bun run --filter @ata/dashboard dev         # Next dev server (:5173), rewrites /api to :3000
 # Options Lab without Postgres/Redis/apps/server: start `bun run py:api`, then
 # OBT_DIRECT=1 routes ONLY /api/backtest/legwise/* straight to it (dev-only,
 # off by default — the Fastify proxy stays the only production path)
 (cd apps/dashboard && OBT_DIRECT=1 bun run dev)
-bun run --filter @ata/dashboard typecheck   # NOT part of the root `bun run typecheck` — has one pre-existing error, run explicitly
+bun run --filter @ata/dashboard typecheck   # NOT part of the root `bun run typecheck` — run explicitly (CI runs it in the dashboard job)
 bun run test:e2e                            # Playwright suite — start the Next dev server first
 ```

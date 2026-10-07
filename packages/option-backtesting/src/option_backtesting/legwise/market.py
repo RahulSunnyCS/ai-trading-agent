@@ -55,7 +55,12 @@ class Series:
         return self
 
     def price_at(self, minute: int) -> float | None:
-        """The price at the START of `minute` — that minute's open."""
+        """The price at time `minute` (its start): the CLOSE of the bar that ends then (the
+        previous minute's), as AlgoTest reads it — its candle stamped T is the bar that starts
+        at T-1 and its fills at T use that candle's close (BL-009 Phase 1, verified against
+        AlgoTest's own candles and trade log). At 09:15 there is no earlier bar: the open."""
+        if minute > 0 and self.close[minute - 1] is not None:
+            return self.close[minute - 1]
         return self.open[minute]
 
 

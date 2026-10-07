@@ -298,8 +298,6 @@ def build_stock_weekly_prices(
     # earlier closes; this preserves economic returns through splits/bonuses.
     # The raw closes are kept separately for the per-share entry price ceiling.
     raw_daily = daily.copy()
-    from trading_data.db import connect, data_root
-
     from momentum_backtesting import db_read, stock_actions
 
     if series_breaks not in ("legacy", "verified"):
@@ -308,7 +306,7 @@ def build_stock_weekly_prices(
     explained: set[tuple[str, pd.Timestamp]] = set()
     crashes: set[tuple[str, pd.Timestamp]] = set()
     if db_read.catalog_mtime() is not None:
-        with connect(data_root(), read_only=True) as con:
+        with db_read.open_catalog(read_only=True) as con:
             if db_read._has_table(con, "stock_action_candidates"):
                 wanted = daily["symbol"].unique().tolist()
                 actions = stock_actions.confirmed_factors(con, wanted)
