@@ -17,8 +17,9 @@ services:
     image: timescale/timescaledb:latest-pg16
     # Host port 5433 (not 5432) avoids colliding with other local Postgres
     # instances/containers. Container still listens on 5432 internally.
+    # Published on loopback only: the dev password must not reach the LAN.
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - trading_pgdata:/var/lib/postgresql/data
     environment:
@@ -37,8 +38,9 @@ services:
     image: redis:7-alpine
     # Host port 6380 (not 6379) avoids colliding with other local Redis
     # instances/containers. Container still listens on 6379 internally.
+    # Published on loopback only: Redis has no password here.
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     volumes:
       - trading_redis_data:/data
     # AOF persistence ensures Redis data survives container restarts.

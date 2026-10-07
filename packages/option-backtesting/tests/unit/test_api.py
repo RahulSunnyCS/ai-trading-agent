@@ -34,6 +34,18 @@ def real_cache_client() -> TestClient:
     yield TestClient(app)
 
 
+class TestGzip:
+    def test_large_responses_are_compressed(self, client: TestClient) -> None:
+        r = client.get("/presets/D_adaptive_trailing", headers={"Accept-Encoding": "gzip"})
+        assert r.status_code == 200
+        assert r.headers.get("content-encoding") == "gzip"
+        assert r.json()["name"] == "D_adaptive_trailing"
+
+    def test_small_responses_are_not(self, client: TestClient) -> None:
+        r = client.get("/health", headers={"Accept-Encoding": "gzip"})
+        assert "content-encoding" not in r.headers
+
+
 class TestHealth:
     def test_health_ok(self, client: TestClient) -> None:
         r = client.get("/health")
@@ -98,6 +110,14 @@ class TestCoverage:
         r = client.get("/coverage", params={"underlying": "NIFTY"})
         assert r.status_code == 200
         assert r.json() == {}
+
+    @pytest.mark.parametrize("underlying", ["..", "../../etc", "NIFTY/15m", "nifty 50", "a" * 40])
+    def test_rejects_an_underlying_that_is_not_a_plain_symbol(
+        self, client: TestClient, underlying: str
+    ) -> None:
+        r = client.get("/coverage", params={"underlying": underlying})
+        assert r.status_code == 400
+        assert "invalid underlying" in r.json()["detail"]
 
     def test_real_cache_reports_a_date_range(self, real_cache_client: TestClient) -> None:
         r = real_cache_client.get("/coverage", params={"underlying": "NIFTY"})

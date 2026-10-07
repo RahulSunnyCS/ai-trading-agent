@@ -17,6 +17,13 @@ const BODY_LIMIT_BYTES = 64 * 1024;
 /** A section name is a short snake_case word. Which ones exist is the Python service's call (its
  * `BacktestSection`), so this only keeps the path safe: nothing else reaches the upstream URL. */
 const SECTION_NAME_PATTERN = '^[a-z_]{1,32}$';
+/** Saved-run ids are `uuid4().hex` (runs_store.py); allow a little slack but never `.`, `/` or
+ * `%`, so a `..` path segment cannot reach the upstream URL. */
+const RUN_ID_PARAMS = {
+  type: 'object',
+  properties: { runId: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,64}$' } },
+  required: ['runId'],
+} as const;
 
 function momentumApiUrl(): string {
   return process.env.MOMENTUM_API_URL || DEFAULT_MOMENTUM_API_URL;
@@ -215,7 +222,7 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
 
   fastify.patch(
     '/api/momentum/saved-runs/:runId',
-    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { params: RUN_ID_PARAMS, body: { type: 'object' } } },
     async (request, reply) => {
       const { runId } = request.params as { runId: string };
       await forward(reply, `/api/saved-runs/${encodeURIComponent(runId)}`, {
@@ -226,10 +233,14 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
-  fastify.delete('/api/momentum/saved-runs/:runId', async (request, reply) => {
-    const { runId } = request.params as { runId: string };
-    await forward(reply, `/api/saved-runs/${encodeURIComponent(runId)}`, { method: 'DELETE' });
-  });
+  fastify.delete(
+    '/api/momentum/saved-runs/:runId',
+    { schema: { params: RUN_ID_PARAMS } },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      await forward(reply, `/api/saved-runs/${encodeURIComponent(runId)}`, { method: 'DELETE' });
+    },
+  );
 
   // Favourites are intentionally not scoped to the currently selected dataset:
   // the weekly scheduler evaluates the complete set and has one global active
@@ -287,7 +298,7 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
 
   fastify.post(
     '/api/momentum/stock-actions/review',
-    { schema: { body: { type: 'object' } } },
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
     async (request, reply) => {
       await forward(reply, '/api/stock-actions/review', {
         method: 'POST',

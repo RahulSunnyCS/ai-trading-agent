@@ -11,9 +11,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from starlette.middleware.gzip import GZipMiddleware
 
 from ..config import resolve_cache_dir
+from ..data.cache import InvalidUnderlyingError
 from .legwise_routes import router as legwise_router
 from .routes import router
 
@@ -29,6 +32,13 @@ def create_app(cache_dir: Path | None = None) -> FastAPI:
     tests/conftest.py)."""
     app = FastAPI(title="option-backtesting", version="0.1.0")
     app.state.cache_dir = cache_dir or resolve_cache_dir()
+    # Backtest results and day curves are large JSON; small bodies are not worth compressing.
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+    @app.exception_handler(InvalidUnderlyingError)
+    async def _invalid_underlying(_request: Request, exc: InvalidUnderlyingError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
     app.include_router(router)
     app.include_router(legwise_router)
     return app
