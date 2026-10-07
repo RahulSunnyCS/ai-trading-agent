@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — becomes P0 the week real money goes into the strategy |
-| **Status** | In progress (Phase 1: rules drafted, awaiting sign-off) |
+| **Status** | In progress (Phase 2) |
 | **Type** | feature |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
@@ -51,7 +51,7 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
    - **Drawdown:** cut half at a 20% fall from the peak, exit fully at 30%. These are stricter
      than the 25–35% tolerance and 40% ceiling stated in BL-010.
    - **Trailing:** review when live is 5 points behind the backtest over 13 weeks.
-   - **Claude's drafted details, for sign-off:**
+   - **Claude's drafted details (signed off by the owner, 2026-10-07):**
      - the money gate is at least 13 paper weeks, beating the Nifty200 Momentum 30 TRI, and
        neither drawdown rule hit;
      - after "cut half" the signal is followed at half size;
@@ -71,3 +71,5 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
   `packages/momentum-backtesting/src/momentum_backtesting/live_rules.toml` drafted with those
   numbers (stage `paper`). It waits for the owner's sign-off of the drafted details, then
   Phase 2 (the weekly check and alert, a BL-012 scheduler job).
+- 2026-10-07 — owner signed off the drafted details ("yes, signed off"). Phase 1 done. Phase 2
+  (the weekly check and alert) started.

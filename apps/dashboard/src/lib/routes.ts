@@ -174,6 +174,15 @@ export function oneOf<T extends string>(
   return allowed.find((item) => item === value) ?? null;
 }
 
+/**
+ * A page laid out on the Analytics page pattern (apps/dashboard/CLAUDE.md): the navigation
+ * shrinks to an icon rail and the page takes the full width, so its hero chart can too.
+ * Momentum's Backtest section, the section `/momentum` opens on, is the first.
+ */
+export function isAnalyticsPage(tab: Tab | null, rest: readonly string[] = []): boolean {
+  return tab === 'momentum' && (oneOf(MOMENTUM_SECTIONS, rest[0]) ?? 'backtest') === 'backtest';
+}
+
 export const APP_NAME = 'AI Trading Agent';
 
 /**

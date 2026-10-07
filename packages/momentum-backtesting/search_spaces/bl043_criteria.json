@@ -1,0 +1,124 @@
+{
+  "written_before_running": "2026-10-07T17:35:00+05:30",
+  "name": "BL-043 daily pattern trading system: rules, grids and pass/kill thresholds",
+  "source": "backlog/BL-043-daily-pattern-trading-system.md - the plan; this file is the machine-readable copy of its rules",
+  "rule": "Committed before any BL-043 run. Never edited after results are seen: a change is a new file (bl043_criteria_addendum_N.json) that names what it changes and why, committed before the step it affects.",
+  "supersedes": null,
+  "owner_answers": "2026-10-07: tight range + flag only; stop/target trigger on the day's low/high (GTT-like); health switch = 60-day win rate below its own expanding median; next-day-open fills; Friday rule as a tested option; 10 slots x 10%, Rs 5 lakh",
+  "universe": {
+    "members": "turnover_rank_members_by_year (point-in-time, as known each January)",
+    "tradable_on_signal_day": {
+      "min_close_rs": 30.0,
+      "min_median_turnover_cr_60d": 2.0,
+      "turnover": "close x volume of the raw (unadjusted) bars, median of the last 60 sessions up to the signal day"
+    },
+    "bad_bars": "BL-042's bad-bar rule (gaps, unexplained moves, bad-print wicks): no candidate whose base or ATR window holds one"
+  },
+  "windows": {
+    "development": { "from": "2012-01-01", "to": "2023-12-29" },
+    "holdout": {
+      "from": "2024-01-01",
+      "to": "latest bar at the Phase 6 run (recorded in the result)"
+    },
+    "embargo_weeks": 13,
+    "walk_forward_years": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
+    "plain": "Development needs no bar on or after 2024-01-01; a trade that would still be open on 2023-12-29 is closed at that day's close for development results. The hold-out was handed over unread by BL-042."
+  },
+  "patterns": {
+    "names": ["tight_range", "flag"],
+    "detectors": "BL-042's frozen detectors (bl042_criteria addendum 2), evaluated at EVERY daily close instead of week ends",
+    "daily_equivalents": {
+      "plain": "Weekly rules become daily-window rules: N weeks = 5N trading days. Tight range: N-week range = highest high - lowest low of the last 5N sessions over the close; its own median = the median of that measure over the previous 260 sessions; uptrend = close above its 150-session average and at least 25% above the 260-session low; near_high = close at least 75% of the 260-session high. Flag: unchanged (already daily); its weekly uptrend/near-high context uses the same 150/260-session forms.",
+      "week": 5,
+      "year": 260
+    }
+  },
+  "entries": {
+    "breakout": "day d: close above the pivot of a base that held at d-1's close, on volume at least 1.5x the 50-session average before d. Signal at d's close.",
+    "pullback": "day d: the base holds at d's close AND the close is more than 5% below its pivot (BL-042's 'forming' state). Signal at d's close.",
+    "fill": "the next session's open, with slippage; the same-day close is reported as a sensitivity, never judged",
+    "one_trade_per_base": "a base (symbol + pattern + base start) is traded at most once"
+  },
+  "exits": {
+    "stops": {
+      "base_low": "lowest low of the base window (for a flag, the flag's lowest low) known at the signal",
+      "atr_1.5": "fill price - 1.5 x ATR(14) at the signal day",
+      "pct_8": "fill price x 0.92"
+    },
+    "skip_if_risk_above": 0.15,
+    "targets": { "2R": 2.0, "3R": 3.0, "none": null },
+    "R": "fill price - stop",
+    "time_stop_sessions": 65,
+    "trigger": "stop: open <= stop -> exit at the open; else low <= stop -> exit at the stop. target: open >= target -> exit at the open; else high >= target -> exit at the target. Both touched the same day -> the stop is assumed first. Checked from the entry day itself (after the open fill).",
+    "time_exit": "close of the 65th session after entry"
+  },
+  "costs": {
+    "model": "engine.py itemised constants: STT 0.1% each side, stamp duty 0.015% on buys, exchange+SEBI+GST 0.004% each side, DP charge Rs 16 per sell",
+    "slippage_bps_each_side": 15
+  },
+  "portfolio": {
+    "capital_rs": 500000,
+    "slots": 10,
+    "size": "current equity / 10 at the fill (compounding); fewer open slots = cash",
+    "idle_cash_return": 0.0,
+    "order": "on a signal day, candidates fill best score first while slots are free; ties by symbol"
+  },
+  "score": {
+    "plain": "0-100 for each candidate = the causal past result of similar candidates under the same entry/stop/target: the mean R (after costs) of earlier candidates in the same cell whose exits had happened before the signal day. 50 = neutral.",
+    "cell": ["pattern", "entry", "above_50dma", "quality_third"],
+    "quality": "BL-042 addendum 1 quality grade, thirds cut on the development candidates",
+    "min_past_trades": 30,
+    "to_score": "clip(50 + 50 x mean_R / 1.0, 0, 100): +1R average = 100, -1R = 0, too few trades = 50",
+    "counts_all_candidates": "past results are computed for every candidate (as if taken), not only the ones a portfolio took"
+  },
+  "health_switch": {
+    "plain": "on: no NEW entries while the win rate of candidates closed in the last 60 sessions (same entry/stop/target, all candidates) is below the expanding median of that same series up to that day; open positions are kept. off: ignored.",
+    "window_sessions": 60,
+    "options": ["off", "on"]
+  },
+  "cutoffs": {
+    "options": [
+      "score>=70 any day",
+      "score>=80 any day",
+      "friday: score>=70 on Fridays, score>=83 other days"
+    ]
+  },
+  "search": {
+    "stage_a": {
+      "what": "trade-level: per pattern, entry (2) x stop (3) x target (3) = 18 combinations, judged on mean R after costs of ALL candidates (no portfolio)",
+      "walk_forward": "for each year Y in walk_forward_years: pick, per pattern, the combination with the highest mean R over candidates whose exits fall before 1 January Y minus the embargo; use it in Y",
+      "pbo": {
+        "blocks": 16,
+        "on": "monthly mean R of each combination's candidates, per pattern",
+        "kill_above": 0.3
+      }
+    },
+    "stage_b": {
+      "what": "portfolio-level, on the stage-A walk-forward choice: cutoff (3) x health switch (2) = 6 trials, both patterns sharing the 10 slots",
+      "walk_forward": "as stage A, judged on the portfolio's weekly log return",
+      "pbo": { "blocks": 16, "on": "weekly log returns of the 6 portfolios", "kill_above": 0.3 }
+    },
+    "trials_total": 42
+  },
+  "pass_kill": {
+    "development": "PASS only if: stage A PBO <= 0.3 for at least one pattern; stage B PBO <= 0.3; the joined walk-forward portfolio (2015-2023) after costs has a CAGR above the Nifty 500 TRI's over the same weeks. Otherwise KILL and Phase 6 is not run.",
+    "holdout_choice": "the stage-A and stage-B choices made on the full development window by the same rules",
+    "holdout": {
+      "runs_allowed": 1,
+      "pass": "CAGR after costs at least 5 points above the Nifty 500 TRI over the same weeks, AND max drawdown no deeper than the Nifty 500 TRI's over the same weeks, AND the strategy beats the index in at least 2 of the calendar years 2024, 2025, 2026 (2026 partial)"
+    },
+    "reported_only": [
+      "Nifty Smallcap 250 TRI",
+      "cash",
+      "same-close fills",
+      "each pattern alone",
+      "trade count, win rate, average holding, turnover, cost drag"
+    ]
+  },
+  "will_not_run": [
+    "anything reading a bar on or after 2024-01-01 before Phase 6",
+    "a stop, target, entry, cutoff or switch outside the grids above",
+    "a second hold-out run",
+    "cup and handle (owner: later, only if these work)"
+  ]
+}

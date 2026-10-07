@@ -31,6 +31,7 @@ from momentum_backtesting.stocks.ui_data import (
     NIFTY500_TRI,
     NIFTY_MIDCAP150_MOMENTUM50_TRI,
     NIFTY_MIDCAP150_TRI,
+    NIFTY_NEXT50_TRI,
     NIFTY_SMALLCAP250_TRI,
     REFERENCE_ONLY_COLUMNS,
 )
@@ -42,6 +43,7 @@ EXPECTED_NAMES = {
     "nifty_midcap150_momentum50_tri": "Nifty Midcap150 Momentum 50 TRI",
     "nifty500_momentum50_tri": "Nifty500 Momentum 50 TRI",
     "nifty500_tri": "Nifty 500 TRI",  # the Phase 6 backcast benchmark
+    "nifty_next50_tri": "Nifty Next 50 TRI",  # the dashboard benchmark picker
 }
 
 
@@ -237,6 +239,7 @@ def _csv_with_extras(data_dir, weeks):
             "nifty_midcap150_momentum50_tri": [float(i + 41) for i in range(n)],
             "nifty500_momentum50_tri": [float(i + 51) for i in range(n)],
             "nifty500_tri": [float(i + 61) for i in range(n)],
+            "nifty_next50_tri": [float(i + 71) for i in range(n)],
         },
         index=weeks,
     ).to_csv(stocks / "benchmarks_weekly.csv")
@@ -256,6 +259,7 @@ def test_load_references_returns_the_extra_columns_after_the_original_two(tmp_pa
         NIFTY_MIDCAP150_MOMENTUM50_TRI,
         NIFTY500_MOMENTUM50_TRI,
         NIFTY500_TRI,
+        NIFTY_NEXT50_TRI,
     ]
     assert list(refs[NIFTY_SMALLCAP250_TRI]) == [31.0, 32.0, 33.0, 34.0]
 

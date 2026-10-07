@@ -13,6 +13,7 @@ import {
   buildPath,
   builderMode,
   documentTitle,
+  isAnalyticsPage,
   oneOf,
   parsePath,
   tabSegment,
@@ -216,5 +217,20 @@ describe('routes', () => {
 
   it('titles an unknown route with the app name alone', () => {
     expect(documentTitle(null)).toBe('AI Trading Agent');
+  });
+});
+
+describe('isAnalyticsPage', () => {
+  it.each([
+    ['momentum', [], true],
+    ['momentum', ['backtest'], true],
+    ['momentum', ['backtest', 'broad'], true],
+    ['momentum', ['nope'], true],
+    ['momentum', ['scores'], false],
+    ['momentum', ['saved'], false],
+    ['optionslab', [], false],
+    [null, [], false],
+  ] as const)('%s %j -> %s', (tab, rest, expected) => {
+    expect(isAnalyticsPage(tab, rest)).toBe(expected);
   });
 });
