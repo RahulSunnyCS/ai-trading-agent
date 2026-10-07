@@ -67,6 +67,8 @@ def test_paper_tracking_not_started_before_paper_start():
     report = live_rules.evaluate(RULES, early, _flat(2))
     assert report.weeks == 0 and report.findings[0].level == "pending"
     assert not report.breached
+    _, title, _ = live_rules.summary(report)
+    assert "not started" in title and "no rule breached" not in title  # nothing was measured
 
 
 def test_weeks_are_counted_from_the_paper_start():

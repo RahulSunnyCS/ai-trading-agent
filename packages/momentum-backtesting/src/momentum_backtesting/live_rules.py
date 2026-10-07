@@ -255,6 +255,8 @@ def summary(report: Report) -> tuple[str, str, str]:
         return "action_required", f"{prefix}{which.title}", body
     if needs:
         return "action_required", f"{prefix}{needs[0].title}", body
+    if report.findings and report.findings[0].rule == "stage":
+        return "info", f"{prefix}Live rules check: {report.findings[0].title.lower()}", body
     return "info", f"{prefix}Live rules check: no rule breached", body
 
 
