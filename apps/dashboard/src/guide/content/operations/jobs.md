@@ -30,6 +30,7 @@ Click a job to read the last 200 lines of its latest log.
 | `fyers-login` (08:05) | Gets the day's [Fyers token](glossary:fyers-token). |
 | `morning-summary` (09:00) | One Telegram message: did the logins work, is the data current. |
 | `options-daily` (16:15) | The [evening run](glossary:evening-run). |
+| `options-derived` (23:30) | Builds any missing 5-minute snapshots and IV tables the evening run left out. |
 | `momentum-preview` (Fri 14:40) | The momentum preview on live prices. |
 | `momentum-final` (Fri 16:45) | The momentum final signal. |
 | `momentum-stock-ingest` (Fri 19:30) | Refreshes NSE stock data, then the stock-based finals. |

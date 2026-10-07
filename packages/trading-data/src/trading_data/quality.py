@@ -364,3 +364,42 @@ def excluded_days(root: Path, asset: str, name: str) -> dict[date, str] | None:
         )
     )
 
+
+def day_verdicts(root: Path, day: date, asset: str = "option") -> dict[str, tuple[str, str | None]]:
+    """{name: (verdict, reason)} for one day of one asset, from the lock-free snapshot ({}
+    when there is no snapshot or no row)."""
+    path = root / SNAPSHOT
+    if not path.exists():
+        return {}
+    table = pq.read_table(
+        path,
+        columns=["name", "verdict", "reason"],
+        filters=[("asset", "=", asset), ("trading_day", "=", day)],
+    )
+    cols = table.to_pydict()
+    return {
+        n: (v, r) for n, v, r in zip(cols["name"], cols["verdict"], cols["reason"], strict=True)
+    }
+
+
+def judge_day(
+    root: Path, day: date, names: list[str], *, lock_wait: float = 120.0
+) -> int:
+    """Judge one day's files for the given names (every asset; an index such as INDIAVIX has
+    only asset=index) in ONE catalog connection, then refresh the lock-free snapshot — the
+    evening run's quality step. `rebuild(days=...)` opens a connection per known name and
+    asset, which is slow on a full lake and waits on every one while another process holds
+    the catalog. Returns the number of day files judged; raises if the catalog stays locked."""
+    stats: list[DayStats] = []
+    for asset in ASSETS:
+        for name in names:
+            path = lake.bars_1m_path(root, asset, name, day)
+            if path.exists():
+                stats += file_stats(asset, name, [path])
+    with connect(root, lock_wait=lock_wait) as con:
+        holidays = {r[0] for r in con.execute("SELECT date FROM ref_holidays").fetchall()}
+        upsert(con, stats, holidays)
+        cross_check(con, names)
+        export_snapshot(con, root)
+    return len(stats)
+

@@ -17,7 +17,7 @@ alerts, 09:00 morning summary), the launchd cut-over code, `obt daily` 16:15, th
 per-type Telegram switches, the loopback API, the alert-only checks (lot sizes, Nifty 50
 membership, holidays/RBI/margin upkeep, stock-data baseline age and review queue, `gh` auth and
 the yearly credential reminder), the Saturday health digest, the dashboard Jobs page and the
-Telegram-alerts card in Settings, and `docs/mac-mini.md`. 18 jobs; 96 scheduler tests.
+Telegram-alerts card in Settings, and `docs/mac-mini.md`. 19 jobs (`options-derived` added by BL-034 Phase 4); 96 scheduler tests.
 
 **Owner steps still open:** `deploy/launchd/install.sh` (nothing runs through the scheduler until
 then), `sudo pmset repeat wakeorpoweron MTWRF 07:55:00`, and whether Postgres :5433 should run.

@@ -43,6 +43,8 @@ VIX_SYMBOL = "NSE:INDIAVIX-INDEX"
 VIX_NAME = "INDIAVIX"
 DEFAULT_PREMIUM_FLOOR = 2.0
 DEFAULT_MAX_EXTRA = 60
+#: Index futures kept per underlying each day: the nearest and the next (BL-034 Phase 4).
+FUTURES_KEPT = 2
 #: Consecutive below-floor strikes before the walk stops — one illiquid strike
 #: with no trades must not end the walk early.
 STOP_AFTER_CHEAP = 2
@@ -390,17 +392,21 @@ def collect_day(
             entry["range"] = [day_low, day_high]
 
             mine = [c for c in contracts if c.underlying == spec.name]
+            # the nearest and the next future (BL-034 Phase 4), in one day file: each row's
+            # instrument_id / vendor_symbol tells them apart
             futures = sorted((c for c in mine if c.option_type == "FUT"), key=lambda c: c.expiry)
-            if futures:
-                fut = futures[0]
+            fut_tables = []
+            entry["futures"] = []
+            for fut in futures[:FUTURES_KEPT]:
                 fut_candles = client.minute_candles(fut.symbol, day)
-                entry["future"] = {"symbol": fut.symbol, "bars": len(fut_candles)}
+                entry["futures"].append({"symbol": fut.symbol, "bars": len(fut_candles)})
                 if fut_candles:
-                    lake.write_parquet(
-                        bars_table(ids[fut.symbol], fut.symbol, fut_candles),
-                        lake.bars_1m_path(root, "future", spec.name, day),
-                    )
+                    fut_tables.append(bars_table(ids[fut.symbol], fut.symbol, fut_candles))
                     rows_total += len(fut_candles)
+            if fut_tables:
+                lake.write_parquet(
+                    pa.concat_tables(fut_tables), lake.bars_1m_path(root, "future", spec.name, day)
+                )
 
             options = [c for c in mine if c.option_type in ("CE", "PE")]
             expiries = select_expiries([c.expiry for c in options], day, spec.cadence)

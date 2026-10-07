@@ -93,6 +93,9 @@ table instead.
   written and regenerable with `tdata quality rebuild`; a day is never dropped from the lake
   for a bad verdict — the label says why, readers decide. Fetch timestamps from DuckDB as
   epoch seconds, not `TIMESTAMPTZ` (that import needs `pytz`, which is not a dependency).
+- **The evening run judges one day with `quality.judge_day`** (one connection, ~20 s), not
+  `rebuild(days=...)` (a connection per known name — minutes, and it waits on every one while the
+  catalog is held).
 - **Readers get verdicts from a file, not the catalog.** `quality.SNAPSHOT`
   (`$TRADING_DATA_ROOT/quality/data_quality.parquet`) is rewritten after every rebuild and vendor
   import (and by `tdata quality export`); `quality.excluded_days()` reads it without the catalog

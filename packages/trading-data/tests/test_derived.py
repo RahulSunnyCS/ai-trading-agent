@@ -294,3 +294,14 @@ def test_a_window_without_a_start_price_gets_no_strikes(root):
     buckets = {r["bucket"] for r in rows(build.chain)}
     assert minute_ts(0) not in buckets
     assert minute_ts(5) in buckets
+
+
+def test_judge_day_judges_one_day_in_one_pass(root):
+    from trading_data import quality
+
+    with connect(root):
+        pass
+    assert quality.judge_day(root, DAY, ["NIFTY", "INDIAVIX"]) == 2  # option + index files
+    assert quality.day_verdicts(root, DAY) == {"NIFTY": ("usable", None)}
+    assert quality.day_verdicts(root, DAY, asset="index") == {"NIFTY": ("usable", None)}
+
