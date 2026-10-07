@@ -10,7 +10,7 @@ import { useThemeStore } from '../../store/theme';
 export function MomentumYearlyChart({
   rows,
   benchmarkName,
-}: { rows: Array<Record<string, unknown>>; benchmarkName: string }) {
+}: { rows: ReadonlyArray<Record<string, unknown>>; benchmarkName: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const theme = useThemeStore((state) => state.theme);
 
