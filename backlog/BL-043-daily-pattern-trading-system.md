@@ -185,7 +185,20 @@ Answered when the owner started the item (2026-10-07):
   bar, one run.
 - **Will not run:** any read of 2024 or later before Phase 6; anything outside the grids; a
   second hold-out run; cup and handle.
-- **Result:** (after the run)
+- **Result (2026-10-07): kill on the development data. Phase 6 not run; the 2024–26 hold-out
+  stays sealed.**
+  - **Stage A (trade level, mean R):** passes. Tight range +0.62R over 1,509 walk-forward
+    trades, PBO 0.04; flag +0.44R over 1,415, PBO 0.20.
+  - **Stage B (portfolio):** fails. Walk-forward CAGR 7.8% (2015–2023) against the Nifty 500
+    TRI's 13.5%; PBO 0.32.
+  - Files: `search_spaces/bl043_dev_result.json`;
+    `data/patterns/swing/dev_portfolio_curves.parquet`.
+  - **Why the stages disagree: a flaw in the pre-registered metric, found on the run.** Mean
+    R rewards tiny stops. The top combination (pullback, base-low stop) wins 18% / 9% of the
+    time and holds a median 6 / 2 days. Its few winners carry R of 10–40 on stops under 1–3%
+    away (13–25% of these trades risk under 1%). A fixed 10% slot earns the percent return,
+    not R. The score, built on mean R, does not rank: its calibration buckets are
+    non-monotonic, and the lowest-score bucket has the best trades.
 
 ## Log
 
@@ -221,3 +234,31 @@ Answered when the owner started the item (2026-10-07):
     - fill 773.20; base-low stop 715 (risk 7.53%); 2R target 889.6;
     - stopped 15 Feb at 715 (low 705); −8.04% after costs;
     - every number matches the bars.
+
+- 2026-10-07 — Phases 3–5 run; **killed** (Result above). Exploratory follow-up, after the
+  result, so hindsight and not evidence:
+  - **In percent per trade** (first of each base, no target, 65-session limit, after costs):
+    | Setup | Avg net / trade | Win rate | Median hold |
+    |---|---|---|---|
+    | Tight-range breakout, base-low stop | +5.0% | 46% | 65 sessions |
+    | Tight-range breakout, 8% stop | +4.7% | 40% | 38 sessions |
+    | Flag pullback, 8% stop | +3.7% | 33% | 22 sessions |
+
+    Fixed 2R/3R targets were worse than none. Nifty 500 TRI made about 3–3.5% a quarter over
+    the same years, so most of each trade is market drift.
+  - **The simple rules as 10-slot portfolios, 2012–2023** (quality orders the fills):
+    | Rule | CAGR | Max drawdown |
+    |---|---|---|
+    | Tight-range breakout, 8% stop | 13.5% | −30.6% |
+    | Tight + flag breakouts, 8% stop | 13.9% | −34.6% |
+    | All four kinds, 8% stop | 20.0% | −43.7% |
+    | *Nifty 500 TRI* | *16.2%* | *−34.2%* |
+    | *Nifty Midcap 150 TRI* | *21.5%* | *−40.3%* |
+    | *Nifty Smallcap 250 TRI* | *19.1%* | *−57.4%* |
+
+    The year-by-year pattern of "all four kinds" tracks the mid/small-cap indices (+73% in
+    2014, −24% in 2018, +88% in 2021). It is mid/small-cap exposure, not a pattern edge.
+  - **Conclusion:** in this data (point-in-time liquid NSE stocks, daily, after costs), tight
+    ranges and flags as a standalone swing system do not beat simply holding a mid-cap index.
+    No rule here is worth spending the sealed hold-out on. Recommended to the owner: close
+    BL-043 as "no edge after costs".

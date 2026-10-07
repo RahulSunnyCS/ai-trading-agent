@@ -580,8 +580,8 @@ answers and the pass/kill rules live in the backlog item.
 | 3.21.0 | Phase 0: pre-registration (criteria + Experiments block) | claude | **Done 2026-10-07** (`bl043_criteria.json`, 42 trials) |
 | 3.21.1 | Phase 1: daily detection + truncation test | claude | **Done 2026-10-07** (`mbt swing candidates`; 16,261 candidates on 8,788 bases, 2012–2023) |
 | 3.21.2 | Phase 2: trade simulator (next-open fills, GTT-style stop/target, 10 × 10%, costs) | claude | **Done 2026-10-07** (tests + a real trade hand-checked) |
-| 3.21.3 | Phases 3–5: playbook, score, rules test on 2012–2023 | claude | Open |
-| 3.21.4 | Phase 6: one hold-out run | claude | Open |
+| 3.21.3 | Phases 3–5: playbook, score, rules test on 2012–2023 | claude | **Done 2026-10-07: killed.** Portfolio 7.8% vs Nifty 500 TRI 13.5%, PBO 0.32. The mean-R metric favoured tiny stops; simple breakout portfolios ≈ mid-cap index exposure (see item) |
+| 3.21.4 | Phase 6: one hold-out run | claude | Not run (dev killed); hold-out still sealed |
 | 3.21.5 | Phase 7: daily Telegram scan + paper tracking | owner→claude | Open |
 
 ## Reference — where detail lives
