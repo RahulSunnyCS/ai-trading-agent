@@ -145,13 +145,8 @@ class _DaySim:
         self.data = data
         self.reference = reference
         self.notes: list[str] = []
-        lot = reference.lot_size(strategy.underlying, data.day)
-        if data.master_lot_size is not None and data.master_lot_size != lot:
-            self.notes.append(
-                f"lot size: reference CSV says {lot}, Fyers symbol master says "
-                f"{data.master_lot_size} — using the CSV; update lot_sizes.csv if it is stale"
-            )
-        self.legs = [_LegRun(leg, leg.lots * lot) for leg in strategy.legs]
+        # Quantity is set per leg in _select: the lot size belongs to the contract's expiry.
+        self.legs = [_LegRun(leg, 0) for leg in strategy.legs]
         for run in self.legs:
             run.reentries_sl = leg_count(run.spec.reentry_on_sl)
             run.reentries_target = leg_count(run.spec.reentry_on_target)
@@ -236,6 +231,14 @@ class _DaySim:
         if series.price_at(minute) is None:
             self.notes.append(f"{spec.id}: {key} has not traded by {minute_label(minute)}")
             return False
+        lot = self.reference.lot_size(self.s.underlying, key[0])
+        if self.data.master_lot_size is not None and self.data.master_lot_size != lot:
+            self.notes.append(
+                f"lot size: reference CSV says {lot} for the {key[0]} expiry, Fyers symbol "
+                f"master says {self.data.master_lot_size} — using the CSV; update "
+                "lot_sizes.csv if it is stale"
+            )
+        run.qty = run.spec.lots * lot
         run.contract, run.series = key, series
         return True
 

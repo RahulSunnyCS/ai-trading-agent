@@ -141,9 +141,17 @@ class ReferenceData:
 
     # -- lookups ----------------------------------------------------------
 
-    def lot_size(self, underlying: str, as_of: date) -> int:
+    def lot_size(self, underlying: str, expiry: date) -> int:
+        """Lot size of the contracts expiring on `expiry`.
+
+        The exchanges revise a lot size per CONTRACT, not per trading day: a contract
+        listed before a revision keeps its old lot size until it expires, so on the same
+        trading day a weekly and a monthly can differ (NIFTY on 2025-01-15: the 16 Jan
+        weekly is 75, the 30 Jan monthly is still 25). `lot_sizes.csv`'s effective_date
+        is therefore the first EXPIRY a size applies to. For a contract that expires
+        today or soon, passing today's date gives the right answer outside a transition."""
         return _most_recent_as_of(
-            self._lot_sizes, as_of, label="lot_sizes", underlying=underlying
+            self._lot_sizes, expiry, label="lot_sizes", underlying=underlying
         ).lot_size
 
     def strike_step(self, underlying: str, as_of: date) -> float:

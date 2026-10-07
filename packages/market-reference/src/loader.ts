@@ -66,7 +66,11 @@ function mostRecentAsOf(rows: DatedRow[], underlying: string, asOf: Date, label:
   return candidates.reduce((a, b) => (a.effectiveDate > b.effectiveDate ? a : b)).value;
 }
 
-/** Contract lot size in force on `asOf`. NIFTY is 65 as of 2026-01-01, not 50. */
+/**
+ * Lot size of the contracts expiring on `asOf` (the exchanges revise per contract, so the
+ * date is the expiry; for a contract expiring soon, pass today). NIFTY is 65 for expiries
+ * from 2026-01-06, not 50.
+ */
 export function lotSize(underlying: Underlying, asOf: Date = new Date()): number {
   lotSizeRows ??= parseCsv('lot_sizes.csv', 'lot_size');
   return mostRecentAsOf(lotSizeRows, underlying, asOf, 'lot_sizes');
