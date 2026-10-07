@@ -1,0 +1,146 @@
+{
+  "written_before_running": "2026-10-07T11:20:00+05:30",
+  "name": "BL-041 chart-pattern POC: detectors, tests and pass/kill thresholds",
+  "source": "backlog/BL-041-chart-pattern-poc.md - the plan; this file is the machine-readable copy of its rules",
+  "rule": "Committed before any BL-041 detection, event study or backtest. Never edited after results are seen: a change is a new file that names this one as superseded, with the reason. Detector thresholds are frozen in bl041_criteria_addendum_1.json after the gallery check and before Phase 4.",
+  "supersedes": null,
+  "owner_approved": "2026-10-07, in the session that wrote the plan ('Yes I am good. Continue')",
+  "patterns_tested": ["tight_range", "flag", "cup_handle"],
+  "reported_only_patterns": ["high_tight_flag"],
+  "universe": {
+    "dataset": "Broad Momentum",
+    "universe_kind": "turnover_rank",
+    "membership": "turnover_rank_members_by_year, as known each January",
+    "liquidity": { "min_turnover_cr": 2.0, "min_price": 30.0, "floor_ratio": 0.25, "circuit": true, "circuit_run": 3 },
+    "series_break_policy": "verified",
+    "respect_circuits": true,
+    "bars": "bars_1d_stock daily OHLCV; highs/lows/opens back-adjusted by chaining NSE prevclose (factor = prevclose_d / close_{d-1}); every pattern measure is a ratio inside its window"
+  },
+  "windows": {
+    "development": { "from": "2012-01-01", "to": "2023-12-29" },
+    "holdout": { "from": "2024-01-01", "to": "2026-09-25" },
+    "embargo_weeks": 13,
+    "forward_returns_end_by": "2023-12-29",
+    "plain": "Nothing before Phase 6 reads a bar dated 2024-01-01 or later, and no forward return in Phases 4-5 ends after 2023-12-29."
+  },
+  "states": {
+    "forming": "the pattern's rules hold at this Friday's close",
+    "near_pivot": "forming, and the close is within 5% below the pivot",
+    "broke_out": "a close above the pivot on volume at least 1.5x the 50-day average, within the last 2 weeks (this Friday included), with the base still valid on the breakout day",
+    "score": { "none": 0.0, "forming": 0.5, "near_pivot": 0.75, "broke_out": 1.0 },
+    "detected": "score >= 0.5 (any state)"
+  },
+  "detectors_starting_values": {
+    "note": "Starting values only. Phase 3 tunes them on the owner's gallery labels (never on returns); the frozen values go in addendum 1.",
+    "tight_range": {
+      "uptrend": { "above_ma_weeks": 30, "min_above_52w_low": 0.25 },
+      "windows_weeks": [3, 5, 8],
+      "max_range": { "3": 0.08, "5": 0.12, "8": 0.15 },
+      "max_range_vs_own_median": 0.5,
+      "own_median_lookback_weeks": 52,
+      "volume_dry_up": { "short_days": 10, "long_days": 50, "max_ratio": 0.7, "required": false },
+      "pivot": "highest high of the tightest qualifying window"
+    },
+    "flag": {
+      "pole": { "min_rise": 0.2, "min_days": 3, "max_days": 25 },
+      "flag": { "min_days": 5, "max_days": 20, "max_retrace_of_pole": 0.3333, "max_drop_from_pole_high": 0.15, "highs_not_rising": true, "volume_below_pole": true },
+      "pivot": "highest high of the flag"
+    },
+    "high_tight_flag": {
+      "pole": { "min_rise": 0.9, "max_weeks": 8 },
+      "flag": { "min_weeks": 3, "max_weeks": 5, "max_drop_from_pole_high": 0.25 }
+    },
+    "cup_handle": {
+      "pivots": "causal zigzag on weekly closes, reversal 8%; a swing point exists only from the week that confirmed it",
+      "prior_advance": 0.3,
+      "cup": { "min_weeks": 7, "max_weeks": 65, "min_depth": 0.12, "max_depth": 0.35, "min_weeks_in_lower_third": 3, "right_lip_within_of_left": 0.1 },
+      "handle": { "min_weeks": 1, "max_weeks": 4, "max_depth": 0.15, "must_be_in_upper_half": true },
+      "pivot": "highest high of the handle"
+    }
+  },
+  "phase_2_momentum_during_formation": {
+    "asked_by": "owner, 2026-10-07: bases take 10-30+ weeks; does the momentum rank fall while they form?",
+    "reported_only": true,
+    "uses_returns": false,
+    "report": [
+      "For every detection: the stock's momentum rank (global and pool) at base start, at the base midpoint and at the detection Friday",
+      "Share of detections whose stock is inside the pool top 10 / 20 / 40 / 200 at the detection Friday",
+      "Detections per year, per pattern and per state"
+    ],
+    "plain": "Shows whether pattern stocks are still high-momentum names when the pattern completes - i.e. whether the filter and bonus shapes can even reach them. Not a gate."
+  },
+  "phase_3_gallery": {
+    "sample_per_pattern": 40,
+    "near_misses_per_pattern": 15,
+    "stratify": "by year",
+    "charts_end_at_detection": true,
+    "precision": "correct / (correct + wrong); unsure excluded",
+    "target_precision": 0.75,
+    "drop_pattern_below_precision": 0.6,
+    "tuning_input": "owner labels only, never forward returns"
+  },
+  "phase_4_event_study": {
+    "sample": "stock-weeks in the Broad pool (stock_pool_ranks not NaN), development window",
+    "event": "detected (any state); per-state results reported, not judged",
+    "horizons_weeks": [4, 13, 26],
+    "return": "the adjusted weekly close the engine trades (ranking.prices), Friday t to Friday t+h",
+    "control": "same Friday, same pool-rank decile, no detection of that pattern",
+    "weekly_statistic": "sum over deciles of n_event_d * (mean_event_d - mean_control_d) / sum n_event_d",
+    "test": "one-sided t on the weekly statistic series with Newey-West standard errors, lags = horizon",
+    "multiple_testing": "Holm across 3 patterns x 3 horizons, alpha 0.05",
+    "pass": "the 13-week test survives Holm and its mean is positive",
+    "minimum_sample": { "events": 100, "distinct_weeks": 52, "below": "inconclusive - treated as not passing" }
+  },
+  "phase_5_ranking_test": {
+    "baseline": {
+      "category_mode": "off",
+      "lookbacks": [1, 4, 13, 26, 52],
+      "weights": null,
+      "score": "ranksum",
+      "voladj_skip_recent_month": true,
+      "pool_top_n": 200,
+      "pool_exit_rank": 250,
+      "off_top_n": 10,
+      "off_exit_rank": 20,
+      "rebalance": "weekly",
+      "rebalance_every": 1,
+      "signal_delay": 1,
+      "cost_model": "itemised",
+      "slippage_bps": 15.0,
+      "capital": 500000,
+      "max_position": 0.35,
+      "max_stock_price": 10000,
+      "min_ranked": 1,
+      "entry": "wait",
+      "tax": "pre-tax"
+    },
+    "hook": "the pattern shape re-ranks UniverseRanking.stock_pool_ranks; run_broad_backtest runs unchanged on that ranking (category_mode off)",
+    "shapes": {
+      "blend": { "weights": [0.25, 0.5, 0.75], "score": "(1-w) * momentum_pct + w * pattern_score, momentum_pct = 1 - (pool_rank-1)/(N-1); re-ranked, ties by pool rank" },
+      "filter": { "top_n": [20, 40], "how": "detected names with pool rank <= top_n first (in momentum order), then every other pool name in momentum order" },
+      "bonus": { "ranks": [5, 10], "how": "detected names move up B ranks; re-ranked, ties by pool rank" }
+    },
+    "trials": 21,
+    "walk_forward": {
+      "years": [2017, 2018, 2019, 2020, 2021, 2022, 2023],
+      "pick": "for each year, per pattern, the shape with the highest sum of weekly log excess return over the baseline from 2012-01-06 to 13 weeks before 1 January of that year",
+      "hold": "that shape through the calendar year; years joined"
+    },
+    "pbo": { "blocks": 16, "on": "weekly log excess return over the baseline, 21 trials, development window", "kill_above": 0.3 },
+    "pass": "joined walk-forward excess CAGR over the baseline > 0, AND PBO <= 0.3",
+    "holdout_choice": "per passing pattern, the shape with the highest development-window excess log return over the baseline"
+  },
+  "phase_6_holdout": {
+    "runs_allowed": 1,
+    "window": { "from": "2024-01-01", "to": "2026-09-25" },
+    "enters": "a pattern that passed Phase 3, Phase 4 and Phase 5",
+    "pass": { "excess_cagr_pts_over_baseline": 2.0, "max_drawdown_not_worse_than_baseline_by_pts": 3.0 },
+    "reported": ["Nifty200 Momentum 30 TRI", "the four bl010_phase6_frozen.json configs with the chosen shape applied to combined_pool_ranks"]
+  },
+  "will_not_run": [
+    "any detection, event study or backtest that reads 2024-01-01 or later before Phase 6",
+    "any detector threshold chosen by forward returns",
+    "a second hold-out run",
+    "shapes or weights outside the 21 trials above"
+  ]
+}

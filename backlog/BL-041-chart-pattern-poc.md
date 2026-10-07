@@ -146,6 +146,14 @@ once on the sealed data. A guess before seeing any data:
   (2011–2023) only.
 - **Done when:** the detectors run over the whole development period and the tests pass.
 
+### Phase 2b — Momentum rank while the pattern forms (owner, 2026-10-07; reported only)
+- **Why:** a base takes 3 to 30+ weeks, and a stock moving sideways loses momentum rank, so the
+  best patterns may sit outside the top momentum names that the filter and bonus shapes look at.
+- **Tasks:** for every detection, record the stock's global and pool momentum rank at base start,
+  midpoint and detection; report the share of detections inside pool top 10 / 20 / 40 / 200, per
+  pattern and state. No returns are read.
+- **Done when:** the table is in this file before Phase 4.
+
 ### Phase 3 — Gallery check (owner; no returns shown)
 - **Tasks:**
   - `mbt patterns gallery` samples ~40 detections per pattern, stratified by year, plus ~15 near
@@ -211,7 +219,31 @@ once on the sealed data. A guess before seeing any data:
 
 ## Experiments
 
-(The first block is added in Phase 0, before any run.)
+### 2026-10-07 — Pattern POC: tight range, flag, cup and handle on Broad Momentum
+- **Hypothesis:** within the Broad pool, a stock showing a detected tight range, flag or cup and
+  handle earns more over the next 13 weeks than non-pattern stocks of the same momentum-rank
+  decile, and re-ranking the pool with the pattern beats the plain Broad ranking after costs.
+- **Universe:** Broad Momentum, `turnover_rank` membership as known each January, tradability
+  gate (₹2 cr, ₹30, floor 0.25, circuit run 3), circuit locks on (point-in-time source:
+  `turnover_rank_members_by_year`, `bars_1d_stock`).
+- **Look-ahead check:** the pattern features for a week are identical with and without the bars
+  after that Friday (truncation test at three cut dates); pivots exist only from the week that
+  confirmed them; highs and lows are back-adjusted by NSE prevclose chaining, and every measure is
+  a ratio inside its window.
+- **Pass / kill rule:** `packages/momentum-backtesting/search_spaces/bl041_criteria.json`.
+  - Gallery precision ≥ 0.75 (drop below 0.6).
+  - Event study: the 13-week test survives Holm across 9 tests, mean positive, ≥ 100 events in
+    ≥ 52 weeks.
+  - Ranking: the joined walk-forward excess CAGR over the baseline is > 0, and PBO ≤ 0.3 over the
+    21 trials.
+  - Hold-out: ≥ +2 points CAGR over the baseline, drawdown no more than 3 points worse.
+  - Comparator: the plain Broad ranking (category mode off, top 10 / exit 20, weekly,
+    signal delay 1, itemised costs).
+- **Hold-out:** data cut-off for development 2023-12-29; unseen period 2024-01-01 → 2026-09-25,
+  one run.
+- **Will not run:** anything reading 2024 or later before Phase 6; thresholds chosen on returns;
+  a second hold-out run; shapes outside the 21 trials.
+- **Result:** (after the run)
 
 ## Log
 
@@ -225,3 +257,7 @@ once on the sealed data. A guess before seeing any data:
 
   `override: owner wants an early POC; research only — default ranking, favourites, goldens and
   the weekly signal untouched; BL-010/BL-036 prerequisite of BL-035 waived for this item only.`
+- 2026-10-07 — owner approved the catalogue and the proposed numbers ("Yes I am good"). Phase 0:
+  `bl041_criteria.json` and the Experiments block committed before any detection or run. Owner
+  added a check (Phase 2b): does the momentum rank fall while a 10–30 week base forms? Reported
+  only, no returns read.
