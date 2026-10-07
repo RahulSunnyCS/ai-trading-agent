@@ -28,7 +28,11 @@ export function MomentumSettingsChips({
     <section
       className={cn(
         'flex items-center gap-1.5',
-        singleLine ? 'flex-nowrap overflow-hidden [&>*]:shrink-0' : 'flex-wrap',
+        // One row that scrolls sideways (touchpad, shift-wheel) rather than wrapping or clipping
+        // a chip out of sight.
+        singleLine
+          ? 'flex-nowrap overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0'
+          : 'flex-wrap',
       )}
       aria-label="Current settings"
     >

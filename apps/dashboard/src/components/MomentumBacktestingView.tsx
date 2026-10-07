@@ -34,6 +34,7 @@ import { formatDuration, formatPct, formatPp } from '../lib/format';
 import {
   benchmarkLabel,
   benchmarkOptions,
+  edgeAgainst,
   resolveBenchmark,
   withBenchmark,
 } from '../lib/momentumBenchmark';
@@ -262,12 +263,15 @@ function MomentumRunTabs({
   runs,
   activeId,
   now,
+  benchmark,
   onSelect,
   onClose,
 }: {
   runs: MomentumRun[];
   activeId: string | null;
   now: number;
+  /** The headline picker's index: each tab's edge is against it, like the headline's. */
+  benchmark: string;
   onSelect: (run: MomentumRun) => void;
   onClose: (run: MomentumRun) => void;
 }) {
@@ -293,7 +297,7 @@ function MomentumRunTabs({
             <>
               <span className="metric text-xs">{formatPct(kpi(run, 'cagr'))}</span>
               <span className="metric text-xs opacity-70">
-                {formatPp(kpi(run, 'excess_cagr'))} edge
+                {formatPp(run.result ? edgeAgainst(run.result, benchmark) : null)} edge
               </span>
             </>
           ) : run.status === 'failed' ? (
@@ -543,7 +547,10 @@ export function MomentumBacktestingView() {
       momentumSettingsDefaults({
         ...nextMeta.defaults,
         ...(seed ?? {}),
-        benchmark: stringDefault(base, 'benchmark', nextMeta.benchmarks?.[0] ?? ''),
+        // The engine's own benchmark is not a setting any more (the headline picker is): a
+        // saved run or shared link carrying another one gets the dataset default, so no hidden
+        // value lingers in the form.
+        benchmark: stringDefault(nextMeta.defaults, 'benchmark', nextMeta.benchmarks?.[0] ?? ''),
       }),
     );
     if (seed) mountSeedRef.current = null;
@@ -622,7 +629,15 @@ export function MomentumBacktestingView() {
     // Replace, not merge: a setting the saved run does not carry goes back to its default
     // instead of keeping whatever the form held.
     setValues((current) =>
-      momentumSettingsDefaults(meta ? { ...meta.defaults, ...config } : { ...current, ...config }),
+      momentumSettingsDefaults(
+        meta
+          ? {
+              ...meta.defaults,
+              ...config,
+              benchmark: stringDefault(meta.defaults, 'benchmark', meta.benchmarks?.[0] ?? ''),
+            }
+          : { ...current, ...config, benchmark: current.benchmark },
+      ),
     );
     setSection('backtest');
     setDrawerOpen(true);
@@ -853,7 +868,10 @@ export function MomentumBacktestingView() {
 
   const resultEnd = result?.series.dates.at(-1);
   // Everything comparative on the page follows the headline picker (lib/momentumBenchmark).
-  const benchmarkView = result ? resolveBenchmark(result, pickedBenchmark) : null;
+  const benchmarkView = useMemo(
+    () => (result ? resolveBenchmark(result, pickedBenchmark) : null),
+    [result, pickedBenchmark],
+  );
   const benchmarkMenu = useMemo(() => (result ? benchmarkOptions(result) : []), [result]);
   const chartSeries = useMemo(
     () => (result && benchmarkView ? withBenchmark(result.series, benchmarkView) : null),
@@ -1173,6 +1191,7 @@ export function MomentumBacktestingView() {
                 runs={runs}
                 activeId={activeRunId}
                 now={now}
+                benchmark={pickedBenchmark}
                 onSelect={(run) => {
                   setStartError(null);
                   useMomentumRunsStore.getState().setActive(run.id);
