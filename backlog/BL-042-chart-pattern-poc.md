@@ -376,3 +376,21 @@ once on the sealed data. A guess before seeing any data:
   - The secondary comparison against the four BL-010 frozen configs was never built; with
     nothing entering Phase 6 it is moot.
   Phase 7 (the owner's decision) is open.
+- 2026-10-07 — **Exploratory, after the result: not evidence.** The criteria promised a
+  per-state breakdown as reported-only, and it had not been built. The owner asked where the
+  test "enters" a pattern. The judged test entered at any detected week (forming, near pivot,
+  or up to two weeks after a breakout) at the Friday close, with no stop. The Broad ranking
+  test bought one week later and exited on momentum rank. Neither is a breakout-day entry.
+  13-week decile-matched excess by state (`data/patterns/exploratory_by_state.json`):
+
+  | Pattern | Forming (>5% below pivot) | Near pivot | Broke out |
+  |---|---|---|---|
+  | Tight range | +3.3% (t 2.7); 26 wk +5.5% (t 2.8) | −0.1% | −0.2% |
+  | Flag | +2.7% (t 1.9); 4 wk +2.2% (t 3.1) | −0.2% | 0.0% |
+  | Cup and handle | −0.1% | −0.6% | −1.1% (4 wk t −2.1) |
+
+  - The only signal is a pullback inside a tight range or flag near the highs. Breakouts
+    measured from the next Friday add nothing.
+  - These are 27 post-hoc looks. A confirmation needs a new pre-registration, tested on the
+    still-sealed 2024–26 hold-out, together with a true breakout-day entry with a stop
+    (proposed to the owner as BL-043).
