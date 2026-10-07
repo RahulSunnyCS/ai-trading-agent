@@ -28,11 +28,22 @@ it). Paths: `/<tab>`, `/optionslab/<strategies|builder|runs|results|regimes>`,
 `/optionslab/builder/yaml` (the YAML engine; `/backtest` redirects there),
 `/coverage/<backfill|replay>` (old `/backfill`, `/replay` redirect), `/jobs` (the scheduler's Jobs page, read from `/api/scheduler/*` — needs `SCHEDULER_DIRECT=1`), `/billing` (`/pricing` redirects),
 `/momentum/<backtest|scores|saved|weekly|rebalance|journal>`, `/momentum/backtest/<dataset>`,
-`/momentum/scores/<stocks|sectors>`. A new sub-tab = add its ids to `lib/routes.ts` and derive
+`/momentum/scores/<stocks|sectors>`, `/guide/<chapter>/<page>` (`/help` and `/docs` redirect). A new sub-tab = add its ids to `lib/routes.ts` and derive
 state from `useAppRoute().rest` — don't add another `useState` for navigation. `useAppRoute`
 moves with `window.history.pushState`/`replaceState`, never `router.push`: every path is the same
 `[[...slug]]` page, and a router navigation to a different slug re-mounts the whole shell (all
 state lost, every view refetches). Next keeps `usePathname` and back/forward in sync with it.
+
+**Guide (BL-041):** the in-app docs for people who know basic options and momentum but not this tool.
+Pages are Markdown in `src/guide/content/<chapter>/<page>.md`, imported as strings (`?raw`; the one
+webpack rule is in `next.config.ts`) and listed in `src/guide/registry.ts`, which also drives the
+index, previous/next, search and the "How this works" link in the top bar (`GuideLink`, looked up
+by tab and sub-section). Terms live in `src/guide/glossary.ts`. In a page, `[x](app:/path)` opens a
+screen, `[x](guide:chapter/page)` another page, `[x](glossary:id)` a hover definition, and
+`> [!NOTE]` / `[!TIP]` / `[!WARNING]` make callouts. **Upkeep rule: a change to a screen's controls,
+labels, defaults or metrics updates its guide page in the same commit.** A new screen or
+sub-section gets a page and a registry entry. `guide/__tests__/registry.test.ts` fails on a broken
+link, a screen that no longer exists, or a Momentum / Options Lab sub-screen with no page.
 
 **Remote hosting:** `src/middleware.ts` (logic in `lib/accessGate.ts`, cookie signing in
 `lib/session.ts`) puts a login in front of everything (a `/login` page and session cookie for
@@ -90,6 +101,7 @@ needs to be shared with the server, it is currently hand-duplicated in
   locally persisted tab visibility/order preferences; `src/store/momentumView.ts` the Momentum
   result layout (full-width results, open chart sections, the chart's advanced tooltip, open details tab). Personality/live state is
   fetched via hooks, not centralized in a store.
+- `src/guide/` — the Guide's registry, glossary and Markdown pages; `components/guide/` renders them
 - `src/types/` — `backtest.ts` etc. — hand-kept in sync with `apps/server`'s
   API response shapes (see Cross-package links above)
 - `e2e/` — Playwright specs

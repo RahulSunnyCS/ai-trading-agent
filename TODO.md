@@ -548,6 +548,16 @@ Every result must stay identical (BL-001 goldens); the owner's decisions live in
 | 3.18.4 | Phase 4: run banner shows the stage and the usual duration | claude | **Done 2026-10-07** (PR #81): a job reports `loading` / `ranking` / `simulating` / `analysing`; the banner shows the step and, after a few real runs, "usually about N s". Also in this PR: the explainer `packages/momentum-backtesting/docs/how-backtests-run-and-how-we-sped-them-up.md` (how the backend works and what BL-005 changed) |
 | 3.18.5 | Phase 5 (live warm Broad still ~20 s CPU; time is in the Trades section's weekly features and catalog connection set-up, not the engine) | claude | **Moved to [BL-039](backlog/BL-039-broad-warm-path-and-weekly-job-cost.md) (P2, Planned) when BL-005 closed 2026-10-07** |
 
+### 3.19 In-app Guide — [BL-041](backlog/BL-041-in-app-guide.md)
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.19.1 | Phase 1: Guide tab, Markdown loading, registry, glossary | claude | **Built 2026-10-07** (not yet merged); wording awaits owner review |
+| 3.19.2 | Phase 2: Start here + Momentum pages | claude | **Built 2026-10-07** (not yet merged); wording awaits owner review |
+| 3.19.3 | Phase 3: Options Lab pages | claude | **Built 2026-10-07** (not yet merged); wording awaits owner review |
+| 3.19.4 | Phase 4: Data & operations pages + "How this works" links | claude | **Built 2026-10-07** (not yet merged); wording awaits owner review |
+| 3.19.5 | Phase 5: upkeep rule in `apps/dashboard/CLAUDE.md` | claude | **Built 2026-10-07** (not yet merged); wording awaits owner review |
+
 ## Reference — where detail lives
 
 | Document | What it holds now |
