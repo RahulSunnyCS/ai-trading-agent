@@ -117,7 +117,7 @@ def _seed_series(rows):
         con.executemany("INSERT INTO stock_weekly_series VALUES (?, ?, ?)", rows)
 
 
-def test_load_references_reads_the_database_when_a_catalog_exists():
+def test_load_references_reads_the_database_when_a_catalog_exists(tmp_path):
     """The reference TRIs live in `stock_weekly_series` since migration 004 (they used to share
     `momentum_prices`). `_from_db` kept calling a helper that 004's commit deleted, so with a
     catalog present EVERY backtest endpoint (all four call `DATA.references()`) crashed with an
@@ -136,7 +136,9 @@ def test_load_references_reads_the_database_when_a_catalog_exists():
         ]
     )
 
-    refs = load_references()
+    # tmp_path, not the default data/: the CSV fills series the database lacks, so a live
+    # data/stocks/benchmarks_weekly.csv would add every other reference (BL-018).
+    refs = load_references(tmp_path)
 
     assert list(refs.columns) == [NIFTY50_TRI, NIFTY200_MOMENTUM30_TRI]
     assert list(refs[NIFTY50_TRI]) == [10.0, 11.0, 12.0]

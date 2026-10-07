@@ -37,7 +37,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
 | [BL-017](BL-017-momentum-settings-module.md) | Momentum: one settings module, and split `api.py` | P2 | Ready | improvement | momentum |
-| [BL-018](BL-018-brittle-benchmark-tests.md) | Momentum benchmark tests fail when the data is refreshed | P2 | Planned | bug | momentum |
 | [BL-020](BL-020-claude-code-workflow-setup.md) | Claude Code working set-up: model per role, saved commands, session habits | P2 | Ready | chore | cross-cutting |
 | [BL-027](BL-027-rebalance-basket-file.md) | Weekly rebalance as a broker basket-order file | P2 | Planned | feature | momentum |
 | [BL-031](BL-031-chart-pattern-detectors.md) | Classical chart-pattern detectors on weekly and daily stock data | P2 | Idea | research | momentum |
@@ -58,6 +57,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-018](BL-018-brittle-benchmark-tests.md) | Momentum tests fail when the live data is refreshed | Done: six data-dependent tests fixed (sessions checked against the bhavcopy calendar, isolated reference tests, current list matched to a curated day, tax classes over priced companies); tests only | 2026-10-07 |
 | [BL-004](BL-004-research-stack-production-mode.md) | Production-build mode for the local research stack (`bun run start:prod`) | Done: `bun run start:prod` serves a password-gated production build on 127.0.0.1:5190, rebuilt only on change (restart 4.2 s); page shell 3.5–4.9 s → ~0.1 s, JS 4.8 MB → 437 KB. Pages still wait 17–20 s on slow Momentum API calls (PRs #101/#104), so the ≤ 1.5 s goal is unmet on live data | 2026-10-07 |
 | [BL-042](BL-042-chart-pattern-poc.md) | Chart-pattern POC for Momentum: tight range, flag, cup and handle | Informative, not adopted: no pattern beat momentum-matched peers; PBO 0.57 over 24 ranking trials; hold-out unread, passed to BL-043 | 2026-10-07 |
 | [BL-005](BL-005-faster-momentum-backtests.md) | Faster Momentum backtests (Broad: 55 s cold, 21 s warm) | Done: Phases 1–4 merged, results identical; identical re-run 62 s → 0.0 s, ETF/Stock 3–4× faster; the warm-Broad goal was missed on real data, so the rest moved to BL-039 | 2026-10-07 |
