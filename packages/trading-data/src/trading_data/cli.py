@@ -211,6 +211,16 @@ def quality_rebuild(
     )
 
 
+@quality_app.command("export")
+def quality_export() -> None:
+    """Rewrite the lock-free verdict file the legwise engine reads (quality.SNAPSHOT) from
+    data_quality. Rebuilds and vendor imports do this themselves."""
+    root = data_root()
+    with connect(root, read_only=True, lock_wait=300) as con:
+        path = quality.export_snapshot(con, root)
+    typer.echo(f"wrote {path}")
+
+
 @quality_app.command("status")
 def quality_status() -> None:
     """Days, range and verdicts per (asset, name), with the reasons for exclusions."""

@@ -7,13 +7,16 @@ as O=H=L=C; minutes before a contract's first trade are None.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-from trading_data import lake
+from trading_data import lake, quality
+
+log = logging.getLogger(__name__)
 
 SESSION_START_MIN = 9 * 60 + 15
 N_MINUTES = 375
@@ -108,6 +111,40 @@ def _load_bars(path: Path) -> Series | None:
 
 def available_days(root: Path, underlying: str) -> list[date]:
     return lake.available_days(root, "option", underlying)
+
+
+def backtest_days(
+    root: Path,
+    underlying: str,
+    start: date | None = None,
+    end: date | None = None,
+    include_excluded: bool = False,
+) -> tuple[list[date], dict[date, str]]:
+    """The days a backtest runs on, and the ones it leaves out with the reason.
+
+    Every option day in [start, end], minus the days `data_quality` excludes (short or
+    special sessions, thin chains, no index spot — see trading_data.quality.verdict), unless
+    `include_excluded`. Read from the lock-free verdict file; with no file yet every day runs
+    and a warning says so."""
+    days = [
+        d
+        for d in available_days(root, underlying)
+        if not ((start and d < start) or (end and d > end))
+    ]
+    if include_excluded:
+        return days, {}
+    excluded = quality.excluded_days(root, "option", underlying)
+    if excluded is None:
+        log.warning(
+            "no data_quality verdict file under %s — running every day; "
+            "`tdata quality export` creates it",
+            root,
+        )
+        return days, {}
+    return (
+        [d for d in days if d not in excluded],
+        {d: f"excluded: {excluded[d]}" for d in days if d in excluded},
+    )
 
 
 def load_day(root: Path, underlying: str, day: date) -> DayData:

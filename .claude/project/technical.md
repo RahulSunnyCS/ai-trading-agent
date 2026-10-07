@@ -113,8 +113,8 @@ uv run tdata backup --to /Volumes/<disk>/TradingData   # monthly; copies only ne
 uv run tdata mount          # attach TRADING_DATA_IMAGE if the root's volume is not mounted (idempotent)
 uv run tdata vendor import --from "/Volumes/RAHUL'S SSD/Stock Market Data/parquet/options" --unit nifty  # BL-034: vendor options history -> lake (resumable; Fyers days never overwritten); import-index <csv> --symbol NIFTY for spot / INDIAVIX
 uv run tdata reference derive-expiries  # rebuild the real expiry list per index from the lake (prints gaps) + re-export CSVs
-uv run tdata quality rebuild  # re-judge every lake day -> data_quality (usable / excluded + why); `quality status` summarises
-uv run obt legwise run strategies/legwise/*.yaml [--trades]   # AlgoTest-style leg-wise backtests over that data
+uv run tdata quality rebuild  # re-judge every lake day -> data_quality (usable / excluded + why); `quality status` summarises; `quality export` rewrites the lock-free verdict file the engine reads
+uv run obt legwise run strategies/legwise/*.yaml [--trades] [--include-excluded]   # AlgoTest-style leg-wise backtests over that data; skips (and counts) days data_quality excludes
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
 uv run obt daily            # the evening routine: fetch the last closed session, run every strategies/legwise/*.yaml, save, summarise + Telegram (--no-telegram)
 uv run pytest tests/golden/test_legwise_scenarios.py  # 30 frozen-input exact-output scenarios

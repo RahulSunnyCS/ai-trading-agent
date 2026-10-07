@@ -39,7 +39,7 @@ from ..legwise.daily import (
     telegram_failure,
     telegram_summary,
 )
-from ..legwise.engine import DayResult, simulate_day
+from ..legwise.engine import DayResult, run_legwise, simulate_day
 from ..legwise.market import available_days, load_day, minute_label
 from ..legwise.schema import LegwiseStrategy
 from ..presets import STRATEGIES_DIR
@@ -181,18 +181,20 @@ def backtest(body: BacktestBody) -> Any:
     start = date.fromisoformat(body.from_) if body.from_ else None
     end = date.fromisoformat(body.to) if body.to else None
     root = data_dir()
-    results = [
-        simulate_day(strategy, load_day(root, strategy.underlying, day))
-        for day in available_days(root, strategy.underlying)
-        if not ((start and day < start) or (end and day > end))
-    ]
+    skipped: dict[date, str] = {}
+    results = run_legwise(strategy, root, start, end, skipped=skipped)
     if not results:
         return _error(404, f"no collected {strategy.underlying} days in that range")
     # Kept as an `adhoc` run: every builder experiment stays queryable with the exact
     # settings that produced it.
     with connect(root) as con:
         run_id = store.save_adhoc(con, strategy, results, {"from": body.from_, "to": body.to})
-    return {"strategy_id": strategy.id, "run_id": run_id, "days": [_day_json(r) for r in results]}
+    return {
+        "strategy_id": strategy.id,
+        "run_id": run_id,
+        "days": [_day_json(r) for r in results],
+        "skipped": [{"day": d.isoformat(), "reason": r} for d, r in sorted(skipped.items())],
+    }
 
 
 # ---------------------------------------------------------------------------

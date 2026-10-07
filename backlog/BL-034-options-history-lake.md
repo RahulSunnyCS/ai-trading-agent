@@ -283,4 +283,7 @@ Still open for Phase 3:
 - 2026-10-07 — Phase 2: **observed expiry calendar** (migration 009, `expiries_observed.csv`,
   `tdata reference derive-expiries`; three hand-added expiries for lake holes) — DTE now from
   2024-10, TODO 3.10.15 closed; **holidays audited** against the lake (8 added, 3 fixed).
+- 2026-10-07 — Phase 2: **backtests leave out excluded days** — the engine reads a lock-free copy
+  of `data_quality` (`quality/data_quality.parquet`), skips excluded days and names every day it
+  could not run (no spot, no reference row) instead of crashing; `--include-excluded`.
 
