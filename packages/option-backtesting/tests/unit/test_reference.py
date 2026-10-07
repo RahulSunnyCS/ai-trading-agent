@@ -201,3 +201,18 @@ class TestHolidayCorrections:
     def test_days_that_traded(self, rd: ReferenceData) -> None:
         for d in (date(2025, 10, 20), date(2026, 3, 20), date(2026, 4, 2)):
             assert rd.is_trading_day(d), d
+
+
+class TestRiskFreeRate:
+    """RBI repo rate from each MPC decision date (rates.csv)."""
+
+    def test_steps(self, rd: ReferenceData) -> None:
+        assert rd.risk_free_rate(date(2024, 10, 1)) == pytest.approx(0.065)
+        assert rd.risk_free_rate(date(2025, 2, 6)) == pytest.approx(0.065)
+        assert rd.risk_free_rate(date(2025, 2, 7)) == pytest.approx(0.0625)
+        assert rd.risk_free_rate(date(2025, 6, 6)) == pytest.approx(0.055)
+        assert rd.risk_free_rate(date(2026, 9, 1)) == pytest.approx(0.0525)
+
+    def test_before_the_table_raises(self, rd: ReferenceData) -> None:
+        with pytest.raises(ValueError, match="No rates row"):
+            rd.risk_free_rate(date(2020, 1, 1))

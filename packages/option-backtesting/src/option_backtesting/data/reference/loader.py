@@ -57,6 +57,13 @@ class ExpiryCalendarRow:
 
 
 @dataclass(frozen=True)
+class RateRow:
+    underlying: str  # the rate's name (RBI_REPO); "underlying" so _most_recent_as_of applies
+    rate_pct: float
+    effective_date: date
+
+
+@dataclass(frozen=True)
 class MarginRow:
     underlying: str
     strategy_type: str
@@ -102,6 +109,7 @@ class ReferenceData:
         self._holidays = self._load_holidays()
         self._margins = self._load_margins()
         self._observed_expiries = self._load_observed_expiries()
+        self._rates = self._load_rates()
 
     # -- loading --------------------------------------------------------
 
@@ -147,6 +155,16 @@ class ReferenceData:
                 out.setdefault(row["underlying"], []).append(_parse_date(row["expiry"]))
         return {u: sorted(v) for u, v in out.items()}
 
+    def _load_rates(self) -> list[RateRow]:
+        path = self._dir / "rates.csv"
+        if not path.exists():
+            return []
+        with open(path, newline="") as f:
+            return [
+                RateRow(row["name"], float(row["rate_pct"]), _parse_date(row["effective_date"]))
+                for row in csv.DictReader(f)
+            ]
+
     def _load_holidays(self) -> frozenset[date]:
         with open(self._dir / "holidays.csv", newline="") as f:
             return frozenset(_parse_date(row["date"]) for row in csv.DictReader(f))
@@ -177,6 +195,13 @@ class ReferenceData:
         return _most_recent_as_of(
             self._lot_sizes, expiry, label="lot_sizes", underlying=underlying
         ).lot_size
+
+    def risk_free_rate(self, as_of: date, name: str = "RBI_REPO") -> float:
+        """Annual risk-free rate in force on `as_of`, as a fraction (0.0525 for 5.25%), for
+        implied volatility. rates.csv: the RBI repo rate from each MPC decision date."""
+        return (
+            _most_recent_as_of(self._rates, as_of, label="rates", underlying=name).rate_pct / 100
+        )
 
     def strike_step(self, underlying: str, as_of: date) -> float:
         return _most_recent_as_of(
