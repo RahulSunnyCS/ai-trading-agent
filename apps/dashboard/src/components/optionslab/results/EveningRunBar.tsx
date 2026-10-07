@@ -9,6 +9,7 @@ import { ChevronDown, Play } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { LEGWISE_API, useDailyJob, useLegwiseData } from '../../../hooks/useLegwise';
+import { useNow } from '../../../hooks/useNow';
 import { apiPost } from '../../../lib/api';
 import { cn } from '../../../lib/cn';
 import { formatDay, formatInt, formatIstDateTimeShort, formatRelative } from '../../../lib/format';
@@ -18,16 +19,6 @@ import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Skeleton } from '../../ui/Skeleton';
-
-/** Re-reads the clock so the countdown and "3 h ago" move without a refetch. */
-function useNow(intervalMs = 30_000): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), intervalMs);
-    return () => clearInterval(timer);
-  }, [intervalMs]);
-  return now;
-}
 
 function TokenBadge({ token, now }: { token: DataStatus['token']; now: Date }) {
   if (!token.ok) {
@@ -104,7 +95,8 @@ export function EveningRunBar({
 }) {
   const data = useLegwiseData();
   const job = useDailyJob();
-  const now = useNow();
+  // Moves the countdown and "3 h ago" without a refetch; null only before the first effect.
+  const now = useNow(30_000);
   const panelId = useId();
   const [day, setDay] = useState('');
   const [fetch, setFetch] = useState(true);
@@ -154,14 +146,14 @@ export function EveningRunBar({
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 text-xs text-muted">
         <span className="text-sm font-semibold text-foreground">Evening run</span>
-        {token ? (
+        {token && now ? (
           <TokenBadge token={token} now={now} />
         ) : data.error ? (
           <Badge status="attention">Data status unavailable</Badge>
         ) : (
           <Skeleton className="h-5 w-40" />
         )}
-        {job.data ? (
+        {job.data && now ? (
           <LastRun job={job.data} now={now} />
         ) : job.error ? (
           <span>Run status unavailable</span>
