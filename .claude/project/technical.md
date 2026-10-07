@@ -52,10 +52,15 @@ bun run dev                 # watch mode with auto-reload (apps/server)
 bun run start:server         # production-style start (apps/server)
 
 # Standalone research stack (no Docker): both Python APIs + one dashboard
-bun run start                # restart Momentum :8765, Options :8000, dashboard :5190
+bun run start                # restart Momentum :8765, Options :8000, dashboard :5190 (next dev, for UI editing)
 bun run start:backend        # restart the two Python APIs only
 bun run start:frontend       # restart the dashboard only
 bun run stop:research        # stop this checkout's research processes
+# Same, with a production build of the dashboard (BL-004: pages ready in ~1 s, not 6-10 s).
+# Builds into apps/dashboard/.next-prod, skipped when nothing changed; refuses to start without
+# DASHBOARD_PASSWORD (env or apps/dashboard/.env.local). Both modes bind 127.0.0.1 only.
+bun run start:prod           # APIs + `next start` on :5190; sign in at /login
+bun run start:frontend:prod  # the production dashboard only; add `-- --rebuild` / `-- --port 5191`
 
 # Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)
 bun run --filter @ata/dashboard dev

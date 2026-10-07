@@ -24,7 +24,11 @@ Two locks, both required:
 
 The password **fails closed**: under `next start` / Vercel (or whenever the service-token
 vars are set) a missing `DASHBOARD_PASSWORD` makes every request, the login page included,
-return 503. Only plain local `next dev` (`bun run start`) is open. The service token fails
+return 503. Only plain local `next dev` (`bun run start`) is open, and it listens on
+`127.0.0.1` only. The local production build (`bun run start:prod`, BL-004) is a `next start`
+like any other, so it needs the password too: it refuses to start until `DASHBOARD_PASSWORD`
+is in the environment or `apps/dashboard/.env.local`, and you sign in at `/login` once per
+browser. It also binds `127.0.0.1` only. The service token fails
 closed too: setting only one of `UPSTREAM_ACCESS_CLIENT_ID` / `UPSTREAM_ACCESS_CLIENT_SECRET`
 (or leaving one blank) also makes every request return 503, instead of every API call failing
 at Cloudflare.

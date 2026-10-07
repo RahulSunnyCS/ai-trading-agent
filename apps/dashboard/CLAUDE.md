@@ -110,6 +110,9 @@ needs to be shared with the server, it is currently hand-duplicated in
 
 Run from the repo root unless noted:
 ```bash
+bun run start                               # research stack: APIs + `next dev` on 127.0.0.1:5190 (UI editing)
+bun run start:prod                          # same with a production build (.next-prod, BL-004): ~1 s pages;
+                                            # needs DASHBOARD_PASSWORD in apps/dashboard/.env.local; rebuilds only on change
 bun run --filter @ata/dashboard dev         # Next dev server (:5173), rewrites /api to :3000
 # Options Lab without Postgres/Redis/apps/server: start `bun run py:api`, then
 # OBT_DIRECT=1 routes ONLY /api/backtest/legwise/* straight to it (dev-only,
