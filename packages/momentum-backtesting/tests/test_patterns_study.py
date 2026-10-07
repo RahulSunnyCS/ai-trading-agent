@@ -88,3 +88,58 @@ def test_phases_4_and_5_refuse_before_the_detectors_are_frozen(tmp_path, monkeyp
         run.event_study(tmp_path)
     with pytest.raises(RuntimeError, match="freeze the detectors"):
         run.ranking_test(tmp_path)
+
+
+def _write(path, data):
+    import json
+
+    path.write_text(json.dumps(data))
+
+
+def test_holdout_entrants_need_all_three_passes(tmp_path, monkeypatch):
+    from momentum_backtesting.patterns import holdout
+
+    monkeypatch.setattr(holdout, "SEARCH_SPACES", tmp_path)
+    _write(tmp_path / "bl041_criteria_addendum_1.json", {"dropped_patterns": ["cup_handle"]})
+    _write(
+        tmp_path / "bl041_event_study_result.json",
+        {"verdicts": {"tight_range": "pass", "flag": "kill", "cup_handle": "pass"}},
+    )
+    _write(
+        tmp_path / "bl041_dev_result.json",
+        {
+            "verdicts": {"tight_range": "pass", "flag": "pass", "cup_handle": "pass"},
+            "holdout_choice": {
+                "tight_range": "tight_range/blend_0.5",
+                "flag": "flag/bonus_5",
+                "cup_handle": "cup_handle/filter_20",
+            },
+        },
+    )
+    assert holdout.entrants() == {"tight_range": "tight_range/blend_0.5"}
+
+
+def test_holdout_runs_once(tmp_path, monkeypatch):
+    from momentum_backtesting.patterns import holdout
+
+    monkeypatch.setattr(holdout, "SEARCH_SPACES", tmp_path)
+    monkeypatch.setattr(holdout.bl010_holdout, "_dirty", lambda: False)
+    monkeypatch.setattr(holdout, "entrants", lambda: {})
+    report = holdout.run(tmp_path / "out", echo=lambda *_: None)
+    assert report["entrants"] == {} and "not read" in report["note"]
+    with pytest.raises(RuntimeError, match="runs once"):
+        holdout.run(tmp_path / "out", echo=lambda *_: None)
+    (tmp_path / holdout.RESULT).unlink()  # even without the result, the claim still blocks
+    with pytest.raises(RuntimeError, match="already started"):
+        holdout.run(tmp_path / "out", echo=lambda *_: None)
+
+
+def test_holdout_judge():
+    from momentum_backtesting.patterns import holdout
+
+    weeks = pd.date_range("2024-01-05", periods=157, freq="W-FRI")
+    base = pd.Series(np.linspace(1.0, 1.3, 157), index=weeks)
+    mine = pd.Series(np.linspace(1.0, 1.5, 157), index=weeks)
+    verdict = holdout.judge(base, mine)
+    assert verdict["excess_cagr_pts"] > 2 and verdict["passes"]
+    assert not holdout.judge(mine, base)["passes"]

@@ -367,6 +367,15 @@ contract, not a shared service).
   `uv run python scripts/update-goldens.py --accept-results --reason "..."` and commit the
   changelog entry it writes. A new request field needs a scenario (`test_coverage.py`).
   `test_lookahead.py` re-runs each dataset on data cut off at a date; never weaken it.
+- `patterns/` (`mbt patterns detect|formation|gallery|study|rank|holdout`) — BL-041's chart-pattern
+  POC (tight range, flag, cup and handle). Research only: nothing here reaches `api.py`, the
+  default ranking or the weekly signal. Rules live in `search_spaces/bl041_criteria.json` (+
+  addenda) and are read, never restated. Daily bars are forward-adjusted by the confirmed share
+  factors so every bar depends only on events up to its own date; `patterns.guard` refuses any
+  read of the sealed hold-out (2024-01-01 on), except the one-shot `holdout.run`, which claims
+  itself before reading. `study`/`rank` refuse to run until `bl041_criteria_addendum_1.json` (the
+  detector freeze from the owner's gallery labels) is committed. `tests/test_patterns.py` pins the
+  no-look-ahead property (detections up to a cut are identical with and without later bars).
 - `audit/` — `mbt audit bundle|replay|study|outside` (BL-010 Phase 2). `bundle.py` writes a
   run's orders and the backtest's claims; `replay.py` rebuilds the result from the orders and
   the lake's raw bars and compares. `replay.py`, `studies.py` and `outside.py` must never import

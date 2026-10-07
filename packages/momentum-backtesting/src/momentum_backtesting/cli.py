@@ -2639,6 +2639,17 @@ def patterns_rank() -> None:
     run.ranking_test(echo=typer.echo)
 
 
+@patterns_app.command("holdout")
+def patterns_holdout() -> None:
+    """Phase 6: the ONE run on the sealed 2024-01 -> 2026-09 hold-out, for the patterns that
+    passed Phases 3-5. Claims the run first and refuses a second; needs committed code."""
+    from .config import load_repo_env
+    from .patterns import holdout
+
+    load_repo_env()
+    holdout.run(echo=typer.echo)
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),

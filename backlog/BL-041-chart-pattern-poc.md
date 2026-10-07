@@ -283,3 +283,9 @@ once on the sealed data. A guess before seeing any data:
   https://claude.ai/artifact/AmbsNx8jkNsBij43qVVBnF. The manifest is
   `search_spaces/bl041_gallery_manifest.json`. Waiting on the owner's labels. Phases 4–5 are
   coded and refuse to run until `bl041_criteria_addendum_1.json` (the detector freeze) exists.
+- 2026-10-07 — Phase 6 runner built (`mbt patterns holdout`). Only patterns that pass Phases 3,
+  4 and 5 enter, each with the shape Phase 5 chose. It claims the run before reading, writes
+  `search_spaces/bl041_holdout_result.json` once and refuses a second run. **Not built yet:** the
+  reported-only line for the four BL-010 frozen configs with the shape applied to
+  `combined_pool_ranks` (criteria `phase_6_holdout.reported`). Add it before Phase 6 runs.
+  The owner kept the trial count at 21; no wider filter/bonus shape was added.
