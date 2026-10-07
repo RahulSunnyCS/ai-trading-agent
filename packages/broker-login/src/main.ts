@@ -21,6 +21,7 @@ import {
 import { type Config, loadConfig, readTelegramConfig } from './config.js';
 import { ARTIFACTS_DIR, describe, dumpHtml, safeScreenshot } from './diagnose.js';
 import { formatReport } from './notify.js';
+import { installOverlayHandlers } from './overlays.js';
 import { brokerPage } from './selectors.js';
 import { waitForNextWindow } from './totp.js';
 
@@ -215,6 +216,9 @@ async function main(): Promise<number> {
       locale: 'en-IN',
       timezoneId: 'Asia/Kolkata',
     });
+
+    // Close any notice that covers the page (AlgoTest, Finvasia's popup) instead of timing out on it.
+    installOverlayHandlers(context);
 
     // Opt-in only: trace snapshots record input values, including the typed password.
     if (tracing) await context.tracing.start({ screenshots: true, snapshots: true });

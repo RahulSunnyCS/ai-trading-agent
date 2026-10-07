@@ -2,6 +2,7 @@ import type { Page } from 'playwright';
 import { BASE_URL, classifyError, visibleErrorText } from '../algotest.js';
 import type { Config } from '../config.js';
 import { safeScreenshot, step } from '../diagnose.js';
+import { waitVisibleDismissing } from '../overlays.js';
 import { brokerNames, brokerPage, dataBrokerKeys, finvasiaForm } from '../selectors.js';
 import { freshTotp } from '../totp.js';
 import { type Broker, BrokerLoginError } from './types.js';
@@ -33,11 +34,13 @@ export const finvasia: Broker = {
     // Either the login form, or - if this browser already holds a Finvasia session -
     // the OAuth consent screen with no form at all.
     await step(target, 'finvasia-await-login-page', async () => {
-      await finvasiaForm
-        .userId(target)
-        .or(finvasiaForm.authorize(target))
-        .first()
-        .waitFor({ state: 'visible', timeout: 30_000 });
+      // A notice on Finvasia's page can hide the form or delay it until closed, so close
+      // any that show up while waiting rather than timing out behind it.
+      await waitVisibleDismissing(
+        target,
+        finvasiaForm.userId(target).or(finvasiaForm.authorize(target)).first(),
+        30_000,
+      );
     });
 
     if (
