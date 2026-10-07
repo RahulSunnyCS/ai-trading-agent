@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the AlgoTest source only serves the last three months, so each day of the gap is lost for good once it ages out: 26 Aug 2026 drops out of the window around 24 Nov 2026 |
-| **Status** | Planned |
+| **Status** | Planned — on hold while the owner asks the vendor (see Log) |
 | **Type** | feature |
 | **Area** | trading-data / options |
 | **Created** | 2026-10-07 |
@@ -152,3 +152,11 @@ which expiries and strikes it covers and which it does not.
 
 - 2026-10-07 — created at P1 on the owner's request ("fix for all the indices and stocks").
   Gap numbers measured from the lake and `data_quality`; connector probe results above.
+- 2026-10-07 — **Vendor first.** The owner will ask the data vendor for the missing days (26 Aug →
+  the first Fyers day, all indices and stocks) before any AlgoTest work starts. If the vendor
+  supplies them, this item closes as "Done by vendor": put the files in the staging set
+  (`options_to_parquet.py --refresh`), run `tdata vendor import` (it picks up new rows by itself),
+  then `tdata quality rebuild --asset option`, and compare the new files with the Fyers days that
+  overlap. If the vendor has not confirmed by **2026-11-03**, start Phase 1 — the AlgoTest window
+  loses 26 Aug around 2026-11-24, so anything left after that date cannot be recovered from it.
+

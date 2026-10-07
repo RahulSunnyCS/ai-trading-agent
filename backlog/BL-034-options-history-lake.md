@@ -263,4 +263,15 @@ Still open for Phase 3:
   options agrees too (NIFTY 2025-03-12 within +-5 points all day; longer expiries differ by
   the cost of carry). Scripts: `packages/trading-data/scripts/vendor/verify_lake.py` and
   `verify_values.py` (BL-037's first task is to promote them to `tdata vendor verify`).
+- 2026-10-07 — **Where it stands and what comes next.** Phase 1 is done and verified; the lake
+  holds NIFTY, SENSEX, BANKNIFTY, FINNIFTY, MIDCPNIFTY and NIFTYNXT50 options from the vendor plus
+  Fyers days, spot for all five indices and India VIX, and a `data_quality` verdict for every day.
+  Open, in this order: (1) the owner asks the vendor for the 26 Aug → 24 Sep gap (BL-040 is the
+  fallback; deadline 2026-11-03 to decide); (2) **Phase 2 — reference data** (observed expiries,
+  dated lot sizes and strike steps for 2024-10 → today, `ref_rates`), the next piece of work and
+  the one that lets legwise run pre-2026 days; (3) Phase 3 derived tables (NIFTY, SENSEX);
+  (4) Phase 4 daily top-up under BL-012, after the owner decides on the scheduler cut-over
+  (`deploy/launchd/install.sh`); (5) owner chores: keep a second copy of the staged Parquet, delete
+  `~/TradingData.pre-bl034` after Phase 2 passes. Parked: BL-037 (the other 169 stocks, P3) and
+  BL-038 (monthly-expiry stock collection, P1, first window 2026-10-27, needs a Fyers login).
 
