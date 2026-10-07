@@ -2577,6 +2577,46 @@ def sources_check() -> None:
     raise typer.Exit(1 if failed else 0)
 
 
+patterns_app = typer.Typer(
+    no_args_is_help=True,
+    help="BL-041 chart-pattern POC (research only): detect tight ranges, flags and cups.",
+)
+app.add_typer(patterns_app, name="patterns")
+
+
+@patterns_app.command("detect")
+def patterns_detect() -> None:
+    """Detections for the development window over the point-in-time Broad universe ->
+    data/patterns/detections_dev.parquet. Never reads the sealed hold-out."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.detect_development(echo=typer.echo)
+
+
+@patterns_app.command("formation")
+def patterns_formation() -> None:
+    """Phase 2b: each detected base's momentum rank at its start, midpoint and detection ->
+    data/patterns/formation_summary.md. Reads ranks only, never a forward return."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.formation_report(echo=typer.echo)
+
+
+@patterns_app.command("gallery")
+def patterns_gallery() -> None:
+    """Phase 3: write data/patterns/gallery.html (charts cut at the detection day, symbol hidden)
+    and its manifest, for the owner to label."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.gallery(echo=typer.echo)
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),
