@@ -77,3 +77,14 @@ def test_forward_returns_never_pass_the_last_week():
     fwd = study.forward_returns(prices, 1)
     assert fwd["A"].iloc[0] == pytest.approx(0.10)
     assert math.isnan(fwd["A"].iloc[-1])
+
+
+def test_phases_4_and_5_refuse_before_the_detectors_are_frozen(tmp_path, monkeypatch):
+    from momentum_backtesting import patterns
+    from momentum_backtesting.patterns import run
+
+    monkeypatch.setattr(patterns, "SEARCH_SPACES", tmp_path)
+    with pytest.raises(RuntimeError, match="freeze the detectors"):
+        run.event_study(tmp_path)
+    with pytest.raises(RuntimeError, match="freeze the detectors"):
+        run.ranking_test(tmp_path)

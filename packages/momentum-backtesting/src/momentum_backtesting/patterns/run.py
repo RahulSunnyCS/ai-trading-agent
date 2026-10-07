@@ -86,3 +86,149 @@ def gallery(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
     detections = load_detections(out_dir)
     page, _ = gallery_mod.build(development_bars(), detections, out_dir, echo=echo)
     return page
+
+
+# --- Phases 4 and 5: only after the detectors are frozen ----------------------------------------
+
+
+def _frozen_spec() -> dict:
+    """Addendum 1 (the detector freeze from the owner's gallery labels) must be committed before
+    any forward return is computed."""
+    import json
+
+    from . import SEARCH_SPACES
+
+    path = SEARCH_SPACES / "bl041_criteria_addendum_1.json"
+    if not path.exists():
+        raise RuntimeError(
+            f"{path.name} is not there: Phase 3 (the gallery check) must freeze the detectors "
+            "before Phases 4-5 read any return"
+        )
+    return json.loads(path.read_text())
+
+
+def _patterns_in_play() -> list[str]:
+    dropped = set(_frozen_spec().get("dropped_patterns", []))
+    return [p for p in criteria()["patterns_tested"] if p not in dropped]
+
+
+def _column_scores(ranking, detections: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    from .features import score_table
+    from .ranking import column_scores
+
+    weeks = ranking.stock_pool_ranks.index
+    symbols = sorted(set(ranking.column_to_base_symbol.values()))
+    return {
+        pattern: column_scores(score_table(detections, pattern, weeks, symbols), ranking)
+        for pattern in _patterns_in_play()
+    }
+
+
+def event_study(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
+    """Phase 4 on the development window -> search_spaces/bl041_event_study_result.json."""
+    import json
+
+    from . import SEARCH_SPACES, study
+    from .universe import broad_ranking
+
+    _frozen_spec()
+    ranking = broad_ranking()
+    detections = load_detections(out_dir)
+    scores = _column_scores(ranking, detections)
+    stocks = list(ranking.stock_pool_ranks.columns)
+    report = study.run(ranking.prices[stocks], ranking.stock_pool_ranks, scores)
+    path = SEARCH_SPACES / "bl041_event_study_result.json"
+    path.write_text(json.dumps(report, indent=1, default=str))
+    for row in report["tests"]:
+        echo(
+            f"{row['pattern']:>12} h={row['horizon_weeks']:>2}: {row['events']:>6} events "
+            f"{row['weeks']:>4} wk  mean {row['mean_excess']:+.4f}  t {row['t_newey_west']:.2f}"
+            f"  holm {row['holm_rejects']}"
+        )
+    echo(f"verdicts: {report['verdicts']}  -> {path}")
+    return path
+
+
+def ranking_test(out_dir: Path = OUT_DIR, *, echo=print) -> Path:
+    """Phase 5 on the development window: baseline + every shape x pattern, walk-forward pick,
+    PBO -> search_spaces/bl041_dev_result.json (curves in data/patterns/)."""
+    import json
+
+    import numpy as np
+
+    from .. import method, metrics
+    from ..categories import circuit_exposure as cx
+    from . import SEARCH_SPACES
+    from . import ranking as shapes
+    from .universe import broad_ranking
+
+    _frozen_spec()
+    spec = criteria()["phase_5_ranking_test"]
+    window = criteria()["windows"]["development"]
+    start, end = window["from"], window["to"]
+    ranking = broad_ranking()
+    locks = cx.lock_masks(ranking.column_to_base_symbol, ranking.prices.index)
+    scores = _column_scores(ranking, load_detections(out_dir))
+
+    echo("baseline ...")
+    curves = {"baseline": shapes.backtest(ranking, None, start=start, end=end, locks=locks)}
+    curves = {"baseline": curves["baseline"].result.equity}
+    for pattern, score in scores.items():
+        for name, shape, value in shapes.variants():
+            echo(f"{pattern} {name} ...")
+            ranks = shapes.apply(shape, ranking.stock_pool_ranks, score, value)
+            out = shapes.backtest(ranking, ranks, start=start, end=end, locks=locks)
+            curves[f"{pattern}/{name}"] = out.result.equity
+    frame = pd.DataFrame(curves).ffill()
+    frame.to_parquet(out_dir / "dev_curves.parquet")
+    logs = np.log(frame).diff().dropna()
+    excess = logs.drop(columns="baseline").sub(logs["baseline"], axis=0)
+
+    wf = spec["walk_forward"]
+    first = pd.Timestamp(start)
+    picks, joined = {}, {}
+    for pattern in scores:
+        cols = [c for c in excess.columns if c.startswith(f"{pattern}/")]
+        parts = []
+        for year in wf["years"]:
+            cut = pd.Timestamp(f"{year}-01-01") - pd.Timedelta(
+                weeks=criteria()["windows"]["embargo_weeks"]
+            )
+            chosen = excess.loc[first:cut, cols].sum().idxmax()
+            picks.setdefault(pattern, {})[year] = chosen
+            held = excess.loc[f"{year}-01-01" : f"{year}-12-31", chosen]
+            parts.append(held)
+        series = pd.concat(parts)
+        joined[pattern] = {
+            "excess_cagr": float(np.exp(series.sum() * 52 / len(series)) - 1),
+            "weeks": len(series),
+        }
+    pbo = method.pbo(excess.to_numpy(), blocks=spec["pbo"]["blocks"])
+    verdicts, holdout_choice = {}, {}
+    for pattern in scores:
+        cols = [c for c in excess.columns if c.startswith(f"{pattern}/")]
+        ok = joined[pattern]["excess_cagr"] > 0 and pbo["pbo"] <= spec["pbo"]["kill_above"]
+        verdicts[pattern] = "pass" if ok else "kill"
+        if ok:
+            holdout_choice[pattern] = excess[cols].sum().idxmax()
+    stats = {
+        name: {
+            "cagr": float(metrics.cagr(frame[name])),
+            "mdd": float(metrics.max_drawdown(frame[name])[0]),
+        }
+        for name in frame.columns
+    }
+    report = {
+        "window": [start, end],
+        "variants": stats,
+        "walk_forward_picks": {p: {str(y): v for y, v in d.items()} for p, d in picks.items()},
+        "walk_forward_joined": joined,
+        "pbo": pbo,
+        "verdicts": verdicts,
+        "holdout_choice": holdout_choice,
+    }
+    path = SEARCH_SPACES / "bl041_dev_result.json"
+    path.write_text(json.dumps(report, indent=1, default=str))
+    echo(json.dumps({"joined": joined, "pbo": pbo["pbo"], "verdicts": verdicts}, indent=1))
+    echo(f"-> {path}")
+    return path

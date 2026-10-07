@@ -2617,6 +2617,28 @@ def patterns_gallery() -> None:
     run.gallery(echo=typer.echo)
 
 
+@patterns_app.command("study")
+def patterns_study() -> None:
+    """Phase 4: the event study on the development window. Refuses to run before the detectors
+    are frozen (bl041_criteria_addendum_1.json)."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.event_study(echo=typer.echo)
+
+
+@patterns_app.command("rank")
+def patterns_rank() -> None:
+    """Phase 5: baseline + every shape on the development window, walk-forward and PBO. Refuses
+    to run before the detectors are frozen."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.ranking_test(echo=typer.echo)
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),
