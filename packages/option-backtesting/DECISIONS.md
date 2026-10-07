@@ -235,3 +235,11 @@ put, as set in AlgoTest), Dir_924 unchanged.
 - **Not settled yet:** RE COST's fill when a bar gaps through the cost price (AlgoTest
   re-entries in the Dir_924 export are at the cost price; none of ours gapped differently in the
   days inspected), RE ASAP (no export uses it).
+- **Range breakout (2026-10-07, fifth export, AlgoTest's "Download trades" format, now parsed
+  too — it adds each leg's expiry, which the comparator checks):** 168 of 244 days match, 280 of
+  361 legs within a tick — far closer than the other NIFTY strategies because a breakout fills
+  at the range level, not at a feed-dependent close. The P&L gap (AlgoTest ₹260, engine ₹8,132)
+  sits mostly on 8 days where a 1/1-point trailed stop is decided by a fraction of a point:
+  2026-09-29 (Fyers day) needs AlgoTest's 11:11 high ≥ 77.75 against our 77.15 for its 63.05
+  exit; the 5-minute candle around it agrees with ours (high 101.15). 2026-09-03 is a thin
+  vendor day (its put's range differs wholesale). Trail rule unchanged: data, not rules.

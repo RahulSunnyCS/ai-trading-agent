@@ -236,7 +236,7 @@ more, not less. V11 replaces "median CAGR" as the first number to read.
 ## Open questions
 
 1. Vendor: name and price — owner will tell later.
-2. AlgoTest trade log for the range-breakout buy strategy — owner will add when ready (the other three arrived 2026-10-07).
+2. ~~AlgoTest trade logs~~ — all five strategies' exports received 2026-10-07.
 3. Confirm the four strike modes whose Quantiply pages did not load. Working definitions (the
    usual Stockmock/AlgoTest ones, to be checked on Stockmock before building):
    straddle width = ATM ± multiplier × ATM straddle price, rounded to a strike;
@@ -304,3 +304,8 @@ more, not less. V11 replaces "median CAGR" as the first number to read.
   Rule found: stop/target levels rounded to the nearest 0.05 tick (512/515 stop exits). SENSEX
   now reproduces AlgoTest on 375 of 424 days (P&L −0.2%); NIFTY differs on prices even on Fyers
   days because AlgoTest's NIFTY feed differs from Fyers' (7 of 25 closes equal) — data, not rules.
+- 2026-10-07 — **Range breakout export** (AlgoTest's Trades format, now parsed): 168/244 days
+  match, 280/361 legs within a tick; remaining gaps are 1/1-point trails decided by NIFTY feed
+  differences of under a point, and one thin vendor day. All five strategies compared; the rules
+  found are fixed. Left in Phase 1: RE COST when a bar gaps through the cost, RE ASAP (no
+  strategy uses it), and the written tolerance for NIFTY (data) in the done-when.
