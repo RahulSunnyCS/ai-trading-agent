@@ -510,10 +510,11 @@ def refresh_weekly_snapshot(
     data_dir: Path,
     now: datetime,
     creds,
-    conn=None,
+    catalog=None,
     log=print,
 ) -> WeeklySnapshot:
-    """Refresh once, then let every weekly strategy read identical closes."""
+    """Refresh once, then let every weekly strategy read identical closes. `catalog` (optional)
+    opens the shared catalog — see `run_weekly`."""
     today = now.date()
     universe = load_universe()
     week_ending = week_ending_on_or_before(today)
@@ -521,10 +522,11 @@ def refresh_weekly_snapshot(
     # week, never accidentally incorporate an incomplete new week.
     until = week_ending if run == "final" else today - timedelta(days=1)
     health = refresh(data_dir, today, creds, log, universe, until)
-    if conn is not None:
+    if catalog is not None:
         from . import local_store as store
 
-        store.push_dir(conn, data_dir, pd.Timestamp(today - timedelta(days=REFRESH_DAYS)))
+        with catalog() as conn:
+            store.push_dir(conn, data_dir, pd.Timestamp(today - timedelta(days=REFRESH_DAYS)))
     return WeeklySnapshot(health=health, universe=universe, today=today, week_ending=week_ending)
 
 
@@ -557,13 +559,16 @@ def run_weekly(
     now: datetime | None = None,
     creds=None,
     settings: LiveSettings | None = None,
-    conn=None,
+    catalog=None,
     log=print,
     snapshot: WeeklySnapshot | None = None,
     display_name: str | None = None,
 ) -> RunResult:
     """Refresh data_dir, compute the signal, and return the Telegram message to send.
-    `conn` (optional) stores fresh official prices and the signal; `creds` is Fyers.
+    `catalog` (optional) stores fresh official prices and the signal: a zero-argument callable
+    returning a connection context manager (`db_read.open_catalog`), opened around each store
+    and closed again, never held across the price refresh or the backtest (other processes
+    wait on the catalog meanwhile). `creds` is Fyers.
     `display_name` (B6) is the saved favourite's human name — stored alongside the signal
     so a reader doesn't have to decode the engine's config-derived label (e.g.
     "buffer-wait-cap35_off_top5_exit10_lb1-4-13-26-52_etf-fri_close") to show which
@@ -576,7 +581,7 @@ def run_weekly(
         log(f"note: today is {today:%A}, not Friday - running anyway")
 
     if snapshot is None:
-        snapshot = refresh_weekly_snapshot(run, data_dir, now, creds, conn, log)
+        snapshot = refresh_weekly_snapshot(run, data_dir, now, creds, catalog, log)
     elif snapshot.today != today:
         raise ValueError("weekly snapshot date does not match the requested run")
     health, universe = snapshot.health, snapshot.universe
@@ -593,10 +598,11 @@ def run_weekly(
             return RunResult(_stale_alert(session, stale, health), None)
         signal = compute_signal(data_dir, settings)
         previous = None
-        if conn is not None:
+        if catalog is not None:
             from . import local_store as store
 
-            previous = store.load_signal(conn, signal["week"], "preview", signal["label"])
+            with catalog() as conn:
+                previous = store.load_signal(conn, signal["week"], "preview", signal["label"])
         changed = changes(previous, signal) if previous is not None else None
         note = format_message(signal, "final", health, settings, now, None, changed)
         if session != snapshot.week_ending:
@@ -604,9 +610,10 @@ def run_weekly(
                 f"\n\nOfficial close: {session:%a %d %b} "
                 f"(Friday {snapshot.week_ending:%d %b} was a market holiday)."
             )
-        if conn is not None:
+        if catalog is not None:
             signal["display_name"] = display_name or signal["label"]
-            store.save_signal(conn, signal["week"], "final", signal["label"], signal)
+            with catalog() as conn:
+                store.save_signal(conn, signal["week"], "final", signal["label"], signal)
         return RunResult(note, signal)
 
     # Preview: live prices go into a scratch copy, never into data_dir or the database.
@@ -620,11 +627,12 @@ def run_weekly(
         apply_preview(scratch_dir, today, index_now, etf_now)
         signal = compute_signal(scratch_dir, settings)
     note = format_message(signal, "preview", health, settings, now, how)
-    if conn is not None:
+    if catalog is not None:
         from . import local_store as store
 
         signal["display_name"] = display_name or signal["label"]
-        store.save_signal(conn, signal["week"], "preview", signal["label"], signal)
+        with catalog() as conn:
+            store.save_signal(conn, signal["week"], "preview", signal["label"], signal)
     return RunResult(note, copy.deepcopy(signal))
 
 
@@ -633,7 +641,7 @@ def run_favorite_strategies(
     data_dir: Path = DATA_DIR,
     now: datetime | None = None,
     creds=None,
-    conn=None,
+    catalog=None,
     log=print,
 ) -> list[dict]:
     """Evaluate every eligible favourite against one shared weekly snapshot.
@@ -647,12 +655,21 @@ def run_favorite_strategies(
     from . import runs_store
 
     now = (now or datetime.now(IST)).astimezone(IST)
-    favorites = runs_store.list_favorites(conn) if conn is not None else []
+    favorites = []
+    if catalog is not None:
+        with catalog() as conn:
+            favorites = runs_store.list_favorites(conn)
     if not favorites:
         # Preserve the existing scheduled-job behaviour until the user has
         # saved and favourited a strategy.
         result = run_weekly(
-            run, data_dir, now, creds, conn=conn, log=log, display_name="Default live strategy"
+            run,
+            data_dir,
+            now,
+            creds,
+            catalog=catalog,
+            log=log,
+            display_name="Default live strategy",
         )
         return [
             {
@@ -665,7 +682,7 @@ def run_favorite_strategies(
             }
         ]
 
-    snapshot = refresh_weekly_snapshot(run, data_dir, now, creds, conn, log)
+    snapshot = refresh_weekly_snapshot(run, data_dir, now, creds, catalog, log)
     outcomes = []
     for favorite in favorites:
         config = favorite["config"]
@@ -689,7 +706,7 @@ def run_favorite_strategies(
                 now,
                 creds,
                 settings=settings_from_saved_config(config),
-                conn=conn,
+                catalog=catalog,
                 log=log,
                 snapshot=snapshot,
                 display_name=favorite["name"],

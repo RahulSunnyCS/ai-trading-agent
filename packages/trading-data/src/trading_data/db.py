@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from importlib import resources
 from pathlib import Path
@@ -183,10 +183,18 @@ def _ensure_reference(con: duckdb.DuckDBPyConnection) -> None:
             import_csvs(con)
 
 
-def refresh_views(con: duckdb.DuckDBPyConnection, root: Path) -> None:
+def refresh_views(
+    con: duckdb.DuckDBPyConnection, root: Path, views: Iterable[str] | None = None
+) -> None:
     """(Re)create TEMP views over the lake for this connection — temp so they work on
     read-only connections too and always point at the CURRENT root, even after the
-    folder has moved to another disk.
+    folder has moved to another disk. `views` limits it to those names (None = all of
+    `LAKE_VIEWS`); works on any connection, an in-memory one included.
+
+    Binding a view reads the footer of every file it covers (`union_by_name`): on the live
+    lake (2026-10-07: ~30k option and ~14k index day files) the two 1-minute views take
+    ~20-35 s, all of it with the catalog locked. A caller that does not query them passes
+    `views` (`connect(views=...)`).
 
     Only runs on `connect()`'s way in. If a lake glob matched nothing, the view is a
     fixed empty placeholder for that connection's whole lifetime — a write made
@@ -194,7 +202,12 @@ def refresh_views(con: duckdb.DuckDBPyConnection, root: Path) -> None:
     instruments, then writes Parquet) is invisible to a query on this connection
     afterward. Always read back through a NEW `connect()` call (a fresh process, or
     a second `with connect(...)` block), never the writer's own connection."""
-    for name, (glob, empty) in LAKE_VIEWS.items():
+    names = list(LAKE_VIEWS) if views is None else list(views)
+    unknown = sorted(set(names) - LAKE_VIEWS.keys())
+    if unknown:
+        raise ValueError(f"no lake view named {', '.join(unknown)}")
+    for name in names:
+        glob, empty = LAKE_VIEWS[name]
         # read_parquet errors on a glob that matches nothing, so a fresh lake gets an
         # empty view with the same columns instead.
         if any((root / "lake").glob(glob)):
@@ -235,11 +248,22 @@ def _open(path: Path, read_only: bool, attempts: int = 40) -> duckdb.DuckDBPyCon
 
 @contextmanager
 def connect(
-    root: Path | None = None, *, read_only: bool = False, lock_wait: float = 10.0
+    root: Path | None = None,
+    *,
+    read_only: bool = False,
+    lock_wait: float = 10.0,
+    views: Iterable[str] | None = None,
 ) -> Iterator[duckdb.DuckDBPyConnection]:
     """`lock_wait`: seconds to keep retrying while another process holds the catalog. 10 s
     suits an interactive command; a long import that has already written files and only
-    needs to record them passes minutes (a crash between the two leaves unrecorded days)."""
+    needs to record them passes minutes (a crash between the two leaves unrecorded days).
+
+    `views`: the lake views this connection needs (None = all). Every caller holds the
+    catalog lock while they bind, and the 1-minute ones take tens of seconds on the live
+    lake, so a caller that never reads them passes the few it does (see `refresh_views`).
+
+    Hold the connection for one short unit of work: never across a request that streams,
+    a network fetch or a long computation (another process waits on it, `lock_wait` long)."""
     root = root or data_root()
     path = catalog_path(root)
     if read_only and not path.exists():
@@ -250,7 +274,7 @@ def connect(
         if not read_only:
             migrate(con)
             _ensure_reference(con)
-        refresh_views(con, root)
+        refresh_views(con, root, views)
         yield con
     finally:
         con.close()

@@ -19,16 +19,64 @@ Callers prefer the database once `mbt local migrate` has populated it, falling
 back to files on a fresh checkout or a test fixture that only wrote CSVs. ETF,
 Stock, Custom Index, Broad Momentum, and Momentum Scores now share this
 database-first read path; see TODO 3.11.8.
+
+Never hold a catalog connection across a request or a long computation: DuckDB lets one
+process hold the file, and `mbt serve` holding it is what made the evening `obt daily` and
+`tdata` fail (2026-10-07). Every connection in this package goes through `open_catalog()`
+(one short unit of work, only the `bars_1d_stock` view bound) or `stock_bars()` (heavy
+daily-bar queries on an in-memory DuckDB, the catalog closed before they start).
 """
 
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
 from datetime import date
 from pathlib import Path
 
+import duckdb
 import pandas as pd
-from trading_data.db import catalog_path, connect, data_root
+import trading_data.db as tdb
+from trading_data.db import catalog_path, data_root
+
+#: The only lake view this package reads. `connect()` binds every lake view by default, and on
+#: the live lake the two 1-minute views alone took ~20-35 s per connection (2026-10-07), all of it
+#: with the catalog locked against `obt daily` and `tdata`.
+LAKE_VIEWS = ("bars_1d_stock",)
+
+
+def open_catalog(
+    root: Path | None = None, *, read_only: bool = False, lock_wait: float = 10.0
+) -> AbstractContextManager[duckdb.DuckDBPyConnection]:
+    """`trading_data.db.connect` for this package: only `LAKE_VIEWS` bound. Use it as a
+    `with` block around one short unit of work; never across a network fetch, a backtest or a
+    response that streams. Calls `tdb.connect` by attribute so a test can replace it."""
+    return tdb.connect(root=root, read_only=read_only, lock_wait=lock_wait, views=LAKE_VIEWS)
+
+
+@contextmanager
+def stock_bars(root: Path | None = None) -> Iterator[duckdb.DuckDBPyConnection]:
+    """An in-memory DuckDB with `bars_1d_stock` (a view over the lake's Parquet) and the stock
+    rows of `instruments` copied out of the catalog, which is open only for that copy
+    (milliseconds). For the heavy daily-bar reads (Broad Momentum's ~3M rows, the liquidity and
+    circuit windows), which take seconds and used to keep the catalog locked throughout. Raises
+    FileNotFoundError when there is no catalog, like `connect(read_only=True)`."""
+    root = root or data_root()
+    with open_catalog(root, read_only=True) as con:
+        instruments = con.execute(
+            "SELECT instrument_id, symbol, company_id, exchange, isin FROM instruments "
+            "WHERE asset_class = 'stock'"
+        ).arrow()
+    mem = duckdb.connect()
+    try:
+        mem.register("_instruments", instruments)
+        mem.execute("CREATE TABLE instruments AS SELECT * FROM _instruments")
+        mem.unregister("_instruments")
+        tdb.refresh_views(mem, root, LAKE_VIEWS)
+        yield mem
+    finally:
+        mem.close()
 
 
 def catalog_mtime(root: Path | None = None) -> float | None:
@@ -100,7 +148,7 @@ def table_fingerprints(root: Path | None = None) -> tuple:
     """(table, row count, order-independent hash of every row) for each catalog table except
     `RUN_RECORD_TABLES`: what `data_version` is made of, and what a snapshot of "the data" should
     compare."""
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         names = [
             name
             for (name,) in con.execute(
@@ -116,7 +164,7 @@ def table_fingerprints(root: Path | None = None) -> tuple:
 
 
 def weekly_closes_from_db(root: Path | None = None) -> pd.DataFrame:
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         rows = con.execute(
             "SELECT date, instrument, close FROM momentum_prices WHERE kind = 'weekly' "
             "ORDER BY date"
@@ -168,7 +216,7 @@ def stock_dataset_from_db_or_none(root: Path | None = None) -> StockDatasetRaw |
 
     if catalog_mtime(root) is None:
         return None
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         # A read-only connect never migrates, so a catalog last opened for writing
         # before 004 has no stock_weekly_series table yet.
         if not _has_table(con, "stock_weekly_series"):
@@ -219,7 +267,7 @@ def has_category_data(root: Path | None = None) -> bool:
     exists, matching what category_membership.csv's mere presence used to signal."""
     if catalog_mtime(root) is None:
         return False
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         return bool(
             con.execute(
                 "SELECT 1 FROM category_membership WHERE category != 'Total Market' LIMIT 1"
@@ -236,7 +284,7 @@ def constant_current_total_market_years_from_db_or_none(
     is no catalog, or no Total Market rows yet."""
     if not has_total_market_data(root):
         return None
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         rows = con.execute(
             "SELECT DISTINCT year FROM category_membership WHERE category = 'Total Market' "
             "AND source_tier = 'constant_current'"
@@ -247,7 +295,7 @@ def constant_current_total_market_years_from_db_or_none(
 def has_total_market_data(root: Path | None = None) -> bool:
     if catalog_mtime(root) is None:
         return False
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         return bool(
             con.execute(
                 "SELECT 1 FROM category_membership WHERE category = 'Total Market' LIMIT 1"
@@ -263,7 +311,7 @@ def category_membership_from_db_or_none(root: Path | None = None) -> pd.DataFram
     Market rows yet — the caller's cue to read the file instead."""
     if catalog_mtime(root) is None:
         return None
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         rows = con.execute(
             "SELECT category, year, symbol, source_tier, wayback_timestamp "
             "FROM category_membership WHERE category != 'Total Market'"
@@ -294,7 +342,7 @@ def daily_prices_from_db_or_none(
         return None
     if not symbols:
         return pd.DataFrame(columns=list(_DAILY_PRICE_COLUMNS))
-    with connect(root or data_root(), read_only=True) as con:
+    with stock_bars(root) as con:
         # `.df()`, not `.fetchall()` + `pd.DataFrame(rows)`: Broad Momentum reads ~3M rows, and
         # building that many Python tuples took ~10x longer and ~2 GB of RAM (measured on a
         # synthetic catalog of the real shape: 9.6 s vs 1.0 s, identical frames).
@@ -322,7 +370,7 @@ def latest_company_closes_from_db_or_none(
         return None
     if not company_ids:
         return {}
-    with connect(root or data_root(), read_only=True) as con:
+    with stock_bars(root) as con:
         rows = con.execute(
             "SELECT company_id, close, symbol, date FROM ("
             "SELECT i.company_id, b.close, i.symbol, b.date, "
@@ -346,7 +394,7 @@ def latest_momentum_closes_from_db_or_none(
         return None
     if not instruments:
         return {}
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         rows = con.execute(
             "SELECT instrument, close, date FROM ("
             "SELECT instrument, close, date, "
@@ -369,7 +417,7 @@ def total_market_members_by_year_from_db_or_none(
     'Total Market' rows yet — the caller's cue to read the CSV instead."""
     if catalog_mtime(root) is None:
         return None
-    with connect(root or data_root(), read_only=True) as con:
+    with open_catalog(root, read_only=True) as con:
         rows = con.execute(
             "SELECT year, symbol FROM category_membership WHERE category = 'Total Market'"
         ).fetchall()

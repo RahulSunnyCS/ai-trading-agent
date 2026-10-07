@@ -73,6 +73,18 @@ table instead.
   blocks other processes' readers. Use `connect()` as a short context manager — never
   hold it across a long download (see how `fyers/daily.py` opens it only to register
   and to finish the run).
+- **Never hold a catalog connection across a request or a long computation.** Open, query,
+  close: not app-lifetime or module-level, not across a network fetch, a backtest, a streamed
+  response or a generator's `yield`. Every other process (`obt daily`'s save, `tdata`) waits on
+  it and gives up after `lock_wait` (10 s). Heavy reads of lake data run on an in-memory DuckDB
+  over the Parquet instead (`refresh_views` works on any connection), with the catalog open only
+  to copy the small table they join (momentum's `db_read.stock_bars`). On 2026-10-07 `mbt serve`
+  broke this and `tdata` / `obt` timed out.
+- **`connect(views=...)` binds only the lake views a caller reads.** Binding a view reads the
+  footer of every file under it (`union_by_name`), with the catalog locked: on the live lake the
+  two 1-minute views took ~20-35 s per connection (2026-10-07; ~30k option, ~14k index files). The
+  default (None) still binds all of them; a caller that never reads them passes the ones it does
+  (momentum: `("bars_1d_stock",)`).
 - **Migrations by filename**, like apps/server's runner: never edit an applied
   migration, add `NNN_name.sql`.
 - **No FOREIGN KEYs** (DuckDB checks them over-eagerly); relations are documented in

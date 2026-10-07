@@ -590,17 +590,18 @@ def local_migrate() -> None:
     index/ETF/premium/weekly price series into the shared local database. The curated
     CSVs and data/ stay the master copies — safe to re-run; every table/partition this
     touches is replaced wholesale, never appended to."""
-    from trading_data.db import connect, data_root
+    from trading_data.db import data_root
 
     from . import db_migrate
+    from .db_read import open_catalog
 
     root = data_root()
-    with connect(root) as con:
+    with open_catalog(root) as con:
         report = db_migrate.migrate(con, root)
     # Reopen after the Parquet write: lake views are fixed when connect() opens.
     from . import stock_actions
 
-    with connect(root) as con:
+    with open_catalog(root) as con:
         action_report = stock_actions.scan_and_store(con, DATA_DIR / "stocks" / "raw")
     typer.echo(
         f"companies {report.companies}, renames {report.company_symbols}, "
@@ -901,11 +902,12 @@ def stocks_fetch_benchmarks(
 
     if skip_catalog:
         return
-    from trading_data.db import connect, data_root
+    from trading_data.db import data_root
 
     from . import db_migrate
+    from .db_read import open_catalog
 
-    with connect(data_root()) as con:
+    with open_catalog(data_root()) as con:
         n_rows = db_migrate.import_extra_benchmarks(con, extra)
     typer.echo(f"catalog stock_weekly_series: {n_rows:,} rows written ({data_root()})")
 
@@ -1072,11 +1074,10 @@ def stocks_deadlines() -> None:
     except Exception as error:  # noqa: BLE001 - reported to the check, which says so
         out["ca_diff"] = {"error": f"{type(error).__name__}: {error}"}
     try:
-        from trading_data.db import connect
-
         from . import stock_actions
+        from .db_read import open_catalog
 
-        with connect(read_only=True) as con:
+        with open_catalog(read_only=True) as con:
             snap = stock_actions.review_snapshot(con, limit=0)
         out["reviews"] = {
             "pending_count": snap["pending_count"],
@@ -1727,11 +1728,10 @@ def journal_show(
     week: str = typer.Option(None, help="Only this signal week (YYYY-MM-DD)."),
 ) -> None:
     """List journal entries, oldest first."""
-    from trading_data.db import connect
-
     from . import forward_journal
+    from .db_read import open_catalog
 
-    with connect() as con:
+    with open_catalog() as con:
         rows = forward_journal.entries(con, week)
     if not rows:
         typer.echo("The journal is empty." if week is None else f"No entries for {week}.")
@@ -1762,15 +1762,14 @@ def journal_check(
     Scheduled for Fridays 20:15 IST by the momentum-weekly-journal-check LaunchAgent."""
     from datetime import datetime
 
-    from trading_data.db import connect
-
     from . import forward_journal, notify, runs_store
+    from .db_read import open_catalog
     from .stocks.ui_data import NIFTY200_MOMENTUM30_TRI
     from .weekly import week_ending_on_or_before
 
     target = week or week_ending_on_or_before(datetime.now(notify.IST).date())
     try:
-        with connect() as con:
+        with open_catalog() as con:
             result = forward_journal.check(
                 con, target, runs_store.list_favorites(con), (NIFTY200_MOMENTUM30_TRI,)
             )
@@ -1808,11 +1807,10 @@ def journal_check(
 @journal_app.command("verify")
 def journal_verify() -> None:
     """Check that no entry was changed, removed or reordered since it was recorded."""
-    from trading_data.db import connect
-
     from . import forward_journal
+    from .db_read import open_catalog
 
-    with connect() as con:
+    with open_catalog() as con:
         problems = forward_journal.verify(con)
         chain = forward_journal.head(con)
     if problems:
@@ -2486,10 +2484,9 @@ def weekly(
     This is a thin wrapper around `api._execute_weekly_run` — the same orchestration the
     dashboard's manual trigger and the scheduled jobs all share, so the CLI, the API, and
     launchd can never drift against each other (they used to duplicate this loop)."""
-    from trading_data.db import connect
-
     from . import api as api_module
     from . import local_store, notify
+    from .db_read import open_catalog
 
     if run not in ("preview", "final"):
         typer.echo("--run must be preview or final")
@@ -2499,7 +2496,7 @@ def weekly(
             "note: --no-db no longer skips the shared database — favourites and signal "
             "history always live there now. Ignoring --no-db."
         )
-    with connect() as conn:
+    with open_catalog() as conn:
         if not (DATA_DIR / "weekly_closes.csv").exists():
             typer.echo(f"pulled {local_store.pull_dir(conn, DATA_DIR)} rows from the database")
     if not (DATA_DIR / "weekly_closes.csv").exists():

@@ -36,9 +36,10 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from trading_data import lake
-from trading_data.db import connect, data_root
+from trading_data.db import data_root
 
 from .. import db_migrate, fyers
+from ..db_read import open_catalog
 from ..weekly import IST, week_ending_on_or_before
 
 CURATED_DIR = Path(__file__).parent / "curated"
@@ -111,41 +112,44 @@ def run_fyers_topup(creds: fyers.Credentials, *, now: date | None = None) -> Top
     today = now or pd.Timestamp.now(IST).date()
     target_week = week_ending_on_or_before(today)
 
-    with connect() as con:
+    # Three steps, the catalog open only for the first and the last: the Fyers calls between
+    # them take minutes (a pause per symbol), and `obt daily` / `tdata` wait on the catalog.
+    with open_catalog() as con:
         last_week_row = con.execute("SELECT max(week) FROM stock_weekly_prices").fetchone()
         last_week = last_week_row[0] if last_week_row else None
         if last_week is not None and pd.Timestamp(last_week).normalize() >= pd.Timestamp(
             target_week
         ):
             return None  # already current — no top-up needed
-
         members = _current_members(con)
-        aliases = _current_aliases()
-        fetch_start = (
-            pd.Timestamp(last_week).date() + timedelta(days=1)
-            if last_week is not None
-            else target_week - timedelta(days=7)
-        )
 
-        skipped: list[str] = []
-        rows: list[tuple[str, float]] = []
-        for company_id in members:
-            symbol = aliases.get(company_id)
-            if symbol is None:
-                skipped.append(company_id)
-                continue
-            try:
-                closes = fyers.daily_closes(f"NSE:{symbol}-EQ", fetch_start, today, creds)
-            except Exception:  # noqa: BLE001 - one bad symbol must not fail the whole top-up
-                skipped.append(company_id)
-                continue
-            finally:
-                time.sleep(fyers.PAUSE_S)
-            if closes.empty:
-                skipped.append(company_id)
-                continue
-            rows.append((company_id, float(closes.iloc[-1])))
+    aliases = _current_aliases()
+    fetch_start = (
+        pd.Timestamp(last_week).date() + timedelta(days=1)
+        if last_week is not None
+        else target_week - timedelta(days=7)
+    )
 
+    skipped: list[str] = []
+    rows: list[tuple[str, float]] = []
+    for company_id in members:
+        symbol = aliases.get(company_id)
+        if symbol is None:
+            skipped.append(company_id)
+            continue
+        try:
+            closes = fyers.daily_closes(f"NSE:{symbol}-EQ", fetch_start, today, creds)
+        except Exception:  # noqa: BLE001 - one bad symbol must not fail the whole top-up
+            skipped.append(company_id)
+            continue
+        finally:
+            time.sleep(fyers.PAUSE_S)
+        if closes.empty:
+            skipped.append(company_id)
+            continue
+        rows.append((company_id, float(closes.iloc[-1])))
+
+    with open_catalog() as con:
         for kind in ("tr", "price"):
             con.execute(
                 "DELETE FROM stock_weekly_prices WHERE kind = ? AND week = ?",
@@ -188,7 +192,7 @@ def run_fyers_topup_total_market(
     # own connection before `total_market_members_by_year` opens its (read-only) one,
     # and that in turn must close before the write connection below opens, or all three
     # collide with `ConnectionException: ... different configuration`.
-    with connect() as con:
+    with open_catalog() as con:
         last_date_row = con.execute("SELECT max(date) FROM bars_1d_stock").fetchone()
         last_date = last_date_row[0] if last_date_row else None
     if last_date is not None and pd.Timestamp(last_date).normalize() >= pd.Timestamp(today):
@@ -241,7 +245,7 @@ def run_fyers_topup_total_market(
             through=pd.Timestamp(today), symbols_updated=0, rows_written=0, symbols_skipped=skipped
         )
 
-    with connect() as con:
+    with open_catalog() as con:
         updated_symbols = sorted({r["symbol"] for r in new_rows})
         instrument_ids = db_migrate.register_stock_instruments(con, updated_symbols, CURATED_DIR)
         for r in new_rows:
