@@ -13,6 +13,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Literal
 
+import duckdb
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
@@ -52,7 +53,7 @@ from .categories.compose import (
     DEFAULT_TOP_N as CATEGORY_DEFAULT_TOP_N,
 )
 from .config import DATA_DIR, load_repo_env
-from .db_read import open_catalog
+from .db_read import open_catalog, read_catalog
 from .engine import (
     BENCHMARK,
     CASH,
@@ -2748,17 +2749,15 @@ def _weekly_status(today: date | None = None) -> dict:
             dataset("stock", "NSE bhavcopy stock data", None, stock_note, str(error.detail))
         )
 
-    import duckdb
-
     try:
-        with open_catalog() as con:
+        with read_catalog() as con:
             # epoch() rather than the TIMESTAMPTZ itself: returning a TIMESTAMPTZ to Python
             # makes DuckDB import pytz, which this package does not depend on.
             rows = con.execute(
                 "SELECT week, run_kind, config_label, payload, epoch(generated_at) "
                 "FROM momentum_signals ORDER BY generated_at DESC LIMIT 6"
             ).fetchall()
-    except duckdb.CatalogException:  # a catalog without the table yet has no signals
+    except (FileNotFoundError, duckdb.CatalogException):  # no catalog / table yet: no signals
         rows = []
     signals = [
         {
@@ -3104,8 +3103,13 @@ def create_app() -> FastAPI:
 
     @app.get("/api/saved-runs")
     def saved_runs(dataset: Literal["etf", "stock", "custom_index", "broad"] = "etf") -> list[dict]:
-        with open_catalog() as con:
-            return runs_store.list_runs(con, dataset)
+        # Read-only (`read_catalog`): the dashboard polls this, and a read-write connection
+        # excludes every other request's (2026-10-07: `/api/meta` waited 8 s and more).
+        try:
+            with read_catalog() as con:
+                return runs_store.list_runs(con, dataset)
+        except (FileNotFoundError, duckdb.CatalogException):  # no catalog / no runs table yet
+            return []
 
     @app.post("/api/saved-runs")
     def create_saved_run(body: SavedRunBody) -> dict:
@@ -3139,8 +3143,11 @@ def create_app() -> FastAPI:
     @app.get("/api/favorite-strategies")
     def favorite_strategies() -> list[dict]:
         """The persisted candidates for the weekly scheduler and dashboard."""
-        with open_catalog() as con:
-            return runs_store.list_favorites(con)
+        try:
+            with read_catalog() as con:
+                return runs_store.list_favorites(con)
+        except (FileNotFoundError, duckdb.CatalogException):  # no catalog / no runs table yet
+            return []
 
     @app.delete("/api/saved-runs/{run_id}")
     def remove_saved_run(run_id: str) -> dict:
