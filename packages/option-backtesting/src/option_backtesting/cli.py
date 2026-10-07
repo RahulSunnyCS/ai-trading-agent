@@ -584,7 +584,13 @@ def legwise_compare(
         raise typer.BadParameter("no AlgoTest days in that range")
     skipped: dict[date, str] = {}
     ours = run_legwise(
-        strategy, data_dir(), theirs[0].day, theirs[-1].day, include_excluded=True, skipped=skipped
+        strategy,
+        data_dir(),
+        theirs[0].day,
+        theirs[-1].day,
+        include_excluded=True,
+        skipped=skipped,
+        only_days={d.day for d in theirs},
     )
     text = report(compare(theirs, ours, strategy, skipped), strategy)
     if out:

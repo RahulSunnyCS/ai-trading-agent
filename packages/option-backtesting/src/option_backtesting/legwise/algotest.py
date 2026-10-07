@@ -110,13 +110,13 @@ def algotest_reasons(day: AlgoDay, exit_min: int) -> list[str]:
     return out
 
 
-def _coarse(ours: str, theirs: str, same_minute_as_overall: bool = False) -> bool:
+def _coarse(ours: str, theirs: str, left_with_others: bool = False) -> bool:
     """Same exit reason, allowing for what the log cannot show: a lone early exit (STOP) may
-    be either stop, and a leg whose own SL fired in the minute the combined stop closed the
-    rest is OVERALL_SL in the log (every leg left together) but SL in the engine."""
+    be either stop, and legs that left in the same minute are OVERALL_SL in the log (inferred)
+    though in the engine one or all of them may have hit their own SL in that minute."""
     if theirs == "STOP":
         return ours in ("SL", "OVERALL_SL")
-    if theirs == "OVERALL_SL" and ours == "SL" and same_minute_as_overall:
+    if theirs == "OVERALL_SL" and ours == "SL" and left_with_others:
         return True
     return ours == theirs
 
@@ -176,13 +176,15 @@ def compare_day(
     pairs = _pair(theirs.legs, ours.trades)
     extra = len(ours.trades) - sum(1 for _, t in pairs if t is not None)
     reasons = algotest_reasons(theirs, exit_min)
-    overall_min = {t.exit_min for t in ours.trades if t.exit_reason == "OVERALL_SL"}
+    exits = Counter(t.exit_min for t in ours.trades if t.exit_min is not None)
     legs: list[LegDiff] = []
+    notes: list[str] = []
     worst = "match"
     for (leg, trade), reason in zip(pairs, reasons, strict=True):
-        if trade is None:
-            missing = f"engine has no {leg.position} {leg.option_type} trade"
-            return DayDiff(theirs.day, "missing", theirs.pnl, ours.gross, note=missing)
+        if trade is None:  # keep comparing the other legs
+            notes.append(f"engine has no {leg.position} {leg.option_type} trade")
+            worst = "missing"
+            continue
         diff = LegDiff(
             option_type=leg.option_type,
             position=leg.position,
@@ -197,7 +199,7 @@ def compare_day(
         legs.append(diff)
         if diff.strike[0] != diff.strike[1]:
             cls = "strike"
-        elif not _coarse(trade.exit_reason, reason, trade.exit_min in overall_min):
+        elif not _coarse(trade.exit_reason, reason, exits[trade.exit_min] >= 2):
             cls = "reason"
         elif diff.entry_min[0] != diff.entry_min[1] or not _minute_ok(diff, reason):
             cls = "minute"
@@ -207,10 +209,11 @@ def compare_day(
             cls = "match"
         if CLASSES.index(cls) < CLASSES.index(worst):
             worst = cls
-    note = f"engine has {extra} more trade(s)" if extra else ""
-    if extra and CLASSES.index("reason") < CLASSES.index(worst):
-        worst = "reason"
-    return DayDiff(theirs.day, worst, theirs.pnl, ours.gross, legs, note)
+    if extra:
+        notes.append(f"engine has {extra} more trade(s)")
+        if CLASSES.index("reason") < CLASSES.index(worst):
+            worst = "reason"
+    return DayDiff(theirs.day, worst, theirs.pnl, ours.gross, legs, "; ".join(notes))
 
 
 def _minute_ok(diff: LegDiff, reason: str) -> bool:

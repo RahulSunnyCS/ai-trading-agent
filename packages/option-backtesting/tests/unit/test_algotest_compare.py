@@ -104,3 +104,19 @@ def test_a_leg_sl_in_the_minute_of_the_combined_stop_counts_as_the_same_exit():
     )
     assert compare_day(theirs, ours, STRATEGY).cls == "match"
 
+
+def test_both_legs_stopped_in_the_same_minute_is_the_same_exit():
+    """Both legs' own SLs in one minute: the log reads it as a combined stop."""
+    theirs = algo(leg("CE", 23150, "09:17", "10:06"), leg("PE", 23050, "09:17", "10:06"))
+    ours = result(
+        trade("CE", 23150, "09:17", "10:05", "SL"), trade("PE", 23050, "09:17", "10:05", "SL")
+    )
+    assert compare_day(theirs, ours, STRATEGY).cls == "match"
+
+
+def test_a_missing_leg_keeps_the_other_legs_diffs():
+    theirs = algo(leg("CE", 23700, "09:17", "15:28"), leg("PE", 23600, "09:17", "15:28"))
+    diff = compare_day(theirs, result(trade("CE", 23700, "09:17", "15:28", "EXIT_TIME")), STRATEGY)
+    assert diff.cls == "missing"
+    assert diff.note == "engine has no sell PE trade"
+    assert [x.option_type for x in diff.legs] == ["CE"]

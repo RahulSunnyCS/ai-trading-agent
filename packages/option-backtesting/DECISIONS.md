@@ -194,5 +194,8 @@ price / match`). First export: Nifty_Widesl_917_OTM1, 436 days.
   legs out together = combined stop; a lone early exit = either stop) and accepts a leg SL that
   fired in the minute the combined stop closed the rest. AlgoTest stamps stop exits at the END of
   the triggering minute: its stop minutes read ours + 1 (253 legs).
-- **5-minute tables follow:** a window's `open` is now the previous minute's close
-  (`DERIVED_VERSION` 2, rebuilt).
+- **5-minute tables:** a window's `open` stays its first minute's open — the engine checks a
+  stop's gap against it. The price at the window's start, which fills use, comes from the
+  previous window's close on the filler minutes (`load_day_5m`), so 5-minute fills follow the
+  new rule unchanged. (A short-lived version 2 made `open` the previous close, which hid gaps
+  from stop fills; the code review caught it; `DERIVED_VERSION` 3.)

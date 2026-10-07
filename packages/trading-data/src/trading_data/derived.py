@@ -9,9 +9,9 @@ Derived datasets (BL-034 Phase 3), rebuilt from the 1-minute lake — never edit
 **Time.** A 5-minute row with `bucket` T covers the window [T, T+5 min) of the session
 09:15-15:30 (75 windows; off-session bars are ignored). Its values use only the 1-minute bars
 that START inside the window (and, for carried prices, earlier ones), so a row is known at
-T+5. `open` is the price at the window's START exactly as the 1-minute legwise engine sees it
-(`Series.price_at`): the close of the minute before the window — the last earlier close — or,
-at 09:15 or before a contract's first earlier trade, the open of the window's first minute;
+T+5. `open` is the open of the window's first minute (the last earlier close when that minute
+had no trade) — the bar the engine checks a gap against. The price AT the window's start, which
+fills use (`Series.price_at`), is the previous window's close; at 09:15 it is this open.
 high/low/close/volume/oi are the window's. IV, greeks and the forward are computed from the
 window's CLOSE.
 
@@ -54,8 +54,9 @@ import pyarrow.parquet as pq
 from . import lake
 from .reference import REFERENCE_DIR
 
-#: 2 (2026-10-07): a window's open is the previous minute's close (BL-009 Phase 1 fill rule).
-DERIVED_VERSION = 2
+#: 3 (2026-10-07): back to the window's first trade as `open` after a short-lived 2 (the
+#: previous minute's close), which hid gaps from the engine's stop fills on 5-minute bars.
+DERIVED_VERSION = 3
 IST = ZoneInfo("Asia/Kolkata")
 BUCKET_MINUTES = 5
 N_BUCKETS = 75  # 09:15 .. 15:25 window starts
@@ -382,9 +383,7 @@ def _index_windows(con: duckdb.DuckDBPyConnection, path: Path, t0: int) -> dict[
     for w in range(max(by_w, default=-1) + 1):
         if w in by_w:
             first_open, hi, lo, close = by_w[w]
-            # the price at the window's start: the previous minute's close (the engine's
-            # price_at), else — at 09:15 — the first minute's open
-            start = last if last is not None else first_open
+            start = first_open if first_open is not None else last
             # no price at the window's start (its first minute missing, nothing earlier):
             # None, never a later price from inside the window
             if start is None:
@@ -516,10 +515,10 @@ def _chain(
         )
         SELECT b.w, b.expiry, b.strike, b.option_type,
                round((b.strike - b.atm) / {step})::SMALLINT AS offset,
-               coalesce(b.prev_close, b.first_open) AS open,
-               greatest(coalesce(b.hi, b.prev_close), coalesce(b.prev_close, b.first_open, b.hi))
+               coalesce(b.first_open, b.prev_close) AS open,
+               greatest(coalesce(b.hi, b.prev_close), coalesce(b.first_open, b.prev_close, b.hi))
                    AS high,
-               least(coalesce(b.lo, b.prev_close), coalesce(b.prev_close, b.first_open, b.lo))
+               least(coalesce(b.lo, b.prev_close), coalesce(b.first_open, b.prev_close, b.lo))
                    AS low,
                b.c_ff AS close, coalesce(b.vol, 0) AS volume, b.oi_ff AS oi, b.traded,
                (b.expiry - DATE '{d}')::SMALLINT AS dte

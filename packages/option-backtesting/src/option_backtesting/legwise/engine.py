@@ -14,7 +14,7 @@ backtest (TODO.md 3.10.7):
   used the OPEN of the T bar.) AlgoTest stamps a stop exit at the END of the
   minute that triggered it, so its stop times read one minute later than ours.
 - **Closest premium** — nearest to the target among the collected strikes of
-  that expiry, by the option's open at the entry minute; an exact tie picks
+  that expiry, by each option's price at the entry time (`price_at`); an exact tie picks
   the LOWER premium (AlgoTest docs' example: premiums 49 and 52 for a 50
   target -> 49).
 - **SL / target** are checked against each bar's high/low, from the entry bar
@@ -254,18 +254,18 @@ class _DaySim:
         if series.price_at(minute) is None:
             self.notes.append(f"{spec.id}: {key} has not traded by {minute_label(minute)}")
             return False
+        contract_lot = self.reference.lot_size(self.s.underlying, key[0])
         historical = self.s.execution.lot_sizing == "historical"
-        lot = self.reference.lot_size(
-            self.s.underlying, key[0] if historical else self.sizing_date
+        lot = (
+            contract_lot
+            if historical
+            else self.reference.lot_size(self.s.underlying, self.sizing_date)
         )
-        if (
-            historical
-            and self.data.master_lot_size is not None
-            and self.data.master_lot_size != lot
-        ):
+        # in either mode: a symbol master that disagrees with the table means the table is stale
+        if self.data.master_lot_size is not None and self.data.master_lot_size != contract_lot:
             self.notes.append(
-                f"lot size: reference CSV says {lot} for the {key[0]} expiry, Fyers symbol "
-                f"master says {self.data.master_lot_size} — using the CSV; update "
+                f"lot size: reference CSV says {contract_lot} for the {key[0]} expiry, Fyers "
+                f"symbol master says {self.data.master_lot_size} — using the CSV; update "
                 "lot_sizes.csv if it is stale"
             )
         run.qty = run.spec.lots * lot
@@ -484,16 +484,23 @@ def run_legwise(
     include_excluded: bool = False,
     skipped: dict[date, str] | None = None,
     bars: str = "1m",
+    only_days: set[date] | None = None,
+    sizing_date: date | None = None,
 ) -> list[DayResult]:
     """Simulate every backtest day (market.backtest_days) in [start, end]. A day that cannot
     be run — excluded by data_quality, no index file, or no reference row (a lot size before
     the table starts) — is left out, never zero-filled; pass `skipped` to receive
     {day: reason} for each. `bars="5m"` runs the same engine on the 5-minute chain snapshots
-    (market.load_day_5m); every strategy time must then be on a 5-minute mark."""
+    (market.load_day_5m); every strategy time must then be on a 5-minute mark. `only_days`
+    restricts the run to those days (e.g. an AlgoTest export's); `sizing_date` pins the date
+    whose lot `lot_sizing: current` uses (default: today)."""
     if bars not in BAR_SIZES:
         raise ValueError(f"bars must be one of {BAR_SIZES}, got {bars!r}")
     reference = reference or default_reference_data()
     days, left_out = backtest_days(root, strategy.underlying, start, end, include_excluded)
+    if only_days is not None:
+        days = [d for d in days if d in only_days]
+        left_out = {d: r for d, r in left_out.items() if d in only_days}
     loader = load_day
     if bars == "5m":
         check_on_5m_marks(
@@ -512,7 +519,7 @@ def run_legwise(
     for day in days:
         try:
             data = loader(root, strategy.underlying, day)
-            results.append(simulate_day(strategy, data, reference))
+            results.append(simulate_day(strategy, data, reference, sizing_date))
         except FileNotFoundError:
             left_out[day] = "no index or option file"
         except MissingReferenceData as error:
