@@ -1,0 +1,167 @@
+{
+ "window": [
+  "2012-01-01",
+  "2023-12-29"
+ ],
+ "variants": {
+  "baseline": {
+   "cagr": 0.1186323556125064,
+   "mdd": -0.7324817380788364
+  },
+  "tight_range/blend_0.25": {
+   "cagr": 0.14814269978066763,
+   "mdd": -0.6837220794114724
+  },
+  "tight_range/blend_0.5": {
+   "cagr": 0.10545772897009731,
+   "mdd": -0.6696484673270948
+  },
+  "tight_range/blend_0.75": {
+   "cagr": 0.07996296055376795,
+   "mdd": -0.6523564399637012
+  },
+  "tight_range/filter_40": {
+   "cagr": 0.15987671737247489,
+   "mdd": -0.6415773651232657
+  },
+  "tight_range/filter_100": {
+   "cagr": 0.08835266516881357,
+   "mdd": -0.6228819626648678
+  },
+  "tight_range/bonus_10": {
+   "cagr": 0.1316829965573223,
+   "mdd": -0.7110921099817819
+  },
+  "tight_range/bonus_25": {
+   "cagr": 0.14749907683800378,
+   "mdd": -0.6680969919150901
+  },
+  "tight_range/learned_0.5": {
+   "cagr": 0.08040921792748801,
+   "mdd": -0.6535075821065397
+  },
+  "flag/blend_0.25": {
+   "cagr": 0.15073200894013228,
+   "mdd": -0.7308839704767831
+  },
+  "flag/blend_0.5": {
+   "cagr": 0.1296737679434481,
+   "mdd": -0.7263682371268447
+  },
+  "flag/blend_0.75": {
+   "cagr": 0.13684093660979468,
+   "mdd": -0.7307625129881026
+  },
+  "flag/filter_40": {
+   "cagr": 0.1499562618907022,
+   "mdd": -0.7260456646172404
+  },
+  "flag/filter_100": {
+   "cagr": 0.10372429343184808,
+   "mdd": -0.735610886187215
+  },
+  "flag/bonus_10": {
+   "cagr": 0.14079702098130675,
+   "mdd": -0.7243716188181281
+  },
+  "flag/bonus_25": {
+   "cagr": 0.13983288793634574,
+   "mdd": -0.7383161929054808
+  },
+  "flag/learned_0.5": {
+   "cagr": 0.11139376483340646,
+   "mdd": -0.7373484417219265
+  },
+  "cup_handle/blend_0.25": {
+   "cagr": 0.12440830522627366,
+   "mdd": -0.7137882011053471
+  },
+  "cup_handle/blend_0.5": {
+   "cagr": 0.13147052110289814,
+   "mdd": -0.6602191776390183
+  },
+  "cup_handle/blend_0.75": {
+   "cagr": 0.1111606429301184,
+   "mdd": -0.6121768084327243
+  },
+  "cup_handle/filter_40": {
+   "cagr": 0.12567470864926533,
+   "mdd": -0.7172626858068976
+  },
+  "cup_handle/filter_100": {
+   "cagr": 0.13014044101523004,
+   "mdd": -0.6747683208973725
+  },
+  "cup_handle/bonus_10": {
+   "cagr": 0.12248334429461938,
+   "mdd": -0.7175346246043193
+  },
+  "cup_handle/bonus_25": {
+   "cagr": 0.12718008104951206,
+   "mdd": -0.7138317771605107
+  },
+  "cup_handle/learned_0.5": {
+   "cagr": 0.12420944516481103,
+   "mdd": -0.6755165046552227
+  }
+ },
+ "walk_forward_picks": {
+  "tight_range": {
+   "2017": "tight_range/blend_0.25",
+   "2018": "tight_range/blend_0.25",
+   "2019": "tight_range/blend_0.25",
+   "2020": "tight_range/blend_0.25",
+   "2021": "tight_range/filter_40",
+   "2022": "tight_range/filter_40",
+   "2023": "tight_range/filter_40"
+  },
+  "flag": {
+   "2017": "flag/blend_0.75",
+   "2018": "flag/blend_0.75",
+   "2019": "flag/blend_0.25",
+   "2020": "flag/blend_0.75",
+   "2021": "flag/bonus_10",
+   "2022": "flag/blend_0.75",
+   "2023": "flag/blend_0.75"
+  },
+  "cup_handle": {
+   "2017": "cup_handle/bonus_25",
+   "2018": "cup_handle/bonus_25",
+   "2019": "cup_handle/bonus_25",
+   "2020": "cup_handle/bonus_25",
+   "2021": "cup_handle/bonus_25",
+   "2022": "cup_handle/bonus_25",
+   "2023": "cup_handle/learned_0.5"
+  }
+ },
+ "walk_forward_joined": {
+  "tight_range": {
+   "excess_cagr": 0.04706637564399596,
+   "weeks": 365
+  },
+  "flag": {
+   "excess_cagr": -0.0593484050083245,
+   "weeks": 365
+  },
+  "cup_handle": {
+   "excess_cagr": 0.011723249601350405,
+   "weeks": 365
+  }
+ },
+ "pbo": {
+  "splits": 12870,
+  "configs": 24,
+  "weeks_used": 608,
+  "pbo": 0.57000777000777,
+  "picked_oos_negative": 0.433022533022533,
+  "slope": -1.299522176166694,
+  "picked_oos_median": 0.030274785822070133,
+  "picked_is_median": 0.300943597970027
+ },
+ "verdicts": {
+  "tight_range": "kill",
+  "flag": "kill",
+  "cup_handle": "kill"
+ },
+ "holdout_choice": {}
+}

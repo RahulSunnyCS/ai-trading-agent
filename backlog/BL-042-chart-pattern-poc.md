@@ -260,7 +260,32 @@ once on the sealed data. A guess before seeing any data:
   one run.
 - **Will not run:** anything reading 2024 or later before Phase 6; thresholds chosen on returns;
   a second hold-out run; shapes outside the 21 trials.
-- **Result:** (after the run)
+- **Result (2026-10-07): kill, all three patterns. Phase 6 not run; the 2024–26 hold-out stays
+  sealed and unclaimed.**
+  - **Phase 4, event study (2012–2023).** Excess return over non-pattern pool stocks in the same
+    momentum decile; Newey-West t, Holm across 9 tests. Nothing survives.
+
+    | Pattern | 4 wk | 13 wk (judged) | 26 wk | Events (13 wk) |
+    |---|---|---|---|---|
+    | Tight range | +0.13% (t 0.44) | +0.18% (t 0.29) | +0.27% (t 0.26) | 6,513 |
+    | Flag | +0.44% (t 1.37) | +0.28% (t 0.38) | −0.52% (t −0.42) | 2,899 |
+    | Cup and handle | −0.35% (t −1.10) | −0.84% (t −1.35) | −2.34% (t −1.68) | 1,973 |
+
+    By quality third (reported only), better-formed bases do no better. Best case: flag middle
+    third, +1.85% at 13 wk, t 1.52.
+  - **Phase 5, ranking test.** Baseline: plain Broad, off mode, top 10, weekly, delay 1,
+    itemised costs. 11.9% CAGR, max drawdown −73.2%, 2012-04 → 2023-12.
+    - Full-window CAGR deltas over the baseline:
+      - tight range −3.9 to +4.1 pts (best `filter_40`);
+      - flag −1.5 to +3.2;
+      - cup −0.7 to +1.3;
+      - the learned score −3.8 / −0.7 / +0.6.
+    - Joined walk-forward 2017–2023: tight range +4.7 pts/yr, flag −5.9, cup +1.2.
+    - **PBO 0.57** over the 24 trials (kill above 0.3). The in-sample winner's out-of-sample rank
+      is a coin flip or worse (slope −1.3; out-of-sample negative in 43% of splits).
+  - **Verdicts:** event study kill × 3; ranking test kill × 3 (PBO). Files:
+    `search_spaces/bl042_event_study_result.json`, `search_spaces/bl042_dev_result.json`;
+    curves in `data/patterns/dev_curves.parquet`.
 
 ## Log
 
@@ -341,3 +366,13 @@ once on the sealed data. A guess before seeing any data:
   6,883 bad bars (the wick rule added ~5,500). Phase 2b on the frozen detectors: at detection
   0.4–0.9% of bases are in the pool's top 10 and 1.3–2.9% in its top 20. A visual check of 12
   new cups and 6 flags: cups are now mostly real cups after an uptrend.
+- 2026-10-07 — Phases 4–5 run on the frozen detectors; all three patterns killed (Result above).
+  Phase 6 is not run: no pattern entered. `mbt patterns holdout` was deliberately left unrun, so
+  the 2024–26 hold-out stays unclaimed for later research. Caveats:
+  - The weekly table (`api.DATA`) starts in 2016, so before 2016 every run lacks the cash and
+    gold/silver/international columns. This affects the baseline and the variants alike.
+  - The baseline is volatile (−73% max drawdown). The test asks whether patterns improve it,
+    not whether it is a good strategy.
+  - The secondary comparison against the four BL-010 frozen configs was never built; with
+    nothing entering Phase 6 it is moot.
+  Phase 7 (the owner's decision) is open.

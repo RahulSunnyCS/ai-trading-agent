@@ -568,7 +568,7 @@ and pass/kill rules live in the backlog item.
 | 3.20.0 | Phase 0: owner reviews the pattern catalogue and the proposed thresholds; criteria committed | owner→claude | **Done 2026-10-07** (`bl041_criteria.json`) |
 | 3.20.1 | Phases 1–2: causal pivots, three detectors, truncation test | claude | **Done 2026-10-07**; Phase 2b (momentum rank while a base forms) recorded in the item |
 | 3.20.2 | Phase 3: chart gallery, owner labels, detector parameters frozen | owner→claude | **Done 2026-10-07**: 159/165 labelled, second review by Claude, fixes and freeze in `bl042_criteria_addendum_2.json` |
-| 3.20.3 | Phases 4–6: event study, ranking test, one hold-out run | claude | Open |
+| 3.20.3 | Phases 4–6: event study, ranking test, one hold-out run | claude | **Done 2026-10-07: killed.** No pattern beats same-momentum peers (event study), and PBO is 0.57 over 24 trials; hold-out not run, still sealed. Phase 7 (owner's decision) open |
 
 ## Reference — where detail lives
 

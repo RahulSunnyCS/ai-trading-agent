@@ -1,0 +1,201 @@
+{
+ "window": [
+  "2012-01-01",
+  "2023-12-29"
+ ],
+ "tests": [
+  {
+   "pattern": "tight_range",
+   "horizon_weeks": 4,
+   "events": 6572,
+   "weeks": 567,
+   "mean_excess": 0.0013262025959492457,
+   "t_newey_west": 0.4367413528934406,
+   "p_one_sided": 0.33114946775592036,
+   "enough_sample": true,
+   "holm_rejects": false
+  },
+  {
+   "pattern": "tight_range",
+   "horizon_weeks": 13,
+   "events": 6513,
+   "weeks": 559,
+   "mean_excess": 0.0018131587582490235,
+   "t_newey_west": 0.2881530916219469,
+   "p_one_sided": 0.38661477699209973,
+   "enough_sample": true,
+   "holm_rejects": false
+  },
+  {
+   "pattern": "tight_range",
+   "horizon_weeks": 26,
+   "events": 6324,
+   "weeks": 546,
+   "mean_excess": 0.0027233809015413672,
+   "t_newey_west": 0.25854029688307556,
+   "p_one_sided": 0.3979949766604126,
+   "enough_sample": true,
+   "holm_rejects": false
+  },
+  {
+   "pattern": "flag",
+   "horizon_weeks": 4,
+   "events": 2950,
+   "weeks": 518,
+   "mean_excess": 0.0043570827019401275,
+   "t_newey_west": 1.3666431973599849,
+   "p_one_sided": 0.08586858514449885,
+   "enough_sample": true,
+   "holm_rejects": false
+  },
+  {
+   "pattern": "flag",
+   "horizon_weeks": 13,
+   "events": 2899,
+   "weeks": 510,
+   "mean_excess": 0.0027503985527878643,
+   "t_newey_west": 0.3797643131092789,
+   "p_one_sided": 0.3520601875961741,
+   "enough_sample": true,
+   "holm_rejects": false
+  },
+  {
+   "pattern": "flag",
+   "horizon_weeks": 26,
+   "events": 2706,
+   "weeks": 497,
+   "mean_excess": -0.0051509003100018375,
+   "t_newey_west": -0.4170086074790319,
+   "p_one_sided": 0.6616639440775354,
+   "enough_sample": true,
+   "holm_rejects": false
+  },
+  {
+   "pattern": "cup_handle",
+   "horizon_weeks": 4,
+   "events": 1997,
+   "weeks": 502,
+   "mean_excess": -0.0035056758404811853,
+   "t_newey_west": -1.096898433696442,
+   "p_one_sided": 0.8636571032347913,
+   "enough_sample": true,
+   "holm_rejects": false
+  },
+  {
+   "pattern": "cup_handle",
+   "horizon_weeks": 13,
+   "events": 1973,
+   "weeks": 496,
+   "mean_excess": -0.008381920083068001,
+   "t_newey_west": -1.3483770861765363,
+   "p_one_sided": 0.9112314350124766,
+   "enough_sample": true,
+   "holm_rejects": false
+  },
+  {
+   "pattern": "cup_handle",
+   "horizon_weeks": 26,
+   "events": 1909,
+   "weeks": 486,
+   "mean_excess": -0.02341819683148662,
+   "t_newey_west": -1.6823651662881498,
+   "p_one_sided": 0.9537509741446781,
+   "enough_sample": true,
+   "holm_rejects": false
+  }
+ ],
+ "verdicts": {
+  "tight_range": "kill",
+  "flag": "kill",
+  "cup_handle": "kill"
+ },
+ "reported_by_quality_third": {
+  "tight_range": {
+   "low": {
+    "quality_range": [
+     0.0,
+     0.24044444444444443
+    ],
+    "events": 2236,
+    "mean_excess": 0.00182797092053939,
+    "t_newey_west": 0.22248512688735148
+   },
+   "mid": {
+    "quality_range": [
+     0.24044444444444443,
+     0.3984166666666667
+    ],
+    "events": 2389,
+    "mean_excess": 0.0021912802581228012,
+    "t_newey_west": 0.32340820892783023
+   },
+   "high": {
+    "quality_range": [
+     0.3984166666666667,
+     1.0
+    ],
+    "events": 1888,
+    "mean_excess": 0.0023743762840728005,
+    "t_newey_west": 0.22433061097344867
+   }
+  },
+  "flag": {
+   "low": {
+    "quality_range": [
+     0.0,
+     0.4068671783845051
+    ],
+    "events": 1308,
+    "mean_excess": -0.0012832208895020123,
+    "t_newey_west": -0.15046568929555912
+   },
+   "mid": {
+    "quality_range": [
+     0.4068671783845051,
+     0.564551071773844
+    ],
+    "events": 929,
+    "mean_excess": 0.01850668991485302,
+    "t_newey_west": 1.5191537707338798
+   },
+   "high": {
+    "quality_range": [
+     0.564551071773844,
+     1.0
+    ],
+    "events": 662,
+    "mean_excess": -0.00011380203107779536,
+    "t_newey_west": -0.008221533038971508
+   }
+  },
+  "cup_handle": {
+   "low": {
+    "quality_range": [
+     0.0,
+     0.535904761904762
+    ],
+    "events": 634,
+    "mean_excess": 0.0018027299713338813,
+    "t_newey_west": 0.17672295482334222
+   },
+   "mid": {
+    "quality_range": [
+     0.535904761904762,
+     0.6500119047619047
+    ],
+    "events": 667,
+    "mean_excess": -0.008091875322571915,
+    "t_newey_west": -0.8611592141729884
+   },
+   "high": {
+    "quality_range": [
+     0.6500119047619047,
+     1.0
+    ],
+    "events": 672,
+    "mean_excess": -0.007916895510930314,
+    "t_newey_west": -0.7140700466264593
+   }
+  }
+ }
+}
