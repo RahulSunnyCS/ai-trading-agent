@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — this month's goal is Momentum with real money (BL-010, BL-024, BL-025); this is the next research line, separate from it |
-| **Status** | In progress |
+| **Status** | In progress — one retry (addendum 1) |
 | **Type** | research |
 | **Area** | momentum (the `patterns/` module; a separate sleeve, not the momentum ranking) |
 | **Created** | 2026-10-07 |
@@ -262,3 +262,21 @@ Answered when the owner started the item (2026-10-07):
     ranges and flags as a standalone swing system do not beat simply holding a mid-cap index.
     No rule here is worth spending the sealed hold-out on. Recommended to the owner: close
     BL-043 as "no edge after costs".
+- 2026-10-07 — **The original test stands as killed.** Owner: "lets do both", meaning close it
+  and make one corrected retry. `bl043_criteria_addendum_1.json` is committed before the retry
+  runs. It is the last attempt; if it fails, BL-043 closes and the hold-out stays sealed.
+  - **Trades are judged in percent:** net % per trade, a 3% minimum stop distance, and a
+    score built on net %.
+  - **Matched control:** 3 random other strong stocks bought the same day under the same
+    exits, so the question is whether the pattern beats simply buying a strong stock.
+  - **The bar is the mid-cap index:** the Nifty Midcap 150 TRI, in CAGR and drawdown, as well
+    as the Nifty 500 TRI.
+  - **Idle cash earns the liquid fund.**
+  - **Three review faults (PR #103, Codex) fixed first:**
+    - the walk-forward portfolio is now one continuous simulation, not stitched together;
+    - a bad bar in the ATR window now excludes the candidate;
+    - the ₹16 DP charge is taken on each actual sale.
+  - **The original stage B figure (7.8%) was stitched together and not realisable.** The
+    original kill rests on stage B's PBO of 0.32 and the metric flaw, not on that number.
+  - **Honesty note:** the development years have been seen once, so the hold-out run is the
+    real test.

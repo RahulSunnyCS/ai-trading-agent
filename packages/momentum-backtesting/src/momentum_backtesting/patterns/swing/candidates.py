@@ -129,6 +129,8 @@ def scan_symbol(bars: SymbolBars, members: dict[int, set[str]] | None) -> list[d
     years = pd.DatetimeIndex(bars.dates).year
     if members is not None:
         ok_day &= np.array([bars.symbol in members.get(int(y), ()) for y in years])
+    # no bad bar in the ATR window (14 true ranges reach back 15 sessions)
+    ok_day &= pd.Series(bars.bad.astype(float)).rolling(15, min_periods=1).max().to_numpy() == 0
     avg = average_volume(bars.volume)
     atr = _atr(bars)
     dma50 = pd.Series(close).rolling(50).mean().to_numpy()

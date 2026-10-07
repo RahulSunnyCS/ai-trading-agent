@@ -1,0 +1,75 @@
+{
+  "written_before_running": "2026-10-07T22:30:00+05:30",
+  "name": "BL-043 criteria, addendum 1: the one retry - judged in percent, against a matched random control and the mid-cap index",
+  "adds_to": "bl043_criteria.json - its blocks are replaced only where this file names them",
+  "rule": "Committed before the retry runs. Never edited after results are seen. This is the LAST attempt on the BL-043 idea: if it fails, BL-043 closes and the 2024-26 hold-out stays sealed.",
+  "reason": "Owner, 2026-10-07 ('lets do both'): close the original test as killed and make one corrected attempt. The original was killed on development data. Its pre-registered metric (mean R) rewarded stops under 1-3% that a fixed 10% slot cannot use, and its score was built on the same metric. The exploratory follow-up then showed the best simple rules landing at about Nifty Midcap 150 TRI returns. The PR #103 review found three implementation faults, fixed before this run: the walk-forward portfolio was stitched from separate simulations (now one continuous portfolio); a bad bar in the ATR window was not excluded (now it is); the DP charge was a fixed fraction of a Rs 50,000 slot (now Rs 16 on each actual sale). Honesty note: the development years have now been seen once, so a development pass here is weaker evidence than a first pass; the one hold-out run is the real test.",
+  "exits": {
+    "stops": {
+      "base_low": "lowest low of the base window (for a flag, the flag's lowest low) known at the signal",
+      "atr_1.5": "fill price - 1.5 x ATR(14) at the signal day",
+      "pct_8": "fill price x 0.92"
+    },
+    "skip_if_risk_below": 0.03,
+    "skip_if_risk_above": 0.15,
+    "targets": { "2R": 2.0, "3R": 3.0, "none": null },
+    "R": "fill price - stop",
+    "time_stop_sessions": 65,
+    "trigger": "unchanged: open <= stop -> exit at the open; else low <= stop -> stop; open >= target -> open; else high >= target -> target; both touched the same day -> stop first",
+    "time_exit": "close of the 65th session after entry"
+  },
+  "control": {
+    "plain": "Each stage-A candidate gets 3 control trades, drawn at random (seed 43) from the stocks that were also eligible on the same signal day but had no candidate: in the point-in-time universe, passing the Rs 30 / Rs 2 cr gates, close above its 150-session average and within 25% of its 260-session high, no bad bar in the last 15 sessions. A control trade fills at the next open with the candidate's stop distance (as a % of the fill) and the same target in R and time limit. The candidate's edge = its net % return minus the mean of its controls'. So the question becomes: does the pattern beat simply buying another strong stock that day?",
+    "per_candidate": 3,
+    "seed": 43
+  },
+  "metric": {
+    "trade": "net % return after costs (a fixed 10% slot earns this, not R)",
+    "edge": "candidate net % minus the mean net % of its 3 controls"
+  },
+  "score": {
+    "plain": "0-100 = the mean net % return (after costs) of earlier first-of-base trades in the same cell (pattern, entry, above/below the 50-session average, quality third), under the same stop/target, counting only trades that had exited before the signal day. 50 until a cell has min_past_trades.",
+    "cell": ["pattern", "entry", "above_50dma", "quality_third"],
+    "min_past_trades": 30,
+    "to_score": "clip(50 + 50 x mean_net / 0.05, 0, 100): +5% average = 100, -5% = 0"
+  },
+  "portfolio": {
+    "capital_rs": 500000,
+    "slots": 10,
+    "size": "current equity / 10 at the fill (compounding)",
+    "idle_cash_return": "the liquid fund (data/stocks/cash_weekly.csv), credited to cash each week",
+    "order": "best score first, ties by symbol; one position per stock; a base traded once"
+  },
+  "search": {
+    "stage_a": {
+      "what": "per pattern, entry (2) x stop (3) x target (3) = 18 combinations; first candidate of each base and entry",
+      "walk_forward": "for each year Y in 2015-2023: per pattern, the combination with the highest mean EDGE over candidates whose exits fall before 1 January Y minus 13 weeks; used in Y",
+      "pbo": { "blocks": 16, "on": "monthly mean edge per combination", "kill_above": 0.3 },
+      "pass": "joined walk-forward mean edge > 0 AND PBO <= 0.3"
+    },
+    "stage_b": {
+      "what": "the patterns that pass stage A share 10 slots; cutoff (score>=70 any day, score>=80 any day, the Friday rule) x health switch (off, on) = 6 portfolios, each simulated continuously 2012-2023 for selection",
+      "walk_forward": "for each year Y in 2015-2023 the portfolio rule with the best weekly log return before 1 January Y minus 13 weeks; the judged walk-forward portfolio is ONE continuous simulation from 2015-01-01 applying each year's chosen rule (and each year's stage-A choice) to that year's signals",
+      "pbo": {
+        "blocks": 16,
+        "on": "weekly log returns of the 6 portfolios, 2015-2023",
+        "kill_above": 0.3
+      }
+    },
+    "trials_total": 42
+  },
+  "pass_kill": {
+    "development": "PASS only if: stage A passes for at least one pattern; stage B PBO <= 0.3; the continuous walk-forward portfolio (2015-01-01 to 2023-12-29) has a CAGR above BOTH the Nifty 500 TRI and the Nifty Midcap 150 TRI over the same weeks, and a max drawdown no deeper than the Nifty Midcap 150 TRI's. Otherwise KILL: BL-043 closes and Phase 6 is not run.",
+    "holdout_choice": "stage-A and stage-B choices made on the full development window by the same rules",
+    "holdout": {
+      "runs_allowed": 1,
+      "pass": "CAGR after costs at least 3 points above the Nifty Midcap 150 TRI AND at least 5 points above the Nifty 500 TRI over the same weeks; max drawdown no deeper than the Nifty Midcap 150 TRI's; and beating the Nifty Midcap 150 TRI in at least 2 of the calendar years 2024, 2025, 2026 (2026 partial)"
+    },
+    "reported_only": [
+      "Nifty Smallcap 250 TRI",
+      "each pattern alone",
+      "the controls' own portfolio",
+      "trade count, win rate, average holding, cost drag"
+    ]
+  }
+}

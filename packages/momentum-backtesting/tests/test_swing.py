@@ -115,6 +115,7 @@ def test_fill_at_next_open_and_stop_intraday():
     assert t["fill"] == 100 and t["stop"] == pytest.approx(92)
     assert t["reason"] == "stop" and t["exit_price"] == pytest.approx(92)
     buy, sell = trader.costs()
+    sell += trader.dp_fraction(trader.slot_rs() * 0.92)  # ₹16 on this sale's value
     assert t["net_return"] == pytest.approx(0.92 * (1 - sell) / (1 + buy) - 1)
     assert t["r"] == pytest.approx(t["net_return"] / 0.08)
 
@@ -182,7 +183,11 @@ def test_portfolio_takes_the_best_scores_into_ten_slots():
     # nine full 10% slots; costs leave the tenth a little smaller (all the remaining cash)
     tenth = (1 - 9 * 0.1 * (1 + buy)) / (1 + buy)
     assert curve.iloc[1] == pytest.approx(0.9 + tenth)  # marked at the fill price
-    assert curve.iloc[-1] == pytest.approx((0.9 + tenth) * 1.10 * (1 - sell))
+    capital = 500_000
+    sale = 0.1 * 1.10  # each full slot sells for 0.11 of starting capital
+    full = 9 * sale * (1 - sell - trader.dp_fraction(sale * capital))
+    small = tenth * 1.10 * (1 - sell - trader.dp_fraction(tenth * 1.10 * capital))
+    assert curve.iloc[-1] == pytest.approx(full + small)
 
 
 def test_portfolio_skips_disallowed_and_traded_bases():
@@ -270,3 +275,15 @@ def test_stages_a_and_b_run_end_to_end_on_synthetic_data():
     b = research.stage_b(cands, outcomes, closes, a, echo=lambda *_: None)
     assert len(b["portfolios"]) == 6 and len(b["walk_forward_picks"]) == 9
     assert all(np.isfinite(c.iloc[-1]) for c in b["curves"].values())
+
+
+def test_no_candidate_with_a_bad_bar_in_its_atr_window():
+    daily = _market()
+    found = candidates.scan(adjust(daily, {}), workers=1)
+    row = found[found["symbol"] == "S0"].iloc[len(found[found["symbol"] == "S0"]) // 2]
+    marked = daily.copy()
+    day = marked[(marked["symbol"] == "S0") & (marked["date"] < row["date"])].index[-5]
+    marked.loc[day, "low"] = marked.loc[day, "close"] * 0.5  # a bad print 5 sessions earlier
+    again = candidates.scan(adjust(marked, {}), workers=1)
+    same_day = again[(again["symbol"] == "S0") & (again["date"] == row["date"])]
+    assert same_day.empty

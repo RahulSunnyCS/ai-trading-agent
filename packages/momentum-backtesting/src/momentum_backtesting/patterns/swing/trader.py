@@ -35,14 +35,24 @@ from . import criteria
 
 
 def costs() -> tuple[float, float]:
-    """(buy, sell) cost as a fraction of trade value for one slot-sized position."""
-    spec = criteria()
-    slip = spec["costs"]["slippage_bps_each_side"] / 10000
-    slot_value = spec["portfolio"]["capital_rs"] / spec["portfolio"]["slots"]
-    dp = min(DP_CHARGE_RS / slot_value, DP_CHARGE_FRACTION_CAP)
+    """(buy, sell) rate as a fraction of trade value, without the flat per-sale DP charge
+    (`dp_fraction` adds it for each actual sale)."""
+    slip = criteria()["costs"]["slippage_bps_each_side"] / 10000
     buy = STT_RATE + STAMP_DUTY_BUY_RATE + EXCHANGE_FEES_RATE + slip
-    sell = STT_RATE + EXCHANGE_FEES_RATE + slip + dp
+    sell = STT_RATE + EXCHANGE_FEES_RATE + slip
     return buy, sell
+
+
+def dp_fraction(sale_rs: float) -> float:
+    """The flat ₹16 DP charge as a fraction of one sale's value (capped, as the engine does)."""
+    if sale_rs <= 0:
+        return 0.0
+    return min(DP_CHARGE_RS / sale_rs, DP_CHARGE_FRACTION_CAP)
+
+
+def slot_rs() -> float:
+    spec = criteria()["portfolio"]
+    return spec["capital_rs"] / spec["slots"]
 
 
 def stop_price(rule: str, fill: float, base_low: float, atr: float) -> float:
@@ -97,6 +107,8 @@ def simulate_trade(
             reason = "data_end"
     buy, sell = costs()
     gross = exit_px / fill - 1
+    # trade level: one slot's worth bought, so the sale is worth slot x (1 + gross)
+    sell += dp_fraction(slot_rs() * (1 + gross))
     net = (1 + gross) * (1 - sell) / (1 + buy) - 1
     path_lo = float(bars.low[entry : exit_i + 1].min())
     path_hi = float(bars.high[entry : exit_i + 1].max())
@@ -163,6 +175,7 @@ def run_portfolio(
     spec = criteria()["portfolio"]
     slots = spec["slots"]
     buy, sell = costs()
+    capital = spec["capital_rs"]
     days = closes.loc[start:end].index
     pick = candidates[allowed & trades["fill"].notna()].copy()
     pick = pick.join(trades[["entry_date", "exit_date", "fill", "exit_price"]])
@@ -201,7 +214,8 @@ def run_portfolio(
         # exits (at the open on a gap, intraday at the stop/target, or at the close)
         for sym in [s for s, p in held.items() if p["exit_date"] == day]:
             p = held.pop(sym)
-            proceeds = p["units"] * p["exit_price"] * (1 - sell)
+            gross_sale = p["units"] * p["exit_price"]
+            proceeds = gross_sale * (1 - sell - dp_fraction(gross_sale * capital))
             cash += proceeds
             log.append({**p["row"], "exit_value": proceeds, "cost_value": p["cost_value"]})
         marked = sum(p["units"] * close_arr.at[day, s] for s, p in held.items())
