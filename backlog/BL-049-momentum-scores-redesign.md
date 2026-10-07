@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — makes the research workbench far more useful for picking and watching names; not on the real-money path (BL-010 / BL-025 are) |
-| **Status** | Planned |
+| **Status** | In progress (Phase 1) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard) |
 | **Created** | 2026-10-07 |
 | **Depends on** | the Momentum Backtest redesign (PR #115): the analytics page pattern, the right-hand drawer and the benchmark-picker conventions it introduces |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.12.16 |
 
 ## Context
 
@@ -184,10 +184,7 @@ Facts this plan relies on (checked 2026-10-07):
 
 ## Open questions
 
-- Should "Open in backtest" (Phase 3) pre-fill a Broad run with the selected sector as the
-  universe, or only open the Backtest tab?
-- Is the 5-stock minimum for a dot right, or should it be a setting kept per browser?
-- Should the Stocks view remember its last quick view across visits, or always open on Leaders?
+All answered 2026-10-08, see the Log.
 
 ## Log
 
@@ -195,3 +192,27 @@ Facts this plan relies on (checked 2026-10-07):
   composite is Broad's own ranking; Cross-Sector Themes is table-only; the buy zone and exit rank
   come from the active favourite (fallback 10 / 20); build after the Backtest redesign
   (PR #115). Supersedes BL-006 (paging and memoised rows are in Phase 1).
+- 2026-10-08 — started. Owner answers: "Open in backtest" just opens the Backtest tab on Broad
+  Momentum (no pre-filled sector); the map's 5-stock minimum is a default the reader can change
+  (kept in the browser); the Stocks view always opens on All (saved views, Phase 3, are how a
+  favourite filter is kept).
+- 2026-10-08 — Phase 1 built (branch `feat/bl-049-scores-phase1`). What it does and where it
+  differs from the plan:
+  - Backend: seven lookbacks; Broad's rank-sum rank this week and last (`compute_ranks` on the
+    last 60 weeks of the page's own live members, so it is the strategy's formula over this
+    page's stocks, not its exact pick); per-stock 52-week-high gap, 40-week average gap,
+    52-week volatility, up-weeks and a 26-week line; a `breadth` block; deterministic primary
+    sub-sector plus every tag. Rounded JSON. On the live data: 745 scored, 707 ranked, warm
+    0.4 s, cold 8 s (the frame load), 669 KB raw before gzip.
+  - Dashboard: market strip, three movers cards, the paged leaderboard (search with `/`, quick
+    views with counts, sector filter, Columns menu, sorting by rank, lookback, return, 52-week
+    high), the 1–10 strip and trend tag, Held/Candidate beside the stock. Decile colours are
+    token classes. The Sectors tab stays a table (with strips) until Phase 2.
+  - **The "Composite" column became the Rank column**: the rank is what the strategy uses; a
+    second 0–10 number would be a second ranking to explain.
+  - Climbers are counted only among stocks now ranked in the top 100 (a jump from 600th to 300th
+    is noise to a strategy that buys the top ten).
+  - No market-regime badge (it needed thresholds nobody has validated).
+  - Fixed on the way: Held/Candidate used Broad's unused `top_n`; split names like `SYM#2` did
+    not match; `Td`/`Th` gained a `dense` option (the one-line row rule), and `ui/CheckboxMenu`.
+  - Not done in Phase 1, by design: the stock drawer, the rotation map, score history (Phase 2).

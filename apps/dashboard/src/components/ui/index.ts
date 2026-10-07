@@ -8,6 +8,8 @@ export { RefreshButton } from './RefreshButton';
 export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedOption } from './SegmentedControl';
 export { Card, CardHeader } from './Card';
+export { CheckboxMenu } from './CheckboxMenu';
+export type { CheckboxMenuOption } from './CheckboxMenu';
 export { CodeBlock } from './CodeBlock';
 export { InfoTooltip } from './InfoTooltip';
 export { PendingInfo } from './PendingInfo';

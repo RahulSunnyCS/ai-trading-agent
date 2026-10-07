@@ -309,3 +309,148 @@ def test_load_stock_group_info_reads_real_curated_file():
     assert sample.company_name
     assert sample.parent_group
     assert sample.subgroup
+
+
+# --------------------------------------------------------------------------
+# BL-049: the composite rank, per-stock statistics, breadth, tags and the payload.
+# --------------------------------------------------------------------------
+
+
+def _series(n: int, start: float, weekly: float) -> list[float]:
+    return [start * (1 + weekly) ** i for i in range(n)]
+
+
+def _long_universe(**kwargs) -> broad.StockUniverseFrame:
+    """90 weeks, five stocks with clearly different, steady weekly drifts (so every rank is
+    unambiguous): A the strongest .. E the weakest."""
+    n = 90
+    return _make_universe(
+        {
+            "A": _series(n, 100, 0.012),
+            "B": _series(n, 100, 0.008),
+            "C": _series(n, 100, 0.004),
+            "D": _series(n, 100, 0.0),
+            "E": _series(n, 100, -0.004),
+        },
+        **kwargs,
+    )
+
+
+def test_composite_rank_is_the_engines_own_ranksum_this_week_and_last():
+    from momentum_backtesting import engine
+
+    universe = _long_universe()
+    snap = ms.compute_stock_momentum_scores(universe, {})
+    ranks, _ = engine.compute_ranks(universe.frame, engine.Config())
+    by_symbol = {r.symbol: r for r in snap.rows}
+    for symbol in "ABCDE":
+        assert by_symbol[symbol].composite_rank == int(ranks.iloc[-1][symbol])
+        assert by_symbol[symbol].composite_rank_prev == int(ranks.iloc[-2][symbol])
+    assert [by_symbol[s].composite_rank for s in "ABCDE"] == [1, 2, 3, 4, 5]
+    assert snap.ranked_count == 5
+
+
+def test_composite_rank_is_among_the_members_of_that_week_only():
+    # E is not a member at the last week: the others are ranked without it, and last week's
+    # ranks (when it still was one) include it.
+    universe = _long_universe(not_a_member_at_end={"E"})
+    snap = ms.compute_stock_momentum_scores(universe, {})
+    by_symbol = {r.symbol: r for r in snap.rows}
+    assert "E" not in by_symbol
+    assert snap.ranked_count == 4
+    assert [by_symbol[s].composite_rank for s in "ABCD"] == [1, 2, 3, 4]
+    assert [by_symbol[s].composite_rank_prev for s in "ABCD"] == [1, 2, 3, 4]
+
+
+def test_a_stock_without_a_full_year_of_history_has_no_rank_and_no_year_statistics():
+    n = 90
+    prices = {"OLD": _series(n, 100, 0.01), "NEW": [float("nan")] * 60 + _series(30, 100, 0.02)}
+    snap = ms.compute_stock_momentum_scores(_make_universe(prices), {})
+    new = {r.symbol: r for r in snap.rows}["NEW"]
+    assert new.composite_rank is None and new.composite_rank_prev is None
+    assert new.high_52w_gap is None and new.volatility_52w is None
+    assert new.above_ma40 is None  # 30 closes, a 40-week average needs 40
+    assert new.up_weeks_26 == pytest.approx(1.0)  # 30 closes cover 26 weekly returns
+    assert len(new.spark) == 26
+
+
+def test_price_statistics_match_hand_arithmetic():
+    n = 90
+    # Rises 1%/week to week 70, then falls 2%/week: the 52-week high is week 70's close.
+    prices = _series(71, 100, 0.01) + [
+        _series(71, 100, 0.01)[-1] * 0.98 ** (i + 1) for i in range(n - 71)
+    ]
+    row = ms.compute_stock_momentum_scores(_make_universe({"X": prices}), {}).rows[0]
+    peak = max(prices[-53:])
+    assert peak == pytest.approx(prices[70])
+    assert row.high_52w_gap == pytest.approx(prices[-1] / peak - 1)
+    assert row.above_ma40 == pytest.approx(prices[-1] / (sum(prices[-40:]) / 40) - 1)
+    weekly = pd.Series(prices[-53:]).pct_change().dropna()
+    assert row.volatility_52w == pytest.approx(weekly.std() * 52**0.5)
+    # Weeks 65..70 rose, 71..89 fell: of the last 26 weekly returns (weeks 64..89) 7 are up.
+    assert row.up_weeks_26 == pytest.approx(7 / 26)
+    assert row.spark[0] == pytest.approx(100.0)
+    assert row.spark[-1] == pytest.approx(prices[-1] / prices[-26] * 100)
+
+
+def test_breadth_counts_members_above_their_40_week_average_now_and_before():
+    n = 90
+    # RISER is always above its 40-week average; FALLER always below. TURNER rises until week 87,
+    # dips 5% at week 88 (still above its average) and falls 40% at week 89 (below it).
+    peak = 100 * 1.01**87
+    turner = _series(88, 100, 0.01) + [peak * 0.95, peak * 0.60]
+    universe = _make_universe(
+        {"RISER": _series(n, 100, 0.01), "FALLER": _series(n, 100, -0.01), "TURNER": turner}
+    )
+    breadth = ms.compute_stock_momentum_scores(universe, {}).breadth
+    assert breadth is not None
+    assert breadth.above_ma40["now"] == pytest.approx(1 / 3)
+    assert breadth.above_ma40["week_ago"] == pytest.approx(2 / 3)
+    assert breadth.above_ma40["month_ago"] == pytest.approx(2 / 3)
+    assert breadth.positive_13w["now"] == pytest.approx(1 / 3)
+    assert breadth.positive_13w["week_ago"] == pytest.approx(2 / 3)
+
+
+def test_breadth_on_a_short_history_is_none_not_an_error():
+    snap = ms.compute_stock_momentum_scores(_make_universe({"A": [100.0] * 10}), {})
+    assert snap.breadth is not None
+    assert snap.breadth.above_ma40["now"] is None
+    assert snap.breadth.median_26w is None
+
+
+def test_a_stock_tagged_to_a_sector_and_a_theme_names_the_sector(tmp_path):
+    (tmp_path / broad.STOCK_GROUPS_FILENAME).write_text(
+        "parent_group,subgroup,symbol,company_name,note\n"
+        "Cross-Sector Themes,PSU / CPSE Stocks,SBIN,State Bank of India,\n"
+        "Financials,PSU Banks,SBIN,State Bank of India,\n"
+        "Cross-Sector Themes,PSU / CPSE Stocks,ONLYTHEME,Only Theme Ltd,\n"
+        "Healthcare,Hospitals,APOLLO,Apollo Hospitals,\n"
+    )
+    info = ms.load_stock_group_info(tmp_path)
+    assert (info["SBIN"].parent_group, info["SBIN"].subgroup) == ("Financials", "PSU Banks")
+    assert info["SBIN"].tags == (
+        ("Cross-Sector Themes", "PSU / CPSE Stocks"),
+        ("Financials", "PSU Banks"),
+    )
+    # A stock that is only in a theme keeps it; a single-tag stock has one tag.
+    assert info["ONLYTHEME"].parent_group == "Cross-Sector Themes"
+    assert info["APOLLO"].tags == (("Healthcare", "Hospitals"),)
+
+
+def test_the_payload_is_rounded_json_with_no_nan():
+    import json
+
+    universe = _long_universe()
+    stock = ms.compute_stock_momentum_scores(universe, {})
+    sector = ms.compute_sector_momentum_scores(stock, {"Sector :: Group": {"A", "B", "Z"}})
+    payload = ms.to_payload(stock, sector, missing_symbols=["Q"], membership_quality=None)
+    text = json.dumps(payload, allow_nan=False)  # raises on NaN / inf
+    assert payload["lookbacks"] == [1, 2, 4, 8, 13, 26, 52]
+    assert payload["ranked_count"] == 5 and payload["missing_symbols"] == ["Q"]
+    a = {s["symbol"]: s for s in payload["stocks"]}["A"]
+    assert a["composite_rank"] == 1 and a["composite_rank_prev"] == 1
+    assert set(a["scores"]) == {"1", "2", "4", "8", "13", "26", "52"}
+    assert a["scores"]["26"] == 100.0 and len(a["spark"]) == 26
+    assert a["returns"]["13"] == round(a["returns"]["13"], 4)
+    assert payload["sectors"][0]["qualifying_count"] == 2
+    assert len(text) < 20_000
