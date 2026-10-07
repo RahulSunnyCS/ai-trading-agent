@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { request as httpRequest } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
 import Fastify from 'fastify';
 
 import { momentumBacktestRoutes } from '../routes/momentum-backtest';
@@ -402,6 +405,62 @@ describe('momentum backtest proxy routes', () => {
     process.env.MOMENTUM_API_URL = 'https://example.com';
     const server = Fastify();
     await expect(server.register(momentumBacktestRoutes)).rejects.toThrow(/loopback or private/);
+    await server.close();
+  });
+
+  it('rejects a saved-run id that is not a plain token', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { ok: true }));
+
+    for (const url of [
+      '/api/momentum/saved-runs/a.b',
+      '/api/momentum/saved-runs/%252E%252E',
+      '/api/momentum/saved-runs/a%2Fb',
+    ]) {
+      const response = await server.inject({ method: 'DELETE', url });
+      expect(response.statusCode, url).toBe(400);
+    }
+    const patch = await server.inject({
+      method: 'PATCH',
+      url: '/api/momentum/saved-runs/..%2Fjobs',
+      payload: { favorite: true },
+    });
+    expect(patch.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const ok = await server.inject({
+      method: 'DELETE',
+      url: '/api/momentum/saved-runs/0123456789abcdef0123456789abcdef',
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/saved-runs/0123456789abcdef0123456789abcdef',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    await server.close();
+  });
+
+  it('rejects an encoded `..` run id over a real socket', async () => {
+    // inject() normalises `%2E%2E` away like a browser would; a raw client does not, and the
+    // decoded `..` would make the upstream URL /api/saved-runs itself.
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    await server.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = server.server.address() as AddressInfo;
+    const status = await new Promise<number | undefined>((resolve, reject) => {
+      const req = httpRequest(
+        { host: '127.0.0.1', port, method: 'DELETE', path: '/api/momentum/saved-runs/%2E%2E' },
+        (res) => {
+          res.resume();
+          resolve(res.statusCode);
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+    expect(status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
     await server.close();
   });
 });

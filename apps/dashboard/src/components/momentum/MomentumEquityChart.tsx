@@ -140,10 +140,11 @@ function signTone(value: number | null | undefined): string {
  * The plot height that ends the chart at the bottom of the first screen: the window's height
  * less where the plot starts on the page (measured at the top of the page, so scrolling does not
  * change it) and the legend row under it. Kept between the minimum and maximum, re-measured on
- * resize.
+ * resize and for each new result.
  */
-function usePlotHeight(plotRef: RefObject<HTMLElement>): number {
+function usePlotHeight(plotRef: RefObject<HTMLElement>, measureKey: unknown): number {
   const [height, setHeight] = useState(PLOT_HEIGHT_FALLBACK);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: measureKey is the trigger (a new result)
   useEffect(() => {
     const measure = (): void => {
       const top = plotRef.current
@@ -155,18 +156,30 @@ function usePlotHeight(plotRef: RefObject<HTMLElement>): number {
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [plotRef]);
+    // measureKey: a new result can arrive with different content above (the run banner gone, a
+    // warning shown), so measure again then. Not on every layout change: opening "All metrics"
+    // should not shrink the chart under the reader.
+  }, [plotRef, measureKey]);
   return height;
 }
 
-/** A key typed into a field, not at the page: the chart's shortcuts leave it alone. */
-function typingTarget(target: EventTarget | null): boolean {
+/** Controls that use the arrow keys or Esc themselves (radio groups, tabs, menus, lists). */
+const KEY_OWNING_ROLES =
+  '[role="radio"],[role="radiogroup"],[role="tab"],[role="tablist"],[role="menu"],[role="menuitem"],[role="menuitemradio"],[role="option"],[role="listbox"],[role="slider"],[role="dialog"]';
+
+/**
+ * A key the chart's shortcuts must leave alone: typed into a field, pressed on a control that
+ * uses the arrow keys itself, or pressed while a menu or dialog is open (its Esc closes it).
+ */
+function keyBelongsElsewhere(target: EventTarget | null): boolean {
+  if (document.querySelector('[role="menu"],[role="dialog"]')) return true;
   if (!(target instanceof HTMLElement)) return false;
   return (
     target.isContentEditable ||
     target.tagName === 'INPUT' ||
     target.tagName === 'TEXTAREA' ||
-    target.tagName === 'SELECT'
+    target.tagName === 'SELECT' ||
+    target.closest(KEY_OWNING_ROLES) !== null
   );
 }
 
@@ -785,7 +798,7 @@ export function MomentumEquityChart({
   const setWeekChangesOpen = useMomentumViewStore((state) => state.setWeekChangesOpen);
   const drawdownOpen = useMomentumViewStore((state) => state.drawdownOpen);
   const setDrawdownOpen = useMomentumViewStore((state) => state.setDrawdownOpen);
-  const plotHeight = usePlotHeight(chartRef);
+  const plotHeight = usePlotHeight(chartRef, series.dates);
   const totalHeight = drawdownOpen ? plotHeight + RISK_PANES_PX : plotHeight;
 
   const isHidden = useCallback(
@@ -959,11 +972,11 @@ export function MomentumEquityChart({
   });
 
   // ← → step the pinned week between rebalances; Esc unpins. Only while a week is pinned, and
-  // never while typing into a field.
+  // never for a key a field, a control or an open menu is using.
   useEffect(() => {
     if (selectedDate === null) return;
     const onKey = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || typingTarget(event.target)) return;
+      if (event.defaultPrevented || keyBelongsElsewhere(event.target)) return;
       if (event.key === 'Escape') {
         setSelectedDate(null);
         return;

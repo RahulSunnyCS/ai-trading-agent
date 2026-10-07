@@ -13,6 +13,8 @@ export { CodeBlock } from './CodeBlock';
 export { InfoTooltip } from './InfoTooltip';
 export { PendingInfo } from './PendingInfo';
 export { RadioCards } from './RadioCards';
+export { RadioMenu } from './RadioMenu';
+export type { RadioMenuOption } from './RadioMenu';
 export type { RadioCardOption } from './RadioCards';
 export { Shimmer, Skeleton, SkeletonRows } from './Skeleton';
 export { StatCard } from './StatCard';

@@ -80,3 +80,10 @@ backend are separated and skip with a clear reason when it is absent.
 ## Log
 
 - 2026-10-05 — created from the Momentum UI performance review (2026-10-04 session).
+- 2026-10-07 — `personalities-api.spec.ts` calls `/personalities/...` (the routes are
+  `/api/personalities/...`) and the production server mounts only `GET /api/personalities`, so
+  it cannot pass against any process. Seven of its nine cases were already in the server's
+  Vitest integration tests; the 8pp comparison-integrity 409 is now ported too
+  (`personalities-api.integration.test.ts`). The 400 range-check case was not ported: the PUT
+  route does not bound `min_probability` at all. Deleting the spec (instead of Phase 2's move)
+  is the owner's call.

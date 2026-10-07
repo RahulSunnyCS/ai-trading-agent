@@ -173,7 +173,6 @@ export const paymentRoutes = fp(async (fastify: FastifyInstance, _opts: unknown)
   });
 
   // ── POST /api/payment/create-order ────────────────────────────────────────
-  // TODO: add rate limiting (requires @fastify/rate-limit) — prevents order flooding
 
   fastify.post('/api/payment/create-order', async (request, reply) => {
     if (!isPaymentEnabled()) {
@@ -220,7 +219,6 @@ export const paymentRoutes = fp(async (fastify: FastifyInstance, _opts: unknown)
   });
 
   // ── POST /api/payment/verify ──────────────────────────────────────────────
-  // TODO: add rate limiting (requires @fastify/rate-limit) — prevents brute-force on signatures
 
   fastify.post('/api/payment/verify', async (request, reply) => {
     const body = request.body as Record<string, unknown> | null | undefined;

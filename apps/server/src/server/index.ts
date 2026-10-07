@@ -149,6 +149,28 @@ function buildPool(): Pool {
   });
 }
 
+const DEFAULT_CORS_ORIGINS = [
+  'http://localhost:5190',
+  'http://127.0.0.1:5190',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
+
+/** Browser origins allowed by CORS: `CORS_ORIGIN` (comma-separated), else the local dashboard. */
+export function corsOrigins(raw: string | undefined = process.env.CORS_ORIGIN): string[] {
+  const list = (raw ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+  return list.length > 0 ? list : DEFAULT_CORS_ORIGINS;
+}
+
+/** GET/HEAD on the research proxies (`/api/backtest/*`, `/api/momentum/*`): rate-limit exempt. */
+export function isResearchProxyRead(method: string, url: string): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  return url.startsWith('/api/backtest/') || url.startsWith('/api/momentum/');
+}
+
 // ---------------------------------------------------------------------------
 // Server factory
 // ---------------------------------------------------------------------------
@@ -188,14 +210,20 @@ export async function buildServer(
 
   // ── Plugins ───────────────────────────────────────────────────────────────
 
-  // CORS — origin:true mirrors every origin back as allowed.
-  // Production note: replace with a specific origin allowlist before deploying
-  // to a public-facing environment.
-  await server.register(fastifyCors, { origin: true });
+  // CORS — only the origins in CORS_ORIGIN (default: the local dashboard) get
+  // CORS headers. A request with no Origin header (curl, the Next server's
+  // rewrites) is unaffected; a browser on another origin cannot read responses.
+  await server.register(fastifyCors, { origin: corsOrigins() });
 
   // Rate limiting — 60 requests per minute per IP globally; mutating POST
   // routes are the primary concern (FOR UPDATE locks + pool contention).
-  await server.register(fastifyRateLimit, { max: 60, timeWindow: '1 minute' });
+  // Research-proxy reads are exempt: behind the Next rewrites every dashboard
+  // user shares one IP, and job polling (every 2s) alone would exhaust it.
+  await server.register(fastifyRateLimit, {
+    max: 60,
+    timeWindow: '1 minute',
+    allowList: (request) => isResearchProxyRead(request.method, request.url),
+  });
 
   // WebSocket support — required before any route uses { websocket: true }.
   await server.register(fastifyWebsocket);
@@ -961,5 +989,6 @@ export async function startServer(
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
-  await server.listen({ port, host: '0.0.0.0' });
+  // Laptop only by default; set HOST=0.0.0.0 to serve other machines (e.g. in a container).
+  await server.listen({ port, host: process.env.HOST ?? '127.0.0.1' });
 }

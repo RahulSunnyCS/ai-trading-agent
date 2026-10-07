@@ -64,6 +64,7 @@ let server: FastifyInstance;
 let clockworkId: string;
 let precisionId: string;
 let adjusterId: string;
+let reducerId: string;
 
 // ---------------------------------------------------------------------------
 // Suite guard
@@ -80,15 +81,16 @@ describe.skipIf(!hasDatabase)('personalities API integration tests', () => {
 
     // Resolve UUIDs by name so the tests are not brittle against re-seeding.
     const rows = await db.query<{ id: string; name: string }>(
-      "SELECT id, name FROM personality_configs WHERE name IN ('clockwork', 'precision', 'adjuster')",
+      "SELECT id, name FROM personality_configs WHERE name IN ('clockwork', 'precision', 'adjuster', 'reducer')",
     );
     for (const row of rows.rows) {
       if (row.name === 'clockwork') clockworkId = row.id;
       if (row.name === 'precision') precisionId = row.id;
       if (row.name === 'adjuster') adjusterId = row.id;
+      if (row.name === 'reducer') reducerId = row.id;
     }
 
-    if (!clockworkId || !precisionId || !adjusterId) {
+    if (!clockworkId || !precisionId || !adjusterId || !reducerId) {
       throw new Error('Seed personalities not found — run migrations first (bun run migrate)');
     }
   }, 30_000); // 30s timeout for Docker service connections
@@ -314,6 +316,102 @@ describe.skipIf(!hasDatabase)('personalities API integration tests', () => {
       payload: { params: { max_daily_trades: 3 } },
     });
     expect(response.statusCode).toBe(404);
+  });
+
+  // -------------------------------------------------------------------------
+  // PUT /api/personalities/:id — comparison integrity (409)
+  // -------------------------------------------------------------------------
+  // Precision, Adjuster and Reducer (entry_type momentum_exhaustion) must keep
+  // their min_probability within 8pp of each other; only ACTIVE rows count.
+  // Seed state: Precision 0.70 and Adjuster 0.70 active, Reducer 0.70 inactive.
+  // Both tests restore the rows directly in SQL (not via PUT, which the
+  // integrity check itself could refuse) so a regression cannot leak state
+  // into later tests.
+
+  /** Reads the stored params / is_active so a test can put them back exactly. */
+  async function snapshot(
+    id: string,
+  ): Promise<{ params: Record<string, unknown>; isActive: boolean }> {
+    const result = await db.query<{ params: Record<string, unknown>; is_active: boolean }>(
+      'SELECT params, is_active FROM personality_configs WHERE id = $1',
+      [id],
+    );
+    const row = result.rows[0] as { params: Record<string, unknown>; is_active: boolean };
+    return { params: row.params, isActive: row.is_active };
+  }
+
+  async function restore(
+    id: string,
+    saved: { params: Record<string, unknown>; isActive: boolean },
+  ): Promise<void> {
+    await db.query(
+      'UPDATE personality_configs SET params = $2::jsonb, is_active = $3 WHERE id = $1',
+      [id, JSON.stringify(saved.params), saved.isActive],
+    );
+  }
+
+  it('PUT /api/personalities/:id returns 409 COMPARISON_INTEGRITY_VIOLATION when min_probability drift > 8pp', async () => {
+    const savedPrecision = await snapshot(precisionId);
+    try {
+      // 0.80 vs Adjuster's 0.70 is a 10pp spread. (Not 0.78: in floating point
+      // (0.78 - 0.70) * 100 is 8.000000000000007, so the route already rejects
+      // an exact 8pp change — avoid asserting on that boundary.)
+      const response = await server.inject({
+        method: 'PUT',
+        url: `/api/personalities/${precisionId}`,
+        payload: { params: { min_probability: 0.8 }, reason: 'integration_test' },
+      });
+      expect(response.statusCode).toBe(409);
+      const body = response.json<{ error: string; offender: string; message: string }>();
+      expect(body.error).toBe('COMPARISON_INTEGRITY_VIOLATION');
+      // Max and min tie for "furthest from the midpoint", so either may be named.
+      expect(['precision', 'adjuster']).toContain(body.offender);
+      expect(body.message).toMatch(/10\.0pp/);
+
+      // A rejected update must not touch the row or the audit log.
+      expect((await snapshot(precisionId)).params.min_probability).toBe(0.7);
+      const audit = await db.query(
+        'SELECT 1 FROM personality_audit_log WHERE personality_id = $1',
+        [precisionId],
+      );
+      expect(audit.rows.length).toBe(0);
+    } finally {
+      await restore(precisionId, savedPrecision);
+    }
+  });
+
+  it('PUT /api/personalities/:id counts an active Reducer in the 8pp comparison', async () => {
+    const savedPrecision = await snapshot(precisionId);
+    const savedReducer = await snapshot(reducerId);
+    try {
+      // Activate Reducer at 0.62: still within 8pp of Precision/Adjuster (0.70).
+      await db.query(
+        `UPDATE personality_configs
+         SET is_active = TRUE,
+             params = params || '{"min_probability": 0.62}'::jsonb
+         WHERE id = $1`,
+        [reducerId],
+      );
+
+      // 0.71 is only 1pp from Adjuster, so it passes when Reducer is inactive;
+      // with Reducer active at 0.62 the spread becomes 9pp and must be refused.
+      const response = await server.inject({
+        method: 'PUT',
+        url: `/api/personalities/${precisionId}`,
+        payload: { params: { min_probability: 0.71 }, reason: 'integration_test' },
+      });
+      expect(response.statusCode).toBe(409);
+      const body = response.json<{ error: string; offender: string; message: string }>();
+      expect(body.error).toBe('COMPARISON_INTEGRITY_VIOLATION');
+      expect(body.message).toMatch(/9\.0pp/);
+      // The route names whichever row is furthest from the max/min midpoint;
+      // max and min tie by construction, so either end may be reported.
+      expect(['precision', 'reducer']).toContain(body.offender);
+      expect((await snapshot(precisionId)).params.min_probability).toBe(0.7);
+    } finally {
+      await restore(reducerId, savedReducer);
+      await restore(precisionId, savedPrecision);
+    }
   });
 
   // -------------------------------------------------------------------------

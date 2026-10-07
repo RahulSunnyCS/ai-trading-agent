@@ -11,6 +11,7 @@ import {
   clientIp,
   gateConfig,
   isApiPath,
+  isCrossSiteApiWrite,
   isPageRequest,
   lockoutSeconds,
   passwordMatches,
@@ -38,6 +39,7 @@ import {
  *
  * Order of checks for every request:
  *   1. broken deployment            -> 503 (generic body; reason in the server log)
+ *   1a. cross-site API write (CSRF) -> 403, even in open local dev
  *   2. /logout                      -> clear cookie, redirect to /login
  *   3. POST /login                  -> check password, set cookie, redirect to `next`
  *   4. valid session cookie         -> through
@@ -176,6 +178,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   const { pathname } = request.nextUrl;
   const method = request.method;
+
+  if (isCrossSiteApiWrite(method, pathname, request.headers, request.nextUrl.host)) {
+    return new NextResponse('Cross-site request refused', { status: 403, headers: NO_STORE });
+  }
 
   if (pathname === LOGOUT_PATH) {
     const response = redirect(request, LOGIN_PATH, 303);

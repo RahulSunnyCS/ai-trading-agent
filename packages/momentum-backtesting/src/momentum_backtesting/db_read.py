@@ -23,8 +23,11 @@ database-first read path; see TODO 3.11.8.
 Never hold a catalog connection across a request or a long computation: DuckDB lets one
 process hold the file, and `mbt serve` holding it is what made the evening `obt daily` and
 `tdata` fail (2026-10-07). Every connection in this package goes through `open_catalog()`
-(one short unit of work, only the `bars_1d_stock` view bound) or `stock_bars()` (heavy
-daily-bar queries on an in-memory DuckDB, the catalog closed before they start).
+(one short unit of work, only the `bars_1d_stock` view bound), `read_catalog()` (the same,
+read-only, for a read that used to open it for writing just to migrate) or `stock_bars()`
+(heavy daily-bar queries on an in-memory DuckDB, the catalog closed before they start).
+Open read-write only to write: within a process a read-write connection waits for every
+reader and holds them all off (`trading_data.db._CatalogLock`).
 """
 
 from __future__ import annotations
@@ -53,6 +56,36 @@ def open_catalog(
     `with` block around one short unit of work; never across a network fetch, a backtest or a
     response that streams. Calls `tdb.connect` by attribute so a test can replace it."""
     return tdb.connect(root=root, read_only=read_only, lock_wait=lock_wait, views=LAKE_VIEWS)
+
+
+_migrated: set[Path] = set()
+_migrated_lock = threading.Lock()
+
+
+def read_catalog(
+    root: Path | None = None, *, lock_wait: float = 10.0
+) -> AbstractContextManager[duckdb.DuckDBPyConnection]:
+    """`open_catalog(read_only=True)` for a read that would otherwise open the catalog for
+    writing only so that `connect()` migrates it first: the first call per catalog in this
+    process opens it read-write once (applying any migration a new release added), every
+    later one is read-only. A read-only connection shares the catalog with this process's
+    other readers and with other processes' (`obt daily`, `tdata`); a read-write one excludes
+    all of them. Raises FileNotFoundError when there is no catalog yet."""
+    root = root or data_root()
+    with _migrated_lock:
+        pending = root not in _migrated and catalog_path(root).exists()
+    if pending:
+        try:
+            # Briefly: while another process writes, a read-write open waits all of `lock_wait`
+            # and the read below would then wait again.
+            with open_catalog(root, lock_wait=min(lock_wait, 1.0)):
+                pass
+        except duckdb.IOException:
+            pass  # another holder: read anyway (fine unless a migration is pending), retry later
+        else:
+            with _migrated_lock:
+                _migrated.add(root)
+    return open_catalog(root, read_only=True, lock_wait=lock_wait)
 
 
 @contextmanager

@@ -8,6 +8,7 @@ import {
   benchmarkOptions,
   changeBetween,
   drawdownSeries,
+  edgeAgainst,
   resolveBenchmark,
   rolling52Excess,
   trailingReturn,
@@ -97,6 +98,12 @@ describe('resolveBenchmark', () => {
       expect(view).toMatchObject({ name: 'Nifty 50', cagr: 0.1, fallback: true, sharpe: null });
       expect(view.values).toBe(series.benchmark);
     }
+  });
+
+  it("quotes the edge against the picked index, else the run's own", () => {
+    expect(edgeAgainst(result({ benchmarks: [mom] }), DEFAULT_BENCHMARK)).toBe(0.06);
+    expect(edgeAgainst(result({ benchmarks: [mom] }), 'Nifty 50 TRI')).toBe(0.05);
+    expect(edgeAgainst(result(), DEFAULT_BENCHMARK)).toBe(0.05);
   });
 
   it('lists the options in order, with availability', () => {
@@ -226,7 +233,9 @@ describe('a benchmark that starts late or has gaps', () => {
     expect(drawdownSeries(late)).toEqual([null, null, 0, 0, expect.closeTo(-0.1)]);
     const edge = rolling52Excess(late, late, 2);
     expect(edge.every((value) => value === null || Number.isFinite(value))).toBe(true);
-    expect(trailingReturn(late, 4)).toBeNull();
+    // A benchmark whose level a year ago is unknown has no trailing return.
+    const dates = ['2024-01-05', '2024-06-07', '2025-01-03', '2025-06-06', '2026-01-02'];
+    expect(trailingReturn(dates, late, 365)).toBeNull();
   });
   it('treats a zero or negative level as unknown', () => {
     expect(drawdownSeries([0, 100, -5])).toEqual([null, 0, expect.any(Number)]);
@@ -262,8 +271,10 @@ describe('derived series', () => {
   });
 
   it('measures the last N weeks and the year to date', () => {
-    expect(trailingReturn(series.strategy, 2)).toBeCloseTo(145.2 / 121 - 1);
-    expect(trailingReturn(series.strategy, 10)).toBeNull();
+    // A year back from 3 Jan 2025 is 3 Jan 2024; the last week on or before it is 29 Dec 2023,
+    // although the series has only five points (counting points would get this wrong).
+    expect(trailingReturn(series.dates, series.strategy)).toBeCloseTo(145.2 / 110 - 1);
+    expect(trailingReturn(series.dates, series.strategy, 3650)).toBeNull();
     expect(yearToDate(series.dates, series.strategy)).toBeCloseTo(145.2 / 132 - 1);
   });
 

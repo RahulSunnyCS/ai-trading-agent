@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 
-import { buildServer } from '../index';
+import { buildServer, corsOrigins, isResearchProxyRead } from '../index';
 
 // ---------------------------------------------------------------------------
 // Mock pg.Pool
@@ -149,5 +149,58 @@ describe('GET /api/positions', () => {
 
     const body = JSON.parse(response.body) as Record<string, unknown>;
     expect(Array.isArray(body.data)).toBe(true);
+  });
+});
+
+describe('CORS allow-list', () => {
+  it('defaults to the local dashboard origins and reads CORS_ORIGIN otherwise', () => {
+    expect(corsOrigins(undefined)).toContain('http://localhost:5190');
+    expect(corsOrigins('  ')).toContain('http://127.0.0.1:5173');
+    expect(corsOrigins('https://a.example, https://b.example')).toEqual([
+      'https://a.example',
+      'https://b.example',
+    ]);
+  });
+
+  it('echoes an allowed origin', async () => {
+    const response = await server.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { origin: 'http://localhost:5190' },
+    });
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5190');
+  });
+
+  it('gives a foreign origin no CORS headers', async () => {
+    const response = await server.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { origin: 'https://evil.example' },
+    });
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('serves a request with no Origin header (curl, Next rewrites)', async () => {
+    const response = await server.inject({ method: 'GET', url: '/health' });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
+
+describe('rate limit', () => {
+  it('exempts research-proxy reads only', () => {
+    expect(isResearchProxyRead('GET', '/api/momentum/backtest/jobs/abc')).toBe(true);
+    expect(isResearchProxyRead('GET', '/api/backtest/runs?limit=5')).toBe(true);
+    expect(isResearchProxyRead('POST', '/api/momentum/backtest/jobs')).toBe(false);
+    expect(isResearchProxyRead('DELETE', '/api/momentum/saved-runs/abc')).toBe(false);
+    expect(isResearchProxyRead('GET', '/api/trades')).toBe(false);
+  });
+
+  it('still limits other routes to 60 a minute', async () => {
+    let last = 0;
+    for (let i = 0; i < 61; i++) {
+      last = (await server.inject({ method: 'GET', url: '/health' })).statusCode;
+    }
+    expect(last).toBe(429);
   });
 });
