@@ -209,3 +209,15 @@ Answered when the owner started the item (2026-10-07):
     | Tight range | Breakout | 1,752 | 1,618 |
     | Flag | Pullback | 5,681 | 2,065 |
     | Flag | Breakout | 697 | 697 |
+- 2026-10-07 — Phase 2 done: `patterns/swing/trader.py`.
+  - **Trade:** next-open fill; GTT-style stop/target (gap at the open first, then intraday,
+    the stop assumed first); 65-session time exit; risk gate (0, 15%]; the engine's itemised
+    costs + 15 bps each side; MAE/MFE.
+  - **Portfolio:** 10 slots sized on the previous close's equity; best score first; one
+    position per stock; a base traded once; entries before exits each day; marked at each close.
+  - **Tests:** 7 hand-built cases (stop, gap through the stop, target, both touched, time,
+    data end, risk gates, slots, cost accounting).
+  - **Hand check on real data** (ONELIFECAP tight-range breakout, 7 Feb 2013):
+    - fill 773.20; base-low stop 715 (risk 7.53%); 2R target 889.6;
+    - stopped 15 Feb at 715 (low 705); −8.04% after costs;
+    - every number matches the bars.
