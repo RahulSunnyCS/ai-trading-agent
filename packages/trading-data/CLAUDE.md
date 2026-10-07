@@ -33,6 +33,8 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   - `009_ref_expiries.sql`: `ref_expiries`, every expiry each index's options actually had
     (from the lake, `tdata reference derive-expiries`; a few added by hand where the lake has
     a hole), exported as `expiries_observed.csv`; days-to-expiry reads it (BL-034 Phase 2)
+  - `010_ref_rates.sql`: `ref_rates`, the RBI repo rate from each policy decision date
+    (`rates.csv`), the risk-free rate for implied volatility (`ReferenceData.risk_free_rate`)
 - `lake/` — immutable Parquet price data, read through TEMP views (`bars_1m_option`,
   `bars_1m_index`, `bars_1m_future`, `symbol_master`, `bars_1d_stock`). One file per
   (asset, name, trading day); `lake.BAR_SCHEMA` / `lake.OPT_SCHEMA` are the one definition

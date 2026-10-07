@@ -65,6 +65,9 @@ TABLES = (
         "ref_margins", "margin.csv", ("underlying", "strategy_type", "month", "margin_inr"), "rowid"
     ),
     RefTable(
+        "ref_rates", "rates.csv", ("name", "rate_pct", "effective_date"), "name, effective_date"
+    ),
+    RefTable(
         "ref_expiries",
         "expiries_observed.csv",
         ("underlying", "expiry", "source"),

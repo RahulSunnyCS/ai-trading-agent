@@ -286,4 +286,8 @@ Still open for Phase 3:
 - 2026-10-07 — Phase 2: **backtests leave out excluded days** — the engine reads a lock-free copy
   of `data_quality` (`quality/data_quality.parquet`), skips excluded days and names every day it
   could not run (no spot, no reference row) instead of crashing; `--include-excluded`.
+- 2026-10-07 — Phase 2: **`ref_rates`** (migration 010, RBI repo rate by decision date) for Phase 3's
+  IV. Phase 2's done-when met: every NIFTY/SENSEX lake day has a dated lot size and a real current
+  expiry, DTE is emitted from 2024-10, and a NIFTY strategy runs 2024-10-01 → 2026-10-06 (492 days,
+  2 excluded days named) with no code change.
 

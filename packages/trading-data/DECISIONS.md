@@ -403,3 +403,18 @@ crashing. `--include-excluded` keeps them.
   reference row (`MissingReferenceData`, e.g. a lot size before 2024-10) used to stop the whole
   run at the first such day; each is now a skipped day with its reason.
 
+---
+
+## The risk-free rate is the RBI repo rate — 2026-10-07
+
+BL-034 Phase 2, for Phase 3's implied volatility. `ref_rates` (migration 010, `rates.csv`) holds
+the RBI policy repo rate from each Monetary Policy Committee decision: 6.50% (in force since
+2023-02-08), 6.25% from 2025-02-07, 6.00% from 2025-04-09, 5.50% from 2025-06-06, 5.25% from
+2025-12-05, held at every meeting since up to 2026-08-05. The 2026-10-07 decision was not yet
+known when this was written: add a row if it changed the rate.
+
+- **Why the repo rate, not the 91-day T-bill.** The T-bill yield moves weekly and has no
+  committed source here; it trades close to the repo rate. For options a few days from expiry
+  the rate moves a price by paise, so a stepped policy rate is precise enough and is verifiable
+  from the RBI's announcements.
+
