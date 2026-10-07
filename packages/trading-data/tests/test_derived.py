@@ -254,3 +254,43 @@ def test_a_contract_near_the_money_once_stays_all_day(build):
     }  # fmt: skip
     assert len(near) == (2 * derived.STRIKES_EACH_SIDE + 1) * 2
 
+
+
+def test_empty_view_placeholders_match_the_derived_schemas(tmp_path):
+    """db.LAKE_VIEWS holds static placeholder columns for the derived views (so importing the
+    catalog does not import numpy); they must name and type every column of the real files."""
+    from trading_data.db import LAKE_VIEWS
+
+    with connect(tmp_path / "empty") as con:
+        for view, schema, parts in (
+            ("chain_snapshots_5m", derived.CHAIN_SCHEMA, ["underlying", "date"]),
+            ("straddle_series_5m", derived.STRADDLE_SCHEMA, ["underlying", "date"]),
+            ("contracts_daily", derived.CONTRACTS_SCHEMA, ["underlying", "date"]),
+            ("iv_daily", derived.IV_DAILY_SCHEMA, ["underlying"]),
+        ):
+            assert view in LAKE_VIEWS
+            names = [r[0] for r in con.execute(f"DESCRIBE {view}").fetchall()]
+            assert names == schema.names + parts, view
+
+
+def test_constant_maturity_iv_interpolates_total_variance():
+    half_hour = 1800 / (365 * 86400)
+    t1, t2, target = 3 / 365 + half_hour, 10 / 365 + half_hour, 7 / 365
+    w = 0.12**2 * t1 + (0.15**2 * t2 - 0.12**2 * t1) * (target - t1) / (t2 - t1)
+    got = derived.constant_maturity_iv([(0, 0.40), (3, 0.12), (10, 0.15)])  # expiry day ignored
+    assert got == pytest.approx(math.sqrt(w / target))
+    assert derived.constant_maturity_iv([(7, 0.13)]) == 0.13  # one side, close enough
+    assert derived.constant_maturity_iv([(20, 0.13)]) is None  # one side, too far
+    assert derived.constant_maturity_iv([(0, 0.40)]) is None
+
+
+def test_a_window_without_a_start_price_gets_no_strikes(root):
+    """If the index's first minute is missing and nothing came before, window 0 has no price
+    at its start: no ATM, so no chain rows — never the window's own later close."""
+    path = lake.bars_1m_path(root, "index", "NIFTY", DAY)
+    table = pq.read_table(path)
+    lake.write_parquet(table.slice(1).cast(lake.BAR_SCHEMA), path)
+    build = derived.build_day(root, "NIFTY", DAY)
+    buckets = {r["bucket"] for r in rows(build.chain)}
+    assert minute_ts(0) not in buckets
+    assert minute_ts(5) in buckets

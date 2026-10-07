@@ -186,7 +186,7 @@ days in 9.4 minutes, 730 MB. `obt legwise run --bars 5m` runs the unchanged engi
 snapshots, 4-5x faster than 1-minute bars. Time-based strategies give identical trades on every day
 of three real months; stop/re-entry strategies differ (stops are checked per window), so they are
 screened on 5-minute bars and confirmed on 1-minute bars (numbers in trading-data DECISIONS.md).
-Front-expiry IV tracks India VIX (correlation 0.89). Deviations: `contracts_daily` per day not per
+7-day constant-maturity IV tracks India VIX (correlation 0.95 NIFTY, 0.94 SENSEX). Deviations: `contracts_daily` per day not per
 year; the version lives in each file's metadata. Open questions answered by default: derived for
 NIFTY+SENSEX only (any index with `--underlying`), image cap 200 GB, slippage stays the engine's
 setting (a backtest question, not a derived-table one).

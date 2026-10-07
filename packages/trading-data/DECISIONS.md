@@ -445,16 +445,27 @@ BL-034 Phase 3. `derived.py` builds `chain_snapshots_5m`, `straddle_series_5m`,
   Inspected divergences were granularity, not bugs: a combined stop fires at the first window
   close past it (10:40 instead of 10:32), and a re-entry after a stop fills at the window's close
   instead of the next minute. Final numbers for stop strategies come from `--bars 1m`.
-- **Rebuild time:** NIFTY and SENSEX, 2024-10-01 → 2026-10-06 (986 days), 9.4 minutes on the
-  laptop, 730 MB. Front-expiry IV at 15:00 vs India VIX over those days: mean 13.3% vs 14.1,
-  correlation 0.89 (NIFTY), 0.88 (SENSEX).
+- **Rebuild time:** NIFTY and SENSEX, 2024-10-01 → 2026-10-06 (986 days), 9.4 minutes cold and
+  5.2 minutes with the disk cache warm, 730 MB. Against India VIX over those days, the 7-day
+  constant-maturity IV averages 13.2% / 13.5% (VIX 14.1) with correlation 0.95 (NIFTY) and 0.94
+  (SENSEX); the front expiry's own IV only 0.89 / 0.88 — the maturity cycle it carries.
 - **The 5-minute backtest reuses the engine, not a copy of it.** `load_day_5m` puts each window
   on its first minute and holds its close on the other four, so every rule (stops, trails,
   re-entries, combined MTM, costs) is the same code. Strategy times must be on 5-minute marks.
-- **Nothing is carried past the data.** A window exists only up to the last one with an index
-  bar, so a short session is not padded to 15:25; a contract appears from its first trade.
-- **IV.** Black-76 on the implied forward from put-call parity at the strike nearest spot with
-  both prices (forward from spot when no pair exists), RBI repo rate, time to 15:30 on expiry day
+  An action the engine takes on one of those four minutes (a re-entry, a combined-stop exit)
+  fills at the window's close and is reported at the window's end, not up to 4 minutes early.
+  Refused on 5-minute bars, with a message pointing to `--bars 1m`: closest-premium legs (the
+  target can sit anywhere in the chain) and OTM/ITM beyond 10 strikes — silently resolving them
+  inside the ±10 band would pick a different trade.
+- **Nothing is carried past the data, nor taken from later in a window.** A window exists only
+  up to the last one with an index bar, so a short session is not padded to 15:25; a contract
+  appears from its first trade; a window with no price at its start (index's first minute
+  missing, nothing earlier) gets no ATM and no strikes rather than its own later close.
+- **A reference gap fails one day, not the rebuild.** A day whose strike step or rate is missing
+  is logged and counted (`failed`), and every other day and `iv_daily` are still built.
+- **IV.** Black-76 on the implied forward from put-call parity at the strike nearest spot whose
+  call and put both traded in the window (`forward_source = parity`; a carried price only when
+  no such pair exists, `parity_stale`; from spot when no pair at all, `spot`), RBI repo rate, time to 15:30 on expiry day
   in calendar years. Bisection, not Newton: it never diverges on deep or near-expiry options.
   The normal CDF is Abramowitz–Stegun (error < 1.5e-7), so no SciPy. `iv_quality` names the
   untrustworthy cases rather than dropping them.
@@ -462,10 +473,15 @@ BL-034 Phase 3. `derived.py` builds `chain_snapshots_5m`, `straddle_series_5m`,
   strikes from their first window within 10 steps of ATM to the end of the day (an open position
   must keep a price however far the index moves — dropping it crashed a SENSEX backtest). Far expiries and wings are in `contracts_daily`
   (every contract, daily) and the raw lake.
-- **iv_daily.** "IV at 15:00" is the window ending 15:00, before the last half hour. The front
-  expiry is the nearest at least 2 days away (expiry-day IV is noise). Percentiles are the share
+- **iv_daily.** "IV at 15:00" is the window ending 15:00, before the last half hour. **Rank
+  `iv_7d_1500`, not the front expiry's IV**: the front expiry's maturity cycles through the week,
+  so its percentile partly measures the day of the expiry cycle. `iv_7d_1500` is ATM IV at a
+  constant 7 calendar days, interpolated in total variance between the expiries either side
+  (expiry day left out); the front-expiry columns stay for reference. Percentiles are the share
   of the trailing 252/504 days at or below today, NULL with under 60 days of history; a test
-  removes later days and requires earlier rows to be unchanged.
+  removes later days and requires earlier rows to be unchanged. `rv_20` counts a return only
+  between consecutive index trading days, so a hole in the option lake (NIFTY 16–22 Sep 2026)
+  leaves it NULL rather than turning a week's move into one daily return.
 - **Deviations from the plan.** `contracts_daily` is one file per (underlying, day), not per
   year, so a daily top-up writes one new file instead of rewriting a year. The version lives in
   each file's Parquet metadata, not a catalog table, so a rebuild needs no catalog lock and a

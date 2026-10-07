@@ -45,7 +45,9 @@ lives under `TRADING_DATA_ROOT` (default `~/TradingData`):
   forward, Black-76 IV and greeks, `iv_quality`), `straddle_series_5m` (ATM straddle at each
   window's start and close, ATM IV, 5-step skew), `contracts_daily` (per contract per day) — one
   file per (underlying, day) — and `iv_daily` (one file per underlying: ATM IV at 09:20/15:00
-  per expiry, VIX, 20-day realised vol, trailing 1y/2y percentiles). Views of the same names.
+  per expiry, 7-day constant-maturity IV, VIX, 20-day realised vol, trailing 1y/2y percentiles —
+  rank `iv_7d_1500`). Views of the same names (static placeholder columns in `db.LAKE_VIEWS`,
+  checked against the schemas by a test, so `db` never imports numpy).
   Each file carries `derived_version` in its Parquet metadata; a rebuild redoes only missing
   or out-of-version files. `obt legwise run --bars 5m` runs the unchanged engine on them
 - `raw/` — gzipped verbatim vendor responses

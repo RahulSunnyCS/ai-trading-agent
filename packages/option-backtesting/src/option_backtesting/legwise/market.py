@@ -211,11 +211,11 @@ BAR_SIZES = ("1m", "5m")
 
 
 def snapshot_days(root: Path, underlying: str) -> set[date]:
-    folder = derived.derived_path(root, "chain_snapshots_5m", underlying, date.min).parent.parent
-    return {
-        date.fromisoformat(p.parent.name.removeprefix("date="))
-        for p in folder.glob("date=*/data.parquet")
-    }
+    return set(derived.available_days(root, "chain_snapshots_5m", underlying))
+
+
+class UnsupportedOn5m(ValueError):
+    """A strategy the 5-minute snapshots cannot run faithfully; use 1-minute bars."""
 
 
 def check_on_5m_marks(*times: str | None) -> None:
@@ -223,7 +223,35 @@ def check_on_5m_marks(*times: str | None) -> None:
     minutes from 09:15."""
     for t in times:
         if t is not None and minute_index(t) % derived.BUCKET_MINUTES:
-            raise ValueError(f"{t} is not on a 5-minute mark; 5-minute bars need :00, :05, …")
+            raise UnsupportedOn5m(
+                f"{t} is not on a 5-minute mark; 5-minute bars need :00, :05, …"
+            )
+
+
+def check_strikes_on_5m(legs: list) -> None:
+    """The snapshots hold only strikes that came within derived.STRIKES_EACH_SIDE steps of
+    the money, so a leg must not need one further out: closest-premium legs (the target may
+    sit anywhere in the chain) and OTM/ITM beyond that are refused rather than silently
+    resolved inside the band."""
+    for leg in legs:
+        if leg.strike.closest_premium is not None:
+            raise UnsupportedOn5m(
+                f"leg {leg.id!r}: closest premium searches the whole chain; 5-minute bars hold "
+                f"only ±{derived.STRIKES_EACH_SIDE} strikes — use --bars 1m"
+            )
+        rule = leg.strike.strike_type or ""
+        if rule[:3] in ("OTM", "ITM") and int(rule[3:] or 0) > derived.STRIKES_EACH_SIDE:
+            raise UnsupportedOn5m(
+                f"leg {leg.id!r}: {rule} is beyond the ±{derived.STRIKES_EACH_SIDE} strikes the "
+                "5-minute snapshots hold — use --bars 1m"
+            )
+
+
+def window_close_minute(minute: int) -> int:
+    """On 5-minute bars an action at a filler minute (5w+1..5w+4) fills at the window's close,
+    i.e. at 5w+5: the minute to report it at."""
+    rest = minute % derived.BUCKET_MINUTES
+    return minute if rest == 0 else minute - rest + derived.BUCKET_MINUTES
 
 
 def load_day_5m(root: Path, underlying: str, day: date) -> DayData:

@@ -54,7 +54,7 @@ def main() -> None:
         ),
     ]
     print(f"{a.underlying} {start} .. {end}")
-    print("strategy       days  same-trades  same-exit-minutes  |gross diff| sum  1m s   5m s")
+    print("strategy       days  same-trades  exits-within-5m  |gross diff| sum  1m s   5m s")
     for spec in specs:
         t0 = time.monotonic()
         one = run_legwise(spec, root, start, end, bars="1m")
@@ -72,11 +72,11 @@ def main() -> None:
             f = by_day[r.day]
             if full(r.trades) == full(f.trades):
                 same += 1
-            # the 5-minute exit happens inside the window of the 1-minute one
+            # same legs and contracts, each 5-minute exit within 5 minutes of the 1-minute one
             if [(t.leg_id, t.contract) for t in r.trades] == [
                 (t.leg_id, t.contract) for t in f.trades
             ] and all(
-                (a_.exit_min or 0) // 5 == (b_.exit_min or 0) // 5
+                abs((a_.exit_min or 0) - (b_.exit_min or 0)) <= 5
                 for a_, b_ in zip(r.trades, f.trades, strict=True)
             ):
                 same_exit += 1

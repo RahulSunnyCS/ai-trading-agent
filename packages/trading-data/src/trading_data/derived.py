@@ -21,7 +21,9 @@ the day, so a position opened near the money keeps a price however far the index
 `offset` is always relative to the row's own window, so it can exceed ±10.
 
 **Forward and IV.** The implied forward of each (window, expiry) comes from put-call parity at
-the strike nearest the spot with both a call and a put price: F = K + (C - P) e^{rT}, r the RBI
+the strike nearest the spot whose call and put both traded in the window (`parity`; a carried
+price only when no such pair exists, `parity_stale`; the spot when no pair at all, `spot`):
+F = K + (C - P) e^{rT}, r the RBI
 repo rate (`rates.csv`), T from the window's end to 15:30 on expiry day in calendar years (at
 least one minute). IV is Black-76 on that forward, solved by bisection; greeks are Black-76
 (delta is d(price)/dF, theta per calendar day, vega per volatility point). `iv_quality` names
@@ -97,7 +99,7 @@ CHAIN_SCHEMA = pa.schema(
         pa.field("dte", pa.int16()),
         pa.field("t_years", pa.float64()),
         pa.field("forward", pa.float64()),
-        pa.field("forward_source", pa.string()),  # parity | spot
+        pa.field("forward_source", pa.string()),  # parity | parity_stale | spot
         pa.field("iv", pa.float64()),
         pa.field("delta", pa.float64()),
         pa.field("gamma", pa.float64()),
@@ -166,10 +168,19 @@ IV_DAILY_SCHEMA = pa.schema(
         pa.field("vix_pct_2y", pa.float64()),  # ... 504 days
         pa.field("front_iv_pct_1y", pa.float64()),
         pa.field("front_iv_pct_2y", pa.float64()),
+        # ATM IV at a constant 7 calendar days, interpolated in total variance between the
+        # expiries either side (expiry day excluded) — the series to rank, since the front
+        # expiry's own maturity cycles through the week
+        pa.field("iv_7d_1500", pa.float64()),
+        pa.field("iv_7d_pct_1y", pa.float64()),
+        pa.field("iv_7d_pct_2y", pa.float64()),
     ]
 )
 #: Percentiles need at least this many days of history, else NULL.
 MIN_PCT_HISTORY = 60
+CONSTANT_MATURITY_DAYS = 7
+#: With expiries on one side only, the nearest is used if within this many days of 7.
+CONSTANT_MATURITY_SLACK_DAYS = 2
 
 
 # ---------------------------------------------------------------------------
@@ -370,9 +381,12 @@ def _index_windows(con: duckdb.DuckDBPyConnection, path: Path, t0: int) -> dict[
         if w in by_w:
             first_open, hi, lo, close = by_w[w]
             start = first_open if first_open is not None else last
+            # no price at the window's start (its first minute missing, nothing earlier):
+            # None, never a later price from inside the window
             if start is None:
-                start = close
-            out[w] = (start, max(hi, start), min(lo, start), close)
+                out[w] = (None, hi, lo, close)
+            else:
+                out[w] = (start, max(hi, start), min(lo, start), close)
             last = close
         elif last is not None:
             out[w] = (last, last, last, last)
@@ -441,7 +455,9 @@ def _chain(
     spot: dict[int, tuple],
 ) -> dict[str, np.ndarray]:
     """Window rows for the kept contracts, as numpy columns (no spot/IV yet)."""
-    atm = {w: math.floor(v[0] / step + 0.5) * step for w, v in spot.items()}
+    atm = {w: math.floor(v[0] / step + 0.5) * step for w, v in spot.items() if v[0] is not None}
+    if not atm:
+        return {}
     lo_strike = min(atm.values()) - (STRIKES_EACH_SIDE + 1) * step
     hi_strike = max(atm.values()) + (STRIKES_EACH_SIDE + 1) * step
     con.register("atm_by_w", pa.table({"w": list(atm), "atm": list(atm.values())}))
@@ -538,6 +554,7 @@ def _add_spot_and_iv(
     strike = c["strike"].astype(float)
     close = np.array([np.nan if v is None else v for v in c["close"]], dtype=float)
     is_call = c["option_type"] == "CE"
+    traded = c["traded"]
 
     # implied forward per (window, expiry), from the strike nearest spot with both prices
     forward = np.full(n, np.nan)
@@ -547,13 +564,28 @@ def _add_spot_and_iv(
         groups.setdefault((int(w[i]), expiry[i]), []).append(i)
     for (wi, _e), idx in groups.items():
         s = spot_cols[wi, 3]
-        calls = {strike[i]: close[i] for i in idx if is_call[i] and not np.isnan(close[i])}
-        puts = {strike[i]: close[i] for i in idx if not is_call[i] and not np.isnan(close[i])}
-        both = sorted(set(calls) & set(puts), key=lambda k: (abs(k - s), k))
+        calls = {
+            strike[i]: (close[i], bool(traded[i]))
+            for i in idx
+            if is_call[i] and not np.isnan(close[i])
+        }
+        puts = {
+            strike[i]: (close[i], bool(traded[i]))
+            for i in idx
+            if not is_call[i] and not np.isnan(close[i])
+        }
+        # nearest to spot among pairs that both traded in the window; a carried price only
+        # when no such pair exists (then the forward is marked parity_stale)
+        both = sorted(
+            set(calls) & set(puts),
+            key=lambda k: (not (calls[k][1] and puts[k][1]), abs(k - s), k),
+        )
         dfi = df[idx[0]]
         if both:
             k = both[0]
-            f, src = k + (calls[k] - puts[k]) / dfi, "parity"
+            fresh = calls[k][1] and puts[k][1]
+            f = k + (calls[k][0] - puts[k][0]) / dfi
+            src = "parity" if fresh else "parity_stale"
         else:
             f, src = s / dfi, "spot"
         forward[idx] = f
@@ -577,7 +609,7 @@ def _add_spot_and_iv(
             reasons.append("stale")
         if last_hour[i]:
             reasons.append("expiry_last_hour")
-        if source[i] == "parity" and abs(forward[i] / s_close[i] - 1) > PARITY_GAP:
+        if source[i] != "spot" and abs(forward[i] / s_close[i] - 1) > PARITY_GAP:
             reasons.append("parity_gap")
         flags.append(",".join(reasons) or None)
 
@@ -642,7 +674,9 @@ def _straddle(chain: pa.Table, step: float) -> pa.Table:
         first = next(iter(rows.values()))
         s_open, s_close = cols["spot_open"][first], cols["spot_close"][first]
         atm = math.floor(s_close / step + 0.5) * step
-        atm_open = math.floor(s_open / step + 0.5) * step
+        atm_open = (
+            None if s_open is None or math.isnan(s_open) else math.floor(s_open / step + 0.5) * step
+        )
 
         def val(strike: float, kind: str, col: str, rows: dict = rows) -> float | None:
             i = rows.get((strike, kind))
@@ -686,7 +720,7 @@ def _straddle(chain: pa.Table, step: float) -> pa.Table:
 def build_iv_daily(root: Path, underlying: str) -> pa.Table:
     """One row per (day, expiry) from every straddle_series_5m file of the underlying.
     Trailing values (rv_20, percentiles) use only that day and earlier days."""
-    folder = root / "lake" / "derived" / "straddle_series_5m" / f"underlying={underlying}"
+    folder = derived_path(root, "straddle_series_5m", underlying).parent
     if not any(folder.glob("date=*/data.parquet")):
         return IV_DAILY_SCHEMA.empty_table()
     con = duckdb.connect()
@@ -734,11 +768,16 @@ def build_iv_daily(root: Path, underlying: str) -> pa.Table:
         return sum(1 for h in hist if h <= today) / len(hist)
 
     front_iv = {d: front[d][1] for d in days}
+    iv_7d = {d: constant_maturity_iv([(r[2], r[4]) for r in per_day[d]]) for d in days}
+    # a return counts only between consecutive index trading days: a hole in the option lake
+    # must not turn a week's move into one "daily" return
+    index_pos = {d: k for k, d in enumerate(lake.available_days(root, "index", underlying))}
     out: dict[str, list] = {name: [] for name in IV_DAILY_SCHEMA.names}
     for i, d in enumerate(days):
         rets = [
             math.log(spot_close[days[j]] / spot_close[days[j - 1]])
             for j in range(max(1, i - 19), i + 1)
+            if index_pos.get(days[j], -10) - index_pos.get(days[j - 1], -20) == 1
         ]
         rv = (
             math.sqrt(sum(x * x for x in rets) / len(rets)) * math.sqrt(252)
@@ -755,6 +794,9 @@ def build_iv_daily(root: Path, underlying: str) -> pa.Table:
             "vix_pct_2y": trailing(vix_close, i, 504),
             "front_iv_pct_1y": trailing(front_iv, i, 252),
             "front_iv_pct_2y": trailing(front_iv, i, 504),
+            "iv_7d_1500": iv_7d[d],
+            "iv_7d_pct_1y": trailing(iv_7d, i, 252),
+            "iv_7d_pct_2y": trailing(iv_7d, i, 504),
         }
         for rank, r in enumerate(per_day[d]):
             row = {
@@ -774,6 +816,30 @@ def build_iv_daily(root: Path, underlying: str) -> pa.Table:
     return pa.table(out).cast(IV_DAILY_SCHEMA)
 
 
+def constant_maturity_iv(points: list[tuple[int, float | None]]) -> float | None:
+    """ATM IV at CONSTANT_MATURITY_DAYS from (dte, ATM IV at 15:00) per expiry: total variance
+    sigma^2 T interpolated linearly in T between the nearest expiries either side (T measured
+    from 15:00 to 15:30 on expiry day). Expiry day itself is left out. With expiries on one side
+    only, the nearest is used when within CONSTANT_MATURITY_SLACK_DAYS, else None."""
+    half_hour = 1800 / _SECONDS_PER_YEAR
+    target = CONSTANT_MATURITY_DAYS / 365
+    pts = sorted(
+        (dte / 365 + half_hour, iv) for dte, iv in points if dte >= 1 and iv is not None
+    )
+    below = [p for p in pts if p[0] <= target]
+    above = [p for p in pts if p[0] >= target]
+    if below and above:
+        (t1, v1), (t2, v2) = below[-1], above[0]
+        if t2 == t1:
+            return v1
+        w = v1 * v1 * t1 + (v2 * v2 * t2 - v1 * v1 * t1) * (target - t1) / (t2 - t1)
+        return math.sqrt(w / target) if w > 0 else None
+    near = below[-1:] or above[:1]
+    if near and abs(near[0][0] - target) <= CONSTANT_MATURITY_SLACK_DAYS / 365:
+        return near[0][1]
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Rebuild
 # ---------------------------------------------------------------------------
@@ -784,7 +850,17 @@ class RebuildReport:
     built: int = 0
     skipped_current: int = 0
     skipped_no_data: int = 0
+    failed: int = 0
     iv_daily_rows: int = 0
+
+
+def available_days(root: Path, dataset: str, underlying: str) -> list[date]:
+    """The days a per-day derived dataset has a file for."""
+    folder = derived_path(root, dataset, underlying).parent
+    return sorted(
+        date.fromisoformat(p.parent.name.removeprefix("date="))
+        for p in folder.glob("date=*/data.parquet")
+    )
 
 
 def candidate_days(root: Path, underlying: str, days: tuple[date, date] | None) -> list[date]:
@@ -814,7 +890,12 @@ def rebuild(
             if not force and all(file_version(p) == DERIVED_VERSION for p in paths.values()):
                 report.skipped_current += 1
                 continue
-            build = build_day(root, u, day, reference)
+            try:
+                build = build_day(root, u, day, reference)
+            except (ValueError, duckdb.Error) as error:  # e.g. no reference row for the day
+                report.failed += 1
+                log(f"{u} {day}: not built — {error}")
+                continue
             if build is None or build.chain.num_rows == 0:
                 report.skipped_no_data += 1
                 continue
@@ -830,7 +911,8 @@ def rebuild(
         report.iv_daily_rows = iv.num_rows
         log(
             f"{u}: built {report.built}, already current {report.skipped_current}, "
-            f"no data {report.skipped_no_data}; iv_daily {iv.num_rows} rows"
+            f"no data {report.skipped_no_data}, failed {report.failed}; "
+            f"iv_daily {iv.num_rows} rows"
         )
         reports[u] = report
     return reports

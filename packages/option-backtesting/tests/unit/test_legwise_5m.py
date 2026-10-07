@@ -8,6 +8,7 @@ import pytest
 from trading_data import derived
 
 from option_backtesting.legwise.engine import run_legwise
+from option_backtesting.legwise.market import UnsupportedOn5m
 from option_backtesting.legwise.schema import LegwiseStrategy
 
 FIXTURE = Path(__file__).resolve().parents[1] / "golden" / "legwise_fixture"
@@ -79,3 +80,33 @@ def test_a_day_without_snapshots_is_skipped_with_the_reason(root, tmp_path):
     skipped: dict = {}
     assert run_legwise(straddle(), tmp_path, bars="5m", skipped=skipped) == []
     assert set(skipped.values()) == {"no 5-minute snapshot (tdata derived rebuild)"}
+
+
+@pytest.mark.parametrize(
+    "strike,match",
+    [
+        ({"closest_premium": 50}, "closest premium searches the whole chain"),
+        ({"strike_type": "OTM12"}, "OTM12 is beyond"),
+    ],
+)
+def test_strikes_the_snapshots_do_not_hold_are_refused(root, strike, match):
+    spec = straddle(leg={})
+    spec = spec.model_copy(
+        update={"legs": [leg.model_copy(update={"strike": leg.strike.model_validate(strike)})
+                         for leg in spec.legs]}
+    )  # fmt: skip
+    with pytest.raises(UnsupportedOn5m, match=match):
+        run_legwise(spec, root, bars="5m")
+
+
+def test_actions_inside_a_window_are_reported_at_its_close(root):
+    """A re-entry or combined-stop exit the engine makes at a filler minute fills at the
+    window's close, so its minute is reported as that window's end, a 5-minute mark."""
+    spec = straddle(
+        leg={"stop_loss": {"percent": 30}, "reentry_on_sl": {"mode": "asap", "count": 1}},
+        overall={"stop_loss_inr": 4000},
+    )
+    for r in run_legwise(spec, root, bars="5m"):
+        for t in r.trades:
+            assert t.entry_min % 5 == 0, t
+            assert t.exit_min is None or t.exit_min % 5 == 0, t

@@ -533,6 +533,7 @@ def legwise_run(
     """Backtest leg-wise strategies over the lake's days (vendor history and Fyers)."""
     from .fyers.daily import data_dir
     from .legwise.engine import run_legwise, skipped_summary
+    from .legwise.market import UnsupportedOn5m
     from .legwise.report import day_table
     from .legwise.schema import load_legwise
 
@@ -551,7 +552,7 @@ def legwise_run(
                 skipped=skipped,
                 bars=bars,
             )
-        except ValueError as error:
+        except UnsupportedOn5m as error:
             raise typer.BadParameter(str(error)) from error
         typer.echo(day_table(strategy.id, days, show_trades=trades))
         if skipped:

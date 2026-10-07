@@ -45,6 +45,7 @@ backtest (TODO.md 3.10.7):
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -64,12 +65,14 @@ from .market import (
     Series,
     backtest_days,
     check_on_5m_marks,
+    check_strikes_on_5m,
     load_day,
     load_day_5m,
     minute_index,
     minute_label,
     pick_expiry,
     snapshot_days,
+    window_close_minute,
 )
 from .schema import Leg, LegwiseStrategy, ReEntry
 
@@ -474,6 +477,7 @@ def run_legwise(
             strategy.no_reentry_after,
             *(leg.range_breakout.until for leg in strategy.legs if leg.range_breakout),
         )
+        check_strikes_on_5m(strategy.legs)
         built = snapshot_days(root, strategy.underlying)
         for day in [d for d in days if d not in built]:
             left_out[day] = "no 5-minute snapshot (tdata derived rebuild)"
@@ -488,9 +492,27 @@ def run_legwise(
             left_out[day] = "no index or option file"
         except MissingReferenceData as error:
             left_out[day] = f"reference: {error}"
+    if bars == "5m":
+        for result in results:
+            _report_at_window_close(result)
     if skipped is not None:
         skipped.update(left_out)
     return results
+
+
+def _report_at_window_close(result: DayResult) -> None:
+    """5-minute bars: an entry or exit the engine made at a filler minute happened at the
+    window's close — report it there (stopped_by's HH:MM too), not up to 4 minutes early."""
+    for t in result.trades:
+        t.entry_min = window_close_minute(t.entry_min)
+        if t.exit_min is not None:
+            t.exit_min = window_close_minute(t.exit_min)
+    if result.stopped_by:
+        result.stopped_by = re.sub(
+            r"\b\d\d:\d\d\b",
+            lambda m: minute_label(window_close_minute(minute_index(m.group(0)))),
+            result.stopped_by,
+        )
 
 
 def skipped_summary(skipped: dict[date, str]) -> str:
