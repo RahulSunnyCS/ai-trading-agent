@@ -33,6 +33,7 @@
     "ignore": [
       "node_modules",
       "**/.next/**",
+      "**/.next-prod/**",
       "**/.venv/**",
       "packages/momentum-backtesting/data/**",
       "packages/momentum-backtesting/tests/golden/**",
