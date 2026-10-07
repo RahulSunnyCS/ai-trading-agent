@@ -275,13 +275,11 @@ def data_snapshot(root: Path | None = None, through: str | None = None) -> dict[
     the confirmed split and bonus factors. With `through` (a run's fixed end date) only data up
     to that date counts, so a new week beyond an end-dated run does not change its snapshot.
     None when there is no catalog."""
-    from trading_data.db import connect, data_root
-
     from . import db_read
 
     if db_read.catalog_mtime(root) is None:
         return None
-    with connect(root or data_root(), read_only=True) as con:
+    with db_read.open_catalog(root, read_only=True) as con:
         cap = through or "9999-12-31"
         last_bar = con.execute(
             "SELECT CAST(max(date) AS DATE) FROM bars_1d_stock WHERE date <= CAST(? AS DATE)",

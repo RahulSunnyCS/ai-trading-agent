@@ -8,7 +8,7 @@ import pytest
 
 from trading_data import lake, reference
 from trading_data.backup import backup
-from trading_data.db import catalog_path, connect
+from trading_data.db import LAKE_VIEWS, catalog_path, connect
 from trading_data.instruments import InstrumentSpec, instrument_key, register
 
 DAY = date(2026, 9, 29)
@@ -100,6 +100,22 @@ def test_views_exist_and_are_empty_on_a_fresh_lake(root):
     with connect(root) as con:
         for view in ("bars_1m_option", "bars_1m_index", "bars_1m_future", "symbol_master"):
             assert con.execute(f"SELECT count(*) FROM {view}").fetchone()[0] == 0
+
+
+def test_views_limits_the_lake_views_a_connection_binds(root):
+    """Binding the 1-minute views takes tens of seconds on the live lake with the catalog
+    locked; a caller that never reads them must be able to skip them."""
+    with connect(root, views=("bars_1d_stock",)) as con:
+        assert con.execute("SELECT count(*) FROM bars_1d_stock").fetchone()[0] == 0
+        bound = {
+            name
+            for (name,) in con.execute(
+                "SELECT view_name FROM duckdb_views() WHERE temporary AND NOT internal"
+            ).fetchall()
+        }
+        assert bound & LAKE_VIEWS.keys() == {"bars_1d_stock"}
+    with pytest.raises(ValueError, match="bars_1m_nope"), connect(root, views=("bars_1m_nope",)):
+        pass
 
 
 def test_read_only_needs_an_existing_catalog(root):

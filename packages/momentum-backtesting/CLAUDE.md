@@ -105,6 +105,22 @@ lost on restart), runs at most 3 at once (CPU-bound — more only slows each) an
 rest; a `fresh: true` run (`DATA.reset()`) runs alone so it never wipes caches under another
 run. The synchronous `POST /api/backtest` still exists (tests, scripts).
 
+**Catalog rule (2026-10-07): never hold a catalog connection across a request or a long
+computation.** `mbt serve` holding `catalog.duckdb` made `tdata` and `obt` (and so the evening
+`obt daily` save) time out on its lock. Every connection in this package goes through
+`db_read.open_catalog()` (a `with` block around one short unit of work; binds only
+`bars_1d_stock`, since binding the 1-minute lake views cost ~20-35 s per connection with the file
+locked) or `db_read.stock_bars()` (the heavy daily-bar reads — Broad's prices, the liquidity and
+circuit windows — on an in-memory DuckDB over the Parquet; the catalog is open only to copy the
+stock rows of `instruments`). Never import `trading_data.db.connect` directly, never keep a
+connection on the app, a module or a cache, and never pass an open one into code that fetches or
+backtests: the weekly run takes a `catalog` factory (`weekly.run_weekly(catalog=open_catalog)`)
+and opens it around each store; `fyers_topup.run_fyers_topup` reads, fetches, then writes in
+separate connections. `tests/golden/test_catalog_release.py` runs the heavy endpoints on the golden
+fixture with an unreadable 1-minute lake file and, after each, opens the catalog for writing from
+another process; `test_weekly.py` checks no connection is open during the refresh or the backtest.
+Still a single long write by design: `mbt local migrate` (`db_migrate.migrate`, the 19:30 sync).
+
 **Caching rule (BL-005, 2026-10-06): key any cache of shared-database data on
 `db_read.data_version()`, never on `db_read.catalog_mtime()`.** The catalog file's mtime moves on
 every write, and the dashboard saves each finished run into it (`POST /api/saved-runs`), so an
