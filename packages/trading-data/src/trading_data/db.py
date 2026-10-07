@@ -5,11 +5,17 @@ DuckDB allows ONE read-write process at a time (a read-write connection also
 locks out other processes' readers). So: open late, close early — every caller
 uses `connect()` as a context manager around a short unit of work, never holds
 a connection across a long download.
+
+Within one process, `connect()` also serialises connections per catalog file
+(`_CatalogLock`): read-only connections share, a read-write one is alone. DuckDB
+itself cannot be opened concurrently from two threads in mixed modes, nor two
+read-write connections opened and closed at once (see `_CatalogLock`).
 """
 
 from __future__ import annotations
 
 import os
+import threading
 import time
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
@@ -240,18 +246,110 @@ def refresh_views(
             con.execute(f"CREATE OR REPLACE TEMP VIEW {name} AS SELECT {empty} WHERE false")
 
 
+class CatalogBusy(duckdb.IOException):
+    """Another thread of this process held the catalog for longer than `lock_wait`. An
+    `IOException`, like DuckDB's own error for another process holding it, so a caller that
+    handles one handles both."""
+
+
+class _CatalogLock:
+    """A readers-writer lock for one catalog file, within this process: any number of
+    read-only connections at once, or one read-write connection alone. Writers go first
+    (a reader arriving while a writer waits waits too), so a polled read endpoint cannot
+    starve a save. Reentrant per thread in the mode it holds: a `with connect()` nested in
+    another of the same mode on the same thread does not deadlock.
+
+    Why it exists: DuckDB keeps one database instance per file per process, and opening that
+    file from two threads at once only works when both are read-only. Measured on DuckDB
+    1.5.6 (2026-10-07, six threads opening and closing a copy of the live catalog):
+    mixed modes raise `ConnectionException: ... different configuration than existing
+    connections` (583 of 1,200 opens), and read-write alone still raises `BinderException:
+    Unique file handle conflict` (17 of 1,200) while one thread's close and another's open
+    overlap. `_open` used to retry the first every 0.25 s for 10 s, which under the
+    dashboard's polling left `GET /api/meta` waiting 8 s and more, burning CPU in the
+    retries (`mbt serve`, 2026-10-07); the second was not retried at all and failed the
+    request."""
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition()
+        self._readers: dict[int, int] = {}  # thread id -> nesting depth
+        self._writer: int | None = None
+        self._writer_depth = 0
+        self._writers_waiting = 0
+
+    def acquire(self, read_only: bool, timeout: float) -> None:
+        me = threading.get_ident()
+        deadline = time.monotonic() + timeout
+        with self._cond:
+            if read_only:
+                if me in self._readers:
+                    self._readers[me] += 1
+                    return
+                if self._writer == me:
+                    raise RuntimeError(
+                        "this thread already holds the catalog read-write: use that "
+                        "connection instead of opening a read-only one inside it"
+                    )
+                while self._writer is not None or self._writers_waiting:
+                    if not self._cond.wait(max(0.0, deadline - time.monotonic())):
+                        raise CatalogBusy(_busy_message(timeout))
+                self._readers[me] = 1
+                return
+            if self._writer == me:
+                self._writer_depth += 1
+                return
+            if me in self._readers:
+                raise RuntimeError(
+                    "this thread already holds the catalog read-only: close that "
+                    "connection before opening a read-write one"
+                )
+            self._writers_waiting += 1
+            try:
+                while self._writer is not None or self._readers:
+                    if not self._cond.wait(max(0.0, deadline - time.monotonic())):
+                        raise CatalogBusy(_busy_message(timeout))
+            finally:
+                self._writers_waiting -= 1
+                self._cond.notify_all()  # readers held back by this waiter may go now
+            self._writer, self._writer_depth = me, 1
+
+    def release(self, read_only: bool) -> None:
+        me = threading.get_ident()
+        with self._cond:
+            if read_only:
+                self._readers[me] -= 1
+                if not self._readers[me]:
+                    del self._readers[me]
+            else:
+                self._writer_depth -= 1
+                if not self._writer_depth:
+                    self._writer = None
+            self._cond.notify_all()
+
+
+def _busy_message(timeout: float) -> str:
+    return f"the catalog was held by another thread of this process for over {timeout:g} s"
+
+
+_catalog_locks: dict[str, _CatalogLock] = {}
+_catalog_locks_guard = threading.Lock()
+
+
+def _catalog_lock(path: Path) -> _CatalogLock:
+    key = os.path.realpath(path)  # one lock per file, however the root was spelled
+    with _catalog_locks_guard:
+        return _catalog_locks.setdefault(key, _CatalogLock())
+
+
 def _open(path: Path, read_only: bool, attempts: int = 40) -> duckdb.DuckDBPyConnection:
     """DuckDB allows one writer process; another process briefly holding the file (the
     dashboard API reading, an evening run saving) makes connect fail with a lock
     error. Retry for ~10 s before giving up — every holder only keeps it open briefly.
 
-    The SAME process can also hit this: two requests in a FastAPI server's threadpool
-    (e.g. a saved-run POST's write connection still open when a concurrent GET opens a
-    read-only one) raise `ConnectionException: ... different configuration than
-    existing connections` instead of `IOException` — same transient cause, same fix.
-    Reproduced live 2026-09-30 in `mbt ui`: a stock-dataset GET arriving while a
-    saved-runs POST's write connection was still open 500'd instead of just waiting the
-    ~1s for it to close."""
+    Another thread of THIS process is not retried here: `connect()` waits on
+    `_CatalogLock` instead, so a `ConnectionException` reaching this is a caller that
+    opened the file with `duckdb.connect` directly, outside `connect()`, and it keeps
+    the old retry."""
     for attempt in range(attempts):
         try:
             return duckdb.connect(str(path), read_only=read_only)
@@ -283,18 +381,29 @@ def connect(
     never reads them passes the few it does, or `()` (see `refresh_views`).
 
     Hold the connection for one short unit of work: never across a request that streams,
-    a network fetch or a long computation (another process waits on it, `lock_wait` long)."""
+    a network fetch or a long computation (another process waits on it, `lock_wait` long,
+    and so does every other thread of this one: `_CatalogLock`). Prefer `read_only=True`
+    wherever nothing is written: read-only connections share, in this process and across
+    processes. `lock_wait` covers both waits; past it, `CatalogBusy` (another thread) or
+    DuckDB's `IOException` (another process)."""
     root = root or data_root()
     path = catalog_path(root)
     if read_only and not path.exists():
         raise FileNotFoundError(f"no catalog at {path} — run `tdata init` first")
     root.mkdir(parents=True, exist_ok=True)
-    con = _open(path, read_only, attempts=max(1, round(lock_wait / 0.25)))
+    lock = _catalog_lock(path)
+    start = time.monotonic()
+    lock.acquire(read_only, lock_wait)
     try:
-        if not read_only:
-            migrate(con)
-            _ensure_reference(con)
-        refresh_views(con, root, views)
-        yield con
+        remaining = lock_wait - (time.monotonic() - start)
+        con = _open(path, read_only, attempts=max(1, round(remaining / 0.25)))
+        try:
+            if not read_only:
+                migrate(con)
+                _ensure_reference(con)
+            refresh_views(con, root, views)
+            yield con
+        finally:
+            con.close()
     finally:
-        con.close()
+        lock.release(read_only)

@@ -83,6 +83,15 @@ table instead.
   over the Parquet instead (`refresh_views` works on any connection), with the catalog open only
   to copy the small table they join (momentum's `db_read.stock_bars`). On 2026-10-07 `mbt serve`
   broke this and `tdata` / `obt` timed out.
+- **Within a process, `connect()` is a readers-writer lock per catalog** (`db._CatalogLock`):
+  read-only connections share, a read-write one waits for them and runs alone, and a waiting
+  writer goes before new readers. DuckDB cannot open one file from two threads at once unless
+  both are read-only (mixed modes: `ConnectionException: ... different configuration`; two
+  writers: `BinderException: Unique file handle conflict`), which left `mbt serve`'s
+  `/api/meta` waiting 8 s and more on 2026-10-07. So open read-only whenever nothing is
+  written, and never `duckdb.connect` the catalog directly in a threaded process. Nesting
+  `connect()` on one thread works in the same mode and raises `RuntimeError` across modes;
+  waiting past `lock_wait` raises `CatalogBusy` (an `IOException`).
 - **`connect(views=...)` binds only the lake views a caller reads.** Binding runs with the
   catalog locked: on the live lake all views took 21-33 s per connection before
   `FIXED_SCHEMA_VIEWS`, ~1 s after (2026-10-07; timings in `db.py`). The default (None) still

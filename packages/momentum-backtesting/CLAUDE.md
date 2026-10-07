@@ -112,7 +112,11 @@ computation.** `mbt serve` holding `catalog.duckdb` made `tdata` and `obt` (and 
 `bars_1d_stock`, since binding the 1-minute lake views cost ~20-35 s per connection with the file
 locked) or `db_read.stock_bars()` (the heavy daily-bar reads — Broad's prices, the liquidity and
 circuit windows — on an in-memory DuckDB over the Parquet; the catalog is open only to copy the
-stock rows of `instruments`). Never import `trading_data.db.connect` directly, never keep a
+stock rows of `instruments`). A read opens it read-only: `db_read.read_catalog()` when the
+endpoint used to open it for writing only so that it migrated (migrates once per process, then
+read-only), since a read-write connection holds off every other request's (`trading_data.db`'s
+in-process lock) and other processes' readers; `tests/test_catalog_concurrency.py` pins the
+polled GETs to read-only. Never import `trading_data.db.connect` directly, never keep a
 connection on the app, a module or a cache, and never pass an open one into code that fetches or
 backtests: the weekly run takes a `catalog` factory (`weekly.run_weekly(catalog=open_catalog)`)
 and opens it around each store; `fyers_topup.run_fyers_topup` reads, fetches, then writes in
