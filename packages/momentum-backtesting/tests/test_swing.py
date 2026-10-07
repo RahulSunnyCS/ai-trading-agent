@@ -115,6 +115,7 @@ def test_fill_at_next_open_and_stop_intraday():
     assert t["fill"] == 100 and t["stop"] == pytest.approx(92)
     assert t["reason"] == "stop" and t["exit_price"] == pytest.approx(92)
     buy, sell = trader.costs()
+    sell += trader.dp_fraction(trader.slot_rs() * 0.92)  # ₹16 on this sale's value
     assert t["net_return"] == pytest.approx(0.92 * (1 - sell) / (1 + buy) - 1)
     assert t["r"] == pytest.approx(t["net_return"] / 0.08)
 
@@ -182,7 +183,11 @@ def test_portfolio_takes_the_best_scores_into_ten_slots():
     # nine full 10% slots; costs leave the tenth a little smaller (all the remaining cash)
     tenth = (1 - 9 * 0.1 * (1 + buy)) / (1 + buy)
     assert curve.iloc[1] == pytest.approx(0.9 + tenth)  # marked at the fill price
-    assert curve.iloc[-1] == pytest.approx((0.9 + tenth) * 1.10 * (1 - sell))
+    capital = 500_000
+    sale = 0.1 * 1.10  # each full slot sells for 0.11 of starting capital
+    full = 9 * sale * (1 - sell - trader.dp_fraction(sale * capital))
+    small = tenth * 1.10 * (1 - sell - trader.dp_fraction(tenth * 1.10 * capital))
+    assert curve.iloc[-1] == pytest.approx(full + small)
 
 
 def test_portfolio_skips_disallowed_and_traded_bases():
@@ -270,3 +275,66 @@ def test_stages_a_and_b_run_end_to_end_on_synthetic_data():
     b = research.stage_b(cands, outcomes, closes, a, echo=lambda *_: None)
     assert len(b["portfolios"]) == 6 and len(b["walk_forward_picks"]) == 9
     assert all(np.isfinite(c.iloc[-1]) for c in b["curves"].values())
+
+
+def test_no_candidate_with_a_bad_bar_in_its_atr_window():
+    daily = _market()
+    found = candidates.scan(adjust(daily, {}), workers=1)
+    row = found[found["symbol"] == "S0"].iloc[len(found[found["symbol"] == "S0"]) // 2]
+    marked = daily.copy()
+    day = marked[(marked["symbol"] == "S0") & (marked["date"] < row["date"])].index[-5]
+    marked.loc[day, "low"] = marked.loc[day, "close"] * 0.5  # a bad print 5 sessions earlier
+    again = candidates.scan(adjust(marked, {}), workers=1)
+    same_day = again[(again["symbol"] == "S0") & (again["date"] == row["date"])]
+    assert same_day.empty
+
+
+def test_retry_stages_run_end_to_end_with_controls():
+    from momentum_backtesting.patterns.swing import retry
+
+    daily = adjust(_long_market(), {})
+    cands = candidates.scan(daily, workers=1)
+    pool = candidates.control_pool(daily, workers=1)
+    assert len(pool) > 0
+    bars = split_symbols(daily)
+    closes = daily.pivot_table(index="date", columns="symbol", values="close")
+    first = research.first_per_base(cands)
+    positions = {
+        s: {np.datetime64(d, "ns"): i for i, d in enumerate(b.dates)} for s, b in bars.items()
+    }
+    controls = retry.sample_controls(cands, first, pool)
+    outcomes, nets = {}, {}
+    for stop in ("base_low", "atr_1.5", "pct_8"):
+        for target in (2.0, 3.0, None):
+            key = f"{stop}|{target}"
+            outcomes[key] = trader.trade_outcomes(cands, bars, stop_rule=stop, target_r=target)
+            nets[key] = retry.control_net(cands, outcomes[key], controls, bars, positions, target)
+    # controls never include the candidate's own stock or one with a candidate that day
+    busy = cands.groupby("date")["symbol"].apply(set)
+    for idx, syms in controls.items():
+        assert not set(syms) & busy[cands.at[idx, "date"]]
+    assert all(r >= 0.03 for t in outcomes.values() for r in t["risk"].dropna())
+    a = retry.stage_a(cands, outcomes, nets, echo=lambda *_: None)
+    for v in a.values():
+        v["passes"] = True
+    days = closes.index
+    growth = retry.cash_growth(
+        days,
+        pd.Series(
+            np.linspace(100, 160, 700), index=pd.date_range("2010-01-01", periods=700, freq="W-FRI")
+        ),
+    )
+    b = retry.stage_b(cands, outcomes, closes, growth, a, echo=lambda *_: None)
+    assert len(b["portfolios"]) == 6 and np.isfinite(b["walk_forward_cagr"])
+    assert b["wf_curve"].index[0] >= pd.Timestamp("2015-01-01")
+
+
+def test_idle_cash_grows_with_the_liquid_fund():
+    from momentum_backtesting.patterns.swing import retry
+
+    days = pd.bdate_range("2020-01-06", periods=10)
+    weekly = pd.Series(
+        [100.0, 101.0, 102.01], index=pd.to_datetime(["2020-01-03", "2020-01-10", "2020-01-17"])
+    )
+    g = retry.cash_growth(days, weekly)
+    assert g.prod() == pytest.approx(1.0201)

@@ -2677,6 +2677,18 @@ def swing_research() -> None:
     run.research_dev(echo=typer.echo)
 
 
+@swing_app.command("retry")
+def swing_retry() -> None:
+    """Addendum 1, the one retry on 2012-2023: net % per trade against matched random
+    controls, the mid-cap index as the bar, one continuous walk-forward portfolio ->
+    search_spaces/bl043_retry_dev_result.json."""
+    from .config import load_repo_env
+    from .patterns.swing import run
+
+    load_repo_env()
+    run.retry_dev(echo=typer.echo)
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),

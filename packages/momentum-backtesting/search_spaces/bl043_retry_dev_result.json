@@ -1,0 +1,420 @@
+{
+  "stage_a": {
+    "tight_range": {
+      "combos": {
+        "breakout/base_low/2R": {
+          "trades": 1464,
+          "mean_net": 0.02919631893838623,
+          "mean_control_net": 0.019235384002360068,
+          "mean_edge": 0.009960934936026157,
+          "win_rate": 0.4918032786885246,
+          "median_sessions": 26.0
+        },
+        "breakout/base_low/3R": {
+          "trades": 1464,
+          "mean_net": 0.037284929832124614,
+          "mean_control_net": 0.02631776685968136,
+          "mean_edge": 0.010967162972443257,
+          "win_rate": 0.46584699453551914,
+          "median_sessions": 36.0
+        },
+        "breakout/base_low/none": {
+          "trades": 1464,
+          "mean_net": 0.049701506801082616,
+          "mean_control_net": 0.03827153992774366,
+          "mean_edge": 0.011429966873338955,
+          "win_rate": 0.4576502732240437,
+          "median_sessions": 65.0
+        },
+        "breakout/atr_1.5/2R": {
+          "trades": 1428,
+          "mean_net": -0.005102070962537075,
+          "mean_control_net": -0.0001358888708572484,
+          "mean_edge": -0.0049661820916798265,
+          "win_rate": 0.33753501400560226,
+          "median_sessions": 5.0
+        },
+        "breakout/atr_1.5/3R": {
+          "trades": 1428,
+          "mean_net": 0.00118307916137623,
+          "mean_control_net": 0.0034594453933578587,
+          "mean_edge": -0.0022763662319816294,
+          "win_rate": 0.2920168067226891,
+          "median_sessions": 6.0
+        },
+        "breakout/atr_1.5/none": {
+          "trades": 1428,
+          "mean_net": 0.02561742617068173,
+          "mean_control_net": 0.01990194761498155,
+          "mean_edge": 0.005715478555700178,
+          "win_rate": 0.22969187675070027,
+          "median_sessions": 8.0
+        },
+        "breakout/pct_8/2R": {
+          "trades": 1617,
+          "mean_net": 0.017299973677464834,
+          "mean_control_net": 0.01436567941779168,
+          "mean_edge": 0.002934294259673157,
+          "win_rate": 0.4483611626468769,
+          "median_sessions": 17.0
+        },
+        "breakout/pct_8/3R": {
+          "trades": 1617,
+          "mean_net": 0.026399237410421075,
+          "mean_control_net": 0.018718408251005143,
+          "mean_edge": 0.007680829159415929,
+          "win_rate": 0.41620284477427333,
+          "median_sessions": 23.0
+        },
+        "breakout/pct_8/none": {
+          "trades": 1617,
+          "mean_net": 0.04742311180418405,
+          "mean_control_net": 0.033587269518070825,
+          "mean_edge": 0.01383584228611322,
+          "win_rate": 0.4038342609771181,
+          "median_sessions": 38.0
+        },
+        "pullback/base_low/2R": {
+          "trades": 1150,
+          "mean_net": 0.004619368518654766,
+          "mean_control_net": -0.002375968839268292,
+          "mean_edge": 0.006995337357923057,
+          "win_rate": 0.39652173913043476,
+          "median_sessions": 8.0
+        },
+        "pullback/base_low/3R": {
+          "trades": 1150,
+          "mean_net": 0.01129217051449661,
+          "mean_control_net": 0.0017063435657258797,
+          "mean_edge": 0.00958582694877073,
+          "win_rate": 0.3391304347826087,
+          "median_sessions": 10.0
+        },
+        "pullback/base_low/none": {
+          "trades": 1150,
+          "mean_net": 0.03699619048910384,
+          "mean_control_net": 0.013069902553496656,
+          "mean_edge": 0.02392628793560718,
+          "win_rate": 0.2669565217391304,
+          "median_sessions": 14.0
+        },
+        "pullback/atr_1.5/2R": {
+          "trades": 2308,
+          "mean_net": -6.636799922487709e-5,
+          "mean_control_net": -0.003473136087105212,
+          "mean_edge": 0.0034067680878803355,
+          "win_rate": 0.3799826689774697,
+          "median_sessions": 6.0
+        },
+        "pullback/atr_1.5/3R": {
+          "trades": 2308,
+          "mean_net": 0.003666272758862455,
+          "mean_control_net": -0.0003231336442419847,
+          "mean_edge": 0.00398940640310444,
+          "win_rate": 0.3106585788561525,
+          "median_sessions": 8.0
+        },
+        "pullback/atr_1.5/none": {
+          "trades": 2308,
+          "mean_net": 0.02697605200190314,
+          "mean_control_net": 0.011970421434040033,
+          "mean_edge": 0.015005630567863101,
+          "win_rate": 0.24003466204506066,
+          "median_sessions": 10.0
+        },
+        "pullback/pct_8/2R": {
+          "trades": 2407,
+          "mean_net": 0.00926033935281112,
+          "mean_control_net": 0.010344140325973913,
+          "mean_edge": -0.001083800973162795,
+          "win_rate": 0.4142085583714167,
+          "median_sessions": 17.0
+        },
+        "pullback/pct_8/3R": {
+          "trades": 2407,
+          "mean_net": 0.015587419333501044,
+          "mean_control_net": 0.013865713730078617,
+          "mean_edge": 0.0017217056034224253,
+          "win_rate": 0.37806398005816366,
+          "median_sessions": 21.0
+        },
+        "pullback/pct_8/none": {
+          "trades": 2407,
+          "mean_net": 0.033505126139707686,
+          "mean_control_net": 0.02387341879128375,
+          "mean_edge": 0.009631707348423942,
+          "win_rate": 0.36393851267137517,
+          "median_sessions": 29.0
+        }
+      },
+      "walk_forward_picks": {
+        "2015": "breakout/base_low/3R",
+        "2016": "breakout/base_low/3R",
+        "2017": "breakout/pct_8/none",
+        "2018": "breakout/pct_8/none",
+        "2019": "breakout/pct_8/none",
+        "2020": "breakout/pct_8/none",
+        "2021": "breakout/pct_8/none",
+        "2022": "pullback/base_low/none",
+        "2023": "pullback/base_low/none"
+      },
+      "walk_forward_trades": 1190,
+      "walk_forward_mean_edge": 0.016637510605454743,
+      "pbo": {
+        "splits": 12870,
+        "configs": 18,
+        "weeks_used": 144,
+        "pbo": 0.1839160839160839,
+        "picked_oos_negative": 0.13698523698523699,
+        "slope": -0.835557578991605,
+        "picked_oos_median": 0.803486985714512,
+        "picked_is_median": 1.3163296370414683
+      },
+      "passes": true,
+      "full_window_choice": "pullback/base_low/none"
+    },
+    "flag": {
+      "combos": {
+        "breakout/base_low/2R": {
+          "trades": 630,
+          "mean_net": 0.0024556934236669883,
+          "mean_control_net": 0.008061636638404424,
+          "mean_edge": -0.005605943214737438,
+          "win_rate": 0.3952380952380952,
+          "median_sessions": 15.0
+        },
+        "breakout/base_low/3R": {
+          "trades": 630,
+          "mean_net": 0.013435708721771095,
+          "mean_control_net": 0.012991911156358539,
+          "mean_edge": 0.0004437975654125583,
+          "win_rate": 0.36507936507936506,
+          "median_sessions": 18.0
+        },
+        "breakout/base_low/none": {
+          "trades": 630,
+          "mean_net": 0.026852602839625334,
+          "mean_control_net": 0.023533215658658194,
+          "mean_edge": 0.0033193871809671415,
+          "win_rate": 0.346031746031746,
+          "median_sessions": 21.5
+        },
+        "breakout/atr_1.5/2R": {
+          "trades": 692,
+          "mean_net": -0.00783296588925207,
+          "mean_control_net": -0.0024717939444077216,
+          "mean_edge": -0.005361171944844348,
+          "win_rate": 0.32947976878612717,
+          "median_sessions": 6.0
+        },
+        "breakout/atr_1.5/3R": {
+          "trades": 692,
+          "mean_net": -0.002217269783786189,
+          "mean_control_net": 0.0019250987642887712,
+          "mean_edge": -0.00414236854807496,
+          "win_rate": 0.28034682080924855,
+          "median_sessions": 8.0
+        },
+        "breakout/atr_1.5/none": {
+          "trades": 692,
+          "mean_net": 0.01916111986343381,
+          "mean_control_net": 0.01442269892793728,
+          "mean_edge": 0.004738420935496532,
+          "win_rate": 0.22976878612716764,
+          "median_sessions": 9.5
+        },
+        "breakout/pct_8/2R": {
+          "trades": 697,
+          "mean_net": 0.002234098352631011,
+          "mean_control_net": 0.006104190386623118,
+          "mean_edge": -0.0038700920339921046,
+          "win_rate": 0.3916786226685796,
+          "median_sessions": 12.0
+        },
+        "breakout/pct_8/3R": {
+          "trades": 697,
+          "mean_net": 0.011684881956308507,
+          "mean_control_net": 0.010535555687278054,
+          "mean_edge": 0.001149326269030452,
+          "win_rate": 0.35437589670014347,
+          "median_sessions": 15.0
+        },
+        "breakout/pct_8/none": {
+          "trades": 697,
+          "mean_net": 0.031079118148896526,
+          "mean_control_net": 0.0212567690370423,
+          "mean_edge": 0.00982234911185422,
+          "win_rate": 0.3328550932568149,
+          "median_sessions": 19.0
+        },
+        "pullback/base_low/2R": {
+          "trades": 391,
+          "mean_net": -0.0028061987101377656,
+          "mean_control_net": -0.003670483389242611,
+          "mean_edge": 0.0008642846791048442,
+          "win_rate": 0.35294117647058826,
+          "median_sessions": 3.0
+        },
+        "pullback/base_low/3R": {
+          "trades": 391,
+          "mean_net": 0.0008504797031399487,
+          "mean_control_net": -0.0013943006603040332,
+          "mean_edge": 0.0022447803634439815,
+          "win_rate": 0.289002557544757,
+          "median_sessions": 4.0
+        },
+        "pullback/base_low/none": {
+          "trades": 391,
+          "mean_net": -0.00038057135984402346,
+          "mean_control_net": 0.010342465892716268,
+          "mean_edge": -0.01072303725256029,
+          "win_rate": 0.13554987212276215,
+          "median_sessions": 5.0
+        },
+        "pullback/atr_1.5/2R": {
+          "trades": 2057,
+          "mean_net": 0.00461924927522141,
+          "mean_control_net": 0.003742037004964324,
+          "mean_edge": 0.0008772122702570843,
+          "win_rate": 0.3928050559066602,
+          "median_sessions": 9.0
+        },
+        "pullback/atr_1.5/3R": {
+          "trades": 2057,
+          "mean_net": 0.011679373091530379,
+          "mean_control_net": 0.009350814746606748,
+          "mean_edge": 0.0023285583449236327,
+          "win_rate": 0.3339815264948955,
+          "median_sessions": 12.0
+        },
+        "pullback/atr_1.5/none": {
+          "trades": 2057,
+          "mean_net": 0.032235987977793916,
+          "mean_control_net": 0.02411581537300081,
+          "mean_edge": 0.00812017260479311,
+          "win_rate": 0.2907146329606223,
+          "median_sessions": 16.0
+        },
+        "pullback/pct_8/2R": {
+          "trades": 2065,
+          "mean_net": 0.010252086961970032,
+          "mean_control_net": 0.008523102911353702,
+          "mean_edge": 0.0017289840506163278,
+          "win_rate": 0.41113801452784504,
+          "median_sessions": 12.0
+        },
+        "pullback/pct_8/3R": {
+          "trades": 2065,
+          "mean_net": 0.01855308681501051,
+          "mean_control_net": 0.015481204907410845,
+          "mean_edge": 0.0030718819075996624,
+          "win_rate": 0.362227602905569,
+          "median_sessions": 16.0
+        },
+        "pullback/pct_8/none": {
+          "trades": 2065,
+          "mean_net": 0.03678578012578963,
+          "mean_control_net": 0.027750266596626914,
+          "mean_edge": 0.009035513529162726,
+          "win_rate": 0.33462469733656175,
+          "median_sessions": 22.0
+        }
+      },
+      "walk_forward_picks": {
+        "2015": "pullback/pct_8/none",
+        "2016": "pullback/pct_8/none",
+        "2017": "pullback/atr_1.5/none",
+        "2018": "pullback/atr_1.5/none",
+        "2019": "breakout/pct_8/none",
+        "2020": "breakout/pct_8/none",
+        "2021": "breakout/pct_8/none",
+        "2022": "breakout/pct_8/none",
+        "2023": "pullback/base_low/3R"
+      },
+      "walk_forward_trades": 934,
+      "walk_forward_mean_edge": 0.0002469130711672644,
+      "pbo": {
+        "splits": 12870,
+        "configs": 18,
+        "weeks_used": 144,
+        "pbo": 0.22999222999222999,
+        "picked_oos_negative": 0.2619269619269619,
+        "slope": -0.767059306824078,
+        "picked_oos_median": 0.3711375064844541,
+        "picked_is_median": 1.2144046395542947
+      },
+      "passes": true,
+      "full_window_choice": "breakout/pct_8/none"
+    }
+  },
+  "stage_b": {
+    "patterns": ["tight_range", "flag"],
+    "portfolios": {
+      "score>=70 any day | health off": {
+        "cagr_2015_2023": 0.17487332235667674,
+        "mdd_2015_2023": -0.3488563517334189
+      },
+      "score>=70 any day | health on": {
+        "cagr_2015_2023": 0.161059469665513,
+        "mdd_2015_2023": -0.1797233767075187
+      },
+      "score>=80 any day | health off": {
+        "cagr_2015_2023": 0.14655537380560624,
+        "mdd_2015_2023": -0.3157482056285975
+      },
+      "score>=80 any day | health on": {
+        "cagr_2015_2023": 0.12877480787602047,
+        "mdd_2015_2023": -0.2060110708655103
+      },
+      "friday: score>=70 on Fridays, score>=83 other days | health off": {
+        "cagr_2015_2023": 0.1258291235387976,
+        "mdd_2015_2023": -0.31467117146961
+      },
+      "friday: score>=70 on Fridays, score>=83 other days | health on": {
+        "cagr_2015_2023": 0.1255139105779104,
+        "mdd_2015_2023": -0.1967694996451972
+      }
+    },
+    "walk_forward_picks": {
+      "2015": "score>=70 any day | health off",
+      "2016": "score>=70 any day | health on",
+      "2017": "score>=70 any day | health on",
+      "2018": "score>=70 any day | health on",
+      "2019": "score>=70 any day | health on",
+      "2020": "score>=70 any day | health on",
+      "2021": "score>=70 any day | health on",
+      "2022": "score>=70 any day | health on",
+      "2023": "score>=70 any day | health on"
+    },
+    "walk_forward_cagr": 0.11930120704449854,
+    "walk_forward_mdd": -0.3269346601598616,
+    "walk_forward_trades": 293,
+    "pbo": {
+      "splits": 12870,
+      "configs": 6,
+      "weeks_used": 464,
+      "pbo": 0.6614607614607615,
+      "picked_oos_negative": 0.07101787101787102,
+      "slope": -0.8984984985034973,
+      "picked_oos_median": 0.5576553102460551,
+      "picked_is_median": 0.7749770876825383
+    },
+    "passes_pbo": false,
+    "full_window_choice": "score>=70 any day | health off"
+  },
+  "benchmarks_same_weeks": {
+    "Nifty 500 TRI": {
+      "cagr": 0.13542772925945012,
+      "mdd": -0.3415630869871794
+    },
+    "Nifty Midcap 150 TRI": {
+      "cagr": 0.17974451360140953,
+      "mdd": -0.4029627281648013
+    },
+    "Nifty Smallcap 250 TRI": {
+      "cagr": 0.15330940085343392,
+      "mdd": -0.5739922266646591
+    }
+  },
+  "development_passes": false
+}

@@ -42,7 +42,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-031](BL-031-chart-pattern-detectors.md) | Classical chart-pattern detectors on weekly and daily stock data | P2 | Idea | research | momentum |
 | [BL-032](BL-032-stock-analog-search.md) | "Stocks like this": analog-path search for six-month stock outcomes | P2 | Idea | research | momentum |
 | [BL-033](BL-033-pattern-features-in-ranking.md) | Pattern and analog features in the Momentum ranking | P2 | Idea | feature | momentum |
-| [BL-043](BL-043-daily-pattern-trading-system.md) | Daily pattern trading system: scored entries, stop-loss, target, a health switch | P2 | In progress | research | momentum |
 | [BL-045](BL-045-dashboard-load-diet.md) | Dashboard load diet: code-split views and the Guide, landing tab before mount, last hand-rolled fetches | P2 | Planned | improvement | dashboard |
 | [BL-046](BL-046-options-api-performance.md) | Options API performance: bounded anatomy/backtest/results loads, reused connections, streamed proxies | P2 | Planned | improvement | options |
 | [BL-047](BL-047-shared-python-plumbing-and-job-locks.md) | Shared Python plumbing in `trading-data` (token, `.env`, notify, IST) and cross-process job locks | P2 | Planned | improvement | trading-data |
@@ -57,6 +56,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-043](BL-043-daily-pattern-trading-system.md) | Daily pattern trading system: scored entries, stop-loss, target, a health switch | No edge after costs: original (mean-R metric flaw) and retry killed. A tight-range pullback beats random strong stocks by ~1.7%/trade (walk-forward), but the portfolio made 11.9% vs Midcap 150 TRI 18.0%, PBO 0.66; hold-out unread | 2026-10-07 |
 | [BL-018](BL-018-brittle-benchmark-tests.md) | Momentum tests fail when the live data is refreshed | Done: six data-dependent tests fixed (sessions checked against the bhavcopy calendar, isolated reference tests, current list matched to a curated day, tax classes over priced companies); tests only | 2026-10-07 |
 | [BL-004](BL-004-research-stack-production-mode.md) | Production-build mode for the local research stack (`bun run start:prod`) | Done: `bun run start:prod` serves a password-gated production build on 127.0.0.1:5190, rebuilt only on change (restart 4.2 s); page shell 3.5–4.9 s → ~0.1 s, JS 4.8 MB → 437 KB. Pages still wait 17–20 s on slow Momentum API calls (PRs #101/#104), so the ≤ 1.5 s goal is unmet on live data | 2026-10-07 |
 | [BL-042](BL-042-chart-pattern-poc.md) | Chart-pattern POC for Momentum: tight range, flag, cup and handle | Informative, not adopted: no pattern beat momentum-matched peers; PBO 0.57 over 24 ranking trials; hold-out unread, passed to BL-043 | 2026-10-07 |

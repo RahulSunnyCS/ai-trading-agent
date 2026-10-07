@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — this month's goal is Momentum with real money (BL-010, BL-024, BL-025); this is the next research line, separate from it |
-| **Status** | In progress |
+| **Status** | Done — no edge after costs (original and retry killed) |
 | **Type** | research |
 | **Area** | momentum (the `patterns/` module; a separate sleeve, not the momentum ranking) |
 | **Created** | 2026-10-07 |
@@ -262,3 +262,43 @@ Answered when the owner started the item (2026-10-07):
     ranges and flags as a standalone swing system do not beat simply holding a mid-cap index.
     No rule here is worth spending the sealed hold-out on. Recommended to the owner: close
     BL-043 as "no edge after costs".
+- 2026-10-07 — **The original test stands as killed.** Owner: "lets do both", meaning close it
+  and make one corrected retry. `bl043_criteria_addendum_1.json` is committed before the retry
+  runs. It is the last attempt; if it fails, BL-043 closes and the hold-out stays sealed.
+  - **Trades are judged in percent:** net % per trade, a 3% minimum stop distance, and a
+    score built on net %.
+  - **Matched control:** 3 random other strong stocks bought the same day under the same
+    exits, so the question is whether the pattern beats simply buying a strong stock.
+  - **The bar is the mid-cap index:** the Nifty Midcap 150 TRI, in CAGR and drawdown, as well
+    as the Nifty 500 TRI.
+  - **Idle cash earns the liquid fund.**
+  - **Three review faults (PR #103, Codex) fixed first:**
+    - the walk-forward portfolio is now one continuous simulation, not stitched together;
+    - a bad bar in the ATR window now excludes the candidate;
+    - the ₹16 DP charge is taken on each actual sale.
+  - **The original stage B figure (7.8%) was stitched together and not realisable.** The
+    original kill rests on stage B's PBO of 0.32 and the metric flaw, not on that number.
+  - **Honesty note:** the development years have been seen once, so the hold-out run is the
+    real test.
+- 2026-10-07 — **Retry result (addendum 1): kill. BL-043 closes. Phase 6 not run; the 2024–26
+  hold-out stays sealed.** Files: `search_spaces/bl043_retry_dev_result.json`;
+  `data/patterns/swing/retry_dev_curves.parquet`.
+  - **Stage A passes: there is a real trade-level signal.** Edge over 3 matched random strong
+    stocks bought the same day with the same exits:
+    - tight range: walk-forward **+1.66% per trade** over 1,190 trades, PBO 0.18;
+    - flag: +0.02%, PBO 0.23.
+
+    Full-window best for tight range: pullback, base-low stop, no target. Net +3.70% against
+    the controls' +1.31% (+2.39% edge), win rate 27%, median hold 14 sessions.
+  - **Stage B fails.** The one continuous walk-forward portfolio (2015–2023) made **11.9% a
+    year, max fall −32.7%**, against Nifty 500 TRI 13.5% (−34.2%) and Nifty Midcap 150 TRI
+    18.0% (−40.3%). PBO 0.66.
+  - **Fragility.** The same rule simulated from 2012 ("score ≥ 70, health on") shows 16.1% with
+    a −18.0% max fall over 2015–2023, but started fresh in 2015 it makes 11.9%. With about 33
+    trades a year in 10 slots, the result depends on the starting point. PBO 0.66 says the
+    same.
+  - **Conclusion:** buying a pullback inside a tight range near the highs beats buying another
+    strong stock by about 1.5–2.5% per trade. As a stand-alone 10-slot portfolio that is too
+    small and too lumpy to beat a mid-cap index after costs. BL-042's earlier test also found
+    it adds nothing to the momentum ranking. Pattern research stops here (owner, "lets do
+    both": the retry was the last attempt).

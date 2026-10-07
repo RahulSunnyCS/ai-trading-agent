@@ -35,14 +35,24 @@ from . import criteria
 
 
 def costs() -> tuple[float, float]:
-    """(buy, sell) cost as a fraction of trade value for one slot-sized position."""
-    spec = criteria()
-    slip = spec["costs"]["slippage_bps_each_side"] / 10000
-    slot_value = spec["portfolio"]["capital_rs"] / spec["portfolio"]["slots"]
-    dp = min(DP_CHARGE_RS / slot_value, DP_CHARGE_FRACTION_CAP)
+    """(buy, sell) rate as a fraction of trade value, without the flat per-sale DP charge
+    (`dp_fraction` adds it for each actual sale)."""
+    slip = criteria()["costs"]["slippage_bps_each_side"] / 10000
     buy = STT_RATE + STAMP_DUTY_BUY_RATE + EXCHANGE_FEES_RATE + slip
-    sell = STT_RATE + EXCHANGE_FEES_RATE + slip + dp
+    sell = STT_RATE + EXCHANGE_FEES_RATE + slip
     return buy, sell
+
+
+def dp_fraction(sale_rs: float) -> float:
+    """The flat ₹16 DP charge as a fraction of one sale's value (capped, as the engine does)."""
+    if sale_rs <= 0:
+        return 0.0
+    return min(DP_CHARGE_RS / sale_rs, DP_CHARGE_FRACTION_CAP)
+
+
+def slot_rs() -> float:
+    spec = criteria()["portfolio"]
+    return spec["capital_rs"] / spec["slots"]
 
 
 def stop_price(rule: str, fill: float, base_low: float, atr: float) -> float:
@@ -63,17 +73,27 @@ def simulate_trade(
     atr: float,
     stop_rule: str,
     target_r: float | None,
+    stop_pct: float | None = None,
 ) -> dict | None:
     """The trade a candidate signalled at daily index `signal` makes, or None when there is no
-    next session or the risk is not in (0, skip_if_risk_above]."""
+    next session or the risk is outside [skip_if_risk_below, skip_if_risk_above] (the floor is
+    0 unless the criteria set one). `stop_pct` overrides the stop rule with a stop that far
+    below the fill (a control trade copies its candidate's stop distance)."""
     spec = criteria()["exits"]
     entry = signal + 1
     if entry >= len(bars.close):
         return None
     fill = float(bars.open[entry])
-    stop = stop_price(stop_rule, fill, base_low, atr)
+    stop = (
+        fill * (1 - stop_pct)
+        if stop_pct is not None
+        else stop_price(stop_rule, fill, base_low, atr)
+    )
     risk = (fill - stop) / fill
-    if not (0 < risk <= spec["skip_if_risk_above"]) or not math.isfinite(risk):
+    floor = spec.get("skip_if_risk_below", 0.0)
+    if not math.isfinite(risk) or not (0 < risk <= spec["skip_if_risk_above"]):
+        return None
+    if stop_pct is None and risk < floor:
         return None
     target = fill + target_r * (fill - stop) if target_r else math.inf
     last = min(entry + spec["time_stop_sessions"] - 1, len(bars.close) - 1)
@@ -97,6 +117,8 @@ def simulate_trade(
             reason = "data_end"
     buy, sell = costs()
     gross = exit_px / fill - 1
+    # trade level: one slot's worth bought, so the sale is worth slot x (1 + gross)
+    sell += dp_fraction(slot_rs() * (1 + gross))
     net = (1 + gross) * (1 - sell) / (1 + buy) - 1
     path_lo = float(bars.low[entry : exit_i + 1].min())
     path_hi = float(bars.high[entry : exit_i + 1].max())
@@ -152,6 +174,7 @@ def run_portfolio(
     allowed: pd.Series,
     start: str | pd.Timestamp,
     end: str | pd.Timestamp,
+    cash_growth: pd.Series | None = None,
 ) -> tuple[pd.Series, pd.DataFrame]:
     """Daily equity (starting at 1.0) and the trades taken.
 
@@ -163,6 +186,7 @@ def run_portfolio(
     spec = criteria()["portfolio"]
     slots = spec["slots"]
     buy, sell = costs()
+    capital = spec["capital_rs"]
     days = closes.loc[start:end].index
     pick = candidates[allowed & trades["fill"].notna()].copy()
     pick = pick.join(trades[["entry_date", "exit_date", "fill", "exit_price"]])
@@ -177,7 +201,10 @@ def run_portfolio(
     traded_bases: set[str] = set()
     curve, log = [], []
     close_arr = closes.reindex(days).ffill()
+    growth = cash_growth.reindex(days).fillna(1.0) if cash_growth is not None else None
     for day in days:
+        if growth is not None:
+            cash *= float(growth.at[day])  # idle cash earns the liquid fund
         # entries at the open, sized on the previous close's equity; a position that exits
         # today still holds its slot this morning (its exit comes at or after the open)
         if day in by_entry:
@@ -201,7 +228,8 @@ def run_portfolio(
         # exits (at the open on a gap, intraday at the stop/target, or at the close)
         for sym in [s for s, p in held.items() if p["exit_date"] == day]:
             p = held.pop(sym)
-            proceeds = p["units"] * p["exit_price"] * (1 - sell)
+            gross_sale = p["units"] * p["exit_price"]
+            proceeds = gross_sale * (1 - sell - dp_fraction(gross_sale * capital))
             cash += proceeds
             log.append({**p["row"], "exit_value": proceeds, "cost_value": p["cost_value"]})
         marked = sum(p["units"] * close_arr.at[day, s] for s, p in held.items())
