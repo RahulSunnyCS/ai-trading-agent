@@ -42,7 +42,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-031](BL-031-chart-pattern-detectors.md) | Classical chart-pattern detectors on weekly and daily stock data | P2 | Idea | research | momentum |
 | [BL-032](BL-032-stock-analog-search.md) | "Stocks like this": analog-path search for six-month stock outcomes | P2 | Idea | research | momentum |
 | [BL-033](BL-033-pattern-features-in-ranking.md) | Pattern and analog features in the Momentum ranking | P2 | Idea | feature | momentum |
-| [BL-043](BL-043-daily-pattern-trading-system.md) | Daily pattern trading system: scored entries, stop-loss, target, a health switch | P2 | Planned | research | momentum |
+| [BL-043](BL-043-daily-pattern-trading-system.md) | Daily pattern trading system: scored entries, stop-loss, target, a health switch | P2 | In progress | research | momentum |
 | [BL-045](BL-045-dashboard-load-diet.md) | Dashboard load diet: code-split views and the Guide, landing tab before mount, last hand-rolled fetches | P2 | Planned | improvement | dashboard |
 | [BL-046](BL-046-options-api-performance.md) | Options API performance: bounded anatomy/backtest/results loads, reused connections, streamed proxies | P2 | Planned | improvement | options |
 | [BL-047](BL-047-shared-python-plumbing-and-job-locks.md) | Shared Python plumbing in `trading-data` (token, `.env`, notify, IST) and cross-process job locks | P2 | Planned | improvement | trading-data |

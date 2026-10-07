@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — this month's goal is Momentum with real money (BL-010, BL-024, BL-025); this is the next research line, separate from it |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | research |
 | **Area** | momentum (the `patterns/` module; a separate sleeve, not the momentum ranking) |
 | **Created** | 2026-10-07 |
 | **Depends on** | BL-042 (detectors, quality and learned scores, hold-out guard); BL-015 (pre-registration); BL-025 before any real money |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | [§3.21](../TODO.md) |
 
 ## Context
 
@@ -149,17 +149,116 @@ costs and beats the Nifty 500 TRI and cash on 2024–26 data no step was tuned o
 
 ## Open questions
 
-1. Which patterns go first? All three, or tight range and flag only (where the exploratory
-   signal was)?
-2. Health switch: is "below its long-run median" the right line, or a fixed win rate (e.g. 40%)?
-3. Is a stop at the close acceptable, or should an intraday stop be approximated with the day's
-   low (more realistic for a GTT stop order)?
+Answered when the owner started the item (2026-10-07):
+
+1. **Patterns:** tight range and flag only. Cup and handle can follow if these work.
+2. **Health switch:** cash when the 60-day win rate is below its own long-run median (expanding,
+   up to that day).
+3. **Stop and target:** they trigger on the day's low and high, like a GTT order. A fill is at
+   the stop or target price, or at the open when the day gaps through it. When both are touched
+   on the same day, the stop is assumed first.
+4. **Branch:** `feat/bl-043-daily-patterns`, stacked on PR #100 (BL-042) and retargeted to
+   `main` once #100 merges.
 
 ## Experiments
 
-(Added in Phase 0, before any run.)
+### 2026-10-07 — Daily tight-range and flag swing system, scored entries, GTT-style exits
+- **Hypothesis:** entering tight ranges and flags (breakout or pullback) at the next open,
+  filtered by a causal score of how similar setups paid before, and exited by a stop, target or
+  65-session time limit, makes money after costs and beats the Nifty 500 TRI.
+- **Universe:** the point-in-time `turnover_rank` members each year, with ₹30 and ₹2 cr
+  median-turnover gates on the signal day (sources: `turnover_rank_members_by_year`,
+  `bars_1d_stock`).
+- **Look-ahead check:**
+  - signals use bars up to the signal day's close; fills are at the next open;
+  - stops and targets are known at the signal;
+  - scores and the health switch use only candidates already exited before the signal day;
+  - a truncation test at three cut dates.
+- **Pass / kill rule:** `packages/momentum-backtesting/search_spaces/bl043_criteria.json`.
+  - Stage A, trade level: per pattern, 2 entries × 3 stops × 3 targets, walk-forward over
+    2015–2023, PBO ≤ 0.3.
+  - Stage B, portfolio: 3 cut-offs × health switch on/off, PBO ≤ 0.3, joined walk-forward CAGR
+    above the Nifty 500 TRI.
+  - Hold-out: at least 5 points over the Nifty 500 TRI, a drawdown no deeper than the index's,
+    and beating it in at least 2 of 2024, 2025 and 2026. 42 trials in all.
+- **Hold-out:** development data ends 2023-12-29; the unseen period is 2024-01-01 → the latest
+  bar, one run.
+- **Will not run:** any read of 2024 or later before Phase 6; anything outside the grids; a
+  second hold-out run; cup and handle.
+- **Result (2026-10-07): kill on the development data. Phase 6 not run; the 2024–26 hold-out
+  stays sealed.**
+  - **Stage A (trade level, mean R):** passes. Tight range +0.62R over 1,509 walk-forward
+    trades, PBO 0.04; flag +0.44R over 1,415, PBO 0.20.
+  - **Stage B (portfolio):** fails. Walk-forward CAGR 7.8% (2015–2023) against the Nifty 500
+    TRI's 13.5%; PBO 0.32.
+  - Files: `search_spaces/bl043_dev_result.json`;
+    `data/patterns/swing/dev_portfolio_curves.parquet`.
+  - **Why the stages disagree: a flaw in the pre-registered metric, found on the run.** Mean
+    R rewards tiny stops. The top combination (pullback, base-low stop) wins 18% / 9% of the
+    time and holds a median 6 / 2 days. Its few winners carry R of 10–40 on stops under 1–3%
+    away (13–25% of these trades risk under 1%). A fixed 10% slot earns the percent return,
+    not R. The score, built on mean R, does not rank: its calibration buckets are
+    non-monotonic, and the lowest-score bucket has the best trades.
 
 ## Log
 
 - 2026-10-07 — created from the owner's plan after BL-042 closed. Owner's answers recorded
   above (next-open fills, the Friday rule tested as an option, 10 × 10% of ₹5 lakh).
+- 2026-10-07 — started. Owner's answers recorded under Open questions. TODO §3.21 added. Phase 0
+  next.
+- 2026-10-07 — Phase 0: `search_spaces/bl043_criteria.json` and the Experiments block committed
+  before any run. Search is staged to keep the trial count small (42): trade-level stop/target/
+  entry first, then the portfolio's cut-off and health switch.
+- 2026-10-07 — Phase 1 done: `mbt swing candidates` (`patterns/swing/candidates.py`).
+  - Daily-window forms of the BL-042 rules.
+  - The flag check refactored into `flag.flag_at`; the weekly output was verified identical
+    (686/686 flags on synthetic data) and BL-042's tests still pass.
+  - Truncation test at three cut dates.
+  - Development candidates (1,578 point-in-time symbols):
+
+    | Pattern | Entry | Signal days | Bases |
+    |---|---|---|---|
+    | Tight range | Pullback | 8,131 | 2,408 |
+    | Tight range | Breakout | 1,752 | 1,618 |
+    | Flag | Pullback | 5,681 | 2,065 |
+    | Flag | Breakout | 697 | 697 |
+- 2026-10-07 — Phase 2 done: `patterns/swing/trader.py`.
+  - **Trade:** next-open fill; GTT-style stop/target (gap at the open first, then intraday,
+    the stop assumed first); 65-session time exit; risk gate (0, 15%]; the engine's itemised
+    costs + 15 bps each side; MAE/MFE.
+  - **Portfolio:** 10 slots sized on the previous close's equity; best score first; one
+    position per stock; a base traded once; entries before exits each day; marked at each close.
+  - **Tests:** 7 hand-built cases (stop, gap through the stop, target, both touched, time,
+    data end, risk gates, slots, cost accounting).
+  - **Hand check on real data** (ONELIFECAP tight-range breakout, 7 Feb 2013):
+    - fill 773.20; base-low stop 715 (risk 7.53%); 2R target 889.6;
+    - stopped 15 Feb at 715 (low 705); −8.04% after costs;
+    - every number matches the bars.
+
+- 2026-10-07 — Phases 3–5 run; **killed** (Result above). Exploratory follow-up, after the
+  result, so hindsight and not evidence:
+  - **In percent per trade** (first of each base, no target, 65-session limit, after costs):
+    | Setup | Avg net / trade | Win rate | Median hold |
+    |---|---|---|---|
+    | Tight-range breakout, base-low stop | +5.0% | 46% | 65 sessions |
+    | Tight-range breakout, 8% stop | +4.7% | 40% | 38 sessions |
+    | Flag pullback, 8% stop | +3.7% | 33% | 22 sessions |
+
+    Fixed 2R/3R targets were worse than none. Nifty 500 TRI made about 3–3.5% a quarter over
+    the same years, so most of each trade is market drift.
+  - **The simple rules as 10-slot portfolios, 2012–2023** (quality orders the fills):
+    | Rule | CAGR | Max drawdown |
+    |---|---|---|
+    | Tight-range breakout, 8% stop | 13.5% | −30.6% |
+    | Tight + flag breakouts, 8% stop | 13.9% | −34.6% |
+    | All four kinds, 8% stop | 20.0% | −43.7% |
+    | *Nifty 500 TRI* | *16.2%* | *−34.2%* |
+    | *Nifty Midcap 150 TRI* | *21.5%* | *−40.3%* |
+    | *Nifty Smallcap 250 TRI* | *19.1%* | *−57.4%* |
+
+    The year-by-year pattern of "all four kinds" tracks the mid/small-cap indices (+73% in
+    2014, −24% in 2018, +88% in 2021). It is mid/small-cap exposure, not a pattern edge.
+  - **Conclusion:** in this data (point-in-time liquid NSE stocks, daily, after costs), tight
+    ranges and flags as a standalone swing system do not beat simply holding a mid-cap index.
+    No rule here is worth spending the sealed hold-out on. Recommended to the owner: close
+    BL-043 as "no edge after costs".
