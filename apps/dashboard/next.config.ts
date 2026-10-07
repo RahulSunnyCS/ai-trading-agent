@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
   // A cold whole-market Broad Momentum run (or Custom Index) takes about a minute; Next's default
   // 30s rewrite-proxy timeout would drop it as a 500. Matches the Fastify proxy's 180s.
   experimental: { proxyTimeout: 180_000 },
+  // The Guide's pages are Markdown files imported as strings (`import body from './x.md?raw'`,
+  // BL-041). Vitest understands `?raw` natively; webpack needs this one rule.
+  webpack(config) {
+    config.module.rules.push({ resourceQuery: /raw/, type: 'asset/source' });
+    return config;
+  },
   async rewrites() {
     return [
       // Local Options Lab work can still bypass the server stack, matching the

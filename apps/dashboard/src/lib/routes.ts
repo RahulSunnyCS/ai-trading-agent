@@ -11,6 +11,7 @@
  *   /momentum/scores/{stocks|sectors}
  *   /coverage/{backfill|replay}
  *   /brokerLogins  /billing  /settings
+ *   /guide/{start|momentum|optionslab|operations|glossary}/<page>
  *
  * A path's first segment is the tab id, except where TAB_SEGMENT says otherwise (the
  * `pricing` tab lives at /billing).
@@ -116,6 +117,9 @@ export const PATH_ALIASES: Readonly<Record<string, string>> = {
   // The standalone YAML Backtest tab became the builder's YAML mode (BL-013 Phase 7).
   '/backtest': '/optionslab/builder/yaml',
   '/optionslab/yaml': '/optionslab/builder/yaml',
+  // The Guide (BL-041) answers to the names people try first.
+  '/help': '/guide',
+  '/docs': '/guide',
 };
 
 const ALIASES = Object.entries(PATH_ALIASES)

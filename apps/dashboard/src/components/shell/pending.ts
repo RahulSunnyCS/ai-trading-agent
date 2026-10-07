@@ -73,4 +73,5 @@ export const PENDING_BY_TAB: Record<Tab, string[]> = {
     'Add international payments via Stripe (Phase 2)',
   ],
   settings: [],
+  guide: [],
 };

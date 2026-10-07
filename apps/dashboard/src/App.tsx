@@ -17,11 +17,13 @@ import { PricingPage } from './components/PricingPage';
 import { RegimeView } from './components/RegimeView';
 import { SettingsView } from './components/SettingsView';
 import { TradesView } from './components/TradesView';
+import { GuideLink } from './components/guide/GuideLink';
+import { GuideView } from './components/guide/GuideView';
 import { BottomBar } from './components/shell/BottomBar';
 import { Sidebar } from './components/shell/Sidebar';
 import { TokenBanner } from './components/shell/TokenBanner';
 import { Topbar } from './components/shell/Topbar';
-import { type Tab, tabLabel } from './components/shell/nav';
+import { type Tab, activeNavChild, navItem, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
 import { Toaster } from './components/ui/Toast';
 import {
@@ -52,6 +54,7 @@ const SUBTITLES: Record<Tab, string> = {
   brokerLogins: 'Connect and manage the market-data brokers used across the dashboard',
   pricing: 'Your credits, payment mode and plans',
   settings: 'Choose which tabs appear and arrange their navigation priority',
+  guide: 'What each screen does, how to use it, and how to read its numbers',
 };
 
 function renderView(
@@ -86,6 +89,8 @@ function renderView(
       return <PricingPage />;
     case 'settings':
       return <SettingsView preferences={preferences} onChange={onPreferencesChange} />;
+    case 'guide':
+      return <GuideView />;
   }
 }
 
@@ -105,6 +110,12 @@ const MAIN_ID = 'main-content';
 export function App() {
   const { pathname, tab, rest, navigate, replace } = useAppRoute();
   const activeTab: Tab = tab ?? DEFAULT_TAB;
+  // The path on screen, for its guide page. A bare tab path shows its default sub-section
+  // (/optionslab is Daily results), so that segment is filled in.
+  const activeItem = navItem(activeTab);
+  const routeRest = tab ? rest : [];
+  const defaultChild = activeItem ? activeNavChild(activeItem, routeRest)?.segment : undefined;
+  const helpRest = routeRest.length || !defaultChild ? routeRest : [defaultChild];
   const setActiveTab = (next: Tab, ...nextRest: string[]) => navigate(next, ...nextRest);
   const [menuOpen, setMenuOpen] = useState(false);
   const [navigationPreferences, setNavigationPreferences] = useState<NavigationPreferences>(
@@ -215,6 +226,7 @@ export function App() {
           subtitle={SUBTITLES[activeTab]}
           pending={PENDING_BY_TAB[activeTab]}
           onOpenMenu={() => setMenuOpen(true)}
+          help={activeTab === 'guide' ? null : <GuideLink tab={activeTab} rest={helpRest} />}
         />
         <TokenBanner />
         {/* Bottom padding below md clears the fixed BottomBar. */}

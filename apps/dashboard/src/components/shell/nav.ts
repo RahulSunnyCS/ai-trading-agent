@@ -1,5 +1,6 @@
 import {
   Activity,
+  BookOpen,
   Building2,
   CalendarClock,
   CreditCard,
@@ -30,7 +31,8 @@ export type Tab =
   | 'momentum'
   | 'brokerLogins'
   | 'pricing'
-  | 'settings';
+  | 'settings'
+  | 'guide';
 
 /** A deep link to a sub-route of a tab, e.g. /momentum/scores. */
 export interface NavChild {
@@ -52,7 +54,14 @@ export interface NavItem {
   defaultSegment?: string;
 }
 
-export type NavGroupId = 'overview' | 'live' | 'optionslab' | 'momentum' | 'data' | 'account';
+export type NavGroupId =
+  | 'overview'
+  | 'live'
+  | 'optionslab'
+  | 'momentum'
+  | 'data'
+  | 'account'
+  | 'help';
 
 export interface NavGroup {
   id: NavGroupId;
@@ -71,7 +80,8 @@ export interface NavGroup {
  * and /backtest redirects there. Backfill and Replay are the two sections of Data ›
  * Coverage (/coverage/backfill, /coverage/replay); their old paths redirect. Pricing is
  * labelled Billing and lives at /billing, keeping its `pricing` id (see TAB_SEGMENT in
- * lib/routes.ts) so stored preferences and existing callers need no change.
+ * lib/routes.ts) so stored preferences and existing callers need no change. The Guide (BL-041)
+ * is the last group; its children are the guide's chapters (guide/registry.ts, a test checks).
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -160,11 +170,35 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: 'settings', label: 'Settings', icon: Settings },
     ],
   },
+  {
+    id: 'help',
+    heading: 'Help',
+    icon: BookOpen,
+    items: [
+      {
+        id: 'guide',
+        label: 'Guide',
+        icon: BookOpen,
+        children: [
+          { segment: 'start', label: 'Start here' },
+          { segment: 'momentum', label: 'Momentum' },
+          { segment: 'optionslab', label: 'Options Lab' },
+          { segment: 'operations', label: 'Data & operations' },
+          { segment: 'glossary', label: 'Glossary' },
+        ],
+      },
+    ],
+  },
 ];
 
-/** Settings is pinned so users can always restore tabs they have hidden. */
+/**
+ * Tabs that cannot be hidden: Settings, so users can always restore tabs they have hidden, and
+ * the Guide, so the help is always one click away.
+ */
+const PINNED_TABS: readonly Tab[] = ['settings', 'guide'];
+
 export const CONFIGURABLE_TABS = NAV_GROUPS.flatMap((group) => group.items).filter(
-  (item) => item.id !== 'settings',
+  (item) => !PINNED_TABS.includes(item.id),
 );
 
 export const BrandIcon = TrendingUp;

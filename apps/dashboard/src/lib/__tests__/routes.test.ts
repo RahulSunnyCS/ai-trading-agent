@@ -88,6 +88,8 @@ describe('routes', () => {
     ['/brokerLogins', 'brokerLogins', []],
     ['/billing', 'pricing', []],
     ['/settings', 'settings', []],
+    ['/guide', 'guide', []],
+    ['/guide/momentum/journal', 'guide', ['momentum', 'journal']],
   ] as const)('known path %s resolves to %s', (path, tab, rest) => {
     expect(parsePath(path)).toEqual({ tab, rest: [...rest] });
     expect(aliasTarget(path)).toBeNull();
@@ -106,6 +108,9 @@ describe('routes', () => {
     ['/optionslab/yaml', '/optionslab/builder/yaml', 'optionslab', ['builder', 'yaml']],
     ['/data/replay/', '/coverage/replay', 'coverage', ['replay']],
     ['/pricing/extra', '/billing/extra', 'pricing', ['extra']],
+    ['/help', '/guide', 'guide', []],
+    ['/docs', '/guide', 'guide', []],
+    ['/docs/momentum/journal', '/guide/momentum/journal', 'guide', ['momentum', 'journal']],
   ] as const)('alias %s redirects to %s', (path, target, tab, rest) => {
     expect(aliasTarget(path)).toBe(target);
     expect(parsePath(path)).toEqual({ tab, rest: [...rest] });
