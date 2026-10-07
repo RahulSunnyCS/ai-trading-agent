@@ -312,3 +312,32 @@ once on the sealed data. A guess before seeing any data:
   "In-app Guide" to `main` as BL-041 while this item was still on its branch, and IDs are never
   reused. Files renamed `bl041_*` → `bl042_*`. Only the ID changed: no rule or value moved, and
   no return had been computed.
+- 2026-10-07 — Phase 3 closed, recorded in `bl042_criteria_addendum_2.json` (`detectors_frozen:
+  true`, `returns_seen: false`).
+  - **Owner's labels:** 159 of 165.
+    | Pattern | Correct / judged | Unsure |
+    |---|---|---|
+    | Tight range | 34/34 | 5 |
+    | Flag | 26/30 | 8 |
+    | Cup and handle | 19/23 | 16 |
+  - **Owner's caveat:** don't take their judgement as final, and a setup that pays matters more
+    than one that looks textbook.
+  - **Claude's second review of 56 charts:** agrees on tight ranges and most flags; judges most
+    cups doubtful (downtrend bounces, no real left-lip top, every one with a 1-week handle).
+  - **Fixes where both reviews agree:**
+    - cup handle at least 2 weeks;
+    - the cup's left lip must be the highest high of the 26 weeks up to it;
+    - every pattern must sit within 25% of its 52-week high;
+    - flags must be in an uptrend, so crash rebounds no longer count;
+    - bad-print wicks count as bad bars.
+  - **No pattern dropped.** The gallery found bugs; whether a pattern pays is for Phases 4–6.
+  - **Owner asked to rank setups two ways: textbook look and past payoff.** The textbook look
+    is addendum 1's quality score. The past payoff is a causal **learned score**: the
+    13-week decile-matched excess of earlier detections in the same pattern × state × quality
+    cell, counted only once known, and neutral until 30 cases. It is added as one more blend
+    shape, `learned_0.5` → 24 trials.
+- 2026-10-07 — re-detected with the frozen detectors (ranks only; no returns): episodes are
+  tight range 11,137, flag 4,691, cup and handle 1,417 (from 5,110), high tight flag 2,433.
+  6,883 bad bars (the wick rule added ~5,500). Phase 2b on the frozen detectors: at detection
+  0.4–0.9% of bases are in the pool's top 10 and 1.3–2.9% in its top 20. A visual check of 12
+  new cups and 6 flags: cups are now mostly real cups after an uptrend.
