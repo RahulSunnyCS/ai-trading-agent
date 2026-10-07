@@ -2677,6 +2677,78 @@ def swing_research() -> None:
     run.research_dev(echo=typer.echo)
 
 
+live_rules_app = typer.Typer(
+    no_args_is_help=True,
+    help="BL-025: check the owner's live-money rules (live_rules.toml). Never trades.",
+)
+app.add_typer(live_rules_app, name="live-rules")
+
+
+@live_rules_app.command("check")
+def live_rules_check(
+    send: bool = typer.Option(False, help="Also send the result to Telegram."),
+    simulate: str = typer.Option(
+        None,
+        help="Trip one rule on synthetic data, to see the alert: "
+        "drawdown-cut | drawdown-exit | trailing | gate-ready.",
+    ),
+) -> None:
+    """Weekly, after the Friday final run (Fri 21:30 IST scheduler job): measure the followed
+    money against the drawdown, trailing and money-gate rules and say which, if any, is hit.
+    A breach exits 0 (the alert is the message); exit 1 means the check could not run or its
+    numbers are stale, which is also sent."""
+    from datetime import datetime
+
+    from . import live_rules, notify
+    from .config import load_repo_env
+    from .weekly import week_ending_on_or_before
+
+    load_repo_env()
+
+    def fail(message: str, title: str) -> None:
+        typer.echo(f"live-rules check FAILED: {message}")
+        if send:
+            notify.send(
+                notify.Notification(
+                    "momentum-live-rules",
+                    "error",
+                    title,
+                    f"{message}\nRerun it: mbt live-rules check --send",
+                    type="momentum.problem",
+                )
+            )
+        raise typer.Exit(1)
+
+    if simulate and simulate not in live_rules.SIMULATIONS:
+        raise typer.BadParameter(f"choose one of {', '.join(live_rules.SIMULATIONS)}")
+    try:
+        report = live_rules.run_check(simulate=simulate, echo=typer.echo)
+    except Exception as error:
+        message = notify.redact(f"{type(error).__name__}: {error}")
+        fail(message, "Live-rules check could not run")
+        return
+    expected = str(week_ending_on_or_before(datetime.now(notify.IST).date()))
+    if not simulate and report.week is not None and report.week < expected:
+        fail(
+            f"the data reaches {report.week}, not this week's {expected}: run `mbt stocks sync` "
+            "then rerun.",
+            "Live-rules check ran on stale data",
+        )
+    severity, title, body = live_rules.summary(report)
+    typer.echo(f"{title}\n{body}")
+    if send:
+        notify.send(
+            notify.Notification(
+                "momentum-live-rules",
+                severity,
+                title,
+                body,
+                # a rule that needs you is never switchable; the routine status is
+                type=None if report.breached or report.simulated else live_rules.NOTIFY_TYPE,
+            )
+        )
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),

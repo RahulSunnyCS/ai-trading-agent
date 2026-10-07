@@ -73,3 +73,30 @@ A `live_rules` file the owner writes once, and a weekly check that alerts when a
   Phase 2 (the weekly check and alert, a BL-012 scheduler job).
 - 2026-10-07 — owner signed off the drafted details ("yes, signed off"). Phase 1 done. Phase 2
   (the weekly check and alert) started.
+- 2026-10-07 — **Phase 2 built:** `mbt live-rules check [--send] [--simulate ...]`
+  (`live_rules.py`) and the scheduler job `momentum-live-rules`, Fri 21:30 IST, after the
+  journal check.
+  - **Alerts:** a breach names the rule and quotes the action from `live_rules.toml`; it is sent
+    untagged, so it cannot be switched off. The routine weekly status is the optional type
+    `momentum.live_rules`. Exit 0 on a breach (the message is the alert); exit 1, with a Telegram
+    error, only when the check cannot run or the data does not reach this week.
+  - **File changes with no number moved:** the action text moved from comments into data
+    fields, and `stage.paper_start = 2026-10-09` was added (the journal's first clean Friday,
+    BL-024 decision 5) so the 13 weeks have a start.
+  - **Simulated breach (the "done when"):** `--simulate drawdown-cut | drawdown-exit |
+    trailing | gate-ready` runs the real evaluation on synthetic curves and sends the real
+    message, prefixed SIMULATED.
+  - **Limits, stated in every weekly message:**
+    - *Trailing rule: not measurable yet.* It needs the journal scored week by week (BL-024
+      Phase 2, not built). A paper curve from the same engine as the backtest is never used
+      for it, because the gap would be zero by construction.
+    - *Paper equity is the model portfolio, not the journal.* The drawdown and money-gate
+      numbers come from the frozen ensemble's model portfolio rebased at `paper_start`
+      (BL-010 Phase 6 step 3's definition).
+    - *Stage `live` is reported as blocked.* Real-money equity needs BL-024 Phase 3 (recorded
+      fills); until then the check refuses to read paper numbers as real money.
+    - *A breach repeats weekly until the owner changes the file.* There is no "acknowledged"
+      field yet.
+  - **A bug the tests caught:** with the data ending before `paper_start` the check took an
+    earlier week as the start and reported all clear. It now reports "paper tracking has not
+    started".

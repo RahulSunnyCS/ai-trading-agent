@@ -596,7 +596,7 @@ The owner's numbers, written before the first rupee; nothing here trades.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.22.1 | Phase 1: rules file (`live_rules.toml`): paper first; cut half at 20%, exit at 30%; review at 5 pts behind over 13 weeks | owner→claude | **Done 2026-10-07**: signed off by the owner |
-| 3.22.2 | Phase 2: weekly check after the Friday final run → Telegram alert naming the rule and its action | claude | Open |
+| 3.22.2 | Phase 2: weekly check after the Friday final run → Telegram alert naming the rule and its action | claude | **Built 2026-10-07** (`mbt live-rules check`, job `momentum-live-rules` Fri 21:30). Drawdown and money gate measured on the paper model portfolio; the trailing rule says "not measurable" until BL-024 Phase 2 scores the journal |
 
 ## Reference — where detail lives
 

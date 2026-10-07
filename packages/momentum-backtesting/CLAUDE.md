@@ -372,6 +372,18 @@ contract, not a shared service).
   `tests/test_broad_parity.py` pins both paths to identical engine arguments and trades. The
   tilt-rank caches (`levers.tilt_cache_get/put`) hold the keyed frame so a recycled `id()`
   cannot serve another frame's ranks.
+- `live_rules.py` + `live_rules.toml` (`mbt live-rules check [--send] [--simulate ...]`, BL-025) — the
+  owner's live-money rules (paper first; cut half at a 20% fall, exit at 30%; review at 5 points
+  behind the backtest over 13 weeks; the money gate) and the weekly check that measures them and
+  sends a Telegram message naming the rule and quoting the action written in the file. Never
+  trades. **Numbers in the TOML are the owner's:** change one only in a commit that also updates
+  `tests/test_live_rules.py` and logs the reason in BL-025. Drawdown and the money gate read the
+  frozen ensemble's model portfolio rebased at `stage.paper_start` (`tracker.run_config`); the
+  trailing rule needs the journal-scored live series (BL-024 Phase 2, not built) and says "not
+  measurable" until then; stage `live` is reported as blocked until real fills are recorded
+  (BL-024 Phase 3). A breach is sent untagged (never switchable); the routine status is the
+  `momentum.live_rules` type. Exit 0 on a breach, 1 only when the check cannot run or the data is
+  stale. Scheduler job `momentum-live-rules`, Fri 21:30 IST.
 - `holdout.py` (`mbt search backcast`) — the one-shot 2012–2016 backcast (criteria addendum 5):
   claims the run before it starts and writes its result once; never run it twice, never edit
   `search_spaces/bl010_phase6_backcast_result.json`. `tracker.py` (`mbt search track <results>
