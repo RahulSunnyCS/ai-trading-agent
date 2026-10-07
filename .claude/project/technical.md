@@ -52,17 +52,22 @@ bun run dev                 # watch mode with auto-reload (apps/server)
 bun run start:server         # production-style start (apps/server)
 
 # Standalone research stack (no Docker): both Python APIs + one dashboard
-bun run start                # restart Momentum :8765, Options :8000, dashboard :5190
+bun run start                # restart Momentum :8765, Options :8000, dashboard :5190 (next dev, for UI editing)
 bun run start:backend        # restart the two Python APIs only
 bun run start:frontend       # restart the dashboard only
 bun run stop:research        # stop this checkout's research processes
+# Same, with a production build of the dashboard (BL-004: pages ready in ~1 s, not 6-10 s).
+# Builds into apps/dashboard/.next-prod, skipped when nothing changed; refuses to start without
+# DASHBOARD_PASSWORD (env or apps/dashboard/.env.local). Both modes bind 127.0.0.1 only.
+bun run start:prod           # APIs + `next start` on :5190; sign in at /login
+bun run start:frontend:prod  # the production dashboard only; add `-- --rebuild` / `-- --port 5191`
 
 # Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)
 bun run --filter @ata/dashboard dev
 
-# Type-check the server (root script is scoped to @ata/server only — the
-# dashboard has one pre-existing type error and isn't CI-enforced yet; run
-# its own check explicitly if you touch apps/dashboard)
+# Type-check the server (root script is scoped to @ata/server only; the
+# dashboard has its own check, which CI runs in the dashboard job — run it
+# explicitly if you touch apps/dashboard)
 bun run typecheck
 bun run --filter @ata/dashboard typecheck
 
@@ -316,7 +321,7 @@ ai-trading-agent/
         │   ├── presets.py                # preset_names()/STRATEGIES_DIR — the allow-list both the API and
         │   │                              # the MCP server check BEFORE building a filesystem path (no traversal)
         │   ├── data/
-        │   │   ├── providers/{base,algotest,dhan}.py   # MarketDataProvider Protocol, canonical Bar/InstrumentKey
+        │   │   ├── providers/{base,algotest}.py   # MarketDataProvider Protocol, canonical Bar/InstrumentKey, AlgoTest plan_requests
         │   │   ├── resolver.py         # ATM/OTMn/ITMn/EXACT -> concrete strike, independent of any vendor
         │   │   ├── reference/          # effective-dated CSVs: expiry_calendar, holidays, lot_sizes, strike_step, margin
         │   │   ├── quality.py          # ingest-time gates: identical_series, bar_gaps, zero_volume, etc.
@@ -442,9 +447,13 @@ The system is a **real-time event-driven pipeline** in four layers:
   is already in flight, so a slow endpoint does not pile up overlapping
   requests. Pass `{ intervalMs }` for a polling hook (e.g. `usePaperTrades`);
   omit it for fetch-once-with-manual-refresh (most of the others). Add
-  `{ cache: true }` when a view re-mounts often (the Momentum sections): it
+  `{ cache: true }` when a view re-mounts often (the Momentum sections, the
+  global `useMeta` / `useFyersAuthStatus` / `usePaymentBalance`): it
   starts from the last response for that URL, kept in memory for the session,
-  and still revalidates; `fetchCached()` shares that cache for one-off reads
+  and still revalidates; `fetchCached()` shares that cache for one-off reads.
+  Instances share one in-flight request per URL (mount and poll ticks join it,
+  `refetch()` starts afresh). Poll ticks pause while the tab is hidden. Poll a
+  job's status only while it runs (`useMomentumWeeklyJob`, `useDailyJob`)
 
 ## Testing
 

@@ -26,8 +26,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from trading_data.db import connect, data_root
 
+from ..db_read import stock_bars
 from ..engine import IDLE, Result
 
 #: Same four close-to-close bands as categories/liquidity.py.
@@ -99,7 +99,7 @@ def lock_masks(
     select i.symbol, cast(b.date + ((5 - dayofweek(b.date) + 7) % 7) * interval 1 day as date) as wk
     from bars_1d_stock b join instruments i using (instrument_id)
     where i.symbol in (select unnest(?)) group by 1, 2"""
-    with connect(root or data_root(), read_only=True) as con:
+    with stock_bars(root) as con:
         frame = con.execute(sql, [symbols, start]).df()
         traded = con.execute(traded_sql, [symbols]).df()
     frame["wk"] = pd.to_datetime(frame["wk"])
@@ -329,7 +329,7 @@ def circuit_exposure(
     last_day = pd.Timestamp(result.weights.index[-1]) + pd.Timedelta(days=7)
     first_day = pd.Timestamp(periods["buy"].min()) - pd.Timedelta(days=10)
     symbols = sorted(periods["symbol"].unique())
-    with connect(root or data_root(), read_only=True) as con:
+    with stock_bars(root) as con:
         bars = con.execute(
             "SELECT i.symbol, b.date, b.close / NULLIF(b.prevclose, 0) - 1 AS move "
             "FROM bars_1d_stock b JOIN instruments i USING (instrument_id) "

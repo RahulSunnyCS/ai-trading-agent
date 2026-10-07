@@ -318,7 +318,7 @@ def _series_rows(catalog_name, weeks, values):
     return [(catalog_name, w.date(), v) for w, v in zip(weeks, values, strict=True)]
 
 
-def test_load_references_reads_the_extras_from_the_database():
+def test_load_references_reads_the_extras_from_the_database(tmp_path):
     from trading_data.db import connect
 
     weeks = pd.date_range("2024-01-05", periods=3, freq="W-FRI")
@@ -332,7 +332,9 @@ def test_load_references_reads_the_extras_from_the_database():
     with connect() as con:
         con.executemany("INSERT INTO stock_weekly_series VALUES (?, ?, ?)", rows)
 
-    refs = load_references()
+    # tmp_path, not the default data/: the CSV fills series the database lacks, so a live
+    # data/stocks/benchmarks_weekly.csv would add every other reference (BL-018).
+    refs = load_references(tmp_path)
 
     assert list(refs.columns) == [NIFTY50_TRI, NIFTY_MIDCAP150_TRI, NIFTY500_MOMENTUM50_TRI]
     assert list(refs[NIFTY_MIDCAP150_TRI]) == [30.0, 31.0, 32.0]

@@ -26,6 +26,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }];
   },
+  // `bun run start:prod` builds into .next-prod so a concurrent `next dev` can't overwrite it.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // A cold whole-market Broad Momentum run (or Custom Index) takes about a minute; Next's default
   // 30s rewrite-proxy timeout would drop it as a 500. Matches the Fastify proxy's 180s.
   experimental: { proxyTimeout: 180_000 },

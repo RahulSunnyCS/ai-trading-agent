@@ -25,6 +25,16 @@
  *    itself forever without ever completing when the endpoint is slower
  *    than the interval.
  *
+ * Poll ticks are skipped while the browser tab is hidden (`document.hidden`); when it becomes
+ * visible again after at least one skipped tick, the hook fetches at once and the interval
+ * carries on. The mount fetch and refetch() run whatever the visibility.
+ *
+ * Hook instances share one in-flight request per URL: three components mounting /api/meta at
+ * once make one request. The mount fetch and poll ticks join a request that is already in
+ * flight for the URL; refetch() always starts a fresh one (the caller usually wants an answer
+ * from after something it just did). An instance that unmounts or moves on only drops its
+ * interest — the shared request is aborted once no instance is waiting for it.
+ *
  * `url` is a plain string, recomputed by the caller on every render (e.g. a
  * template literal over query params) — there is no dependency array to get
  * wrong, unlike the useCallback([...params]) + useEffect([fetch]) pairing
@@ -41,6 +51,18 @@ import { type ApiResult, apiGet } from '../lib/api';
  * page session only: it makes coming back to a view instant, never replaces the revalidation. */
 const responseCache = new Map<string, unknown>();
 
+/** One GET shared by every hook instance waiting for the same URL. */
+interface SharedRequest {
+  controller: AbortController;
+  promise: Promise<ApiResult<unknown>>;
+  /** Instances still waiting for it; aborted when this drops to zero before it settles. */
+  subscribers: number;
+  settled: boolean;
+}
+
+/** The request in flight per URL, joined by the mount fetch and poll ticks of every instance. */
+const inflight = new Map<string, SharedRequest>();
+
 /**
  * One-off GET that shares `usePolledResource`'s cache: answers from it when this URL has
  * already been loaded (by either), otherwise fetches and stores. For data a view needs once
@@ -53,9 +75,44 @@ export async function fetchCached<T>(url: string): Promise<ApiResult<T>> {
   return result;
 }
 
-/** Test seam: forget cached responses between tests. */
+/** Test seam: forget cached responses (and any shared in-flight request) between tests. */
 export function clearPolledResourceCache(): void {
   responseCache.clear();
+  inflight.clear();
+}
+
+/** Join the request in flight for `url`, or start one (always, when `fresh`). */
+function acquire(url: string, fresh: boolean): SharedRequest {
+  const existing = inflight.get(url);
+  if (existing && !fresh) {
+    existing.subscribers += 1;
+    return existing;
+  }
+  const controller = new AbortController();
+  const entry: SharedRequest = {
+    controller,
+    subscribers: 1,
+    settled: false,
+    promise: apiGet<unknown>(url, controller.signal).then((result) => {
+      entry.settled = true;
+      if (inflight.get(url) === entry) inflight.delete(url);
+      return result;
+    }),
+  };
+  inflight.set(url, entry);
+  return entry;
+}
+
+/** Drop one instance's interest; abort the request when nobody else is waiting for it. */
+function release(url: string, entry: SharedRequest): void {
+  entry.subscribers -= 1;
+  if (entry.subscribers > 0 || entry.settled) return;
+  if (inflight.get(url) === entry) inflight.delete(url);
+  entry.controller.abort();
+}
+
+function tabHidden(): boolean {
+  return typeof document !== 'undefined' && document.hidden;
 }
 
 export interface PolledResourceState<T> {
@@ -83,7 +140,14 @@ export interface UsePolledResourceOptions {
   cache?: boolean;
 }
 
-type FetchMode = 'manual' | 'poll';
+/** `mount` (and a url change) joins a shared in-flight request, `manual` (refetch) always
+ * starts a fresh one, `poll` joins and skips itself when this instance is already waiting. */
+type FetchMode = 'mount' | 'manual' | 'poll';
+
+interface Subscription {
+  url: string;
+  entry: SharedRequest;
+}
 
 export function usePolledResource<T>(
   url: string,
@@ -96,26 +160,37 @@ export function usePolledResource<T>(
     error: null,
   }));
 
-  // Doubles as the in-flight guard for poll ticks (non-null = a request is
-  // outstanding) and as the "am I still the current request" check for
-  // deciding whether a resolved response is allowed to update state.
-  const controllerRef = useRef<AbortController | null>(null);
+  // In-flight guard for poll ticks (non-null = waiting) and the "am I still the current
+  // request" check. A fresh object per run, so two runs on one shared request differ.
+  const currentRef = useRef<Subscription | null>(null);
+  // A poll tick was skipped while the tab was hidden: fetch as soon as it is visible again.
+  const missedTickRef = useRef(false);
+
+  const dropCurrent = useCallback(() => {
+    const current = currentRef.current;
+    currentRef.current = null;
+    if (current) release(current.url, current.entry);
+  }, []);
 
   const run = useCallback(
     async (mode: FetchMode) => {
-      if (mode === 'poll' && controllerRef.current) {
-        // A request is already in flight — skip this tick rather than pile
-        // up overlapping requests against a slow endpoint.
-        return;
+      if (mode === 'poll') {
+        // A request is already in flight — skip this tick rather than pile up overlapping
+        // requests against a slow endpoint.
+        if (currentRef.current) return;
+        if (tabHidden()) {
+          missedTickRef.current = true;
+          return;
+        }
       }
 
-      // Manual (including the initial mount call): cancel whatever is in
-      // flight and take over. This is what makes refetch() always resolve.
-      controllerRef.current?.abort();
-      const controller = new AbortController();
-      controllerRef.current = controller;
+      // Mount/manual: cancel (drop interest in) whatever this instance was waiting for and
+      // take over. This is what makes refetch() always resolve.
+      dropCurrent();
+      const subscription: Subscription = { url, entry: acquire(url, mode === 'manual') };
+      currentRef.current = subscription;
 
-      if (mode === 'manual') {
+      if (mode !== 'poll') {
         // Poll ticks deliberately do NOT flip loading back to true — doing
         // so would flicker the view every interval. A manual refetch (and
         // the initial mount call, which starts from loading: true anyway)
@@ -128,15 +203,15 @@ export function usePolledResource<T>(
         }));
       }
 
-      const result = await apiGet<T>(url, controller.signal);
+      const result = (await subscription.entry.promise) as ApiResult<T>;
 
       // Ignore a response from a request that was superseded by a newer
-      // refetch, or aborted on unmount — only the current controller may
+      // refetch, or dropped on unmount — only the current subscription may
       // update state. This subsumes checking `result.error === 'AbortError'`
       // and is stricter: it also protects against two back-to-back manual
       // refetch() calls resolving out of order.
-      if (controllerRef.current !== controller) return;
-      controllerRef.current = null;
+      if (currentRef.current !== subscription) return;
+      dropCurrent();
 
       if (!result.ok) {
         if (result.error === 'AbortError') return;
@@ -149,23 +224,30 @@ export function usePolledResource<T>(
       if (cache) responseCache.set(url, result.data);
       setState({ data: result.data, loading: false, error: null });
     },
-    [url, cache],
+    [url, cache, dropCurrent],
   );
 
   useEffect(() => {
-    void run('manual');
+    void run('mount');
 
     let timer: ReturnType<typeof setInterval> | undefined;
+    let onVisibility: (() => void) | undefined;
     if (intervalMs) {
       timer = setInterval(() => void run('poll'), intervalMs);
+      onVisibility = () => {
+        if (tabHidden() || !missedTickRef.current) return;
+        missedTickRef.current = false;
+        void run('poll');
+      };
+      document.addEventListener('visibilitychange', onVisibility);
     }
 
     return () => {
-      controllerRef.current?.abort();
-      controllerRef.current = null;
+      dropCurrent();
       if (timer) clearInterval(timer);
+      if (onVisibility) document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [run, intervalMs]);
+  }, [run, intervalMs, dropCurrent]);
 
   const refetch = useCallback(() => void run('manual'), [run]);
 

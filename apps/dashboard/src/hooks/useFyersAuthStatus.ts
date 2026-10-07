@@ -70,8 +70,10 @@ export function fyersTokenState(status: FyersAuthStatus | null, now: Date): Toke
 // ---------------------------------------------------------------------------
 
 export function useFyersAuthStatus(): FyersAuthState {
+  // `cache`: mounted in several places at once, so a later mount starts from the last answer.
   const { data, loading, error, refetch } = usePolledResource<FyersAuthStatus>(STATUS_URL, {
     intervalMs: POLL_MS,
+    cache: true,
   });
 
   // usePolledResource raises `loading` and clears `error` on every manual refetch. Latch the
@@ -81,6 +83,9 @@ export function useFyersAuthStatus(): FyersAuthState {
   if (!loading) {
     settled.current = true;
     lastError.current = error;
+  } else if (data !== null) {
+    // A cached status from an earlier mount: show it rather than a loading state.
+    settled.current = true;
   }
 
   useEffect(() => {

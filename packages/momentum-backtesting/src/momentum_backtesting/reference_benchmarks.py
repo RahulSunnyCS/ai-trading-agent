@@ -75,9 +75,7 @@ def _from_db() -> pd.DataFrame | None:
 
     if db_read.catalog_mtime() is None:
         return None
-    from trading_data.db import connect, data_root  # noqa: PLC0415
-
-    with connect(data_root(), read_only=True) as con:
+    with db_read.open_catalog(read_only=True) as con:
         # Migration 004 moved these TRIs from `momentum_prices` to `stock_weekly_series`. A
         # read-only connect never migrates, so a catalog last opened for writing before 004 has
         # no such table: that, or no matching rows, means "not in the database" -> the CSV.

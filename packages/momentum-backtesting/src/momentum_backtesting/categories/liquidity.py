@@ -33,7 +33,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
-from trading_data.db import connect, data_root
+
+from ..db_read import stock_bars
 
 TURNOVER_WINDOW = 60
 CIRCUIT_WINDOW = 125
@@ -75,7 +76,7 @@ def market_members_by_year(root: Path | None = None) -> dict[int, set[str]]:
     market, delisted names included). ISIN 'INE...' keeps companies and drops ETFs / mutual-fund
     units ('INF...', e.g. GOLDBEES) that also trade in the EQ series. This is only the "was it
     listed" part of point-in-time membership; the tradability gate does the rest."""
-    with connect(root or data_root(), read_only=True) as con:
+    with stock_bars(root) as con:
         rows = con.execute(
             "SELECT DISTINCT year(b.date) AS y, i.symbol FROM bars_1d_stock b "
             "JOIN instruments i USING (instrument_id) "
@@ -102,7 +103,7 @@ def turnover_rank_members_by_year(
 
     It is a proxy, not the index: NSE ranks by free-float market value, which is not in the
     data. A stock needs 60 sessions in the window, so a recent listing waits a year."""
-    with connect(root or data_root(), read_only=True) as con:
+    with stock_bars(root) as con:
         rows = con.execute(
             """
             WITH window_stats AS (
@@ -190,7 +191,7 @@ def compute_weekly_features(symbols: list[str], root: Path | None = None) -> pd.
            arg_max(p10_60, date) as p10_60, arg_max(maxrun125, date) as maxrun125,
            arg_max(bandhits60, date) as bandhits60, arg_max(close, date) as px
     from f group by 1, 2"""
-    with connect(root or data_root(), read_only=True) as con:
+    with stock_bars(root) as con:
         frame = con.execute(sql, [symbols]).df()
     frame["wk"] = pd.to_datetime(frame["wk"])
     return frame

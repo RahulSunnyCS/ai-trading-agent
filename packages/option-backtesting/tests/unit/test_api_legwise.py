@@ -1,4 +1,5 @@
 import time
+from datetime import date
 
 import pytest
 import yaml
@@ -68,7 +69,7 @@ def test_daily_job_runs_in_background_and_reports_its_log(client, monkeypatch):
     client.put("/legwise/strategies/my_one", json={"strategy": STRATEGY})
     started = client.post("/legwise/daily", json={"date": "2026-09-29", "fetch": False}).json()
     assert started == {"state": "running", "day": "2026-09-29"}
-    for _ in range(50):
+    for _ in range(600):  # judging the (empty) day in data_quality takes a few seconds
         job = client.get("/legwise/daily").json()
         if job["state"] != "running":
             break
@@ -77,3 +78,42 @@ def test_daily_job_runs_in_background_and_reports_its_log(client, monkeypatch):
     assert any("skipped" in line for line in job["log"])  # no data collected in tmp
     [message] = sent
     assert message.severity == "warn" and "skipped" in message.body
+
+
+def test_daily_job_runs_the_same_routine_as_obt_daily(client, monkeypatch):
+    """The dashboard's evening run used to skip refresh_day: the day was never judged in
+    data_quality, no derived tables were built and the summary had no data verdicts."""
+    from option_backtesting.legwise import daily, evening
+
+    calls = {}
+
+    def collect(day, underlyings, **_kwargs):
+        calls["collect"] = (day, underlyings)
+        return 3
+
+    def refresh(_root, day, underlyings, log):
+        calls["refresh"] = (day, underlyings)
+        log("refresh ran")
+        return daily.DayCheck(["data usable: NIFTY"], problems=False)
+
+    def telegram_summary(*args):
+        calls["telegram"] = args
+        return "message"
+
+    monkeypatch.setattr(evening, "collect", collect)
+    monkeypatch.setattr(evening, "refresh_day", refresh)
+    monkeypatch.setattr(evening, "run_day", lambda _day, _root, _files: [])
+    monkeypatch.setattr(evening, "telegram_summary", telegram_summary)
+    monkeypatch.setattr("option_backtesting.notify.send", lambda _n: (True, ""))
+    monkeypatch.setattr(legwise_routes, "_job", legwise_routes._Job(state="running"))
+
+    legwise_routes._run_daily(date(2026, 9, 29), fetch=True, telegram=True)
+
+    underlyings = list(legwise_routes.UNDERLYINGS)
+    assert calls["collect"] == (date(2026, 9, 29), underlyings)
+    assert calls["refresh"] == (date(2026, 9, 29), underlyings)
+    *_, errors, check = calls["telegram"]
+    assert errors == 3 and check.lines == ["data usable: NIFTY"]  # verdicts reach Telegram
+    assert legwise_routes._job.state == "done"
+    assert "refresh ran" in legwise_routes._job.log
+    assert any("data usable: NIFTY" in line for line in legwise_routes._job.log)

@@ -230,10 +230,30 @@ needs_raw = pytest.mark.skipif(
 
 @needs_raw
 def test_real_membership_invariants():
+    """Counts are checked over every session. The current-list half asks only that the
+    hand-downloaded snapshot equals the curated members on SOME session: a reshuffle is curated
+    once announced (BSE for WIPRO, effective 2026-09-30), so the curation can run ahead of the
+    snapshot, and the snapshot carries no date of its own (a file time changes on any copy).
+    `mbt stocks fetch`'s guard still compares the open rows and fails until the snapshot is
+    refreshed (BL-018)."""
     membership = _read("nifty50_membership.csv")
-    sessions = pd.read_csv(RAW / "benchmarks/NIFTY50_EQUAL_WEIGHT_PRICE.csv")["date"]
-    current = pd.read_csv(RAW / "nifty50_current.csv")["Symbol"]
-    assert mc.check_invariants(membership, sessions, current) == []
+    sessions = pd.to_datetime(
+        pd.read_csv(RAW / "benchmarks/NIFTY50_EQUAL_WEIGHT_PRICE.csv")["date"]
+    )
+    open_rows = membership.loc[membership["to"] == "", "symbol"]
+    assert mc.check_invariants(membership, sessions, open_rows) == []
+
+    snapshot = set(pd.read_csv(RAW / "nifty50_current.csv")["Symbol"])
+    start = pd.to_datetime(membership["from"])
+    stop = pd.to_datetime(membership["to"].replace("", None))  # inclusive; NaT = still a member
+    # The member set only changes on a `from` day or the day after a `to`.
+    changes = sorted(set(start) | {d + pd.Timedelta(days=1) for d in stop.dropna()})
+    matches = [
+        day
+        for day in changes
+        if set(membership.loc[(start <= day) & (stop.isna() | (stop >= day)), "symbol"]) == snapshot
+    ]
+    assert matches, "nifty50_current.csv matches the curated members on no day"
 
 
 @pytest.mark.skipif(not (DATA / "daily.parquet").exists(), reason="daily.parquet absent")
