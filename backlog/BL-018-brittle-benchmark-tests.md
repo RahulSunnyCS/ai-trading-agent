@@ -41,9 +41,9 @@ The tests check what they mean, and pass after any data refresh.
 ## Plan
 
 ### Phase 1 — Fix the assertions
-- **Tasks:** compare the date sets with each other and against the session history instead
+- **Tasks:** compare the date sets with each other and against NSE's session calendar instead
   of a fixed length; keep a minimum-length floor. Point the database tests at an empty data
-  dir. Compare the current-list snapshot with the members on the day it was downloaded.
+  dir. Check the current-list snapshot matches the curated members on some day.
   Check tax classes over the companies the built data prices.
 - **Done when:** the suite passes on today's data and with no `data/`.
 
@@ -53,13 +53,15 @@ The tests check what they mean, and pass after any data refresh.
 - 2026-10-07 — four more data-dependent failures found on `main` (table above) and folded in.
   Fixed, tests only, `tests/golden/` untouched:
   - Benchmarks: `_assert_full_session_history` checks the TRIs and the EW price share one
-    index, unique and increasing, starting 2011-01-03, at least 3,900 sessions, no gap over
-    6 days (the longest closure, 2014-10-01 → 07). No committed NSE calendar goes back to
-    2011 (`holidays.csv` starts 2024), so the gap check stands in for one. Weekend sessions
-    are allowed (Muhurat trading, budget days).
+    index, unique and increasing, starting 2011-01-03, at least 3,900 sessions, and equal to
+    the `ok` days of `data/stocks/raw/bhavcopy_manifest.csv` (NSE's own per-session files)
+    up to the manifest's last day. Days after it only get a 6-day gap bound (the longest
+    closure, 2014-10-01 → 07). PR #102 review: a max-gap bound alone let a missing ordinary
+    weekday through.
   - Reference tests pass `tmp_path` to `load_references`.
-  - Membership: counts checked over every session as before; the snapshot is compared with
-    the members active on its file date.
+  - Membership: counts checked over every session as before; the snapshot must equal the
+    curated members on some day (it carries no date, and a file time moves on any copy:
+    PR #102 review).
   - Stock smoke test: tax classes checked over priced companies only.
   - Result: the six pass on live data; 68 passed / 5 skipped without `data/`; full suite
     1,142 passed on live data.

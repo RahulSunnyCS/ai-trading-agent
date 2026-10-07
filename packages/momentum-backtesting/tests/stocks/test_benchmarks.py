@@ -26,8 +26,11 @@ FIXTURES = Path(__file__).resolve().parents[2] / "data/stocks/raw/benchmarks"
 
 #: `data/` is not tracked in git (it is rebuilt by `mbt stocks fetch`), so a clean checkout - CI
 #: included - has no raw fixtures. The tests that read them skip there instead of failing.
+#: The bhavcopy manifest (same raw cache) is the session calendar the feeds are checked against.
+BHAVCOPY_MANIFEST = FIXTURES.parent / "bhavcopy_manifest.csv"
 needs_raw_fixtures = pytest.mark.skipif(
-    not FIXTURES.exists(), reason="data/stocks/raw/benchmarks not present (run `mbt stocks fetch`)"
+    not FIXTURES.exists() or not BHAVCOPY_MANIFEST.exists(),
+    reason="data/stocks/raw benchmarks or bhavcopy manifest not present (run `mbt stocks fetch`)",
 )
 
 
@@ -36,17 +39,31 @@ needs_raw_fixtures = pytest.mark.skipif(
 FIRST_SESSION = pd.Timestamp("2011-01-03")
 MIN_SESSIONS = 3900
 #: Longest closure in the history: 2014-10-01 -> 2014-10-07 (Gandhi Jayanti, Dussehra and Bakri
-#: Id around a weekend). A longer gap means a missing session, not a holiday.
+#: Id around a weekend). Only bounds the days after the bhavcopy manifest ends.
 MAX_SESSION_GAP = pd.Timedelta(days=6)
 
 
 def _assert_full_session_history(index: pd.DatetimeIndex) -> None:
-    """A gap-free daily session history from 2011-01-03, however recently it was refreshed.
-    Weekends are allowed: NSE has held Saturday/Sunday sessions (Muhurat trading, budget days)."""
+    """Every NSE session from 2011-01-03, however recently the feed was refreshed.
+
+    Up to the bhavcopy manifest's last day the index must equal its `ok` days exactly - NSE's own
+    per-session cash-market files, independent of niftyindices - so a single missing ordinary
+    session fails. The feed can run a few days past the manifest (refreshed at different times);
+    those days only get the gap bound. Weekend sessions (Muhurat trading, budget days) are in
+    the manifest like any other."""
     assert index.is_unique and index.is_monotonic_increasing
     assert index[0] == FIRST_SESSION
     assert len(index) >= MIN_SESSIONS
-    assert index.to_series().diff().max() <= MAX_SESSION_GAP
+    manifest = pd.read_csv(BHAVCOPY_MANIFEST, parse_dates=["date"])
+    calendar = pd.DatetimeIndex(manifest.loc[manifest["status"] == "ok", "date"])
+    covered = min(calendar.max(), index.max())
+    head, expected = index[index <= covered], calendar[calendar <= covered]
+    missing, extra = expected.difference(head), head.difference(expected)
+    assert missing.empty and extra.empty, (
+        f"missing sessions {list(missing[:5])}, extra {list(extra[:5])}"
+    )
+    tail = index[index >= covered]
+    assert len(tail) == 1 or tail.to_series().diff().max() <= MAX_SESSION_GAP
 
 
 def _fake_urlopen(rows: list[dict], seen: list):

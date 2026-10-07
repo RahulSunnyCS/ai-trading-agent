@@ -53,7 +53,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
-| [BL-018](BL-018-brittle-benchmark-tests.md) | Momentum tests fail when the live data is refreshed | Done: six data-dependent tests fixed (session-set floor and gap check, isolated reference tests, membership checked as of the snapshot's date, tax classes over priced companies); tests only | 2026-10-07 |
+| [BL-018](BL-018-brittle-benchmark-tests.md) | Momentum tests fail when the live data is refreshed | Done: six data-dependent tests fixed (sessions checked against the bhavcopy calendar, isolated reference tests, current list matched to a curated day, tax classes over priced companies); tests only | 2026-10-07 |
 | [BL-042](BL-042-chart-pattern-poc.md) | Chart-pattern POC for Momentum: tight range, flag, cup and handle | Informative, not adopted: no pattern beat momentum-matched peers; PBO 0.57 over 24 ranking trials; hold-out unread, passed to BL-043 | 2026-10-07 |
 | [BL-005](BL-005-faster-momentum-backtests.md) | Faster Momentum backtests (Broad: 55 s cold, 21 s warm) | Done: Phases 1–4 merged, results identical; identical re-run 62 s → 0.0 s, ETF/Stock 3–4× faster; the warm-Broad goal was missed on real data, so the rest moved to BL-039 | 2026-10-07 |
 | [BL-019](BL-019-product-focus-and-freeze.md) | Product focus: rewrite the overview, freeze the dormant parts | Done: overview and business rewritten; personality engine, payments and TODO §3.1–3.4, 3.7 marked frozen | 2026-10-06 |
