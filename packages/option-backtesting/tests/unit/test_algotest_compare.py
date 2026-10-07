@@ -120,3 +120,30 @@ def test_a_missing_leg_keeps_the_other_legs_diffs():
     assert diff.cls == "missing"
     assert diff.note == "engine has no sell PE trade"
     assert [x.option_type for x in diff.legs] == ["CE"]
+
+
+def test_stop_levels_are_rounded_to_the_tick():
+    from option_backtesting.legwise.engine import to_tick
+
+    # AlgoTest: 88.25 x 1.21 = 106.7825 -> 106.80; 143.10 x 1.21 = 173.151 -> 173.15
+    assert (to_tick(88.25 * 1.21), to_tick(143.10 * 1.21), to_tick(112.10 * 1.21)) == (
+        106.80,
+        173.15,
+        135.65,
+    )
+
+
+def test_a_re_entry_is_stamped_at_the_end_of_its_minute():
+    """RE COST: AlgoTest's re-entry at 11:24 is the engine's 11:23 bar."""
+    theirs = algo(
+        leg("CE", 25050, "09:24", "09:41"), leg("PE", 25150, "09:24", "15:28"),
+        leg("CE", 25050, "11:24", "12:03"),
+    )  # fmt: skip
+    ours = result(
+        trade("CE", 25050, "09:24", "09:40", "SL"), trade("PE", 25150, "09:24", "15:28", "EXIT_TIME"),
+        trade("CE", 25050, "11:23", "12:02", "SL"),
+    )  # fmt: skip
+    dir_strategy = load_legwise(
+        ROOT / "strategies" / "legwise" / "nifty_dir_924_itm1_sl21_recost.yaml"
+    )
+    assert compare_day(theirs, ours, dir_strategy).cls == "match"

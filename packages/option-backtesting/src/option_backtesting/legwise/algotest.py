@@ -8,7 +8,8 @@ and time, CE/PE, strike, Buy/Sell, quantity, prices, P/L). Times carry a leading
 seconds (" 09:17:00"); the file starts with a byte-order mark.
 
 **Minute stamps.** A fill at a scheduled time (entry, exit time) is stamped with that time on
-both sides. A stop exit is stamped by AlgoTest at the END of the minute that triggered it,
+both sides. A stop exit or a re-entry is stamped by AlgoTest at the END of the minute that
+triggered it,
 the engine at its start, so AlgoTest's stop minutes are expected to be the engine's + 1 — the
 comparison accepts 0..2 for those and reports the distribution, so the convention stays a
 measured fact rather than an assumption.
@@ -171,6 +172,7 @@ def compare_day(
     theirs: AlgoDay, ours: DayResult | None, strategy: LegwiseStrategy, skipped: str = ""
 ) -> DayDiff:
     exit_min = minute_index(strategy.exit_time)
+    entry_min = minute_index(strategy.entry_time)
     if ours is None:
         return DayDiff(theirs.day, "missing", theirs.pnl, None, note=skipped or "not run")
     pairs = _pair(theirs.legs, ours.trades)
@@ -201,7 +203,7 @@ def compare_day(
             cls = "strike"
         elif not _coarse(trade.exit_reason, reason, exits[trade.exit_min] >= 2):
             cls = "reason"
-        elif diff.entry_min[0] != diff.entry_min[1] or not _minute_ok(diff, reason):
+        elif not _entry_ok(diff, entry_min) or not _minute_ok(diff, reason):
             cls = "minute"
         elif diff.price_gap > TICK + 1e-9:
             cls = "price"
@@ -214,6 +216,15 @@ def compare_day(
         if CLASSES.index("reason") < CLASSES.index(worst):
             worst = "reason"
     return DayDiff(theirs.day, worst, theirs.pnl, ours.gross, legs, "; ".join(notes))
+
+
+def _entry_ok(diff: LegDiff, scheduled: int) -> bool:
+    """The scheduled entry is stamped alike; a re-entry (RE COST / RE ASAP) is an event, which
+    AlgoTest stamps at the end of the triggering minute, like a stop exit."""
+    theirs, ours = diff.entry_min
+    if theirs == scheduled:
+        return ours == scheduled
+    return theirs - ours in STOP_MINUTE_DELTAS
 
 
 def _minute_ok(diff: LegDiff, reason: str) -> bool:

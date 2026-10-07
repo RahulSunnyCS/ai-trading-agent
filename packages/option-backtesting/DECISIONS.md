@@ -199,3 +199,39 @@ price / match`). First export: Nifty_Widesl_917_OTM1, 436 days.
   previous window's close on the filler minutes (`load_day_5m`), so 5-minute fills follow the
   new rule unchanged. (A short-lived version 2 made `open` the previous close, which hid gaps
   from stop fills; the code review caught it; `DERIVED_VERSION` 3.)
+
+---
+
+## AlgoTest comparison, round 2: four strategies; stop levels on the tick; NIFTY data differs — 2026-10-07
+
+The owner exported all four strategies (fixtures in `tests/fixtures/algotest/`); each strategy
+file now follows the settings in the owner's PDF of the same day (the source of truth):
+closest premium ₹65 (was ₹60), a new `sensex_widesl_917_otm2` (SL 114% on the call, 115% on the
+put, as set in AlgoTest), Dir_924 unchanged.
+
+- **Rule: stop and target levels are rounded to the nearest 0.05 tick.** Across the four
+  exports, 512 of 515 untrailed stop exits equal entry × (1 + SL%) rounded to the nearest tick;
+  88 equal it unrounded, 261 rounded up. Trailed levels are rounded the same way. Golden
+  scenarios with stops re-accepted (stop prices move onto the tick, e.g. 53.4875 → 53.50).
+- **Comparator:** a re-entry (RE COST / RE ASAP) is an event AlgoTest stamps at the end of the
+  triggering minute, like a stop exit — its entry minute is now compared with the same 0..2
+  tolerance (Dir_924: "minute" days 145 → 38).
+- **Results** (days fully matching / P&L engine vs AlgoTest):
+
+  | Strategy | Days | Match | P&L engine | P&L AlgoTest |
+  |---|---|---|---|---|
+  | SENSEX OTM2 | 424 | 375 | ₹1,58,352 | ₹1,58,676 |
+  | NIFTY OTM1 | 429 | 6 | ₹1,30,911 | ₹1,38,054 |
+  | NIFTY ITM1 RE COST | 236 | 2 | ₹44,139 | ₹40,518 |
+  | NIFTY closest premium | 241 | 2 | ₹50,294 | ₹44,688 |
+
+- **Why NIFTY differs: AlgoTest's NIFTY prices come from a different feed.** SENSEX legs are
+  within a tick on 788 of 848 legs, vendor days and Fyers days alike, so the engine's rules
+  reproduce AlgoTest. NIFTY legs are not even on Fyers-collected days (1 of 18 legs within a
+  tick, 2026-09-23 → 10-06); AlgoTest's own 15-minute candles for NIFTY 23200 PE on 2026-09-24
+  equal our Fyers closes at only 7 of 25 marks (gaps up to ~1 point). With tight thresholds (21%
+  stops, ₹2,500–3,000 combined stops) those gaps move exit minutes and, on some days, exit
+  reasons and closest-premium strikes. Remaining NIFTY differences are data, not rules.
+- **Not settled yet:** RE COST's fill when a bar gaps through the cost price (AlgoTest
+  re-entries in the Dir_924 export are at the cost price; none of ours gapped differently in the
+  days inspected), RE ASAP (no export uses it).

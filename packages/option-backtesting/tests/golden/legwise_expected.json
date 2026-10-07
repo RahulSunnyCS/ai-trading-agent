@@ -48,25 +48,25 @@
       },
       "summary": {
         "days": 1,
-        "gross": -62.56,
+        "gross": -61.75,
         "costs": 0.0,
-        "net": -62.56,
+        "net": -61.75,
         "win_days": 0,
-        "max_drawdown": -62.56,
+        "max_drawdown": -61.75,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -62.56,
+          "gross": -61.75,
           "costs": 0.0,
-          "net": -62.56,
+          "net": -61.75,
           "worst_mtm": -728.0,
           "best_mtm": 598.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "mtm_sha256": "86f2ddac6ebbeb13dd7f11c553296109126b783c801e55d640f1a1a11a52c52f",
           "trades": [
             {
               "leg": "pe",
@@ -96,9 +96,9 @@
               "entry_time": "10:18",
               "entry_price": 44.65,
               "exit_time": "12:48",
-              "exit_price": 53.4875,
+              "exit_price": 53.5,
               "exit_reason": "SL",
-              "pnl": 574.44
+              "pnl": 575.25
             }
           ]
         }
@@ -115,25 +115,25 @@
       },
       "summary": {
         "days": 1,
-        "gross": -726.37,
+        "gross": -724.75,
         "costs": 0.0,
-        "net": -726.37,
+        "net": -724.75,
         "win_days": 0,
-        "max_drawdown": -726.37,
+        "max_drawdown": -724.75,
         "trades": 1
       },
       "days": [
         {
           "day": "2026-09-24",
-          "gross": -726.37,
+          "gross": -724.75,
           "costs": 0.0,
-          "net": -726.37,
-          "worst_mtm": -726.37,
+          "net": -724.75,
+          "worst_mtm": -724.75,
           "best_mtm": 182.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "mtm_sha256": "a27c00714bfd948e539cc2e1df3fba2bc2c74749d6b80b4481e3a7813590d429",
           "trades": [
             {
               "leg": "pe",
@@ -147,9 +147,9 @@
               "entry_time": "09:45",
               "entry_price": 64.7,
               "exit_time": "10:09",
-              "exit_price": 53.525,
+              "exit_price": 53.55,
               "exit_reason": "SL",
-              "pnl": -726.37
+              "pnl": -724.75
             }
           ]
         }
@@ -166,9 +166,9 @@
       },
       "summary": {
         "days": 1,
-        "gross": 138.12,
+        "gross": 139.75,
         "costs": 0.0,
-        "net": 138.12,
+        "net": 139.75,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -176,15 +176,15 @@
       "days": [
         {
           "day": "2026-09-25",
-          "gross": 138.12,
+          "gross": 139.75,
           "costs": 0.0,
-          "net": 138.12,
-          "worst_mtm": -1311.38,
-          "best_mtm": 489.12,
+          "net": 139.75,
+          "worst_mtm": -1309.75,
+          "best_mtm": 490.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "mtm_sha256": "3a4120d09ec0e262a40da58f17b2179f290f029b98316c998c7f5a6f104377c3",
           "trades": [
             {
               "leg": "pe",
@@ -198,9 +198,9 @@
               "entry_time": "09:52",
               "entry_price": 66.9,
               "exit_time": "10:07",
-              "exit_price": 50.175,
+              "exit_price": 50.2,
               "exit_reason": "SL",
-              "pnl": -1087.12
+              "pnl": -1085.5
             },
             {
               "leg": "ce",
@@ -233,25 +233,25 @@
       },
       "summary": {
         "days": 1,
-        "gross": -637.81,
+        "gross": -637.0,
         "costs": 0.0,
-        "net": -637.81,
+        "net": -637.0,
         "win_days": 0,
-        "max_drawdown": -637.81,
+        "max_drawdown": -637.0,
         "trades": 1
       },
       "days": [
         {
           "day": "2026-09-28",
-          "gross": -637.81,
+          "gross": -637.0,
           "costs": 0.0,
-          "net": -637.81,
-          "worst_mtm": -637.81,
+          "net": -637.0,
+          "worst_mtm": -637.0,
           "best_mtm": 500.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "650d5efe81ed967f920f75ba7f08dc48a9516d80435003bc0f18ccb2257ff67e",
+          "mtm_sha256": "154fff69908f43063ae4a4845ef090a9061cdbd1aa3ef1643d878e79a49ae6bf",
           "trades": [
             {
               "leg": "pe",
@@ -265,9 +265,9 @@
               "entry_time": "10:17",
               "entry_price": 79.25,
               "exit_time": "11:40",
-              "exit_price": 69.4375,
+              "exit_price": 69.45,
               "exit_reason": "SL",
-              "pnl": -637.81
+              "pnl": -637.0
             }
           ]
         }
@@ -284,9 +284,9 @@
       },
       "summary": {
         "days": 1,
-        "gross": 1776.94,
+        "gross": 1777.75,
         "costs": 0.0,
-        "net": 1776.94,
+        "net": 1777.75,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 1
@@ -294,15 +294,15 @@
       "days": [
         {
           "day": "2026-09-29",
-          "gross": 1776.94,
+          "gross": 1777.75,
           "costs": 0.0,
-          "net": 1776.94,
+          "net": 1777.75,
           "worst_mtm": 0.0,
           "best_mtm": 2044.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "9963bdc3342977696c7e3e1099298b294bf22cc09156a5a29019479a49ea616c",
+          "mtm_sha256": "b05e43aab717cfedc6c74494ad1f1b0417cb3a1ab8fad641abfc84fd5f7b4ce8",
           "trades": [
             {
               "leg": "ce",
@@ -316,9 +316,9 @@
               "entry_time": "11:10",
               "entry_price": 58.65,
               "exit_time": "11:16",
-              "exit_price": 85.9875,
+              "exit_price": 86.0,
               "exit_reason": "SL",
-              "pnl": 1776.94
+              "pnl": 1777.75
             }
           ]
         }
@@ -335,9 +335,9 @@
       },
       "summary": {
         "days": 1,
-        "gross": 6464.25,
+        "gross": 6461.0,
         "costs": 0.0,
-        "net": 6464.25,
+        "net": 6461.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -345,15 +345,15 @@
       "days": [
         {
           "day": "2026-10-01",
-          "gross": 6464.25,
+          "gross": 6461.0,
           "costs": 0.0,
-          "net": 6464.25,
+          "net": 6461.0,
           "worst_mtm": -494.0,
-          "best_mtm": 7096.38,
+          "best_mtm": 7094.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "361b1a7ecca510b354a144eaeda3483046aa2b188d6c7500503a3d74b3bdc111",
+          "mtm_sha256": "a545f377475d7340d939354059096e9c4a93614441ee52bd0e5dc777b1694b5e",
           "trades": [
             {
               "leg": "ce",
@@ -367,9 +367,9 @@
               "entry_time": "09:49",
               "entry_price": 53.3,
               "exit_time": "10:13",
-              "exit_price": 48.975,
+              "exit_price": 48.95,
               "exit_reason": "SL",
-              "pnl": -281.13
+              "pnl": -282.75
             },
             {
               "leg": "pe",
@@ -383,9 +383,9 @@
               "entry_time": "12:10",
               "entry_price": 56.9,
               "exit_time": "12:59",
-              "exit_price": 160.675,
+              "exit_price": 160.65,
               "exit_reason": "SL",
-              "pnl": 6745.38
+              "pnl": 6743.75
             }
           ]
         }
@@ -402,25 +402,25 @@
       },
       "summary": {
         "days": 1,
-        "gross": -592.12,
+        "gross": -591.5,
         "costs": 0.0,
-        "net": -592.12,
+        "net": -591.5,
         "win_days": 0,
-        "max_drawdown": -592.12,
+        "max_drawdown": -591.5,
         "trades": 3
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -592.12,
+          "gross": -591.5,
           "costs": 0.0,
-          "net": -592.12,
-          "worst_mtm": -1199.87,
+          "net": -591.5,
+          "worst_mtm": -1199.25,
           "best_mtm": 663.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "9554d2dffee66569dc0fe247380f082a4db9987014820f64ec7e4381c7b74ca1",
+          "mtm_sha256": "6e55f16537d5360bbe2f574359b2644584b87c54879531991769ce76b2ecc95d",
           "trades": [
             {
               "leg": "ce",
@@ -434,9 +434,9 @@
               "entry_time": "09:24",
               "entry_price": 161.95,
               "exit_time": "12:06",
-              "exit_price": 195.9595,
+              "exit_price": 195.95,
               "exit_reason": "SL",
-              "pnl": -2210.62
+              "pnl": -2210.0
             },
             {
               "leg": "pe",
@@ -485,9 +485,9 @@
       },
       "summary": {
         "days": 1,
-        "gross": 663.32,
+        "gross": 663.0,
         "costs": 0.0,
-        "net": 663.32,
+        "net": 663.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 3
@@ -495,15 +495,15 @@
       "days": [
         {
           "day": "2026-09-24",
-          "gross": 663.32,
+          "gross": 663.0,
           "costs": 0.0,
-          "net": 663.32,
-          "worst_mtm": -2271.43,
-          "best_mtm": 757.57,
+          "net": 663.0,
+          "worst_mtm": -2271.75,
+          "best_mtm": 757.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "dc6f3066bd52ad4a48dcecc54d905078ba399836b8d38a662b9dcfab94984666",
+          "mtm_sha256": "46191910239216e4cc6774be74c9a89cdc5eb152232f6f98521d122a4760b97e",
           "trades": [
             {
               "leg": "ce",
@@ -533,9 +533,9 @@
               "entry_time": "09:24",
               "entry_price": 129.75,
               "exit_time": "09:48",
-              "exit_price": 156.9975,
+              "exit_price": 157.0,
               "exit_reason": "SL",
-              "pnl": -1771.09
+              "pnl": -1771.25
             },
             {
               "leg": "pe",
@@ -549,9 +549,9 @@
               "entry_time": "10:55",
               "entry_price": 129.75,
               "exit_time": "11:32",
-              "exit_price": 156.9975,
+              "exit_price": 157.0,
               "exit_reason": "SL",
-              "pnl": -1771.09
+              "pnl": -1771.25
             }
           ]
         }
@@ -568,25 +568,25 @@
       },
       "summary": {
         "days": 1,
-        "gross": -3053.96,
+        "gross": -3051.75,
         "costs": 0.0,
-        "net": -3053.96,
+        "net": -3051.75,
         "win_days": 0,
-        "max_drawdown": -3053.96,
+        "max_drawdown": -3051.75,
         "trades": 3
       },
       "days": [
         {
           "day": "2026-09-25",
-          "gross": -3053.96,
+          "gross": -3051.75,
           "costs": 0.0,
-          "net": -3053.96,
-          "worst_mtm": -3053.96,
-          "best_mtm": 67.14,
+          "net": -3051.75,
+          "worst_mtm": -3051.75,
+          "best_mtm": 68.25,
           "stopped_by": "overall SL at 11:17",
           "notes": [],
           "mtm_points": 114,
-          "mtm_sha256": "3ab1d37fa26abfed3d213f089140330b137b2f53c5cb653cc5c2a3d2d6182627",
+          "mtm_sha256": "fb83e2842781782ecab4502cb17ed978a6d30026418dce658fda020b68949c66",
           "trades": [
             {
               "leg": "ce",
@@ -616,9 +616,9 @@
               "entry_time": "09:24",
               "entry_price": 117.7,
               "exit_time": "09:42",
-              "exit_price": 142.417,
+              "exit_price": 142.4,
               "exit_reason": "SL",
-              "pnl": -1606.61
+              "pnl": -1605.5
             },
             {
               "leg": "pe",
@@ -632,9 +632,9 @@
               "entry_time": "10:08",
               "entry_price": 117.7,
               "exit_time": "10:47",
-              "exit_price": 142.417,
+              "exit_price": 142.4,
               "exit_reason": "SL",
-              "pnl": -1606.61
+              "pnl": -1605.5
             }
           ]
         }
@@ -651,9 +651,9 @@
       },
       "summary": {
         "days": 1,
-        "gross": 5380.54,
+        "gross": 5382.0,
         "costs": 0.0,
-        "net": 5380.54,
+        "net": 5382.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -661,15 +661,15 @@
       "days": [
         {
           "day": "2026-09-28",
-          "gross": 5380.54,
+          "gross": 5382.0,
           "costs": 0.0,
-          "net": 5380.54,
+          "net": 5382.0,
           "worst_mtm": 0.0,
-          "best_mtm": 5543.04,
+          "best_mtm": 5544.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "1bc7e95221b5fd02c0a6788da1a0795a2d1681e8a4b2841647c1b8f7a7ecf9bb",
+          "mtm_sha256": "6a9286510bcbecbdc4ccfb6c90ec385ed52932bc5d5f7e69ee6d0a2e9afc557f",
           "trades": [
             {
               "leg": "ce",
@@ -699,9 +699,9 @@
               "entry_time": "09:24",
               "entry_price": 82.25,
               "exit_time": "09:33",
-              "exit_price": 99.5225,
+              "exit_price": 99.5,
               "exit_reason": "SL",
-              "pnl": -1122.71
+              "pnl": -1121.25
             }
           ]
         }
@@ -718,25 +718,25 @@
       },
       "summary": {
         "days": 1,
-        "gross": -3572.66,
+        "gross": -3571.75,
         "costs": 0.0,
-        "net": -3572.66,
+        "net": -3571.75,
         "win_days": 0,
-        "max_drawdown": -3572.66,
+        "max_drawdown": -3571.75,
         "trades": 4
       },
       "days": [
         {
           "day": "2026-09-29",
-          "gross": -3572.66,
+          "gross": -3571.75,
           "costs": 0.0,
-          "net": -3572.66,
-          "worst_mtm": -3572.66,
-          "best_mtm": 3185.2,
+          "net": -3571.75,
+          "worst_mtm": -3571.75,
+          "best_mtm": 3185.0,
           "stopped_by": "overall SL at 12:41",
           "notes": [],
           "mtm_points": 198,
-          "mtm_sha256": "92ac1bbaab54225fcc579172c6c3c21556236c021882ebc488e0748a5ae9b0fa",
+          "mtm_sha256": "5c5781b9019f15a2bcf7a08a2f9a191823c0cc23d731f7c24e19e9a12a167da0",
           "trades": [
             {
               "leg": "ce",
@@ -750,9 +750,9 @@
               "entry_time": "09:24",
               "entry_price": 117.0,
               "exit_time": "11:30",
-              "exit_price": 141.57,
+              "exit_price": 141.55,
               "exit_reason": "SL",
-              "pnl": -1597.05
+              "pnl": -1595.75
             },
             {
               "leg": "pe",
@@ -766,9 +766,9 @@
               "entry_time": "09:24",
               "entry_price": 70.7,
               "exit_time": "09:27",
-              "exit_price": 85.547,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -965.05
+              "pnl": -965.25
             },
             {
               "leg": "pe",
@@ -782,9 +782,9 @@
               "entry_time": "11:11",
               "entry_price": 70.7,
               "exit_time": "12:32",
-              "exit_price": 85.547,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -965.05
+              "pnl": -965.25
             },
             {
               "leg": "ce",
@@ -817,25 +817,25 @@
       },
       "summary": {
         "days": 1,
-        "gross": -363.48,
+        "gross": -360.75,
         "costs": 0.0,
-        "net": -363.48,
+        "net": -360.75,
         "win_days": 0,
-        "max_drawdown": -363.48,
+        "max_drawdown": -360.75,
         "trades": 3
       },
       "days": [
         {
           "day": "2026-10-01",
-          "gross": -363.48,
+          "gross": -360.75,
           "costs": 0.0,
-          "net": -363.48,
-          "worst_mtm": -2630.42,
-          "best_mtm": 3000.27,
+          "net": -360.75,
+          "worst_mtm": -2629.25,
+          "best_mtm": 3003.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "ab20ef6a50f730f54b552f670bf96a0c82bcfaa1b8270d9148778caa6422b45e",
+          "mtm_sha256": "cf0763737c6ac3fe90eb6ff584282c57eeed7053adae616a43373cb2d9de5903",
           "trades": [
             {
               "leg": "ce",
@@ -849,9 +849,9 @@
               "entry_time": "09:24",
               "entry_price": 190.8,
               "exit_time": "10:01",
-              "exit_price": 230.868,
+              "exit_price": 230.85,
               "exit_reason": "SL",
-              "pnl": -2604.42
+              "pnl": -2603.25
             },
             {
               "leg": "pe",
@@ -865,9 +865,9 @@
               "entry_time": "09:24",
               "entry_price": 129.4,
               "exit_time": "12:24",
-              "exit_price": 156.574,
+              "exit_price": 156.55,
               "exit_reason": "SL",
-              "pnl": -1766.31
+              "pnl": -1764.75
             },
             {
               "leg": "ce",
@@ -893,16 +893,16 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_23",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "688772ef8ede",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-23",
         "to": "2026-09-23"
       },
       "summary": {
         "days": 1,
-        "gross": 877.5,
+        "gross": 962.0,
         "costs": 0.0,
-        "net": 877.5,
+        "net": 962.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -910,15 +910,15 @@
       "days": [
         {
           "day": "2026-09-23",
-          "gross": 877.5,
+          "gross": 962.0,
           "costs": 0.0,
-          "net": 877.5,
-          "worst_mtm": -646.75,
-          "best_mtm": 1017.25,
+          "net": 962.0,
+          "worst_mtm": -747.5,
+          "best_mtm": 1069.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 368,
-          "mtm_sha256": "63a09437b593a4ea1cda988f6af13094a7a313c00b630b611978680de0472c2b",
+          "mtm_sha256": "ab16989da5ea14794f861e7994c2b635da094986ef88771612446ef2dbc99479",
           "trades": [
             {
               "leg": "ce",
@@ -926,15 +926,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23550.0,
+                "strike": 23500.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 54.25,
+              "entry_price": 71.75,
               "exit_time": "15:25",
-              "exit_price": 61.75,
+              "exit_price": 82.4,
               "exit_reason": "EXIT_TIME",
-              "pnl": -487.5
+              "pnl": -692.25
             },
             {
               "leg": "pe",
@@ -942,15 +942,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23200.0,
+                "strike": 23250.0,
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 53.6,
+              "entry_price": 66.55,
               "exit_time": "15:25",
-              "exit_price": 32.6,
+              "exit_price": 41.1,
               "exit_reason": "EXIT_TIME",
-              "pnl": 1365.0
+              "pnl": 1654.25
             }
           ]
         }
@@ -960,32 +960,32 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_24",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "688772ef8ede",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-24",
         "to": "2026-09-24"
       },
       "summary": {
         "days": 1,
-        "gross": -2626.0,
+        "gross": -2590.25,
         "costs": 0.0,
-        "net": -2626.0,
+        "net": -2590.25,
         "win_days": 0,
-        "max_drawdown": -2626.0,
+        "max_drawdown": -2590.25,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-24",
-          "gross": -2626.0,
+          "gross": -2590.25,
           "costs": 0.0,
-          "net": -2626.0,
-          "worst_mtm": -2626.0,
+          "net": -2590.25,
+          "worst_mtm": -2590.25,
           "best_mtm": 0.0,
-          "stopped_by": "overall SL at 13:26",
+          "stopped_by": "overall SL at 13:42",
           "notes": [],
-          "mtm_points": 250,
-          "mtm_sha256": "ef7b4836df1995d925a50a6c10ed268e989e19ba01f8c496f2a3f700141f0560",
+          "mtm_points": 266,
+          "mtm_sha256": "608e48bddbc295bb106ce8caaebe0f80221399c96d580d6617ac99fba78b649e",
           "trades": [
             {
               "leg": "ce",
@@ -993,15 +993,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23400.0,
+                "strike": 23350.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 52.65,
-              "exit_time": "13:26",
-              "exit_price": 38.3,
+              "entry_price": 70.5,
+              "exit_time": "13:42",
+              "exit_price": 49.35,
               "exit_reason": "OVERALL_SL",
-              "pnl": 932.75
+              "pnl": 1374.75
             },
             {
               "leg": "pe",
@@ -1014,10 +1014,10 @@
               },
               "entry_time": "09:17",
               "entry_price": 66.0,
-              "exit_time": "13:26",
-              "exit_price": 120.75,
+              "exit_time": "13:42",
+              "exit_price": 127.0,
               "exit_reason": "OVERALL_SL",
-              "pnl": -3558.75
+              "pnl": -3965.0
             }
           ]
         }
@@ -1027,7 +1027,7 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_25",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "688772ef8ede",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-25",
         "to": "2026-09-25"
@@ -1094,7 +1094,7 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_28",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "688772ef8ede",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-28",
         "to": "2026-09-28"
@@ -1161,32 +1161,32 @@
       "id": "nifty_widesl_917_closest_premium__2026_09_29",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "688772ef8ede",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-29",
         "to": "2026-09-29"
       },
       "summary": {
         "days": 1,
-        "gross": -2618.85,
+        "gross": -2619.5,
         "costs": 0.0,
-        "net": -2618.85,
+        "net": -2619.5,
         "win_days": 0,
-        "max_drawdown": -2618.85,
+        "max_drawdown": -2619.5,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-29",
-          "gross": -2618.85,
+          "gross": -2619.5,
           "costs": 0.0,
-          "net": -2618.85,
-          "worst_mtm": -2618.85,
+          "net": -2619.5,
+          "worst_mtm": -2619.5,
           "best_mtm": 48.75,
           "stopped_by": "overall SL at 11:12",
           "notes": [],
           "mtm_points": 116,
-          "mtm_sha256": "5f6db122cf99960c15324cc5c3d71657c07c41107f07b9eff241a1c3cd8a485f",
+          "mtm_sha256": "2b96484beffbc090d6aaf6604b5d502fe42d580c469c3bbf3fc215969a887cda",
           "trades": [
             {
               "leg": "ce",
@@ -1216,9 +1216,9 @@
               "entry_time": "09:17",
               "entry_price": 54.6,
               "exit_time": "09:35",
-              "exit_price": 117.39,
+              "exit_price": 117.4,
               "exit_reason": "SL",
-              "pnl": -4081.35
+              "pnl": -4082.0
             }
           ]
         }
@@ -1228,32 +1228,32 @@
       "id": "nifty_widesl_917_closest_premium__2026_10_01",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "688772ef8ede",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-10-01",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 1,
-        "gross": -2769.0,
+        "gross": -2700.75,
         "costs": 0.0,
-        "net": -2769.0,
+        "net": -2700.75,
         "win_days": 0,
-        "max_drawdown": -2769.0,
+        "max_drawdown": -2700.75,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-10-01",
-          "gross": -2769.0,
+          "gross": -2700.75,
           "costs": 0.0,
-          "net": -2769.0,
-          "worst_mtm": -2769.0,
-          "best_mtm": 539.5,
-          "stopped_by": "overall SL at 12:46",
+          "net": -2700.75,
+          "worst_mtm": -2700.75,
+          "best_mtm": 627.25,
+          "stopped_by": "overall SL at 12:45",
           "notes": [],
-          "mtm_points": 210,
-          "mtm_sha256": "764a59322b518f0fcfdabd2179db2b2f4d3b44d4203076b1a5c8b3846e34cbe7",
+          "mtm_points": 209,
+          "mtm_sha256": "8b6f90d0f815198fee2fefa96e16a67d91e806e873aad4cf27ba54d848bb0873",
           "trades": [
             {
               "leg": "ce",
@@ -1261,15 +1261,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-10-06",
-                "strike": 22800.0,
+                "strike": 22750.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 53.1,
-              "exit_time": "12:46",
-              "exit_price": 30.15,
+              "entry_price": 67.55,
+              "exit_time": "12:45",
+              "exit_price": 35.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": 1491.75
+              "pnl": 2070.25
             },
             {
               "leg": "pe",
@@ -1277,15 +1277,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-10-06",
-                "strike": 22400.0,
+                "strike": 22450.0,
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 57.0,
-              "exit_time": "12:46",
-              "exit_price": 122.55,
-              "exit_reason": "SL",
-              "pnl": -4260.75
+              "entry_price": 70.8,
+              "exit_time": "12:45",
+              "exit_price": 144.2,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -4771.0
             }
           ]
         }
@@ -1503,9 +1503,9 @@
       },
       "summary": {
         "days": 1,
-        "gross": 508.46,
+        "gross": 507.0,
         "costs": 0.0,
-        "net": 508.46,
+        "net": 507.0,
         "win_days": 1,
         "max_drawdown": 0.0,
         "trades": 2
@@ -1513,15 +1513,15 @@
       "days": [
         {
           "day": "2026-09-28",
-          "gross": 508.46,
+          "gross": 507.0,
           "costs": 0.0,
-          "net": 508.46,
-          "worst_mtm": -1259.54,
-          "best_mtm": 550.71,
+          "net": 507.0,
+          "worst_mtm": -1261.0,
+          "best_mtm": 549.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 371,
-          "mtm_sha256": "d489f7f304d6f0b5cc36c19e6e8f8b002457698a01acc94e15056e6089ccac53",
+          "mtm_sha256": "e3599739a0de60347a6f3b1a4b32960f2c3243b94ea931d3f4f10ee289a2646a",
           "trades": [
             {
               "leg": "ce",
@@ -1551,9 +1551,9 @@
               "entry_time": "09:17",
               "entry_price": 50.85,
               "exit_time": "10:41",
-              "exit_price": 109.3275,
+              "exit_price": 109.35,
               "exit_reason": "SL",
-              "pnl": -3801.04
+              "pnl": -3802.5
             }
           ]
         }
@@ -1570,25 +1570,25 @@
       },
       "summary": {
         "days": 1,
-        "gross": -2826.04,
+        "gross": -2827.5,
         "costs": 0.0,
-        "net": -2826.04,
+        "net": -2827.5,
         "win_days": 0,
-        "max_drawdown": -2826.04,
+        "max_drawdown": -2827.5,
         "trades": 2
       },
       "days": [
         {
           "day": "2026-09-29",
-          "gross": -2826.04,
+          "gross": -2827.5,
           "costs": 0.0,
-          "net": -2826.04,
-          "worst_mtm": -2826.04,
+          "net": -2827.5,
+          "worst_mtm": -2827.5,
           "best_mtm": 341.25,
           "stopped_by": "overall SL at 11:30",
           "notes": [],
           "mtm_points": 134,
-          "mtm_sha256": "3456e6c93ed389ae20c999d2fcd2966891f9cff6d58ba9074fe826e468f7c985",
+          "mtm_sha256": "c7d4178828ede669ad3d5a6290bbfe6d7549627ebe98228d79489ae0b93244e4",
           "trades": [
             {
               "leg": "ce",
@@ -1618,9 +1618,9 @@
               "entry_time": "09:17",
               "entry_price": 35.85,
               "exit_time": "09:32",
-              "exit_price": 77.0775,
+              "exit_price": 77.1,
               "exit_reason": "SL",
-              "pnl": -2679.79
+              "pnl": -2681.25
             }
           ]
         }
@@ -1704,25 +1704,25 @@
       },
       "summary": {
         "days": 6,
-        "gross": 6952.56,
+        "gross": 6955.0,
         "costs": 0.0,
-        "net": 6952.56,
+        "net": 6955.0,
         "win_days": 3,
-        "max_drawdown": -1288.62,
+        "max_drawdown": -1283.75,
         "trades": 9
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -62.56,
+          "gross": -61.75,
           "costs": 0.0,
-          "net": -62.56,
+          "net": -61.75,
           "worst_mtm": -728.0,
           "best_mtm": 598.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "mtm_sha256": "86f2ddac6ebbeb13dd7f11c553296109126b783c801e55d640f1a1a11a52c52f",
           "trades": [
             {
               "leg": "pe",
@@ -1752,23 +1752,23 @@
               "entry_time": "10:18",
               "entry_price": 44.65,
               "exit_time": "12:48",
-              "exit_price": 53.4875,
+              "exit_price": 53.5,
               "exit_reason": "SL",
-              "pnl": 574.44
+              "pnl": 575.25
             }
           ]
         },
         {
           "day": "2026-09-24",
-          "gross": -726.37,
+          "gross": -724.75,
           "costs": 0.0,
-          "net": -726.37,
-          "worst_mtm": -726.37,
+          "net": -724.75,
+          "worst_mtm": -724.75,
           "best_mtm": 182.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "mtm_sha256": "a27c00714bfd948e539cc2e1df3fba2bc2c74749d6b80b4481e3a7813590d429",
           "trades": [
             {
               "leg": "pe",
@@ -1782,23 +1782,23 @@
               "entry_time": "09:45",
               "entry_price": 64.7,
               "exit_time": "10:09",
-              "exit_price": 53.525,
+              "exit_price": 53.55,
               "exit_reason": "SL",
-              "pnl": -726.37
+              "pnl": -724.75
             }
           ]
         },
         {
           "day": "2026-09-25",
-          "gross": 138.12,
+          "gross": 139.75,
           "costs": 0.0,
-          "net": 138.12,
-          "worst_mtm": -1311.38,
-          "best_mtm": 489.12,
+          "net": 139.75,
+          "worst_mtm": -1309.75,
+          "best_mtm": 490.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "mtm_sha256": "3a4120d09ec0e262a40da58f17b2179f290f029b98316c998c7f5a6f104377c3",
           "trades": [
             {
               "leg": "pe",
@@ -1812,9 +1812,9 @@
               "entry_time": "09:52",
               "entry_price": 66.9,
               "exit_time": "10:07",
-              "exit_price": 50.175,
+              "exit_price": 50.2,
               "exit_reason": "SL",
-              "pnl": -1087.12
+              "pnl": -1085.5
             },
             {
               "leg": "ce",
@@ -1836,15 +1836,15 @@
         },
         {
           "day": "2026-09-28",
-          "gross": -637.81,
+          "gross": -637.0,
           "costs": 0.0,
-          "net": -637.81,
-          "worst_mtm": -637.81,
+          "net": -637.0,
+          "worst_mtm": -637.0,
           "best_mtm": 500.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "650d5efe81ed967f920f75ba7f08dc48a9516d80435003bc0f18ccb2257ff67e",
+          "mtm_sha256": "154fff69908f43063ae4a4845ef090a9061cdbd1aa3ef1643d878e79a49ae6bf",
           "trades": [
             {
               "leg": "pe",
@@ -1858,23 +1858,23 @@
               "entry_time": "10:17",
               "entry_price": 79.25,
               "exit_time": "11:40",
-              "exit_price": 69.4375,
+              "exit_price": 69.45,
               "exit_reason": "SL",
-              "pnl": -637.81
+              "pnl": -637.0
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": 1776.94,
+          "gross": 1777.75,
           "costs": 0.0,
-          "net": 1776.94,
+          "net": 1777.75,
           "worst_mtm": 0.0,
           "best_mtm": 2044.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "9963bdc3342977696c7e3e1099298b294bf22cc09156a5a29019479a49ea616c",
+          "mtm_sha256": "b05e43aab717cfedc6c74494ad1f1b0417cb3a1ab8fad641abfc84fd5f7b4ce8",
           "trades": [
             {
               "leg": "ce",
@@ -1888,23 +1888,23 @@
               "entry_time": "11:10",
               "entry_price": 58.65,
               "exit_time": "11:16",
-              "exit_price": 85.9875,
+              "exit_price": 86.0,
               "exit_reason": "SL",
-              "pnl": 1776.94
+              "pnl": 1777.75
             }
           ]
         },
         {
           "day": "2026-10-01",
-          "gross": 6464.25,
+          "gross": 6461.0,
           "costs": 0.0,
-          "net": 6464.25,
+          "net": 6461.0,
           "worst_mtm": -494.0,
-          "best_mtm": 7096.38,
+          "best_mtm": 7094.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "361b1a7ecca510b354a144eaeda3483046aa2b188d6c7500503a3d74b3bdc111",
+          "mtm_sha256": "a545f377475d7340d939354059096e9c4a93614441ee52bd0e5dc777b1694b5e",
           "trades": [
             {
               "leg": "ce",
@@ -1918,9 +1918,9 @@
               "entry_time": "09:49",
               "entry_price": 53.3,
               "exit_time": "10:13",
-              "exit_price": 48.975,
+              "exit_price": 48.95,
               "exit_reason": "SL",
-              "pnl": -281.13
+              "pnl": -282.75
             },
             {
               "leg": "pe",
@@ -1934,9 +1934,9 @@
               "entry_time": "12:10",
               "entry_price": 56.9,
               "exit_time": "12:59",
-              "exit_price": 160.675,
+              "exit_price": 160.65,
               "exit_reason": "SL",
-              "pnl": 6745.38
+              "pnl": 6743.75
             }
           ]
         }
@@ -1953,25 +1953,25 @@
       },
       "summary": {
         "days": 6,
-        "gross": -1538.36,
+        "gross": -1530.75,
         "costs": 0.0,
-        "net": -1538.36,
+        "net": -1530.75,
         "win_days": 2,
-        "max_drawdown": -3936.14,
+        "max_drawdown": -3932.5,
         "trades": 18
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -592.12,
+          "gross": -591.5,
           "costs": 0.0,
-          "net": -592.12,
-          "worst_mtm": -1199.87,
+          "net": -591.5,
+          "worst_mtm": -1199.25,
           "best_mtm": 663.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "9554d2dffee66569dc0fe247380f082a4db9987014820f64ec7e4381c7b74ca1",
+          "mtm_sha256": "6e55f16537d5360bbe2f574359b2644584b87c54879531991769ce76b2ecc95d",
           "trades": [
             {
               "leg": "ce",
@@ -1985,9 +1985,9 @@
               "entry_time": "09:24",
               "entry_price": 161.95,
               "exit_time": "12:06",
-              "exit_price": 195.9595,
+              "exit_price": 195.95,
               "exit_reason": "SL",
-              "pnl": -2210.62
+              "pnl": -2210.0
             },
             {
               "leg": "pe",
@@ -2025,15 +2025,15 @@
         },
         {
           "day": "2026-09-24",
-          "gross": 663.32,
+          "gross": 663.0,
           "costs": 0.0,
-          "net": 663.32,
-          "worst_mtm": -2271.43,
-          "best_mtm": 757.57,
+          "net": 663.0,
+          "worst_mtm": -2271.75,
+          "best_mtm": 757.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "dc6f3066bd52ad4a48dcecc54d905078ba399836b8d38a662b9dcfab94984666",
+          "mtm_sha256": "46191910239216e4cc6774be74c9a89cdc5eb152232f6f98521d122a4760b97e",
           "trades": [
             {
               "leg": "ce",
@@ -2063,9 +2063,9 @@
               "entry_time": "09:24",
               "entry_price": 129.75,
               "exit_time": "09:48",
-              "exit_price": 156.9975,
+              "exit_price": 157.0,
               "exit_reason": "SL",
-              "pnl": -1771.09
+              "pnl": -1771.25
             },
             {
               "leg": "pe",
@@ -2079,23 +2079,23 @@
               "entry_time": "10:55",
               "entry_price": 129.75,
               "exit_time": "11:32",
-              "exit_price": 156.9975,
+              "exit_price": 157.0,
               "exit_reason": "SL",
-              "pnl": -1771.09
+              "pnl": -1771.25
             }
           ]
         },
         {
           "day": "2026-09-25",
-          "gross": -3053.96,
+          "gross": -3051.75,
           "costs": 0.0,
-          "net": -3053.96,
-          "worst_mtm": -3053.96,
-          "best_mtm": 67.14,
+          "net": -3051.75,
+          "worst_mtm": -3051.75,
+          "best_mtm": 68.25,
           "stopped_by": "overall SL at 11:17",
           "notes": [],
           "mtm_points": 114,
-          "mtm_sha256": "3ab1d37fa26abfed3d213f089140330b137b2f53c5cb653cc5c2a3d2d6182627",
+          "mtm_sha256": "fb83e2842781782ecab4502cb17ed978a6d30026418dce658fda020b68949c66",
           "trades": [
             {
               "leg": "ce",
@@ -2125,9 +2125,9 @@
               "entry_time": "09:24",
               "entry_price": 117.7,
               "exit_time": "09:42",
-              "exit_price": 142.417,
+              "exit_price": 142.4,
               "exit_reason": "SL",
-              "pnl": -1606.61
+              "pnl": -1605.5
             },
             {
               "leg": "pe",
@@ -2141,23 +2141,23 @@
               "entry_time": "10:08",
               "entry_price": 117.7,
               "exit_time": "10:47",
-              "exit_price": 142.417,
+              "exit_price": 142.4,
               "exit_reason": "SL",
-              "pnl": -1606.61
+              "pnl": -1605.5
             }
           ]
         },
         {
           "day": "2026-09-28",
-          "gross": 5380.54,
+          "gross": 5382.0,
           "costs": 0.0,
-          "net": 5380.54,
+          "net": 5382.0,
           "worst_mtm": 0.0,
-          "best_mtm": 5543.04,
+          "best_mtm": 5544.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "1bc7e95221b5fd02c0a6788da1a0795a2d1681e8a4b2841647c1b8f7a7ecf9bb",
+          "mtm_sha256": "6a9286510bcbecbdc4ccfb6c90ec385ed52932bc5d5f7e69ee6d0a2e9afc557f",
           "trades": [
             {
               "leg": "ce",
@@ -2187,23 +2187,23 @@
               "entry_time": "09:24",
               "entry_price": 82.25,
               "exit_time": "09:33",
-              "exit_price": 99.5225,
+              "exit_price": 99.5,
               "exit_reason": "SL",
-              "pnl": -1122.71
+              "pnl": -1121.25
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": -3572.66,
+          "gross": -3571.75,
           "costs": 0.0,
-          "net": -3572.66,
-          "worst_mtm": -3572.66,
-          "best_mtm": 3185.2,
+          "net": -3571.75,
+          "worst_mtm": -3571.75,
+          "best_mtm": 3185.0,
           "stopped_by": "overall SL at 12:41",
           "notes": [],
           "mtm_points": 198,
-          "mtm_sha256": "92ac1bbaab54225fcc579172c6c3c21556236c021882ebc488e0748a5ae9b0fa",
+          "mtm_sha256": "5c5781b9019f15a2bcf7a08a2f9a191823c0cc23d731f7c24e19e9a12a167da0",
           "trades": [
             {
               "leg": "ce",
@@ -2217,9 +2217,9 @@
               "entry_time": "09:24",
               "entry_price": 117.0,
               "exit_time": "11:30",
-              "exit_price": 141.57,
+              "exit_price": 141.55,
               "exit_reason": "SL",
-              "pnl": -1597.05
+              "pnl": -1595.75
             },
             {
               "leg": "pe",
@@ -2233,9 +2233,9 @@
               "entry_time": "09:24",
               "entry_price": 70.7,
               "exit_time": "09:27",
-              "exit_price": 85.547,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -965.05
+              "pnl": -965.25
             },
             {
               "leg": "pe",
@@ -2249,9 +2249,9 @@
               "entry_time": "11:11",
               "entry_price": 70.7,
               "exit_time": "12:32",
-              "exit_price": 85.547,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -965.05
+              "pnl": -965.25
             },
             {
               "leg": "ce",
@@ -2273,15 +2273,15 @@
         },
         {
           "day": "2026-10-01",
-          "gross": -363.48,
+          "gross": -360.75,
           "costs": 0.0,
-          "net": -363.48,
-          "worst_mtm": -2630.42,
-          "best_mtm": 3000.27,
+          "net": -360.75,
+          "worst_mtm": -2629.25,
+          "best_mtm": 3003.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "ab20ef6a50f730f54b552f670bf96a0c82bcfaa1b8270d9148778caa6422b45e",
+          "mtm_sha256": "cf0763737c6ac3fe90eb6ff584282c57eeed7053adae616a43373cb2d9de5903",
           "trades": [
             {
               "leg": "ce",
@@ -2295,9 +2295,9 @@
               "entry_time": "09:24",
               "entry_price": 190.8,
               "exit_time": "10:01",
-              "exit_price": 230.868,
+              "exit_price": 230.85,
               "exit_reason": "SL",
-              "pnl": -2604.42
+              "pnl": -2603.25
             },
             {
               "leg": "pe",
@@ -2311,9 +2311,9 @@
               "entry_time": "09:24",
               "entry_price": 129.4,
               "exit_time": "12:24",
-              "exit_price": 156.574,
+              "exit_price": 156.55,
               "exit_reason": "SL",
-              "pnl": -1766.31
+              "pnl": -1764.75
             },
             {
               "leg": "ce",
@@ -2339,32 +2339,32 @@
       "id": "nifty_widesl_917_closest_premium__all_6d",
       "strategy_file": "nifty_widesl_917_closest_premium.yaml",
       "strategy_id": "nifty_widesl_917_closest_premium",
-      "strategy_spec_hash": "688772ef8ede",
+      "strategy_spec_hash": "974f3b550c78",
       "window": {
         "from": "2026-09-23",
         "to": "2026-10-01"
       },
       "summary": {
         "days": 6,
-        "gross": -8017.1,
+        "gross": -7829.25,
         "costs": 0.0,
-        "net": -8017.1,
+        "net": -7829.25,
         "win_days": 2,
-        "max_drawdown": -8894.6,
+        "max_drawdown": -8791.25,
         "trades": 12
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": 877.5,
+          "gross": 962.0,
           "costs": 0.0,
-          "net": 877.5,
-          "worst_mtm": -646.75,
-          "best_mtm": 1017.25,
+          "net": 962.0,
+          "worst_mtm": -747.5,
+          "best_mtm": 1069.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 368,
-          "mtm_sha256": "63a09437b593a4ea1cda988f6af13094a7a313c00b630b611978680de0472c2b",
+          "mtm_sha256": "ab16989da5ea14794f861e7994c2b635da094986ef88771612446ef2dbc99479",
           "trades": [
             {
               "leg": "ce",
@@ -2372,15 +2372,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23550.0,
+                "strike": 23500.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 54.25,
+              "entry_price": 71.75,
               "exit_time": "15:25",
-              "exit_price": 61.75,
+              "exit_price": 82.4,
               "exit_reason": "EXIT_TIME",
-              "pnl": -487.5
+              "pnl": -692.25
             },
             {
               "leg": "pe",
@@ -2388,29 +2388,29 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23200.0,
+                "strike": 23250.0,
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 53.6,
+              "entry_price": 66.55,
               "exit_time": "15:25",
-              "exit_price": 32.6,
+              "exit_price": 41.1,
               "exit_reason": "EXIT_TIME",
-              "pnl": 1365.0
+              "pnl": 1654.25
             }
           ]
         },
         {
           "day": "2026-09-24",
-          "gross": -2626.0,
+          "gross": -2590.25,
           "costs": 0.0,
-          "net": -2626.0,
-          "worst_mtm": -2626.0,
+          "net": -2590.25,
+          "worst_mtm": -2590.25,
           "best_mtm": 0.0,
-          "stopped_by": "overall SL at 13:26",
+          "stopped_by": "overall SL at 13:42",
           "notes": [],
-          "mtm_points": 250,
-          "mtm_sha256": "ef7b4836df1995d925a50a6c10ed268e989e19ba01f8c496f2a3f700141f0560",
+          "mtm_points": 266,
+          "mtm_sha256": "608e48bddbc295bb106ce8caaebe0f80221399c96d580d6617ac99fba78b649e",
           "trades": [
             {
               "leg": "ce",
@@ -2418,15 +2418,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-09-29",
-                "strike": 23400.0,
+                "strike": 23350.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 52.65,
-              "exit_time": "13:26",
-              "exit_price": 38.3,
+              "entry_price": 70.5,
+              "exit_time": "13:42",
+              "exit_price": 49.35,
               "exit_reason": "OVERALL_SL",
-              "pnl": 932.75
+              "pnl": 1374.75
             },
             {
               "leg": "pe",
@@ -2439,10 +2439,10 @@
               },
               "entry_time": "09:17",
               "entry_price": 66.0,
-              "exit_time": "13:26",
-              "exit_price": 120.75,
+              "exit_time": "13:42",
+              "exit_price": 127.0,
               "exit_reason": "OVERALL_SL",
-              "pnl": -3558.75
+              "pnl": -3965.0
             }
           ]
         },
@@ -2540,15 +2540,15 @@
         },
         {
           "day": "2026-09-29",
-          "gross": -2618.85,
+          "gross": -2619.5,
           "costs": 0.0,
-          "net": -2618.85,
-          "worst_mtm": -2618.85,
+          "net": -2619.5,
+          "worst_mtm": -2619.5,
           "best_mtm": 48.75,
           "stopped_by": "overall SL at 11:12",
           "notes": [],
           "mtm_points": 116,
-          "mtm_sha256": "5f6db122cf99960c15324cc5c3d71657c07c41107f07b9eff241a1c3cd8a485f",
+          "mtm_sha256": "2b96484beffbc090d6aaf6604b5d502fe42d580c469c3bbf3fc215969a887cda",
           "trades": [
             {
               "leg": "ce",
@@ -2578,23 +2578,23 @@
               "entry_time": "09:17",
               "entry_price": 54.6,
               "exit_time": "09:35",
-              "exit_price": 117.39,
+              "exit_price": 117.4,
               "exit_reason": "SL",
-              "pnl": -4081.35
+              "pnl": -4082.0
             }
           ]
         },
         {
           "day": "2026-10-01",
-          "gross": -2769.0,
+          "gross": -2700.75,
           "costs": 0.0,
-          "net": -2769.0,
-          "worst_mtm": -2769.0,
-          "best_mtm": 539.5,
-          "stopped_by": "overall SL at 12:46",
+          "net": -2700.75,
+          "worst_mtm": -2700.75,
+          "best_mtm": 627.25,
+          "stopped_by": "overall SL at 12:45",
           "notes": [],
-          "mtm_points": 210,
-          "mtm_sha256": "764a59322b518f0fcfdabd2179db2b2f4d3b44d4203076b1a5c8b3846e34cbe7",
+          "mtm_points": 209,
+          "mtm_sha256": "8b6f90d0f815198fee2fefa96e16a67d91e806e873aad4cf27ba54d848bb0873",
           "trades": [
             {
               "leg": "ce",
@@ -2602,15 +2602,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-10-06",
-                "strike": 22800.0,
+                "strike": 22750.0,
                 "option_type": "CE"
               },
               "entry_time": "09:17",
-              "entry_price": 53.1,
-              "exit_time": "12:46",
-              "exit_price": 30.15,
+              "entry_price": 67.55,
+              "exit_time": "12:45",
+              "exit_price": 35.7,
               "exit_reason": "OVERALL_SL",
-              "pnl": 1491.75
+              "pnl": 2070.25
             },
             {
               "leg": "pe",
@@ -2618,15 +2618,15 @@
               "quantity": 65,
               "contract": {
                 "expiry": "2026-10-06",
-                "strike": 22400.0,
+                "strike": 22450.0,
                 "option_type": "PE"
               },
               "entry_time": "09:17",
-              "entry_price": 57.0,
-              "exit_time": "12:46",
-              "exit_price": 122.55,
-              "exit_reason": "SL",
-              "pnl": -4260.75
+              "entry_price": 70.8,
+              "exit_time": "12:45",
+              "exit_price": 144.2,
+              "exit_reason": "OVERALL_SL",
+              "pnl": -4771.0
             }
           ]
         }
@@ -2643,11 +2643,11 @@
       },
       "summary": {
         "days": 6,
-        "gross": -5447.32,
+        "gross": -5450.25,
         "costs": 0.0,
-        "net": -5447.32,
+        "net": -5450.25,
         "win_days": 3,
-        "max_drawdown": -6269.57,
+        "max_drawdown": -6272.5,
         "trades": 12
       },
       "days": [
@@ -2791,15 +2791,15 @@
         },
         {
           "day": "2026-09-28",
-          "gross": 508.46,
+          "gross": 507.0,
           "costs": 0.0,
-          "net": 508.46,
-          "worst_mtm": -1259.54,
-          "best_mtm": 550.71,
+          "net": 507.0,
+          "worst_mtm": -1261.0,
+          "best_mtm": 549.25,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 371,
-          "mtm_sha256": "d489f7f304d6f0b5cc36c19e6e8f8b002457698a01acc94e15056e6089ccac53",
+          "mtm_sha256": "e3599739a0de60347a6f3b1a4b32960f2c3243b94ea931d3f4f10ee289a2646a",
           "trades": [
             {
               "leg": "ce",
@@ -2829,23 +2829,23 @@
               "entry_time": "09:17",
               "entry_price": 50.85,
               "exit_time": "10:41",
-              "exit_price": 109.3275,
+              "exit_price": 109.35,
               "exit_reason": "SL",
-              "pnl": -3801.04
+              "pnl": -3802.5
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": -2826.04,
+          "gross": -2827.5,
           "costs": 0.0,
-          "net": -2826.04,
-          "worst_mtm": -2826.04,
+          "net": -2827.5,
+          "worst_mtm": -2827.5,
           "best_mtm": 341.25,
           "stopped_by": "overall SL at 11:30",
           "notes": [],
           "mtm_points": 134,
-          "mtm_sha256": "3456e6c93ed389ae20c999d2fcd2966891f9cff6d58ba9074fe826e468f7c985",
+          "mtm_sha256": "c7d4178828ede669ad3d5a6290bbfe6d7549627ebe98228d79489ae0b93244e4",
           "trades": [
             {
               "leg": "ce",
@@ -2875,9 +2875,9 @@
               "entry_time": "09:17",
               "entry_price": 35.85,
               "exit_time": "09:32",
-              "exit_price": 77.0775,
+              "exit_price": 77.1,
               "exit_reason": "SL",
-              "pnl": -2679.79
+              "pnl": -2681.25
             }
           ]
         },
@@ -2940,25 +2940,25 @@
       },
       "summary": {
         "days": 3,
-        "gross": -650.81,
+        "gross": -646.75,
         "costs": 0.0,
-        "net": -650.81,
+        "net": -646.75,
         "win_days": 1,
-        "max_drawdown": -788.94,
+        "max_drawdown": -786.5,
         "trades": 5
       },
       "days": [
         {
           "day": "2026-09-23",
-          "gross": -62.56,
+          "gross": -61.75,
           "costs": 0.0,
-          "net": -62.56,
+          "net": -61.75,
           "worst_mtm": -728.0,
           "best_mtm": 598.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "8290d80e90b554b0a3f04a5aeae398c0c0f3238b64b7266bbe38888077226cb4",
+          "mtm_sha256": "86f2ddac6ebbeb13dd7f11c553296109126b783c801e55d640f1a1a11a52c52f",
           "trades": [
             {
               "leg": "pe",
@@ -2988,23 +2988,23 @@
               "entry_time": "10:18",
               "entry_price": 44.65,
               "exit_time": "12:48",
-              "exit_price": 53.4875,
+              "exit_price": 53.5,
               "exit_reason": "SL",
-              "pnl": 574.44
+              "pnl": 575.25
             }
           ]
         },
         {
           "day": "2026-09-24",
-          "gross": -726.37,
+          "gross": -724.75,
           "costs": 0.0,
-          "net": -726.37,
-          "worst_mtm": -726.37,
+          "net": -724.75,
+          "worst_mtm": -724.75,
           "best_mtm": 182.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "fa7bb4a34fcbaeb34e0c5713c0a4531a0cac097c4a2f1bd9e056473fb335f727",
+          "mtm_sha256": "a27c00714bfd948e539cc2e1df3fba2bc2c74749d6b80b4481e3a7813590d429",
           "trades": [
             {
               "leg": "pe",
@@ -3018,23 +3018,23 @@
               "entry_time": "09:45",
               "entry_price": 64.7,
               "exit_time": "10:09",
-              "exit_price": 53.525,
+              "exit_price": 53.55,
               "exit_reason": "SL",
-              "pnl": -726.37
+              "pnl": -724.75
             }
           ]
         },
         {
           "day": "2026-09-25",
-          "gross": 138.12,
+          "gross": 139.75,
           "costs": 0.0,
-          "net": 138.12,
-          "worst_mtm": -1311.38,
-          "best_mtm": 489.12,
+          "net": 139.75,
+          "worst_mtm": -1309.75,
+          "best_mtm": 490.75,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 339,
-          "mtm_sha256": "af153c25c01e544a61244b5c92e42d5d60377f64baac7a0015178300808f6fec",
+          "mtm_sha256": "3a4120d09ec0e262a40da58f17b2179f290f029b98316c998c7f5a6f104377c3",
           "trades": [
             {
               "leg": "pe",
@@ -3048,9 +3048,9 @@
               "entry_time": "09:52",
               "entry_price": 66.9,
               "exit_time": "10:07",
-              "exit_price": 50.175,
+              "exit_price": 50.2,
               "exit_reason": "SL",
-              "pnl": -1087.12
+              "pnl": -1085.5
             },
             {
               "leg": "ce",
@@ -3083,25 +3083,25 @@
       },
       "summary": {
         "days": 3,
-        "gross": 1444.4,
+        "gross": 1449.5,
         "costs": 0.0,
-        "net": 1444.4,
+        "net": 1449.5,
         "win_days": 1,
-        "max_drawdown": -3936.14,
+        "max_drawdown": -3932.5,
         "trades": 9
       },
       "days": [
         {
           "day": "2026-09-28",
-          "gross": 5380.54,
+          "gross": 5382.0,
           "costs": 0.0,
-          "net": 5380.54,
+          "net": 5382.0,
           "worst_mtm": 0.0,
-          "best_mtm": 5543.04,
+          "best_mtm": 5544.5,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "1bc7e95221b5fd02c0a6788da1a0795a2d1681e8a4b2841647c1b8f7a7ecf9bb",
+          "mtm_sha256": "6a9286510bcbecbdc4ccfb6c90ec385ed52932bc5d5f7e69ee6d0a2e9afc557f",
           "trades": [
             {
               "leg": "ce",
@@ -3131,23 +3131,23 @@
               "entry_time": "09:24",
               "entry_price": 82.25,
               "exit_time": "09:33",
-              "exit_price": 99.5225,
+              "exit_price": 99.5,
               "exit_reason": "SL",
-              "pnl": -1122.71
+              "pnl": -1121.25
             }
           ]
         },
         {
           "day": "2026-09-29",
-          "gross": -3572.66,
+          "gross": -3571.75,
           "costs": 0.0,
-          "net": -3572.66,
-          "worst_mtm": -3572.66,
-          "best_mtm": 3185.2,
+          "net": -3571.75,
+          "worst_mtm": -3571.75,
+          "best_mtm": 3185.0,
           "stopped_by": "overall SL at 12:41",
           "notes": [],
           "mtm_points": 198,
-          "mtm_sha256": "92ac1bbaab54225fcc579172c6c3c21556236c021882ebc488e0748a5ae9b0fa",
+          "mtm_sha256": "5c5781b9019f15a2bcf7a08a2f9a191823c0cc23d731f7c24e19e9a12a167da0",
           "trades": [
             {
               "leg": "ce",
@@ -3161,9 +3161,9 @@
               "entry_time": "09:24",
               "entry_price": 117.0,
               "exit_time": "11:30",
-              "exit_price": 141.57,
+              "exit_price": 141.55,
               "exit_reason": "SL",
-              "pnl": -1597.05
+              "pnl": -1595.75
             },
             {
               "leg": "pe",
@@ -3177,9 +3177,9 @@
               "entry_time": "09:24",
               "entry_price": 70.7,
               "exit_time": "09:27",
-              "exit_price": 85.547,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -965.05
+              "pnl": -965.25
             },
             {
               "leg": "pe",
@@ -3193,9 +3193,9 @@
               "entry_time": "11:11",
               "entry_price": 70.7,
               "exit_time": "12:32",
-              "exit_price": 85.547,
+              "exit_price": 85.55,
               "exit_reason": "SL",
-              "pnl": -965.05
+              "pnl": -965.25
             },
             {
               "leg": "ce",
@@ -3217,15 +3217,15 @@
         },
         {
           "day": "2026-10-01",
-          "gross": -363.48,
+          "gross": -360.75,
           "costs": 0.0,
-          "net": -363.48,
-          "worst_mtm": -2630.42,
-          "best_mtm": 3000.27,
+          "net": -360.75,
+          "worst_mtm": -2629.25,
+          "best_mtm": 3003.0,
           "stopped_by": null,
           "notes": [],
           "mtm_points": 364,
-          "mtm_sha256": "ab20ef6a50f730f54b552f670bf96a0c82bcfaa1b8270d9148778caa6422b45e",
+          "mtm_sha256": "cf0763737c6ac3fe90eb6ff584282c57eeed7053adae616a43373cb2d9de5903",
           "trades": [
             {
               "leg": "ce",
@@ -3239,9 +3239,9 @@
               "entry_time": "09:24",
               "entry_price": 190.8,
               "exit_time": "10:01",
-              "exit_price": 230.868,
+              "exit_price": 230.85,
               "exit_reason": "SL",
-              "pnl": -2604.42
+              "pnl": -2603.25
             },
             {
               "leg": "pe",
@@ -3255,9 +3255,9 @@
               "entry_time": "09:24",
               "entry_price": 129.4,
               "exit_time": "12:24",
-              "exit_price": 156.574,
+              "exit_price": 156.55,
               "exit_reason": "SL",
-              "pnl": -1766.31
+              "pnl": -1764.75
             },
             {
               "leg": "ce",
