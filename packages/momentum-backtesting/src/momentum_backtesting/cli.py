@@ -862,10 +862,11 @@ def stocks_fetch_benchmarks(
         False, "--skip-catalog", help="Write the raw snapshots and the CSV only."
     ),
 ) -> None:
-    """Fetch ONLY the comparison-only TRIs (Nifty Midcap 150, Smallcap 250, Midcap150 Momentum
-    50, Nifty500 Momentum 50) and add them to data/stocks/benchmarks_weekly.csv and the shared
-    catalog's stock_weekly_series. Touches no other column, series or table, so it is safe
-    without the full `mbt stocks fetch` rebuild (which needs NSE bhavcopies)."""
+    """Fetch ONLY the comparison-only TRIs (Nifty Midcap 150, Smallcap 250, Next 50, Midcap150
+    Momentum 50, Nifty500 Momentum 50, Nifty 500) and add them to
+    data/stocks/benchmarks_weekly.csv and the shared catalog's stock_weekly_series. Touches no
+    other column, series or table, so it is safe without the full `mbt stocks fetch` rebuild
+    (which needs NSE bhavcopies)."""
     from datetime import date as date_cls
 
     from .stocks import adjust

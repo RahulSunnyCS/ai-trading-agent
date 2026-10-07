@@ -217,14 +217,22 @@ export function MomentumKpiCards({
   tax,
   expanded,
   detailOnly = false,
+  aheadOfBenchmark,
 }: {
   result: MomentumResult;
   tax: boolean;
   expanded: boolean;
   /** Only the detail tiles: the headline strip (MomentumHeadline) shows the rest. */
   detailOnly?: boolean;
+  /** Share of 52-week windows ahead of the PICKED benchmark. The run's own `kpis` only know
+   * the benchmark it was run with, so the tile that quotes it is overridden when this is given
+   * (null = unknown against the picked one). */
+  aheadOfBenchmark?: number | null | undefined;
 }) {
-  const k = result.kpis;
+  const k =
+    aheadOfBenchmark === undefined
+      ? result.kpis
+      : { ...result.kpis, pct_rolling_52w_ahead: aheadOfBenchmark };
   const b = result.benchmark_name;
   const runs = useMomentumRunsStore((state) => state.runs);
   const previous = previousComparableRun(runs, result);

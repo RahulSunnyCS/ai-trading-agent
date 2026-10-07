@@ -432,6 +432,10 @@ The system is a **real-time event-driven pipeline** in four layers:
   never call `Intl.*`, `toFixed` or `toLocaleString`. Use `formatInr`, `formatPct` (takes a
   fraction; pass `{ unit: 'percent' }` otherwise), `formatPp`, `formatNumber`, `formatDay`
   (a zone-less 'YYYY-MM-DD'), `formatIstDate` / `formatIstTime` (instants), `EMPTY`
+- **Dashboard analytics pages follow one pattern** — icon-rail sidebar, run bar + settings drawer,
+  headline strip with a benchmark picker, a full-width hero chart with a follow tooltip, and widgets
+  that load after the chart paints. The rules and vocabulary are in `apps/dashboard/CLAUDE.md` →
+  Analytics page pattern; a new result page reuses it rather than adding side columns or tabs
 - **Dashboard controls come from `components/ui/`** — `SegmentedControl` for one-of-N,
   `Tabs` for any tab bar (the only place `role="tablist"` appears), `Input` / `Select` /
   `NumberField` for fields, `RefreshButton`, `CopyButton`, `toast()`. Do not hand-roll another

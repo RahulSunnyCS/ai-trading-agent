@@ -19,6 +19,7 @@ import {
 import {
   type BenchmarkOption,
   type BenchmarkView,
+  aheadShare,
   trailingReturn,
   yearToDate,
   yearlyRows,
@@ -147,12 +148,13 @@ export function BenchmarkPicker({
           <DropdownMenu.Label className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-faint">
             Compare against · CAGR same period
           </DropdownMenu.Label>
-          <DropdownMenu.RadioGroup value={view.fallback ? '' : view.name} onValueChange={onPick}>
+          <DropdownMenu.RadioGroup value={view.name} onValueChange={onPick}>
             {options.map((option) => (
               <DropdownMenu.RadioItem
                 key={option.name}
                 value={option.name}
                 disabled={!option.available}
+                title={option.reason ?? undefined}
                 className="flex h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2.5 text-sm outline-none data-[disabled]:cursor-not-allowed data-[highlighted]:bg-surface-2 data-[disabled]:opacity-50"
               >
                 <span className="w-3.5 text-primary">
@@ -347,8 +349,19 @@ export function MomentumHeadline({
           gap={ytd === null ? null : `YTD ${formatPct(ytd, 1, { sign: true })}`}
         />
       </div>
+      {view.replaced ? (
+        <p className="border-t border-border bg-warning/10 px-4 py-1.5 text-xs text-muted sm:px-5">
+          {view.replaced.label} has no usable data for this run
+          {view.replaced.reason ? ` (${view.replaced.reason})` : ''}, so {view.label} is shown
+          instead.
+        </p>
+      ) : null}
       <div className="flex items-center gap-x-5 gap-y-1 overflow-hidden border-t border-border px-4 py-2 text-xs text-muted sm:px-5">
-        <div className="flex min-w-0 flex-1 items-center gap-x-5 overflow-hidden">
+        {/* One line, never wrapping: what does not fit fades out, and "All metrics" has the rest. */}
+        <div
+          className="flex min-w-0 flex-1 items-center gap-x-5 overflow-hidden [mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]"
+          title="All metrics shows the full set"
+        >
           <Inline label="Sortino">{formatNumber(num(k.sortino))}</Inline>
           <Inline label="Volatility">{formatPct(num(k.volatility))}</Inline>
           <Inline label="Beat it">
@@ -412,7 +425,13 @@ export function MomentumHeadline({
             </p>
           ) : null}
           <MomentumInsights result={result} view={view} yearly={yearlyRows(series)} />
-          <MomentumKpiCards result={result} tax={Boolean(config.tax)} expanded detailOnly />
+          <MomentumKpiCards
+            result={result}
+            tax={Boolean(config.tax)}
+            expanded
+            detailOnly
+            aheadOfBenchmark={view.fallback ? undefined : aheadShare(series.rolling_52w_excess)}
+          />
         </div>
       ) : null}
     </section>

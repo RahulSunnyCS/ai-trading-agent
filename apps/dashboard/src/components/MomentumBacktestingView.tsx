@@ -1,6 +1,5 @@
 'use client';
 
-import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlertCircle,
   ArrowUp,
@@ -76,6 +75,7 @@ import { MomentumRunBar } from './momentum/backtest/MomentumRunBar';
 import { MomentumSettingsChips } from './momentum/backtest/MomentumSettingsChips';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
+import { Drawer } from './ui/Drawer';
 import { SegmentedControl, type SegmentedOption } from './ui/SegmentedControl';
 import { StateMessage } from './ui/StateMessage';
 import { type TabItem, Tabs } from './ui/Tabs';
@@ -685,10 +685,13 @@ export function MomentumBacktestingView() {
     const failure = await useMomentumRunsStore.getState().startRun(dataset, config, fresh);
     setStarting(null);
     if (failure) setStartError(failure);
+    // The run is under way: close the drawer so the progress banner and the previous result
+    // behind it are in view. A failed start keeps it open, with the reason in its run bar.
+    else setDrawerOpen(false);
   }
 
-  // When the run on screen finishes while you are here, close the settings drawer and, if the
-  // summary is out of view, say so where you are looking. Switching to an already-finished tab
+  // When the run on screen finishes while you are here and the summary is out of view, say so
+  // where you are looking. Switching to an already-finished tab
   // changes the run id, so it does neither.
   const watchedRef = useRef<{ id: string | null; running: boolean }>({ id: null, running: false });
   // Layout effect, not requestAnimationFrame: it measures the freshly committed layout
@@ -698,7 +701,6 @@ export function MomentumBacktestingView() {
     const nowDone = activeRun?.status === 'done';
     watchedRef.current = { id: activeRun?.id ?? null, running };
     if (!(prev.running && prev.id === activeRun?.id && nowDone)) return;
-    setDrawerOpen(false);
     const rect = summaryRef.current?.getBoundingClientRect();
     // The header + headline numbers sit at the card's top edge; a sliver of its bottom
     // peeking into view doesn't count as "seen".
@@ -838,22 +840,48 @@ export function MomentumBacktestingView() {
   }
   useEffect(() => {
     if (!revealSection) return;
-    const node = document.getElementById(settingsSectionDomId(revealSection.id));
-    if (!node) return;
-    const body = settingsBodyRef.current;
-    if (body && body.scrollHeight > body.clientHeight + 1) {
-      // The drawer's body scrolls on its own, so move only it.
-      const offset = node.getBoundingClientRect().top - body.getBoundingClientRect().top;
-      body.scrollTo({ top: body.scrollTop + offset - 8, behavior: 'smooth' });
-    } else {
-      node.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    node.querySelector('button')?.focus({ preventScroll: true });
+    // The drawer mounts its content a render after it opens, so the section may not exist yet:
+    // look again on the next frames instead of giving up.
+    let frame = 0;
+    let tries = 0;
+    const reveal = (): void => {
+      const node = document.getElementById(settingsSectionDomId(revealSection.id));
+      if (!node) {
+        tries += 1;
+        if (tries < 30) frame = requestAnimationFrame(reveal);
+        return;
+      }
+      const body = settingsBodyRef.current;
+      if (body && body.scrollHeight > body.clientHeight + 1) {
+        // The drawer's body scrolls on its own, so move only it.
+        const offset = node.getBoundingClientRect().top - body.getBoundingClientRect().top;
+        body.scrollTo({ top: body.scrollTop + offset - 8, behavior: 'smooth' });
+      } else {
+        node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      node.querySelector('button')?.focus({ preventScroll: true });
+    };
+    reveal();
+    return () => cancelAnimationFrame(frame);
   }, [revealSection]);
+
+  // The drawer belongs to the Backtest section: leaving it (Back, another tab) closes it, so it
+  // does not pop open when you return.
+  useEffect(() => {
+    if (section !== 'backtest') setDrawerOpen(false);
+  }, [section]);
+
+  // Which run's hero chart has drawn its first frame; the widgets below wait for it.
+  const [paintedRunId, setPaintedRunId] = useState<string | null>(null);
 
   const resultEnd = result?.series.dates.at(-1);
   // Everything comparative on the page follows the headline picker (lib/momentumBenchmark).
-  const benchmarkView = result ? resolveBenchmark(result, pickedBenchmark) : null;
+  // Memoised: it is a new object each call, and everything below keys on it, so without this the
+  // charts would redraw on every render (the run timer ticks four times a second).
+  const benchmarkView = useMemo(
+    () => (result ? resolveBenchmark(result, pickedBenchmark) : null),
+    [result, pickedBenchmark],
+  );
   const benchmarkMenu = useMemo(() => (result ? benchmarkOptions(result) : []), [result]);
   const chartSeries = useMemo(
     () => (result && benchmarkView ? withBenchmark(result.series, benchmarkView) : null),
@@ -1079,93 +1107,84 @@ export function MomentumBacktestingView() {
               </div>
             ) : null}
 
-            <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
-              <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 z-40 bg-black/30 data-[state=open]:animate-fade-in" />
-                <Dialog.Content
-                  aria-describedby={undefined}
-                  onKeyDown={onSettingsKeyDown}
-                  className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[30rem] flex-col border-l border-border-strong bg-surface shadow-elevated focus:outline-none data-[state=open]:animate-fade-in"
-                >
-                  <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <Dialog.Title className="text-sm font-semibold text-foreground">
-                        Strategy settings
-                      </Dialog.Title>
-                      <p className="truncate text-xs text-muted">
-                        {datasetLabel} ·{' '}
-                        {modified.size === 0
-                          ? 'dataset defaults'
-                          : `${modified.size} ${modified.size === 1 ? 'section' : 'sections'} changed from the defaults`}
-                      </p>
-                    </div>
-                    {confirmReset ? (
-                      <>
-                        <span className="text-xs text-muted">Discard edits?</span>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => {
-                            setConfirmReset(false);
-                            void loadMeta(dataset);
-                          }}
-                        >
-                          Reset
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)}>
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setConfirmReset(true)}
-                        disabled={loading || reloading || modified.size === 0}
-                        title="Put every setting back to the dataset's defaults"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        Defaults
-                      </Button>
-                    )}
-                    <Dialog.Close asChild>
-                      <Button size="icon" variant="ghost" aria-label="Close settings">
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </Dialog.Close>
-                  </div>
-                  <div ref={settingsBodyRef} className="min-h-0 flex-1 overflow-y-auto p-4">
-                    {loading || !meta ? (
-                      <MomentumSettingsSkeleton />
-                    ) : (
-                      <MomentumSettingsPanel
-                        dataset={dataset}
-                        instruments={meta.instruments}
-                        firstWeek={meta.first_week}
-                        lastWeek={meta.last_week}
-                        core={core}
-                        onCoreChange={onCoreChange}
-                        values={values}
-                        onChange={onValueChange}
-                        openSections={openSections}
-                        onToggleSection={toggleSection}
-                        modifiedSections={modified}
-                      />
-                    )}
-                  </div>
-                  <MomentumRunBar
-                    starting={starting}
-                    disabled={!meta}
-                    dirty={dirty}
-                    hasRun={lastRunConfig !== null}
-                    inFlightCount={inFlightCount}
-                    runError={runError}
-                    runErrorRef={runErrorRef}
-                    onRun={(options) => void runBacktest(options)}
-                  />
-                </Dialog.Content>
-              </Dialog.Portal>
-            </Dialog.Root>
+            <Drawer
+              open={drawerOpen}
+              onOpenChange={(open) => {
+                setDrawerOpen(open);
+                // A reset question left open would still be showing next time.
+                if (!open) setConfirmReset(false);
+              }}
+              title="Strategy settings"
+              subtitle={`${datasetLabel} · ${
+                modified.size === 0
+                  ? 'dataset defaults'
+                  : `${modified.size} ${modified.size === 1 ? 'section' : 'sections'} changed from the defaults`
+              }`}
+              closeLabel="Close settings"
+              onKeyDown={onSettingsKeyDown}
+              bodyRef={settingsBodyRef}
+              actions={
+                confirmReset ? (
+                  <>
+                    <span className="text-xs text-muted">Discard edits?</span>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => {
+                        setConfirmReset(false);
+                        void loadMeta(dataset);
+                      }}
+                    >
+                      Reset
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmReset(false)}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setConfirmReset(true)}
+                    disabled={loading || reloading || modified.size === 0}
+                    title="Put every setting back to the dataset's defaults"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Defaults
+                  </Button>
+                )
+              }
+              footer={
+                <MomentumRunBar
+                  starting={starting}
+                  disabled={!meta}
+                  dirty={dirty}
+                  hasRun={lastRunConfig !== null}
+                  inFlightCount={inFlightCount}
+                  runError={runError}
+                  runErrorRef={runErrorRef}
+                  onRun={(options) => void runBacktest(options)}
+                />
+              }
+            >
+              {loading || !meta ? (
+                <MomentumSettingsSkeleton />
+              ) : (
+                <MomentumSettingsPanel
+                  dataset={dataset}
+                  instruments={meta.instruments}
+                  firstWeek={meta.first_week}
+                  lastWeek={meta.last_week}
+                  core={core}
+                  onCoreChange={onCoreChange}
+                  values={values}
+                  onChange={onValueChange}
+                  openSections={openSections}
+                  onToggleSection={toggleSection}
+                  modifiedSections={modified}
+                />
+              )}
+            </Drawer>
 
             {/* One tab per run, once there is more than one to switch between. */}
             {runs.length > 1 ? (
@@ -1268,6 +1287,7 @@ export function MomentumBacktestingView() {
                   comparisons={otherIndices}
                   flashKey={finishedAt}
                   broad={shownRun?.dataset === 'broad'}
+                  onPainted={() => setPaintedRunId(shownRun?.id ?? '')}
                 />
                 <MomentumResultWidgets
                   key={shownRun?.id ?? ''}
@@ -1278,6 +1298,7 @@ export function MomentumBacktestingView() {
                   config={shownConfig ?? {}}
                   savedRuns={savedRuns}
                   broad={shownRun?.dataset === 'broad'}
+                  chartPainted={paintedRunId === (shownRun?.id ?? '')}
                 />
               </div>
             ) : null}

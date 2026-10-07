@@ -1,12 +1,21 @@
 'use client';
 
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { useWidgetActivation } from '../../hooks/useWidgetActivation';
 import { cn } from '../../lib/cn';
 import { formatDay, formatInt, formatPct } from '../../lib/format';
 import {
   type BenchmarkView,
+  aheadShare,
   changeBetween,
   worstEpisodes,
   yearlyRows,
@@ -36,6 +45,16 @@ const PREFETCH_MS = {
   instruments: 2800,
 } as const;
 
+/** False until the hero chart has painted (or `READY_FALLBACK_MS` has passed): the widgets
+ * hold back so they do not compete with it. */
+const ReadyContext = createContext(true);
+
+/** The chart is slow or failed: the widgets load anyway after this long. */
+const READY_FALLBACK_MS = 4000;
+
+/** How near the fold the circuit-exposure slot must come before its second engine run starts. */
+const CIRCUIT_MARGIN = '0px 0px 120px 0px';
+
 /**
  * A card below the fold: title, a one-line description and actions on one header row, then its
  * content once it is near the screen (or its prefetch time has come). Half width by default;
@@ -59,7 +78,8 @@ function Widget({
   children: () => ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
-  const active = useWidgetActivation(ref, { prefetchAfterMs });
+  const ready = useContext(ReadyContext);
+  const active = useWidgetActivation(ref, { prefetchAfterMs, ready });
   return (
     <section
       ref={ref}
@@ -81,13 +101,32 @@ function Widget({
   );
 }
 
-/** A widget-less lazy slot, for a section that draws its own card (circuit exposure). */
-function LazySlot({ children }: { children: () => ReactNode }) {
+/**
+ * A lazy slot for an expensive section that draws its own card (circuit exposure: a second
+ * engine run). It loads only when scrolled to, never in the background, and shows a short
+ * placeholder until then so the reader can see it exists.
+ */
+function LazySlot({ title, children }: { title: string; children: () => ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const active = useWidgetActivation(ref, { prefetchAfterMs: null });
+  const ready = useContext(ReadyContext);
+  const active = useWidgetActivation(ref, {
+    prefetchAfterMs: null,
+    margin: CIRCUIT_MARGIN,
+    ready,
+    expensive: true,
+  });
   return (
     <div ref={ref} className="min-w-0 lg:col-span-2">
-      {active ? children() : null}
+      {active ? (
+        children()
+      ) : (
+        <section
+          aria-label={title}
+          className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-xs text-faint"
+        >
+          {title} loads when you scroll here.
+        </section>
+      )}
     </div>
   );
 }
@@ -228,12 +267,6 @@ function BenchmarkFallsBody({ series, view }: { series: MomentumSeries; view: Be
   );
 }
 
-/** Share of 52-week windows in which the strategy was ahead of the benchmark. */
-function aheadShare(excess: ReadonlyArray<number | null>): number | null {
-  const known = excess.filter((value): value is number => value !== null);
-  return known.length ? known.filter((value) => value > 0).length / known.length : null;
-}
-
 function rolling52(values: ReadonlyArray<number | null>): Array<number | null> {
   return values.map((value, index) => {
     const start = values[index - 52];
@@ -254,6 +287,7 @@ export function MomentumResultWidgets({
   config,
   savedRuns,
   broad,
+  chartPainted = true,
 }: {
   runId: string;
   result: MomentumResult;
@@ -262,8 +296,15 @@ export function MomentumResultWidgets({
   config: Record<string, unknown>;
   savedRuns: MomentumSavedRun[];
   broad: boolean;
+  /** The hero chart has drawn its first frame; the widgets wait for it. */
+  chartPainted?: boolean;
 }) {
   const [tradeFilter, setTradeFilter] = useState('');
+  const [fallbackElapsed, setFallbackElapsed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setFallbackElapsed(true), READY_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, []);
   const yearly = useMemo(() => yearlyRows(series), [series]);
   const rollingLines = useMemo(
     () => [
@@ -276,88 +317,97 @@ export function MomentumResultWidgets({
   const tradeCount = result.kpis.exits_per_year;
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-2">
-      <Widget
-        wide
-        title="This week"
-        meta="The latest signals and what the portfolio holds now"
-        prefetchAfterMs={PREFETCH_MS.week}
-        placeholderRows={6}
-      >
-        {() => <WeekPanel runId={runId} result={result} config={config} />}
-      </Widget>
-      <Widget title="Yearly returns" meta={`Green years beat ${view.label}, red trailed it`}>
-        {() => <MomentumYearlyChart rows={yearly as never} benchmarkName={view.label} />}
-      </Widget>
-      <Widget
-        title="Rolling 1-year return"
-        meta={
-          ahead === null
-            ? 'Return over each trailing 52 weeks'
-            : `Ahead of ${view.label} in ${formatPct(ahead, 0)} of 52-week windows`
-        }
-      >
-        {() => (
-          <MomentumLineChart
-            dates={series.dates}
-            lines={rollingLines}
-            height={280}
-            label={`Trailing 52-week return of the strategy and ${view.label}`}
-          />
-        )}
-      </Widget>
-      <Widget title="Drawdowns" meta="The deepest falls and how long they lasted">
-        {() => <DrawdownsBody series={series} view={view} />}
-      </Widget>
-      <Widget title="Monthly returns" meta="By calendar month, with the year's total">
-        {() => <MomentumMonthlyHeatmap series={series} benchmarkName={view.label} />}
-      </Widget>
-      <Widget
-        wide
-        title="Trades"
-        meta={
-          typeof tradeCount === 'number'
-            ? `Newest first · about ${formatInt(Math.round(tradeCount))} exits a year`
-            : 'Newest first'
-        }
-        prefetchAfterMs={PREFETCH_MS.trades}
-      >
-        {() => <TradesPanel runId={runId} filter={tradeFilter} onFilter={setTradeFilter} />}
-      </Widget>
-      <Widget
-        title={`${view.label}'s worst falls`}
-        meta="And what the strategy did over the same weeks"
-      >
-        {() => <BenchmarkFallsBody series={series} view={view} />}
-      </Widget>
-      <Widget title="Compare runs" meta="Saved runs of this dataset, side by side">
-        {() =>
-          savedRuns.length ? (
-            <MomentumCompare runs={savedRuns} />
-          ) : (
-            <p className="text-sm text-muted">
-              No saved runs to compare yet. Each finished run is saved automatically.
-            </p>
-          )
-        }
-      </Widget>
-      <Widget
-        wide
-        title="Holdings timeline"
-        meta="What was held when, and today's split"
-        prefetchAfterMs={PREFETCH_MS.timeline}
-      >
-        {() => <TimelinePanel runId={runId} result={result} />}
-      </Widget>
-      {broad ? <LazySlot>{() => <MomentumCircuitExposureLoader runId={runId} />}</LazySlot> : null}
-      <Widget
-        wide
-        title="Instrument attribution"
-        meta="How each instrument contributed across the whole run"
-        prefetchAfterMs={PREFETCH_MS.instruments}
-      >
-        {() => <InstrumentsPanel runId={runId} />}
-      </Widget>
-    </div>
+    <ReadyContext.Provider value={chartPainted || fallbackElapsed}>
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Widget
+          wide
+          title="This week"
+          meta="The latest signals and what the portfolio holds now"
+          prefetchAfterMs={PREFETCH_MS.week}
+          placeholderRows={6}
+        >
+          {() => <WeekPanel runId={runId} result={result} config={config} />}
+        </Widget>
+        <Widget title="Yearly returns" meta={`Green years beat ${view.label}, red trailed it`}>
+          {() => <MomentumYearlyChart rows={yearly as never} benchmarkName={view.label} />}
+        </Widget>
+        <Widget
+          title="Rolling 1-year return"
+          meta={
+            ahead === null
+              ? 'Return over each trailing 52 weeks'
+              : `Ahead of ${view.label} in ${formatPct(ahead, 0)} of 52-week windows`
+          }
+        >
+          {() => (
+            <MomentumLineChart
+              dates={series.dates}
+              lines={rollingLines}
+              height={280}
+              label={`Trailing 52-week return of the strategy and ${view.label}`}
+            />
+          )}
+        </Widget>
+        <Widget title="Drawdowns" meta="The deepest falls and how long they lasted">
+          {() => <DrawdownsBody series={series} view={view} />}
+        </Widget>
+        <Widget title="Monthly returns" meta="By calendar month, with the year's total">
+          {() => <MomentumMonthlyHeatmap series={series} benchmarkName={view.label} />}
+        </Widget>
+        <Widget
+          wide
+          title="Trades"
+          meta={
+            typeof tradeCount === 'number'
+              ? `Newest first · about ${formatInt(Math.round(tradeCount))} exits a year`
+              : 'Newest first'
+          }
+          prefetchAfterMs={PREFETCH_MS.trades}
+        >
+          {() => <TradesPanel runId={runId} filter={tradeFilter} onFilter={setTradeFilter} />}
+        </Widget>
+        <Widget
+          title={`${view.label}'s worst falls`}
+          meta="And what the strategy did over the same weeks"
+        >
+          {() => <BenchmarkFallsBody series={series} view={view} />}
+        </Widget>
+        <Widget
+          title="Compare runs"
+          meta="Saved runs of this dataset, side by side; edge is against each run's own benchmark"
+        >
+          {() =>
+            savedRuns.length ? (
+              <MomentumCompare runs={savedRuns} />
+            ) : (
+              <p className="text-sm text-muted">
+                No saved runs to compare yet. Each finished run is saved automatically.
+              </p>
+            )
+          }
+        </Widget>
+        <Widget
+          wide
+          title="Holdings timeline"
+          meta="What was held when, and today's split"
+          prefetchAfterMs={PREFETCH_MS.timeline}
+        >
+          {() => <TimelinePanel runId={runId} result={result} />}
+        </Widget>
+        {broad ? (
+          <LazySlot title="Circuit exposure">
+            {() => <MomentumCircuitExposureLoader runId={runId} />}
+          </LazySlot>
+        ) : null}
+        <Widget
+          wide
+          title="Instrument attribution"
+          meta="How each instrument contributed across the whole run"
+          prefetchAfterMs={PREFETCH_MS.instruments}
+        >
+          {() => <InstrumentsPanel runId={runId} />}
+        </Widget>
+      </div>
+    </ReadyContext.Provider>
   );
 }

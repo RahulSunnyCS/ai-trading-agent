@@ -25,7 +25,10 @@ beating it is what makes running this strategy worth the effort.
 
 > [!NOTE]
 > Nifty 200 Momentum 30 before August 2020 is NSE's back-calculation, not live history. An
-> index without data for the run's period shows *no data* in the menu.
+> index without data for the run's period shows *no data* in the menu, and hovering it says why
+> (it starts after the run's first week, it ends early, or it has a gap of more than a week). If
+> your last pick has no data for a run, the page shows the run's own benchmark and says so under
+> the headline numbers instead of switching quietly.
 
 ## The headline numbers
 
@@ -62,8 +65,10 @@ from one year is fragile.
 
 ## The sections below the chart
 
-They load in the background once the chart is on screen, and any section you scroll to loads
-straight away.
+They load in the background once the chart has drawn, and any section you scroll to loads
+straight away. Circuit exposure (Broad Momentum only) costs a second run of the engine, so it
+loads only when you scroll to it. Compare runs shows each saved run's edge against *its own*
+benchmark, not the one picked on the headline.
 
 | Section | What it shows |
 |---|---|

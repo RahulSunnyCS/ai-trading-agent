@@ -133,7 +133,8 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     chapter: 'momentum',
     slug: 'backtest-results',
     title: 'Backtest: reading the results',
-    summary: 'The headline cards, the equity chart and the detail tabs, and what good looks like.',
+    summary:
+      'The headline cards, the equity chart and the sections below it, and what good looks like.',
     kind: 'Screen',
     body: momentumBacktestResults,
     screen: { tab: 'momentum', rest: ['backtest'] },

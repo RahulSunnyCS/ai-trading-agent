@@ -36,7 +36,7 @@ export function MomentumRunBar({
 }) {
   const busy = starting !== null;
   return (
-    <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 space-y-2 rounded-b-xl border-t border-border bg-surface px-4 py-3 md:bottom-0 xl:static">
+    <div className="shrink-0 space-y-2 border-t border-border bg-surface px-4 py-3">
       {runError ? (
         <div
           ref={runErrorRef}
