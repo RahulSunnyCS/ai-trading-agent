@@ -78,3 +78,7 @@ consolidation tightness pick better than momentum alone?
 - 2026-10-06 — created from the owner's chart-pattern idea; split out as the cheap first test.
 - 2026-10-06 — owner: a hard prerequisite is BL-010 (momentum evaluation review) *and* the UI
   changes that come out of it; only then start this.
+- 2026-10-07 — owner asked for an early pattern POC. The tightness test (as "tight range / VCP")
+  runs under [BL-042](BL-042-chart-pattern-poc.md), together with flag and cup and handle.
+  `override: research-only POC under BL-042; the BL-010/BL-036 prerequisite is waived for that item
+  only; default ranking, goldens and weekly signal untouched.`

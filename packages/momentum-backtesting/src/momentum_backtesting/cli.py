@@ -2577,6 +2577,79 @@ def sources_check() -> None:
     raise typer.Exit(1 if failed else 0)
 
 
+patterns_app = typer.Typer(
+    no_args_is_help=True,
+    help="BL-042 chart-pattern POC (research only): detect tight ranges, flags and cups.",
+)
+app.add_typer(patterns_app, name="patterns")
+
+
+@patterns_app.command("detect")
+def patterns_detect() -> None:
+    """Detections for the development window over the point-in-time Broad universe ->
+    data/patterns/detections_dev.parquet. Never reads the sealed hold-out."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.detect_development(echo=typer.echo)
+
+
+@patterns_app.command("formation")
+def patterns_formation() -> None:
+    """Phase 2b: each detected base's momentum rank at its start, midpoint and detection ->
+    data/patterns/formation_summary.md. Reads ranks only, never a forward return."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.formation_report(echo=typer.echo)
+
+
+@patterns_app.command("gallery")
+def patterns_gallery() -> None:
+    """Phase 3: write data/patterns/gallery.html (charts cut at the detection day, symbol hidden)
+    and its manifest, for the owner to label."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.gallery(echo=typer.echo)
+
+
+@patterns_app.command("study")
+def patterns_study() -> None:
+    """Phase 4: the event study on the development window. Refuses to run before the detectors
+    are frozen (a bl042 addendum with detectors_frozen: true)."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.event_study(echo=typer.echo)
+
+
+@patterns_app.command("rank")
+def patterns_rank() -> None:
+    """Phase 5: baseline + every shape on the development window, walk-forward and PBO. Refuses
+    to run before the detectors are frozen."""
+    from .config import load_repo_env
+    from .patterns import run
+
+    load_repo_env()
+    run.ranking_test(echo=typer.echo)
+
+
+@patterns_app.command("holdout")
+def patterns_holdout() -> None:
+    """Phase 6: the ONE run on the sealed 2024-01 -> 2026-09 hold-out, for the patterns that
+    passed Phases 3-5. Claims the run first and refuses a second; needs committed code."""
+    from .config import load_repo_env
+    from .patterns import holdout
+
+    load_repo_env()
+    holdout.run(echo=typer.echo)
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),

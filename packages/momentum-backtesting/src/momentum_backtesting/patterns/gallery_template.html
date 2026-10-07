@@ -1,0 +1,289 @@
+<title>BL-042 Pattern Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a label bench. Summary bar + filters on top, then a grid of chart cards, each with its verdict buttons. Tokens follow the dashboard's "Quant Studio" set. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --surface-2: #eef0f3; --border: #dfe3e8; --border-strong: #c6ccd5;
+  --fg: #16181d; --muted: #5f6673; --faint: #646b78;
+  --primary: #3b5bdb; --primary-fg: #ffffff;
+  --positive: #1d8a4a; --negative: #c7414a; --warning: #b9771d;
+  --base: rgba(42, 120, 214, 0.12); --base-edge: #2a78d6; --mark: #eb6834;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121417; --surface: #191c21; --surface-2: #20242b; --border: #2a2f38; --border-strong: #3a414d;
+    --fg: #e8eaee; --muted: #9aa1ac; --faint: #8b929d;
+    --primary: #7f9cff; --primary-fg: #0d1020;
+    --positive: #4cc072; --negative: #f07079; --warning: #e0a24a;
+    --base: rgba(57, 135, 229, 0.16); --base-edge: #3987e5; --mark: #e0773f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121417; --surface: #191c21; --surface-2: #20242b; --border: #2a2f38; --border-strong: #3a414d;
+  --fg: #e8eaee; --muted: #9aa1ac; --faint: #8b929d;
+  --primary: #7f9cff; --primary-fg: #0d1020;
+  --positive: #4cc072; --negative: #f07079; --warning: #e0a24a;
+  --base: rgba(57, 135, 229, 0.16); --base-edge: #3987e5; --mark: #e0773f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 64px; display: grid; gap: 20px; }
+header { display: grid; gap: 8px; }
+h1 { font-size: 22px; font-weight: 600; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 68ch; }
+.summary { display: flex; flex-wrap: wrap; gap: 12px; }
+.tally { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; min-width: 0; display: grid; gap: 2px; }
+.tally b { font-weight: 500; }
+.tally .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+.bar { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; width: 180px; max-width: 100%; }
+.bar i { display: block; height: 100%; background: var(--primary); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; font: inherit; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--fg); font-weight: 500; }
+label.check { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
+.status { color: var(--faint); font-size: 13px; }
+.status.warn { color: var(--warning); }
+details.rules { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
+details.rules summary { cursor: pointer; font-weight: 500; }
+details.rules dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 10px 0 0; }
+details.rules dt { font-weight: 500; }
+details.rules dd { margin: 0; color: var(--muted); max-width: 80ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.card[data-label="correct"] { border-color: var(--positive); }
+.card[data-label="wrong"] { border-color: var(--negative); }
+.card[data-label="unsure"] { border-color: var(--warning); }
+.card-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.card-head .id { font-family: var(--font-mono); color: var(--faint); font-size: 12px; }
+.card-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--font-mono); font-size: 12px; background: var(--surface-2); color: var(--muted); padding: 2px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+svg.chart { width: 100%; height: auto; display: block; }
+svg.chart text { font-family: var(--font-mono); font-size: 10px; fill: var(--faint); }
+.verdict { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.verdict button { font: inherit; border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg); padding: 5px 12px; border-radius: var(--radius); cursor: pointer; }
+.verdict button:hover { background: var(--surface-2); }
+.verdict button:focus-visible, .seg button:focus-visible, input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.verdict button[aria-pressed="true"][data-v="correct"] { background: var(--positive); border-color: var(--positive); color: var(--primary-fg); }
+.verdict button[aria-pressed="true"][data-v="wrong"] { background: var(--negative); border-color: var(--negative); color: var(--primary-fg); }
+.verdict button[aria-pressed="true"][data-v="unsure"] { background: var(--warning); border-color: var(--warning); color: var(--primary-fg); }
+.verdict input { flex: 1 1 180px; min-width: 0; font: inherit; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--fg); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.empty { color: var(--muted); padding: 24px 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>BL-042 Pattern Gallery</h1>
+    <p class="lede">Each chart ends on the day the detector fired. Symbol and exact date are hidden so the shape is judged on its own. Mark each one: is this a real example of the named pattern, as you would trade it? A few charts are deliberate near-misses, mixed in unmarked.</p>
+    <div class="legend" aria-hidden="true">
+      <span><i class="sw" style="background: var(--base); outline: 1px solid var(--base-edge)"></i>Base the detector found</span>
+      <span><i class="sw" style="background: var(--warning)"></i>Pivot (breakout level)</span>
+      <span><i class="sw" style="background: var(--mark)"></i>Pole / cup points</span>
+    </div>
+  </header>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Pattern" id="filter"></div>
+    <label class="check"><input type="checkbox" id="only-open"> Unlabelled only</label>
+    <span class="status" id="status">Connecting to saved labels…</span>
+  </div>
+
+  <details class="rules">
+    <summary>What each detector looks for</summary>
+    <dl>
+      <dt>Tight range</dt><dd>An uptrend (above the 30-week average, 25%+ off the 52-week low), then the last 3, 5 or 8 weeks trade in a band of at most 8 / 12 / 15% that is also no more than half the stock's usual band for that length. Pivot: the band's high.</dd>
+      <dt>Bull flag</dt><dd>A pole of 20%+ in 3–25 trading days, then 5–20 days that give back at most a third of the pole and 15% from its top, with highs not rising and volume below the pole's. Pivot: the flag's high.</dd>
+      <dt>Cup and handle</dt><dd>After a 30%+ advance, a U-shaped cup of 7–65 weeks and 12–35% depth, right lip within 10% of the left, then a 1–4 week handle in the cup's upper half, at most 15% deep. Pivot: the handle's high. Drawn in weekly bars.</dd>
+    </dl>
+  </details>
+
+  <div class="grid" id="grid"><p class="empty">Loading charts…</p></div>
+</div>
+
+<script type="application/json" id="gallery-data">__GALLERY_DATA__</script>
+<script>
+(() => {
+  const items = JSON.parse(document.getElementById("gallery-data").textContent);
+  const PATTERNS = [["all", "All"], ["tight_range", "Tight range"], ["flag", "Bull flag"], ["cup_handle", "Cup and handle"]];
+  const labels = {};          // id -> {label, note}
+  let filter = "all";
+  let db = null;
+  let writable = true;
+  const statusEl = document.getElementById("status");
+  const onlyOpen = document.getElementById("only-open");
+
+  const pct = (x) => (x * 100).toFixed(1) + "%";
+  const GEOMETRY = {
+    tight_range: (g) => [`${g.weeks} wk`, `range ${pct(g.range)}`, `${g.range_vs_own_median.toFixed(2)}× usual`, g.volume_10d_vs_50d != null ? `vol ${g.volume_10d_vs_50d.toFixed(2)}× 50d` : null],
+    flag: (g) => [`pole +${pct(g.pole_rise)} in ${g.pole_days}d`, `flag ${g.flag_days}d`, `−${pct(g.drop_from_pole_high)} from top`, `vol ${g.flag_vs_pole_volume.toFixed(2)}× pole`],
+    cup_handle: (g) => [`cup ${g.cup_weeks} wk`, `depth ${pct(g.depth)}`, `handle ${g.handle_weeks} wk −${pct(g.handle_depth)}`, `advance +${pct(g.prior_advance)}`],
+  };
+
+  function setStatus(text, warn) { statusEl.textContent = text; statusEl.classList.toggle("warn", !!warn); }
+
+  function chartSvg(item) {
+    const c = item.chart, n = c.c.length;
+    const W = 600, H = 250, padL = 8, padR = 52, top = 10, priceH = 170, volTop = 190, volH = 44;
+    const lows = c.l.concat([item.pivot]), highs = c.h.concat([item.pivot]);
+    let lo = Math.min(...lows), hi = Math.max(...highs);
+    const span = hi - lo || hi * 0.01; lo -= span * 0.04; hi += span * 0.04;
+    const step = (W - padL - padR) / n, bw = Math.max(1, Math.min(8, step * 0.7));
+    const x = (i) => padL + step * (i + 0.5);
+    const y = (p) => top + (hi - p) / (hi - lo) * priceH;
+    const vmax = Math.max(...c.v) || 1;
+    const idx = (date) => { let k = c.d.findIndex((d) => d >= date); return k < 0 ? n - 1 : k; };
+    const parts = [];
+    // grid + price ticks
+    for (let t = 0; t <= 3; t++) {
+      const p = lo + (hi - lo) * t / 3, yy = y(p).toFixed(1);
+      parts.push(`<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" stroke="var(--border)" stroke-width="1"/>`);
+      parts.push(`<text x="${W - padR + 6}" y="${(+yy + 3).toFixed(1)}">${p.toFixed(p < 100 ? 2 : 0)}</text>`);
+    }
+    // base box
+    const b0 = idx(item.base_start), b1 = n - 1;
+    let bLo = Infinity, bHi = -Infinity;
+    for (let i = b0; i <= b1; i++) { bLo = Math.min(bLo, c.l[i]); bHi = Math.max(bHi, c.h[i]); }
+    parts.push(`<rect x="${(x(b0) - step / 2).toFixed(1)}" y="${y(bHi).toFixed(1)}" width="${((b1 - b0 + 1) * step).toFixed(1)}" height="${(y(bLo) - y(bHi)).toFixed(1)}" fill="var(--base)" stroke="var(--base-edge)" stroke-width="1"/>`);
+    // candles + volume
+    for (let i = 0; i < n; i++) {
+      const up = c.c[i] >= c.o[i], col = up ? "var(--positive)" : "var(--negative)";
+      const yo = y(c.o[i]), yc = y(c.c[i]);
+      parts.push(`<line x1="${x(i).toFixed(1)}" x2="${x(i).toFixed(1)}" y1="${y(c.h[i]).toFixed(1)}" y2="${y(c.l[i]).toFixed(1)}" stroke="${col}" stroke-width="1"/>`);
+      parts.push(`<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${Math.min(yo, yc).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0.8, Math.abs(yc - yo)).toFixed(1)}" fill="${col}"/>`);
+      const vh = c.v[i] / vmax * volH;
+      parts.push(`<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${(volTop + volH - vh).toFixed(1)}" width="${bw.toFixed(1)}" height="${vh.toFixed(1)}" fill="var(--border-strong)"/>`);
+    }
+    // pivot line
+    const yp = y(item.pivot).toFixed(1);
+    parts.push(`<line x1="${(x(b0) - step / 2).toFixed(1)}" x2="${W - padR}" y1="${yp}" y2="${yp}" stroke="var(--warning)" stroke-width="1.5" stroke-dasharray="4 3"/>`);
+    // pattern points
+    const g = item.geometry, marks = [];
+    if (item.pattern === "flag") marks.push([item.base_start, "low", "pole start"], [g.pole_top, "high", "pole top"]);
+    if (item.pattern === "cup_handle") marks.push([g.left_lip, "high", "left lip"], [g.bottom, "low", "bottom"], [g.right_lip, "high", "right lip"]);
+    for (const [date, side, name] of marks) {
+      if (!date) continue;
+      const k = idx(date), py = side === "high" ? y(c.h[k]) - 6 : y(c.l[k]) + 6;
+      parts.push(`<circle cx="${x(k).toFixed(1)}" cy="${py.toFixed(1)}" r="3.5" fill="var(--mark)"><title>${name}</title></circle>`);
+    }
+    // date axis
+    parts.push(`<text x="${padL}" y="${H - 2}">${c.d[0].slice(5)}</text>`);
+    parts.push(`<text x="${W - padR}" y="${H - 2}" text-anchor="end">${c.d[n - 1].slice(5)} · ${c.unit === "week" ? "weekly" : "daily"}</text>`);
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${item.title} chart, ${n} ${c.unit} bars">${parts.join("")}</svg>`;
+  }
+
+  function renderSummary() {
+    const box = document.getElementById("summary");
+    box.innerHTML = "";
+    for (const [key, name] of PATTERNS) {
+      const mine = key === "all" ? items : items.filter((it) => it.pattern === key);
+      const done = mine.filter((it) => labels[it.id]?.label);
+      const correct = done.filter((it) => labels[it.id].label === "correct").length;
+      const judged = done.filter((it) => labels[it.id].label !== "unsure").length;
+      const el = document.createElement("div");
+      el.className = "tally";
+      el.innerHTML = `<b></b><span class="num"></span><span class="bar"><i></i></span>`;
+      el.querySelector("b").textContent = name;
+      el.querySelector(".num").textContent = `${done.length} / ${mine.length} labelled · ${judged ? Math.round(correct / judged * 100) + "% marked correct" : "none judged yet"}`;
+      el.querySelector("i").style.width = (mine.length ? done.length / mine.length * 100 : 0) + "%";
+      box.appendChild(el);
+    }
+  }
+
+  function renderFilter() {
+    const box = document.getElementById("filter");
+    box.innerHTML = "";
+    for (const [key, name] of PATTERNS) {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = name; b.setAttribute("aria-pressed", String(filter === key));
+      b.addEventListener("click", () => { filter = key; renderFilter(); renderGrid(); });
+      box.appendChild(b);
+    }
+  }
+
+  async function save(id, patch) {
+    const next = { ...(labels[id] || {}), ...patch, at: new Date().toISOString() };
+    labels[id] = next;
+    applyLabel(id); renderSummary();
+    if (!db || !writable) { setStatus(db ? "Read-only: your labels are not being saved." : "Labels can't be saved in this view.", true); return; }
+    try {
+      await db.collection("labels").doc(id).set({ label: next.label || null, note: next.note || "", at: next.at });
+      setStatus("Saved");
+    } catch (e) {
+      if (e && e.code === "invalid_argument") { writable = false; setStatus("You can view this gallery but not save labels.", true); }
+      else setStatus("Could not save the last label. Check your connection and click it again.", true);
+    }
+  }
+
+  function applyLabel(id) {
+    const card = document.querySelector(`.card[data-id="${id}"]`);
+    if (!card) return;
+    const cur = labels[id] || {};
+    card.dataset.label = cur.label || "";
+    card.querySelectorAll(".verdict button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === cur.label)));
+    const input = card.querySelector("input");
+    if (document.activeElement !== input) input.value = cur.note || "";
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById("grid");
+    const shown = items.filter((it) => (filter === "all" || it.pattern === filter) && (!onlyOpen.checked || !labels[it.id]?.label));
+    grid.innerHTML = "";
+    if (!shown.length) { grid.innerHTML = `<p class="empty">Nothing left to label here.</p>`; return; }
+    for (const it of shown) {
+      const card = document.createElement("article");
+      card.className = "card"; card.dataset.id = it.id;
+      const chips = (GEOMETRY[it.pattern](it.geometry) || []).filter(Boolean).map((t) => `<span class="chip">${t}</span>`).join("");
+      card.innerHTML = `
+        <div class="card-head"><h2></h2><span class="id"></span></div>
+        ${chartSvg(it)}
+        <div class="chips">${chips}<span class="chip">pivot ${it.pivot}</span></div>
+        <div class="verdict">
+          <button type="button" data-v="correct">Correct</button>
+          <button type="button" data-v="wrong">Wrong</button>
+          <button type="button" data-v="unsure">Unsure</button>
+          <input type="text" id="note-${it.id}" placeholder="Note (optional): what is off?" aria-label="Note for ${it.id}">
+        </div>`;
+      card.querySelector("h2").textContent = `${it.title} · ${it.year}`;
+      card.querySelector(".id").textContent = it.id;
+      card.querySelectorAll(".verdict button").forEach((b) => b.addEventListener("click", () => save(it.id, { label: b.dataset.v })));
+      const input = card.querySelector("input");
+      input.addEventListener("change", () => save(it.id, { note: input.value.trim() }));
+      grid.appendChild(card);
+      applyLabel(it.id);
+    }
+  }
+
+  renderFilter(); renderSummary(); renderGrid();
+  onlyOpen.addEventListener("change", renderGrid);
+
+  (async () => {
+    db = window.claude ? await window.claude.use("db") : null;
+    if (!db) { setStatus("Saved labels are unavailable in this view; open the gallery on claude.ai to label.", true); return; }
+    db.collection("labels").onSnapshot((snap) => {
+      for (const doc of snap.docs) {
+        const d = doc.data() || {};
+        const input = document.getElementById(`note-${doc.id}`);
+        labels[doc.id] = { label: d.label || null, note: d.note || "" };
+        if (input && document.activeElement === input) labels[doc.id].note = input.value;
+      }
+      document.querySelectorAll(".card").forEach((c) => applyLabel(c.dataset.id));
+      renderSummary();
+      const done = Object.values(labels).filter((l) => l.label).length;
+      setStatus(`${done} of ${items.length} labelled · saved automatically`);
+    }, (e) => setStatus(e && e.code === "revoked" ? "Labels are no longer available in this view." : "Lost the connection to saved labels. Reload the page.", true));
+  })();
+})();
+</script>
