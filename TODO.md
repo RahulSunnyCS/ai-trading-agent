@@ -20,7 +20,7 @@ per-task acceptance detail. They no longer carry status or open items.
 - Status lives here. `.claude/project/overview.md` holds *what is built*; this
   file holds *what is left*.
 
-Last updated: 2026-10-06
+Last updated: 2026-10-08
 
 **Closed while consolidating** (they were still listed as open somewhere, but
 are done): the stray `yarn.lock` and `package-lock.json` are both gone; T-51
@@ -598,6 +598,20 @@ The owner's numbers, written before the first rupee; nothing here trades.
 |---|---|---|---|
 | 3.22.1 | Phase 1: rules file (`live_rules.toml`): paper first; cut half at 20%, exit at 30%; review at 5 pts behind over 13 weeks | owner→claude | **Done 2026-10-07**: signed off by the owner |
 | 3.22.2 | Phase 2: weekly check after the Friday final run → Telegram alert naming the rule and its action | claude | **Built 2026-10-07** (`mbt live-rules check`, job `momentum-live-rules` Fri 21:30). Drawdown and money gate measured on the paper model portfolio; the trailing rule says "not measurable" until BL-024 Phase 2 scores the journal |
+
+### 3.23 Momentum filter POC — [BL-050](backlog/BL-050-momentum-filter-poc.md)
+
+Research only, Broad (stocks) only: six pre-registered filters tested against the frozen BL-010
+Phase 6 ensemble, which stays unchanged. The plan, the owner's answers and the rules live in the
+backlog item and `search_spaces/bl050_criteria.json`.
+
+| # | Task | Owner | State |
+|---|---|---|---|
+| 3.23.0 | Phase 0: red-team the draft, owner answers, criteria committed | owner→claude | **Done 2026-10-08** (`bl050_criteria.json`; nothing run) |
+| 3.23.1 | Phase 1: six features, pick-level tilt hook, hold-out read guard, prefix-invariance tests; default output unchanged | claude | Open |
+| 3.23.2 | Phase 2: screen (Holm across 6, momentum-decile-matched, 2012–2023) | claude | Open |
+| 3.23.3 | Phase 3: engine test on the frozen ensemble + one hold-out run for survivors | claude | Open |
+| 3.23.4 | Phase 4: forward shadow arm per survivor, ≥ 26 weeks (needs BL-024 Phase 2) | owner→claude | Open |
 
 ## Reference — where detail lives
 

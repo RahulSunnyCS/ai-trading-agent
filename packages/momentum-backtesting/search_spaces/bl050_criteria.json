@@ -1,0 +1,251 @@
+{
+  "written_before_running": "2026-10-08T01:35:00+05:30",
+  "name": "BL-050 momentum filter POC: six filters on the frozen Broad ensemble",
+  "source": "backlog/BL-050-momentum-filter-poc.md - the plan; this file is the machine-readable copy of its rules and holds the exact formulas",
+  "rule": "Committed before any BL-050 feature computation, screen or backtest. Never edited after results are seen: a change is a new file (bl050_criteria_addendum_N.json) that names what it supersedes and why. Code reads these values and never restates them.",
+  "supersedes": null,
+  "owner_approved": "2026-10-08, answers to the start questions recorded in BL-050 (tilt weight 0.25; pick-level tilt; tighter statistical bar; two CLI shadow arms)",
+  "hypothesis": "At least one of V1, V2, R1, M1, M2, T1, applied the same way to all four frozen configs, raises the ensemble's after-cost CAGR robustly across rolling windows without worsening its drawdown.",
+
+  "universe": {
+    "dataset": "Broad Momentum",
+    "universe_kind": "turnover_rank",
+    "membership": "liquidity.turnover_rank_members_by_year, as known each January (top 750 by median daily turnover in July-December of the year before)",
+    "liquidity": "the frozen gate in bl010_phase6_frozen.json fixed_settings (liq_*)",
+    "category_tags": "curated",
+    "series_break_policy": "verified",
+    "delisted": "kept in their historical years; a series that ends is valued at its last real close",
+    "cross_section": "Any cross-sectional step (percentile, quintile, decile) uses only that week's stock_membership (PIT member AND liquidity pass), stock columns only. Never all columns of the price frame: it also holds names that are members only in later years.",
+    "atomics": "ATOMIC_NAMES (Gold, Silver, Nasdaq 100, Hang Seng) are never gated and get a neutral (0.5) feature percentile"
+  },
+
+  "comparator": {
+    "file": "search_spaces/bl010_phase6_frozen.json",
+    "unchanged": true,
+    "ensemble": "choose.ensemble_curve over the four configs (equal capital, reset at the last week before each 1 April)",
+    "tax": "pre-tax",
+    "overrides": "only start and end, set to the window being tested; every other setting exactly as frozen"
+  },
+
+  "data": {
+    "prices": "the adjusted weekly closes the engine trades (UniverseRanking.prices: split/bonus back-adjusted, price-only, no dividends)",
+    "turnover": "bars_1d_stock.turnover (rupees), rows with synthetic_close = true excluded; a split segment column (SYMBOL#2) reads its base symbol's turnover",
+    "week_label": "W-FRI: a session belongs to the week ending on its Friday (sources.weekly), the same label as the prices and the liquidity gate",
+    "benchmark": "reference_benchmarks.NIFTY500_TRI weekly close, matched to the stock weeks by exact W-FRI label with no carry-forward; a missing week makes R1 and M2 missing for that week (counted in the results)",
+    "known_bias": "Nifty 500 TRI includes dividends and the stock prices do not, so R1 is biased against stocks by about half the index dividend yield over 26 weeks. Accepted; no new data."
+  },
+
+  "trials": {
+    "count": 6,
+    "tilt": {
+      "weight": 0.25,
+      "level": "pick",
+      "mechanism": "Category selection runs exactly as frozen on the untouched combined_pool_ranks. Inside each held category, the picks_per_category picks are the names with the highest blended = 0.75 * momentum_pct + 0.25 * feature_pct (ties by pool rank). momentum_pct = 1 - (combined_pool_rank - 1) / (N - 1) over that week's pool; feature_pct = the feature's percentile rank over that week's pool stocks with a value, oriented so 1.0 is best; a missing feature counts as 0.5. The config's own stock_tilt then applies unchanged on top. A held name that stops being a pick loses its rank and is sold, as today.",
+      "default": "off; with the hook off every result is byte-identical"
+    },
+    "gate": {
+      "mechanism": "run_broad_backtest(extra_no_buy=mask): blocks fresh buys only, never forces a sale; a blocked pick's slot goes to the next buyable slot in the engine's rank order",
+      "missing_value": "not blocked"
+    },
+    "features": {
+      "V1": {
+        "family": "volume",
+        "shape": "tilt",
+        "direction": "higher_is_better",
+        "formula": "median(daily turnover, last 20 sessions up to and including the decision Friday) / median(daily turnover, last 130 sessions)",
+        "min_sessions": { "short": 15, "long": 100 }
+      },
+      "V2": {
+        "family": "volume",
+        "shape": "tilt",
+        "direction": "higher_is_better",
+        "formula": "over the last 13 weeks (t-12..t): sum of weekly turnover in weeks whose adjusted weekly return > 0 / sum of weekly turnover in weeks whose return < 0; flat weeks ignored; weekly turnover = sum of that week's daily turnover",
+        "min_weeks": 10,
+        "zero_down_weeks": "+inf (ranks best)"
+      },
+      "R1": {
+        "family": "relative_strength",
+        "shape": "gate",
+        "direction": "names_that_fail_are_worse",
+        "formula": "blocked when P_t / P_(t-26) - 1 <= TRI_t / TRI_(t-26) - 1",
+        "min_weeks": 27
+      },
+      "M1": {
+        "family": "momentum",
+        "shape": "gate",
+        "direction": "overextended_names_are_worse",
+        "formula": "ext = P_t / mean(P_(t-9..t)); blocked when ext >= the 0.95 quantile (linear) of ext over that week's stock_membership names with a value",
+        "min_weeks": 10
+      },
+      "M2": {
+        "family": "momentum",
+        "shape": "tilt",
+        "direction": "higher_is_better",
+        "formula": "OLS of the stock's weekly return on Nifty 500 TRI's weekly return over weeks t-51..t (intercept included); residuals e over that window; M2 = sum(e over t-29..t-4) / std(e over t-51..t, ddof 1)",
+        "min_observations": 46,
+        "min_observations_in_sum": 22
+      },
+      "T1": {
+        "family": "trend_quality",
+        "shape": "tilt",
+        "direction": "higher_is_better",
+        "formula": "OLS of ln(P) on the week index over t-25..t; T1 = slope * 52 * R^2",
+        "min_observations": 24
+      }
+    }
+  },
+
+  "lookahead_checks": [
+    "Every feature at week t uses sessions and closes up to and including the decision Friday t only; signal_delay = 1 is unchanged.",
+    "Prefix invariance, per feature: at 24 decision Fridays sampled evenly over the development window, the value computed from raw daily bars cut at that Friday, with turnover_rank membership and the liquidity gate rebuilt from the cut data, equals the full-data value (relative tolerance 1e-9; M1 and R1 compare the block booleans). Slicing the weekly frame is not enough: it cannot catch a universe leak.",
+    "M1's percentile uses that week's stock_membership only (see universe.cross_section).",
+    "M2 and T1 regressions use trailing windows only.",
+    "Nifty 500 TRI is matched by exact week, never carried forward.",
+    "Screen forward returns start at the fill week t+1, not the decision week.",
+    "Nothing reads a bar dated on or after windows.holdout.from before the one hold-out run (a guard refuses it), and no development forward return ends after windows.development.to."
+  ],
+
+  "windows": {
+    "development": { "from": "2012-01-01", "to": "2023-12-29" },
+    "holdout": {
+      "from": "2024-01-01",
+      "to": "2026-09-25",
+      "status": "reserved, not unseen: the frozen configs were selected on data through 2026-10, and 3.9.23 ran relatives of T1 and M1 over it",
+      "runs_allowed": 1,
+      "claim_file": "search_spaces/bl050_holdout_result.json, written before the run reads any hold-out bar"
+    },
+    "embargo_weeks": 14,
+    "plain": "Development reads no bar on or after 2024-01-01. A screen decision at Friday t needs t + 14 weeks <= 2023-12-29 (one fill week + 13 forward weeks)."
+  },
+
+  "prior_related_trials": {
+    "count_at_least": 39,
+    "detail": [
+      "TODO 3.9.23 on Broad (corrected every-week re-run): every 2 weeks, make_room, weights 0,1,1,1,1, 52-week-high gate, vol target 15% and 20%, smoothness gate, trend gate, breadth gate, dispersion timing, high-vol exclusion = 11",
+      "TODO 3.9.23 follow-up: grouped tilt on Broad, at least 4 settings (0.3 to 1.0, screened or not)",
+      "BL-042 Phase 5: 24 ranking trials on Broad (PBO 0.57)"
+    ],
+    "none_adopted": true,
+    "closest_relatives": {
+      "T1": "smoothness gate (levers.choppy_mask), rejected on Broad, median -5.9",
+      "M1": "near the inverse of the 52-week-high gate (levers.below_high52_mask), marginal",
+      "R1": "a relative cousin of the cash hurdle (defensive='filter'), rejected twice"
+    },
+    "deflated_sharpe_n": 45
+  },
+
+  "phase_2_screen": {
+    "score": {
+      "from_config": "1281e8ed6824",
+      "score": "voladj",
+      "lookbacks": [4, 13, 26, 52],
+      "weights": [4.0, 3.0, 2.0, 1.0],
+      "weight_scheme": "recent",
+      "voladj_skip_recent_month": true,
+      "why": "the frozen configs use three different scores; this one is shared by two of the four (1281e8ed6824, bad83df3821a)"
+    },
+    "decision_weeks": "Fridays whose week number since engine.CADENCE_EPOCH (2016-01-01) is 0 mod 4, from the first such Friday on or after 2012-01-01 through the last t with t + 14 weeks <= 2023-12-29",
+    "candidates": "the top quintile by score among that week's stock_membership names with a score, split into its two momentum deciles",
+    "split": {
+      "tilt": "inside each decile, names with a feature value split at the decile's median feature: better half (by the pre-registered direction) vs worse half",
+      "gate": "inside each decile, blocked vs passed"
+    },
+    "return": "adjusted weekly close from Friday t+1 (the fill week, signal_delay 1) to Friday t+1+h, minus a 0.3% round trip; a series that ends inside the horizon earns its return to its last real close",
+    "cost_note": "the round trip is subtracted from both sides, so it cancels in the spread; stated so the returns are after cost, not as a test",
+    "horizons_weeks": [4, 13],
+    "deciding_horizon_weeks": 13,
+    "weekly_statistic": "sum over the two deciles of n_d * (mean_better_d - mean_worse_d) / sum n_d, where n_d is the smaller half's count (tilts) or the blocked count (gates); for gates, better = passed and worse = blocked",
+    "test": "one-sided t on the weekly statistic series in the pre-registered direction, Newey-West standard errors, lags = ceil(h / 4) (13 weeks: 4; 4 weeks: 1)",
+    "multiple_testing": "Holm across the 6 features at the 13-week horizon, alpha 0.05; the 4-week results are reported only",
+    "minimum_sample": {
+      "decision_weeks": 100,
+      "gate_blocked_name_weeks": 100,
+      "gate_distinct_weeks_with_a_block": 52,
+      "gate_min_block_rate": 0.02,
+      "below": "inconclusive - treated as not passing; reported, never tuned"
+    },
+    "reported": [
+      "per gate: names blocked per decision week (mean, median, max) and block rate among candidates",
+      "per feature: correlation with the momentum score inside the top quintile",
+      "4-week results"
+    ],
+    "pass": "the 13-week test survives Holm and its mean is in the pre-registered direction, with the minimum sample met",
+    "killed": "stops here, except as a PBO trial in Phase 3 (where it cannot pass)"
+  },
+
+  "phase_3_engine_test": {
+    "runs": "all 6 features through all 4 frozen configs (gates via extra_no_buy, tilts via the pick-level hook), each ensembled with choose.ensemble_curve; plus the comparator",
+    "window": "windows.development",
+    "rolling": {
+      "years": 3,
+      "step_weeks": 13,
+      "method": "sweep.rolling_windows over the development weeks; each window a fresh run from its start (sweep.rerun_windows), comparator and trial both"
+    },
+    "pass_all_of": {
+      "median_delta_cagr_pts_min": 2.0,
+      "cagr_win_share_min": 0.7,
+      "full_period_max_drawdown_worse_by_pts_max": 3.0,
+      "pbo_max": 0.3
+    },
+    "pbo": {
+      "method": "CSCV",
+      "blocks": 16,
+      "on": "weekly log returns of the 7 ensemble curves (6 trials + comparator), development window",
+      "trials": 7
+    },
+    "also_must": "pass phase_2_screen; a feature killed there cannot pass here",
+    "reported": [
+      "full-period CAGR, Sharpe, MaxDD, pre-tax",
+      "average holdings and cash share",
+      "turnover (metrics.turnover)",
+      "gate substitutions: blocked buys and what filled the slot",
+      "deflated Sharpe with N = prior_related_trials.deflated_sharpe_n"
+    ]
+  },
+
+  "phase_3_holdout": {
+    "enters": "every feature that passed phase_3_engine_test, all in the one run",
+    "window": "windows.holdout",
+    "runs_allowed": 1,
+    "pass_all_of": {
+      "delta_cagr_pts_min": 0.0,
+      "max_drawdown_worse_by_pts_max": 3.0
+    },
+    "why_weaker": "short window, and in-sample for the frozen base configs; Phase 4 is the deciding test"
+  },
+
+  "phase_4_forward_shadow": {
+    "arms": "one per hold-out survivor (owner, 2026-10-08); each arm = the four frozen configs plus that filter, saved as four favourites, never the active (Telegram) favourite",
+    "starts": "the first Friday after the arm's favourites are saved",
+    "journal": "BL-024 forward journal, next to the frozen ensemble; neither is changed",
+    "display": "CLI only (mbt journal show, the tracker)",
+    "minimum_weeks": 26,
+    "compared_over": "the arm's recorded weeks, against the frozen ensemble over the same weeks",
+    "pass_all_of": [
+      "shadow return >= ensemble return",
+      "shadow max drawdown no more than 3 pts worse",
+      "no live-rule breach (live_rules.toml) that the ensemble did not also hit"
+    ],
+    "needs": "BL-024 Phase 2 (journal scoring)",
+    "adoption": "a separate owner decision under BL-025 (paper first, then money); never automatic"
+  },
+
+  "will_not_run": [
+    "fundamentals of any kind (owner, 2026-10-07)",
+    "the ETF track (owner, 2026-10-07)",
+    "market-wide trend, breadth or choppiness gates (rejected in 3.9.23)",
+    "cash-hurdle absolute momentum (rejected twice)",
+    "52-week-high proximity (marginal)",
+    "RSI (a duplicate of M1)",
+    "ADX (daily highs/lows are not split-adjusted; overlaps T1)",
+    "RS momentum / the RRG axis (reduces to a lookback)",
+    "delivery %",
+    "a second setting or weight for any feature",
+    "a tilt at the slot level (stock_tilt-style) or the pool level",
+    "a screen on any other score",
+    "combinations of survivors",
+    "anything that reads a bar on or after 2024-01-01 before the hold-out run",
+    "a second hold-out run",
+    "exclusions or thresholds added after seeing results"
+  ]
+}
