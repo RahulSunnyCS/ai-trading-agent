@@ -321,7 +321,7 @@ ai-trading-agent/
         │   ├── presets.py                # preset_names()/STRATEGIES_DIR — the allow-list both the API and
         │   │                              # the MCP server check BEFORE building a filesystem path (no traversal)
         │   ├── data/
-        │   │   ├── providers/{base,algotest,dhan}.py   # MarketDataProvider Protocol, canonical Bar/InstrumentKey
+        │   │   ├── providers/{base,algotest}.py   # MarketDataProvider Protocol, canonical Bar/InstrumentKey, AlgoTest plan_requests
         │   │   ├── resolver.py         # ATM/OTMn/ITMn/EXACT -> concrete strike, independent of any vendor
         │   │   ├── reference/          # effective-dated CSVs: expiry_calendar, holidays, lot_sizes, strike_step, margin
         │   │   ├── quality.py          # ingest-time gates: identical_series, bar_gaps, zero_volume, etc.

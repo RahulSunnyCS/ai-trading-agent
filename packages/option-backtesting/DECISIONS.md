@@ -14,10 +14,13 @@ asking."
   server, with a "Backtest" tab in `apps/dashboard`. See the epic plan for the full rationale.
 - **AlgoTest transport: Claude Routine via MCP, not a REST/API-key client.** No AlgoTest REST
   credentials exist for this project; the AlgoTest MCP tools are available in a Claude Code
-  session today, at zero incremental cost. `data/providers/algotest.py` is written against the
-  same `MarketDataProvider` Protocol the original design specified, so a REST or Python-MCP-client
-  transport can be swapped in later without touching the resolver, engine, or anything downstream
-  of the cache.
+  session today, at zero incremental cost. `data/providers/base.py` keeps the `MarketDataProvider`
+  Protocol the original design specified, so a REST or Python-MCP-client transport can be swapped
+  in later without touching the resolver, engine, or anything downstream of the cache. Removed
+  2026-10-07 as dead code: the `AlgoTestProvider` and `DhanProvider` stubs (both only raised
+  `NotImplementedError`) and the Dhan parity harness (`compare`/`run_parity_suite`/`verdict`/
+  `GATES`), none of which anything called; recover them from git history if a second vendor is
+  ever wired.
 
 ## Phase-1 deviation: strike-relative ingest, not concrete-contract
 

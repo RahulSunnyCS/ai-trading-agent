@@ -11,22 +11,16 @@ session — a plain Python process cannot reach them. The actual flow is:
     2. A Claude Code session (interactive or a scheduled Routine) calls the
        MCP tools for each planned request and writes the verbatim response
        to `data/raw/algotest/...` via `data.raw.write_raw`.
-    3. `obt ingest` reads those raw files directly (`data.ingest`) — it does
-       NOT go through `AlgoTestProvider.fetch_bars` below.
+    3. `obt ingest` reads those raw files directly (`data.ingest`).
 
-`AlgoTestProvider.fetch_bars` is therefore an unimplemented stub for now,
-exactly as it was in the original design handoff (its `fetch_bars` also
-raised `NotImplementedError("wire to MCP client or REST")`). It exists so
-that a future REST or Python-MCP-client transport can implement the same
-`MarketDataProvider` Protocol without the ingest pipeline, resolver, or
-engine needing to change.
+A future REST or Python-MCP-client transport would implement the
+`MarketDataProvider` Protocol in `base.py`, so the ingest pipeline, resolver
+and engine would not need to change.
 """
 
 from __future__ import annotations
 
 from datetime import date
-
-from .base import Bar, InstrumentKey, ProviderCaps
 
 # ---------------------------------------------------------------------------
 # Request planning — the actual Phase-1 transport entry point
@@ -165,40 +159,3 @@ def plan_requests(
         )
 
     return requests
-
-
-# ---------------------------------------------------------------------------
-# MarketDataProvider Protocol implementation (future transport; unused today)
-# ---------------------------------------------------------------------------
-
-
-class AlgoTestProvider:
-    """Wraps get_ohlc_by_data_source / fetch_greeks_by_data_source.
-
-    Strike-relative by design: you pass StrikeType.ATM etc. and it resolves.
-    That is convenient and is also why we cross-check it (see resolver.py and
-    the identical-series quality gate).
-    """
-
-    def caps(self) -> ProviderCaps:
-        return ProviderCaps(
-            name="algotest",
-            max_lookback_days=92,
-            timeframes=frozenset({"1m", "5m", "15m", "30m", "1h", "1d"}),
-            has_greeks=True,
-            has_expired_options=True,
-            has_oi=False,
-            max_days_per_call=92,
-        )
-
-    def fetch_bars(
-        self,
-        instrument: InstrumentKey,
-        start: date,
-        end: date,
-        timeframe: str,
-    ) -> list[Bar]:
-        raise NotImplementedError(
-            "AlgoTest is reached via the Claude Routine/MCP flow, not this method — "
-            "see obt ingest plan / obt ingest, and the module docstring."
-        )
