@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { apiGet, apiPost } from '../lib/api';
+import { recordDuration } from '../lib/momentumDurations';
 import type { MomentumResult, MomentumSavedRun, MomentumSectionName } from '../types/momentum';
 
 /**
@@ -37,6 +38,10 @@ export interface MomentumRun {
   error: string | null;
   /** Name of the saved run created from this one, once the auto-save has landed. */
   savedAs: string | null;
+  /** The step a running job has reached ("loading", "ranking", "simulating", "analysing"), as the
+   * server last reported it, and the server's ordered list of steps. */
+  stage?: string | null;
+  stages?: string[] | undefined;
   /** Sections being fetched, or that failed to be. Absent once loaded (see `result`). */
   sections?: Partial<Record<MomentumSectionName, MomentumSectionState>>;
 }
@@ -71,6 +76,12 @@ interface JobView {
   status: MomentumRunStatus;
   result: MomentumResult | null;
   error: string | null;
+  stage?: string | null;
+  stages?: string[];
+  compute_started_at?: string | null;
+  finished_at?: string | null;
+  /** How long the computation took, in milliseconds. */
+  compute_ms?: number | null;
 }
 
 const STORAGE_KEY = 'ata-momentum-runs';
@@ -243,7 +254,8 @@ async function pollOnce(run: MomentumRun): Promise<void> {
   }
   const { job } = response.data;
   if (job.status === 'done' && job.result) {
-    patchRun(run.id, { status: 'done', finishedAt: Date.now(), result: job.result });
+    patchRun(run.id, { status: 'done', stage: null, finishedAt: Date.now(), result: job.result });
+    rememberDuration(run.dataset, job);
     void saveFinishedRun(run, job.result);
   } else if (job.status === 'failed') {
     patchRun(run.id, {
@@ -251,9 +263,24 @@ async function pollOnce(run: MomentumRun): Promise<void> {
       finishedAt: Date.now(),
       error: job.error ?? 'The run failed.',
     });
-  } else if (job.status !== run.status) {
-    patchRun(run.id, { status: job.status });
+  } else if (job.status !== run.status || (job.stage ?? null) !== (run.stage ?? null)) {
+    patchRun(run.id, { status: job.status, stage: job.stage ?? null, stages: job.stages });
   }
+}
+
+/** Remember how long the server spent computing a finished run, for the banner's "usually about".
+ * A run it answered from its cache says nothing about that. */
+function rememberDuration(dataset: string, job: JobView): void {
+  if (job.result?.cache?.hit) return;
+  // The server's own millisecond figure; the timestamps it also sends are whole seconds, which is
+  // too coarse for a run of a second or two.
+  if (typeof job.compute_ms === 'number') {
+    recordDuration(dataset, job.compute_ms);
+    return;
+  }
+  const began = job.compute_started_at ? Date.parse(job.compute_started_at) : Number.NaN;
+  const ended = job.finished_at ? Date.parse(job.finished_at) : Number.NaN;
+  recordDuration(dataset, ended - began);
 }
 
 function schedulePoll(epoch: number): void {

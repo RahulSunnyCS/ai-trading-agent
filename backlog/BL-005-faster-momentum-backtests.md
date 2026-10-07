@@ -198,3 +198,15 @@ under ~400 KB, all with byte-identical results (BL-001 goldens).
   live warm time (12.7 s before) is still to be re-taken. Left alone: the weekly job builds the full
   payload (including the circuit card) and reads only the core and `latest`; reading just those
   would save about a card per favourite, but means changing tests other work depends on.
+- 2026-10-07 — Phase 4 code done. A background job reports its step (`loading`, `ranking`,
+  `simulating`, `analysing`) through a `report` callback the job runner passes to the dataset
+  builders; the dashboard banner shows "Step 2 of 4 · Ranking" and, once a few real runs of that
+  dataset have been seen, "usually about N s" (median of the last five non-cached computations,
+  kept in the browser). The synchronous callers pass nothing. Done-when ("a cold Broad run shows at
+  least three stage changes") is covered by a test of the Broad builder's four reports in order
+  and a polling test that follows `loading` to `done`; not watched live, since the catalog was
+  locked.
+- 2026-10-07 — Added `packages/momentum-backtesting/docs/how-backtests-run-and-how-we-sped-them-up.md`,
+  an explainer written for the owner (no backend background assumed): how the data is captured and
+  stored, how the ranking, simulation, costs, tax and metrics are calculated, what each dataset
+  does, and what BL-005 changed in each place, with the measurements.

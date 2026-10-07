@@ -39,6 +39,7 @@ import {
   diffConfigs,
   modifiedSections,
 } from '../lib/momentumConfig';
+import { usualDuration } from '../lib/momentumDurations';
 import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
 import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
 import { hydrateMomentumViewFromStorage, useMomentumViewStore } from '../store/momentumView';
@@ -419,6 +420,9 @@ export function MomentumBacktestingView() {
   // this page and several runs can be in flight at once (one tab each).
   const running = activeRun !== null && inFlight(activeRun);
   const runStartedAt = running ? activeRun.startedAt : null;
+  // How long a real run of this dataset usually takes here: read once per run, not on every tick.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-read when a run starts, not per render
+  const usualMs = useMemo(() => usualDuration(dataset), [dataset, activeRun?.id]);
   // While a new run computes, the last finished run of the same dataset stays on screen (faded)
   // instead of a skeleton. Only a first-ever run has nothing to show.
   const previousRun = running
@@ -1243,6 +1247,9 @@ export function MomentumBacktestingView() {
                       datasetLabel={datasetLabel}
                       hasPreviousResult={result !== null}
                       queued={activeRun?.status === 'queued'}
+                      stage={activeRun?.stage ?? null}
+                      stages={activeRun?.stages}
+                      usualMs={usualMs}
                     />
                   </div>
                 ) : null}

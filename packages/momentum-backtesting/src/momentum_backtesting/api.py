@@ -1,6 +1,7 @@
 """Private Momentum API consumed by the shared dashboard."""
 
 import contextlib
+import inspect
 import json
 import os
 import threading
@@ -9,6 +10,7 @@ from collections import OrderedDict
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from time import perf_counter
 from typing import Literal
 
 import pandas as pd
@@ -956,6 +958,31 @@ def _stock_meta() -> dict:
 Parts = tuple[dict, dict[str, Callable[[], object]]]
 
 
+#: Tells a background job which step it has reached ("loading", "ranking", "simulating",
+#: "analysing"), so the dashboard can show more than a clock. The synchronous callers pass nothing.
+Report = Callable[[str], None]
+
+#: The steps a job goes through, in order. Every name a builder reports is one of these, and each
+#: job carries the list so the dashboard does not hard-code the order or the count.
+JOB_STAGES = ("loading", "ranking", "simulating", "analysing")
+
+
+def _no_report(stage: str) -> None:
+    return None
+
+
+def _takes_report(work: Callable[..., object]) -> bool:
+    """True when `work` declares a required positional parameter, which is where the job runner
+    puts its reporter. A callable with no parameters, only optional ones, or no readable signature
+    (some builtins) is called with nothing."""
+    try:
+        parameters = inspect.signature(work).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    positional = (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    return any(p.default is inspect.Parameter.empty and p.kind in positional for p in parameters)
+
+
 def _full(core: dict, lazy: dict[str, Callable[[], object]]) -> dict:
     return {**core, **{name: build() for name, build in lazy.items()}}
 
@@ -964,7 +991,8 @@ def _etf_backtest(req: BacktestRequest) -> dict:
     return _full(*_etf_parts(req))
 
 
-def _etf_parts(req: BacktestRequest) -> Parts:
+def _etf_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
+    report("loading")
     prices = DATA.get()
     universe = {inst.name: inst for inst in load_universe()}
     includes = {name: inst.include for name, inst in universe.items()}
@@ -1002,6 +1030,7 @@ def _etf_parts(req: BacktestRequest) -> Parts:
             no_buy = masks[0]
             for extra in masks[1:]:
                 no_buy = no_buy.reindex_like(extra).fillna(False) | extra
+        report("simulating")
         result = run_backtest(
             prices,
             includes,
@@ -1016,6 +1045,7 @@ def _etf_parts(req: BacktestRequest) -> Parts:
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
     groups = {name: inst.group for name, inst in universe.items()}
+    report("analysing")
     return analysis.payload_parts(
         result,
         prices,
@@ -1032,7 +1062,8 @@ def _stock_backtest(req: BacktestRequest) -> dict:
     return _full(*_stock_parts(req))
 
 
-def _stock_parts(req: BacktestRequest) -> Parts:
+def _stock_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
+    report("loading")
     stock = DATA.get_stock()
     classification = _stock_classification(stock)
     includes = {cid: include for cid, (include, _group) in classification.items()}
@@ -1060,6 +1091,7 @@ def _stock_parts(req: BacktestRequest) -> Parts:
                 f"Only {len(ranked)} instruments selected for ranking - need at least "
                 f"top N ({config.top_n})."
             )
+        report("simulating")
         result = run_backtest(
             stock.prices,
             includes,
@@ -1074,6 +1106,7 @@ def _stock_parts(req: BacktestRequest) -> Parts:
         raise HTTPException(422, str(error)) from None
     groups = dict.fromkeys(stock.companies, "Nifty 50")
     groups.update({name: extra["group"] for name, extra in stock.extra_instruments.items()})
+    report("analysing")
     core, lazy = analysis.payload_parts(
         result,
         stock.prices,
@@ -1300,7 +1333,8 @@ def _custom_index_backtest(req: BacktestRequest) -> dict:
     return _full(*_custom_index_parts(req))
 
 
-def _custom_index_parts(req: BacktestRequest) -> Parts:
+def _custom_index_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
+    report("loading")
     if not (
         db_read.has_category_data()
         or (DATA_DIR / "categories" / "category_membership.csv").exists()
@@ -1309,6 +1343,7 @@ def _custom_index_parts(req: BacktestRequest) -> Parts:
     if req.weights is not None and len(req.weights) != len(req.lookbacks):
         raise HTTPException(422, "Give one weight per lookback.")
     try:
+        report("ranking")  # the ~60 per-category backtests behind a cold run
         universe_result = DATA.get_categories_universe(
             inner_top_n=req.inner_top_n,
             inner_exit_rank=req.inner_exit_rank,
@@ -1365,6 +1400,7 @@ def _custom_index_parts(req: BacktestRequest) -> Parts:
                 f"Only {len(ranked)} categories selected for ranking - need at least "
                 f"top N ({config.top_n})."
             )
+        report("simulating")
         result = run_backtest(prices, includes, config, rank_cache=DATA.custom_index_rank_cache)
         DATA.trim_cache()
     except ValueError as error:
@@ -1373,6 +1409,7 @@ def _custom_index_parts(req: BacktestRequest) -> Parts:
         name: _CATEGORY_LABEL_INFO.get(label, ("core", "Custom"))[1]
         for name, label in universe_result.labels.items()
     }
+    report("analysing")
     core, lazy = analysis.payload_parts(
         result, prices, config, groups, references=DATA.references()
     )
@@ -1714,7 +1751,8 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     return _full(*_broad_parts(req))
 
 
-def _broad_parts(req: BacktestRequest) -> Parts:
+def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
+    report("loading")
     on = req.broad_category_mode == "on"
     if on and req.broad_category_top_n > req.broad_category_exit_rank:
         raise HTTPException(422, "Category top N can't be greater than the category exit rank.")
@@ -1731,8 +1769,10 @@ def _broad_parts(req: BacktestRequest) -> Parts:
         raise HTTPException(409, "No Total Market data yet - run `mbt categories fetch-universe`.")
 
     try:
+        report("ranking")  # ~20 s the first time for a set of ranking settings, then cached
         ranking = _broad_ranking(req)
         outer_prices = DATA.get()
+        report("simulating")
         outcome = _run_broad(req, ranking, outer_prices)
         DATA.trim_cache()
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
@@ -1744,6 +1784,7 @@ def _broad_parts(req: BacktestRequest) -> Parts:
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
+    report("analysing")
     core, lazy = analysis.payload_parts(
         result,
         prices,
@@ -2536,7 +2577,7 @@ class _BacktestJobs:
             return [self._public(job, False) for job in reversed(self._jobs.values())]
 
     def start(
-        self, work: Callable[[], dict | tuple[dict, RunParts]], fresh: bool, extra_fields: dict
+        self, work: Callable[..., dict | tuple[dict, RunParts]], fresh: bool, extra_fields: dict
     ) -> dict:
         with self._cond:
             job = {
@@ -2548,6 +2589,11 @@ class _BacktestJobs:
                 "finished_at": None,
                 "result": None,
                 "error": None,
+                # The step a running job has reached (see `Report`); None before and after.
+                "stage": None,
+                "stages": list(JOB_STAGES),
+                # How long the computation took, in milliseconds (the timestamps are whole seconds).
+                "compute_ms": None,
                 "_parts": None,
                 **extra_fields,
             }
@@ -2576,7 +2622,7 @@ class _BacktestJobs:
     def _execute(
         self,
         job: dict,
-        work: Callable[[], dict | tuple[dict, RunParts]],
+        work: Callable[..., dict | tuple[dict, RunParts]],
         fresh: bool,
     ) -> None:
         with self._cond:
@@ -2587,15 +2633,24 @@ class _BacktestJobs:
                 self._fresh_running = True
             job["status"] = "running"
             job["compute_started_at"] = datetime.now(IST).isoformat(timespec="seconds")
+        began = perf_counter()
         parts = None
+
+        def report(stage: str) -> None:
+            with self._cond:
+                job["stage"] = stage
+
         try:
-            out = work()
+            # A job that wants to say how far it has got takes `report`; a plain callable does not.
+            out = work(report) if _takes_report(work) else work()
             result, parts = out if isinstance(out, tuple) else (out, None)
             error = None
         except Exception as exc:  # the job must always finish, or the UI spins forever
             result, error = None, f"{type(exc).__name__}: {getattr(exc, 'detail', exc)}"
         with self._cond:
             job["status"] = "failed" if error else "done"
+            job["stage"] = None
+            job["compute_ms"] = round((perf_counter() - began) * 1000)
             job["result"], job["error"], job["_parts"] = result, error, parts
             job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
             self._finished += 1
@@ -2960,7 +3015,7 @@ def create_app() -> FastAPI:
             universe,
         )
 
-    def _dispatch_parts(req: BacktestRequest) -> tuple[RunParts, bool]:
+    def _dispatch_parts(req: BacktestRequest, report: Report = _no_report) -> tuple[RunParts, bool]:
         """The run for this request (built, or the identical earlier one) and whether it was an
         earlier one. Nothing heavy beyond the core is built here: see run_parts.RunParts."""
         if req.fresh:
@@ -2974,7 +3029,7 @@ def create_app() -> FastAPI:
             "broad": _broad_parts,
             "custom_index": _custom_index_parts,
         }
-        core, lazy = builders.get(req.dataset, _etf_parts)(req)
+        core, lazy = builders.get(req.dataset, _etf_parts)(req, report)
         parts = RunParts(core, lazy, datetime.now(IST).isoformat(timespec="seconds"))
         DATA.store_result(key, parts)
         return parts, False
@@ -2984,9 +3039,9 @@ def create_app() -> FastAPI:
         parts, hit = _dispatch_parts(req)
         return {**parts.full(), "cache": {"hit": hit, "computed_at": parts.computed_at}}
 
-    def _dispatch_job(req: BacktestRequest) -> tuple[dict, RunParts]:
+    def _dispatch_job(req: BacktestRequest, report: Report) -> tuple[dict, RunParts]:
         """A job's result is the core plus the names of the sections still to fetch."""
-        parts, hit = _dispatch_parts(req)
+        parts, hit = _dispatch_parts(req, report)
         result = {
             **parts.core,
             "cache": {"hit": hit, "computed_at": parts.computed_at},
@@ -3004,7 +3059,7 @@ def create_app() -> FastAPI:
         the page or start more runs. Body validation (422) still happens here, up front; a failure
         during the computation lands in the job's `error`. Returns the job at once."""
         job = BACKTEST_JOBS.start(
-            lambda: _dispatch_job(req),
+            lambda report: _dispatch_job(req, report),
             req.fresh,
             {"dataset": req.dataset},
         )

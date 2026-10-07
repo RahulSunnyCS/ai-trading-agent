@@ -154,6 +154,20 @@ thing on the cases the scenarios miss (ties, gaps, missing values). Building a D
 object array infers a string dtype in this pandas: pass `dtype=object` where object is meant.
 Replacing many columns one at a time (`frame[col] = ...`) fragments the frame: build it in one step.
 
+**A running job says which step it is in (BL-005 Phase 4).** `_BacktestJobs` hands a job's work a
+`report(stage)` callback (a plain zero-argument callable still works: the executor checks the
+signature); `_dispatch_parts(req, report)` passes it to `_etf_parts` / `_stock_parts` /
+`_custom_index_parts` / `_broad_parts`, which call it with `loading` -> `ranking` (Custom Index's
+category build, Broad's Step 2) -> `simulating` -> `analysing`. The job record carries `stage` (None
+before and after, and in the job list) and `stages` (`api.JOB_STAGES`, the ordered list: the
+dashboard numbers "Step 2 of 4 · Ranking" from it, so a new step needs adding there and to
+`STAGE_LABELS` in `MomentumRunProgress.tsx` only for a nicer label), and `compute_ms`, the
+computation time in milliseconds (the `*_at` timestamps are whole seconds). The dashboard keeps the
+median of the last five real (non-cache-hit) `compute_ms` per dataset in localStorage to say
+"usually about 20 s" (`lib/momentumDurations.ts`), and past twice that it explains the slow run
+instead (cold runs rebuild rankings). A job's work takes `report` only if it declares a required
+positional parameter (`_takes_report`). The synchronous callers (`_*_backtest(req)`) pass nothing.
+
 **Checking that a change leaves results alone on live data:**
 `scripts/result-baseline.py capture` stores every golden scenario and every saved favourite as
 the real API returns them today; `compare` re-runs them and reports differences, whether the data
