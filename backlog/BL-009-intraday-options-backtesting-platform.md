@@ -236,7 +236,7 @@ more, not less. V11 replaces "median CAGR" as the first number to read.
 ## Open questions
 
 1. Vendor: name and price — owner will tell later.
-2. AlgoTest trade logs for the other three strategies (closest premium, range breakout, ITM1 RE COST), 2025-01-01 → 2026-10-06 — owner will add when ready.
+2. AlgoTest trade log for the range-breakout buy strategy — owner will add when ready (the other three arrived 2026-10-07).
 3. Confirm the four strike modes whose Quantiply pages did not load. Working definitions (the
    usual Stockmock/AlgoTest ones, to be checked on Stockmock before building):
    straddle width = ATM ± multiplier × ATM straddle price, rounded to a strike;
@@ -299,3 +299,8 @@ more, not less. V11 replaces "median CAGR" as the first number to read.
     off the 0.05 tick), and the 5 reason / 27 minute days are thresholds crossed a minute or a
     few points apart (2026-05-14: our combined MTM −₹2,538 at 13:37, ₹38 past the stop). Next:
     AlgoTest candles for the in-window differing days (2026-07-17, 09-11, 10-05, 10-06) to prove it.
+- 2026-10-07 — **Round 2**: exports for Dir_924 (RE COST), closest premium and the new SENSEX
+  OTM2 strategy; strategy files follow the owner's PDFs (closest premium ₹65; SENSEX file added).
+  Rule found: stop/target levels rounded to the nearest 0.05 tick (512/515 stop exits). SENSEX
+  now reproduces AlgoTest on 375 of 424 days (P&L −0.2%); NIFTY differs on prices even on Fyers
+  days because AlgoTest's NIFTY feed differs from Fyers' (7 of 25 closes equal) — data, not rules.

@@ -17,8 +17,9 @@ backtest (TODO.md 3.10.7):
   that expiry, by each option's price at the entry time (`price_at`); an exact tie picks
   the LOWER premium (AlgoTest docs' example: premiums 49 and 52 for a 50
   target -> 49).
-- **SL / target** are checked against each bar's high/low, from the entry bar
-  itself (everything in the entry bar happens after its open). They fill at
+- **SL / target** levels are rounded to the nearest 0.05 tick (AlgoTest does;
+  BL-009 Phase 1). They are checked against each bar's high/low, from the entry
+  bar itself (everything in the entry bar happens after its open). They fill at
   the trigger price, or at the bar's open if it gapped through. If a bar
   touches both, the SL wins (conservative).
 - **Trail SL [X, Y]** — every full X of favourable move from the entry price
@@ -81,6 +82,14 @@ from .market import (
 from .schema import Leg, LegwiseStrategy, ReEntry
 
 _EPS = 1e-9
+#: NSE/BSE option tick. Stop and target levels are rounded to the nearest one, as AlgoTest
+#: does (BL-009 Phase 1: 512 of 515 untrailed stop exits across four exports equal the level
+#: rounded to the nearest 0.05; 88 equal it unrounded).
+TICK = 0.05
+
+
+def to_tick(price: float) -> float:
+    return round(round(price / TICK) * TICK, 2)
 
 
 @dataclass
@@ -197,9 +206,11 @@ class _DaySim:
         run.best = price
         spec = run.spec
         run.initial_sl = run.sl = (
-            price - run.sign * spec.stop_loss.distance(price) if spec.stop_loss else None
+            to_tick(price - run.sign * spec.stop_loss.distance(price)) if spec.stop_loss else None
         )
-        run.target = price + run.sign * spec.target.distance(price) if spec.target else None
+        run.target = (
+            to_tick(price + run.sign * spec.target.distance(price)) if spec.target else None
+        )
         run.fresh_intrabar = intrabar
         run.state = "open"
 
@@ -346,7 +357,7 @@ class _DaySim:
             x, y = run.spec.trail_sl.step(run.entry_price)
             moved = run.sign * (run.best - run.entry_price)
             steps = math.floor(moved / x + _EPS) if moved > 0 else 0
-            trailed = run.initial_sl + run.sign * steps * y  # type: ignore[operator]
+            trailed = to_tick(run.initial_sl + run.sign * steps * y)  # type: ignore[operator]
             run.sl = max(run.sl, trailed) if buy else min(run.sl, trailed)  # type: ignore[type-var]
         return None
 
