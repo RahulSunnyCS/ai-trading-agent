@@ -168,6 +168,24 @@ const BASE_JOBS: Job[] = [
     fixHint: 'cd packages/momentum-backtesting && uv run mbt journal check --send',
   },
   {
+    id: 'momentum-live-rules',
+    description:
+      "Check the owner's live-money rules (drawdown, trailing, money gate) against the followed money",
+    schedule: { at: '21:30', on: FRIDAY, label: 'Fri 21:30' },
+    steps: [['uv', 'run', 'mbt', 'live-rules', 'check', '--send']],
+    cwd: MOMENTUM,
+    // Runs the four frozen configs through the latest week, like `mbt search track`.
+    timeoutMinutes: 30,
+    retries: 1,
+    retryDelayMinutes: 15,
+    catchUpHours: 48,
+    group: 'catalog',
+    // The command sends its own message, including when it cannot run or the data is stale.
+    alertsItself: true,
+    logFile: `${MOMENTUM}/data/launchd-weekly-live-rules.log`,
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt live-rules check --send',
+  },
+  {
     id: 'options-daily',
     description:
       "Collect the day's 1-minute option data from Fyers and run every leg-wise strategy",

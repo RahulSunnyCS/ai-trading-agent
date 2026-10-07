@@ -16,6 +16,7 @@ not in plists. See [`apps/scheduler/CLAUDE.md`](../../apps/scheduler/CLAUDE.md).
 | `momentum-preview` / `-final` | Fri 14:40 / 16:45 | `mbt weekly --run preview|final` |
 | `momentum-stock-ingest` | Fri 19:30 | `mbt stocks sync`, then the stock/Custom Index/Broad final (needs the GUI session) |
 | `momentum-journal-check` | Fri 21:00 | `mbt journal check --send` |
+| `momentum-live-rules` | Fri 21:30 | `mbt live-rules check --send` |
 
 Failures and missed runs reach Telegram immediately; successes only appear in the morning
 summary.

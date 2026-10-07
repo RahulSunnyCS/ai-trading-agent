@@ -35,6 +35,7 @@ Click a job to read the last 200 lines of its latest log.
 | `momentum-final` (Fri 16:45) | The momentum final signal. |
 | `momentum-stock-ingest` (Fri 19:30) | Refreshes NSE stock data, then the stock-based finals. |
 | `momentum-journal-check` (Fri 21:00) | Checks the journal recorded every favourite. |
+| `momentum-live-rules` (Fri 21:30) | Checks your live-money rules (drawdown, trailing, the money gate) and messages you. A rule that is hit always sends; it never trades. |
 | `backup` (1st Sunday) | Copies the research database to the external disk. |
 | `weekly-digest` | A weekly summary message. |
 | `check-…`, reminders | Quiet checks (lot sizes, index membership, stock data, calendar, credentials) that message only when something needs attention. |
