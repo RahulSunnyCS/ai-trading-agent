@@ -196,3 +196,16 @@ Answered when the owner started the item (2026-10-07):
 - 2026-10-07 — Phase 0: `search_spaces/bl043_criteria.json` and the Experiments block committed
   before any run. Search is staged to keep the trial count small (42): trade-level stop/target/
   entry first, then the portfolio's cut-off and health switch.
+- 2026-10-07 — Phase 1 done: `mbt swing candidates` (`patterns/swing/candidates.py`).
+  - Daily-window forms of the BL-042 rules.
+  - The flag check refactored into `flag.flag_at`; the weekly output was verified identical
+    (686/686 flags on synthetic data) and BL-042's tests still pass.
+  - Truncation test at three cut dates.
+  - Development candidates (1,578 point-in-time symbols):
+
+    | Pattern | Entry | Signal days | Bases |
+    |---|---|---|---|
+    | Tight range | Pullback | 8,131 | 2,408 |
+    | Tight range | Breakout | 1,752 | 1,618 |
+    | Flag | Pullback | 5,681 | 2,065 |
+    | Flag | Breakout | 697 | 697 |

@@ -578,7 +578,7 @@ answers and the pass/kill rules live in the backlog item.
 | # | Task | Owner | State |
 |---|---|---|---|
 | 3.21.0 | Phase 0: pre-registration (criteria + Experiments block) | claude | **Done 2026-10-07** (`bl043_criteria.json`, 42 trials) |
-| 3.21.1 | Phase 1: daily detection + truncation test | claude | Open |
+| 3.21.1 | Phase 1: daily detection + truncation test | claude | **Done 2026-10-07** (`mbt swing candidates`; 16,261 candidates on 8,788 bases, 2012–2023) |
 | 3.21.2 | Phase 2: trade simulator (next-open fills, GTT-style stop/target, 10 × 10%, costs) | claude | Open |
 | 3.21.3 | Phases 3–5: playbook, score, rules test on 2012–2023 | claude | Open |
 | 3.21.4 | Phase 6: one hold-out run | claude | Open |

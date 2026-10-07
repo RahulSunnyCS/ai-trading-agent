@@ -33,53 +33,60 @@ HIGH_TIGHT = "high_tight_flag"
 
 def scan(bars: SymbolBars, params: dict | None = None) -> list[Base | None]:
     p = params or detector_params(PATTERN)
-    pole, flag = p["pole"], p["flag"]
-    high, low, vol, bad = bars.high, bars.low, bars.volume, bars.bad
     out: list[Base | None] = [None] * len(bars.week_end)
     setting = context(bars.weekly(), p)
     for k, i in enumerate(bars.week_end):
-        i = int(i)
-        if not setting[k]:
-            continue
-        lo_h, hi_h = i - flag["max_days"], i - flag["min_days"]
-        if lo_h - pole["max_days"] < 0:
-            continue
-        h = lo_h + int(np.argmax(high[lo_h : hi_h + 1]))
-        top = high[h]
-        if high[h + 1 : i + 1].max() > top:
-            continue
-        lo_s, hi_s = h - pole["max_days"], h - pole["min_days"]
-        s = lo_s + int(np.argmin(low[lo_s : hi_s + 1]))
-        base_low = low[s]
-        if top < base_low * (1 + pole["min_rise"]) or bad[s : i + 1].any():
-            continue
-        flag_low = low[h + 1 : i + 1].min()
-        drop = 1 - flag_low / top
-        retrace = (top - flag_low) / (top - base_low)
-        if drop > flag["max_drop_from_pole_high"] or retrace > flag["max_retrace_of_pole"]:
-            continue
-        flag_high = high[h + 1 : i + 1]
-        half = len(flag_high) // 2
-        if flag["highs_not_rising"] and flag_high[half:].max() > flag_high[:half].max():
-            continue
-        pole_volume, flag_volume = vol[s : h + 1].mean(), vol[h + 1 : i + 1].mean()
-        if flag["volume_below_pole"] and not flag_volume < pole_volume:
-            continue
-        out[k] = Base(
-            pivot=float(flag_high.max()),
-            start=s,
-            end=i,
-            geometry={
-                "pole_rise": round(float(top / base_low - 1), 4),
-                "pole_days": h - s,
-                "flag_days": i - h,
-                "drop_from_pole_high": round(float(drop), 4),
-                "retrace_of_pole": round(float(retrace), 3),
-                "flag_vs_pole_volume": round(float(flag_volume / pole_volume), 3),
-                "pole_top": str(np.datetime_as_string(bars.dates[h], unit="D")),
-            },
-        )
+        if setting[k]:
+            found = flag_at(bars, int(i), p)
+            out[k] = found[0] if found else None
     return out
+
+
+def flag_at(bars: SymbolBars, i: int, p: dict) -> tuple[Base, float] | None:
+    """The flag ending on daily bar `i` (bars up to `i` only), and the flag's lowest low, or
+    None. The stock's setting (`common.context`) is the caller's to check: weekly in `scan`,
+    daily in BL-043's daily scan."""
+    pole, flag = p["pole"], p["flag"]
+    high, low, vol, bad = bars.high, bars.low, bars.volume, bars.bad
+    lo_h, hi_h = i - flag["max_days"], i - flag["min_days"]
+    if lo_h - pole["max_days"] < 0:
+        return None
+    h = lo_h + int(np.argmax(high[lo_h : hi_h + 1]))
+    top = high[h]
+    if high[h + 1 : i + 1].max() > top:
+        return None
+    lo_s, hi_s = h - pole["max_days"], h - pole["min_days"]
+    s = lo_s + int(np.argmin(low[lo_s : hi_s + 1]))
+    base_low = low[s]
+    if top < base_low * (1 + pole["min_rise"]) or bad[s : i + 1].any():
+        return None
+    flag_low = low[h + 1 : i + 1].min()
+    drop = 1 - flag_low / top
+    retrace = (top - flag_low) / (top - base_low)
+    if drop > flag["max_drop_from_pole_high"] or retrace > flag["max_retrace_of_pole"]:
+        return None
+    flag_high = high[h + 1 : i + 1]
+    half = len(flag_high) // 2
+    if flag["highs_not_rising"] and flag_high[half:].max() > flag_high[:half].max():
+        return None
+    pole_volume, flag_volume = vol[s : h + 1].mean(), vol[h + 1 : i + 1].mean()
+    if flag["volume_below_pole"] and not flag_volume < pole_volume:
+        return None
+    base = Base(
+        pivot=float(flag_high.max()),
+        start=s,
+        end=i,
+        geometry={
+            "pole_rise": round(float(top / base_low - 1), 4),
+            "pole_days": h - s,
+            "flag_days": i - h,
+            "drop_from_pole_high": round(float(drop), 4),
+            "retrace_of_pole": round(float(retrace), 3),
+            "flag_vs_pole_volume": round(float(flag_volume / pole_volume), 3),
+            "pole_top": str(np.datetime_as_string(bars.dates[h], unit="D")),
+        },
+    )
+    return base, float(flag_low)
 
 
 def scan_high_tight(bars: SymbolBars, params: dict | None = None) -> list[Base | None]:

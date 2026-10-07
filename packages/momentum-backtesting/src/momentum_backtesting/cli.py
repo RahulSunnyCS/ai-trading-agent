@@ -2650,6 +2650,24 @@ def patterns_holdout() -> None:
     holdout.run(echo=typer.echo)
 
 
+swing_app = typer.Typer(
+    no_args_is_help=True,
+    help="BL-043 daily pattern swing system (research only; signals, never orders).",
+)
+app.add_typer(swing_app, name="swing")
+
+
+@swing_app.command("candidates")
+def swing_candidates() -> None:
+    """Phase 1: entry candidates at every daily close over the development window ->
+    data/patterns/swing/candidates_dev.parquet. Never reads the sealed hold-out."""
+    from .config import load_repo_env
+    from .patterns.swing import run
+
+    load_repo_env()
+    run.candidates_dev(echo=typer.echo)
+
+
 @app.command()
 def serve(
     port: int = typer.Option(8765, help="Port on 127.0.0.1."),
