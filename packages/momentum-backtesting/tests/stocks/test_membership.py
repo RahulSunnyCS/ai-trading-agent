@@ -8,6 +8,7 @@ it is absent (fresh clone / CI).
 from __future__ import annotations
 
 import csv
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -230,10 +231,22 @@ needs_raw = pytest.mark.skipif(
 
 @needs_raw
 def test_real_membership_invariants():
+    """Counts are checked over every session. The current-list half compares the snapshot with
+    the members on the day it was downloaded, not with the open-ended rows: a reshuffle is
+    curated once announced (BSE for WIPRO, effective 2026-09-30), so the committed curation can
+    run ahead of the hand-downloaded snapshot. `mbt stocks fetch`'s guard still compares the
+    open rows and fails until the snapshot is refreshed (BL-018)."""
     membership = _read("nifty50_membership.csv")
     sessions = pd.read_csv(RAW / "benchmarks/NIFTY50_EQUAL_WEIGHT_PRICE.csv")["date"]
-    current = pd.read_csv(RAW / "nifty50_current.csv")["Symbol"]
-    assert mc.check_invariants(membership, sessions, current) == []
+    open_rows = membership.loc[membership["to"] == "", "symbol"]
+    assert mc.check_invariants(membership, sessions, open_rows) == []
+
+    snapshot = RAW / "nifty50_current.csv"
+    taken = date.fromtimestamp(snapshot.stat().st_mtime).isoformat()
+    on_that_day = (membership["from"] <= taken) & (
+        (membership["to"] == "") | (membership["to"] >= taken)
+    )
+    assert set(membership.loc[on_that_day, "symbol"]) == set(pd.read_csv(snapshot)["Symbol"])
 
 
 @pytest.mark.skipif(not (DATA / "daily.parquet").exists(), reason="daily.parquet absent")

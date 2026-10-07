@@ -31,6 +31,24 @@ needs_raw_fixtures = pytest.mark.skipif(
 )
 
 
+#: plan.md §1 recorded 3,900 sessions from 2011-01-03 when the raw files were first fetched;
+#: every refresh adds sessions (BL-018), so that count is a floor, not an exact length.
+FIRST_SESSION = pd.Timestamp("2011-01-03")
+MIN_SESSIONS = 3900
+#: Longest closure in the history: 2014-10-01 -> 2014-10-07 (Gandhi Jayanti, Dussehra and Bakri
+#: Id around a weekend). A longer gap means a missing session, not a holiday.
+MAX_SESSION_GAP = pd.Timedelta(days=6)
+
+
+def _assert_full_session_history(index: pd.DatetimeIndex) -> None:
+    """A gap-free daily session history from 2011-01-03, however recently it was refreshed.
+    Weekends are allowed: NSE has held Saturday/Sunday sessions (Muhurat trading, budget days)."""
+    assert index.is_unique and index.is_monotonic_increasing
+    assert index[0] == FIRST_SESSION
+    assert len(index) >= MIN_SESSIONS
+    assert index.to_series().diff().max() <= MAX_SESSION_GAP
+
+
 def _fake_urlopen(rows: list[dict], seen: list):
     def urlopen(request, timeout):
         seen.append(request)
@@ -111,19 +129,22 @@ def test_nifty_50_equal_weight_tri_and_price_share_an_identical_date_set():
     price_series = pd.Series(price_df["close"].to_numpy(), index=price_df["date"])
 
     benchmarks.assert_same_session_set(tri_series, price_series)  # must not raise
-    assert len(tri_series) == 3900
-    assert len(price_series) == 3900
+    _assert_full_session_history(tri_series.index)
 
 
 @needs_raw_fixtures
 def test_nifty_50_tri_and_nifty200_momentum_30_tri_fixtures_share_the_same_session_set():
-    """The three TRI feeds (plan.md §1) share one 3,900-date session set."""
+    """The three TRI feeds (plan.md §1) share one session set."""
     n50 = parse_niftyindices_tri(json.loads((FIXTURES / "NIFTY_50_TRI.json").read_text()))
     momentum30 = parse_niftyindices_tri(
         json.loads((FIXTURES / "NIFTY200_MOMENTUM_30_TRI.json").read_text())
     )
-    assert len(n50) == len(momentum30) == 3900
+    ew = parse_niftyindices_tri(
+        json.loads((FIXTURES / "NIFTY50_EQUAL_WEIGHT_TRI.json").read_text())
+    )
     assert n50.index.equals(momentum30.index)
+    assert n50.index.equals(ew.index)
+    _assert_full_session_history(n50.index)
 
 
 def test_is_back_calculated_flags_dates_before_the_nifty200_momentum_30_launch():

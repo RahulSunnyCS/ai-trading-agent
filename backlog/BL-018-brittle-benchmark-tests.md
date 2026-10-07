@@ -1,14 +1,14 @@
-# BL-018 — Momentum benchmark tests fail when the data is refreshed
+# BL-018 — Momentum tests fail when the live data is refreshed
 
 | | |
 |---|---|
-| **Priority** | P2 — two local failures that will turn red again on every data refresh |
-| **Status** | Planned |
+| **Priority** | P2 — local failures that turned red again on every data refresh |
+| **Status** | Done |
 | **Type** | bug |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
 | **Depends on** | none |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.14.5 |
 
 ## Context
 
@@ -21,18 +21,48 @@ On 2026-10-06 the full momentum suite ran 766 passed, 2 failed, both in
 Both assert `len(series) == 3900`; the refreshed series has 3,904 sessions (data now runs to
 2026-10-01). The tests check a hard-coded row count against data that grows every week.
 
+On 2026-10-07 four more tests in the same class failed on `main` (af608c2) with the live
+`data/` and `.env` present. CI has neither, so all six skip or pass there:
+
+| Test | Root cause |
+|---|---|
+| `tests/test_extra_benchmarks.py::test_load_references_reads_the_extras_from_the_database` | `load_references()` with no `data_dir` falls back to the live `data/stocks/benchmarks_weekly.csv` for any series the (isolated, seeded) catalog lacks, so every other reference leaked in |
+| `tests/test_reference_benchmarks.py::test_load_references_reads_the_database_when_a_catalog_exists` | Same |
+| `tests/stocks/test_membership.py::test_real_membership_invariants` | The committed curation records the Sep-2026 review (BSE in, WIPRO out, effective 2026-09-30; commit 4412bad), but the hand-downloaded `data/stocks/raw/nifty50_current.csv` is from 2026-09-27, before it. The test compared the open-ended rows with that snapshot |
+| `tests/stocks/test_engine_stocks.py::test_load_stock_dataset_smoke` (KeyError `C0096`) | `ds.companies` is the committed `companies.csv` (BSE added as C0096); `ds.tax_classes` is keyed on the built data's columns (built 2026-09-28, no BSE yet). The test looked up every company's tax class |
+
+None is a code bug. `api._stock_classification` and `_stock_meta` already handle a company
+with no price column (it shows as a former member until the next build).
+
 ## Goal
 
-The tests check what they mean (the series share an identical date set, with no gaps) and pass
-after any data refresh.
+The tests check what they mean, and pass after any data refresh.
 
 ## Plan
 
-### Phase 1 — Fix the assertion
-- **Tasks:** compare the date sets with each other and against the trading calendar instead of
-  a fixed length; keep a minimum-length floor.
-- **Done when:** the suite passes on today's data and on the committed fixtures.
+### Phase 1 — Fix the assertions
+- **Tasks:** compare the date sets with each other and against the session history instead
+  of a fixed length; keep a minimum-length floor. Point the database tests at an empty data
+  dir. Compare the current-list snapshot with the members on the day it was downloaded.
+  Check tax classes over the companies the built data prices.
+- **Done when:** the suite passes on today's data and with no `data/`.
 
 ## Log
 
 - 2026-10-06 — created; found while running every suite for the codebase review.
+- 2026-10-07 — four more data-dependent failures found on `main` (table above) and folded in.
+  Fixed, tests only, `tests/golden/` untouched:
+  - Benchmarks: `_assert_full_session_history` checks the TRIs and the EW price share one
+    index, unique and increasing, starting 2011-01-03, at least 3,900 sessions, no gap over
+    6 days (the longest closure, 2014-10-01 → 07). No committed NSE calendar goes back to
+    2011 (`holidays.csv` starts 2024), so the gap check stands in for one. Weekend sessions
+    are allowed (Muhurat trading, budget days).
+  - Reference tests pass `tmp_path` to `load_references`.
+  - Membership: counts checked over every session as before; the snapshot is compared with
+    the members active on its file date.
+  - Stock smoke test: tax classes checked over priced companies only.
+  - Result: the six pass on live data; 68 passed / 5 skipped without `data/`; full suite
+    1,142 passed on live data.
+  - **Still open, owner:** `mbt stocks fetch`'s guard compares the open rows with the same
+    stale snapshot and is severity F, so `mbt stocks sync` (the Friday 19:30 job) exits 1
+    until `data/stocks/raw/nifty50_current.csv` is downloaded again (TODO 3.14.6).

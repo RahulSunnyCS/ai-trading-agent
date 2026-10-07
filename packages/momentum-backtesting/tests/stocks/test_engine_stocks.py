@@ -302,9 +302,12 @@ def test_load_stock_dataset_smoke():
         assert column in ds.price_only.columns
     assert ds.last_week == ds.prices.index.max()
     assert ds.companies and all(isinstance(v, str) and v for v in ds.companies.values())
-    # Every company_id is still "equity"; the 4 extra instruments (Gold/Silver/Cash/Gilt) added
-    # their own gold_silver/debt tax classes on top - see ui_data._EXTRA_TAX_CLASSES.
-    assert ds.tax_classes and {ds.tax_classes[c] for c in ds.companies} == {"equity"}
+    # Every priced company_id is still "equity"; the 4 extra instruments (Gold/Silver/Cash/Gilt)
+    # added their own gold_silver/debt tax classes on top - see ui_data._EXTRA_TAX_CLASSES.
+    # `companies` is the committed companies.csv and can list a company the built data does not
+    # price yet (BSE, curated before the next `mbt stocks fetch`), so test the priced ones (BL-018).
+    priced = [c for c in ds.companies if c in ds.prices.columns]
+    assert priced and {ds.tax_classes[c] for c in priced} == {"equity"}
     assert ds.extra_instruments  # Gold/Silver/Gilt present in this repo's real weekly_closes.csv
     # CASH and the benchmarks are dense full-history series (unlike individual stocks, which can
     # legitimately have leading NaN before their listing date).
