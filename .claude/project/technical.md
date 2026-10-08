@@ -67,6 +67,7 @@ bun run start:frontend:prod  # the production dashboard only; add `-- --rebuild`
 bun run cf:build            # OpenNext build with the root .env hidden + a check that no env was bundled
 bun run cf:deploy           # cf:build, then wrangler deploy
 bun run cf:preview          # cf:build, then wrangler dev on :8787
+# Auto-deploy: a push to the `release` branch runs .github/workflows/deploy-dashboard.yml (needs the CLOUDFLARE_API_TOKEN secret)
 bun run start:tunnel        # cloudflared tunnel run: only while someone is using the hosted dashboard
 
 # Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)

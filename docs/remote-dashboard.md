@@ -181,6 +181,15 @@ overwritten, and the dashboard's `Authorization`, Access token and session cooki
 upstream. **On Workers a header the middleware deletes still reaches the rewrite target; a blank one
 does not, so `upstreamHeaders` blanks them.** The bundle is 1.6 MiB gzipped (free plan limit 3 MiB).
 
+**Auto-deploy.** Pushing to the `release` branch deploys the dashboard
+(`.github/workflows/deploy-dashboard.yml`); nothing else does. Promote a tested `main` with
+`git push origin main:release`, or run the workflow by hand from the Actions tab. One-time setup:
+Cloudflare dashboard → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers" template,
+limited to this account and the `codifie.dev` zone (add Zone → DNS → Edit if the deploy complains
+about the custom domain); then store it with `gh secret set CLOUDFLARE_API_TOKEN` (the value is
+typed at the prompt). The account ID and the four build values in the workflow are not secret.
+The runner has no repo-root `.env`, and `cf:deploy` still refuses to ship a bundle with any env in it.
+
 **Second laptop:** put the variables in `apps/dashboard/.env.local`, then
 
 ```bash
