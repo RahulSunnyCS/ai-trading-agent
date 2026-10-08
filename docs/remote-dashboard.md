@@ -142,6 +142,32 @@ the root directory" on — the tsconfig extends the repo root's), add the variab
 Production. Hobby is fine for personal use; its terms rule out commercial use, so move to
 Pro before any subscriber touches it.
 
+**Cloudflare Workers** (instead of Vercel; one account for the dashboard and the tunnel). The
+dashboard builds with the OpenNext Cloudflare adapter (`open-next.config.ts`, `wrangler.jsonc`).
+Needs Node 22+ for `wrangler` (Node 20 is refused). **OpenNext bundles every `.env` it finds, the repo-root
+`.env` included, into the Worker, which would upload every broker, Telegram and Google secret.** Move the
+root `.env` aside for the build (`mv .env /tmp/env.hidden`, build, `mv` it back);
+`scripts/check-no-env-bundled.mjs` (run by `cf:deploy`) refuses to deploy if any variable was bundled.
+The Worker is `dashboard.codifie.dev` (a custom domain, `workers_dev` off). Build and deploy from the laptop:
+
+```bash
+cd apps/dashboard
+npx wrangler login                                   # once
+# build-time values: put these four in apps/dashboard/.env.local or export them
+#   MOMENTUM_DIRECT=1  OBT_DIRECT=1  MOMENTUM_DIRECT_API_URL=…  OBT_DIRECT_API_URL=…
+npx wrangler secret put DASHBOARD_PASSWORD           # runtime secrets, one prompt each
+npx wrangler secret put UPSTREAM_ACCESS_CLIENT_ID
+npx wrangler secret put UPSTREAM_ACCESS_CLIENT_SECRET
+bun run cf:deploy                                    # builds, then wrangler deploy
+bun run cf:preview                                   # local Workers runtime on :8787 (put the three secrets in .dev.vars, gitignored)
+```
+
+Checked locally under `wrangler dev` against an echo server: wrong or missing password → 401
+(pages redirect to `/login`), the service-token headers reach the upstream, and a client-supplied
+`CF-Access-Client-Id` is overwritten. Not yet checked: a real deploy, the real tunnel, and the cold
+Broad backtest through Workers. Bundle is 1.6 MiB gzipped (free plan limit 3 MiB). The dashboard
+password's Basic header is forwarded upstream with the service token, as on Vercel.
+
 **Second laptop:** put the variables in `apps/dashboard/.env.local`, then
 
 ```bash
@@ -151,6 +177,26 @@ bun run --filter @ata/dashboard start
 ```
 
 Use `start`, not `dev`: production mode is what makes the password mandatory.
+
+## Signing in with Google (Cloudflare Access) instead of the password
+
+Put the dashboard's own hostname behind Access too. People sign in with Google (so Google's
+2-step verification, an authenticator app or a passkey, is the second factor) and the dashboard
+checks the signed token Access attaches; `DASHBOARD_PASSWORD` and `/login` are then unused.
+
+1. Google Cloud Console → APIs & Services → OAuth consent screen (External; add your Google
+   address as a test user) → Credentials → Create OAuth client ID, type Web. Authorized redirect
+   URI: `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback`. Copy the client ID and secret.
+2. Zero Trust → Settings → Authentication → Login methods → Add new → Google, paste both.
+3. Zero Trust → Access → Applications → Add → Self-hosted: domain `dashboard.<your-domain>`, login
+   method Google only, one **Allow** policy that includes your email. Copy the application's **AUD tag**.
+4. Put `ACCESS_TEAM_DOMAIN` (`<team>.cloudflareaccess.com`) and `ACCESS_AUD` in `wrangler.jsonc`
+   under `vars` (neither is secret), rebuild and `bun run cf:deploy`, then delete the
+   `DASHBOARD_PASSWORD` secret (`npx wrangler secret delete DASHBOARD_PASSWORD`).
+
+The Worker refuses (403) any request without a valid Access token, so reaching it by another route
+does not get in. `/logout` hands over to Access's own logout. Scripts and curl need an Access service
+token for the dashboard hostname, as for the API hostnames.
 
 ## Limits
 

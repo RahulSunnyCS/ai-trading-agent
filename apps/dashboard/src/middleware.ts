@@ -19,6 +19,7 @@ import {
   safeNextPath,
   upstreamHeaders,
 } from './lib/accessGate';
+import { ACCESS_JWT_HEADER, verifyAccessJwt } from './lib/cfAccess';
 import {
   SESSION_COOKIE,
   clearedSessionCookie,
@@ -40,6 +41,8 @@ import {
  * Order of checks for every request:
  *   1. broken deployment            -> 503 (generic body; reason in the server log)
  *   1a. cross-site API write (CSRF) -> 403, even in open local dev
+ *   1b. Cloudflare Access mode (ACCESS_TEAM_DOMAIN + ACCESS_AUD set): a valid signed Access
+ *       token -> through, anything else -> 403; the steps below (the password) are not used
  *   2. /logout                      -> clear cookie, redirect to /login
  *   3. POST /login                  -> check password, set cookie, redirect to `next`
  *   4. valid session cookie         -> through
@@ -56,6 +59,8 @@ const attempts: AttemptStore = new Map();
 
 const LOGIN_PATH = '/login';
 const LOGOUT_PATH = '/logout';
+/** Access serves this path on the application's own hostname; it clears the Access session. */
+const ACCESS_LOGOUT_PATH = '/cdn-cgi/access/logout';
 const MAX_LOGIN_BODY_BYTES = 8192;
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
@@ -107,6 +112,31 @@ function forward(request: NextRequest, config: GateConfig): NextResponse {
     if (headers) return NextResponse.next({ request: { headers } });
   }
   return NextResponse.next();
+}
+
+/**
+ * Cloudflare Access mode. Access signs the person in before the request reaches us; this only
+ * verifies the token it attaches, so a request that skipped Access (or forged the header) is
+ * refused. /login has nothing to do here and /logout hands over to Access's own logout.
+ */
+async function handleAccess(
+  request: NextRequest,
+  config: GateConfig,
+  access: NonNullable<GateConfig['access']>,
+): Promise<NextResponse> {
+  const valid = await verifyAccessJwt(request.headers.get(ACCESS_JWT_HEADER), access, Date.now());
+  if (!valid) {
+    return new NextResponse('Sign in through Cloudflare Access', {
+      status: 403,
+      headers: NO_STORE,
+    });
+  }
+  const { pathname } = request.nextUrl;
+  if (pathname === LOGOUT_PATH) return redirect(request, ACCESS_LOGOUT_PATH, 303);
+  if (pathname === LOGIN_PATH) {
+    return redirect(request, safeNextPath(request.nextUrl.searchParams.get('next')), 302);
+  }
+  return forward(request, config);
 }
 
 async function handleLogin(request: NextRequest, password: string | null): Promise<NextResponse> {
@@ -182,6 +212,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (isCrossSiteApiWrite(method, pathname, request.headers, request.nextUrl.host)) {
     return new NextResponse('Cross-site request refused', { status: 403, headers: NO_STORE });
   }
+
+  if (config.access) return handleAccess(request, config, config.access);
 
   if (pathname === LOGOUT_PATH) {
     const response = redirect(request, LOGIN_PATH, 303);
