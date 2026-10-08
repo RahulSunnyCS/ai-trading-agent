@@ -139,15 +139,7 @@ export interface MomentumScores {
 
 // --- Sorting ---------------------------------------------------------------------------------
 
-export type ScoreSortKey =
-  | 'name'
-  | 'price'
-  | 'change'
-  | 'members'
-  | 'score'
-  | 'rank'
-  | 'high'
-  | 'return';
+export type ScoreSortKey = 'name' | 'price' | 'change' | 'score' | 'rank' | 'high' | 'return';
 
 /** The keys that sort by one lookback's figure. */
 const LOOKBACK_KEYS: ReadonlySet<ScoreSortKey> = new Set(['score', 'return']);
@@ -209,7 +201,7 @@ function compareText(a: string, b: string, ascending: boolean): number {
   return ascending ? a.localeCompare(b) : b.localeCompare(a);
 }
 
-/** A sorted copy. A key that does not apply to stocks ('members') falls back to the score. */
+/** A sorted copy. */
 export function sortStocks(stocks: readonly StockScore[], sort: ScoreSort): StockScore[] {
   const lookback = String(sort.lookback);
   return [...stocks].sort((a, b) => {
@@ -222,17 +214,6 @@ export function sortStocks(stocks: readonly StockScore[], sort: ScoreSort): Stoc
     if (sort.key === 'high') return compareNumbers(a.high_52w_gap, b.high_52w_gap, sort.ascending);
     if (sort.key === 'return')
       return compareNumbers(a.returns[lookback], b.returns[lookback], sort.ascending);
-    return compareNumbers(a.scores[lookback], b.scores[lookback], sort.ascending);
-  });
-}
-
-/** A sorted copy. Keys that do not apply to sectors ('price', 'change') fall back to the score. */
-export function sortSectors(sectors: readonly SectorScore[], sort: ScoreSort): SectorScore[] {
-  const lookback = String(sort.lookback);
-  return [...sectors].sort((a, b) => {
-    if (sort.key === 'name') return compareText(a.subgroup, b.subgroup, sort.ascending);
-    if (sort.key === 'members')
-      return compareNumbers(a.qualifying_count, b.qualifying_count, sort.ascending);
     return compareNumbers(a.scores[lookback], b.scores[lookback], sort.ascending);
   });
 }
@@ -281,44 +262,6 @@ export function filterStocks(stocks: readonly StockScore[], filter: ScoreFilter)
       stock.parent_group,
     ),
   );
-}
-
-/** Sectors in the chosen parent group whose name or parent group contains the text. */
-export function filterSectors(sectors: readonly SectorScore[], filter: ScoreFilter): SectorScore[] {
-  return sectors.filter((sector) =>
-    matches(`${sector.subgroup} ${sector.parent_group}`, filter, sector.parent_group),
-  );
-}
-
-/** The stocks tagged to one sector row. */
-export function sectorMembers(
-  stocks: readonly StockScore[],
-  sector: Pick<SectorScore, 'parent_group' | 'subgroup'>,
-): StockScore[] {
-  const tagged = (stock: StockScore): boolean =>
-    (stock.tags?.length
-      ? stock.tags
-      : [{ parent_group: stock.parent_group, subgroup: stock.subgroup }]
-    ).some((tag) => tag.parent_group === sector.parent_group && tag.subgroup === sector.subgroup);
-  return stocks.filter(tagged);
-}
-
-// --- Score bands -----------------------------------------------------------------------------
-
-export type ScoreBand = 'weak' | 'middle' | 'strong';
-
-/** 0–40 weak, above 40 to 60 middle, above 60 strong; null when there is no score. */
-export function scoreBand(value: number | null | undefined): ScoreBand | null {
-  if (value == null || !Number.isFinite(value)) return null;
-  if (value <= 40) return 'weak';
-  if (value <= 60) return 'middle';
-  return 'strong';
-}
-
-/** -1, 0 or 1 for a return; null when missing. Drives the positive / negative colouring. */
-export function signOf(value: number | null | undefined): -1 | 0 | 1 | null {
-  if (value == null || !Number.isFinite(value)) return null;
-  return value > 0 ? 1 : value < 0 ? -1 : 0;
 }
 
 // --- Held / Candidate marks from a weekly signal ---------------------------------------------
@@ -642,15 +585,24 @@ export function leaderCount(stocks: readonly StockScore[]): number {
   return stocks.filter((stock) => trendOf(stock) === 'leader').length;
 }
 
+/** The parent group whose rows are theme baskets (PSU, CPSE...), not sectors. */
+export const THEME_PARENT = 'Cross-Sector Themes';
+
 /**
  * The strongest sub-sector: highest mean 26-week score among those with at least `minStocks`
- * qualifying stocks (a sector of two stocks is one stock's mood).
+ * qualifying stocks (a sector of two stocks is one stock's mood). Theme baskets are not sectors
+ * and are left out, as on the rotation map.
  */
 export function topSector(sectors: readonly SectorScore[], minStocks = 5): SectorScore | null {
   let best: SectorScore | null = null;
   for (const sector of sectors) {
     const score = sector.scores['26'];
-    if (score == null || sector.qualifying_count < minStocks) continue;
+    if (
+      score == null ||
+      sector.qualifying_count < minStocks ||
+      sector.parent_group === THEME_PARENT
+    )
+      continue;
     if (best === null || score > (best.scores['26'] ?? Number.NEGATIVE_INFINITY)) best = sector;
   }
   return best;

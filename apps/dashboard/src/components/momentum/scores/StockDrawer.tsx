@@ -199,6 +199,8 @@ export function StockDrawer({
   const peers = stock ? stocksInSub(stocks, stock.parent_group, stock.subgroup) : [];
   const place = stock ? rankInGroup(stock, peers) : null;
   const change = stock ? rankChange(stock) : null;
+  // The ranking covers only stocks with a full year of prices, not every scored stock.
+  const rankedCount = stocks.reduce((n, s) => n + (s.composite_rank == null ? 0 : 1), 0);
 
   return (
     <Drawer
@@ -259,7 +261,7 @@ export function StockDrawer({
             </span>
             <span className="text-sm text-muted">
               Rank <b className="metric text-foreground">{stock.composite_rank ?? EMPTY}</b>
-              {stock.composite_rank != null ? ` of ${formatInt(stocks.length)}` : ''}
+              {stock.composite_rank != null ? ` of ${formatInt(rankedCount)}` : ''}
               {change ? (
                 <span className={change > 0 ? ' text-positive' : ' text-negative'}>
                   {' '}

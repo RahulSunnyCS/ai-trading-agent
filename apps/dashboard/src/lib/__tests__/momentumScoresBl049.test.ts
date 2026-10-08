@@ -17,7 +17,6 @@ import {
   markKey,
   nextSort,
   rankChange,
-  sectorMembers,
   sortStocks,
   stockDecile,
   topSector,
@@ -202,6 +201,11 @@ describe('the strongest sub-sector', () => {
   it('is null when none qualifies', () => {
     expect(topSector([sector('Tiny', 99, 2), sector('Blank', null, 9)])).toBeNull();
   });
+  it('never names a theme basket', () => {
+    const theme = { ...sector('PSU / CPSE Stocks', 99, 40), parent_group: 'Cross-Sector Themes' };
+    expect(topSector([theme, sector('Big', 80, 9)])?.subgroup).toBe('Big');
+    expect(topSector([theme])).toBeNull();
+  });
 });
 
 describe('sorting by rank, 52-week high and return', () => {
@@ -246,15 +250,9 @@ describe('tags', () => {
     ],
   });
   it('lists a stock under every group it is tagged to', () => {
-    expect(
-      sectorMembers([sbin], { parent_group: 'Cross-Sector Themes', subgroup: 'PSU / CPSE Stocks' }),
-    ).toHaveLength(1);
-    expect(
-      sectorMembers([sbin], { parent_group: 'Financials', subgroup: 'PSU Banks' }),
-    ).toHaveLength(1);
-    expect(
-      sectorMembers([sbin], { parent_group: 'Financials', subgroup: 'Insurance' }),
-    ).toHaveLength(0);
+    expect(stocksInSub([sbin], 'Cross-Sector Themes', 'PSU / CPSE Stocks')).toHaveLength(1);
+    expect(stocksInSub([sbin], 'Financials', 'PSU Banks')).toHaveLength(1);
+    expect(stocksInSub([sbin], 'Financials', 'Insurance')).toHaveLength(0);
   });
   it('searches by any tag', () => {
     expect(filterStocks([sbin], { query: 'cpse', group: '' })).toHaveLength(1);

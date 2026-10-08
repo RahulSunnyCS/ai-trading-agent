@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { cn } from '../../../lib/cn';
 import { formatNumber } from '../../../lib/format';
@@ -113,22 +113,27 @@ export function RotationMap({
 
   const plotW = Math.max(120, width - MARGIN.left - MARGIN.right);
   const plotH = height - MARGIN.top - MARGIN.bottom;
-  const x = (value: number): number =>
-    MARGIN.left + (Math.min(100, Math.max(0, value)) / 100) * plotW;
-  const y = (value: number): number =>
-    MARGIN.top + (1 - (Math.min(range, Math.max(-range, value)) + range) / (2 * range)) * plotH;
+  // The scales depend only on the plot size and range, so the dots and labels below are not
+  // laid out again for a hover.
+  const x = useCallback(
+    (value: number): number => MARGIN.left + (Math.min(100, Math.max(0, value)) / 100) * plotW,
+    [plotW],
+  );
+  const y = useCallback(
+    (value: number): number =>
+      MARGIN.top + (1 - (Math.min(range, Math.max(-range, value)) + range) / (2 * range)) * plotH,
+    [range, plotH],
+  );
 
   const placed: Placed[] = useMemo(
     () =>
       placeable.map((entry) => ({
         entry,
-        cx: MARGIN.left + (Math.min(100, Math.max(0, entry.now.x)) / 100) * plotW,
-        cy:
-          MARGIN.top +
-          (1 - (Math.min(range, Math.max(-range, entry.now.y)) + range) / (2 * range)) * plotH,
+        cx: x(entry.now.x),
+        cy: y(entry.now.y),
         r: dotRadius(sizeOf(entry)),
       })),
-    [placeable, plotW, plotH, range, sizeOf],
+    [placeable, x, y, sizeOf],
   );
 
   // Names: the picked and hovered first, then the leaders and the improving (the ones worth

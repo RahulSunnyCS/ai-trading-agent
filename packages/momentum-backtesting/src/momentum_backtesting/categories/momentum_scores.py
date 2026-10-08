@@ -30,6 +30,8 @@ from __future__ import annotations
 import csv
 import math
 import threading
+import weakref
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -662,8 +664,28 @@ def compute_rotation(
     return Rotation(weeks=tuple(dates), groups=groups, subs=subs)
 
 
-_RANK_LOCK = threading.Lock()
-_RANK_CACHE: dict = {"universe": None, "table": None}
+class UniverseMemo:
+    """The last value built from one price frame. The frame object is replaced when the data
+    changes, so `is` on it is the freshness check; it is held weakly, so a replaced frame is not
+    kept alive by this cache. Built under the lock, so two requests that arrive together on a cold
+    cache share one build."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._universe: weakref.ref | None = None
+        self._key: object = None
+        self._value: object = None
+
+    def get(self, universe: broad.StockUniverseFrame, key: object, build: Callable[[], object]):
+        with self._lock:
+            if self._universe is not None and self._universe() is universe and self._key == key:
+                return self._value
+            value = build()
+            self._universe, self._key, self._value = weakref.ref(universe), key, value
+            return value
+
+
+_RANK_MEMO = UniverseMemo()
 
 
 def composite_rank_history(
@@ -672,24 +694,21 @@ def composite_rank_history(
     """The composite rank (see `_composite_ranks`) of every stock for each of the last `weeks`
     weeks: rows are weeks (oldest first), columns base symbols, values the rank or NaN. Each week
     is ranked among that week's members. About a second to build, so it is kept for the price
-    frame it was built from (the frame object is replaced when the data changes)."""
-    with _RANK_LOCK:
-        if _RANK_CACHE["universe"] is universe and _RANK_CACHE["table"] is not None:
-            return _RANK_CACHE["table"]
-    frame = universe.frame
-    mapper = universe.column_to_base_symbol
-    rows: dict[pd.Timestamp, dict[str, int]] = {}
-    for pos in range(max(0, len(frame.index) - weeks), len(frame.index)):
-        member = universe.stock_membership.loc[frame.index[pos]]
-        cols = [c for c in frame.columns if bool(member.get(c, False))]
-        rows[frame.index[pos]] = {
-            mapper[col]: rank for col, rank in _composite_ranks(frame, pos, cols).items()
-        }
-    table = pd.DataFrame.from_dict(rows, orient="index").sort_index()
-    with _RANK_LOCK:
-        _RANK_CACHE["universe"] = universe
-        _RANK_CACHE["table"] = table
-    return table
+    frame and week count it was built from."""
+
+    def build() -> pd.DataFrame:
+        frame = universe.frame
+        mapper = universe.column_to_base_symbol
+        rows: dict[pd.Timestamp, dict[str, int]] = {}
+        for pos in range(max(0, len(frame.index) - weeks), len(frame.index)):
+            member = universe.stock_membership.loc[frame.index[pos]]
+            cols = [c for c in frame.columns if bool(member.get(c, False))]
+            rows[frame.index[pos]] = {
+                mapper[col]: rank for col, rank in _composite_ranks(frame, pos, cols).items()
+            }
+        return pd.DataFrame.from_dict(rows, orient="index").sort_index()
+
+    return _RANK_MEMO.get(universe, weeks, build)  # type: ignore[return-value]
 
 
 def live_column(universe: broad.StockUniverseFrame, symbol: str) -> str | None:

@@ -64,6 +64,15 @@ describe('momentum backtest proxy routes', () => {
       });
       expect(response.statusCode).toBe(400);
     }
+    // Dot-only names are refused too: some clients normalise them away (a 404 here), others send
+    // them as they are, and neither may reach the upstream path.
+    for (const dots of ['.', '..', '%2e%2e']) {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/api/momentum/scores/stock/${dots}`,
+      });
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    }
     expect(fetchMock).not.toHaveBeenCalled();
     await server.close();
   });

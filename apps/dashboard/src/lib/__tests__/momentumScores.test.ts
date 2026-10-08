@@ -3,19 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL_GROUPS,
   type ScoreSort,
-  type SectorScore,
   type StockScore,
   activeSignalFromJob,
   ariaSort,
-  filterSectors,
   filterStocks,
   nextSort,
   parentGroups,
-  scoreBand,
-  sectorMembers,
-  signOf,
   signalMarks,
-  sortSectors,
   sortStocks,
 } from '../momentumScores';
 
@@ -28,18 +22,6 @@ function stock(symbol: string, over: Partial<StockScore> = {}): StockScore {
     last_price: 100,
     change_1w_pct: 0,
     returns: {},
-    scores: {},
-    ...over,
-  };
-}
-
-function sector(subgroup: string, over: Partial<SectorScore> = {}): SectorScore {
-  return {
-    cid: subgroup,
-    parent_group: 'Financials',
-    subgroup,
-    member_count: 2,
-    qualifying_count: 2,
     scores: {},
     ...over,
   };
@@ -102,24 +84,6 @@ describe('sorting', () => {
     expect(symbols(sorted)).toEqual(['AAA', 'BBB', 'CCC']);
     expect(symbols(input)).toEqual(['CCC', 'BBB', 'AAA']);
   });
-
-  it('sorts sectors by name, qualifying members and score', () => {
-    const sectors = [
-      sector('Banks', { qualifying_count: 3, scores: { '4': 20 } }),
-      sector('Steel', { qualifying_count: 9, scores: { '4': 70 } }),
-      sector('Pharma', { qualifying_count: 1, scores: { '4': null } }),
-    ];
-    const names = (rows: SectorScore[]) => rows.map((row) => row.subgroup);
-    expect(names(sortSectors(sectors, { key: 'name', lookback: null, ascending: true }))).toEqual([
-      'Banks',
-      'Pharma',
-      'Steel',
-    ]);
-    expect(
-      names(sortSectors(sectors, { key: 'members', lookback: null, ascending: false })),
-    ).toEqual(['Steel', 'Banks', 'Pharma']);
-    expect(names(sortSectors(sectors, byScore(4)))).toEqual(['Steel', 'Banks', 'Pharma']);
-  });
 });
 
 describe('sort header state', () => {
@@ -172,42 +136,6 @@ describe('filtering', () => {
     expect(symbols(filterStocks(STOCKS, { query: '', group: 'Healthcare' }))).toEqual(['BBB']);
     expect(filterStocks(STOCKS, { query: 'aaa', group: 'Healthcare' })).toEqual([]);
     expect(symbols(filterStocks(STOCKS, { query: 'aaa', group: 'Financials' }))).toEqual(['AAA']);
-  });
-
-  it('filters sectors by group and text', () => {
-    const sectors = [sector('Banks'), sector('Pharma', { parent_group: 'Healthcare' })];
-    expect(filterSectors(sectors, { query: '', group: 'Healthcare' }).map((s) => s.cid)).toEqual([
-      'Pharma',
-    ]);
-    expect(
-      filterSectors(sectors, { query: 'financ', group: ALL_GROUPS }).map((s) => s.cid),
-    ).toEqual(['Banks']);
-  });
-
-  it('finds the stocks tagged to a sector', () => {
-    expect(
-      symbols(sectorMembers(STOCKS, { parent_group: 'Financials', subgroup: 'Banks' })),
-    ).toEqual(['AAA']);
-  });
-});
-
-describe('score bands and signs', () => {
-  it('bands a 0–100 score', () => {
-    expect(scoreBand(0)).toBe('weak');
-    expect(scoreBand(40)).toBe('weak');
-    expect(scoreBand(40.1)).toBe('middle');
-    expect(scoreBand(60)).toBe('middle');
-    expect(scoreBand(60.1)).toBe('strong');
-    expect(scoreBand(null)).toBeNull();
-    expect(scoreBand(undefined)).toBeNull();
-    expect(scoreBand(Number.NaN)).toBeNull();
-  });
-
-  it('gives the sign of a return', () => {
-    expect(signOf(0.01)).toBe(1);
-    expect(signOf(-0.01)).toBe(-1);
-    expect(signOf(0)).toBe(0);
-    expect(signOf(null)).toBeNull();
   });
 });
 

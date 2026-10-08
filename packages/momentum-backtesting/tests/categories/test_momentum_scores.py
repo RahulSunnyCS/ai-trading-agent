@@ -535,6 +535,34 @@ def test_composite_rank_history_matches_the_single_week_ranks_and_is_kept():
     assert ms.composite_rank_history(_ten_stocks(), weeks=6) is not table  # a new frame is
 
 
+def test_composite_rank_history_is_kept_per_week_count():
+    universe = _ten_stocks()
+    six = ms.composite_rank_history(universe, weeks=6)
+    four = ms.composite_rank_history(universe, weeks=4)
+    assert len(six.index) == 6 and len(four.index) == 4  # not the first call's table again
+
+
+def test_universe_memo_builds_once_per_frame_and_key_and_does_not_keep_a_dead_frame():
+    import gc
+    import weakref
+
+    memo = ms.UniverseMemo()
+    universe = _ten_stocks()
+    built: list[int] = []
+
+    def build():
+        built.append(1)
+        return object()
+
+    first = memo.get(universe, "a", build)
+    assert memo.get(universe, "a", build) is first and len(built) == 1
+    assert memo.get(universe, "b", build) is not first and len(built) == 2  # another key
+    ref = weakref.ref(universe)
+    del universe
+    gc.collect()
+    assert ref() is None  # the memo does not pin the replaced frame
+
+
 def test_stock_detail_gives_closes_average_scores_and_ranks():
     universe = _ten_stocks()
     detail = ms.stock_detail(universe, "S3")

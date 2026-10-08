@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { usePolledResource } from '../../hooks/usePolledResource';
@@ -65,9 +65,17 @@ export function MomentumScoresView() {
     [kind, groupSlug, subSlug],
   );
   // Opening a stock adds a history entry (Back closes it); stepping to another one replaces it.
+  // Read through a ref so the callback keeps one identity: it goes to every row of the list, and a
+  // new one each time the drawer opens would re-render them all.
+  const openFrom = useRef({ here, stockSymbol });
+  openFrom.current = { here, stockSymbol };
   const openStock = useCallback(
-    (symbol: string) => go({ ...here, stock: symbol }, stockSymbol ? 'replace' : 'push'),
-    [go, here, stockSymbol],
+    (symbol: string) =>
+      go(
+        { ...openFrom.current.here, stock: symbol },
+        openFrom.current.stockSymbol ? 'replace' : 'push',
+      ),
+    [go],
   );
   const openSector = useCallback(
     (stock: StockScore) =>

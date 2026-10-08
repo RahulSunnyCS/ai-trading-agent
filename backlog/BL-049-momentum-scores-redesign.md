@@ -274,3 +274,10 @@ All answered 2026-10-08, see the Log.
     uses.
   - "Open in backtest" already opened the Backtest tab on Broad Momentum (owner answer); left as
     is.
+- 2026-10-08 — review fixes after `/code-review` of #124 and #125 (branch `fix/bl-049-review-findings`):
+  the market strip's strongest sub-sector skips theme baskets; the scores payload (snapshots and
+  rotation) is kept per price frame and group file (`UniverseMemo`, held weakly) instead of rebuilt
+  per request; the rank-history cache is keyed by week count too and built under a lock; the stock
+  proxy refuses dot-only names; `openStock` keeps one identity so rows stay memoised; `/` is not
+  taken where there is no search box; the rotation panel and map no longer recompute on hover; the
+  drawer's rank total counts ranked stocks; dead sector-table helpers removed.

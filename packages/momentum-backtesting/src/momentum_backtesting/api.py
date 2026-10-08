@@ -1546,6 +1546,9 @@ def _liquidity_preview_payload(
     return liquidity_mod.preview(cfg, symbols)
 
 
+_SCORES_MEMO = momentum_scores_mod.UniverseMemo()
+
+
 def _momentum_scores_payload() -> dict:
     """ "Momentum Scores" page (TODO.md 3.9.16) - a live/current-state snapshot, not a backtest
     dataset, so it doesn't go through `/api/meta` + `/api/backtest` the way the four config+run
@@ -1561,19 +1564,28 @@ def _momentum_scores_payload() -> dict:
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
 
-    group_info = momentum_scores_mod.load_stock_group_info(CATEGORIES_CURATED_DIR)
-    group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR)
-    stock_snapshot = momentum_scores_mod.compute_stock_momentum_scores(universe, group_info)
-    sector_snapshot = momentum_scores_mod.compute_sector_momentum_scores(
-        stock_snapshot, group_members
-    )
+    groups_file = CATEGORIES_CURATED_DIR / broad.STOCK_GROUPS_FILENAME
+    key = groups_file.stat().st_mtime if groups_file.exists() else None
 
+    def build() -> tuple:
+        group_info = momentum_scores_mod.load_stock_group_info(CATEGORIES_CURATED_DIR)
+        group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR)
+        stock_snapshot = momentum_scores_mod.compute_stock_momentum_scores(universe, group_info)
+        return (
+            stock_snapshot,
+            momentum_scores_mod.compute_sector_momentum_scores(stock_snapshot, group_members),
+            momentum_scores_mod.compute_rotation(universe, group_members),
+        )
+
+    # Everything but the quality note is a function of the price frame and the group file, and
+    # changes once a day: kept for the frame it came from, so a refresh or a second tab is cheap.
+    stock_snapshot, sector_snapshot, rotation = _SCORES_MEMO.get(universe, key, build)
     return momentum_scores_mod.to_payload(
         stock_snapshot,
         sector_snapshot,
         missing_symbols=universe.missing_symbols,
         membership_quality=_membership_quality(),
-        rotation=momentum_scores_mod.compute_rotation(universe, group_members),
+        rotation=rotation,
     )
 
 
