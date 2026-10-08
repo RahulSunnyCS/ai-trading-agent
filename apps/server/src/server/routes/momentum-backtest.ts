@@ -83,6 +83,26 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, '/api/momentum-scores');
   });
 
+  // One stock's history for the Scores page's drawer: closes with the 40-week average, scores
+  // over the last 12 weeks, composite rank over 26. The symbol is checked here (NSE symbols are
+  // letters, digits and `&`, `-`, `_`, `.`) before it is put in an upstream path.
+  fastify.get(
+    '/api/momentum/scores/stock/:symbol',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['symbol'],
+          properties: { symbol: { type: 'string', pattern: '^[A-Za-z0-9&._-]{1,32}$' } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { symbol } = request.params as { symbol: string };
+      await forward(reply, `/api/momentum-scores/stock/${encodeURIComponent(symbol)}`);
+    },
+  );
+
   // Live tradability preview for Broad Momentum's liquidity gate: how many stocks pass the given
   // thresholds today and why each rejected one failed. Python re-validates every bound.
   fastify.get(

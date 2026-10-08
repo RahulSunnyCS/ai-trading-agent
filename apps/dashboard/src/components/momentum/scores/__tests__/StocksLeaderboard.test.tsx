@@ -1,5 +1,6 @@
-// @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+// @vitest-environment happy-dom
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_BUY_ZONE, type StockScore } from '../../../../lib/momentumScores';
@@ -120,5 +121,89 @@ describe('StocksLeaderboard', () => {
     });
     await act(async () => {});
     expect(screen.getByText('No stocks match.')).toBeTruthy();
+  });
+
+  it('survives a parent that keeps the reported order in state and rebuilds the list every render', async () => {
+    function Host() {
+      const [order, setOrder] = useState<string[]>([]);
+      return (
+        <>
+          <output data-testid="order">{order.length}</output>
+          <StocksLeaderboard
+            stocks={STOCKS.map((s) => s)}
+            lookbacks={LOOKBACKS}
+            zone={DEFAULT_BUY_ZONE}
+            marks={undefined}
+            scoredCount={STOCKS.length}
+            onOrder={setOrder}
+          />
+        </>
+      );
+    }
+    render(<Host />);
+    await act(async () => {});
+    expect(screen.getByTestId('order').textContent).toBe('250');
+  });
+
+  it('opens a stock when its row is clicked, and a sector from its own link', () => {
+    const opened: string[] = [];
+    const sectors: string[] = [];
+    render(
+      <StocksLeaderboard
+        stocks={[stock(1)]}
+        lookbacks={LOOKBACKS}
+        zone={DEFAULT_BUY_ZONE}
+        marks={undefined}
+        scoredCount={1}
+        onOpenStock={(symbol) => opened.push(symbol)}
+        onSector={(s) => sectors.push(s.subgroup)}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Banks' }));
+    expect(sectors).toEqual(['Banks']);
+    expect(opened).toEqual([]); // the sector link does not also open the stock
+    fireEvent.click(bodyRows()[0] as HTMLElement);
+    expect(opened).toEqual(['S001']);
+  });
+
+  it('shows only the strongest few, with a link to the whole list, in the top variant', () => {
+    const all: number[] = [];
+    render(
+      <StocksLeaderboard
+        stocks={STOCKS}
+        lookbacks={LOOKBACKS}
+        zone={DEFAULT_BUY_ZONE}
+        marks={undefined}
+        scoredCount={STOCKS.length}
+        heading="Strongest stocks right now"
+        top={{ limit: 10, onShowAll: () => all.push(1) }}
+      />,
+    );
+    expect(bodyRows()).toHaveLength(10);
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /more/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /All 250 stocks/ }));
+    expect(all).toHaveLength(1);
+  });
+
+  it('shows a removable filter chip', () => {
+    const cleared: number[] = [];
+    render(
+      <StocksLeaderboard
+        stocks={[stock(1)]}
+        lookbacks={LOOKBACKS}
+        zone={DEFAULT_BUY_ZONE}
+        marks={undefined}
+        scoredCount={1}
+        heading="Stocks in Financials"
+        chip={{ label: 'Sub-sector: PSU Banks', onClear: () => cleared.push(1) }}
+        showGroupFilter={false}
+      />,
+    );
+    expect(screen.queryByRole('combobox', { name: 'Sector group' })).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Remove the Sub-sector: PSU Banks filter' }),
+    );
+    expect(cleared).toHaveLength(1);
   });
 });

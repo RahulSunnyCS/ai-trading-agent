@@ -301,3 +301,235 @@ describe('Held / Candidate from a weekly signal (BL-049 fixes)', () => {
     expect(marks?.get('BBB')).toBe('candidate');
   });
 });
+
+// --- Phase 2: the rotation map's rows -------------------------------------------------------
+
+import {
+  type RotationGroup,
+  TAIL_CHOICES,
+  buildRotationRows,
+  groupBySlug,
+  meanScores,
+  medianReturn,
+  quadrantOf,
+  rankInGroup,
+  rotationEntry,
+  shareAboveAverage,
+  slugify,
+  stocksInGroup,
+  stocksInSub,
+  strengthRank,
+  subBySlug,
+} from '../momentumScores';
+
+/** A group whose 26-week score is `s26` and whose 4-week score runs `s4` over 18 weeks. */
+function group(
+  key: string,
+  s4: Array<number | null>,
+  s26: Array<number | null>,
+  over: Partial<RotationGroup> = {},
+): RotationGroup {
+  const [parent = key, sub = null] = key.split(' :: ');
+  return {
+    key,
+    parent_group: parent,
+    subgroup: sub,
+    theme: false,
+    member_count: 10,
+    scored_count: 10,
+    s4,
+    s26,
+    ...over,
+  };
+}
+const flat = (value: number): number[] => Array.from({ length: 18 }, () => value);
+const ramp = (from: number, to: number): number[] =>
+  Array.from({ length: 18 }, (_, i) => from + ((to - from) * i) / 17);
+
+describe('quadrantOf', () => {
+  it.each([
+    [60, 5, 'leading'],
+    [60, -5, 'weakening'],
+    [40, 5, 'improving'],
+    [40, -5, 'lagging'],
+    [50, 0, 'leading'], // the lines belong to the stronger, rising side
+    [49.9, 0, 'improving'],
+  ])('(%s, %s) is %s', (x, y, quadrant) => expect(quadrantOf(x, y)).toBe(quadrant));
+});
+
+describe('rotationEntry', () => {
+  it('places a group by its 26-week score and the change in its 4-week score over 4 weeks', () => {
+    const g = group('Fin', ramp(40, 74), flat(70));
+    const entry = rotationEntry(g, 4);
+    // s4 rises 2 a week, so over 4 weeks it moved +8; the 26-week score is 70.
+    expect(entry.now).toEqual({ x: 70, y: expect.closeTo(8) });
+    expect(entry.quadrant).toBe('leading');
+    expect(entry.tail).toHaveLength(5); // the last 4 weeks and now
+    expect(entry.changed).toBe(false);
+  });
+
+  it('reports a move between quadrants over the last 4 weeks', () => {
+    const s4 = [...flat(50).slice(0, 13), 50, 48, 46, 44, 42].slice(0, 18); // falling at the end
+    const s26 = [...flat(60).slice(0, 13), 60, 59, 55, 51, 45].slice(0, 18); // crossing 50
+    const entry = rotationEntry(group('Fin', s4, s26), 4);
+    expect(entry.before).toBe('leading'); // 4 weeks ago: strong and not falling yet
+    expect(entry.quadrant).toBe('lagging');
+    expect(entry.changed).toBe(true);
+  });
+
+  it('has no position when a score it needs is missing, and skips gaps in the tail', () => {
+    const missing = rotationEntry(group('Fin', flat(50), Array(18).fill(null)), 4);
+    expect(missing.now).toBeNull();
+    expect(missing.quadrant).toBeNull();
+    expect(missing.changed).toBe(false);
+    const gap = flat(50).map((v, i) => (i === 16 ? null : v));
+    expect(rotationEntry(group('Fin', gap, flat(60)), 4).tail).toHaveLength(4);
+  });
+
+  it('draws a longer tail on request, but never before the 4-week change exists', () => {
+    expect(TAIL_CHOICES).toEqual([4, 8, 13]);
+    expect(rotationEntry(group('Fin', flat(50), flat(60)), 13).tail).toHaveLength(14);
+    expect(rotationEntry(group('Fin', flat(50), flat(60)), 17).tail).toHaveLength(14);
+  });
+});
+
+describe('rotation rows', () => {
+  const opts = { tail: 4, minStocks: 5, query: '', changedOnly: false, lookbacks: [4, 13, 26] };
+  const groups = [
+    group('Strong', flat(50), flat(80)),
+    group('Weak', flat(50), flat(20)),
+    group('Tiny', flat(50), flat(90), { scored_count: 2 }),
+    group('Cross-Sector Themes', flat(50), flat(95), { theme: true }),
+    group('NoHistory', flat(50), Array(18).fill(null)),
+  ];
+  const stocksOf = () => [stock('A', { scores: { '4': 60, '13': 70, '26': 80 }, above_ma40: 0.1 })];
+
+  it('puts dotted groups strongest first and the table-only ones after, each with a reason', () => {
+    const rows = buildRotationRows(groups, stocksOf, opts);
+    expect(rows.map((r) => r.entry.key)).toEqual([
+      'Strong',
+      'Weak',
+      'Cross-Sector Themes',
+      'Tiny',
+      'NoHistory',
+    ]);
+    expect(rows.map((r) => r.onMap)).toEqual([true, true, false, false, false]);
+    expect(rows.map((r) => r.why)).toEqual([
+      null,
+      null,
+      'a theme basket, not a sector',
+      'fewer than 5 scored stocks',
+      'too little history',
+    ]);
+  });
+
+  it('lets the minimum change who gets a dot', () => {
+    const rows = buildRotationRows(groups, stocksOf, { ...opts, minStocks: 1 });
+    expect(rows.find((r) => r.entry.key === 'Tiny')?.onMap).toBe(true);
+    expect(rows.find((r) => r.entry.key === 'Cross-Sector Themes')?.onMap).toBe(false);
+  });
+
+  it('filters by name', () => {
+    const rows = buildRotationRows(groups, stocksOf, { ...opts, query: ' STRONG' });
+    expect(rows.map((r) => r.entry.key)).toEqual(['Strong']);
+  });
+
+  it('keeps only the groups that changed quadrant, and never a table-only one', () => {
+    const moved = group(
+      'Moved',
+      flat(50).map((v, i) => (i >= 14 ? 40 : v)),
+      flat(70),
+    );
+    const rows = buildRotationRows([...groups, moved], stocksOf, { ...opts, changedOnly: true });
+    expect(rows.map((r) => r.entry.key)).toEqual(['Moved']);
+  });
+
+  it("carries each group's stocks, mean strip and breadth", () => {
+    const row = buildRotationRows([groups[0] as RotationGroup], stocksOf, opts)[0];
+    expect(row?.strip).toEqual({ '4': 60, '13': 70, '26': 80 });
+    expect(row?.above).toBe(1);
+  });
+});
+
+describe('slugs and lookups', () => {
+  const groups = [
+    group('Metals & Mining', flat(50), flat(60)),
+    group('Financials', flat(50), flat(70)),
+  ];
+  const subs = [
+    group('Financials :: PSU Banks', flat(50), flat(70)),
+    group('Metals & Mining :: PSU Banks', flat(50), flat(70)),
+  ];
+  it('slugifies names for URLs', () => {
+    expect(slugify('Metals & Mining')).toBe('metals-and-mining');
+    expect(slugify('Oil, Gas & Consumable Fuels')).toBe('oil-gas-and-consumable-fuels');
+    expect(slugify('  PSU / CPSE Stocks ')).toBe('psu-cpse-stocks');
+  });
+  it('finds a group and a sub-sector by slug, and none for a stranger', () => {
+    expect(groupBySlug(groups, 'metals-and-mining')?.key).toBe('Metals & Mining');
+    expect(groupBySlug(groups, 'nope')).toBeNull();
+    expect(groupBySlug(groups, null)).toBeNull();
+    expect(subBySlug(subs, 'Financials', 'psu-banks')?.key).toBe('Financials :: PSU Banks');
+    expect(subBySlug(subs, 'Metals & Mining', 'psu-banks')?.key).toBe(
+      'Metals & Mining :: PSU Banks',
+    );
+    expect(subBySlug(subs, 'Financials', 'insurance')).toBeNull();
+  });
+  it('ranks a group by strength among the sector groups, leaving out themes', () => {
+    const all = [...groups, group('Cross-Sector Themes', flat(50), flat(99), { theme: true })];
+    expect(strengthRank(all[1] as RotationGroup, all)).toEqual({ place: 1, of: 2 });
+    expect(strengthRank(all[0] as RotationGroup, all)).toEqual({ place: 2, of: 2 });
+    expect(strengthRank(group('X', flat(50), Array(18).fill(null)), all)).toBeNull();
+  });
+});
+
+describe('a group of stocks', () => {
+  const stocks = [
+    stock('A', {
+      tags: [
+        { parent_group: 'Cross-Sector Themes', subgroup: 'PSU' },
+        { parent_group: 'Financials', subgroup: 'PSU Banks' },
+      ],
+      scores: { '26': 80 },
+      returns: { '26': 0.3 },
+      above_ma40: 0.1,
+      composite_rank: 5,
+    }),
+    stock('B', {
+      parent_group: 'Financials',
+      subgroup: 'Insurance',
+      scores: { '26': 40 },
+      returns: { '26': 0.1 },
+      above_ma40: -0.1,
+      composite_rank: 9,
+    }),
+    stock('C', {
+      parent_group: 'Health',
+      subgroup: 'Pharma',
+      scores: { '26': null },
+      composite_rank: 2,
+    }),
+  ];
+  it('lists them by parent group and sub-sector, each stock once', () => {
+    expect(stocksInGroup(stocks, 'Financials').map((s) => s.symbol)).toEqual(['A', 'B']);
+    expect(stocksInGroup(stocks, 'Cross-Sector Themes').map((s) => s.symbol)).toEqual(['A']);
+    expect(stocksInSub(stocks, 'Financials', 'PSU Banks').map((s) => s.symbol)).toEqual(['A']);
+    expect(stocksInSub(stocks, 'Financials', 'Pharma')).toEqual([]);
+  });
+  it('summarises them', () => {
+    const fin = stocksInGroup(stocks, 'Financials');
+    expect(meanScores(fin, [26])).toEqual({ '26': 60 });
+    expect(meanScores([stocks[2] as StockScore], [26])).toEqual({ '26': null });
+    expect(shareAboveAverage(fin)).toBe(0.5);
+    expect(shareAboveAverage([stocks[2] as StockScore])).toBeNull();
+    expect(medianReturn(fin)).toBeCloseTo(0.2);
+    expect(medianReturn(stocks)).toBeCloseTo(0.2);
+    expect(medianReturn([])).toBeNull();
+  });
+  it("places a stock among its sector's by composite rank", () => {
+    const fin = stocksInGroup(stocks, 'Financials');
+    expect(rankInGroup(fin[0] as StockScore, fin)).toEqual({ place: 1, of: 2 });
+    expect(rankInGroup(fin[1] as StockScore, fin)).toEqual({ place: 2, of: 2 });
+    expect(rankInGroup(stock('Z'), fin)).toBeNull();
+  });
+});
