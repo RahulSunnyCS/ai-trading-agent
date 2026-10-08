@@ -150,7 +150,7 @@ def run_one(task: dict) -> dict:
                 phases.append(outcome.result.equity)
                 trades = outcome.result.trades
                 if not trades.empty:
-                    count += int(trades["reason"].astype(str).str.startswith("stop").sum())
+                    count += int(trades["reason"].astype(str).str.contains("stop:").sum())
             name = f"{key}__{'tax' if taxed else 'pre'}"
             curves[name] = pd.concat(phases, axis=1).mean(axis=1)
             counts[name] = count

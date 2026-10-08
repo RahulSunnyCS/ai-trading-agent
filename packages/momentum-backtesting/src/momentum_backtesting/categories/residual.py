@@ -40,9 +40,10 @@ def group_returns(returns: pd.DataFrame, group_of: dict[str, str]) -> pd.DataFra
 
 
 def residual_scores(
-    prices: pd.DataFrame, market: pd.Series, group_of: dict[str, str]
+    prices: pd.DataFrame, market: pd.Series, group_of: dict[str, str], *, standardise: bool = True
 ) -> pd.DataFrame:
-    """Weeks x columns residual-momentum score (NaN where the history is too short)."""
+    """Weeks x columns residual-momentum score (NaN where the history is too short).
+    `standardise=False` returns the plain sum of the residuals (BL-050's M2)."""
     y = prices.pct_change()
     m = market.reindex(prices.index).ffill().pct_change()
     g = group_returns(y, group_of)
@@ -110,7 +111,7 @@ def residual_scores(
     )
     var = (sum_e2 - sum_e * sum_e / SCORE_WEEKS) / (SCORE_WEEKS - 1)
     with np.errstate(invalid="ignore", divide="ignore"):
-        score = sum_e / np.sqrt(np.where(var > 0, var, np.nan))
+        score = sum_e / np.sqrt(np.where(var > 0, var, np.nan)) if standardise else sum_e
     score = np.where(full & (n2 >= SCORE_WEEKS), score, np.nan)
     return pd.DataFrame(score, index=prices.index, columns=prices.columns)
 

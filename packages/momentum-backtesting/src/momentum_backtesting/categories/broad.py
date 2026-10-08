@@ -495,6 +495,24 @@ class UniverseBase:
     global_ranks: pd.DataFrame
 
 
+def _apply_feature_tilt(
+    ranks: pd.DataFrame, feature: pd.DataFrame, weight: float
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """BL-050's tilt: blend each week's effective rank with the feature's rank over the same
+    names, then re-rank (lower = better). Returns (ranks, blended score)."""
+    if not 0 < weight < 1:
+        raise ValueError("feature_tilt weight must be between 0 and 1")
+    eligible = ranks.notna()
+    values = feature.reindex(index=ranks.index, columns=ranks.columns).where(eligible)
+    feat_rank = values.rank(axis=1, ascending=False, method="first")
+    middle = eligible.sum(axis=1).add(1).div(2)
+    feat_rank = feat_rank.apply(lambda col: col.fillna(middle)).where(eligible)
+    blended = ((1 - weight) * ranks + weight * feat_rank).where(eligible)
+    from ..levers import rerank
+
+    return rerank(blended), blended
+
+
 def _residual_global_ranks(full_frame: pd.DataFrame) -> pd.DataFrame:
     """BL-054 L6: rank every column on residual momentum (categories/residual.py), with Nifty 50
     TRI as the market and today's curated category tags as the groups."""
@@ -1197,6 +1215,11 @@ def run_broad_backtest(
     # BL-054 L5: engine.Config.weight_by / vol_window.
     weight_by: Literal["equal", "inverse_vol"] = "equal",
     vol_window: int = 26,
+    # BL-050: (feature, weight). Inside the effective stock ranking (after the stock tilt, if
+    # any), final = (1 - weight) x that rank + weight x the feature's rank among the same names
+    # that week (higher feature = better; a name without a value gets the week's middle rank),
+    # re-ranked. None (default) changes nothing.
+    feature_tilt: tuple[pd.DataFrame, float] | None = None,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1329,6 +1352,8 @@ def run_broad_backtest(
             index=eligible.index, columns=eligible.columns, fill_value=False
         )
         over_ceiling = low if over_ceiling is None else (over_ceiling.astype(bool) | low)
+    if feature_tilt is not None:
+        ranks_full, scores_full = _apply_feature_tilt(ranks_full, *feature_tilt)
     includes = {c: "core" for c in prices.columns}
     config = Config(
         lookbacks=lookbacks,
