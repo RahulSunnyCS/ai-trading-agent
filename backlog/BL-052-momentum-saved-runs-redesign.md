@@ -290,4 +290,13 @@ Answered by the owner on 2026-10-08 (see the Log):
   each run's config from `strategy_versions.spec`, so the version keeps the anchor's raw config.
   Rehearsed on a copy of the live catalog: 26 runs → 12 strategies, and the favourites' configs
   are byte-identical before and after, read by the old code and the new.
+- 2026-10-08 — Phase 1 merge applied to the live catalog after a backup
+  (`catalog.pre-bl052-merge.duckdb`): 26 runs → 12 strategies, favourites' configs unchanged.
+  Phase 2 started on a branch stacked on Phase 1. Decisions: the drawer opens with `?strategy=`
+  through `useQueryState` like This week's drawers (Esc closes it; Back does not); the BL-051
+  alert bell does not exist yet (its Phase 5), so the Saved runs tab carries the count of
+  unreviewed Check / Not reproducible changes and the bell entry waits for it; the Backtest
+  chart now leaves out the overlay of the strategy on screen by fingerprint (the old "skip the
+  first run in the list" rule hid an arbitrary run); the drawer draws the strategy's own curve
+  only (no tradable twin yet: that needs the twin found by settings, left for Phase 3's findings).
 

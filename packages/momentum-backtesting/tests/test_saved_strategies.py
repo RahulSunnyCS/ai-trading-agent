@@ -55,9 +55,12 @@ def test_running_the_same_settings_again_adds_no_strategy(client):
     again = client.post("/api/saved-runs", json=_payload(name="Run 2")).json()
     assert (first["outcome"], again["outcome"]) == ("new", "repeat")
     assert again["strategy_ref"]["id"] == first["id"]
-    listed = _strategies(client)["strategies"]
+    response = _strategies(client)
+    listed = response["strategies"]
     assert len(listed) == 1
     assert (listed[0]["id"], listed[0]["runs"], listed[0]["repeats"]) == (first["id"], 2, 1)
+    assert "broad_liquidity_filter" in response["ignored_fields"]["etf"]
+    assert again["strategy_ref"]["name_typed"] is False
 
 
 def test_settings_the_dataset_ignores_and_missing_defaults_are_the_same_strategy(client):

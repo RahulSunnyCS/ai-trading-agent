@@ -199,6 +199,7 @@ def save_run(
     record["strategy_ref"] = {
         "id": anchor_id,
         "name": anchor_summary.get("name"),
+        "name_typed": bool(anchor_summary.get("name_typed", False)),
         "favourite": _is_favourite(anchor_summary),
     }
     record["change"] = change

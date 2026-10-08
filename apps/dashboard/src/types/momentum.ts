@@ -257,6 +257,113 @@ export interface MomentumSavedRun {
   outcome?: 'new' | 'repeat' | 'new_result' | null;
 }
 
+/** Why a saved strategy's result moved (BL-052, `saved_identity.explain`). */
+export type ResultChangeLabel =
+  | 'data_revised'
+  | 'intended'
+  | 'check'
+  | 'not_reproducible'
+  | 'unknown';
+
+/** One row of the append-only result-change log (`momentum_result_changes`). */
+export interface ResultChange {
+  change_id: string;
+  created_at: string;
+  dataset: string;
+  version_id: string;
+  anchor_run_id: string;
+  prev_run_id: string;
+  run_id: string;
+  label: ResultChangeLabel;
+  prev_versions: MomentumRunVersions | null;
+  versions: MomentumRunVersions | null;
+  /** What differs in the data: catalog table names, "stock lake files", "input files". */
+  changed: string[] | null;
+  /** First week the two curves disagree, 'YYYY-MM-DD'. */
+  first_difference: string | null;
+  kpis_before: Record<string, number | null>;
+  kpis_after: Record<string, number | null>;
+  /** `reason`: the accepted golden change's reason, for `intended`. */
+  detail: { reason?: string } | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  /** A Check or Not reproducible change nobody has marked reviewed. */
+  needs_review: boolean;
+}
+
+/** How far a strategy's result can be trusted (`runs_store._trust`). */
+export type StrategyTrust = 'validated' | 'not_tradable' | 'old_data' | 'in_sample';
+
+/** One saved strategy: every run of one set of normalised settings (BL-052). Its id is the
+ * anchor run's, which holds the name, notes and favourite state. */
+export interface SavedStrategy {
+  id: string;
+  version_id: string;
+  dataset: string;
+  fingerprint: string;
+  name: string;
+  /** False for a placeholder ("Run 12"): the dashboard shows an automatic name instead. */
+  name_typed: boolean;
+  notes: string | null;
+  config: Record<string, unknown>;
+  favorite: boolean;
+  active: boolean;
+  status: FavouriteStatus | null;
+  group: string[] | null;
+  member_of: string | null;
+  overlay: boolean;
+  runs: number;
+  repeats: number;
+  first_saved: string;
+  last_run: string;
+  latest: {
+    id: string;
+    created_at: string;
+    kpis: Record<string, number | null>;
+    dates: string[];
+    strategy: Array<number | null>;
+    data_through: string | null;
+    versions: MomentumRunVersions | null;
+    outcome: 'new' | 'repeat' | 'new_result' | null;
+  };
+  /** The change the latest run made, when it moved the result. */
+  change: ResultChange | null;
+  /** Check / Not reproducible changes of this strategy nobody has reviewed. */
+  unreviewed: number;
+  /** Null for a group (it has no result of its own). */
+  trust: StrategyTrust | null;
+  /** A group's members, each a strategy of its own. */
+  members?: SavedStrategy[];
+  /** `/saved-strategies/{id}` only: every run, newest first. */
+  history?: SavedStrategyRun[];
+}
+
+export interface SavedStrategyRun {
+  id: string;
+  created_at: string;
+  n: number | null;
+  name: string | null;
+  kpis: Record<string, number | null>;
+  data_through: string | null;
+  versions: MomentumRunVersions | null;
+  outcome: 'new' | 'repeat' | 'new_result' | null;
+  change: ResultChange | null;
+}
+
+export interface SavedStrategiesResponse {
+  strategies: SavedStrategy[];
+  /** Check / Not reproducible changes nobody has reviewed, across every strategy. */
+  unreviewed: number;
+  /** Per dataset, the settings it never reads (left out of names and differences). */
+  ignored_fields: Record<string, string[]>;
+}
+
+/** What saving a finished run did (BL-052): the record plus how it joined its strategy. */
+export interface MomentumSaveOutcome extends MomentumSavedRun {
+  strategy_ref?: { id: string; name: string | null; name_typed: boolean; favourite: boolean };
+  change?: ResultChange | null;
+}
+
 /** A run's data and code fingerprints (BL-052, `saved_identity.versions_from_input`). */
 export interface MomentumRunVersions {
   data: string;
