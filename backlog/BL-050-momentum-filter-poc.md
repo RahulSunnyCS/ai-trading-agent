@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P1 — set by the owner (2026-10-08); research only, so nothing live is at risk |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-07 |
 | **Depends on** | BL-015 (pre-registration); BL-010 Phase 6 (the frozen ensemble is the comparator); BL-024 (the journal carries the Phase 4 shadow arm); BL-001 (goldens prove the default output is unchanged) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.13.8 |
 | **Handoff** | [`docs/handover-bl050-filter-poc.md`](../docs/handover-bl050-filter-poc.md): paste-ready planning and working prompts, and which steps need the laptop |
 
 ## Context
@@ -237,6 +237,8 @@ To confirm when this is started:
   3. **M2 stays as planned** (Nifty 500 TRI market, no sector factor, frozen ensemble
      comparator); it is a different question from BL-054 L6.
   4. **Shadow phase:** each survivor gets its own shadow arm, when Phase 4 is approved.
+- 2026-10-09 — Phase 0 committed: `search_spaces/bl050_criteria.json` (11 trials, both tilt
+  weights, V3 added), before any BL-050 run.
 
 - 2026-10-09 — owner added V3 (quiet-or-building 1-week turnover as an entry gate) before any
   BL-050 run; the trial count is now seven. Context: the 2026-10-03 exploratory volume study
