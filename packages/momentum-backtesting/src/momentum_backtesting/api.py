@@ -3529,7 +3529,16 @@ def create_app() -> FastAPI:
         except (FileNotFoundError, duckdb.CatalogException):
             return {"strategies": [], "unreviewed": 0, "ignored_fields": _IGNORED_FIELDS}
 
-    # Registered before `/{run_id}`: the static path must not be read as a strategy id.
+    # Registered before `/{run_id}`: the static paths must not be read as a strategy id.
+    @app.get("/api/saved-strategies/summary")
+    def saved_strategies_summary() -> dict:
+        """The Momentum tab's label: strategy count and moved results to review."""
+        try:
+            with read_catalog() as con:
+                return runs_store.strategy_summary(con)
+        except (FileNotFoundError, duckdb.CatalogException):
+            return {"count": 0, "unreviewed": 0}
+
     @app.get("/api/saved-strategies/merge")
     def saved_strategies_merge_plan() -> dict:
         """The one-time merge as a dry run: what would be folded together. Writes nothing."""

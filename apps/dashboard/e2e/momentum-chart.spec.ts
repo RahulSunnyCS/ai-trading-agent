@@ -48,6 +48,7 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
         version_id: `momentum:etf:${run.id}`,
         dataset: 'etf',
         fingerprint: String(run.id),
+        config_full: run.config,
         name_typed: true,
         notes: null,
         status: null,
@@ -72,11 +73,13 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
         trust: 'in_sample',
         history: [],
       }));
-      const body = path.endsWith('/merge')
-        ? { merges: [], conflicts: [], runs: 0, strategies: 0 }
-        : path === '/api/momentum/saved-strategies'
-          ? { strategies, unreviewed: 0, ignored_fields: {} }
-          : strategies[0];
+      const body = path.endsWith('/summary')
+        ? { count: strategies.length, unreviewed: 0 }
+        : path.endsWith('/merge')
+          ? { merges: [], conflicts: [], runs: 0, strategies: 0 }
+          : path === '/api/momentum/saved-strategies'
+            ? { strategies, unreviewed: 0, ignored_fields: {} }
+            : strategies[0];
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

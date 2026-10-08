@@ -15,6 +15,7 @@ function strategy(id: string, name: string, patch: Partial<SavedStrategy> = {}):
     name_typed: true,
     notes: null,
     config: { dataset: 'etf', start: '2017-01-01', top_n: 5 },
+    config_full: { dataset: 'etf', start: '2017-01-01', top_n: 5 },
     favorite: false,
     active: false,
     status: null,
@@ -102,6 +103,14 @@ async function mockSavedStrategies(
   );
   await page.route(/\/api\/momentum\/(favorite-strategies|saved-runs)(\?.*)?$/, (route) =>
     route.fulfill(json([])),
+  );
+  await page.route(/\/api\/momentum\/saved-strategies\/summary$/, (route) =>
+    route.fulfill(
+      json({
+        count: strategies.filter((s) => !s.member_of).length,
+        unreviewed: reviewed.length ? 0 : 1,
+      }),
+    ),
   );
   await page.route(/\/api\/momentum\/saved-strategies\/merge$/, (route) =>
     route.fulfill(json({ merges: [], conflicts: [], runs: 0, strategies: 0 })),

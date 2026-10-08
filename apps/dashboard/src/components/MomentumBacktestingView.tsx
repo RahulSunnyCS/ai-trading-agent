@@ -464,7 +464,10 @@ export function MomentumBacktestingView() {
   // whichever run happened to be listed first).
   const shownFingerprint = shownRun?.savedFingerprint ?? null;
   const overlays = useMemo(
-    () => savedRuns.filter((run) => run.overlay && run.fingerprint !== shownFingerprint),
+    () =>
+      savedRuns.filter(
+        (run) => run.overlay && (shownFingerprint === null || run.fingerprint !== shownFingerprint),
+      ),
     [savedRuns, shownFingerprint],
   );
   const savedSummary = useSavedStrategiesSummary();
@@ -615,7 +618,7 @@ export function MomentumBacktestingView() {
   /** Open a saved strategy's settings in Backtest, switching dataset when it is another one. */
   function openSavedStrategy(strategy: SavedStrategy): void {
     const target = strategy.dataset as Dataset;
-    const config = { ...strategy.config, dataset: target };
+    const config = { ...strategy.config_full, dataset: target };
     if (target === dataset) {
       loadSettings({ ...asSavedRun(strategy, strategy.name), config });
       return;
@@ -636,7 +639,7 @@ export function MomentumBacktestingView() {
     openSavedStrategy(strategy);
     const failure = await useMomentumRunsStore
       .getState()
-      .startRun(target, { ...strategy.config, dataset: target }, false);
+      .startRun(target, { ...strategy.config_full, dataset: target }, false);
     if (failure) {
       toast(failure, 'error');
       return;
@@ -990,7 +993,10 @@ export function MomentumBacktestingView() {
           <SavedStrategiesView
             onOpenInBacktest={openSavedStrategy}
             onRerun={(strategy) => void rerunSavedStrategy(strategy)}
-            onChanged={() => void refreshSavedRuns(dataset)}
+            onChanged={() => {
+              void refreshSavedRuns(dataset);
+              savedSummary.refetch();
+            }}
           />
         ) : (
           <>

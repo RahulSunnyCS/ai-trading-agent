@@ -244,6 +244,7 @@ describe('momentum backtest proxy routes', () => {
         '/api/momentum/saved-strategies?dataset=broad',
         '/api/saved-strategies?dataset=broad',
       ],
+      ['GET', '/api/momentum/saved-strategies/summary', '/api/saved-strategies/summary'],
       ['GET', '/api/momentum/saved-strategies/merge', '/api/saved-strategies/merge'],
       ['POST', '/api/momentum/saved-strategies/merge', '/api/saved-strategies/merge'],
       ['GET', '/api/momentum/saved-strategies/abc', '/api/saved-strategies/abc'],

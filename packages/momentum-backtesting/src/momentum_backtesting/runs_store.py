@@ -707,10 +707,18 @@ def delete_run(con: duckdb.DuckDBPyConnection, run_id: str) -> bool:
             member_summary["favorite"] = True
             member_summary["status"] = "watching"
             updates[member_id] = member_summary
+    version_id = con.execute(
+        "SELECT version_id FROM backtest_runs WHERE run_id = ?", [run_id]
+    ).fetchone()[0]
     # One transaction: a group is never left pointing at runs that no longer name it.
     _write_summaries(
         con, updates, ("DELETE FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id])
     )
+    left = con.execute(
+        "SELECT count(*) FROM backtest_runs WHERE version_id = ? AND kind = 'weekly'", [version_id]
+    ).fetchone()[0]
+    if not left:  # the strategy's last run: nothing is left to review
+        _close_changes(con, version_id, "removed with the strategy")
     return True
 
 
@@ -874,6 +882,11 @@ def _strategy(runs: list[dict[str, Any]], changes: list[dict[str, Any]]) -> dict
         ),
         "notes": summary.get("notes"),
         "config": anchor["config"],
+        # What the runs used, every request default spelled out: the dashboard opens and
+        # re-runs this, so the form and the run agree.
+        "config_full": saved_identity.complete(anchor["dataset"], anchor["config"])
+        if not summary.get("group")
+        else anchor["config"],
         "favorite": bool(summary.get("favorite", False)),
         "active": bool(summary.get("active", False)),
         "status": status_of(summary),
@@ -968,8 +981,7 @@ def get_strategy(con: duckdb.DuckDBPyConnection, run_id: str) -> dict[str, Any] 
         None if strategy["group"] else _trust(strategy, _frozen_fingerprints(), _newest_data(con))
     )
     if strategy["group"]:
-        members = [get_strategy(con, member) for member in strategy["group"]]
-        strategy["members"] = [m for m in members if m is not None]
+        strategy["members"] = _group_members(con, strategy)
     by_run = {c["run_id"]: c for c in changes}
     strategy["history"] = [
         {
@@ -986,6 +998,41 @@ def get_strategy(con: duckdb.DuckDBPyConnection, run_id: str) -> dict[str, Any] 
         for r in reversed(runs)
     ]
     return strategy
+
+
+def _group_members(con: duckdb.DuckDBPyConnection, group: dict[str, Any]) -> list[dict[str, Any]]:
+    """A group's members as strategies, from one read of the dataset's runs and changes."""
+    runs = _all_runs(con, group["dataset"])
+    version_of = {r["id"]: r["version_id"] for r in runs}
+    by_version: dict[str, list[dict[str, Any]]] = {}
+    for run in runs:
+        by_version.setdefault(run["version_id"], []).append(run)
+    changes: dict[str, list[dict[str, Any]]] = {}
+    for change in list_changes(con):
+        changes.setdefault(change["version_id"], []).append(change)
+    validated, newest = _frozen_fingerprints(), _newest_data(con)
+    members = []
+    for member in group["group"]:
+        version_id = version_of.get(member)
+        if version_id is None:
+            continue
+        strategy = _strategy(by_version[version_id], changes.get(version_id, []))
+        strategy["trust"] = _trust(strategy, validated, newest)
+        members.append(strategy)
+    return members
+
+
+def strategy_summary(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
+    """How many strategies are listed and how many moved results need a look: the Momentum tab's
+    label, without the list itself."""
+    rows = con.execute(
+        "SELECT count(DISTINCT r.version_id) FROM backtest_runs r "
+        "JOIN strategy_versions v USING (version_id) JOIN strategies s USING (strategy_id) "
+        "WHERE s.package = ? AND r.kind = 'weekly' AND r.version_id NOT IN ("
+        "  SELECT version_id FROM backtest_runs WHERE (summary ->> 'member_of') IS NOT NULL)",
+        [PACKAGE],
+    ).fetchone()
+    return {"count": rows[0], "unreviewed": len(list_changes(con, unreviewed=True))}
 
 
 def update_strategy(

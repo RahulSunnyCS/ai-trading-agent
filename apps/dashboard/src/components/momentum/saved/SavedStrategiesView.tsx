@@ -258,6 +258,7 @@ export function SavedStrategiesView({
 
   function done(): void {
     saved.refetch();
+    merge.refetch();
     onChanged();
   }
 
@@ -768,16 +769,20 @@ export function SavedStrategiesView({
   );
 }
 
-/** For the Momentum tab label: how many strategies, and how many moved results need a look. */
+/** For the Momentum tab label: how many strategies, and how many moved results need a look
+ * (a small summary, not the list). */
 export function useSavedStrategiesSummary(): {
   count: number | null;
   unreviewed: number;
   refetch: () => void;
 } {
-  const saved = usePolledResource<SavedStrategiesResponse>(SAVED_STRATEGIES_URL, { cache: true });
+  const summary = usePolledResource<{ count: number; unreviewed: number }>(
+    `${SAVED_STRATEGIES_URL}/summary`,
+    { cache: true },
+  );
   return {
-    count: saved.data ? saved.data.strategies.length : null,
-    unreviewed: saved.data?.unreviewed ?? 0,
-    refetch: saved.refetch,
+    count: summary.data ? summary.data.count : null,
+    unreviewed: summary.data?.unreviewed ?? 0,
+    refetch: summary.refetch,
   };
 }

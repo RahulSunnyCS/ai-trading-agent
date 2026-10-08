@@ -306,6 +306,9 @@ export interface SavedStrategy {
   name_typed: boolean;
   notes: string | null;
   config: Record<string, unknown>;
+  /** `config` with every request default spelled out: what the runs used. Open and re-run
+   * take this, so the form shows exactly the strategy that ran. */
+  config_full: Record<string, unknown>;
   favorite: boolean;
   active: boolean;
   status: FavouriteStatus | null;

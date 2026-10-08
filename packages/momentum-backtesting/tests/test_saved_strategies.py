@@ -375,3 +375,40 @@ def test_hiding_a_strategy_clears_every_runs_overlay(client):
     assert hidden["overlay"] is False
     shown = client.patch(f"/api/saved-strategies/{old}", json={"overlay": True}).json()
     assert shown["overlay"] is True
+
+
+def test_pruning_a_strategy_closes_its_open_changes(client):
+    client.post("/api/saved-runs", json=_payload(top_n=1))
+    client.post("/api/saved-runs", json=_payload(top_n=1, curve=(100.0, 103.0)))
+    assert _strategies(client)["unreviewed"] == 1
+    for top_n in range(2, 13):  # ten newer strategies push it out
+        client.post("/api/saved-runs", json=_payload(top_n=top_n))
+    assert _strategies(client)["unreviewed"] == 0
+    (change,) = client.get("/api/result-changes").json()["changes"]
+    assert change["reviewed_by"] == "pruned with the strategy"
+
+
+def test_deleting_the_last_run_by_the_old_route_closes_its_changes(client):
+    client.post("/api/saved-runs", json=_payload())
+    moved = client.post("/api/saved-runs", json=_payload(curve=(100.0, 103.0))).json()
+    first = moved["strategy_ref"]["id"]
+    client.delete(f"/api/saved-runs/{moved['id']}")
+    assert _strategies(client)["unreviewed"] == 1  # the strategy still has a run
+    client.delete(f"/api/saved-runs/{first}")
+    assert _strategies(client)["unreviewed"] == 0
+
+
+def test_the_summary_counts_strategies_and_open_changes(client):
+    client.post("/api/saved-runs", json=_payload())
+    client.post("/api/saved-runs", json=_payload(curve=(100.0, 103.0)))
+    client.post("/api/saved-runs", json=_payload(top_n=7))
+    assert client.get("/api/saved-strategies/summary").json() == {"count": 2, "unreviewed": 1}
+
+
+def test_a_strategy_carries_its_config_with_every_default_spelled_out(client):
+    client.post("/api/saved-runs", json=_payload(dataset="broad", config={"broad_off_top_n": 3}))
+    (strategy,) = _strategies(client)["strategies"]
+    full = strategy["config_full"]
+    assert full["broad_off_top_n"] == 3
+    assert full["broad_liquidity_filter"] is False  # the request default, not the form's
+    assert "fresh" not in full

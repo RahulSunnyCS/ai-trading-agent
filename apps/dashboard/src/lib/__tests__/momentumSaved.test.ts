@@ -32,6 +32,7 @@ function strategy(patch: Partial<SavedStrategy> = {}): SavedStrategy {
     name_typed: false,
     notes: null,
     config: { ...BROAD_DEFAULTS, broad_liquidity_filter: false },
+    config_full: { ...BROAD_DEFAULTS, broad_liquidity_filter: false },
     favorite: false,
     active: false,
     status: null,
