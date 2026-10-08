@@ -55,9 +55,12 @@ def test_running_the_same_settings_again_adds_no_strategy(client):
     again = client.post("/api/saved-runs", json=_payload(name="Run 2")).json()
     assert (first["outcome"], again["outcome"]) == ("new", "repeat")
     assert again["strategy_ref"]["id"] == first["id"]
-    listed = _strategies(client)["strategies"]
+    response = _strategies(client)
+    listed = response["strategies"]
     assert len(listed) == 1
     assert (listed[0]["id"], listed[0]["runs"], listed[0]["repeats"]) == (first["id"], 2, 1)
+    assert "broad_liquidity_filter" in response["ignored_fields"]["etf"]
+    assert again["strategy_ref"]["name_typed"] is False
 
 
 def test_settings_the_dataset_ignores_and_missing_defaults_are_the_same_strategy(client):
@@ -342,3 +345,70 @@ def test_the_headline_run_is_the_anchor_when_two_favourites_share_settings(clien
         )
     strategy = _strategies(client)["strategies"][0]
     assert (strategy["id"], strategy["active"]) == (headline, True)
+
+
+def test_removing_a_strategy_closes_its_open_changes(client):
+    first = client.post("/api/saved-runs", json=_payload()).json()
+    client.post("/api/saved-runs", json=_payload(curve=(100.0, 103.0)))
+    assert _strategies(client)["unreviewed"] == 1
+    client.delete(f"/api/saved-strategies/{first['id']}")
+    assert _strategies(client)["unreviewed"] == 0  # nothing left to review, count can clear
+    (change,) = client.get("/api/result-changes").json()["changes"]
+    assert change["reviewed_by"] == "removed with the strategy"  # the row itself stays
+
+
+def test_hiding_a_strategy_clears_every_runs_overlay(client):
+    base = {"universe": UNIVERSE, "top_n": 5}
+    with connect() as con:
+        old = _legacy_run(con, "etf", "Run 1", base, (100.0, 101.0))
+        later = _legacy_run(con, "etf", "Run 2", base, (100.0, 101.0))
+        summary = json.loads(
+            con.execute("SELECT summary FROM backtest_runs WHERE run_id = ?", [later]).fetchone()[0]
+        )
+        con.execute(
+            "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
+            [json.dumps({**summary, "overlay": True}), later],
+        )
+    client.post("/api/saved-strategies/merge")
+    assert client.get(f"/api/saved-strategies/{old}").json()["overlay"] is True
+    hidden = client.patch(f"/api/saved-strategies/{old}", json={"overlay": False}).json()
+    assert hidden["overlay"] is False
+    shown = client.patch(f"/api/saved-strategies/{old}", json={"overlay": True}).json()
+    assert shown["overlay"] is True
+
+
+def test_pruning_a_strategy_closes_its_open_changes(client):
+    client.post("/api/saved-runs", json=_payload(top_n=1))
+    client.post("/api/saved-runs", json=_payload(top_n=1, curve=(100.0, 103.0)))
+    assert _strategies(client)["unreviewed"] == 1
+    for top_n in range(2, 13):  # ten newer strategies push it out
+        client.post("/api/saved-runs", json=_payload(top_n=top_n))
+    assert _strategies(client)["unreviewed"] == 0
+    (change,) = client.get("/api/result-changes").json()["changes"]
+    assert change["reviewed_by"] == "pruned with the strategy"
+
+
+def test_deleting_the_last_run_by_the_old_route_closes_its_changes(client):
+    client.post("/api/saved-runs", json=_payload())
+    moved = client.post("/api/saved-runs", json=_payload(curve=(100.0, 103.0))).json()
+    first = moved["strategy_ref"]["id"]
+    client.delete(f"/api/saved-runs/{moved['id']}")
+    assert _strategies(client)["unreviewed"] == 1  # the strategy still has a run
+    client.delete(f"/api/saved-runs/{first}")
+    assert _strategies(client)["unreviewed"] == 0
+
+
+def test_the_summary_counts_strategies_and_open_changes(client):
+    client.post("/api/saved-runs", json=_payload())
+    client.post("/api/saved-runs", json=_payload(curve=(100.0, 103.0)))
+    client.post("/api/saved-runs", json=_payload(top_n=7))
+    assert client.get("/api/saved-strategies/summary").json() == {"count": 2, "unreviewed": 1}
+
+
+def test_a_strategy_carries_its_config_with_every_default_spelled_out(client):
+    client.post("/api/saved-runs", json=_payload(dataset="broad", config={"broad_off_top_n": 3}))
+    (strategy,) = _strategies(client)["strategies"]
+    full = strategy["config_full"]
+    assert full["broad_off_top_n"] == 3
+    assert full["broad_liquidity_filter"] is False  # the request default, not the form's
+    assert "fresh" not in full

@@ -322,6 +322,10 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  fastify.get('/api/momentum/saved-strategies/summary', async (_request, reply) => {
+    await forward(reply, '/api/saved-strategies/summary');
+  });
+
   fastify.get('/api/momentum/saved-strategies/merge', async (_request, reply) => {
     await forward(reply, '/api/saved-strategies/merge');
   });

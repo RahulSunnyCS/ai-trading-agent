@@ -38,6 +38,55 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
       }
     },
   );
+  // BL-052: Saved runs lists strategies; each saved run here is its own strategy.
+  await page.route(
+    (url) => url.pathname.startsWith('/api/momentum/saved-strategies'),
+    async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      const strategies = savedRuns.map((run) => ({
+        ...run,
+        version_id: `momentum:etf:${run.id}`,
+        dataset: 'etf',
+        fingerprint: String(run.id),
+        config_full: run.config,
+        name_typed: true,
+        notes: null,
+        status: null,
+        group: null,
+        member_of: null,
+        runs: 1,
+        repeats: 0,
+        first_saved: run.created_at,
+        last_run: run.created_at,
+        latest: {
+          id: run.id,
+          created_at: run.created_at,
+          kpis: run.kpis,
+          dates: run.dates,
+          strategy: run.strategy,
+          data_through: null,
+          versions: null,
+          outcome: 'new',
+        },
+        change: null,
+        unreviewed: 0,
+        trust: 'in_sample',
+        history: [],
+      }));
+      const body = path.endsWith('/summary')
+        ? { count: strategies.length, unreviewed: 0 }
+        : path.endsWith('/merge')
+          ? { merges: [], conflicts: [], runs: 0, strategies: 0 }
+          : path === '/api/momentum/saved-strategies'
+            ? { strategies, unreviewed: 0, ignored_fields: {} }
+            : strategies[0];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(body),
+      });
+    },
+  );
   await page.route(
     (url) => url.pathname === '/api/momentum/meta' && url.searchParams.get('dataset') === 'etf',
     (route) =>
@@ -141,10 +190,11 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
     'true',
   );
   await page.getByRole('tab', { name: 'Saved runs (1)' }).click();
-  await expect(page.getByRole('heading', { name: /Saved runs/ })).toBeVisible();
-  // The name is plain text until Rename turns it into a field holding the current name.
+  await expect(page.getByRole('heading', { name: 'Strategies' })).toBeVisible();
+  // A row opens its drawer; Rename there turns the name into a field holding it.
+  await page.getByText('Run 1', { exact: true }).click();
   await page.getByRole('button', { name: 'Rename Run 1' }).click();
-  await expect(page.getByRole('textbox', { name: 'Name for run 1' })).toHaveValue('Run 1');
+  await expect(page.getByRole('textbox', { name: 'Strategy name' })).toHaveValue('Run 1');
 });
 
 /** One scored stock in a sector, with the history the drawer asks for. */

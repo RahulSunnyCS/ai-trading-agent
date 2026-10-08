@@ -15,9 +15,12 @@ running P&L, EOD retrospection charts, pricing/payment UI, and an "Options Lab" 
 strategies on the Fyers 1-minute data: saved `obt daily` results, the evening
 run button, and an AlgoTest-style strategy builder that validates, backtests
 and saves `strategies/legwise/*.yaml`, all via `/api/backtest/legwise/*`. Clicking a day replays it (`DayForensics.tsx`: MTM vs index, markers, per-leg attribution, via `/legwise/day`); the day grid carries per-segment anatomy chips (`/legwise/anatomy`); stats are ₹ per lot with sample-size guards (`lib/legwiseStats.ts` — keep that maths out of components). A "Market regimes" tab studies whether QUIET/CHOP/TREND periods persist (`RegimesPanel.tsx`; permutation-tested in `lib/regimeStats.ts` — new statistics belong there, seeded and unit-tested, never `Math.random`). Strategy P&L is joined to day type in `DayTypeCard.tsx` (`lib/legwiseJoin.ts`: same-day vs previous-day lenses); the builder diffs an edit against the saved version's stored results rather than re-running it (a re-run costs a credit). Use `lib/plotly.ts` for Plotly.
-The Momentum view is the sole Momentum frontend; its Saved strategies section promotes saved
-runs to weekly favourites and selects one global Telegram-active favourite. Weekly signal runs
-render every favourite's result while only that active result is delivered. The Python package
+The Momentum view is the sole Momentum frontend. Its Saved runs section (BL-052,
+`components/momentum/saved/SavedStrategiesView.tsx`) lists one row per saved *strategy* across
+every dataset from `/api/momentum/saved-strategies`, sets each favourite's status, makes the
+headline and groups, and opens a strategy drawer (`?strategy=<id>`) with why a result moved;
+names, differences from the defaults, trust and change wording are in `lib/momentumSaved.ts`.
+Every favourite is evaluated each Friday while only the headline's result is delivered. The Python package
 serves its API;
 its research chart uses a lazy-loaded Plotly basic bundle with optional wheel/
 touchpad zoom and the shared CSS theme tokens.

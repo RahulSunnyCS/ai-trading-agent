@@ -538,6 +538,12 @@ def input_version() -> tuple:
     return (db_read.data_version(), tuple(sorted(files)))
 
 
+_IGNORED_FIELDS = {
+    dataset: sorted(fields | saved_identity.RUN_ONLY_FIELDS)
+    for dataset, fields in saved_identity.IGNORED_FIELDS.items()
+}
+
+
 def _alert_if_not_reproducible(record: dict) -> None:
     """BL-052: a favourite whose result moved with the same settings, code and data is a bug;
     say so on Telegram (untagged, like a live-rules breach: it cannot be switched off). A Check is
@@ -3516,11 +3522,23 @@ def create_app() -> FastAPI:
                 return {
                     "strategies": runs_store.list_strategies(con, dataset),
                     "unreviewed": len(runs_store.list_changes(con, unreviewed=True)),
+                    # The settings each dataset never reads, so the dashboard leaves them out
+                    # when it says how a strategy differs from the defaults (and names it).
+                    "ignored_fields": _IGNORED_FIELDS,
                 }
         except (FileNotFoundError, duckdb.CatalogException):
-            return {"strategies": [], "unreviewed": 0}
+            return {"strategies": [], "unreviewed": 0, "ignored_fields": _IGNORED_FIELDS}
 
-    # Registered before `/{run_id}`: the static path must not be read as a strategy id.
+    # Registered before `/{run_id}`: the static paths must not be read as a strategy id.
+    @app.get("/api/saved-strategies/summary")
+    def saved_strategies_summary() -> dict:
+        """The Momentum tab's label: strategy count and moved results to review."""
+        try:
+            with read_catalog() as con:
+                return runs_store.strategy_summary(con)
+        except (FileNotFoundError, duckdb.CatalogException):
+            return {"count": 0, "unreviewed": 0}
+
     @app.get("/api/saved-strategies/merge")
     def saved_strategies_merge_plan() -> dict:
         """The one-time merge as a dry run: what would be folded together. Writes nothing."""

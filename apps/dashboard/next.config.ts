@@ -119,6 +119,14 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/saved-runs/:runId`,
             },
             {
+              source: '/api/momentum/saved-strategies',
+              destination: `${momentumDirectOrigin}/api/saved-strategies`,
+            },
+            {
+              source: '/api/momentum/result-changes',
+              destination: `${momentumDirectOrigin}/api/result-changes`,
+            },
+            {
               // BL-052: one strategy per set of settings (+ `merge`, `:runId`), and the log of
               // why a result moved (+ `:changeId/reviewed`).
               source: '/api/momentum/saved-strategies/:path*',
