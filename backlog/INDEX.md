@@ -30,16 +30,15 @@ Sorted by priority (P0 first), then ID.
 | [BL-040](BL-040-fill-the-vendor-gap-from-algotest.md) | Fill the vendor gap (26 Aug – 24 Sep 2026) from AlgoTest, for every index and stock (on hold: owner asks the vendor first) | P1 | Planned | feature | trading-data |
 | [BL-044](BL-044-local-service-auth-and-network-hardening.md) | Local-service auth and network hardening: Host/Origin guards, OAuth state bound to the browser, an internal token, tunnel checks | P1 | Planned | improvement | cross-cutting |
 | [BL-050](BL-050-momentum-filter-poc.md) | Momentum filter POC: volume, relative strength, overextension, residual momentum, trend quality (Broad only) | P1 | Planned | research | momentum |
+| [BL-051](BL-051-momentum-this-week-and-journal.md) | Momentum "This week" and Journal redesign: favourite statuses, Friday timeline, orders from Fyers holdings, alerts | P1 | Planned | feature | momentum |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
 | [BL-036](BL-036-momentum-ui-from-bl010.md) | Momentum dashboard: what the BL-010 review changes on screen | P2 | Planned | improvement | dashboard |
-| [BL-003](BL-003-momentum-weekly-rebalance-loading.md) | Momentum: honest loading states on Weekly signal and Rebalance | P2 | Planned | improvement | dashboard |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
 | [BL-017](BL-017-momentum-settings-module.md) | Momentum: one settings module, and split `api.py` | P2 | Ready | improvement | momentum |
 | [BL-020](BL-020-claude-code-workflow-setup.md) | Claude Code working set-up: model per role, saved commands, session habits | P2 | Ready | chore | cross-cutting |
-| [BL-027](BL-027-rebalance-basket-file.md) | Weekly rebalance as a broker basket-order file | P2 | Planned | feature | momentum |
 | [BL-031](BL-031-chart-pattern-detectors.md) | Classical chart-pattern detectors on weekly and daily stock data | P2 | Idea | research | momentum |
 | [BL-032](BL-032-stock-analog-search.md) | "Stocks like this": analog-path search for six-month stock outcomes | P2 | Idea | research | momentum |
 | [BL-033](BL-033-pattern-features-in-ranking.md) | Pattern and analog features in the Momentum ranking | P2 | Idea | feature | momentum |
@@ -57,6 +56,8 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-003](BL-003-momentum-weekly-rebalance-loading.md) | Momentum: honest loading states on Weekly signal and Rebalance | Superseded by BL-051: its findings are Phase 2's loading-state task on the merged This week page | 2026-10-08 |
+| [BL-027](BL-027-rebalance-basket-file.md) | Weekly rebalance as a broker basket-order file | Superseded by BL-051: Fyers basket file and recorded fills are its Phase 4; broker answered (Fyers) | 2026-10-08 |
 | [BL-049](BL-049-momentum-scores-redesign.md) | Momentum Scores redesign: market strip, sector rotation map, 1–10 score strips, stock drawer | Done: Sectors and Stocks views, rotation map, sector page, stock drawer, saved views, circuit locks and the strip guide; Phases 1–3 and review fixes merged (#124, #126–#128) | 2026-10-08 |
 | [BL-006](BL-006-momentum-scores-table-responsiveness.md) | Momentum Scores table: responsive sort and filter | Superseded by BL-049: paged, memoised rows with a deferred filter are in its Phase 1 | 2026-10-07 |
 | [BL-018](BL-018-brittle-benchmark-tests.md) | Momentum tests fail when the live data is refreshed | Done: six data-dependent tests fixed (sessions checked against the bhavcopy calendar, isolated reference tests, current list matched to a curated day, tax classes over priced companies); tests only | 2026-10-07 |

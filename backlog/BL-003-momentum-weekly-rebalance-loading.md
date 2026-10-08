@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the Weekly page shows placeholder values that read as real answers about what Telegram will send |
-| **Status** | Planned |
+| **Status** | Dropped (superseded by BL-051) |
 | **Type** | improvement |
 | **Area** | dashboard |
 | **Created** | 2026-10-05 |
@@ -89,3 +89,4 @@ usable as soon as its saved runs and meta arrive, independent of the scores down
 ## Log
 
 - 2026-10-05 — created from the Momentum UI performance review (2026-10-04 session).
+- 2026-10-08 — superseded by BL-051: Weekly signal and Rebalance merge into This week, and these loading-state findings are its Phase 2 task.

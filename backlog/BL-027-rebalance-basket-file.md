@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — removes hand-typed orders once real money is in; not needed before |
-| **Status** | Planned |
+| **Status** | Dropped (superseded by BL-051) |
 | **Type** | feature |
 | **Area** | momentum |
 | **Created** | 2026-10-06 |
@@ -52,3 +52,4 @@ orders, with quantities computed from the owner's current holdings and capital.
 - 2026-10-06 — created; owner approved the idea on PR #27.
 - 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: the Momentum account's broker and its basket CSV; holdings from the broker's export.
 - 2026-10-06 — owner: pending decisions stay here as open questions and are settled when the item is picked up; the broker is open question 1.
+- 2026-10-08 — superseded by BL-051 (Phase 4). Owner answered open question 1: the broker is Fyers; holdings are read from Fyers (BL-051 Phase 3).
