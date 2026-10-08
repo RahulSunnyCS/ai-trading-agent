@@ -213,12 +213,33 @@ CHANGELOG_DIFF = """\
 
 def test_only_a_golden_change_of_the_same_dataset_explains_a_move(monkeypatch):
     monkeypatch.setattr(saved_identity, "_git", lambda *args: CHANGELOG_DIFF)
-    reason = saved_identity.accepted_golden_change("a", "b", "broad")
+    reason = saved_identity.accepted_golden_change("abc1234", "def5678", "broad")
     assert reason == "Broad: circuit days now counted from the fill week."
     # An accepted Broad change cannot hide an ETF move.
-    assert saved_identity.accepted_golden_change("a", "b", "etf") is None
+    assert saved_identity.accepted_golden_change("abc1234", "def5678", "etf") is None
 
 
 def test_same_result_ignores_float_noise_only():
     assert saved_identity.same_result(_run(A), _run([100.0, 101.0, 102.0 + 1e-12]))
     assert not saved_identity.same_result(_run(A), _run(B))
+
+
+def test_a_commit_that_is_not_a_plain_id_never_reaches_git(monkeypatch):
+    calls = []
+    monkeypatch.setattr(saved_identity, "_git", lambda *args: calls.append(args) or CHANGELOG_DIFF)
+    assert saved_identity.accepted_golden_change("--output=/tmp/x", "abc1234", "broad") is None
+    assert saved_identity.accepted_golden_change("abc1234", "def5678 -p", "broad") is None
+    assert calls == []
+    assert saved_identity.accepted_golden_change("abc1234", "def5678", "broad") is not None
+
+
+def test_tool_state_files_do_not_move_the_input_version(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "DATA_DIR", tmp_path)
+    (tmp_path / "weekly_closes.csv").write_text("a")
+    before = api.input_version()
+    (tmp_path / ".fyers_token.json").write_text("{}")  # rewritten every morning
+    (tmp_path / "live_rules_last.json").write_text("{}")
+    (tmp_path / "launchd-weekly-final.log").write_text("x")
+    assert api.input_version() == before
+    (tmp_path / "weekly_closes.csv").write_text("ab")  # a real input still counts
+    assert api.input_version() != before

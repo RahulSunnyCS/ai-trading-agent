@@ -15,7 +15,7 @@ from typing import Literal
 
 import duckdb
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
@@ -507,6 +507,17 @@ DATA = _Data()
 _INPUT_FOLDERS = ("", "daily", "daily_etf", "categories", "stocks")
 
 
+#: Files under data/ that are written by the tools, never read by a backtest: logs, the Fyers token
+#: cache (`.fyers_token.json`, rewritten every morning) and other dotfiles, and the live-rules
+#: check's last report. Counting them moved the data version with no market data changing, which
+#: emptied caches and made a moved result look like a data revision (BL-052).
+_STATE_FILES = frozenset({"live_rules_last.json"})
+
+
+def _not_an_input(name: str) -> bool:
+    return name.endswith(".log") or name.startswith(".") or name in _STATE_FILES
+
+
 def input_version() -> tuple:
     """Everything a backtest result depends on apart from its request: the shared database's
     `data_version()` and the size and mtime of every input file under data/ and the curated
@@ -519,7 +530,7 @@ def input_version() -> tuple:
         if not folder.is_dir():
             continue
         for entry in os.scandir(folder):
-            if entry.is_file() and not entry.name.endswith(".log"):
+            if entry.is_file() and not _not_an_input(entry.name):
                 stat = entry.stat()
                 files.append((entry.path, stat.st_size, stat.st_mtime_ns))
     return (db_read.data_version(), tuple(sorted(files)))
@@ -3306,7 +3317,7 @@ def create_app() -> FastAPI:
             return []
 
     @app.post("/api/saved-runs")
-    def create_saved_run(body: SavedRunBody) -> dict:
+    def create_saved_run(body: SavedRunBody, background: BackgroundTasks) -> dict:
         versions = body.versions or {
             **saved_identity.versions_from_input(input_version(), saved_identity.code_commit()),
             "measured": "at_save",
@@ -3323,7 +3334,8 @@ def create_app() -> FastAPI:
                 overlay=body.overlay,
                 versions=versions,
             )
-        _alert_if_not_reproducible(record)
+        # After the response: a slow Telegram must not hold up the dashboard's save.
+        background.add_task(_alert_if_not_reproducible, record)
         return record
 
     @app.post("/api/saved-runs/groups")

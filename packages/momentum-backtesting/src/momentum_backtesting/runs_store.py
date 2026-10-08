@@ -110,8 +110,7 @@ def _normalised_version(
     con: duckdb.DuckDBPyConnection, dataset: str, config: dict[str, Any]
 ) -> tuple[str, str]:
     """(version_id, fingerprint) of the strategy this config belongs to."""
-    settings = saved_identity.normalise(dataset, config)
-    fp = saved_identity.fingerprint(dataset, config)
+    settings, fp = saved_identity.identity(dataset, config)
     return _ensure_version(con, dataset, fp, settings if settings is not None else config), fp
 
 
@@ -138,8 +137,9 @@ def save_run(
     versions: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Save a finished run under its strategy. The record carries `outcome` (`new`, `repeat`,
-    `new_result`), the strategy (`strategy`: anchor id and name) and, for a moved result, the
-    `change` row written with it."""
+    `new_result`), the strategy it joined (`strategy_ref`: anchor id, name, whether it is a
+    favourite; `strategy` stays the equity curve) and, for a moved result, the `change` row
+    written with it."""
     version_id, fp = _normalised_version(con, dataset, config)
     previous = _latest_run(con, version_id)
     anchor = _anchor(con, version_id)
@@ -197,7 +197,7 @@ def save_run(
     record["strategy_ref"] = {
         "id": anchor_id,
         "name": anchor_summary.get("name"),
-        "favourite": _keeps(anchor_summary),
+        "favourite": _is_favourite(anchor_summary),
     }
     record["change"] = change
     return record
@@ -206,11 +206,14 @@ def save_run(
 # --- strategies: anchor, latest run, pruning --------------------------------------------------
 
 
+def _is_favourite(summary: dict[str, Any]) -> bool:
+    """A favourite, a group or a group member: what the weekly job runs (an overlay is not)."""
+    return bool(summary.get("favorite") or summary.get("member_of") or summary.get("group"))
+
+
 def _keeps(summary: dict[str, Any]) -> bool:
     """A run whose strategy is never pruned: a favourite, a group member, a group, an overlay."""
-    return bool(
-        summary.get("favorite") or summary.get("member_of") or summary.get("group")
-    ) or bool(summary.get("overlay"))
+    return _is_favourite(summary) or bool(summary.get("overlay"))
 
 
 _FLAG_SQL = (
@@ -759,16 +762,24 @@ def mark_reviewed(con: duckdb.DuckDBPyConnection, change_id: str, by: str) -> di
     return _changes(con, "WHERE change_id = ?", [change_id])[0]
 
 
+_frozen_memo: tuple[float, frozenset[str]] | None = None
+
+
 def _frozen_fingerprints() -> frozenset[str]:
-    """Fingerprints of the BL-010 Phase 6 frozen configs: the only validated strategies."""
+    """Fingerprints of the BL-010 Phase 6 frozen configs: the only validated strategies.
+    Recomputed only when the frozen file changes."""
+    global _frozen_memo
     from . import live_rules, phase6
 
     try:
-        frozen = json.loads(live_rules.FROZEN_PATH.read_text())
-        requests = phase6.favourite_requests(frozen)
+        mtime = live_rules.FROZEN_PATH.stat().st_mtime
+        if _frozen_memo is None or _frozen_memo[0] != mtime:
+            requests = phase6.favourite_requests(json.loads(live_rules.FROZEN_PATH.read_text()))
+            fps = frozenset(saved_identity.fingerprint("broad", r) for r in requests)
+            _frozen_memo = (mtime, fps)
     except (OSError, ValueError, KeyError):
         return frozenset()
-    return frozenset(saved_identity.fingerprint("broad", request) for request in requests)
+    return _frozen_memo[1]
 
 
 def _trust(strategy: dict[str, Any], validated: frozenset[str], newest: str | None) -> str:
@@ -793,7 +804,7 @@ def _trust(strategy: dict[str, Any], validated: frozenset[str], newest: str | No
 
 def _strategy(runs: list[dict[str, Any]], changes: list[dict[str, Any]]) -> dict[str, Any]:
     """One strategy from its runs (oldest first) and its change rows (newest first)."""
-    anchor = next((r for r in runs if _keeps({**r["summary"], "overlay": False})), runs[0])
+    anchor = next((r for r in runs if _is_favourite(r["summary"])), runs[0])
     latest = runs[-1]
     summary, last = anchor["summary"], latest["summary"]
     change = changes[0] if changes and changes[0]["run_id"] == latest["id"] else None
@@ -865,25 +876,46 @@ def list_strategies(
 
 def _strategy_runs(con: duckdb.DuckDBPyConnection, run_id: str) -> list[dict[str, Any]] | None:
     row = con.execute(
-        "SELECT version_id FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id]
+        "SELECT version_id, v.strategy_id FROM backtest_runs r "
+        "JOIN strategy_versions v USING (version_id) WHERE r.run_id = ? AND r.kind = 'weekly'",
+        [run_id],
     ).fetchone()
     if row is None:
         return None
-    return [r for r in _all_runs(con) if r["version_id"] == row[0]]
+    version_id, strategy_id = row
+    return [
+        r
+        for r in _all_runs(con, strategy_id.removeprefix("momentum:"))
+        if r["version_id"] == version_id
+    ]
+
+
+def _newest_data(con: duckdb.DuckDBPyConnection) -> str | None:
+    """The newest `data_through` of any saved run: what "old data" is measured against."""
+    row = con.execute(
+        "SELECT max(COALESCE(r.summary ->> 'data_through', "
+        "json_extract_string(r.summary, '$.dates[#-1]'))) FROM backtest_runs r "
+        "JOIN strategy_versions v USING (version_id) JOIN strategies s USING (strategy_id) "
+        "WHERE s.package = ? AND r.kind = 'weekly'",
+        [PACKAGE],
+    ).fetchone()
+    return row[0] if row else None
 
 
 def get_strategy(con: duckdb.DuckDBPyConnection, run_id: str) -> dict[str, Any] | None:
     """The strategy any of its runs belongs to, with its run history (newest first): each run's
     numbers, data and code fingerprints, outcome and, for a moved result, why it moved."""
     runs = _strategy_runs(con, run_id)
-    if runs is None:
+    if not runs:
         return None
     changes = list_changes(con, version_id=runs[0]["version_id"])
-    strategy = next(
-        s
-        for s in list_strategies(con, runs[0]["dataset"]) + _members(con, runs[0]["dataset"])
-        if s["version_id"] == runs[0]["version_id"]
+    strategy = _strategy(runs, changes)
+    strategy["trust"] = (
+        None if strategy["group"] else _trust(strategy, _frozen_fingerprints(), _newest_data(con))
     )
+    if strategy["group"]:
+        members = [get_strategy(con, member) for member in strategy["group"]]
+        strategy["members"] = [m for m in members if m is not None]
     by_run = {c["run_id"]: c for c in changes}
     strategy["history"] = [
         {
@@ -900,10 +932,6 @@ def get_strategy(con: duckdb.DuckDBPyConnection, run_id: str) -> dict[str, Any] 
         for r in reversed(runs)
     ]
     return strategy
-
-
-def _members(con: duckdb.DuckDBPyConnection, dataset: str) -> list[dict[str, Any]]:
-    return [m for s in list_strategies(con, dataset) for m in s.get("members", [])]
 
 
 def update_strategy(
@@ -928,8 +956,11 @@ def delete_strategy(con: duckdb.DuckDBPyConnection, run_id: str) -> bool:
         return False
     version_id = runs[0]["version_id"]
     anchor = _anchor(con, version_id)
-    if anchor[1].get("group") or anchor[1].get("member_of"):
+    if anchor[1].get("group"):
         return delete_run(con, anchor[0])
+    for run in runs:  # any run in a group, not only the anchor: the group would name a lost run
+        if run["summary"].get("member_of"):
+            return delete_run(con, run["id"])  # refuses, naming the group
     con.execute("DELETE FROM backtest_runs WHERE version_id = ? AND kind = 'weekly'", [version_id])
     return True
 
@@ -951,10 +982,11 @@ def merge_plan(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     for (dataset, fp), runs in targets.items():
         target = f"{_strategy_id(dataset)}:{fp}"
         moving = [r for r in runs if r["version_id"] != target]
-        unscored = [r for r in runs if "outcome" not in r["summary"]]
+        unscored = [r for r in runs[1:] if r["summary"].get("outcome") in (None, "new")]
+        unscored += [r for r in runs[:1] if "outcome" not in r["summary"]]
         if not moving and not unscored:
             continue
-        favourites = [r for r in runs if _keeps({**r["summary"], "overlay": False})]
+        favourites = [r for r in runs if _is_favourite(r["summary"])]
         item = {
             "dataset": dataset,
             "fingerprint": fp,
@@ -999,14 +1031,18 @@ def apply_merge(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
             version_id = _ensure_version(
                 con, dataset, item["fingerprint"], settings if settings else runs[0]["config"]
             )
-            anchor = next((r for r in runs if _keeps({**r["summary"], "overlay": False})), runs[0])
+            anchor = next((r for r in runs if _is_favourite(r["summary"])), runs[0])
             previous = None
             for run in runs:
                 summary = run["summary"]
                 summary["fingerprint"] = item["fingerprint"]
                 summary.setdefault("data_through", (summary.get("dates") or [None])[-1])
                 summary.setdefault("name_typed", not _PLACEHOLDER.match(summary.get("name") or ""))
-                if "outcome" not in summary:
+                # A run saved after BL-052 is "new" in its own version; once older runs join it,
+                # it is compared like the rest.
+                if "outcome" not in summary or (
+                    summary["outcome"] == "new" and previous is not None
+                ):
                     if previous is None:
                         summary["outcome"] = "new"
                     elif saved_identity.same_result(previous[1], summary):

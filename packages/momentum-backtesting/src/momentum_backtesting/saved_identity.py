@@ -30,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -125,10 +126,15 @@ def normalise(dataset: str, config: dict[str, Any]) -> dict[str, Any] | None:
     return settings
 
 
+def identity(dataset: str, config: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """(normalised settings or None, fingerprint), validating the config once."""
+    settings = normalise(dataset, config)
+    return settings, (_hash(settings) if settings is not None else raw_hash(config))
+
+
 def fingerprint(dataset: str, config: dict[str, Any]) -> str:
     """The strategy's identity within its dataset: same fingerprint = same strategy."""
-    settings = normalise(dataset, config)
-    return _hash(settings) if settings is not None else raw_hash(config)
+    return identity(dataset, config)[1]
 
 
 # --- run versions -----------------------------------------------------------------------------
@@ -239,10 +245,16 @@ def _git(*args: str) -> str | None:
     return done.stdout if done.returncode == 0 else None
 
 
+_COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
+
+
 def accepted_golden_change(before: str, after: str, dataset: str) -> str | None:
     """The reason of an accepted golden change that moved a scenario of `dataset` between two
     commits, read from what the commits added to the changelog; None when there is none (or git
-    cannot tell)."""
+    cannot tell). The commits come from saved runs, which a client sends: anything that is not a
+    plain hex commit id is refused before it reaches git's arguments."""
+    if not (_COMMIT.match(before or "") and _COMMIT.match(after or "")):
+        return None
     diff = _git("diff", "--unified=0", before, after, "--", _CHANGELOG)
     if not diff:
         return None

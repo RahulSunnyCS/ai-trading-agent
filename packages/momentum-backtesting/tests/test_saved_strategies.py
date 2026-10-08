@@ -247,3 +247,47 @@ def test_the_merge_leaves_two_favourites_with_the_same_settings_alone(client):
     plan = client.post("/api/saved-strategies/merge").json()
     assert plan["merges"] == [] and len(plan["conflicts"]) == 1
     assert len(_strategies(client)["strategies"]) == 2
+
+
+def test_an_overlay_is_not_a_favourite_for_the_alert(client, sent):
+    first = client.post("/api/saved-runs", json=_payload()).json()
+    client.patch(f"/api/saved-runs/{first['id']}", json={"overlay": True})
+    moved = client.post("/api/saved-runs", json=_payload(curve=(100.0, 103.0))).json()
+    assert moved["change"]["label"] == "not_reproducible"
+    assert moved["strategy_ref"]["favourite"] is False
+    assert sent == []
+
+
+def test_a_strategy_with_a_group_member_cannot_be_deleted(client):
+    plain = client.post("/api/saved-runs", json=_payload()).json()["id"]
+    client.patch(f"/api/saved-runs/{plain}", json={"favorite": True})  # anchor: oldest favourite
+    member = client.post("/api/saved-runs", json=_payload(name="Run 2")).json()["id"]
+    other = client.post("/api/saved-runs", json=_payload(top_n=7)).json()["id"]
+    client.post("/api/saved-runs/groups", json={"name": "G", "members": [member, other]})
+    assert client.delete(f"/api/saved-strategies/{plain}").status_code == 409
+    assert client.get(f"/api/saved-strategies/{member}").status_code == 200
+
+
+def test_a_member_whose_group_is_gone_still_opens(client):
+    saved = client.post("/api/saved-runs", json=_payload()).json()["id"]
+    with connect() as con:
+        summary = json.loads(
+            con.execute("SELECT summary FROM backtest_runs WHERE run_id = ?", [saved]).fetchone()[0]
+        )
+        summary.update({"favorite": True, "member_of": "missing-group"})
+        con.execute(
+            "UPDATE backtest_runs SET summary = ? WHERE run_id = ?", [json.dumps(summary), saved]
+        )
+    assert client.get(f"/api/saved-strategies/{saved}").json()["id"] == saved
+
+
+def test_the_merge_compares_a_run_saved_after_the_change_with_older_ones(client):
+    base = {"universe": UNIVERSE, "top_n": 5}
+    with connect() as con:
+        old = _legacy_run(con, "etf", "Run 10", {**base, "exit_rank": 10}, (100.0, 101.0))
+    newer = client.post("/api/saved-runs", json=_payload(curve=(100.0, 103.0))).json()
+    assert newer["outcome"] == "new"  # its own version, before the merge
+    client.post("/api/saved-strategies/merge")
+    history = client.get(f"/api/saved-strategies/{old}").json()["history"]
+    assert [r["outcome"] for r in history] == ["new_result", "new"]
+    assert history[0]["change"]["label"] == "unknown"
