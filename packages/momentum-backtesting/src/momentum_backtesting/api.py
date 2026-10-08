@@ -511,9 +511,10 @@ _INPUT_FOLDERS = ("", "daily", "daily_etf", "categories", "stocks")
 
 #: Files under data/ that are written by the tools, never read by a backtest: logs, the Fyers token
 #: cache (`.fyers_token.json`, rewritten every morning) and other dotfiles, and the live-rules
-#: check's last report. Counting them moved the data version with no market data changing, which
-#: emptied caches and made a moved result look like a data revision (BL-052).
-_STATE_FILES = frozenset({"live_rules_last.json"})
+#: check's last report and the alerts' open/resolved cache. Counting them moved the data version
+#: with no market data changing, which emptied caches and made a moved result look like a data
+#: revision (BL-052).
+_STATE_FILES = frozenset({"live_rules_last.json", "alerts_state.json"})
 
 
 def _not_an_input(name: str) -> bool:
@@ -2484,6 +2485,11 @@ def _run_live_rules_check() -> dict:
     return live_rules.load_last(this_week.state_dir()) or {}
 
 
+def _now() -> datetime:
+    """The current instant in IST; a seam so tests can pin the clock."""
+    return datetime.now(IST)
+
+
 def _journal_line(journal: dict) -> str | None:
     """The Telegram line that witnesses the journal: Telegram's own timestamp then proves how
     long the chain was, and its newest hash, when this message went out."""
@@ -3653,6 +3659,22 @@ def create_app() -> FastAPI:
         if change is None:
             raise HTTPException(404, "result change not found")
         return change
+
+    @app.get("/api/alerts")
+    def alerts_view() -> dict:
+        """What needs a person right now (BL-051 Phase 5), computed from the checks the Telegram
+        jobs run: an unclassified split, the headline's data not ready, a journal entry missing
+        after its run, an unreviewed Check / Not reproducible result change, a live-money rule
+        breached. Open alerts for the bell and the pop-up; `resolved` are those that cleared."""
+        from . import alerts, live_rules
+
+        return alerts.collect(
+            now=_now(),
+            catalog=read_catalog,
+            weekly_status=lambda today: _weekly_status(today),
+            live_rules_report=lambda: live_rules.load_last(this_week.state_dir()),
+            state_dir=this_week.state_dir(),
+        )
 
     @app.post("/api/weekly/run", status_code=202)
     def weekly_run(body: WeeklyRunBody) -> dict:

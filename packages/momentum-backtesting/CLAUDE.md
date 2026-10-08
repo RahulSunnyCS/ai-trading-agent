@@ -401,6 +401,19 @@ contract, not a shared service).
   `tests/conftest.py` points at a temp folder so no test writes the real ones. "Room to exit" is
   only given for a strategy with a single exit rank (`_exit_rank`); Broad in category mode sells on
   its category and pool ranks too, so it gets none.
+- `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
+  and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:
+  `split` (`stock_actions.review_snapshot`), `data` (`/weekly/status` readiness, for the
+  **headline's** dataset only, once its Friday run is past: 16:45 ETF, 19:30 stock, +15 min),
+  `journal` (`forward_journal.check`, once the 21:00 check is past, never on an empty journal; a
+  broken chain at any time), `change` (`runs_store.list_changes(unreviewed=True)`: Not reproducible
+  = error, Check = warning) and `rules` (the saved `live_rules_last.json`: a finding that
+  `needs_you`, or a stale check; never re-runs the check). `collect` reads the catalog once via
+  `read_catalog()` (never held across the weekly-status call), keeps ids stable (kind + subject)
+  and records `opened_at` / `resolved_at` in `alerts_state.json` (`this_week.state_dir()`); a kind
+  whose source cannot be read keeps its previous open alerts and is listed in `unchecked`, so a
+  locked catalog never looks like "all clear". An alert resolves when its check clears (classify
+  the split, Mark reviewed, the entry recorded, the next rules check passes).
 - `holdout.py` (`mbt search backcast`) — the one-shot 2012–2016 backcast (criteria addendum 5):
   claims the run before it starts and writes its result once; never run it twice, never edit
   `search_spaces/bl010_phase6_backcast_result.json`. `tracker.py` (`mbt search track <results>
