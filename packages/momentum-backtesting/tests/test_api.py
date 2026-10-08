@@ -1571,6 +1571,9 @@ def test_an_identical_request_is_served_from_the_result_cache(client, monkeypatc
     assert len(calls) == ran  # nothing recomputed
     assert second["cache"] == {"hit": True, "computed_at": first["cache"]["computed_at"]}
     assert _without_cache(second) == _without_cache(first)
+    # BL-052: a result says what it was computed from, and a cached one says the same.
+    assert set(first["versions"]) >= {"data", "tables", "code"}
+    assert second["versions"] == first["versions"]
 
 
 def test_a_changed_setting_or_a_fresh_run_is_computed_again(client, monkeypatch):

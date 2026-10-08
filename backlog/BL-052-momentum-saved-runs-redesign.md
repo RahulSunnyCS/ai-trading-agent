@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — the workbench page where favourites are chosen; not on the real-money path, but its "why it moved" check catches results that change for no reason |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard) |
 | **Created** | 2026-10-08 |
 | **Depends on** | BL-051 Phase 1 (favourite status Watching / Paper / Invested, groups, headline): this item builds on that model rather than restating it. Related: BL-001 (result integrity) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.12.18 |
 
 ## Context
 
@@ -266,3 +266,28 @@ Answered by the owner on 2026-10-08 (see the Log):
   and code plus data changing together is "Check".
 - 2026-10-08 — owner answered the last two questions: Check is not sent to Telegram (page only);
   keep the last 3 repeat runs per strategy, plus every result change.
+- 2026-10-08 — started. No new questions: every open one was answered. Phase 1 decisions from
+  reading the code:
+  - **Strategy state stays on an anchor run** (the favourite run, else the oldest) instead of a
+    new strategy table: the journal, the weekly job and BL-051's groups key on run ids, and this
+    keeps every one of them stable. A run's own config is now read from `backtest_runs.params`;
+    the version's `spec` holds the anchor's raw config (runnable by code from before BL-052,
+    which still reads it; normalised Broad settings have no `universe`).
+  - **Normalised with the request model's defaults**, not the meta endpoints' UI defaults: they
+    are what the engine actually ran with (Broad's meta turns the liquidity filter on, the
+    request model leaves it off). The fields each dataset never reads come from the code (a test
+    recomputes them from `api.py` and fails if they drift); `weights` count only for the
+    `ranksum` score, which is the only one that reads them.
+  - **Auto names move to Phase 2** (the dashboard already has the setting labels;
+    `name_typed` tells it which names are placeholders). **"Comparison" trust waits** for the
+    median companion's config to be recorded next to the frozen file: Phase 1 derives Validated
+    (the four frozen configs match exactly), Not tradable, Old data and In-sample. **Re-run now
+    to check** moves to Phase 2 (it re-runs through Backtest, whose save gives the outcome).
+- 2026-10-08 — Phase 1 code review (#138): 10 findings, all fixed (commit ids checked before git,
+  tool state under `data/` no longer moves the data version, a strategy holding a group member
+  cannot be deleted, overlays get no alert, and others in the PR comment). Before applying the
+  merge: the scheduler's checkout and the running service still run pre-BL-052 code, which reads
+  each run's config from `strategy_versions.spec`, so the version keeps the anchor's raw config.
+  Rehearsed on a copy of the live catalog: 26 runs → 12 strategies, and the favourites' configs
+  are byte-identical before and after, read by the old code and the new.
+

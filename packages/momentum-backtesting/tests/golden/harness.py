@@ -26,7 +26,7 @@ EXPECTED = GOLDEN / "expected"
 REL_TOL = 1e-9
 SIGNIFICANT_DIGITS = 10
 #: Parts of a response that describe the run, not its result, and change by themselves.
-VOLATILE_KEYS = frozenset({"elapsed_ms", "computed_at", "cache", "provenance"})
+VOLATILE_KEYS = frozenset({"elapsed_ms", "computed_at", "cache", "provenance", "versions"})
 
 
 def normalise(value):
