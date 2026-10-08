@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — makes the research workbench far more useful for picking and watching names; not on the real-money path (BL-010 / BL-025 are) |
-| **Status** | In progress (Phases 1 to 3 built, awaiting merge) |
+| **Status** | Done (2026-10-08) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard) |
 | **Created** | 2026-10-07 |
@@ -281,3 +281,10 @@ All answered 2026-10-08, see the Log.
   proxy refuses dot-only names; `openStock` keeps one identity so rows stay memoised; `/` is not
   taken where there is no search box; the rotation panel and map no longer recompute on hover; the
   drawer's rank total counts ranked stocks; dead sector-table helpers removed.
+- 2026-10-08 — closed. All three phases and the review fixes are on main (#124, #126, #127, #128).
+  Phase 3 has a Playwright test (`e2e/momentum-chart.spec.ts`: a saved view applied and kept
+  across a reload with the list still opening on All, the strip guide folded and remembered,
+  circuit locks fetched only once a drawer opens); the suite is not in CI. Loose ends: a
+  "two children with the same key, AXISCADES" console warning seen once in a dev session could not
+  be reproduced on live data (745 unique symbols; no warning across every group, sub-sector,
+  drawer and quick view); `short_name` for sub-sectors was dropped, labels fit without it.
