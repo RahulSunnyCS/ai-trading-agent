@@ -468,9 +468,15 @@ export const DEFAULT_BUY_ZONE: BuyZone = { topN: 10, exitRank: 20, source: 'defa
  * The buy zone from the Telegram-active favourite's saved request (`broad_off_top_n` and
  * `broad_off_exit_rank`), else Broad's defaults. A non-Broad favourite carries neither key.
  */
-export function buyZoneFrom(favourite: { config: Record<string, unknown> } | undefined): BuyZone {
-  const topN = finiteNumber(favourite?.config.broad_off_top_n);
-  const exitRank = finiteNumber(favourite?.config.broad_off_exit_rank);
+export function buyZoneFrom(
+  favourite:
+    | { config: Record<string, unknown>; members?: Array<{ config: Record<string, unknown> }> }
+    | undefined,
+): BuyZone {
+  // A group (BL-051) has no config of its own: its sleeves share the buy zone, so read the first.
+  const config = favourite?.members?.[0]?.config ?? favourite?.config;
+  const topN = finiteNumber(config?.broad_off_top_n);
+  const exitRank = finiteNumber(config?.broad_off_exit_rank);
   if (topN === null || exitRank === null || topN < 1 || exitRank < topN) return DEFAULT_BUY_ZONE;
   return { topN, exitRank, source: 'favourite' };
 }

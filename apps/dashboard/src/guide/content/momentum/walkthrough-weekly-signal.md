@@ -2,7 +2,7 @@ This walkthrough goes from Friday's Telegram message to a portfolio that matches
 
 ## 1. Read the message
 
-On Friday at 16:45 (IST) the Telegram-active strategy's final signal arrives. It lists what to
+On Friday at 16:45 (IST) the headline favourite's final signal arrives. It lists what to
 **sell** (holdings that fell past the exit rank), what to **buy** (new names in the top N), and
 what to **top up** or **trim**. The 14:40 preview, if you saw it, should mostly agree.
 

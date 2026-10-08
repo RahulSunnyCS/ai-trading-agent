@@ -13,7 +13,7 @@ stock split.
 
 | Card | What it shows |
 |---|---|
-| This week's readiness | The target week, the latest final signal, the Telegram-active strategy, and whether each dataset's data runs through that week. |
+| This week's readiness | The target week, the latest final signal, the headline favourite (the one sent to Telegram), and whether each dataset's data runs through that week. |
 | Run the weekly signal | Run the signal yourself: choose the target week ending and **preview** or **final**. |
 | Send to Telegram | Re-send the latest final signal. It asks you to confirm first. |
 | Schedule & saved signals | The scheduled runs and the signals they saved. |

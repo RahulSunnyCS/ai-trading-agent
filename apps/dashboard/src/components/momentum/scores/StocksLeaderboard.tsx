@@ -528,7 +528,7 @@ export function StocksLeaderboard({
           <span className="mr-1 inline-block h-3 w-0.5 bg-primary align-middle" /> top {zone.topN}{' '}
           buy zone · <span className="mr-1 inline-block h-3 w-0.5 bg-primary/40 align-middle" /> top{' '}
           {zone.exitRank} hold zone (
-          {zone.source === 'favourite' ? 'your active favourite' : "Broad Momentum's defaults"})
+          {zone.source === 'favourite' ? 'your headline favourite' : "Broad Momentum's defaults"})
         </span>
       </footer>
     </section>

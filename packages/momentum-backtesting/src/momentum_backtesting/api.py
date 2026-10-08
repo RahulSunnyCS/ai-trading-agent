@@ -32,6 +32,7 @@ from . import (
     search,
     stock_actions,
 )
+from . import groups as groups_mod
 from .categories import broad
 from .categories import circuit_exposure as circuit_exposure_mod
 from .categories import exit_reasons as exit_reasons_mod
@@ -694,6 +695,15 @@ class SavedRunUpdate(BaseModel):
     overlay: bool | None = None
     favorite: bool | None = None
     active: bool | None = None
+    # BL-051: Watching / Paper / Invested, or "none" to stop following it.
+    status: Literal["none", "watching", "paper", "invested"] | None = None
+
+
+class SavedRunGroupBody(BaseModel):
+    """BL-051: saved runs of one dataset made one favourite (`runs_store.create_group`)."""
+
+    name: str = Field(min_length=1, max_length=64)
+    members: list[str] = Field(min_length=2, max_length=12)
 
 
 class WeeklyRunBody(BaseModel):
@@ -2211,7 +2221,8 @@ def _journal_entries(
     entries = []
     for outcome in outcomes:
         result = outcome["result"]
-        if result is None or result.signal is None:
+        # A group is journalled through its members, one entry each (BL-051).
+        if result is None or result.signal is None or outcome.get("group"):
             continue
         signal = result.signal
         favorite = favorites_by_id.get(outcome["id"])
@@ -2383,6 +2394,7 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
         creds = None
     with open_catalog() as con:
         favorites_by_id = {item["id"]: item for item in runs_store.list_favorites(con)}
+        favourite_groups = runs_store.list_groups(con)
     # `catalog`, not an open connection: the run refreshes prices over the network and runs a
     # backtest per favourite, minutes in all, and opens the catalog only around each store.
     outcomes = run_favorite_strategies(
@@ -2405,6 +2417,7 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
             except (HTTPException, ValueError, KeyError, FileNotFoundError) as error:
                 outcome["result"] = None
                 outcome["blocked"] = str(getattr(error, "detail", error))
+    outcomes += _group_outcomes(favourite_groups, outcomes, body.run)
     journal = _journal_weekly(body.run, outcomes, favorites_by_id, datetime.now(IST), target_week)
     journal_line = _journal_line(journal)
     active = next((outcome for outcome in outcomes if outcome["active"]), None)
@@ -2418,6 +2431,16 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
     in_scope = body.only_if_active_dataset is None or (
         active is not None and active["dataset"] in body.only_if_active_dataset
     )
+    # BL-051: a stock-based headline (Stock, Custom Index, Broad) gets its signal from the 19:30
+    # stock-ingest rerun, once the bhavcopy is in. The 14:40 preview and 16:45 final cannot
+    # evaluate it, and saying "blocked" twice every Friday is noise, not an alert.
+    if (
+        body.only_if_active_dataset is None
+        and active is not None
+        and active_result is None
+        and active["dataset"] != "etf"
+    ):
+        in_scope = False
     blocked_note: Notification | None = None
     sent_main = False
     if active_result is not None:
@@ -2480,6 +2503,7 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
                 "name": outcome["name"],
                 "dataset": outcome["dataset"],
                 "active": outcome["active"],
+                "group": bool(outcome.get("group")),
                 "blocked": outcome["blocked"],
                 "title": outcome["result"].notification.title if outcome["result"] else None,
                 "body": outcome["result"].notification.body if outcome["result"] else None,
@@ -2821,6 +2845,65 @@ def _weekly_status(today: date | None = None) -> dict:
     }
 
 
+def _rebalance_info(req: BacktestRequest, week: pd.Timestamp) -> dict:
+    """Whether `week` is a rebalance week for this config, and the next one (BL-051)."""
+    every = req.rebalance_every if req.rebalance == "weekly" else 1
+    offset = req.rebalance_offset if every > 1 else 0
+    if req.rebalance != "weekly":
+        return {"on_cadence": True, "every": None, "offset": None, "next": None}
+    week = pd.Timestamp(week).normalize()
+    upcoming = [week + pd.Timedelta(weeks=k) for k in range(1, every + 1)]
+    following = next(w for w in upcoming if cadence_weeks([w], every, offset))
+    return {
+        "on_cadence": bool(cadence_weeks([week], every, offset)),
+        "every": every,
+        "offset": offset,
+        "next": following.strftime("%Y-%m-%d"),
+    }
+
+
+def _group_outcomes(groups: list[dict], outcomes: list[dict], run: str) -> list[dict]:
+    """One outcome per favourite group, combined from its members' outcomes (BL-051). A group
+    whose members did not all produce a signal in this run is blocked, naming them."""
+    from .weekly import RunResult
+
+    by_id = {outcome["id"]: outcome for outcome in outcomes}
+    combined = []
+    for group in groups:
+        members = [by_id.get(member["id"]) for member in group["members"]]
+        missing = [
+            f"{member['name']}: {(outcome or {}).get('blocked') or 'not evaluated in this run'}"
+            for member, outcome in zip(group["members"], members, strict=True)
+            if outcome is None or outcome["result"] is None or outcome["result"].signal is None
+        ]
+        result, blocked = None, None
+        if missing or not members:
+            blocked = (
+                f"{len(missing)} of {len(group['members'])} sleeves have no signal: "
+                + "; ".join(missing)
+            )
+        else:
+            week = max(str(outcome["result"].signal["week"]) for outcome in members)
+            signal = groups_mod.combine(
+                group,
+                [{"id": o["id"], "name": o["name"], "signal": o["result"].signal} for o in members],
+                week,
+            )
+            result = RunResult(groups_mod.notification(signal, run), signal)
+        combined.append(
+            {
+                "id": group["id"],
+                "name": group["name"],
+                "dataset": group["config"].get("dataset", "etf"),
+                "active": group["active"],
+                "result": result,
+                "blocked": blocked,
+                "group": True,
+            }
+        )
+    return combined
+
+
 def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     """Evaluate one bhavcopy-backed favourite after its processed-week gate passes."""
     from .weekly import RunResult
@@ -2880,7 +2963,15 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
         "rows": rows,
         "weights": weights,
         "config": config,
+        # BL-051: what a group needs to combine this sleeve with the others.
+        "rebalance": _rebalance_info(req, target_week),
+        "sleeve_value": groups_mod.sleeve_value(
+            payload.get("series", {}).get("dates", []),
+            payload.get("series", {}).get("strategy", []),
+        ),
     }
+    if latest.get("target_weights") is not None:
+        signal["target_weights"] = latest["target_weights"]
     note = Notification(
         "momentum-weekly",
         "action_required" if actionable else "info",
@@ -3146,34 +3237,54 @@ def create_app() -> FastAPI:
                 overlay=body.overlay,
             )
 
+    @app.post("/api/saved-runs/groups")
+    def create_saved_run_group(body: SavedRunGroupBody) -> dict:
+        try:
+            with open_catalog() as con:
+                return runs_store.create_group(con, body.name, body.members)
+        except runs_store.FavouriteError as error:
+            raise HTTPException(409, str(error)) from error
+
     @app.patch("/api/saved-runs/{run_id}")
     def patch_saved_run(run_id: str, body: SavedRunUpdate) -> dict:
-        with open_catalog() as con:
-            record = runs_store.update_run(
-                con,
-                run_id,
-                name=body.name,
-                overlay=body.overlay,
-                favorite=body.favorite,
-                active=body.active,
-            )
+        try:
+            with open_catalog() as con:
+                record = runs_store.update_run(
+                    con,
+                    run_id,
+                    name=body.name,
+                    overlay=body.overlay,
+                    favorite=body.favorite,
+                    active=body.active,
+                    status=body.status,
+                )
+        except runs_store.FavouriteError as error:
+            raise HTTPException(409, str(error)) from error
         if record is None:
             raise HTTPException(404, "saved run not found")
         return record
 
     @app.get("/api/favorite-strategies")
     def favorite_strategies() -> list[dict]:
-        """The persisted candidates for the weekly scheduler and dashboard."""
+        """The persisted candidates for the weekly scheduler and dashboard: every favourite, and
+        each group with its members' records under `members` (BL-051). The headline is first."""
         try:
             with read_catalog() as con:
-                return runs_store.list_favorites(con)
+                groups = {group["id"]: group for group in runs_store.list_groups(con)}
+                return [
+                    groups.get(record["id"], record)
+                    for record in runs_store.list_favorites(con, include_groups=True)
+                ]
         except (FileNotFoundError, duckdb.CatalogException):  # no catalog / no runs table yet
             return []
 
     @app.delete("/api/saved-runs/{run_id}")
     def remove_saved_run(run_id: str) -> dict:
-        with open_catalog() as con:
-            found = runs_store.delete_run(con, run_id)
+        try:
+            with open_catalog() as con:
+                found = runs_store.delete_run(con, run_id)
+        except runs_store.FavouriteError as error:
+            raise HTTPException(409, str(error)) from error
         if not found:
             raise HTTPException(404, "saved run not found")
         return {"ok": True}

@@ -3,13 +3,13 @@
 | | |
 |---|---|
 | **Priority** | P1 — the page the owner acts on every Friday; paper tracking starts 2026-10-09 and real money will follow the headline favourite (BL-025) |
-| **Status** | Planned |
+| **Status** | In progress (Phase 1) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard + scheduler) |
 | **Created** | 2026-10-08 |
 | **Depends on** | BL-024 (journal; its Phase 2 scoring feeds the "behaving like the backtest" chart), BL-025 (live rules), BL-049 (Scores strip, stock drawer, `ui/Drawer`) |
 | **Supersedes** | BL-003 (loading states, absorbed into Phase 2) and BL-027 (basket file, absorbed into Phase 4) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.12.17 |
 
 ## Context
 
@@ -138,15 +138,13 @@ Each phase is one PR, reviewed and merged before the next.
     message above. Migration: today's active favourite → headline + Paper; other favourites →
     Watching.
   - **Groups**: a saved run of kind `group` holding member run IDs; members inherit its status and
-    use no slot of their own. `weekly.py` runs a favourite (or sleeve) only on its own rebalance
-    weeks (`rebalance_every` / `rebalance_offset`); on other Fridays it records a "no rebalance
-    this week" journal entry with the holdings carried over, and the journal check expects that
-    entry instead of a full one. On its weeks it runs each member, records one journal entry per member
+    use no slot of their own. `weekly.py` runs every member every Friday (off weeks make no
+    trades and say so), runs each member, records one journal entry per member
     (unchanged), and builds the group's combined target from each sleeve's current value (the
     `ensemble_curve` convention). One Telegram message for a group headline: sleeves trading this
     week, combined sells / buys, holds. Create the "Phase 6 ensemble" group from the four frozen
-    configs; point `live_rules.py` at the headline group instead of reading the frozen JSON
-    directly (same four configs, so the numbers do not change).
+    configs. `live_rules.py` keeps reading the frozen JSON (the same four configs); it follows
+    the headline when the headline stops being that group.
   - **Saved runs page**: status switch per row, filters (All / Favourites / Invested / Paper /
     Watching), the "Paper + Invested n of 8" counter, group rows with their members, "Make a group"
     from selected runs, headline choice.
@@ -238,9 +236,6 @@ Each phase is one PR, reviewed and merged before the next.
 - **Paper stage.** Until money goes in, the owner's Fyers account does not hold the strategy, so
   Your orders runs against the journal's paper portfolio (owner, 2026-10-08), with a switch to
   the real holdings.
-- **Off-week journal entries** change BL-024's "every favourite every Friday" record: the entry
-  still exists every Friday, but off weeks carry the holdings rather than re-run the strategy.
-  The tamper chain and the 21:00 check must treat both kinds.
 
 ## Open questions
 
@@ -253,10 +248,11 @@ Answered by the owner on 2026-10-08 (see the Log):
    go through.
 3. ~~14:15 orders on Telegram?~~ **Yes**, a short "Your orders" message as well as the dashboard.
 4. Fyers basket format: confirmed when Phase 4 starts.
-5. ~~Do Watching favourites run every Friday?~~ **Every favourite runs on its own rebalance weeks
-   only**: a 4-week config (or sleeve) runs once every 4 weeks, on its phase. On its other Fridays
-   nothing is run; its holdings carry over and the journal records a cheap "no rebalance this week"
-   entry (holdings carried, no backtest), so the 21:00 check does not report it missing.
+5. ~~Do Watching favourites run every Friday?~~ **Every favourite still runs every Friday**
+   (owner, 2026-10-08, revised): a 4-week config makes no trades on its 3 off weeks anyway (the
+   engine says "Not a rebalance week"), and running it keeps the journal's holdings complete for
+   the live-against-backtest scoring. Off weeks are quiet: "no rebalance · next <date>" on the
+   page and in a group's Telegram message, no trades and no orders.
 
 ## Log
 
@@ -274,3 +270,9 @@ Answered by the owner on 2026-10-08 (see the Log):
   14:15 orders also go to Telegram; every favourite runs only on its own rebalance weeks (a 4-week
   config every 4 weeks).
 - 2026-10-08 — owner: minimum trade ₹10,000 by default, configurable.
+- 2026-10-08 — owner revised the off-week answer: every favourite still runs every Friday (off
+  weeks make no trades; running keeps the journal complete). Started: TODO 3.12.17, Phase 1.
+  Phase 1 decisions: the headline keeps the API field name `active` so existing readers keep
+  working; a 14:40 / 16:45 run that cannot evaluate a stock-based headline stays silent (the
+  19:30 run sends it); `live_rules.py` keeps reading the frozen Phase 6 file, which holds the
+  same four configs as the group.

@@ -375,10 +375,31 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   },
   {
     id: 'favourite',
-    term: 'Favourite / Telegram-active run',
+    term: 'Favourite',
     group: 'Momentum',
     short:
-      'Favourite saved runs are re-evaluated every Friday and recorded in the journal. Exactly one of them is Telegram-active: its signal is the one sent to Telegram.',
+      'A saved run re-evaluated every Friday and recorded in the journal. Each has a status (Watching, Paper or Invested); one followed favourite is the headline, the one sent to Telegram.',
+  },
+  {
+    id: 'favourite-status',
+    term: 'Watching / Paper / Invested',
+    group: 'Momentum',
+    short:
+      'How closely a favourite is followed. Watching: journalled only. Paper: tracked against your live-money rules as if it had money. Invested: real money follows it. Paper and Invested together are limited to 8.',
+  },
+  {
+    id: 'headline',
+    term: 'Headline favourite',
+    group: 'Momentum',
+    short:
+      'The one Paper or Invested favourite that Telegram sends each Friday and This week shows first. It used to be called the Telegram-active run.',
+  },
+  {
+    id: 'favourite-group',
+    term: 'Group (sleeves)',
+    group: 'Momentum',
+    short:
+      'Several saved runs of one dataset kept as one favourite, such as the Phase 6 ensemble. Each run is a sleeve with its own share of the money and its own rebalance weeks; the group has one status and one combined signal.',
   },
   {
     id: 'forward-journal',

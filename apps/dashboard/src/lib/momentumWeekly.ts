@@ -41,7 +41,7 @@ export function sendConfirmationText(activeName: string | null, known: boolean):
     return "Sends the active strategy's final signal to Telegram.";
   }
   if (activeName === null) {
-    return 'No favourite is marked Telegram-active, so Telegram will receive a "no active favourite selected" warning instead of a signal.';
+    return 'No favourite is the headline, so Telegram will receive a "no active favourite selected" warning instead of a signal. Make one the headline in Saved runs.';
   }
   return `Sends the active strategy's final signal (${activeName}) to Telegram. If that strategy is blocked this week, Telegram receives the blocked warning instead.`;
 }
@@ -189,7 +189,7 @@ export function weeklyReadiness(
       : null;
   const blockedReasons: string[] = [];
   if (favorites && !active && favorites.length > 0) {
-    blockedReasons.push('No favourite is marked Telegram-active, so no signal would be sent.');
+    blockedReasons.push('No favourite is the headline, so no signal would be sent.');
   }
   for (const item of status?.datasets ?? []) {
     if (item.ready && !item.error) continue;

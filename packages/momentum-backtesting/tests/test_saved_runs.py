@@ -489,3 +489,197 @@ def test_weekly_status_flags_a_scheduled_run_that_fired_late(client, tmp_path, m
     status = api._weekly_status(date(2026, 10, 2))
     preview = next(item for item in status["schedule"] if item["run"] == "preview")
     assert preview["ran_late_by_minutes"] == 42
+
+
+# --- BL-051: favourite status, the Paper + Invested limit, groups -------------------------
+
+
+def _favourite(client, name: str, status: str, dataset: str = "etf") -> dict:
+    run = client.post("/api/saved-runs", json=_payload(name, dataset)).json()
+    response = client.patch(f"/api/saved-runs/{run['id']}", json={"status": status})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_a_favourite_has_a_status_and_older_favourites_read_as_watching(client):
+    plain = client.post("/api/saved-runs", json=_payload("Plain")).json()
+    assert plain["status"] is None
+    legacy = client.patch(f"/api/saved-runs/{plain['id']}", json={"favorite": True}).json()
+    assert legacy["favorite"] is True and legacy["status"] == "watching"
+    paper = client.patch(f"/api/saved-runs/{plain['id']}", json={"status": "paper"}).json()
+    assert paper["status"] == "paper"
+    dropped = client.patch(f"/api/saved-runs/{plain['id']}", json={"status": "none"}).json()
+    assert dropped["favorite"] is False and dropped["status"] is None
+
+
+def test_the_headline_is_always_followed(client):
+    run = _favourite(client, "Watched", "watching")
+    headline = client.patch(f"/api/saved-runs/{run['id']}", json={"active": True}).json()
+    assert headline["active"] is True and headline["status"] == "paper"
+    back = client.patch(f"/api/saved-runs/{run['id']}", json={"status": "watching"}).json()
+    assert back["active"] is False
+
+
+def test_paper_and_invested_are_capped_at_eight_and_watching_is_not(client):
+    for i in range(runs_store.MAX_FOLLOWED):
+        _favourite(client, f"Followed {i}", "paper" if i % 2 else "invested", "broad")
+    ninth = client.post("/api/saved-runs", json=_payload("Ninth", "broad")).json()
+    refused = client.patch(f"/api/saved-runs/{ninth['id']}", json={"status": "paper"})
+    assert refused.status_code == 409
+    assert "Set one to Watching first" in refused.json()["detail"]
+    assert client.patch(f"/api/saved-runs/{ninth['id']}", json={"active": True}).status_code == 409
+    watching = client.patch(f"/api/saved-runs/{ninth['id']}", json={"status": "watching"})
+    assert watching.status_code == 200
+    # A followed favourite can still move between Paper and Invested at the limit.
+    first = client.get("/api/favorite-strategies").json()[0]
+    flipped = client.patch(f"/api/saved-runs/{first['id']}", json={"status": "invested"})
+    assert flipped.status_code == 200
+
+
+def test_a_group_is_one_favourite_with_one_status_and_one_slot(client):
+    members = [_favourite(client, f"Sleeve {i}", "paper", "broad") for i in range(4)]
+    client.patch(f"/api/saved-runs/{members[1]['id']}", json={"active": True})
+    response = client.post(
+        "/api/saved-runs/groups",
+        json={"name": "Phase 6 ensemble", "members": [m["id"] for m in members]},
+    )
+    assert response.status_code == 200, response.text
+    group = response.json()
+    assert group["status"] == "paper" and group["active"] is True
+    assert group["group"] == [m["id"] for m in members]
+    assert group["config"] == {"dataset": "broad", "group": [m["id"] for m in members]}
+
+    with connect() as con:
+        assert runs_store.followed_count(con) == 1  # four sleeves, one slot
+        # Members are still favourites (run and journalled), just not groups.
+        assert {f["id"] for f in runs_store.list_favorites(con)} == {m["id"] for m in members}
+        (listed,) = runs_store.list_groups(con)
+    assert [m["id"] for m in listed["members"]] == [m["id"] for m in members]
+    assert all(m["member_of"] == group["id"] and m["status"] is None for m in listed["members"])
+
+    favourites = client.get("/api/favorite-strategies").json()
+    assert favourites[0]["id"] == group["id"] and len(favourites[0]["members"]) == 4
+
+    # A member follows its group; the group cannot be unfollowed, only deleted.
+    member = client.patch(f"/api/saved-runs/{members[0]['id']}", json={"status": "watching"})
+    assert member.status_code == 409 and "Phase 6 ensemble" in member.json()["detail"]
+    assert client.delete(f"/api/saved-runs/{members[0]['id']}").status_code == 409
+    unfollow = client.patch(f"/api/saved-runs/{group['id']}", json={"status": "none"})
+    assert unfollow.status_code == 409
+
+
+def test_deleting_a_group_keeps_its_runs_as_watching_favourites(client):
+    members = [_favourite(client, f"Sleeve {i}", "paper", "broad") for i in range(2)]
+    group = client.post(
+        "/api/saved-runs/groups", json={"name": "Pair", "members": [m["id"] for m in members]}
+    ).json()
+    assert client.delete(f"/api/saved-runs/{group['id']}").status_code == 200
+    listed = {r["id"]: r for r in client.get("/api/saved-runs", params={"dataset": "broad"}).json()}
+    assert set(listed) == {m["id"] for m in members}
+    assert all(r["status"] == "watching" and r["member_of"] is None for r in listed.values())
+
+
+def test_a_group_needs_two_runs_of_one_dataset(client):
+    etf = _favourite(client, "ETF", "watching", "etf")
+    broad = _favourite(client, "Broad", "watching", "broad")
+    mixed = client.post(
+        "/api/saved-runs/groups", json={"name": "Mixed", "members": [etf["id"], broad["id"]]}
+    )
+    assert mixed.status_code == 409 and "same dataset" in mixed.json()["detail"]
+    single = client.post(
+        "/api/saved-runs/groups", json={"name": "One", "members": [etf["id"], etf["id"]]}
+    )
+    assert single.status_code == 409
+
+
+def test_a_group_headline_sends_one_combined_message_and_journals_each_sleeve(client, monkeypatch):
+    members = [_favourite(client, f"Sleeve {i}", "paper", "broad") for i in range(2)]
+    group = client.post(
+        "/api/saved-runs/groups", json={"name": "Pair", "members": [m["id"] for m in members]}
+    ).json()
+    client.patch(f"/api/saved-runs/{group['id']}", json={"active": True})
+
+    def signal(holds: str, buys: str | None, on_cadence: bool) -> dict:
+        rows = [{"asset": holds, "action": "HOLD", "rank": 1}]
+        target = {holds: 1.0}
+        if buys:
+            rows.append({"asset": buys, "action": "BUY", "rank": 3})
+            target = {holds: 0.5, buys: 0.5}
+        return {
+            "week": "2026-12-04",
+            "rows": rows,
+            "weights": {holds: 1.0},
+            "target_weights": target,
+            "sleeve_value": 1.0,
+            "rebalance": {"on_cadence": on_cadence, "every": 4, "next": "2026-12-11"},
+        }
+
+    results = {
+        members[0]["id"]: signal("BSE", "ANGELONE", True),
+        members[1]["id"]: signal("HAL", None, False),
+    }
+    monkeypatch.setattr(
+        weekly,
+        "run_favorite_strategies",
+        lambda *args, **kwargs: [
+            {
+                "id": m["id"],
+                "name": m["name"],
+                "dataset": "broad",
+                "active": False,
+                "result": weekly.RunResult(
+                    Notification("test", "info", m["name"], "x"), results[m["id"]]
+                ),
+                "blocked": None,
+            }
+            for m in members
+        ],
+    )
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: None)
+    journalled = []
+
+    def journal_spy(run, outcomes, *args):
+        journalled.extend(o["id"] for o in outcomes if not o.get("group"))
+        return {"recorded": [], "head": None, "notes": [], "error": None}
+
+    monkeypatch.setattr(api, "_journal_weekly", journal_spy)
+    sent = []
+    monkeypatch.setattr(notify, "send", sent.append)
+    monkeypatch.setattr(notify, "run_url", lambda: None)
+
+    result = api._execute_weekly_run(api.WeeklyRunBody(run="final", send=True))
+    assert len(sent) == 1
+    assert "Pair" in sent[0].title
+    assert "Sleeves trading: Sleeve 0" in sent[0].body and "ANGELONE — BUY" in sent[0].body
+    assert result["signal"]["target_weights"] == {"BSE": 0.25, "ANGELONE": 0.25, "HAL": 0.5}
+    # The journal sees both sleeves and not the group.
+    assert journalled == [m["id"] for m in members]
+    assert [s["group"] for s in result["strategies"]] == [False, False, True]
+
+
+def test_a_stock_based_headline_stays_quiet_before_the_1930_run(client, monkeypatch):
+    """The 14:40 preview and 16:45 final cannot evaluate a Broad headline; the 19:30 rerun does.
+    They must not send 'blocked' every Friday."""
+    headline = _favourite(client, "Broad headline", "paper", "broad")
+    client.patch(f"/api/saved-runs/{headline['id']}", json={"active": True})
+    monkeypatch.setattr(
+        weekly,
+        "run_favorite_strategies",
+        lambda *args, **kwargs: [
+            {
+                "id": headline["id"],
+                "name": "Broad headline",
+                "dataset": "broad",
+                "active": True,
+                "result": None,
+                "blocked": "Weekly ingest is not yet available for this dataset.",
+            }
+        ],
+    )
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: None)
+    sent = []
+    monkeypatch.setattr(notify, "send", sent.append)
+
+    result = api._execute_weekly_run(api.WeeklyRunBody(run="preview", send=True))
+    assert result["sent_to_telegram"] is False
+    assert all(note.type != "momentum.problem" for note in sent)

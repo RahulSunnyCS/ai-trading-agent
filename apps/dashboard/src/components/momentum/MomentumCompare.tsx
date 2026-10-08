@@ -124,7 +124,7 @@ export function MomentumCompare({
                 <Th key={run.id} align="right" className="normal-case tracking-normal">
                   <span className="inline-flex items-center justify-end gap-1.5 text-foreground">
                     {runName(run)}
-                    {run.active ? <Badge tone="primary">Active</Badge> : null}
+                    {run.active ? <Badge tone="primary">Headline</Badge> : null}
                   </span>
                 </Th>
               ))}

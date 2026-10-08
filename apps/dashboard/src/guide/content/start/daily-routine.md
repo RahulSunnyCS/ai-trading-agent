@@ -16,7 +16,7 @@ says what runs when, and when it is worth looking.
 | Time | What happens | Where to check |
 |---|---|---|
 | 14:40 | Momentum **preview**: the ETF ranking on live prices, so a trade can be placed before the close. | [Weekly signal](app:/momentum/weekly) |
-| 16:45 | Momentum **final**: the same ranking on the official close. The Telegram-active strategy's signal is sent. | [Weekly signal](app:/momentum/weekly) |
+| 16:45 | Momentum **final**: the same ranking on the official close. The headline favourite's signal is sent (a stock-based headline's comes at 19:30). | [Weekly signal](app:/momentum/weekly) |
 | 19:30 | Stock data is refreshed from NSE, then the stock-based strategies (Broad Momentum) get their final. | [Weekly signal](app:/momentum/weekly) |
 | 21:00 | A check that the [journal](guide:momentum/journal) recorded a signal for every favourite. | [Journal](app:/momentum/journal) |
 | 21:30 | A check of your live-money rules: how far the followed money has fallen from its peak, whether it trails the backtest, and whether the money gate has passed. It messages you; it never trades. | Telegram |

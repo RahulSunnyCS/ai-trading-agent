@@ -52,7 +52,7 @@ import {
   getDefaultDateRangeYears,
   getDefaultMomentumDataset,
 } from '../store/settings';
-import type { MomentumResult, MomentumSavedRun } from '../types/momentum';
+import type { FavouriteStatus, MomentumResult, MomentumSavedRun } from '../types/momentum';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
 import { MomentumHeadline } from './momentum/MomentumHeadline';
 import { MomentumJournalView } from './momentum/MomentumJournalView';
@@ -498,8 +498,18 @@ export function MomentumBacktestingView() {
   async function toggleOverlay(id: string, overlay: boolean): Promise<void> {
     await patchRun(id, { overlay });
   }
-  async function toggleFavorite(id: string, favorite: boolean): Promise<void> {
-    await patchRun(id, { favorite });
+  async function setFavouriteStatus(id: string, status: FavouriteStatus | 'none'): Promise<void> {
+    await patchRun(id, { status });
+  }
+  async function createGroup(name: string, members: string[]): Promise<boolean> {
+    setSavedRunError(null);
+    const response = await apiPost('/api/momentum/saved-runs/groups', { name, members });
+    if (!response.ok) {
+      setSavedRunError(response.error);
+      return false;
+    }
+    await refreshSavedRuns(dataset);
+    return true;
   }
   async function setActive(id: string): Promise<void> {
     await patchRun(id, { active: true });
@@ -999,8 +1009,9 @@ export function MomentumBacktestingView() {
               loading={savedRunsLoading}
               onRename={renameRun}
               onToggleOverlay={toggleOverlay}
-              onToggleFavorite={toggleFavorite}
+              onSetStatus={setFavouriteStatus}
               onSetActive={setActive}
+              onCreateGroup={createGroup}
               onRemove={removeRun}
               onLoad={loadSettings}
             />

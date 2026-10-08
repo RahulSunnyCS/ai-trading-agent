@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from . import criteria
+from . import criteria, groups
 
 FIRST_FY = 2018  # FY2018 = April 2017 to March 2018; the curves start in January 2017
 CLUSTER_CORR = 0.9
@@ -485,10 +485,9 @@ def ensemble_curve(curves: pd.DataFrame, picks: list[str]) -> pd.Series:
     """The weekly value of equal capital in `picks`, reset to equal each April (addendum 4)."""
     weeks = curves.index
     out, level = [], 1.0
-    # Reset where each financial year's window starts: the last week before 1 April.
-    aprils = [pd.Timestamp(f"{y}-04-01") for y in range(weeks[0].year, weeks[-1].year + 1)]
-    resets = [weeks[0]] + [weeks[weeks < a][-1] for a in aprils if weeks[0] < a <= weeks[-1]]
-    resets = sorted(set(resets))
+    # Reset where each financial year's window starts: the last week before 1 April. The live
+    # group signal weights its sleeves by the same resets (`groups.reset_weeks`, BL-051).
+    resets = groups.reset_weeks(weeks)
     for i, start in enumerate(resets):
         end = resets[i + 1] if i + 1 < len(resets) else weeks[-1]
         span = curves.loc[start:end, picks]

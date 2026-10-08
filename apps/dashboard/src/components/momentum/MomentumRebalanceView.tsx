@@ -288,7 +288,7 @@ export function MomentumRebalanceView({
               {runs.map((run) => (
                 <option key={run.id} value={run.id}>
                   {run.name}
-                  {run.active ? ' · Telegram active' : ''}
+                  {run.active ? ' · headline' : ''}
                 </option>
               ))}
             </Select>

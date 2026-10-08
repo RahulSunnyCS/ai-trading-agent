@@ -528,7 +528,7 @@ function ReadinessCard({
               : 'None saved yet'
             : EMPTY}
         </Fact>
-        <Fact label="Telegram-active strategy">
+        <Fact label="Headline favourite">
           {favoritesError ? (
             <span className="text-warning">Couldn&apos;t load favourites</span>
           ) : readiness.activeKnown ? (
@@ -729,7 +729,7 @@ function WeeklyResults({ result }: { result: MomentumWeeklyRunResult }) {
                   {strategy.title ?? strategy.name}
                 </h3>
                 <Badge tone="neutral">{datasetLabel(strategy.dataset)}</Badge>
-                {strategy.active ? <Badge tone="primary">Telegram-active</Badge> : null}
+                {strategy.active ? <Badge tone="primary">Headline</Badge> : null}
                 {severity === 'blocked' ? <Badge tone="negative">Blocked</Badge> : null}
               </div>
               <p className="mt-1 text-sm text-muted">

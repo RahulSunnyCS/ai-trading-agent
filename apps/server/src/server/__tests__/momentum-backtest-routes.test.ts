@@ -233,6 +233,28 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards making a group of saved runs', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { id: 'g1', group: ['a', 'b'] }));
+
+    const response = await server.inject({
+      method: 'POST',
+      url: '/api/momentum/saved-runs/groups',
+      payload: { name: 'Phase 6 ensemble', members: ['a', 'b'] },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/saved-runs/groups',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ name: 'Phase 6 ensemble', members: ['a', 'b'] }),
+      }),
+    );
+    await server.close();
+  });
+
   it('forwards deleting a saved run', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);
