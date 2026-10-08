@@ -3,6 +3,7 @@ catalog (see runs_store.py). Exercised at both layers: runs_store.py directly ag
 a DuckDB connection, and the /api/saved-runs routes through a TestClient - the isolated
 TRADING_DATA_ROOT from conftest.py means these never touch the real catalog."""
 
+import itertools
 import threading
 import time
 from datetime import date
@@ -21,11 +22,20 @@ def client():
     return TestClient(api.create_app())
 
 
+_DISTINCT = itertools.count()
+
+
 def _payload(name: str = "Run 1", dataset: str = "etf") -> dict:
+    # Each payload its own strategy (BL-052: the same settings again would be a repeat of one,
+    # and these tests make separate favourites); cost_pct, read by every dataset, differs.
     return {
         "dataset": dataset,
         "name": name,
-        "config": {"top_n": 5, "lookbacks": [1, 4, 13, 26, 52]},
+        "config": {
+            "top_n": 5,
+            "lookbacks": [1, 4, 13, 26, 52],
+            "cost_pct": round(0.10 + next(_DISTINCT) % 50 / 100, 2),
+        },
         "kpis": {"cagr": 0.18, "sharpe": 1.2},
         "dates": ["2020-01-03", "2020-01-10"],
         "strategy": [100.0, 101.5],
@@ -37,7 +47,8 @@ def test_save_list_and_the_record_shape_matches_the_frontend_type(client):
     saved = client.post("/api/saved-runs", json=_payload()).json()
     assert saved["name"] == "Run 1"
     assert saved["n"] == 1
-    assert saved["config"] == {"top_n": 5, "lookbacks": [1, 4, 13, 26, 52]}
+    assert saved["config"]["top_n"] == 5
+    assert saved["config"]["lookbacks"] == [1, 4, 13, 26, 52]
     assert saved["kpis"] == {"cagr": 0.18, "sharpe": 1.2}
     assert saved["dates"] == ["2020-01-03", "2020-01-10"]
     assert saved["strategy"] == [100.0, 101.5]

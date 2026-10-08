@@ -310,3 +310,35 @@ def test_after_the_merge_older_code_still_reads_a_runnable_config(client):
         ).fetchone()[0]
     assert json.loads(spec) == favourite
     api.BacktestRequest.model_validate({**json.loads(spec), "dataset": "broad"})
+
+
+def test_a_strategy_has_one_favourite_record(client):
+    # The current Saved runs page still shows each run; starring or heading a repeat of a
+    # strategy that already has a favourite run changes that run, never a second one.
+    first = client.post("/api/saved-runs", json=_payload()).json()["id"]
+    client.patch(f"/api/saved-runs/{first}", json={"status": "paper"})
+    repeat = client.post("/api/saved-runs", json=_payload(name="Run 2")).json()["id"]
+    headed = client.patch(f"/api/saved-runs/{repeat}", json={"active": True}).json()
+    assert headed["id"] == first and headed["active"] is True
+    runs = {r["id"]: r for r in client.get("/api/saved-runs", params={"dataset": "etf"}).json()}
+    assert runs[repeat]["favorite"] is False and runs[repeat]["active"] is False
+    strategy = _strategies(client)["strategies"][0]
+    assert (strategy["id"], strategy["active"], strategy["status"]) == (first, True, "paper")
+
+
+def test_the_headline_run_is_the_anchor_when_two_favourites_share_settings(client):
+    base = {"universe": UNIVERSE, "top_n": 5}
+    with connect() as con:
+        _legacy_run(con, "etf", "Fav 1", base, (100.0, 101.0), True)
+        headline = _legacy_run(con, "etf", "Fav 2", base, (100.0, 101.0), True)
+        summary = json.loads(
+            con.execute(
+                "SELECT summary FROM backtest_runs WHERE run_id = ?", [headline]
+            ).fetchone()[0]
+        )
+        summary.update({"active": True, "status": "paper"})
+        con.execute(
+            "UPDATE backtest_runs SET summary = ? WHERE run_id = ?", [json.dumps(summary), headline]
+        )
+    strategy = _strategies(client)["strategies"][0]
+    assert (strategy["id"], strategy["active"]) == (headline, True)

@@ -224,15 +224,38 @@ _FLAG_SQL = (
     "OR (r.summary ->> 'group') IS NOT NULL)"
 )
 _ORDER = "r.created_at, (r.summary ->> 'n')::INT"
+# Which run of a strategy is its anchor: the headline, then a favourite (highest status first),
+# then the oldest. Mirrored by `_anchor_of` for runs already loaded.
+_ANCHOR_SQL = (
+    "COALESCE((r.summary ->> 'active')::BOOLEAN, FALSE) DESC, "
+    f"{_FLAG_SQL} DESC, "
+    "CASE r.summary ->> 'status' WHEN 'invested' THEN 2 WHEN 'paper' THEN 1 ELSE 0 END DESC, "
+    f"{_ORDER}"
+)
+_RANK = {"invested": 2, "paper": 1}
+
+
+def _anchor_of(runs: list[dict[str, Any]]) -> dict[str, Any]:
+    """`_anchor` for runs already loaded (oldest first)."""
+    return min(
+        enumerate(runs),
+        key=lambda item: (
+            not item[1]["summary"].get("active", False),
+            not _is_favourite(item[1]["summary"]),
+            -_RANK.get(item[1]["summary"].get("status"), 0),
+            item[0],
+        ),
+    )[1]
 
 
 def _anchor(con: duckdb.DuckDBPyConnection, version_id: str) -> tuple[str, dict[str, Any]] | None:
-    """The run holding the strategy's name and favourite state: its favourite run if any, else
+    """The run holding the strategy's name and favourite state: its headline or favourite run if
+    any (a favourite change to another run of the strategy is moved here, so there is one), else
     its oldest run."""
     row = con.execute(
         "SELECT r.run_id, r.summary FROM backtest_runs r "
         "WHERE r.version_id = ? AND r.kind = 'weekly' "
-        f"ORDER BY {_FLAG_SQL} DESC, {_ORDER} LIMIT 1",
+        f"ORDER BY {_ANCHOR_SQL} LIMIT 1",
         [version_id],
     ).fetchone()
     return (row[0], json.loads(row[1])) if row else None
@@ -480,9 +503,17 @@ def update_run(
     loaded = _load(con, run_id)
     if loaded is None:
         return None
+    favourite_change = favorite is not None or active is not None or status is not None
+    if favourite_change:
+        # One favourite record per strategy (BL-052): a favourite change to a repeat of a
+        # strategy that already has a favourite run goes to that run, never a second one.
+        holder = _favourite_holder(con, run_id)
+        if holder is not None and holder != run_id:
+            if name is not None or notes is not None or overlay is not None:
+                update_run(con, run_id, name=name, notes=notes, overlay=overlay)
+            return update_run(con, holder, favorite=favorite, active=active, status=status)
     spec, summary, created_at, _ = loaded
     before = status_of(summary)
-    favourite_change = favorite is not None or active is not None or status is not None
     if favourite_change and summary.get("member_of"):
         group = _load(con, summary["member_of"])
         group_name = group[1].get("name", "its group") if group else "its group"
@@ -531,6 +562,15 @@ def update_run(
         raise FavouriteError(_limit_message())
     _write_summaries(con, {run_id: summary})
     return _record(run_id, json.loads(spec), summary, created_at)
+
+
+def _favourite_holder(con: duckdb.DuckDBPyConnection, run_id: str) -> str | None:
+    """The run holding the favourite state of `run_id`'s strategy, if any run of it does."""
+    row = con.execute(
+        "SELECT version_id FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id]
+    ).fetchone()
+    anchor = _anchor(con, row[0]) if row else None
+    return anchor[0] if anchor and _is_favourite(anchor[1]) else None
 
 
 def create_group(
@@ -806,7 +846,7 @@ def _trust(strategy: dict[str, Any], validated: frozenset[str], newest: str | No
 
 def _strategy(runs: list[dict[str, Any]], changes: list[dict[str, Any]]) -> dict[str, Any]:
     """One strategy from its runs (oldest first) and its change rows (newest first)."""
-    anchor = next((r for r in runs if _is_favourite(r["summary"])), runs[0])
+    anchor = _anchor_of(runs)
     latest = runs[-1]
     summary, last = anchor["summary"], latest["summary"]
     change = changes[0] if changes and changes[0]["run_id"] == latest["id"] else None
@@ -1029,7 +1069,7 @@ def apply_merge(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
             dataset = item["dataset"]
             ids = [r["id"] for r in item["runs"]]
             runs = [r for r in _all_runs(con, dataset) if r["id"] in ids]
-            anchor = next((r for r in runs if _is_favourite(r["summary"])), runs[0])
+            anchor = _anchor_of(runs)
             version_id = _ensure_version(con, dataset, item["fingerprint"], anchor["config"])
             # The anchor's own config, even if the version existed already: an older reader
             # (pre-BL-052 code still running) takes every run's config from here.
