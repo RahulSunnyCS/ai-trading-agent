@@ -11,6 +11,7 @@ export { Card, CardHeader } from './Card';
 export { CheckboxMenu } from './CheckboxMenu';
 export type { CheckboxMenuOption } from './CheckboxMenu';
 export { CodeBlock } from './CodeBlock';
+export { Drawer } from './Drawer';
 export { InfoTooltip } from './InfoTooltip';
 export { PendingInfo } from './PendingInfo';
 export { RadioCards } from './RadioCards';

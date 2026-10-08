@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import csv
 import math
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,6 +52,12 @@ MA_WEEKS = 40
 UP_WEEKS = 26
 YEAR_WEEKS = 52
 SPARK_WEEKS = 26
+#: Weeks of group-score history the rotation map reads: the longest tail (13 weeks) plus the 4
+#: weeks before its first point, which the "change in the 4-week score" needs.
+HISTORY_WEEKS = 18
+#: Weeks of per-stock score history in the stock drawer, and of rank history.
+DRAWER_SCORE_WEEKS = 12
+DRAWER_RANK_WEEKS = 26
 #: The parent group that is a theme (PSU / CPSE baskets...), not a sector: its stocks also sit in
 #: a real sector, which is what a stock's own "sector" should name.
 THEME_PARENT = "Cross-Sector Themes"
@@ -463,12 +470,33 @@ def _by_lookback(values: dict[int, float | None], digits: int) -> dict[str, floa
     return {str(k): _round(v, digits) for k, v in values.items()}
 
 
+def _rotation_json(rotation: Rotation) -> dict:
+    def entry(g: GroupHistory) -> dict:
+        return {
+            "key": g.key,
+            "parent_group": g.parent_group,
+            "subgroup": g.subgroup,
+            "theme": g.theme,
+            "member_count": g.member_count,
+            "scored_count": g.scored_count,
+            "s4": [_round(v, 1) for v in g.s4],
+            "s26": [_round(v, 1) for v in g.s26],
+        }
+
+    return {
+        "weeks": list(rotation.weeks),
+        "groups": [entry(g) for g in rotation.groups],
+        "subs": [entry(g) for g in rotation.subs],
+    }
+
+
 def to_payload(
     stock_snapshot: StockMomentumSnapshot,
     sector_snapshot: SectorMomentumSnapshot,
     *,
     missing_symbols: list[str],
     membership_quality: dict | None,
+    rotation: Rotation | None = None,
 ) -> dict:
     """`/api/momentum-scores`' response. Returns to 4 decimals, scores to 1, closes to 2: far more
     precise than the page prints, a fraction of the size."""
@@ -510,6 +538,7 @@ def to_payload(
             }
             for r in snap.rows
         ],
+        "rotation": None if rotation is None else _rotation_json(rotation),
         "sectors": [
             {
                 "cid": r.cid,
@@ -521,4 +550,181 @@ def to_payload(
             }
             for r in sector_snapshot.rows
         ],
+    }
+
+
+# ---------------------------------------------------------------------------------------------
+# History: the same percentile scores, week by week (BL-049 Phase 2). The rotation map needs a
+# group's score over recent weeks, the stock drawer a stock's.
+# ---------------------------------------------------------------------------------------------
+
+
+def weekly_percentile_scores(
+    universe: broad.StockUniverseFrame, lookback: int, weeks: int
+) -> pd.DataFrame:
+    """`_percentile_scores` for each of the last `weeks` weeks at once: rows are weeks (oldest
+    first), columns the frame's columns, values 0-100 where the column was a member that week and
+    had `lookback` weeks of history, else NaN. Each row ranks only that week's members, so a
+    score means what it meant on the day: the week's own cross-section, not today's."""
+    frame = universe.frame
+    start = max(0, len(frame.index) - weeks)
+    returns = frame.iloc[start:] / frame.shift(lookback).iloc[start:] - 1
+    member = universe.stock_membership.reindex_like(returns).fillna(False).astype(bool)
+    returns = returns.where(member)
+    count = returns.notna().sum(axis=1)
+    rank = returns.rank(axis=1, ascending=True, method="min")
+    scores = rank.sub(1).div((count - 1).where(count > 1), axis=0) * 100.0
+    # One member is scored neutral (50), as `_percentile_scores` does; none stays NaN.
+    scores = scores.where(~((count == 1).to_numpy()[:, None] & returns.notna()), 50.0)
+    return scores
+
+
+def _by_symbol(scores: pd.DataFrame, universe: broad.StockUniverseFrame) -> pd.DataFrame:
+    """Columns renamed to their base symbol; the segments of one stock (`SYM`, `SYM#2`, only one
+    of which is live in a given week) fold into one column."""
+    mapper = pd.Series(universe.column_to_base_symbol)
+    base = mapper.reindex(scores.columns)
+    return scores.T.groupby(base.to_numpy()).first().T
+
+
+@dataclass(frozen=True)
+class GroupHistory:
+    """One sector group's (or sub-sector's) mean 4 and 26-week scores over the last weeks, for the
+    rotation map: x is the 26-week score, y how much the 4-week score moved in 4 weeks."""
+
+    key: str  # "Financials" or "Financials :: PSU Banks"
+    parent_group: str
+    subgroup: str | None
+    theme: bool
+    member_count: int
+    scored_count: int  # members with a 26-week score now
+    s4: tuple[float | None, ...]
+    s26: tuple[float | None, ...]
+
+
+@dataclass(frozen=True)
+class Rotation:
+    weeks: tuple[str, ...]  # HISTORY_WEEKS Fridays, oldest first; the last is `as_of`
+    groups: list[GroupHistory]
+    subs: list[GroupHistory]
+
+
+def compute_rotation(
+    universe: broad.StockUniverseFrame,
+    group_members: dict[str, set[str]],
+    *,
+    weeks: int = HISTORY_WEEKS,
+) -> Rotation:
+    """Each parent group's and sub-sector's mean percentile score at 4 and 26 weeks, for each of
+    the last `weeks` weeks. A parent group's members are the unique symbols of all its
+    sub-sectors (a stock tagged to two of them counts once). Only the members of that week, with
+    that lookback's history, are averaged."""
+    frame = universe.frame
+    dates = [d.strftime("%Y-%m-%d") for d in frame.index[-weeks:]]
+    by_lookback = {
+        k: _by_symbol(weekly_percentile_scores(universe, k, weeks), universe) for k in (4, 26)
+    }
+
+    def history(key: str, parent: str, sub: str | None, members: set[str]) -> GroupHistory:
+        series: dict[int, tuple[float | None, ...]] = {}
+        for k, table in by_lookback.items():
+            cols = [m for m in members if m in table.columns]
+            mean = table[cols].mean(axis=1) if cols else pd.Series(float("nan"), index=table.index)
+            series[k] = tuple(_none_if_nan(v) for v in mean)
+        scored = (
+            int(
+                by_lookback[26][[m for m in members if m in by_lookback[26].columns]]
+                .iloc[-1]
+                .notna()
+                .sum()
+            )
+            if members
+            else 0
+        )
+        return GroupHistory(
+            key=key,
+            parent_group=parent,
+            subgroup=sub,
+            theme=parent == THEME_PARENT,
+            member_count=len(members),
+            scored_count=scored,
+            s4=series[4],
+            s26=series[26],
+        )
+
+    parents: dict[str, set[str]] = {}
+    subs: list[GroupHistory] = []
+    for cid, members in sorted(group_members.items()):
+        parent, _, sub = cid.partition(" :: ")
+        parents.setdefault(parent, set()).update(members)
+        subs.append(history(cid, parent, sub, members))
+    groups = [history(parent, parent, None, members) for parent, members in sorted(parents.items())]
+    return Rotation(weeks=tuple(dates), groups=groups, subs=subs)
+
+
+_RANK_LOCK = threading.Lock()
+_RANK_CACHE: dict = {"universe": None, "table": None}
+
+
+def composite_rank_history(
+    universe: broad.StockUniverseFrame, weeks: int = DRAWER_RANK_WEEKS
+) -> pd.DataFrame:
+    """The composite rank (see `_composite_ranks`) of every stock for each of the last `weeks`
+    weeks: rows are weeks (oldest first), columns base symbols, values the rank or NaN. Each week
+    is ranked among that week's members. About a second to build, so it is kept for the price
+    frame it was built from (the frame object is replaced when the data changes)."""
+    with _RANK_LOCK:
+        if _RANK_CACHE["universe"] is universe and _RANK_CACHE["table"] is not None:
+            return _RANK_CACHE["table"]
+    frame = universe.frame
+    mapper = universe.column_to_base_symbol
+    rows: dict[pd.Timestamp, dict[str, int]] = {}
+    for pos in range(max(0, len(frame.index) - weeks), len(frame.index)):
+        member = universe.stock_membership.loc[frame.index[pos]]
+        cols = [c for c in frame.columns if bool(member.get(c, False))]
+        rows[frame.index[pos]] = {
+            mapper[col]: rank for col, rank in _composite_ranks(frame, pos, cols).items()
+        }
+    table = pd.DataFrame.from_dict(rows, orient="index").sort_index()
+    with _RANK_LOCK:
+        _RANK_CACHE["universe"] = universe
+        _RANK_CACHE["table"] = table
+    return table
+
+
+def stock_detail(universe: broad.StockUniverseFrame, symbol: str) -> dict | None:
+    """What the stock drawer shows beyond the list's own row: 53 weekly closes with the 40-week
+    average, the percentile score at each lookback over the last 12 weeks, and the composite rank
+    over the last 26. None when the symbol is not a live member at the latest week."""
+    frame = universe.frame
+    if frame.empty:
+        return None
+    pos = len(frame.index) - 1
+    member = universe.stock_membership.loc[frame.index[pos]]
+    columns = [
+        c
+        for c in frame.columns
+        if universe.column_to_base_symbol.get(c) == symbol and bool(member.get(c, False))
+    ]
+    if not columns:
+        return None
+    column = columns[0]
+    closes = frame[column].iloc[max(0, pos - YEAR_WEEKS) :]
+    ma = frame[column].rolling(MA_WEEKS, min_periods=MA_WEEKS).mean().loc[closes.index]
+    score_weeks = [d.strftime("%Y-%m-%d") for d in frame.index[-DRAWER_SCORE_WEEKS:]]
+    scores: dict[str, list[float | None]] = {}
+    for k in DEFAULT_LOOKBACKS:
+        table = weekly_percentile_scores(universe, k, DRAWER_SCORE_WEEKS)
+        scores[str(k)] = [_round(_none_if_nan(v), 1) for v in table[column]]
+    ranks = composite_rank_history(universe)
+    rank_series = ranks[symbol] if symbol in ranks.columns else pd.Series(dtype=float)
+    return {
+        "symbol": symbol,
+        "weeks": [d.strftime("%Y-%m-%d") for d in closes.index],
+        "closes": [_round(_none_if_nan(v), 2) for v in closes],
+        "ma40": [_round(_none_if_nan(v), 2) for v in ma],
+        "score_weeks": score_weeks,
+        "scores": scores,
+        "rank_weeks": [d.strftime("%Y-%m-%d") for d in ranks.index],
+        "ranks": [None if pd.isna(v) else int(v) for v in rank_series.reindex(ranks.index)],
     }

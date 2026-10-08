@@ -9,6 +9,16 @@ likely to favour, to spot what changed this week, and to sanity-check a signal.
 Nothing; it reads the latest prices in the research database. The card's subtitle says the date
 of those prices and how many stocks were scored.
 
+## Two views: Sectors and Stocks
+
+The switch under the header picks the view; **Sectors** is the default. The address follows
+the view (`/momentum/scores/sectors`, `/sectors/<group>`, `/stocks`), so Back, a bookmark and a
+shared link all land where you were.
+
+- **Sectors** answers "where is money moving?": the [rotation map](glossary:rotation-map) and
+  its table, what changed this week, and the ten strongest stocks. Click a group to open its page.
+- **Stocks** answers "which stocks?": the full list below.
+
 ## The market strip
 
 Five tiles above the list say how healthy momentum is right now:
@@ -43,7 +53,7 @@ Momentum's defaults (10 and 20) when there is none, and the footer says which.
 | Sector group | Narrow the list to one group. |
 | Columns | Switch optional columns off; the choice is kept in this browser. |
 | Column headers | Sort by rank, name, a lookback's score (click its `4w`, `13w`… label in the strip header), 13 or 26-week return, distance from the 52-week high or price. |
-| Stocks / Sectors | Switch between the stock list and the sector table. |
+| Click a row | Opens the stock's drawer. |
 
 The list shows 100 rows at a time: **Show more** adds the next 100.
 
@@ -70,10 +80,54 @@ last weekly close is below the highest weekly close of the year.
 Names marked **Held** or **Candidate** come from the Telegram-active strategy's latest weekly
 run: what it holds, and what it would buy if it had cash.
 
-## The sector table
+## The rotation map
 
-Each sub-sector shows a strip of its stocks' average score per lookback; open a row to see the
-stocks in it. A stock tagged to a sector and to a theme basket appears under both.
+Each dot is one of the 24 sector groups. Left to right is how strong the group has been over 26
+weeks (its average [score](glossary:score-decile) percentile, 0–100); bottom to top is whether its
+4-week strength has been **rising or falling** over the last four weeks. The four corners:
+
+| Corner | Meaning |
+|---|---|
+| **Leading** (top right) | Strong over 26 weeks and still improving. |
+| **Weakening** (bottom right) | Strong over 26 weeks, but the recent weeks are fading. |
+| **Lagging** (bottom left) | Weak over 26 weeks and not improving. |
+| **Improving** (top left) | Weak over 26 weeks, but the recent weeks are picking up. |
+
+Hover a dot for the group's stocks, strip, where it is now against four weeks ago, how many of
+its stocks are above their 40-week average and its leaders; a faint tail shows where it came
+from. Click a dot or a table row to open the group. Both are linked: hovering a row lights its
+dot.
+
+| Control | What it does |
+|---|---|
+| Search | Narrow the map and table by group name. |
+| Changed quadrant only | Keep the groups that moved to another corner over the last four weeks, the ones worth a look. |
+| Min stocks | A group needs this many scored stocks to get a dot (default 5; 1, 3, 5 or 10). Smaller groups stay in the table, marked "fewer than 5 scored stocks", because a score from two stocks is noise. The choice is kept in this browser. |
+| Tails | How far back each tail reaches: 4, 8 or 13 weeks. |
+
+**Cross-Sector Themes** are baskets that cut across sectors, so they are listed in the table
+only and never get a dot.
+
+## A sector page
+
+Click a group to open it. The page shows the group's own rotation map (one dot per sub-sector,
+same corners), the sub-sector table and the stocks in it. Pick a sub-sector, on the map or in its
+table, to narrow the stock list to it; pick it again to clear. **← All sectors** returns to the overview.
+
+## A stock's drawer
+
+Click any stock, in any list, to slide its page in from the right. It shows the price and week
+change, the score strip, the figures used elsewhere (rank and change, distance from the 52-week
+high, % above the 40-week average, volatility, up-weeks), and three charts:
+
+- **Price**: weekly closes over the last year with the 40-week average.
+- **Scores**: the 1–10 score of each lookback over the last 12 weeks, so you see a trend forming.
+- **Rank**: the composite rank over the last 26 weeks (up the page is better).
+
+**← Prev** and **Next →** walk the list you opened it from, in its order.
+**Open its sector** goes to the stock's group page and **Open in backtest** opens the Backtest
+tab on Broad Momentum. Esc, the close button or Back closes it; the address carries
+`?stock=SYMBOL`, so a drawer can be shared.
 
 ## Common questions
 

@@ -29,6 +29,42 @@ export interface StockScore {
   spark?: number[];
 }
 
+/** One group's (or sub-sector's) mean percentile scores, week by week, oldest first. */
+export interface RotationGroup {
+  /** "Financials" for a parent group, "Financials :: PSU Banks" for a sub-sector. */
+  key: string;
+  parent_group: string;
+  subgroup: string | null;
+  /** A theme basket (its stocks also sit in real sectors): in the table, never on the map. */
+  theme: boolean;
+  member_count: number;
+  /** Members with a 26-week score now. */
+  scored_count: number;
+  s4: Array<number | null>;
+  s26: Array<number | null>;
+}
+
+export interface Rotation {
+  weeks: string[];
+  groups: RotationGroup[];
+  subs: RotationGroup[];
+}
+
+/** One stock's history for the drawer (`/api/momentum/scores/stock/<symbol>`). */
+export interface StockDetail {
+  symbol: string;
+  /** 53 weekly closes with the 40-week average (null until 40 weeks exist). */
+  weeks: string[];
+  closes: Array<number | null>;
+  ma40: Array<number | null>;
+  /** Percentile score per lookback (weeks, as a string) over `score_weeks`. */
+  score_weeks: string[];
+  scores: Record<string, Array<number | null>>;
+  /** Composite rank over `rank_weeks`; null where the stock had none. */
+  rank_weeks: string[];
+  ranks: Array<number | null>;
+}
+
 /** How wide the market's momentum is (shares are fractions). */
 export interface Breadth {
   above_ma40: { now: number | null; week_ago: number | null; month_ago: number | null };
@@ -53,6 +89,8 @@ export interface MomentumScores {
   /** Stocks with a composite rank. */
   ranked_count?: number;
   breadth?: Breadth | null;
+  /** Each group's and sub-sector's mean 4 and 26-week score over recent weeks (the rotation map). */
+  rotation?: Rotation | null;
   missing_symbols: string[];
   stocks: StockScore[];
   sectors: SectorScore[];
@@ -549,3 +587,265 @@ export const DECILE_CLASS: Record<number, string> = {
   9: 'bg-positive/45',
   10: 'bg-positive/55',
 };
+
+// --- Rotation: where each group is, and which way it is moving ------------------------------
+
+export type Quadrant = 'leading' | 'improving' | 'weakening' | 'lagging';
+
+export const QUADRANT_LABEL: Record<Quadrant, string> = {
+  leading: 'Leading',
+  improving: 'Improving',
+  weakening: 'Weakening',
+  lagging: 'Lagging',
+};
+
+/** Weeks the "change in the 4-week score" looks back over. */
+export const MOMENTUM_STEP = 4;
+
+/** The map's centre lines: a score of 50 is the middle of the universe, a change of 0 no move. */
+export function quadrantOf(strength: number, direction: number): Quadrant {
+  if (strength >= 50) return direction >= 0 ? 'leading' : 'weakening';
+  return direction >= 0 ? 'improving' : 'lagging';
+}
+
+export interface RotationPoint {
+  /** The 26-week score, 0 to 100. */
+  x: number;
+  /** The 4-week score now minus 4 weeks earlier, in points. */
+  y: number;
+}
+
+/** The point for week index `u`, or null when either score it needs is missing. */
+function pointAt(group: RotationGroup, u: number): RotationPoint | null {
+  const x = group.s26[u];
+  const now = group.s4[u];
+  const before = group.s4[u - MOMENTUM_STEP];
+  if (x == null || now == null || before == null) return null;
+  return { x, y: now - before };
+}
+
+export interface RotationEntry {
+  key: string;
+  label: string;
+  group: RotationGroup;
+  /** Where it is now; null when it has too little history to place. */
+  now: RotationPoint | null;
+  /** The last `tail` weeks up to now, oldest first (gaps dropped). */
+  tail: RotationPoint[];
+  quadrant: Quadrant | null;
+  /** The quadrant it was in four weeks ago. */
+  before: Quadrant | null;
+  changed: boolean;
+}
+
+/**
+ * A group placed on the map: its position now, the tail of positions over the last `tail`
+ * weeks, and the quadrant it is in now and was in four weeks ago.
+ */
+export function rotationEntry(group: RotationGroup, tail: number): RotationEntry {
+  const last = group.s26.length - 1;
+  const now = pointAt(group, last);
+  const prev = pointAt(group, last - MOMENTUM_STEP);
+  const points: RotationPoint[] = [];
+  for (let u = Math.max(MOMENTUM_STEP, last - tail); u <= last; u += 1) {
+    const point = pointAt(group, u);
+    if (point) points.push(point);
+  }
+  const quadrant = now ? quadrantOf(now.x, now.y) : null;
+  const before = prev ? quadrantOf(prev.x, prev.y) : null;
+  return {
+    key: group.key,
+    label: group.subgroup ?? group.parent_group,
+    group,
+    now,
+    tail: points,
+    quadrant,
+    before,
+    changed: quadrant !== null && before !== null && quadrant !== before,
+  };
+}
+
+/** A URL-safe name: "Metals & Mining" -> "metals-and-mining". */
+export function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** A stock's tags, or its own sector when the payload carries none. */
+function tagsOf(stock: StockScore): Array<{ parent_group: string; subgroup: string }> {
+  return stock.tags?.length
+    ? stock.tags
+    : [{ parent_group: stock.parent_group, subgroup: stock.subgroup }];
+}
+
+/** The stocks tagged to a parent group (each once, however many of its sub-sectors they are in). */
+export function stocksInGroup(stocks: readonly StockScore[], parentGroup: string): StockScore[] {
+  return stocks.filter((stock) => tagsOf(stock).some((tag) => tag.parent_group === parentGroup));
+}
+
+/** The stocks tagged to one sub-sector. */
+export function stocksInSub(
+  stocks: readonly StockScore[],
+  parentGroup: string,
+  subgroup: string,
+): StockScore[] {
+  return stocks.filter((stock) =>
+    tagsOf(stock).some((tag) => tag.parent_group === parentGroup && tag.subgroup === subgroup),
+  );
+}
+
+/** Mean percentile score of the stocks at one lookback; null when none has one. */
+export function meanScore(stocks: readonly StockScore[], weeks: number): number | null {
+  const values = stocks
+    .map((stock) => stock.scores[String(weeks)])
+    .filter((value): value is number => value != null);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+/** The mean score per lookback, as a score record a strip can draw. */
+export function meanScores(
+  stocks: readonly StockScore[],
+  lookbacks: readonly number[],
+): Record<string, number | null> {
+  return Object.fromEntries(lookbacks.map((weeks) => [String(weeks), meanScore(stocks, weeks)]));
+}
+
+/** Share of the stocks above their 40-week average; null when none has one. */
+export function shareAboveAverage(stocks: readonly StockScore[]): number | null {
+  const known = stocks.filter((stock) => stock.above_ma40 != null);
+  return known.length
+    ? known.filter((stock) => (stock.above_ma40 ?? 0) > 0).length / known.length
+    : null;
+}
+
+/** The median 26-week return of the stocks that have one. */
+export function medianReturn(stocks: readonly StockScore[], weeks = 26): number | null {
+  const values = stocks
+    .map((stock) => stock.returns[String(weeks)])
+    .filter((value): value is number => value != null)
+    .sort((a, b) => a - b);
+  if (!values.length) return null;
+  const mid = Math.floor(values.length / 2);
+  return values.length % 2
+    ? (values[mid] ?? null)
+    : ((values[mid - 1] ?? 0) + (values[mid] ?? 0)) / 2;
+}
+
+/** Where a stock stands among those of its sector: "1 of 5" by composite rank. */
+export function rankInGroup(
+  stock: StockScore,
+  peers: readonly StockScore[],
+): { place: number; of: number } | null {
+  if (stock.composite_rank == null) return null;
+  const ranked = peers.filter((peer) => peer.composite_rank != null);
+  const own = stock.composite_rank;
+  return {
+    place: ranked.filter((peer) => (peer.composite_rank ?? 0) < own).length + 1,
+    of: ranked.length,
+  };
+}
+
+// --- The rows behind the map and its table ---------------------------------------------------
+
+/** Longest tail the map can draw, in weeks, and the choices it offers. */
+export const TAIL_CHOICES = [4, 8, 13] as const;
+
+export interface RotationRow {
+  entry: RotationEntry;
+  /** The stocks tagged to the group. */
+  stocks: StockScore[];
+  /** Their mean score at each lookback, for the strip. */
+  strip: Record<string, number | null>;
+  /** Share of them above their 40-week average. */
+  above: number | null;
+  /** Gets a dot on the map; false rows are in the table only. */
+  onMap: boolean;
+  /** Why a row has no dot, when it does not. */
+  why: string | null;
+}
+
+export interface RotationRowOptions {
+  tail: number;
+  /** Fewest scored stocks for a dot. */
+  minStocks: number;
+  /** Free text over the group's name. */
+  query: string;
+  /** Only the groups that crossed into another quadrant in the last 4 weeks. */
+  changedOnly: boolean;
+  lookbacks: readonly number[];
+}
+
+/**
+ * The rows for a set of groups (parent groups, or the sub-sectors of one): each placed on the
+ * map, with its stocks and strip for the table. Theme baskets, groups with too few scored stocks
+ * and groups with too little history are table-only, said so in `why`. `changedOnly` keeps just
+ * the groups that moved quadrant. Strongest 26-week score first, table-only rows last.
+ */
+export function buildRotationRows(
+  groups: readonly RotationGroup[],
+  stocksOf: (group: RotationGroup) => StockScore[],
+  options: RotationRowOptions,
+): RotationRow[] {
+  const needle = options.query.trim().toLowerCase();
+  const rows: RotationRow[] = [];
+  for (const group of groups) {
+    const entry = rotationEntry(group, options.tail);
+    if (needle && !entry.label.toLowerCase().includes(needle)) continue;
+    let why: string | null = null;
+    if (group.theme) why = 'a theme basket, not a sector';
+    else if (entry.now === null) why = 'too little history';
+    else if (group.scored_count < options.minStocks)
+      why = `fewer than ${options.minStocks} scored stocks`;
+    if (options.changedOnly && (why !== null || !entry.changed)) continue;
+    const stocks = stocksOf(group);
+    rows.push({
+      entry,
+      stocks,
+      strip: meanScores(stocks, options.lookbacks),
+      above: shareAboveAverage(stocks),
+      onMap: why === null,
+      why,
+    });
+  }
+  return rows.sort(
+    (a, b) =>
+      Number(b.onMap) - Number(a.onMap) ||
+      (b.entry.group.s26.at(-1) ?? Number.NEGATIVE_INFINITY) -
+        (a.entry.group.s26.at(-1) ?? Number.NEGATIVE_INFINITY),
+  );
+}
+
+/** The sector group a URL slug names, among the parent groups. */
+export function groupBySlug(
+  groups: readonly RotationGroup[],
+  slug: string | null,
+): RotationGroup | null {
+  return slug ? (groups.find((group) => slugify(group.parent_group) === slug) ?? null) : null;
+}
+
+/** The sub-sector a `?sub=` slug names, within one parent group. */
+export function subBySlug(
+  subs: readonly RotationGroup[],
+  parentGroup: string,
+  slug: string | null,
+): RotationGroup | null {
+  return slug
+    ? (subs.find(
+        (sub) => sub.parent_group === parentGroup && slugify(sub.subgroup ?? '') === slug,
+      ) ?? null)
+    : null;
+}
+
+/** Where a group's 26-week score stands among the sector groups (theme baskets left out). */
+export function strengthRank(
+  group: RotationGroup,
+  groups: readonly RotationGroup[],
+): { place: number; of: number } | null {
+  const score = group.s26.at(-1);
+  if (score == null) return null;
+  const peers = groups.filter((g) => !g.theme && g.s26.at(-1) != null);
+  return { place: peers.filter((g) => (g.s26.at(-1) ?? 0) > score).length + 1, of: peers.length };
+}

@@ -2078,3 +2078,33 @@ def test_broad_circuit_card_is_a_section_built_from_the_runs_own_prices(broad_cl
     assert whole["circuit_exposure"] == {"lc": [{"n": 1}], "realism": {"cagr_impact": 0.5}}
     for name in LAZY:
         assert _as_json(sections[name]) == _as_json(whole[name]), name
+
+
+def test_the_stock_drawer_endpoint_returns_history_and_404s_for_an_unscored_symbol(
+    client, monkeypatch
+):
+    import pandas as pd
+
+    from momentum_backtesting.categories import broad
+
+    weeks = [pd.Timestamp("2020-01-03") + pd.Timedelta(weeks=i) for i in range(90)]
+    frame = pd.DataFrame(
+        {f"S{i}": [100 * (1 + 0.01 - i * 0.002) ** w for w in range(90)] for i in range(5)},
+        index=weeks,
+    )
+    universe = broad.StockUniverseFrame(
+        frame=frame,
+        weeks=weeks,
+        column_to_base_symbol={c: c for c in frame.columns},
+        stock_membership=pd.DataFrame(True, index=weeks, columns=frame.columns),
+        events=pd.DataFrame(),
+        stale_columns={},
+        missing_symbols=[],
+    )
+    monkeypatch.setattr(api.DATA, "get_momentum_universe", lambda: universe)
+
+    ok = client.get("/api/momentum-scores/stock/S2")
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["symbol"] == "S2" and len(body["closes"]) == 53 and len(body["ranks"]) == 26
+    assert client.get("/api/momentum-scores/stock/NOPE").status_code == 404

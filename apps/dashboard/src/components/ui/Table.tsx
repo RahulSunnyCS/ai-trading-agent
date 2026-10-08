@@ -79,17 +79,28 @@ export function TRow({
   className,
   onClick,
   selected,
+  highlighted,
+  onHover,
 }: {
   children: ReactNode;
   className?: string;
   /** Makes the whole row a control: clickable, focusable, and activated by Enter or Space. */
   onClick?: (() => void) | undefined;
   selected?: boolean | undefined;
+  /** Lit from elsewhere (a hovered dot on a map that this row is also on). */
+  highlighted?: boolean | undefined;
+  /** Called with true when the pointer or focus enters the row, false when it leaves. */
+  onHover?: ((hovering: boolean) => void) | undefined;
 }) {
   return (
     <tr
+      onMouseEnter={onHover ? () => onHover(true) : undefined}
+      onMouseLeave={onHover ? () => onHover(false) : undefined}
+      onFocus={onHover ? () => onHover(true) : undefined}
+      onBlur={onHover ? () => onHover(false) : undefined}
       className={cn(
         'border-b border-border/60 transition-colors hover:bg-surface-2/50',
+        highlighted && 'bg-surface-2/60',
         onClick &&
           'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
         selected && 'bg-surface-2/60',

@@ -238,6 +238,13 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       'How many stocks are taking part in a move, such as the share above their 40-week average or up over 13 weeks. Momentum strategies work best when breadth is wide.',
   },
   {
+    id: 'rotation-map',
+    term: 'Rotation map',
+    group: 'Momentum',
+    short:
+      'A chart that places each sector group by its 26-week strength (left to right) and by whether its 4-week strength is rising or falling (bottom to top). The corners are Leading, Weakening, Lagging and Improving; groups tend to travel round them clockwise.',
+  },
+  {
     id: 'rank-sum',
     term: 'Rank-sum score',
     group: 'Momentum',

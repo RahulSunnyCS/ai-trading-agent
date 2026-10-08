@@ -1573,7 +1573,22 @@ def _momentum_scores_payload() -> dict:
         sector_snapshot,
         missing_symbols=universe.missing_symbols,
         membership_quality=_membership_quality(),
+        rotation=momentum_scores_mod.compute_rotation(universe, group_members),
     )
+
+
+def _momentum_stock_payload(symbol: str) -> dict:
+    """The stock drawer's own data (BL-049): price with its 40-week average, score history and
+    rank history for one stock. Fetched when the drawer opens, so the page's own payload stays
+    small."""
+    try:
+        universe = DATA.get_momentum_universe()
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    detail = momentum_scores_mod.stock_detail(universe, symbol)
+    if detail is None:
+        raise HTTPException(404, f"{symbol} is not scored this week.")
+    return detail
 
 
 def _run_broad(
@@ -2960,6 +2975,10 @@ def create_app() -> FastAPI:
     @app.get("/api/momentum-scores")
     def momentum_scores() -> dict:
         return _momentum_scores_payload()
+
+    @app.get("/api/momentum-scores/stock/{symbol}")
+    def momentum_scores_stock(symbol: str) -> dict:
+        return _momentum_stock_payload(symbol)
 
     @app.get("/api/liquidity-preview")
     def liquidity_preview(
