@@ -96,6 +96,18 @@ describe('StockDrawer', () => {
     );
   });
 
+  it('counts the rank against the ranked stocks, not every scored one', async () => {
+    setup({
+      stocks: [
+        stock('AAA'),
+        stock('BBB'),
+        stock('CCC', { composite_rank: null, composite_rank_prev: null }),
+      ],
+    });
+    await act(async () => {});
+    expect(document.body.textContent).toMatch(/Rank 27 of 2\b/);
+  });
+
   it('steps to the neighbours in the list it was opened from', async () => {
     const calls = setup({ symbol: 'BBB' });
     await act(async () => {});

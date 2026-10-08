@@ -186,6 +186,21 @@ describe('StocksLeaderboard', () => {
     expect(all).toHaveLength(1);
   });
 
+  it('leaves "/" alone in the top variant, which has no search box', () => {
+    render(
+      <StocksLeaderboard
+        stocks={STOCKS}
+        lookbacks={LOOKBACKS}
+        zone={DEFAULT_BUY_ZONE}
+        marks={undefined}
+        scoredCount={STOCKS.length}
+        heading="Strongest stocks right now"
+        top={{ limit: 10, onShowAll: () => {} }}
+      />,
+    );
+    expect(fireEvent.keyDown(window, { key: '/' })).toBe(true); // not default-prevented
+  });
+
   it('shows a removable filter chip', () => {
     const cleared: number[] = [];
     render(
