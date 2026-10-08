@@ -74,7 +74,7 @@ import pandas as pd
 
 from momentum_backtesting import engine
 from momentum_backtesting import tax as tax_mod
-from momentum_backtesting.categories import compose, snapshots, sources
+from momentum_backtesting.categories import compose, daily_moves, snapshots, sources
 from momentum_backtesting.categories import liquidity as liquidity_mod
 from momentum_backtesting.categories import prices as cat_prices
 from momentum_backtesting.categories.liquidity import LiquidityConfig
@@ -1166,6 +1166,10 @@ def run_broad_backtest(
     # BL-054 L1: engine.Config.tax_hold_band / tax_hold_weeks (inert without `tax`).
     tax_hold_band: int = 0,
     tax_hold_weeks: int = 0,
+    # BL-054 L4: "daily" checks the stop every day and sells at the next open; the daily moves are
+    # read from the daily bars here unless a caller passes them.
+    stop_granularity: Literal["weekly", "daily"] = "weekly",
+    daily: daily_moves.DailyMoves | None = None,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1337,7 +1341,14 @@ def run_broad_backtest(
         stop_delay=stop_delay,
         tax_hold_band=tax_hold_band,
         tax_hold_weeks=tax_hold_weeks,
+        stop_granularity=stop_granularity,
     )
+    if stop_granularity == "daily" and daily is None:
+        daily = daily_moves.daily_moves(
+            {col: col.split("#", 1)[0] for col in prices.columns},
+            str(prices.index[0].date()),
+            str(prices.index[-1].date()),
+        )
     result = engine.run_backtest(
         prices,
         includes,
@@ -1352,6 +1363,7 @@ def run_broad_backtest(
         no_buy=over_ceiling.reindex(prices.index) if over_ceiling is not None else None,
         uc_locked=uc_locked,
         lc_locked=lc_locked,
+        daily=daily,
         tax_classes=_tax_classes(list(prices.columns)) if tax is not None else None,
     )
     return BroadBacktestResult(

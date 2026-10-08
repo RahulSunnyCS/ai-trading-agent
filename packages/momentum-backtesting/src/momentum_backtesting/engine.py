@@ -41,7 +41,7 @@ import functools
 import math
 import operator
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
@@ -53,6 +53,9 @@ GILT = "Gilt 8-13 yr"
 BENCHMARK = "Nifty 50"
 IDLE = "Idle cash"  # money parked in the liquid fund because nothing qualified
 _POOL = "__pool__"  # the buffer rule's idle-money position, priced as the liquid fund
+if TYPE_CHECKING:  # categories imports this module: type-only, no cycle at run time
+    from .categories.daily_moves import DailyMoves
+
 MIN_TRADE = 0.005  # don't move parked cash for less than 0.5% of the portfolio
 _LIQUID_FUND = frozenset({CASH, _POOL, IDLE})  # every name the liquid fund goes by
 
@@ -199,6 +202,10 @@ class Config:
     # join that week's normal reinvestment.
     stop_proceeds: Literal["cash", "top"] = "cash"
     stop_delay: int = 0
+    # "daily" (BL-054 L4): the stop is checked on every trading day's close, and a triggered
+    # stop sells at the NEXT session's open (a lower-circuit lock delays it). Needs `daily` moves
+    # passed to run_backtest and stop_delay 0. "weekly" is the BL-053 behaviour.
+    stop_granularity: Literal["weekly", "daily"] = "weekly"
     # flat = cost_pct on both sides (today's model, unchanged). itemised = STT/stamp duty/
     # exchange fees/slippage/DP charge - see the rate constants above `Config`.
     cost_model: CostModel = "flat"
@@ -257,6 +264,10 @@ class Config:
             raise ValueError(f"unknown stop_proceeds {self.stop_proceeds!r}")
         if self.stop_delay not in (0, 1):
             raise ValueError("stop_delay must be 0 or 1")
+        if self.stop_granularity not in ("weekly", "daily"):
+            raise ValueError(f"unknown stop_granularity {self.stop_granularity!r}")
+        if self.stop_granularity == "daily" and (not self.has_stop or self.stop_delay != 0):
+            raise ValueError("a daily stop needs a stop level and stop_delay 0")
         if self.has_stop and self.portfolio != "buffer":
             raise ValueError("a stop-loss needs portfolio='buffer'")
         if self.min_ranked < 0:
@@ -304,6 +315,7 @@ class Config:
             buy = f"b{round(self.stop_from_buy * 100)}" if self.stop_from_buy else ""
             peak = f"p{round(self.stop_from_peak * 100)}" if self.stop_from_peak else ""
             rebalance += f"_stop{buy}{peak}{self.stop_proceeds}d{self.stop_delay}"
+            rebalance += "_daily" if self.stop_granularity == "daily" else ""
         cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
@@ -541,6 +553,8 @@ class _Sim:
     # (default) leave the engine exactly as before.
     uc_locked: pd.DataFrame | None = None
     lc_locked: pd.DataFrame | None = None
+    # Daily stop only (BL-054): per-day moves, open gaps and lock flags. See DailyMoves.
+    daily: "DailyMoves | None" = None
     # The tables above, read by position (see `_Grid`). Built once, here: nothing replaces a table
     # on a sim after it is made.
     _prices: _Grid | _FrameGrid = field(init=False, repr=False)
@@ -787,6 +801,7 @@ def run_backtest(
     no_buy: pd.DataFrame | None = None,
     uc_locked: pd.DataFrame | None = None,
     lc_locked: pd.DataFrame | None = None,
+    daily: "DailyMoves | None" = None,
 ) -> Result:
     """`rank_cache` lets a sweep reuse the (slow) ranking when only top_n/exit/mode differ.
     `trade_prices` (signal week x instrument) is what trades fill at and holdings are valued
@@ -829,6 +844,8 @@ def run_backtest(
     circuit cannot be sold or trimmed (so it is held through, and marked down, until the lock
     lifts). Unlike `no_buy` they are not shifted by `signal_delay`. See
     categories/circuit_exposure.py for how they are built."""
+    if config.stop_granularity == "daily" and daily is None:
+        raise ValueError("stop_granularity='daily' needs daily moves (categories.daily_moves)")
     names = ranked_universe(includes, config)
     missing = [n for n in [*names, CASH, config.benchmark] if n not in prices]
     if missing:
@@ -925,6 +942,7 @@ def run_backtest(
         no_buy=no_buy,
         uc_locked=uc_locked,
         lc_locked=lc_locked,
+        daily=daily,
     )
     outcome = _run_slots(sim, weeks) if config.portfolio == "slots" else _run_buffer(sim, weeks)
 
@@ -1238,10 +1256,15 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         in_gain = oldest["units"] * sim.price(asset, week) > oldest["basis"]
         return config.tax_hold_band if in_gain else 0
 
-    def sell(asset: str, fraction: float, week) -> tuple[float, float, float, dict]:
+    def sell(
+        asset: str, fraction: float, week, price: float | None = None, day=None
+    ) -> tuple[float, float, float, dict]:
         """Sell `fraction` of every lot. Returns (gross value, net proceeds, tax, fill details
-        for `sim.record`)."""
-        price, before = sim.price(asset, week), units_held(asset)
+        for `sim.record`). `price` and `day` override the week's fill price and date (the daily
+        stop sells at a morning's open)."""
+        price = sim.price(asset, week) if price is None else price
+        before = units_held(asset)
+        when = week if day is None else day
         # Gross first, so the itemised cost's DP-charge fraction (which depends on the total
         # value_fraction sold) is computed once and applied consistently across every lot.
         gross = sum(lot["units"] * fraction * price for lot in lots[asset])
@@ -1250,7 +1273,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         for lot in lots[asset]:
             units, basis = lot["units"] * fraction, lot["basis"] * fraction
             lot_gross = units * price
-            tax += sim.tax(asset, lot_gross * (1 - sell_frac) - basis, (week - lot["since"]).days)
+            tax += sim.tax(asset, lot_gross * (1 - sell_frac) - basis, (when - lot["since"]).days)
             lot["units"] -= units
             lot["basis"] -= basis
         if fraction >= 1 - 1e-12:
@@ -1290,13 +1313,76 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                 return f"stop: {fall:.0%} below the peak"
         return None
 
+    daily = sim.daily if config.stop_granularity == "daily" else None
+    run_price: dict[str, float] = {}  # daily stop: a holding's running price
+    run_peak: dict[str, float] = {}  # ... and its highest running price since it was bought
+    pending: dict[str, str] = {}  # ... stops triggered, awaiting a morning they can sell in
+
+    def daily_walk(week, nxt) -> float:
+        """BL-054 L4. Walk the trading days in (week, nxt] over what is held after this week's
+        trades. Each day's close can trigger a stop, which sells at the next session's open (not
+        on a locked day). The running price follows the exchange's daily moves and is re-anchored
+        to the weekly price at nxt, so the weekly series stays authoritative. Returns the cash
+        raised, which waits for the next rebalance."""
+        raised = 0.0
+        for a in [a for a in run_price if a not in lots]:
+            run_price.pop(a), run_peak.pop(a, None), pending.pop(a, None)
+        for a in lots:
+            if a != _POOL and a not in run_price:
+                run_price[a] = run_peak[a] = sim.price(a, week)
+        for d in daily.days_between(week, nxt):
+            for a in [a for a in lots if a != _POOL and a in daily.move.columns]:
+                before = run_price[a]
+                if a in pending and not daily.locked.at[d, a]:
+                    fill = before * (1 + daily.open_gap.at[d, a])
+                    position = lots[a]
+                    since = min(lot["since"] for lot in position)
+                    basis = sum(lot["basis"] for lot in position)
+                    value_before = units_held(a) * fill
+                    note = f"{pending.pop(a)}, sold at the {d.date()} open"
+                    _, net, tax, fill_info = sell(a, 1.0, week, price=fill, day=d)
+                    details = {
+                        "entry_week": since,
+                        "entry_value": basis,
+                        "weeks_held": (d - since).days / 7,
+                        "price_return": fill / sim.price(a, since) - 1,
+                        "position_return": value_before / basis - 1 if basis else float("nan"),
+                    }
+                    sim.record(week, "SELL", a, note, value_before, tax=tax, **details, **fill_info)
+                    run_price.pop(a), run_peak.pop(a, None)
+                    raised += net
+                    continue
+                price = before * (1 + daily.move.at[d, a])
+                run_price[a] = price
+                run_peak[a] = max(run_peak[a], price)
+                if a in pending:
+                    continue  # locked this morning: still waiting
+                units = units_held(a)
+                bought = sum(lot["basis"] for lot in lots[a]) / units if units > 0 else price
+                if config.stop_from_buy is not None and 1 - price / bought >= config.stop_from_buy:
+                    fall, what = 1 - price / bought, "buy price"
+                elif (
+                    config.stop_from_peak is not None
+                    and 1 - price / run_peak[a] >= config.stop_from_peak
+                ):
+                    fall, what = 1 - price / run_peak[a], "peak"
+                else:
+                    continue
+                pending[a] = f"daily stop: {fall:.0%} below the {what} at the {d.date()} close"
+        for a in lots:
+            weekly = sim.price(a, nxt) if a != _POOL else math.nan
+            if a in run_price and weekly > 0 and run_price[a] > 0:
+                run_peak[a] *= weekly / run_price[a]
+                run_price[a] = weekly
+        return raised
+
     for i, week in enumerate(weeks[:-1]):
         proceeds, uninvested = uninvested, 0.0
 
         is_buy_week = week in sim.trade_weeks
         stopped: set[str] = set()
         stop_net = 0.0
-        if config.has_stop:
+        if config.has_stop and daily is None:
             # 0. Stop-loss, every week (BL-053), before the rank exits.
             for asset in [a for a in lots if a != _POOL]:
                 reason = stop_reason(asset, i)
@@ -1518,6 +1604,8 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         )
 
         nxt = weeks[i + 1]
+        if daily is not None:
+            uninvested += daily_walk(week, nxt)
         equity[nxt] = sum(value(a, nxt) for a in lots) + uninvested
 
     last = weeks[-1]
