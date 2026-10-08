@@ -704,3 +704,29 @@ export interface MomentumLiveRules {
     error: string | null;
   } | null;
 }
+
+export type MomentumAlertKind = 'split' | 'data' | 'journal' | 'change' | 'rules';
+export type MomentumAlertSeverity = 'error' | 'warning' | 'info';
+
+/** One thing that needs a person (`GET /api/momentum/alerts`). The id is stable (kind + subject). */
+export interface MomentumAlert {
+  id: string;
+  kind: MomentumAlertKind;
+  severity: MomentumAlertSeverity;
+  title: string;
+  detail: string;
+  /** An in-app path with its query, where the alert is acted on. */
+  link: string;
+  opened_at: string | null;
+  resolved_at: string | null;
+}
+
+export interface MomentumAlertsResponse {
+  checked_at: string;
+  /** Open alerts, most severe first. */
+  alerts: MomentumAlert[];
+  /** The latest ones that cleared. */
+  resolved: MomentumAlert[];
+  /** Kinds that could not be checked this time; their open alerts are kept. */
+  unchecked: MomentumAlertKind[];
+}

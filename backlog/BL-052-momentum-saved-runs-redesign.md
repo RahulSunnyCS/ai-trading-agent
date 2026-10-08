@@ -299,4 +299,6 @@ Answered by the owner on 2026-10-08 (see the Log):
   chart now leaves out the overlay of the strategy on screen by fingerprint (the old "skip the
   first run in the list" rule hid an arbitrary run); the drawer draws the strategy's own curve
   only (no tradable twin yet: that needs the twin found by settings, left for Phase 3's findings).
-
+- 2026-10-08 — the alert-bell follow-up is done in BL-051 Phase 5: an unreviewed Check (warning) or
+  Not reproducible (error) change is an alert whose link opens the strategy's drawer on Saved
+  runs (`/momentum/saved?strategy=<id>`); **Mark reviewed** there resolves it.

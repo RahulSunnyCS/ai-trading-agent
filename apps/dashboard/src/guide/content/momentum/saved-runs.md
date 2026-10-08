@@ -49,7 +49,8 @@ code. When the same settings give a different result, they say why:
 | Unknown | Saved before runs recorded their code and data. |
 
 A **Check** or **Not reproducible** change counts on the Saved runs tab until you choose
-**Mark reviewed** in the drawer. Every change is also kept in a log on the server.
+**Mark reviewed** in the drawer, and also appears as an [alert](guide:start/alerts) in the bell
+and pops up once a day on any screen. Every change is also kept in a log on the server.
 
 ## Favourites, their status and the headline
 
