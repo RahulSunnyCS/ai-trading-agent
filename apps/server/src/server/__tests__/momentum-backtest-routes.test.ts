@@ -330,6 +330,39 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it("forwards This week's view and the live-rules check, and refuses a week that is not a date", async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { ok: true }));
+
+    expect(
+      (await server.inject({ method: 'GET', url: '/api/momentum/week?week=2026-12-04' }))
+        .statusCode,
+    ).toBe(200);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      'http://127.0.0.1:8765/api/week?week=2026-12-04',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+    await server.inject({ method: 'GET', url: '/api/momentum/week' });
+    expect(fetchMock).toHaveBeenLastCalledWith('http://127.0.0.1:8765/api/week', expect.anything());
+    await server.inject({ method: 'GET', url: '/api/momentum/live-rules' });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      'http://127.0.0.1:8765/api/live-rules',
+      expect.anything(),
+    );
+    await server.inject({ method: 'POST', url: '/api/momentum/live-rules/run' });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      'http://127.0.0.1:8765/api/live-rules/run',
+      expect.objectContaining({ method: 'POST' }),
+    );
+
+    fetchMock.mockClear();
+    const bad = await server.inject({ method: 'GET', url: '/api/momentum/week?week=../x' });
+    expect(bad.statusCode).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await server.close();
+  });
+
   it('rejects a journal week that is not a date, without calling upstream', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

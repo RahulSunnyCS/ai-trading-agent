@@ -27,7 +27,7 @@ renders the shell; `lib/routes.ts` holds the path grammar, `hooks/useAppRoute.ts
 it). Paths: `/<tab>`, `/optionslab/<strategies|builder|runs|results|regimes>`,
 `/optionslab/builder/yaml` (the YAML engine; `/backtest` redirects there),
 `/coverage/<backfill|replay>` (old `/backfill`, `/replay` redirect), `/jobs` (the scheduler's Jobs page, read from `/api/scheduler/*` — needs `SCHEDULER_DIRECT=1`), `/billing` (`/pricing` redirects),
-`/momentum/<backtest|scores|saved|weekly|rebalance|journal>`, `/momentum/backtest/<dataset>`,
+`/momentum/<backtest|scores|saved|week|rebalance|journal>` (`/momentum/weekly` redirects to `week`; This week's state is in the query: `?week=`, `?fav=`, `?panel=run`, `?review=`, `?stock=`), `/momentum/backtest/<dataset>`,
 `/momentum/scores/<stocks|sectors>`, `/guide/<chapter>/<page>` (`/help` and `/docs` redirect). A new sub-tab = add its ids to `lib/routes.ts` and derive
 state from `useAppRoute().rest` — don't add another `useState` for navigation. `useAppRoute`
 moves with `window.history.pushState`/`replaceState`, never `router.push`: every path is the same

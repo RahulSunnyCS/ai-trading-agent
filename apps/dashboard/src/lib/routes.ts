@@ -6,7 +6,7 @@
  *   /live  /trades  /personalities  /pnl  /regime
  *   /optionslab/{strategies|builder|runs|results|regimes}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
- *   /momentum/{backtest|scores|saved|weekly|rebalance|journal}
+ *   /momentum/{backtest|scores|saved|week|rebalance|journal} (old /momentum/weekly redirects)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
  *   /momentum/scores/{stocks|sectors}
  *   /coverage/{backfill|replay}
@@ -77,7 +77,7 @@ export const MOMENTUM_SECTIONS = [
   'backtest',
   'scores',
   'saved',
-  'weekly',
+  'week',
   'rebalance',
   'journal',
 ] as const;
@@ -105,6 +105,8 @@ export interface ParsedRoute {
  * When a later phase renames or merges a screen, its old path goes here.
  */
 export const PATH_ALIASES: Readonly<Record<string, string>> = {
+  // Weekly signal became This week (BL-051 Phase 2).
+  '/momentum/weekly': '/momentum/week',
   // Pricing was renamed Billing (BL-013 Phase 8).
   '/pricing': '/billing',
   '/brokers': '/brokerLogins',

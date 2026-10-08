@@ -2730,6 +2730,11 @@ def live_rules_check(
         return
     expected = str(week_ending_on_or_before(datetime.now(notify.IST).date()))
     if not simulate and report.week is not None and report.week < expected:
+        from .this_week import state_dir
+
+        live_rules.save_last(
+            report, "error", "Live-rules check ran on stale data", state_dir(), stale=expected
+        )
         fail(
             f"the data reaches {report.week}, not this week's {expected}: run `mbt stocks sync` "
             "then rerun.",
@@ -2737,6 +2742,10 @@ def live_rules_check(
         )
     severity, title, body = live_rules.summary(report)
     typer.echo(f"{title}\n{body}")
+    if not simulate:
+        from .this_week import state_dir
+
+        live_rules.save_last(report, severity, title, state_dir())
     if send:
         notify.send(
             notify.Notification(

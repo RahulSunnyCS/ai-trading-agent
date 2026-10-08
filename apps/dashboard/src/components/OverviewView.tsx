@@ -69,7 +69,7 @@ const OPTIONS_UNREACHABLE = "Can't reach the Options Lab service right now.";
 interface CardLink {
   label: string;
   tab: Tab;
-  /** Sub-route segments, e.g. ['weekly']. */
+  /** Sub-route segments, e.g. ['week']. */
   rest?: string[];
 }
 
@@ -492,7 +492,7 @@ function WeeklySignalCard() {
     <OverviewCard
       title="Weekly momentum signal"
       icon={<LineChart className="h-4 w-4" />}
-      links={[{ label: 'Weekly signal', tab: 'momentum', rest: ['weekly'] }]}
+      links={[{ label: 'This week', tab: 'momentum', rest: ['week'] }]}
     >
       {body}
     </OverviewCard>

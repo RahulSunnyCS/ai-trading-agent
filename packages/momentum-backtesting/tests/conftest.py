@@ -12,6 +12,13 @@ def _isolated_trading_data_root(tmp_path_factory, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolated_state_dir(tmp_path_factory, monkeypatch):
+    """BL-051: the weekly message and live-rules files (`this_week.state_dir()`) go to a temp
+    folder, never the real `data/`."""
+    monkeypatch.setenv("MOMENTUM_STATE_DIR", str(tmp_path_factory.mktemp("momentum_state")))
+
+
+@pytest.fixture(autouse=True)
 def _isolated_environ():
     """A7 fix: `config.load_repo_env()` loads the repo's real `.env` into `os.environ` via
     `os.environ.setdefault` — a direct mutation, not `monkeypatch.setenv`. Several API routes

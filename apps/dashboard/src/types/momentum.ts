@@ -298,7 +298,7 @@ export interface MomentumWeeklyStatus {
   }>;
   signals: Array<{ week: string; run: 'preview' | 'final'; label: string; generated_at: string }>;
   schedule: Array<{
-    run: 'preview' | 'final' | 'stock-ingest' | 'journal-check';
+    run: 'preview' | 'final' | 'stock-ingest' | 'journal-check' | 'live-rules';
     when: string;
     last_ran_at: string | null;
     last_line: string | null;
@@ -431,4 +431,143 @@ export interface MomentumJournal {
   week: string | null;
   entries: MomentumJournalEntry[];
   check: MomentumJournalCheck | null;
+}
+
+// --- This week (BL-051) ---------------------------------------------------------------------
+
+/** One name on a favourite's card: what the signal does with it this week. */
+export interface MomentumWeekRow {
+  asset: string;
+  /** BUY, SELL, TRIM, ADD, HOLD, or an engine action such as TOP UP / WAIT. */
+  action: string;
+  /** The strategy's own rank (a group: the rank in the sleeve that acted on it). */
+  rank: number | null;
+  rank_prev?: number | null;
+  held: boolean;
+  /** Share of the portfolio after this week's trades. */
+  after?: number | null;
+  /** Groups only: share before the trades, and the sleeves holding or trading it. */
+  before?: number;
+  sleeves?: string[] | null;
+}
+
+/** One configuration inside a group, and its rebalance cadence. */
+export interface MomentumWeekSleeve {
+  id: string;
+  name: string;
+  value?: number;
+  on_cadence?: boolean;
+  every?: number | null;
+  offset?: number | null;
+  next?: string | null;
+}
+
+export interface MomentumWeekEdgeName {
+  asset: string;
+  rank: number;
+  rank_prev?: number | null;
+}
+
+/** Next week's likely trades: the weakest names held and the strongest not held. */
+export interface MomentumWeekEdge {
+  /** Groups: the sleeve that trades next, and when. */
+  sleeve: string | null;
+  on: string | null;
+  weakest_held: MomentumWeekEdgeName[];
+  strongest_not_held: MomentumWeekEdgeName[];
+}
+
+export interface MomentumWeekCard {
+  id: string;
+  name: string;
+  status: FavouriteStatus | null;
+  headline: boolean;
+  dataset: string;
+  group: boolean;
+  sleeves: MomentumWeekSleeve[] | null;
+  run: 'preview' | 'final' | null;
+  recorded_at: string | null;
+  blocked: string | null;
+  rows: MomentumWeekRow[];
+  held: string[];
+  cash: number | null;
+  exit_rank: number | null;
+  explain: string | null;
+  edge: MomentumWeekEdge | null;
+  since_preview: {
+    added: Array<{ asset: string; action: string }>;
+    dropped: Array<{ asset: string; action: string }>;
+  } | null;
+  trades: number;
+  shared_with_headline: number | null;
+}
+
+/** The message a weekly run produced for the headline, as sent (or held back). */
+export interface MomentumWeekMessage {
+  week: string | null;
+  run: string;
+  title: string;
+  body: string;
+  sent: boolean;
+  headline: string | null;
+  at: string;
+}
+
+/** `GET /api/momentum/week`. */
+export interface MomentumWeekView {
+  week: string;
+  target_week: string;
+  /** Weeks with journal entries, newest first. */
+  weeks: string[];
+  favourites: MomentumWeekCard[];
+  message: MomentumWeekMessage | null;
+}
+
+export interface MomentumLiveRulesFinding {
+  rule: 'drawdown' | 'trailing' | 'money_gate' | 'stage' | 'data';
+  level: 'ok' | 'breach' | 'pending' | 'ready' | 'unmeasurable' | 'blocked';
+  title: string;
+  detail: string;
+  action: string | null;
+  needs_you: boolean;
+}
+
+/** The latest live-money rules check (BL-025), as the 21:30 job or a manual check saved it. */
+export interface MomentumLiveRulesReport {
+  checked_at: string;
+  severity: string;
+  title: string;
+  stage: string;
+  week: string | null;
+  weeks: number;
+  breached: boolean;
+  /** The week the check should have covered, when its data was older. */
+  stale: string | null;
+  numbers: Partial<{
+    drawdown: number;
+    worst_drawdown: number;
+    peak_week: string;
+    cut_half_at: number;
+    exit_at: number;
+    weeks: number;
+    min_paper_weeks: number;
+    return: number;
+    benchmark_return: number;
+    must_beat: string;
+    trailing_window_weeks: number;
+    review_when_behind_pts: number;
+  }>;
+  findings: MomentumLiveRulesFinding[];
+}
+
+/** `GET /api/momentum/live-rules`. */
+export interface MomentumLiveRules {
+  report: MomentumLiveRulesReport | null;
+  job: {
+    id: string;
+    status: 'running' | 'done' | 'failed';
+    started_at: string;
+    finished_at: string | null;
+    error: string | null;
+  } | null;
 }

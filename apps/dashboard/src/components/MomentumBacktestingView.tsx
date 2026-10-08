@@ -71,9 +71,9 @@ import {
   settingsSectionDomId,
 } from './momentum/MomentumSettingsPanel';
 import { MomentumSettingsSkeleton } from './momentum/MomentumSkeletons';
-import { MomentumWeeklyView } from './momentum/MomentumWeeklyView';
 import { MomentumRunBar } from './momentum/backtest/MomentumRunBar';
 import { MomentumSettingsChips } from './momentum/backtest/MomentumSettingsChips';
+import { ThisWeekView } from './momentum/week/ThisWeekView';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Drawer } from './ui/Drawer';
@@ -101,9 +101,10 @@ const SECTIONS: Array<{ id: MomentumSection; label: string; description: string 
     description: 'Review and compare saved backtests for the selected dataset.',
   },
   {
-    id: 'weekly',
-    label: 'Weekly signal',
-    description: 'Check the latest signal, schedule, and data readiness.',
+    id: 'week',
+    label: 'This week',
+    description:
+      "Friday's signal for every favourite, the steps of the day, your live-money rules and what needs you.",
   },
   {
     id: 'rebalance',
@@ -937,7 +938,7 @@ export function MomentumBacktestingView() {
             <span
               className="inline-flex min-h-7 items-center gap-2"
               title={
-                item.id === 'weekly' && weekly.running
+                item.id === 'week' && weekly.running
                   ? 'Weekly signal is running in the background'
                   : undefined
               }
@@ -950,7 +951,7 @@ export function MomentumBacktestingView() {
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
                 </span>
               ) : null}
-              {item.id === 'weekly' && weekly.running ? (
+              {item.id === 'week' && weekly.running ? (
                 <span className="relative flex h-2 w-2" aria-label="running">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
@@ -975,8 +976,8 @@ export function MomentumBacktestingView() {
       >
         {section === 'scores' ? (
           <MomentumScoresView />
-        ) : section === 'weekly' ? (
-          <MomentumWeeklyView weekly={weekly} />
+        ) : section === 'week' ? (
+          <ThisWeekView weekly={weekly} />
         ) : section === 'journal' ? (
           <MomentumJournalView />
         ) : section === 'rebalance' ? (
