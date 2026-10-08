@@ -2,13 +2,14 @@
 
 | | |
 |---|---|
-| **Priority** | P2 — research on top of a strategy that is only now entering paper trading; this month's commitment is BL-010/001/024/025 |
+| **Priority** | P1 — set by the owner (2026-10-08); research only, so nothing live is at risk |
 | **Status** | Planned |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-07 |
 | **Depends on** | BL-015 (pre-registration); BL-010 Phase 6 (the frozen ensemble is the comparator); BL-024 (the journal carries the Phase 4 shadow arm); BL-001 (goldens prove the default output is unchanged) |
 | **TODO.md row** | — (filled in when started) |
+| **Handoff** | [`docs/handover-bl050-filter-poc.md`](../docs/handover-bl050-filter-poc.md): paste-ready planning and working prompts, and which steps need the laptop |
 
 ## Context
 
@@ -223,3 +224,5 @@ To confirm when this is started:
   recorded in Context. Owner decisions: Broad only, fundamentals not required, forward shadow
   tracking as the deciding test. RS-momentum candidate withdrawn (it reduces to a lookback).
   Status `Planned`, P2.
+- 2026-10-08 — Re-prioritised P2 → P1 by the owner. Handoff prompts added in
+  `docs/handover-bl050-filter-poc.md`.
