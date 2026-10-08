@@ -423,7 +423,7 @@ The system is a **real-time event-driven pipeline** in four layers:
   hook on Bash) refuses `gh pr merge` while any check is failing or pending, `--admin`, a PR over
   500 changed lines (data, fixtures and lockfiles excluded) without the `reviewed` label, and a
   push to `main` that changes anything but `*.md` outside `packages/*/src/`. Add `reviewed` only
-  after `/code-review` has run and its result is on the PR
+  after `/code-review` has run and its result is on the PR. `/code-review-merge` (`.claude/skills/code-review-merge/`) automates the whole loop: Opus review, Haiku CI poller every 5 minutes, merge, sync local `main`
 - **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
   the chart palette helpers (`lib/chartTheme.ts`) and the font setup (self-hosted `next/font/local`, IBM Plex
   Sans / Mono) are in `docs/dashboard-design-tokens.md`
