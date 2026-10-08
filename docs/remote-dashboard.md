@@ -189,6 +189,16 @@ limited to this account and the `codifie.dev` zone (add Zone → DNS → Edit if
 about the custom domain); then store it with `gh secret set CLOUDFLARE_API_TOKEN` (the value is
 typed at the prompt). The account ID and the four build values in the workflow are not secret.
 The runner has no repo-root `.env`, and `cf:deploy` still refuses to ship a bundle with any env in it.
+Without the secret the workflow fails at its first step with that message, on every push to `release`.
+
+**Do not also connect the repository to the Worker in Cloudflare's dashboard** (Workers & Pages →
+`ata-dashboard` → Settings → Build → Git repository). That is Workers Builds, Cloudflare's own CI: it
+builds every push on every branch, posts a "Workers Builds: ata-dashboard" check and a "Deploying
+Preview to Cloudflare" comment on each PR, and with the default build settings (repository root, no
+`wrangler.jsonc` there) it fails in the same second it starts, so every PR shows a red check that has
+nothing to do with its code and the merge guard refuses `gh pr merge`. The repo's deploy path is the
+workflow above and only `release`; if the Worker is connected, disconnect it there. A PR whose head
+commit already carries the failed check needs one more push (any commit) for a clean head.
 
 **Second laptop:** put the variables in `apps/dashboard/.env.local`, then
 
