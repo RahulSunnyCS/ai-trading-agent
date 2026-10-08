@@ -148,6 +148,9 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
 });
 
 test('Momentum Scores exposes stock and sector details', async ({ page }) => {
+  const lookbacks = [1, 2, 4, 8, 13, 26, 52];
+  const byLookback = (value: (weeks: number) => number) =>
+    Object.fromEntries(lookbacks.map((weeks) => [String(weeks), value(weeks)]));
   await page.route('**/api/momentum/scores', (route) =>
     route.fulfill({
       status: 200,
@@ -155,7 +158,14 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
       body: JSON.stringify({
         as_of: '2024-01-19',
         universe_size: 1,
-        lookbacks: [4, 13, 26],
+        ranked_count: 1,
+        lookbacks,
+        breadth: {
+          above_ma40: { now: 0.6, week_ago: 0.55, month_ago: 0.5 },
+          positive_13w: { now: 0.58, week_ago: 0.5 },
+          median_26w: 0.08,
+          top_decile_26w: 0.4,
+        },
         missing_symbols: [],
         stocks: [
           {
@@ -163,10 +173,15 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
             company_name: 'Test Company',
             parent_group: 'Industry',
             subgroup: 'Metals',
+            tags: [{ parent_group: 'Industry', subgroup: 'Metals' }],
             last_price: 120,
             change_1w_pct: 0.02,
-            returns: { '4': 0.08, '13': 0.12, '26': 0.2 },
-            scores: { '4': 75, '13': 80, '26': 90 },
+            returns: byLookback((weeks) => (weeks === 13 ? 0.12 : weeks === 26 ? 0.2 : 0.08)),
+            scores: byLookback(() => 95),
+            composite_rank: 1,
+            composite_rank_prev: 4,
+            high_52w_gap: -0.03,
+            spark: Array.from({ length: 26 }, (_, i) => 100 + i),
           },
         ],
         sectors: [
@@ -176,23 +191,27 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
             subgroup: 'Metals',
             member_count: 2,
             qualifying_count: 1,
-            scores: { '4': 75, '13': 80, '26': 90 },
+            scores: byLookback(() => 95),
           },
         ],
       }),
     }),
   );
 
-  await page.goto('/momentum/scores');
-  await expect(page.getByText('Test Company')).toBeVisible();
-  // Raw returns sit beside each score pill; stock rows no longer expand.
+  await page.goto('/momentum/scores/stocks');
+  await expect(page.getByRole('region', { name: 'Market momentum' })).toContainText('60%');
   const stockRow = page.getByRole('row', { name: /Test Company/ });
-  await expect(stockRow).toContainText('+8.0%');
-  await expect(stockRow).toContainText('+2.00%');
+  await expect(stockRow).toBeVisible();
+  // Rank 1, up three places, the 13 and 26-week returns and the price beside the strip.
+  await expect(stockRow).toContainText('▲3');
+  await expect(stockRow).toContainText('+12.0%');
+  await expect(stockRow).toContainText('+20.0%');
+  await expect(stockRow).toContainText('₹120');
+  await expect(stockRow.getByRole('img', { name: /Deciles by lookback/ })).toBeVisible();
   await page.getByRole('radio', { name: 'Sectors', exact: true }).click();
   await page.getByRole('button', { name: /Metals/ }).click();
   // Anchored: the sector's own row contains the member table, so its name includes this text too.
-  const memberRow = page.getByRole('row', { name: /^TEST · Test Company/ });
+  const memberRow = page.getByRole('row', { name: /^TEST Test Company/ });
   await expect(memberRow).toContainText('₹120');
-  await expect(memberRow).toContainText('+20.0%');
+  await expect(memberRow).toContainText('+2.0%');
 });

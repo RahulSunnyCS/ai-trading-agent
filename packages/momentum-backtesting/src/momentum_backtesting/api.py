@@ -1568,42 +1568,12 @@ def _momentum_scores_payload() -> dict:
         stock_snapshot, group_members
     )
 
-    def scores_json(scores: dict) -> dict:
-        return {str(k): v for k, v in scores.items()}
-
-    return {
-        "as_of": (
-            None if pd.isna(stock_snapshot.as_of) else stock_snapshot.as_of.strftime("%Y-%m-%d")
-        ),
-        "lookbacks": list(stock_snapshot.lookbacks),
-        "universe_size": stock_snapshot.universe_size,
-        "missing_symbols": universe.missing_symbols,
-        "membership_quality": _membership_quality(),
-        "stocks": [
-            {
-                "symbol": r.symbol,
-                "company_name": r.company_name,
-                "parent_group": r.parent_group,
-                "subgroup": r.subgroup,
-                "last_price": r.last_price,
-                "change_1w_pct": r.change_1w_pct,
-                "returns": scores_json(r.returns),
-                "scores": scores_json(r.scores),
-            }
-            for r in stock_snapshot.rows
-        ],
-        "sectors": [
-            {
-                "cid": r.cid,
-                "parent_group": r.parent_group,
-                "subgroup": r.subgroup,
-                "member_count": r.member_count,
-                "qualifying_count": r.qualifying_count,
-                "scores": scores_json(r.scores),
-            }
-            for r in sector_snapshot.rows
-        ],
-    }
+    return momentum_scores_mod.to_payload(
+        stock_snapshot,
+        sector_snapshot,
+        missing_symbols=universe.missing_symbols,
+        membership_quality=_membership_quality(),
+    )
 
 
 def _run_broad(
