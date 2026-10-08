@@ -83,6 +83,12 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, '/api/momentum-scores');
   });
 
+  // Provisional scores from live Fyers prices, Fridays 09:15–15:30 IST only (BL-051). Python
+  // answers 409 outside that window; nothing is saved, the close replaces them.
+  fastify.get('/api/momentum/scores/live', async (_request, reply) => {
+    await forward(reply, '/api/momentum-scores/live');
+  });
+
   // One stock's history for the Scores page's drawer: closes with the 40-week average, scores
   // over the last 12 weeks, composite rank over 26. The symbol is checked here before it is put in
   // an upstream path: NSE symbols start with a letter or digit and may hold `&`, `-`, `_`, `.`,

@@ -9,6 +9,7 @@ import threading
 import urllib.parse
 from collections import OrderedDict
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from time import perf_counter
@@ -1682,6 +1683,119 @@ def _momentum_scores_payload() -> dict:
         membership_quality=_membership_quality(),
         rotation=rotation,
     )
+
+
+#: Live scores (BL-051 Phase 3): Fridays, during market hours (IST).
+LIVE_SCORES_OPEN, LIVE_SCORES_CLOSE = time(9, 15), time(15, 30)
+_LIVE_SCORES_CACHE: dict[tuple, dict] = {}
+_LIVE_SCORES_LOCK = threading.Lock()
+LIVE_SCORES_TTL_MINUTES = 5
+
+
+def live_scores_universe(
+    universe: broad.StockUniverseFrame, quotes: dict[str, float], week: pd.Timestamp
+) -> tuple[broad.StockUniverseFrame, dict]:
+    """The scores' price frame with a provisional row for `week` (this Friday) from live prices
+    (`quotes`: base symbol -> last traded price). In memory only, never stored: the 19:30 closes
+    replace it by recomputation. Membership and the liquidity gate keep the last stored week's,
+    since a day's turnover is not complete until the close. A price more than 50% from the last
+    close (an unadjusted split, a bad tick) keeps the last close and is reported, not used."""
+    frame = universe.frame.copy()
+    last = frame.index[-1]
+    row = frame.loc[last].copy()
+    raw = universe.raw_frame.copy() if universe.raw_frame is not None else None
+    raw_row = raw.loc[last].copy() if raw is not None else None
+    used, missing, suspect = 0, [], []
+    for column, base in universe.column_to_base_symbol.items():
+        if column in universe.stale_columns or pd.isna(row.get(column)):
+            continue
+        price = quotes.get(base)
+        if price is None or not math.isfinite(price) or price <= 0:
+            missing.append(base)
+            continue
+        if not 0.5 <= price / float(row[column]) <= 1.5:
+            suspect.append(base)
+            continue
+        row[column] = price
+        if raw_row is not None:
+            raw_row[column] = price
+        used += 1
+
+    def with_row(table: pd.DataFrame | None, value: pd.Series | None) -> pd.DataFrame | None:
+        if table is None:
+            return None
+        table = table.copy()
+        table.loc[week] = value if value is not None else table.loc[last]
+        return table.sort_index()
+
+    live = replace(
+        universe,
+        frame=with_row(frame, row),
+        raw_frame=with_row(raw, raw_row) if raw is not None else None,
+        weeks=sorted({*universe.weeks, week}),
+        stock_membership=with_row(universe.stock_membership, None),
+        liquidity_gate=with_row(universe.liquidity_gate, None),
+    )
+    return live, {"used": used, "missing": sorted(missing), "suspect": sorted(suspect)}
+
+
+def _momentum_scores_live_payload(now: datetime | None = None) -> dict:
+    """GET /api/momentum-scores/live (BL-051 Phase 3): every score and rank on live Fyers prices,
+    Fridays in market hours. Provisional; cached for a few minutes."""
+    from .weekly import week_ending_on_or_before
+
+    now = (now or datetime.now(IST)).astimezone(IST)
+    if now.weekday() != 4 or not LIVE_SCORES_OPEN <= now.time() <= LIVE_SCORES_CLOSE:
+        raise HTTPException(409, "Live scores are available on Fridays from 09:15 to 15:30 IST.")
+    week = pd.Timestamp(week_ending_on_or_before(now.date()))
+    try:
+        universe = DATA.get_momentum_universe()
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    last = pd.Timestamp(universe.frame.index[-1]).normalize()
+    if last >= week:
+        raise HTTPException(
+            409, "This Friday's closes are already in: the normal scores are final."
+        )
+    if last < week - pd.Timedelta(days=7):
+        raise HTTPException(
+            409, f"The stored prices end {last:%d %b}; refresh the stock data first."
+        )
+    slot = (week, now.hour, now.minute // LIVE_SCORES_TTL_MINUTES)
+    with _LIVE_SCORES_LOCK:
+        if slot in _LIVE_SCORES_CACHE:
+            return _LIVE_SCORES_CACHE[slot]
+    bases = sorted(set(universe.column_to_base_symbol.values()))
+    try:
+        quoted = fyers.quotes([f"NSE:{base}-EQ" for base in bases], fyers.resolve_credentials())
+    except fyers.FyersCredentialsError as error:
+        raise HTTPException(409, f"No valid Fyers login: {error}") from error
+    except (RuntimeError, OSError) as error:
+        raise HTTPException(502, f"Fyers quotes failed: {error}") from error
+    quotes = {fyers.nse_symbol(symbol): price for symbol, price in quoted.items()}
+    live, info = live_scores_universe(universe, quotes, week)
+    group_info = momentum_scores_mod.load_stock_group_info(CATEGORIES_CURATED_DIR)
+    group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR)
+    stock_snapshot = momentum_scores_mod.compute_stock_momentum_scores(live, group_info)
+    payload = momentum_scores_mod.to_payload(
+        stock_snapshot,
+        momentum_scores_mod.compute_sector_momentum_scores(stock_snapshot, group_members),
+        missing_symbols=universe.missing_symbols,
+        membership_quality=_membership_quality(),
+        rotation=momentum_scores_mod.compute_rotation(live, group_members),
+    )
+    payload["live"] = {
+        "provisional": True,
+        "as_of": now.isoformat(timespec="seconds"),
+        "week": journal_week_string(week),
+        "priced": info["used"],
+        "missing": info["missing"],
+        "suspect": info["suspect"],
+    }
+    with _LIVE_SCORES_LOCK:
+        _LIVE_SCORES_CACHE.clear()
+        _LIVE_SCORES_CACHE[slot] = payload
+    return payload
 
 
 def _momentum_stock_payload(symbol: str) -> dict:
@@ -3607,6 +3721,10 @@ def create_app() -> FastAPI:
         if dataset == "broad":
             return _broad_meta()
         return _etf_meta()
+
+    @app.get("/api/momentum-scores/live")
+    def momentum_scores_live() -> dict:
+        return _momentum_scores_live_payload()
 
     @app.get("/api/momentum-scores")
     def momentum_scores() -> dict:
