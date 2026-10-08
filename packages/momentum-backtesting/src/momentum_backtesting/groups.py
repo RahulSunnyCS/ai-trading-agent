@@ -15,9 +15,11 @@ from typing import Any
 
 import pandas as pd
 
+from .engine import CASH, IDLE
 from .notify import Notification
 
-IDLE_NAMES = frozenset({"IDLE", "CASH"})
+#: The engine's parked-cash and liquid-fund assets: cash, never a holding.
+IDLE_NAMES = frozenset({IDLE, CASH})
 EPS = 5e-4
 #: Engine actions that do not trade.
 QUIET_ACTIONS = frozenset({"", "HOLD", "AT CAP", "WAIT"})

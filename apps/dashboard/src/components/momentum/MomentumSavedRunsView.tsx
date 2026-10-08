@@ -2,7 +2,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { ArrowDown, ArrowUp, ArrowUpDown, Layers } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePolledResource } from '../../hooks/usePolledResource';
 import { cn } from '../../lib/cn';
@@ -189,9 +189,12 @@ export function MomentumSavedRunsView({
     cache: true,
   });
   const refetchFavourites = favourites.refetch;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a changed list is the trigger
+  // A changed list (a status set, a group made) can move the cap; the first list is the one the
+  // hook has just fetched with, so skip it.
+  const seenRuns = useRef<MomentumSavedRun[] | null>(null);
   useEffect(() => {
-    refetchFavourites();
+    if (seenRuns.current !== null && seenRuns.current !== runs) refetchFavourites();
+    seenRuns.current = runs;
   }, [runs, refetchFavourites]);
   const followed = favourites.data ? followedCount(favourites.data) : null;
   const atLimit = followed !== null && followed >= MAX_FOLLOWED;
@@ -697,7 +700,7 @@ export function MomentumSavedRunsView({
       {runs.length > 0 ? (
         <Card>
           <MomentumCompare
-            runs={runs}
+            runs={runs.filter((run) => !run.group)}
             selectedIds={selectedIds}
             onSelectedIdsChange={setSelected}
             picker={false}

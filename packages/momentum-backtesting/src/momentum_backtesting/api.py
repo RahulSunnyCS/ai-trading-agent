@@ -2434,11 +2434,14 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
     # BL-051: a stock-based headline (Stock, Custom Index, Broad) gets its signal from the 19:30
     # stock-ingest rerun, once the bhavcopy is in. The 14:40 preview and 16:45 final cannot
     # evaluate it, and saying "blocked" twice every Friday is noise, not an alert.
+    # Only when it is merely waiting for that data: a headline blocked for any other reason is
+    # still reported, by every run.
     if (
         body.only_if_active_dataset is None
         and active is not None
         and active_result is None
         and active["dataset"] != "etf"
+        and (active.get("awaiting_data") or _awaiting_data(active["blocked"]))
     ):
         in_scope = False
     blocked_note: Notification | None = None
@@ -2862,9 +2865,18 @@ def _rebalance_info(req: BacktestRequest, week: pd.Timestamp) -> dict:
     }
 
 
+#: Reasons a stock-based favourite has no signal yet that only mean "its data lands at 19:30".
+_AWAITING_DATA = ("is not processed yet", "Weekly ingest is not yet available")
+
+
+def _awaiting_data(blocked: str | None) -> bool:
+    return blocked is not None and any(reason in blocked for reason in _AWAITING_DATA)
+
+
 def _group_outcomes(groups: list[dict], outcomes: list[dict], run: str) -> list[dict]:
     """One outcome per favourite group, combined from its members' outcomes (BL-051). A group
     whose members did not all produce a signal in this run is blocked, naming them."""
+    from .forward_journal import week_string
     from .weekly import RunResult
 
     by_id = {outcome["id"]: outcome for outcome in outcomes}
@@ -2876,14 +2888,27 @@ def _group_outcomes(groups: list[dict], outcomes: list[dict], run: str) -> list[
             for member, outcome in zip(group["members"], members, strict=True)
             if outcome is None or outcome["result"] is None or outcome["result"].signal is None
         ]
-        result, blocked = None, None
+        result, blocked, awaiting = None, None, False
+        weeks = (
+            {} if missing else {o["name"]: week_string(o["result"].signal["week"]) for o in members}
+        )
         if missing or not members:
             blocked = (
                 f"{len(missing)} of {len(group['members'])} sleeves have no signal: "
                 + "; ".join(missing)
             )
+            awaiting = all(
+                outcome is not None and _awaiting_data(outcome["blocked"])
+                for outcome in members
+                if outcome is None or outcome["result"] is None
+            )
+        elif len(set(weeks.values())) > 1:
+            # Never present a lagging sleeve's old portfolio as this week's.
+            blocked = "The sleeves' signals are for different weeks: " + ", ".join(
+                f"{name} {week}" for name, week in weeks.items()
+            )
         else:
-            week = max(str(outcome["result"].signal["week"]) for outcome in members)
+            week = next(iter(weeks.values()))
             signal = groups_mod.combine(
                 group,
                 [{"id": o["id"], "name": o["name"], "signal": o["result"].signal} for o in members],
@@ -2898,6 +2923,7 @@ def _group_outcomes(groups: list[dict], outcomes: list[dict], run: str) -> list[
                 "active": group["active"],
                 "result": result,
                 "blocked": blocked,
+                "awaiting_data": awaiting,
                 "group": True,
             }
         )
@@ -2964,7 +2990,8 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
         "weights": weights,
         "config": config,
         # BL-051: what a group needs to combine this sleeve with the others.
-        "rebalance": _rebalance_info(req, target_week),
+        # The engine's decision week (the newest stored one), which the rows are for.
+        "rebalance": _rebalance_info(req, pd.Timestamp(latest.get("week", target_week))),
         "sleeve_value": groups_mod.sleeve_value(
             payload.get("series", {}).get("dates", []),
             payload.get("series", {}).get("strategy", []),

@@ -127,7 +127,8 @@ export function MomentumRebalanceView({
       dataset === 'broad' ? apiGet<Scores>('/api/momentum/scores') : Promise.resolve(null),
     ]).then(([saved, metadata, scores]) => {
       if (!alive) return;
-      setRuns(saved.ok ? saved.data : []);
+      // A favourite group (BL-051) has no config of its own to preview.
+      setRuns(saved.ok ? saved.data.filter((run) => !run.group) : []);
       setMeta(metadata.ok ? metadata.data : null);
       setSuggestions(
         dataset === 'broad'

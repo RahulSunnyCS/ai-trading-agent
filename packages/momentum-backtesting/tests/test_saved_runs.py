@@ -683,3 +683,51 @@ def test_a_stock_based_headline_stays_quiet_before_the_1930_run(client, monkeypa
     result = api._execute_weekly_run(api.WeeklyRunBody(run="preview", send=True))
     assert result["sent_to_telegram"] is False
     assert all(note.type != "momentum.problem" for note in sent)
+
+
+def test_a_group_with_sleeves_from_different_weeks_is_blocked_not_mixed():
+    group = {"id": "g", "name": "Pair", "config": {"dataset": "broad"}, "active": True}
+    group["members"] = [{"id": "a", "name": "A"}, {"id": "b", "name": "B"}]
+
+    def outcome(id_, week):
+        return {
+            "id": id_,
+            "name": id_.upper(),
+            "result": weekly.RunResult(
+                Notification("t", "info", id_, ""),
+                {"week": week, "rows": [], "weights": {}, "target_weights": {}},
+            ),
+            "blocked": None,
+        }
+
+    (combined,) = api._group_outcomes(
+        [group], [outcome("a", "2026-12-04"), outcome("b", "2026-11-27")], "final"
+    )
+    assert combined["result"] is None
+    assert "different weeks" in combined["blocked"] and "B 2026-11-27" in combined["blocked"]
+
+
+def test_a_stock_based_headline_blocked_for_a_real_reason_is_still_reported(client, monkeypatch):
+    headline = _favourite(client, "Broad headline", "paper", "broad")
+    client.patch(f"/api/saved-runs/{headline['id']}", json={"active": True})
+    monkeypatch.setattr(
+        weekly,
+        "run_favorite_strategies",
+        lambda *args, **kwargs: [
+            {
+                "id": headline["id"],
+                "name": "Broad headline",
+                "dataset": "broad",
+                "active": True,
+                "result": None,
+                "blocked": "tax needs tax_classes",
+            }
+        ],
+    )
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda: None)
+    sent = []
+    monkeypatch.setattr(notify, "send", sent.append)
+
+    result = api._execute_weekly_run(api.WeeklyRunBody(run="preview", send=True))
+    assert result["sent_to_telegram"] is True
+    assert any("tax needs tax_classes" in note.body for note in sent)

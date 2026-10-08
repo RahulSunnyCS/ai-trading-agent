@@ -3,6 +3,7 @@
 import pandas as pd
 
 from momentum_backtesting import choose, groups
+from momentum_backtesting.engine import CASH, IDLE
 
 
 def _member(id_, weights, target, rows, value=1.0, on_cadence=True):
@@ -44,14 +45,15 @@ def test_actions_come_from_the_sleeves_that_trade_not_from_price_drift():
         # Off week: its weights drifted with prices, but it made no trade.
         _member(
             "b",
-            {"KEEP": 0.6, "IDLE": 0.4},
-            {"KEEP": 0.7, "IDLE": 0.3},
+            {"KEEP": 0.6, IDLE: 0.4},
+            {"KEEP": 0.7, IDLE: 0.2, CASH: 0.1},
             [{"asset": "KEEP", "action": "HOLD", "rank": 2}],
             on_cadence=False,
         ),
     ]
     signal = groups.combine({"name": "G"}, members, "2026-12-04")
     actions = {r["asset"]: r["action"] for r in signal["rows"]}
+    # The engine's parked cash and liquid fund are cash, never a held name.
     assert actions == {"OLD": "SELL", "NEW": "BUY", "KEEP": "HOLD"}
     assert signal["cash"] == 0.15
     keep = next(r for r in signal["rows"] if r["asset"] == "KEEP")

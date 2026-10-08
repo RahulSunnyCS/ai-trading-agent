@@ -197,12 +197,15 @@ def list_runs(con: duckdb.DuckDBPyConnection, dataset: str) -> list[dict[str, An
     ]
 
 
-def _package_rows(con: duckdb.DuckDBPyConnection) -> list[tuple[str, dict[str, Any]]]:
+def _package_rows(con: duckdb.DuckDBPyConnection, flag: str) -> list[tuple[str, dict[str, Any]]]:
+    """Every run whose summary has `flag` ("favorite" or "active") set, parsed. Filtered in SQL:
+    a summary carries the run's whole weekly curve, so parsing every run would be wasted work."""
     rows = con.execute(
         "SELECT r.run_id, r.summary FROM backtest_runs r "
         "JOIN strategy_versions v USING (version_id) "
         "JOIN strategies s ON s.strategy_id = v.strategy_id "
-        "WHERE s.package = ? AND r.kind = 'weekly'",
+        "WHERE s.package = ? AND r.kind = 'weekly' "
+        f"AND COALESCE((r.summary ->> '{flag}')::BOOLEAN, FALSE) = TRUE",
         [PACKAGE],
     ).fetchall()
     return [(run_id, json.loads(summary)) for run_id, summary in rows]
@@ -214,7 +217,7 @@ def followed_count(
     """Paper + Invested favourites across every dataset; a group counts once, its members not."""
     return sum(
         1
-        for run_id, summary in _package_rows(con)
+        for run_id, summary in _package_rows(con, "favorite")
         if run_id not in exclude and status_of(summary) in FOLLOWED
     )
 
@@ -226,19 +229,19 @@ def _limit_message() -> str:
 def _write_summaries(
     con: duckdb.DuckDBPyConnection,
     summaries: dict[str, dict[str, Any]],
-    insert: tuple[str, list] | None = None,
+    statement: tuple[str, list] | None = None,
 ) -> None:
-    """Write several summaries in one transaction (after `insert`, a new row's statement, when
-    given); a new headline clears every other one."""
+    """Write several summaries in one transaction, with `statement` (a new group's INSERT, a
+    deleted group's DELETE) run first in the same one; a new headline clears every other one."""
     con.execute("BEGIN")
     try:
-        if insert is not None:
-            con.execute(*insert)
+        if statement is not None:
+            con.execute(*statement)
         if any(summary.get("active", False) for summary in summaries.values()):
             # The Telegram job has exactly one source. Clear the global active flag, not
             # merely this dataset's flag, before promoting this run.
-            for other_id, other in _package_rows(con):
-                if other_id not in summaries and other.get("active", False):
+            for other_id, other in _package_rows(con, "active"):
+                if other_id not in summaries:
                     other["active"] = False
                     con.execute(
                         "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
@@ -459,7 +462,8 @@ def delete_run(con: duckdb.DuckDBPyConnection, run_id: str) -> bool:
             member_summary["favorite"] = True
             member_summary["status"] = "watching"
             updates[member_id] = member_summary
-    if updates:
-        _write_summaries(con, updates)
-    con.execute("DELETE FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id])
+    # One transaction: a group is never left pointing at runs that no longer name it.
+    _write_summaries(
+        con, updates, ("DELETE FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id])
+    )
     return True
