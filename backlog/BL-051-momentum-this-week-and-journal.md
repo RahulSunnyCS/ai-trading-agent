@@ -312,3 +312,12 @@ Answered by the owner on 2026-10-08 (see the Log):
   live (the account holds nothing yet, so per-holding field names follow Fyers' documentation).
   Still to come in Phase 3: Friday live scores and delay-0 estimates (in memory, provisional),
   "Since your 14:15 orders", and retiring the Rebalance tab.
+- 2026-10-09 — Phase 3, second PR: Friday live scores. `GET /api/momentum-scores/live` adds this
+  Friday as a provisional row from live Fyers prices (in memory, five-minute cache, a price more
+  than 50% from last week's close is kept at that close and reported) and recomputes every score,
+  rank and sector; the Scores page shows a Last close | Live (provisional) switch on Fridays
+  09:15–15:30 IST. Deferred, not dropped: delay-0 live estimates on This week and the "Since
+  your 14:15 orders" card. Every favourite uses a one-week signal delay today, so the 14:15
+  decision is exact and both would show nothing new; build them when a delay-0 strategy becomes
+  Paper or Invested. Retiring the Rebalance tab waits for the rebalance-preview job fix
+  (`fix/rebalance-preview-job`) to land, so the two changes do not collide.
