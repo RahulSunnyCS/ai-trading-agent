@@ -35,6 +35,8 @@ CREATE TABLE momentum_owner_settings (
     -- 'paper': orders against the paper portfolio (the model at the owner's capital) until money
     -- goes in; 'fyers': against the synced holdings.
     holdings_source  TEXT NOT NULL DEFAULT 'paper' CHECK (holdings_source IN ('paper', 'fyers')),
+    -- The paper portfolio's size while holdings_source is 'paper' (owner, 2026-10-08: Rs 1 lakh).
+    paper_capital_rs DOUBLE NOT NULL DEFAULT 100000,
     updated_at       TEXT
 );
 

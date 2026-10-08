@@ -43,7 +43,7 @@ def test_the_minimum_trade_applies_to_top_ups_and_trims_only():
         min_trade_rs=2_500,
     )
     assert _rows(small) == {"A": ("SKIP", 0), "B": ("SKIP", 0)}
-    assert "would cost Rs" in small.rows[0].note
+    assert "would cost ₹" in small.rows[0].note
 
 
 def test_a_blocked_name_is_held_and_a_buy_under_one_share_is_skipped():

@@ -1717,6 +1717,55 @@ def _categories_curated_dir() -> Path:
     return Path(__file__).parent / "categories" / "curated"
 
 
+orders_app = typer.Typer(
+    help="BL-051: your orders for the headline favourite (read-only Fyers; never places orders)."
+)
+app.add_typer(orders_app, name="orders")
+
+
+@orders_app.command("run")
+def orders_run(
+    send: bool = typer.Option(False, help="Also send the summary to Telegram."),
+    sync: bool = typer.Option(
+        True, help="Read the Fyers holdings first when the source is 'fyers'."
+    ),
+) -> None:
+    """Fri 14:15 (scheduler job `momentum-orders`): the headline's orders for this Friday against
+    the paper portfolio or the synced Fyers holdings, saved for This week. Never trades."""
+    from . import api, fyers, holdings_store, notify
+    from .config import load_repo_env
+    from .db_read import open_catalog
+
+    load_repo_env()
+    if sync:
+        with open_catalog() as con:
+            source = holdings_store.settings(con, holdings_store.owner())["holdings_source"]
+        if source == "fyers":
+            try:
+                rows = fyers.holdings(fyers.resolve_credentials())
+            except (fyers.FyersCredentialsError, RuntimeError) as error:
+                message = notify.redact(f"{type(error).__name__}: {error}")
+                typer.echo(f"orders: could not read the Fyers holdings: {message}")
+                if send:
+                    notify.send(
+                        notify.Notification(
+                            "momentum-orders",
+                            "error",
+                            "Your orders: Fyers holdings could not be read",
+                            f"{message}\nLog in again (Broker logins), then: mbt orders run --send",
+                            type="momentum.problem",
+                        )
+                    )
+                raise typer.Exit(1) from error
+            with open_catalog() as con:
+                holdings_store.save_holdings(con, holdings_store.owner(), "fyers", rows)
+    payload = api._compute_orders("scheduled")
+    note = api._orders_message(payload)
+    typer.echo(f"{note.title}\n{note.body}")
+    if send:
+        notify.send(note)
+
+
 journal_app = typer.Typer(
     no_args_is_help=True,
     help="The forward-signal journal (BL-024): every weekly signal as recorded, unchangeable.",

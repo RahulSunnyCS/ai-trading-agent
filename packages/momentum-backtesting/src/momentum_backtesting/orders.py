@@ -4,7 +4,7 @@ Pure arithmetic over holdings in shares, prices and target weights; no I/O. The 
 owner set them on 2026-10-08:
 
 - A name the model no longer holds is sold in full, and a name it newly holds is bought, whatever
-  the amount. Only top-ups and trims are subject to the minimum trade (Rs 10,000 by default).
+  the amount. Only top-ups and trims are subject to the minimum trade (₹10,000 by default).
 - Whole shares, rounded down; a trade worth less than one share is skipped and says so.
 - A blocked name (an unclassified possible split: its price may be wrong) is held, never traded.
 - Sells first, then buys. Estimated charges use the backtest's itemised rates (`engine`'s STT,
@@ -103,16 +103,16 @@ def plan(
         elif held <= 0 and weight > 0:
             row.action, row.quantity = "BUY", math.floor(gap / price)
             if row.quantity == 0:
-                row.action, row.note = "SKIP", f"less than one share (Rs {price:,.0f})"
+                row.action, row.note = "SKIP", f"less than one share (₹{price:,.0f})"
         elif abs(gap) < min_trade_rs:
             if abs(gap) >= price:  # a real but small difference: say what it would have cost
                 cost = buy_charges(abs(gap)) if gap > 0 else sell_charges(abs(gap))
                 row.action = "SKIP"
-                row.note = f"under the Rs {min_trade_rs:,.0f} minimum; would cost Rs {cost:,.0f}"
+                row.note = f"under the ₹{min_trade_rs:,.0f} minimum; would cost ₹{cost:,.0f}"
         else:
             quantity = math.floor(abs(gap) / price)
             if quantity == 0:
-                row.action, row.note = "SKIP", f"less than one share (Rs {price:,.0f})"
+                row.action, row.note = "SKIP", f"less than one share (₹{price:,.0f})"
             else:
                 row.action, row.quantity = ("ADD" if gap > 0 else "TRIM"), quantity
         if row.quantity:

@@ -15,6 +15,7 @@ export const NOTIFICATION_TYPES = {
   'broker.fyers': 'Fyers login failures',
   'momentum.preview': 'Momentum weekly preview (Fri 14:40)',
   'momentum.final': 'Momentum weekly final signal / rebalance (Fri 16:45)',
+  'momentum.orders': 'Momentum: your orders for the headline favourite (Fri 14:15)',
   'momentum.journal': 'Momentum forward-journal entries and weekly check',
   'momentum.problem': 'Momentum: no signal, stale data, blocked favourite or failed job',
   'momentum.live_rules':

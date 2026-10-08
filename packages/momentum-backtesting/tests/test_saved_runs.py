@@ -466,6 +466,7 @@ def test_weekly_status_says_how_far_each_dataset_is_ingested(client, tmp_path, m
     assert by_key["etf"]["through"] == "2026-10-02" and by_key["etf"]["ready"] is True
     assert by_key["stock"]["through"] == "2026-09-25" and by_key["stock"]["ready"] is False
     assert [item["run"] for item in status["schedule"]] == [
+        "orders",
         "preview",
         "final",
         "stock-ingest",
