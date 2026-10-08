@@ -365,9 +365,20 @@ def _prune(con: duckdb.DuckDBPyConnection, dataset: str) -> None:
     ).fetchall()
     ordinary = [version_id for version_id, kept in rows if not kept]
     for version_id in ordinary[MAX_STRATEGIES_PER_DATASET:]:
+        _close_changes(con, version_id, "pruned with the strategy")
         con.execute(
             "DELETE FROM backtest_runs WHERE version_id = ? AND kind = 'weekly'", [version_id]
         )
+
+
+def _close_changes(con: duckdb.DuckDBPyConnection, version_id: str, why: str) -> None:
+    """A strategy that is gone has nothing left to review: its open changes are marked reviewed
+    (with why), so the Saved runs tab's count can reach zero. The rows themselves stay."""
+    con.execute(
+        "UPDATE momentum_result_changes SET reviewed_at = now(), reviewed_by = ? "
+        "WHERE version_id = ? AND reviewed_at IS NULL",
+        [why, version_id],
+    )
 
 
 def _record(
@@ -986,7 +997,18 @@ def update_strategy(
     if runs is None:
         return None
     anchor = _anchor(con, runs[0]["version_id"])
-    if update_run(con, anchor[0], **changes) is None:
+    overlay = changes.pop("overlay", None)
+    if overlay is not None:
+        # The strategy is on the chart when any of its runs is (runs merged from before BL-052
+        # can carry the flag): showing sets the anchor, hiding clears every run.
+        updates = {}
+        for run in runs:
+            wanted = overlay and run["id"] == anchor[0]
+            if bool(run["summary"].get("overlay")) != wanted:
+                updates[run["id"]] = {**run["summary"], "overlay": wanted}
+        if updates:
+            _write_summaries(con, updates)
+    if changes and update_run(con, anchor[0], **changes) is None:
         return None
     return get_strategy(con, anchor[0])
 
@@ -1004,7 +1026,16 @@ def delete_strategy(con: duckdb.DuckDBPyConnection, run_id: str) -> bool:
     for run in runs:  # any run in a group, not only the anchor: the group would name a lost run
         if run["summary"].get("member_of"):
             return delete_run(con, run["id"])  # refuses, naming the group
-    con.execute("DELETE FROM backtest_runs WHERE version_id = ? AND kind = 'weekly'", [version_id])
+    con.execute("BEGIN")
+    try:
+        _close_changes(con, version_id, "removed with the strategy")
+        con.execute(
+            "DELETE FROM backtest_runs WHERE version_id = ? AND kind = 'weekly'", [version_id]
+        )
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
     return True
 
 

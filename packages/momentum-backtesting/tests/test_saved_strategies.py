@@ -345,3 +345,33 @@ def test_the_headline_run_is_the_anchor_when_two_favourites_share_settings(clien
         )
     strategy = _strategies(client)["strategies"][0]
     assert (strategy["id"], strategy["active"]) == (headline, True)
+
+
+def test_removing_a_strategy_closes_its_open_changes(client):
+    first = client.post("/api/saved-runs", json=_payload()).json()
+    client.post("/api/saved-runs", json=_payload(curve=(100.0, 103.0)))
+    assert _strategies(client)["unreviewed"] == 1
+    client.delete(f"/api/saved-strategies/{first['id']}")
+    assert _strategies(client)["unreviewed"] == 0  # nothing left to review, count can clear
+    (change,) = client.get("/api/result-changes").json()["changes"]
+    assert change["reviewed_by"] == "removed with the strategy"  # the row itself stays
+
+
+def test_hiding_a_strategy_clears_every_runs_overlay(client):
+    base = {"universe": UNIVERSE, "top_n": 5}
+    with connect() as con:
+        old = _legacy_run(con, "etf", "Run 1", base, (100.0, 101.0))
+        later = _legacy_run(con, "etf", "Run 2", base, (100.0, 101.0))
+        summary = json.loads(
+            con.execute("SELECT summary FROM backtest_runs WHERE run_id = ?", [later]).fetchone()[0]
+        )
+        con.execute(
+            "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
+            [json.dumps({**summary, "overlay": True}), later],
+        )
+    client.post("/api/saved-strategies/merge")
+    assert client.get(f"/api/saved-strategies/{old}").json()["overlay"] is True
+    hidden = client.patch(f"/api/saved-strategies/{old}", json={"overlay": False}).json()
+    assert hidden["overlay"] is False
+    shown = client.patch(f"/api/saved-strategies/{old}", json={"overlay": True}).json()
+    assert shown["overlay"] is True

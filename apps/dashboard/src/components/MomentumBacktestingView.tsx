@@ -630,6 +630,9 @@ export function MomentumBacktestingView() {
    * finished run is saved like any other, and its toast says whether the result moved. */
   async function rerunSavedStrategy(strategy: SavedStrategy): Promise<void> {
     const target = strategy.dataset as Dataset;
+    // The form shows the settings being re-run (not whatever was open), so the run bar and a
+    // later Run match this run.
+    openSavedStrategy(strategy);
     const failure = await useMomentumRunsStore
       .getState()
       .startRun(target, { ...strategy.config, dataset: target }, false);
@@ -637,9 +640,8 @@ export function MomentumBacktestingView() {
       toast(failure, 'error');
       return;
     }
+    setDrawerOpen(false);
     toast("Re-running it on today's code and data; the result is saved when it finishes", 'info');
-    if (target !== dataset) setDatasetState(target);
-    navigate('momentum', 'backtest', target);
   }
 
   function buildConfig(): Record<string, unknown> {
