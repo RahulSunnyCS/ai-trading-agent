@@ -108,14 +108,20 @@ proposed for real money (through BL-025).
   TRI all exist from 2011, so 52-week lookbacks are warm by 2012). 2012–16 was read once by the
   BL-010 backcast. That read does not bias a comparison of filter against no filter.
 - **Pass / kill rules:**
-  - **Phase 2 screen:** kill a feature if its forward-return spread has |t| < 2 at 13 weeks, or
-    points the wrong way. The spread is computed within the top quintile of momentum scores, net
-    of a 0.3% round trip, with a Newey-West t-statistic.
+  - **Phase 2 screen:** run once per frozen config, each on its **own** score definition
+    (score, lookbacks, weight scheme), its own cadence (2 or 4 weeks) and its own rebalance
+    offset, exactly as in `bl010_phase6_frozen.json`. No config or calendar is chosen by hand.
+    For each config, compute the 13-week forward-return spread within the top quintile of that
+    config's score, net of a 0.3% round trip, with a Newey-West t-statistic. A feature passes
+    only if the mean of the four t-statistics is ≥ 2 in the pre-registered direction **and** at
+    least 3 of the 4 configs have the right sign. Otherwise it is killed.
   - **Phase 3 engine test:** against the comparator on the dev window, all of:
     - median ΔCAGR ≥ +2.0 pts across rolling 3-year windows stepped quarterly;
     - CAGR win share ≥ 70%;
     - full-period MaxDD no more than 3 pts worse;
-    - PBO < 0.5 across the six trials plus the baseline (CSCV).
+    - PBO < 0.5 across all six trials plus the baseline (CSCV). Every trial's ensemble curve is
+      built for the PBO matrix, including features killed in Phase 2. A killed feature cannot
+      pass; its curve only keeps the trial count honest.
 - **Hold-out:** 2024-01-01 → 2026-09-25 stays sealed for **one** confirmation run of Phase 3
   survivors only. Pass = ΔCAGR ≥ 0 and MaxDD no more than 3 pts worse. This is a weaker rule
   because the window is short and, for the base configs, in-sample. Phase 4 is the deciding test.
@@ -149,25 +155,25 @@ proposed for real money (through BL-025).
 ### Phase 2 — Cheap screen (event study, the BL-042 pattern)
 
 - **Tasks:**
-  - At every 4-weekly rebalance in the dev window, take the top quintile of the universe by the
-    frozen voladj score.
+  - For each of the four frozen configs, at each of its own rebalance dates in the dev window
+    (its cadence and offset), take the top quintile of the universe by that config's own score.
   - For tilts, split those names by feature (top half vs bottom half). For gates, split them
     into blocked vs passed.
   - Measure forward 4- and 13-week returns net of costs and the Newey-West t-statistic.
   - Also report how many names each gate blocks per week. A gate that blocks almost nothing or
     almost everything is noted, not tuned.
 - **Deliverables:** `search_spaces/bl050_screen_result.json`, a short table in this file.
-- **Done when:** every feature has a recorded pass or kill under the Phase 0 rule; killed ones
-  stop here.
+- **Done when:** every feature has a recorded pass or kill under the Phase 0 rule (four per-config
+  t-statistics, their mean and the sign count). Killed features get no verdict work after this;
+  Phase 3 builds their curves only for PBO.
 
 ### Phase 3 — Engine test on the frozen ensemble
 
 - **Tasks:**
-  - Run each survivor through all four frozen configs: gates via `extra_no_buy`, tilts via the
-    Phase 1 hook.
-  - Build the ensemble with `choose.ensemble_curve`.
-  - Score with the 3.9.23 yardstick and CSCV/PBO over all six trials (killed ones included, so
-    the trial count stays honest).
+  - Run **all six** features through all four frozen configs: gates via `extra_no_buy`, tilts
+    via the Phase 1 hook. Build each ensemble with `choose.ensemble_curve`.
+  - Compute CSCV/PBO over the six ensemble curves plus the baseline.
+  - Score Phase 2 survivors only with the 3.9.23 yardstick, and give each a pass/kill verdict.
   - Run the single confirmation on the sealed 2024–26 window for survivors only.
 - **Deliverables:** `search_spaces/bl050_dev_result.json`, `bl050_holdout_result.json`, a
   results table and verdict per feature.
@@ -226,3 +232,6 @@ To confirm when this is started:
   Status `Planned`, P2.
 - 2026-10-08 — Re-prioritised P2 → P1 by the owner. Handoff prompts added in
   `docs/handover-bl050-filter-poc.md`.
+- 2026-10-08 — Review fixes, before any run (PR #129, Codex). The Phase 2 screen is now
+  pre-registered per frozen config, on each config's own score and calendar, with a fixed rule
+  for combining the four. Phase 3 builds all six curves for PBO, and only survivors get verdicts.

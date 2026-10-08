@@ -114,18 +114,22 @@ Phase 1 — Features and hooks:
   - `uv run pytest` and the lefthook pre-push checks pass.
 
 Phase 2 — Cheap screen:
-- At each 4-weekly rebalance, 2012-01-01 → 2023-12-31: top quintile by the frozen voladj score.
-  Split tilts top half vs bottom half, gates blocked vs passed.
-- Report forward 4- and 13-week returns net of a 0.3% round trip, with a Newey-West t-stat. Kill
-  if |t| < 2 at 13 weeks or the sign is wrong.
+- Run once per frozen config, 2012-01-01 → 2023-12-31, each on its OWN score definition, cadence
+  and rebalance offset from bl010_phase6_frozen.json. Never pick one config or calendar by hand.
+  At each of its rebalance dates take the top quintile by that config's score; split tilts top
+  half vs bottom half, gates blocked vs passed.
+- Report forward 4- and 13-week returns net of a 0.3% round trip, with a Newey-West t-stat per
+  config. Pass only if the mean of the four 13-week t-stats is ≥ 2 in the pre-registered
+  direction AND at least 3 of 4 configs have the right sign; otherwise kill.
 - Also report how many names each gate blocks per week.
 - Save search_spaces/bl050_screen_result.json and a table in BL-050.
 
-Phase 3 — Engine test (survivors only):
-- Run all four frozen configs: gates via extra_no_buy, tilts via the new hook. Build the
-  ensemble with choose.ensemble_curve.
-- Score with the 3.9.23 yardstick (full-period CAGR/Sharpe/MaxDD; win shares over rolling 3-year
-  windows stepped quarterly; median ΔCAGR) plus CSCV/PBO over all six trials. Killed ones count.
+Phase 3 — Engine test:
+- Run ALL SIX features through all four frozen configs: gates via extra_no_buy, tilts via the new
+  hook. Build each ensemble with choose.ensemble_curve. Compute CSCV/PBO over the six curves plus
+  the baseline. Features killed in Phase 2 are in the PBO matrix but cannot pass.
+- Score Phase 2 survivors only with the 3.9.23 yardstick (full-period CAGR/Sharpe/MaxDD; win
+  shares over rolling 3-year windows stepped quarterly; median ΔCAGR).
 - Report average holdings and cash share next to every result.
 - Pass needs all of: median ΔCAGR ≥ +2.0; CAGR win share ≥ 70%; MaxDD no more than 3 pts worse;
   PBO < 0.5.
