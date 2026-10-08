@@ -167,6 +167,14 @@ const nextConfig: NextConfig = {
               source: '/api/momentum/rebalance-preview',
               destination: `${momentumDirectOrigin}/api/rebalance-preview`,
             },
+            {
+              source: '/api/momentum/rebalance-preview/jobs',
+              destination: `${momentumDirectOrigin}/api/rebalance-preview/jobs`,
+            },
+            {
+              source: '/api/momentum/rebalance-preview/jobs/:id',
+              destination: `${momentumDirectOrigin}/api/rebalance-preview/jobs/:id`,
+            },
           ]
         : []),
       // The scheduler's loopback API (apps/scheduler, BL-012): Jobs and Notifications pages.

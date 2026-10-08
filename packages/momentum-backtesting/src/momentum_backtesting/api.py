@@ -2701,6 +2701,54 @@ class _SingleFlightJob:
             job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
 
 
+class _PreviewJobs:
+    """Rebalance previews run off the request thread. A Broad preview can take minutes on a cold
+    cache, and Cloudflare answers 524 for any request open longer than ~100 s, so the dashboard
+    starts one (202) and polls it. In memory, newest `MAX_KEPT` kept; a restart forgets them."""
+
+    MAX_KEPT = 20
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._jobs: dict[str, dict] = {}
+
+    def start(self, req: RebalanceRequest) -> dict:
+        job = {
+            "id": os.urandom(8).hex(),
+            "status": "running",
+            "started_at": datetime.now(IST).isoformat(timespec="seconds"),
+            "finished_at": None,
+            "result": None,
+            "error": None,
+            "error_status": None,
+        }
+        with self._lock:
+            self._jobs[job["id"]] = job
+            for old in list(self._jobs)[: -self.MAX_KEPT]:
+                del self._jobs[old]
+        threading.Thread(target=self._execute, args=(job, req), daemon=True).start()
+        return dict(job)
+
+    def get(self, job_id: str) -> dict | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            return dict(job) if job is not None else None
+
+    def _execute(self, job: dict, req: RebalanceRequest) -> None:
+        result, error, error_status = None, None, None
+        try:
+            result = rebalance_preview(req)
+        except HTTPException as exc:  # the same refusals the synchronous route gives
+            error, error_status = str(exc.detail), exc.status_code
+        except Exception as exc:  # the job must always finish, or the UI spins forever
+            error, error_status = f"{type(exc).__name__}: {exc}", 500
+        with self._lock:
+            job["status"] = "failed" if error else "done"
+            job["result"], job["error"], job["error_status"] = result, error, error_status
+            job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
+
+
+PREVIEW_JOBS = _PreviewJobs()
 WEEKLY_JOBS = _SingleFlightJob()
 LIVE_RULES_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
@@ -3699,6 +3747,17 @@ def create_app() -> FastAPI:
     @app.post("/api/rebalance-preview")
     def preview(req: RebalanceRequest) -> dict:
         return rebalance_preview(req)
+
+    @app.post("/api/rebalance-preview/jobs", status_code=202)
+    def start_preview_job(req: RebalanceRequest) -> dict:
+        return PREVIEW_JOBS.start(req)
+
+    @app.get("/api/rebalance-preview/jobs/{job_id}")
+    def preview_job(job_id: str) -> dict:
+        job = PREVIEW_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown preview job (the service may have restarted).")
+        return job
 
     return app
 
