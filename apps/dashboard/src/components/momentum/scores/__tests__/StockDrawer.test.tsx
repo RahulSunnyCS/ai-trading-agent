@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearPolledResourceCache } from '../../../../hooks/usePolledResource';
@@ -44,6 +44,46 @@ const detail = {
   ranks: Array.from({ length: 26 }, (_, i) => 200 - i * 6),
 };
 
+const circuits = {
+  symbol: 'AAA',
+  since: '2025-10-03',
+  until: '2026-10-02',
+  weeks: 52,
+  sessions: 248,
+  min_days: 3,
+  total: 2,
+  locks: [
+    {
+      direction: 'UC',
+      start: '2026-09-28',
+      end: '2026-10-02',
+      days: 5,
+      band_pct: 10,
+      move_pct: 61.5,
+      ongoing: true,
+    },
+    {
+      direction: 'LC',
+      start: '2026-03-10',
+      end: '2026-03-12',
+      days: 3,
+      band_pct: 5,
+      move_pct: -14.3,
+      ongoing: false,
+    },
+  ],
+};
+
+/** Answers each endpoint with its own body; `over` swaps one for another response. */
+function answer(over: { circuits?: () => Response } = {}) {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.endsWith('/circuits'))
+      return over.circuits ? over.circuits() : new Response(JSON.stringify(circuits));
+    return new Response(JSON.stringify(detail), { status: 200 });
+  });
+}
+
 function setup(over: Partial<Parameters<typeof StockDrawer>[0]> = {}) {
   const calls = { open: vi.fn(), close: vi.fn(), sector: vi.fn(), backtest: vi.fn() };
   render(
@@ -67,10 +107,7 @@ function setup(over: Partial<Parameters<typeof StockDrawer>[0]> = {}) {
 describe('StockDrawer', () => {
   beforeEach(() => {
     clearPolledResourceCache();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(JSON.stringify(detail), { status: 200 })),
-    );
+    vi.stubGlobal('fetch', answer());
   });
   afterEach(() => {
     cleanup();
@@ -155,11 +192,75 @@ describe('StockDrawer', () => {
     setup();
     await act(async () => {});
     expect(screen.getByText("Couldn't load this stock's history")).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy();
+    // one retry for the history and one for the circuit locks, which fail on their own
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(2);
   });
 
   it('is closed with no symbol', () => {
     setup({ symbol: null });
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  describe('circuit locks', () => {
+    it('lists the locks of the last 52 weeks, newest first, with the ongoing one flagged', async () => {
+      setup();
+      await act(async () => {});
+      const section = screen.getByRole('heading', { name: /Circuit locks/ }).closest('section');
+      expect(section).toBeTruthy();
+      const rows = within(section as HTMLElement).getAllByRole('listitem');
+      expect(rows).toHaveLength(2);
+      expect(within(rows[0] as HTMLElement).getByText('Upper')).toBeTruthy();
+      expect(within(rows[0] as HTMLElement).getByText('Ongoing')).toBeTruthy();
+      expect(within(rows[0] as HTMLElement).getByText(/5 sessions/)).toBeTruthy();
+      expect(within(rows[0] as HTMLElement).getByText('+61.5%')).toBeTruthy();
+      expect(within(rows[1] as HTMLElement).getByText('Lower')).toBeTruthy();
+      expect(within(rows[1] as HTMLElement).getByText('-14.3%')).toBeTruthy();
+      expect(within(rows[1] as HTMLElement).queryByText('Ongoing')).toBeNull();
+      expect(within(section as HTMLElement).getByText(/1 lower, 1 upper/)).toBeTruthy();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/momentum/scores/stock/AAA/circuits'),
+        expect.anything(),
+      );
+    });
+
+    it('says how many exist when only the latest are listed', async () => {
+      vi.stubGlobal(
+        'fetch',
+        answer({
+          circuits: () => new Response(JSON.stringify({ ...circuits, total: 15 })),
+        }),
+      );
+      setup();
+      await act(async () => {});
+      expect(screen.getByText(/the latest 2 listed/)).toBeTruthy();
+    });
+
+    it('says plainly when there were none', async () => {
+      vi.stubGlobal(
+        'fetch',
+        answer({
+          circuits: () => new Response(JSON.stringify({ ...circuits, total: 0, locks: [] })),
+        }),
+      );
+      setup();
+      await act(async () => {});
+      expect(screen.getByText(/No run of 3 or more sessions/)).toBeTruthy();
+      expect(screen.getByText(/in the 248 sessions checked/)).toBeTruthy();
+    });
+
+    it('offers a retry of its own without hiding the rest of the drawer', async () => {
+      vi.stubGlobal('fetch', answer({ circuits: () => new Response('boom', { status: 500 }) }));
+      setup();
+      await act(async () => {});
+      expect(screen.getByText("Couldn't load the circuit locks")).toBeTruthy();
+      expect(screen.getByRole('img', { name: /Weekly closes over the last year/ })).toBeTruthy();
+      expect(screen.getByText('+47.9%')).toBeTruthy();
+    });
+
+    it('is not fetched while the drawer is closed', async () => {
+      setup({ symbol: null });
+      await act(async () => {});
+      expect(fetch).not.toHaveBeenCalled();
+    });
   });
 });

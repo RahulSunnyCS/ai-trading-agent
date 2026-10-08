@@ -1603,6 +1603,22 @@ def _momentum_stock_payload(symbol: str) -> dict:
     return detail
 
 
+def _momentum_stock_circuits_payload(symbol: str) -> dict:
+    """The circuit locks one stock sat through in the last 52 weeks (BL-049 Phase 3). Its own
+    endpoint, fetched after the drawer's history: it reads the daily bars, which the page's own
+    payload and the history never touch."""
+    try:
+        universe = DATA.get_momentum_universe()
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    if momentum_scores_mod.live_column(universe, symbol) is None:
+        raise HTTPException(404, f"{symbol} is not scored this week.")
+    try:
+        return circuit_exposure_mod.stock_circuit_locks(symbol, universe.frame.index[-1])
+    except FileNotFoundError:
+        raise HTTPException(503, "The research database has no daily stock bars yet.") from None
+
+
 def _run_broad(
     req: BacktestRequest,
     ranking: broad.UniverseRanking,
@@ -2991,6 +3007,10 @@ def create_app() -> FastAPI:
     @app.get("/api/momentum-scores/stock/{symbol}")
     def momentum_scores_stock(symbol: str) -> dict:
         return _momentum_stock_payload(symbol)
+
+    @app.get("/api/momentum-scores/stock/{symbol}/circuits")
+    def momentum_scores_stock_circuits(symbol: str) -> dict:
+        return _momentum_stock_circuits_payload(symbol)
 
     @app.get("/api/liquidity-preview")
     def liquidity_preview(

@@ -16,6 +16,7 @@ import {
   slugify,
 } from '../../lib/momentumScores';
 import { hydrateMomentumScoresFromStorage } from '../../store/momentumScores';
+import { hydrateMomentumScoresViewsFromStorage } from '../../store/momentumScoresViews';
 import type { MomentumSavedRun } from '../../types/momentum';
 import { Card, CardHeader } from '../ui/Card';
 import { RefreshButton } from '../ui/RefreshButton';
@@ -27,6 +28,7 @@ import { SectorPage } from './scores/SectorPage';
 import { SectorsOverview } from './scores/SectorsOverview';
 import { StockDrawer } from './scores/StockDrawer';
 import { StocksLeaderboard } from './scores/StocksLeaderboard';
+import { StripGuide } from './scores/StripGuide';
 
 export function MomentumScoresView() {
   // Cached: the payload changes once a day, so coming back to this section shows the last copy
@@ -53,7 +55,10 @@ export function MomentumScoresView() {
   // The symbols in the order of the list the drawer was opened from, for its prev and next.
   const [order, setOrder] = useState<string[]>([]);
 
-  useEffect(() => hydrateMomentumScoresFromStorage(), []);
+  useEffect(() => {
+    hydrateMomentumScoresFromStorage();
+    hydrateMomentumScoresViewsFromStorage();
+  }, []);
 
   const here = useMemo(
     () => ({ kind, group: groupSlug, sub: subSlug }),
@@ -149,6 +154,7 @@ export function MomentumScoresView() {
 
       {data ? (
         <>
+          <StripGuide />
           {kind === 'sectors' && groupBySlug(data.rotation?.groups ?? [], groupSlug) ? null : (
             <ScoresMarketStrip
               asOf={data.as_of}
@@ -167,6 +173,7 @@ export function MomentumScoresView() {
                 zone={zone}
                 marks={marks}
                 scoredCount={data.stocks.length}
+                savedViews
                 activeSymbol={stockSymbol}
                 onOpenStock={openStock}
                 onOrder={setOrder}

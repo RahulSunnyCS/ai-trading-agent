@@ -53,11 +53,32 @@ Momentum's defaults (10 and 20) when there is none, and the footer says which.
 | Sector group | Narrow the list to one group. |
 | Columns | Switch optional columns off; the choice is kept in this browser. |
 | Column headers | Sort by rank, name, a lookback's score (click its `4w`, `13w`… label in the strip header), 13 or 26-week return, distance from the 52-week high or price. |
+| Views | Saved views of this list (below). |
 | Click a row | Opens the stock's drawer. |
 
 The list shows 100 rows at a time: **Show more** adds the next 100.
 
+### Saved views
+
+Found a combination you come back to, say Leaders in Financials sorted by the 13-week score?
+Set it up, open **Views** and choose **Save current view…**, type a name and press Save. A [saved
+view](glossary:saved-view) keeps the quick view, the sector, the search text and the sort.
+
+- Pick a view in the menu to apply it; **All stocks** returns to the default. The view that
+  matches what you are looking at is ticked.
+- Saving under a name you already use replaces that view. You can keep 12; **Delete a view** in
+  the menu removes one.
+- Views live in this browser only, like the column choice, so they do not follow you to another
+  browser or device.
+- The list **always opens on All**. A saved view is applied only when you pick it, never
+  automatically. If a view names a sector or lookback that no longer exists, it opens with all
+  sectors or the rank order rather than an empty list.
+
 ## Reading the results
+
+The **How to read the strip** card under the header explains this in place, with an example of
+each shape. It starts open; **Got it** folds it to a single line, and clicking that line opens it
+again. The choice is kept in this browser.
 
 Each stock has a strip of small coloured cells, one per lookback (1, 2, 4, 8, 13, 26 and 52
 weeks). The number is the [1–10 score](glossary:score-decile): 10 means the return over that
@@ -123,6 +144,16 @@ high, % above the 40-week average, volatility, up-weeks), and three charts:
 - **Price**: weekly closes over the last year with the 40-week average.
 - **Scores**: the 1–10 score of each lookback over the last 12 weeks, so you see a trend forming.
 - **Rank**: the composite rank over the last 26 weeks (up the page is better).
+
+Below the figures, **Circuit locks** lists every [circuit lock](glossary:circuit-lock) of the last
+52 weeks, newest first: a run of three or more sessions closing on the same price-band edge (2, 5,
+10 or 20%). **Lower** means the stock fell to its limit and holders could not have sold; **Upper**,
+that it rose to its limit and a buyer could not have bought. Each row gives the dates, the number
+of sessions, the band and the stock's move across the lock, and **Ongoing** marks one that has not
+ended yet. At most the latest 12 are listed, with the total beside them. The band is inferred from
+the daily closes, so treat it as a strong hint rather than an exchange record; the definition is
+the one Broad Momentum's circuit-exposure card uses on a backtest. It loads after the charts; if
+it fails, the rest of the drawer is unaffected and it has its own Retry.
 
 **← Prev** and **Next →** walk the list you opened it from, in its order.
 **Open its sector** goes to the stock's group page and **Open in backtest** opens the Backtest

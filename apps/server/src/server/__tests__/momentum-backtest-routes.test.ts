@@ -77,6 +77,33 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it("forwards one stock's circuit locks, and refuses a symbol that is not an NSE symbol", async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { symbol: 'M&M', locks: [] }));
+
+    const ok = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/scores/stock/M%26M/circuits',
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/momentum-scores/stock/M%26M/circuits',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+
+    fetchMock.mockClear();
+    for (const bad of ['..%2Fmeta', 'A%20B', `${'X'.repeat(33)}`]) {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/api/momentum/scores/stock/${bad}/circuits`,
+      });
+      expect(response.statusCode).toBe(400);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    await server.close();
+  });
+
   it('forwards the liquidity preview query and rejects out-of-range thresholds', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

@@ -104,6 +104,25 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // The circuit locks that one stock sat through in the last 52 weeks, for the drawer. A second
+  // call after the history one: it reads the daily bars. Same symbol check as above.
+  fastify.get(
+    '/api/momentum/scores/stock/:symbol/circuits',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['symbol'],
+          properties: { symbol: { type: 'string', pattern: '^[A-Za-z0-9&._-]{1,32}$' } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { symbol } = request.params as { symbol: string };
+      await forward(reply, `/api/momentum-scores/stock/${encodeURIComponent(symbol)}/circuits`);
+    },
+  );
+
   // Live tradability preview for Broad Momentum's liquidity gate: how many stocks pass the given
   // thresholds today and why each rejected one failed. Python re-validates every bound.
   fastify.get(

@@ -231,6 +231,20 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       'A name for the shape of a stock’s 4, 13 and 26-week scores: Leader (strong on all three), Emerging (strong lately, not yet over 26 weeks), Fading (strong over 26 weeks, weak lately), Laggard (weak on 13 and 26 weeks) or Mixed.',
   },
   {
+    id: 'circuit-lock',
+    term: 'Circuit lock',
+    group: 'Momentum',
+    short:
+      'Three or more sessions in a row closing on the same price-band edge. A lower lock means holders could not have sold; an upper lock, that buyers could not have bought. Inferred from daily closes, since the database has no band data. The stock drawer lists those of the last 52 weeks.',
+  },
+  {
+    id: 'saved-view',
+    term: 'Saved view',
+    group: 'Momentum',
+    short:
+      'On the Scores page’s Stocks list, a named combination of quick view, sector, search text and sort that you can bring back in one click. Kept in this browser only; the list always opens on All.',
+  },
+  {
     id: 'market-breadth',
     term: 'Market breadth',
     group: 'Momentum',

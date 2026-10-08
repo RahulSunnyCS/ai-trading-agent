@@ -605,3 +605,10 @@ def test_the_payload_carries_the_rotation_as_json():
     assert len(rotation["weeks"]) == ms.HISTORY_WEEKS
     assert rotation["groups"][0]["key"] == "Fin" and rotation["subs"][0]["key"] == "Fin :: Banks"
     assert rotation["subs"][0]["scored_count"] == 3
+
+
+def test_live_column_names_the_column_of_a_live_member_only():
+    universe = _ten_stocks(not_a_member_at_end={"S0"})
+    assert ms.live_column(universe, "S3") == "S3"
+    assert ms.live_column(universe, "S0") is None  # left the universe at the latest week
+    assert ms.live_column(universe, "NOPE") is None

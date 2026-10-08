@@ -306,6 +306,69 @@ def lc_outcomes(
     return {"trapped": trapped, "escaped": escaped}
 
 
+#: The stock drawer looks back this far (BL-049 Phase 3).
+DRAWER_WEEKS = 52
+#: Most locks listed in the drawer, newest first; the rest are only counted.
+DRAWER_MAX_LOCKS = 12
+#: Calendar days fetched ahead of the window so a lock that began just before it is measured whole.
+_LOOKAHEAD_DAYS = 45
+
+
+def stock_circuit_locks(
+    symbol: str,
+    as_of: pd.Timestamp,
+    *,
+    weeks: int = DRAWER_WEEKS,
+    root: Path | None = None,
+) -> dict:
+    """The circuit locks one stock sat through in the `weeks` ending `as_of` (the stock drawer).
+
+    Same definition as the backtest's `circuit_exposure`: a lock is a run of at least
+    `LOCK_MIN_DAYS` consecutive sessions closing on the same price-band edge in one direction
+    (`_runs`; bhavcopy has no band data, so the band is inferred). A lock that began before the
+    window but reaches into it is listed with its true start and length. Listed newest first, at
+    most `DRAWER_MAX_LOCKS` of them; `total` is the full count. `ongoing` marks a run that reaches
+    the stock's latest session. Display only."""
+    until = pd.Timestamp(as_of).normalize()
+    since = until - pd.Timedelta(weeks=weeks)
+    with stock_bars(root) as con:
+        bars = con.execute(
+            "SELECT b.date, b.close / NULLIF(b.prevclose, 0) - 1 AS move "
+            "FROM bars_1d_stock b JOIN instruments i USING (instrument_id) "
+            "WHERE i.symbol = ? AND b.series = 'EQ' AND b.date BETWEEN ? AND ? ORDER BY b.date",
+            [symbol, (since - pd.Timedelta(days=_LOOKAHEAD_DAYS)).date(), until.date()],
+        ).df()
+    bars["date"] = pd.to_datetime(bars["date"])
+    last_session = bars["date"].iloc[-1] if len(bars) else None
+    locks = [
+        run
+        for run in _runs(bars.dropna(subset=["move"]).reset_index(drop=True))
+        if run["days"] >= LOCK_MIN_DAYS and run["end"] > since
+    ]
+    locks.sort(key=lambda run: run["start"], reverse=True)
+    return {
+        "symbol": symbol,
+        "since": f"{since:%Y-%m-%d}",
+        "until": f"{until:%Y-%m-%d}",
+        "weeks": weeks,
+        "sessions": int((bars["date"] > since).sum()),
+        "min_days": LOCK_MIN_DAYS,
+        "total": len(locks),
+        "locks": [
+            {
+                "direction": run["direction"],
+                "start": f"{run['start']:%Y-%m-%d}",
+                "end": f"{run['end']:%Y-%m-%d}",
+                "days": run["days"],
+                "band_pct": round(run["band"] * 100),
+                "move_pct": round(run["move"] * 100, 1),
+                "ongoing": bool(last_session is not None and run["end"] == last_session),
+            }
+            for run in locks[:DRAWER_MAX_LOCKS]
+        ],
+    }
+
+
 def circuit_exposure(
     result: Result,
     column_to_base: dict[str, str],

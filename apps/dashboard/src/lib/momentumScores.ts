@@ -65,6 +65,47 @@ export interface StockDetail {
   ranks: Array<number | null>;
 }
 
+/** One circuit lock: consecutive sessions closing on the same price-band edge. */
+export interface CircuitLock {
+  /** 'LC' a lower circuit (nobody buying), 'UC' an upper one (nobody selling). */
+  direction: 'LC' | 'UC';
+  start: string;
+  end: string;
+  days: number;
+  /** The band the closes sat on: 2, 5, 10 or 20. */
+  band_pct: number;
+  /** The compounded move across the lock, in percent. */
+  move_pct: number;
+  /** The lock reaches the stock's latest session. */
+  ongoing: boolean;
+}
+
+/** `/api/momentum/scores/stock/<symbol>/circuits`: the locks of the last 52 weeks, newest first. */
+export interface StockCircuits {
+  symbol: string;
+  since: string;
+  until: string;
+  weeks: number;
+  /** Sessions in the window that were checked. */
+  sessions: number;
+  /** The fewest sessions that make a lock. */
+  min_days: number;
+  /** All locks found; `locks` holds only the newest few. */
+  total: number;
+  locks: CircuitLock[];
+}
+
+/** How many of the listed locks fell each way. */
+export function lockCounts(locks: readonly CircuitLock[]): { lc: number; uc: number } {
+  let lc = 0;
+  let uc = 0;
+  for (const lock of locks) {
+    if (lock.direction === 'LC') lc += 1;
+    else uc += 1;
+  }
+  return { lc, uc };
+}
+
 /** How wide the market's momentum is (shares are fractions). */
 export interface Breadth {
   above_ma40: { now: number | null; week_ago: number | null; month_ago: number | null };
@@ -359,6 +400,53 @@ export function trendOf(stock: StockScore): TrendTag | null {
   if (d26 >= 7 && d4 <= 4) return 'fading';
   if (d13 <= 3 && d26 <= 3) return 'laggard';
   return 'mixed';
+}
+
+/** The lookbacks the example strips of the "How to read the strip" card are drawn at. */
+export const STRIP_EXAMPLE_LOOKBACKS = [1, 2, 4, 8, 13, 26, 52] as const;
+
+/**
+ * One typical strip for each trend tag (deciles at 1, 2, 4, 8, 13, 26 and 52 weeks) for the
+ * "How to read the strip" card. A test runs each through `trendOf`, so the card cannot teach a
+ * shape the page would name differently.
+ */
+export const STRIP_EXAMPLES: ReadonlyArray<{
+  trend: TrendTag;
+  deciles: readonly number[];
+  says: string;
+}> = [
+  {
+    trend: 'leader',
+    deciles: [8, 9, 9, 9, 9, 9, 10],
+    says: 'Strong on every window: an established trend.',
+  },
+  {
+    trend: 'emerging',
+    deciles: [10, 10, 9, 8, 6, 4, 3],
+    says: 'Strong lately, not yet over 26 weeks: a newer trend, earlier and riskier.',
+  },
+  {
+    trend: 'fading',
+    deciles: [2, 3, 3, 5, 7, 9, 10],
+    says: 'Strong over the long run, weak lately: a trend losing steam.',
+  },
+  {
+    trend: 'laggard',
+    deciles: [3, 2, 2, 2, 2, 1, 1],
+    says: 'Weak over 13 and 26 weeks: not where momentum is.',
+  },
+  {
+    trend: 'mixed',
+    deciles: [8, 3, 7, 4, 6, 3, 5],
+    says: 'No clear shape: windows disagree.',
+  },
+];
+
+/** A stock whose strip has these deciles at `STRIP_EXAMPLE_LOOKBACKS` (the middle of each tenth). */
+export function stripExampleScores(deciles: readonly number[]): Record<string, number> {
+  return Object.fromEntries(
+    STRIP_EXAMPLE_LOOKBACKS.map((weeks, i) => [String(weeks), ((deciles[i] ?? 1) - 1) * 10 + 5]),
+  );
 }
 
 // --- The strategy's zone, rank movement and what changed this week ---------------------------
@@ -800,4 +888,125 @@ export function strengthRank(
   if (score == null) return null;
   const peers = groups.filter((g) => !g.theme && g.s26.at(-1) != null);
   return { place: peers.filter((g) => (g.s26.at(-1) ?? 0) > score).length + 1, of: peers.length };
+}
+
+// --- Saved views of the Stocks list ------------------------------------------------------------
+
+/** What the Stocks list is showing and how: the part of it worth keeping as a saved view. */
+export interface StocksViewSettings {
+  view: StockView;
+  /** A `parent_group`, or `ALL_GROUPS`. */
+  group: string;
+  sort: ScoreSort;
+  query: string;
+}
+
+export const DEFAULT_STOCKS_SORT: ScoreSort = { key: 'rank', lookback: null, ascending: true };
+
+/** The Stocks list as it opens: everything, strongest rank first (the owner's default). */
+export const DEFAULT_STOCKS_SETTINGS: StocksViewSettings = {
+  view: 'all',
+  group: ALL_GROUPS,
+  sort: DEFAULT_STOCKS_SORT,
+  query: '',
+};
+
+/** The columns the Stocks list can be sorted by. */
+const STOCK_SORT_KEYS: ReadonlySet<string> = new Set([
+  'name',
+  'price',
+  'change',
+  'score',
+  'rank',
+  'high',
+  'return',
+]);
+const STOCK_VIEW_IDS: ReadonlySet<string> = new Set(STOCK_VIEWS.map((view) => view.id));
+export const MAX_SAVED_QUERY = 80;
+
+export function sameSettings(a: StocksViewSettings, b: StocksViewSettings): boolean {
+  return (
+    a.view === b.view &&
+    a.group === b.group &&
+    a.query.trim() === b.query.trim() &&
+    a.sort.key === b.sort.key &&
+    a.sort.ascending === b.sort.ascending &&
+    (!LOOKBACK_KEYS.has(a.sort.key) || a.sort.lookback === b.sort.lookback)
+  );
+}
+
+/** Anything stored -> settings, or null when it is not a usable view. */
+export function normalizeSettings(value: unknown): StocksViewSettings | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const sort = raw.sort;
+  if (!sort || typeof sort !== 'object' || Array.isArray(sort)) return null;
+  const rawSort = sort as Record<string, unknown>;
+  if (typeof raw.view !== 'string' || !STOCK_VIEW_IDS.has(raw.view)) return null;
+  if (typeof rawSort.key !== 'string' || !STOCK_SORT_KEYS.has(rawSort.key)) return null;
+  const key = rawSort.key as ScoreSortKey;
+  const lookback = rawSort.lookback;
+  if (LOOKBACK_KEYS.has(key)) {
+    if (typeof lookback !== 'number' || !Number.isInteger(lookback) || lookback < 1) return null;
+  }
+  return {
+    view: raw.view as StockView,
+    group: typeof raw.group === 'string' ? raw.group : ALL_GROUPS,
+    query: typeof raw.query === 'string' ? raw.query.slice(0, MAX_SAVED_QUERY) : '',
+    sort: {
+      key,
+      lookback: LOOKBACK_KEYS.has(key) ? (lookback as number) : null,
+      ascending: typeof rawSort.ascending === 'boolean' ? rawSort.ascending : true,
+    },
+  };
+}
+
+/**
+ * A saved view as it can be applied today: a sector group that no longer exists falls back to
+ * all sectors, and a sort on a lookback the page no longer scores falls back to the rank, so a
+ * view never opens onto an empty list for a reason the reader cannot see.
+ */
+export function settingsFit(
+  settings: StocksViewSettings,
+  groups: readonly string[],
+  lookbacks: readonly number[],
+): StocksViewSettings {
+  const group = groups.includes(settings.group) ? settings.group : ALL_GROUPS;
+  const lookbackOk =
+    !LOOKBACK_KEYS.has(settings.sort.key) ||
+    (settings.sort.lookback !== null && lookbacks.includes(settings.sort.lookback));
+  return { ...settings, group, sort: lookbackOk ? settings.sort : DEFAULT_STOCKS_SORT };
+}
+
+const SORT_LABEL: Record<string, string> = {
+  name: 'name',
+  price: 'price',
+  change: '1-week change',
+  rank: 'rank',
+  high: 'distance from 52-week high',
+};
+
+function directionOf(sort: ScoreSort): string {
+  if (sort.key === 'name') return sort.ascending ? 'A to Z' : 'Z to A';
+  if (sort.key === 'rank') return sort.ascending ? 'strongest first' : 'weakest first';
+  return sort.ascending ? 'lowest first' : 'highest first';
+}
+
+/** One line saying what a view holds: "Leaders · Financials · by 13w score, highest first". */
+export function describeSettings(settings: StocksViewSettings): string {
+  const view = STOCK_VIEWS.find((option) => option.id === settings.view)?.label ?? 'All';
+  const parts = [view];
+  if (settings.group !== ALL_GROUPS) parts.push(settings.group);
+  if (settings.query.trim()) parts.push(`“${settings.query.trim()}”`);
+  const { sort } = settings;
+  if (sort.key !== DEFAULT_STOCKS_SORT.key || !sort.ascending) {
+    const what =
+      sort.key === 'score'
+        ? `${sort.lookback}w score`
+        : sort.key === 'return'
+          ? `${sort.lookback}w return`
+          : (SORT_LABEL[sort.key] ?? sort.key);
+    parts.push(`by ${what}, ${directionOf(sort)}`);
+  }
+  return parts.join(' · ');
 }
