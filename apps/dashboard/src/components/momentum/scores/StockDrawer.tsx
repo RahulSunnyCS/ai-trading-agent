@@ -3,12 +3,14 @@
 import type { ReactNode } from 'react';
 
 import { usePolledResource } from '../../../hooks/usePolledResource';
-import { EMPTY, formatInr, formatInt, formatPct } from '../../../lib/format';
+import { EMPTY, formatDay, formatInr, formatInt, formatPct } from '../../../lib/format';
 import {
   type BuyZone,
   type SignalMark,
+  type StockCircuits,
   type StockDetail,
   type StockScore,
+  lockCounts,
   markKey,
   rankChange,
   rankInGroup,
@@ -76,6 +78,87 @@ function History({
         <RankChart weeks={data.rank_weeks} ranks={data.ranks} zone={zone} />
       </Section>
     </div>
+  );
+}
+
+/**
+ * The circuit locks of the last 52 weeks: runs of closes on a price-band edge, three sessions or
+ * more. Its own call, made when the drawer opens, after the history: it reads the daily bars.
+ * A lower-circuit lock is a stretch in which a holder could not have sold; an upper one, one in
+ * which a buyer could not have bought.
+ */
+function CircuitLocks({ symbol }: { symbol: string }) {
+  const { data, loading, error, refetch } = usePolledResource<StockCircuits>(
+    `/api/momentum/scores/stock/${encodeURIComponent(symbol)}/circuits`,
+    { cache: true },
+  );
+  const note = `${data?.weeks ?? 52} weeks`;
+  let body: ReactNode;
+  if (error) {
+    body = (
+      <div className="space-y-2">
+        <StateMessage variant="error" title="Couldn't load the circuit locks" description={error} />
+        <Button size="sm" onClick={refetch}>
+          Retry
+        </Button>
+      </div>
+    );
+  } else if (loading && !data) {
+    body = <Skeleton className="h-16 w-full" />;
+  } else if (!data) {
+    body = null;
+  } else if (data.locks.length === 0) {
+    body = (
+      <p className="text-sm text-muted">
+        None. No run of {data.min_days} or more sessions closed on a price-band edge in the{' '}
+        {formatInt(data.sessions)} sessions checked.
+      </p>
+    );
+  } else {
+    const counts = lockCounts(data.locks);
+    body = (
+      <div className="space-y-2">
+        <p className="text-sm text-muted">
+          <b className="metric text-foreground">{formatInt(data.total)}</b>{' '}
+          {data.total === 1 ? 'lock' : 'locks'}
+          {data.total === data.locks.length
+            ? `: ${formatInt(counts.lc)} lower, ${formatInt(counts.uc)} upper.`
+            : `, the latest ${formatInt(data.locks.length)} listed (${formatInt(counts.lc)} lower, ${formatInt(counts.uc)} upper).`}
+        </p>
+        <ul className="divide-y divide-border rounded-lg border border-border">
+          {data.locks.map((lock) => (
+            <li
+              key={`${lock.direction}-${lock.start}`}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm"
+            >
+              <Badge tone={lock.direction === 'LC' ? 'negative' : 'positive'}>
+                {lock.direction === 'LC' ? 'Lower' : 'Upper'}
+              </Badge>
+              <span className="metric text-foreground">
+                {formatDay(lock.start)} – {formatDay(lock.end)}
+              </span>
+              {lock.ongoing ? <Badge tone="warning">Ongoing</Badge> : null}
+              <span className="ml-auto text-xs text-muted">
+                {formatInt(lock.days)} sessions · {formatPct(lock.band_pct, 0, { unit: 'percent' })}{' '}
+                band ·{' '}
+                <span className={lock.move_pct >= 0 ? 'text-positive' : 'text-negative'}>
+                  {formatPct(lock.move_pct, 1, { unit: 'percent', sign: true })}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  return (
+    <Section title="Circuit locks" note={note}>
+      {body}
+      <p className="text-xs text-faint">
+        Inferred from daily closes at a price-band edge (the database has no band data). A lower
+        lock means a holder could not have sold; an upper lock, that a buyer could not have bought.
+      </p>
+    </Section>
   );
 }
 
@@ -217,6 +300,7 @@ export function StockDrawer({
               value={place ? `${place.place} of ${place.of}` : EMPTY}
             />
           </section>
+          <CircuitLocks key={stock.symbol} symbol={stock.symbol} />
         </div>
       ) : null}
     </Drawer>

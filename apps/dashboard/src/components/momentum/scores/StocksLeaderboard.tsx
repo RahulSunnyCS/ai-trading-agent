@@ -8,18 +8,21 @@ import { EMPTY, formatInr, formatInt, formatPct } from '../../../lib/format';
 import {
   ALL_GROUPS,
   type BuyZone,
+  DEFAULT_STOCKS_SORT,
   STOCK_VIEWS,
   type ScoreSort,
   type ScoreSortKey,
   type SignalMark,
   type StockScore,
   type StockView,
+  type StocksViewSettings,
   filterStocks,
   inView,
   markKey,
   nextSort,
   parentGroups,
   rankChange,
+  settingsFit,
   sortStocks,
   trendOf,
   viewCounts,
@@ -29,12 +32,14 @@ import {
   type ScoreColumn,
   useMomentumScoresStore,
 } from '../../../store/momentumScores';
+import { useMomentumScoresViewsStore } from '../../../store/momentumScoresViews';
 import { Badge } from '../../ui/Badge';
 import { Button } from '../../ui/Button';
 import { CheckboxMenu } from '../../ui/CheckboxMenu';
 import { Input, Select } from '../../ui/Input';
 import { SegmentedControl } from '../../ui/SegmentedControl';
 import { THead, TRow, Table, Td, Th } from '../../ui/Table';
+import { SavedViewsMenu } from './SavedViewsMenu';
 import { ScoreStrip, Spark, TrendBadge } from './ScoreStrip';
 import { SortTh } from './SortTh';
 
@@ -194,6 +199,7 @@ export function StocksLeaderboard({
   heading,
   chip,
   showGroupFilter = true,
+  savedViews = false,
   top,
   activeSymbol = null,
   onOpenStock,
@@ -211,6 +217,8 @@ export function StocksLeaderboard({
   chip?: { label: string; onClear: () => void };
   /** The sector-group filter; off where the list is already one sector. */
   showGroupFilter?: boolean;
+  /** The Views menu: named quick view + sector + search + sort combinations kept in the browser. */
+  savedViews?: boolean;
   /** Just the strongest `limit` stocks, no search or paging, and a link to the whole list. */
   top?: { limit: number; onShowAll: () => void };
   /** The stock whose drawer is open, lit in the list. */
@@ -224,11 +232,14 @@ export function StocksLeaderboard({
   const [query, setQuery] = useState('');
   const [view, setView] = useState<StockView>('all');
   const [group, setGroup] = useState(ALL_GROUPS);
-  const [sort, setSort] = useState<ScoreSort>({ key: 'rank', lookback: null, ascending: true });
+  const [sort, setSort] = useState<ScoreSort>(DEFAULT_STOCKS_SORT);
   const [shown, setShown] = useState(top?.limit ?? PAGE);
   const searchRef = useRef<HTMLInputElement>(null);
   const hidden = useMomentumScoresStore((state) => state.hidden);
   const setColumnShown = useMomentumScoresStore((state) => state.setColumnShown);
+  const views = useMomentumScoresViewsStore((state) => state.views);
+  const saveView = useMomentumScoresViewsStore((state) => state.saveView);
+  const deleteView = useMomentumScoresViewsStore((state) => state.deleteView);
 
   const deferredQuery = useDeferredValue(query);
   const counts = useMemo(() => viewCounts(stocks, marks), [stocks, marks]);
@@ -244,6 +255,22 @@ export function StocksLeaderboard({
       ),
     [stocks, view, marks, deferredQuery, group, sort],
   );
+
+  const current = useMemo<StocksViewSettings>(
+    () => ({ view, group, sort, query }),
+    [view, group, sort, query],
+  );
+  const applySettings = (settings: StocksViewSettings): void => {
+    const fit = settingsFit(
+      settings,
+      groups.map((option) => option.group),
+      lookbacks,
+    );
+    setView(fit.view);
+    setGroup(fit.group);
+    setSort(fit.sort);
+    setQuery(fit.query);
+  };
 
   // Told only when the order really changed: a parent that keeps what it is told in state must
   // not be woken by a list that was rebuilt to the same symbols.
@@ -361,6 +388,15 @@ export function StocksLeaderboard({
                   </option>
                 ))}
               </Select>
+            ) : null}
+            {savedViews ? (
+              <SavedViewsMenu
+                views={views}
+                current={current}
+                onApply={applySettings}
+                onSave={(name) => saveView(name, current)}
+                onDelete={deleteView}
+              />
             ) : null}
             <CheckboxMenu
               ariaLabel="Choose columns"

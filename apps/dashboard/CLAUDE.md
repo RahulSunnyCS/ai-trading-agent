@@ -102,7 +102,9 @@ needs to be shared with the server, it is currently hand-duplicated in
 - `src/hooks/` — one hook per data resource, all built on `usePolledResource`
 - `src/store/settings.ts` — density, defaults, notifications and the developer flag
   (Settings tab); `src/store/theme.ts` — Zustand theme store; `src/store/navigation.ts` owns the
-  locally persisted tab visibility/order preferences; `src/store/momentumView.ts` the Momentum
+  locally persisted tab visibility/order preferences; `src/store/momentumScores.ts` and
+  `src/store/momentumScoresViews.ts` what the reader keeps on Momentum › Scores (hidden columns, the map's
+  minimum stocks; saved views of the Stocks list and the strip card's open state); `src/store/momentumView.ts` the Momentum
   result layout (the headline benchmark pick, the chart's drawdown pane and week list, the full metric set). Personality/live state is
   fetched via hooks, not centralized in a store.
 - `src/guide/` — the Guide's registry, glossary and Markdown pages; `components/guide/` renders them

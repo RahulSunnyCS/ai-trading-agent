@@ -2108,3 +2108,42 @@ def test_the_stock_drawer_endpoint_returns_history_and_404s_for_an_unscored_symb
     body = ok.json()
     assert body["symbol"] == "S2" and len(body["closes"]) == 53 and len(body["ranks"]) == 26
     assert client.get("/api/momentum-scores/stock/NOPE").status_code == 404
+
+
+def test_the_stock_circuits_endpoint_reads_the_52_weeks_to_the_pages_last_week(client, monkeypatch):
+    import pandas as pd
+
+    from momentum_backtesting.categories import broad
+
+    weeks = [pd.Timestamp("2020-01-03") + pd.Timedelta(weeks=i) for i in range(90)]
+    frame = pd.DataFrame({"S0": [100.0 + w for w in range(90)]}, index=weeks)
+    universe = broad.StockUniverseFrame(
+        frame=frame,
+        weeks=weeks,
+        column_to_base_symbol={"S0": "S0"},
+        stock_membership=pd.DataFrame(True, index=weeks, columns=frame.columns),
+        events=pd.DataFrame(),
+        stale_columns={},
+        missing_symbols=[],
+    )
+    monkeypatch.setattr(api.DATA, "get_momentum_universe", lambda: universe)
+    asked = []
+
+    def fake(symbol, as_of, **kwargs):
+        asked.append((symbol, as_of))
+        return {"symbol": symbol, "locks": [], "total": 0}
+
+    monkeypatch.setattr(api.circuit_exposure_mod, "stock_circuit_locks", fake)
+
+    ok = client.get("/api/momentum-scores/stock/S0/circuits")
+    assert ok.status_code == 200 and ok.json()["symbol"] == "S0"
+    assert asked == [("S0", weeks[-1])]
+    # a symbol the page does not score is a 404 and never reads the bars
+    assert client.get("/api/momentum-scores/stock/NOPE/circuits").status_code == 404
+    assert len(asked) == 1
+
+    def no_database(*args, **kwargs):
+        raise FileNotFoundError("no catalog")
+
+    monkeypatch.setattr(api.circuit_exposure_mod, "stock_circuit_locks", no_database)
+    assert client.get("/api/momentum-scores/stock/S0/circuits").status_code == 503

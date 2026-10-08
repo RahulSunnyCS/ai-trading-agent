@@ -79,6 +79,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/momentum-scores/stock/:symbol`,
             },
             {
+              source: '/api/momentum/scores/stock/:symbol/circuits',
+              destination: `${momentumDirectOrigin}/api/momentum-scores/stock/:symbol/circuits`,
+            },
+            {
               source: '/api/momentum/backtest',
               destination: `${momentumDirectOrigin}/api/backtest`,
             },

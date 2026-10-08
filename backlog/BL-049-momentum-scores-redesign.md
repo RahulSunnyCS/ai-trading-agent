@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — makes the research workbench far more useful for picking and watching names; not on the real-money path (BL-010 / BL-025 are) |
-| **Status** | In progress (Phase 2 built, Phase 3 to do) |
+| **Status** | In progress (Phases 1 to 3 built, awaiting merge) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard) |
 | **Created** | 2026-10-07 |
@@ -241,3 +241,36 @@ All answered 2026-10-08, see the Log.
     second takes the other's copy as is.
   - Not done, by design: `short_name` on sub-sectors (labels fit without it), saved views,
     circuit locks and the strip-reading card (Phase 3).
+- 2026-10-08 — Phase 3 built (branch `feat/bl-049-scores-phase3`, stacked on Phase 2). What it
+  does and where it differs from the plan:
+  - **Saved views** (`store/momentumScoresViews.ts`, own key `ata.momentumScoresViews.v1`, so the
+    Phase 2 store and its stored key are untouched): a **Views** menu beside Columns on the Stocks
+    view only (not on the sector page or the overview's top ten). A view keeps the quick view,
+    sector group, search text and sort; names are unique ignoring case (saving an existing name
+    replaces it), at most 12, 40 characters. Applying is always an explicit pick: the list still
+    opens on All (owner decision), and **All stocks** in the menu returns to the default. A view
+    whose sector or lookback has since disappeared opens with all sectors or the rank order rather
+    than an empty list. Delete is a submenu so every action is keyboard reachable.
+  - **Circuit locks over 52 weeks** in the drawer: a sibling endpoint
+    `GET /api/momentum-scores/stock/{symbol}/circuits` (Fastify
+    `/api/momentum/scores/stock/:symbol/circuits`, Next direct rewrite), fetched by the drawer
+    only once it is open, in parallel with its history, and with its own error and Retry. It runs
+    the daily-bar query of `circuit_exposure.py` through `stock_bars()` for one symbol and groups
+    runs with the same `_runs`, so the definition is the backtest card's: a lock is **3 or more**
+    sessions on one band edge in one direction (`LOCK_MIN_DAYS`, the owner's rule); shorter runs
+    are ordinary moves and are not listed. A lock that began before the window but reaches into it
+    is listed whole. Newest first, at most 12 listed with the total counted; `ongoing` marks a run
+    that reaches the stock's latest session. 404 for a symbol the page does not score, 503 if the
+    daily bars are missing. `live_column` was lifted out of `stock_detail` so both endpoints share
+    the one membership check.
+  - **"How to read the strip" card** (`scores/StripGuide.tsx`) on all Scores views: the 10-step
+    colour key, which end is recent, and one example strip per trend tag. The examples live in
+    `lib/momentumScores.ts` and a test runs each through `trendOf`, so the card cannot teach a
+    shape the page names differently.
+  - Judgement calls, conservative defaults (owner may change): the card starts **open on a first
+    visit** and "Got it" folds it to a one-line toggle that stays on the page (remembered in the
+    browser); saved views keep the search text as well as the filters; a view is never applied on
+    load; the lock threshold is 3 sessions, not the 2 that `circuit_exposure`'s escape analysis
+    uses.
+  - "Open in backtest" already opened the Backtest tab on Broad Momentum (owner answer); left as
+    is.

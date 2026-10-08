@@ -692,23 +692,28 @@ def composite_rank_history(
     return table
 
 
+def live_column(universe: broad.StockUniverseFrame, symbol: str) -> str | None:
+    """The frame column of `symbol` when it is a live member at the latest week, else None. The
+    per-stock endpoints (history, circuit locks) answer only for stocks the page scores."""
+    frame = universe.frame
+    if frame.empty:
+        return None
+    member = universe.stock_membership.loc[frame.index[-1]]
+    for column in frame.columns:
+        if universe.column_to_base_symbol.get(column) == symbol and bool(member.get(column, False)):
+            return column
+    return None
+
+
 def stock_detail(universe: broad.StockUniverseFrame, symbol: str) -> dict | None:
     """What the stock drawer shows beyond the list's own row: 53 weekly closes with the 40-week
     average, the percentile score at each lookback over the last 12 weeks, and the composite rank
     over the last 26. None when the symbol is not a live member at the latest week."""
+    column = live_column(universe, symbol)
+    if column is None:
+        return None
     frame = universe.frame
-    if frame.empty:
-        return None
     pos = len(frame.index) - 1
-    member = universe.stock_membership.loc[frame.index[pos]]
-    columns = [
-        c
-        for c in frame.columns
-        if universe.column_to_base_symbol.get(c) == symbol and bool(member.get(c, False))
-    ]
-    if not columns:
-        return None
-    column = columns[0]
     closes = frame[column].iloc[max(0, pos - YEAR_WEEKS) :]
     ma = frame[column].rolling(MA_WEEKS, min_periods=MA_WEEKS).mean().loc[closes.index]
     score_weeks = [d.strftime("%Y-%m-%d") for d in frame.index[-DRAWER_SCORE_WEEKS:]]
