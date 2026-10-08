@@ -3,6 +3,7 @@ catalog (see runs_store.py). Exercised at both layers: runs_store.py directly ag
 a DuckDB connection, and the /api/saved-runs routes through a TestClient - the isolated
 TRADING_DATA_ROOT from conftest.py means these never touch the real catalog."""
 
+import itertools
 import threading
 import time
 from datetime import date
@@ -21,11 +22,20 @@ def client():
     return TestClient(api.create_app())
 
 
+_DISTINCT = itertools.count()
+
+
 def _payload(name: str = "Run 1", dataset: str = "etf") -> dict:
+    # Each payload its own strategy (BL-052: the same settings again would be a repeat of one,
+    # and these tests make separate favourites); cost_pct, read by every dataset, differs.
     return {
         "dataset": dataset,
         "name": name,
-        "config": {"top_n": 5, "lookbacks": [1, 4, 13, 26, 52]},
+        "config": {
+            "top_n": 5,
+            "lookbacks": [1, 4, 13, 26, 52],
+            "cost_pct": round(0.10 + next(_DISTINCT) % 50 / 100, 2),
+        },
         "kpis": {"cagr": 0.18, "sharpe": 1.2},
         "dates": ["2020-01-03", "2020-01-10"],
         "strategy": [100.0, 101.5],
@@ -37,7 +47,8 @@ def test_save_list_and_the_record_shape_matches_the_frontend_type(client):
     saved = client.post("/api/saved-runs", json=_payload()).json()
     assert saved["name"] == "Run 1"
     assert saved["n"] == 1
-    assert saved["config"] == {"top_n": 5, "lookbacks": [1, 4, 13, 26, 52]}
+    assert saved["config"]["top_n"] == 5
+    assert saved["config"]["lookbacks"] == [1, 4, 13, 26, 52]
     assert saved["kpis"] == {"cagr": 0.18, "sharpe": 1.2}
     assert saved["dates"] == ["2020-01-03", "2020-01-10"]
     assert saved["strategy"] == [100.0, 101.5]
@@ -110,11 +121,15 @@ def test_patching_or_deleting_an_unknown_run_is_a_clear_404(client):
     assert client.delete("/api/saved-runs/does-not-exist").status_code == 404
 
 
-def test_more_than_ten_runs_prunes_the_oldest_per_dataset(client):
-    ids = [
-        client.post("/api/saved-runs", json=_payload(name=f"Run {i}")).json()["id"]
-        for i in range(12)
-    ]
+def _distinct(i: int, name: str | None = None) -> dict:
+    """A run of its own strategy (BL-052: the same settings again is a repeat of one)."""
+    payload = _payload(name=name or f"Run {i}")
+    payload["config"] = {**payload["config"], "top_n": i + 1}
+    return payload
+
+
+def test_more_than_ten_strategies_prunes_the_oldest_per_dataset(client):
+    ids = [client.post("/api/saved-runs", json=_distinct(i)).json()["id"] for i in range(12)]
     listed = client.get("/api/saved-runs", params={"dataset": "etf"}).json()
     assert len(listed) == 10
     listed_ids = {run["id"] for run in listed}
@@ -123,12 +138,12 @@ def test_more_than_ten_runs_prunes_the_oldest_per_dataset(client):
 
 
 def test_favorite_and_overlay_runs_are_never_pruned(client):
-    favorite = client.post("/api/saved-runs", json=_payload(name="Fav")).json()["id"]
-    overlay = client.post("/api/saved-runs", json=_payload(name="Overlay")).json()["id"]
+    favorite = client.post("/api/saved-runs", json=_distinct(100, "Fav")).json()["id"]
+    overlay = client.post("/api/saved-runs", json=_distinct(101, "Overlay")).json()["id"]
     client.patch(f"/api/saved-runs/{favorite}", json={"favorite": True})
     client.patch(f"/api/saved-runs/{overlay}", json={"overlay": True})
     for i in range(15):
-        client.post("/api/saved-runs", json=_payload(name=f"Run {i}"))
+        client.post("/api/saved-runs", json=_distinct(i))
     listed_ids = {r["id"] for r in client.get("/api/saved-runs", params={"dataset": "etf"}).json()}
     assert {favorite, overlay} <= listed_ids
     assert len(listed_ids) == 12  # 10 ordinary + the two kept ones

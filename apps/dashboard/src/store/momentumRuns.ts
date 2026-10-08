@@ -231,6 +231,8 @@ async function saveFinishedRun(run: MomentumRun, result: MomentumResult): Promis
       dates: result.series.dates,
       strategy: result.series.strategy,
       overlay: false,
+      // BL-052: lets the server tell a data revision from a code change when the result moves.
+      versions: result.versions ?? null,
     });
     if (saved.ok) patchRun(run.id, { savedAs: saved.data.name });
   } finally {

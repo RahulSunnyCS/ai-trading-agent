@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { type FyersAuthState, useFyersAuthStatus } from '../../hooks/useFyersAuthStatus';
 import { useMeta } from '../../hooks/useMeta';
 import { usePaymentBalance } from '../../hooks/usePaymentBalance';
+import { usePolledResource } from '../../hooks/usePolledResource';
 import { cn } from '../../lib/cn';
 import { formatInt } from '../../lib/format';
 import { startFyersLogin } from '../../lib/fyers-login';
@@ -145,6 +146,12 @@ export function SystemStatus() {
   const { meta, loading: metaLoading, error: metaError } = useMeta();
   const auth = useFyersAuthStatus();
   const credits = usePaymentBalance();
+  // The trading server (`apps/server`, frozen) is optional; the research stack runs without it.
+  // When /api/meta fails, the Momentum API answering means the part people use is up.
+  const research = usePolledResource<unknown>('/api/momentum/meta', {
+    intervalMs: 30_000,
+    cache: true,
+  });
 
   // Null until mounted: the session depends on the clock, which the server render and the
   // browser would not agree on at a session boundary.
@@ -155,7 +162,9 @@ export function SystemStatus() {
     return () => clearInterval(timer);
   }, []);
 
-  const apiDown = metaError !== null;
+  const researchUp = research.data !== null && research.error === null;
+  const tradingServerOff = metaError !== null && researchUp;
+  const apiDown = metaError !== null && !researchUp;
   const apiPending = !apiDown && meta === null && metaLoading;
   const session = now ? marketSession(now) : null;
   const simulate = meta?.simulate === true;
@@ -164,14 +173,24 @@ export function SystemStatus() {
   return (
     <div className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-muted md:gap-3">
       <StatusItem
-        tone={apiDown ? 'negative' : apiPending ? 'neutral' : 'positive'}
-        label={apiDown ? 'API unreachable' : apiPending ? 'Checking the API' : 'API reachable'}
+        tone={apiDown ? 'negative' : apiPending || tradingServerOff ? 'neutral' : 'positive'}
+        label={
+          apiDown
+            ? 'API unreachable'
+            : tradingServerOff
+              ? 'Research API reachable'
+              : apiPending
+                ? 'Checking the API'
+                : 'API reachable'
+        }
         title={
           apiDown
             ? `API unreachable: ${metaError}`
-            : apiPending
-              ? 'Checking the API'
-              : 'API reachable'
+            : tradingServerOff
+              ? 'Research APIs are reachable; the trading server (apps/server) is not running'
+              : apiPending
+                ? 'Checking the API'
+                : 'API reachable'
         }
       >
         {apiDown ? <span className="text-negative">API unreachable</span> : 'API'}
