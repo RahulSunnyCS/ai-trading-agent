@@ -15,11 +15,13 @@ The browser only ever talks to the dashboard; the dashboard's **server** forward
 APIs must be reachable from wherever Next runs — that is what the tunnel is for. No CORS,
 no open ports, and the Python services stay bound to `127.0.0.1`.
 
-Two locks, both required:
+Two locks, both required. The first is the dashboard password, or, when the dashboard host sits
+behind Cloudflare Access, Access's own sign-in (see "Signing in with Google" below; the password is
+then unused):
 
 | Lock | Protects | Configured by |
 |---|---|---|
-| Dashboard password | the dashboard (every page and `/api/*`) | `DASHBOARD_PASSWORD` on the dashboard host |
+| Dashboard password (or Cloudflare Access sign-in) | the dashboard (every page and `/api/*`) | `DASHBOARD_PASSWORD` on the dashboard host (or `ACCESS_TEAM_DOMAIN` + `ACCESS_AUD`) |
 | Cloudflare Access service token | the tunnel hostnames, so the APIs can't be called around the dashboard | Cloudflare Zero Trust + `UPSTREAM_ACCESS_CLIENT_ID/SECRET` on the dashboard host |
 
 The password **fails closed**: under `next start` / Vercel (or whenever the service-token
@@ -142,6 +144,52 @@ the root directory" on — the tsconfig extends the repo root's), add the variab
 Production. Hobby is fine for personal use; its terms rule out commercial use, so move to
 Pro before any subscriber touches it.
 
+**Cloudflare Workers** (instead of Vercel; one account for the dashboard and the tunnel). The
+dashboard builds with the OpenNext Cloudflare adapter (`open-next.config.ts`, `wrangler.jsonc`) and is
+served at `dashboard.codifie.dev` (a custom domain, `workers_dev` off). Needs Node 22+ for `wrangler`
+(Node 20 is refused).
+
+OpenNext bundles every `.env` it finds, the repo-root `.env` included, which would upload every broker,
+Telegram and Google secret. So always build with `bun run cf:build` (or `cf:deploy` / `cf:preview`, which
+call it): `scripts/cf-build.mjs` renames every `.env`, `.env.local`, `.env.production` and
+`.env.production.local` (repo root and `apps/dashboard`) for the build and puts them back afterwards, even
+on an error or Ctrl+C. They are missing for the minutes the build takes, so avoid running a scheduled job
+that reads the root `.env` meanwhile. The script then `scripts/check-no-env-bundled.mjs` fails the build unless the bundled env is
+empty. Do not run `opennextjs-cloudflare build` or `wrangler deploy` directly. If a build is killed
+outright and a `.env` file is missing, rename its `.cf-build-hidden` copy back (the next `cf:build` also does it).
+
+```bash
+cd apps/dashboard
+npx wrangler login                                   # once
+# build-time values: export these four in the shell (not in a .env file, which the build hides)
+#   MOMENTUM_DIRECT=1  OBT_DIRECT=1  MOMENTUM_DIRECT_API_URL=…  OBT_DIRECT_API_URL=…
+npx wrangler secret put DASHBOARD_PASSWORD           # password mode only; the name goes in the command,
+npx wrangler secret put UPSTREAM_ACCESS_CLIENT_ID    # the value is typed at the hidden prompt
+npx wrangler secret put UPSTREAM_ACCESS_CLIENT_SECRET
+bun run cf:deploy                                    # builds, checks, then wrangler deploy
+bun run cf:preview                                   # local Workers runtime on :8787
+```
+
+`cf:preview` reads secrets from `apps/dashboard/.dev.vars` (gitignored). `ACCESS_TEAM_DOMAIN` and
+`ACCESS_AUD` are set in `wrangler.jsonc`, so a preview is in Access mode and refuses every request
+(no Access token on localhost) unless `.dev.vars` blanks them (`ACCESS_TEAM_DOMAIN=` and `ACCESS_AUD=`),
+which gives the password mode.
+
+Checked under `wrangler dev` against an echo server: wrong or missing password gets 401 (pages redirect to
+`/login`), the service-token headers reach the upstream, a client-supplied `CF-Access-Client-Id` is
+overwritten, and the dashboard's `Authorization`, Access token and session cookies do not reach the
+upstream. **On Workers a header the middleware deletes still reaches the rewrite target; a blank one
+does not, so `upstreamHeaders` blanks them.** The bundle is 1.6 MiB gzipped (free plan limit 3 MiB).
+
+**Auto-deploy.** Pushing to the `release` branch deploys the dashboard
+(`.github/workflows/deploy-dashboard.yml`); nothing else does. Promote a tested `main` with
+`git push origin main:release`, or run the workflow by hand from the Actions tab. One-time setup:
+Cloudflare dashboard → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers" template,
+limited to this account and the `codifie.dev` zone (add Zone → DNS → Edit if the deploy complains
+about the custom domain); then store it with `gh secret set CLOUDFLARE_API_TOKEN` (the value is
+typed at the prompt). The account ID and the four build values in the workflow are not secret.
+The runner has no repo-root `.env`, and `cf:deploy` still refuses to ship a bundle with any env in it.
+
 **Second laptop:** put the variables in `apps/dashboard/.env.local`, then
 
 ```bash
@@ -151,6 +199,26 @@ bun run --filter @ata/dashboard start
 ```
 
 Use `start`, not `dev`: production mode is what makes the password mandatory.
+
+## Signing in with Google (Cloudflare Access) instead of the password
+
+Put the dashboard's own hostname behind Access too. People sign in with Google (so Google's
+2-step verification, an authenticator app or a passkey, is the second factor) and the dashboard
+checks the signed token Access attaches; `DASHBOARD_PASSWORD` and `/login` are then unused.
+
+1. Google Cloud Console → APIs & Services → OAuth consent screen (External; add your Google
+   address as a test user) → Credentials → Create OAuth client ID, type Web. Authorized redirect
+   URI: `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback`. Copy the client ID and secret.
+2. Zero Trust → Settings → Authentication → Login methods → Add new → Google, paste both.
+3. Zero Trust → Access → Applications → Add → Self-hosted: domain `dashboard.<your-domain>`, login
+   method Google only, one **Allow** policy that includes your email. Copy the application's **AUD tag**.
+4. Put `ACCESS_TEAM_DOMAIN` (`<team>.cloudflareaccess.com`) and `ACCESS_AUD` in `wrangler.jsonc`
+   under `vars` (neither is secret), rebuild and `bun run cf:deploy`, then delete the
+   `DASHBOARD_PASSWORD` secret (`npx wrangler secret delete DASHBOARD_PASSWORD`).
+
+The Worker refuses (403) any request without a valid Access token, so reaching it by another route
+does not get in. `/logout` hands over to Access's own logout. Scripts and curl need an Access service
+token for the dashboard hostname, as for the API hostnames.
 
 ## Limits
 

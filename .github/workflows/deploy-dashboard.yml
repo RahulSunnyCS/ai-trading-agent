@@ -1,0 +1,60 @@
+name: Deploy dashboard
+
+# Pushing to the `release` branch deploys the dashboard to Cloudflare Workers
+# (dashboard.codifie.dev, docs/remote-dashboard.md). Nothing else deploys it.
+# Promote with: git push origin main:release   (or merge main into release)
+on:
+  push:
+    branches: [release]
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one that is uploading.
+concurrency:
+  group: deploy-dashboard
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Dashboard — Deploy to Cloudflare Workers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.x'
+
+      # wrangler needs Node 22+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check the deploy token is set
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Add the CLOUDFLARE_API_TOKEN repository secret (docs/remote-dashboard.md, Auto-deploy)."
+            exit 1
+          fi
+
+      # cf:deploy builds (OpenNext), refuses to ship a bundle that contains any env variable, then
+      # runs wrangler deploy. The runtime secrets (service token) and the ACCESS_* vars live on the
+      # Worker / in wrangler.jsonc, so nothing secret is needed here beyond the API token. The four
+      # build values are not secret: they are baked into the rewrites.
+      - name: Build and deploy
+        working-directory: apps/dashboard
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 4b36831f8c22d7b48d1f1f32380131ec
+          MOMENTUM_DIRECT: '1'
+          OBT_DIRECT: '1'
+          MOMENTUM_DIRECT_API_URL: https://momentum-api.codifie.dev
+          OBT_DIRECT_API_URL: https://options-api.codifie.dev
+        run: bun run cf:deploy

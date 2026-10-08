@@ -388,6 +388,27 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       'How closely a favourite is followed. Watching: journalled only. Paper: tracked against your live-money rules as if it had money. Invested: real money follows it. Paper and Invested together are limited to 8.',
   },
   {
+    id: 'saved-strategy',
+    term: 'Saved strategy',
+    group: 'Momentum',
+    short:
+      'Every run of one set of settings, shown as one row in Saved runs. Settings are compared after filling in the defaults and leaving out the ones the dataset never reads, so a repeat run joins its strategy instead of adding a row.',
+  },
+  {
+    id: 'strategy-trust',
+    term: 'Trust (Saved runs)',
+    group: 'Momentum',
+    short:
+      "How far a saved result can be trusted: Validated (one of the frozen Phase 6 ensemble's configs, tested on data their choice never saw), In-sample (the best of what was tried on the same data), Not tradable (Broad with the tradability filter or circuit rule off) or Old data (a week or more behind).",
+  },
+  {
+    id: 'result-moved',
+    term: 'Result moved',
+    group: 'Momentum',
+    short:
+      'The same settings gave a different result. Each run records its data and code versions, so the move is labelled Data revised, Intended change, Check (possibly a bug), Not reproducible (a bug) or Unknown (saved before versions were recorded).',
+  },
+  {
     id: 'headline',
     term: 'Headline favourite',
     group: 'Momentum',
