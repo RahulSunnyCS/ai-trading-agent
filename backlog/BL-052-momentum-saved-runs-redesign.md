@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — the workbench page where favourites are chosen; not on the real-money path, but its "why it moved" check catches results that change for no reason |
-| **Status** | Planned |
+| **Status** | In progress |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard) |
 | **Created** | 2026-10-08 |
 | **Depends on** | BL-051 Phase 1 (favourite status Watching / Paper / Invested, groups, headline): this item builds on that model rather than restating it. Related: BL-001 (result integrity) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.12.18 |
 
 ## Context
 
@@ -266,3 +266,20 @@ Answered by the owner on 2026-10-08 (see the Log):
   and code plus data changing together is "Check".
 - 2026-10-08 — owner answered the last two questions: Check is not sent to Telegram (page only);
   keep the last 3 repeat runs per strategy, plus every result change.
+- 2026-10-08 — started. No new questions: every open one was answered. Phase 1 decisions from
+  reading the code:
+  - **Strategy state stays on an anchor run** (the favourite run, else the oldest) instead of a
+    new strategy table: the journal, the weekly job and BL-051's groups key on run ids, and this
+    keeps every one of them stable. A run's own config is now read from `backtest_runs.params`;
+    the version's `spec` holds the normalised settings.
+  - **Normalised with the request model's defaults**, not the meta endpoints' UI defaults: they
+    are what the engine actually ran with (Broad's meta turns the liquidity filter on, the
+    request model leaves it off). The fields each dataset never reads come from the code (a test
+    recomputes them from `api.py` and fails if they drift); `weights` count only for the
+    `ranksum` score, which is the only one that reads them.
+  - **Auto names move to Phase 2** (the dashboard already has the setting labels;
+    `name_typed` tells it which names are placeholders). **"Comparison" trust waits** for the
+    median companion's config to be recorded next to the frozen file: Phase 1 derives Validated
+    (the four frozen configs match exactly), Not tradable, Old data and In-sample. **Re-run now
+    to check** moves to Phase 2 (it re-runs through Backtest, whose save gives the outcome).
+

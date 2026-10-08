@@ -33,10 +33,11 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("008_data_quality",),
             ("009_ref_expiries",),
             ("010_ref_rates",),
+            ("011_momentum_result_changes",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 10
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 11
 
 
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):

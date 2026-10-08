@@ -110,11 +110,15 @@ def test_patching_or_deleting_an_unknown_run_is_a_clear_404(client):
     assert client.delete("/api/saved-runs/does-not-exist").status_code == 404
 
 
-def test_more_than_ten_runs_prunes_the_oldest_per_dataset(client):
-    ids = [
-        client.post("/api/saved-runs", json=_payload(name=f"Run {i}")).json()["id"]
-        for i in range(12)
-    ]
+def _distinct(i: int, name: str | None = None) -> dict:
+    """A run of its own strategy (BL-052: the same settings again is a repeat of one)."""
+    payload = _payload(name=name or f"Run {i}")
+    payload["config"] = {**payload["config"], "top_n": i + 1}
+    return payload
+
+
+def test_more_than_ten_strategies_prunes_the_oldest_per_dataset(client):
+    ids = [client.post("/api/saved-runs", json=_distinct(i)).json()["id"] for i in range(12)]
     listed = client.get("/api/saved-runs", params={"dataset": "etf"}).json()
     assert len(listed) == 10
     listed_ids = {run["id"] for run in listed}
@@ -123,12 +127,12 @@ def test_more_than_ten_runs_prunes_the_oldest_per_dataset(client):
 
 
 def test_favorite_and_overlay_runs_are_never_pruned(client):
-    favorite = client.post("/api/saved-runs", json=_payload(name="Fav")).json()["id"]
-    overlay = client.post("/api/saved-runs", json=_payload(name="Overlay")).json()["id"]
+    favorite = client.post("/api/saved-runs", json=_distinct(100, "Fav")).json()["id"]
+    overlay = client.post("/api/saved-runs", json=_distinct(101, "Overlay")).json()["id"]
     client.patch(f"/api/saved-runs/{favorite}", json={"favorite": True})
     client.patch(f"/api/saved-runs/{overlay}", json={"overlay": True})
     for i in range(15):
-        client.post("/api/saved-runs", json=_payload(name=f"Run {i}"))
+        client.post("/api/saved-runs", json=_distinct(i))
     listed_ids = {r["id"] for r in client.get("/api/saved-runs", params={"dataset": "etf"}).json()}
     assert {favorite, overlay} <= listed_ids
     assert len(listed_ids) == 12  # 10 ordinary + the two kept ones

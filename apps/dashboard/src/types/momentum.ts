@@ -205,6 +205,9 @@ export interface MomentumResult {
   /** Whether the server answered from its result cache (then `computed_at` is when it was
    * actually computed), as opposed to computing it for this request. */
   cache?: { hit: boolean; computed_at: string };
+  /** What the result was computed from (BL-052): data and code fingerprints, sent back when the
+   * run is saved so a later move can be explained. */
+  versions?: MomentumRunVersions | null;
   /** A background run's result holds the core only: each section below is `undefined` until
    * fetched (its name is in `sections_available`). A whole result from the synchronous endpoint
    * has them all. */
@@ -246,6 +249,23 @@ export interface MomentumSavedRun {
   member_of: string | null;
   /** `/favorite-strategies` only: a group's members' full records. */
   members?: MomentumSavedRun[];
+  /** BL-052: the normalised-settings hash; runs sharing it are one strategy. */
+  fingerprint?: string | null;
+  versions?: MomentumRunVersions | null;
+  data_through?: string | null;
+  /** Against the strategy's previous run: a new strategy, the same result again, or a new one. */
+  outcome?: 'new' | 'repeat' | 'new_result' | null;
+}
+
+/** A run's data and code fingerprints (BL-052, `saved_identity.versions_from_input`). */
+export interface MomentumRunVersions {
+  data: string;
+  tables: Record<string, string>;
+  lake: string;
+  files: string;
+  code: string;
+  /** "at_save" when the result did not carry them and the server measured them on saving. */
+  measured?: string;
 }
 
 /** How closely a favourite is followed (BL-051). Paper + Invested together are capped. */
