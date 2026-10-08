@@ -1766,6 +1766,46 @@ def orders_run(
         notify.send(note)
 
 
+saved_app = typer.Typer(
+    no_args_is_help=True,
+    help="Saved runs (BL-052): one strategy per set of settings.",
+)
+app.add_typer(saved_app, name="saved")
+
+
+@saved_app.command("merge")
+def saved_merge(
+    apply: bool = typer.Option(
+        False, "--apply", help="Write the merge. Without it, only list what would be merged."
+    ),
+) -> None:
+    """Fold saved runs with the same normalised settings into one strategy each. A dry run by
+    default; nothing is ever deleted, and running it again changes nothing."""
+    from . import runs_store
+    from .db_read import open_catalog, read_catalog
+
+    if apply:
+        with open_catalog() as con:
+            plan = runs_store.apply_merge(con)
+    else:
+        with read_catalog() as con:
+            plan = runs_store.merge_plan(con)
+    if not plan["merges"] and not plan["conflicts"]:
+        typer.echo("Nothing to merge: every saved run is already under its strategy.")
+        return
+    verb = "Merged" if apply else "Would merge"
+    typer.echo(f"{verb} {plan['runs']} runs into {plan['strategies']} strategies:")
+    for item in plan["merges"]:
+        names = ", ".join(run["name"] or run["id"][:8] for run in item["runs"])
+        results = "1 result" if item["results"] == 1 else f"{item['results']} different results"
+        typer.echo(f"  {item['dataset']:<12} {item['fingerprint']}  {names}  ({results})")
+    for item in plan["conflicts"]:
+        names = ", ".join(run["name"] or run["id"][:8] for run in item["runs"])
+        typer.echo(f"  left as is (two favourites share these settings): {names}")
+    if not apply:
+        typer.echo("Run again with --apply to write it. Later saves keep the last 3 repeats.")
+
+
 journal_app = typer.Typer(
     no_args_is_help=True,
     help="The forward-signal journal (BL-024): every weekly signal as recorded, unchangeable.",

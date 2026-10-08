@@ -1,4 +1,4 @@
-"""Your orders' state in the shared catalog (BL-051 Phase 3; trading-data migration 011): the
+"""Your orders' state in the shared catalog (BL-051 Phase 3; trading-data migration 012): the
 owner's holdings snapshots, holding rules, order settings, and the orders computed each Friday.
 
 Every row carries an owner ID (`owner()`: MOMENTUM_OWNER, default "rahul") so friends can be

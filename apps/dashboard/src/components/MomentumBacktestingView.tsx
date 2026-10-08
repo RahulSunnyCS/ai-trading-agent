@@ -27,7 +27,7 @@ import {
 
 import { useAppRoute } from '../hooks/useAppRoute';
 import { useMomentumWeeklyJob } from '../hooks/useMomentumWeeklyJob';
-import { apiDelete, apiGet, apiPatch, apiPost } from '../lib/api';
+import { apiGet } from '../lib/api';
 import { cn } from '../lib/cn';
 import { formatDuration, formatPct, formatPp } from '../lib/format';
 import {
@@ -44,6 +44,7 @@ import {
   modifiedSections,
 } from '../lib/momentumConfig';
 import { usualDuration } from '../lib/momentumDurations';
+import { asSavedRun } from '../lib/momentumSaved';
 import { MOMENTUM_DATASETS, MOMENTUM_SECTIONS, type MomentumSection, oneOf } from '../lib/routes';
 import { type MomentumRun, hydrateMomentumRuns, useMomentumRunsStore } from '../store/momentumRuns';
 import { hydrateMomentumViewFromStorage, useMomentumViewStore } from '../store/momentumView';
@@ -52,7 +53,7 @@ import {
   getDefaultDateRangeYears,
   getDefaultMomentumDataset,
 } from '../store/settings';
-import type { FavouriteStatus, MomentumResult, MomentumSavedRun } from '../types/momentum';
+import type { MomentumResult, MomentumSavedRun, SavedStrategy } from '../types/momentum';
 import { MomentumEquityChart } from './momentum/MomentumEquityChart';
 import { MomentumHeadline } from './momentum/MomentumHeadline';
 import { MomentumJournalView } from './momentum/MomentumJournalView';
@@ -60,7 +61,6 @@ import { MomentumRebalanceView } from './momentum/MomentumRebalanceView';
 import type { MomentumRunInfo } from './momentum/MomentumResultDetails';
 import { MomentumResultWidgets } from './momentum/MomentumResultWidgets';
 import { MomentumResultsSkeleton, MomentumRunBanner } from './momentum/MomentumRunProgress';
-import { MomentumSavedRunsView } from './momentum/MomentumSavedRunsView';
 import { MomentumScoresView } from './momentum/MomentumScoresView';
 import {
   type CoreSettings,
@@ -73,6 +73,10 @@ import {
 import { MomentumSettingsSkeleton } from './momentum/MomentumSkeletons';
 import { MomentumRunBar } from './momentum/backtest/MomentumRunBar';
 import { MomentumSettingsChips } from './momentum/backtest/MomentumSettingsChips';
+import {
+  SavedStrategiesView,
+  useSavedStrategiesSummary,
+} from './momentum/saved/SavedStrategiesView';
 import { ThisWeekView } from './momentum/week/ThisWeekView';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -98,7 +102,8 @@ const SECTIONS: Array<{ id: MomentumSection; label: string; description: string 
   {
     id: 'saved',
     label: 'Saved runs',
-    description: 'Review and compare saved backtests for the selected dataset.',
+    description:
+      'Every saved backtest, one row per strategy across all datasets: how far each can be trusted, whether its result moved, and which ones you follow.',
   },
   {
     id: 'week',
@@ -448,19 +453,24 @@ export function MomentumBacktestingView() {
         }
       : null;
   const inFlightCount = runs.filter(inFlight).length;
+  // This dataset's saved runs, for the chart's overlays (the Saved runs section lists strategies
+  // across every dataset itself, BL-052).
   const [savedRuns, setSavedRuns] = useState<MomentumSavedRun[]>([]);
-  // Until the first response lands the list is unknown, not empty: the Saved runs section shows
-  // placeholders and its tab shows no count, rather than "0 runs".
-  const [savedRunsLoading, setSavedRunsLoading] = useState(true);
-  const [savedRunsLoadError, setSavedRunsLoadError] = useState<string | null>(null);
   const savedRunsRequest = useRef(0);
-  const [savedRunError, setSavedRunError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Overlays are the saved strategies you chose to keep on the chart, except the one on screen
+  // (BL-052: matched by its settings' fingerprint, not by being first in the list, which hid
+  // whichever run happened to be listed first).
+  const shownFingerprint = shownRun?.savedFingerprint ?? null;
   const overlays = useMemo(
-    () => savedRuns.filter((run, index) => index > 0 && run.overlay),
-    [savedRuns],
+    () =>
+      savedRuns.filter(
+        (run) => run.overlay && (shownFingerprint === null || run.fingerprint !== shownFingerprint),
+      ),
+    [savedRuns, shownFingerprint],
   );
+  const savedSummary = useSavedStrategiesSummary();
 
   /** Saved runs are persisted server-side, grouped by dataset. Only the newest request may update
    * the list, so a slow response for the dataset you just left can't replace the current one. */
@@ -468,13 +478,7 @@ export function MomentumBacktestingView() {
     const request = ++savedRunsRequest.current;
     const response = await apiGet<MomentumSavedRun[]>(`/api/momentum/saved-runs?dataset=${target}`);
     if (request !== savedRunsRequest.current) return;
-    setSavedRunsLoading(false);
-    if (response.ok) {
-      setSavedRuns(response.data);
-      setSavedRunsLoadError(null);
-    } else {
-      setSavedRunsLoadError(response.error);
-    }
+    if (response.ok) setSavedRuns(response.data);
   }
 
   function onCoreChange(patch: Partial<CoreSettings>): void {
@@ -482,47 +486,6 @@ export function MomentumBacktestingView() {
   }
   function onValueChange(key: string, value: unknown): void {
     setValues((current) => ({ ...current, [key]: value }));
-  }
-
-  async function patchRun(id: string, patch: Record<string, unknown>): Promise<void> {
-    setSavedRunError(null);
-    const response = await apiPatch(`/api/momentum/saved-runs/${id}`, patch);
-    if (!response.ok) {
-      setSavedRunError(response.error);
-      return;
-    }
-    await refreshSavedRuns(dataset);
-  }
-  async function renameRun(id: string, name: string): Promise<void> {
-    await patchRun(id, { name });
-  }
-  async function toggleOverlay(id: string, overlay: boolean): Promise<void> {
-    await patchRun(id, { overlay });
-  }
-  async function setFavouriteStatus(id: string, status: FavouriteStatus | 'none'): Promise<void> {
-    await patchRun(id, { status });
-  }
-  async function createGroup(name: string, members: string[]): Promise<boolean> {
-    setSavedRunError(null);
-    const response = await apiPost('/api/momentum/saved-runs/groups', { name, members });
-    if (!response.ok) {
-      setSavedRunError(response.error);
-      return false;
-    }
-    await refreshSavedRuns(dataset);
-    return true;
-  }
-  async function setActive(id: string): Promise<void> {
-    await patchRun(id, { active: true });
-  }
-  async function removeRun(id: string): Promise<void> {
-    setSavedRunError(null);
-    const response = await apiDelete(`/api/momentum/saved-runs/${id}`);
-    if (!response.ok) {
-      setSavedRunError(response.error);
-      return;
-    }
-    await refreshSavedRuns(dataset);
   }
 
   async function loadMeta(nextDataset: Dataset, seed?: Record<string, unknown>): Promise<void> {
@@ -596,9 +559,6 @@ export function MomentumBacktestingView() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadMeta is redefined every render; it should only re-run when the dataset itself changes
   useEffect(() => {
     setSavedRuns([]);
-    setSavedRunsLoading(true);
-    setSavedRunsLoadError(null);
-    setSavedRunError(null);
     void refreshSavedRuns(dataset);
     lastDataset = dataset;
     const seed = mountSeedRef.current;
@@ -623,6 +583,7 @@ export function MomentumBacktestingView() {
     if (savedKeyRef.current === savedKey) return;
     savedKeyRef.current = savedKey;
     void refreshSavedRuns(dataset);
+    savedSummary.refetch();
   }, [savedKey]);
 
   function loadSettings(run: MomentumSavedRun): void {
@@ -652,6 +613,39 @@ export function MomentumBacktestingView() {
     );
     setSection('backtest');
     setDrawerOpen(true);
+  }
+
+  /** Open a saved strategy's settings in Backtest, switching dataset when it is another one. */
+  function openSavedStrategy(strategy: SavedStrategy): void {
+    const target = strategy.dataset as Dataset;
+    const config = { ...strategy.config_full, dataset: target };
+    if (target === dataset) {
+      loadSettings({ ...asSavedRun(strategy, strategy.name), config });
+      return;
+    }
+    // The dataset effect loads the target's meta and seeds the form with this config.
+    mountSeedRef.current = config;
+    setDatasetState(target);
+    navigate('momentum', 'backtest', target);
+    setDrawerOpen(true);
+  }
+
+  /** "Re-run now to check": run the strategy's own settings on today's code and data. The
+   * finished run is saved like any other, and its toast says whether the result moved. */
+  async function rerunSavedStrategy(strategy: SavedStrategy): Promise<void> {
+    const target = strategy.dataset as Dataset;
+    // The form shows the settings being re-run (not whatever was open), so the run bar and a
+    // later Run match this run.
+    openSavedStrategy(strategy);
+    const failure = await useMomentumRunsStore
+      .getState()
+      .startRun(target, { ...strategy.config_full, dataset: target }, false);
+    if (failure) {
+      toast(failure, 'error');
+      return;
+    }
+    setDrawerOpen(false);
+    toast("Re-running it on today's code and data; the result is saved when it finishes", 'info');
   }
 
   function buildConfig(): Record<string, unknown> {
@@ -944,7 +938,20 @@ export function MomentumBacktestingView() {
               }
             >
               {item.label}
-              {item.id === 'saved' ? (savedRunsLoading ? ' (…)' : ` (${savedRuns.length})`) : ''}
+              {item.id === 'saved'
+                ? savedSummary.count === null
+                  ? ' (…)'
+                  : ` (${savedSummary.count})`
+                : ''}
+              {item.id === 'saved' && savedSummary.unreviewed > 0 ? (
+                <span
+                  className="rounded-full bg-warning/15 px-1.5 font-mono text-[10.5px] text-warning"
+                  aria-label={`${savedSummary.unreviewed} moved results to review`}
+                  title="Saved strategies whose result moved and need a look (Check or Not reproducible)"
+                >
+                  {savedSummary.unreviewed}
+                </span>
+              ) : null}
               {item.id === 'backtest' && inFlightCount > 0 ? (
                 <span className="relative flex h-2 w-2" aria-label={`${inFlightCount} running`}>
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
@@ -983,40 +990,14 @@ export function MomentumBacktestingView() {
         ) : section === 'rebalance' ? (
           <MomentumRebalanceView currentBroadConfig={dataset === 'broad' ? currentConfig : null} />
         ) : section === 'saved' ? (
-          <div className="space-y-3">
-            <SegmentedControl
-              ariaLabel="Dataset"
-              value={dataset}
-              options={DATASET_OPTIONS}
-              onChange={setDataset}
-            />
-            {savedRunError ? (
-              <StateMessage
-                variant="error"
-                title="Could not update saved run"
-                description={savedRunError}
-              />
-            ) : null}
-            {savedRunsLoadError ? (
-              <StateMessage
-                variant="error"
-                title="Could not load saved runs"
-                description={savedRunsLoadError}
-              />
-            ) : null}
-            <MomentumSavedRunsView
-              dataset={dataset}
-              runs={savedRuns}
-              loading={savedRunsLoading}
-              onRename={renameRun}
-              onToggleOverlay={toggleOverlay}
-              onSetStatus={setFavouriteStatus}
-              onSetActive={setActive}
-              onCreateGroup={createGroup}
-              onRemove={removeRun}
-              onLoad={loadSettings}
-            />
-          </div>
+          <SavedStrategiesView
+            onOpenInBacktest={openSavedStrategy}
+            onRerun={(strategy) => void rerunSavedStrategy(strategy)}
+            onChanged={() => {
+              void refreshSavedRuns(dataset);
+              savedSummary.refetch();
+            }}
+          />
         ) : (
           <>
             {/* The run bar (Analytics page pattern): the dataset, the settings the next run tests

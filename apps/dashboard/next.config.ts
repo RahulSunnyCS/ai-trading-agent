@@ -119,6 +119,24 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/saved-runs/:runId`,
             },
             {
+              source: '/api/momentum/saved-strategies',
+              destination: `${momentumDirectOrigin}/api/saved-strategies`,
+            },
+            {
+              source: '/api/momentum/result-changes',
+              destination: `${momentumDirectOrigin}/api/result-changes`,
+            },
+            {
+              // BL-052: one strategy per set of settings (+ `merge`, `:runId`), and the log of
+              // why a result moved (+ `:changeId/reviewed`).
+              source: '/api/momentum/saved-strategies/:path*',
+              destination: `${momentumDirectOrigin}/api/saved-strategies/:path*`,
+            },
+            {
+              source: '/api/momentum/result-changes/:path*',
+              destination: `${momentumDirectOrigin}/api/result-changes/:path*`,
+            },
+            {
               // Weekly signal's favourites + Telegram-active strategy. Without this rule the call
               // fell through to Fastify (not running in this mode) and 500'd silently.
               source: '/api/momentum/favorite-strategies',

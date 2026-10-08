@@ -233,6 +233,52 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards the saved-strategy routes (BL-052)', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, {}));
+    const cases: Array<[string, string, string, Record<string, unknown>?]> = [
+      ['GET', '/api/momentum/saved-strategies', '/api/saved-strategies'],
+      [
+        'GET',
+        '/api/momentum/saved-strategies?dataset=broad',
+        '/api/saved-strategies?dataset=broad',
+      ],
+      ['GET', '/api/momentum/saved-strategies/summary', '/api/saved-strategies/summary'],
+      ['GET', '/api/momentum/saved-strategies/merge', '/api/saved-strategies/merge'],
+      ['POST', '/api/momentum/saved-strategies/merge', '/api/saved-strategies/merge'],
+      ['GET', '/api/momentum/saved-strategies/abc', '/api/saved-strategies/abc'],
+      ['PATCH', '/api/momentum/saved-strategies/abc', '/api/saved-strategies/abc', { notes: 'x' }],
+      ['DELETE', '/api/momentum/saved-strategies/abc', '/api/saved-strategies/abc'],
+      ['GET', '/api/momentum/result-changes', '/api/result-changes'],
+      [
+        'GET',
+        '/api/momentum/result-changes?unreviewed=true',
+        '/api/result-changes?unreviewed=true',
+      ],
+      [
+        'POST',
+        '/api/momentum/result-changes/c1/reviewed',
+        '/api/result-changes/c1/reviewed',
+        { reviewed_by: 'rahul' },
+      ],
+    ];
+    for (const [method, url, upstream, payload] of cases) {
+      fetchMock.mockClear();
+      const response = await server.inject({
+        method: method as 'GET' | 'POST' | 'PATCH' | 'DELETE',
+        url,
+        ...(payload ? { payload } : {}),
+      });
+      expect(response.statusCode, `${method} ${url}`).toBe(200);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `http://127.0.0.1:8765${upstream}`,
+        expect.objectContaining(method === 'GET' ? {} : { method }),
+      );
+    }
+    await server.close();
+  });
+
   it('forwards making a group of saved runs', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

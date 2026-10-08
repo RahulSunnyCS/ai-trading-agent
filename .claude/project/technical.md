@@ -62,6 +62,14 @@ bun run stop:research        # stop this checkout's research processes
 bun run start:prod           # APIs + `next start` on :5190; sign in at /login
 bun run start:frontend:prod  # the production dashboard only; add `-- --rebuild` / `-- --port 5191`
 
+# Hosted dashboard on Cloudflare Workers at dashboard.codifie.dev (docs/remote-dashboard.md); run from apps/dashboard, Node 22+.
+# Always through these scripts: cf-build hides the repo-root .env, which OpenNext would otherwise bundle into the Worker
+bun run cf:build            # OpenNext build with the root .env hidden + a check that no env was bundled
+bun run cf:deploy           # cf:build, then wrangler deploy
+bun run cf:preview          # cf:build, then wrangler dev on :8787
+# Auto-deploy: a push to the `release` branch runs .github/workflows/deploy-dashboard.yml (needs the CLOUDFLARE_API_TOKEN secret)
+bun run start:tunnel        # cloudflared tunnel run: only while someone is using the hosted dashboard
+
 # Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)
 bun run --filter @ata/dashboard dev
 
@@ -143,6 +151,7 @@ uv run mbt compare         # rank-and-rotate backtest, off/ranked/filter modes -
 uv run mbt serve           # private Momentum API on 127.0.0.1:8765
 uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
+uv run mbt saved merge [--apply]  # BL-052: fold saved runs with the same normalised settings into one strategy each (dry run by default; deletes nothing)
 uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 scheduler job)
 uv run mbt live-rules check [--send] [--simulate drawdown-cut|drawdown-exit|trailing|gate-ready]  # BL-025: the owner's live-money rules vs the followed money (Fri 21:30 scheduler job); never trades
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
@@ -422,7 +431,7 @@ The system is a **real-time event-driven pipeline** in four layers:
   hook on Bash) refuses `gh pr merge` while any check is failing or pending, `--admin`, a PR over
   500 changed lines (data, fixtures and lockfiles excluded) without the `reviewed` label, and a
   push to `main` that changes anything but `*.md` outside `packages/*/src/`. Add `reviewed` only
-  after `/code-review` has run and its result is on the PR
+  after `/code-review` has run and its result is on the PR. `/code-review-merge` (`.claude/skills/code-review-merge/`) automates the whole loop: Opus review, Haiku CI poller every 5 minutes, merge, sync local `main`
 - **Dashboard colours and type come from tokens** — never a hex in a component. Token roles,
   the chart palette helpers (`lib/chartTheme.ts`) and the font setup (self-hosted `next/font/local`, IBM Plex
   Sans / Mono) are in `docs/dashboard-design-tokens.md`
@@ -505,6 +514,7 @@ Critical variables whose misconfiguration causes real pain:
 | `SCHEDULER_API_PORT` / `SCHEDULER_DIRECT` / `SCHEDULER_DIRECT_API_URL` | The scheduler (`apps/scheduler`, `jobs serve`) runs a loopback-only JSON API on `127.0.0.1:$SCHEDULER_API_PORT` (default 8790). `SCHEDULER_DIRECT=1` (set by `scripts/dev-stack.mjs`; off in a plain production build) makes the dashboard rewrite `/api/scheduler/*` to `SCHEDULER_DIRECT_API_URL` (default `http://127.0.0.1:8790`), ahead of the `/api/*` catch-all. The dev stack never starts a second scheduler loop |
 | `DASHBOARD_PASSWORD` | Password for the dashboard (`apps/dashboard/src/middleware.ts`): a `/login` page that sets a 30-day signed `HttpOnly` session cookie for people, and HTTP Basic (username ignored) for `/api/*` and curl. Changing it signs everyone out. **Required** whenever the dashboard is reachable remotely — a production build, or either `UPSTREAM_ACCESS_*` var set — and a missing one makes every request 503 rather than serve openly. Unset is fine only for local `next dev` |
 | `UPSTREAM_ACCESS_CLIENT_ID` / `UPSTREAM_ACCESS_CLIENT_SECRET` | Cloudflare Access service token the dashboard's Next server adds to `/api/*` requests it forwards to the tunnel hostnames; client-supplied copies are always stripped. Set both or neither: one without the other (or one blank) makes every request 503 rather than letting every API call fail upstream |
+| `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` | Optional. The dashboard host sits behind a Cloudflare Access application that signs people in (Google, one-time PIN). Set both (team hostname `<team>.cloudflareaccess.com` and the application's AUD tag; plain Worker vars, not secrets) and the dashboard accepts only requests carrying a valid signed Access token (`apps/dashboard/src/lib/cfAccess.ts`); `DASHBOARD_PASSWORD` and `/login` are then unused. One without the other, or a team domain outside `cloudflareaccess.com`, makes every request 503 |
 | ~~`MOMENTUM_DATABASE_URL`~~ | **Retired 2026-09-30** (TODO 3.11.5) — `packages/momentum-backtesting`'s price history and weekly signals now live in the shared `momentum_prices`/`momentum_signals` tables (`TRADING_DATA_ROOT`), not a separate Neon Postgres. `DATABASE_URL` (unrelated, still live) is what momentum's `fyers.py` reads for `broker_tokens` |
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after the dashboard token and `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
 | `MOMENTUM_OWNER` | Owner ID on Momentum's Your orders rows (settings, holdings, orders; BL-051). Default `rahul`; a second person would run with their own. Tests also set `MOMENTUM_STATE_DIR` / `SCHEDULER_STATE_DIR` to temp folders so they never touch the real `data/` files or the scheduler's run history |

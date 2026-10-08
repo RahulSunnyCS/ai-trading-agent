@@ -406,7 +406,7 @@ contract, not a shared service).
   owner's minimum, ₹10,000 by default, skipped; whole shares; blocked names held; charges at
   `engine`'s itemised rates, no brokerage). `holdings_store` keeps per-owner settings (`MOMENTUM_OWNER`,
   default `rahul`; paper capital ₹1 lakh), holdings snapshots (Fyers `fyers.holdings`, read-only,
-  or pasted), holding rules and the orders made (trading-data migration 011). `api._compute_orders`
+  or pasted), holding rules and the orders made (trading-data migration 012). `api._compute_orders`
   is the body of `mbt orders run [--send]` (scheduler job `momentum-orders`, Fri 14:15) and of
   `POST /api/orders/run`: the headline's target from `_orders_signal`, which for a stored week one
   short of the target and a signal delay of 1 uses `_broad_sentinel_run(ahead=True)` - deciding the
@@ -516,7 +516,20 @@ contract, not a shared service).
   journalled one by one. `list_favorites` leaves groups out (they have no config to run);
   `list_groups` returns them with their members; `/api/favorite-strategies` returns both.
   `groups.py` combines the members' signals into the group's (sleeves weighted by value since the
-  last April reset, `choose.ensemble_curve`'s convention) and its one Telegram message. `api.py`'s `/api/saved-runs` routes call this;
+  last April reset, `choose.ensemble_curve`'s convention) and its one Telegram message. **One strategy per set of
+  settings (BL-052):** a version is the run's *normalised* settings
+  (`saved_identity.fingerprint`: request-model defaults filled, the fields the dataset never reads
+  dropped, `weights` only for `ranksum`), so rerunning the same settings is a `repeat` of one
+  strategy, not a new row. Every run stores `versions` (data + code fingerprints, carried by each
+  backtest result) and an `outcome`; a moved result appends a row to the append-only
+  `momentum_result_changes` (a run-record table: listed in `db_read.RUN_RECORD_TABLES`, so it
+  never moves the data version) labelled by `saved_identity.explain` — data revised, intended (a
+  same-dataset accepted golden change), check, not reproducible (Telegram for a favourite) or
+  unknown. Strategy state (name, notes, status) stays on the *anchor* run (the favourite, else the
+  oldest), so the run ids the journal keys on never change; a run's config is
+  `backtest_runs.params`. Each strategy keeps its last 3 repeats; each dataset its newest 10
+  unkept strategies. `/api/saved-strategies*` and `/api/result-changes*` serve it;
+  `mbt saved merge [--apply]` folded the runs saved before. `api.py`'s `/api/saved-runs` routes call this;
   the Fastify proxy (`apps/server/src/server/routes/momentum-backtest.ts`)
   forwards `/api/momentum/saved-runs*` to it unchanged.
 

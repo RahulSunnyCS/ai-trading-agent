@@ -1,8 +1,15 @@
 import { create } from 'zustand';
 
+import { toast } from '../components/ui/Toast';
 import { apiGet, apiPost } from '../lib/api';
 import { recordDuration } from '../lib/momentumDurations';
-import type { MomentumResult, MomentumSavedRun, MomentumSectionName } from '../types/momentum';
+import { saveToast } from '../lib/momentumSaved';
+import type {
+  MomentumResult,
+  MomentumSaveOutcome,
+  MomentumSavedRun,
+  MomentumSectionName,
+} from '../types/momentum';
 
 /**
  * Momentum backtest runs, held OUTSIDE the view so they outlive it.
@@ -38,6 +45,8 @@ export interface MomentumRun {
   error: string | null;
   /** Name of the saved run created from this one, once the auto-save has landed. */
   savedAs: string | null;
+  /** The saved strategy's settings fingerprint (BL-052): the chart leaves its own overlay out. */
+  savedFingerprint?: string | null;
   /** The step a running job has reached ("loading", "ranking", "simulating", "analysing"), as the
    * server last reported it, and the server's ordered list of steps. */
   stage?: string | null;
@@ -216,7 +225,7 @@ async function saveFinishedRun(run: MomentumRun, result: MomentumResult): Promis
     const sequence = Math.max(0, ...(existing.ok ? existing.data.map((saved) => saved.n) : [])) + 1;
     const kpis = result.kpis;
     const num = (value: unknown): number | null => (typeof value === 'number' ? value : null);
-    const saved = await apiPost<MomentumSavedRun>('/api/momentum/saved-runs', {
+    const saved = await apiPost<MomentumSaveOutcome>('/api/momentum/saved-runs', {
       dataset: run.dataset,
       name: `Run ${sequence}`,
       config: run.config,
@@ -231,8 +240,18 @@ async function saveFinishedRun(run: MomentumRun, result: MomentumResult): Promis
       dates: result.series.dates,
       strategy: result.series.strategy,
       overlay: false,
+      // BL-052: lets the server tell a data revision from a code change when the result moves.
+      versions: result.versions ?? null,
     });
-    if (saved.ok) patchRun(run.id, { savedAs: saved.data.name });
+    if (saved.ok) {
+      patchRun(run.id, {
+        savedAs: saved.data.name,
+        savedFingerprint: saved.data.fingerprint ?? null,
+      });
+      // BL-052: say where the run went: a new strategy, a repeat, or a moved result and why.
+      const said = saveToast(saved.data);
+      toast(said.message, said.tone);
+    }
   } finally {
     saving.delete(run.id);
   }

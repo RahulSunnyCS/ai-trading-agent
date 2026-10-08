@@ -296,6 +296,110 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // BL-052: saved runs as one strategy per set of settings, and the log of why a result moved.
+  // `merge` is registered before `:runId`; a static segment wins anyway.
+  fastify.get(
+    '/api/momentum/saved-strategies',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            dataset: { type: 'string', enum: ['etf', 'stock', 'custom_index', 'broad'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { dataset } = request.query as { dataset?: string };
+      await forward(
+        reply,
+        dataset
+          ? `/api/saved-strategies?dataset=${encodeURIComponent(dataset)}`
+          : '/api/saved-strategies',
+      );
+    },
+  );
+
+  fastify.get('/api/momentum/saved-strategies/summary', async (_request, reply) => {
+    await forward(reply, '/api/saved-strategies/summary');
+  });
+
+  fastify.get('/api/momentum/saved-strategies/merge', async (_request, reply) => {
+    await forward(reply, '/api/saved-strategies/merge');
+  });
+
+  fastify.post('/api/momentum/saved-strategies/merge', async (_request, reply) => {
+    await forward(reply, '/api/saved-strategies/merge', { method: 'POST' });
+  });
+
+  fastify.get(
+    '/api/momentum/saved-strategies/:runId',
+    { schema: { params: RUN_ID_PARAMS } },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      await forward(reply, `/api/saved-strategies/${encodeURIComponent(runId)}`);
+    },
+  );
+
+  fastify.patch(
+    '/api/momentum/saved-strategies/:runId',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { params: RUN_ID_PARAMS, body: { type: 'object' } } },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      await forward(reply, `/api/saved-strategies/${encodeURIComponent(runId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.delete(
+    '/api/momentum/saved-strategies/:runId',
+    { schema: { params: RUN_ID_PARAMS } },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      await forward(reply, `/api/saved-strategies/${encodeURIComponent(runId)}`, {
+        method: 'DELETE',
+      });
+    },
+  );
+
+  fastify.get(
+    '/api/momentum/result-changes',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { unreviewed: { type: 'boolean' } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { unreviewed } = request.query as { unreviewed?: boolean };
+      await forward(
+        reply,
+        unreviewed ? '/api/result-changes?unreviewed=true' : '/api/result-changes',
+      );
+    },
+  );
+
+  fastify.post(
+    '/api/momentum/result-changes/:runId/reviewed',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { params: RUN_ID_PARAMS } },
+    async (request, reply) => {
+      const { runId } = request.params as { runId: string };
+      await forward(reply, `/api/result-changes/${encodeURIComponent(runId)}/reviewed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body ?? {}),
+      });
+    },
+  );
+
   // Favourites are intentionally not scoped to the currently selected dataset:
   // the weekly scheduler evaluates the complete set and has one global active
   // strategy whose result may be sent to Telegram.

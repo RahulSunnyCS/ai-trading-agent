@@ -16,7 +16,7 @@ from typing import Literal
 
 import duckdb
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
@@ -30,6 +30,7 @@ from . import (
     rebalance,
     reference_benchmarks,
     runs_store,
+    saved_identity,
     search,
     stock_actions,
     this_week,
@@ -509,6 +510,17 @@ DATA = _Data()
 _INPUT_FOLDERS = ("", "daily", "daily_etf", "categories", "stocks")
 
 
+#: Files under data/ that are written by the tools, never read by a backtest: logs, the Fyers token
+#: cache (`.fyers_token.json`, rewritten every morning) and other dotfiles, and the live-rules
+#: check's last report. Counting them moved the data version with no market data changing, which
+#: emptied caches and made a moved result look like a data revision (BL-052).
+_STATE_FILES = frozenset({"live_rules_last.json"})
+
+
+def _not_an_input(name: str) -> bool:
+    return name.endswith(".log") or name.startswith(".") or name in _STATE_FILES
+
+
 def input_version() -> tuple:
     """Everything a backtest result depends on apart from its request: the shared database's
     `data_version()` and the size and mtime of every input file under data/ and the curated
@@ -521,10 +533,45 @@ def input_version() -> tuple:
         if not folder.is_dir():
             continue
         for entry in os.scandir(folder):
-            if entry.is_file() and not entry.name.endswith(".log"):
+            if entry.is_file() and not _not_an_input(entry.name):
                 stat = entry.stat()
                 files.append((entry.path, stat.st_size, stat.st_mtime_ns))
     return (db_read.data_version(), tuple(sorted(files)))
+
+
+_IGNORED_FIELDS = {
+    dataset: sorted(fields | saved_identity.RUN_ONLY_FIELDS)
+    for dataset, fields in saved_identity.IGNORED_FIELDS.items()
+}
+
+
+def _alert_if_not_reproducible(record: dict) -> None:
+    """BL-052: a favourite whose result moved with the same settings, code and data is a bug;
+    say so on Telegram (untagged, like a live-rules breach: it cannot be switched off). A Check is
+    shown on the dashboard only (owner, 2026-10-08)."""
+    change = record.get("change")
+    strategy = record.get("strategy_ref") or {}
+    if not change or change.get("label") != "not_reproducible" or not strategy.get("favourite"):
+        return
+    from . import notify
+
+    before, after = change.get("kpis_before") or {}, change.get("kpis_after") or {}
+
+    def pct(value: object) -> str:
+        return f"{value * 100:.2f}%" if isinstance(value, int | float) else "?"
+
+    notify.send(
+        Notification(
+            source="Momentum saved runs",
+            severity="error",
+            title=f"Result not reproducible: {strategy.get('name')}",
+            body=(
+                "Same settings, same code and same data gave a different result. "
+                f"CAGR {pct(before.get('cagr'))} -> {pct(after.get('cagr'))}; first different "
+                f"week {change.get('first_difference') or '?'}. Open Saved runs to review it."
+            ),
+        )
+    )
 
 
 def request_key(req: BaseModel) -> str:
@@ -691,6 +738,23 @@ class SavedRunBody(BaseModel):
     dates: list[str]
     strategy: list[float | None]
     overlay: bool = False
+    #: The run's data and code fingerprints, as the backtest result carried them (`versions`,
+    #: BL-052). Missing (an older dashboard): measured when the run is saved.
+    versions: dict | None = None
+
+
+class SavedStrategyUpdate(BaseModel):
+    """A change to a saved strategy (BL-052): applied to its anchor run."""
+
+    name: str | None = Field(None, min_length=1, max_length=64)
+    notes: str | None = Field(None, max_length=500)
+    overlay: bool | None = None
+    status: Literal["none", "watching", "paper", "invested"] | None = None
+    active: bool | None = None
+
+
+class ResultChangeReview(BaseModel):
+    reviewed_by: str = Field("owner", min_length=1, max_length=64)
 
 
 class SavedRunUpdate(BaseModel):
@@ -3590,6 +3654,7 @@ def create_app() -> FastAPI:
         hit = DATA.cached_result(key)
         if hit is not None:
             return hit, True
+        versions = saved_identity.versions_from_input(key[0], saved_identity.code_commit())
         builders = {
             "stock": _stock_parts,
             "broad": _broad_parts,
@@ -3597,13 +3662,19 @@ def create_app() -> FastAPI:
         }
         core, lazy = builders.get(req.dataset, _etf_parts)(req, report)
         parts = RunParts(core, lazy, datetime.now(IST).isoformat(timespec="seconds"))
+        # BL-052: what the result was computed from, so a saved run can say why it later moved.
+        parts.versions = versions
         DATA.store_result(key, parts)
         return parts, False
 
     def _dispatch_backtest(req: BacktestRequest) -> dict:
         """The whole result, every section included: what the synchronous endpoint returns."""
         parts, hit = _dispatch_parts(req)
-        return {**parts.full(), "cache": {"hit": hit, "computed_at": parts.computed_at}}
+        return {
+            **parts.full(),
+            "cache": {"hit": hit, "computed_at": parts.computed_at},
+            "versions": getattr(parts, "versions", None),
+        }
 
     def _dispatch_job(req: BacktestRequest, report: Report) -> tuple[dict, RunParts]:
         """A job's result is the core plus the names of the sections still to fetch."""
@@ -3611,6 +3682,7 @@ def create_app() -> FastAPI:
         result = {
             **parts.core,
             "cache": {"hit": hit, "computed_at": parts.computed_at},
+            "versions": getattr(parts, "versions", None),
             "sections_available": list(parts.names),
         }
         return result, parts
@@ -3677,9 +3749,13 @@ def create_app() -> FastAPI:
             return []
 
     @app.post("/api/saved-runs")
-    def create_saved_run(body: SavedRunBody) -> dict:
+    def create_saved_run(body: SavedRunBody, background: BackgroundTasks) -> dict:
+        versions = body.versions or {
+            **saved_identity.versions_from_input(input_version(), saved_identity.code_commit()),
+            "measured": "at_save",
+        }
         with open_catalog() as con:
-            return runs_store.save_run(
+            record = runs_store.save_run(
                 con,
                 body.dataset,
                 name=body.name,
@@ -3688,7 +3764,11 @@ def create_app() -> FastAPI:
                 dates=body.dates,
                 strategy=body.strategy,
                 overlay=body.overlay,
+                versions=versions,
             )
+        # After the response: a slow Telegram must not hold up the dashboard's save.
+        background.add_task(_alert_if_not_reproducible, record)
+        return record
 
     @app.post("/api/saved-runs/groups")
     def create_saved_run_group(body: SavedRunGroupBody) -> dict:
@@ -3741,6 +3821,101 @@ def create_app() -> FastAPI:
         if not found:
             raise HTTPException(404, "saved run not found")
         return {"ok": True}
+
+    # --- saved strategies (BL-052): one per set of settings, with why a result moved ---------
+
+    @app.get("/api/saved-strategies")
+    def saved_strategies(
+        dataset: Literal["etf", "stock", "custom_index", "broad"] | None = None,
+    ) -> dict:
+        try:
+            with read_catalog() as con:
+                return {
+                    "strategies": runs_store.list_strategies(con, dataset),
+                    "unreviewed": len(runs_store.list_changes(con, unreviewed=True)),
+                    # The settings each dataset never reads, so the dashboard leaves them out
+                    # when it says how a strategy differs from the defaults (and names it).
+                    "ignored_fields": _IGNORED_FIELDS,
+                }
+        except (FileNotFoundError, duckdb.CatalogException):
+            return {"strategies": [], "unreviewed": 0, "ignored_fields": _IGNORED_FIELDS}
+
+    # Registered before `/{run_id}`: the static paths must not be read as a strategy id.
+    @app.get("/api/saved-strategies/summary")
+    def saved_strategies_summary() -> dict:
+        """The Momentum tab's label: strategy count and moved results to review."""
+        try:
+            with read_catalog() as con:
+                return runs_store.strategy_summary(con)
+        except (FileNotFoundError, duckdb.CatalogException):
+            return {"count": 0, "unreviewed": 0}
+
+    @app.get("/api/saved-strategies/merge")
+    def saved_strategies_merge_plan() -> dict:
+        """The one-time merge as a dry run: what would be folded together. Writes nothing."""
+        try:
+            with read_catalog() as con:
+                return runs_store.merge_plan(con)
+        except (FileNotFoundError, duckdb.CatalogException):
+            return {"merges": [], "conflicts": [], "runs": 0, "strategies": 0}
+
+    @app.post("/api/saved-strategies/merge")
+    def saved_strategies_merge() -> dict:
+        with open_catalog() as con:
+            return runs_store.apply_merge(con)
+
+    @app.get("/api/saved-strategies/{run_id}")
+    def saved_strategy(run_id: str) -> dict:
+        try:
+            with read_catalog() as con:
+                strategy = runs_store.get_strategy(con, run_id)
+        except (FileNotFoundError, duckdb.CatalogException):
+            strategy = None
+        if strategy is None:
+            raise HTTPException(404, "saved strategy not found")
+        return strategy
+
+    @app.patch("/api/saved-strategies/{run_id}")
+    def patch_saved_strategy(run_id: str, body: SavedStrategyUpdate) -> dict:
+        try:
+            with open_catalog() as con:
+                strategy = runs_store.update_strategy(
+                    con, run_id, **body.model_dump(exclude_none=True)
+                )
+        except runs_store.FavouriteError as error:
+            raise HTTPException(409, str(error)) from error
+        if strategy is None:
+            raise HTTPException(404, "saved strategy not found")
+        return strategy
+
+    @app.delete("/api/saved-strategies/{run_id}")
+    def remove_saved_strategy(run_id: str) -> dict:
+        try:
+            with open_catalog() as con:
+                found = runs_store.delete_strategy(con, run_id)
+        except runs_store.FavouriteError as error:
+            raise HTTPException(409, str(error)) from error
+        if not found:
+            raise HTTPException(404, "saved strategy not found")
+        return {"ok": True}
+
+    @app.get("/api/result-changes")
+    def result_changes(unreviewed: bool = False) -> dict:
+        """The result-change log (BL-052), newest first; `unreviewed=true` gives the Check and Not
+        reproducible changes nobody has marked reviewed."""
+        try:
+            with read_catalog() as con:
+                return {"changes": runs_store.list_changes(con, unreviewed=unreviewed)}
+        except (FileNotFoundError, duckdb.CatalogException):
+            return {"changes": []}
+
+    @app.post("/api/result-changes/{change_id}/reviewed")
+    def review_result_change(change_id: str, body: ResultChangeReview) -> dict:
+        with open_catalog() as con:
+            change = runs_store.mark_reviewed(con, change_id, body.reviewed_by)
+        if change is None:
+            raise HTTPException(404, "result change not found")
+        return change
 
     @app.post("/api/weekly/run", status_code=202)
     def weekly_run(body: WeeklyRunBody) -> dict:

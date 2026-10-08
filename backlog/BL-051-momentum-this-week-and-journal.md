@@ -304,7 +304,7 @@ Answered by the owner on 2026-10-08 (see the Log):
   not journalled and not sent.
 - 2026-10-08 — Phase 3, first PR: Your orders (orders calculator, per-owner settings with a
   Rs 1 lakh paper portfolio, holdings snapshots from Fyers read-only or pasted, holding rules,
-  saved orders; migration 011), the week-ahead decision for delay-1 strategies (parity-tested
+  saved orders; migration 012), the week-ahead decision for delay-1 strategies (parity-tested
   against the full backtest: identical buys and full exits in 6 cadence cases), `mbt orders run`
   and the Fri 14:15 scheduler job with a Telegram summary, the Your orders section and its
   settings drawer. A real-data dry run of the week ahead (9 Oct) gave 15 trades from sleeve

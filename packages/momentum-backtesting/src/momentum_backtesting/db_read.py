@@ -120,7 +120,8 @@ def catalog_mtime(root: Path | None = None) -> float | None:
 
 
 #: Catalog tables that record runs rather than hold market data: a backtest never reads them, and
-#: the dashboard writes `backtest_runs` after every finished run (BL-005).
+#: the dashboard writes `backtest_runs` after every finished run (BL-005). A new run-record table
+#: belongs here, or writing it would change the data version (BL-052's change log).
 RUN_RECORD_TABLES = frozenset(
     {
         "backtest_runs",
@@ -130,6 +131,7 @@ RUN_RECORD_TABLES = frozenset(
         "strategy_versions",
         "momentum_signals",
         "momentum_forward_journal",
+        "momentum_result_changes",
         "ingest_runs",
         "schema_migrations",
     }
