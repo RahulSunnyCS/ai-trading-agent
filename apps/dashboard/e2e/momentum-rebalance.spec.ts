@@ -97,43 +97,54 @@ test('Momentum rebalance previews holdings without changing Backtest dataset', a
   );
   const previewRequests: Array<Record<string, unknown>> = [];
   await page.route(
-    (url) => url.pathname === '/api/momentum/rebalance-preview',
+    (url) => url.pathname === '/api/momentum/rebalance-preview/jobs',
     (route) => {
       previewRequests.push(route.request().postDataJSON());
+      return json(route, { id: 'abc123', status: 'running', result: null, error: null });
+    },
+  );
+  await page.route(
+    (url) => url.pathname === '/api/momentum/rebalance-preview/jobs/abc123',
+    (route) => {
       return json(route, {
-        dataset: 'stock',
-        as_of: '2026-10-02',
-        signal_week: '2026-10-02',
-        price_mode: 'last_close',
-        price_source: 'Latest database close',
-        portfolio_value: 100000,
-        first_allocation: false,
-        rebalance_schedule: {
-          strategy_start_date: '2026-09-18',
-          cadence: 'every_n_weeks',
-          interval_weeks: 4,
-          effective_rebalance_offset: 3,
-          is_rebalance_week: false,
-          previous_rebalance_date: '2026-09-18',
-          current_rebalance_date: null,
-          next_rebalance_date: '2026-10-16',
-        },
-        current_pct: { C0001: 40, 'Idle cash': 60 },
-        target_pct: { C0001: 60, 'Idle cash': 40 },
-        rows: [
-          {
-            asset: 'C0001',
-            symbol: 'NSE:EXAMPLE-EQ',
-            action: 'BUY',
-            current_pct: 40,
-            target_pct: 60,
-            delta_pct: 20,
-            ltp: 100,
-            indicative_value: 20000,
-            indicative_quantity: 200,
+        id: 'abc123',
+        status: 'done',
+        error: null,
+        result: {
+          dataset: 'stock',
+          as_of: '2026-10-02',
+          signal_week: '2026-10-02',
+          price_mode: 'last_close',
+          price_source: 'Latest database close',
+          portfolio_value: 100000,
+          first_allocation: false,
+          rebalance_schedule: {
+            strategy_start_date: '2026-09-18',
+            cadence: 'every_n_weeks',
+            interval_weeks: 4,
+            effective_rebalance_offset: 3,
+            is_rebalance_week: false,
+            previous_rebalance_date: '2026-09-18',
+            current_rebalance_date: null,
+            next_rebalance_date: '2026-10-16',
           },
-        ],
-        note: 'No orders were placed.',
+          current_pct: { C0001: 40, 'Idle cash': 60 },
+          target_pct: { C0001: 60, 'Idle cash': 40 },
+          rows: [
+            {
+              asset: 'C0001',
+              symbol: 'NSE:EXAMPLE-EQ',
+              action: 'BUY',
+              current_pct: 40,
+              target_pct: 60,
+              delta_pct: 20,
+              ltp: 100,
+              indicative_value: 20000,
+              indicative_quantity: 200,
+            },
+          ],
+          note: 'No orders were placed.',
+        },
       });
     },
   );
