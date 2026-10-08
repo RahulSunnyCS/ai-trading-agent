@@ -80,10 +80,20 @@ def daily_moves(
     with open_catalog(root, read_only=True) as con:
         factors = confirmed_factors(con, symbols)
     divisor = pd.Series(1.0, index=pd.MultiIndex.from_frame(frame[["symbol", "date"]]))
+    raw = (frame["close"] / frame["prevclose"].where(frame["prevclose"] > 0)).to_numpy()
+    raw = pd.Series(raw, index=divisor.index)
     for symbol, events in factors.items():
         for ex_date, factor in events:
-            if factor and factor > 0 and (symbol, ex_date) in divisor.index:
-                divisor[(symbol, ex_date)] = factor
+            key = (symbol, ex_date)
+            if not (factor and factor > 0 and key in divisor.index):
+                continue
+            # Only an unadjusted prevclose shows the factor's jump: apply it when the day's raw
+            # close/prevclose is nearer (in log terms) to 1/factor than to 1, so a source row
+            # that is already adjusted is not divided twice into a phantom move.
+            ratio = raw.loc[key]
+            ratio = float(ratio.iloc[0]) if isinstance(ratio, pd.Series) else float(ratio)
+            if ratio > 0 and abs(np.log(ratio * factor)) < abs(np.log(ratio)):
+                divisor[key] = factor
     prev = (frame["prevclose"] / divisor.to_numpy()).where(frame["prevclose"] > 0)
     frame["move"] = frame["close"] / prev - 1
     frame["gap"] = frame["open"] / prev - 1

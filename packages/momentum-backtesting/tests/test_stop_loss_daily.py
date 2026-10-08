@@ -166,3 +166,45 @@ def test_daily_needs_the_daily_moves() -> None:
     cfg = config(stop_from_buy=0.2, stop_granularity="daily")
     with pytest.raises(ValueError, match="daily moves"):
         run_backtest(prices, includes, cfg, external_ranks=external)
+
+
+def test_after_tax_final_value_keeps_cash_from_a_last_week_stop() -> None:
+    from momentum_backtesting.tax import EQUITY, TaxRules
+
+    levels = {day(29, 1): 70.0}  # falls in the last week; sold Wednesday, cash waits
+    prices, includes, external, daily = build(levels)
+    classes = {name: EQUITY for name in ("A", "B", "C")}
+    cfg = config(stop_from_buy=0.25, stop_granularity="daily", tax=TaxRules())
+    taxed = run_backtest(
+        prices, includes, cfg, external_ranks=external, daily=daily, tax_classes=classes
+    )
+    assert len(daily_sells(taxed)) == 1
+    before = taxed.equity.iloc[-2]
+    # the stop's proceeds (net of tax) are cash at the end: the final value must not lose them
+    assert taxed.equity.iloc[-1] > 0.6 * before
+
+
+def test_a_pending_stop_is_not_bought_again_at_the_friday_rebalance() -> None:
+    # A and B held (top 2). At week 4's close A's stop triggers (sale due Monday) and B drops out
+    # of the ranks, so B's proceeds are reinvested that Friday: they must not go into A.
+    prices, includes, _, daily = build({WEEKS[4]: 70.0})
+    ranks = pd.DataFrame({"A": 1.0, "B": 2.0, "C": 3.0}, index=WEEKS)
+    ranks.loc[WEEKS[4] :, "B"] = 5.0
+    ranks.loc[WEEKS[4] :, "C"] = 2.0
+    cfg = Config(
+        top_n=2,
+        exit_rank=3,
+        cost_pct=0.0,
+        start="2020-01-01",
+        universe=("A", "B", "C"),
+        max_position=None,
+        min_ranked=1,
+        stop_from_buy=0.25,
+        stop_granularity="daily",
+    )
+    result = run_backtest(prices, includes, cfg, external_ranks=(ranks, -ranks), daily=daily)
+    t = result.trades
+    assert ((t["week"] == WEEKS[4]) & (t["asset"] == "B") & (t["action"] == "SELL")).any()
+    rebought = (t["week"] == WEEKS[4]) & (t["asset"] == "A") & t["action"].isin(["BUY", "ADD"])
+    assert not rebought.any()
+    assert len(daily_sells(result)) == 1

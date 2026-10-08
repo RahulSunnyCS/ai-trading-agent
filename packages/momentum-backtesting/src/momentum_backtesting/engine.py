@@ -1501,7 +1501,8 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             # 3. Split the money equally across the current top N, but never past the cap. Parked
             #    cash joins in as soon as there's room for it.
             tops = sim.top_names(week, frozenset(a for a in lots if a != _POOL))
-            tops = [n for n in tops if n not in stopped]
+            # a stopped name, or one whose daily stop sells at the next open, is not re-bought
+            tops = [n for n in tops if n not in stopped and n not in pending]
             total = portfolio_value(week) + proceeds
             if tops and _POOL in lots:
                 need = absorbable(tops, total, week) - proceeds
@@ -1687,7 +1688,9 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                 total += net - closing.sale(
                     tax_class, net - lot["basis"], (last - lot["since"]).days
                 )
-        equity[last] = total
+        # Cash waiting for the next rebalance (a stop's or `sell_every_week`'s proceeds) is
+        # already net of tax: it belongs in the final value too.
+        equity[last] = total + uninvested
         ledger = closing
 
     return _Outcome(
