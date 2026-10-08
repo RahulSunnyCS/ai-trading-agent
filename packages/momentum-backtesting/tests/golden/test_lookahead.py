@@ -18,7 +18,16 @@ CUTS = ("2021-06-25", "2023-03-31", "2025-04-04")  # Fridays
 DATASETS = ("etf", "stock", "custom_index", "broad")
 #: The parts of a response that are the result. Others (`latest`, `instruments`) describe the
 #: data on hand and may honestly differ when later data is absent.
-RESULT_KEYS = ("kpis", "series", "trades", "rotations", "yearly", "open_positions", "comparisons")
+RESULT_KEYS = (
+    "kpis",
+    "series",
+    "trades",
+    "rotations",
+    "yearly",
+    "open_positions",
+    "comparisons",
+    "benchmarks",
+)
 
 
 #: Fields that honestly depend on later data, and why each is left out of the comparison.

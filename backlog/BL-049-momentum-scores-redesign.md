@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P2 — makes the research workbench far more useful for picking and watching names; not on the real-money path (BL-010 / BL-025 are) |
-| **Status** | Planned |
+| **Status** | In progress (Phase 2 built, Phase 3 to do) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard) |
 | **Created** | 2026-10-07 |
 | **Depends on** | the Momentum Backtest redesign (PR #115): the analytics page pattern, the right-hand drawer and the benchmark-picker conventions it introduces |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.12.16 |
 
 ## Context
 
@@ -184,10 +184,7 @@ Facts this plan relies on (checked 2026-10-07):
 
 ## Open questions
 
-- Should "Open in backtest" (Phase 3) pre-fill a Broad run with the selected sector as the
-  universe, or only open the Backtest tab?
-- Is the 5-stock minimum for a dot right, or should it be a setting kept per browser?
-- Should the Stocks view remember its last quick view across visits, or always open on Leaders?
+All answered 2026-10-08, see the Log.
 
 ## Log
 
@@ -195,3 +192,59 @@ Facts this plan relies on (checked 2026-10-07):
   composite is Broad's own ranking; Cross-Sector Themes is table-only; the buy zone and exit rank
   come from the active favourite (fallback 10 / 20); build after the Backtest redesign
   (PR #115). Supersedes BL-006 (paging and memoised rows are in Phase 1).
+- 2026-10-08 — started. Owner answers: "Open in backtest" just opens the Backtest tab on Broad
+  Momentum (no pre-filled sector); the map's 5-stock minimum is a default the reader can change
+  (kept in the browser); the Stocks view always opens on All (saved views, Phase 3, are how a
+  favourite filter is kept).
+- 2026-10-08 — Phase 1 built (branch `feat/bl-049-scores-phase1`). What it does and where it
+  differs from the plan:
+  - Backend: seven lookbacks; Broad's rank-sum rank this week and last (`compute_ranks` on the
+    last 60 weeks of the page's own live members, so it is the strategy's formula over this
+    page's stocks, not its exact pick); per-stock 52-week-high gap, 40-week average gap,
+    52-week volatility, up-weeks and a 26-week line; a `breadth` block; deterministic primary
+    sub-sector plus every tag. Rounded JSON. On the live data: 745 scored, 707 ranked, warm
+    0.4 s, cold 8 s (the frame load), 669 KB raw before gzip.
+  - Dashboard: market strip, three movers cards, the paged leaderboard (search with `/`, quick
+    views with counts, sector filter, Columns menu, sorting by rank, lookback, return, 52-week
+    high), the 1–10 strip and trend tag, Held/Candidate beside the stock. Decile colours are
+    token classes. The Sectors tab stays a table (with strips) until Phase 2.
+  - **The "Composite" column became the Rank column**: the rank is what the strategy uses; a
+    second 0–10 number would be a second ranking to explain.
+  - Climbers are counted only among stocks now ranked in the top 100 (a jump from 600th to 300th
+    is noise to a strategy that buys the top ten).
+  - No market-regime badge (it needed thresholds nobody has validated).
+  - Fixed on the way: Held/Candidate used Broad's unused `top_n`; split names like `SYM#2` did
+    not match; `Td`/`Th` gained a `dense` option (the one-line row rule), and `ui/CheckboxMenu`.
+  - Not done in Phase 1, by design: the stock drawer, the rotation map, score history (Phase 2).
+- 2026-10-08 — Phase 2 built (branch `feat/bl-049-scores-phase2`, stacked on Phase 1). What it
+  does and where it differs from the plan:
+  - Backend: `weekly_percentile_scores` (the same row-wise percentile as the current one, masked
+    by each week's membership); `compute_rotation` gives the 24 parent groups and every
+    sub-sector 18 weeks of mean 4 and 26-week scores (members counted once per symbol, themes
+    flagged); `composite_rank_history` (26 weeks, cached per universe); `stock_detail` and
+    `GET /api/momentum-scores/stock/{symbol}` (404 for a symbol not scored this week), with the
+    Fastify route `/api/momentum/scores/stock/:symbol` and the Next rewrite. Main payload gains
+    `rotation`; the stock history is fetched only when a drawer opens.
+  - Dashboard: `Sectors | Stocks` switch (Sectors default; the address is
+    `/momentum/scores/<sectors|stocks>[/<group>]?sub=&stock=`, read through `useScoresRoute`
+    on the history API, so Back, deep links and Esc all work; the drawer's own history entry is
+    marked so closing steps back instead of stacking). Rotation map (x = 26-week score, y = change
+    in the 4-week score over 4 weeks) with linked hover, tails of 4/8/13 weeks, search, "Changed
+    quadrant only", an adjustable minimum of stocks (default 5, kept in the browser); sector page
+    with its own map of sub-sectors, a sub-sector filter and its stocks; the stock drawer
+    (`ui/Drawer`) with figures, price + 40-week average, score history and rank history, Prev/Next
+    through the list it was opened from, Open its sector and Open in backtest.
+  - Cross-Sector Themes are in the table only, as decided; groups under the minimum are also
+    table-only and say why.
+  - The old `SectorsTable` is deleted; the guide page and glossary (`rotation-map`) are updated.
+  - `ui/Drawer.tsx` is the same file as in #123 (the Backtest follow-ups); whichever merges
+    second takes the other's copy as is.
+  - Not done, by design: `short_name` on sub-sectors (labels fit without it), saved views,
+    circuit locks and the strip-reading card (Phase 3).
+- 2026-10-08 — review fixes after `/code-review` of #124 and #125 (branch `fix/bl-049-review-findings`):
+  the market strip's strongest sub-sector skips theme baskets; the scores payload (snapshots and
+  rotation) is kept per price frame and group file (`UniverseMemo`, held weakly) instead of rebuilt
+  per request; the rank-history cache is keyed by week count too and built under a lock; the stock
+  proxy refuses dot-only names; `openStock` keeps one identity so rows stay memoised; `/` is not
+  taken where there is no search box; the rotation panel and map no longer recompute on hover; the
+  drawer's rank total counts ranked stocks; dead sector-table helpers removed.

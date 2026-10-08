@@ -1546,6 +1546,9 @@ def _liquidity_preview_payload(
     return liquidity_mod.preview(cfg, symbols)
 
 
+_SCORES_MEMO = momentum_scores_mod.UniverseMemo()
+
+
 def _momentum_scores_payload() -> dict:
     """ "Momentum Scores" page (TODO.md 3.9.16) - a live/current-state snapshot, not a backtest
     dataset, so it doesn't go through `/api/meta` + `/api/backtest` the way the four config+run
@@ -1561,49 +1564,43 @@ def _momentum_scores_payload() -> dict:
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
 
-    group_info = momentum_scores_mod.load_stock_group_info(CATEGORIES_CURATED_DIR)
-    group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR)
-    stock_snapshot = momentum_scores_mod.compute_stock_momentum_scores(universe, group_info)
-    sector_snapshot = momentum_scores_mod.compute_sector_momentum_scores(
-        stock_snapshot, group_members
+    groups_file = CATEGORIES_CURATED_DIR / broad.STOCK_GROUPS_FILENAME
+    key = groups_file.stat().st_mtime if groups_file.exists() else None
+
+    def build() -> tuple:
+        group_info = momentum_scores_mod.load_stock_group_info(CATEGORIES_CURATED_DIR)
+        group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR)
+        stock_snapshot = momentum_scores_mod.compute_stock_momentum_scores(universe, group_info)
+        return (
+            stock_snapshot,
+            momentum_scores_mod.compute_sector_momentum_scores(stock_snapshot, group_members),
+            momentum_scores_mod.compute_rotation(universe, group_members),
+        )
+
+    # Everything but the quality note is a function of the price frame and the group file, and
+    # changes once a day: kept for the frame it came from, so a refresh or a second tab is cheap.
+    stock_snapshot, sector_snapshot, rotation = _SCORES_MEMO.get(universe, key, build)
+    return momentum_scores_mod.to_payload(
+        stock_snapshot,
+        sector_snapshot,
+        missing_symbols=universe.missing_symbols,
+        membership_quality=_membership_quality(),
+        rotation=rotation,
     )
 
-    def scores_json(scores: dict) -> dict:
-        return {str(k): v for k, v in scores.items()}
 
-    return {
-        "as_of": (
-            None if pd.isna(stock_snapshot.as_of) else stock_snapshot.as_of.strftime("%Y-%m-%d")
-        ),
-        "lookbacks": list(stock_snapshot.lookbacks),
-        "universe_size": stock_snapshot.universe_size,
-        "missing_symbols": universe.missing_symbols,
-        "membership_quality": _membership_quality(),
-        "stocks": [
-            {
-                "symbol": r.symbol,
-                "company_name": r.company_name,
-                "parent_group": r.parent_group,
-                "subgroup": r.subgroup,
-                "last_price": r.last_price,
-                "change_1w_pct": r.change_1w_pct,
-                "returns": scores_json(r.returns),
-                "scores": scores_json(r.scores),
-            }
-            for r in stock_snapshot.rows
-        ],
-        "sectors": [
-            {
-                "cid": r.cid,
-                "parent_group": r.parent_group,
-                "subgroup": r.subgroup,
-                "member_count": r.member_count,
-                "qualifying_count": r.qualifying_count,
-                "scores": scores_json(r.scores),
-            }
-            for r in sector_snapshot.rows
-        ],
-    }
+def _momentum_stock_payload(symbol: str) -> dict:
+    """The stock drawer's own data (BL-049): price with its 40-week average, score history and
+    rank history for one stock. Fetched when the drawer opens, so the page's own payload stays
+    small."""
+    try:
+        universe = DATA.get_momentum_universe()
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    detail = momentum_scores_mod.stock_detail(universe, symbol)
+    if detail is None:
+        raise HTTPException(404, f"{symbol} is not scored this week.")
+    return detail
 
 
 def _run_broad(
@@ -2990,6 +2987,10 @@ def create_app() -> FastAPI:
     @app.get("/api/momentum-scores")
     def momentum_scores() -> dict:
         return _momentum_scores_payload()
+
+    @app.get("/api/momentum-scores/stock/{symbol}")
+    def momentum_scores_stock(symbol: str) -> dict:
+        return _momentum_stock_payload(symbol)
 
     @app.get("/api/liquidity-preview")
     def liquidity_preview(

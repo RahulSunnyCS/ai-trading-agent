@@ -217,6 +217,34 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       'How many weeks back a return is measured. The default uses five: 1, 4, 13, 26 and 52 weeks (about a week, a month, a quarter, six months and a year).',
   },
   {
+    id: 'score-decile',
+    term: 'Score 1–10 (decile)',
+    group: 'Momentum',
+    short:
+      'On the Scores page, each stock gets a 1–10 colour per lookback: the tenth of all scored stocks its return falls in. 10 is the strongest tenth, 1 the weakest. The percentile behind it (0–100) is in the cell’s hover text.',
+  },
+  {
+    id: 'trend-tag',
+    term: 'Trend tag',
+    group: 'Momentum',
+    short:
+      'A name for the shape of a stock’s 4, 13 and 26-week scores: Leader (strong on all three), Emerging (strong lately, not yet over 26 weeks), Fading (strong over 26 weeks, weak lately), Laggard (weak on 13 and 26 weeks) or Mixed.',
+  },
+  {
+    id: 'market-breadth',
+    term: 'Market breadth',
+    group: 'Momentum',
+    short:
+      'How many stocks are taking part in a move, such as the share above their 40-week average or up over 13 weeks. Momentum strategies work best when breadth is wide.',
+  },
+  {
+    id: 'rotation-map',
+    term: 'Rotation map',
+    group: 'Momentum',
+    short:
+      'A chart that places each sector group by its 26-week strength (left to right) and by whether its 4-week strength is rising or falling (bottom to top). The corners are Leading, Weakening, Lagging and Improving; groups tend to travel round them clockwise.',
+  },
+  {
     id: 'rank-sum',
     term: 'Rank-sum score',
     group: 'Momentum',

@@ -52,13 +52,16 @@ export function THead({ children }: { children: ReactNode }) {
 interface ThProps extends ThHTMLAttributes<HTMLTableCellElement> {
   children: ReactNode;
   align?: 'left' | 'right' | 'center';
+  /** Matches `Td dense`: the same tighter sides. */
+  dense?: boolean;
 }
 
-export function Th({ children, align = 'left', className, ...rest }: ThProps) {
+export function Th({ children, align = 'left', dense = false, className, ...rest }: ThProps) {
   return (
     <th
       className={cn(
-        'whitespace-nowrap bg-surface px-3 py-2.5 text-xs font-semibold uppercase tracking-wider text-faint',
+        'whitespace-nowrap bg-surface py-2.5 text-xs font-semibold uppercase tracking-wider text-faint',
+        dense ? 'px-2' : 'px-3',
         align === 'right' && 'text-right',
         align === 'center' && 'text-center',
         align === 'left' && 'text-left',
@@ -76,17 +79,28 @@ export function TRow({
   className,
   onClick,
   selected,
+  highlighted,
+  onHover,
 }: {
   children: ReactNode;
   className?: string;
   /** Makes the whole row a control: clickable, focusable, and activated by Enter or Space. */
   onClick?: (() => void) | undefined;
   selected?: boolean | undefined;
+  /** Lit from elsewhere (a hovered dot on a map that this row is also on). */
+  highlighted?: boolean | undefined;
+  /** Called with true when the pointer or focus enters the row, false when it leaves. */
+  onHover?: ((hovering: boolean) => void) | undefined;
 }) {
   return (
     <tr
+      onMouseEnter={onHover ? () => onHover(true) : undefined}
+      onMouseLeave={onHover ? () => onHover(false) : undefined}
+      onFocus={onHover ? () => onHover(true) : undefined}
+      onBlur={onHover ? () => onHover(false) : undefined}
       className={cn(
         'border-b border-border/60 transition-colors hover:bg-surface-2/50',
+        highlighted && 'bg-surface-2/60',
         onClick &&
           'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
         selected && 'bg-surface-2/60',
@@ -116,13 +130,23 @@ interface TdProps extends TdHTMLAttributes<HTMLTableCellElement> {
   children: ReactNode;
   align?: 'left' | 'right' | 'center';
   numeric?: boolean;
+  /** Tighter cells for a long list read at a glance (about 32 px a row with one-line content). */
+  dense?: boolean;
 }
 
-export function Td({ children, align = 'left', numeric = false, className, ...rest }: TdProps) {
+export function Td({
+  children,
+  align = 'left',
+  numeric = false,
+  dense = false,
+  className,
+  ...rest
+}: TdProps) {
   return (
     <td
       className={cn(
-        'px-3 py-3 text-foreground',
+        dense ? 'px-2 py-1' : 'px-3 py-3',
+        'text-foreground',
         numeric && 'font-mono tabular-nums',
         align === 'right' && 'text-right',
         align === 'center' && 'text-center',

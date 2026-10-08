@@ -15,7 +15,7 @@ scheduled job or see [Jobs](app:/jobs).
 ## 3. See why
 
 Open [Backtest](app:/momentum/backtest), load the same strategy from
-[Saved runs](app:/momentum/saved), run it, and open the **This week** tab. You can see every
+[Saved runs](app:/momentum/saved), run it, and scroll to the **This week** section below the chart. You can see every
 candidate's rank, and why a name was sold (its rank fell past the exit rank) or bought.
 
 ## 4. Compare with what you hold

@@ -1,6 +1,7 @@
 """Nifty 50 TRI / Nifty200 Momentum 30 TRI comparison lines (TODO 3.9.23, Step 0a)."""
 
 import json
+import math
 
 import numpy as np
 import pandas as pd
@@ -113,7 +114,11 @@ def test_every_etf_backtest_payload_carries_the_comparisons(tmp_path, monkeypatc
     assert mom["series"][0] == pytest.approx(100_000)
     assert mom["final_value"] == pytest.approx(mom["series"][-1])
     assert mom["excess_cagr"] == pytest.approx(body["kpis"]["cagr"] - mom["cagr"])
-    assert picked[NIFTY_NEXT50_TRI] == {"name": NIFTY_NEXT50_TRI, "available": False}
+    assert picked[NIFTY_NEXT50_TRI] == {
+        "name": NIFTY_NEXT50_TRI,
+        "available": False,
+        "reason": "No data for this index",
+    }
     json.dumps(body, allow_nan=False)
 
 
@@ -140,7 +145,11 @@ def test_picker_measures_each_index_on_the_strategys_own_definitions():
     assert 0 <= nifty["years_beating"] <= 4
     assert out[NIFTY200_MOMENTUM30_TRI]["as_of"] == f"{weeks[-1]:%Y-%m-%d}"
     assert out[NIFTY200_MOMENTUM30_TRI]["note"].startswith("Back-calculated")
-    assert out[NIFTY_NEXT50_TRI] == {"name": NIFTY_NEXT50_TRI, "available": False}
+    assert out[NIFTY_NEXT50_TRI] == {
+        "name": NIFTY_NEXT50_TRI,
+        "available": False,
+        "reason": "No data for this index",
+    }
 
 
 def test_picker_drops_an_index_that_stopped_more_than_a_week_early():
@@ -149,6 +158,59 @@ def test_picker_drops_an_index_that_stopped_more_than_a_week_early():
     refs = pd.DataFrame({NIFTY50_TRI: [100.0] * 8 + [None, None]}, index=weeks)
     out = {entry["name"]: entry for entry in picker(equity, equity, refs)}
     assert out[NIFTY50_TRI]["available"] is False
+    assert out[NIFTY50_TRI]["reason"].startswith("Ends 21 Feb 2020")
+
+
+def test_aligned_refuses_a_hole_longer_than_one_week_instead_of_inventing_flat_weeks():
+    weeks = pd.date_range("2020-01-03", periods=12, freq="W-FRI")
+    ref = pd.Series(np.linspace(100.0, 130.0, 12), index=weeks)
+    ref.iloc[4:8] = None  # four weeks missing in the middle
+    assert aligned(ref, weeks) is None
+    line, reason = reference_benchmarks._align(ref, weeks)
+    assert line is None and reason == "Missing 3 weeks from 07 Feb 2020"
+
+
+def test_picker_says_why_an_index_that_starts_late_is_unavailable():
+    weeks = pd.date_range("2020-01-03", periods=10, freq="W-FRI")
+    equity = pd.Series(np.linspace(1, 2, 10), index=weeks)
+    refs = pd.DataFrame({NIFTY50_TRI: [None] * 3 + [100.0] * 7}, index=weeks)
+    entry = {e["name"]: e for e in picker(equity, equity, refs)}[NIFTY50_TRI]
+    assert entry["available"] is False
+    assert entry["reason"] == "Starts 24 Jan 2020, after this run's first week"
+
+
+def test_a_benchmark_identical_to_the_strategy_reproduces_the_strategys_own_statistics():
+    weeks = pd.date_range("2018-01-05", periods=200, freq="W-FRI")
+    rng = np.random.default_rng(11)
+    equity = pd.Series(np.cumprod(1 + rng.normal(0.003, 0.02, len(weeks))), index=weeks)
+    cash = pd.Series(1.001 ** np.arange(len(weeks)), index=weeks)
+    refs = pd.DataFrame({NIFTY50_TRI: equity * 250})
+    entry = {e["name"]: e for e in picker(equity, cash, refs)}[NIFTY50_TRI]
+    own = metrics.curve_stats(equity / equity.iloc[0], cash)
+    assert entry["cagr"] == pytest.approx(own["CAGR"])
+    assert entry["volatility"] == pytest.approx(own["volatility"])
+    assert entry["sharpe"] == pytest.approx(own["Sharpe"])
+    assert entry["max_drawdown"] == pytest.approx(own["max drawdown"])
+    assert entry["excess_cagr"] == pytest.approx(0.0, abs=1e-12)
+    assert entry["years_beating"] == 0  # a tie is not a win
+
+
+def test_picker_sortino_and_years_beating_match_a_hand_calculation():
+    weeks = pd.date_range("2020-01-03", periods=105, freq="W-FRI")
+    equity = pd.Series(1.006 ** np.arange(len(weeks)), index=weeks)
+    cash = pd.Series(np.ones(len(weeks)), index=weeks)
+    weekly = np.where(np.arange(len(weeks)) % 4 == 3, -0.01, 0.01)
+    weekly[0] = 0.0
+    level = pd.Series(100 * np.cumprod(1 + weekly), index=weeks)
+    entry = {e["name"]: e for e in picker(equity, cash, pd.DataFrame({NIFTY50_TRI: level}))}[
+        NIFTY50_TRI
+    ]
+    line = level / level.iloc[0]
+    returns = line.pct_change().dropna()
+    downside = returns[returns < 0].std() * math.sqrt(52)
+    assert entry["sortino"] == pytest.approx(metrics.cagr(line) / downside)
+    # A steady 0.6% a week out-earns the saw tooth (about 0.5% a week) in both calendar years.
+    assert entry["years_beating"] == 2
 
 
 def test_payload_without_reference_data_has_an_empty_list(tmp_path):

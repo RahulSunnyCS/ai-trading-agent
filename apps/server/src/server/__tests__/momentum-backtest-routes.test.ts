@@ -44,6 +44,39 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it("forwards one stock's score history, and refuses a symbol that is not an NSE symbol", async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { symbol: 'M&M' }));
+
+    const ok = await server.inject({ method: 'GET', url: '/api/momentum/scores/stock/M%26M' });
+    expect(ok.statusCode).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/momentum-scores/stock/M%26M',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+
+    fetchMock.mockClear();
+    for (const bad of ['..%2Fmeta', 'A%20B', `${'X'.repeat(33)}`]) {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/api/momentum/scores/stock/${bad}`,
+      });
+      expect(response.statusCode).toBe(400);
+    }
+    // Dot-only names are refused too: some clients normalise them away (a 404 here), others send
+    // them as they are, and neither may reach the upstream path.
+    for (const dots of ['.', '..', '%2e%2e']) {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/api/momentum/scores/stock/${dots}`,
+      });
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    await server.close();
+  });
+
   it('forwards the liquidity preview query and rejects out-of-range thresholds', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

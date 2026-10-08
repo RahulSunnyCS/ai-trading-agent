@@ -5,13 +5,15 @@
  * the page draws and quotes, and derives the series the run used to carry for its single
  * benchmark (drawdown, 52-week edge, yearly returns, worst falls). The statistics that need the
  * run's cash series and the engine's definitions (CAGR, Sharpe, Sortino, max drawdown) come
- * from the server; nothing here re-derives them.
+ * from the server. What is derived here is only what the run used to carry for its one benchmark
+ * and is cheap from the curve: drawdown, the rolling 52-week edge, calendar-year returns and the
+ * worst falls, on the same definitions as the Python `metrics` module.
  *
  * A result computed before the picker existed has no `benchmarks`: it falls back to the run's
  * own benchmark (`benchmark_name`, `series.benchmark`, `kpis.benchmark_*`), and so does a pick
  * whose index has no data for this run.
  */
-import type { MomentumResult, MomentumSeries } from '../types/momentum';
+import type { MomentumBenchmarkChoice, MomentumResult, MomentumSeries } from '../types/momentum';
 
 type Series = ReadonlyArray<number | null>;
 
@@ -23,6 +25,8 @@ export interface BenchmarkOption {
   label: string;
   available: boolean;
   cagr: number | null;
+  /** Why an unavailable index cannot be used for this run. */
+  reason: string | null;
 }
 
 export interface BenchmarkView {
@@ -45,6 +49,9 @@ export interface BenchmarkView {
   note: string | null;
   /** True when this is the run's own benchmark, not a picker index. */
   fallback: boolean;
+  /** When the pick had no usable data and the run's own benchmark is shown instead: which index
+   * was asked for and why it cannot be used, so the page says so rather than switching silently. */
+  replaced: { label: string; reason: string } | null;
 }
 
 function num(value: unknown): number | null {
@@ -58,19 +65,31 @@ export function benchmarkLabel(name: string): string {
 
 /** The picker's menu for this result, in the server's order; empty for an older result. */
 export function benchmarkOptions(result: MomentumResult): BenchmarkOption[] {
-  return (result.benchmarks ?? []).map((choice) => ({
-    name: choice.name,
-    label: benchmarkLabel(choice.name),
-    available: choice.available,
-    cagr: choice.available ? num(choice.cagr) : null,
-  }));
+  return (result.benchmarks ?? []).map((choice) => {
+    const problem = unusable(result, choice);
+    return {
+      name: choice.name,
+      label: benchmarkLabel(choice.name),
+      available: problem === null,
+      cagr: problem === null && choice.available ? num(choice.cagr) : null,
+      reason: problem,
+    };
+  });
+}
+
+/** Why `choice` cannot be drawn against this run's weeks, or null when it can. A curve whose
+ * length differs from the run's dates would be silently truncated by every chart and statistic. */
+function unusable(result: MomentumResult, choice: MomentumBenchmarkChoice): string | null {
+  if (!choice.available) return choice.reason ?? 'No data for this run';
+  if (choice.series.length !== result.series.dates.length) return "Does not match this run's weeks";
+  return null;
 }
 
 /** The picked index as the page uses it, or the run's own benchmark when it has no data. */
 export function resolveBenchmark(result: MomentumResult, picked: string): BenchmarkView {
   const choice = result.benchmarks?.find((entry) => entry.name === picked);
   const lastWeek = result.series.dates.at(-1)?.slice(0, 10) ?? null;
-  if (choice?.available) {
+  if (choice?.available && unusable(result, choice) === null) {
     return {
       name: choice.name,
       label: benchmarkLabel(choice.name),
@@ -86,12 +105,13 @@ export function resolveBenchmark(result: MomentumResult, picked: string): Benchm
       asOf: choice.as_of && choice.as_of !== lastWeek ? choice.as_of : null,
       note: choice.note,
       fallback: false,
+      replaced: null,
     };
   }
   const k = result.kpis;
   return {
     name: result.benchmark_name,
-    label: result.benchmark_name,
+    label: benchmarkLabel(result.benchmark_name),
     values: result.series.benchmark,
     cagr: num(k.benchmark_cagr),
     excessCagr: num(k.excess_cagr),
@@ -104,7 +124,19 @@ export function resolveBenchmark(result: MomentumResult, picked: string): Benchm
     asOf: null,
     note: null,
     fallback: true,
+    replaced: result.benchmarks?.length
+      ? {
+          label: benchmarkLabel(picked),
+          reason: choice ? (unusable(result, choice) ?? '') : 'Not offered for this run',
+        }
+      : null,
   };
+}
+
+/** Share of 52-week windows in which the strategy was ahead of the benchmark; null with none. */
+export function aheadShare(excess: ReadonlyArray<number | null>): number | null {
+  const known = excess.filter((value): value is number => value !== null);
+  return known.length ? known.filter((value) => value > 0).length / known.length : null;
 }
 
 /**
@@ -113,7 +145,9 @@ export function resolveBenchmark(result: MomentumResult, picked: string): Benchm
  */
 export function edgeAgainst(result: MomentumResult, picked: string): number | null {
   const choice = result.benchmarks?.find((entry) => entry.name === picked);
-  return choice?.available ? num(choice.excess_cagr) : num(result.kpis.excess_cagr);
+  return choice?.available && unusable(result, choice) === null
+    ? num(choice.excess_cagr)
+    : num(result.kpis.excess_cagr);
 }
 
 /** Peak-to-date fall: value / running max - 1. A gap keeps the running max and stays null. */

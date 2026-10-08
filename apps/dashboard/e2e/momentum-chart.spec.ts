@@ -148,6 +148,9 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
 });
 
 test('Momentum Scores exposes stock and sector details', async ({ page }) => {
+  const lookbacks = [1, 2, 4, 8, 13, 26, 52];
+  const byLookback = (value: (weeks: number) => number) =>
+    Object.fromEntries(lookbacks.map((weeks) => [String(weeks), value(weeks)]));
   await page.route('**/api/momentum/scores', (route) =>
     route.fulfill({
       status: 200,
@@ -155,7 +158,14 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
       body: JSON.stringify({
         as_of: '2024-01-19',
         universe_size: 1,
-        lookbacks: [4, 13, 26],
+        ranked_count: 1,
+        lookbacks,
+        breadth: {
+          above_ma40: { now: 0.6, week_ago: 0.55, month_ago: 0.5 },
+          positive_13w: { now: 0.58, week_ago: 0.5 },
+          median_26w: 0.08,
+          top_decile_26w: 0.4,
+        },
         missing_symbols: [],
         stocks: [
           {
@@ -163,12 +173,44 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
             company_name: 'Test Company',
             parent_group: 'Industry',
             subgroup: 'Metals',
+            tags: [{ parent_group: 'Industry', subgroup: 'Metals' }],
             last_price: 120,
             change_1w_pct: 0.02,
-            returns: { '4': 0.08, '13': 0.12, '26': 0.2 },
-            scores: { '4': 75, '13': 80, '26': 90 },
+            returns: byLookback((weeks) => (weeks === 13 ? 0.12 : weeks === 26 ? 0.2 : 0.08)),
+            scores: byLookback(() => 95),
+            composite_rank: 1,
+            composite_rank_prev: 4,
+            high_52w_gap: -0.03,
+            spark: Array.from({ length: 26 }, (_, i) => 100 + i),
           },
         ],
+        rotation: {
+          weeks: Array.from({ length: 18 }, (_, i) => `2023-09-${String(i + 1).padStart(2, '0')}`),
+          groups: [
+            {
+              key: 'Industry',
+              parent_group: 'Industry',
+              subgroup: null,
+              theme: false,
+              member_count: 6,
+              scored_count: 6,
+              s4: Array.from({ length: 18 }, () => 60),
+              s26: Array.from({ length: 18 }, () => 80),
+            },
+          ],
+          subs: [
+            {
+              key: 'Industry / Metals',
+              parent_group: 'Industry',
+              subgroup: 'Metals',
+              theme: false,
+              member_count: 6,
+              scored_count: 6,
+              s4: Array.from({ length: 18 }, () => 60),
+              s26: Array.from({ length: 18 }, () => 80),
+            },
+          ],
+        },
         sectors: [
           {
             cid: 'metals',
@@ -176,23 +218,71 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
             subgroup: 'Metals',
             member_count: 2,
             qualifying_count: 1,
-            scores: { '4': 75, '13': 80, '26': 90 },
+            scores: byLookback(() => 95),
           },
         ],
       }),
     }),
   );
 
+  await page.route('**/api/momentum/scores/stock/TEST', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        symbol: 'TEST',
+        weeks: Array.from(
+          { length: 53 },
+          (_, i) => `2023-01-${String((i % 28) + 1).padStart(2, '0')}`,
+        ),
+        closes: Array.from({ length: 53 }, (_, i) => 100 + i),
+        ma40: Array.from({ length: 53 }, (_, i) => (i < 39 ? null : 110 + i / 2)),
+        score_weeks: Array.from(
+          { length: 12 },
+          (_, i) => `2024-01-${String(i + 1).padStart(2, '0')}`,
+        ),
+        scores: byLookback(() => Array.from({ length: 12 }, (_, i) => 50 + i * 4)),
+        rank_weeks: Array.from(
+          { length: 26 },
+          (_, i) => `2023-07-${String((i % 28) + 1).padStart(2, '0')}`,
+        ),
+        ranks: Array.from({ length: 26 }, (_, i) => 30 - i),
+      }),
+    }),
+  );
+
+  // Sectors is the default view: the rotation map's table, then a group's page.
   await page.goto('/momentum/scores');
-  await expect(page.getByText('Test Company')).toBeVisible();
-  // Raw returns sit beside each score pill; stock rows no longer expand.
+  await expect(page.getByRole('region', { name: 'Market momentum' })).toContainText('60%');
+  await expect(page.getByRole('radio', { name: 'Sectors', exact: true })).toBeChecked();
+  await page
+    .getByRole('region', { name: 'Sector groups' })
+    .getByRole('row', { name: /Industry/ })
+    .click();
+  await expect(page).toHaveURL(/\/momentum\/scores\/sectors\/industry/);
+  await page
+    .getByRole('region', { name: 'Industry sub-sectors' })
+    .getByRole('row', { name: /Metals/ })
+    .click();
+  await expect(page).toHaveURL(/sub=/);
+
+  // The stocks list: rank, movement, returns and price beside the strip.
+  await page.getByRole('radio', { name: 'Stocks', exact: true }).click();
+  await expect(page).toHaveURL(/\/momentum\/scores\/stocks/);
   const stockRow = page.getByRole('row', { name: /Test Company/ });
-  await expect(stockRow).toContainText('+8.0%');
-  await expect(stockRow).toContainText('+2.00%');
-  await page.getByRole('radio', { name: 'Sectors', exact: true }).click();
-  await page.getByRole('button', { name: /Metals/ }).click();
-  // Anchored: the sector's own row contains the member table, so its name includes this text too.
-  const memberRow = page.getByRole('row', { name: /^TEST · Test Company/ });
-  await expect(memberRow).toContainText('₹120');
-  await expect(memberRow).toContainText('+20.0%');
+  await expect(stockRow).toBeVisible();
+  await expect(stockRow).toContainText('▲3');
+  await expect(stockRow).toContainText('+12.0%');
+  await expect(stockRow).toContainText('+20.0%');
+  await expect(stockRow).toContainText('₹120');
+  await expect(stockRow.getByRole('img', { name: /Deciles by lookback/ })).toBeVisible();
+
+  // A stock opens in a drawer; Esc closes it and the address loses ?stock.
+  await stockRow.click();
+  await expect(page.getByRole('dialog', { name: /TEST/ })).toBeVisible();
+  await expect(page).toHaveURL(/stock=TEST/);
+  await expect(page.getByRole('img', { name: /Weekly closes over the last year/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).not.toHaveURL(/stock=/);
 });
