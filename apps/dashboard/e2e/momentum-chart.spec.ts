@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { type Page, expect, test } from '@playwright/test';
 
 test('Momentum backtest renders an interactive chart with optional touchpad zoom', async ({
   page,
@@ -147,7 +147,8 @@ test('Momentum backtest renders an interactive chart with optional touchpad zoom
   await expect(page.getByRole('textbox', { name: 'Name for run 1' })).toHaveValue('Run 1');
 });
 
-test('Momentum Scores exposes stock and sector details', async ({ page }) => {
+/** One scored stock in a sector, with the history the drawer asks for. */
+async function mockScores(page: Page): Promise<void> {
   const lookbacks = [1, 2, 4, 8, 13, 26, 52];
   const byLookback = (value: (weeks: number) => number) =>
     Object.fromEntries(lookbacks.map((weeks) => [String(weeks), value(weeks)]));
@@ -250,6 +251,10 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
       }),
     }),
   );
+}
+
+test('Momentum Scores exposes stock and sector details', async ({ page }) => {
+  await mockScores(page);
 
   // Sectors is the default view: the rotation map's table, then a group's page.
   await page.goto('/momentum/scores');
@@ -285,4 +290,86 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).not.toHaveURL(/stock=/);
+});
+
+test('Momentum Scores keeps saved views, shows circuit locks and folds the strip guide', async ({
+  page,
+}) => {
+  await mockScores(page);
+  let circuitCalls = 0;
+  await page.route('**/api/momentum/scores/stock/TEST/circuits', (route) => {
+    circuitCalls += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        symbol: 'TEST',
+        since: '2023-01-20',
+        until: '2024-01-19',
+        weeks: 52,
+        sessions: 250,
+        min_days: 3,
+        total: 2,
+        locks: [
+          {
+            direction: 'UC',
+            start: '2024-02-09',
+            end: '2024-02-12',
+            days: 4,
+            band_pct: 20,
+            move_pct: 21.5,
+            ongoing: false,
+          },
+          {
+            direction: 'LC',
+            start: '2023-05-29',
+            end: '2023-06-02',
+            days: 3,
+            band_pct: 20,
+            move_pct: -14.3,
+            ongoing: true,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto('/momentum/scores/stocks');
+  await expect(page.getByRole('row', { name: /Test Company/ })).toBeVisible();
+  // The drawer's circuit call is made only once a stock is opened.
+  expect(circuitCalls).toBe(0);
+
+  // The strip guide starts open; "Got it" folds it, and it stays folded after a reload.
+  const guide = page.getByRole('region', { name: 'How to read the strip' });
+  await expect(guide.getByRole('button', { name: 'Got it' })).toBeVisible();
+  await guide.getByRole('button', { name: 'Got it' }).click();
+  await expect(guide.getByRole('button', { name: 'Got it' })).toHaveCount(0);
+
+  // Save the current view (the Leaders chip) under a name, go back to All, then apply it.
+  await page.getByRole('radio', { name: /^Leaders/ }).click();
+  await page.getByRole('button', { name: 'Saved views' }).click();
+  await page.getByRole('menuitem', { name: /Save current view/ }).click();
+  await page.getByRole('textbox', { name: 'Name for this view' }).fill('My leaders');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByRole('radio', { name: /^All/ }).click();
+  await page.getByRole('button', { name: 'Saved views' }).click();
+  await page.getByRole('menuitemradio', { name: /My leaders/ }).click();
+  await expect(page.getByRole('radio', { name: /^Leaders/ })).toBeChecked();
+
+  // A reload keeps the view and the folded guide, and the list still opens on All.
+  await page.reload();
+  await expect(page.getByRole('radio', { name: /^All/ })).toBeChecked();
+  await expect(guide.getByRole('button', { name: 'Got it' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Saved views' }).click();
+  await expect(page.getByRole('menuitemradio', { name: /My leaders/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Opening a stock fetches its circuit locks, newest first.
+  await page.getByRole('row', { name: /Test Company/ }).click();
+  const drawer = page.getByRole('dialog', { name: /TEST/ });
+  await expect(drawer.getByText('Circuit locks')).toBeVisible();
+  await expect(drawer.getByText('Upper', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('Lower', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('Ongoing', { exact: true })).toBeVisible();
+  expect(circuitCalls).toBeGreaterThan(0);
 });
