@@ -315,6 +315,14 @@ contract, not a shared service).
   `run_broad_backtest` takes the same four arguments; nothing in the API or the weekly signal
   sets them. Pre-registered test: `search_spaces/bl053_criteria.json`,
   `scripts/bl053_stop_loss.py`.
+- **BL-054 engine options (all off by default, none adopted):** `Config.stop_granularity="daily"`
+  (the stop is checked on each day's close and sells at the next open; daily moves from
+  `categories/daily_moves.py`, which divides the stored, unadjusted `prevclose` by confirmed
+  split/bonus factors); `Config.weight_by="inverse_vol"` / `vol_window`; `score="residual"`
+  (`categories/residual.py`, Broad's global ranking only; `engine.compute_ranks` refuses it).
+  `run_broad_backtest` also takes `tax_hold_band`/`tax_hold_weeks` (inert in category mode: every
+  sale is an "ineligible" exit) and `feature_tilt=(frame, weight)` (BL-050). Runners:
+  `scripts/bl054_levers.py`, `scripts/bl050_filters.py`; features in `filters.py`.
 - `categories/broad.py` — Broad Momentum's category-selection funnel
   (`compute_universe_ranking`, `compute_category_selection*`,
   `run_broad_backtest`) — a pure, no-P&L ranking layer that feeds `engine.py`

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner wants the strategies improved before real money follows them |
-| **Status** | In progress |
+| **Status** | Done — no lever adopted |
 | **Type** | research (+ opt-in engine features: daily stop, inverse-vol sizing, residual score) |
 | **Area** | momentum |
 | **Created** | 2026-10-09 |
@@ -82,6 +82,21 @@ must pass at both fill timings.
 ### Phase 6 — Verdicts
 - `search_spaces/bl054_result.json`, this file's Result section, TODO row.
 
+## Result (2026-10-09): no lever adopted
+
+Full write-up: `packages/momentum-backtesting/docs/bl054-levers-2026-10-09.md`; verdicts in
+`search_spaces/bl054_result.json`. After tax at Rs 5 lakh, median of 11 strategies: baseline
+29.9% (FY2018-22) and 32.4% (FY2023-26); tax costs 8-9 points a year.
+
+| Lever | Verdict | Key numbers |
+|---|---|---|
+| L1 cadence / tax hold | Kill | 6 weeks +0.9 then -2.4; 13 weeks -0.7 then -8.2. The tax hold never fires in Broad (every sale is an "ineligible" exit) |
+| L2 all Fridays | Report | Removes up to 10 points of Friday luck; does not raise the average |
+| L3 ETF blend | Kill | 75% Broad: -5.8 points on FY2018-22, smoother in 11 of 11 |
+| L4 daily stop | Kill | 25% peak stop passed FY2018-22 (8 of 11, -0.4, worst fall +2.0), failed FY2023-26 (0 of 11, -1.3); owner's 20%/30% rule -0.9 then -4.1 |
+| L5 inverse vol | Kill | -1.4 then -0.4, less pain 2 then 6 of 11 |
+| L6 residual momentum | Kill | -16.4 then -29.5: with an intercept the score drops the long-run momentum (top-30 52-week return 3% vs 265%) |
+
 ## Risks
 
 - Six levers x cells is another search on the same ten years: the split sample and the
@@ -109,3 +124,6 @@ must pass at both fill timings.
     stock's own 52-week average, not a constant outperformance. For configs with a stock tilt,
     the tilt still re-orders picks inside a category; the residual score replaces the global
     ranking (category and pool selection, and the stock order where the tilt is 0).
+- 2026-10-09 — all grids run (L1 01:34, L4 02:14, L5 02:24, L6 02:41 IST); no lever adopted.
+  The L4 stop counter missed daily sales for the first strategies (fixed mid-run); a spot check
+  replaced it. L6's collapse was checked for a bug: none, the definition removes momentum.
