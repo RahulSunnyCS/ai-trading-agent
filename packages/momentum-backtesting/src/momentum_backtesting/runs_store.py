@@ -33,7 +33,9 @@ data version) or `new_result`, which also appends a row to `momentum_result_chan
 moved (`saved_identity.explain`). The strategy's name, notes and favourite state live on its
 *anchor* run (the favourite run if there is one, else the oldest), so a favourite's run id, which
 the journal and the weekly job key on, never changes. A run's own config is `backtest_runs.params`
-(what it was saved with); the version's `spec` is the normalised settings.
+(what it was saved with). The version's `spec` is a runnable config of the strategy (its anchor's
+raw config), never the normalised settings: code from before BL-052 reads a run's config from
+`spec`, and normalised Broad settings have no `universe`, which the request model requires.
 
 Pruning: each strategy keeps every result change and its newest `MAX_REPEATS` repeats; each
 dataset keeps its newest `MAX_STRATEGIES_PER_DATASET` strategies that nothing keeps (a favourite,
@@ -110,8 +112,8 @@ def _normalised_version(
     con: duckdb.DuckDBPyConnection, dataset: str, config: dict[str, Any]
 ) -> tuple[str, str]:
     """(version_id, fingerprint) of the strategy this config belongs to."""
-    settings, fp = saved_identity.identity(dataset, config)
-    return _ensure_version(con, dataset, fp, settings if settings is not None else config), fp
+    _, fp = saved_identity.identity(dataset, config)
+    return _ensure_version(con, dataset, fp, config), fp
 
 
 def _next_n(con: duckdb.DuckDBPyConnection, dataset: str) -> int:
@@ -1027,11 +1029,14 @@ def apply_merge(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
             dataset = item["dataset"]
             ids = [r["id"] for r in item["runs"]]
             runs = [r for r in _all_runs(con, dataset) if r["id"] in ids]
-            settings = saved_identity.normalise(dataset, runs[0]["config"])
-            version_id = _ensure_version(
-                con, dataset, item["fingerprint"], settings if settings else runs[0]["config"]
-            )
             anchor = next((r for r in runs if _is_favourite(r["summary"])), runs[0])
+            version_id = _ensure_version(con, dataset, item["fingerprint"], anchor["config"])
+            # The anchor's own config, even if the version existed already: an older reader
+            # (pre-BL-052 code still running) takes every run's config from here.
+            con.execute(
+                "UPDATE strategy_versions SET spec = ? WHERE version_id = ?",
+                [json.dumps(anchor["config"], default=str), version_id],
+            )
             previous = None
             for run in runs:
                 summary = run["summary"]

@@ -291,3 +291,22 @@ def test_the_merge_compares_a_run_saved_after_the_change_with_older_ones(client)
     history = client.get(f"/api/saved-strategies/{old}").json()["history"]
     assert [r["outcome"] for r in history] == ["new_result", "new"]
     assert history[0]["change"]["label"] == "unknown"
+
+
+def test_after_the_merge_older_code_still_reads_a_runnable_config(client):
+    # Code from before BL-052 (the scheduler's checkout, the running service) takes each run's
+    # config from strategy_versions.spec: it must be the favourite's own config, not normalised
+    # settings (normalised Broad settings have no `universe`, which the request model requires).
+    favourite = {"universe": ["X"], "broad_off_top_n": 3, "top_n": 9}
+    with connect() as con:
+        _legacy_run(con, "broad", "Run 1", {"broad_off_top_n": 3, "universe": ["Y"]}, (1.0, 2.0))
+        fav = _legacy_run(con, "broad", "Phase 6 x", favourite, (1.0, 2.0), True)
+    client.post("/api/saved-strategies/merge")
+    with connect() as con:
+        spec = con.execute(
+            "SELECT v.spec FROM backtest_runs r JOIN strategy_versions v USING (version_id) "
+            "WHERE r.run_id = ?",
+            [fav],
+        ).fetchone()[0]
+    assert json.loads(spec) == favourite
+    api.BacktestRequest.model_validate({**json.loads(spec), "dataset": "broad"})
