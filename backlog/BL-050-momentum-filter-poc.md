@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — set by the owner (2026-10-08); research only, so nothing live is at risk |
-| **Status** | In progress |
+| **Status** | Phases 0-3 done: no survivor; Phase 4 not applicable |
 | **Type** | research |
 | **Area** | momentum |
 | **Created** | 2026-10-07 |
@@ -197,6 +197,46 @@ proposed for real money (through BL-025).
 - **Done when:** 26 recorded weeks and a verdict. Adoption is a separate owner decision under
   BL-025 (paper first, then money), never automatic.
 
+## Result (2026-10-09): no feature survives
+
+`search_spaces/bl050_screen_result.json`, `bl050_dev_result.json`; curves in
+`data/search/round7_A/bl050/dev/`. The sealed 2024-26 window was **not read** (no survivor).
+
+**Phase 2 screen** (13-week forward spread inside each config's top momentum quintile, net of
+0.3%, Newey-West t; pass = mean t >= 2 and 3 of 4 right sign):
+
+| Feature | Mean t | Right sign | Screen |
+|---|---|---|---|
+| V1 turnover expansion | 4.76 | 4 of 4 | pass |
+| T1 trend quality | 3.31 | 4 of 4 | pass |
+| V2 accumulation | 3.07 | 4 of 4 | pass |
+| R1 beats Nifty 500 | 2.11 | 4 of 4 | pass |
+| M2 residual sum | 1.24 | 4 of 4 | kill |
+| V3 quiet-or-building gate (owner) | -1.20 | 0 of 4 | kill (wrong way: blocked names did better) |
+| M1 overextension gate | -2.41 | 0 of 4 | kill (wrong way: stretched names did better) |
+
+**Phase 3 engine** (frozen ensemble, 2012-01-01 to 2023-12-29, pre-tax Rs 2 lakh; baseline
+29.7% a year, worst fall -31.4%, 10.2 holdings). PBO over the 11 trials plus baseline: **0.74**
+(limit 0.5), so no trial can pass.
+
+| Trial | CAGR | Median 3-year dCAGR | Win share | Worst fall | Holdings |
+|---|---|---|---|---|---|
+| V1 @ 0.25 / 0.5 | 30.0% / 29.8% | +0.3 / +0.1 | 97% / 58% | -31.4% | 10.2 / 10.1 |
+| V2 @ 0.25 / 0.5 | 29.7% / 29.9% | 0.0 / +0.2 | 33% / 83% | -31.4% | 10.2 / 10.1 |
+| T1 @ 0.25 / 0.5 | 29.5% / 29.5% | -0.2 / -0.1 | 36% / 42% | -31.4% | 10.1 |
+| M2 @ 0.25 / 0.5 | 29.7% / 29.7% | +0.1 / +0.1 | 53% / 53% | -31.4% / -30.8% | 10.1 |
+| R1 gate | 29.6% | -0.1 | 8% | -31.4% | 10.1 |
+| V3 gate (owner) | 30.1% | -0.3 | 47% | -26.7% | 6.2 |
+| M1 gate | 29.1% | -0.4 | 42% | -29.1% | 9.5 |
+
+- The screen's signal is real among top-momentum names (V1 at t = 4.8), but the tilt as
+  pre-registered acts only inside the categories already chosen, where few names compete, so it
+  changed few decisions (dCAGR within +/-0.3 points). A tilt on the wider pool or the category
+  choice is a different question and needs its own pre-registration.
+- V3's shallower worst fall comes mostly from holding 6 stocks instead of 10 (blocked buys left
+  slots empty); its cash share came out blank (NaN in the run metadata) and was not chased.
+- Phase 4 (shadow arms) has nothing to track.
+
 ## Risks
 
 - **Low statistical power.** 26 forward weeks cannot prove an edge. They can catch an
@@ -258,3 +298,5 @@ To confirm when this is started:
 - 2026-10-08 — Review fixes, before any run (PR #129, Codex). The Phase 2 screen is now
   pre-registered per frozen config, on each config's own score and calendar, with a fixed rule
   for combining the four. Phase 3 builds all six curves for PBO, and only survivors get verdicts.
+- 2026-10-09 — Phases 1-3 run overnight (features 02:42, screen 02:45, engine 02:49 IST): four
+  features pass the screen, none passes the engine test (PBO 0.74); the hold-out stays sealed.
