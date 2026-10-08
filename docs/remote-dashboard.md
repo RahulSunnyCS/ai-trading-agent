@@ -182,7 +182,7 @@ upstream. **On Workers a header the middleware deletes still reaches the rewrite
 does not, so `upstreamHeaders` blanks them.** The bundle is 1.6 MiB gzipped (free plan limit 3 MiB).
 
 **Auto-deploy.** Pushing to the `release` branch deploys the dashboard
-(`.github/workflows/deploy-dashboard.yml`); nothing else does. Promote a tested `main` with
+(`.github/workflows/deploy-dashboard.yml`); nothing else does, and only a commit already on `main` deploys (the workflow checks, because GitHub cannot restrict which branch a push to `release` comes from). Promote a tested `main` with
 `git push origin main:release`, or run the workflow by hand from the Actions tab. One-time setup:
 Cloudflare dashboard → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers" template,
 limited to this account and the `codifie.dev` zone (add Zone → DNS → Edit if the deploy complains

@@ -2,7 +2,7 @@ name: Deploy dashboard
 
 # Pushing to the `release` branch deploys the dashboard to Cloudflare Workers
 # (dashboard.codifie.dev, docs/remote-dashboard.md). Nothing else deploys it.
-# Promote with: git push origin main:release   (or merge main into release)
+# Promote with: git push origin main:release. Only commits already on main deploy (checked below).
 on:
   push:
     branches: [release]
@@ -22,6 +22,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # the main-only check below needs main's history
+          fetch-depth: 0
+
+      # Only commits that are already on main may deploy. GitHub cannot restrict which branch a
+      # push to `release` comes from, so a feature-branch commit pushed there stops here.
+      - name: Check the commit is on main
+        run: |
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not on main. Merge it to main first, then: git push origin main:release"
+            exit 1
+          fi
 
       - uses: oven-sh/setup-bun@v2
         with:
