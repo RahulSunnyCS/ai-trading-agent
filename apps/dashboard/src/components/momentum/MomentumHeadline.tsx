@@ -137,6 +137,7 @@ export function BenchmarkPicker({
         label: option.label,
         detail: option.available ? formatPct(option.cagr) : 'no data',
         disabled: !option.available,
+        title: option.reason ?? undefined,
       }))}
       onChange={onPick}
       footer="Dividends included (TRI). Switching re-compares the whole page; the backtest does not run again."
@@ -314,8 +315,19 @@ export function MomentumHeadline({
           gap={ytd === null ? null : `YTD ${formatPct(ytd, 1, { sign: true })}`}
         />
       </div>
+      {view.replaced ? (
+        <p className="border-t border-border bg-warning/10 px-4 py-1.5 text-xs text-muted sm:px-5">
+          {view.replaced.label} has no usable data for this run
+          {view.replaced.reason ? ` (${view.replaced.reason})` : ''}, so {view.label} is shown
+          instead.
+        </p>
+      ) : null}
       <div className="flex items-center gap-x-5 gap-y-1 overflow-hidden border-t border-border px-4 py-2 text-xs text-muted sm:px-5">
-        <div className="flex min-w-0 flex-1 items-center gap-x-5 overflow-hidden">
+        {/* One line, never wrapping: what does not fit fades out, and "All metrics" has the rest. */}
+        <div
+          className="flex min-w-0 flex-1 items-center gap-x-5 overflow-hidden [mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]"
+          title="All metrics shows the full set"
+        >
           <Inline label="Sortino">{formatNumber(num(k.sortino))}</Inline>
           <Inline label="Volatility">{formatPct(num(k.volatility))}</Inline>
           <Inline label="Beat it">

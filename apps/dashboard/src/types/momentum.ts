@@ -58,10 +58,15 @@ export interface MomentumComparison {
  * One of the five indices the headline benchmark picker offers (`reference_benchmarks.PICKER`),
  * all dividend-inclusive. `series` is in rupees on `series.dates`, rebased to ₹1 lakh like the
  * strategy; the statistics use the strategy's own definitions (Sharpe and Sortino vs cash). An
- * index without data for this run is listed with `available` false and nothing else.
+ * index without data for this run is listed with `available` false and a `reason`.
  */
 export type MomentumBenchmarkChoice =
-  | { name: string; available: false }
+  | {
+      name: string;
+      available: false;
+      /** Why: no data, starts after the run's first week, ends early, or a gap over a week. */
+      reason?: string;
+    }
   | {
       name: string;
       available: true;
