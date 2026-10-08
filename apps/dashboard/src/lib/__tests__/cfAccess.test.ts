@@ -157,6 +157,39 @@ describe('verifyAccessJwt', () => {
     expect(await verifyAccessJwt(await sign(good), config, NOW, failing)).toBe(false);
   });
 
+  it('keeps using the cached keys when a refresh fails after the TTL', async () => {
+    const token = await sign(good);
+    expect(await verifyAccessJwt(token, config, NOW, fetchKeys)).toBe(true);
+    const failing = vi.fn<FetchKeys>(async () => {
+      throw new Error('offline');
+    });
+    const later = NOW + 2 * 60 * 60_000;
+    const fresh = await sign(good, { exp: later / 1000 + 3600 });
+    expect(await verifyAccessJwt(fresh, config, later, failing)).toBe(true);
+    expect(await verifyAccessJwt(fresh, config, later + 1000, failing)).toBe(true);
+    expect(failing).toHaveBeenCalledTimes(1);
+  });
+
+  it('rate limits retries after a failed first fetch', async () => {
+    const failing = vi.fn<FetchKeys>(async () => {
+      throw new Error('offline');
+    });
+    const token = await sign(good);
+    expect(await verifyAccessJwt(token, config, NOW, failing)).toBe(false);
+    expect(await verifyAccessJwt(token, config, NOW + 1000, failing)).toBe(false);
+    expect(failing).toHaveBeenCalledTimes(1);
+    expect(await verifyAccessJwt(token, config, NOW + 61_000, fetchKeys)).toBe(true);
+  });
+
+  it('shares one key fetch between concurrent requests', async () => {
+    const token = await sign(good);
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => verifyAccessJwt(token, config, NOW, fetchKeys)),
+    );
+    expect(results).toEqual([true, true, true, true, true]);
+    expect(fetchKeys).toHaveBeenCalledTimes(1);
+  });
+
   it('caches keys, and does not refetch for an unknown key id within a minute', async () => {
     const token = await sign(good);
     await verifyAccessJwt(token, config, NOW, fetchKeys);
@@ -220,6 +253,22 @@ describe('middleware in Cloudflare Access mode', () => {
     expect(new URL(login.headers.get('location') ?? '').pathname).toBe('/momentum');
     const logout = await middleware(request('/logout', { 'cf-access-jwt-assertion': token }));
     expect(new URL(logout.headers.get('location') ?? '').pathname).toBe('/cdn-cgi/access/logout');
+  });
+
+  it('on API paths adds the service token and blanks the Access token and cookie', async () => {
+    vi.stubEnv('UPSTREAM_ACCESS_CLIENT_ID', 'real-id');
+    vi.stubEnv('UPSTREAM_ACCESS_CLIENT_SECRET', 'real-secret');
+    const token = await sign(good);
+    const res = await middleware(
+      request('/api/momentum/meta', {
+        'cf-access-jwt-assertion': token,
+        cookie: `theme=dark; CF_Authorization=${token}`,
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-middleware-request-cf-access-client-id')).toBe('real-id');
+    expect(res.headers.get('x-middleware-request-cf-access-jwt-assertion')).toBe('');
+    expect(res.headers.get('x-middleware-request-cookie')).toBe('theme=dark');
   });
 
   it('503s on a half-configured Access setup', async () => {

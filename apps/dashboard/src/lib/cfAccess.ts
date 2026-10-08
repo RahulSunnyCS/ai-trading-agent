@@ -48,7 +48,13 @@ export async function fetchAccessKeys(teamDomain: string): Promise<Jwk[]> {
 
 interface KeyCache {
   keys: Jwk[];
+  /** Imported verification keys by kid, so a request does not re-import the same RSA key. */
+  imported: Map<string, CryptoKey>;
   fetchedAt: number;
+  /** Last time a refresh was started, successful or not: failures are retried at most this often. */
+  attemptedAt: number;
+  /** The refresh in flight, shared by concurrent requests. */
+  pending: Promise<void> | null;
 }
 const caches = new Map<string, KeyCache>();
 
@@ -57,19 +63,70 @@ export function resetAccessKeyCache(): void {
   caches.clear();
 }
 
+function refresh(
+  cache: KeyCache,
+  teamDomain: string,
+  now: number,
+  fetchKeys: FetchKeys,
+): Promise<void> {
+  cache.attemptedAt = now;
+  cache.pending ??= fetchKeys(teamDomain)
+    .then((keys) => {
+      cache.keys = keys;
+      cache.imported.clear();
+      cache.fetchedAt = now;
+    })
+    // A failed refresh keeps the keys we already have; the next try is rate limited above.
+    .catch(() => {})
+    .finally(() => {
+      cache.pending = null;
+    });
+  return cache.pending;
+}
+
 async function keyFor(
   teamDomain: string,
   kid: string,
   now: number,
   fetchKeys: FetchKeys,
-): Promise<Jwk | null> {
-  const cached = caches.get(teamDomain);
-  const hit = cached?.keys.find((key) => key.kid === kid);
-  if (hit && cached && now - cached.fetchedAt < KEYS_TTL_MS) return hit;
-  if (cached && now - cached.fetchedAt < KEYS_MIN_REFETCH_MS) return null;
-  const keys = await fetchKeys(teamDomain);
-  caches.set(teamDomain, { keys, fetchedAt: now });
-  return keys.find((key) => key.kid === kid) ?? null;
+): Promise<CryptoKey | null> {
+  let cache = caches.get(teamDomain);
+  if (!cache) {
+    cache = {
+      keys: [],
+      imported: new Map(),
+      fetchedAt: Number.NEGATIVE_INFINITY,
+      attemptedAt: Number.NEGATIVE_INFINITY,
+      pending: null,
+    };
+    caches.set(teamDomain, cache);
+  }
+  const hit = cache.keys.some((key) => key.kid === kid);
+  const stale = now - cache.fetchedAt >= KEYS_TTL_MS;
+  // Refresh when the keys are old, or when a token names a key we do not have (a rotation),
+  // but never more than once a minute.
+  if ((stale || !hit) && now - cache.attemptedAt >= KEYS_MIN_REFETCH_MS) {
+    await refresh(cache, teamDomain, now, fetchKeys);
+  } else if (cache.pending) {
+    await cache.pending;
+  }
+  const cached = cache.imported.get(kid);
+  if (cached) return cached;
+  const jwk = cache.keys.find((key) => key.kid === kid);
+  if (!jwk || jwk.kty !== 'RSA') return null;
+  try {
+    const key = await crypto.subtle.importKey(
+      'jwk',
+      jwk,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    );
+    cache.imported.set(kid, key);
+    return key;
+  } catch {
+    return null;
+  }
 }
 
 function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> | null {
@@ -116,22 +173,9 @@ export async function verifyAccessJwt(
   if (!header || !payload || !signature) return false;
   if (header.alg !== 'RS256' || typeof header.kid !== 'string') return false;
 
-  let jwk: Jwk | null;
+  const key = await keyFor(config.teamDomain, header.kid, now, fetchKeys);
+  if (!key) return false;
   try {
-    jwk = await keyFor(config.teamDomain, header.kid, now, fetchKeys);
-  } catch {
-    return false;
-  }
-  if (!jwk || jwk.kty !== 'RSA') return false;
-
-  try {
-    const key = await crypto.subtle.importKey(
-      'jwk',
-      jwk,
-      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-      false,
-      ['verify'],
-    );
     const signed = new TextEncoder().encode(`${headerPart}.${payloadPart}`);
     if (!(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, signed))) return false;
   } catch {

@@ -62,6 +62,13 @@ bun run stop:research        # stop this checkout's research processes
 bun run start:prod           # APIs + `next start` on :5190; sign in at /login
 bun run start:frontend:prod  # the production dashboard only; add `-- --rebuild` / `-- --port 5191`
 
+# Hosted dashboard on Cloudflare Workers at dashboard.codifie.dev (docs/remote-dashboard.md); run from apps/dashboard, Node 22+.
+# Always through these scripts: cf-build hides the repo-root .env, which OpenNext would otherwise bundle into the Worker
+bun run cf:build            # OpenNext build with the root .env hidden + a check that no env was bundled
+bun run cf:deploy           # cf:build, then wrangler deploy
+bun run cf:preview          # cf:build, then wrangler dev on :8787
+bun run start:tunnel        # cloudflared tunnel run: only while someone is using the hosted dashboard
+
 # Dashboard dev server (Next.js on :5173; rewrites /api to the server on :3000)
 bun run --filter @ata/dashboard dev
 

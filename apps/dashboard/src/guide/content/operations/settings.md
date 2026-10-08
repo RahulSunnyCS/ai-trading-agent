@@ -11,7 +11,7 @@ Personal preferences for this browser, plus which Telegram messages are sent.
 | Navigation | Show, hide and reorder sidebar tabs. Settings and this Guide cannot be hidden. |
 | Browser alerts | A warning in the dashboard before the Fyers token expires. |
 | Telegram alerts | One switch per message type: broker logins, the momentum preview/final/journal, live-money rules status and problems, the options evening summary and problems, the morning summary, the weekly digest and the backup. Scheduler failures and missed runs always send. |
-| Account | The dashboard is protected by one shared password; **Log out** ends your session. |
+| Account | Signing in is handled in front of the dashboard (a Google sign-in or an emailed code when it is hosted, nothing on your own computer); **Log out** ends your session. |
 | About | What the dashboard is connected to. **Developer mode** shows each screen's list of unfinished work next to its title. |
 
 > [!TIP]

@@ -15,11 +15,13 @@ The browser only ever talks to the dashboard; the dashboard's **server** forward
 APIs must be reachable from wherever Next runs — that is what the tunnel is for. No CORS,
 no open ports, and the Python services stay bound to `127.0.0.1`.
 
-Two locks, both required:
+Two locks, both required. The first is the dashboard password, or, when the dashboard host sits
+behind Cloudflare Access, Access's own sign-in (see "Signing in with Google" below; the password is
+then unused):
 
 | Lock | Protects | Configured by |
 |---|---|---|
-| Dashboard password | the dashboard (every page and `/api/*`) | `DASHBOARD_PASSWORD` on the dashboard host |
+| Dashboard password (or Cloudflare Access sign-in) | the dashboard (every page and `/api/*`) | `DASHBOARD_PASSWORD` on the dashboard host (or `ACCESS_TEAM_DOMAIN` + `ACCESS_AUD`) |
 | Cloudflare Access service token | the tunnel hostnames, so the APIs can't be called around the dashboard | Cloudflare Zero Trust + `UPSTREAM_ACCESS_CLIENT_ID/SECRET` on the dashboard host |
 
 The password **fails closed**: under `next start` / Vercel (or whenever the service-token
@@ -143,30 +145,39 @@ Production. Hobby is fine for personal use; its terms rule out commercial use, s
 Pro before any subscriber touches it.
 
 **Cloudflare Workers** (instead of Vercel; one account for the dashboard and the tunnel). The
-dashboard builds with the OpenNext Cloudflare adapter (`open-next.config.ts`, `wrangler.jsonc`).
-Needs Node 22+ for `wrangler` (Node 20 is refused). **OpenNext bundles every `.env` it finds, the repo-root
-`.env` included, into the Worker, which would upload every broker, Telegram and Google secret.** Move the
-root `.env` aside for the build (`mv .env /tmp/env.hidden`, build, `mv` it back);
-`scripts/check-no-env-bundled.mjs` (run by `cf:deploy`) refuses to deploy if any variable was bundled.
-The Worker is `dashboard.codifie.dev` (a custom domain, `workers_dev` off). Build and deploy from the laptop:
+dashboard builds with the OpenNext Cloudflare adapter (`open-next.config.ts`, `wrangler.jsonc`) and is
+served at `dashboard.codifie.dev` (a custom domain, `workers_dev` off). Needs Node 22+ for `wrangler`
+(Node 20 is refused).
+
+OpenNext bundles every `.env` it finds, the repo-root `.env` included, which would upload every broker,
+Telegram and Google secret. So always build with `bun run cf:build` (or `cf:deploy` / `cf:preview`, which
+call it): `scripts/cf-build.mjs` renames the root `.env` for the build and puts it back afterwards, even on
+an error or Ctrl+C, then `scripts/check-no-env-bundled.mjs` fails the build unless the bundled env is
+empty. Do not run `opennextjs-cloudflare build` or `wrangler deploy` directly. If a build is killed
+outright and `.env` is missing, rename `.env.cf-build-hidden` back (the next `cf:build` also does it).
 
 ```bash
 cd apps/dashboard
 npx wrangler login                                   # once
 # build-time values: put these four in apps/dashboard/.env.local or export them
 #   MOMENTUM_DIRECT=1  OBT_DIRECT=1  MOMENTUM_DIRECT_API_URL=…  OBT_DIRECT_API_URL=…
-npx wrangler secret put DASHBOARD_PASSWORD           # runtime secrets, one prompt each
-npx wrangler secret put UPSTREAM_ACCESS_CLIENT_ID
+npx wrangler secret put DASHBOARD_PASSWORD           # password mode only; the name goes in the command,
+npx wrangler secret put UPSTREAM_ACCESS_CLIENT_ID    # the value is typed at the hidden prompt
 npx wrangler secret put UPSTREAM_ACCESS_CLIENT_SECRET
-bun run cf:deploy                                    # builds, then wrangler deploy
-bun run cf:preview                                   # local Workers runtime on :8787 (put the three secrets in .dev.vars, gitignored)
+bun run cf:deploy                                    # builds, checks, then wrangler deploy
+bun run cf:preview                                   # local Workers runtime on :8787
 ```
 
-Checked locally under `wrangler dev` against an echo server: wrong or missing password → 401
-(pages redirect to `/login`), the service-token headers reach the upstream, and a client-supplied
-`CF-Access-Client-Id` is overwritten. Not yet checked: a real deploy, the real tunnel, and the cold
-Broad backtest through Workers. Bundle is 1.6 MiB gzipped (free plan limit 3 MiB). The dashboard
-password's Basic header is forwarded upstream with the service token, as on Vercel.
+`cf:preview` reads secrets from `apps/dashboard/.dev.vars` (gitignored). `ACCESS_TEAM_DOMAIN` and
+`ACCESS_AUD` are set in `wrangler.jsonc`, so a preview is in Access mode and refuses every request
+(no Access token on localhost) unless `.dev.vars` blanks them (`ACCESS_TEAM_DOMAIN=` and `ACCESS_AUD=`),
+which gives the password mode.
+
+Checked under `wrangler dev` against an echo server: wrong or missing password gets 401 (pages redirect to
+`/login`), the service-token headers reach the upstream, a client-supplied `CF-Access-Client-Id` is
+overwritten, and the dashboard's `Authorization`, Access token and session cookies do not reach the
+upstream. **On Workers a header the middleware deletes still reaches the rewrite target; a blank one
+does not, so `upstreamHeaders` blanks them.** The bundle is 1.6 MiB gzipped (free plan limit 3 MiB).
 
 **Second laptop:** put the variables in `apps/dashboard/.env.local`, then
 

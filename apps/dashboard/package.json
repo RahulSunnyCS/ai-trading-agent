@@ -7,9 +7,9 @@
     "dev": "next dev --port 5173",
     "build": "next build",
     "start": "next start --port 5173",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && node scripts/check-no-env-bundled.mjs && wrangler dev",
-    "cf:deploy": "opennextjs-cloudflare build && node scripts/check-no-env-bundled.mjs && wrangler deploy",
+    "cf:build": "node scripts/cf-build.mjs",
+    "cf:preview": "node scripts/cf-build.mjs && wrangler dev",
+    "cf:deploy": "node scripts/cf-build.mjs && wrangler deploy",
     "typecheck": "bun run --bun tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test"
