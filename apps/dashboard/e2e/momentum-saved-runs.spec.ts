@@ -215,3 +215,19 @@ test('the drawer says why a result moved and marks it reviewed', async ({ page }
   await page.keyboard.press('Escape');
   await expect(page).not.toHaveURL(/strategy=/);
 });
+
+test('the findings card points at what needs a look and can be hidden', async ({ page }) => {
+  await mockSavedStrategies(page);
+  await page.goto('/momentum/saved');
+  const card = page.getByRole('heading', { name: 'What the saved runs say' });
+  await expect(card).toBeVisible();
+  await expect(page.getByText('Core ETF: result moved with no known cause')).toBeVisible();
+  await expect(page.getByText('5 saved runs are 3 strategies')).toBeVisible();
+  await page.getByRole('button', { name: 'Review it ›' }).click();
+  await expect(page).toHaveURL(/[?&]strategy=a1/);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Hide' }).click();
+  await expect(page.getByText('5 saved runs are 3 strategies')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('button', { name: /^Show \d/ })).toBeVisible();
+});

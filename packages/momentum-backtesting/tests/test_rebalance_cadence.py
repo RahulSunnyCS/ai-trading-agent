@@ -302,3 +302,42 @@ def test_api_accepts_sell_every_week_and_rejects_it_without_the_buffer_rule(clie
     assert bad.status_code == 422
     meta = http.get("/api/meta").json()
     assert meta["defaults"]["sell_every_week"] is False
+
+
+# --- rebalance preview as a background job (Cloudflare 524) --------------------------------------
+
+
+def _wait_for_job(http, job_id):
+    import time
+
+    for _ in range(100):
+        job = http.get(f"/api/rebalance-preview/jobs/{job_id}").json()
+        if job["status"] != "running":
+            return job
+        time.sleep(0.05)
+    raise AssertionError("preview job never finished")
+
+
+def test_rebalance_preview_job_returns_the_result_and_the_refusals(client, monkeypatch):
+    from fastapi import HTTPException
+
+    from momentum_backtesting import api
+
+    http, universe = client
+    body = {"universe": universe, "portfolio_value": 1000, "holdings_pct": {}}
+
+    monkeypatch.setattr(api, "rebalance_preview", lambda req: {"signal_week": "2026-10-02"})
+    started = http.post("/api/rebalance-preview/jobs", json=body)
+    assert started.status_code == 202
+    done = _wait_for_job(http, started.json()["id"])
+    assert done["status"] == "done" and done["result"] == {"signal_week": "2026-10-02"}
+
+    def refuse(req):
+        raise HTTPException(422, "Rebalance preview supports Stock and Broad Momentum.")
+
+    monkeypatch.setattr(api, "rebalance_preview", refuse)
+    failed = _wait_for_job(http, http.post("/api/rebalance-preview/jobs", json=body).json()["id"])
+    assert failed["status"] == "failed" and failed["error_status"] == 422
+    assert "Stock and Broad" in failed["error"]
+
+    assert http.get("/api/rebalance-preview/jobs/ffff").status_code == 404

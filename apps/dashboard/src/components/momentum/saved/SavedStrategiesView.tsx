@@ -10,8 +10,9 @@ import {
   Layers,
   Star,
 } from 'lucide-react';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useAppRoute } from '../../../hooks/useAppRoute';
 import { fetchCached, usePolledResource } from '../../../hooks/usePolledResource';
 import { useQueryState } from '../../../hooks/useQueryState';
 import { apiDelete, apiPatch, apiPost } from '../../../lib/api';
@@ -35,6 +36,7 @@ import {
   toggleSelection,
 } from '../../../lib/momentumCompare';
 import { MAX_FOLLOWED, isFollowed } from '../../../lib/momentumFavourites';
+import { type FindingAction, savedFindings, tradableTwin } from '../../../lib/momentumFindings';
 import {
   CHANGE,
   DATASET_SHORT,
@@ -47,6 +49,10 @@ import {
   strategyCounts,
   strategyName,
 } from '../../../lib/momentumSaved';
+import {
+  hydrateMomentumSavedFromStorage,
+  useMomentumSavedStore,
+} from '../../../store/momentumSaved';
 import type {
   MomentumWeeklyStatus,
   SavedStrategiesResponse,
@@ -63,6 +69,7 @@ import { toast } from '../../ui/Toast';
 import { MomentumCompare } from '../MomentumCompare';
 import { momentumSettingsDefaults } from '../MomentumSettingsPanel';
 import { MomentumListSkeleton } from '../MomentumSkeletons';
+import { SavedFindingsCard } from './SavedFindingsCard';
 import { SavedRunSparkline } from './SavedRunSparkline';
 import { SavedStrategyDrawer } from './SavedStrategyDrawer';
 import { StrategyStatusMenu } from './StrategyStatusMenu';
@@ -255,6 +262,28 @@ export function SavedStrategiesView({
     (s) => !s.member_of && s.dataset === selectedStrategies[0]?.dataset,
   );
   const opened = all.find((s) => s.id === openId) ?? null;
+  const openedTwin = opened ? tradableTwin(opened, all, ignoredFields.broad ?? []) : null;
+
+  // Findings (Phase 3): below the list and the compare bar; Hide is remembered in this browser.
+  const findings = useMemo(
+    () => savedFindings(strategies, nameOf, ignoredFields),
+    [strategies, nameOf, ignoredFields],
+  );
+  const findingsHidden = useMomentumSavedStore((state) => state.findingsHidden);
+  const setFindingsHidden = useMomentumSavedStore((state) => state.setFindingsHidden);
+  useEffect(() => hydrateMomentumSavedFromStorage(), []);
+  const { navigate } = useAppRoute();
+  const compareRef = useRef<HTMLDivElement>(null);
+
+  function act(action: FindingAction): void {
+    if (action.kind === 'open') setOpenId(action.id);
+    else if (action.kind === 'guide') navigate('guide', 'momentum', 'saved-runs');
+    else {
+      setSelected(action.ids);
+      // After the compare card renders with the two ticked.
+      window.setTimeout(() => compareRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }
+  }
 
   function done(): void {
     saved.refetch();
@@ -700,18 +729,29 @@ export function SavedStrategiesView({
       ) : null}
 
       {selectedStrategies.length > 0 ? (
-        <Card>
-          <MomentumCompare
-            runs={all.filter((s) => !s.group).map((s) => asSavedRun(s, nameOf(s)))}
-            selectedIds={selectedIds}
-            onSelectedIdsChange={setSelected}
-            picker={false}
-          />
-        </Card>
+        <div ref={compareRef}>
+          <Card>
+            <MomentumCompare
+              runs={all.filter((s) => !s.group).map((s) => asSavedRun(s, nameOf(s)))}
+              selectedIds={selectedIds}
+              onSelectedIdsChange={setSelected}
+              picker={false}
+            />
+          </Card>
+        </div>
       ) : null}
+
+      <SavedFindingsCard
+        findings={findings}
+        hidden={findingsHidden}
+        onHiddenChange={setFindingsHidden}
+        onAction={act}
+      />
 
       <SavedStrategyDrawer
         strategy={opened}
+        twin={openedTwin}
+        twinName={openedTwin ? nameOf(openedTwin) : ''}
         name={opened ? nameOf(opened) : ''}
         defaults={opened ? defaults[opened.dataset] : undefined}
         ignored={opened ? (ignoredFields[opened.dataset] ?? []) : []}
