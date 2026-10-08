@@ -37,6 +37,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-036](BL-036-momentum-ui-from-bl010.md) | Momentum dashboard: what the BL-010 review changes on screen | P2 | Planned | improvement | dashboard |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
+| [BL-054](BL-054-momentum-improvement-levers.md) | Six levers to improve the Broad strategies: cadence and tax, phase blend, ETF blend, daily stop, inverse-vol sizing, residual momentum | P1 | In progress | research | momentum |
 | [BL-017](BL-017-momentum-settings-module.md) | Momentum: one settings module, and split `api.py` | P2 | Ready | improvement | momentum |
 | [BL-020](BL-020-claude-code-workflow-setup.md) | Claude Code working set-up: model per role, saved commands, session habits | P2 | Ready | chore | cross-cutting |
 | [BL-031](BL-031-chart-pattern-detectors.md) | Classical chart-pattern detectors on weekly and daily stock data | P2 | Idea | research | momentum |
