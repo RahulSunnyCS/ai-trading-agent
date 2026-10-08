@@ -21,7 +21,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
 | [BL-022](BL-022-analog-day-search.md) | "Days like today": analog-day search for intraday options | P1 | Idea | research | options |
-| [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | Planned | feature | momentum |
+| [BL-025](BL-025-live-money-rules.md) | Live-money rules for Momentum: written before the first rupee, enforced by alerts | P1 | In progress | feature | momentum |
 | [BL-026](BL-026-realised-vs-backtest-options.md) | Options: realised P&L against the backtest of the same days | P1 | Planned | feature | options |
 | [BL-029](BL-029-point-in-time-universe-in-ui.md) | Point-in-time universe as a choice on the Broad tab | P1 | Planned | feature | momentum |
 | [BL-030](BL-030-choose-journal-favourites.md) | Choose the ~8 favourites to track and trade | P1 | Idea | research | momentum |

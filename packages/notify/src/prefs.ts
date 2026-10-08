@@ -17,6 +17,8 @@ export const NOTIFICATION_TYPES = {
   'momentum.final': 'Momentum weekly final signal / rebalance (Fri 16:45)',
   'momentum.journal': 'Momentum forward-journal entries and weekly check',
   'momentum.problem': 'Momentum: no signal, stale data, blocked favourite or failed job',
+  'momentum.live_rules':
+    'Momentum live-money rules: the weekly status (a rule that is hit is always sent)',
   'options.daily': 'Options evening collection and leg-wise P&L summary',
   'options.problem': 'Options evening collection could not run',
   'scheduler.morning': 'Scheduler morning summary (09:00 on trading days)',

@@ -9,7 +9,8 @@ rank, how to rank it, how to hold it and what it costs, then run.
   have different settings; saved runs are kept per dataset.
 - Press **Settings** in the run bar (or click any setting's chip) to open the settings drawer
   from the right. **Run** is at the foot of the drawer and in the run bar; Ctrl/Cmd + Enter
-  runs from anywhere in the drawer. **Defaults** at the top of the drawer resets every setting.
+  runs from anywhere in the drawer, and the drawer closes once the run has started. **Defaults** at
+  the top of the drawer resets every setting.
 - No login is needed to backtest. Prices come from the research database, refreshed by the
   scheduled jobs.
 

@@ -52,6 +52,55 @@ calls, so the dashboard can run off the laptop that serves the APIs. The passwor
 mandatory (fails closed) in production builds; plain `next dev` stays open. Runbook:
 `docs/remote-dashboard.md`.
 
+## Analytics page pattern
+
+First built on Momentum › Backtest (owner-approved from mockups, 2026-10-07; the mockups are
+`backlog/assets/BL-049/` for Scores). Use it for any page that shows the result of a run:
+backtests, Options Lab runs, P&L, journals, the Scores page (BL-049). Words used in prompts
+and code comments are in *italics*.
+
+1. **One sidebar.** On an analytics page (`isAnalyticsPage` in `lib/routes.ts`) the app
+   navigation is an icon rail and the page uses the full width. It never adds a second
+   permanent side column.
+2. **Run bar.** One line at the top: the current inputs as chips (a chip opens that section of
+   the settings), then reload, share, **Settings** and **Run**. Settings open in a *settings
+   drawer*, `components/ui/Drawer.tsx`, from the right. Run closes it once the run has started.
+3. **Headline strip.** The 4–5 numbers that decide whether the result is good, large, each with
+   the benchmark's figure and the gap as a badge (`+6.5pp`, `1.78×`). Secondary metrics go on
+   one line that never wraps and fades out at the edge, with "All metrics" for the rest.
+4. **Benchmarks are first-class.** Every headline number is shown against a benchmark; the
+   *benchmark picker* on the strip switches every comparison on the page at once without a
+   re-run. The server sends all choices with the result (`result.benchmarks`);
+   `lib/momentumBenchmark.ts` resolves the pick. A pick with no usable data for the run falls
+   back to the run's own benchmark and says so (`view.replaced`), never silently.
+5. **Hero chart.** Full width, as tall as the first screen allows (aim for two-thirds), main
+   series and benchmark only; other series are added by the reader. Secondary panes (drawdown)
+   are off by default behind a toggle.
+6. **First-screen rule.** In a 1600×1000 window the run bar, headline strip and hero chart
+   answer "is this good?" without scrolling.
+7. **Follow tooltip.** A short tooltip centred about 1 cm (40 px) *below* the cursor; flips
+   above near the bottom edge, clamps at the sides, and ignores the mouse (`pointer-events:
+   none`) so the next point is always reachable. Click pins the full-detail card (Esc or a second
+   click closes it); ← → step between events such as rebalances. The placement maths is
+   `tooltipPlacement` in `lib/momentumResult.ts`; place the tooltip once per animation frame.
+8. **Widgets, not tabs, below the first screen.** A scrolling grid of cards (`Widget` in
+   `components/momentum/MomentumResultWidgets.tsx`): title, one-line description, actions on the
+   right. A widget that does not apply to the current mode is left out, not disabled.
+9. **Progressive loading.** The first screen renders from the core response alone. Widgets
+   wait for the hero chart's first paint (`onPainted`), then load in the background in order,
+   or at once when scrolled near (`hooks/useWidgetActivation.ts`). An expensive widget (a second
+   engine run) loads only when scrolled to, with a short margin. Every widget shows a placeholder
+   while loading and an error with Retry on failure (`useRunSection` and `Loaded`).
+10. **Dense one-line tables.** 32 px rows that never wrap: long text is cut with an ellipsis and
+    the full text is in the tooltip; figures in the mono face, right-aligned; an inline bar or a
+    badge instead of a second line; "Show all" for long lists.
+11. **Charts must not redraw on unrelated renders.** Anything derived from the picked benchmark
+    is memoised, so a ticking timer or a settings keystroke does not redraw Plotly.
+
+The repo-wide rules still apply: token colours only, `lib/format.ts` for display formatting,
+controls from `components/ui/`, fetching through `usePolledResource` / `useRunSection`, and
+the guide page updated in the same commit.
+
 ## Cross-package links
 
 This app has **no internal package dependencies** (`package.json` declares
