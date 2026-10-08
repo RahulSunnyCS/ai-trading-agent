@@ -336,3 +336,6 @@ Answered by the owner on 2026-10-08, when the item was started:
   matched split, PBO ≤ 0.3); two shadow arms if two survive, read from the CLI. Status
   `In progress`; TODO §3.23 added; `search_spaces/bl050_criteria.json` committed with this entry,
   before any run.
+- 2026-10-08 — Owner confirmed M2's standardised definition (residual sum ÷ residual standard
+  deviation) as committed; no criteria change. The draft's branch `claude/new-session-tpe04k` was
+  deleted; its commit lives on in `docs/bl-050-start`.
