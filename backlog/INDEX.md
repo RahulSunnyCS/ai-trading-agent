@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 
 ## Open
 
@@ -29,6 +29,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-038](BL-038-monthly-expiry-stock-options-collection.md) | Collect every F&O stock's options on its monthly expiry day, from Fyers, from October 2026 | P1 | Planned | feature | options |
 | [BL-040](BL-040-fill-the-vendor-gap-from-algotest.md) | Fill the vendor gap (26 Aug – 24 Sep 2026) from AlgoTest, for every index and stock (on hold: owner asks the vendor first) | P1 | Planned | feature | trading-data |
 | [BL-044](BL-044-local-service-auth-and-network-hardening.md) | Local-service auth and network hardening: Host/Origin guards, OAuth state bound to the browser, an internal token, tunnel checks | P1 | Planned | improvement | cross-cutting |
+| [BL-050](BL-050-momentum-filter-poc.md) | Momentum filter POC: volume, relative strength, overextension, residual momentum, trend quality (Broad only) | P1 | Planned | research | momentum |
 | [BL-002](BL-002-vercel-dashboard-laptop-backend.md) | Go live: dashboard on Vercel, research backend on the laptop | P2 | Planned | chore | infra |
 | [BL-039](BL-039-broad-warm-path-and-weekly-job-cost.md) | Broad warm path and weekly-job cost (follow-up to BL-005) | P2 | Planned | improvement | momentum |
 | [BL-041](BL-041-in-app-guide.md) | In-app Guide: what each dashboard section does and how to use it | P2 | In progress | feature | dashboard |
