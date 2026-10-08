@@ -34,11 +34,60 @@ import { StrategyStatusMenu } from './StrategyStatusMenu';
 const CURVE_WIDTH = 440;
 const CURVE_HEIGHT = 120;
 
-function Curve({ values, dates }: { values: Array<number | null>; dates: string[] }) {
-  const path = sparklinePath(values, CURVE_WIDTH, CURVE_HEIGHT, 160);
+/** Both curves on one log scale, matched by date, so the twin is drawn beside the strategy. */
+function scaledPaths(
+  dates: string[],
+  values: Array<number | null>,
+  twin: { dates: string[]; values: Array<number | null> } | null,
+): [string | null, string | null] {
+  const alone = sparklinePath(values, CURVE_WIDTH, CURVE_HEIGHT, 160);
+  if (!twin) return [alone, null];
+  const twinBy = new Map(twin.dates.map((date, i) => [date, twin.values[i] ?? null]));
+  const pairs: Array<[number, number]> = [];
+  dates.forEach((date, i) => {
+    const own = values[i];
+    const other = twinBy.get(date);
+    if (typeof own === 'number' && typeof other === 'number' && own > 0 && other > 0) {
+      pairs.push([own, other]);
+    }
+  });
+  if (pairs.length < 2) return [alone, null];
+  const logs = pairs.flatMap(([a, b]) => [Math.log(a), Math.log(b)]);
+  const low = Math.min(...logs);
+  const span = Math.max(...logs) - low || 1;
+  const path = (pick: 0 | 1) =>
+    pairs
+      .map((pair, i) => {
+        const x = Math.round((i / (pairs.length - 1)) * CURVE_WIDTH * 10) / 10;
+        const y =
+          Math.round((1 + (1 - (Math.log(pair[pick]) - low) / span) * (CURVE_HEIGHT - 2)) * 10) /
+          10;
+        return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+      })
+      .join(' ');
+  return [path(0), path(1)];
+}
+
+function Curve({
+  values,
+  dates,
+  twin,
+}: {
+  values: Array<number | null>;
+  dates: string[];
+  /** The tradable version of a Not-tradable strategy, drawn dashed beside it. */
+  twin: { name: string; dates: string[]; values: Array<number | null> } | null;
+}) {
+  const [path, twinPath] = scaledPaths(dates, values, twin);
   if (!path) return <p className="text-xs text-faint">No stored curve.</p>;
   return (
     <figure className="space-y-1">
+      {twinPath && twin ? (
+        <p className="flex flex-wrap gap-x-3 text-xs text-muted">
+          <span className="text-primary">— this strategy</span>
+          <span>- - {twin.name} (the tradable version)</span>
+        </p>
+      ) : null}
       <svg
         role="img"
         aria-label="The latest run's equity curve"
@@ -46,6 +95,16 @@ function Curve({ values, dates }: { values: Array<number | null>; dates: string[
         className="block h-28 w-full text-primary"
         preserveAspectRatio="none"
       >
+        {twinPath ? (
+          <path
+            d={twinPath}
+            fill="none"
+            className="stroke-muted"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
         <path
           d={path}
           fill="none"
@@ -81,6 +140,8 @@ function Section({ title, meta, children }: { title: string; meta?: string; chil
  */
 export function SavedStrategyDrawer({
   strategy,
+  twin,
+  twinName,
   name,
   defaults,
   ignored,
@@ -95,6 +156,9 @@ export function SavedStrategyDrawer({
 }: {
   /** Null closes the drawer. */
   strategy: SavedStrategy | null;
+  /** For a Not-tradable strategy, the same settings with both rules on, if saved. */
+  twin: SavedStrategy | null;
+  twinName: string;
   name: string;
   defaults: Record<string, unknown> | undefined;
   ignored: ReadonlyArray<string>;
@@ -123,6 +187,8 @@ export function SavedStrategyDrawer({
         <DrawerBody
           key={strategy.id}
           strategy={strategy}
+          twin={twin}
+          twinName={twinName}
           name={name}
           defaults={defaults}
           ignored={ignored}
@@ -142,6 +208,8 @@ export function SavedStrategyDrawer({
 
 function DrawerBody({
   strategy,
+  twin,
+  twinName,
   name,
   defaults,
   ignored,
@@ -321,7 +389,15 @@ function DrawerBody({
                 </div>
               ))}
             </dl>
-            <Curve values={strategy.latest.strategy} dates={strategy.latest.dates} />
+            <Curve
+              values={strategy.latest.strategy}
+              dates={strategy.latest.dates}
+              twin={
+                twin
+                  ? { name: twinName, dates: twin.latest.dates, values: twin.latest.strategy }
+                  : null
+              }
+            />
           </Section>
 
           <Section title={`Different from the ${DATASET_SHORT[strategy.dataset] ?? ''} defaults`}>
