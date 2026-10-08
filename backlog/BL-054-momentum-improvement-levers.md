@@ -127,3 +127,7 @@ Full write-up: `packages/momentum-backtesting/docs/bl054-levers-2026-10-09.md`; 
 - 2026-10-09 — all grids run (L1 01:34, L4 02:14, L5 02:24, L6 02:41 IST); no lever adopted.
   The L4 stop counter missed daily sales for the first strategies (fixed mid-run); a spot check
   replaced it. L6's collapse was checked for a bug: none, the definition removes momentum.
+- 2026-10-09 — PR #152 code review: three engine bugs fixed (after-tax final value dropped
+  waiting cash; daily mode could re-buy a stock with a pending stop; a confirmed factor could be
+  applied to an already-adjusted prevclose). L4 re-run on the fixed engine: medians moved by 0.1
+  point or less, same three development passes, none confirmed; verdict unchanged.
