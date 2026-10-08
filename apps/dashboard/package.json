@@ -7,6 +7,9 @@
     "dev": "next dev --port 5173",
     "build": "next build",
     "start": "next start --port 5173",
+    "cf:build": "node scripts/cf-build.mjs",
+    "cf:preview": "node scripts/cf-build.mjs && wrangler dev",
+    "cf:deploy": "node scripts/cf-build.mjs && wrangler deploy",
     "typecheck": "bun run --bun tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test"
@@ -28,6 +31,7 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.9",
     "@playwright/test": "^1.59.1",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^20.0.0",
@@ -38,6 +42,7 @@
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.5.0",
-    "vitest": "^2.0.0"
+    "vitest": "^2.0.0",
+    "wrangler": "^4.148.0"
   }
 }

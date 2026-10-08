@@ -15,12 +15,17 @@
  *     a deployment mistake, not "no token": it also blocks every request, so
  *     the dashboard fails loudly instead of every API call failing upstream.
  *
+ *  3. Cloudflare Access sign-in (optional) — ACCESS_TEAM_DOMAIN + ACCESS_AUD. When both are
+ *     set the dashboard hostname is behind an Access application, a valid signed Access token
+ *     (lib/cfAccess.ts) replaces the password gate, and DASHBOARD_PASSWORD is not used.
+ *
  * This file holds the pure pieces (config, password check, redirect-target
  * validation, wrong-password backoff); middleware.ts wires them to requests.
  *
  * Runs in the edge middleware runtime: Web Crypto only, no node:crypto.
  */
 
+import { ACCESS_COOKIE, ACCESS_JWT_HEADER, type AccessConfig, parseTeamDomain } from './cfAccess';
 import { SESSION_COOKIE, withoutCookie } from './session';
 
 export const PASSWORD_REALM = 'Trading Research';
@@ -40,6 +45,8 @@ export interface GateConfig {
   /** True when a missing password must block requests rather than allow them. */
   passwordRequired: boolean;
   upstream: { clientId: string; clientSecret: string } | null;
+  /** Set when Cloudflare Access signs people in; then the password gate is not used. */
+  access: AccessConfig | null;
   /** Why every request must be refused (a broken deployment), or null. */
   configError: string | null;
 }
@@ -55,14 +62,27 @@ export function gateConfig(env: Env): GateConfig {
   const upstream = clientId && clientSecret ? { clientId, clientSecret } : null;
   const remote = env.NODE_ENV === 'production' || Boolean(clientId || clientSecret);
   const halfToken = Boolean(clientId) !== Boolean(clientSecret);
+
+  const rawTeam = nonBlank(env.ACCESS_TEAM_DOMAIN);
+  const aud = nonBlank(env.ACCESS_AUD);
+  const teamDomain = rawTeam ? parseTeamDomain(rawTeam) : null;
+  const access = teamDomain && aud ? { teamDomain, aud } : null;
+  const accessError =
+    Boolean(rawTeam) !== Boolean(aud)
+      ? 'ACCESS_TEAM_DOMAIN and ACCESS_AUD must both be set (only one is)'
+      : rawTeam && !teamDomain
+        ? 'ACCESS_TEAM_DOMAIN must be a <team>.cloudflareaccess.com hostname'
+        : null;
+
   return {
     // Not trimmed: a password is used exactly as configured.
     password: env.DASHBOARD_PASSWORD ? env.DASHBOARD_PASSWORD : null,
-    passwordRequired: remote,
+    passwordRequired: remote && !access,
     upstream,
+    access,
     configError: halfToken
       ? 'UPSTREAM_ACCESS_CLIENT_ID and UPSTREAM_ACCESS_CLIENT_SECRET must both be set (only one is)'
-      : null,
+      : accessError,
   };
 }
 
@@ -112,27 +132,33 @@ export async function checkPassword(
 
 /**
  * Request headers to forward upstream: incoming headers minus any client-sent
- * Access credentials (and minus Authorization and the session cookie, which
- * prove the dashboard password and have no business reaching the APIs), plus
+ * Access credentials (and minus Authorization, the session cookie and the dashboard's own
+ * Access token and cookie, which prove who is signed in to the dashboard and have no business
+ * reaching the APIs), plus
  * the configured service token when set. Returns null when nothing needs changing.
  */
 export function upstreamHeaders(incoming: Headers, config: GateConfig): Headers | null {
   const cookie = incoming.get('cookie');
   const hasSessionCookie = cookie?.includes(`${SESSION_COOKIE}=`) ?? false;
+  const hasAccessCookie = cookie?.includes(`${ACCESS_COOKIE}=`) ?? false;
   const hasClientCopies =
     incoming.has(UPSTREAM_ID_HEADER) ||
     incoming.has(UPSTREAM_SECRET_HEADER) ||
     incoming.has('authorization') ||
-    hasSessionCookie;
+    incoming.has(ACCESS_JWT_HEADER) ||
+    hasSessionCookie ||
+    hasAccessCookie;
   if (!hasClientCopies && !config.upstream) return null;
   const headers = new Headers(incoming);
-  headers.delete(UPSTREAM_ID_HEADER);
-  headers.delete(UPSTREAM_SECRET_HEADER);
-  headers.delete('authorization');
-  if (cookie && hasSessionCookie) {
-    const rest = withoutCookie(cookie, SESSION_COOKIE);
-    if (rest) headers.set('cookie', rest);
-    else headers.delete('cookie');
+  // Blanked, not deleted: on Cloudflare Workers (OpenNext) a header the middleware deletes still
+  // reaches the rewrite target, a blank one does not (checked against an echo upstream).
+  headers.set(UPSTREAM_ID_HEADER, '');
+  headers.set(UPSTREAM_SECRET_HEADER, '');
+  headers.set('authorization', '');
+  headers.set(ACCESS_JWT_HEADER, '');
+  if (cookie && (hasSessionCookie || hasAccessCookie)) {
+    const rest = withoutCookie(withoutCookie(cookie, SESSION_COOKIE) ?? '', ACCESS_COOKIE);
+    headers.set('cookie', rest ?? '');
   }
   if (config.upstream) {
     headers.set(UPSTREAM_ID_HEADER, config.upstream.clientId);

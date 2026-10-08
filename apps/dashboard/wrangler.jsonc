@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ata-dashboard",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "routes": [{ "pattern": "dashboard.codifie.dev", "custom_domain": true }],
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "noisy-glade-c1b3.cloudflareaccess.com",
+    "ACCESS_AUD": "b680680ec078c4f06a91bf346ca2b3476ed7ad1a6d192cf7904a7bffa38ad683"
+  },
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" }
+}

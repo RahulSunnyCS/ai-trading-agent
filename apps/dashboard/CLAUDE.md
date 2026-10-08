@@ -52,7 +52,9 @@ link, a screen that no longer exists, or a Momentum / Options Lab sub-screen wit
 `lib/session.ts`) puts a login in front of everything (a `/login` page and session cookie for
 people, HTTP Basic for `/api/*` and curl) and adds the Cloudflare Access service token to forwarded `/api/*`
 calls, so the dashboard can run off the laptop that serves the APIs. The password is
-mandatory (fails closed) in production builds; plain `next dev` stays open. Runbook:
+mandatory (fails closed) in production builds; plain `next dev` stays open. With `ACCESS_TEAM_DOMAIN` + `ACCESS_AUD` set,
+Cloudflare Access signs people in instead and the middleware only verifies its signed token
+(`lib/cfAccess.ts`). Runbook:
 `docs/remote-dashboard.md`.
 
 ## Analytics page pattern
