@@ -88,7 +88,9 @@ def test_the_message_says_which_sleeves_trade_or_when_the_next_one_does():
     note = groups.notification(trading)
     assert note.severity == "action_required"
     assert "Sleeves trading: Sleeve a (every 4 wk)" in note.body
-    assert "• X — SELL · rank 22" in note.body and "• Y — BUY · rank 3" in note.body
+    assert "• X — SELL (was 100.0%)" in note.body and "• Y — BUY → 100.0%" in note.body
+    assert "Holds 1 name after these trades · cash 0.0%" in note.body
+    assert "rank" not in note.body
     assert note.title == "Momentum FINAL — Ensemble — week of 04 Dec 2026"
 
     quiet = groups.combine(
@@ -106,7 +108,7 @@ def test_the_message_says_which_sleeves_trade_or_when_the_next_one_does():
     )
     note = groups.notification(quiet)
     assert note.severity == "info"
-    assert "No sleeve rebalances this week. Next: Sleeve a on 11 Dec." in note.body
+    assert "No sleeve rebalances this week. Next: Sleeve a (every 4 wk) on 11 Dec." in note.body
 
 
 def test_sleeve_value_uses_the_same_april_reset_as_the_ensemble_curve():
@@ -124,3 +126,35 @@ def test_sleeve_value_uses_the_same_april_reset_as_the_ensemble_curve():
 def test_sleeve_value_is_unknown_without_matching_dates():
     assert groups.sleeve_value([], [100.0, 101.0]) is None
     assert groups.sleeve_value(["2026-12-04"], [100.0, 101.0]) is None
+
+
+def test_held_names_count_every_name_held_after_the_trades_and_sleeves_lose_the_group_prefix():
+    members = [
+        {
+            "id": "a",
+            "name": "Ensemble aaa (4w, ph1)",
+            "signal": {
+                "weights": {"X": 0.5, "Y": 0.5},
+                "target_weights": {"X": 0.25, "Y": 0.5, "Z": 0.25},
+                "rows": [
+                    {"asset": "X", "action": "TRIM", "rank": 4},
+                    {"asset": "Z", "action": "BUY", "rank": 2},
+                ],
+                "rebalance": {"on_cadence": True, "every": 4, "next": "2026-10-30"},
+            },
+        },
+        _member(
+            "b",
+            {"X": 1.0},
+            {"X": 1.0},
+            [{"asset": "X", "action": "HOLD", "rank": 1}],
+            on_cadence=False,
+        ),
+    ]
+    signal = groups.combine({"name": "Ensemble"}, members, "2026-10-02")
+    note = groups.notification(signal)
+    assert "Sleeves trading: aaa (4w, ph1)" in note.body
+    assert "Holds 3 names after these trades" in note.body
+    x = next(r for r in signal["rows"] if r["asset"] == "X")
+    assert x["action"] == "TRIM" and x["rank"] == 4  # the acting sleeve's rank, not the best one
+    assert "• X — TRIM 75.0% → 62.5%" in note.body
