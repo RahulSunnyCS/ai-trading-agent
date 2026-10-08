@@ -110,7 +110,7 @@ export function SignalCard({
                 <Fragment key={section}>
                   <tr>
                     <td
-                      colSpan={showExit ? 8 : card.group ? 7 : 6}
+                      colSpan={6 + (card.group ? 1 : 0) + (showExit ? 1 : 0)}
                       className="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-faint"
                     >
                       {SECTION_LABEL[section]} · {formatInt(rows.length)}

@@ -1,10 +1,14 @@
 'use client';
 
 import { Check, Clock, Play, TriangleAlert } from 'lucide-react';
+import { useMemo } from 'react';
+
+import { useNow } from '../../../hooks/useNow';
 
 import { cn } from '../../../lib/cn';
 import { formatDay, formatIstTime } from '../../../lib/format';
-import { type StepState, type TimelineStep, countdown } from '../../../lib/momentumWeek';
+import { type StepState, type TimelineStep, countdown, timeline } from '../../../lib/momentumWeek';
+import type { MomentumWeeklyStatus } from '../../../types/momentum';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
 import { Skeleton } from '../../ui/Skeleton';
@@ -12,6 +16,7 @@ import { Skeleton } from '../../ui/Skeleton';
 const STATE_STYLE: Record<StepState, string> = {
   done: 'bg-positive/15 text-positive',
   late: 'bg-warning/15 text-warning',
+  failed: 'bg-negative/15 text-negative',
   waiting: 'border border-dashed border-border-strong text-faint',
   due: 'bg-primary/15 text-primary',
   missed: 'bg-negative/15 text-negative',
@@ -24,6 +29,7 @@ function stepNote(step: TimelineStep): string {
   if (step.state === 'waiting')
     return step.minutesToGo != null ? `in ${countdown(step.minutesToGo)}` : 'later today';
   if (step.state === 'due') return 'due now';
+  if (step.state === 'failed') return `failed${step.ranAt ? ` ${formatIstTime(step.ranAt)}` : ''}`;
   return 'did not run';
 }
 
@@ -33,7 +39,7 @@ function stepNote(step: TimelineStep): string {
  * opens the drawer with the manual run, data readiness and the schedule.
  */
 export function FridayTimeline({
-  steps,
+  status,
   week,
   onRunByHand,
   onWeek,
@@ -41,7 +47,7 @@ export function FridayTimeline({
   nextWeek,
   running,
 }: {
-  steps: readonly TimelineStep[] | null;
+  status: MomentumWeeklyStatus | null;
   week: string | null;
   onRunByHand: () => void;
   onWeek: (week: string | null) => void;
@@ -49,6 +55,9 @@ export function FridayTimeline({
   nextWeek: string | null;
   running: boolean;
 }) {
+  // The one ticking clock on the page lives here, so a tick redraws only the timeline.
+  const now = useNow(60_000);
+  const steps = useMemo(() => (status && now ? timeline(status, now) : null), [status, now]);
   return (
     <Card flush>
       <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
@@ -100,7 +109,9 @@ export function FridayTimeline({
                   >
                     {step.state === 'done' ? (
                       <Check className="h-3 w-3" aria-hidden="true" />
-                    ) : step.state === 'late' || step.state === 'missed' ? (
+                    ) : step.state === 'late' ||
+                      step.state === 'missed' ||
+                      step.state === 'failed' ? (
                       <TriangleAlert className="h-3 w-3" aria-hidden="true" />
                     ) : (
                       <Clock className="h-3 w-3" aria-hidden="true" />
@@ -114,7 +125,9 @@ export function FridayTimeline({
                 <div
                   className={cn(
                     'whitespace-nowrap text-xs',
-                    step.state === 'missed' ? 'text-negative' : 'text-muted',
+                    step.state === 'missed' || step.state === 'failed'
+                      ? 'text-negative'
+                      : 'text-muted',
                   )}
                 >
                   {stepNote(step)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useAppRoute } from '../../../hooks/useAppRoute';
 import type { MomentumWeeklyJobState } from '../../../hooks/useMomentumWeeklyJob';
@@ -56,7 +56,8 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   const [panel, setPanel] = useQueryState('panel');
   const [review, setReview] = useQueryState('review');
   const [stockSymbol, setStockSymbol] = useQueryState('stock');
-  const now = useNow(60_000);
+  // A slow clock for Needs attention only; the timeline keeps its own minute clock.
+  const now = useNow(300_000);
 
   const view = usePolledResource<MomentumWeekView>(
     week ? `/api/momentum/week?week=${week}` : '/api/momentum/week',
@@ -73,7 +74,8 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   const favourites = usePolledResource<MomentumSavedRun[]>('/api/momentum/favorite-strategies', {
     cache: true,
   });
-  const scores = usePolledResource<MomentumScores>('/api/momentum/scores', { cache: true });
+  // The Scores payload (~300 KB) only when a card holds scored stocks; see ScoresFetcher.
+  const [scoresData, setScoresData] = useState<MomentumScores | null>(null);
 
   // A finished manual run may have recorded new entries and a new message.
   const finishedAt = weekly.job?.finished_at ?? null;
@@ -96,6 +98,13 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
     return () => clearInterval(timer);
   }, [checking, refetchRules]);
 
+  const datasetsInUse = useMemo(
+    () =>
+      new Set<'etf' | 'stock'>(
+        (view.data?.favourites ?? []).map((c) => (c.dataset === 'etf' ? 'etf' : 'stock')),
+      ),
+    [view.data],
+  );
   const steps = useMemo(
     () => (status.data && now ? timeline(status.data, now) : null),
     [status.data, now],
@@ -108,18 +117,19 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
             status: status.data ?? null,
             stockActions: actions.data ?? null,
             journal: journal.data?.check ?? null,
+            datasetsInUse,
           })
         : [],
-    [steps, status.data, actions.data, journal.data],
+    [steps, status.data, actions.data, journal.data, datasetsInUse],
   );
   const cards = view.data?.favourites ?? null;
   const card = cards ? selectedCard(cards, favId) : null;
   const scoreMap = useMemo(() => {
-    if (!scores.data) return null;
+    if (!scoresData) return null;
     const map = new Map<string, StockScore>();
-    for (const stock of scores.data.stocks) map.set(markKey(stock.symbol), stock);
+    for (const stock of scoresData.stocks) map.set(markKey(stock.symbol), stock);
     return map;
-  }, [scores.data]);
+  }, [scoresData]);
   const headlineFavourite = favourites.data?.find((run) => run.active);
   const zone = useMemo(() => buyZoneFrom(headlineFavourite), [headlineFavourite]);
   const order = useMemo(
@@ -131,7 +141,12 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   );
 
   // The weeks the journal has, newest first, plus this one: step back and forward through them.
-  const weeks = view.data?.weeks ?? [];
+  // The journal's weeks plus this one, which has none until its first run.
+  const weeks = useMemo(() => {
+    const all = new Set(view.data?.weeks ?? []);
+    if (view.data?.target_week) all.add(view.data.target_week);
+    return [...all].sort().reverse();
+  }, [view.data]);
   const shown = view.data?.week ?? null;
   const previousWeek = shown ? (weeks.find((w) => w < shown) ?? null) : null;
   const laterWeeks = shown ? weeks.filter((w) => w > shown) : [];
@@ -152,7 +167,7 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
   return (
     <div className="space-y-4">
       <FridayTimeline
-        steps={steps}
+        status={status.data ?? null}
         week={shown ?? status.data?.target_week ?? null}
         onRunByHand={() => setPanel('run')}
         onWeek={(next) => setWeek(next && next !== view.data?.target_week ? next : null)}
@@ -180,7 +195,7 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
           <SignalCard
             card={card}
             scores={scoreMap}
-            lookbacks={scores.data?.lookbacks ?? [1, 2, 4, 8, 13, 26, 52]}
+            lookbacks={scoresData?.lookbacks ?? [1, 2, 4, 8, 13, 26, 52]}
             onStock={setStockSymbol}
           />
           <div className="grid content-start gap-4 lg:grid-cols-2 2xl:grid-cols-1">
@@ -196,6 +211,9 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
         </div>
       ) : null}
 
+      {card && card.dataset !== 'etf' && !scoresData ? (
+        <ScoresFetcher onData={setScoresData} />
+      ) : null}
       <RunByHandDrawer open={panel === 'run'} onClose={() => setPanel(null)} weekly={weekly} />
       <ClassifySplitDrawer
         symbol={review}
@@ -205,12 +223,12 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
           toast(`${review ?? 'The move'} classified`);
         }}
       />
-      {scores.data ? (
+      {scoresData ? (
         <StockDrawer
           symbol={stockSymbol}
-          stocks={scores.data.stocks}
+          stocks={scoresData.stocks}
           order={order}
-          lookbacks={scores.data.lookbacks}
+          lookbacks={scoresData.lookbacks}
           zone={zone}
           marks={undefined}
           onOpen={setStockSymbol}
@@ -223,4 +241,14 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
       ) : null}
     </div>
   );
+}
+
+/** Loads the Scores payload once it is needed, and hands it up (the fetch hook cannot be
+ * switched off, so it lives in a component that is only rendered then). */
+function ScoresFetcher({ onData }: { onData: (data: MomentumScores) => void }) {
+  const scores = usePolledResource<MomentumScores>('/api/momentum/scores', { cache: true });
+  useEffect(() => {
+    if (scores.data) onData(scores.data);
+  }, [scores.data, onData]);
+  return null;
 }

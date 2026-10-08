@@ -90,6 +90,37 @@ describe('the Friday timeline', () => {
     expect(saturday.find((s) => s.run === 'journal-check')?.state).toBe('missed');
   });
 
+  it('calls a step failed when the scheduler says its latest run on that Friday failed', () => {
+    const base = status();
+    const failed = {
+      ...base,
+      schedule: base.schedule.map((item) =>
+        item.run === 'stock-ingest'
+          ? {
+              ...item,
+              last_ran_at: '2026-12-04T19:31:00+05:30',
+              last_exit_code: 1,
+              last_exit_at: '2026-12-04T14:01:00Z',
+            }
+          : item,
+      ),
+    };
+    const steps = timeline(failed, new Date('2026-12-04T15:00:00Z'));
+    expect(steps.find((s) => s.run === 'stock-ingest')?.state).toBe('failed');
+    const items = needsAttention({ steps, status: failed, stockActions: null, journal: null });
+    expect(items.map((i) => i.key)).toContain('failed-stock-ingest');
+    // An old failure from an earlier week does not mark this Friday's step.
+    const old = {
+      ...failed,
+      schedule: failed.schedule.map((item) =>
+        item.run === 'stock-ingest' ? { ...item, last_exit_at: '2026-11-27T14:01:00Z' } : item,
+      ),
+    };
+    expect(
+      timeline(old, new Date('2026-12-04T15:00:00Z')).find((s) => s.run === 'stock-ingest')?.state,
+    ).toBe('done');
+  });
+
   it('formats countdowns and IST days', () => {
     expect(countdown(140)).toBe('2 h 20 min');
     expect(countdown(45)).toBe('45 min');
@@ -151,6 +182,15 @@ describe('needs attention', () => {
     const night = timeline(status(), new Date('2026-12-04T16:30:00Z')); // 22:00 IST
     const later = needsAttention({ steps: night, status: status(), stockActions: null, journal });
     expect(later.map((i) => i.key)).toEqual(['data-stock', 'journal-missing']);
+    // Stock data that no favourite uses is not an alert.
+    const etfOnly = needsAttention({
+      steps: night,
+      status: status(),
+      stockActions: null,
+      journal: null,
+      datasetsInUse: new Set(['etf']),
+    });
+    expect(etfOnly).toEqual([]);
     expect(later[1]?.detail).toBe('A (final)');
   });
 });

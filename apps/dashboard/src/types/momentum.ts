@@ -305,6 +305,9 @@ export interface MomentumWeeklyStatus {
     /** Set when the job fired more than ~10 minutes after its scheduled time — typically
      * the laptop was asleep; launchd runs it on wake with no catch-up marker of its own. */
     ran_late_by_minutes: number | null;
+    /** The scheduler's exit code for its latest run of this job, and when it ended (BL-051). */
+    last_exit_code?: number | null;
+    last_exit_at?: string | null;
   }>;
 }
 

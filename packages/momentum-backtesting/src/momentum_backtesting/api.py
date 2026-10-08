@@ -2407,10 +2407,16 @@ def _run_live_rules_check() -> dict:
     """The live-money rules check as the Friday 21:30 job runs it, without sending, saved for
     the dashboard (BL-051)."""
     from . import live_rules
+    from .weekly import week_ending_on_or_before
 
     report = live_rules.run_check(echo=lambda _m: None)
     severity, title, _ = live_rules.summary(report)
-    live_rules.save_last(report, severity, title, this_week.state_dir())
+    # As `mbt live-rules check` does: numbers that stop short of this week are flagged stale.
+    expected = str(week_ending_on_or_before(datetime.now(IST).date()))
+    stale = expected if report.week is not None and report.week < expected else None
+    if stale:
+        severity, title = "error", "Live-rules check ran on stale data"
+    live_rules.save_last(report, severity, title, this_week.state_dir(), stale=stale)
     return live_rules.load_last(this_week.state_dir()) or {}
 
 
@@ -2809,6 +2815,39 @@ _SCHEDULED_RUNS = (
     ("journal-check", "Fri 21:00 IST", 21, 0, "launchd-weekly-journal-check.log"),
     ("live-rules", "Fri 21:30 IST", 21, 30, "launchd-weekly-live-rules.log"),
 )
+#: The scheduler's job id for each scheduled run (`apps/scheduler/src/jobs.ts`).
+_SCHEDULER_JOB_IDS = {
+    "preview": "momentum-preview",
+    "final": "momentum-final",
+    "stock-ingest": "momentum-stock-ingest",
+    "journal-check": "momentum-journal-check",
+    "live-rules": "momentum-live-rules",
+}
+
+
+def _scheduler_last_runs() -> dict[str, tuple[str | None, int | None]]:
+    """(ended_at, exit_code) of each job's latest run in the scheduler's own history
+    (`apps/scheduler`, SQLite at SCHEDULER_STATE_DIR), read-only. A log file's time moves when a
+    run fails too, so only the exit code says whether it worked. Empty when there is none."""
+    import sqlite3
+
+    root = os.environ.get("SCHEDULER_STATE_DIR", "").strip() or str(
+        Path.home() / "Library" / "Application Support" / "ai-trading-agent"
+    )
+    path = Path(root) / "scheduler.db"
+    if not path.exists():
+        return {}
+    try:
+        with contextlib.closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=2)) as db:
+            rows = db.execute(
+                "SELECT job, ended_at, exit_code FROM runs r WHERE id = "
+                "(SELECT max(id) FROM runs WHERE job = r.job)"
+            ).fetchall()
+    except sqlite3.Error:
+        return {}
+    return {job: (ended, code) for job, ended, code in rows}
+
+
 # A scheduled job fired more than this many minutes after its scheduled time (typically the
 # laptop was asleep, per TODO.md 3.11.5's launchd caveat) is flagged "ran late" rather than
 # silently treated as on time.
@@ -2884,6 +2923,7 @@ def _weekly_status(today: date | None = None) -> dict:
     ]
 
     schedule = []
+    scheduler_runs = _scheduler_last_runs()
     for run, when, hour, minute, log_name in _SCHEDULED_RUNS:
         log = DATA_DIR / log_name
         last_ran_at = last_line = None
@@ -2900,6 +2940,7 @@ def _weekly_status(today: date | None = None) -> dict:
             delay = (ran_at - scheduled_at).total_seconds() / 60
             if delay > _LATE_THRESHOLD_MINUTES:
                 ran_late_by_minutes = round(delay)
+        ended_at, exit_code = scheduler_runs.get(_SCHEDULER_JOB_IDS[run], (None, None))
         schedule.append(
             {
                 "run": run,
@@ -2907,6 +2948,9 @@ def _weekly_status(today: date | None = None) -> dict:
                 "last_ran_at": last_ran_at,
                 "last_line": last_line,
                 "ran_late_by_minutes": ran_late_by_minutes,
+                # BL-051: the scheduler's verdict on its latest run of this job (None: unknown).
+                "last_exit_code": exit_code,
+                "last_exit_at": ended_at,
             }
         )
 

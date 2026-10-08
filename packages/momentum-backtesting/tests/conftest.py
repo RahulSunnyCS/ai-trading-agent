@@ -16,6 +16,8 @@ def _isolated_state_dir(tmp_path_factory, monkeypatch):
     """BL-051: the weekly message and live-rules files (`this_week.state_dir()`) go to a temp
     folder, never the real `data/`."""
     monkeypatch.setenv("MOMENTUM_STATE_DIR", str(tmp_path_factory.mktemp("momentum_state")))
+    # ... and the scheduler's run history is never the real one either.
+    monkeypatch.setenv("SCHEDULER_STATE_DIR", str(tmp_path_factory.mktemp("scheduler_state")))
 
 
 @pytest.fixture(autouse=True)

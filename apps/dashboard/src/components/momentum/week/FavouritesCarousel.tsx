@@ -77,7 +77,9 @@ function FavouriteTile({
         <span className="text-muted">{card.headline ? 'Holds' : 'Same names as headline'}</span>
         <span className="metric text-foreground">
           {card.headline
-            ? `${formatInt(card.held.length)} names`
+            ? card.blocked || !card.run
+              ? '—'
+              : `${formatInt(card.held.length)} names`
             : card.shared_with_headline == null
               ? '—'
               : `${formatInt(card.shared_with_headline)} of ${formatInt(card.held.length)}`}

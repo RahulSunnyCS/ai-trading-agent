@@ -161,3 +161,22 @@ def test_the_week_endpoint_works_before_anything_is_recorded():
     assert body["favourites"] == [] and body["message"] is None and body["weeks"] == []
     assert body["week"] == body["target_week"]
     assert client.get("/api/live-rules").json() == {"report": None, "job": None}
+
+
+def test_weekly_status_carries_the_schedulers_exit_code(tmp_path, monkeypatch):
+    import sqlite3
+
+    monkeypatch.setenv("SCHEDULER_STATE_DIR", str(tmp_path))
+    with sqlite3.connect(tmp_path / "scheduler.db") as db:
+        db.execute(
+            "CREATE TABLE runs (id INTEGER PRIMARY KEY, job TEXT, trigger TEXT, scheduled_for TEXT,"
+            " started_at TEXT, ended_at TEXT, exit_code INTEGER, attempts INTEGER, pid INTEGER,"
+            " log_path TEXT, error TEXT)"
+        )
+        db.execute(
+            "INSERT INTO runs (job, started_at, ended_at, exit_code) VALUES "
+            "('momentum-stock-ingest', 'a', '2026-12-04T13:58:00Z', 0),"
+            "('momentum-stock-ingest', 'b', '2026-12-04T14:01:00Z', 1)"
+        )
+    runs = api._scheduler_last_runs()
+    assert runs["momentum-stock-ingest"] == ("2026-12-04T14:01:00Z", 1)

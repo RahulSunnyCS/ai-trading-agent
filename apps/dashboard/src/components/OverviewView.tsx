@@ -452,7 +452,7 @@ function WeeklySignalCard() {
   if (status.data === null || !Array.isArray(status.data.signals)) {
     body = status.loading ? <CardSkeleton /> : <PlainState>{MOMENTUM_UNREACHABLE}</PlainState>;
   } else {
-    // Same reading as Momentum › Weekly signal: the newest saved final signal, and the
+    // Same reading as Momentum › This week: the newest saved final signal, and the
     // Telegram-active favourite (or the built-in live strategy when none is active).
     const latestFinal = status.data.signals.find((signal) => signal.run === 'final');
     const strategyName =

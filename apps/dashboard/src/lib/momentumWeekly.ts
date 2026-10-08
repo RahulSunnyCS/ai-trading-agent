@@ -1,5 +1,5 @@
 /**
- * Pure rules for the Momentum › Weekly signal view: which run / send combinations are
+ * Pure rules for Momentum › This week's Run by hand panel (once the Weekly signal view): which run / send combinations are
  * allowed, what the Run button says, how a signal's action words and a strategy block's
  * severity map to tones, and the readiness facts shown in the strip at the top.
  */

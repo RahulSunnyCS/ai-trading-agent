@@ -174,7 +174,7 @@ export function MomentumSavedRunsView({
   const [confirmActiveId, setConfirmActiveId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
-  // Shares the Weekly signal tab's endpoint rather than threading its status down through
+  // Shares This week's endpoint rather than threading its status down through
   // props — cheap to poll and keeps this view self-contained.
   const { data: status } = usePolledResource<MomentumWeeklyStatus>('/api/momentum/weekly/status', {
     cache: true,

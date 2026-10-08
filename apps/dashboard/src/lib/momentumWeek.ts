@@ -22,7 +22,7 @@ export const STEP_LABEL: Record<ScheduledRun, string> = {
   'live-rules': 'Rules check',
 };
 
-export type StepState = 'done' | 'late' | 'waiting' | 'due' | 'missed';
+export type StepState = 'done' | 'late' | 'failed' | 'waiting' | 'due' | 'missed';
 
 export interface TimelineStep {
   run: ScheduledRun;
@@ -75,9 +75,17 @@ export function timeline(status: MomentumWeeklyStatus, now: Date): TimelineStep[
         ? item.when
         : `${String(Math.floor(at / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`;
     const ran = item.last_ran_at !== null && istDay(item.last_ran_at) >= friday;
+    // A log is written when a run fails too: only the scheduler's exit code says it worked.
+    const failed =
+      item.last_exit_code != null &&
+      item.last_exit_code !== 0 &&
+      item.last_exit_at != null &&
+      istDay(item.last_exit_at) >= friday;
     let state: StepState;
     let minutesToGo: number | null = null;
-    if (ran) {
+    if (failed) {
+      state = 'failed';
+    } else if (ran) {
       state = item.ran_late_by_minutes != null ? 'late' : 'done';
     } else if (today === friday && at !== null && nowMinutes < at) {
       state = 'waiting';
@@ -92,7 +100,7 @@ export function timeline(status: MomentumWeeklyStatus, now: Date): TimelineStep[
       label: STEP_LABEL[item.run] ?? item.run,
       time,
       state,
-      ranAt: ran ? item.last_ran_at : null,
+      ranAt: ran ? item.last_ran_at : failed ? (item.last_exit_at ?? null) : null,
       minutesToGo,
       lateBy: ran ? (item.ran_late_by_minutes ?? null) : null,
     };
@@ -126,13 +134,28 @@ export function needsAttention({
   status,
   stockActions,
   journal,
+  datasetsInUse,
 }: {
   steps: readonly TimelineStep[];
   status: MomentumWeeklyStatus | null;
   stockActions: MomentumStockActionReview | null;
   journal: MomentumJournalCheck | null;
+  /** The data each favourite needs ('etf', or 'stock' for Stock / Custom Index / Broad); a
+   * dataset no favourite uses is never an alert. Omitted: every dataset counts. */
+  datasetsInUse?: ReadonlySet<'etf' | 'stock'>;
 }): AttentionItem[] {
   const items: AttentionItem[] = [];
+  for (const step of steps) {
+    if (step.state === 'failed') {
+      items.push({
+        key: `failed-${step.run}`,
+        tone: 'negative',
+        title: `The ${step.time} ${step.label.toLowerCase()} run failed`,
+        detail: 'See Jobs for its log, or run it again by hand.',
+        action: { kind: 'run' },
+      });
+    }
+  }
   for (const item of stockActions?.items ?? []) {
     const drop = 1 - item.close / item.previous_close;
     items.push({
@@ -147,6 +170,7 @@ export function needsAttention({
   const after = (run: ScheduledRun) =>
     steps.some((step) => step.run === run && step.state !== 'waiting' && step.state !== 'due');
   for (const dataset of status?.datasets ?? []) {
+    if (datasetsInUse && !datasetsInUse.has(dataset.key)) continue;
     const due = dataset.key === 'stock' ? after('stock-ingest') : after('final');
     if (!dataset.ready && due) {
       items.push({

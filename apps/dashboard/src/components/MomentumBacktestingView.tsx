@@ -939,7 +939,7 @@ export function MomentumBacktestingView() {
               className="inline-flex min-h-7 items-center gap-2"
               title={
                 item.id === 'week' && weekly.running
-                  ? 'Weekly signal is running in the background'
+                  ? 'The weekly signal is running in the background'
                   : undefined
               }
             >
