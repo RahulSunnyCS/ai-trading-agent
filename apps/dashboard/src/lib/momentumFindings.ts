@@ -13,7 +13,7 @@ export const MAX_FINDINGS = 5;
 /** The two Broad settings whose "off" makes a result untradable (`runs_store._trust`). */
 const REALISM_FLAGS = ['broad_liquidity_filter', 'broad_respect_circuits'] as const;
 /** Never part of the comparison between a strategy and its tradable version. */
-const NOT_COMPARED = new Set(['dataset', 'universe', 'end', 'fresh', ...REALISM_FLAGS]);
+const NOT_COMPARED = new Set(['dataset', 'universe', 'fresh', ...REALISM_FLAGS]);
 
 export type FindingAction =
   | { kind: 'open'; id: string; label: string }
@@ -62,8 +62,13 @@ export function tradableTwin(
 ): SavedStrategy | null {
   if (strategy.dataset !== 'broad' || strategy.trust !== 'not_tradable') return null;
   const skip = new Set([...NOT_COMPARED, ...ignored]);
+  // `end` stays: a run over another period is not the same strategy. "" and no end are the same.
   const key = (config: Record<string, unknown>) =>
-    canonical(Object.fromEntries(Object.entries(config).filter(([name]) => !skip.has(name))));
+    canonical(
+      Object.fromEntries(
+        Object.entries({ ...config, end: config.end || null }).filter(([name]) => !skip.has(name)),
+      ),
+    );
   const own = key(strategy.config_full);
   return (
     strategies.find(
@@ -87,16 +92,19 @@ export function savedFindings(
   const findings: Finding[] = [];
 
   // 1. Moved results nobody has reviewed: Not reproducible before Check.
+  // From `unreviewed`, not the latest run's change: a later repeat hides the change from
+  // `strategy.change` while it is still waiting for a look.
   const toReview = all
-    .filter((s) => s.change?.needs_review)
+    .filter((s) => s.unreviewed > 0)
     .sort(
       (a, b) =>
         Number(b.change?.label === 'not_reproducible') -
         Number(a.change?.label === 'not_reproducible'),
     );
   const first = toReview[0];
-  if (first?.change) {
-    const bug = first.change.label === 'not_reproducible';
+  if (first) {
+    const bug = first.change?.label === 'not_reproducible';
+    const known = first.change?.needs_review === true;
     findings.push({
       id: 'review',
       tone: bug ? 'negative' : 'warning',
@@ -105,10 +113,14 @@ export function savedFindings(
           ? `${toReview.length} moved results need a look`
           : bug
             ? `${nameOf(first)}: result not reproducible`
-            : `${nameOf(first)}: result moved with no known cause`,
+            : known
+              ? `${nameOf(first)}: result moved with no known cause`
+              : `${nameOf(first)}: a moved result needs a look`,
       detail: bug
         ? 'Same settings, code and data gave a different result: a bug. Open it to see where the curves first differ.'
-        : 'The code changed and no accepted change to the frozen test results explains it. Re-run it to check, then mark it reviewed.',
+        : known
+          ? 'The code changed and no accepted change to the frozen test results explains it. Re-run it to check, then mark it reviewed.'
+          : 'An earlier run changed the result with no known cause. Open its run history to mark it reviewed.',
       action: { kind: 'open', id: first.id, label: 'Review it ›' },
     });
   }
@@ -161,18 +173,19 @@ export function savedFindings(
     const start = String(s.config_full.start ?? '');
     starts.set(start, (starts.get(start) ?? 0) + 1);
   }
-  const usual = [...starts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  // "Most" only when one start really is used by most strategies, not the first of a tie.
+  const [usual, usualCount] = [...starts.entries()].sort((a, b) => b[1] - a[1])[0] ?? ['', 0];
+  const hasUsual = all.length > 2 && usualCount * 2 > all.length;
   const odd = all.find(
-    (s) =>
-      s.trust === 'old_data' || (all.length > 2 && String(s.config_full.start ?? '') !== usual),
+    (s) => s.trust === 'old_data' || (hasUsual && String(s.config_full.start ?? '') !== usual),
   );
   if (odd) {
     const reasons = [
       odd.trust === 'old_data' && odd.latest.data_through
         ? `its data ends ${formatDay(odd.latest.data_through)}`
         : null,
-      String(odd.config_full.start ?? '') !== usual
-        ? `it starts ${formatDay(String(odd.config_full.start))} while most start ${formatDay(usual ?? '')}`
+      hasUsual && String(odd.config_full.start ?? '') !== usual
+        ? `it starts ${formatDay(String(odd.config_full.start))} while most start ${formatDay(usual)}`
         : null,
     ].filter(Boolean);
     findings.push({
@@ -187,8 +200,9 @@ export function savedFindings(
   // 5. The validated favourites score lower than the best in-sample results, as they should.
   const validated = all.filter((s) => s.trust === 'validated');
   const bestValidated = Math.max(...validated.map((s) => cagr(s) ?? Number.NEGATIVE_INFINITY));
+  // Only in-sample results: Not tradable and Old data ones are not a like-for-like comparison.
   const higher = all.filter(
-    (s) => s.trust !== 'validated' && (cagr(s) ?? Number.NEGATIVE_INFINITY) > bestValidated,
+    (s) => s.trust === 'in_sample' && (cagr(s) ?? Number.NEGATIVE_INFINITY) > bestValidated,
   );
   if (validated.length > 0 && higher.length > 0) {
     findings.push({

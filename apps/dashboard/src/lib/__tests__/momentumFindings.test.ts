@@ -151,3 +151,38 @@ describe('savedFindings', () => {
     expect(findings.map((f) => f.id)).toEqual(['in-sample']);
   });
 });
+
+describe('review fixes', () => {
+  it('keeps the end date in the twin identity', () => {
+    const other = strategy('other-end', 0.4, { config_full: { ...BASE, end: '2024-12-31' } });
+    expect(tradableTwin(LIVE[0] as SavedStrategy, [LIVE[0] as SavedStrategy, other])).toBeNull();
+    const sameEnd = strategy('same', 0.4, { config_full: { ...BASE, end: '' } });
+    expect(tradableTwin(LIVE[0] as SavedStrategy, [LIVE[0] as SavedStrategy, sameEnd])?.id).toBe(
+      'same',
+    );
+  });
+
+  it('still finds a change to review after a later repeat hid it from the latest run', () => {
+    const hidden = strategy('hidden', 0.2, { change: null, unreviewed: 1 });
+    const [first] = savedFindings([hidden, strategy('b', 0.1)], name);
+    expect(first).toMatchObject({ id: 'review', title: 'hidden: a moved result needs a look' });
+  });
+
+  it('names no usual start when no start is used by most strategies', () => {
+    const three = [
+      strategy('a', 0.3, { config_full: { start: '2012-01-01' } }),
+      strategy('b', 0.2, { config_full: { start: '2017-01-01' } }),
+      strategy('c', 0.1, { config_full: { start: '2019-01-01' } }),
+    ];
+    expect(savedFindings(three, name).map((f) => f.id)).not.toContain('not-comparable');
+  });
+
+  it('counts only in-sample results against the validated ones', () => {
+    const list = [
+      strategy('v', 0.3, { trust: 'validated' }),
+      strategy('nt', 0.5, { trust: 'not_tradable', config_full: off }),
+      strategy('old', 0.4, { trust: 'old_data' }),
+    ];
+    expect(savedFindings(list, name).map((f) => f.id)).not.toContain('in-sample');
+  });
+});
