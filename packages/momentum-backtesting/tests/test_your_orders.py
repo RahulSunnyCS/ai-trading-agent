@@ -53,8 +53,20 @@ def _headline(client):
     return run
 
 
-class _Ranking:
-    column_to_base_symbol = {"AAA": "AAA", "BBB": "BBB", "CCC#2": "CCC"}
+def _strategy(monkeypatch, prices):
+    """The strategy's names, their Fyers symbols and stored prices, without a real ranking."""
+    symbols = {
+        "AAA": "NSE:AAA-EQ",
+        "BBB": "NSE:BBB-EQ",
+        "CCC#2": "NSE:CCC-EQ",
+        "Nasdaq 100": "NSE:MON100-EQ",
+    }
+    monkeypatch.setattr(api, "_strategy_symbols", lambda rankings, today: (prices, symbols))
+    monkeypatch.setattr(
+        api,
+        "_order_prices",
+        lambda stored, symbols, names: ({n: stored[n] for n in names if n in stored}, "last close"),
+    )
 
 
 def test_orders_against_the_paper_portfolio_are_saved_and_summarised(client, monkeypatch):
@@ -66,12 +78,8 @@ def test_orders_against_the_paper_portfolio_are_saved_and_summarised(client, mon
         "rows": [],
         "sleeves": [],
     }
-    monkeypatch.setattr(api, "_orders_signal", lambda *a: (signal, "exact", None, _Ranking()))
-    monkeypatch.setattr(
-        api,
-        "_order_prices",
-        lambda ranking, names, as_of: ({"AAA": 100.0, "BBB": 50.0, "CCC#2": 250.0}, "last close"),
-    )
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (signal, "exact", None, ["ranking"]))
+    _strategy(monkeypatch, {"AAA": 100.0, "BBB": 50.0, "CCC#2": 250.0})
     payload = api._compute_orders("scheduled")
     plan = payload["plan"]
     assert payload["kind"] == "exact" and payload["holdings"] == {
@@ -97,7 +105,7 @@ def test_a_strategy_that_decides_on_fridays_close_says_why_there_are_no_orders_y
     monkeypatch.setattr(
         api,
         "_orders_signal",
-        lambda *a: (None, "unavailable", "Broad headline decides on Friday's own close.", None),
+        lambda *a: (None, "unavailable", "Broad headline decides on Friday's own close.", []),
     )
     payload = api._compute_orders()
     assert "plan" not in payload and "own close" in payload["reason"]
@@ -113,3 +121,35 @@ def test_owner_settings_are_per_owner(monkeypatch):
         holdings_store.save_settings(con, "rahul", min_trade_rs=7000)
         assert holdings_store.settings(con, "friend")["min_trade_rs"] == 10_000
         assert holdings_store.settings(con, "rahul")["min_trade_rs"] == 7000
+
+
+def test_fyers_holdings_map_to_the_strategys_names_and_others_are_never_sold(client, monkeypatch):
+    """A series-break stock maps to the column traded now, an ETF to its asset, the engine's idle
+    cash is cash, and a holding outside the strategy is left alone rather than sold."""
+    from momentum_backtesting.engine import IDLE
+
+    _headline(client)
+    client.put("/api/orders/settings", json={"holdings_source": "fyers", "extra_cash_rs": 1000})
+    client.post(
+        "/api/holdings/paste",
+        json={"text": "CCC 10\nMON100 40\nRELIANCE 20\nAAA 30\nLIQUIDBEES 100"},
+    )
+    client.put("/api/holdings/rules", json={"symbol": "LIQUIDBEES", "treatment": "cash"})
+    signal = {
+        "week": "2026-10-09",
+        "weights": {},
+        "target_weights": {"CCC#2": 0.5, "Nasdaq 100": 0.3, IDLE: 0.2},
+        "rows": [],
+        "sleeves": [],
+    }
+    monkeypatch.setattr(api, "_orders_signal", lambda *a: (signal, "exact", None, ["ranking"]))
+    _strategy(monkeypatch, {"AAA": 100.0, "CCC#2": 250.0, "Nasdaq 100": 200.0})
+    payload = api._compute_orders()
+    rows = {r["symbol"]: (r["action"], r["held"]) for r in payload["plan"]["rows"]}
+    assert payload["holdings"]["outside"] == ["RELIANCE"]
+    assert "RELIANCE" not in rows and "CCC" not in rows and "MON100" not in rows
+    assert rows["CCC#2"][1] == 10 and rows["Nasdaq 100"][1] == 40
+    assert rows["AAA"] == ("SELL", 30)  # a strategy name the model no longer holds
+    assert IDLE not in rows
+    # LIQUIDBEES counted as cash (a paste has no average price, so 0) + the extra cash.
+    assert payload["plan"]["cash"] == 1000

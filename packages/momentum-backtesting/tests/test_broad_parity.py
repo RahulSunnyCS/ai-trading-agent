@@ -344,7 +344,7 @@ def test_the_signal_rows_keep_the_shape_telegram_and_the_journal_read(
     cutter.to(cutter.weekly.index[120])
     signal = api._broad_engine_signal(_request(case))
     # sleeve_value (BL-051): the sleeve's value since the April reset, for weighting a group.
-    assert set(signal) == {"week", "rows", "explain", "target_weights", "sleeve_value"}
+    assert set(signal) == {"week", "rows", "explain", "target_weights", "sleeve_value", "weights"}
     assert signal["sleeve_value"] > 0
     assert signal["week"] == cutter.weekly.index[120].strftime("%Y-%m-%d")
     assert signal["rows"], "no rows"
@@ -422,3 +422,42 @@ def test_the_week_ahead_signal_is_for_the_next_friday(broad_client, tmp_path, mo
     last = api._broad_ranking(req).prices.index[-1]
     signal = api._broad_engine_signal(req, ahead=True)
     assert pd.Timestamp(signal["week"]) == last + pd.Timedelta(days=7)
+
+
+def test_your_orders_from_the_real_week_ahead_signal_trade_only_what_the_backtest_traded(
+    broad_client, tmp_path, monkeypatch
+):
+    """The engine signal -> _orders_signal -> paper portfolio path, unmocked: the portfolio going
+    into week t (the signal's `weights`) and the target after it must differ by exactly the
+    backtest's buys and full exits at t, so the paper orders never re-buy the whole portfolio."""
+    from momentum_backtesting import orders
+
+    cutter = _Cutter(tmp_path, monkeypatch)
+    req = _request(CASES[2])  # every 4 weeks, phase 0
+    cutter.to(None)
+    full = api._run_broad(req, api._broad_ranking(req), api.DATA.get())
+    weeks = list(full.result.equity.index)
+    cash = {api.IDLE, api.CASH}
+    checked = 0
+    for i in CHECK_WEEKS:
+        week = weeks[i]
+        cutter.to(weeks[i - 1])
+        headline = {"id": "h", "name": "H", "config": req.model_dump(mode="json")}
+        signal, kind, reason, rankings = api._orders_signal(headline, [], week)
+        assert kind == "exact" and reason is None and rankings
+        before = {k for k, v in signal["weights"].items() if v > 0 and k not in cash}
+        after = {k for k, v in signal["target_weights"].items() if v > 0 and k not in cash}
+        prior = set(_held(full.result, weeks[i - 1])) - cash
+        held = set(_held(full.result, week)) - cash
+        assert before == prior, f"{week:%Y-%m-%d} before"
+        assert (after - before, before - after) == (held - prior, prior - held), f"{week:%Y-%m-%d}"
+        plan = orders.plan(
+            {n: 1000 * signal["weights"][n] for n in before},
+            {name: 1.0 for name in before | after},
+            {n: signal["target_weights"][n] for n in after},
+        )
+        bought = {r.symbol for r in plan.rows if r.action == "BUY"}
+        sold = {r.symbol for r in plan.rows if r.action == "SELL"}
+        assert bought == after - before and sold == before - after, f"{week:%Y-%m-%d}"
+        checked += bool(bought or sold)
+    assert checked >= 2

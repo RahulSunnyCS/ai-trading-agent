@@ -2014,6 +2014,17 @@ def _broad_engine_signal(req: BacktestRequest, *, ahead: bool = False) -> dict:
             "sleeve_value": groups_mod.sleeve_value(
                 [d.strftime("%Y-%m-%d") for d in equity.index], list(equity.values)
             ),
+            # The model portfolio going into the week (the previous week's holdings after its
+            # trades), what a group's "before" and Your orders' paper portfolio start from.
+            "weights": (
+                {
+                    name: round(float(weight), 4)
+                    for name, weight in result.weights.loc[previous].items()
+                    if weight > 1e-9
+                }
+                if previous is not None and previous in result.weights.index
+                else {IDLE: 1.0}
+            ),
             "target_weights": {
                 name: round(weight, 4)
                 for name, weight in _model_holdings_or_idle(result, week).items()
@@ -2465,13 +2476,15 @@ def _orders_signal(
     "exact": it ends the week before and every sleeve has a signal delay, so the decision is
     already fixed (`_broad_sentinel_run(ahead=True)`); otherwise none yet."""
     sleeves = members or [headline]
-    signals, kinds, ranking = [], set(), None
+    signals, kinds, rankings = [], set(), []
     for sleeve in sleeves:
         config = sleeve["config"]
         if config.get("dataset") != "broad":
             return None, "unavailable", "Your orders cover Broad strategies for now.", None
         req = BacktestRequest.model_validate(config)
         ranking = _broad_ranking(req)
+        if all(ranking is not seen for seen in rankings):
+            rankings.append(ranking)
         last = ranking.prices.index[-1].normalize()
         if last >= target_week.normalize():
             signal, kind = _broad_engine_signal(req), "final"
@@ -2503,14 +2516,28 @@ def _orders_signal(
             "target_weights": only.get("target_weights", {}),
             "sleeves": [],
         }
-    return combined, ("final" if kinds == {"final"} else "exact"), None, ranking
+    return combined, ("final" if kinds == {"final"} else "exact"), None, rankings
+
+
+def _strategy_symbols(
+    rankings: list[broad.UniverseRanking], as_of: date
+) -> tuple[dict[str, float], dict[str, str]]:
+    """Every name the strategy can hold, across its sleeves' rankings: its last stored price and
+    its Fyers symbol ("NSE:SBIN-EQ"; an atomic asset's is its trade ETF). Retired series-break
+    columns are not in it, so a held base symbol maps to the column the strategy trades now."""
+    stored: dict[str, float] = {}
+    symbols: dict[str, str] = {}
+    for ranking in rankings:
+        prices, names = rebalance.persisted_broad_prices(ranking, as_of)
+        stored.update(prices)
+        symbols.update(names)
+    return stored, symbols
 
 
 def _order_prices(
-    ranking: broad.UniverseRanking, names: set[str], as_of: date
+    stored: dict[str, float], symbols: dict[str, str], names: set[str]
 ) -> tuple[dict[str, float], str]:
     """Rupee prices for `names`: live Fyers quotes when the token works, else the last close."""
-    stored, symbols = rebalance.persisted_broad_prices(ranking, as_of)
     prices = {name: stored[name] for name in names if name in stored}
     wanted = {name: symbols[name] for name in names if name in symbols}
     try:
@@ -2534,18 +2561,21 @@ def _compute_orders(trigger: str = "manual") -> dict:
     today = datetime.now(IST).date()
     # On a Friday this is that Friday; on any other day, the coming one.
     target_week = pd.Timestamp(week_ending_on_or_before(today + timedelta(days=6)))
-    with open_catalog() as con:
-        favourites = runs_store.list_favorites(con, include_groups=True)
-        groups = {g["id"]: g for g in runs_store.list_groups(con)}
-        settings = holdings_store.settings(con, who)
-        synced = holdings_store.latest_holdings(con, who)
-        rules = holdings_store.rules(con, who)
-        review = stock_actions.review_snapshot(con)
+    try:
+        with read_catalog() as con:
+            favourites = runs_store.list_favorites(con, include_groups=True)
+            groups = {g["id"]: g for g in runs_store.list_groups(con)}
+            settings = holdings_store.settings(con, who)
+            synced = holdings_store.latest_holdings(con, who)
+            rules = holdings_store.rules(con, who)
+            review = stock_actions.review_snapshot(con)
+    except FileNotFoundError:  # no catalog yet: no favourites either
+        favourites = []
     headline = next((f for f in favourites if f["active"]), None)
     if headline is None:
         return {"week": journal_week_string(target_week), "error": "No headline favourite."}
     members = groups.get(headline["id"], {}).get("members", [])
-    signal, kind, reason, ranking = _orders_signal(headline, members, target_week)
+    signal, kind, reason, rankings = _orders_signal(headline, members, target_week)
     payload: dict = {
         "week": journal_week_string(target_week),
         "headline": {"id": headline["id"], "name": headline["name"]},
@@ -2553,15 +2583,20 @@ def _compute_orders(trigger: str = "manual") -> dict:
         "reason": reason,
         "settings": settings,
     }
-    if signal is None or ranking is None:
+    if signal is None or not rankings:
         return payload
-    target = {k: v for k, v in signal["target_weights"].items() if v > 0}
+    cash_names = {IDLE, CASH}
+    target = {k: v for k, v in signal["target_weights"].items() if v > 0 and k not in cash_names}
     blocked = {item["symbol"] for item in review.get("items", [])}
-    base_of = dict(ranking.column_to_base_symbol)
-    column_of = {base: column for column, base in base_of.items() if "#" not in column}
+    stored, symbols = _strategy_symbols(rankings, today)
+    # A Fyers holding's base symbol -> the strategy's name for it (SBIN, NAVINFLUOR#2, Nasdaq 100).
+    name_of = {fyers.nse_symbol(symbol): name for name, symbol in symbols.items()}
+    base_of = {name: fyers.nse_symbol(symbol) for name, symbol in symbols.items()}
     if settings["holdings_source"] == "paper":
-        before = {k: v for k, v in signal.get("weights", {}).items() if v > 0}
-        prices, source = _order_prices(ranking, set(before) | set(target), today)
+        before = {
+            k: v for k, v in signal.get("weights", {}).items() if v > 0 and k not in cash_names
+        }
+        prices, source = _order_prices(stored, symbols, set(before) | set(target))
         capital = float(settings["paper_capital_rs"])
         holdings = {
             name: math.floor(capital * weight / prices[name])
@@ -2573,21 +2608,27 @@ def _compute_orders(trigger: str = "manual") -> dict:
     else:
         rows = (synced or {}).get("rows", [])
         cash = float(settings["extra_cash_rs"])
-        holdings = {}
+        holdings: dict[str, float] = {}
+        outside = []
         for row in rows:
             treatment = rules.get(row["symbol"])
             if treatment == "exclude":
                 continue
-            name = column_of.get(row["symbol"], row["symbol"])
-            holdings[name] = holdings.get(name, 0.0) + float(row["quantity"])
             if treatment == "cash":
-                holdings.pop(name)
                 cash += float(row["quantity"]) * float(row.get("avg_price") or 0)
-        prices, source = _order_prices(ranking, set(holdings) | set(target), today)
+                continue
+            name = name_of.get(row["symbol"])
+            if name is None:
+                # Not something this strategy holds or could buy: never ordered sold.
+                outside.append(row["symbol"])
+                continue
+            holdings[name] = holdings.get(name, 0.0) + float(row["quantity"])
+        prices, source = _order_prices(stored, symbols, set(holdings) | set(target))
         payload["holdings"] = {
             "source": "fyers",
             "synced_at": (synced or {}).get("synced_at"),
             "excluded": sorted(s for s, t in rules.items() if t == "exclude"),
+            "outside": sorted(outside),
         }
     blocked_names = {n for n in set(holdings) | set(target) if base_of.get(n, n) in blocked}
     plan = orders.plan(

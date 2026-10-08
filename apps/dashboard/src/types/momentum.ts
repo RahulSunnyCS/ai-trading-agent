@@ -632,7 +632,13 @@ export interface MomentumOrders {
   reason: string | null;
   holdings?:
     | { source: 'paper'; capital: number }
-    | { source: 'fyers'; synced_at: string | null; excluded: string[] };
+    | {
+        source: 'fyers';
+        synced_at: string | null;
+        excluded: string[];
+        /** Holdings that are not something this strategy holds or could buy: left alone. */
+        outside?: string[];
+      };
   prices?: string;
   sleeves?: MomentumWeekSleeve[];
   plan?: MomentumOrderPlan;

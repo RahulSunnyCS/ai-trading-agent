@@ -240,6 +240,9 @@ export function YourOrders() {
             always go through. Made {formatIstDateTime(latest.created_at)} (
             {latest.trigger === 'scheduled' ? 'the 14:15 job' : 'by hand'}).
             {plan.missing_prices.length ? ` No price for ${plan.missing_prices.join(', ')}.` : ''}
+            {latest.holdings?.source === 'fyers' && latest.holdings.outside?.length
+              ? ` Left alone, not part of this strategy: ${latest.holdings.outside.join(', ')}.`
+              : ''}
           </p>
         </>
       )}
