@@ -10,6 +10,8 @@ export interface RadioMenuOption {
   /** A figure or note shown right-aligned in the figures face (a CAGR, "no data"). */
   detail?: ReactNode;
   disabled?: boolean;
+  /** Native hover text, e.g. why an option is disabled. */
+  title?: string | undefined;
 }
 
 /**
@@ -77,6 +79,7 @@ export function RadioMenu({
                 key={option.value}
                 value={option.value}
                 disabled={option.disabled ?? false}
+                title={option.title}
                 className="flex h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2.5 text-sm outline-none data-[disabled]:cursor-not-allowed data-[highlighted]:bg-surface-2 data-[disabled]:opacity-50"
               >
                 <span className="w-3.5 text-primary">

@@ -11,7 +11,7 @@ the strategy beats the obvious off-the-shelf momentum product. These two lines a
 - Nifty200 Momentum 30 TRI: a buyable factor index (an ETF tracks it). Back-calculated by NSE
   before 2020-08-11 - a backtest of the index methodology, not live history.
 
-Four more TRIs are loaded too (`EXTRA_REFERENCES`, BL-010 Phase 5) for judging a basket
+Six more TRIs are loaded too (`EXTRA_REFERENCES`, BL-010 Phase 5) for judging a basket
 against the broader market or its own factor family, by name, via
 `criteria.basket_passes(..., indices=...)`. `compare()` and everything that displays comparison
 lines still show only `REFERENCES`, so adding these changed no existing output:
@@ -21,7 +21,7 @@ lines still show only `REFERENCES`, so adding these changed no existing output:
 - Nifty 500 TRI (BL-010 Phase 6 backcast benchmark)
 - Nifty Next 50 TRI (the dashboard's benchmark picker)
 
-NSE back-calculates all four before each index's launch, as it does Mom30 before 2020-08-11;
+NSE back-calculates each of them before the index's launch, as it does Mom30 before 2020-08-11;
 unlike Mom30 they carry no back-calculated flag yet, so read their early years as NSE's
 backtest of the index method, not investable history.
 
@@ -31,7 +31,7 @@ page can switch benchmark without running the backtest again. The benchmark neve
 simulation itself, only what the result is compared against.
 
 All of them come from `data/stocks/benchmarks_weekly.csv` (`mbt stocks fetch`, or for just the
-four extras `mbt stocks fetch-benchmarks`; niftyindices.com), or the shared database's
+extras `mbt stocks fetch-benchmarks`; niftyindices.com), or the shared database's
 `stock_weekly_series` once those rows are migrated there. When neither exists the comparisons
 are simply absent - never an error, since every dataset can run without them.
 """
@@ -129,18 +129,35 @@ def load_references(data_dir: Path | None = None) -> pd.DataFrame:
     return frame[[c for c in LOADED if c in frame]].sort_index()
 
 
+def _align(
+    reference: pd.Series | None, span: pd.DatetimeIndex
+) -> tuple[pd.Series | None, str | None]:
+    """`reference` on the backtest's weeks, rebased to 1.0 at the first week, and why not when it
+    cannot be. A week the reference lacks (a holiday-shortened week labelled differently) carries
+    the previous close forward one week at most; a longer hole, a start after the first week or
+    an end more than a week before the last would make its statistics describe a different
+    window (or an invented flat stretch), so the line is refused with a reason the page shows."""
+    s = None if reference is None else reference.dropna()
+    if s is None or s.empty:
+        return None, "No data for this index"
+    if s.index[0] > span[0]:
+        return None, f"Starts {s.index[0]:%d %b %Y}, after this run's first week"
+    filled = s.reindex(s.index.union(span)).ffill(limit=1).reindex(span)
+    if pd.isna(filled.iloc[0]):
+        return None, f"Starts {s.index[0]:%d %b %Y}, after this run's first week"
+    if pd.isna(filled.iloc[-1]):
+        return None, f"Ends {s.index[-1]:%d %b %Y}, more than a week before this run's last week"
+    if filled.isna().any():
+        first = filled.index[filled.isna().to_numpy().argmax()]
+        weeks = int(filled.isna().sum())
+        return None, f"Missing {weeks} weeks from {first:%d %b %Y}"
+    return filled / filled.iloc[0], None
+
+
 def aligned(reference: pd.Series, span: pd.DatetimeIndex) -> pd.Series | None:
-    """`reference` on the backtest's weeks, rebased to 1.0 at the first week. A week the
-    reference lacks (a holiday-shortened week labelled differently) carries the previous close
-    forward one week at most. None when it does not cover the first or last week - a partial
-    line would make its CAGR meaningless."""
-    s = reference.dropna()
-    if s.empty or s.index[0] > span[0]:
-        return None
-    s = s.reindex(s.index.union(span)).ffill(limit=1).reindex(span)
-    if pd.isna(s.iloc[0]) or pd.isna(s.iloc[-1]):
-        return None
-    return s.ffill() / s.iloc[0]
+    """`reference` on the backtest's weeks, rebased to 1.0 at the first week; None when it does
+    not cover the whole window (see `_align`) - a partial line would make its CAGR meaningless."""
+    return _align(reference, span)[0]
 
 
 def compare(equity: pd.Series, references: pd.DataFrame) -> list[dict]:
@@ -192,7 +209,7 @@ def picker(equity: pd.Series, cash: pd.Series, references: pd.DataFrame | None) 
     over annualised downside deviation, max drawdown, and how many calendar years the strategy
     beat it. `as_of` is the index's last real close on or before the final week (`aligned` may
     carry it one week forward). An index with no usable data is listed with `available` False,
-    so the menu can say so instead of dropping it."""
+    so the menu can say so, with a `reason`, instead of dropping it."""
     out: list[dict] = []
     if len(equity) < 2:
         return out
@@ -201,9 +218,9 @@ def picker(equity: pd.Series, cash: pd.Series, references: pd.DataFrame | None) 
     strategy_years = _year_end_returns(equity)
     for name in PICKER:
         source = references[name] if references is not None and name in references else None
-        line = aligned(source, equity.index) if source is not None else None
+        line, reason = _align(source, equity.index)
         if line is None:
-            out.append({"name": name, "available": False})
+            out.append({"name": name, "available": False, "reason": reason})
             continue
         stats = metrics.curve_stats(line, cash)
         weekly = line.pct_change().dropna()

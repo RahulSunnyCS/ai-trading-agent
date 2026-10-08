@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { MomentumResult, MomentumSeries } from '../../types/momentum';
 import {
   DEFAULT_BENCHMARK,
+  aheadShare,
   benchmarkLabel,
   benchmarkOptions,
   changeBetween,
@@ -111,9 +112,134 @@ describe('resolveBenchmark', () => {
         result({ benchmarks: [mom, { name: 'Nifty Next 50 TRI', available: false }] }),
       ),
     ).toEqual([
-      { name: DEFAULT_BENCHMARK, label: 'Nifty 200 Momentum 30', available: true, cagr: 0.18 },
-      { name: 'Nifty Next 50 TRI', label: 'Nifty Next 50', available: false, cagr: null },
+      {
+        name: DEFAULT_BENCHMARK,
+        label: 'Nifty 200 Momentum 30',
+        available: true,
+        cagr: 0.18,
+        reason: null,
+      },
+      {
+        name: 'Nifty Next 50 TRI',
+        label: 'Nifty Next 50',
+        available: false,
+        cagr: null,
+        reason: 'No data for this run',
+      },
     ]);
+  });
+
+  it("carries the server's reason for an index it could not use", () => {
+    const options = benchmarkOptions(
+      result({
+        benchmarks: [
+          mom,
+          {
+            name: 'Nifty Smallcap 250 TRI',
+            available: false,
+            reason: "Starts 05 Jan 2024, after this run's first week",
+          },
+        ],
+      }),
+    );
+    expect(options[1]).toMatchObject({
+      available: false,
+      reason: "Starts 05 Jan 2024, after this run's first week",
+    });
+  });
+
+  it("refuses a curve that does not match the run's weeks, instead of drawing it truncated", () => {
+    const short = { ...mom, series: [100, 90, 99] };
+    const r = result({ benchmarks: [short] });
+    expect(benchmarkOptions(r)[0]).toMatchObject({
+      available: false,
+      reason: "Does not match this run's weeks",
+    });
+    const view = resolveBenchmark(r, DEFAULT_BENCHMARK);
+    expect(view.fallback).toBe(true);
+    expect(view.replaced).toEqual({
+      label: 'Nifty 200 Momentum 30',
+      reason: "Does not match this run's weeks",
+    });
+  });
+});
+
+describe('a pick that cannot be used', () => {
+  it("says which index was asked for and why the run's own benchmark is shown", () => {
+    const r = result({
+      benchmarks: [
+        mom,
+        { name: 'Nifty 50 TRI', available: false, reason: 'No data for this index' },
+      ],
+    });
+    const view = resolveBenchmark(r, 'Nifty 50 TRI');
+    expect(view).toMatchObject({ fallback: true, label: 'Nifty 50', name: 'Nifty 50' });
+    expect(view.replaced).toEqual({ label: 'Nifty 50', reason: 'No data for this index' });
+  });
+
+  it('names a pick the run does not offer at all', () => {
+    const r = result({ benchmarks: [mom] });
+    expect(resolveBenchmark(r, 'Nifty Smallcap 250 TRI').replaced).toEqual({
+      label: 'Nifty Smallcap 250',
+      reason: 'Not offered for this run',
+    });
+  });
+
+  it('is silent for an older result with no picker at all', () => {
+    expect(resolveBenchmark(result(), DEFAULT_BENCHMARK).replaced).toBeNull();
+  });
+
+  it('is not a replacement when the pick is used', () => {
+    expect(resolveBenchmark(result({ benchmarks: [mom] }), DEFAULT_BENCHMARK).replaced).toBeNull();
+  });
+});
+
+describe('switching the benchmark changes everything derived from it', () => {
+  const other = { ...mom, name: 'Nifty 50 TRI', series: [100, 105, 110, 115, 120], cagr: 0.1 };
+  const r = result({ benchmarks: [mom, other] });
+  const a = withBenchmark(series, resolveBenchmark(r, DEFAULT_BENCHMARK));
+  const b = withBenchmark(series, resolveBenchmark(r, 'Nifty 50 TRI'));
+
+  it('swaps the curve, its drawdown and the 52-week edge', () => {
+    expect(a.benchmark).toEqual(mom.series);
+    expect(b.benchmark).toEqual(other.series);
+    expect(a.drawdown_benchmark).not.toEqual(b.drawdown_benchmark);
+    expect(a.benchmark).not.toEqual(series.benchmark);
+    expect(b.benchmark).not.toEqual(series.benchmark);
+  });
+
+  it('changes the yearly rows and the worst falls', () => {
+    const yearlyA = yearlyRows(a);
+    const yearlyB = yearlyRows(b);
+    expect(yearlyA.map((row) => row.benchmark)).not.toEqual(yearlyB.map((row) => row.benchmark));
+    expect(worstEpisodes(a.benchmark)).toHaveLength(1);
+    expect(worstEpisodes(b.benchmark)).toHaveLength(0);
+  });
+});
+
+describe('aheadShare', () => {
+  it('is the share of known weeks the strategy was ahead', () => {
+    expect(aheadShare([null, 0.1, -0.1, 0.2, 0])).toBeCloseTo(0.5);
+  });
+  it('is null when nothing is known', () => {
+    expect(aheadShare([null, null])).toBeNull();
+    expect(aheadShare([])).toBeNull();
+  });
+});
+
+describe('a benchmark that starts late or has gaps', () => {
+  it('keeps nulls as nulls instead of NaN or Infinity', () => {
+    const late = [null, null, 100, 110, 99];
+    expect(drawdownSeries(late)).toEqual([null, null, 0, 0, expect.closeTo(-0.1)]);
+    const edge = rolling52Excess(late, late, 2);
+    expect(edge.every((value) => value === null || Number.isFinite(value))).toBe(true);
+    // A benchmark whose level a year ago is unknown has no trailing return.
+    const dates = ['2024-01-05', '2024-06-07', '2025-01-03', '2025-06-06', '2026-01-02'];
+    expect(trailingReturn(dates, late, 365)).toBeNull();
+  });
+  it('treats a zero or negative level as unknown', () => {
+    expect(drawdownSeries([0, 100, -5])).toEqual([null, 0, expect.any(Number)]);
+    expect(rolling52Excess([100, 110, 120], [0, 100, 110], 1)[1]).toBeNull();
   });
 });
 

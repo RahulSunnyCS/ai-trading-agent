@@ -144,6 +144,7 @@ uv run mbt serve           # private Momentum API on 127.0.0.1:8765
 uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
 uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 scheduler job)
+uv run mbt live-rules check [--send] [--simulate drawdown-cut|drawdown-exit|trailing|gate-ready]  # BL-025: the owner's live-money rules vs the followed money (Fri 21:30 scheduler job); never trades
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change
 uv run python scripts/bench-backtest.py [--scenario broad_default] [--live] [--profile out.prof]   # time one backtest cold/warm/cached/via jobs, with the seconds per stage; golden-fixture data by default
 uv run python scripts/result-baseline.py capture --data-dir <data> --out <dir>   # snapshot every result on LIVE data; `compare --baseline <dir>` after a change meant to keep them
@@ -432,6 +433,10 @@ The system is a **real-time event-driven pipeline** in four layers:
   never call `Intl.*`, `toFixed` or `toLocaleString`. Use `formatInr`, `formatPct` (takes a
   fraction; pass `{ unit: 'percent' }` otherwise), `formatPp`, `formatNumber`, `formatDay`
   (a zone-less 'YYYY-MM-DD'), `formatIstDate` / `formatIstTime` (instants), `EMPTY`
+- **Dashboard analytics pages follow one pattern** — icon-rail sidebar, run bar + settings drawer,
+  headline strip with a benchmark picker, a full-width hero chart with a follow tooltip, and widgets
+  that load after the chart paints. The rules and vocabulary are in `apps/dashboard/CLAUDE.md` →
+  Analytics page pattern; a new result page reuses it rather than adding side columns or tabs
 - **Dashboard controls come from `components/ui/`** — `SegmentedControl` for one-of-N,
   `Tabs` for any tab bar (the only place `role="tablist"` appears), `Input` / `Select` /
   `NumberField` for fields, `RefreshButton`, `CopyButton`, `toast()`. Do not hand-roll another

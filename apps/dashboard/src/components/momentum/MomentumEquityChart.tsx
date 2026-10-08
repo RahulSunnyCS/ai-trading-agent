@@ -422,7 +422,7 @@ function PinnedWeekCard({
   return (
     <section
       aria-label="Pinned week"
-      className="absolute z-20 w-[360px] overflow-y-auto rounded-lg border border-border-strong bg-surface/95 px-3 py-2 text-xs shadow-elevated backdrop-blur-sm"
+      className="absolute z-20 w-[360px] max-w-[calc(100%-1.5rem)] overflow-y-auto rounded-lg border border-border-strong bg-surface/95 px-3 py-2 text-xs shadow-elevated backdrop-blur-sm"
       style={{ left: PLOT_MARGIN.l + PIN_INSET, top: PLOT_MARGIN.t + PIN_INSET, maxHeight }}
     >
       <div className="mb-1.5 flex items-center gap-1">
@@ -760,6 +760,7 @@ export function MomentumEquityChart({
   comparisons = [],
   flashKey = null,
   broad = false,
+  onPainted,
 }: {
   series: MomentumSeries;
   benchmarkName: string;
@@ -769,8 +770,12 @@ export function MomentumEquityChart({
   flashKey?: number | null;
   /** A Broad Momentum result: its rotation markers show only at a year or less. */
   broad?: boolean;
+  /** Called after each draw; the page uses the first to start loading what is below. */
+  onPainted?: () => void;
 }) {
   const flashing = useResultFlash(flashKey);
+  const onPaintedRef = useRef(onPainted);
+  onPaintedRef.current = onPainted;
   const chartRef = useRef<HTMLDivElement>(null);
   const plotlyRef = useRef<PlotlyBasic | null>(null);
   const [scrollZoom, setScrollZoom] = useState(false);
@@ -937,9 +942,16 @@ export function MomentumEquityChart({
   useEffect(() => {
     const element = chartRef.current;
     if (!element) return;
+    // The cursor is stored on every move, but the tooltip is placed once per frame: placing it
+    // reads layout and writes styles, which would otherwise be forced on every mouse event.
+    let frame: number | null = null;
     const move = (event: MouseEvent): void => {
       cursorRef.current = { x: event.clientX, y: event.clientY };
-      placeTooltip();
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        placeTooltip();
+      });
     };
     const leave = (): void => {
       cursorRef.current = null;
@@ -950,6 +962,7 @@ export function MomentumEquityChart({
     return () => {
       element.removeEventListener('mousemove', move);
       element.removeEventListener('mouseleave', leave);
+      if (frame !== null) cancelAnimationFrame(frame);
     };
   }, [placeTooltip]);
 
@@ -1208,6 +1221,7 @@ export function MomentumEquityChart({
         scrollZoom,
       });
       if (!mounted) return;
+      onPaintedRef.current?.();
       const plotlyElement = element as PlotlyHTMLElement;
       for (const name of PLOT_EVENTS) plotlyElement.removeAllListeners?.(name);
       plotlyElement.on?.('plotly_hover', (event) => {
@@ -1275,6 +1289,11 @@ export function MomentumEquityChart({
   const listDay = shown.dates[listIndex]?.slice(0, 10) ?? null;
   const hoverDay = hoverIndex >= 0 ? activeDay : null;
   const pinnedDay = pinnedIndex >= 0 ? (shown.dates[pinnedIndex]?.slice(0, 10) ?? null) : null;
+  // A pin the shown weeks no longer contain (another run, a shorter range) is dropped, so the
+  // arrow keys do not keep stepping from a week that is not on screen.
+  useEffect(() => {
+    if (selectedDate !== null && pinnedIndex < 0) setSelectedDate(null);
+  }, [selectedDate, pinnedIndex]);
 
   const weekValues = (index: number): WeekValue[] => [
     {
