@@ -175,7 +175,7 @@ Each phase is one PR, reviewed and merged before the next. Built after BL-051 Ph
     later. One JSON log line per change. `GET /api/result-changes?unreviewed=1` and
     `POST /api/result-changes/{id}/reviewed`.
   - Prune by strategy: keep the newest 10 non-kept strategies per dataset (kept = followed,
-    starred or overlay); a strategy's own run history keeps every result change and the last few
+    starred or overlay); a strategy's own run history keeps every result change and the last 3
     repeats.
   - `trust` per strategy (validated / comparison / in-sample / not tradable / old data) on the
     server, since it reads the frozen file.
@@ -245,11 +245,10 @@ Answered by the owner on 2026-10-08 (see the Log):
    results stay in the strategy's run history so the move can be explained.
 2. ~~Save automatically or on demand?~~ **Automatically**, as now.
 
-To ask when started:
-
-3. Telegram alert for **Check** as well as Not reproducible, or Check on the page only?
-4. How many repeat runs to keep per strategy (proposed: every result change plus the last 5
-   repeats).
+3. ~~Telegram alert for Check too?~~ **No.** Only Not reproducible on a favourite goes to
+   Telegram; Check shows on the page (row badge, tab count, bell and pop-up, findings).
+4. ~~How many repeat runs to keep per strategy?~~ **The last 3 repeats**, plus every result
+   change.
 
 ## Log
 
@@ -265,3 +264,5 @@ To ask when started:
   the data fingerprint (`RUN_RECORD_TABLES`); the same result on a new data version is "ran
   again", not a change; "Intended change" needs an accepted golden change of the same dataset,
   and code plus data changing together is "Check".
+- 2026-10-08 — owner answered the last two questions: Check is not sent to Telegram (page only);
+  keep the last 3 repeat runs per strategy, plus every result change.
