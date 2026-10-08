@@ -308,4 +308,4 @@ To confirm when this is started:
   and all 12 dev trials were re-run; baseline, tilts and R1 never parked cash and are unchanged.
   The unpatched curves are kept in `data/search/round7_A/bl050/dev_unpatched/`.
 - 2026-10-09 — Phases 1-3 run overnight (features 02:42, screen 02:45, engine 02:49 IST): four
-  features pass the screen, none passes the engine test (PBO 0.74); the hold-out stays sealed.
+  features pass the screen, none passes the engine test (PBO 0.74 before the cash fix below, 0.72 after); the hold-out stays sealed.
