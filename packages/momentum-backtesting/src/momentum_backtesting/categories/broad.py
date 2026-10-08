@@ -1163,6 +1163,9 @@ def run_broad_backtest(
     stop_from_peak: float | None = None,
     stop_proceeds: Literal["cash", "top"] = "cash",
     stop_delay: int = 0,
+    # BL-054 L1: engine.Config.tax_hold_band / tax_hold_weeks (inert without `tax`).
+    tax_hold_band: int = 0,
+    tax_hold_weeks: int = 0,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1332,6 +1335,8 @@ def run_broad_backtest(
         stop_from_peak=stop_from_peak,
         stop_proceeds=stop_proceeds,
         stop_delay=stop_delay,
+        tax_hold_band=tax_hold_band,
+        tax_hold_weeks=tax_hold_weeks,
     )
     result = engine.run_backtest(
         prices,
