@@ -163,6 +163,9 @@ uv run mbt stocks pin-manifest           # commit the raw cache + events as the 
 # option-backtesting MCP server (stdio) — registered in root .mcp.json as "option-backtesting";
 # a Claude Code session picks it up automatically, no manual start needed.
 
+# Weekly process review (Saturday 08:55 IST Routine; method in .claude/skills/process-review/SKILL.md)
+scripts/process-review-stats.sh [SINCE] [UNTIL]   # git-only numbers the review starts from; reports land in docs/process-reviews/
+
 # Teardown
 docker compose down         # stop services, keep data volumes
 docker compose down -v      # stop + destroy data volumes (full reset)

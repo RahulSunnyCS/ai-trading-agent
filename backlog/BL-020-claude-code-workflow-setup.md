@@ -63,3 +63,7 @@ short and on one topic.
 - 2026-10-06 — created from the process review.
 - 2026-10-06 — owner decisions on PR #27: credential rotation and TODO 1.2 approved — added as Phase 4.
 - 2026-10-06 — owner delegated the remaining open questions to Claude's recommendations: Sonnet 5.5 for the implementer. Status Ready.
+- 2026-10-08 — second process review (`docs/process-reviews/2026-10-08.md`): Phases 1–3 not
+  started; `code-review-merge` covers part of `/safe-merge`. A weekly `process-review` skill,
+  its stats script and a Saturday 08:55 IST Routine now measure follow-through on this item
+  and on BL-014/BL-015/BL-021.
