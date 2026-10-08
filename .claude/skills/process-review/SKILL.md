@@ -16,7 +16,11 @@ from the numbers, the backlog and the PRs.
    size, backlog counts, owner-pending TODO rows. Default window: the last 7 days.
 2. The previous review: the newest file in `docs/process-reviews/`. Its tables are the baseline;
    its recommendations are the follow-through list to check one by one.
-3. GitHub, through the `mcp__github__*` tools, repo `RahulSunnyCS/ai-trading-agent` only:
+3. GitHub, repo `RahulSunnyCS/ai-trading-agent` only, through the `mcp__github__*` tools when
+   the session has them, else `gh` (`gh pr list --state merged -L 100 --json number,title,
+   labels,createdAt,mergedAt,additions,deletions`, `gh run list --workflow ci.yml --branch main
+   -L 100 --json conclusion,createdAt,event`); if neither works, mark the PR and CI rows
+   "not measured this week" and carry on with the git-side numbers. With the MCP tools:
    `list_pull_requests` (closed, sorted by updated) for PR count, size, labels and time from
    open to merge; `actions_list` on `ci.yml`, branch `main`, for the green/red count;
    open PRs and how many touch the same area.
