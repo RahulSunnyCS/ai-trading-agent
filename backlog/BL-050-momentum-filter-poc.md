@@ -216,7 +216,7 @@ proposed for real money (through BL-025).
 | M1 overextension gate | -2.41 | 0 of 4 | kill (wrong way: stretched names did better) |
 
 **Phase 3 engine** (frozen ensemble, 2012-01-01 to 2023-12-29, pre-tax Rs 2 lakh; baseline
-29.7% a year, worst fall -31.4%, 10.2 holdings). PBO over the 11 trials plus baseline: **0.74**
+29.7% a year, worst fall -31.4%, 10.2 holdings). PBO over the 11 trials plus baseline: **0.72**
 (limit 0.5), so no trial can pass.
 
 | Trial | CAGR | Median 3-year dCAGR | Win share | Worst fall | Holdings |
@@ -226,15 +226,17 @@ proposed for real money (through BL-025).
 | T1 @ 0.25 / 0.5 | 29.5% / 29.5% | -0.2 / -0.1 | 36% / 42% | -31.4% | 10.1 |
 | M2 @ 0.25 / 0.5 | 29.7% / 29.7% | +0.1 / +0.1 | 53% / 53% | -31.4% / -30.8% | 10.1 |
 | R1 gate | 29.6% | -0.1 | 8% | -31.4% | 10.1 |
-| V3 gate (owner) | 30.1% | -0.3 | 47% | -26.7% | 6.2 |
-| M1 gate | 29.1% | -0.4 | 42% | -29.1% | 9.5 |
+| V3 gate (owner) | 28.8% | +0.3 | 53% | -24.5% | 6.2 (4% cash) |
+| M1 gate | 29.3% | -0.4 | 42% | -29.5% | 9.5 |
 
 - The screen's signal is real among top-momentum names (V1 at t = 4.8), but the tilt as
   pre-registered acts only inside the categories already chosen, where few names compete, so it
   changed few decisions (dCAGR within +/-0.3 points). A tilt on the wider pool or the category
   choice is a different question and needs its own pre-registration.
-- V3's shallower worst fall comes mostly from holding 6 stocks instead of 10 (blocked buys left
-  slots empty); its cash share came out blank (NaN in the run metadata) and was not chased.
+- V3 (the owner's gate) cut the worst fall from -31.4% to -24.5% for 0.9 points of CAGR, but
+  by holding about 6 stocks instead of 10: blocked buys concentrated the money in fewer names.
+  Its screen was the wrong way round and it fails the engine rule, so it is not evidence; a
+  drawdown effect from concentration is not what the filter was meant to test.
 - Phase 4 (shadow arms) has nothing to track.
 
 ## Risks
@@ -298,5 +300,12 @@ To confirm when this is started:
 - 2026-10-08 — Review fixes, before any run (PR #129, Codex). The Phase 2 screen is now
   pre-registered per frozen config, on each config's own score and calendar, with a fixed rule
   for combining the four. Phase 3 builds all six curves for PBO, and only survivors get verdicts.
+- 2026-10-09 — **bug found and fixed before the verdict was published:** the weekly table's
+  liquid-fund price starts in 2016, so money a gate parked in 2012-2015 was valued at NaN and
+  that sleeve's curve stayed NaN (V3: 2 of 4 sleeves, M1: 1 of 4; the ensemble silently averaged
+  the rest). The runner now applies the backcast's committed patch
+  (`holdout.patched_outer_prices`, BL-010 addendum 5: the stock layer's cash series before 2016)
+  and all 12 dev trials were re-run; baseline, tilts and R1 never parked cash and are unchanged.
+  The unpatched curves are kept in `data/search/round7_A/bl050/dev_unpatched/`.
 - 2026-10-09 — Phases 1-3 run overnight (features 02:42, screen 02:45, engine 02:49 IST): four
   features pass the screen, none passes the engine test (PBO 0.74); the hold-out stays sealed.

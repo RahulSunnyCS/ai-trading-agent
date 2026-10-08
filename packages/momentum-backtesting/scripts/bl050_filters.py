@@ -33,10 +33,21 @@ ROUND_TRIP = 0.003
 
 
 def runner():
-    from momentum_backtesting import bias, search
+    """The search's runner on the PIT universe, with the backcast's committed pre-2016 cash patch
+    (holdout.patched_outer_prices, BL-010 addendum 5): the weekly table's liquid-fund price starts
+    in 2016, so money a gate leaves parked in 2012-2015 would otherwise be valued at NaN."""
+    from momentum_backtesting import api, bias, holdout, reference_benchmarks, search
 
     space = search.load_space(SPACE)
-    return bias.Runner(space, universe_kind="turnover_rank", category_tags="curated")
+    r = bias.Runner(space, universe_kind="turnover_rank", category_tags="curated")
+    cash = pd.read_csv(
+        api.DATA_DIR / "stocks" / "cash_weekly.csv", index_col="date", parse_dates=True
+    )
+    refs = reference_benchmarks.load_references()
+    r.common["outer_prices"] = holdout.patched_outer_prices(
+        r.common["outer_prices"], cash["close"].dropna(), refs["Nifty 50 TRI"]
+    )
+    return r
 
 
 def sleeves() -> list[dict]:
@@ -228,7 +239,8 @@ def run_trials(start: str, end: str, dest: Path, only: list[str] | None = None) 
             res = outcome.result
             curves[cfg["id"]] = res.equity
             holdings.append(float(res.holdings["count"].mean()))
-            idle.append(float(res.holdings["idle_share"].mean()))
+            # a week holding nothing has no weights row total: count it as fully in cash
+            idle.append(float(res.holdings["idle_share"].fillna(1.0).mean()))
         frame = pd.DataFrame(curves)
         ensemble = choose.ensemble_curve(frame, list(frame.columns))
         out = frame.assign(ensemble=ensemble)

@@ -3,11 +3,11 @@
   "splits": 12870,
   "configs": 12,
   "weeks_used": 608,
-  "pbo": 0.7396270396270396,
-  "picked_oos_negative": 0.0001554001554001554,
-  "slope": -1.0116638211494258,
-  "picked_oos_median": 1.4329438076145486,
-  "picked_is_median": 1.5713896195621082
+  "pbo": 0.7226107226107226,
+  "picked_oos_negative": 0.0002331002331002331,
+  "slope": -0.9775818177604507,
+  "picked_oos_median": 1.4240415428312252,
+  "picked_is_median": 1.531170600476345
  },
  "baseline": {
   "cagr": 0.29745153211555886,
@@ -114,14 +114,14 @@
   },
   "V3": {
    "screen_pass": false,
-   "cagr": 0.30070261308688817,
+   "cagr": 0.28775519684632545,
    "baseline_cagr": 0.29745153211555886,
-   "median_rolling_dcagr": -0.0032588834409165157,
-   "rolling_win_share": 0.4722222222222222,
-   "mdd": -0.26722752117866067,
+   "median_rolling_dcagr": 0.0034799359733443946,
+   "rolling_win_share": 0.5277777777777778,
+   "mdd": -0.24543147387773456,
    "baseline_mdd": -0.31399206643067645,
    "avg_holdings": 6.241830065359477,
-   "avg_idle_share": null,
+   "avg_idle_share": 0.04303444958043014,
    "passes": false
   },
   "R1": {
@@ -138,14 +138,14 @@
   },
   "M1": {
    "screen_pass": false,
-   "cagr": 0.290816470178195,
+   "cagr": 0.29333995692681647,
    "baseline_cagr": 0.29745153211555886,
-   "median_rolling_dcagr": -0.0039374783499021015,
+   "median_rolling_dcagr": -0.0037725200648418555,
    "rolling_win_share": 0.4166666666666667,
-   "mdd": -0.2913264724529919,
+   "mdd": -0.29454410404972453,
    "baseline_mdd": -0.31399206643067645,
    "avg_holdings": 9.453839869281046,
-   "avg_idle_share": 0.0,
+   "avg_idle_share": 0.0004207435663608526,
    "passes": false
   }
  },
