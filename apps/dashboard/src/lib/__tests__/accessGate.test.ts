@@ -161,8 +161,8 @@ describe('upstreamHeaders', () => {
       }),
       open,
     );
-    expect(headers?.has('cf-access-client-id')).toBe(false);
-    expect(headers?.has('cf-access-client-secret')).toBe(false);
+    expect(headers?.get('cf-access-client-id')).toBe('');
+    expect(headers?.get('cf-access-client-secret')).toBe('');
     expect(headers?.get('authorization')).toBe('');
     expect(headers?.get('accept')).toBe('application/json');
   });

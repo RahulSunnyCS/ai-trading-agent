@@ -151,15 +151,17 @@ served at `dashboard.codifie.dev` (a custom domain, `workers_dev` off). Needs No
 
 OpenNext bundles every `.env` it finds, the repo-root `.env` included, which would upload every broker,
 Telegram and Google secret. So always build with `bun run cf:build` (or `cf:deploy` / `cf:preview`, which
-call it): `scripts/cf-build.mjs` renames the root `.env` for the build and puts it back afterwards, even on
-an error or Ctrl+C, then `scripts/check-no-env-bundled.mjs` fails the build unless the bundled env is
+call it): `scripts/cf-build.mjs` renames every `.env`, `.env.local`, `.env.production` and
+`.env.production.local` (repo root and `apps/dashboard`) for the build and puts them back afterwards, even
+on an error or Ctrl+C. They are missing for the minutes the build takes, so avoid running a scheduled job
+that reads the root `.env` meanwhile. The script then `scripts/check-no-env-bundled.mjs` fails the build unless the bundled env is
 empty. Do not run `opennextjs-cloudflare build` or `wrangler deploy` directly. If a build is killed
-outright and `.env` is missing, rename `.env.cf-build-hidden` back (the next `cf:build` also does it).
+outright and a `.env` file is missing, rename its `.cf-build-hidden` copy back (the next `cf:build` also does it).
 
 ```bash
 cd apps/dashboard
 npx wrangler login                                   # once
-# build-time values: put these four in apps/dashboard/.env.local or export them
+# build-time values: export these four in the shell (not in a .env file, which the build hides)
 #   MOMENTUM_DIRECT=1  OBT_DIRECT=1  MOMENTUM_DIRECT_API_URL=…  OBT_DIRECT_API_URL=…
 npx wrangler secret put DASHBOARD_PASSWORD           # password mode only; the name goes in the command,
 npx wrangler secret put UPSTREAM_ACCESS_CLIENT_ID    # the value is typed at the hidden prompt

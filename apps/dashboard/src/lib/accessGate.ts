@@ -150,10 +150,10 @@ export function upstreamHeaders(incoming: Headers, config: GateConfig): Headers 
     hasAccessCookie;
   if (!hasClientCopies && !config.upstream) return null;
   const headers = new Headers(incoming);
-  headers.delete(UPSTREAM_ID_HEADER);
-  headers.delete(UPSTREAM_SECRET_HEADER);
   // Blanked, not deleted: on Cloudflare Workers (OpenNext) a header the middleware deletes still
   // reaches the rewrite target, a blank one does not (checked against an echo upstream).
+  headers.set(UPSTREAM_ID_HEADER, '');
+  headers.set(UPSTREAM_SECRET_HEADER, '');
   headers.set('authorization', '');
   headers.set(ACCESS_JWT_HEADER, '');
   if (cookie && (hasSessionCookie || hasAccessCookie)) {
