@@ -378,7 +378,7 @@ export function MomentumResultWidgets({
         >
           {() =>
             savedRuns.length ? (
-              <MomentumCompare runs={savedRuns} />
+              <MomentumCompare runs={savedRuns.filter((run) => !run.group)} />
             ) : (
               <p className="text-sm text-muted">
                 No saved runs to compare yet. Each finished run is saved automatically.

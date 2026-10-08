@@ -17,6 +17,14 @@ is already documented as free-form JSON. This mirrors what used to be a
 `localStorage` array of `MomentumSavedRun` objects, just moved server-side so
 saved runs survive a browser/device change (see TODO.md's P4 entry).
 
+Favourites (BL-051) carry a status: "watching" (journalled every Friday), "paper" (tracked
+against the live-money rules as if it had money) or "invested" (real money follows it). Paper +
+Invested together are capped at `MAX_FOLLOWED`; Watching is unlimited. Exactly one followed
+favourite is the *headline* (`active`, kept under its old name so every existing reader keeps
+working): Telegram sends it and This week puts it first. Several runs of one dataset can form a
+*group* (e.g. the Phase 6 ensemble's four configs): one favourite with one status and one slot,
+whose members are still run and journalled one by one (`summary.member_of`).
+
 Capped at 10 ordinary runs per dataset, oldest dropped first. Favourited and
 overlay runs are retained separately from that disposable comparison history:
 the weekly scheduler must be able to evaluate favourites, and an overlay is a
@@ -36,6 +44,25 @@ import duckdb
 
 PACKAGE = "momentum"
 MAX_RUNS_PER_DATASET = 10
+STATUSES = ("watching", "paper", "invested")
+FOLLOWED = ("paper", "invested")
+MAX_FOLLOWED = 8
+
+
+class FavouriteError(ValueError):
+    """A favourite change the rules refuse (HTTP 409); the message is shown to the owner."""
+
+
+def status_of(summary: dict[str, Any]) -> str | None:
+    """A run's favourite status. None for a non-favourite and for a group member (it follows its
+    group). Favourites saved before statuses existed read as Paper if they were the Telegram one,
+    Watching otherwise."""
+    if summary.get("member_of") or not summary.get("favorite", False):
+        return None
+    status = summary.get("status")
+    if status in STATUSES:
+        return status
+    return "paper" if summary.get("active", False) else "watching"
 
 
 def _strategy_id(dataset: str) -> str:
@@ -149,6 +176,9 @@ def _record(
         "overlay": summary["overlay"],
         "favorite": bool(summary.get("favorite", False)),
         "active": bool(summary.get("active", False)),
+        "status": status_of(summary),
+        "group": summary.get("group"),
+        "member_of": summary.get("member_of"),
     }
 
 
@@ -167,6 +197,82 @@ def list_runs(con: duckdb.DuckDBPyConnection, dataset: str) -> list[dict[str, An
     ]
 
 
+def _package_rows(con: duckdb.DuckDBPyConnection, flag: str) -> list[tuple[str, dict[str, Any]]]:
+    """Every run whose summary has `flag` ("favorite" or "active") set, parsed. Filtered in SQL:
+    a summary carries the run's whole weekly curve, so parsing every run would be wasted work."""
+    rows = con.execute(
+        "SELECT r.run_id, r.summary FROM backtest_runs r "
+        "JOIN strategy_versions v USING (version_id) "
+        "JOIN strategies s ON s.strategy_id = v.strategy_id "
+        "WHERE s.package = ? AND r.kind = 'weekly' "
+        f"AND COALESCE((r.summary ->> '{flag}')::BOOLEAN, FALSE) = TRUE",
+        [PACKAGE],
+    ).fetchall()
+    return [(run_id, json.loads(summary)) for run_id, summary in rows]
+
+
+def followed_count(
+    con: duckdb.DuckDBPyConnection, exclude: set[str] | frozenset = frozenset()
+) -> int:
+    """Paper + Invested favourites across every dataset; a group counts once, its members not."""
+    return sum(
+        1
+        for run_id, summary in _package_rows(con, "favorite")
+        if run_id not in exclude and status_of(summary) in FOLLOWED
+    )
+
+
+def _limit_message() -> str:
+    return f"{MAX_FOLLOWED} favourites are already Paper or Invested. Set one to Watching first."
+
+
+def _write_summaries(
+    con: duckdb.DuckDBPyConnection,
+    summaries: dict[str, dict[str, Any]],
+    statement: tuple[str, list] | None = None,
+) -> None:
+    """Write several summaries in one transaction, with `statement` (a new group's INSERT, a
+    deleted group's DELETE) run first in the same one; a new headline clears every other one."""
+    con.execute("BEGIN")
+    try:
+        if statement is not None:
+            con.execute(*statement)
+        if any(summary.get("active", False) for summary in summaries.values()):
+            # The Telegram job has exactly one source. Clear the global active flag, not
+            # merely this dataset's flag, before promoting this run.
+            for other_id, other in _package_rows(con, "active"):
+                if other_id not in summaries:
+                    other["active"] = False
+                    con.execute(
+                        "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
+                        [json.dumps(other, default=str), other_id],
+                    )
+        for run_id, summary in summaries.items():
+            con.execute(
+                "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
+                [json.dumps(summary, default=str), run_id],
+            )
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+
+
+def _load(
+    con: duckdb.DuckDBPyConnection, run_id: str
+) -> tuple[str, dict[str, Any], str, str] | None:
+    row = con.execute(
+        "SELECT v.spec, r.summary, strftime(r.created_at, '%Y-%m-%dT%H:%M:%S%z'), v.strategy_id "
+        "FROM backtest_runs r JOIN strategy_versions v USING (version_id) "
+        "WHERE r.run_id = ? AND r.kind = 'weekly'",
+        [run_id],
+    ).fetchone()
+    if row is None:
+        return None
+    spec, summary_json, created_at, strategy_id = row
+    return spec, json.loads(summary_json), created_at, strategy_id
+
+
 def update_run(
     con: duckdb.DuckDBPyConnection,
     run_id: str,
@@ -175,68 +281,135 @@ def update_run(
     overlay: bool | None = None,
     favorite: bool | None = None,
     active: bool | None = None,
+    status: str | None = None,
 ) -> dict[str, Any] | None:
-    row = con.execute(
-        "SELECT v.spec, r.summary, "
-        "strftime(r.created_at, '%Y-%m-%dT%H:%M:%S%z') "
-        "FROM backtest_runs r JOIN strategy_versions v USING (version_id) "
-        "WHERE r.run_id = ? AND r.kind = 'weekly'",
-        [run_id],
-    ).fetchone()
-    if row is None:
+    """Rename, overlay, or change a run's favourite state. `status` is one of `STATUSES`, or
+    "none" to stop following it; `favorite` is the older on/off switch (on = Watching).
+    `active` makes it the headline, which must be Paper or Invested (Watching is promoted to
+    Paper). Raises `FavouriteError` for a change the rules refuse."""
+    loaded = _load(con, run_id)
+    if loaded is None:
         return None
-    spec, summary_json, created_at = row
-    summary = json.loads(summary_json)
+    spec, summary, created_at, _ = loaded
+    before = status_of(summary)
+    favourite_change = favorite is not None or active is not None or status is not None
+    if favourite_change and summary.get("member_of"):
+        group = _load(con, summary["member_of"])
+        group_name = group[1].get("name", "its group") if group else "its group"
+        raise FavouriteError(
+            f"“{summary.get('name')}” is part of the group “{group_name}”: "
+            "change the group's status instead."
+        )
     if name is not None:
         summary["name"] = name
     if overlay is not None:
         summary["overlay"] = overlay
-    if favorite is not None:
-        summary["favorite"] = favorite
-        # An inactive favourite is valid; an active non-favourite is not.
-        if not favorite:
+    if favorite is not None and status is None:
+        status = ("watching" if before is None else before) if favorite else "none"
+    if status is not None:
+        if status == "none":
+            if summary.get("group"):
+                raise FavouriteError(
+                    "A group is always a favourite. Delete the group to stop following it "
+                    "(its runs are kept)."
+                )
+            summary["favorite"] = False
             summary["active"] = False
+            summary.pop("status", None)
+        elif status in STATUSES:
+            summary["favorite"] = True
+            summary["status"] = status
+            if status == "watching":
+                summary["active"] = False
+        else:
+            raise FavouriteError(f"Unknown status {status!r}.")
     if active is not None:
         summary["active"] = active
         if active:
             summary["favorite"] = True
-
-    con.execute("BEGIN")
-    try:
-        if summary.get("active", False):
-            # The Telegram job has exactly one source. Clear the global active
-            # flag, not merely this dataset's flag, before promoting this run.
-            active_rows = con.execute(
-                "SELECT r.run_id, r.summary FROM backtest_runs r "
-                "JOIN strategy_versions v USING (version_id) "
-                "JOIN strategies s ON s.strategy_id = v.strategy_id "
-                "WHERE s.package = ? AND r.kind = 'weekly' AND r.run_id <> ? "
-                "AND COALESCE((r.summary ->> 'active')::BOOLEAN, FALSE) = TRUE",
-                [PACKAGE, run_id],
-            ).fetchall()
-            for other_id, other_summary_json in active_rows:
-                other_summary = json.loads(other_summary_json)
-                other_summary["active"] = False
-                con.execute(
-                    "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
-                    [json.dumps(other_summary, default=str), other_id],
-                )
-        con.execute(
-            "UPDATE backtest_runs SET summary = ? WHERE run_id = ?",
-            [json.dumps(summary, default=str), run_id],
-        )
-        con.execute("COMMIT")
-    except Exception:
-        con.execute("ROLLBACK")
-        raise
+            if status_of(summary) not in FOLLOWED:
+                summary["status"] = "paper"
+    after = status_of(summary)
+    if (
+        after in FOLLOWED
+        and before not in FOLLOWED
+        and followed_count(con, {run_id}) >= MAX_FOLLOWED
+    ):
+        raise FavouriteError(_limit_message())
+    _write_summaries(con, {run_id: summary})
     return _record(run_id, json.loads(spec), summary, created_at)
 
 
-def list_favorites(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
+def create_group(
+    con: duckdb.DuckDBPyConnection, name: str, member_ids: list[str]
+) -> dict[str, Any]:
+    """Make several saved runs of one dataset into one favourite. Each member stays a favourite
+    (it is still run and journalled every Friday) but takes the group's status; the group takes
+    the highest status among them, and the headline if one of them had it."""
+    member_ids = list(dict.fromkeys(member_ids))
+    if len(member_ids) < 2:
+        raise FavouriteError("A group needs at least two saved runs.")
+    members: dict[str, dict[str, Any]] = {}
+    datasets = set()
+    for member_id in member_ids:
+        loaded = _load(con, member_id)
+        if loaded is None:
+            raise FavouriteError(f"Saved run {member_id} was not found.")
+        _, summary, _, strategy_id = loaded
+        if summary.get("group"):
+            raise FavouriteError(f"“{summary.get('name')}” is a group; groups cannot be nested.")
+        if summary.get("member_of"):
+            raise FavouriteError(f"“{summary.get('name')}” is already in a group.")
+        members[member_id] = summary
+        datasets.add(strategy_id.removeprefix("momentum:"))
+    if len(datasets) != 1:
+        raise FavouriteError("Every run in a group must be from the same dataset.")
+    dataset = datasets.pop()
+    statuses = [status_of(summary) for summary in members.values()]
+    status = next((s for s in reversed(STATUSES) if s in statuses), "watching")
+    headline = any(summary.get("active", False) for summary in members.values())
+    if status in FOLLOWED and followed_count(con, set(member_ids)) >= MAX_FOLLOWED:
+        raise FavouriteError(_limit_message())
+
+    config = {"dataset": dataset, "group": member_ids}
+    version_id = _ensure_version(con, dataset, config)
+    group_id = uuid.uuid4().hex
+    summary = {
+        "name": name,
+        "n": _next_n(con, dataset),
+        "kpis": {},
+        "dates": [],
+        "strategy": [],
+        "overlay": False,
+        "favorite": True,
+        "status": status,
+        "active": headline,
+        "group": member_ids,
+    }
+    insert = (
+        "INSERT INTO backtest_runs (run_id, version_id, kind, params, summary) "
+        "VALUES (?, ?, 'weekly', ?, ?)",
+        [group_id, version_id, json.dumps(config), json.dumps(summary, default=str)],
+    )
+    updates = {group_id: summary}
+    for member_id, member in members.items():
+        member.update({"favorite": True, "active": False, "member_of": group_id})
+        member.pop("status", None)
+        updates[member_id] = member
+    _write_summaries(con, updates, insert)
+    created_at = _load(con, group_id)[2]
+    return _record(group_id, config, summary, created_at)
+
+
+def list_favorites(
+    con: duckdb.DuckDBPyConnection, *, include_groups: bool = False
+) -> list[dict[str, Any]]:
     """Return all scheduled momentum strategies, with the active one first.
 
     This is intentionally cross-dataset: the weekly orchestrator owns the
     eligibility decision while the dashboard needs one consolidated list.
+    Groups are left out unless asked for: they have no config of their own to run, and their
+    members are listed (and run, and journalled) as ordinary favourites.
     """
     rows = con.execute(
         "SELECT r.run_id, v.spec, r.summary, "
@@ -248,15 +421,49 @@ def list_favorites(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
         "ORDER BY COALESCE((r.summary ->> 'active')::BOOLEAN, FALSE) DESC, r.created_at ASC",
         [PACKAGE],
     ).fetchall()
-    return [
+    records = [
         _record(run_id, json.loads(spec), json.loads(summary), created_at)
         for run_id, spec, summary, created_at in rows
+    ]
+    return records if include_groups else [record for record in records if not record["group"]]
+
+
+def list_groups(con: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
+    """Every group, each with its members' full records under `members`."""
+    favourites = list_favorites(con, include_groups=True)
+    by_id = {record["id"]: record for record in favourites}
+    return [
+        {**record, "members": [by_id[m] for m in record["group"] if m in by_id]}
+        for record in favourites
+        if record["group"]
     ]
 
 
 def delete_run(con: duckdb.DuckDBPyConnection, run_id: str) -> bool:
-    before = con.execute(
-        "SELECT count(*) FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id]
-    ).fetchone()[0]
-    con.execute("DELETE FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id])
-    return before > 0
+    """Delete a saved run. Deleting a group keeps its members, as Watching favourites; a member
+    cannot be deleted while its group exists."""
+    loaded = _load(con, run_id)
+    if loaded is None:
+        return False
+    summary = loaded[1]
+    if summary.get("member_of"):
+        group = _load(con, summary["member_of"])
+        group_name = group[1].get("name", "its group") if group else "its group"
+        raise FavouriteError(
+            f"“{summary.get('name')}” is part of the group “{group_name}”. "
+            "Delete the group first (its runs are kept)."
+        )
+    updates = {}
+    for member_id in summary.get("group") or []:
+        member = _load(con, member_id)
+        if member is not None:
+            member_summary = member[1]
+            member_summary.pop("member_of", None)
+            member_summary["favorite"] = True
+            member_summary["status"] = "watching"
+            updates[member_id] = member_summary
+    # One transaction: a group is never left pointing at runs that no longer name it.
+    _write_summaries(
+        con, updates, ("DELETE FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id])
+    )
+    return True

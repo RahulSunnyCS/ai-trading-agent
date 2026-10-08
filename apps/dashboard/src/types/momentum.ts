@@ -236,9 +236,20 @@ export interface MomentumSavedRun {
   overlay: boolean;
   /** Included in every scheduled weekly evaluation. */
   favorite: boolean;
-  /** The sole favourite whose result is delivered to Telegram. */
+  /** The headline (BL-051): the one followed favourite whose result is delivered to Telegram. */
   active: boolean;
+  /** Watching / Paper / Invested; null for a non-favourite and for a group member. */
+  status: FavouriteStatus | null;
+  /** A group (BL-051): the ids of the saved runs it is made of; null for an ordinary run. */
+  group: string[] | null;
+  /** The group this run belongs to, if any: it then follows the group's status. */
+  member_of: string | null;
+  /** `/favorite-strategies` only: a group's members' full records. */
+  members?: MomentumSavedRun[];
 }
+
+/** How closely a favourite is followed (BL-051). Paper + Invested together are capped. */
+export type FavouriteStatus = 'watching' | 'paper' | 'invested';
 
 export interface MomentumWeeklyRunResult {
   title: string;
@@ -251,6 +262,8 @@ export interface MomentumWeeklyRunResult {
     name: string;
     dataset: 'etf' | 'stock' | 'custom_index' | 'broad';
     active: boolean;
+    /** A favourite group's combined outcome (BL-051); its sleeves are listed separately. */
+    group?: boolean;
     blocked: string | null;
     title: string | null;
     body: string | null;

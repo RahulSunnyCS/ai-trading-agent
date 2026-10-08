@@ -200,6 +200,6 @@ describe('weeklyReadiness', () => {
     const r = weeklyReadiness(status, [favourite('ETF Core', 'etf', false)]);
     expect(r.activeName).toBeNull();
     expect(r.activeKnown).toBe(true);
-    expect(r.blockedReasons[0]).toMatch(/No favourite is marked Telegram-active/);
+    expect(r.blockedReasons[0]).toMatch(/No favourite is the headline/);
   });
 });

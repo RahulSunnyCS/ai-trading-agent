@@ -260,6 +260,20 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // BL-051: several saved runs of one dataset made into one favourite (e.g. the Phase 6
+  // ensemble's four configs). Registered before `:runId` routes; a static segment wins anyway.
+  fastify.post(
+    '/api/momentum/saved-runs/groups',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/saved-runs/groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
   fastify.patch(
     '/api/momentum/saved-runs/:runId',
     { bodyLimit: BODY_LIMIT_BYTES, schema: { params: RUN_ID_PARAMS, body: { type: 'object' } } },

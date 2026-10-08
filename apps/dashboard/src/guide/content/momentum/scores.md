@@ -43,7 +43,7 @@ Strongest first. The **Rank** is [Broad Momentum](glossary:broad-momentum)'s own
 [rank-sum](glossary:rank-sum) of the 1, 4, 13, 26 and 52-week returns) among the stocks scored
 here; **Δ wk** is the places gained or lost since last week. A stock needs 52 weeks of prices to
 have a rank. A blue edge marks the **buy zone** (rank 1 to top N) and a paler one the **hold
-zone** (up to the exit rank); the numbers come from your Telegram-active favourite, or are Broad
+zone** (up to the exit rank); the numbers come from your [headline](glossary:headline) favourite, or are Broad
 Momentum's defaults (10 and 20) when there is none, and the footer says which.
 
 | Control | What it does |
@@ -98,7 +98,7 @@ last weekly close is below the highest weekly close of the year.
 > score, where **lower is better**. Here **higher is better**; the rank column is the one where 1
 > is best.
 
-Names marked **Held** or **Candidate** come from the Telegram-active strategy's latest weekly
+Names marked **Held** or **Candidate** come from the headline favourite's latest weekly
 run: what it holds, and what it would buy if it had cash.
 
 ## The rotation map

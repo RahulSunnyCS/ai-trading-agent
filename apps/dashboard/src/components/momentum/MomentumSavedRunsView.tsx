@@ -1,8 +1,8 @@
 'use client';
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowDown, ArrowUp, ArrowUpDown, Star } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Layers } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePolledResource } from '../../hooks/usePolledResource';
 import { cn } from '../../lib/cn';
@@ -18,12 +18,26 @@ import {
   sortSavedRuns,
   toggleSelection,
 } from '../../lib/momentumCompare';
-import type { MomentumSavedRun, MomentumWeeklyStatus } from '../../types/momentum';
+import {
+  FAVOURITE_STATUSES,
+  MAX_FOLLOWED,
+  STATUS_HINT,
+  STATUS_LABEL,
+  type SavedRunFilter,
+  filterCounts,
+  followedCount,
+  groupOf,
+  isFollowed,
+  matchesFilter,
+} from '../../lib/momentumFavourites';
+import type { FavouriteStatus, MomentumSavedRun, MomentumWeeklyStatus } from '../../types/momentum';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input } from '../ui/Input';
+import { RadioMenu } from '../ui/RadioMenu';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { toast } from '../ui/Toast';
 import { MomentumCompare } from './MomentumCompare';
@@ -46,7 +60,17 @@ const LIMIT_MESSAGE = `Compare takes up to ${MAX_COMPARE} runs. Untick one to ad
 const OVERLAY_DISABLED_REASON =
   'Not available for this run: the Backtest chart never draws the first run in the saved list as an overlay (it treats it as the run being shown).';
 const TELEGRAM_CONFIRM =
-  "Send this strategy's weekly signal to Telegram from now on? The current active strategy stops being sent.";
+  'It goes first on This week and its weekly signal is the one sent to Telegram. The current headline stays a favourite with its status, but is no longer sent.';
+const GROUP_HINT =
+  'One favourite made of the ticked runs: one status and one of the 8 Paper + Invested places. Each run is still evaluated and journalled every Friday, and This week shows them as its sleeves.';
+
+const FILTERS: ReadonlyArray<{ value: SavedRunFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'favourites', label: 'Favourites' },
+  { value: 'invested', label: 'Invested' },
+  { value: 'paper', label: 'Paper' },
+  { value: 'watching', label: 'Watching' },
+];
 
 /** Custom Index and Broad Momentum price through the same bhavcopy-backed stock layer as
  * Stock mode (see weekly.py's A5 gate investigation), so they share the "stock" readiness
@@ -61,7 +85,7 @@ function readiness(
   run: MomentumSavedRun,
   status: MomentumWeeklyStatus | null,
 ): { ready: boolean; detail: string } | null {
-  if (!run.favorite || !status) return null;
+  if (!run.favorite || run.member_of || !status) return null;
   const item = status.datasets.find((d) => d.key === readinessKey(run.config.dataset));
   if (!item) return null;
   return {
@@ -116,8 +140,9 @@ export function MomentumSavedRunsView({
   loading = false,
   onRename,
   onToggleOverlay,
-  onToggleFavorite,
+  onSetStatus,
   onSetActive,
+  onCreateGroup,
   onRemove,
   onLoad,
 }: {
@@ -128,13 +153,18 @@ export function MomentumSavedRunsView({
   /** May return a promise; the view waits for it before confirming or reporting the rename. */
   onRename: (id: string, name: string) => void | Promise<void>;
   onToggleOverlay: (id: string, overlay: boolean) => void;
-  onToggleFavorite: (id: string, favorite: boolean) => void;
+  /** 'none' stops following the run. */
+  onSetStatus: (id: string, status: FavouriteStatus | 'none') => void;
   onSetActive: (id: string) => void;
+  /** Resolves true once the group exists (the parent shows any error above the table). */
+  onCreateGroup: (name: string, members: string[]) => Promise<boolean>;
   onRemove: (id: string) => void;
   onLoad: (run: MomentumSavedRun) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [filter, setFilter] = useState<SavedRunFilter>('all');
+  const [groupDraft, setGroupDraft] = useState<string | null>(null);
+  const [groupSaving, setGroupSaving] = useState(false);
   const [sortKey, setSortKey] = useState<SavedRunSortKey>('saved');
   const [direction, setDirection] = useState<SortDirection>('desc');
   const [selected, setSelected] = useState<string[]>([]);
@@ -154,15 +184,29 @@ export function MomentumSavedRunsView({
     `/api/momentum/meta?dataset=${dataset}`,
     { cache: true },
   );
+  // Every dataset's favourites: the Paper + Invested cap counts across all of them.
+  const favourites = usePolledResource<MomentumSavedRun[]>('/api/momentum/favorite-strategies', {
+    cache: true,
+  });
+  const refetchFavourites = favourites.refetch;
+  // A changed list (a status set, a group made) can move the cap; the first list is the one the
+  // hook has just fetched with, so skip it.
+  const seenRuns = useRef<MomentumSavedRun[] | null>(null);
+  useEffect(() => {
+    if (seenRuns.current !== null && seenRuns.current !== runs) refetchFavourites();
+    seenRuns.current = runs;
+  }, [runs, refetchFavourites]);
+  const followed = favourites.data ? followedCount(favourites.data) : null;
+  const atLimit = followed !== null && followed >= MAX_FOLLOWED;
+  const counts = useMemo(() => filterCounts(runs), [runs]);
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = runs.filter(
-      (run) =>
-        (!favouritesOnly || run.favorite) && (!needle || run.name.toLowerCase().includes(needle)),
+      (run) => matchesFilter(run, filter) && (!needle || run.name.toLowerCase().includes(needle)),
     );
     return sortSavedRuns(filtered, sortKey, direction);
-  }, [runs, query, favouritesOnly, sortKey, direction]);
+  }, [runs, query, filter, sortKey, direction]);
 
   // A removed run drops out of the comparison.
   const selectedIds = useMemo(
@@ -171,7 +215,26 @@ export function MomentumSavedRunsView({
   );
   const opened = runs.find((run) => run.id === openId) ?? null;
   const confirmRun = runs.find((run) => run.id === confirmActiveId) ?? null;
-  const currentActive = runs.find((run) => run.active) ?? null;
+  const currentActive =
+    favourites.data?.find((run) => run.active) ?? runs.find((run) => run.active) ?? null;
+  // Runs that can join a new group: ticked, not groups, not already in one.
+  const groupable = selectedIds.filter((id) => {
+    const run = runs.find((item) => item.id === id);
+    return run !== undefined && !run.group && !run.member_of;
+  });
+
+  async function createGroup(): Promise<void> {
+    const name = groupDraft?.trim();
+    if (!name || groupSaving) return;
+    setGroupSaving(true);
+    const ok = await onCreateGroup(name, groupable);
+    setGroupSaving(false);
+    if (ok) {
+      toast(`"${name}" is now one favourite of ${groupable.length} runs`);
+      setGroupDraft(null);
+      setSelected([]);
+    }
+  }
 
   // A rename is confirmed by the refreshed list carrying the new name. If the parent's call has
   // returned and the name is still the old one, the save failed (the parent shows its reason
@@ -275,7 +338,14 @@ export function MomentumSavedRunsView({
       <Card>
         <CardHeader
           title={`Saved runs · ${DATASET_NAMES[dataset]}`}
-          description={`${loading ? 'Loading the saved runs' : `${runs.length} runs`} for this dataset. Favourites run every weekly cycle; only the active favourite is sent to Telegram.`}
+          description={`${loading ? 'Loading the saved runs' : `${runs.length} runs`} for this dataset. Every favourite runs each Friday and is journalled; the headline is the one sent to Telegram.`}
+          actions={
+            followed !== null ? (
+              <Badge tone={atLimit ? 'warning' : 'neutral'}>
+                Paper + Invested {followed} of {MAX_FOLLOWED}
+              </Badge>
+            ) : null
+          }
         />
         {loading && runs.length === 0 ? (
           <MomentumListSkeleton rows={4} label="Loading saved runs" />
@@ -292,20 +362,32 @@ export function MomentumSavedRunsView({
                 onChange={(event) => setQuery(event.target.value)}
                 className="w-56"
               />
-              <label className="flex items-center gap-1.5 text-xs text-muted">
-                <input
-                  type="checkbox"
-                  className="accent-primary"
-                  checked={favouritesOnly}
-                  onChange={(event) => setFavouritesOnly(event.target.checked)}
-                />
-                Favourites only
-              </label>
+              <SegmentedControl
+                ariaLabel="Show"
+                size="sm"
+                value={filter}
+                onChange={setFilter}
+                options={FILTERS.map((item) => ({
+                  value: item.value,
+                  label: `${item.label} ${counts[item.value]}`,
+                }))}
+              />
               <span className="text-xs text-muted">
                 Showing {shown.length} of {runs.length}
               </span>
               <span className="ml-auto flex items-center gap-2 text-xs text-muted">
                 {selectedIds.length} of {MAX_COMPARE} ticked to compare
+                {groupable.length >= 2 ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    title={GROUP_HINT}
+                    onClick={() => setGroupDraft('')}
+                  >
+                    <Layers className="h-3.5 w-3.5" aria-hidden />
+                    Group as one favourite
+                  </Button>
+                ) : null}
                 {selectedIds.length > 0 ? (
                   <Button
                     size="sm"
@@ -340,7 +422,7 @@ export function MomentumSavedRunsView({
                       {...sortProps(metric.key)}
                     />
                   ))}
-                  <Th>Weekly signal</Th>
+                  <Th>Favourite</Th>
                   <Th>Overlay</Th>
                   <Th align="right">Actions</Th>
                 </THead>
@@ -351,6 +433,10 @@ export function MomentumSavedRunsView({
                     const overlayDisabled = runs.indexOf(run) === 0;
                     const ready = readiness(run, status ?? null);
                     const ticked = selectedIds.includes(run.id);
+                    const parent = groupOf(run, runs);
+                    const memberNames = run.group
+                      ? run.group.map((id) => runs.find((other) => other.id === id)?.name ?? id)
+                      : [];
                     return (
                       <TRow key={run.id} selected={ticked}>
                         <Td className="min-w-52 max-w-80">
@@ -360,6 +446,12 @@ export function MomentumSavedRunsView({
                               className="mt-1 accent-primary"
                               aria-label={`Compare ${run.name}`}
                               checked={ticked}
+                              disabled={run.group !== null}
+                              title={
+                                run.group
+                                  ? 'A group has no curve of its own to compare.'
+                                  : undefined
+                              }
                               onChange={() => toggleCompare(run.id)}
                             />
                             <div className="min-w-0 space-y-1">
@@ -387,10 +479,26 @@ export function MomentumSavedRunsView({
                                 onCommit={() => commitRename(run)}
                                 onCancel={() => setRename(null)}
                               />
-                              {run.active ? (
-                                <Badge tone="primary" dot>
-                                  Active
-                                </Badge>
+                              <div className="flex flex-wrap items-center gap-1">
+                                {run.active ? (
+                                  <Badge tone="primary" dot>
+                                    Headline
+                                  </Badge>
+                                ) : null}
+                                {run.group ? (
+                                  <span title={memberNames.join(', ')}>
+                                    <Badge tone="neutral">Group · {run.group.length} runs</Badge>
+                                  </span>
+                                ) : null}
+                                {parent ? <Badge tone="neutral">In {parent.name}</Badge> : null}
+                              </div>
+                              {run.group ? (
+                                <p
+                                  className="truncate text-xs text-muted"
+                                  title={memberNames.join(', ')}
+                                >
+                                  {memberNames.join(' · ')}
+                                </p>
                               ) : null}
                             </div>
                           </div>
@@ -427,30 +535,64 @@ export function MomentumSavedRunsView({
                         })}
                         <Td>
                           <div className="flex flex-col items-start gap-1">
-                            <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted">
-                              <input
-                                type="checkbox"
-                                className="accent-primary"
-                                aria-label={`Favourite ${run.name}`}
-                                checked={run.favorite}
-                                onChange={(event) => onToggleFavorite(run.id, event.target.checked)}
+                            {parent ? (
+                              <span className="whitespace-nowrap text-xs text-muted">
+                                Follows {parent.name}
+                              </span>
+                            ) : (
+                              <RadioMenu
+                                ariaLabel={`Favourite status of ${run.name}: ${run.status ? STATUS_LABEL[run.status] : 'not a favourite'}. Change it`}
+                                value={run.status ?? 'none'}
+                                valueLabel={
+                                  run.status ? STATUS_LABEL[run.status] : 'Not a favourite'
+                                }
+                                heading="Favourite status"
+                                options={[
+                                  {
+                                    value: 'none',
+                                    label: 'Not a favourite',
+                                    disabled: run.group !== null,
+                                    title: run.group
+                                      ? 'A group is always a favourite: remove the group instead.'
+                                      : undefined,
+                                  },
+                                  ...FAVOURITE_STATUSES.map((value) => {
+                                    const blocked =
+                                      atLimit && isFollowed(value) && !isFollowed(run.status);
+                                    return {
+                                      value,
+                                      label: STATUS_LABEL[value],
+                                      disabled: blocked,
+                                      title: blocked
+                                        ? `${MAX_FOLLOWED} favourites are already Paper or Invested. Set one to Watching first.`
+                                        : STATUS_HINT[value],
+                                    };
+                                  }),
+                                ]}
+                                footer={
+                                  followed !== null
+                                    ? `Paper + Invested: ${followed} of ${MAX_FOLLOWED}, across every dataset. Watching has no limit.`
+                                    : undefined
+                                }
+                                onChange={(value) =>
+                                  onSetStatus(run.id, value as FavouriteStatus | 'none')
+                                }
                               />
-                              <Star className="h-3.5 w-3.5" aria-hidden />
-                              Favourite
-                            </label>
+                            )}
                             {run.active ? (
                               <span className="whitespace-nowrap text-xs font-medium text-primary">
                                 Sent to Telegram
                               </span>
-                            ) : run.favorite ? (
+                            ) : run.favorite && !parent ? (
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 px-1.5"
-                                aria-label={`Use ${run.name} for Telegram`}
+                                className="h-6 whitespace-nowrap px-1.5"
+                                aria-label={`Make ${run.name} the headline`}
+                                disabled={atLimit && !isFollowed(run.status)}
                                 onClick={() => setConfirmActiveId(run.id)}
                               >
-                                Make Telegram active
+                                Make headline
                               </Button>
                             ) : null}
                             {ready ? (
@@ -464,28 +606,32 @@ export function MomentumSavedRunsView({
                           </div>
                         </Td>
                         <Td>
-                          <span className="flex items-center gap-1">
-                            <label
-                              className="flex items-center gap-1.5 text-xs text-muted"
-                              title={overlayDisabled ? OVERLAY_DISABLED_REASON : undefined}
-                            >
-                              <input
-                                type="checkbox"
-                                className="accent-primary"
-                                aria-label={`Overlay ${run.name}`}
-                                checked={run.overlay}
-                                disabled={overlayDisabled}
-                                onChange={(event) => onToggleOverlay(run.id, event.target.checked)}
-                              />
-                              <span className="sr-only">Overlay on the Backtest chart</span>
-                            </label>
-                            {overlayDisabled ? (
-                              <InfoTooltip
-                                text={OVERLAY_DISABLED_REASON}
-                                label={`Why ${run.name} cannot be overlaid`}
-                              />
-                            ) : null}
-                          </span>
+                          {run.group ? null : (
+                            <span className="flex items-center gap-1">
+                              <label
+                                className="flex items-center gap-1.5 text-xs text-muted"
+                                title={overlayDisabled ? OVERLAY_DISABLED_REASON : undefined}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="accent-primary"
+                                  aria-label={`Overlay ${run.name}`}
+                                  checked={run.overlay}
+                                  disabled={overlayDisabled}
+                                  onChange={(event) =>
+                                    onToggleOverlay(run.id, event.target.checked)
+                                  }
+                                />
+                                <span className="sr-only">Overlay on the Backtest chart</span>
+                              </label>
+                              {overlayDisabled ? (
+                                <InfoTooltip
+                                  text={OVERLAY_DISABLED_REASON}
+                                  label={`Why ${run.name} cannot be overlaid`}
+                                />
+                              ) : null}
+                            </span>
+                          )}
                         </Td>
                         <Td align="right">
                           <div className="flex justify-end gap-1.5 whitespace-nowrap">
@@ -499,7 +645,7 @@ export function MomentumSavedRunsView({
                                     setRemoveId(null);
                                   }}
                                 >
-                                  Confirm remove
+                                  {run.group ? 'Remove group (keeps its runs)' : 'Confirm remove'}
                                 </Button>
                                 <Button size="sm" variant="ghost" onClick={() => setRemoveId(null)}>
                                   Cancel
@@ -507,16 +653,24 @@ export function MomentumSavedRunsView({
                               </>
                             ) : (
                               <>
-                                <Button
-                                  size="sm"
-                                  aria-label={`Open ${run.name}`}
-                                  onClick={() => setOpenId(run.id)}
-                                >
-                                  Open
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => loadSettings(run)}>
-                                  Load settings
-                                </Button>
+                                {run.group ? null : (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      aria-label={`Open ${run.name}`}
+                                      onClick={() => setOpenId(run.id)}
+                                    >
+                                      Open
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => loadSettings(run)}
+                                    >
+                                      Load settings
+                                    </Button>
+                                  </>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -535,8 +689,9 @@ export function MomentumSavedRunsView({
               </Table>
             )}
             <p className="mt-3 text-xs text-faint">
-              The Telegram-active run stays on top whatever the sort. Equity is each run&apos;s
-              stored weekly value over its own period ({EMPTY} when none was stored).
+              The headline stays on top whatever the sort. Paper + Invested are capped at{' '}
+              {MAX_FOLLOWED} across every dataset; a group takes one place. Equity is each
+              run&apos;s stored weekly value over its own period ({EMPTY} when none was stored).
             </p>
           </>
         )}
@@ -545,7 +700,7 @@ export function MomentumSavedRunsView({
       {runs.length > 0 ? (
         <Card>
           <MomentumCompare
-            runs={runs}
+            runs={runs.filter((run) => !run.group)}
             selectedIds={selectedIds}
             onSelectedIdsChange={setSelected}
             picker={false}
@@ -556,6 +711,58 @@ export function MomentumSavedRunsView({
       <SavedRunViewer run={opened} onClose={() => setOpenId(null)} onLoad={loadSettings} />
 
       <Dialog.Root
+        open={groupDraft !== null}
+        onOpenChange={(open) => (open ? undefined : setGroupDraft(null))}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(460px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-6 shadow-elevated">
+            <Dialog.Title className="text-base font-semibold tracking-tight text-foreground">
+              Group {groupable.length} runs as one favourite
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-muted">
+              {GROUP_HINT}
+            </Dialog.Description>
+            <ul className="mt-3 space-y-0.5 text-xs text-muted">
+              {groupable.map((id) => (
+                <li key={id} className="truncate">
+                  {runs.find((run) => run.id === id)?.name}
+                </li>
+              ))}
+            </ul>
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void createGroup();
+              }}
+            >
+              <Input
+                aria-label="Group name"
+                placeholder="e.g. Phase 6 ensemble"
+                maxLength={64}
+                value={groupDraft ?? ''}
+                onChange={(event) => setGroupDraft(event.target.value)}
+                autoFocus
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setGroupDraft(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={!groupDraft?.trim() || groupSaving}
+                >
+                  {groupSaving ? 'Grouping…' : 'Make group'}
+                </Button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root
         open={confirmRun !== null}
         onOpenChange={(open) => (open ? undefined : setConfirmActiveId(null))}
       >
@@ -563,15 +770,16 @@ export function MomentumSavedRunsView({
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(440px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-6 shadow-elevated">
             <Dialog.Title className="text-base font-semibold tracking-tight text-foreground">
-              Make “{confirmRun?.name}” the Telegram strategy?
+              Make “{confirmRun?.name}” the headline?
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-sm text-muted">
               {TELEGRAM_CONFIRM}
             </Dialog.Description>
             <p className="mt-2 text-xs text-muted">
               {currentActive
-                ? `Active now: ${currentActive.name}.`
-                : 'No strategy is active right now.'}
+                ? `Headline now: ${currentActive.name}.`
+                : 'There is no headline right now.'}
+              {confirmRun && !isFollowed(confirmRun.status) ? ' It becomes Paper.' : ''}
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setConfirmActiveId(null)}>

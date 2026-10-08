@@ -93,7 +93,9 @@ and still writes `data/launchd-weekly-<run>.log`, which `GET /api/weekly/status`
 `api._execute_weekly_run` (the same function the API route calls) — there is exactly one
 orchestration, not two copies that can drift.
 
-**A blocked or missing active favourite now sends a Telegram warning** (not silence) —
+**A blocked or missing active favourite now sends a Telegram warning** (not silence), except
+that a stock-based headline (Stock, Custom Index, Broad) is not reported as blocked by the 14:40
+preview or 16:45 final, which cannot evaluate it: the 19:30 rerun sends it (BL-051) —
 previously a favourite that failed (e.g. the tax-config bug below) meant the job computed a
 signal, found no usable active result, and exited 0 with nothing sent and no alert, for every
 run, for over a week, before anyone noticed.
@@ -481,8 +483,17 @@ contract, not a shared service).
   series, overlay/favourite/active flags) lives in `backtest_runs.summary` JSON, not
   `backtest_days`/`backtest_trades` — those are shaped for day-by-day option
   trades, not a momentum run's weekly curve. Ordinary history is capped at 10 runs/dataset and
-  pruned oldest-first; favourites are never pruned. Exactly one favourite can be globally active
-  for Telegram. `api.py`'s `/api/saved-runs` routes call this;
+  pruned oldest-first; favourites are never pruned. **Favourite status (BL-051):** Watching /
+  Paper / Invested (`status_of`; older favourites read as Watching, or Paper if active), Paper +
+  Invested capped at `MAX_FOLLOWED` = 8 (`FavouriteError` → HTTP 409). Exactly one followed
+  favourite is the *headline*, still stored and returned as `active` so every reader keeps
+  working: Telegram sends it. A **group** (`create_group`, `POST /api/saved-runs/groups`) is one
+  favourite made of several runs of one dataset (the Phase 6 ensemble's four sleeves): one status,
+  one slot; its members stay favourites with `member_of` set, so they are still run and
+  journalled one by one. `list_favorites` leaves groups out (they have no config to run);
+  `list_groups` returns them with their members; `/api/favorite-strategies` returns both.
+  `groups.py` combines the members' signals into the group's (sleeves weighted by value since the
+  last April reset, `choose.ensemble_curve`'s convention) and its one Telegram message. `api.py`'s `/api/saved-runs` routes call this;
   the Fastify proxy (`apps/server/src/server/routes/momentum-backtest.ts`)
   forwards `/api/momentum/saved-runs*` to it unchanged.
 
