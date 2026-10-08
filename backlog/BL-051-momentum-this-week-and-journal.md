@@ -138,7 +138,10 @@ Each phase is one PR, reviewed and merged before the next.
     message above. Migration: today's active favourite → headline + Paper; other favourites →
     Watching.
   - **Groups**: a saved run of kind `group` holding member run IDs; members inherit its status and
-    use no slot of their own. `weekly.py` runs each member, records one journal entry per member
+    use no slot of their own. `weekly.py` runs a favourite (or sleeve) only on its own rebalance
+    weeks (`rebalance_every` / `rebalance_offset`); on other Fridays it records a "no rebalance
+    this week" journal entry with the holdings carried over, and the journal check expects that
+    entry instead of a full one. On its weeks it runs each member, records one journal entry per member
     (unchanged), and builds the group's combined target from each sleeve's current value (the
     `ensemble_curve` convention). One Telegram message for a group headline: sleeves trading this
     week, combined sells / buys, holds. Create the "Phase 6 ensemble" group from the four frozen
@@ -231,21 +234,28 @@ Each phase is one PR, reviewed and merged before the next.
 - **Catalog writes from several jobs** (DuckDB single writer): the 14:15 job writes holdings and
   orders while the dashboard reads; use the cross-process lock planned in BL-047 or short write
   transactions with retry.
-- **Paper stage.** Until money goes in, the owner's Fyers account does not hold the strategy;
-  orders against it would be meaningless (open question 1).
+- **Paper stage.** Until money goes in, the owner's Fyers account does not hold the strategy, so
+  Your orders runs against the journal's paper portfolio (owner, 2026-10-08), with a switch to
+  the real holdings.
+- **Off-week journal entries** change BL-024's "every favourite every Friday" record: the entry
+  still exists every Friday, but off weeks carry the holdings rather than re-run the strategy.
+  The tamper chain and the 21:00 check must treat both kinds.
 
 ## Open questions
 
-Pending, decided when the item is picked up (per the backlog rules).
+Answered by the owner on 2026-10-08 (see the Log):
 
-1. While the stage is `paper`, should Your orders run against the real Fyers holdings (only
-   meaningful once invested) or against the paper portfolio from the journal? **Proposed:** the
-   paper portfolio until the first Invested favourite exists, with a switch.
-2. Minimum trade default: 1% of the portfolio? Also a rupee floor?
-3. Should the 14:15 orders go to Telegram, or only to the dashboard?
+1. ~~Paper stage: real holdings or the paper portfolio?~~ **The journal's paper portfolio** until the
+   first Invested favourite exists, with a switch to the real Fyers holdings.
+2. Minimum trade default: 1% of the portfolio? Explained to the owner on 2026-10-08; awaiting a
+   yes or another number. It only affects small top-ups and trims: full exits and new buys always
+   go through.
+3. ~~14:15 orders on Telegram?~~ **Yes**, a short "Your orders" message as well as the dashboard.
 4. Fyers basket format: confirmed when Phase 4 starts.
-5. Should Watching favourites keep running every Friday (cost of the Broad runs at 19:30), or only
-   Paper and Invested?
+5. ~~Do Watching favourites run every Friday?~~ **Every favourite runs on its own rebalance weeks
+   only**: a 4-week config (or sleeve) runs once every 4 weeks, on its phase. On its other Fridays
+   nothing is run; its holdings carry over and the journal records a cheap "no rebalance this week"
+   entry (holdings carried, no backtest), so the 21:00 check does not report it missing.
 
 ## Log
 
@@ -259,3 +269,6 @@ Pending, decided when the item is picked up (per the backlog rules).
   proposed by Claude: a group counts as one favourite; Your orders only for the headline; the
   `business.md` Fyers line is updated when holdings are read.
 - 2026-10-08 — supersedes BL-003 (Phase 2) and BL-027 (Phase 4).
+- 2026-10-08 — owner answered: paper portfolio for Your orders until something is Invested; the
+  14:15 orders also go to Telegram; every favourite runs only on its own rebalance weeks (a 4-week
+  config every 4 weeks). The minimum-trade default is still open.
