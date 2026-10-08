@@ -65,7 +65,7 @@ use sample data on a future Friday (4 Dec 2026, paper week 9 of 13).
   exactly as sent, with Re-send.
 - **Your orders** (lower half, headline only): holdings **synced read-only from Fyers** and stored
   per **owner ID** (only `rahul` for now; friends later), totals (value, sells, buys, cash after,
-  estimated costs, not traded), a **minimum trade** (default 1% of the portfolio), orders in whole
+  estimated costs, not traded), a **minimum trade** (default ₹10,000, a per-owner setting), orders in whole
   shares (full exits, trims, buys), SKIP rows with the cost they would have paid, blocked names
   (unclassified split) held, a **Fyers basket file** and **I placed these** (fills stored next to
   the journal entry).
@@ -184,7 +184,8 @@ Each phase is one PR, reviewed and merged before the next.
   - `fyers.holdings(creds)` (read-only); sync on demand and in the job; paste / CSV fallback when
     the token is missing or expired.
   - Orders engine on top of `rebalance.build_plan`: holdings in shares, whole shares rounded down,
-    full exits then trims then buys, minimum trade (1% default), less-than-one-share skips,
+    full exits then trims then buys, minimum trade (₹10,000 default, stored per owner in a
+    `momentum_owner_settings` row and editable on the Your orders section), less-than-one-share skips,
     blocked names held, costs from the engine's itemised cost model.
   - Scheduler job `momentum-orders` Fri 14:15: sync holdings, compute the headline's orders on live
     prices (Broad included), store them, Telegram a short "Your orders" summary; alert if the Fyers
@@ -247,8 +248,8 @@ Answered by the owner on 2026-10-08 (see the Log):
 
 1. ~~Paper stage: real holdings or the paper portfolio?~~ **The journal's paper portfolio** until the
    first Invested favourite exists, with a switch to the real Fyers holdings.
-2. Minimum trade default: 1% of the portfolio? Explained to the owner on 2026-10-08; awaiting a
-   yes or another number. It only affects small top-ups and trims: full exits and new buys always
+2. ~~Minimum trade default?~~ **₹10,000**, configurable: a per-owner setting edited on the Your
+   orders section. Top-ups and trims smaller than that are skipped; full exits and new buys always
    go through.
 3. ~~14:15 orders on Telegram?~~ **Yes**, a short "Your orders" message as well as the dashboard.
 4. Fyers basket format: confirmed when Phase 4 starts.
@@ -271,4 +272,5 @@ Answered by the owner on 2026-10-08 (see the Log):
 - 2026-10-08 — supersedes BL-003 (Phase 2) and BL-027 (Phase 4).
 - 2026-10-08 — owner answered: paper portfolio for Your orders until something is Invested; the
   14:15 orders also go to Telegram; every favourite runs only on its own rebalance weeks (a 4-week
-  config every 4 weeks). The minimum-trade default is still open.
+  config every 4 weeks).
+- 2026-10-08 — owner: minimum trade ₹10,000 by default, configurable.
