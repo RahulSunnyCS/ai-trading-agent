@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the owner wants a drawdown rule before real money goes in, and the top configs trade only every 4 weeks |
-| **Status** | In progress |
+| **Status** | Done — killed: no cell passes |
 | **Type** | research (+ an opt-in engine feature) |
 | **Area** | momentum |
 | **Created** | 2026-10-08 |
@@ -73,6 +73,41 @@ The binding rule is `packages/momentum-backtesting/search_spaces/bl053_criteria.
   strategies, applies the rule and writes `data/search/round7_A/bl053/report.md`.
 - **Done when:** the verdict is recorded here and in `bl053_result.json`.
 
+## Result (2026-10-08): killed, 0 of 30 cells pass
+
+`search_spaces/bl053_result.json`; per cell `data/search/round7_A/bl053/cells.csv`, per strategy
+`metrics.csv`. Pre-tax, Rs 2 lakh, point in time, 2017-01 to 2026-10.
+
+Baseline medians over the 11 strategies: CAGR 40.2%, worst fall -27.1%, Ulcer 9.2%, third-worst
+FY 12.8 points ahead of Nifty200 Momentum 30 TRI. Changes below are medians, in points.
+
+| Stop | Sell | Less pain (of 11) | CAGR | Worst fall (+ = shallower) | Ulcer | 3rd-worst FY |
+|---|---|---|---|---|---|---|
+| Owner's rule: 20% below buy or 30% below peak, cash | same Friday | 1 | -0.5 | 0.0 | +0.6 | 12.5 |
+| | next Friday | 1 | -0.8 | -0.4 | +0.5 | 12.0 |
+| 20% below buy only | same / next | 4 / 3 | +0.2 / -0.2 | +0.2 / +0.1 | +0.1 / 0.0 | 14.6 / 12.7 |
+| 25% below buy only | same / next | 7 / 3 | +0.3 / 0.0 | +0.2 / 0.0 | -0.1 / 0.0 | 13.4 / 12.8 |
+| 30% below peak only | same / next | 1 / 1 | -0.2 / -0.8 | 0.0 / -0.4 | +0.5 / +0.4 | 12.2 / 12.6 |
+| 25% below peak only | same / next | 1 / 6 | -0.8 / -0.9 | +0.8 / +1.4 | +0.2 / 0.0 | 12.4 / 12.6 |
+| 20% below peak only | same / next | 4 / 4 | -1.7 / -1.6 | +3.1 / +1.4 | +0.2 / 0.0 | 11.8 / 12.7 |
+
+- No cell makes both the worst fall and the Ulcer index better in 7 of 11 strategies at both
+  fill timings. The nearest miss, 25% below the buy price, passes only when selling at the same
+  Friday close (7 of 11) and fails at the next (3 of 11).
+- Stops are cheap (58 of 60 cell-timings cost under 2 points of CAGR) but do not reduce pain:
+  Ulcer moves by at most half a point either way on a 9.2% baseline. Tight peak stops (20%) make
+  the single worst fall 1.4-3.1 points shallower and cost about 1.6 points of CAGR.
+- Cash or top stock makes little difference.
+- The frozen ensemble (8-12 holdings, deeper falls) is where the owner's rule looks best: same
+  Friday +0.8 CAGR and a 5.2-point shallower worst fall; next Friday 0.0 and 1.0. The gap between
+  the two timings says it catches one fall a few days early rather than working throughout.
+- Why: the rank exit already sells most collapsing stocks at the next rebalance, and a stop mostly
+  sells momentum names in a dip that the strategy buys back. Consistent with the 2026-10-01 alpha
+  study, where selling on rank between rebalances cut a 4-week config from 37% to 22%.
+
+Not adopted. The engine stop stays, off by default, for anyone who wants it as a behavioural
+safety net; nothing in the API or the weekly signal sets it.
+
 ## Risks
 
 - Thirty cells is a search: some can pass by chance. The 10-of-30 rule guards against reading
@@ -83,3 +118,11 @@ The binding rule is `packages/momentum-backtesting/search_spaces/bl053_criteria.
 
 - 2026-10-08 — created and started; owner accepted the grid, the pass rule, Monday-open timing
   (bracketed as above) and this branch. Phase 0 committed before any run.
+- 2026-10-08 — grid run (14 runs x 61 cells, about 70 minutes on 4 workers); verdict kill, 0 of 30.
+  Monday-open replay of the ensemble (report only; no cell passed, so the owner's rule was added
+  as an extra): each sleeve's stop run repriced at the next open, against its baseline repriced
+  the same way. CAGR / worst fall, no stop -> with the owner's 20%/30% rule:
+  `1281e8ed` 34.3% / -27.9% -> 35.7% / -25.2%; `08c4307d` 36.1% / -37.5% -> 36.3% / -36.9%;
+  `535b17b4` 32.7% / -34.7% -> 30.8% / -36.6%; `bad83df3` 29.5% / -28.9% -> 30.1% / -28.4%.
+  Average CAGR change +0.1 points, two sleeves better and one clearly worse: neutral, as the
+  grid found. Bundles and studies in `data/search/round7_A/bl053/monday/`.

@@ -307,6 +307,14 @@ contract, not a shared service).
   buffer/fixed-slots portfolio rules, hysteresis (`top_n`/`exit_rank`). Every
   dataset mode (ETF, Stock, Custom Index, Broad Momentum) ultimately calls
   into this — see its own docstrings before adding a new portfolio rule.
+- **Weekly stop-loss (BL-053):** `engine.Config.stop_from_buy` / `stop_from_peak` (fractions,
+  None = off), `stop_proceeds` (`cash` waits for the next rebalance, `top` buys
+  `_Sim.best_unheld`, the best buyable unheld name down to `exit_rank`) and `stop_delay` (0 sells
+  at the close the fall is seen on, 1 a week later). Buffer rule only, checked every week before
+  the rank exits, blocked by a lower-circuit lock; a stopped name is not re-bought that week.
+  `run_broad_backtest` takes the same four arguments; nothing in the API or the weekly signal
+  sets them. Pre-registered test: `search_spaces/bl053_criteria.json`,
+  `scripts/bl053_stop_loss.py`.
 - `categories/broad.py` — Broad Momentum's category-selection funnel
   (`compute_universe_ranking`, `compute_category_selection*`,
   `run_broad_backtest`) — a pure, no-P&L ranking layer that feeds `engine.py`
