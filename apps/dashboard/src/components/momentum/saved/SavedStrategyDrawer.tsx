@@ -358,10 +358,11 @@ function DrawerBody({
           </Section>
 
           <Section title="Run history" meta="the list shows the latest; earlier results stay here">
+            {/* One line per run, like every table here. */}
             {detail.loading && !detail.data ? (
               <p className="text-xs text-muted">Loading the runs…</p>
             ) : (
-              <Table>
+              <Table className="[&_td]:whitespace-nowrap">
                 <THead>
                   <Th>Ran</Th>
                   <Th align="right">CAGR</Th>

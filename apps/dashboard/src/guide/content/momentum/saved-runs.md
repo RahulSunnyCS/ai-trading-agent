@@ -15,8 +15,8 @@ and choose which ones the Friday signal follows.
 | ★ | A star makes it a favourite (Watching). Its status is then set on the right. |
 | Strategy | Its name: the one you typed, or one made from what differs from the dataset's defaults ("Broad · Tradability filter Off"). **Headline** marks the one sent to Telegram; **Group** a group of strategies. |
 | Runs | How many times these settings were run (×3). Repeats with the same result add no row. |
-| CAGR · vs bench · Max DD · Sharpe | The latest run's numbers. A group shows its members' CAGR range. |
-| Trust | How far the result can be trusted: [Validated, In-sample, Not tradable, Old data](glossary:strategy-trust). **moved** when the latest run changed the result. |
+| CAGR · Edge · Max DD · Sharpe | The latest run's numbers (Edge: CAGR over the benchmark, in points). A group shows its members' CAGR range. |
+| Trust | How far the result can be trusted: [Validated, In-sample, Not tradable, Old data](glossary:strategy-trust). **↻** with the CAGR move, in points, when the latest run changed the result. |
 | Status | Not a favourite, Watching, Paper or Invested. **Blocked this week** when its data is not ready. |
 | Last run | When it was last run. |
 

@@ -172,7 +172,7 @@ test('Saved runs shows one row per strategy, its status, and groups strategies',
 
   await expect(page.getByText('3 strategies · 5 runs · all datasets')).toBeVisible();
   await expect(page.getByText('Paper + Invested 0 of 8')).toBeVisible();
-  await expect(page.getByText('moved -0.4 pp')).toBeVisible();
+  await expect(page.getByText('↻ -0.4')).toBeVisible();
 
   await page.getByRole('button', { name: /Favourite status of Sleeve one/ }).click();
   await page.getByRole('menuitemradio', { name: 'Paper' }).click();
@@ -196,7 +196,7 @@ test('the drawer says why a result moved and marks it reviewed', async ({ page }
   await expect(page).toHaveURL(/[?&]strategy=a1/);
   const drawer = page.getByRole('dialog');
   await expect(drawer.getByText('Run history')).toBeVisible();
-  await expect(drawer.getByText('-0.4 pp · Check')).toBeVisible();
+  await expect(drawer.getByText('-0.4 pp · Check', { exact: true })).toBeVisible();
   await expect(
     drawer.getByText(/no accepted golden change of this dataset explains it/),
   ).toBeVisible();

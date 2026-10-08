@@ -102,7 +102,8 @@ const SECTIONS: Array<{ id: MomentumSection; label: string; description: string 
   {
     id: 'saved',
     label: 'Saved runs',
-    description: 'Review and compare saved backtests for the selected dataset.',
+    description:
+      'Every saved backtest, one row per strategy across all datasets: how far each can be trusted, whether its result moved, and which ones you follow.',
   },
   {
     id: 'week',

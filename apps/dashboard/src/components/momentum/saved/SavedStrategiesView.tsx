@@ -86,7 +86,7 @@ const STATUS_FILTERS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
 ];
 const METRICS: ReadonlyArray<{ key: SavedRunSortKey; label: string }> = [
   { key: 'cagr', label: 'CAGR' },
-  { key: 'excess_cagr', label: 'vs bench' },
+  { key: 'excess_cagr', label: 'Edge' },
   { key: 'max_drawdown', label: 'Max DD' },
   { key: 'sharpe', label: 'Sharpe' },
 ];
@@ -125,6 +125,7 @@ function SortHeader({
   const Icon = !active ? ArrowUpDown : direction === 'asc' ? ArrowUp : ArrowDown;
   return (
     <Th
+      dense
       align={align}
       aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
@@ -409,7 +410,7 @@ export function SavedStrategiesView({
           )}
         </Td>
         <Td
-          className={cn('max-w-[26rem]', member && 'pl-8')}
+          className={cn('max-w-[16rem]', member && 'pl-8')}
           title={strategy.notes ? `${name}\n${strategy.notes}` : name}
         >
           <span className="flex items-center gap-1.5">
@@ -422,10 +423,13 @@ export function SavedStrategiesView({
               </Badge>
             ) : null}
             {isGroup ? <Badge tone="neutral">Group · {strategy.group?.length}</Badge> : null}
+            {strategy.name_typed || isGroup ? (
+              // An automatic name starts with its dataset; a typed one says it here.
+              <span className="shrink-0 text-xs text-faint">
+                {DATASET_SHORT[strategy.dataset] ?? strategy.dataset}
+              </span>
+            ) : null}
           </span>
-        </Td>
-        <Td className="text-xs text-muted">
-          {DATASET_SHORT[strategy.dataset] ?? strategy.dataset}
         </Td>
         <Td
           align="right"
@@ -435,12 +439,12 @@ export function SavedStrategiesView({
         >
           {isGroup ? EMPTY : `×${strategy.runs}`}
         </Td>
-        <Td>
+        <Td dense className="whitespace-nowrap">
           {isGroup ? null : <SavedRunSparkline values={strategy.latest.strategy} name={name} />}
         </Td>
-        <Td align="right" numeric>
+        <Td dense align="right" numeric>
           {isGroup && memberCagrs.length
-            ? `${formatPct(Math.min(...memberCagrs))}–${formatPct(Math.max(...memberCagrs))}`
+            ? `${formatPct(Math.min(...memberCagrs), 0)}–${formatPct(Math.max(...memberCagrs), 0)}`
             : formatPct(kpis.cagr)}
         </Td>
         <Td
@@ -450,13 +454,13 @@ export function SavedStrategiesView({
         >
           {isGroup ? EMPTY : formatPp(kpis.excess_cagr)}
         </Td>
-        <Td align="right" numeric className="text-negative">
+        <Td dense align="right" numeric className="text-negative">
           {isGroup ? EMPTY : formatPct(kpis.max_drawdown)}
         </Td>
-        <Td align="right" numeric>
+        <Td dense align="right" numeric>
           {isGroup ? EMPTY : formatNumber(kpis.sharpe, 2)}
         </Td>
-        <Td>
+        <Td dense className="whitespace-nowrap">
           <span className="flex items-center gap-1">
             {trust ? (
               <span title={trust.hint}>
@@ -464,13 +468,18 @@ export function SavedStrategiesView({
               </span>
             ) : null}
             {change && strategy.change ? (
-              <span title={change.hint}>
-                <Badge tone={change.tone}>moved {formatPp(cagrMove(strategy.change))}</Badge>
+              <span
+                title={`Result moved ${formatPp(cagrMove(strategy.change))} CAGR on its latest run: ${change.label}. ${change.hint}`}
+              >
+                <Badge tone={change.tone}>
+                  ↻{' '}
+                  {formatNumber((cagrMove(strategy.change) ?? Number.NaN) * 100, 1, { sign: true })}
+                </Badge>
               </span>
             ) : null}
           </span>
         </Td>
-        <Td onClick={(event) => event.stopPropagation()}>
+        <Td dense onClick={(event) => event.stopPropagation()}>
           {member ? (
             <span className="text-xs text-faint">follows the group</span>
           ) : strategy.favorite ? (
@@ -495,7 +504,7 @@ export function SavedStrategiesView({
             <span className="text-xs text-faint">☆ to follow</span>
           )}
         </Td>
-        <Td className="text-xs text-muted" title={formatIstDateTimeShort(strategy.last_run)}>
+        <Td dense className="text-xs text-muted" title={formatIstDateTimeShort(strategy.last_run)}>
           {formatIstDate(strategy.last_run)}
         </Td>
       </TRow>
@@ -508,7 +517,7 @@ export function SavedStrategiesView({
       <Fragment key={title}>
         <tr>
           <td
-            colSpan={13}
+            colSpan={12}
             className="border-b border-border px-3 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-faint"
           >
             {title}
@@ -545,9 +554,10 @@ export function SavedStrategiesView({
       {merge.data && merge.data.merges.length > 0 ? (
         <Card className="flex flex-wrap items-center gap-3 border-info/40">
           <span className="text-sm">
-            {merge.data.runs} saved runs from before strategies existed share their settings: fold
-            them into {merge.data.strategies} strategies. Nothing is deleted; each run stays in its
-            strategy&apos;s history.
+            {merge.data.runs} saved runs share their settings but are not yet under one strategy
+            (saved by older code): fold them into{' '}
+            {merge.data.strategies === 1 ? 'one strategy' : `${merge.data.strategies} strategies`}.
+            Nothing is deleted; each run stays in its strategy&apos;s history.
           </span>
           <span className="grow" />
           <Button size="sm" variant="primary" onClick={() => void applyMerge()}>
@@ -556,7 +566,8 @@ export function SavedStrategiesView({
         </Card>
       ) : null}
 
-      <Card className="p-0">
+      {/* Rows are one line (the analytics table rule): long names are cut, full text on hover. */}
+      <Card className="p-0 [&_td]:whitespace-nowrap">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold text-foreground">Strategies</h2>
           <span className="text-xs text-faint">
@@ -619,16 +630,17 @@ export function SavedStrategiesView({
         ) : (
           <Table stickyFirstCol>
             <THead>
-              <Th>
+              <Th dense>
                 <span className="sr-only">Compare</span>
               </Th>
-              <Th>
+              <Th dense>
                 <span className="sr-only">Favourite</span>
               </Th>
               <SortHeader label="Strategy" {...sortProps('name')} />
-              <Th>Dataset</Th>
-              <Th align="right">Runs</Th>
-              <Th>Equity</Th>
+              <Th dense align="right">
+                Runs
+              </Th>
+              <Th dense>Equity</Th>
               {METRICS.map((metric) => (
                 <SortHeader
                   key={metric.key}
@@ -637,8 +649,8 @@ export function SavedStrategiesView({
                   {...sortProps(metric.key)}
                 />
               ))}
-              <Th>Trust</Th>
-              <Th>Status</Th>
+              <Th dense>Trust</Th>
+              <Th dense>Status</Th>
               <SortHeader label="Last run" {...sortProps('saved')} />
             </THead>
             <tbody>
