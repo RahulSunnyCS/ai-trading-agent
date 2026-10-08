@@ -447,3 +447,61 @@ def test_no_catalog_yet_is_an_empty_list_not_an_error(client, tmp_path, monkeypa
     body = client.get("/api/alerts")
     assert body.status_code == 200
     assert body.json()["alerts"] == []
+
+
+def test_a_symbol_with_an_ampersand_is_encoded_in_the_link():
+    snapshot = {
+        "items": [
+            {"symbol": "M&M", "ex_date": "2026-10-07", "previous_close": 200.0, "close": 100.0}
+        ]
+    }
+    (alert,) = alerts.split_alerts(snapshot)
+    assert alert["link"] == "/momentum/week?review=M%26M"
+
+
+def test_a_rules_finding_that_cannot_be_read_is_skipped_not_fatal():
+    report = {
+        "week": FRIDAY,
+        "findings": [
+            {"rule": "drawdown", "level": "breach", "title": "Cut half", "needs_you": True},
+            {"rule": "trailing", "needs_you": True},
+            "not a finding",
+        ],
+    }
+    (alert,) = alerts.rules_alerts(report)
+    assert alert["title"] == "Cut half" and "Your action" not in alert["detail"]
+
+
+def test_a_poll_that_changes_nothing_does_not_rewrite_the_state_file(tmp_path, monkeypatch):
+    kwargs = {
+        "now": at(FRIDAY, 12),
+        "catalog": lambda: (_ for _ in ()).throw(FileNotFoundError()),
+        "weekly_status": lambda today: {"datasets": [], "target_week": FRIDAY},
+        "live_rules_report": lambda: None,
+        "state_dir": tmp_path,
+    }
+    alerts.collect(**kwargs)
+    saves = []
+    real = alerts._save_state
+    monkeypatch.setattr(alerts, "_save_state", lambda *args: saves.append(args) or real(*args))
+    alerts.collect(**kwargs)
+    assert saves == []
+
+
+def test_a_resolved_alert_is_listed_as_cleared_only_for_two_days(tmp_path):
+    state = {
+        "open": {},
+        "resolved": [
+            {"id": "old", "kind": "rules", "resolved_at": at("2026-10-01", 9).isoformat()},
+            {"id": "new", "kind": "rules", "resolved_at": at("2026-10-08", 9).isoformat()},
+        ],
+    }
+    (tmp_path / alerts.STATE_FILE).write_text(__import__("json").dumps(state))
+    result = alerts.collect(
+        now=at(FRIDAY, 12),
+        catalog=lambda: (_ for _ in ()).throw(FileNotFoundError()),
+        weekly_status=lambda today: {"datasets": [], "target_week": FRIDAY},
+        live_rules_report=lambda: None,
+        state_dir=tmp_path,
+    )
+    assert [r["id"] for r in result["resolved"]] == ["new"]

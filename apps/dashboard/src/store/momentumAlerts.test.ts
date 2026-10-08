@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MOMENTUM_ALERTS_STORAGE_KEY,
   hydrateMomentumAlertsFromStorage,
+  mergeAlertMemory,
   parseStoredAlertMemory,
   useMomentumAlertsStore,
 } from './momentumAlerts';
@@ -72,5 +73,13 @@ describe('alert memory store', () => {
     useMomentumAlertsStore.setState({ shown: { a: '2026-10-08', b: '2026-10-09' } });
     useMomentumAlertsStore.getState().prune([], '2026-10-09');
     expect(useMomentumAlertsStore.getState().shown).toEqual({ b: '2026-10-09' });
+  });
+});
+
+describe('two tabs', () => {
+  it('keeps the later day for an alert both remember and everything either remembers', () => {
+    expect(
+      mergeAlertMemory({ a: '2026-10-08', b: '2026-10-09' }, { a: '2026-10-09', c: '2026-10-07' }),
+    ).toEqual({ a: '2026-10-09', b: '2026-10-09', c: '2026-10-07' });
   });
 });

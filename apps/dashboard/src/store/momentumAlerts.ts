@@ -67,6 +67,30 @@ export const useMomentumAlertsStore = create<MomentumAlertsState>((set, get) => 
   },
 }));
 
+/** The memory of two tabs, merged: the later day wins for an alert both remember. */
+export function mergeAlertMemory(a: AlertMemory, b: AlertMemory): AlertMemory {
+  const merged: Record<string, string> = { ...a };
+  for (const [id, day] of Object.entries(b)) {
+    if (!merged[id] || day > merged[id]) merged[id] = day;
+  }
+  return merged;
+}
+
+let listening = false;
+
+/** Another tab recorded a pop-up: take it over, so an alert pops up once a day across tabs. */
+function listenForOtherTabs(): void {
+  if (listening || typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+    return;
+  }
+  listening = true;
+  window.addEventListener('storage', (event) => {
+    if (event.key !== MOMENTUM_ALERTS_STORAGE_KEY) return;
+    const other = parseStoredAlertMemory(event.newValue);
+    useMomentumAlertsStore.setState((state) => ({ shown: mergeAlertMemory(state.shown, other) }));
+  });
+}
+
 /** Client-only, post-mount: loads what was remembered. Never call during render or SSR. */
 export function hydrateMomentumAlertsFromStorage(): void {
   let stored: string | null = null;
@@ -76,4 +100,5 @@ export function hydrateMomentumAlertsFromStorage(): void {
     stored = null;
   }
   useMomentumAlertsStore.setState({ shown: parseStoredAlertMemory(stored), hydrated: true });
+  listenForOtherTabs();
 }

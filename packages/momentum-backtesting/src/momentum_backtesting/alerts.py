@@ -21,6 +21,7 @@ from contextlib import AbstractContextManager
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import duckdb
 
@@ -29,6 +30,8 @@ from .notify import IST
 STATE_FILE = "alerts_state.json"
 #: Resolved alerts kept, newest first, so the bell can say what just cleared.
 KEEP_RESOLVED = 20
+#: A resolved alert is listed as 'cleared recently' for this long.
+RESOLVED_FOR = timedelta(days=2)
 
 SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 KINDS = ("split", "data", "journal", "change", "rules")
@@ -102,7 +105,7 @@ def split_alerts(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 f"{symbol} fell {round(drop * 100, 1)}% on {ex_date}: classify it",
                 "No matching split or bonus filing was found. Until it is classified, no share "
                 "adjustment is applied and its scores may be wrong.",
-                f"/momentum/week?review={symbol}",
+                f"/momentum/week?review={quote(symbol, safe='')}",
             )
         )
     return out
@@ -233,17 +236,21 @@ def rules_alerts(report: dict[str, Any] | None) -> list[dict[str, Any]]:
             )
         )
     for finding in report.get("findings", []):
-        if not finding.get("needs_you"):
+        if not isinstance(finding, dict) or not finding.get("needs_you"):
             continue
-        level = finding["level"]
+        # One finding this version cannot read must not blank the whole kind (it would then be
+        # "unchecked", and its old alerts kept for ever): skip it.
+        rule, level, title = finding.get("rule"), finding.get("level"), finding.get("title")
+        if not (rule and level and title):
+            continue
+        action = finding.get("action")
         out.append(
             _alert(
                 "rules",
-                f"{finding['rule']}:{level}:{week}",
+                f"{rule}:{level}:{week}",
                 "info" if level == "ready" else "error",
-                finding["title"],
-                finding["detail"]
-                + (f" Your action: {finding['action']}" if finding["action"] else ""),
+                title,
+                (finding.get("detail") or "") + (f" Your action: {action}" if action else ""),
                 "/momentum/week",
             )
         )
@@ -397,8 +404,12 @@ def collect(
         ]
         reopened = set(current)
         kept = [r for r in state["resolved"] if r["id"] not in reopened]
-        state = {"open": current, "resolved": (resolved + kept)[:KEEP_RESOLVED]}
-        _save_state(state_dir, state)
+        oldest = (now - RESOLVED_FOR).isoformat(timespec="seconds")
+        recent = [r for r in resolved + kept if (r.get("resolved_at") or "") >= oldest]
+        new_state = {"open": current, "resolved": recent[:KEEP_RESOLVED]}
+        if new_state != state:  # a poll that changes nothing writes nothing
+            _save_state(state_dir, new_state)
+        state = new_state
 
     return {
         "checked_at": stamp,
