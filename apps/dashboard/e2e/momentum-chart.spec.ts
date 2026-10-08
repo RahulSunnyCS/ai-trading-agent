@@ -184,6 +184,33 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
             spark: Array.from({ length: 26 }, (_, i) => 100 + i),
           },
         ],
+        rotation: {
+          weeks: Array.from({ length: 18 }, (_, i) => `2023-09-${String(i + 1).padStart(2, '0')}`),
+          groups: [
+            {
+              key: 'Industry',
+              parent_group: 'Industry',
+              subgroup: null,
+              theme: false,
+              member_count: 6,
+              scored_count: 6,
+              s4: Array.from({ length: 18 }, () => 60),
+              s26: Array.from({ length: 18 }, () => 80),
+            },
+          ],
+          subs: [
+            {
+              key: 'Industry / Metals',
+              parent_group: 'Industry',
+              subgroup: 'Metals',
+              theme: false,
+              member_count: 6,
+              scored_count: 6,
+              s4: Array.from({ length: 18 }, () => 60),
+              s26: Array.from({ length: 18 }, () => 80),
+            },
+          ],
+        },
         sectors: [
           {
             cid: 'metals',
@@ -198,20 +225,64 @@ test('Momentum Scores exposes stock and sector details', async ({ page }) => {
     }),
   );
 
-  await page.goto('/momentum/scores/stocks');
+  await page.route('**/api/momentum/scores/stock/TEST', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        symbol: 'TEST',
+        weeks: Array.from(
+          { length: 53 },
+          (_, i) => `2023-01-${String((i % 28) + 1).padStart(2, '0')}`,
+        ),
+        closes: Array.from({ length: 53 }, (_, i) => 100 + i),
+        ma40: Array.from({ length: 53 }, (_, i) => (i < 39 ? null : 110 + i / 2)),
+        score_weeks: Array.from(
+          { length: 12 },
+          (_, i) => `2024-01-${String(i + 1).padStart(2, '0')}`,
+        ),
+        scores: byLookback(() => Array.from({ length: 12 }, (_, i) => 50 + i * 4)),
+        rank_weeks: Array.from(
+          { length: 26 },
+          (_, i) => `2023-07-${String((i % 28) + 1).padStart(2, '0')}`,
+        ),
+        ranks: Array.from({ length: 26 }, (_, i) => 30 - i),
+      }),
+    }),
+  );
+
+  // Sectors is the default view: the rotation map's table, then a group's page.
+  await page.goto('/momentum/scores');
   await expect(page.getByRole('region', { name: 'Market momentum' })).toContainText('60%');
+  await expect(page.getByRole('radio', { name: 'Sectors', exact: true })).toBeChecked();
+  await page
+    .getByRole('region', { name: 'Sector groups' })
+    .getByRole('row', { name: /Industry/ })
+    .click();
+  await expect(page).toHaveURL(/\/momentum\/scores\/sectors\/industry/);
+  await page
+    .getByRole('region', { name: 'Industry sub-sectors' })
+    .getByRole('row', { name: /Metals/ })
+    .click();
+  await expect(page).toHaveURL(/sub=/);
+
+  // The stocks list: rank, movement, returns and price beside the strip.
+  await page.getByRole('radio', { name: 'Stocks', exact: true }).click();
+  await expect(page).toHaveURL(/\/momentum\/scores\/stocks/);
   const stockRow = page.getByRole('row', { name: /Test Company/ });
   await expect(stockRow).toBeVisible();
-  // Rank 1, up three places, the 13 and 26-week returns and the price beside the strip.
   await expect(stockRow).toContainText('▲3');
   await expect(stockRow).toContainText('+12.0%');
   await expect(stockRow).toContainText('+20.0%');
   await expect(stockRow).toContainText('₹120');
   await expect(stockRow.getByRole('img', { name: /Deciles by lookback/ })).toBeVisible();
-  await page.getByRole('radio', { name: 'Sectors', exact: true }).click();
-  await page.getByRole('button', { name: /Metals/ }).click();
-  // Anchored: the sector's own row contains the member table, so its name includes this text too.
-  const memberRow = page.getByRole('row', { name: /^TEST Test Company/ });
-  await expect(memberRow).toContainText('₹120');
-  await expect(memberRow).toContainText('+2.0%');
+
+  // A stock opens in a drawer; Esc closes it and the address loses ?stock.
+  await stockRow.click();
+  await expect(page.getByRole('dialog', { name: /TEST/ })).toBeVisible();
+  await expect(page).toHaveURL(/stock=TEST/);
+  await expect(page.getByRole('img', { name: /Weekly closes over the last year/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).not.toHaveURL(/stock=/);
 });

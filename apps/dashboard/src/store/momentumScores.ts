@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 
 /**
- * Which optional columns of the Momentum › Scores stock table the reader has switched off,
- * remembered in this browser. SSR-safe like `store/momentumView.ts`: fixed defaults on the server
+ * What the reader has chosen on Momentum › Scores, remembered in this browser: the optional
+ * columns of the stock table switched off, and how many scored stocks a sector needs for a dot on
+ * the rotation map. SSR-safe like `store/momentumView.ts`: fixed defaults on the server
  * and on the client's first render, `hydrateMomentumScoresFromStorage()` from an effect after.
  */
 export const SCORE_COLUMNS = [
@@ -20,46 +21,75 @@ export const MOMENTUM_SCORES_STORAGE_KEY = 'ata.momentumScores.v1';
 
 const COLUMN_IDS: ReadonlySet<string> = new Set(SCORE_COLUMNS.map((column) => column.id));
 
-/** Any stored value -> the set of hidden columns; unknown or malformed entries are dropped. */
-export function parseHiddenColumns(stored: string | null): ReadonlySet<ScoreColumn> {
-  if (!stored) return new Set();
+/** The rotation map's default: a sector needs this many scored stocks to get a dot. */
+export const DEFAULT_MIN_STOCKS = 5;
+export const MIN_STOCK_CHOICES = [1, 3, 5, 10] as const;
+
+function storedObject(stored: string | null): Record<string, unknown> {
+  if (!stored) return {};
   try {
     const value: unknown = JSON.parse(stored);
-    const hidden =
-      value && typeof value === 'object' ? (value as Record<string, unknown>).hidden : null;
-    if (!Array.isArray(hidden)) return new Set();
-    return new Set(
-      hidden.filter((id): id is ScoreColumn => typeof id === 'string' && COLUMN_IDS.has(id)),
-    );
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   } catch {
-    return new Set();
+    return {};
   }
+}
+
+/** Any stored value -> the set of hidden columns; unknown or malformed entries are dropped. */
+export function parseHiddenColumns(stored: string | null): ReadonlySet<ScoreColumn> {
+  const hidden = storedObject(stored).hidden;
+  if (!Array.isArray(hidden)) return new Set();
+  return new Set(
+    hidden.filter((id): id is ScoreColumn => typeof id === 'string' && COLUMN_IDS.has(id)),
+  );
+}
+
+/** Any stored value -> the minimum stocks per map dot; anything but a known choice is the default. */
+export function parseMinStocks(stored: string | null): number {
+  const value = storedObject(stored).minStocks;
+  return (MIN_STOCK_CHOICES as readonly unknown[]).includes(value)
+    ? (value as number)
+    : DEFAULT_MIN_STOCKS;
 }
 
 interface MomentumScoresState {
   hidden: ReadonlySet<ScoreColumn>;
+  /** Fewest scored stocks a sector needs for a dot on the rotation map. */
+  minStocks: number;
   setColumnShown: (column: ScoreColumn, shown: boolean) => void;
+  setMinStocks: (minStocks: number) => void;
+}
+
+function persist(hidden: ReadonlySet<ScoreColumn>, minStocks: number): void {
+  try {
+    window.localStorage.setItem(
+      MOMENTUM_SCORES_STORAGE_KEY,
+      JSON.stringify({ hidden: [...hidden], minStocks }),
+    );
+  } catch {
+    // Storage full or blocked: the choice still applies for this visit.
+  }
 }
 
 export const useMomentumScoresStore = create<MomentumScoresState>((set, get) => ({
   hidden: new Set(),
+  minStocks: DEFAULT_MIN_STOCKS,
   setColumnShown: (column, shown) => {
     const hidden = new Set(get().hidden);
     if (shown) hidden.delete(column);
     else hidden.add(column);
     set({ hidden });
-    try {
-      window.localStorage.setItem(
-        MOMENTUM_SCORES_STORAGE_KEY,
-        JSON.stringify({ hidden: [...hidden] }),
-      );
-    } catch {
-      // Storage full or blocked: the choice still applies for this visit.
-    }
+    persist(hidden, get().minStocks);
+  },
+  setMinStocks: (minStocks) => {
+    set({ minStocks });
+    persist(get().hidden, minStocks);
   },
 }));
 
-/** Client-only, post-mount: applies the stored choice. Never call during render or SSR. */
+/** Client-only, post-mount: applies the stored choices. Never call during render or SSR. */
 export function hydrateMomentumScoresFromStorage(): void {
   let stored: string | null = null;
   try {
@@ -67,5 +97,8 @@ export function hydrateMomentumScoresFromStorage(): void {
   } catch {
     stored = null;
   }
-  useMomentumScoresStore.setState({ hidden: parseHiddenColumns(stored) });
+  useMomentumScoresStore.setState({
+    hidden: parseHiddenColumns(stored),
+    minStocks: parseMinStocks(stored),
+  });
 }

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — makes the research workbench far more useful for picking and watching names; not on the real-money path (BL-010 / BL-025 are) |
-| **Status** | In progress (Phase 1) |
+| **Status** | In progress (Phase 2 built, Phase 3 to do) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard) |
 | **Created** | 2026-10-07 |
@@ -216,3 +216,28 @@ All answered 2026-10-08, see the Log.
   - Fixed on the way: Held/Candidate used Broad's unused `top_n`; split names like `SYM#2` did
     not match; `Td`/`Th` gained a `dense` option (the one-line row rule), and `ui/CheckboxMenu`.
   - Not done in Phase 1, by design: the stock drawer, the rotation map, score history (Phase 2).
+- 2026-10-08 — Phase 2 built (branch `feat/bl-049-scores-phase2`, stacked on Phase 1). What it
+  does and where it differs from the plan:
+  - Backend: `weekly_percentile_scores` (the same row-wise percentile as the current one, masked
+    by each week's membership); `compute_rotation` gives the 24 parent groups and every
+    sub-sector 18 weeks of mean 4 and 26-week scores (members counted once per symbol, themes
+    flagged); `composite_rank_history` (26 weeks, cached per universe); `stock_detail` and
+    `GET /api/momentum-scores/stock/{symbol}` (404 for a symbol not scored this week), with the
+    Fastify route `/api/momentum/scores/stock/:symbol` and the Next rewrite. Main payload gains
+    `rotation`; the stock history is fetched only when a drawer opens.
+  - Dashboard: `Sectors | Stocks` switch (Sectors default; the address is
+    `/momentum/scores/<sectors|stocks>[/<group>]?sub=&stock=`, read through `useScoresRoute`
+    on the history API, so Back, deep links and Esc all work; the drawer's own history entry is
+    marked so closing steps back instead of stacking). Rotation map (x = 26-week score, y = change
+    in the 4-week score over 4 weeks) with linked hover, tails of 4/8/13 weeks, search, "Changed
+    quadrant only", an adjustable minimum of stocks (default 5, kept in the browser); sector page
+    with its own map of sub-sectors, a sub-sector filter and its stocks; the stock drawer
+    (`ui/Drawer`) with figures, price + 40-week average, score history and rank history, Prev/Next
+    through the list it was opened from, Open its sector and Open in backtest.
+  - Cross-Sector Themes are in the table only, as decided; groups under the minimum are also
+    table-only and say why.
+  - The old `SectorsTable` is deleted; the guide page and glossary (`rotation-map`) are updated.
+  - `ui/Drawer.tsx` is the same file as in #123 (the Backtest follow-ups); whichever merges
+    second takes the other's copy as is.
+  - Not done, by design: `short_name` on sub-sectors (labels fit without it), saved views,
+    circuit locks and the strip-reading card (Phase 3).

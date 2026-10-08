@@ -1,17 +1,20 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { usePolledResource } from '../../hooks/usePolledResource';
+import { useScoresRoute } from '../../hooks/useScoresRoute';
 import { formatDay, formatInt } from '../../lib/format';
 import {
   type MomentumScores,
+  type StockScore,
   activeSignalFromJob,
   buyZoneFrom,
+  groupBySlug,
   markKey,
+  slugify,
 } from '../../lib/momentumScores';
-import { MOMENTUM_SCORE_KINDS, type MomentumScoreKind, oneOf } from '../../lib/routes';
 import { hydrateMomentumScoresFromStorage } from '../../store/momentumScores';
 import type { MomentumSavedRun } from '../../types/momentum';
 import { Card, CardHeader } from '../ui/Card';
@@ -20,7 +23,9 @@ import { SegmentedControl } from '../ui/SegmentedControl';
 import { StateMessage } from '../ui/StateMessage';
 import { MomentumScoresSkeleton } from './MomentumSkeletons';
 import { ScoresMarketStrip, ScoresMovers } from './scores/ScoresMarket';
-import { SectorsTable } from './scores/SectorsTable';
+import { SectorPage } from './scores/SectorPage';
+import { SectorsOverview } from './scores/SectorsOverview';
+import { StockDrawer } from './scores/StockDrawer';
 import { StocksLeaderboard } from './scores/StocksLeaderboard';
 
 export function MomentumScoresView() {
@@ -36,10 +41,34 @@ export function MomentumScoresView() {
   const favorites = usePolledResource<MomentumSavedRun[]>('/api/momentum/favorite-strategies', {
     cache: true,
   });
-  const { rest, navigate } = useAppRoute();
-  const kind: MomentumScoreKind = oneOf(MOMENTUM_SCORE_KINDS, rest[1]) ?? 'stocks';
+  const { navigate } = useAppRoute();
+  const {
+    kind,
+    group: groupSlug,
+    sub: subSlug,
+    stock: stockSymbol,
+    go,
+    closeStock,
+  } = useScoresRoute();
+  // The symbols in the order of the list the drawer was opened from, for its prev and next.
+  const [order, setOrder] = useState<string[]>([]);
 
   useEffect(() => hydrateMomentumScoresFromStorage(), []);
+
+  const here = useMemo(
+    () => ({ kind, group: groupSlug, sub: subSlug }),
+    [kind, groupSlug, subSlug],
+  );
+  // Opening a stock adds a history entry (Back closes it); stepping to another one replaces it.
+  const openStock = useCallback(
+    (symbol: string) => go({ ...here, stock: symbol }, stockSymbol ? 'replace' : 'push'),
+    [go, here, stockSymbol],
+  );
+  const openSector = useCallback(
+    (stock: StockScore) =>
+      go({ kind: 'sectors', group: slugify(stock.parent_group), sub: slugify(stock.subgroup) }),
+    [go],
+  );
 
   const activeSignal = useMemo(() => activeSignalFromJob(latestJob.data), [latestJob.data]);
   const marks = activeSignal?.marks;
@@ -90,7 +119,7 @@ export function MomentumScoresView() {
               { value: 'stocks', label: 'Stocks' },
               { value: 'sectors', label: 'Sectors' },
             ]}
-            onChange={(next) => navigate('momentum', 'scores', next)}
+            onChange={(next) => go({ kind: next })}
           />
         </div>
         {data && signalNote ? <p className="mt-2 text-xs text-muted">{signalNote}</p> : null}
@@ -112,13 +141,15 @@ export function MomentumScoresView() {
 
       {data ? (
         <>
-          <ScoresMarketStrip
-            asOf={data.as_of}
-            universe={data.universe_size}
-            breadth={data.breadth}
-            stocks={data.stocks}
-            sectors={data.sectors}
-          />
+          {kind === 'sectors' && groupBySlug(data.rotation?.groups ?? [], groupSlug) ? null : (
+            <ScoresMarketStrip
+              asOf={data.as_of}
+              universe={data.universe_size}
+              breadth={data.breadth}
+              stocks={data.stocks}
+              sectors={data.sectors}
+            />
+          )}
           {kind === 'stocks' ? (
             <>
               <ScoresMovers stocks={data.stocks} zone={zone} marks={marks} />
@@ -128,16 +159,64 @@ export function MomentumScoresView() {
                 zone={zone}
                 marks={marks}
                 scoredCount={data.stocks.length}
+                activeSymbol={stockSymbol}
+                onOpenStock={openStock}
+                onOrder={setOrder}
+                onSector={openSector}
               />
             </>
+          ) : !data.rotation ? (
+            <MomentumScoresSkeleton />
+          ) : groupSlug ? (
+            (() => {
+              const group = groupBySlug(data.rotation.groups, groupSlug);
+              return group ? (
+                <SectorPage
+                  data={data}
+                  group={group}
+                  subSlug={subSlug}
+                  zone={zone}
+                  marks={marks}
+                  activeSymbol={stockSymbol}
+                  onBack={() => go({ kind: 'sectors' })}
+                  onPickSub={(sub) => go({ kind: 'sectors', group: groupSlug, sub })}
+                  onOpenStock={openStock}
+                  onOrder={setOrder}
+                  onSector={openSector}
+                />
+              ) : (
+                <StateMessage
+                  variant="empty"
+                  title="No sector group by that name"
+                  description="The link may be old. Go back to all sectors and pick one."
+                />
+              );
+            })()
           ) : (
-            <SectorsTable
-              sectors={data.sectors}
-              stocks={data.stocks}
-              lookbacks={data.lookbacks}
+            <SectorsOverview
+              data={data}
+              zone={zone}
               marks={marks}
+              activeSymbol={stockSymbol}
+              onOpenGroup={(slug) => go({ kind: 'sectors', group: slug })}
+              onShowAllStocks={() => go({ kind: 'stocks' })}
+              onOpenStock={openStock}
+              onOrder={setOrder}
+              onSector={openSector}
             />
           )}
+          <StockDrawer
+            symbol={stockSymbol}
+            stocks={data.stocks}
+            order={order}
+            lookbacks={data.lookbacks}
+            zone={zone}
+            marks={marks}
+            onOpen={openStock}
+            onClose={() => closeStock(here)}
+            onSector={openSector}
+            onBacktest={() => navigate('momentum', 'backtest', 'broad')}
+          />
         </>
       ) : null}
     </div>
