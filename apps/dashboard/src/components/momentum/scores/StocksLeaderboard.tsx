@@ -261,7 +261,9 @@ export function StocksLeaderboard({
   useEffect(() => setShown(top?.limit ?? PAGE), [deferredQuery, view, group, sort, top?.limit]);
 
   // "/" jumps to the search box, as on most sites, unless you are already typing somewhere.
+  const hasSearch = !top;
   useEffect(() => {
+    if (!hasSearch) return;
     const onKey = (event: KeyboardEvent): void => {
       if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
       if (typingInField(event.target)) return;
@@ -270,7 +272,7 @@ export function StocksLeaderboard({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [hasSearch]);
 
   const onSort = (key: ScoreSortKey, lookback: number | null): void =>
     setSort((current) => nextSort(current, key, lookback));

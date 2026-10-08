@@ -125,7 +125,7 @@ export function RotationPanel({
       }),
     [groups, stocksOf, tail, minStocks, deferredQuery, changedOnly, lookbacks],
   );
-  const mapRows = rows.filter((row) => row.onMap);
+  const mapRows = useMemo(() => rows.filter((row) => row.onMap), [rows]);
   const byKey = useMemo(() => new Map(rows.map((row) => [row.entry.key, row])), [rows]);
   const entries = useMemo(() => mapRows.map((row) => row.entry), [mapRows]);
   const sizeOf = useMemo(() => {

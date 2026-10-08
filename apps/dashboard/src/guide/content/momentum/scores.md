@@ -29,7 +29,7 @@ Five tiles above the list say how healthy momentum is right now:
 | Up over 13 weeks | The share with a positive 13-week return. |
 | Median 26-week return | The middle stock's return over 26 weeks, and where the strongest tenth begins. |
 | Leaders | How many stocks are strong on every horizon (see the [trend tag](glossary:trend-tag)). |
-| Strongest sub-sector | The sub-sector with the highest average 26-week score, among those with at least five scored stocks. |
+| Strongest sub-sector | The sub-sector with the highest average 26-week score, among those with at least five scored stocks. Theme baskets are not counted. |
 
 ## What changed this week
 

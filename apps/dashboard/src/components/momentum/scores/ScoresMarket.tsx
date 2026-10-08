@@ -82,7 +82,7 @@ export function ScoresMarketStrip({
         />
         <StatCard
           label="Strongest sub-sector"
-          hint="The sub-sector with the highest average 26-week score, among those with at least five scored stocks."
+          hint="The sub-sector with the highest average 26-week score, among those with at least five scored stocks. Theme baskets are not counted."
           value={
             <span
               className="line-clamp-2 break-words text-base leading-snug"
