@@ -60,7 +60,7 @@ to `stock_tilt`, and two of the four frozen configs already use that (1.0 and 0.
 
 ## Goal
 
-A pre-registered, kill-early answer for six specific filters on the frozen Broad ensemble:
+A pre-registered, kill-early answer for seven specific filters on the frozen Broad ensemble:
 does any of them improve it after costs, robustly across rolling windows and without
 overfitting? Any survivor then runs as a shadow arm in the forward journal before it can be
 proposed for real money (through BL-025).
@@ -78,7 +78,7 @@ proposed for real money (through BL-025).
 
 ### Phase 0 — Pre-register (`search_spaces/bl050_criteria.json`, committed before any run)
 
-- **Hypothesis:** at least one of the six features below, applied the same way to all four frozen
+- **Hypothesis:** at least one of the seven features below, applied the same way to all four frozen
   configs, raises the ensemble's after-cost CAGR robustly, without worsening its drawdown.
 - **Universe:** Broad Momentum on the point-in-time `turnover_rank` universe, curated category
   tags, frozen liquidity gate (₹2 cr / ₹30 / 0.25, circuit gate on). Delisted names stay in their
@@ -86,13 +86,14 @@ proposed for real money (through BL-025).
 - **Comparator:** the BL-010 Phase 6 ensemble exactly as frozen
   (`search_spaces/bl010_phase6_frozen.json`: four configs, equal capital reset each April,
   `signal_delay=1`, itemised costs + 15 bps slippage).
-- **The six trials** (one shape, one setting each, fixed here; feature tilts use
+- **The seven trials** (one shape, one setting each, fixed here; feature tilts use
   `rank = 0.75 × momentum rank + 0.25 × feature rank`):
 
   | ID | Family | Feature (weekly, point-in-time) | Shape | Pre-registered direction |
   |---|---|---|---|---|
   | V1 | Volume | Median daily **turnover (₹)** over the last 4 weeks ÷ median over 26 weeks. Turnover, not share volume: it is not distorted by splits and bonuses | Tilt | Higher is better |
   | V2 | Volume | Up-week turnover ÷ down-week turnover over 13 weeks (accumulation; the `reversal.py` definition) | Tilt | Higher is better |
+  | V3 | Volume | Quiet-or-building entry (owner, 2026-10-09): last week's turnover ≤ its 26-week median (quiet), **or** turnover rose in each of the last 3 weeks (building). Fails = a one-week spike or a choppy, rising-then-falling pattern | Gate (no new buy if it fails) | Names that fail are worse |
   | R1 | Relative strength | 26-week return must beat Nifty 500 TRI's 26-week return | Gate (no new buy if it fails) | Names that fail are worse |
   | M1 | Momentum | Overextension: close ÷ 10-week average in the top 5% of that week's universe | Gate (no new buy if overextended) | Overextended names are worse |
   | M2 | Momentum | Residual momentum: 26-week sum of residuals from a trailing 52-week regression of weekly returns on Nifty 500 TRI, skipping the last 4 weeks | Tilt | Higher is better |
@@ -119,7 +120,7 @@ proposed for real money (through BL-025).
     - median ΔCAGR ≥ +2.0 pts across rolling 3-year windows stepped quarterly;
     - CAGR win share ≥ 70%;
     - full-period MaxDD no more than 3 pts worse;
-    - PBO < 0.5 across all six trials plus the baseline (CSCV). Every trial's ensemble curve is
+    - PBO < 0.5 across all seven trials plus the baseline (CSCV). Every trial's ensemble curve is
       built for the PBO matrix, including features killed in Phase 2. A killed feature cannot
       pass; its curve only keeps the trial count honest.
 - **Hold-out:** 2024-01-01 → 2026-09-25 stays sealed for **one** confirmation run of Phase 3
@@ -225,6 +226,15 @@ To confirm when this is started:
    arms), or should the owner pick one?
 
 ## Log
+
+- 2026-10-09 — owner added V3 (quiet-or-building 1-week turnover as an entry gate) before any
+  BL-050 run; the trial count is now seven. Context: the 2026-10-03 exploratory volume study
+  (`data/backtests/volume/`) tested 2- and 4-week volume ratios and accumulation on the pool and
+  found no predictive signal (information coefficients near 0, none passed); a 1-week measure
+  and this entry-gate shape were never tested. Also: BL-054 L6 (2026-10-09) tests residual
+  momentum on the 11 BL-053 strategies; when this item starts, M2 should cite that result and
+  run only if it adds something (it differs: Nifty 500 TRI as the market, no sector factor,
+  the frozen ensemble as comparator).
 
 - 2026-10-07 — Created from the owner's "five filters" idea. Repo check of all five families
   recorded in Context. Owner decisions: Broad only, fundamentals not required, forward shadow
