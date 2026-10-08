@@ -1,11 +1,11 @@
 {
- "cells_passing": 0,
- "of": 30,
- "verdict": "kill",
- "passing": [],
- "rule": {
-  "helps": "at least 10 of the 30 cells pass",
-  "inconclusive": "1 to 9 cells pass: they are named, not adopted",
-  "kill": "no cell passes"
- }
+  "cells_passing": 0,
+  "of": 30,
+  "verdict": "kill",
+  "passing": [],
+  "rule": {
+    "helps": "at least 10 of the 30 cells pass",
+    "inconclusive": "1 to 9 cells pass: they are named, not adopted",
+    "kill": "no cell passes"
+  }
 }

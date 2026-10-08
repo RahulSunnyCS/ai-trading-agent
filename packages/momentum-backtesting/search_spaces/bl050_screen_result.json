@@ -1,82 +1,82 @@
 {
- "rule": "the mean of the four per-config t-statistics >= 2 in the pre-registered direction AND at least 3 of the 4 configs have the right sign; otherwise killed. The screen is per feature: a tilt's two weights share its screen verdict",
- "features": {
-  "M1": {
-   "per_config_t": {
-    "1281e8ed6824": -2.509,
-    "08c4307d7aa9": -1.929,
-    "535b17b44ba5": -2.549,
-    "bad83df3821a": -2.669
-   },
-   "mean_t": -2.4137459989323187,
-   "right_sign": 0,
-   "passes": false
-  },
-  "M2": {
-   "per_config_t": {
-    "1281e8ed6824": 1.026,
-    "08c4307d7aa9": 1.424,
-    "535b17b44ba5": 1.29,
-    "bad83df3821a": 1.226
-   },
-   "mean_t": 1.2414753478002467,
-   "right_sign": 4,
-   "passes": false
-  },
-  "R1": {
-   "per_config_t": {
-    "1281e8ed6824": 2.746,
-    "08c4307d7aa9": 0.663,
-    "535b17b44ba5": 3.577,
-    "bad83df3821a": 1.445
-   },
-   "mean_t": 2.107539795563199,
-   "right_sign": 4,
-   "passes": true
-  },
-  "T1": {
-   "per_config_t": {
-    "1281e8ed6824": 3.572,
-    "08c4307d7aa9": 2.154,
-    "535b17b44ba5": 3.882,
-    "bad83df3821a": 3.65
-   },
-   "mean_t": 3.3144978463857457,
-   "right_sign": 4,
-   "passes": true
-  },
-  "V1": {
-   "per_config_t": {
-    "1281e8ed6824": 4.949,
-    "08c4307d7aa9": 3.568,
-    "535b17b44ba5": 5.04,
-    "bad83df3821a": 5.486
-   },
-   "mean_t": 4.760705503214826,
-   "right_sign": 4,
-   "passes": true
-  },
-  "V2": {
-   "per_config_t": {
-    "1281e8ed6824": 3.015,
-    "08c4307d7aa9": 2.593,
-    "535b17b44ba5": 2.96,
-    "bad83df3821a": 3.729
-   },
-   "mean_t": 3.0740654834220345,
-   "right_sign": 4,
-   "passes": true
-  },
-  "V3": {
-   "per_config_t": {
-    "1281e8ed6824": -1.678,
-    "08c4307d7aa9": -0.254,
-    "535b17b44ba5": -1.464,
-    "bad83df3821a": -1.41
-   },
-   "mean_t": -1.2016680842064287,
-   "right_sign": 0,
-   "passes": false
+  "rule": "the mean of the four per-config t-statistics >= 2 in the pre-registered direction AND at least 3 of the 4 configs have the right sign; otherwise killed. The screen is per feature: a tilt's two weights share its screen verdict",
+  "features": {
+    "M1": {
+      "per_config_t": {
+        "1281e8ed6824": -2.509,
+        "08c4307d7aa9": -1.929,
+        "535b17b44ba5": -2.549,
+        "bad83df3821a": -2.669
+      },
+      "mean_t": -2.4137459989323187,
+      "right_sign": 0,
+      "passes": false
+    },
+    "M2": {
+      "per_config_t": {
+        "1281e8ed6824": 1.026,
+        "08c4307d7aa9": 1.424,
+        "535b17b44ba5": 1.29,
+        "bad83df3821a": 1.226
+      },
+      "mean_t": 1.2414753478002467,
+      "right_sign": 4,
+      "passes": false
+    },
+    "R1": {
+      "per_config_t": {
+        "1281e8ed6824": 2.746,
+        "08c4307d7aa9": 0.663,
+        "535b17b44ba5": 3.577,
+        "bad83df3821a": 1.445
+      },
+      "mean_t": 2.107539795563199,
+      "right_sign": 4,
+      "passes": true
+    },
+    "T1": {
+      "per_config_t": {
+        "1281e8ed6824": 3.572,
+        "08c4307d7aa9": 2.154,
+        "535b17b44ba5": 3.882,
+        "bad83df3821a": 3.65
+      },
+      "mean_t": 3.3144978463857457,
+      "right_sign": 4,
+      "passes": true
+    },
+    "V1": {
+      "per_config_t": {
+        "1281e8ed6824": 4.949,
+        "08c4307d7aa9": 3.568,
+        "535b17b44ba5": 5.04,
+        "bad83df3821a": 5.486
+      },
+      "mean_t": 4.760705503214826,
+      "right_sign": 4,
+      "passes": true
+    },
+    "V2": {
+      "per_config_t": {
+        "1281e8ed6824": 3.015,
+        "08c4307d7aa9": 2.593,
+        "535b17b44ba5": 2.96,
+        "bad83df3821a": 3.729
+      },
+      "mean_t": 3.0740654834220345,
+      "right_sign": 4,
+      "passes": true
+    },
+    "V3": {
+      "per_config_t": {
+        "1281e8ed6824": -1.678,
+        "08c4307d7aa9": -0.254,
+        "535b17b44ba5": -1.464,
+        "bad83df3821a": -1.41
+      },
+      "mean_t": -1.2016680842064287,
+      "right_sign": 0,
+      "passes": false
+    }
   }
- }
 }

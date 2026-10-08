@@ -4,17 +4,56 @@
   "note": "Pre-registered before any BL-050 run (backlog/BL-050-momentum-filter-poc.md Phase 0 and the owner's 2026-10-09 answers). Never edit after a run; supersede with bl050_criteria_addendum_N.json.",
   "comparator": "search_spaces/bl010_phase6_frozen.json exactly: four configs at their frozen offsets, equal capital reset each April, signal_delay 1, itemised costs + 15 bps, Rs 2 lakh, pre-tax; turnover_rank universe, curated tags",
   "windows": {
-    "development": {"start": "2012-01-01", "end": "2023-12-29"},
-    "holdout": {"start": "2024-01-01", "end": "2026-09-25", "rule": "one run per Phase 3 survivor plus the baseline, over 2012-01-01..2026-09-25, reading only the 2024-01-01.. slice; never before Phase 3 verdicts are written"}
+    "development": { "start": "2012-01-01", "end": "2023-12-29" },
+    "holdout": {
+      "start": "2024-01-01",
+      "end": "2026-09-25",
+      "rule": "one run per Phase 3 survivor plus the baseline, over 2012-01-01..2026-09-25, reading only the 2024-01-01.. slice; never before Phase 3 verdicts are written"
+    }
   },
   "features": {
-    "V1": {"family": "volume", "shape": "tilt", "direction": "higher", "definition": "median daily turnover (Rs) over the last 4 weeks / median daily turnover over the last 26 weeks, EQ bars up to the decision Friday"},
-    "V2": {"family": "volume", "shape": "tilt", "direction": "higher", "definition": "sum of weekly turnover in up weeks / sum in down weeks over the last 13 weeks (reversal.py's up/down split, turnover instead of share volume); a zero denominator reads as the 95th percentile of that week"},
-    "V3": {"family": "volume", "shape": "gate", "direction": "fail is worse", "definition": "passes if last week's turnover <= the median weekly turnover of the 26 weeks before it (quiet), or weekly turnover rose in each of the last 3 weeks (w-3 < w-2 < w-1 < w0, building); fails otherwise: no new buy that week"},
-    "R1": {"family": "relative strength", "shape": "gate", "direction": "fail is worse", "definition": "passes if the stock's 26-week return > Nifty 500 TRI's 26-week return"},
-    "M1": {"family": "momentum", "shape": "gate", "direction": "overextended is worse", "definition": "fails if close / 10-week average close is in the top 5% of that week's point-in-time universe"},
-    "M2": {"family": "momentum", "shape": "tilt", "direction": "higher", "definition": "26-week sum of residuals (weeks t-29..t-4) from a trailing 52-week regression with intercept of weekly returns on Nifty 500 TRI's weekly return; not divided by their std"},
-    "T1": {"family": "trend quality", "shape": "tilt", "direction": "higher", "definition": "annualised slope of log weekly close over 26 weeks x R^2 of that linear fit"}
+    "V1": {
+      "family": "volume",
+      "shape": "tilt",
+      "direction": "higher",
+      "definition": "median daily turnover (Rs) over the last 4 weeks / median daily turnover over the last 26 weeks, EQ bars up to the decision Friday"
+    },
+    "V2": {
+      "family": "volume",
+      "shape": "tilt",
+      "direction": "higher",
+      "definition": "sum of weekly turnover in up weeks / sum in down weeks over the last 13 weeks (reversal.py's up/down split, turnover instead of share volume); a zero denominator reads as the 95th percentile of that week"
+    },
+    "V3": {
+      "family": "volume",
+      "shape": "gate",
+      "direction": "fail is worse",
+      "definition": "passes if last week's turnover <= the median weekly turnover of the 26 weeks before it (quiet), or weekly turnover rose in each of the last 3 weeks (w-3 < w-2 < w-1 < w0, building); fails otherwise: no new buy that week"
+    },
+    "R1": {
+      "family": "relative strength",
+      "shape": "gate",
+      "direction": "fail is worse",
+      "definition": "passes if the stock's 26-week return > Nifty 500 TRI's 26-week return"
+    },
+    "M1": {
+      "family": "momentum",
+      "shape": "gate",
+      "direction": "overextended is worse",
+      "definition": "fails if close / 10-week average close is in the top 5% of that week's point-in-time universe"
+    },
+    "M2": {
+      "family": "momentum",
+      "shape": "tilt",
+      "direction": "higher",
+      "definition": "26-week sum of residuals (weeks t-29..t-4) from a trailing 52-week regression with intercept of weekly returns on Nifty 500 TRI's weekly return; not divided by their std"
+    },
+    "T1": {
+      "family": "trend quality",
+      "shape": "tilt",
+      "direction": "higher",
+      "definition": "annualised slope of log weekly close over 26 weeks x R^2 of that linear fit"
+    }
   },
   "tilt": {
     "weights": [0.25, 0.5],
@@ -22,7 +61,19 @@
     "note": "owner 2026-10-09: both weights"
   },
   "gate_rule": "a failing name may not be bought that week (run_broad_backtest extra_no_buy); never forces a sale",
-  "trials": ["V1@0.25", "V1@0.5", "V2@0.25", "V2@0.5", "M2@0.25", "M2@0.5", "T1@0.25", "T1@0.5", "V3", "R1", "M1"],
+  "trials": [
+    "V1@0.25",
+    "V1@0.5",
+    "V2@0.25",
+    "V2@0.5",
+    "M2@0.25",
+    "M2@0.5",
+    "T1@0.25",
+    "T1@0.5",
+    "V3",
+    "R1",
+    "M1"
+  ],
   "phase_2_screen": {
     "sample": "for each frozen config, at each of its own rebalance dates in the development window, the top quintile of the point-in-time universe by that config's own global score",
     "split": "tilts: top half vs bottom half of the feature within that set; gates: passed vs blocked",

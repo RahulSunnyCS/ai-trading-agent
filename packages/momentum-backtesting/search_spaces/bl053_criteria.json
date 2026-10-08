@@ -28,8 +28,8 @@
     "end": "2026-10-02"
   },
   "grid": {
-    "stop_from_buy": [null, 0.15, 0.20, 0.25],
-    "stop_from_peak": [null, 0.20, 0.25, 0.30],
+    "stop_from_buy": [null, 0.15, 0.2, 0.25],
+    "stop_from_peak": [null, 0.2, 0.25, 0.3],
     "stop_proceeds": ["cash", "top"],
     "stop_delay": [0, 1],
     "cells": "every combination with at least one stop on: 15 threshold pairs x 2 proceeds = 30 cells, each run at both delays; the baseline is both stops off"
