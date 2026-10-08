@@ -74,7 +74,7 @@ import pandas as pd
 
 from momentum_backtesting import engine
 from momentum_backtesting import tax as tax_mod
-from momentum_backtesting.categories import compose, daily_moves, snapshots, sources
+from momentum_backtesting.categories import compose, daily_moves, residual, snapshots, sources
 from momentum_backtesting.categories import liquidity as liquidity_mod
 from momentum_backtesting.categories import prices as cat_prices
 from momentum_backtesting.categories.liquidity import LiquidityConfig
@@ -495,6 +495,27 @@ class UniverseBase:
     global_ranks: pd.DataFrame
 
 
+def _residual_global_ranks(full_frame: pd.DataFrame) -> pd.DataFrame:
+    """BL-054 L6: rank every column on residual momentum (categories/residual.py), with Nifty 50
+    TRI as the market and today's curated category tags as the groups."""
+    from momentum_backtesting import reference_benchmarks as rb
+
+    market = rb.load_references()[rb.NIFTY50_TRI]
+    market.index = pd.to_datetime(market.index)
+    tags = load_stock_groups(Path(__file__).parent / "curated")
+    first: dict[str, str] = {}
+    for group in sorted(tags):
+        for symbol in tags[group]:
+            first.setdefault(symbol, group)
+    group_of = {
+        col: first[col.split("#", 1)[0]]
+        for col in full_frame.columns
+        if col.split("#", 1)[0] in first
+    }
+    ranks, _scores = residual.residual_ranks(full_frame, market, group_of)
+    return ranks
+
+
 def compute_universe_base(
     *,
     outer_prices: pd.DataFrame,
@@ -502,7 +523,7 @@ def compute_universe_base(
     categories_data_dir: Path,
     lookbacks: tuple[int, ...] = (1, 4, 13, 26, 52),
     weights: tuple[float, ...] | None = None,
-    score: Literal["ranksum", "voladj", "blend"] = "ranksum",
+    score: Literal["ranksum", "voladj", "blend", "residual"] = "ranksum",
     voladj_skip_recent_month: bool = True,
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
@@ -550,7 +571,10 @@ def compute_universe_base(
         voladj_skip_recent_month=voladj_skip_recent_month,
         universe=tuple(full_frame.columns),
     )
-    global_ranks, _global_scores = engine.compute_ranks(full_frame, config)
+    if score == "residual":
+        global_ranks = _residual_global_ranks(full_frame)
+    else:
+        global_ranks, _global_scores = engine.compute_ranks(full_frame, config)
 
     return UniverseBase(
         universe=universe,
@@ -1105,7 +1129,7 @@ def run_broad_backtest(
     end: str | None = None,
     lookbacks: tuple[int, ...] = (1, 4, 13, 26, 52),
     weights: tuple[float, ...] | None = None,
-    score: Literal["ranksum", "voladj", "blend"] = "ranksum",
+    score: Literal["ranksum", "voladj", "blend", "residual"] = "ranksum",
     voladj_skip_recent_month: bool = True,
     pool_top_n: int = DEFAULT_POOL_TOP_N,
     pool_exit_rank: int = DEFAULT_POOL_EXIT_RANK,
@@ -1170,6 +1194,9 @@ def run_broad_backtest(
     # read from the daily bars here unless a caller passes them.
     stop_granularity: Literal["weekly", "daily"] = "weekly",
     daily: daily_moves.DailyMoves | None = None,
+    # BL-054 L5: engine.Config.weight_by / vol_window.
+    weight_by: Literal["equal", "inverse_vol"] = "equal",
+    vol_window: int = 26,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1342,6 +1369,8 @@ def run_broad_backtest(
         tax_hold_band=tax_hold_band,
         tax_hold_weeks=tax_hold_weeks,
         stop_granularity=stop_granularity,
+        weight_by=weight_by,
+        vol_window=vol_window,
     )
     if stop_granularity == "daily" and daily is None:
         daily = daily_moves.daily_moves(

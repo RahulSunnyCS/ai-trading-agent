@@ -64,7 +64,7 @@ PortfolioRule = Literal["buffer", "slots"]
 EntryRule = Literal["wait", "make_room"]
 Track = Literal["index", "etf"]
 Execution = Literal["fri_close", "mon_open", "mon_10am"]
-Score = Literal["ranksum", "voladj", "blend"]
+Score = Literal["ranksum", "voladj", "blend", "residual"]
 Rebalance = Literal["weekly", "monthly"]
 CostModel = Literal["flat", "itemised"]
 
@@ -206,6 +206,12 @@ class Config:
     # stop sells at the NEXT session's open (a lower-circuit lock delays it). Needs `daily` moves
     # passed to run_backtest and stop_delay 0. "weekly" is the BL-053 behaviour.
     stop_granularity: Literal["weekly", "daily"] = "weekly"
+    # Buffer rule only (BL-054 L5). How a buy week's money is split across the names that get
+    # it: "equal" (default) or "inverse_vol", in proportion to 1 / the standard deviation of each
+    # name's last `vol_window` weekly returns up to the signal week (a name without that history
+    # gets the median weight). The position and group caps apply as before.
+    weight_by: Literal["equal", "inverse_vol"] = "equal"
+    vol_window: int = 26
     # flat = cost_pct on both sides (today's model, unchanged). itemised = STT/stamp duty/
     # exchange fees/slippage/DP charge - see the rate constants above `Config`.
     cost_model: CostModel = "flat"
@@ -244,7 +250,7 @@ class Config:
             raise ValueError(f"unknown track {self.track!r}")
         if self.execution not in ("fri_close", "mon_open", "mon_10am"):
             raise ValueError(f"unknown execution {self.execution!r}")
-        if self.score not in ("ranksum", "voladj", "blend"):
+        if self.score not in ("ranksum", "voladj", "blend", "residual"):
             raise ValueError(f"unknown score {self.score!r}")
         if self.rebalance not in ("weekly", "monthly"):
             raise ValueError(f"unknown rebalance {self.rebalance!r}")
@@ -264,6 +270,12 @@ class Config:
             raise ValueError(f"unknown stop_proceeds {self.stop_proceeds!r}")
         if self.stop_delay not in (0, 1):
             raise ValueError("stop_delay must be 0 or 1")
+        if self.weight_by not in ("equal", "inverse_vol"):
+            raise ValueError(f"unknown weight_by {self.weight_by!r}")
+        if self.weight_by == "inverse_vol" and self.portfolio != "buffer":
+            raise ValueError("weight_by='inverse_vol' needs portfolio='buffer'")
+        if self.vol_window < 4:
+            raise ValueError("vol_window must be at least 4 weeks")
         if self.stop_granularity not in ("weekly", "daily"):
             raise ValueError(f"unknown stop_granularity {self.stop_granularity!r}")
         if self.stop_granularity == "daily" and (not self.has_stop or self.stop_delay != 0):
@@ -316,6 +328,8 @@ class Config:
             peak = f"p{round(self.stop_from_peak * 100)}" if self.stop_from_peak else ""
             rebalance += f"_stop{buy}{peak}{self.stop_proceeds}d{self.stop_delay}"
             rebalance += "_daily" if self.stop_granularity == "daily" else ""
+        if self.weight_by == "inverse_vol":
+            rebalance += f"_ivol{self.vol_window}"
         cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
@@ -366,6 +380,11 @@ def compute_ranks(prices: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, p
         return _compute_ranks_ranksum(prices, config)
     if config.score == "voladj":
         return _compute_ranks_voladj(prices, config)
+    if config.score == "residual":
+        raise ValueError(
+            "score='residual' needs factor returns: Broad builds it in "
+            "categories.residual (compute_universe_base)"
+        )
     return _compute_ranks_blend(prices, config)
 
 
@@ -555,6 +574,8 @@ class _Sim:
     lc_locked: pd.DataFrame | None = None
     # Daily stop only (BL-054): per-day moves, open gaps and lock flags. See DailyMoves.
     daily: "DailyMoves | None" = None
+    # inverse_vol only: week x name, 1 / trailing weekly-return std at the signal week.
+    inv_vol: pd.DataFrame | None = None
     # The tables above, read by position (see `_Grid`). Built once, here: nothing replaces a table
     # on a sim after it is made.
     _prices: _Grid | _FrameGrid = field(init=False, repr=False)
@@ -694,6 +715,21 @@ class _Sim:
                 break
             out.append(n)
         return [n for n in out if not unbuyable(n)]
+
+    def split_weights(self, week: pd.Timestamp, names: list[str]) -> dict[str, float]:
+        """Shares (summing to 1) of a buy week's money across `names`: equal, or inverse
+        volatility (BL-054 L5), where a name with no usable volatility gets the median weight."""
+        if self.inv_vol is None or not names:
+            return {n: 1 / len(names) for n in names} if names else {}
+        raw = {}
+        for n in names:
+            v = self.inv_vol.at[week, n] if n in self.inv_vol.columns else np.nan
+            raw[n] = float(v) if np.isfinite(v) and v > 0 else np.nan
+        known = [v for v in raw.values() if np.isfinite(v)]
+        fill = float(np.median(known)) if known else 1.0
+        weights = {n: (v if np.isfinite(v) else fill) for n, v in raw.items()}
+        total = sum(weights.values())
+        return {n: w / total for n, w in weights.items()}
 
     def best_unheld(self, week: pd.Timestamp, exclude: set[str] | frozenset[str]) -> str | None:
         """BL-053 `stop_proceeds="top"`: the best-ranked name not in `exclude` that may be bought
@@ -856,6 +892,10 @@ def run_backtest(
             "(see trade_prices.build_trade_prices)"
         )
     fills = prices if trade_prices is None else trade_prices.reindex(prices.index)
+    inv_vol = None
+    if config.weight_by == "inverse_vol":
+        std = fills.pct_change().rolling(config.vol_window).std()
+        inv_vol = (1 / std.where(std > 0)).shift(config.signal_delay)
     missing = [n for n in [*names, CASH, config.benchmark] if n not in fills]
     if missing:
         raise ValueError(f"trade prices are missing {missing}")
@@ -943,6 +983,7 @@ def run_backtest(
         uc_locked=uc_locked,
         lc_locked=lc_locked,
         daily=daily,
+        inv_vol=inv_vol,
     )
     outcome = _run_slots(sim, weeks) if config.portfolio == "slots" else _run_buffer(sim, weeks)
 
@@ -1514,13 +1555,15 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
                         name for name in tops if _has_room(name, rooms, given, label_of, group_left)
                     ]
                     while left > 1e-12 and active:  # equal shares; a capped name's excess spreads
-                        share = left / len(active)
+                        split = sim.split_weights(week, active) if sim.inv_vol is not None else None
+                        pot = left
                         still = []
                         for name in active:
                             label = label_of[name]
                             allowed = rooms[name] - given[name]
                             if label is not None:
                                 allowed = min(allowed, group_left[label])
+                            share = pot / len(active) if split is None else pot * split[name]
                             give = max(min(share, allowed), 0.0)
                             given[name] += give
                             left -= give

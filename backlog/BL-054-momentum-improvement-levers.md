@@ -94,3 +94,18 @@ must pass at both fill timings.
 
 - 2026-10-09 — created and started; owner agreed to all five levers and added the daily stop.
   Phase 0 committed before any run.
+- 2026-10-09 — addendum 1: the daily-stop grid adds the 15% buy stop (owner), 11 cells.
+- 2026-10-09 — judgement calls while building, all before any lever result was read:
+  - Daily stop: the stored `prevclose` is NOT adjusted for corporate actions (RELIANCE's 1:1
+    bonuses read -50%), so the daily move divides it by the confirmed share-count factor
+    (`stock_actions.confirmed_factors`), the same factors the weekly series uses. Falls still
+    "under review" (2,155) stay as real falls, as in the weekly series; demergers (no factor)
+    therefore read as falls, as the weekly series breaks them too. A day is "locked" when the
+    stock has no bar or both opened and closed at its lower band edge. Cash from a daily stop
+    waits uninvested (no liquid-fund return) until the next rebalance, as `sell_every_week`
+    money already does; a stopped stock may be bought again at the next rebalance if it ranks.
+  - Residual momentum: the regression keeps an intercept, as in the published method (Blitz,
+    Huij and Martens 2011), so the score measures the last 26 weeks (skipping 4) against the
+    stock's own 52-week average, not a constant outperformance. For configs with a stock tilt,
+    the tilt still re-orders picks inside a category; the residual score replaces the global
+    ranking (category and pool selection, and the stock order where the tilt is 0).
