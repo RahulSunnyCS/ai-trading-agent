@@ -35,12 +35,13 @@ List PRs with `mcp__github__list_pull_requests` (state `open`). Never act outsid
    - the poller reports nothing new for a PR that needs the owner → Step 5.
 
 4. **Merge.** One PR at a time, oldest first, with `mcp__github__merge_pull_request` using the repo's usual method (the existing history uses merge commits). Do not use the admin bypass; branch protection and `.claude/hooks/merge-guard.py` rules still apply (green checks, `reviewed` label over 500 lines). After each merge the other PRs are behind `main`: update their branches and let CI re-run before merging them.
+   **Sync local after every merge** (local session only): `git fetch origin main && git checkout main && git merge --ff-only origin/main`. If the working tree is dirty, skip the sync and note it in the report rather than stashing. In a cloud session (the container is ephemeral and is not the owner's machine) there is no local checkout to sync, so skip it silently; merging is enough.
 
 5. **Ask the owner only when needed.** Default is to decide and proceed. Ask (with `AskUserQuestion`, one batched message) only for: a secret or access the sandbox lacks, a finding that changes behaviour or design where both options are reasonable, a failure that is red on `main` too and has no obvious fix, or a conflict where both sides changed the same logic. Say what is blocked and which PRs carry on meanwhile.
 
 6. **Finish.** When every PR in scope is merged or closed:
-   - `git fetch origin main && git checkout main && git merge --ff-only origin/main` (sync local to origin/main; if the working tree is dirty, stop and tell the owner rather than stash);
-   - **then** delete the Haiku schedule (`CronDelete`). The schedule stops last, only after local is synced;
+   - make sure local `main` is synced as in Step 4 (local session only; nothing to do in the cloud);
+   - **then** delete the Haiku schedule (`CronDelete`). The schedule stops last, after the final merge and, in a local session, the sync;
    - report in a few lines: PRs merged, PRs left open and why, fixes pushed.
 
 ## Rules
