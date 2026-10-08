@@ -107,7 +107,7 @@ export function MomentumScoresView() {
     }
     if (latestJob.loading || favorites.loading) return null;
     return activeFavorite
-      ? `Held and Candidate marks come from ${activeFavorite.name}’s latest weekly run, and no run result is available right now. They appear after the next run from Weekly signal.`
+      ? `Held and Candidate marks come from ${activeFavorite.name}’s latest weekly run, and no run result is available right now. They appear after the next run from This week.`
       : 'Held and Candidate marks need a headline favourite and a weekly run; neither is available right now.';
   })();
 

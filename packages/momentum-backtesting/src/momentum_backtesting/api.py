@@ -32,6 +32,7 @@ from . import (
     saved_identity,
     search,
     stock_actions,
+    this_week,
 )
 from . import groups as groups_mod
 from .categories import broad
@@ -67,6 +68,7 @@ from .engine import (
     run_backtest,
 )
 from .fetch import load_universe
+from .forward_journal import week_string as journal_week_string
 from .notify import IST, Notification
 from .run_parts import RunParts, SectionReleased
 from .stocks import ui_data
@@ -2423,6 +2425,59 @@ def _journal_view(week: str | None) -> dict:
     return {"available": True, "weeks": weeks, "week": selected, "entries": entries, "check": check}
 
 
+def _week_view(week: str | None) -> dict:
+    """GET /api/week (BL-051): every favourite's signal for one week, from the journal, and the
+    headline's message. Defaults to the latest Friday on or before today."""
+    from . import forward_journal as journal
+    from .weekly import week_ending_on_or_before
+
+    target = journal.week_string(week_ending_on_or_before(datetime.now(IST).date()))
+    selected = journal.week_string(week) if week else target
+    previous = journal.week_string(pd.Timestamp(selected) - pd.Timedelta(weeks=1))
+    try:
+        with read_catalog() as con:
+            favourites = runs_store.list_favorites(con, include_groups=True)
+            groups = runs_store.list_groups(con)
+            if db_read._has_table(con, journal.TABLE):
+                rows = journal.entries(con, selected)
+                prior = journal.entries(con, previous)
+                weeks = [
+                    w
+                    for (w,) in con.execute(
+                        f"SELECT DISTINCT strftime(week, '%Y-%m-%d') FROM {journal.TABLE} "
+                        "ORDER BY 1 DESC"
+                    ).fetchall()
+                ]
+            else:
+                rows, prior, weeks = [], [], []
+    except (FileNotFoundError, duckdb.CatalogException):
+        favourites, groups, rows, prior, weeks = [], [], [], [], []
+    return {
+        "week": selected,
+        "target_week": target,
+        "weeks": weeks,
+        "favourites": this_week.week_view(selected, rows, prior, favourites, groups),
+        "message": this_week.message_for(this_week.load_messages(this_week.state_dir()), selected),
+    }
+
+
+def _run_live_rules_check() -> dict:
+    """The live-money rules check as the Friday 21:30 job runs it, without sending, saved for
+    the dashboard (BL-051)."""
+    from . import live_rules
+    from .weekly import week_ending_on_or_before
+
+    report = live_rules.run_check(echo=lambda _m: None)
+    severity, title, _ = live_rules.summary(report)
+    # As `mbt live-rules check` does: numbers that stop short of this week are flagged stale.
+    expected = str(week_ending_on_or_before(datetime.now(IST).date()))
+    stale = expected if report.week is not None and report.week < expected else None
+    if stale:
+        severity, title = "error", "Live-rules check ran on stale data"
+    live_rules.save_last(report, severity, title, this_week.state_dir(), stale=stale)
+    return live_rules.load_last(this_week.state_dir()) or {}
+
+
 def _journal_line(journal: dict) -> str | None:
     """The Telegram line that witnesses the journal: Telegram's own timestamp then proves how
     long the chain was, and its newest hash, when this message went out."""
@@ -2533,6 +2588,26 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
                 type="momentum.journal",
             )
         )
+    # BL-051: keep what was (or would have been) sent, for This week's message card.
+    message = (
+        active_result.notification if active_result else blocked_note if blocked_note else None
+    )
+    if message is not None:
+        # The message card is a convenience; the run has already done its job.
+        with contextlib.suppress(OSError):
+            this_week.save_message(
+                this_week.state_dir(),
+                week=(
+                    journal_week_string(active_result.signal["week"])
+                    if active_result is not None and (active_result.signal or {}).get("week")
+                    else (journal_week_string(target_week) if target_week is not None else None)
+                ),
+                run=body.run,
+                title=message.title,
+                body=message.body,
+                sent=sent_main,
+                headline=active["name"] if active is not None else None,
+            )
     return {
         "title": (
             active_result.notification.title
@@ -2621,6 +2696,7 @@ class _SingleFlightJob:
 
 
 WEEKLY_JOBS = _SingleFlightJob()
+LIVE_RULES_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
 
 
@@ -2795,7 +2871,41 @@ _SCHEDULED_RUNS = (
     ("final", "Fri 16:45 IST", 16, 45, "launchd-weekly-final.log"),
     ("stock-ingest", "Fri 19:30 IST", 19, 30, "launchd-weekly-stock-ingest.log"),
     ("journal-check", "Fri 21:00 IST", 21, 0, "launchd-weekly-journal-check.log"),
+    ("live-rules", "Fri 21:30 IST", 21, 30, "launchd-weekly-live-rules.log"),
 )
+#: The scheduler's job id for each scheduled run (`apps/scheduler/src/jobs.ts`).
+_SCHEDULER_JOB_IDS = {
+    "preview": "momentum-preview",
+    "final": "momentum-final",
+    "stock-ingest": "momentum-stock-ingest",
+    "journal-check": "momentum-journal-check",
+    "live-rules": "momentum-live-rules",
+}
+
+
+def _scheduler_last_runs() -> dict[str, tuple[str | None, int | None]]:
+    """(ended_at, exit_code) of each job's latest run in the scheduler's own history
+    (`apps/scheduler`, SQLite at SCHEDULER_STATE_DIR), read-only. A log file's time moves when a
+    run fails too, so only the exit code says whether it worked. Empty when there is none."""
+    import sqlite3
+
+    root = os.environ.get("SCHEDULER_STATE_DIR", "").strip() or str(
+        Path.home() / "Library" / "Application Support" / "ai-trading-agent"
+    )
+    path = Path(root) / "scheduler.db"
+    if not path.exists():
+        return {}
+    try:
+        with contextlib.closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=2)) as db:
+            rows = db.execute(
+                "SELECT job, ended_at, exit_code FROM runs r WHERE id = "
+                "(SELECT max(id) FROM runs WHERE job = r.job)"
+            ).fetchall()
+    except sqlite3.Error:
+        return {}
+    return {job: (ended, code) for job, ended, code in rows}
+
+
 # A scheduled job fired more than this many minutes after its scheduled time (typically the
 # laptop was asleep, per TODO.md 3.11.5's launchd caveat) is flagged "ran late" rather than
 # silently treated as on time.
@@ -2871,6 +2981,7 @@ def _weekly_status(today: date | None = None) -> dict:
     ]
 
     schedule = []
+    scheduler_runs = _scheduler_last_runs()
     for run, when, hour, minute, log_name in _SCHEDULED_RUNS:
         log = DATA_DIR / log_name
         last_ran_at = last_line = None
@@ -2887,6 +2998,7 @@ def _weekly_status(today: date | None = None) -> dict:
             delay = (ran_at - scheduled_at).total_seconds() / 60
             if delay > _LATE_THRESHOLD_MINUTES:
                 ran_late_by_minutes = round(delay)
+        ended_at, exit_code = scheduler_runs.get(_SCHEDULER_JOB_IDS[run], (None, None))
         schedule.append(
             {
                 "run": run,
@@ -2894,6 +3006,9 @@ def _weekly_status(today: date | None = None) -> dict:
                 "last_ran_at": last_ran_at,
                 "last_line": last_line,
                 "ran_late_by_minutes": ran_late_by_minutes,
+                # BL-051: the scheduler's verdict on its latest run of this job (None: unknown).
+                "last_exit_code": exit_code,
+                "last_exit_at": ended_at,
             }
         )
 
@@ -3492,6 +3607,25 @@ def create_app() -> FastAPI:
     @app.get("/api/weekly/status")
     def weekly_status() -> dict:
         return _weekly_status()
+
+    @app.get("/api/week")
+    def week_view(week: date | None = None) -> dict:
+        return _week_view(week.isoformat() if week else None)
+
+    @app.get("/api/live-rules")
+    def live_rules_last() -> dict:
+        """The latest live-money rules check (the 21:30 job's, or one run from here)."""
+        from . import live_rules
+
+        return {
+            "report": live_rules.load_last(this_week.state_dir()),
+            "job": LIVE_RULES_JOBS.latest(),
+        }
+
+    @app.post("/api/live-rules/run", status_code=202)
+    def live_rules_run() -> dict:
+        job, started = LIVE_RULES_JOBS.start(_run_live_rules_check, {})
+        return {"job": job, "started": started}
 
     @app.get("/api/journal")
     def forward_journal_view(week: str | None = None) -> dict:

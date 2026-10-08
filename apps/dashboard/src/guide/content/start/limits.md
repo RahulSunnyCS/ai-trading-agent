@@ -43,7 +43,7 @@ passed, treat its numbers as research, not as a track record.
   collected (or bought from a data vendor). Short histories mean wide uncertainty.
 - Momentum's stock data is [survivorship](glossary:survivorship)-aware, but prices are adjusted
   for [corporate actions](glossary:corporate-action) by rules that can occasionally be wrong; the
-  [Weekly signal](guide:momentum/weekly-signal) screen asks a person to confirm suspicious moves.
+  [Weekly signal](guide:momentum/this-week) screen asks a person to confirm suspicious moves.
 
 ## The forward record is the real test
 

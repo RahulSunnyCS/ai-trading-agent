@@ -74,16 +74,16 @@ function useElapsed(startedAt: string | null, active: boolean): number {
 
 /**
  * Manual trigger for the Friday weekly signal (TODO.md 3.11.5) — the same
- * orchestration the launchd-scheduled `mbt weekly` CLI runs. The run executes
+ * orchestration the scheduled `mbt weekly` CLI runs. The run executes
  * in the background on the Momentum service, so the user can switch sections or
  * leave the dashboard; the job state lives in the parent (see
  * useMomentumWeeklyJob) so the section tab can show a running indicator too.
  *
- * Order: readiness strip, run controls, the latest run's result, then schedule and data
- * health. Sending to Telegram needs a final run and an explicit confirmation (the rules are
- * in lib/momentumWeekly.ts).
+ * Since BL-051 this is the body of This week's "Run by hand" drawer, next to `ReadinessCard`
+ * and `ScheduleCard`. Sending to Telegram needs a final run and an explicit confirmation (the
+ * rules are in lib/momentumWeekly.ts).
  */
-export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState }) {
+export function RunWeeklyPanel({ weekly }: { weekly: MomentumWeeklyJobState }) {
   const [runKind, setRunKind] = useState<WeeklyRunKind>('final');
   const [send, setSend] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -287,19 +287,11 @@ export function MomentumWeeklyView({ weekly }: { weekly: MomentumWeeklyJobState 
       </div>
 
       <ScheduleCard status={status.data ?? null} />
-      <details className="rounded-xl border border-border bg-surface p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-foreground">
-          Data health · stock action reviews
-        </summary>
-        <div className="mt-3">
-          <StockActionAlerts stockSyncFinishedAt={stockSyncFinishedAt} />
-        </div>
-      </details>
     </div>
   );
 }
 
-function StockActionAlerts({ stockSyncFinishedAt }: { stockSyncFinishedAt: string | null }) {
+export function StockActionAlerts({ stockSyncFinishedAt }: { stockSyncFinishedAt: string | null }) {
   const actions = usePolledResource<MomentumStockActionReview>('/api/momentum/stock-actions');
   const refetch = actions.refetch;
   useEffect(() => {
@@ -349,7 +341,7 @@ function StockActionAlerts({ stockSyncFinishedAt }: { stockSyncFinishedAt: strin
   );
 }
 
-function StockActionAlertRow({
+export function StockActionAlertRow({
   item,
   onSaved,
 }: {

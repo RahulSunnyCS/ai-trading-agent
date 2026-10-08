@@ -136,7 +136,7 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'backtest', label: 'Backtest' },
           { segment: 'scores', label: 'Scores' },
           { segment: 'saved', label: 'Saved runs' },
-          { segment: 'weekly', label: 'Weekly signal' },
+          { segment: 'week', label: 'This week' },
           { segment: 'rebalance', label: 'Rebalance' },
           { segment: 'journal', label: 'Journal' },
         ],

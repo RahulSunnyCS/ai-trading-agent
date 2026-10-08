@@ -485,6 +485,32 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // BL-051: This week — every favourite's signal for one week, from the journal.
+  fastify.get(
+    '/api/momentum/week',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { week: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { week } = request.query as { week?: string };
+      await forward(reply, week ? `/api/week?week=${encodeURIComponent(week)}` : '/api/week');
+    },
+  );
+
+  // BL-051: the latest live-money rules check, and a manual re-check (never sends).
+  fastify.get('/api/momentum/live-rules', async (_request, reply) => {
+    await forward(reply, '/api/live-rules');
+  });
+  fastify.post('/api/momentum/live-rules/run', async (_request, reply) => {
+    await forward(reply, '/api/live-rules/run', { method: 'POST' });
+  });
+
   fastify.post(
     '/api/momentum/rebalance-preview',
     { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },

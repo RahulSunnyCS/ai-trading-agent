@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the page the owner acts on every Friday; paper tracking starts 2026-10-09 and real money will follow the headline favourite (BL-025) |
-| **Status** | In progress (Phase 1) |
+| **Status** | In progress (Phase 2) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard + scheduler) |
 | **Created** | 2026-10-08 |
@@ -276,3 +276,15 @@ Answered by the owner on 2026-10-08 (see the Log):
   working; a 14:40 / 16:45 run that cannot evaluate a stock-based headline stays silent (the
   19:30 run sends it); `live_rules.py` keeps reading the frozen Phase 6 file, which holds the
   same four configs as the group.
+- 2026-10-08 — Phase 1 merged (#133); review fixes in the same PR. The live "Phase 6 ensemble"
+  group was created (four sleeves, Paper, headline). A dry run of it on live data (week of 2 Oct)
+  found the group message miscounting held names and showing ranks that cannot be compared
+  across sleeves; fixed before the first Friday in #135 (shares of the group instead of ranks).
+- 2026-10-08 — Phase 2 decisions: the Rebalance tab stays until Phase 3's Your orders replaces it
+  (redirecting it now would lose the only holdings comparison); This week reads the journal, so a
+  week before the first Friday shows every favourite as "Not recorded yet"; "Names at the edge"
+  are the weakest held and strongest not held by the strategy's own rank (for a group, in the
+  sleeve that trades next) rather than a distance to an exit line, and "Room to exit" appears only
+  for a strategy with a single exit rank (Broad in category mode has none); the rules strip shows
+  the last saved check, with "Check now" re-running it here without sending; "Since the preview"
+  covers ETF favourites until Phase 3 stores the 14:15 orders.
