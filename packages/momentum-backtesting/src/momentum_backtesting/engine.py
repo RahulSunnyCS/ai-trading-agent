@@ -184,6 +184,21 @@ class Config:
     # categories held) needs 1: with the default, those weeks are silently skipped - nothing is
     # sold or bought and the curve jumps several weeks at once (TODO 3.9.23).
     min_ranked: int = 0
+    # Buffer rule only (BL-053). A stop-loss checked EVERY week, whatever `rebalance_every` is:
+    # a holding is sold once its weekly close is `stop_from_buy` or more below its average buy
+    # price (0.20 = a 20% fall), or `stop_from_peak` or more below its highest weekly close since
+    # it was first bought. None (default) = off; both None leaves the engine exactly as before.
+    # `stop_delay` 0 sells at the close the fall is seen on; 1 sells a week later, at the next
+    # close (the stop is judged on the earlier week's prices). A lower-circuit lock blocks the
+    # sale until it lifts. A stock stopped out is not bought back that same week.
+    stop_from_buy: float | None = None
+    stop_from_peak: float | None = None
+    # Where the money goes on a week that is not a rebalance week: "cash" waits (uninvested)
+    # until the next rebalance; "top" buys the best-ranked name that may be bought and is not
+    # held, up to the position cap (the rest waits). On a rebalance week the proceeds always
+    # join that week's normal reinvestment.
+    stop_proceeds: Literal["cash", "top"] = "cash"
+    stop_delay: int = 0
     # flat = cost_pct on both sides (today's model, unchanged). itemised = STT/stamp duty/
     # exchange fees/slippage/DP charge - see the rate constants above `Config`.
     cost_model: CostModel = "flat"
@@ -234,6 +249,16 @@ class Config:
             raise ValueError("rebalance_offset must be between 0 and rebalance_every - 1")
         if self.sell_every_week and self.portfolio != "buffer":
             raise ValueError("sell_every_week needs portfolio='buffer'")
+        for name in ("stop_from_buy", "stop_from_peak"):
+            level = getattr(self, name)
+            if level is not None and not 0 < level < 1:
+                raise ValueError(f"{name} must be between 0 and 1 (e.g. 0.20 for a 20% fall)")
+        if self.stop_proceeds not in ("cash", "top"):
+            raise ValueError(f"unknown stop_proceeds {self.stop_proceeds!r}")
+        if self.stop_delay not in (0, 1):
+            raise ValueError("stop_delay must be 0 or 1")
+        if self.has_stop and self.portfolio != "buffer":
+            raise ValueError("a stop-loss needs portfolio='buffer'")
         if self.min_ranked < 0:
             raise ValueError("min_ranked can't be negative")
         if self.tax_hold_band < 0 or self.tax_hold_weeks < 0:
@@ -250,6 +275,10 @@ class Config:
             raise ValueError("momentum_sizing_floor must be between 0 and 1")
         if not 0 <= self.mass_exit_throttle_fraction <= 1:
             raise ValueError("mass_exit_throttle_fraction must be between 0 and 1")
+
+    @property
+    def has_stop(self) -> bool:
+        return self.stop_from_buy is not None or self.stop_from_peak is not None
 
     @property
     def needs_trade_prices(self) -> bool:
@@ -271,6 +300,10 @@ class Config:
             rebalance += f"_taxhold{self.tax_hold_band}w{self.tax_hold_weeks}"
         if self.min_ranked:
             rebalance += f"_minranked{self.min_ranked}"
+        if self.has_stop:
+            buy = f"b{round(self.stop_from_buy * 100)}" if self.stop_from_buy else ""
+            peak = f"p{round(self.stop_from_peak * 100)}" if self.stop_from_peak else ""
+            rebalance += f"_stop{buy}{peak}{self.stop_proceeds}d{self.stop_delay}"
         cost_model = f"_{self.cost_model}" if self.cost_model != "flat" else ""
         return (
             f"{rule}_{self.defensive}_top{self.top_n}_exit{self.exit_rank}_"
@@ -647,6 +680,29 @@ class _Sim:
                 break
             out.append(n)
         return [n for n in out if not unbuyable(n)]
+
+    def best_unheld(self, week: pd.Timestamp, exclude: set[str] | frozenset[str]) -> str | None:
+        """BL-053 `stop_proceeds="top"`: the best-ranked name not in `exclude` that may be bought
+        this week (the same gates as `top_names`), down to `exit_rank` - a name ranked worse
+        would be sold at the next rebalance. None when there is none."""
+        ranks = self.ranks.loc[week].dropna().sort_values()
+        gates = [g for g in (self._no_buy, self._uc_locked) if g is not None]
+        membership = self._membership
+        for name, rank in ranks.items():
+            if rank > self.config.exit_rank:
+                return None
+            if name in exclude or not self.passes_filter(name, week):
+                continue
+            if (
+                membership is not None
+                and membership.has(name)
+                and not bool(membership.at(week, name))
+            ):
+                continue
+            if any(g.has(name) and bool(g.at(week, name)) for g in gates):
+                continue
+            return name
+        return None
 
     def tax(self, asset: str, gain: float, held_days: int) -> float:
         if self.ledger is None:
@@ -1207,10 +1263,68 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
         }
         return gross, gross * (1 - sell_frac) - tax, tax, fill
 
+    def stop_reason(asset: str, i: int) -> str | None:
+        """Why the stop-loss sells `asset` at weeks[i], judged on the close `stop_delay` weeks
+        earlier, or None. Never a reason while the sale itself is locked."""
+        week = weeks[i]
+        if sim.sell_blocked(asset, week):
+            return None
+        seen = weeks[i - config.stop_delay] if i >= config.stop_delay else None
+        position = lots[asset]
+        since = min(lot["since"] for lot in position)
+        if seen is None or seen < since:
+            return None  # bought after the week the stop looks at
+        now = sim.price(asset, seen)
+        if not now > 0:
+            return None
+        units = sum(lot["units"] for lot in position)
+        if config.stop_from_buy is not None and units > 0:
+            bought = sum(lot["basis"] for lot in position) / units
+            fall = 1 - now / bought
+            if fall >= config.stop_from_buy:
+                return f"stop: {fall:.0%} below the buy price"
+        if config.stop_from_peak is not None:
+            peak = sim.prices.loc[since:seen, asset].max()
+            fall = 1 - now / peak if peak > 0 else 0.0
+            if fall >= config.stop_from_peak:
+                return f"stop: {fall:.0%} below the peak"
+        return None
+
     for i, week in enumerate(weeks[:-1]):
         proceeds, uninvested = uninvested, 0.0
 
         is_buy_week = week in sim.trade_weeks
+        stopped: set[str] = set()
+        stop_net = 0.0
+        if config.has_stop:
+            # 0. Stop-loss, every week (BL-053), before the rank exits.
+            for asset in [a for a in lots if a != _POOL]:
+                reason = stop_reason(asset, i)
+                if reason is None:
+                    continue
+                position = lots[asset]
+                since = min(lot["since"] for lot in position)
+                basis = sum(lot["basis"] for lot in position)
+                value_before = value(asset, week)
+                details = sim.exit_details(asset, week, since, basis, value_before)
+                _, net, tax, fill = sell(asset, 1.0, week)
+                sim.record(week, "SELL", asset, reason, value_before, tax=tax, **details, **fill)
+                proceeds += net
+                stop_net += net
+                stopped.add(asset)
+            if stopped and not is_buy_week and config.stop_proceeds == "top":
+                name = sim.best_unheld(week, set(lots) | stopped)
+                if name is not None:
+                    total = portfolio_value(week) + proceeds
+                    amount = min(stop_net, room(name, total, week))
+                    label = sim.group(week, name) if gcap is not None else None
+                    if label is not None:
+                        amount = min(amount, group_room(label, total, week))
+                    if amount > MIN_TRADE * total:
+                        fill = buy(name, amount, week)
+                        rank = int(sim.rank(week, name))
+                        sim.record(week, "BUY", name, f"rank {rank} (after a stop)", amount, **fill)
+                        proceeds -= amount
         if is_buy_week or config.sell_every_week:
             # 1. Sell whatever has dropped out. Gated on `is_buy_week` alone when
             #    `sell_every_week` is off (the original, unchanged behaviour); with it on, this
@@ -1260,6 +1374,7 @@ def _run_buffer(sim: _Sim, weeks: list[pd.Timestamp]) -> _Outcome:
             # 3. Split the money equally across the current top N, but never past the cap. Parked
             #    cash joins in as soon as there's room for it.
             tops = sim.top_names(week, frozenset(a for a in lots if a != _POOL))
+            tops = [n for n in tops if n not in stopped]
             total = portfolio_value(week) + proceeds
             if tops and _POOL in lots:
                 need = absorbable(tops, total, week) - proceeds

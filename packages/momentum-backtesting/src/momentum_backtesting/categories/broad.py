@@ -1158,6 +1158,11 @@ def run_broad_backtest(
     # Capital-gains tax per sale (tax.py). None = pre-tax, exactly as before. Every stock is
     # taxed as listed equity; the atomics by what they are (see `_tax_classes`).
     tax: tax_mod.TaxRules | None = None,
+    # BL-053 stop-loss (engine.Config's fields of the same names). Off by default.
+    stop_from_buy: float | None = None,
+    stop_from_peak: float | None = None,
+    stop_proceeds: Literal["cash", "top"] = "cash",
+    stop_delay: int = 0,
 ) -> BroadBacktestResult:
     """Step 2 (if `ranking` isn't already supplied -- e.g. by a caller's own cache, see
     `api.py`'s `get_categories_universe` for the equivalent Custom Index pattern) plus either
@@ -1323,6 +1328,10 @@ def run_broad_backtest(
         mass_exit_throttle=(mass_exit_response == "throttle"),
         mass_exit_throttle_fraction=mass_exit_throttle_fraction,
         tax=tax,
+        stop_from_buy=stop_from_buy,
+        stop_from_peak=stop_from_peak,
+        stop_proceeds=stop_proceeds,
+        stop_delay=stop_delay,
     )
     result = engine.run_backtest(
         prices,
