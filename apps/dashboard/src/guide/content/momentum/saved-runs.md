@@ -35,6 +35,24 @@ the newest 10 per dataset; a star keeps one for good. Click a row to open its dr
 - **Notes:** a line of your own, saved when you leave the box.
 - **Open in Backtest**, **Show on Backtest chart** (an overlay), **Remove** (every run of it).
 
+## What the saved runs say
+
+Below the list (and the compare bar) a card lists up to five findings worked out from the saved
+strategies, most pressing first, each with a link to where you act:
+
+- **Moved results to review:** a Not reproducible or Check change nobody has marked reviewed.
+- **Your highest CAGR is not tradable as tested:** the top result was run with the tradability
+  filter or the circuit rule off. When the same settings with both on are saved, the finding
+  names that tradable version and **Compare the two** ticks both; the drawer draws it dashed
+  beside the strategy.
+- **Same settings, different result:** the latest run moved the result, and why.
+- **Not comparable with the rest:** old data, or a different start from most strategies.
+- **The validated strategies are lower than the best backtests, by design:** every higher one
+  is in-sample.
+- **N saved runs are M strategies:** how many repeats were folded together.
+
+**Hide** folds the card away; this browser remembers it until you choose **Show** again.
+
 ## Why a result moved
 
 Every run records three things: its settings, the version of the data and the version of the

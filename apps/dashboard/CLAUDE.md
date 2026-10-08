@@ -19,7 +19,8 @@ The Momentum view is the sole Momentum frontend. Its Saved runs section (BL-052,
 `components/momentum/saved/SavedStrategiesView.tsx`) lists one row per saved *strategy* across
 every dataset from `/api/momentum/saved-strategies`, sets each favourite's status, makes the
 headline and groups, and opens a strategy drawer (`?strategy=<id>`) with why a result moved;
-names, differences from the defaults, trust and change wording are in `lib/momentumSaved.ts`.
+names, differences from the defaults, trust and change wording are in `lib/momentumSaved.ts`,
+the findings card's rules in `lib/momentumFindings.ts`.
 Every favourite is evaluated each Friday while only the headline's result is delivered. The Python package
 serves its API;
 its research chart uses a lazy-loaded Plotly basic bundle with optional wheel/
@@ -165,7 +166,7 @@ needs to be shared with the server, it is currently hand-duplicated in
   (Settings tab); `src/store/theme.ts` — Zustand theme store; `src/store/navigation.ts` owns the
   locally persisted tab visibility/order preferences; `src/store/momentumScores.ts` and
   `src/store/momentumScoresViews.ts` what the reader keeps on Momentum › Scores (hidden columns, the map's
-  minimum stocks; saved views of the Stocks list and the strip card's open state); `src/store/momentumAlerts.ts` which alerts have popped up today (per browser; the "at most once a day" rule is `lib/momentumAlerts.ts`); `src/store/momentumView.ts` the Momentum
+  minimum stocks; saved views of the Stocks list and the strip card's open state); `src/store/momentumAlerts.ts` which alerts have popped up today (per browser; the "at most once a day" rule is `lib/momentumAlerts.ts`); `src/store/momentumSaved.ts` whether Saved runs' findings card is hidden; `src/store/momentumView.ts` the Momentum
   result layout (the headline benchmark pick, the chart's drawdown pane and week list, the full metric set). Personality/live state is
   fetched via hooks, not centralized in a store.
 - `src/guide/` — the Guide's registry, glossary and Markdown pages; `components/guide/` renders them
