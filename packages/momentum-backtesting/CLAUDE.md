@@ -390,6 +390,17 @@ contract, not a shared service).
   (BL-024 Phase 3). A breach is sent untagged (never switchable); the routine status is the
   `momentum.live_rules` type. Exit 0 on a breach, 1 only when the check cannot run or the data is
   stale. Scheduler job `momentum-live-rules`, Fri 21:30 IST.
+- `this_week.py` (BL-051) — Momentum › This week's data: `week_view` builds one card per
+  favourite (a group's from its sleeves via `groups.combine`, sleeves never shown alone) from the
+  **forward journal** of that week and the week before, so it survives restarts and covers the
+  scheduled CLI runs the API never sees. `GET /api/week?week=` serves it. The weekly run keeps the
+  headline's message (`save_message` → `weekly_messages.json`, last 40) and the live-rules check
+  keeps its last report (`live_rules.save_last` → `live_rules_last.json`, written by `mbt
+  live-rules check` and by `POST /api/live-rules/run`, a background job; `GET /api/live-rules`).
+  Both files live in `this_week.state_dir()`: `data/`, or `MOMENTUM_STATE_DIR`, which
+  `tests/conftest.py` points at a temp folder so no test writes the real ones. "Room to exit" is
+  only given for a strategy with a single exit rank (`_exit_rank`); Broad in category mode sells on
+  its category and pool ranks too, so it gets none.
 - `holdout.py` (`mbt search backcast`) — the one-shot 2012–2016 backcast (criteria addendum 5):
   claims the run before it starts and writes its result once; never run it twice, never edit
   `search_spaces/bl010_phase6_backcast_result.json`. `tracker.py` (`mbt search track <results>

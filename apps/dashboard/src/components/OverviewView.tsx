@@ -69,7 +69,7 @@ const OPTIONS_UNREACHABLE = "Can't reach the Options Lab service right now.";
 interface CardLink {
   label: string;
   tab: Tab;
-  /** Sub-route segments, e.g. ['weekly']. */
+  /** Sub-route segments, e.g. ['week']. */
   rest?: string[];
 }
 
@@ -452,7 +452,7 @@ function WeeklySignalCard() {
   if (status.data === null || !Array.isArray(status.data.signals)) {
     body = status.loading ? <CardSkeleton /> : <PlainState>{MOMENTUM_UNREACHABLE}</PlainState>;
   } else {
-    // Same reading as Momentum › Weekly signal: the newest saved final signal, and the
+    // Same reading as Momentum › This week: the newest saved final signal, and the
     // Telegram-active favourite (or the built-in live strategy when none is active).
     const latestFinal = status.data.signals.find((signal) => signal.run === 'final');
     const strategyName =
@@ -492,7 +492,7 @@ function WeeklySignalCard() {
     <OverviewCard
       title="Weekly momentum signal"
       icon={<LineChart className="h-4 w-4" />}
-      links={[{ label: 'Weekly signal', tab: 'momentum', rest: ['weekly'] }]}
+      links={[{ label: 'This week', tab: 'momentum', rest: ['week'] }]}
     >
       {body}
     </OverviewCard>

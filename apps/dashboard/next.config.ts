@@ -129,6 +129,18 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/journal`,
             },
             {
+              source: '/api/momentum/week',
+              destination: `${momentumDirectOrigin}/api/week`,
+            },
+            {
+              source: '/api/momentum/live-rules',
+              destination: `${momentumDirectOrigin}/api/live-rules`,
+            },
+            {
+              source: '/api/momentum/live-rules/:path*',
+              destination: `${momentumDirectOrigin}/api/live-rules/:path*`,
+            },
+            {
               // run, jobs/latest and status
               source: '/api/momentum/weekly/:path*',
               destination: `${momentumDirectOrigin}/api/weekly/:path*`,

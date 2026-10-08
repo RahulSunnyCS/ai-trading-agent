@@ -58,6 +58,9 @@ class Report:
     weeks: int  # weeks tracked since the start
     findings: list[Finding] = field(default_factory=list)
     simulated: str | None = None
+    #: The figures behind the findings, for the dashboard's gauges (BL-051): drawdown now and
+    #: worst, the cut/exit lines, weeks tracked and needed, return against the benchmark.
+    numbers: dict = field(default_factory=dict)
 
     @property
     def breached(self) -> bool:
@@ -134,6 +137,20 @@ def evaluate(
     weeks = len(e) - 1
     report = Report(stage=stage, week=str(e.index[-1].date()), weeks=weeks)
     dd = e / e.cummax() - 1
+    report.numbers = {
+        "drawdown": float(dd.iloc[-1]),
+        "worst_drawdown": float(dd.min()),
+        "peak_week": str(e.idxmax().date()),
+        "cut_half_at": float(rules["drawdown"]["cut_half_at"]),
+        "exit_at": float(rules["drawdown"]["exit_at"]),
+        "weeks": weeks,
+        "min_paper_weeks": int(rules["money_gate"]["min_paper_weeks"]),
+        "return": float(e.iloc[-1] - 1),
+        "benchmark_return": float(b.iloc[-1] - 1),
+        "must_beat": rules["money_gate"]["must_beat"],
+        "trailing_window_weeks": int(rules["trailing"]["window_weeks"]),
+        "review_when_behind_pts": float(rules["trailing"]["review_when_behind_pts"]),
+    }
     report.findings.append(_drawdown(rules, e, dd))
     report.findings.append(_trailing(rules, weeks, live, backtest))
     report.findings.append(_gate(rules, e, b, dd, weeks))
@@ -228,6 +245,45 @@ def _gate(rules: dict, e: pd.Series, b: pd.Series, dd: pd.Series, weeks: int) ->
             cfg["confirm_action"],
         )
     return Finding("money_gate", "pending", "Money gate: not yet", detail)
+
+
+LAST_REPORT = "live_rules_last.json"
+
+
+def save_last(report: Report, severity: str, title: str, data_dir, now=None, stale=None) -> None:
+    """Keep the latest real check for the dashboard (This week's rules strip, BL-051). The file is
+    a cache of the check, not a record: the Telegram message is the record."""
+    import json
+    from datetime import datetime
+
+    from .notify import IST
+
+    payload = {
+        "checked_at": (now or datetime.now(IST)).isoformat(timespec="seconds"),
+        "severity": severity,
+        "title": title,
+        "stage": report.stage,
+        "week": report.week,
+        "weeks": report.weeks,
+        "breached": report.breached,
+        "stale": stale,
+        "numbers": report.numbers,
+        "findings": [{**f.__dict__, "needs_you": f.needs_you} for f in report.findings],
+    }
+    path = data_dir / LAST_REPORT
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, indent=1, default=str))
+    tmp.replace(path)
+
+
+def load_last(data_dir) -> dict | None:
+    import json
+
+    path = data_dir / LAST_REPORT
+    try:
+        return json.loads(path.read_text())
+    except (FileNotFoundError, ValueError):
+        return None
 
 
 def summary(report: Report) -> tuple[str, str, str]:

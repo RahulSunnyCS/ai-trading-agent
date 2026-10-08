@@ -24,9 +24,9 @@ import momentumJournal from './content/momentum/journal.md?raw';
 import momentumRebalance from './content/momentum/rebalance.md?raw';
 import momentumSavedRuns from './content/momentum/saved-runs.md?raw';
 import momentumScores from './content/momentum/scores.md?raw';
+import momentumThisWeek from './content/momentum/this-week.md?raw';
 import momentumFirstBacktest from './content/momentum/walkthrough-first-backtest.md?raw';
 import momentumReadSignal from './content/momentum/walkthrough-weekly-signal.md?raw';
-import momentumWeeklySignal from './content/momentum/weekly-signal.md?raw';
 import opsBrokerLogins from './content/operations/broker-logins.md?raw';
 import opsCoverage from './content/operations/coverage.md?raw';
 import opsJobs from './content/operations/jobs.md?raw';
@@ -160,12 +160,13 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
   },
   {
     chapter: 'momentum',
-    slug: 'weekly-signal',
-    title: 'Weekly signal',
-    summary: "Friday's buy and sell list: readiness, preview vs final, Telegram, split reviews.",
+    slug: 'this-week',
+    title: 'This week',
+    summary:
+      "Friday's signal for every favourite: the day's steps, your rules, what needs you, split reviews.",
     kind: 'Screen',
-    body: momentumWeeklySignal,
-    screen: { tab: 'momentum', rest: ['weekly'] },
+    body: momentumThisWeek,
+    screen: { tab: 'momentum', rest: ['week'] },
   },
   {
     chapter: 'momentum',

@@ -2,15 +2,17 @@ This walkthrough goes from Friday's Telegram message to a portfolio that matches
 
 ## 1. Read the message
 
-On Friday at 16:45 (IST) the headline favourite's final signal arrives. It lists what to
-**sell** (holdings that fell past the exit rank), what to **buy** (new names in the top N), and
-what to **top up** or **trim**. The 14:40 preview, if you saw it, should mostly agree.
+On Friday the headline favourite's final signal arrives: at 16:45 (IST) for an ETF strategy, at
+19:30 for a stock-based one such as the Phase 6 ensemble, once the day's stock data is in. It
+lists what to **sell**, what to **buy**, and what to **top up** or **trim**. A group's message
+also says which of its sleeves trade this week.
 
 ## 2. Check it on the dashboard
 
-Open [Weekly signal](app:/momentum/weekly). In **This week's readiness**, check the target week
-is this Friday and the data for the strategy's dataset runs through it. If not, wait for the
-scheduled job or see [Jobs](app:/jobs).
+Open [This week](app:/momentum/week). The **Friday timeline** should show the steps done; if
+**Needs attention** lists anything (data not ready, a split to classify), deal with it first.
+The headline's table shows the same trades as the message, with each name's score strip and
+rank.
 
 ## 3. See why
 
