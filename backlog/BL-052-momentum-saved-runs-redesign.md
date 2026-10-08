@@ -42,8 +42,11 @@ is a data revision or a bug. Mockups approved in the same session; they use the 
   in, settings the dataset ignores dropped, run-only switches such as `fresh` dropped, numbers
   canonical so `1` equals `1.0`) and hashed. Same dataset + same hash = same strategy.
 - **Three outcomes when a run finishes**, each with its own toast on Backtest: **new strategy**
-  (new row), **ran again** (same data and same result: run count +1, no new row), **new result**
-  (added to that strategy's run history; the row shows the latest and "moved −0.4pp").
+  (new row), **ran again** (the same result: run count +1, no new row), **new result** (a
+  different result: added to that strategy's run history; the row shows the latest and "moved
+  −0.4pp"). The outcome is decided by the result alone: the same curve on a new data version
+  (an ETF refresh changes the version a Broad rerun sees without changing its result) is **ran
+  again**, its new data version is recorded, and no change is logged.
 - **Saving stays automatic** (owner, 2026-10-08).
 - **Why it moved.** Every run stores three fingerprints: settings hash, data version
   (`db_read.data_version()` / `api.input_version()`) and code commit (`journal.code_commit()`).
@@ -51,9 +54,12 @@ is a data revision or a bug. Mockups approved in the same session; they use the 
   - **Data revised**: same code, new data. Names the tables whose fingerprint changed and the
     first week the two curves differ.
   - **Intended change**: the code changed and `tests/golden/CHANGELOG.md` has an accepted entry
-    between the two commits. Quotes its reason.
-  - **Check**: the code changed with no accepted golden change. The frozen scenarios did not
-    move, but this run did: possibly a bug the goldens miss.
+    between the two commits that moved a scenario **of the same dataset** (the changelog names
+    each scenario; its prefix is the dataset). Quotes that entry's reason. An accepted change to
+    another dataset explains nothing here: an accepted Broad change cannot hide an ETF move.
+  - **Check**: the code changed with no accepted same-dataset golden change in between. The
+    frozen scenarios of this dataset did not move, but this run did: possibly a bug the goldens
+    miss. Data and code both changed counts as Check too, never Data revised.
   - **Not reproducible**: same settings, code and data, different result. A bug. Shown as a
     finding and sent to Telegram when the strategy is a favourite.
   - **Unknown**: a run saved before the fingerprints existed (all 26 today).
@@ -151,14 +157,21 @@ Each phase is one PR, reviewed and merged before the next. Built after BL-051 Ph
   - Strategy record per version: name (auto or typed, with a flag), notes, overlay, and the
     BL-051 status fields, which move from the run summary to the strategy. Runs keep their own
     kpis, curve, `data_version`, `data_through`, `code_commit`.
-  - `save_run` returns `{outcome: new | repeat | new_result, strategy, run}`; `repeat` (same data
-    version and the same curve within a tolerance) stores the run without a new strategy.
+  - `save_run` returns `{outcome: new | repeat | new_result, strategy, run}`. `repeat` = the same
+    curve and kpis within a tolerance, whatever the data version (a fingerprint that moved with
+    an unchanged result is stored on the run, not logged as a change); `new_result` = a different
+    curve. Test both, including a rerun after a refresh of another dataset's data.
   - `explain(previous_run, run)` → `data_revised | intended | check | not_reproducible | unknown`,
     with the changed table names, the first differing week and, for `intended`, the golden
-    changelog reason. `not_reproducible` on a favourite sends a Telegram alert through
+    changelog reason. `intended` requires an accepted entry between the two commits whose
+    scenarios include this strategy's dataset; otherwise `check`. Tests: an ETF move with only a
+    Broad entry in between is `check`; code and data both changed is `check`. `not_reproducible` on a favourite sends a Telegram alert through
     `notify.py`.
   - `momentum_result_changes` (trading-data migration): append-only, written in the same
-    transaction as the run that moved; a `reviewed_at` / `reviewed_by` pair is the only thing set
+    transaction as the run that moved. Add it, and the new strategy-record table, to
+    `db_read.RUN_RECORD_TABLES`: `table_fingerprints()` hashes every other table, so without this
+    the first change row would itself move the next run's data version, and an identical rerun
+    would read as Data revised instead of Not reproducible (test this); a `reviewed_at` / `reviewed_by` pair is the only thing set
     later. One JSON log line per change. `GET /api/result-changes?unreviewed=1` and
     `POST /api/result-changes/{id}/reviewed`.
   - Prune by strategy: keep the newest 10 non-kept strategies per dataset (kept = followed,
@@ -248,3 +261,7 @@ To ask when started:
 - 2026-10-08 — owner: log every result change in the backend for later analytics, and make a
   change visible in the UI. Added `momentum_result_changes`, the tab count, and the bell / pop-up
   entries with Mark reviewed.
+- 2026-10-08 — review fixes (PR #132 review): the change log and strategy table are excluded from
+  the data fingerprint (`RUN_RECORD_TABLES`); the same result on a new data version is "ran
+  again", not a change; "Intended change" needs an accepted golden change of the same dataset,
+  and code plus data changing together is "Check".
