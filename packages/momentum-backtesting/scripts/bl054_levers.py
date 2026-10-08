@@ -172,16 +172,37 @@ def run(lever: str, workers: int = 4) -> None:
 # --- the rules ---
 
 
+def _by_cadence(frame: pd.DataFrame, own: int) -> pd.DataFrame:
+    """L1 only: name each cell by the cadence it runs at (`cad6`, `cad4_hold`, ...), so cells
+    line up across strategies whose own cadence differs. The baseline keeps its name and is also
+    `cad<own>`."""
+    renamed = {}
+    for col in frame.columns:
+        cell, kind = col.rsplit("__", 1)
+        if cell == "baseline":
+            renamed[col] = col
+            renamed[f"cad{own}__{kind}"] = col
+        elif cell.startswith("every"):
+            renamed["cad" + cell[len("every") :] + f"__{kind}"] = col
+    return pd.DataFrame({new: frame[old] for new, old in renamed.items()})
+
+
+def _own_every(task_id: str) -> int:
+    return next(int(t["light"]["rebalance_every"]) for t in tasks() if t["id"] == task_id)
+
+
 def strategy_curves(lever: str) -> dict[str, pd.DataFrame]:
     from momentum_backtesting import choose
 
-    out = {cid: pd.read_parquet(OUT / lever / f"curves-{cid}.parquet") for cid in NAMES}
-    sleeves = {
-        c["id"]: pd.read_parquet(OUT / lever / f"curves-sleeve-{c['id']}.parquet")
-        for c in FROZEN["configs"]
-    }
+    def load(task_id: str) -> pd.DataFrame:
+        frame = pd.read_parquet(OUT / lever / f"curves-{task_id}.parquet")
+        return _by_cadence(frame, _own_every(task_id)) if lever == "l1" else frame
+
+    out = {cid: load(cid) for cid in NAMES}
+    sleeves = {c["id"]: load(f"sleeve-{c['id']}") for c in FROZEN["configs"]}
     ids = list(sleeves)
-    keys = next(iter(sleeves.values())).columns
+    first = next(iter(sleeves.values())).columns
+    keys = [k for k in first if all(k in f for f in sleeves.values())]
     out["ensemble"] = pd.DataFrame(
         {k: choose.ensemble_curve(pd.DataFrame({s: sleeves[s][k] for s in ids}), ids) for k in keys}
     )
@@ -226,9 +247,15 @@ def judge(table: pd.DataFrame, lever: str) -> pd.DataFrame:
     rows = []
     for taxed in ("pre", "tax"):
         base = table[table.cell == f"baseline__{taxed}"].set_index("strategy")
-        for key in sorted(
-            {c for c in table.cell if c.endswith(f"__{taxed}") and not c.startswith("baseline")}
-        ):
+        counts = table.cell.value_counts()
+        keys = {
+            c
+            for c in table.cell
+            if c.endswith(f"__{taxed}")
+            and not c.startswith("baseline")
+            and counts[c] == base.shape[0]
+        }
+        for key in sorted(keys):
             cell = table[table.cell == key].set_index("strategy").loc[base.index]
             better = (cell.ulcer < base.ulcer) & (cell.max_drawdown > base.max_drawdown)
             dcagr = cell.cagr - base.cagr
