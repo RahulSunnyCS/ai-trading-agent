@@ -173,6 +173,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/live-rules/:path*`,
             },
             {
+              source: '/api/momentum/alerts',
+              destination: `${momentumDirectOrigin}/api/alerts`,
+            },
+            {
               // run, jobs/latest and status
               source: '/api/momentum/weekly/:path*',
               destination: `${momentumDirectOrigin}/api/weekly/:path*`,

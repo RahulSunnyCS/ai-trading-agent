@@ -41,6 +41,7 @@ import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
 import optionsLosingDays from './content/optionslab/walkthrough-losing-days.md?raw';
 import optionsShortStraddle from './content/optionslab/walkthrough-short-straddle.md?raw';
+import startAlerts from './content/start/alerts.md?raw';
 import startDailyRoutine from './content/start/daily-routine.md?raw';
 import startLimits from './content/start/limits.md?raw';
 import startTour from './content/start/tour.md?raw';
@@ -100,6 +101,15 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     summary: 'What runs on its own each trading day and each Friday, and when to look.',
     kind: 'Introduction',
     body: startDailyRoutine,
+  },
+  {
+    chapter: 'start',
+    slug: 'alerts',
+    title: 'Alerts: the bell and the pop-up',
+    summary:
+      'What the bell in the top bar and the once-a-day pop-up tell you, and what clears them.',
+    kind: 'Introduction',
+    body: startAlerts,
   },
   {
     chapter: 'start',

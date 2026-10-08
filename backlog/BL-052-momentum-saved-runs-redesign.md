@@ -316,4 +316,6 @@ Answered by the owner on 2026-10-08 (see the Log):
   companion's config recorded next to the frozen file; automatic names read the dataset defaults
   from `/meta`, whose Broad variant builds the price frame on a cold service (split the four meta
   `defaults` blocks into static functions).
-
+- 2026-10-08 — the alert-bell follow-up is done in BL-051 Phase 5: an unreviewed Check (warning) or
+  Not reproducible (error) change is an alert whose link opens the strategy's drawer on Saved
+  runs (`/momentum/saved?strategy=<id>`); **Mark reviewed** there resolves it.

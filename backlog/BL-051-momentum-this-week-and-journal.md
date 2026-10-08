@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the page the owner acts on every Friday; paper tracking starts 2026-10-09 and real money will follow the headline favourite (BL-025) |
-| **Status** | In progress (Phase 3) |
+| **Status** | In progress (Phases 1, 2 and 5 done; Phase 3 in progress) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard + scheduler) |
 | **Created** | 2026-10-08 |
@@ -312,3 +312,18 @@ Answered by the owner on 2026-10-08 (see the Log):
   live (the account holds nothing yet, so per-holding field names follow Fyers' documentation).
   Still to come in Phase 3: Friday live scores and delay-0 estimates (in memory, provisional),
   "Since your 14:15 orders", and retiring the Rebalance tab.
+- 2026-10-08 — Phase 5 (alerts) built, ahead of Phases 3 and 4 because it does not depend on
+  them. `GET /api/alerts` (`alerts.py`) computes the open alerts from the same checks the
+  Telegram jobs use; the bell is in the top bar and the pop-up is mounted once in the app shell,
+  so it shows on every tab. Kinds: unclassified split (link `/momentum/week?review=SYMBOL`), the
+  headline's data not ready after its Friday run, a journal entry missing after the 21:00 check
+  (or a broken chain), an unreviewed Check / Not reproducible result change (BL-052; link
+  `/momentum/saved?strategy=<id>`), and live-money rules the last saved check says need you.
+  Not yet, because their sources arrive with the phase that builds them: "Fyers login expired
+  before 14:15" (Phase 3). Decisions: data readiness alerts only for the **headline's** dataset
+  (a Watching favourite's late data is on This week, not worth a pop-up); showing an alert records
+  the day in localStorage, so a pop-up is at most once a day however it is closed, and "Remind me
+  tomorrow" and the close button are the same; alert ids are kind + subject (`split:SYM:ex-date`,
+  `journal:missing:week`, `change:id`, `rules:rule:level:week`); `opened_at` / `resolved_at` come
+  from a small state file, so a locked catalog keeps the previous alerts rather than clearing
+  them.

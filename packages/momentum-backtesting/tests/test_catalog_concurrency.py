@@ -87,6 +87,7 @@ def test_meta_and_saved_runs_requests_in_parallel_never_clash(client, clashes):
             ("GET", "/api/saved-runs", {"dataset": "etf"}),
             ("GET", "/api/favorite-strategies", {}),
             ("GET", "/api/weekly/status", {}),
+            ("GET", "/api/alerts", {}),  # the bell polls it from every page
             # A write moves the catalog's mtime, so the next meta recomputes data_version
             # with a read-only connection: the exact read that clashed live.
             ("POST", "/api/saved-runs", _payload(n)),
@@ -125,6 +126,7 @@ def test_read_endpoints_open_the_catalog_read_only(client, monkeypatch):
         ("/api/favorite-strategies", {}),
         ("/api/meta", {"dataset": "etf"}),
         ("/api/weekly/status", {}),
+        ("/api/alerts", {}),
     ]:
         assert client.get(path, params=params).status_code == 200, path
     assert modes and all(modes), modes

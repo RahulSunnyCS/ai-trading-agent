@@ -239,6 +239,7 @@ def test_tool_state_files_do_not_move_the_input_version(tmp_path, monkeypatch):
     before = api.input_version()
     (tmp_path / ".fyers_token.json").write_text("{}")  # rewritten every morning
     (tmp_path / "live_rules_last.json").write_text("{}")
+    (tmp_path / "alerts_state.json").write_text("{}")  # rewritten when an alert opens or clears
     (tmp_path / "launchd-weekly-final.log").write_text("x")
     assert api.input_version() == before
     (tmp_path / "weekly_closes.csv").write_text("ab")  # a real input still counts

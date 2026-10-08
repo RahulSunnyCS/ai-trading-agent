@@ -559,6 +559,11 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, '/api/live-rules/run', { method: 'POST' });
   });
 
+  // BL-051 Phase 5: what needs a person (the bell and the pop-up), polled from every page.
+  fastify.get('/api/momentum/alerts', async (_request, reply) => {
+    await forward(reply, '/api/alerts');
+  });
+
   fastify.post(
     '/api/momentum/rebalance-preview',
     { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },

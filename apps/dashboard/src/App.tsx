@@ -20,6 +20,7 @@ import { SettingsView } from './components/SettingsView';
 import { TradesView } from './components/TradesView';
 import { GuideLink } from './components/guide/GuideLink';
 import { GuideView } from './components/guide/GuideView';
+import { AlertsPopup } from './components/shell/AlertsPopup';
 import { BottomBar } from './components/shell/BottomBar';
 import { Sidebar } from './components/shell/Sidebar';
 import { TokenBanner } from './components/shell/TokenBanner';
@@ -27,6 +28,7 @@ import { Topbar } from './components/shell/Topbar';
 import { type Tab, activeNavChild, navItem, tabLabel } from './components/shell/nav';
 import { PENDING_BY_TAB } from './components/shell/pending';
 import { Toaster } from './components/ui/Toast';
+import { hydrateMomentumAlertsFromStorage } from './store/momentumAlerts';
 import {
   DEFAULT_NAVIGATION_PREFERENCES,
   type NavigationPreferences,
@@ -106,6 +108,7 @@ const MAIN_ID = 'main-content';
  *   drawer       the same navigation as a slide-over (below lg)
  *   main column  <Topbar>, then <main id="main-content"> with the active view
  *   <BottomBar>  section tab bar (below md)
+ *   <AlertsPopup> the once-a-day alert card, on every tab
  *   <Toaster>
  */
 export function App() {
@@ -133,6 +136,7 @@ export function App() {
     hydrateThemeFromStorage();
     hydrateSettingsFromStorage();
     hydrateRegimeCutsFromStorage();
+    hydrateMomentumAlertsFromStorage();
     const stored = loadNavigationPreferences();
     setNavigationPreferences(stored);
   }, []);
@@ -261,6 +265,7 @@ export function App() {
         onOpenMenu={() => setMenuOpen(true)}
         menuOpen={menuOpen}
       />
+      <AlertsPopup />
       <Toaster />
     </div>
   );

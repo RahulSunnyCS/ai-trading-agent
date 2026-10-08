@@ -49,6 +49,13 @@ labels, defaults or metrics updates its guide page in the same commit.** A new s
 sub-section gets a page and a registry entry. `guide/__tests__/registry.test.ts` fails on a broken
 link, a screen that no longer exists, or a Momentum / Options Lab sub-screen with no page.
 
+**Alerts (BL-051 Phase 5):** the bell (`components/shell/AlertsBell.tsx`, in the `Topbar`) and the
+once-a-day pop-up (`AlertsPopup.tsx`, mounted once in `App.tsx` so it shows on every tab) both read
+`useMomentumAlerts()` (`/api/momentum/alerts`, polled every 3 minutes). An alert's `link` is an
+in-app path with its query; open it with `navigateToLink` (`hooks/useQueryState.ts`), never a plain
+`<a>` (a page load) or `useAppRoute().navigate` (drops the query). A new alert kind is added in
+`packages/momentum-backtesting/src/momentum_backtesting/alerts.py`; the dashboard needs no change.
+
 **Remote hosting:** `src/middleware.ts` (logic in `lib/accessGate.ts`, cookie signing in
 `lib/session.ts`) puts a login in front of everything (a `/login` page and session cookie for
 people, HTTP Basic for `/api/*` and curl) and adds the Cloudflare Access service token to forwarded `/api/*`
@@ -159,7 +166,7 @@ needs to be shared with the server, it is currently hand-duplicated in
   (Settings tab); `src/store/theme.ts` — Zustand theme store; `src/store/navigation.ts` owns the
   locally persisted tab visibility/order preferences; `src/store/momentumScores.ts` and
   `src/store/momentumScoresViews.ts` what the reader keeps on Momentum › Scores (hidden columns, the map's
-  minimum stocks; saved views of the Stocks list and the strip card's open state); `src/store/momentumSaved.ts` whether Saved runs' findings card is hidden; `src/store/momentumView.ts` the Momentum
+  minimum stocks; saved views of the Stocks list and the strip card's open state); `src/store/momentumAlerts.ts` which alerts have popped up today (per browser; the "at most once a day" rule is `lib/momentumAlerts.ts`); `src/store/momentumSaved.ts` whether Saved runs' findings card is hidden; `src/store/momentumView.ts` the Momentum
   result layout (the headline benchmark pick, the chart's drawdown pane and week list, the full metric set). Personality/live state is
   fetched via hooks, not centralized in a store.
 - `src/guide/` — the Guide's registry, glossary and Markdown pages; `components/guide/` renders them
