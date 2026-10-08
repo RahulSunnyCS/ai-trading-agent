@@ -5,7 +5,7 @@ resolved when the check clears."""
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -253,8 +253,12 @@ def test_alerts_are_ordered_error_first_then_oldest():
 
 @pytest.fixture
 def client(monkeypatch):
-    # A clock two weeks ahead, so the Friday it names is after anything these tests create.
-    now = datetime.now(IST) + timedelta(days=14)
+    # A Saturday noon at least two weeks ahead: the Friday before it is after anything these
+    # tests create, and every Friday step (16:45, 19:30, the 21:00 journal check) is past, so
+    # the result does not depend on the day or hour the suite runs.
+    ahead = (datetime.now(IST) + timedelta(days=14)).date()
+    saturday = ahead + timedelta(days=(5 - ahead.weekday()) % 7)
+    now = datetime.combine(saturday, time(12, 0), tzinfo=IST)
     monkeypatch.setattr(api, "_now", lambda: now)
     monkeypatch.setattr(
         api, "_weekly_status", lambda today=None: {"datasets": [], "target_week": ""}
