@@ -119,6 +119,14 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/saved-runs/:runId`,
             },
             {
+              source: '/api/momentum/saved-strategies',
+              destination: `${momentumDirectOrigin}/api/saved-strategies`,
+            },
+            {
+              source: '/api/momentum/result-changes',
+              destination: `${momentumDirectOrigin}/api/result-changes`,
+            },
+            {
               // BL-052: one strategy per set of settings (+ `merge`, `:runId`), and the log of
               // why a result moved (+ `:changeId/reviewed`).
               source: '/api/momentum/saved-strategies/:path*',
@@ -151,6 +159,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/live-rules/:path*`,
             },
             {
+              source: '/api/momentum/alerts',
+              destination: `${momentumDirectOrigin}/api/alerts`,
+            },
+            {
               // run, jobs/latest and status
               source: '/api/momentum/weekly/:path*',
               destination: `${momentumDirectOrigin}/api/weekly/:path*`,
@@ -158,6 +170,14 @@ const nextConfig: NextConfig = {
             {
               source: '/api/momentum/rebalance-preview',
               destination: `${momentumDirectOrigin}/api/rebalance-preview`,
+            },
+            {
+              source: '/api/momentum/rebalance-preview/jobs',
+              destination: `${momentumDirectOrigin}/api/rebalance-preview/jobs`,
+            },
+            {
+              source: '/api/momentum/rebalance-preview/jobs/:id',
+              destination: `${momentumDirectOrigin}/api/rebalance-preview/jobs/:id`,
             },
           ]
         : []),

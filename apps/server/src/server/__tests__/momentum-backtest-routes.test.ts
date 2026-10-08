@@ -244,6 +244,7 @@ describe('momentum backtest proxy routes', () => {
         '/api/momentum/saved-strategies?dataset=broad',
         '/api/saved-strategies?dataset=broad',
       ],
+      ['GET', '/api/momentum/saved-strategies/summary', '/api/saved-strategies/summary'],
       ['GET', '/api/momentum/saved-strategies/merge', '/api/saved-strategies/merge'],
       ['POST', '/api/momentum/saved-strategies/merge', '/api/saved-strategies/merge'],
       ['GET', '/api/momentum/saved-strategies/abc', '/api/saved-strategies/abc'],
@@ -375,7 +376,7 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
-  it("forwards This week's view and the live-rules check, and refuses a week that is not a date", async () => {
+  it("forwards This week's view, the alerts and the live-rules check, and refuses a week that is not a date", async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);
     fetchMock.mockResolvedValue(jsonResponse(200, { ok: true }));
@@ -399,6 +400,12 @@ describe('momentum backtest proxy routes', () => {
     expect(fetchMock).toHaveBeenLastCalledWith(
       'http://127.0.0.1:8765/api/live-rules/run',
       expect.objectContaining({ method: 'POST' }),
+    );
+
+    await server.inject({ method: 'GET', url: '/api/momentum/alerts' });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      'http://127.0.0.1:8765/api/alerts',
+      expect.anything(),
     );
 
     fetchMock.mockClear();

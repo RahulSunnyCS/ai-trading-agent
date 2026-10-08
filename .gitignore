@@ -46,3 +46,4 @@ apps/server/data/sym_master/
 
 # Postman collections — may embed live API tokens, keep local-only
 docs/*.postman_collection.json
+.env.cf-build-hidden

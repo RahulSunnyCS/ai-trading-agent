@@ -322,6 +322,10 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  fastify.get('/api/momentum/saved-strategies/summary', async (_request, reply) => {
+    await forward(reply, '/api/saved-strategies/summary');
+  });
+
   fastify.get('/api/momentum/saved-strategies/merge', async (_request, reply) => {
     await forward(reply, '/api/saved-strategies/merge');
   });
@@ -511,6 +515,11 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     await forward(reply, '/api/live-rules/run', { method: 'POST' });
   });
 
+  // BL-051 Phase 5: what needs a person (the bell and the pop-up), polled from every page.
+  fastify.get('/api/momentum/alerts', async (_request, reply) => {
+    await forward(reply, '/api/alerts');
+  });
+
   fastify.post(
     '/api/momentum/rebalance-preview',
     { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
@@ -520,6 +529,36 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request.body),
       });
+    },
+  );
+
+  // The preview can outlast Cloudflare's ~100 s request limit: start a job, poll it.
+  fastify.post(
+    '/api/momentum/rebalance-preview/jobs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/rebalance-preview/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.get(
+    '/api/momentum/rebalance-preview/jobs/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await forward(reply, `/api/rebalance-preview/jobs/${id}`);
     },
   );
 });

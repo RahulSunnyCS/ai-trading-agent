@@ -132,6 +132,22 @@ def identity(dataset: str, config: dict[str, Any]) -> tuple[dict[str, Any] | Non
     return settings, (_hash(settings) if settings is not None else raw_hash(config))
 
 
+def complete(dataset: str, config: dict[str, Any]) -> dict[str, Any]:
+    """The config with every setting the request model would default spelled out: what the run
+    actually used, so a form filled from it (whose own defaults differ for some settings, e.g.
+    Broad's tradability filter) runs the same strategy. The config itself when it is refused."""
+    from .api import BacktestRequest
+
+    try:
+        request = BacktestRequest.model_validate({**config, "dataset": dataset})
+    except ValidationError:
+        return config
+    full = request.model_dump(mode="json", exclude=set(RUN_ONLY_FIELDS))
+    if "universe" not in config:
+        full.pop("universe", None)
+    return full
+
+
 def fingerprint(dataset: str, config: dict[str, Any]) -> str:
     """The strategy's identity within its dataset: same fingerprint = same strategy."""
     return identity(dataset, config)[1]

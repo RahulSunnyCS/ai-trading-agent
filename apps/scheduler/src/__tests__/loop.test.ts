@@ -8,7 +8,7 @@ import type { Job } from '../jobs.js';
 import { decide, skippedToday } from '../loop.js';
 import { type RunResult, runJob } from '../runner.js';
 import { istAt } from '../schedule.js';
-import { formatSummary, jobChecks } from '../summary.js';
+import { formatSummary, jobChecks, morningSummary } from '../summary.js';
 
 const job: Job = {
   id: 'login',
@@ -184,8 +184,11 @@ describe('review fixes', () => {
     const id = history.start('momentum-final', 'schedule', friday, '', friday);
     history.finish(id, 1, 1, friday, 'exit 1');
     const lines: string[] = [];
-    const { morningSummary } = await import('../summary.js');
-    await morningSummary(async () => undefined)({
+    // No system checks: the real ones run `gh`, `uv run mbt` and git, which took ~10 s on CI.
+    await morningSummary(
+      async () => undefined,
+      () => [],
+    )({
       repoRoot: '.',
       env: { PATH: '/usr/bin:/bin' },
       logDir: '/tmp',

@@ -34,6 +34,7 @@
       "node_modules",
       "**/.next/**",
       "**/.next-prod/**",
+      "**/.open-next/**",
       "**/.venv/**",
       "packages/momentum-backtesting/data/**",
       "packages/momentum-backtesting/tests/golden/**",

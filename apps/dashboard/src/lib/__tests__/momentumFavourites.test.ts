@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MomentumSavedRun } from '../../types/momentum';
-import {
-  filterCounts,
-  followedCount,
-  groupOf,
-  isFollowed,
-  matchesFilter,
-} from '../momentumFavourites';
+import { followedCount, isFollowed } from '../momentumFavourites';
 
 function run(id: string, patch: Partial<MomentumSavedRun> = {}): MomentumSavedRun {
   return {
@@ -44,28 +38,5 @@ describe('favourite status', () => {
     expect(followedCount(runs)).toBe(2);
     expect(isFollowed('watching')).toBe(false);
     expect(isFollowed(null)).toBe(false);
-  });
-
-  it('filters and counts by status', () => {
-    expect(runs.filter((r) => matchesFilter(r, 'paper')).map((r) => r.id)).toEqual(['g']);
-    expect(runs.filter((r) => matchesFilter(r, 'favourites')).map((r) => r.id)).toEqual([
-      'g',
-      'a',
-      'b',
-      'c',
-      'd',
-    ]);
-    expect(filterCounts(runs)).toEqual({
-      all: 6,
-      favourites: 5,
-      watching: 1,
-      paper: 1,
-      invested: 1,
-    });
-  });
-
-  it("finds a member's group", () => {
-    expect(groupOf(runs[1] as MomentumSavedRun, runs)?.id).toBe('g');
-    expect(groupOf(runs[3] as MomentumSavedRun, runs)).toBeNull();
   });
 });

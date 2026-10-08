@@ -193,18 +193,22 @@ function recentFailures(ctx: BuiltinContext, today: Check[]): Check[] {
     }));
 }
 
-export function morningSummary(sink?: AlertSink): Builtin {
+/** The checks that look outside the history table: GitHub, Fyers, the lake, git, the disk. */
+export type SystemChecks = (ctx: BuiltinContext) => Check[];
+
+const systemChecks: SystemChecks = (ctx) => [
+  algotestCheck(ctx),
+  fyersCheck(ctx),
+  optionsDataCheck(ctx),
+  checkoutCheck(ctx),
+  diskCheck(),
+];
+
+/** `system` is injectable so a test needs no `gh`, `uv`, git or network. */
+export function morningSummary(sink?: AlertSink, system: SystemChecks = systemChecks): Builtin {
   return async (ctx) => {
     const jobs = jobChecks(ctx);
-    const checks = [
-      ...jobs,
-      algotestCheck(ctx),
-      fyersCheck(ctx),
-      optionsDataCheck(ctx),
-      checkoutCheck(ctx),
-      diskCheck(),
-      ...recentFailures(ctx, jobs),
-    ];
+    const checks = [...jobs, ...system(ctx), ...recentFailures(ctx, jobs)];
     const { text } = formatSummary(istDay(ctx.now()), checks);
     ctx.log(text);
     await (sink ?? telegramSink(ctx.env, 'scheduler.morning'))(text);

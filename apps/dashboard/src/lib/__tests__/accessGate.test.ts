@@ -29,8 +29,30 @@ describe('gateConfig', () => {
       password: null,
       passwordRequired: false,
       upstream: null,
+      access: null,
       configError: null,
     });
+  });
+
+  it('reads Cloudflare Access sign-in and then needs no password', () => {
+    const config = gateConfig({
+      NODE_ENV: 'production',
+      ACCESS_TEAM_DOMAIN: 'https://My-Team.cloudflareaccess.com/',
+      ACCESS_AUD: ' abc ',
+    });
+    expect(config.access).toEqual({ teamDomain: 'my-team.cloudflareaccess.com', aud: 'abc' });
+    expect(config.passwordRequired).toBe(false);
+    expect(config.configError).toBeNull();
+  });
+
+  it.each([
+    { ACCESS_TEAM_DOMAIN: 'my-team.cloudflareaccess.com' },
+    { ACCESS_AUD: 'abc' },
+    { ACCESS_TEAM_DOMAIN: 'evil.example.com', ACCESS_AUD: 'abc' },
+  ])('reports a broken Access setup as a config error: %o', (env) => {
+    const config = gateConfig({ NODE_ENV: 'production', ...env });
+    expect(config.access).toBeNull();
+    expect(config.configError).toMatch(/ACCESS_/);
   });
 
   it('requires a password in production', () => {
@@ -90,7 +112,13 @@ describe('passwordMatches', () => {
 });
 
 describe('checkPassword', () => {
-  const required = { password: null, passwordRequired: true, upstream: null, configError: null };
+  const required = {
+    password: null,
+    passwordRequired: true,
+    upstream: null,
+    access: null,
+    configError: null,
+  };
 
   it('fails closed when required and unset', async () => {
     expect(await checkPassword(basic('u', 'x'), required)).toEqual({ kind: 'misconfigured' });
@@ -111,7 +139,13 @@ describe('checkPassword', () => {
 });
 
 describe('upstreamHeaders', () => {
-  const open = { password: null, passwordRequired: false, upstream: null, configError: null };
+  const open = {
+    password: null,
+    passwordRequired: false,
+    upstream: null,
+    access: null,
+    configError: null,
+  };
 
   it('leaves untouched requests alone', () => {
     expect(upstreamHeaders(new Headers({ accept: 'application/json' }), open)).toBeNull();
@@ -127,9 +161,9 @@ describe('upstreamHeaders', () => {
       }),
       open,
     );
-    expect(headers?.has('cf-access-client-id')).toBe(false);
-    expect(headers?.has('cf-access-client-secret')).toBe(false);
-    expect(headers?.has('authorization')).toBe(false);
+    expect(headers?.get('cf-access-client-id')).toBe('');
+    expect(headers?.get('cf-access-client-secret')).toBe('');
+    expect(headers?.get('authorization')).toBe('');
     expect(headers?.get('accept')).toBe('application/json');
   });
 
@@ -140,7 +174,7 @@ describe('upstreamHeaders', () => {
     );
     expect(headers?.get('cookie')).toBe('theme=dark; other=1');
     const only = upstreamHeaders(new Headers({ cookie: `${SESSION_COOKIE}=v1.1.2.sig` }), open);
-    expect(only?.has('cookie')).toBe(false);
+    expect(only?.get('cookie')).toBe('');
     expect(upstreamHeaders(new Headers({ cookie: 'theme=dark' }), open)).toBeNull();
   });
 
@@ -415,7 +449,7 @@ describe('middleware', () => {
     );
     expect(res.headers.get('x-middleware-request-cf-access-client-id')).toBe('real-id');
     expect(res.headers.get('x-middleware-request-cf-access-client-secret')).toBe('real-secret');
-    expect(res.headers.get('x-middleware-override-headers')).not.toContain('authorization');
+    expect(res.headers.get('x-middleware-request-authorization')).toBe('');
   });
 
   it('redirects an unauthenticated page request to /login with the path as next', async () => {
@@ -619,5 +653,18 @@ describe('middleware', () => {
     expect(location(posted)).toBe('/trades');
     expect(posted.headers.has('set-cookie')).toBe(false);
     expect(location(await middleware(request('/logout')))).toBe('/login');
+  });
+});
+
+describe('upstreamHeaders with Cloudflare Access', () => {
+  it('drops the dashboard token and its cookie but keeps other cookies', () => {
+    const config = gateConfig({ NODE_ENV: 'production' });
+    const incoming = new Headers({
+      'cf-access-jwt-assertion': 'a.b.c',
+      cookie: 'theme=dark; CF_Authorization=a.b.c; other=1',
+    });
+    const out = upstreamHeaders(incoming, config);
+    expect(out?.get('cf-access-jwt-assertion')).toBe('');
+    expect(out?.get('cookie')).toBe('theme=dark; other=1');
   });
 });

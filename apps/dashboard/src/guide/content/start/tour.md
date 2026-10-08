@@ -1,6 +1,13 @@
 A one-paragraph tour of every screen in the sidebar. Each heading links to the screen; each
 "Guide" link opens its full page.
 
+## The top bar
+
+Every screen has the same top bar: a link to that screen's Guide page, the live system status,
+and the **bell**, which lists anything that needs you (a stock to classify, data not ready, a
+missing journal entry, a saved result that moved, a live-money rule) and pops up once a day.
+[Guide](guide:start/alerts)
+
 ## Overview
 
 The landing screen. One card per daily question: is the market open, is the Fyers login valid,

@@ -45,7 +45,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-045](BL-045-dashboard-load-diet.md) | Dashboard load diet: code-split views and the Guide, landing tab before mount, last hand-rolled fetches | P2 | Planned | improvement | dashboard |
 | [BL-046](BL-046-options-api-performance.md) | Options API performance: bounded anatomy/backtest/results loads, reused connections, streamed proxies | P2 | Planned | improvement | options |
 | [BL-047](BL-047-shared-python-plumbing-and-job-locks.md) | Shared Python plumbing in `trading-data` (token, `.env`, notify, IST) and cross-process job locks | P2 | Planned | improvement | trading-data |
-| [BL-052](BL-052-momentum-saved-runs-redesign.md) | Momentum Saved runs: one row per strategy, why a result moved, findings | P2 | In progress | feature | momentum |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
@@ -56,6 +55,7 @@ Sorted by priority (P0 first), then ID.
 
 | ID | Title | Outcome | Closed |
 |---|---|---|---|
+| [BL-052](BL-052-momentum-saved-runs-redesign.md) | Momentum Saved runs: one row per strategy, why a result moved, findings | Done: one strategy per normalised set of settings, run fingerprints and the why-it-moved log, the merge (applied live), the strategies page and drawer, findings; Phases 1–3 merged (#138, #139, Phase 3 PR). Follow-ups in its Log | 2026-10-08 |
 | [BL-003](BL-003-momentum-weekly-rebalance-loading.md) | Momentum: honest loading states on Weekly signal and Rebalance | Superseded by BL-051: its findings are Phase 2's loading-state task on the merged This week page | 2026-10-08 |
 | [BL-027](BL-027-rebalance-basket-file.md) | Weekly rebalance as a broker basket-order file | Superseded by BL-051: Fyers basket file and recorded fills are its Phase 4; broker answered (Fyers) | 2026-10-08 |
 | [BL-049](BL-049-momentum-scores-redesign.md) | Momentum Scores redesign: market strip, sector rotation map, 1–10 score strips, stock drawer | Done: Sectors and Stocks views, rotation map, sector page, stock drawer, saved views, circuit locks and the strip guide; Phases 1–3 and review fixes merged (#124, #126–#128) | 2026-10-08 |

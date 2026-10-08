@@ -15,7 +15,7 @@ Open this page to read the week, to run something by hand, or to classify a poss
 | Part | What it shows |
 |---|---|
 | Friday timeline | Each scheduled step: done (with the time it ran), done late (the laptop was asleep), still to come with a countdown, due now, or missed. **Run by hand** opens a drawer with the manual run, the data status (and **Refresh stock data**) and the schedule. **Week before** / **Week after** step through the weeks the journal holds. |
-| Needs attention | Only shown when something needs you: a [possible split](glossary:corporate-action) to classify, a dataset not ready when it should be, or a journal entry still missing after the 21:00 check. |
+| Needs attention | Only shown when something needs you: a [possible split](glossary:corporate-action) to classify, a dataset not ready when it should be, or a journal entry still missing after the 21:00 check. The same items also reach you from any screen as [alerts](guide:start/alerts). |
 | Live-money rules | The last [rules check](guide:momentum/journal): weeks of paper tracking against the money gate, drawdown against your cut and exit lines, paper against the backtest, and the benchmark. **Check now** re-runs it here without sending anything. |
 | Favourites | Every favourite with its [status](glossary:favourite-status): the [headline](glossary:headline) first and larger, then the rest, scrolling sideways. Each shows this week's trades and how many names it shares with the headline. Click one to show its table below. |
 | The favourite's table | Sell, Buy and Hold, each by rank: the 1–10 score strip from Scores, the rank and how it moved since last week, the room left before the exit rank (when the strategy has a single exit rank), and the name's share after the trades. A [group](glossary:favourite-group) shows its sleeves first: the ones that trade this week, and when the others next do. Click a scored stock for its drawer. |
@@ -32,7 +32,8 @@ since the last reset in April. A week when no sleeve rebalances says so.
 ## Classifying a possible split or bonus
 
 A stock that halves overnight has usually split, not crashed. When the automatic check cannot
-match the drop to a filing, it appears under **Needs attention**; **Classify…** opens a drawer:
+match the drop to a filing, it appears under **Needs attention** and as an [alert](guide:start/alerts)
+(its **Review ›** button opens this drawer); **Classify…** opens a drawer:
 
 | Classification | When to choose it | What else to enter |
 |---|---|---|

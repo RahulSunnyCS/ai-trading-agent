@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — the workbench page where favourites are chosen; not on the real-money path, but its "why it moved" check catches results that change for no reason |
-| **Status** | In progress |
+| **Status** | Done |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard) |
 | **Created** | 2026-10-08 |
@@ -290,4 +290,32 @@ Answered by the owner on 2026-10-08 (see the Log):
   each run's config from `strategy_versions.spec`, so the version keeps the anchor's raw config.
   Rehearsed on a copy of the live catalog: 26 runs → 12 strategies, and the favourites' configs
   are byte-identical before and after, read by the old code and the new.
-
+- 2026-10-08 — Phase 1 merge applied to the live catalog after a backup
+  (`catalog.pre-bl052-merge.duckdb`): 26 runs → 12 strategies, favourites' configs unchanged.
+  Phase 2 started on a branch stacked on Phase 1. Decisions: the drawer opens with `?strategy=`
+  through `useQueryState` like This week's drawers (Esc closes it; Back does not); the BL-051
+  alert bell does not exist yet (its Phase 5), so the Saved runs tab carries the count of
+  unreviewed Check / Not reproducible changes and the bell entry waits for it; the Backtest
+  chart now leaves out the overlay of the strategy on screen by fingerprint (the old "skip the
+  first run in the list" rule hid an arbitrary run); the drawer draws the strategy's own curve
+  only (no tradable twin yet: that needs the twin found by settings, left for Phase 3's findings).
+- 2026-10-08 — Phase 2 merged (#139, with two rounds of review fixes: re-run seeds the form from
+  the strategy's full config, removing or pruning a strategy closes its open changes, overlays are
+  strategy-wide, a small /saved-strategies/summary feeds the tab label). Checked in the browser on
+  the live catalog.
+- 2026-10-08 — Phase 3 done: the findings card (`lib/momentumFindings.ts`, tested) below the list
+  and the compare bar, at most five lines, Hide remembered per browser (`store/momentumSaved.ts`);
+  the drawer draws a Not-tradable strategy's tradable version dashed beside it. "Repeats merged"
+  is worked out from the strategies (runs against strategies), not a stored merge record. Checked
+  against this morning's merged copy of the live catalog: the five findings of screen 1, in order,
+  with the 149/162 move as Unknown. By the evening the live catalog itself had changed (the ETF,
+  Stock and earlier Broad runs and the median companion were deleted outside this code; ten new
+  "Sectors" favourites saved), and there the card shows its one applicable finding.
+- 2026-10-08 — closed. Follow-ups, not in this item: the alert bell entry for Check / Not
+  reproducible changes belongs to BL-051 Phase 5; the "Comparison" trust badge needs the median
+  companion's config recorded next to the frozen file; automatic names read the dataset defaults
+  from `/meta`, whose Broad variant builds the price frame on a cold service (split the four meta
+  `defaults` blocks into static functions).
+- 2026-10-08 — the alert-bell follow-up is done in BL-051 Phase 5: an unreviewed Check (warning) or
+  Not reproducible (error) change is an alert whose link opens the strategy's drawer on Saved
+  runs (`/momentum/saved?strategy=<id>`); **Mark reviewed** there resolves it.
