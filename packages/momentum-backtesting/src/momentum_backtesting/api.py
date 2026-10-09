@@ -1989,9 +1989,8 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         # advisory `analysis.latest_signal` knows neither the price ceiling nor the circuit locks
         # Broad passes the engine, so it recommended buys the engine would refuse. One more engine
         # pass (the ranking is the run's own), made when the panel is opened.
-        return _broad_engine_signal(
-            req, _broad_decide(req, ranking, outer_prices, result.ranks.index[-1])
-        )
+        run = _broad_decide(req, ranking, outer_prices, result.ranks.index[-1])
+        return _mark_price_skips(_broad_engine_signal(req, run), req, *run)
 
     return core, {
         **lazy,
@@ -1999,6 +1998,53 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         "latest": latest,
         "circuit_exposure": circuit_exposure,
     }
+
+
+#: The result panel's action for a stock the price ceiling kept out (`_mark_price_skips`).
+PRICE_SKIP = "SKIP (above max price)"
+
+
+def _mark_price_skips(
+    signal: dict,
+    req: BacktestRequest,
+    outcome: broad.BroadBacktestResult,
+    week: pd.Timestamp,
+) -> dict:
+    """Label the stocks the engine would have bought on `week` but for `max_stock_price`: in
+    its top N, not held, priced above the ceiling, on a week the cadence buys. The engine skips
+    them silently and the next-best name takes the slot, so without this a top-ranked stock just
+    shows no action. Result panel only: the weekly signal, Telegram and the journal keep the
+    engine's trades alone. As in the engine, the price is the one of the week the ranks come
+    from (`signal_delay` weeks back), the raw traded close, and atomics are exempt."""
+    if not req.max_stock_price:
+        return signal
+    on, _ = analysis.rebalance_weeks(week, req.rebalance, req.rebalance_every, req.rebalance_offset)
+    ranking = outcome.ranking
+    weeks = ranking.prices.index
+    position = weeks.get_loc(week) - req.signal_delay
+    if not on or position < 0:
+        return signal
+    raw = ranking.raw_prices if ranking.raw_prices is not None else ranking.prices
+    priced = raw.loc[weeks[position]]
+    over = broad.price_ceiling_mask(raw.loc[[weeks[position]]], req.max_stock_price)
+    assert over is not None  # max_stock_price is set
+    blocked = over.iloc[0]
+    top_n = outcome.result.config.top_n
+    for row in signal["rows"]:
+        rank, name = row["rank"], row["asset"]
+        if (
+            not row["action"]
+            and not row["held"]
+            and rank is not None
+            and rank <= top_n
+            and bool(blocked.get(name, False))
+        ):
+            row["action"] = PRICE_SKIP
+            row["reason"] = (
+                f"₹{priced[name]:,.0f} a share is above Max price to buy "
+                f"₹{req.max_stock_price:,.0f}; the next-best stock takes its slot."
+            )
+    return signal
 
 
 def _outer_with_sentinel(

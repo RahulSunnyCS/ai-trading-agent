@@ -191,6 +191,8 @@ export interface MomentumLatest {
     action: string;
     held: boolean;
     returns: Record<string, number | null>;
+    /** Set by the service on some actions (Broad's "SKIP (above max price)"). */
+    reason?: string;
   }>;
 }
 

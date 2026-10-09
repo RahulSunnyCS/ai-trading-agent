@@ -385,7 +385,8 @@ contract, not a shared service).
   after the newest week (as `rebalance_preview` does), not `analysis.latest_signal`, which
   knows neither the price ceiling nor the circuit locks. A Broad result's "This week" section
   (`latest`) is the same engine decision for the run's own last week (`api._broad_decide`, which
-  drops any later weeks first, so a run with a past `end` is decided on what was known then).
+  drops any later weeks first, so a run with a past `end` is decided on what was known then),
+  plus `_mark_price_skips`' "SKIP (above max price)" rows, which only the result panel shows.
   `latest_signal` (ETF, Stock, Custom Index) follows the cadence through
   `analysis.cadence_explain`, which both paths use for the "Not a rebalance week" wording.
   `tests/test_broad_parity.py` pins both paths to identical engine arguments and trades. The

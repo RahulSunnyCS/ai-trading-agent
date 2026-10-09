@@ -224,6 +224,7 @@ function signalReason(
     ? Number((broadOn ? config.broad_category_exit_rank : config.broad_off_exit_rank) ?? 0)
     : Number(config.exit_rank ?? 0);
   if (action === 'NOT A MEMBER') return "Outside this week's eligible universe.";
+  if (action.startsWith('SKIP')) return row.reason || 'Ranked to buy, but blocked by a buy rule.';
   if (action.startsWith('BUY')) {
     return action.includes('make room')
       ? `Rank ${rank} is within the top ${top}; existing holdings are trimmed to fund it.`

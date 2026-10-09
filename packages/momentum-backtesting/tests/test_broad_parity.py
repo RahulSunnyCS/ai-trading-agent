@@ -362,9 +362,10 @@ def test_the_result_panel_of_a_run_ending_in_the_past_is_what_the_backtest_did_t
     assert traded >= 3
 
 
-def test_the_result_panel_never_buys_above_the_price_ceiling(broad_client):
+def test_the_result_panel_never_buys_above_the_price_ceiling_and_labels_the_skips(broad_client):
     """`max_stock_price` blocks new buys in the engine; the result panel used to ignore it and
-    recommend them. With delay 1 the ceiling reads the price of the week the ranks come from."""
+    recommend them. Now it shows the engine's trades, and labels a top-N stock the ceiling kept
+    out. With delay 1 the ceiling reads the price of the week the ranks come from."""
     loose = _request({"rebalance_every": 1, "rebalance_offset": 0, "entry": "make_room"})
     ranking = api._broad_ranking(loose)
     raw = ranking.raw_prices if ranking.raw_prices is not None else ranking.prices
@@ -372,25 +373,51 @@ def test_the_result_panel_never_buys_above_the_price_ceiling(broad_client):
     ceiling = float(raw[stocks].stack().median())
     weeks = list(api._run_broad(loose, ranking, api.DATA.get()).result.equity.index)
 
-    def bought_above(req) -> set[tuple[pd.Timestamp, str]]:
-        found = set()
-        for i in CHECK_WEEKS:
-            week = weeks[i]
-            panel = api._broad_parts(req.model_copy(update={"end": week.strftime("%Y-%m-%d")}))
-            rows = panel[1]["latest"]()["rows"]
-            found |= {
-                (week, row["asset"])
-                for row in rows
-                if row["action"] == "BUY"
-                and row["asset"] in stocks
-                and not row["held"]
-                and raw.at[weeks[i - 1], row["asset"]] > ceiling
-            }
-        return found
+    def panels(req) -> dict[int, dict]:
+        return {
+            i: api._broad_parts(req.model_copy(update={"end": weeks[i].strftime("%Y-%m-%d")}))[1][
+                "latest"
+            ]()
+            for i in CHECK_WEEKS
+        }
 
-    assert bought_above(loose)  # without a ceiling some buys are above it: not vacuous
-    capped = loose.model_copy(update={"max_stock_price": ceiling})
+    def above(i: int, row: dict) -> bool:
+        return row["asset"] in stocks and raw.at[weeks[i - 1], row["asset"]] > ceiling
+
+    def bought_above(found: dict[int, dict]) -> set[tuple[int, str]]:
+        return {
+            (i, row["asset"])
+            for i, panel in found.items()
+            for row in panel["rows"]
+            if row["action"] == "BUY" and not row["held"] and above(i, row)
+        }
+
+    uncapped = panels(loose)
+    assert bought_above(uncapped)  # without a ceiling some buys are above it: not vacuous
+    assert not any(r["action"] == api.PRICE_SKIP for p in uncapped.values() for r in p["rows"])
+
+    capped_req = loose.model_copy(update={"max_stock_price": ceiling})
+    capped = panels(capped_req)
     assert bought_above(capped) == set()
+    top_n = api._run_broad(capped_req, ranking, api.DATA.get()).result.config.top_n
+    skips = [(i, r) for i, p in capped.items() for r in p["rows"] if r["action"] == api.PRICE_SKIP]
+    assert skips  # the ceiling did keep a top-N stock out
+    for i, row in skips:
+        assert above(i, row) and not row["held"] and row["rank"] <= top_n, (weeks[i], row)
+        assert "above Max price to buy" in row["reason"]
+
+    # The weekly signal (Telegram, the journal) keeps the engine's trades alone.
+    i = skips[0][0]
+    signal = api._broad_engine_signal(
+        capped_req, api._broad_decide(capped_req, ranking, api.DATA.get(), weeks[i])
+    )
+    assert not any(r["action"] == api.PRICE_SKIP for r in signal["rows"])
+
+    # Off cadence nothing is bought, so nothing is labelled skipped either.
+    fortnightly = capped_req.model_copy(update={"rebalance_every": 2, "rebalance_offset": 0})
+    for i, panel in panels(fortnightly).items():
+        if "Not a rebalance week" in panel["explain"]:
+            assert not any(r["action"] == api.PRICE_SKIP for r in panel["rows"]), weeks[i]
 
 
 def test_the_signal_rows_keep_the_shape_telegram_and_the_journal_read(
