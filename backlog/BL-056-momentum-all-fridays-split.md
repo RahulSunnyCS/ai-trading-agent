@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Priority** | P0 — set by the owner (2026-10-09); how real money should follow any config that trades every 2 or 4 weeks |
-| **Status** | Planned |
+| **Status** | In progress (started 2026-10-09) |
 | **Type** | feature |
 | **Area** | momentum / dashboard |
 | **Created** | 2026-10-09 |
 | **Depends on** | BL-051 (saved-run groups), BL-054 (the measurement below) |
-| **TODO.md row** | — (filled in when started) |
+| **TODO.md row** | 3.12.19 |
 
 ## Context
 
@@ -54,26 +54,31 @@ measurement, not a pre-registered test, but consistent across every config and b
 ## Goal
 
 1. A backtest can be run "All Fridays": the blended curve, plus each Friday's figures.
-2. A saved strategy can be followed "on all Fridays": one group, one sleeve per Friday, one
-   Telegram message and journal entry per week.
-3. Nothing changes for an existing run or favourite unless the owner opts in.
+2. Every favourite that rebalances every 2+ weeks is followed "on all Fridays": one group, one
+   sleeve per Friday, one Telegram message per week, every sleeve journalled (owner, 2026-10-09).
+3. The Rebalance preview previews such a favourite (and any group) as the whole account: every
+   sleeve's target, weighted by its value since the April reset, against the actual holdings.
+4. A backtest's result changes only when "All Fridays" is switched on for it.
 
 ## Out of scope
 
-Changing the frozen Phase 6 ensemble; any new research; weekly (every = 1) configs, which have
-only one calendar.
+Changing the frozen Phase 6 ensemble (already a group of sleeves on different Fridays, left as
+it is); any new research; weekly (every = 1) configs, which have only one calendar.
 
 ## Plan
 
 ### Phase 1 — API
 - **Tasks:** `BacktestRequest.split_fridays: bool = False` (meaningful only when
-  rebalance_every > 1): run every offset with `capital / K` and return the blended equity as the
-  run's curve; a lazily built `friday_spread` section with each offset's CAGR, max drawdown and
-  Ulcer (after tax when the request is taxed). Add the field to the request key and
-  `saved_identity.fingerprint`, and follow the Broad ranking cache-key rules in the package
-  CLAUDE.md.
-- **Done when:** a test shows the split result equals the mean of the per-offset runs; the flag
-  is in the key and fingerprint; momentum goldens unchanged.
+  rebalance="weekly" and rebalance_every > 1): run every offset with `capital / K` and return the
+  blended equity as the run's curve, equal capital restored at each April reset
+  (`choose.ensemble_curve`, `groups.reset_weeks`); separate tax ledgers per sleeve, labelled
+  slightly pessimistic. A lazily built `friday_spread` section with each offset's CAGR, max
+  drawdown and Ulcer (after tax when the request is taxed). The flag is in the request key; in
+  `saved_identity` it is dropped when off (so no existing fingerprint moves) and kept when on.
+  Broad ranking is shared across offsets (the offset is not in its cache key).
+- **Done when:** a test shows the split result equals the April-reset blend of the per-offset
+  runs; the flag is in the key and (when on) the fingerprint; existing fingerprints unchanged;
+  momentum goldens unchanged.
 
 ### Phase 2 — Dashboard backtest
 - **Tasks:** a "Fridays: One / All (split)" `SegmentedControl` beside the rebalance cadence
@@ -84,12 +89,26 @@ only one calendar.
   card renders on a real Broad run.
 
 ### Phase 3 — Follow on all Fridays
-- **Tasks:** a "Follow on all Fridays" action on a saved strategy with rebalance_every > 1: save
+- **Tasks:** favouriting a saved run with rebalance_every > 1 follows it on all Fridays: save
   one run per offset (same config, `rebalance_offset` 0..K-1, capital / K) and `create_group`
-  them as "<strategy> · all Fridays"; respect `MAX_FOLLOWED` and the status rules; show which
-  sleeve trades this Friday on the This week page.
-- **Done when:** a test creates the group from a saved run, the weekly job journals each sleeve,
-  and the group's Telegram message names this week's sleeve and its orders.
+  them as "<strategy> · all Fridays"; respect `MAX_FOLLOWED` (the group takes one slot) and the
+  status rules. Existing every-2+ favourites are converted by `mbt saved split-fridays
+  [--apply]` (dry run by default; applied to the live catalog only after the owner says so).
+  On This week, the group's card names the sleeve trading this Friday and shows its orders at its
+  capital share; the other sleeves are listed with their next Friday.
+- **Done when:** a test creates the group on favouriting, the conversion's dry run lists the
+  live favourites it would change, the weekly job journals each sleeve, and the group's Telegram
+  message names this week's sleeve and its orders.
+
+### Phase 4 — Rebalance preview for a group
+- **Tasks:** `/api/rebalance-preview` accepts a favourite group (all-Fridays or any other, e.g.
+  the ensemble): run each sleeve's model target, weight it by the sleeve's value since the last
+  April reset (`groups.sleeve_value`; equal on a first allocation), and build one plan against the
+  actual holdings. `MomentumRebalanceView` offers groups (today it filters them out), says which
+  sleeve trades this Friday, and drops the strategy-start-date field for an all-Fridays group
+  (every calendar is held, so the phase no longer matters). Guide page in the same commit.
+- **Done when:** a test shows a group's target equals the value-weighted mix of its sleeves'
+  targets, and the preview renders for a real all-Fridays favourite.
 
 ## Risks
 
@@ -100,15 +119,24 @@ only one calendar.
 
 ## Open questions
 
-To ask the owner when this is started:
-1. Should "All Fridays" be the default for configs with rebalance_every > 1, or opt-in?
-2. Equal capital reset each April (the groups convention), or never rebalance the sleeves
-   against each other?
-3. With tax on, one shared tax ledger (what one account really does) instead of
-   `tranches.py`'s separate ledgers?
-4. Where should each Friday's orders appear on the This week page for a split group?
+Answered by the owner on 2026-10-09:
+1. **Default:** the backtest's "All Fridays" is opt-in. Every favourite with rebalance_every > 1
+   is followed on all Fridays, and the Rebalance page follows suit (Phase 4).
+2. **April reset:** yes, equal capital each April (the groups / ensemble convention), in both the
+   backtest blend and the followed group. The split figures therefore move slightly from
+   BL-054's, which never rebalanced the sleeves.
+3. **Tax ledger:** separate ledgers per sleeve, as `tranches.py` does. `tax.py` models no LTCG
+   exemption and carries losses forward without limit, so the gap from one shared ledger is only
+   timing; labelled slightly pessimistic.
+4. **This week:** one group card naming the sleeve trading this Friday, its orders at its capital
+   share, the other sleeves with their next Friday.
 
 ## Log
 
 - 2026-10-09 — created at P0 by the owner, from the BL-054 L2 result.
 - 2026-10-09 — the split-against-single-Friday measurement landed (above): shallower falls in 10 of 10.
+- 2026-10-09 — started. Owner's answers recorded above; scope widened to every favourite and the
+  Rebalance preview (Phase 4). Built on PR #152's branch (owner: do not wait for it). Number clash:
+  an unpushed branch `research/bl-056-favourites-score-delay` also uses BL-056; the owner chose to
+  keep this item's number and renumber that one when it is pushed. The phase-split fall-depth
+  measurement (`scripts/bl054_phase_split.py`) was still running at start; cite it when it lands.
