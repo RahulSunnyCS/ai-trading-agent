@@ -323,6 +323,11 @@ contract, not a shared service).
   `run_broad_backtest` also takes `tax_hold_band`/`tax_hold_weeks` (inert in category mode: every
   sale is an "ineligible" exit) and `feature_tilt=(frame, weight)` (BL-050). Runners:
   `scripts/bl054_levers.py`, `scripts/bl050_filters.py`; features in `filters.py`.
+- **voladj ignores `lookbacks` and `weights` by default** (NSE's method: 26- and 52-week returns,
+  4 weeks back, over 26-week volatility). For a voladj config those two search settings only reach
+  the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-055, a heavy key in the
+  rank-cache key) makes it follow them; tested and killed (short lookbacks without the skip-month
+  chase reversing spikes), so it stays off.
 - `categories/broad.py` — Broad Momentum's category-selection funnel
   (`compute_universe_ranking`, `compute_category_selection*`,
   `run_broad_backtest`) — a pure, no-P&L ranking layer that feeds `engine.py`

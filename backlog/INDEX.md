@@ -36,7 +36,6 @@ Sorted by priority (P0 first), then ID.
 | [BL-036](BL-036-momentum-ui-from-bl010.md) | Momentum dashboard: what the BL-010 review changes on screen | P2 | Planned | improvement | dashboard |
 | [BL-008](BL-008-dashboard-e2e-suite-repair.md) | Repair the stale dashboard e2e suite and run it in CI | P2 | Planned | chore | dashboard |
 | [BL-016](BL-016-validation-status-in-ui.md) | Show validation status and known assumptions next to every result | P2 | Planned | improvement | momentum |
-| [BL-055](BL-055-voladj-follows-lookbacks.md) | Volatility-adjusted score that follows the selected lookbacks and weights | P2 | In progress | research | momentum |
 | [BL-017](BL-017-momentum-settings-module.md) | Momentum: one settings module, and split `api.py` | P2 | Ready | improvement | momentum |
 | [BL-020](BL-020-claude-code-workflow-setup.md) | Claude Code working set-up: model per role, saved commands, session habits | P2 | Ready | chore | cross-cutting |
 | [BL-031](BL-031-chart-pattern-detectors.md) | Classical chart-pattern detectors on weekly and daily stock data | P2 | Idea | research | momentum |
@@ -60,6 +59,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-003](BL-003-momentum-weekly-rebalance-loading.md) | Momentum: honest loading states on Weekly signal and Rebalance | Superseded by BL-051: its findings are Phase 2's loading-state task on the merged This week page | 2026-10-08 |
 | [BL-027](BL-027-rebalance-basket-file.md) | Weekly rebalance as a broker basket-order file | Superseded by BL-051: Fyers basket file and recorded fills are its Phase 4; broker answered (Fyers) | 2026-10-08 |
 | [BL-049](BL-049-momentum-scores-redesign.md) | Momentum Scores redesign: market strip, sector rotation map, 1–10 score strips, stock drawer | Done: Sectors and Stocks views, rotation map, sector page, stock drawer, saved views, circuit locks and the strip guide; Phases 1–3 and review fixes merged (#124, #126–#128) | 2026-10-08 |
+| [BL-055](BL-055-voladj-follows-lookbacks.md) | Volatility-adjusted score that follows the selected lookbacks and weights | Killed: -12.2 pts a year after tax on FY2018-22 (0 of 10 better), -1.4 on FY2023-26; short lookbacks without the skip-month chase reversing spikes. Keep NSE's 26/52 method | 2026-10-09 |
 | [BL-050](BL-050-momentum-filter-poc.md) | Momentum filter POC: volume, relative strength, overextension, residual momentum, trend quality | No survivor: 4 of 7 features pass the screen (turnover expansion t 4.8), none improves the frozen ensemble (PBO 0.72); hold-out unread; the owner's volume gate pointed the wrong way | 2026-10-09 |
 | [BL-054](BL-054-momentum-improvement-levers.md) | Six levers to improve the Broad strategies | No lever adopted: slower cadence, ETF blend, daily stop, inverse-vol sizing and residual momentum all killed after tax; the tax hold cannot act in Broad; all-Fridays reported | 2026-10-09 |
 | [BL-053](BL-053-momentum-stop-loss.md) | Weekly stop-loss on the Broad Momentum strategies | Killed: 0 of 30 cells pass; stops cost little but do not reduce Ulcer or falls on 11 strategies; engine stop kept, off by default | 2026-10-08 |

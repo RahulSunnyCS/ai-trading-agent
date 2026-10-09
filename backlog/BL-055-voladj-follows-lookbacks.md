@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner question; affects half the search space's meaning |
-| **Status** | In progress |
+| **Status** | Done — killed |
 | **Type** | research (+ an opt-in engine flag) |
 | **Area** | momentum |
 | **Created** | 2026-10-09 |
@@ -49,6 +49,27 @@ more than 2 pts deeper; confirmed on FY2023-26: median change >= 0, not lower in
 ### Phase 2 — Run and verdict
 `scripts/bl054_levers.py l7`; result in this file and `search_spaces/bl055_result.json`.
 
+## Result (2026-10-09): killed
+
+After tax at Rs 5 lakh, median of the 10 strategies (`search_spaces/bl055_result.json`):
+
+| Window | CAGR change | Strategies not worse | Worst fall change |
+|---|---|---|---|
+| FY2018-22 (choose) | **-12.2 pts** | 0 of 10 | -9.6 pts deeper |
+| FY2023-26 (confirm) | -1.4 pts | 3 of 10 | -3.5 pts deeper |
+
+Every strategy lost on FY2018-22, by 6 to 21 points (pre-tax median -15.0). Checked for a bug:
+none (the variant reproduces today's score exactly at 26/52 with equal weights). The cause is the
+pre-registered skip rule: lookbacks under 26 weeks are measured to the latest close, so the score
+favours stocks that just jumped, and those reverse. On a sample of weeks for Five Sectors Monthly
+the variant's top 30 had risen 13.1% over the last 4 weeks (7.3% for today's score) and then fell
+4.4% over the next 4 (0.9%); the two top-30 lists shared 9 names. NSE skips the latest month for
+this reason.
+
+**Keep today's NSE method.** The flag stays in the engine, off. A variant that skips the latest
+month on every lookback is a different question; it would need its own addendum and run.
+
 ## Log
 
 - 2026-10-09 — created and started (owner: "do both"); Phase 0 committed before any run.
+- 2026-10-09 — run (13 runs, 2 cells); killed. Diagnosed as short-term reversal, not a bug.
