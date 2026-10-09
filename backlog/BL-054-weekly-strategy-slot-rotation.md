@@ -78,13 +78,18 @@ Committed before any run. Never edited after a run; a changed rule is a new date
     Gives the "luck" distribution for the same constraints.
   - **E:** the 22 Widesl/Dir variants equally weighted and scaled to 5 lots, plus the 11 Buy
     variants equally weighted and scaled to 2 lots in the Buy weeks.
-  - **T:** today's setup at today's times, 5 lots fixed: Widesl OTM1 09:17 × 2, Dir ITM1 09:24
-    × 2, Buy 09:35 × 1.
+  - **B1, B2, B3 (owner's benchmarks, amended 2026-10-09, replacing T in the pass rule):** fixed
+    mixes of the live strategies at their live times, every day, no rotation:
+    **B1** = 5 × Widesl OTM1 09:17; **B2** = 3 × Widesl OTM1 09:17 + 2 × Dir ITM1 09:24;
+    **B3** = 4 × Widesl OTM1 09:17 + 1 × Dir ITM1 09:24 + 1 × Buy 09:35 (6 lots). Dir here is
+    the live ITM1 strategy, not the ATM variant.
+  - **T** (2 + 2 + 1 of the same three) is kept as a reported line only.
 - **Pass / kill rule:**
   - **Pass** if all three hold:
     1. The rotation's total P&L is at or above R's 90th percentile.
     2. It beats E on total P&L, with a max drawdown no worse than E's.
-    3. It beats T on total P&L, with a max drawdown no worse than T's.
+    3. It beats each of B1, B2 and B3 on total P&L, with a max drawdown no worse than that
+       benchmark's.
   - **Kill** if (1) fails: the ranking does no better than luck.
   - **Inconclusive** otherwise.
 - **Reported alongside, not part of the rule:**
@@ -164,5 +169,10 @@ Committed before any run. Never edited after a run; a changed rule is a new date
   least 2 Widesl; Buy adds 2 lots on top when its best variant's score is positive (owner chose
   this trigger and "on top" over "replace"); minimum-Widesl 3 reported as sensitivity.
   Supersedes the earlier "top 6 of all 33" wording, which was never run.
+- 2026-10-09 — amendment before any result was read: the 33 variant backtests had been started
+  but nothing was evaluated. Owner gave three benchmarks (B1, B2, B3 above); they replace T in
+  pass condition 3 and T stays as a reported line. R, E and conditions 1 and 2 are unchanged.
+  B3 holds 6 lots against the rotation's 5 or 7, so lots-adjusted figures (P&L per lot-week)
+  are reported next to the totals; the verdict still reads totals and drawdown.
 - 2026-10-09 — owner dropped the minimum-Widesl 4 and 5 sensitivity runs before any run; only
   2 (verdict) and 3 (sensitivity) remain.
