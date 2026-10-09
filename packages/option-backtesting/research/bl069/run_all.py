@@ -58,14 +58,21 @@ RUNS += [(f"A:B3-placebo-{s}", [*A, "--fit-lookbacks", "21:50,63:50", "--shuffle
 
 def run(item) -> dict:
     name, args = item
-    out = subprocess.run(
-        [sys.executable, str(ROTATE), "--basket", "DRB-6W3L2", *args],
-        capture_output=True,
-        text=True,
-        cwd=HERE.parent.parent,
-    ).stdout
     (HERE / "out").mkdir(exist_ok=True)
-    (HERE / "out" / f"run_{name.replace(':', '_')}.txt").write_text(out)
+    cache = HERE / "out" / f"run_{name.replace(':', '_')}.txt"
+    if cache.exists() and "CASE A" in cache.read_text():  # resumable: a finished run is not redone
+        out = cache.read_text()
+    else:
+        proc = subprocess.run(
+            [sys.executable, str(ROTATE), "--basket", "DRB-6W3L2", *args],
+            capture_output=True,
+            text=True,
+            cwd=HERE.parent.parent,
+        )
+        out = proc.stdout
+        cache.write_text(out)
+        if "CASE A" not in out:
+            return dict(name=name, args=" ".join(args), error=proc.stderr.strip().splitlines()[-1:] or ["no report"])
     row = dict(name=name, args=" ".join(args), **parse_case_a(out))
     path = re.search(r"picks file: (.+)", out)
     if path:

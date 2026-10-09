@@ -20,7 +20,11 @@ sys.path.insert(0, str(HERE.parent / "common"))
 import analyse as A  # noqa: E402  (day_features, load, VIX bands, WD)
 import varlib  # noqa: E402  (live_csv: the comparator inputs)
 
-WINDOW_FROM = "2025-09-01"
+# BL-071: `--window-from 2024-10-09` scores the rule from the start of the per-variant results (the
+# default is the owner's "last year" window, 2025-09-01); the selection days start 63 days later
+WINDOW_FROM = (
+    sys.argv[sys.argv.index("--window-from") + 1] if "--window-from" in sys.argv else "2025-09-01"
+)
 WARMUP = 63
 LOOKBACKS = [(5, 0.4), (21, 0.3), (63, 0.3)]
 W_CRIT = {"recent": 0.33, "weekday": 0.25, "dte": 0.25, "vix": 0.17}
@@ -559,7 +563,9 @@ def main() -> None:
     core_pool = np.where(~is_buy)[0]
     wd, vb, dte = day_inputs(f, names)
     if RECENT_FAMILY:
-        _STATE["family_idx"] = pd.factorize(["_".join(n.split("_")[:2]) for n in names])[0]
+        _STATE["family_idx"] = np.unique(
+            ["_".join(n.split("_")[:2]) for n in names], return_inverse=True
+        )[1]
     if W_CRIT.get("gap"):
         _STATE["gap"] = gap_labels(P.index, names)
         gl = pd.Series(_STATE["gap"][:, 0]).value_counts().to_dict()
@@ -769,7 +775,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}.csv"
         )
     )
     R.assign(

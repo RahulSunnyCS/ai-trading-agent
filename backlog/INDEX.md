@@ -63,6 +63,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-068](BL-068-drb-recent-controls-and-label-placebo.md) | Is DRB's recent-return edge real? Lookback ladder, lag, reverse, label placebo, stability of the BL-067 rows | P2 | Done: recent return is momentum and stable; fit criteria not shown real (placebo: 1 of 20 above) | research | options |
 | [BL-069](BL-069-drb-new-ingredients.md) | New ingredients for DRB's ranking: family-pooled recent, overnight gap, longer fit lookbacks, spacing, streak shapes, sit-out gates | P2 | In progress | research | options |
 | [BL-070](BL-070-drb-without-per-strategy-stops.md) | The 248 variants with no per-strategy MTM stop: are the stops worth it, does DRB's edge depend on them | P2 | In progress | research | options |
+| [BL-071](BL-071-drb-out-of-period-and-2022-import.md) | Does DRB's rule hold outside the studied year? Jan–Aug 2025 from existing results now; the 2022–2024 import (BL-034 Phase 5) needs the owner's go-ahead | P2 | In progress | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
