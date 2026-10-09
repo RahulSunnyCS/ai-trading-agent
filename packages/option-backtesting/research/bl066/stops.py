@@ -23,6 +23,7 @@ LEVELS = [None] + (
     else [10_000, 12_000, 15_000, 17_000, 20_000]
 )
 FILL_AT_LEVEL = "--fill-at-level" in sys.argv
+TRAIL = "--trail" in sys.argv  # BL-066: the stop trails X below the day's highest combined P&L
 PER = 2  # lots in each strategy (DRB-6W3L2)
 PICKS = HERE.parent / "bl057" / "daily_picks_min3_core6_buy2L2_whole_day.csv"
 CHARGES = HERE.parent / "bl063" / "out" / "daily_charges.csv"
@@ -94,12 +95,21 @@ def main() -> None:
         pnl, stopped, mins = final.copy(), np.zeros(len(keys), bool), np.full(len(keys), -1)
         if X is not None:
             for i in range(len(keys)):
-                hit = np.where(paths[i] <= -X)[0]
+                if (
+                    TRAIL
+                ):  # level = X below the highest combined P&L of the earlier minutes (at least 0)
+                    peak_before = np.maximum.accumulate(
+                        np.maximum(np.concatenate(([0.0], paths[i, :-1])), 0)
+                    )
+                    level = peak_before - X
+                else:
+                    level = np.full(N, -float(X))
+                hit = np.where(paths[i] <= level)[0]
                 if len(hit):
                     # default: close at the combined value of the first minute that ends at or below -X;
                     # --fill-at-level: best case, the stop fills exactly at -X (a stop order that fires inside the bar)
                     pnl[i], stopped[i], mins[i] = (
-                        (-X if FILL_AT_LEVEL else paths[i, hit[0]]),
+                        (level[hit[0]] if FILL_AT_LEVEL else paths[i, hit[0]]),
                         True,
                         hit[0],
                     )
