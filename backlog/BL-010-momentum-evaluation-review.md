@@ -524,3 +524,10 @@ Also parked here (owner, 2026-10-06), priority P3:
   decide whether to follow a strategy that failed its hold-out.
 - 2026-10-07 — the UI plan (BL-010's last task) is written as BL-036 (four phases: say what the
   number is, execution realism, follow the frozen four, optional); BL-029 is its Phase 1 core.
+- 2026-10-10 — owner asked, before any run: re-run the five highest-CAGR favourites on the
+  point-in-time stock universe and check each still clears **30% CAGR** (2017-01 → latest
+  week, pre-tax). Found first: all 14 favourites were already saved on `turnover_rank` (the
+  point-in-time universe) with the curated tags, so the re-run reproduces them as saved, and
+  adds the two Phase 3 variants `pit_rerun.py` already names — `extended` tags (the one
+  remaining category-hindsight fix) and today's list (reference only). No threshold other than
+  the owner's 30% line; nothing is saved to the catalog. Results below when done.
