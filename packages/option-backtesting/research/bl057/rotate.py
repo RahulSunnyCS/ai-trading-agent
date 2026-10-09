@@ -35,10 +35,48 @@ CORE = _arg("--core", 5)  # 5 = first block; 3 = small-book block
 BUY_MAX = _arg("--buy-max", 2)  # 2 = first block; 1 = small-book block
 N_RUNS, SEED = 1000, 57
 # BL-061: add the closest-premium Widesl (NIFTY 80 / 100, SENSEX 250 / 320) to the candidate list
-CLOSEST = "--closest" in sys.argv
+WHOLE_DAY = "--whole-day" in sys.argv  # BL-062: every start time 09:17..15:17 (248 variants)
+CLOSEST = "--closest" in sys.argv or WHOLE_DAY
 CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320")
 # Case A's Widesl minimum: 2 is the first pre-registered block; 3 is the later block (BL-057).
 MIN_WIDE = int(sys.argv[sys.argv.index("--min-wide") + 1]) if "--min-wide" in sys.argv else 2
+
+
+def read_net(path) -> pd.Series:
+    return pd.read_csv(path, parse_dates=["day"]).set_index("day").net
+
+
+def whole_day_columns(underlying: str, pfx: str) -> pd.DataFrame:
+    """BL-062: every variant of one index at the 25 start times 09:17..15:17: Widesl, Dir and Buy
+    (no Buy at 15:17: it exits 15:14) with the OTM strike, and the closest-premium Widesl (NIFTY 80 /
+    100, SENSEX 250 / 320). Per-day results come from the folder of the item that ran each start time."""
+    research = HERE.parent
+    nifty = underlying == "NIFTY"
+    morning = research / ("bl054" if nifty else "bl056") / "results"
+    premiums = (80, 100) if nifty else (250, 320)
+    cols = {}
+    for slot in varlib.SLOTS_MORNING + varlib.SLOTS_LATE + [varlib.SLOT_LAST]:
+        tag = slot.replace(":", "")
+        early, last = slot in varlib.SLOTS_MORNING, slot == varlib.SLOT_LAST
+        for fam in ("wide", "dir", "buy"):
+            if fam == "buy" and last:
+                continue
+            folder = morning if early else research / ("bl062" if last else "bl059") / "results"
+            name = f"{fam}_{tag}.csv" if early else f"{pfx}{fam}_{tag}.csv"
+            cols[f"{pfx}{fam}_{tag}"] = read_net(folder / name)
+        for premium in premiums:
+            if early:
+                path = (
+                    research / ("bl061" if nifty else "bl060") / "results" / f"p{premium}_{tag}.csv"
+                )
+            elif last or nifty:
+                path = research / "bl062" / "results" / f"{pfx}p{premium}_{tag}.csv"
+            else:
+                path = research / "bl060" / "results" / f"p{premium}_{tag}.csv"
+            cols[f"{pfx}p{premium}_{tag}"] = read_net(path)
+    df = pd.DataFrame(cols).sort_index()
+    assert not df.isna().any().any(), f"{underlying}: whole-day variants do not cover the same days"
+    return df
 
 
 def closest_columns(underlying: str, pfx: str, days: pd.DatetimeIndex) -> pd.DataFrame:
@@ -61,13 +99,14 @@ def closest_columns(underlying: str, pfx: str, days: pd.DatetimeIndex) -> pd.Dat
 def load_all():
     frames, feats = [], {}
     for u, pfx in (("NIFTY", "N_"), ("SENSEX", "S_")):
-        df = A.load(u)
+        df = whole_day_columns(u, pfx) if WHOLE_DAY else A.load(u)
         df = df[df.index >= pd.Timestamp(WINDOW_FROM)]
         f = A.day_features(u, df.index)
         wk = f.weekday.isin(A.WD).values
         df, f = df[wk], f[wk]
-        df.columns = [pfx + c for c in df.columns]
-        if CLOSEST:
+        if not WHOLE_DAY:
+            df.columns = [pfx + c for c in df.columns]
+        if CLOSEST and not WHOLE_DAY:
             df = df.join(closest_columns(u, pfx, df.index))
         frames.append(df)
         feats[u] = f
@@ -78,7 +117,8 @@ def load_all():
     frames = [x.loc[common] for x in frames]
     feats = {u: x.loc[common] for u, x in feats.items()}
     P = pd.concat(frames, axis=1)
-    assert P.shape[1] == (110 if CLOSEST else 66) and not P.isna().any().any()
+    expected = 248 if WHOLE_DAY else (110 if CLOSEST else 66)
+    assert P.shape[1] == expected and not P.isna().any().any(), (P.shape[1], expected)
     assert feats["NIFTY"].index.equals(feats["SENSEX"].index)
     f = feats["NIFTY"][["weekday", "vix_band"]].copy()
     f["dte_N"] = feats["NIFTY"].dte_label
@@ -181,6 +221,16 @@ def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
     return core_a, core_b, buy, overridden
 
 
+START_WINDOWS = ["09:17-09:47", "10:02-10:47", "11:02-11:47", "12:02-13:47", "14:02-15:17"]
+
+
+def start_window(slot: str) -> str:
+    for label, edge in zip(START_WINDOWS[:-1], ("10:02", "11:02", "12:02", "14:02"), strict=True):
+        if slot < edge:
+            return label
+    return START_WINDOWS[-1]
+
+
 def closest_report(picks_a, names, Pv, wd, vb, dte, days):
     """BL-061: how much of the daily core the closest-premium Widesl take, and on which days."""
     is_closest = closest_mask(names)
@@ -253,6 +303,17 @@ def closest_report(picks_a, names, Pv, wd, vb, dte, days):
             t.closest, "closest-premium Widesl", np.where(t.widesl, "OTM Widesl", "Dir ATM")
         )
     )
+    pl["slot"] = pl.variant.str.split("_").str[2].map(lambda x: f"{x[:2]}:{x[2:]}")
+    pl["window"] = pl.slot.map(start_window)
+    wins = [w_ for w_ in START_WINDOWS if w_ in set(pl.window)]
+    share = pl.groupby(["window", "kind"]).size().unstack(fill_value=0).reindex(wins)
+    total_lots = share.to_numpy().sum()
+    print("\nshare of core lots by start-time window and strike rule (% of all core lots):")
+    print((100 * share / total_lots).round(1).to_string(float_format=lambda x: f"{x:,.1f}"))
+    print("  window totals:", {w_: f"{100 * share.loc[w_].sum() / total_lots:.0f}%" for w_ in wins})
+    avg = pl.groupby(["window", "kind"]).pnl.mean().unstack().reindex(wins)
+    print("average P&L per lot by start-time window and strike rule (1 lot, before charges):")
+    print(avg.round(0).to_string(float_format=lambda x: f"{x:,.0f}"))
     g = pl.groupby("kind").agg(
         lots=("pnl", "size"),
         avg_pnl=("pnl", "mean"),
@@ -437,7 +498,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST) == (2, 5, 2, False)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{'_closest' if CLOSEST else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}.csv"
         )
     )
 

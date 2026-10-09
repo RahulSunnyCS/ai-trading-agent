@@ -39,6 +39,9 @@ SLOTS_LATE = [
     "15:02",
 ]
 
+# the last 15-minute start before 15:30 (BL-062); Widesl and Dir exit 15:28, Buy exits 15:14 and has none
+SLOT_LAST = "15:17"
+
 
 def plus(hhmm: str, minutes: int) -> str:
     h, m = map(int, hhmm.split(":"))
