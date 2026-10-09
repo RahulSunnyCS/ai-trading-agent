@@ -106,7 +106,15 @@ def l6_cells(_: int) -> list[tuple[str, dict]]:
     return [("baseline", {}), ("residual", {"score": "residual"})]
 
 
-LEVERS = {"l1": l1_cells, "l4": l4_cells, "l5": l5_cells, "l6": l6_cells}
+def l7_cells(_: int) -> list[tuple[str, dict]]:
+    """BL-055 (search_spaces/bl055_criteria.json): voladj follows the selected lookbacks.
+    `voladj_lookbacks` is a heavy key: run_one rebuilds the base ranking for this cell."""
+    return [("baseline", {}), ("voladj_lookbacks", {"voladj_lookbacks": True})]
+
+
+LEVERS = {"l1": l1_cells, "l4": l4_cells, "l5": l5_cells, "l6": l6_cells, "l7": l7_cells}
+#: BL-055 leaves out the rank-sum strategy: the flag does not touch ranksum.
+EXCLUDED = {"l7": {"9f9ef3aa6c1b"}}
 
 
 def run_one(task: dict) -> dict:
@@ -161,7 +169,7 @@ def run_one(task: dict) -> dict:
 
 
 def run(lever: str, workers: int = 4) -> None:
-    todo = [{**t, "lever": lever} for t in tasks()]
+    todo = [{**t, "lever": lever} for t in tasks() if t["id"] not in EXCLUDED.get(lever, ())]
     print(f"{lever}: {len(todo)} strategies, {workers} workers", flush=True)
     ctx = mp.get_context("spawn")
     with ctx.Pool(workers, maxtasksperchild=1) as pool:
@@ -198,7 +206,7 @@ def strategy_curves(lever: str) -> dict[str, pd.DataFrame]:
         frame = pd.read_parquet(OUT / lever / f"curves-{task_id}.parquet")
         return _by_cadence(frame, _own_every(task_id)) if lever == "l1" else frame
 
-    out = {cid: load(cid) for cid in NAMES}
+    out = {cid: load(cid) for cid in NAMES if cid not in EXCLUDED.get(lever, ())}
     sleeves = {c["id"]: load(f"sleeve-{c['id']}") for c in FROZEN["configs"]}
     ids = list(sleeves)
     first = next(iter(sleeves.values())).columns
@@ -271,7 +279,14 @@ def judge(table: pd.DataFrame, lever: str) -> pd.DataFrame:
                 "baseline_third_worst": float(base.third_worst_fy.median()),
                 "baseline_cagr": float(base.cagr.median()),
             }
-            if lever == "l1":
+            if lever == "l7":  # BL-055: 10 strategies
+                row["passes"] = bool(
+                    taxed == "tax"
+                    and dcagr.median() >= 0.01
+                    and (dcagr >= 0).sum() >= 6
+                    and (cell.max_drawdown - base.max_drawdown).median() >= -0.02
+                )
+            elif lever == "l1":
                 row["passes"] = bool(
                     taxed == "tax"
                     and dcagr.median() >= 0.015
@@ -299,7 +314,9 @@ def report(lever: str) -> dict:
     confirmed = []
     for key in passing:
         c = conf[conf.cell == key].iloc[0]
-        if lever == "l1":
+        if lever == "l7":
+            ok = c.median_cagr_change >= 0 and c.cagr_not_lower >= 5
+        elif lever == "l1":
             ok = c.median_cagr_change >= 0
         else:
             ok = c.less_pain >= 6 and c.median_cagr_change >= -0.02

@@ -159,6 +159,10 @@ class Config:
     # risk-adjusted 6m/12m z-score composite), or blend (average of the two ranks, re-ranked).
     score: Score = "ranksum"
     voladj_skip_recent_month: bool = True  # voladj/blend only
+    # voladj/blend only (BL-055). False (default): NSE's method, 26- and 52-week returns over
+    # 26-week volatility, ignoring `lookbacks`/`weights`. True: one component per selected
+    # lookback, weighted by `weights` (see _compute_ranks_voladj).
+    voladj_lookbacks: bool = False
     # Trade only on the last week-in-`weeks` of each calendar month (rebalance="monthly"); the
     # weekly mark-to-market/hold step always runs regardless of this setting.
     rebalance: Rebalance = "weekly"
@@ -447,6 +451,8 @@ def _compute_ranks_voladj(
     return volatility, cross-sectionally z-scored, then summed. Higher composite = stronger
     momentum. `voladj_skip_recent_month` computes the returns as of 4 weeks ago (skip-the-most-
     recent-month convention); vol itself is always the latest trailing 26-week window."""
+    if config.voladj_lookbacks:
+        return _compute_ranks_voladj_lookbacks(prices, config)
     s = 4 if config.voladj_skip_recent_month else 0
     ret_6m = prices / prices.shift(s + 26) - 1
     ret_12m = prices / prices.shift(s + 52) - 1
@@ -468,6 +474,36 @@ def _compute_ranks_voladj(
 
     score = (zscore(comp_6m) + zscore(comp_12m)).where(eligible)
     final = _rank_from_score(score, tie_break=ret_6m, higher_is_better=True)
+    return final, score
+
+
+def _cross_zscore(component: pd.DataFrame) -> pd.DataFrame:
+    """Per-week z-score across the names with a value that week (NaN excluded)."""
+    return component.sub(component.mean(axis=1), axis=0).div(component.std(axis=1), axis=0)
+
+
+def _compute_ranks_voladj_lookbacks(
+    prices: pd.DataFrame, config: Config
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """BL-055 (`voladj_lookbacks=True`): one volatility-adjusted component per selected lookback
+    L, the L-week return (measured 4 weeks back when L >= 26 and the skip-month flag is on, the
+    NSE convention for its 6- and 12-month returns; else to the latest close) over the trailing
+    26-week volatility, z-scored across names, summed with the lookback weights (equal when
+    None). With lookbacks (26, 52) and equal weights it equals the default voladj score."""
+    vol = prices.pct_change().rolling(26).std()
+    safe_vol = vol.where(vol > 0)
+    rets = []
+    for lookback in config.lookbacks:
+        skip = 4 if config.voladj_skip_recent_month and lookback >= 26 else 0
+        rets.append(prices / prices.shift(skip + lookback) - 1)
+    eligible = functools.reduce(operator.and_, (r.notna() for r in (*rets, vol)))
+    weights = config.weights or (1.0,) * len(rets)
+    score = None
+    for weight, ret in zip(weights, rets, strict=True):
+        part = weight * _cross_zscore((ret / safe_vol).where(eligible))
+        score = part if score is None else score + part
+    score = score.where(eligible)
+    final = _rank_from_score(score, tie_break=rets[-1], higher_is_better=True)
     return final, score
 
 
@@ -913,6 +949,7 @@ def run_backtest(
             config.weights,
             config.score,
             config.voladj_skip_recent_month,
+            config.voladj_lookbacks,
         )
         if rank_cache is not None and key in rank_cache:
             ranks, scores = rank_cache[key]

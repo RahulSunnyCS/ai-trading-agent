@@ -47,6 +47,7 @@ HEAVY_KEYS = {
     "weight_scheme",
     "score",
     "voladj_skip_recent_month",
+    "voladj_lookbacks",
     "min_drop_pct",
     "turnover_spike_multiple",
     "series_break_policy",  # "legacy" | "verified" (see api.BacktestRequest.broad_series_breaks)

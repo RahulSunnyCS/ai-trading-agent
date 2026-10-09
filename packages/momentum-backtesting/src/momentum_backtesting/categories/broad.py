@@ -543,6 +543,7 @@ def compute_universe_base(
     weights: tuple[float, ...] | None = None,
     score: Literal["ranksum", "voladj", "blend", "residual"] = "ranksum",
     voladj_skip_recent_month: bool = True,
+    voladj_lookbacks: bool = False,
     min_drop_pct: float = cat_prices.DEFAULT_MIN_DROP_PCT,
     turnover_spike_multiple: float = cat_prices.DEFAULT_TURNOVER_SPIKE_MULTIPLE,
     liquidity: LiquidityConfig | None = None,
@@ -587,6 +588,7 @@ def compute_universe_base(
         weights=weights,
         score=score,
         voladj_skip_recent_month=voladj_skip_recent_month,
+        voladj_lookbacks=voladj_lookbacks,
         universe=tuple(full_frame.columns),
     )
     if score == "residual":
@@ -1149,6 +1151,7 @@ def run_broad_backtest(
     weights: tuple[float, ...] | None = None,
     score: Literal["ranksum", "voladj", "blend", "residual"] = "ranksum",
     voladj_skip_recent_month: bool = True,
+    voladj_lookbacks: bool = False,
     pool_top_n: int = DEFAULT_POOL_TOP_N,
     pool_exit_rank: int = DEFAULT_POOL_EXIT_RANK,
     coverage_floor: float = DEFAULT_COVERAGE_FLOOR,
@@ -1273,6 +1276,7 @@ def run_broad_backtest(
             weights=weights,
             score=score,
             voladj_skip_recent_month=voladj_skip_recent_month,
+            voladj_lookbacks=voladj_lookbacks,
             pool_top_n=pool_top_n,
             pool_exit_rank=pool_exit_rank,
         )
