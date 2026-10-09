@@ -88,6 +88,15 @@ GRID = _arg("--grid", 0)
 # BL-067: `--weights R,W,D,V` overrides the criteria weights (recent, weekday, days to expiry, VIX
 # band; whole percents summing to 100). Unset = the BL-057 weights 33/25/25/17
 WEIGHTS = None
+# BL-068: controls on the "recent" criterion and a placebo on the fit labels.
+#   --recent-window N   recent = plain sum of the last N days (unset: 2/3 x last 5 + 1/3 x the 5 before)
+#   --recent-lag L      recent reads the window ending L days before the day (skips the latest L days)
+#   --reverse           pick the LOWEST composite instead of the highest (bottom-ranked basket)
+#   --shuffle-labels S  permute the days' weekday / VIX band / days-to-expiry labels with seed S
+RECENT_WINDOW = _arg("--recent-window", 0)
+RECENT_LAG = _arg("--recent-lag", 0)
+REVERSE = "--reverse" in sys.argv
+SHUFFLE = _arg("--shuffle-labels", -1)
 if "--weights" in sys.argv:
     WEIGHTS = tuple(int(x) for x in sys.argv[sys.argv.index("--weights") + 1].split(","))
     assert len(WEIGHTS) == 4 and sum(WEIGHTS) == 100, WEIGHTS
@@ -283,6 +292,15 @@ def day_inputs(f, names):
     return wd, vb, dte
 
 
+def recent_score(Pv: np.ndarray, i: int) -> np.ndarray:
+    """The recent criterion for the day at row i: 2/3 x the last 5 days + 1/3 x the 5 before (BL-057),
+    or the plain sum of the last RECENT_WINDOW days; both end RECENT_LAG days before the day."""
+    end = i - RECENT_LAG
+    if RECENT_WINDOW:
+        return Pv[end - RECENT_WINDOW : end].sum(axis=0)
+    return (2 / 3) * Pv[end - 5 : end].sum(axis=0) + (1 / 3) * Pv[end - 10 : end - 5].sum(axis=0)
+
+
 def score_day(Pv, wd, vb, dte, i):
     """The four criteria and the composite for the day at row i.
 
@@ -290,13 +308,13 @@ def score_day(Pv, wd, vb, dte, i):
     and days to expiry (known before the first entry). Pv[i] itself is never used, so a caller
     scoring a day that has no results yet can pass a zero row there."""
     crit = {
-        "recent": (2 / 3) * Pv[i - 5 : i].sum(axis=0) + (1 / 3) * Pv[i - 10 : i - 5].sum(axis=0),
+        "recent": recent_score(Pv, i),
         "weekday": skewed_fit(Pv, (wd[:, None] == wd[i]).repeat(Pv.shape[1], axis=1), i),
         "dte": skewed_fit(Pv, dte == dte[i][None, :], i),
         "vix": skewed_fit(Pv, (vb[:, None] == vb[i]).repeat(Pv.shape[1], axis=1), i),
     }
     comp = sum(W_CRIT[k] * pct_rank(crit[k]) for k in W_CRIT)
-    return crit, comp
+    return crit, (-comp if REVERSE else comp)
 
 
 def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
@@ -444,6 +462,12 @@ def main() -> None:
     is_wide, is_dir, is_buy, is_nifty = masks
     core_pool = np.where(~is_buy)[0]
     wd, vb, dte = day_inputs(f, names)
+    if SHUFFLE >= 0:
+        # placebo: every day keeps its P&L but takes another day's labels (one permutation for all
+        # three, over every row including the warm-up)
+        perm = np.random.default_rng(SHUFFLE).permutation(len(wd))
+        wd, vb, dte = wd[perm], vb[perm], dte[perm]
+        print(f"labels shuffled with seed {SHUFFLE}")
     days = P.index
     print(
         f"{len(names)} variants, {len(days)} weekdays {days[0].date()} -> {days[-1].date()}; selection from day {WARMUP + 1} = {days[WARMUP].date()}"
@@ -632,7 +656,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}.csv"
         )
     )
 
