@@ -11,14 +11,14 @@ from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from time import perf_counter
-from typing import Literal
+from typing import Any, Literal
 
 import duckdb
 import pandas as pd
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from . import (
     all_fridays,
@@ -835,6 +835,17 @@ class RebalanceRequest(BacktestRequest):
     # When supplied it anchors the every-K-weeks cadence phase used by this preview.
     strategy_start_date: date | None = None
     auth_source: Literal["auto", "dashboard"] = "auto"
+    # BL-056: preview a favourite group (one sleeve per Friday, or the ensemble) as one account.
+    # `dataset` is still needed; the group's sleeves bring their own settings, so the rest of the
+    # strategy's fields are ignored (a placeholder `universe` is filled in).
+    group: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _group_needs_no_universe(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("group") and not data.get("universe"):
+            return {**data, "universe": ["_"]}
+        return data
 
 
 def _stock_classification(stock: StockDataset) -> dict[str, tuple[str, str]]:
@@ -2227,8 +2238,21 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
     Market hours prefer a temporary Fyers LTP row. At every other time (and when
     live credentials or quotes are unavailable), the latest persisted strategy week
     and trade closes are used without pretending those prices are live.
+
+    With `req.group` the target is a favourite group's: every sleeve's model target, weighted
+    by the sleeve's value since the last April reset (`groups.combine`'s rule).
     """
     now = (now or datetime.now(IST)).astimezone(IST)
+    if req.group:
+        return _rebalance_group_preview(req, now)
+    model = _rebalance_model(req, now)
+    return _rebalance_response(req, now, model, model["target"])
+
+
+def _rebalance_model(req: RebalanceRequest, now: datetime) -> dict:
+    """One strategy's model target and the prices to trade it at: `target` (name -> fraction),
+    `ltp`, `symbols`, `week`, `live`, `schedule`, `first_allocation`, `model_req` (the request
+    the model ran with) and `sleeve_value` (its value since the last April reset)."""
     if req.dataset not in ("stock", "broad"):
         raise HTTPException(422, "Rebalance preview supports Stock and Broad Momentum.")
     if req.weights is not None and len(req.weights) != len(req.lookbacks):
@@ -2356,23 +2380,53 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
             outer = _outer_with_sentinel(week, settlement_week)
             outcome = _run_broad(model_req, preview_ranking, outer).result
             target = rebalance.model_holdings(outcome, week)
-        current = dict(req.holdings_pct)
-        current[IDLE] = current.get(IDLE, 0.0) + max(0.0, 100 - sum(current.values()))
-        rows = rebalance.build_plan(
-            current,
-            target,
-            ltp,
-            symbols,
-            req.portfolio_value,
-            allow_missing_prices=not live,
-        )
     except (ValueError, KeyError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
     except FileNotFoundError as error:
         raise HTTPException(409, str(error)) from None
+    return {
+        "target": target,
+        "ltp": ltp,
+        "symbols": symbols,
+        "week": week,
+        "live": live,
+        "schedule": schedule,
+        "first_allocation": first_allocation,
+        "model_req": model_req,
+        "sleeve_value": groups_mod.sleeve_value(
+            [d.strftime("%Y-%m-%d") for d in outcome.equity.index], outcome.equity.tolist()
+        ),
+    }
+
+
+def _rebalance_response(
+    req: RebalanceRequest,
+    now: datetime,
+    model: dict,
+    target: dict[str, float],
+    *,
+    extra: dict | None = None,
+) -> dict:
+    """The preview for `target` against the supplied holdings, at `model`'s prices."""
+    week, live = model["week"], model["live"]
+    first_allocation, schedule = model["first_allocation"], model["schedule"]
+    current = dict(req.holdings_pct)
+    current[IDLE] = current.get(IDLE, 0.0) + max(0.0, 100 - sum(current.values()))
+    try:
+        rows = rebalance.build_plan(
+            current,
+            target,
+            model["ltp"],
+            model["symbols"],
+            req.portfolio_value,
+            allow_missing_prices=not live,
+        )
+    except (ValueError, KeyError) as error:
+        raise HTTPException(422, str(error)) from None
     price_mode = "live" if live else "last_close"
 
     return {
+        **(extra or {}),
         "dataset": req.dataset,
         "as_of": now.isoformat(timespec="seconds") if live else week.strftime("%Y-%m-%d"),
         "signal_week": week.strftime("%Y-%m-%d"),
@@ -2401,6 +2455,66 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
             "fees, taxes and live order-book liquidity are not included. No orders were placed."
         ),
     }
+
+
+def _rebalance_group_preview(req: RebalanceRequest, now: datetime) -> dict:
+    """The Rebalance preview of a favourite group as one account (BL-056): every sleeve's model
+    target, mixed by the sleeve's value since the last April reset, against the supplied holdings.
+    Sleeves keep their own calendar (`rebalance_offset`), so no strategy start date is used: the
+    phase a person would have trading it from a start date is what All Fridays removes."""
+    try:
+        with read_catalog() as con:
+            found = next((g for g in runs_store.list_groups(con) if g["id"] == req.group), None)
+    except (FileNotFoundError, duckdb.CatalogException):
+        found = None
+    if found is None:
+        raise HTTPException(404, "favourite group not found")
+    shared = {
+        "holdings_pct": req.holdings_pct,
+        "portfolio_value": req.portfolio_value,
+        "auth_source": req.auth_source,
+    }
+    models = []
+    for member in found["members"]:
+        member_req = RebalanceRequest.model_validate(
+            {"universe": ["_"], **member["config"], "dataset": req.dataset, **shared}
+        )
+        models.append((member, member_req, _rebalance_model(member_req, now)))
+    if not models:
+        raise HTTPException(422, "This group has no sleeves.")
+    # The sleeves share a market: take prices and the signal week from the first, and every
+    # price any sleeve needed.
+    first = models[0][2]
+    model = {
+        **first,
+        "live": all(m["live"] for _, _, m in models),
+        "ltp": {k: v for _, _, m in models for k, v in m["ltp"].items()},
+        "symbols": {k: v for _, _, m in models for k, v in m["symbols"].items()},
+        "schedule": None,
+    }
+    values = [float(m["sleeve_value"] or 1.0) for _, _, m in models]
+    target = groups_mod.mix_targets(
+        [(value, m["target"]) for value, (_, _, m) in zip(values, models, strict=True)]
+    )
+    total = sum(values)
+    sleeves = [
+        {
+            "id": member["id"],
+            "name": member["name"],
+            "value": round(value, 4),
+            "share": round(value / total, 4),
+            "target_pct": {n: round(w * 100, 4) for n, w in m["target"].items()},
+            **_rebalance_info(m["model_req"], m["week"]),
+        }
+        for value, (member, _, m) in zip(values, models, strict=True)
+    ]
+    return _rebalance_response(
+        req,
+        now,
+        model,
+        target,
+        extra={"group": {"id": found["id"], "name": found["name"], "sleeves": sleeves}},
+    )
 
 
 def _no_active_signal_notification(

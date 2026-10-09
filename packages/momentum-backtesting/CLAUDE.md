@@ -345,6 +345,13 @@ contract, not a shared service).
   cadence, releasing the old favourite (kept as a saved run; restored if the group fails). The
   weekly run needs no change: members are journalled one by one and `groups.combine` weights them
   by value since the April reset. Deleting a group keeps its sleeves.
+- **Rebalance preview of a group (BL-056 Phase 4):** `POST /api/rebalance-preview` (and `/jobs`)
+  takes `group: <id>` (a placeholder `universe` is filled in). `_rebalance_group_preview` runs
+  `_rebalance_model` once per sleeve (`rebalance_preview` is that plus `_rebalance_response`),
+  without a `strategy_start_date`: a sleeve's own `rebalance_offset` fixes its Fridays. Targets are
+  mixed by `groups.mix_targets` weighted by each sleeve's value since the April reset (from the
+  model's own equity curve), prices come from all sleeves, and the response carries `group`
+  (sleeves with `share`, `on_cadence`, `next`) and no `rebalance_schedule`.
 - **voladj ignores `lookbacks` and `weights` by default** (NSE's method: 26- and 52-week returns,
   4 weeks back, over 26-week volatility). For a voladj config those two search settings only reach
   the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-055, a heavy key in the

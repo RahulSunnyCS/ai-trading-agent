@@ -192,3 +192,76 @@ def test_a_failed_group_puts_the_old_favourite_back(client, monkeypatch):
     saved = client.get("/api/saved-runs?dataset=etf").json()
     assert next(r for r in saved if r["id"] == run["id"])["status"] == "invested"
     assert [r["id"] for r in saved if r["name"].endswith("of 4")] == []  # sleeves removed
+
+
+# --- BL-056 Phase 4: the Rebalance preview of a group ----------------------------------------
+
+
+def _fake_model(week, target, value):
+    def model(req, now):
+        return {
+            "target": target,
+            "ltp": {"X": 100.0, "Y": 50.0},
+            "symbols": {"X": "NSE:X-EQ", "Y": "NSE:Y-EQ"},
+            "week": week,
+            "live": False,
+            "schedule": None,
+            "first_allocation": False,
+            "model_req": req,
+            "sleeve_value": value,
+        }
+
+    return model
+
+
+def test_a_groups_preview_is_the_value_weighted_mix_of_its_sleeves(client, monkeypatch):
+    import pandas as pd
+
+    run = _save(client)
+    group = client.patch(f"/api/saved-strategies/{run['id']}", json={"status": "watching"}).json()
+    members = next(f for f in client.get("/api/favorite-strategies").json() if f["group"])[
+        "members"
+    ]
+    week = pd.Timestamp("2026-10-02")
+    # Friday 1 has grown to 1.5, the others stayed at 1.0: it counts for more in the account.
+    targets = [{"X": 1.0}, {"Y": 1.0}, {"Y": 1.0}, {"Y": 1.0}]
+    values = [1.5, 1.0, 1.0, 1.0]
+    offsets = [m["config"]["rebalance_offset"] for m in members]
+    by_offset = dict(zip(offsets, zip(targets, values, strict=True), strict=True))
+
+    def model(req, now):
+        target, value = by_offset[req.rebalance_offset]
+        return _fake_model(week, target, value)(req, now)
+
+    monkeypatch.setattr(api, "_rebalance_model", model)
+    result = client.post(
+        "/api/rebalance-preview",
+        json={
+            "dataset": "etf",
+            "group": group["id"],
+            "holdings_pct": {},
+            "portfolio_value": 1_000_000,
+        },
+    )
+    assert result.status_code == 200, result.text
+    body = result.json()
+    assert body["target_pct"] == {
+        "X": pytest.approx(100 / 3, abs=1e-3),
+        "Y": pytest.approx(200 / 3, abs=1e-3),
+    }
+    assert body["group"]["name"] == "Run 1 · all Fridays"
+    assert [s["value"] for s in body["group"]["sleeves"]] == values
+    assert sum(s["share"] for s in body["group"]["sleeves"]) == pytest.approx(1.0, abs=1e-3)
+    assert body["rebalance_schedule"] is None
+    rows = {r["asset"]: r for r in body["rows"]}
+    assert rows["X"]["action"] == "BUY" and rows["X"]["target_pct"] == pytest.approx(
+        100 / 3, abs=1e-3
+    )
+
+
+def test_a_group_preview_of_an_unknown_group_is_a_404(client):
+    result = client.post(
+        "/api/rebalance-preview",
+        json={"dataset": "etf", "group": "nope", "holdings_pct": {}, "portfolio_value": 1000},
+    )
+    assert result.status_code == 404

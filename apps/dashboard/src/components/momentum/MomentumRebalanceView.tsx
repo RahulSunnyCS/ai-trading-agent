@@ -24,11 +24,16 @@ import {
   buildRebalanceTable,
   parseHoldingsPaste,
   previewBlocker,
+  summariseGroup,
   targetAsHoldings,
   toDrafts,
   validateHoldings,
 } from '../../lib/momentumRebalance';
-import type { MomentumRebalanceResult, MomentumSavedRun } from '../../types/momentum';
+import type {
+  MomentumRebalanceGroup,
+  MomentumRebalanceResult,
+  MomentumSavedRun,
+} from '../../types/momentum';
 import { Badge, type Tone } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader } from '../ui/Card';
@@ -113,6 +118,43 @@ function cadenceLabel(schedule: MomentumRebalanceResult['rebalance_schedule']): 
     : `Every ${schedule.interval_weeks ?? EMPTY} weeks`;
 }
 
+/** The sleeves of a previewed group: who trades this week and how much of the account each is. */
+function GroupPreview({
+  group,
+  firstAllocation,
+}: {
+  group: MomentumRebalanceGroup;
+  firstAllocation: boolean;
+}) {
+  const summary = summariseGroup(group, firstAllocation);
+  return (
+    <div className="mb-4 rounded-lg border border-border bg-surface-2/40 px-4 py-3">
+      <p className="text-sm font-medium text-foreground">{group.name}</p>
+      <p className="mt-1 text-sm text-muted">{summary.sentence}</p>
+      <ul className="mt-2 flex flex-wrap gap-1.5">
+        {summary.lines.map((line) => (
+          <li
+            key={line.id}
+            className={
+              line.trades
+                ? 'inline-flex items-center gap-1.5 rounded-lg border border-primary/50 bg-primary/10 px-2.5 py-1 text-xs text-foreground'
+                : 'inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-xs text-muted'
+            }
+          >
+            <span className="font-semibold">{line.label}</span>
+            <span className="tabular-nums">{formatPct(line.share, 1)}</span>
+            {line.trades ? (
+              <Badge tone="info">trades</Badge>
+            ) : line.next ? (
+              <span className="text-faint">next {formatDay(line.next)}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function pct(value: number): string {
   return formatPct(value, 2, { unit: 'percent' });
 }
@@ -159,8 +201,10 @@ export function MomentumRebalanceView({
       dataset === 'broad' ? apiGet<Scores>('/api/momentum/scores') : Promise.resolve(null),
     ]).then(([saved, metadata, scores]) => {
       if (!alive) return;
-      // A favourite group (BL-051) has no config of its own to preview.
-      setRuns(saved.ok ? saved.data.filter((run) => !run.group) : []);
+      // A favourite group (BL-051, BL-056) is previewed as one account: its sleeves' targets
+      // weighted by their value (the server does the mixing).
+      // A sleeve follows its group, so only the group is offered.
+      setRuns(saved.ok ? saved.data.filter((run) => !run.member_of) : []);
       setMeta(metadata.ok ? metadata.data : null);
       setSuggestions(
         dataset === 'broad'
@@ -182,8 +226,10 @@ export function MomentumRebalanceView({
   }, [dataset]);
 
   const selectedRun = runs.find((run) => run.id === choice);
+  const group = selectedRun?.group ?? null;
   const config = useMemo(() => {
     if (choice === 'current') return currentBroadConfig;
+    if (selectedRun?.group) return { dataset, group: selectedRun.id };
     if (selectedRun) return selectedRun.config;
     if (!meta) return null;
     return {
@@ -198,8 +244,8 @@ export function MomentumRebalanceView({
     };
   }, [choice, currentBroadConfig, dataset, meta, selectedRun]);
   const described = useMemo(
-    () => (config ? describeConfig(config, dataset) : null),
-    [config, dataset],
+    () => (config && !group ? describeConfig(config, dataset) : null),
+    [config, dataset, group],
   );
   const validation = useMemo(() => validateHoldings(holdings), [holdings]);
   const allocated = validation.allocated;
@@ -210,7 +256,8 @@ export function MomentumRebalanceView({
     hasConfig: config !== null,
     holdingsError: validation.error,
     portfolioValue,
-    strategyStartDate,
+    // A group's sleeves keep their own Fridays, so there is no start date to ask for.
+    strategyStartDate: group ? 'group' : strategyStartDate,
   });
   const knownAssets = useMemo(() => suggestions.map((item) => item.value), [suggestions]);
   const pasted = useMemo(
@@ -267,7 +314,7 @@ export function MomentumRebalanceView({
       ...config,
       holdings_pct: validation.holdings,
       portfolio_value: Number(portfolioValue),
-      strategy_start_date: strategyStartDate,
+      ...(group ? {} : { strategy_start_date: strategyStartDate }),
       auth_source: 'dashboard',
     });
     if (!response.ok) setError(response.error);
@@ -321,6 +368,7 @@ export function MomentumRebalanceView({
               {runs.map((run) => (
                 <option key={run.id} value={run.id}>
                   {run.name}
+                  {run.group ? ` · group of ${run.group.length}` : ''}
                   {run.active ? ' · headline' : ''}
                 </option>
               ))}
@@ -328,6 +376,13 @@ export function MomentumRebalanceView({
           </label>
           <p className="text-xs text-muted">Data through {formatDay(meta?.last_week)}</p>
         </div>
+        {group ? (
+          <p className="mt-3 rounded-lg bg-surface-2/50 px-3 py-2 text-xs text-muted">
+            A group of {formatInt(group.length)} sleeves, previewed as one account: each sleeve's
+            target weighted by its value since the April reset. Every sleeve trades on its own
+            Fridays.
+          </p>
+        ) : null}
         {config && described ? (
           <p className="mt-3 rounded-lg bg-surface-2/50 px-3 py-2 text-xs text-muted">
             {described.period}
@@ -501,23 +556,25 @@ export function MomentumRebalanceView({
               className="mt-1"
             />
           </label>
-          <label htmlFor="rebalance-start" className="text-xs text-muted">
-            Strategy live start date
-            <Input
-              id="rebalance-start"
-              type="date"
-              required
-              value={strategyStartDate}
-              onChange={(event) => {
-                setStrategyStartDate(event.target.value);
-                setPlan(null);
-              }}
-              className="mt-1"
-            />
-            <span className="mt-1 block">
-              Anchors which Friday is week 1 for an every-2, every-3 or every-4-week strategy.
-            </span>
-          </label>
+          {group ? null : (
+            <label htmlFor="rebalance-start" className="text-xs text-muted">
+              Strategy live start date
+              <Input
+                id="rebalance-start"
+                type="date"
+                required
+                value={strategyStartDate}
+                onChange={(event) => {
+                  setStrategyStartDate(event.target.value);
+                  setPlan(null);
+                }}
+                className="mt-1"
+              />
+              <span className="mt-1 block">
+                Anchors which Friday is week 1 for an every-2, every-3 or every-4-week strategy.
+              </span>
+            </label>
+          )}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
           <Button
@@ -557,6 +614,9 @@ export function MomentumRebalanceView({
                 : `as of ${formatDay(plan.as_of)}`
             } · Signal week ${formatDay(plan.signal_week)}`}
           />
+          {plan.group ? (
+            <GroupPreview group={plan.group} firstAllocation={plan.first_allocation} />
+          ) : null}
           {plan.rebalance_schedule ? (
             <div
               className={`mb-4 rounded-lg border px-4 py-3 ${

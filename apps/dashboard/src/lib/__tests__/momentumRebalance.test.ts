@@ -4,6 +4,7 @@ import {
   buildRebalanceTable,
   parseHoldingsPaste,
   previewBlocker,
+  summariseGroup,
   targetAsHoldings,
   toDrafts,
   validateHoldings,
@@ -252,5 +253,44 @@ describe('buildRebalanceTable', () => {
     });
     expect(table.cash).toBeNull();
     expect(table.rows.map((row) => row.asset)).toEqual(['A']);
+  });
+});
+
+describe('summariseGroup', () => {
+  const sleeve = (n: number, on_cadence: boolean, share: number) => ({
+    id: `s${n}`,
+    name: `Five Sectors · all Fridays · Friday ${n} of 4`,
+    value: 1,
+    share,
+    target_pct: {},
+    on_cadence,
+    every: 4,
+    next: on_cadence ? null : '2026-10-23',
+  });
+  const group = {
+    id: 'g',
+    name: 'Five Sectors · all Fridays',
+    sleeves: [sleeve(1, false, 0.3), sleeve(2, true, 0.7)],
+  };
+
+  it("names the Friday that trades and each sleeve's share of the account", () => {
+    const summary = summariseGroup(group);
+    expect(summary.trading).toEqual(['Friday 2 of 4']);
+    expect(summary.lines.map((l) => [l.label, l.share, l.trades])).toEqual([
+      ['Friday 1 of 4', 0.3, false],
+      ['Friday 2 of 4', 0.7, true],
+    ]);
+    expect(summary.sentence).toMatch(/^Friday 2 of 4 trades this week; the other sleeves hold/);
+  });
+
+  it('does not call a first allocation a trading week', () => {
+    expect(summariseGroup(group, true).sentence).toMatch(
+      /^First allocation: every sleeve invests now/,
+    );
+  });
+
+  it('says so when no sleeve rebalances', () => {
+    const quiet = { ...group, sleeves: group.sleeves.map((s) => ({ ...s, on_cadence: false })) };
+    expect(summariseGroup(quiet).sentence).toMatch(/^No sleeve rebalances this week/);
   });
 });

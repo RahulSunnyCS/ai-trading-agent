@@ -494,6 +494,26 @@ export interface MomentumStockActionReview {
   }>;
 }
 
+/** One sleeve of a previewed group: its weight in the account and whether it trades this week. */
+export interface MomentumRebalanceSleeve {
+  id: string;
+  name: string;
+  /** Value since the last April reset (1 = unchanged). */
+  value: number;
+  /** Its fraction of the whole group. */
+  share: number;
+  target_pct: Record<string, number>;
+  on_cadence: boolean;
+  every: number | null;
+  next: string | null;
+}
+
+export interface MomentumRebalanceGroup {
+  id: string;
+  name: string;
+  sleeves: MomentumRebalanceSleeve[];
+}
+
 export interface MomentumRebalanceResult {
   dataset: 'stock' | 'broad';
   as_of: string;
@@ -512,6 +532,8 @@ export interface MomentumRebalanceResult {
     current_rebalance_date: string | null;
     next_rebalance_date: string;
   } | null;
+  /** Present when a favourite group was previewed (BL-056): its sleeves and what each holds. */
+  group?: MomentumRebalanceGroup;
   current_pct: Record<string, number>;
   target_pct: Record<string, number>;
   rows: Array<{
