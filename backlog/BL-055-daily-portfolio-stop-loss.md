@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; follows BL-054 |
-| **Status** | In progress (exploratory: owner override, no hold-out) |
+| **Status** | Done (exploratory: owner override, no hold-out) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -87,7 +87,20 @@ the first block's rule, levels or result.
 - **Hold-out:** none (same override).
 - **Will not run:** other premiums (₹65 exists in the repo and is not used), other slots, other
   stop levels, premium versions of Dir or Buy.
-- **Result:** (after the run)
+- **Result:** the stop rarely "helps" under the rule: 3 of 36 combinations × levels (OTM1 B2 and B3
+  at 8k, P80 B1 at 10k); never for P100 or B4. No-stop totals / max drawdown, OTM1 | P80 | P100 —
+  **B1** ₹8.73L / −₹2.26L | ₹7.02L / −₹1.99L | ₹7.37L / −₹1.76L; **B2** ₹9.47L / −₹1.67L | ₹8.45L /
+  −₹1.05L | ₹8.66L / −₹1.01L; **B3** ₹9.30L / −₹2.10L | ₹7.94L / −₹1.49L | ₹8.22L / −₹1.28L;
+  **B4** ₹10.49L / −₹0.91L | ₹8.93L / −₹0.95L | ₹9.25L / −₹0.97L. Total return over max drawdown,
+  OTM1 | P80 | P100: B1 3.9 | 3.5 | 4.2; B2 5.7 | 8.0 | 8.6; B3 4.4 | 5.3 | 6.4; B4 11.6 | 9.4 | 9.5.
+  Premium versions earn 4–19% less than OTM1 in every mix and have the smaller drawdown in B1–B3
+  (not in B4). B4 with OTM1 had the highest total and the smallest drawdown of the 12, worst day
+  −₹17,438; the stop changed its total by ≤ 1% and its drawdown by 2–12% (stopped 82 / 53 / 26 days
+  at 8k / 10k / 12.5k). Across all 12 combinations the stop moved total P&L by −19.7% to +12.1% and
+  drawdown by −42% to +11%, with no pattern that holds across Widesl versions (B2 at 8k: drawdown
+  −42% with OTM1, +3% with P80, −18% with P100). The stop reliably trims the worst day (B2 −₹19.2k →
+  −₹13.3k at 8k, −₹15.9k at 10k) and little else. B4's picks are hindsight (see the note above),
+  so its lead is partly built in. Scripts: `packages/option-backtesting/research/bl055/`.
 
 ## Log
 
