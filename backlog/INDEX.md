@@ -17,6 +17,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-014](BL-014-ci-and-merge-gates.md) | CI and merge gates: nothing reaches `main` while checks are red | P0 | In progress | chore | infra |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
 | [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data in `trading-data`, derived tables for straddle backtests, daily top-up | P0 | In progress | feature | trading-data |
+| [BL-056](BL-056-momentum-all-fridays-split.md) | Momentum: backtest and follow a config split across every rebalance Friday | P0 | Planned | feature | momentum |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
