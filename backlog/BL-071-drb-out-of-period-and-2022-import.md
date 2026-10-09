@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; follows BL-067 / 068 / 069 |
-| **Status** | In progress (part A); part B waiting for the owner |
+| **Status** | Part A done: recent edge not confirmed out of period; part B (import) started 2026-10-10 on the owner's go-ahead |
 | **Type** | research |
 | **Area** | options / trading-data |
 | **Created** | 2026-10-10 |
@@ -39,7 +39,28 @@ year only") and which has been examined many times. Two ways to test the rule ou
   and recent-only are reported, not judged.
 - **Hold-out:** this slice is the hold-out; nothing is changed after it is read.
 - **Will not run:** other slices, other rows, re-tuning on the slice.
-- **Result:** pending.
+- **Result (2026-10-10): NOT confirmed — the recent edge did not hold out of period; it reversed.** Slice
+  2025-01-10 → 2025-08-29, 157 selection days, gross before charges, DRB-6W3L2, 248 variants:
+
+  | Row | Gross | Max DD | Win % | Per day |
+  |---|---|---|---|---|
+  | baseline 33/25/25/17 | ₹1,70,015 | −₹88,366 | 52.9 | ₹1,083 |
+  | recent-only 100/0/0/0 | ₹1,98,550 | −₹69,912 | 57.3 | ₹1,265 |
+  | no-recent 0/33/33/34 | **₹2,96,897** | −₹59,930 | 56.1 | ₹1,891 |
+  | no-VIX 40/30/30/0 | ₹2,18,753 | −₹87,720 | 52.9 | ₹1,393 |
+
+  Random picks of the same shape on the same days (n = 1,000): P50 ₹1,98,170, P90 ₹2,94,240, max
+  ₹4,26,365. (1) baseline ≥ P90: **false** (it beats 34% of random picks; below the median). (2)
+  baseline − no-recent: **−₹1,26,882**, 90% block-bootstrap interval [−₹2,59,561, −₹68], so the sign is
+  the opposite of the in-sample year's +₹2,04,763. (3) per-day gap −₹808 against ≥ +₹507: false. All three
+  conditions fail. Report-only: baseline − recent-only −₹28,535; baseline − no-VIX −₹48,739.
+  Reading: in Jan–Aug 2025 the weekday / days-to-expiry / VIX-band fit criteria alone (no-recent) did
+  best, at the random P90, and adding recent return made it worse; in 2025-09 → 2026-10 it was the other
+  way round (BL-067/068). The ranking of the criteria is not stable across the two periods, so BL-067/068's
+  "recent return carries the edge" is a finding about that one year, not yet about the rule. Not a
+  statement that no-recent is good: one 157-day slice, one comparison. The whole two-year run of the
+  baseline (422 selection days) makes ₹7,20,873 gross, drawdown −₹88,366, of which ₹4,30,868 is the
+  2025-12 → 2026-10 year.
 
 ### Part B — 2022–2024 NIFTY from the SSD's `2014-2024` folder (needs the owner's go-ahead)
 - **What is there** (read-only inspection, 2026-10-10, `/Volumes/RAHUL'S SSD/Stock Market Data/2014-2024`):
@@ -77,3 +98,4 @@ year only") and which has been examined many times. Two ways to test the rule ou
 ## Log
 
 - 2026-10-10 — created; part A registered before its runs, part B inspected read-only and written up.
+- 2026-10-10 — part A ran: not confirmed (all three conditions fail; baseline − no-recent −₹1,26,882). Owner said "import it now in parallel": part B starts, staged (importer into scratch, checked against the Oct 2024 overlap, before anything is written to the lake).
