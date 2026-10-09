@@ -6,8 +6,9 @@ favourite (the one sent to Telegram) comes first.
 
 ## Before you start
 
-Nothing. The scheduled jobs do the work: 14:40 ETF preview, 16:45 ETF final, 19:30 stock data
-and the stock-based final (Broad, Stock, Custom Index), 21:00 journal check, 21:30 rules check.
+Nothing. The scheduled jobs do the work: 14:40 preview (ETF favourites, and a Broad headline on
+live Fyers prices), 16:45 ETF final, 19:30 stock data and the stock-based final (Broad, Stock,
+Custom Index), 21:00 journal check, 21:30 rules check.
 Open this page to read the week, to run something by hand, or to classify a possible split.
 
 ## The page, top to bottom
