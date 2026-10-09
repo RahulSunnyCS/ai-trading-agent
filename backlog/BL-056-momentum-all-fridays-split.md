@@ -28,21 +28,6 @@ gamble; it does not raise the average. Every after-tax number in BL-054 already 
 split. The owner (2026-10-09) wants it in the dashboard, both to backtest and to follow with
 money.
 
-Does the split also make falls shallower? Measured (`scripts/bl054_phase_split.py` on
-`feat/momentum-stop-loss`; output in its gitignored
-`data/search/round7_A/bl054/phase_split/phase_split.csv`) on the same 10 configs, after tax at
-Rs 5 lakh, the sleeves never evened out. Median over the 10, full period:
-
-| | Split | Single Friday: median | Single Friday: worst |
-|---|---|---|---|
-| Max drawdown | -27.6% | -31.1% | -35.7% |
-| Ulcer (average fall) | 9.9 | 10.8 | 12.4 |
-| CAGR | 31.5% | | 27.5% (best 33.9%) |
-
-Yes: a shallower worst fall and a calmer ride than a typical Friday, and a CAGR inside the
-single-Friday range. FY2018-22 alone: -27.3% against -28.6% (worst -35.7%); FY2023-26: -19.3%
-against -20.8% (worst -23.2%).
-
 **Measured after tax at Rs 5 lakh, 2017-2026** (`scripts/bl054_phase_split.py`, output
 `data/search/round7_A/bl054/phase_split/phase_split.csv`): the split's worst fall is shallower
 than the typical single Friday's in 10 of 10 configs (median -27.6% against -31.1%; the
