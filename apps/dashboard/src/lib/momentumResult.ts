@@ -629,7 +629,9 @@ export function signalActionTone(action: string | null | undefined): SignalTone 
   const text = (action ?? '').trim().toUpperCase();
   if (text.startsWith('BUY') || text.startsWith('ADD') || text === 'IN') return 'positive';
   if (text.startsWith('SELL') || text.startsWith('TRIM') || text === 'OUT') return 'negative';
-  if (text.startsWith('WAIT') || text.startsWith('AT CAP')) return 'warning';
+  if (text.startsWith('WAIT') || text.startsWith('AT CAP') || text.startsWith('SKIP')) {
+    return 'warning';
+  }
   return 'neutral';
 }
 

@@ -64,7 +64,6 @@ from .engine import (
     IDLE,
     Config,
     Result,
-    cadence_weeks,
     ranked_universe,
     run_backtest,
 )
@@ -1985,20 +1984,85 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
                 exposure["realism"] = _circuit_realism(req, ranking, outcome, outer_prices)
         return exposure
 
-    return core, {**lazy, "trades": trades, "circuit_exposure": circuit_exposure}
+    def latest() -> object:
+        # The engine's own decision for the run's last week, as the weekly signal uses: the
+        # advisory `analysis.latest_signal` knows neither the price ceiling nor the circuit locks
+        # Broad passes the engine, so it recommended buys the engine would refuse. One more engine
+        # pass (the ranking is the run's own), made when the panel is opened.
+        run = _broad_decide(req, ranking, outer_prices, result.ranks.index[-1])
+        return _mark_price_skips(_broad_engine_signal(req, run), req, *run)
+
+    return core, {
+        **lazy,
+        "trades": trades,
+        "latest": latest,
+        "circuit_exposure": circuit_exposure,
+    }
 
 
-def _outer_with_sentinel(week: pd.Timestamp, sentinel: pd.Timestamp) -> pd.DataFrame:
+#: The result panel's action for a stock the price ceiling kept out (`_mark_price_skips`).
+PRICE_SKIP = "SKIP (above max price)"
+
+
+def _mark_price_skips(
+    signal: dict,
+    req: BacktestRequest,
+    outcome: broad.BroadBacktestResult,
+    week: pd.Timestamp,
+) -> dict:
+    """Label the stocks the engine would have bought on `week` but for `max_stock_price`: in
+    its top N, not held, priced above the ceiling, on a week the cadence buys. The engine skips
+    them silently and the next-best name takes the slot, so without this a top-ranked stock just
+    shows no action. Result panel only: the weekly signal, Telegram and the journal keep the
+    engine's trades alone. As in the engine, the price is the one of the week the ranks come
+    from (`signal_delay` weeks back), the raw traded close, and atomics are exempt."""
+    if not req.max_stock_price:
+        return signal
+    on, _ = analysis.rebalance_weeks(week, req.rebalance, req.rebalance_every, req.rebalance_offset)
+    ranking = outcome.ranking
+    weeks = ranking.prices.index
+    position = weeks.get_loc(week) - req.signal_delay
+    if not on or position < 0:
+        return signal
+    raw = ranking.raw_prices if ranking.raw_prices is not None else ranking.prices
+    priced = raw.loc[weeks[position]]
+    over = broad.price_ceiling_mask(raw.loc[[weeks[position]]], req.max_stock_price)
+    assert over is not None  # max_stock_price is set
+    blocked = over.iloc[0]
+    top_n = outcome.result.config.top_n
+    for row in signal["rows"]:
+        rank, name = row["rank"], row["asset"]
+        if (
+            not row["action"]
+            and not row["held"]
+            and rank is not None
+            and rank <= top_n
+            and bool(blocked.get(name, False))
+        ):
+            row["action"] = PRICE_SKIP
+            row["reason"] = (
+                f"₹{priced[name]:,.0f} a share is above Max price to buy "
+                f"₹{req.max_stock_price:,.0f}; the next-best stock takes its slot."
+            )
+    return signal
+
+
+def _outer_with_sentinel(
+    week: pd.Timestamp, sentinel: pd.Timestamp, outer: pd.DataFrame | None = None
+) -> pd.DataFrame:
     """The outer-market prices (CASH and the atomic assets) with `week` present and a flat
-    `sentinel` week after it, to match a ranking from `rebalance.persisted_broad_ranking`."""
-    outer = DATA.get().copy()
+    `sentinel` week after it, to match a ranking from `rebalance.persisted_broad_ranking`.
+    `outer` is the frame to start from (a finished run's own); by default, the stored data."""
+    outer = (DATA.get() if outer is None else outer).copy()
     if week not in outer.index:
         available = outer.loc[outer.index <= week]
         if available.empty:
             raise ValueError("No persisted outer-market data for the preview week.")
         outer.loc[week] = available.iloc[-1]
     outer.loc[sentinel] = outer.loc[week]
-    return outer
+    # Sorted: with a past `week` the frame has later rows, and a missing sentinel Friday is
+    # appended after them.
+    return outer.sort_index()
 
 
 def _broad_sentinel_run(
@@ -2017,12 +2081,22 @@ def _broad_sentinel_run(
     ranking = _broad_ranking(req)
     if ahead:
         ranking = rebalance.persisted_broad_ranking(ranking)
-    week = ranking.prices.index[-1]
+    return _broad_decide(req, ranking, DATA.get(), ranking.prices.index[-1])
+
+
+def _broad_decide(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outer_prices: pd.DataFrame,
+    week: pd.Timestamp,
+) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
+    """Run Broad through `week` plus a flat sentinel week after it, so the engine decides `week`
+    with every rule it has (see `_broad_sentinel_run`). Weeks after `week` are dropped first."""
     sentinel = week + pd.Timedelta(days=7)
     outcome = _run_broad(
         req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
-        rebalance.persisted_broad_ranking(ranking),
-        _outer_with_sentinel(week, sentinel),
+        rebalance.persisted_broad_ranking(ranking, through=week),
+        _outer_with_sentinel(week, sentinel, outer_prices),
     )
     return outcome, week
 
@@ -2136,20 +2210,15 @@ def _broad_engine_signal(
         )
     rows.sort(key=lambda r: (pd.isna(r["rank"]), r["rank"] if pd.notna(r["rank"]) else 0))
 
-    if req.rebalance == "weekly" and req.rebalance_every > 1:
-        on_cadence = bool(cadence_weeks([week], req.rebalance_every, req.rebalance_offset))
+    explain = analysis.cadence_explain(
+        week, req.rebalance, req.rebalance_every, req.rebalance_offset, req.sell_every_week
+    )
+    if explain is None and req.rebalance == "weekly" and req.rebalance_every > 1:
         explain = (
-            f"Rebalance week (every {req.rebalance_every} weeks, phase {req.rebalance_offset})."
-            if on_cadence
-            else f"Not a rebalance week (every {req.rebalance_every} weeks, phase "
-            f"{req.rebalance_offset}): "
-            + (
-                "only sells of names that dropped out are made."
-                if req.sell_every_week
-                else "no trades."
-            )
+            f"Rebalance week (every {req.rebalance_every} weeks, "
+            f"phase {req.rebalance_offset + 1} of {req.rebalance_every})."
         )
-    else:
+    elif explain is None:
         explain = "Rebalance week."
     if req.signal_delay:
         explain += f" With a {req.signal_delay}-week signal delay, the ranks shown are that old."
@@ -3474,19 +3543,21 @@ def _weekly_status(today: date | None = None) -> dict:
 
 
 def _rebalance_info(req: BacktestRequest, week: pd.Timestamp) -> dict:
-    """Whether `week` is a rebalance week for this config, and the next one (BL-051)."""
+    """Whether `week` is a rebalance week for this config, and the next one (BL-051). Monthly
+    trades on the last Friday of the month only, as the engine does (`every` stays None)."""
     every = req.rebalance_every if req.rebalance == "weekly" else 1
     offset = req.rebalance_offset if every > 1 else 0
-    if req.rebalance != "weekly":
+    if req.rebalance == "weekly" and every == 1:
         return {"on_cadence": True, "every": None, "offset": None, "next": None}
-    week = pd.Timestamp(week).normalize()
-    upcoming = [week + pd.Timedelta(weeks=k) for k in range(1, every + 1)]
-    following = next(w for w in upcoming if cadence_weeks([w], every, offset))
+    on, following = analysis.rebalance_weeks(
+        pd.Timestamp(week).normalize(), req.rebalance, every, offset
+    )
+    monthly = req.rebalance == "monthly"
     return {
-        "on_cadence": bool(cadence_weeks([week], every, offset)),
-        "every": every,
-        "offset": offset,
-        "next": following.strftime("%Y-%m-%d"),
+        "on_cadence": on,
+        "every": None if monthly else every,
+        "offset": None if monthly else offset,
+        "next": following.strftime("%Y-%m-%d") if following is not None else None,
     }
 
 
@@ -3729,8 +3800,11 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     elif req.dataset == "custom_index":
         payload = _custom_index_backtest(req)
     elif req.dataset == "broad":
-        payload = _broad_backtest(req)
-        # The engine's own decision for this week, not the advisory panel (see its docstring).
+        core, lazy = _broad_parts(req)
+        # The engine's own decision for the newest STORED week (a lagging outer-market series can
+        # end the run itself a week earlier), so the run's own `latest` is not built at all.
+        lazy.pop("latest", None)
+        payload = _full(core, lazy)
         payload["latest"] = _broad_engine_signal(req)
     else:
         return None, f"Unsupported weekly dataset {req.dataset!r}."

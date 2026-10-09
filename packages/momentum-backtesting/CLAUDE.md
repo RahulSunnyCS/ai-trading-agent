@@ -383,7 +383,12 @@ contract, not a shared service).
   sample and is never used. The Broad weekly signal (`api._broad_engine_signal`, used by
   `_research_weekly_result`) is the engine's own decision from a flat sentinel week appended
   after the newest week (as `rebalance_preview` does), not `analysis.latest_signal`, which
-  ignores cadence, `sell_every_week`, the price ceiling and circuit locks.
+  knows neither the price ceiling nor the circuit locks. A Broad result's "This week" section
+  (`latest`) is the same engine decision for the run's own last week (`api._broad_decide`, which
+  drops any later weeks first, so a run with a past `end` is decided on what was known then),
+  plus `_mark_price_skips`' "SKIP (above max price)" rows, which only the result panel shows.
+  `latest_signal` (ETF, Stock, Custom Index) follows the cadence through
+  `analysis.cadence_explain`, which both paths use for the "Not a rebalance week" wording.
   `tests/test_broad_parity.py` pins both paths to identical engine arguments and trades. The
   tilt-rank caches (`levers.tilt_cache_get/put`) hold the keyed frame so a recycled `id()`
   cannot serve another frame's ranks.
