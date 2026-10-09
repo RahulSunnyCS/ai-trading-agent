@@ -45,11 +45,56 @@ to total P&L and drawdown?
 - **Hold-out:** none. Owner override (below).
 - **Will not run:** other levels, a trailing or time-based stop, re-entry after the stop, a stop
   on the BL-054 rotation, per-lot-count scaling of the per-strategy stops.
+- **Result:** **inconclusive** under the rule. 489 days, 2024-10-09 → 2026-10-08, before charges;
+  stop closes everything at the first minute the combined P&L is ≤ −X (minute-close value).
+  Total P&L / max drawdown (no stop → 8k / 10k / 12.5k):
+  **B2** ₹9,47,039 / −₹1,67,246 → ₹10,61,722 (+12.1%) / −₹96,829 (−42%); ₹10,34,463 (+9.2%) /
+  −₹1,31,435 (−21%); ₹9,60,386 (+1.4%) / −₹1,69,014 (+1%). **B1** ₹8,72,687 / −₹2,25,807 →
+  ₹7,66,668 (−12.1%) / −₹1,48,038 (−34%); ₹8,13,267 (−6.8%) / −₹2,03,011 (−10%); 12.5k no change.
+  **B3** ₹9,29,984 / −₹2,10,009 → ₹8,94,013 (−3.9%) / −₹1,34,560 (−36%); ₹9,75,090 (+4.9%) /
+  −₹1,63,066 (−22%); ₹9,73,335 (+4.7%) / −₹1,90,369 (−9%). Level 8k "helps" B2 and B3 under the
+  rule but cuts B1's total by 12.1% (> 10%), so the pass condition on B1 fails; no other level
+  clears the 25% drawdown bar. Worst day: B2 −₹19,167 → −₹13,315 (8k), −₹15,941 (10k and 12.5k);
+  B1 −₹21,710 → −₹16,673 (8k). Days stopped at 8k: B1 224, B2 151, B3 180 of 489; days that
+  would have finished better unstopped: 59, 65, 73. 12.5k does nothing for B1 because 5 identical
+  copies each carry their own ₹2,500 stop (5 × 2,500 = 12,500) and all stop in the same minute.
+  Average stopped-day loss: −₹8.6k to −₹9.2k at 8k, −₹13.3k to −₹13.9k at 12.5k (minute-bar
+  overshoot of 8–11%). Scripts: `packages/option-backtesting/research/bl055/`.
+
+### 2026-10-09 (later) — Mix B4 and closest-premium Widesl versions
+Added after the first block's result was read (above). It extends the test and changes none of
+the first block's rule, levels or result.
+- **Hypothesis:** the same daily stop helps a mix built from the best start times, and the
+  Widesl strike choice (OTM1, closest ₹80, closest ₹100) changes how much the stop helps.
+- **Universe:** window, data, stop rule and levels (8,000 / 10,000 / 12,500) as above. New mix
+  **B4** (6 lots): Widesl at 09:17 + Widesl at 09:32 + Widesl at 10:02 (1 lot each), Dir ATM at
+  11:17 + Dir ATM at 11:32 (1 lot each), Buy 09:35 (1 lot). Dir ATM is
+  `nifty_dir_924_itm1_sl21_recost.yaml` with ATM strikes and the entry time changed (as in
+  BL-054). **Widesl versions**, applied to every Widesl lot of every mix at the same start
+  times: **OTM1** (as now), **P80** and **P100** — `nifty_widesl_917_otm1.yaml` with both legs'
+  strike replaced by `closest_premium: 80` or `100`; SL 115% trailed 15/10 percent, ₹2,500
+  overall stop, exit 15:28 unchanged. Mixes B1, B2, B3, B4 × 3 Widesl versions = 12
+  combinations, each at no stop and the three levels.
+- **Look-ahead / selection note:** the 09:17, 09:32, 10:02 Widesl slots and the 11:17, 11:32 Dir
+  ATM slots were chosen by the owner from the BL-054 whole-window results on this same window.
+  B4 is therefore optimistic by construction; its numbers say what the stop does to a
+  hindsight-picked mix, not what the mix would have earned.
+- **Pass / kill rule:** the first block's "helps" test (max drawdown ≥ 25% smaller and total ≤ 10%
+  lower than the same combination with no stop), reported per combination. No new verdict beyond
+  that; the per-combination table is the result.
+- **Reported alongside:** the no-stop totals and drawdowns of all 12 combinations (does P80 or
+  P100 beat OTM1 without any stop?), 10 worst days of B4, days stopped, whipsaws.
+- **Hold-out:** none (same override).
+- **Will not run:** other premiums (₹65 exists in the repo and is not used), other slots, other
+  stop levels, premium versions of Dir or Buy.
 - **Result:** (after the run)
 
 ## Log
 
 - 2026-10-09 — override: owner asked for the same two years already looked at; exploratory, and
   cannot by itself justify putting a stop into live trading.
+- 2026-10-09 — owner asked for mix B4 (3 Widesl, 2 Dir ATM, 1 Buy) and ₹80 / ₹100 closest-premium
+  Widesl versions of every mix; owner chose 11:17 and 11:32 for the Dir ATM lots and applying
+  the premium versions to all four mixes.
 - 2026-10-09 — levels: owner listed 8k, 10k, 12k and 12.5k; three were asked for, so 8k, 10k and
   12.5k are used (12k is within 4% of 12.5k).
