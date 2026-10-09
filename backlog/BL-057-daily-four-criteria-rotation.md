@@ -134,9 +134,16 @@ Added after the first block's result was read. It changes only the core constrai
 - **Hold-out:** none; chosen by the owner after seeing the at-least-2 result on the same window,
   so the result is exploratory and cannot replace the first block's verdict.
 - **Will not run:** minimums of 4 or 5 (as in BL-054, the owner kept the sweep at 2 and 3).
-- **Result:** (after the run)
+- **Result:** **inconclusive**, and worse than the at-least-2 case on every line. Same 202 days and
+  Buy add-on days. At least 3 Widesl: ₹2,81,250, max DD −₹86,287, worst day −₹16,061, ₹244 per
+  lot-day; R (at-least-3) P50 ₹1,87,742 / P90 ₹2,53,976, beats 97% → (1) passes; E ₹2,44,304 /
+  DD −₹56,095 → (2) fails (more total, drawdown ₹30,192 worse); B2 → (3) passes. Against the
+  at-least-2 case: −₹50,592 total, drawdown ₹29,134 worse. The override fired on 155 of 202 days
+  (core held exactly 3 Widesl on 175). The first block's verdict stands. `rotate.py --min-wide 3`;
+  the default reproduces the first block's ₹3,31,842.
 
 ## Log
 
 - 2026-10-09 — created from the owner's idea and answers; override: same already-seen window.
 - 2026-10-09 — ran; inconclusive under the pass rule (Result above).
+- 2026-10-09 — at-least-3 block ran; inconclusive, below the at-least-2 case on total and drawdown.
