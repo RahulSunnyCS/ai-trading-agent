@@ -76,3 +76,17 @@ month on every lookback is a different question; it would need its own addendum 
 - 2026-10-09 — owner: also test skipping the latest month on every lookback, and not skipping at
   all. Addendum 1 (`search_spaces/bl055_criteria_addendum_1.json`) committed before any run; same
   strategies and rules, 3 variants in all.
+- 2026-10-09 — **bug found while building addendum 1, before any addendum run:** the default
+  voladj score's "skip the latest month" does not skip. `_compute_ranks_voladj` computes
+  `prices / prices.shift(s + 26) - 1`, a 30-week (and 56-week) return to the latest close, not
+  the 26/52-week return measured 4 weeks back that its docstring and NSE's method describe. Every
+  voladj and blend result so far (round 7, the frozen ensemble, the Friday Broad signals) used
+  the widened windows. The default is **not** changed here (it would move every saved result
+  and the frozen ensemble: an owner decision). Consequences for this item:
+  - the first variant (killed above) copied the same formula for lookbacks >= 26, so it did not
+    match its own pre-registration on those components; its short components were as
+    registered, so the reversal diagnosis stands;
+  - the lookback-following path now does a true skip (return from skip + L to skip weeks ago),
+    and lever l8 runs the first variant again as registered (`skip_long`) next to addendum 1's
+    `skip_all` and `skip_none`, all against today's default;
+  - tests pin the default's actual behaviour and the corrected NSE formula.

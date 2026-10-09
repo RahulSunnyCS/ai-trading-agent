@@ -163,6 +163,9 @@ class Config:
     # 26-week volatility, ignoring `lookbacks`/`weights`. True: one component per selected
     # lookback, weighted by `weights` (see _compute_ranks_voladj).
     voladj_lookbacks: bool = False
+    # voladj_lookbacks only (BL-055 addendum 1): which lookbacks skip the latest 4 weeks when
+    # `voladj_skip_recent_month` is on: "long" (26 weeks or more, the first variant), "all", "none".
+    voladj_skip: Literal["long", "all", "none"] = "long"
     # Trade only on the last week-in-`weeks` of each calendar month (rebalance="monthly"); the
     # weekly mark-to-market/hold step always runs regardless of this setting.
     rebalance: Rebalance = "weekly"
@@ -274,6 +277,8 @@ class Config:
             raise ValueError(f"unknown stop_proceeds {self.stop_proceeds!r}")
         if self.stop_delay not in (0, 1):
             raise ValueError("stop_delay must be 0 or 1")
+        if self.voladj_skip not in ("long", "all", "none"):
+            raise ValueError(f"unknown voladj_skip {self.voladj_skip!r}")
         if self.weight_by not in ("equal", "inverse_vol"):
             raise ValueError(f"unknown weight_by {self.weight_by!r}")
         if self.weight_by == "inverse_vol" and self.portfolio != "buffer":
@@ -489,13 +494,18 @@ def _compute_ranks_voladj_lookbacks(
     L, the L-week return (measured 4 weeks back when L >= 26 and the skip-month flag is on, the
     NSE convention for its 6- and 12-month returns; else to the latest close) over the trailing
     26-week volatility, z-scored across names, summed with the lookback weights (equal when
-    None). With lookbacks (26, 52) and equal weights it equals the default voladj score."""
+    None). The skip is a true skip, so with lookbacks (26, 52) it is NSE's method as published,
+    which the default score below does not implement (it widens the window instead)."""
     vol = prices.pct_change().rolling(26).std()
     safe_vol = vol.where(vol > 0)
     rets = []
     for lookback in config.lookbacks:
-        skip = 4 if config.voladj_skip_recent_month and lookback >= 26 else 0
-        rets.append(prices / prices.shift(skip + lookback) - 1)
+        skips = {"long": lookback >= 26, "all": True, "none": False}[config.voladj_skip]
+        skip = 4 if config.voladj_skip_recent_month and skips else 0
+        # A true skip: the return from (skip + lookback) weeks ago to `skip` weeks ago. (The
+        # default voladj score above computes prices / prices.shift(skip + 26), a 30-week return
+        # that still includes the latest month; see BL-055's log.)
+        rets.append(prices.shift(skip) / prices.shift(skip + lookback) - 1)
     eligible = functools.reduce(operator.and_, (r.notna() for r in (*rets, vol)))
     weights = config.weights or (1.0,) * len(rets)
     score = None
@@ -950,6 +960,7 @@ def run_backtest(
             config.score,
             config.voladj_skip_recent_month,
             config.voladj_lookbacks,
+            config.voladj_skip,
         )
         if rank_cache is not None and key in rank_cache:
             ranks, scores = rank_cache[key]

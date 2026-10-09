@@ -26,13 +26,33 @@ def test_off_by_default_and_ignores_lookbacks_as_before() -> None:
     pd.testing.assert_frame_equal(a, b)
 
 
-def test_26_52_equal_weights_reproduces_the_default_score() -> None:
+def test_the_default_score_widens_the_window_instead_of_skipping() -> None:
+    """Pins today's default as it is: 30- and 56-week returns to the latest close (the
+    'skip-month' widens the window), not 26/52 measured 4 weeks back. See BL-055's log."""
     p = prices()
     _, classic = compute_ranks(p, Config(score="voladj", universe=tuple(p)))
-    _, flagged = compute_ranks(
-        p, Config(score="voladj", lookbacks=(26, 52), voladj_lookbacks=True, universe=tuple(p))
-    )
-    pd.testing.assert_frame_equal(classic, flagged)
+    vol = p.pct_change().rolling(26).std()
+
+    def z(ret):
+        comp = ret / vol
+        return comp.sub(comp.mean(axis=1), axis=0).div(comp.std(axis=1), axis=0)
+
+    widened = z(p / p.shift(30) - 1) + z(p / p.shift(56) - 1)
+    pd.testing.assert_series_equal(classic.iloc[-1], widened.iloc[-1], check_names=False)
+
+
+def test_26_52_with_a_true_skip_is_nse_as_published() -> None:
+    p = prices()
+    cfg = Config(score="voladj", lookbacks=(26, 52), voladj_lookbacks=True, universe=tuple(p))
+    _, score = compute_ranks(p, cfg)
+    vol = p.pct_change().rolling(26).std()
+
+    def z(ret):
+        comp = ret / vol
+        return comp.sub(comp.mean(axis=1), axis=0).div(comp.std(axis=1), axis=0)
+
+    nse = z(p.shift(4) / p.shift(30) - 1) + z(p.shift(4) / p.shift(56) - 1)
+    pd.testing.assert_series_equal(score.iloc[-1], nse.iloc[-1], check_names=False)
 
 
 def test_the_lookbacks_and_weights_now_change_the_ranking() -> None:
@@ -96,3 +116,41 @@ def test_a_shared_rank_cache_keeps_the_two_variants_apart(score) -> None:
     flagged = run_backtest(p, includes, Config(voladj_lookbacks=True, **common), rank_cache=cache)
     assert len(cache) == 2
     assert not plain.ranks.equals(flagged.ranks)
+
+
+def _single(p: pd.DataFrame, skip: str) -> pd.Series:
+    cfg = Config(
+        score="voladj", lookbacks=(4,), voladj_lookbacks=True, voladj_skip=skip, universe=tuple(p)
+    )
+    return compute_ranks(p, cfg)[1].iloc[-1]
+
+
+def _expected(p: pd.DataFrame, start: int, end: int) -> pd.Series:
+    ret = p.shift(end) / p.shift(start) - 1
+    comp = ret / p.pct_change().rolling(26).std()
+    z = comp.sub(comp.mean(axis=1), axis=0).div(comp.std(axis=1), axis=0)
+    return z.iloc[-1]
+
+
+def test_skip_all_measures_every_lookback_four_weeks_back() -> None:
+    p = prices()
+    pd.testing.assert_series_equal(_single(p, "all"), _expected(p, 8, 4), check_names=False)
+
+
+def test_skip_none_runs_every_lookback_to_the_latest_close() -> None:
+    p = prices()
+    pd.testing.assert_series_equal(_single(p, "none"), _expected(p, 4, 0), check_names=False)
+
+
+def test_skip_long_only_skips_26_weeks_and_more() -> None:
+    p = prices()
+    pd.testing.assert_series_equal(_single(p, "long"), _single(p, "none"))  # 4 < 26: no skip
+    cfg = dict(score="voladj", lookbacks=(26, 52), voladj_lookbacks=True, universe=tuple(p))
+    _, long_rule = compute_ranks(p, Config(voladj_skip="long", **cfg))
+    _, all_rule = compute_ranks(p, Config(voladj_skip="all", **cfg))
+    pd.testing.assert_frame_equal(long_rule, all_rule)  # every lookback here is >= 26
+
+
+def test_unknown_skip_rule_is_refused() -> None:
+    with pytest.raises(ValueError):
+        Config(voladj_skip="some")

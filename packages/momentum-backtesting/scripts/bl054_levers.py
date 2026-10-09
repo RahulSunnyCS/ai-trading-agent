@@ -112,9 +112,28 @@ def l7_cells(_: int) -> list[tuple[str, dict]]:
     return [("baseline", {}), ("voladj_lookbacks", {"voladj_lookbacks": True})]
 
 
-LEVERS = {"l1": l1_cells, "l4": l4_cells, "l5": l5_cells, "l6": l6_cells, "l7": l7_cells}
+def l8_cells(_: int) -> list[tuple[str, dict]]:
+    """BL-055 addendum 1: the lookback-following voladj under each skip rule, with a true skip
+    (the first variant re-run as registered, plus every lookback skipped, plus none)."""
+    on = {"voladj_lookbacks": True}
+    return [
+        ("baseline", {}),
+        ("skip_long", {**on, "voladj_skip": "long"}),
+        ("skip_all", {**on, "voladj_skip": "all"}),
+        ("skip_none", {**on, "voladj_skip": "none"}),
+    ]
+
+
+LEVERS = {
+    "l1": l1_cells,
+    "l4": l4_cells,
+    "l5": l5_cells,
+    "l6": l6_cells,
+    "l7": l7_cells,
+    "l8": l8_cells,
+}
 #: BL-055 leaves out the rank-sum strategy: the flag does not touch ranksum.
-EXCLUDED = {"l7": {"9f9ef3aa6c1b"}}
+EXCLUDED = {"l7": {"9f9ef3aa6c1b"}, "l8": {"9f9ef3aa6c1b"}}
 
 
 def run_one(task: dict) -> dict:
@@ -279,7 +298,7 @@ def judge(table: pd.DataFrame, lever: str) -> pd.DataFrame:
                 "baseline_third_worst": float(base.third_worst_fy.median()),
                 "baseline_cagr": float(base.cagr.median()),
             }
-            if lever == "l7":  # BL-055: 10 strategies
+            if lever in ("l7", "l8"):  # BL-055 and its addendum: 10 strategies
                 row["passes"] = bool(
                     taxed == "tax"
                     and dcagr.median() >= 0.01
@@ -314,7 +333,7 @@ def report(lever: str) -> dict:
     confirmed = []
     for key in passing:
         c = conf[conf.cell == key].iloc[0]
-        if lever == "l7":
+        if lever in ("l7", "l8"):
             ok = c.median_cagr_change >= 0 and c.cagr_not_lower >= 5
         elif lever == "l1":
             ok = c.median_cagr_change >= 0
