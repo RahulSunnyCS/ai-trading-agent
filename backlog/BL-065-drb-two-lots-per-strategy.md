@@ -81,7 +81,20 @@ diversification, which this tests.
   already-seen runs on the same year, not a validation.
 - **Hold-out:** none (owner override, as above). **Will not run:** dropping one index's closest-premium
   only, dropping one premium only, other baskets on the 148-list, re-tuning the weights.
-- **Result:** pending.
+- **Result:** **worse** on the read-out: the 148-list earns 30% less gross and 37% less net, for a shallower
+  drawdown. 148 variants, 202 selection days, Buy on 63 days, 6.62 lots a day. Gross ₹3,02,889 (+23.3%)
+  vs ₹4,30,868; max drawdown −₹49,428 vs −₹68,294; worst day −₹21,048 vs −₹19,368; 61.4% winning days;
+  ₹226 per lot-day vs ₹329. INCONCLUSIVE on the three conditions (R P90 ₹2,92,140, beats 93% of random;
+  E ₹2,53,471 / −₹47,546 fails on drawdown; live mix ₹2,32,014 / −₹2,08,439). After charges (flat ₹13
+  an order): charges ₹80,965 (27% of gross), net ₹2,21,925 (+17.1%) vs ₹3,50,407 (+27.0%); drawdown
+  −₹56,448 (4.3%) vs −₹84,469 (6.5%); 9 of 11 months positive, worst month −3.00% (Jan 2026). With
+  AlgoTest's fee: ₹2,09,214. Why: on the full list the closest-premium Widesl took 277 of the 606 core
+  picks (46%); without them the slots went to OTM Widesl (420 picks vs 170), not Dir (186 vs 159). The
+  2-Widesl minimum's override fired on 166 of 202 days (125 before): OTM Widesl seldom rank top-3 on their
+  own, and on the 148-list case B (no minimum) makes ₹3,93,721, so the minimum costs ₹91k here vs ₹12k on
+  the full list. Monthly gross gap: Jan −₹31.7k, Feb −₹25.6k, Mar −₹36.6k, Jul −₹66.1k; May +₹27.7k the one
+  clear gain. Same core on only 26 of 202 days. Picks file
+  `research/bl057/daily_picks_min3_core6_buy2L2_whole_day_otm_only.csv`; charges rotation `DRB-6W3L2/OTM`.
 
 ## Log
 
@@ -93,3 +106,5 @@ diversification, which this tests.
   (6.5%), 8 of 11, worst month −1.74%. Net at ₹7 / ₹13 / ₹20 per order: 6W2L2 ₹3,75,842 / ₹3,54,588 / ₹3,29,791; 6W3L2
   ₹3,70,401 / ₹3,50,407 / ₹3,27,080. After AlgoTest's fee at ₹19 a strategy-day: ₹3,42,162 (+26.3%) / ₹3,37,981 (+26.0%).
   DRB-6W3 (6 × 1 lot) unchanged: net ₹2,49,942 (+19.2%), drawdown −₹72,220.
+- 2026-10-09 — owner asked for DRB-6W3L2 without the closest-premium Widesl; block above, ran: 30% less gross,
+  37% less net, shallower drawdown. The closest-premium variants stay in the list.

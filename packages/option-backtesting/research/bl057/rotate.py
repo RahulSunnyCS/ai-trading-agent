@@ -155,7 +155,7 @@ def load_all():
     frames = [x.loc[common] for x in frames]
     feats = {u: x.loc[common] for u, x in feats.items()}
     P = pd.concat(frames, axis=1)
-    expected = 248 if WHOLE_DAY else (110 if CLOSEST else 66)
+    expected = (148 if NO_CLOSEST else 248) if WHOLE_DAY else (110 if CLOSEST else 66)
     assert P.shape[1] == expected and not P.isna().any().any(), (P.shape[1], expected)
     assert feats["NIFTY"].index.equals(feats["SENSEX"].index)
     f = feats["NIFTY"][["weekday", "vix_band"]].copy()
