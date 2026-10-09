@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import { PendingInfo } from '../ui/PendingInfo';
 import { ThemeToggle } from '../ui/ThemeToggle';
+import { AlertsBell } from './AlertsBell';
 import { SystemStatus } from './SystemStatus';
 
 interface TopbarProps {
@@ -18,7 +19,7 @@ interface TopbarProps {
 
 /**
  * Sticky page header: mobile menu trigger + current view title on the left,
- * the screen's guide link, live system status + theme toggle on the right.
+ * the screen's guide link, live system status, the alerts bell + theme toggle on the right.
  */
 export function Topbar({ title, subtitle, pending, onOpenMenu, help }: TopbarProps) {
   return (
@@ -43,6 +44,7 @@ export function Topbar({ title, subtitle, pending, onOpenMenu, help }: TopbarPro
       <div className="ml-auto flex items-center gap-2">
         {help}
         <SystemStatus />
+        <AlertsBell />
         <ThemeToggle />
       </div>
     </header>

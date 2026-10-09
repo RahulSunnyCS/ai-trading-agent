@@ -191,6 +191,8 @@ export interface MomentumLatest {
     action: string;
     held: boolean;
     returns: Record<string, number | null>;
+    /** Set by the service on some actions (Broad's "SKIP (above max price)"). */
+    reason?: string;
   }>;
 }
 
@@ -428,7 +430,7 @@ export interface MomentumWeeklyStatus {
   }>;
   signals: Array<{ week: string; run: 'preview' | 'final'; label: string; generated_at: string }>;
   schedule: Array<{
-    run: 'preview' | 'final' | 'stock-ingest' | 'journal-check' | 'live-rules';
+    run: 'orders' | 'preview' | 'final' | 'stock-ingest' | 'journal-check' | 'live-rules';
     when: string;
     last_ran_at: string | null;
     last_line: string | null;
@@ -481,6 +483,8 @@ export interface MomentumRebalanceResult {
   signal_week: string;
   price_mode: 'live' | 'last_close';
   price_source: string;
+  /** Why a market-hours preview used stored closes instead of live prices; null otherwise. */
+  live_unavailable?: string | null;
   portfolio_value: number;
   first_allocation: boolean;
   rebalance_schedule: {
@@ -703,4 +707,109 @@ export interface MomentumLiveRules {
     finished_at: string | null;
     error: string | null;
   } | null;
+}
+
+// --- Your orders (BL-051 Phase 3) ------------------------------------------------------------
+
+export interface MomentumOrderSettings {
+  owner: string;
+  min_trade_rs: number;
+  extra_cash_rs: number;
+  holdings_source: 'paper' | 'fyers';
+  paper_capital_rs: number;
+  updated_at: string | null;
+}
+
+export interface MomentumHoldingsSnapshot {
+  synced_at: string;
+  source: 'fyers' | 'paste';
+  rows: Array<{ symbol: string; quantity: number; avg_price: number | null }>;
+}
+
+export interface MomentumOrderRow {
+  symbol: string;
+  /** SELL, TRIM, BUY, ADD, SKIP, HOLD (blocked), or '' (at the target). */
+  action: string;
+  held: number;
+  price: number | null;
+  value: number;
+  current: number;
+  target: number;
+  quantity: number;
+  order_value: number;
+  charges: number;
+  note: string;
+}
+
+export interface MomentumOrderPlan {
+  portfolio_value: number;
+  cash: number;
+  rows: MomentumOrderRow[];
+  sells: number;
+  buys: number;
+  charges: number;
+  cash_after: number;
+  not_traded: number;
+  missing_prices: string[];
+}
+
+/** One set of orders for a week, as `momentum_orders` keeps it. */
+export interface MomentumOrders {
+  created_at: string;
+  trigger: 'scheduled' | 'manual';
+  favourite_id: string;
+  holdings_source: 'paper' | 'fyers';
+  week: string;
+  headline: { id: string; name: string };
+  /** exact: decided before the close by last Friday's ranks; final: from the week's own data. */
+  kind: 'exact' | 'final' | 'unavailable';
+  reason: string | null;
+  holdings?:
+    | { source: 'paper'; capital: number }
+    | {
+        source: 'fyers';
+        synced_at: string | null;
+        excluded: string[];
+        /** Holdings that are not something this strategy holds or could buy: left alone. */
+        outside?: string[];
+      };
+  prices?: string;
+  sleeves?: MomentumWeekSleeve[];
+  plan?: MomentumOrderPlan;
+}
+
+/** `GET /api/momentum/orders`. */
+export interface MomentumOrdersView {
+  week: string;
+  settings: MomentumOrderSettings;
+  holdings: MomentumHoldingsSnapshot | null;
+  rules: Record<string, 'exclude' | 'cash'>;
+  orders: MomentumOrders[];
+  job: MomentumLiveRules['job'];
+}
+
+export type MomentumAlertKind = 'split' | 'data' | 'journal' | 'change' | 'rules';
+export type MomentumAlertSeverity = 'error' | 'warning' | 'info';
+
+/** One thing that needs a person (`GET /api/momentum/alerts`). The id is stable (kind + subject). */
+export interface MomentumAlert {
+  id: string;
+  kind: MomentumAlertKind;
+  severity: MomentumAlertSeverity;
+  title: string;
+  detail: string;
+  /** An in-app path with its query, where the alert is acted on. */
+  link: string;
+  opened_at: string | null;
+  resolved_at: string | null;
+}
+
+export interface MomentumAlertsResponse {
+  checked_at: string;
+  /** Open alerts, most severe first. */
+  alerts: MomentumAlert[];
+  /** The latest ones that cleared. */
+  resolved: MomentumAlert[];
+  /** Kinds that could not be checked this time; their open alerts are kept. */
+  unchecked: MomentumAlertKind[];
 }

@@ -8,7 +8,9 @@ trade the same way. These tests do not need real data:
   * the two paths hand `run_broad_backtest` identical arguments;
   * the live signal for week t, computed on data that ends at t (a flat sentinel week appended so
     the engine trades t), equals what a backtest on later data traded at t - on and off cadence;
-  * the old advisory panel (`analysis.latest_signal`) did not.
+  * the backtest result's "This week" panel says the same, also for a run that ends in the past
+    and with a price ceiling (the advisory `analysis.latest_signal` it used knew neither the
+    cadence nor the ceiling).
 """
 
 # ruff: noqa: F811 - the broad_client fixture is imported, then named as a test argument
@@ -266,9 +268,9 @@ def _held(result, week) -> dict[str, float]:
     return {n: round(float(w), 9) for n, w in row.items() if w > 1e-6}
 
 
-def _sweep(tmp_path, monkeypatch, case, *, with_old=False):
+def _sweep(tmp_path, monkeypatch, case, *, with_panel=False):
     """week -> trades and holdings from the full-data backtest and from the live path on data that
-    ends that week (plus the live signal rows, and the old advisory panel if asked)."""
+    ends that week (plus the live signal rows, and the result's "This week" panel if asked)."""
     cutter = _Cutter(tmp_path, monkeypatch)
     req = _request(case)
     cutter.to(None)
@@ -281,12 +283,12 @@ def _sweep(tmp_path, monkeypatch, case, *, with_old=False):
         outcome, decided = api._broad_sentinel_run(req)
         assert decided == week
         signal = api._broad_engine_signal(req)
-        old = api._broad_backtest(req)["latest"] if with_old else None
+        panel = api._broad_parts(req)[1]["latest"]() if with_panel else None
         out[week] = {
             "full": (_trades_at(full.result, week), _held(full.result, week)),
             "live": (_trades_at(outcome.result, week), _held(outcome.result, week)),
             "signal": signal,
-            "old": old,
+            "panel": panel,
         }
     return out
 
@@ -317,23 +319,105 @@ def test_the_live_signal_equals_the_backtests_trades_and_holdings_every_week(
     assert traded >= 3  # the sweep is not vacuous
 
 
-def test_off_cadence_weeks_show_no_buys_and_the_old_panel_did(broad_client, tmp_path, monkeypatch):
+def test_off_cadence_weeks_show_no_buys_in_the_signal_or_the_result_panel(
+    broad_client, tmp_path, monkeypatch
+):
     case = {"rebalance_every": 4, "rebalance_offset": 0, "entry": "wait"}
-    swept = _sweep(tmp_path, monkeypatch, case, with_old=True)
-    buying = {"BUY", "ADD", "BUY (make room)", "WAIT"}
+    swept = _sweep(tmp_path, monkeypatch, case, with_panel=True)
     off_weeks = [w for w in swept if round((w - pd.Timestamp("2016-01-01")).days / 7) % 4 != 0]
     assert off_weeks
-    old_recommended_a_buy = []
     for week in off_weeks:
         engine_actions = {a for _asset, a, _r, _v in swept[week]["live"][0]}
         assert not engine_actions & {"BUY", "ADD"}, week  # nothing is bought off cadence
         assert "Not a rebalance week" in swept[week]["signal"]["explain"]
-        old_actions = {r["action"] for r in swept[week]["old"]["rows"]}
-        if old_actions & buying:
-            old_recommended_a_buy.append(week)
-    # the bug the test exists for: the advisory panel recommended buys on weeks the engine
-    # does not trade
-    assert old_recommended_a_buy
+    for week, got in swept.items():
+        # the result panel used the advisory `analysis.latest_signal`, which recommended buys on
+        # the weeks the engine does not trade; it is now the engine's own decision
+        assert got["panel"]["rows"] == got["signal"]["rows"], week
+        assert got["panel"]["explain"] == got["signal"]["explain"], week
+
+
+def _actions(signal) -> dict[str, str]:
+    return {r["asset"]: r["action"] for r in signal["rows"] if r["action"] not in ("", "HOLD")}
+
+
+@pytest.mark.parametrize("case", CASES[2:4], ids=["every4-o0", "every4-o1"])
+def test_the_result_panel_of_a_run_ending_in_the_past_is_what_the_backtest_did_that_week(
+    case, broad_client
+):
+    """A run with an `end` before the newest data: the panel decides the run's last week on the
+    data up to it, so it says what the longer backtest traded that week."""
+    req = _request(case)
+    full = api._run_broad(req, api._broad_ranking(req), api.DATA.get())
+    weeks = list(full.result.equity.index)
+    traded = 0
+    for i in CHECK_WEEKS:
+        week = weeks[i]
+        ended = req.model_copy(update={"end": week.strftime("%Y-%m-%d")})
+        panel = api._broad_parts(ended)[1]["latest"]()
+        assert panel["week"] == week.strftime("%Y-%m-%d")
+        trades = _trades_at(full.result, week)
+        assert _actions(panel) == {a: act for a, act, _r, _v in trades if a != api.CASH}, week
+        traded += bool(trades)
+    assert traded >= 3
+
+
+def test_the_result_panel_never_buys_above_the_price_ceiling_and_labels_the_skips(broad_client):
+    """`max_stock_price` blocks new buys in the engine; the result panel used to ignore it and
+    recommend them. Now it shows the engine's trades, and labels a top-N stock the ceiling kept
+    out. With delay 1 the ceiling reads the price of the week the ranks come from."""
+    loose = _request({"rebalance_every": 1, "rebalance_offset": 0, "entry": "make_room"})
+    ranking = api._broad_ranking(loose)
+    raw = ranking.raw_prices if ranking.raw_prices is not None else ranking.prices
+    stocks = [c for c in raw.columns if c not in broad.ATOMIC_NAMES]
+    ceiling = float(raw[stocks].stack().median())
+    weeks = list(api._run_broad(loose, ranking, api.DATA.get()).result.equity.index)
+
+    def panels(req) -> dict[int, dict]:
+        return {
+            i: api._broad_parts(req.model_copy(update={"end": weeks[i].strftime("%Y-%m-%d")}))[1][
+                "latest"
+            ]()
+            for i in CHECK_WEEKS
+        }
+
+    def above(i: int, row: dict) -> bool:
+        return row["asset"] in stocks and raw.at[weeks[i - 1], row["asset"]] > ceiling
+
+    def bought_above(found: dict[int, dict]) -> set[tuple[int, str]]:
+        return {
+            (i, row["asset"])
+            for i, panel in found.items()
+            for row in panel["rows"]
+            if row["action"] == "BUY" and not row["held"] and above(i, row)
+        }
+
+    uncapped = panels(loose)
+    assert bought_above(uncapped)  # without a ceiling some buys are above it: not vacuous
+    assert not any(r["action"] == api.PRICE_SKIP for p in uncapped.values() for r in p["rows"])
+
+    capped_req = loose.model_copy(update={"max_stock_price": ceiling})
+    capped = panels(capped_req)
+    assert bought_above(capped) == set()
+    top_n = api._run_broad(capped_req, ranking, api.DATA.get()).result.config.top_n
+    skips = [(i, r) for i, p in capped.items() for r in p["rows"] if r["action"] == api.PRICE_SKIP]
+    assert skips  # the ceiling did keep a top-N stock out
+    for i, row in skips:
+        assert above(i, row) and not row["held"] and row["rank"] <= top_n, (weeks[i], row)
+        assert "above Max price to buy" in row["reason"]
+
+    # The weekly signal (Telegram, the journal) keeps the engine's trades alone.
+    i = skips[0][0]
+    signal = api._broad_engine_signal(
+        capped_req, api._broad_decide(capped_req, ranking, api.DATA.get(), weeks[i])
+    )
+    assert not any(r["action"] == api.PRICE_SKIP for r in signal["rows"])
+
+    # Off cadence nothing is bought, so nothing is labelled skipped either.
+    fortnightly = capped_req.model_copy(update={"rebalance_every": 2, "rebalance_offset": 0})
+    for i, panel in panels(fortnightly).items():
+        if "Not a rebalance week" in panel["explain"]:
+            assert not any(r["action"] == api.PRICE_SKIP for r in panel["rows"]), weeks[i]
 
 
 def test_the_signal_rows_keep_the_shape_telegram_and_the_journal_read(
@@ -343,7 +427,9 @@ def test_the_signal_rows_keep_the_shape_telegram_and_the_journal_read(
     cutter = _Cutter(tmp_path, monkeypatch)
     cutter.to(cutter.weekly.index[120])
     signal = api._broad_engine_signal(_request(case))
-    assert set(signal) == {"week", "rows", "explain", "target_weights"}
+    # sleeve_value (BL-051): the sleeve's value since the April reset, for weighting a group.
+    assert set(signal) == {"week", "rows", "explain", "target_weights", "sleeve_value", "weights"}
+    assert signal["sleeve_value"] > 0
     assert signal["week"] == cutter.weekly.index[120].strftime("%Y-%m-%d")
     assert signal["rows"], "no rows"
     for row in signal["rows"]:
@@ -366,7 +452,7 @@ def test_the_weekly_result_for_broad_uses_the_engine_rows_not_the_advisory_panel
         "target_weights": {"INFY": 1.0},
     }
     monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
-    monkeypatch.setattr(api, "_broad_backtest", lambda req: {"latest": advisory})
+    monkeypatch.setattr(api, "_broad_parts", lambda req: ({"latest": advisory}, {}))
     monkeypatch.setattr(api, "_broad_engine_signal", lambda req: engine)
     favourite = {"name": "Broad", "config": {"dataset": "broad", "universe": ["x"]}}
     result, blocked = api._research_weekly_result(favourite, pd.Timestamp("2026-10-09"))
@@ -374,3 +460,88 @@ def test_the_weekly_result_for_broad_uses_the_engine_rows_not_the_advisory_panel
     assert result.signal["rows"] == engine["rows"]
     assert "No trades this week." in result.notification.body
     assert "BUY" not in result.notification.body
+
+
+# --- BL-051 Phase 3: the 14:15 decision, a week ahead ------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "case", CASES, ids=lambda c: f"every{c['rebalance_every']}-o{c['rebalance_offset']}"
+)
+def test_with_a_signal_delay_the_week_ahead_buys_and_sells_what_the_backtest_did(
+    case, broad_client, tmp_path, monkeypatch
+):
+    """At 14:15 on Friday t the stored data ends at t-1. With delay 1, which names are bought and
+    which are sold outright at t come from t-1's ranks, so deciding "ahead" on data that ends at
+    t-1 must name exactly the backtest's buys and full exits at t. Trims and top-ups read t's own
+    prices (the stand-in is a flat copy of t-1), so they are not compared."""
+    cutter = _Cutter(tmp_path, monkeypatch)
+    req = _request(case)
+    cutter.to(None)
+    full = api._run_broad(req, api._broad_ranking(req), api.DATA.get())
+    weeks = list(full.result.equity.index)
+    compared = 0
+    for i in CHECK_WEEKS:
+        week, before = weeks[i], weeks[i - 1]
+        cutter.to(before)
+        outcome, decided = api._broad_sentinel_run(req, ahead=True)
+        assert decided == week, (decided, week)
+
+        def entries_and_exits(result, at):
+            held_before = set(_held(result, weeks[weeks.index(at) - 1]) if at in weeks else ())
+            held_after = set(_held(result, at))
+            return held_after - held_before, held_before - held_after
+
+        assert entries_and_exits(outcome.result, week) == entries_and_exits(full.result, week), (
+            f"{week:%Y-%m-%d}"
+        )
+        compared += bool(set().union(*entries_and_exits(full.result, week)))
+    assert compared >= 3  # the sweep is not vacuous
+
+
+def test_the_week_ahead_signal_is_for_the_next_friday(broad_client, tmp_path, monkeypatch):
+    cutter = _Cutter(tmp_path, monkeypatch)
+    req = _request(CASES[0])
+    cutter.to(None)
+    last = api._broad_ranking(req).prices.index[-1]
+    signal = api._broad_engine_signal(req, ahead=True)
+    assert pd.Timestamp(signal["week"]) == last + pd.Timedelta(days=7)
+
+
+def test_your_orders_from_the_real_week_ahead_signal_trade_only_what_the_backtest_traded(
+    broad_client, tmp_path, monkeypatch
+):
+    """The engine signal -> _orders_signal -> paper portfolio path, unmocked: the portfolio going
+    into week t (the signal's `weights`) and the target after it must differ by exactly the
+    backtest's buys and full exits at t, so the paper orders never re-buy the whole portfolio."""
+    from momentum_backtesting import orders
+
+    cutter = _Cutter(tmp_path, monkeypatch)
+    req = _request(CASES[2])  # every 4 weeks, phase 0
+    cutter.to(None)
+    full = api._run_broad(req, api._broad_ranking(req), api.DATA.get())
+    weeks = list(full.result.equity.index)
+    cash = {api.IDLE, api.CASH}
+    checked = 0
+    for i in CHECK_WEEKS:
+        week = weeks[i]
+        cutter.to(weeks[i - 1])
+        headline = {"id": "h", "name": "H", "config": req.model_dump(mode="json")}
+        signal, kind, reason, rankings = api._orders_signal(headline, [], week)
+        assert kind == "exact" and reason is None and rankings
+        before = {k for k, v in signal["weights"].items() if v > 0 and k not in cash}
+        after = {k for k, v in signal["target_weights"].items() if v > 0 and k not in cash}
+        prior = set(_held(full.result, weeks[i - 1])) - cash
+        held = set(_held(full.result, week)) - cash
+        assert before == prior, f"{week:%Y-%m-%d} before"
+        assert (after - before, before - after) == (held - prior, prior - held), f"{week:%Y-%m-%d}"
+        plan = orders.plan(
+            {n: 1000 * signal["weights"][n] for n in before},
+            {name: 1.0 for name in before | after},
+            {n: signal["target_weights"][n] for n in after},
+        )
+        bought = {r.symbol for r in plan.rows if r.action == "BUY"}
+        sold = {r.symbol for r in plan.rows if r.action == "SELL"}
+        assert bought == after - before and sold == before - after, f"{week:%Y-%m-%d}"
+        checked += bool(bought or sold)
+    assert checked >= 2

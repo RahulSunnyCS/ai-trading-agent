@@ -3,6 +3,7 @@
 import contextlib
 import inspect
 import json
+import math
 import os
 import threading
 import urllib.parse
@@ -63,7 +64,6 @@ from .engine import (
     IDLE,
     Config,
     Result,
-    cadence_weeks,
     ranked_universe,
     run_backtest,
 )
@@ -511,9 +511,10 @@ _INPUT_FOLDERS = ("", "daily", "daily_etf", "categories", "stocks")
 
 #: Files under data/ that are written by the tools, never read by a backtest: logs, the Fyers token
 #: cache (`.fyers_token.json`, rewritten every morning) and other dotfiles, and the live-rules
-#: check's last report. Counting them moved the data version with no market data changing, which
-#: emptied caches and made a moved result look like a data revision (BL-052).
-_STATE_FILES = frozenset({"live_rules_last.json"})
+#: check's last report and the alerts' open/resolved cache. Counting them moved the data version
+#: with no market data changing, which emptied caches and made a moved result look like a data
+#: revision (BL-052).
+_STATE_FILES = frozenset({"live_rules_last.json", "alerts_state.json"})
 
 
 def _not_an_input(name: str) -> bool:
@@ -763,6 +764,24 @@ class SavedRunUpdate(BaseModel):
     active: bool | None = None
     # BL-051: Watching / Paper / Invested, or "none" to stop following it.
     status: Literal["none", "watching", "paper", "invested"] | None = None
+
+
+class OrderSettingsBody(BaseModel):
+    """BL-051 Phase 3: Your orders' settings (any left out are kept)."""
+
+    min_trade_rs: float | None = Field(None, ge=0, le=10_000_000)
+    extra_cash_rs: float | None = Field(None, ge=0, le=1_000_000_000)
+    holdings_source: Literal["paper", "fyers"] | None = None
+    paper_capital_rs: float | None = Field(None, ge=1_000, le=1_000_000_000)
+
+
+class PastedHoldingsBody(BaseModel):
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+class HoldingRuleBody(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9&._-]+$")
+    treatment: Literal["exclude", "cash"] | None = None
 
 
 class SavedRunGroupBody(BaseModel):
@@ -1806,6 +1825,35 @@ def _circuit_realism(
 #: Universes that are only meaningful behind the tradability gate: the whole market (the gate is
 #: what narrows it) and the point-in-time turnover rank (every search that used it gated).
 GATED_BROAD_UNIVERSES = ("all_liquid", "turnover_rank")
+#: Universes the live rebalance preview does not quote. The whole market is ~1,800 stocks; the
+#: turnover rank is the top 750, the same size as the Total Market pool, so it is quoted.
+LIVE_REFUSED_BROAD_UNIVERSES = ("all_liquid",)
+
+#: Exceptions a live preview reports instead of raising: a missing token, a Fyers error, a
+#: network failure (urllib's URLError and timeouts are OSError), stale history or a missing quote.
+LIVE_PREVIEW_ERRORS = (fyers.FyersCredentialsError, RuntimeError, ValueError, KeyError, OSError)
+
+
+def _exchange_holiday(day: date) -> bool:
+    """Whether NSE is closed on `day` (the catalog's `ref_holidays`). Unknown = open: a missing
+    or locked catalog must not switch live prices off."""
+    try:
+        with read_catalog() as con:
+            row = con.execute("SELECT count(*) FROM ref_holidays WHERE date = ?", [day]).fetchone()
+        return bool(row and row[0])
+    except Exception:  # noqa: BLE001 - a lookup failure means "assume open"
+        return False
+
+
+def _market_open(now: datetime) -> bool:
+    """NSE's cash session is open at `now` (IST): a weekday, 09:15-15:30, not a holiday. Off
+    hours, Fyers "live" quotes are the previous session's last prices."""
+    now = now.astimezone(IST)
+    return (
+        now.weekday() < 5
+        and time(9, 15) <= now.time() <= time(15, 30)
+        and not _exchange_holiday(now.date())
+    )
 
 
 def _liquidity_config(req: BacktestRequest) -> liquidity_mod.LiquidityConfig | None:
@@ -1936,33 +1984,166 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
                 exposure["realism"] = _circuit_realism(req, ranking, outcome, outer_prices)
         return exposure
 
-    return core, {**lazy, "trades": trades, "circuit_exposure": circuit_exposure}
+    def latest() -> object:
+        # The engine's own decision for the run's last week, as the weekly signal uses: the
+        # advisory `analysis.latest_signal` knows neither the price ceiling nor the circuit locks
+        # Broad passes the engine, so it recommended buys the engine would refuse. One more engine
+        # pass (the ranking is the run's own), made when the panel is opened.
+        run = _broad_decide(req, ranking, outer_prices, result.ranks.index[-1])
+        return _mark_price_skips(_broad_engine_signal(req, run), req, *run)
+
+    return core, {
+        **lazy,
+        "trades": trades,
+        "latest": latest,
+        "circuit_exposure": circuit_exposure,
+    }
 
 
-def _outer_with_sentinel(week: pd.Timestamp, sentinel: pd.Timestamp) -> pd.DataFrame:
+#: The result panel's action for a stock the price ceiling kept out (`_mark_price_skips`).
+PRICE_SKIP = "SKIP (above max price)"
+
+
+def _mark_price_skips(
+    signal: dict,
+    req: BacktestRequest,
+    outcome: broad.BroadBacktestResult,
+    week: pd.Timestamp,
+) -> dict:
+    """Label the stocks the engine would have bought on `week` but for `max_stock_price`: in
+    its top N, not held, priced above the ceiling, on a week the cadence buys. The engine skips
+    them silently and the next-best name takes the slot, so without this a top-ranked stock just
+    shows no action. Result panel only: the weekly signal, Telegram and the journal keep the
+    engine's trades alone. As in the engine, the price is the one of the week the ranks come
+    from (`signal_delay` weeks back), the raw traded close, and atomics are exempt."""
+    if not req.max_stock_price:
+        return signal
+    on, _ = analysis.rebalance_weeks(week, req.rebalance, req.rebalance_every, req.rebalance_offset)
+    ranking = outcome.ranking
+    weeks = ranking.prices.index
+    position = weeks.get_loc(week) - req.signal_delay
+    if not on or position < 0:
+        return signal
+    raw = ranking.raw_prices if ranking.raw_prices is not None else ranking.prices
+    priced = raw.loc[weeks[position]]
+    over = broad.price_ceiling_mask(raw.loc[[weeks[position]]], req.max_stock_price)
+    assert over is not None  # max_stock_price is set
+    blocked = over.iloc[0]
+    top_n = outcome.result.config.top_n
+    for row in signal["rows"]:
+        rank, name = row["rank"], row["asset"]
+        if (
+            not row["action"]
+            and not row["held"]
+            and rank is not None
+            and rank <= top_n
+            and bool(blocked.get(name, False))
+        ):
+            row["action"] = PRICE_SKIP
+            row["reason"] = (
+                f"₹{priced[name]:,.0f} a share is above Max price to buy "
+                f"₹{req.max_stock_price:,.0f}; the next-best stock takes its slot."
+            )
+    return signal
+
+
+def _outer_with_sentinel(
+    week: pd.Timestamp, sentinel: pd.Timestamp, outer: pd.DataFrame | None = None
+) -> pd.DataFrame:
     """The outer-market prices (CASH and the atomic assets) with `week` present and a flat
-    `sentinel` week after it, to match a ranking from `rebalance.persisted_broad_ranking`."""
-    outer = DATA.get().copy()
+    `sentinel` week after it, to match a ranking from `rebalance.persisted_broad_ranking`.
+    `outer` is the frame to start from (a finished run's own); by default, the stored data."""
+    outer = (DATA.get() if outer is None else outer).copy()
     if week not in outer.index:
         available = outer.loc[outer.index <= week]
         if available.empty:
             raise ValueError("No persisted outer-market data for the preview week.")
         outer.loc[week] = available.iloc[-1]
     outer.loc[sentinel] = outer.loc[week]
-    return outer
+    # Sorted: with a past `week` the frame has later rows, and a missing sentinel Friday is
+    # appended after them.
+    return outer.sort_index()
 
 
-def _broad_sentinel_run(req: BacktestRequest) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
+def _broad_sentinel_run(
+    req: BacktestRequest, *, ahead: bool = False
+) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
     """Run Broad on the stored data PLUS one flat sentinel week after the newest stored week, so
     the engine - which never trades its newest week - decides the newest real one with every
     rule it has: rebalance cadence and phase, sell_every_week, signal delay, the price ceiling,
-    the 52-week-low guard, circuit locks. Returns the outcome and that decision week."""
+    the 52-week-low guard, circuit locks. Returns the outcome and that decision week.
+
+    `ahead` (BL-051, the 14:15 orders): decide the week AFTER the newest stored one, on a flat
+    copy of the newest week's prices. With a signal delay of 1 its ranks are the stored week's
+    real ones, so which names are bought and sold is exact before that Friday's data exists;
+    what reads that week's own prices (cap trims, the price ceiling, circuit locks, the 52-week
+    low) sees the stand-in. Meaningless with no delay: the caller must check."""
     ranking = _broad_ranking(req)
-    week = ranking.prices.index[-1]
+    if ahead:
+        ranking = rebalance.persisted_broad_ranking(ranking)
+    return _broad_decide(req, ranking, DATA.get(), ranking.prices.index[-1])
+
+
+def _broad_decide(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outer_prices: pd.DataFrame,
+    week: pd.Timestamp,
+) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
+    """Run Broad through `week` plus a flat sentinel week after it, so the engine decides `week`
+    with every rule it has (see `_broad_sentinel_run`). Weeks after `week` are dropped first."""
     sentinel = week + pd.Timedelta(days=7)
     outcome = _run_broad(
         req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
-        rebalance.persisted_broad_ranking(ranking),
+        rebalance.persisted_broad_ranking(ranking, through=week),
+        _outer_with_sentinel(week, sentinel, outer_prices),
+    )
+    return outcome, week
+
+
+def _broad_live_ranking(
+    req: BacktestRequest, quotes: dict[str, float], today: date
+) -> tuple[broad.UniverseRanking, dict[str, float], dict[str, str], pd.Timestamp]:
+    """The stored ranking with this week's row replaced (or added) from live quotes, in memory
+    only (`rebalance.live_broad_ranking`), plus the week it decides. Raises ValueError when the
+    stored history is stale or a quote is missing; the caller falls back or reports it."""
+    if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
+        raise ValueError(
+            "The whole-market universe is not quoted live (about 1,800 stocks); "
+            "it previews from the latest stored close."
+        )
+    ranking = _broad_ranking(req)
+    config = Config(
+        lookbacks=tuple(req.lookbacks),
+        weights=tuple(req.weights) if req.weights else None,
+        score=req.score,
+        voladj_skip_recent_month=req.voladj_skip_recent_month,
+    )
+    live, ltp, symbols = rebalance.live_broad_ranking(
+        ranking,
+        quotes,
+        today,
+        config,
+        pool_top_n=req.broad_pool_top_n,
+        pool_exit_rank=req.broad_pool_exit_rank,
+        liquidity=_liquidity_config(req),
+        universe_kind=req.broad_universe,
+        series_breaks=req.broad_series_breaks,
+        data_dir=DATA_DIR,
+    )
+    return live, ltp, symbols, rebalance.signal_week(today)
+
+
+def _broad_live_sentinel_run(
+    req: BacktestRequest, quotes: dict[str, float], today: date
+) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
+    """`_broad_sentinel_run` on live prices: this week's row comes from `quotes` and is never
+    stored. The engine decides this week with every rule it has, as on stored data."""
+    ranking, _ltp, _symbols, week = _broad_live_ranking(req, quotes, today)
+    sentinel = week + pd.Timedelta(days=7)
+    outcome = _run_broad(
+        req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
+        ranking,
         _outer_with_sentinel(week, sentinel),
     )
     return outcome, week
@@ -1976,13 +2157,20 @@ def _model_holdings_or_idle(result: Result, week: pd.Timestamp) -> dict[str, flo
     return {IDLE: 1.0}
 
 
-def _broad_engine_signal(req: BacktestRequest) -> dict:
+def _broad_engine_signal(
+    req: BacktestRequest,
+    run: tuple[broad.BroadBacktestResult, pd.Timestamp] | None = None,
+    *,
+    ahead: bool = False,
+) -> dict:
     """This week's Broad signal as the engine itself would trade it (BL-010 Phase 6): same shape
     as `analysis.latest_signal` (`week`, `rows`, `explain`), plus `target_weights`, the model's
     portfolio after the week's trades. `analysis.latest_signal` is an advisory panel that does
     not know the cadence, `sell_every_week`, the price ceiling or the circuit locks, so on a
-    4-weekly strategy it recommended trades the engine would not make on 3 weeks in 4."""
-    outcome, week = _broad_sentinel_run(req)
+    4-weekly strategy it recommended trades the engine would not make on 3 weeks in 4.
+    `run` is a sentinel run already made (the live preview's); by default, the stored data's
+    (`ahead` as `_broad_sentinel_run`)."""
+    outcome, week = run or _broad_sentinel_run(req, ahead=ahead)
     result = outcome.result
     ranking = outcome.ranking
     trades = result.trades
@@ -2022,28 +2210,39 @@ def _broad_engine_signal(req: BacktestRequest) -> dict:
         )
     rows.sort(key=lambda r: (pd.isna(r["rank"]), r["rank"] if pd.notna(r["rank"]) else 0))
 
-    if req.rebalance == "weekly" and req.rebalance_every > 1:
-        on_cadence = bool(cadence_weeks([week], req.rebalance_every, req.rebalance_offset))
+    explain = analysis.cadence_explain(
+        week, req.rebalance, req.rebalance_every, req.rebalance_offset, req.sell_every_week
+    )
+    if explain is None and req.rebalance == "weekly" and req.rebalance_every > 1:
         explain = (
-            f"Rebalance week (every {req.rebalance_every} weeks, phase {req.rebalance_offset})."
-            if on_cadence
-            else f"Not a rebalance week (every {req.rebalance_every} weeks, phase "
-            f"{req.rebalance_offset}): "
-            + (
-                "only sells of names that dropped out are made."
-                if req.sell_every_week
-                else "no trades."
-            )
+            f"Rebalance week (every {req.rebalance_every} weeks, "
+            f"phase {req.rebalance_offset + 1} of {req.rebalance_every})."
         )
-    else:
+    elif explain is None:
         explain = "Rebalance week."
     if req.signal_delay:
         explain += f" With a {req.signal_delay}-week signal delay, the ranks shown are that old."
+    equity = result.equity.loc[:week]
     return analysis._clean(
         {
             "week": week,
             "rows": rows,
             "explain": explain,
+            # BL-051: what a group needs to weight this sleeve (value since the April reset).
+            "sleeve_value": groups_mod.sleeve_value(
+                [d.strftime("%Y-%m-%d") for d in equity.index], list(equity.values)
+            ),
+            # The model portfolio going into the week (the previous week's holdings after its
+            # trades), what a group's "before" and Your orders' paper portfolio start from.
+            "weights": (
+                {
+                    name: round(float(weight), 4)
+                    for name, weight in result.weights.loc[previous].items()
+                    if weight > 1e-9
+                }
+                if previous is not None and previous in result.weights.index
+                else {IDLE: 1.0}
+            ),
             "target_weights": {
                 name: round(weight, 4)
                 for name, weight in _model_holdings_or_idle(result, week).items()
@@ -2098,14 +2297,17 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                 updates["rebalance_offset"] = offset
         return req.model_copy(update=updates), schedule
 
-    live = now.weekday() < 5 and time(9, 15) <= now.time() <= time(15, 30)
+    live = _market_open(now)
+    # Why a preview taken in market hours still used stored closes. Shown on the page, so a
+    # fallback is never mistaken for live prices.
+    live_unavailable: str | None = None
     creds = None
     if live:
         load_repo_env()
         try:
             creds = fyers.resolve_credentials(prefer_dashboard=req.auth_source == "dashboard")
-        except fyers.FyersCredentialsError:
-            live = False
+        except fyers.FyersCredentialsError as error:
+            live, live_unavailable = False, f"No usable Fyers token: {error}"
 
     try:
         if req.dataset == "stock":
@@ -2124,8 +2326,8 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                         stock, req.universe, req.holdings_pct, quotes, now.date()
                     )
                     week = rebalance.signal_week(now.date())
-                except (fyers.FyersCredentialsError, RuntimeError, ValueError):
-                    live = False
+                except LIVE_PREVIEW_ERRORS as error:
+                    live, live_unavailable = False, str(error) or type(error).__name__
             if not live:
                 week = stock.prices.index[-1]
                 prices = stock.prices.copy()
@@ -2151,33 +2353,18 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
             unknown = set(req.holdings_pct) - set(symbol_map) - {IDLE}
             if unknown:
                 raise ValueError(f"Unknown or inactive holdings: {', '.join(sorted(unknown))}.")
-            # Quoting every listed stock is intentionally avoided for the whole-market
-            # universe. Its preview remains available from the latest database close.
-            if live and req.broad_universe in GATED_BROAD_UNIVERSES:
-                live = False
+            # The whole market is not quoted by design: the last close is its normal preview,
+            # not a fallback, so it carries no warning.
+            if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
+                live, live_unavailable = False, None
             if live:
                 try:
                     quotes = fyers.quotes(sorted(set(symbol_map.values())), creds)
-                    config = Config(
-                        lookbacks=tuple(req.lookbacks),
-                        weights=tuple(req.weights) if req.weights else None,
-                        score=req.score,
-                        voladj_skip_recent_month=req.voladj_skip_recent_month,
+                    preview_ranking, ltp, symbols, week = _broad_live_ranking(
+                        req, quotes, now.date()
                     )
-                    preview_ranking, ltp, symbols = rebalance.live_broad_ranking(
-                        ranking,
-                        quotes,
-                        now.date(),
-                        config,
-                        pool_top_n=req.broad_pool_top_n,
-                        pool_exit_rank=req.broad_pool_exit_rank,
-                        liquidity=_liquidity_config(req),
-                        universe_kind=req.broad_universe,
-                        series_breaks=req.broad_series_breaks,
-                    )
-                    week = rebalance.signal_week(now.date())
-                except (fyers.FyersCredentialsError, RuntimeError, ValueError):
-                    live = False
+                except LIVE_PREVIEW_ERRORS as error:
+                    live, live_unavailable = False, str(error) or type(error).__name__
             if not live:
                 week = ranking.prices.index[-1]
                 preview_ranking = rebalance.persisted_broad_ranking(ranking)
@@ -2209,6 +2396,7 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
         "signal_week": week.strftime("%Y-%m-%d"),
         "price_mode": price_mode,
         "price_source": "Fyers last traded price" if live else "Latest database close",
+        "live_unavailable": live_unavailable,
         "portfolio_value": req.portfolio_value,
         "first_allocation": first_allocation,
         "rebalance_schedule": schedule,
@@ -2287,8 +2475,14 @@ def _journal_entries(
     entries = []
     for outcome in outcomes:
         result = outcome["result"]
-        # A group is journalled through its members, one entry each (BL-051).
-        if result is None or result.signal is None or outcome.get("group"):
+        # A group is journalled through its members, one entry each (BL-051). A live-price
+        # Broad preview is not journalled (`_broad_live_previews`).
+        if (
+            result is None
+            or result.signal is None
+            or outcome.get("group")
+            or outcome.get("journal") is False
+        ):
             continue
         signal = result.signal
         favorite = favorites_by_id.get(outcome["id"])
@@ -2484,6 +2678,274 @@ def _run_live_rules_check() -> dict:
     return live_rules.load_last(this_week.state_dir()) or {}
 
 
+# --- Your orders (BL-051 Phase 3) ---------------------------------------------------------------
+
+
+def _orders_signal(
+    headline: dict, members: list[dict], target_week: pd.Timestamp
+) -> tuple[dict | None, str, str | None, broad.UniverseRanking | None]:
+    """The headline's combined signal for `target_week`, how it was decided, why not (when it
+    could not be), and a ranking to price it with. "final": the stored data reaches the week;
+    "exact": it ends the week before and every sleeve has a signal delay, so the decision is
+    already fixed (`_broad_sentinel_run(ahead=True)`); otherwise none yet."""
+    sleeves = members or [headline]
+    signals, kinds, rankings = [], set(), []
+    for sleeve in sleeves:
+        config = sleeve["config"]
+        if config.get("dataset") != "broad":
+            return None, "unavailable", "Your orders cover Broad strategies for now.", None
+        req = BacktestRequest.model_validate(config)
+        ranking = _broad_ranking(req)
+        if all(ranking is not seen for seen in rankings):
+            rankings.append(ranking)
+        last = ranking.prices.index[-1].normalize()
+        if last >= target_week.normalize():
+            signal, kind = _broad_engine_signal(req), "final"
+        elif last == (target_week - pd.Timedelta(days=7)).normalize() and req.signal_delay >= 1:
+            signal, kind = _broad_engine_signal(req, ahead=True), "exact"
+        elif req.signal_delay < 1:
+            return (
+                None,
+                "unavailable",
+                f"{sleeve['name']} decides on Friday's own close: its orders come after the "
+                "19:30 data, or from the live estimate.",
+                None,
+            )
+        else:
+            return None, "unavailable", f"The stock data ends {last:%d %b}, too old.", None
+        signal["rebalance"] = _rebalance_info(req, pd.Timestamp(signal["week"]))
+        signals.append({"id": sleeve["id"], "name": sleeve["name"], "signal": signal})
+        kinds.add(kind)
+    week = journal_week_string(target_week)
+    if members:
+        combined = groups_mod.combine(headline, signals, week)
+    else:
+        only = signals[0]["signal"]
+        combined = {
+            "week": week,
+            "label": headline["name"],
+            "rows": only["rows"],
+            "weights": only.get("weights", {}),
+            "target_weights": only.get("target_weights", {}),
+            "sleeves": [],
+        }
+    return combined, ("final" if kinds == {"final"} else "exact"), None, rankings
+
+
+def _strategy_symbols(
+    rankings: list[broad.UniverseRanking], as_of: date
+) -> tuple[dict[str, float], dict[str, str]]:
+    """Every name the strategy can hold, across its sleeves' rankings: its last stored price and
+    its Fyers symbol ("NSE:SBIN-EQ"; an atomic asset's is its trade ETF). Retired series-break
+    columns are not in it, so a held base symbol maps to the column the strategy trades now."""
+    stored: dict[str, float] = {}
+    symbols: dict[str, str] = {}
+    for ranking in rankings:
+        prices, names = rebalance.persisted_broad_prices(ranking, as_of)
+        stored.update(prices)
+        symbols.update(names)
+    return stored, symbols
+
+
+def _order_prices(
+    stored: dict[str, float], symbols: dict[str, str], names: set[str]
+) -> tuple[dict[str, float], str]:
+    """Rupee prices for `names`: live Fyers quotes when the token works, else the last close."""
+    prices = {name: stored[name] for name in names if name in stored}
+    wanted = {name: symbols[name] for name in names if name in symbols}
+    try:
+        creds = fyers.resolve_credentials()
+        quoted = fyers.quotes(sorted(set(wanted.values())), creds)
+    except (fyers.FyersCredentialsError, RuntimeError, OSError):
+        return prices, "last close"
+    live = {name: quoted[symbol] for name, symbol in wanted.items() if symbol in quoted}
+    prices.update(live)
+    return prices, ("live Fyers quotes" if live else "last close")
+
+
+def _compute_orders(trigger: str = "manual") -> dict:
+    """The headline's orders for this Friday against the owner's holdings (the paper portfolio
+    until money goes in), saved to `momentum_orders`. The body of the 14:15 job and of the page's
+    "Make orders now"."""
+    from . import holdings_store, orders
+    from .weekly import week_ending_on_or_before
+
+    who = holdings_store.owner()
+    today = datetime.now(IST).date()
+    # On a Friday this is that Friday; on any other day, the coming one.
+    target_week = pd.Timestamp(week_ending_on_or_before(today + timedelta(days=6)))
+    try:
+        with read_catalog() as con:
+            favourites = runs_store.list_favorites(con, include_groups=True)
+            groups = {g["id"]: g for g in runs_store.list_groups(con)}
+            settings = holdings_store.settings(con, who)
+            synced = holdings_store.latest_holdings(con, who)
+            rules = holdings_store.rules(con, who)
+            review = stock_actions.review_snapshot(con)
+    except FileNotFoundError:  # no catalog yet: no favourites either
+        favourites = []
+    headline = next((f for f in favourites if f["active"]), None)
+    if headline is None:
+        return {"week": journal_week_string(target_week), "error": "No headline favourite."}
+    members = groups.get(headline["id"], {}).get("members", [])
+    signal, kind, reason, rankings = _orders_signal(headline, members, target_week)
+    payload: dict = {
+        "week": journal_week_string(target_week),
+        "headline": {"id": headline["id"], "name": headline["name"]},
+        "kind": kind,
+        "reason": reason,
+        "settings": settings,
+    }
+    if signal is None or not rankings:
+        return payload
+    cash_names = {IDLE, CASH}
+    target = {k: v for k, v in signal["target_weights"].items() if v > 0 and k not in cash_names}
+    blocked = {item["symbol"] for item in review.get("items", [])}
+    stored, symbols = _strategy_symbols(rankings, today)
+    # A Fyers holding's base symbol -> the strategy's name for it (SBIN, NAVINFLUOR#2, Nasdaq 100).
+    name_of = {fyers.nse_symbol(symbol): name for name, symbol in symbols.items()}
+    base_of = {name: fyers.nse_symbol(symbol) for name, symbol in symbols.items()}
+    if settings["holdings_source"] == "paper":
+        before = {
+            k: v for k, v in signal.get("weights", {}).items() if v > 0 and k not in cash_names
+        }
+        prices, source = _order_prices(stored, symbols, set(before) | set(target))
+        capital = float(settings["paper_capital_rs"])
+        holdings = {
+            name: math.floor(capital * weight / prices[name])
+            for name, weight in before.items()
+            if prices.get(name)
+        }
+        cash = capital - sum(q * prices[n] for n, q in holdings.items())
+        payload["holdings"] = {"source": "paper", "capital": capital}
+    else:
+        rows = (synced or {}).get("rows", [])
+        cash = float(settings["extra_cash_rs"])
+        holdings: dict[str, float] = {}
+        outside = []
+        for row in rows:
+            treatment = rules.get(row["symbol"])
+            if treatment == "exclude":
+                continue
+            if treatment == "cash":
+                cash += float(row["quantity"]) * float(row.get("avg_price") or 0)
+                continue
+            name = name_of.get(row["symbol"])
+            if name is None:
+                # Not something this strategy holds or could buy: never ordered sold.
+                outside.append(row["symbol"])
+                continue
+            holdings[name] = holdings.get(name, 0.0) + float(row["quantity"])
+        prices, source = _order_prices(stored, symbols, set(holdings) | set(target))
+        payload["holdings"] = {
+            "source": "fyers",
+            "synced_at": (synced or {}).get("synced_at"),
+            "excluded": sorted(s for s, t in rules.items() if t == "exclude"),
+            "outside": sorted(outside),
+        }
+    blocked_names = {n for n in set(holdings) | set(target) if base_of.get(n, n) in blocked}
+    plan = orders.plan(
+        holdings,
+        prices,
+        target,
+        cash=cash,
+        min_trade_rs=float(settings["min_trade_rs"]),
+        blocked=blocked_names,
+    )
+    payload.update(
+        {
+            "prices": source,
+            "sleeves": signal.get("sleeves", []),
+            "plan": plan.to_dict(),
+        }
+    )
+    with open_catalog() as con:
+        payload["created_at"] = holdings_store.save_orders(
+            con,
+            who,
+            week=payload["week"],
+            trigger=trigger,
+            favourite_id=headline["id"],
+            holdings_source=settings["holdings_source"],
+            payload=payload,
+        )
+    return payload
+
+
+def _orders_message(payload: dict) -> Notification:
+    """The 14:15 Telegram summary of Your orders."""
+    plan = payload.get("plan")
+    head = payload.get("headline", {}).get("name", "Momentum")
+    week = pd.Timestamp(payload["week"])
+    title = f"Your orders — {head} — {week:%d %b %Y}"
+    if plan is None:
+        return Notification(
+            "momentum-orders",
+            "warn",
+            title,
+            payload.get("reason") or payload.get("error") or "",
+            type="momentum.problem",
+        )
+    holdings = payload["holdings"]
+    where = (
+        f"paper portfolio of ₹{holdings['capital']:,.0f}"
+        if holdings["source"] == "paper"
+        else "your Fyers holdings"
+    )
+    how = (
+        "Exact (decided by last Friday's ranks)"
+        if payload["kind"] == "exact"
+        else "From the final data"
+    )
+    lines = [f"{how} · against your {where} · prices: {payload['prices']}"]
+    trades = [r for r in plan["rows"] if r["quantity"]]
+    for row in trades:
+        lines.append(
+            f"• {row['action']} {row['symbol']} {row['quantity']} sh (₹{row['order_value']:,.0f})"
+        )
+    if not trades:
+        lines.append("No orders this week.")
+    skipped = [r for r in plan["rows"] if r["action"] in ("SKIP", "HOLD")]
+    if skipped:
+        lines.append(f"Not traded: {', '.join(r['symbol'] for r in skipped)}")
+    lines.append(
+        f"Sells ₹{plan['sells']:,.0f} · buys ₹{plan['buys']:,.0f} · charges "
+        f"₹{plan['charges']:,.0f} · cash after ₹{plan['cash_after']:,.0f}"
+    )
+    return Notification(
+        "momentum-orders",
+        "action_required" if trades else "info",
+        title,
+        "\n".join(lines),
+        type="momentum.orders",
+    )
+
+
+def _parse_pasted_holdings(text: str) -> list[dict]:
+    """'SBIN 10' / 'SBIN,10' / 'NSE:SBIN-EQ 10' lines -> holdings rows; refuses a line it
+    cannot read rather than guessing."""
+    rows: dict[str, float] = {}
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = [p for p in line.replace(",", " ").replace("\t", " ").split(" ") if p]
+        try:
+            quantity = float(parts[-1])
+        except (IndexError, ValueError) as error:
+            raise ValueError(f"Line {number}: expected 'SYMBOL quantity', got {line!r}.") from error
+        if len(parts) < 2 or quantity <= 0:
+            raise ValueError(f"Line {number}: expected 'SYMBOL quantity', got {line!r}.")
+        symbol = fyers.nse_symbol(parts[0].upper())
+        rows[symbol] = rows.get(symbol, 0.0) + quantity
+    return [{"symbol": s, "quantity": q, "avg_price": None} for s, q in sorted(rows.items())]
+
+
+def _now() -> datetime:
+    """The current instant in IST; a seam so tests can pin the clock."""
+    return datetime.now(IST)
+
+
 def _journal_line(journal: dict) -> str | None:
     """The Telegram line that witnesses the journal: Telegram's own timestamp then proves how
     long the chain was, and its newest hash, when this message went out."""
@@ -2536,6 +2998,8 @@ def _execute_weekly_run(body: WeeklyRunBody) -> dict:
             except (HTTPException, ValueError, KeyError, FileNotFoundError) as error:
                 outcome["result"] = None
                 outcome["blocked"] = str(getattr(error, "detail", error))
+    if body.run == "preview":
+        _broad_live_previews(outcomes, favorites_by_id, favourite_groups, creds)
     outcomes += _group_outcomes(favourite_groups, outcomes, body.run)
     journal = _journal_weekly(body.run, outcomes, favorites_by_id, datetime.now(IST), target_week)
     journal_line = _journal_line(journal)
@@ -2701,8 +3165,57 @@ class _SingleFlightJob:
             job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
 
 
+class _PreviewJobs:
+    """Rebalance previews run off the request thread. A Broad preview can take minutes on a cold
+    cache, and Cloudflare answers 524 for any request open longer than ~100 s, so the dashboard
+    starts one (202) and polls it. In memory, newest `MAX_KEPT` kept; a restart forgets them."""
+
+    MAX_KEPT = 20
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._jobs: dict[str, dict] = {}
+
+    def start(self, req: RebalanceRequest) -> dict:
+        job = {
+            "id": os.urandom(8).hex(),
+            "status": "running",
+            "started_at": datetime.now(IST).isoformat(timespec="seconds"),
+            "finished_at": None,
+            "result": None,
+            "error": None,
+            "error_status": None,
+        }
+        with self._lock:
+            self._jobs[job["id"]] = job
+            for old in list(self._jobs)[: -self.MAX_KEPT]:
+                del self._jobs[old]
+        threading.Thread(target=self._execute, args=(job, req), daemon=True).start()
+        return dict(job)
+
+    def get(self, job_id: str) -> dict | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            return dict(job) if job is not None else None
+
+    def _execute(self, job: dict, req: RebalanceRequest) -> None:
+        result, error, error_status = None, None, None
+        try:
+            result = rebalance_preview(req)
+        except HTTPException as exc:  # the same refusals the synchronous route gives
+            error, error_status = str(exc.detail), exc.status_code
+        except Exception as exc:  # the job must always finish, or the UI spins forever
+            error, error_status = f"{type(exc).__name__}: {exc}", 500
+        with self._lock:
+            job["status"] = "failed" if error else "done"
+            job["result"], job["error"], job["error_status"] = result, error, error_status
+            job["finished_at"] = datetime.now(IST).isoformat(timespec="seconds")
+
+
+PREVIEW_JOBS = _PreviewJobs()
 WEEKLY_JOBS = _SingleFlightJob()
 LIVE_RULES_JOBS = _SingleFlightJob()
+ORDERS_JOBS = _SingleFlightJob()
 STOCK_SYNC_JOBS = _SingleFlightJob()
 
 
@@ -2873,6 +3386,7 @@ _SCHEDULED_RUNS = (
     # (run, label, scheduled hour, scheduled minute, log filename) — the hour/minute are
     # launchd's StartCalendarInterval values from the matching plist, used for B5's
     # "ran late" flag (see _schedule_entry below).
+    ("orders", "Fri 14:15 IST", 14, 15, "launchd-weekly-orders.log"),
     ("preview", "Fri 14:40 IST", 14, 40, "launchd-weekly-preview.log"),
     ("final", "Fri 16:45 IST", 16, 45, "launchd-weekly-final.log"),
     ("stock-ingest", "Fri 19:30 IST", 19, 30, "launchd-weekly-stock-ingest.log"),
@@ -2881,6 +3395,7 @@ _SCHEDULED_RUNS = (
 )
 #: The scheduler's job id for each scheduled run (`apps/scheduler/src/jobs.ts`).
 _SCHEDULER_JOB_IDS = {
+    "orders": "momentum-orders",
     "preview": "momentum-preview",
     "final": "momentum-final",
     "stock-ingest": "momentum-stock-ingest",
@@ -3028,19 +3543,21 @@ def _weekly_status(today: date | None = None) -> dict:
 
 
 def _rebalance_info(req: BacktestRequest, week: pd.Timestamp) -> dict:
-    """Whether `week` is a rebalance week for this config, and the next one (BL-051)."""
+    """Whether `week` is a rebalance week for this config, and the next one (BL-051). Monthly
+    trades on the last Friday of the month only, as the engine does (`every` stays None)."""
     every = req.rebalance_every if req.rebalance == "weekly" else 1
     offset = req.rebalance_offset if every > 1 else 0
-    if req.rebalance != "weekly":
+    if req.rebalance == "weekly" and every == 1:
         return {"on_cadence": True, "every": None, "offset": None, "next": None}
-    week = pd.Timestamp(week).normalize()
-    upcoming = [week + pd.Timedelta(weeks=k) for k in range(1, every + 1)]
-    following = next(w for w in upcoming if cadence_weeks([w], every, offset))
+    on, following = analysis.rebalance_weeks(
+        pd.Timestamp(week).normalize(), req.rebalance, every, offset
+    )
+    monthly = req.rebalance == "monthly"
     return {
-        "on_cadence": bool(cadence_weeks([week], every, offset)),
-        "every": every,
-        "offset": offset,
-        "next": following.strftime("%Y-%m-%d"),
+        "on_cadence": on,
+        "every": None if monthly else every,
+        "offset": None if monthly else offset,
+        "next": following.strftime("%Y-%m-%d") if following is not None else None,
     }
 
 
@@ -3109,6 +3626,162 @@ def _group_outcomes(groups: list[dict], outcomes: list[dict], run: str) -> list[
     return combined
 
 
+def _ist_now() -> datetime:
+    """The clock the weekly orchestration reads (patched in tests)."""
+    return datetime.now(IST)
+
+
+def _headline_ids(outcomes: list[dict], groups: list[dict]) -> set[str]:
+    """The headline favourite's id, or its sleeves' ids when the headline is a group."""
+    for group in groups:
+        if group.get("active"):
+            return {member["id"] for member in group["members"]}
+    return {o["id"] for o in outcomes if o["active"] and o["id"] is not None}
+
+
+def _broad_live_previews(
+    outcomes: list[dict],
+    favorites_by_id: dict[str, dict],
+    groups: list[dict],
+    creds,
+    *,
+    now: datetime | None = None,
+) -> None:
+    """The 14:40 preview for a Broad headline: rank on Fyers live prices, held in memory only
+    (the same path as the dashboard's rebalance preview), so the trades can be placed before
+    the close instead of waiting for the 19:30 bhavcopy run. Only the headline: every other
+    Broad favourite still gets its signal at 19:30, and each live run costs a full ranking.
+    Fills `result`, or `blocked` with the reason (reported, since the headline is waiting on
+    nothing else). Never journalled: a live-price preview is not a reproducible record."""
+    now = (now or _ist_now()).astimezone(IST)
+    headline = _headline_ids(outcomes, groups)
+    market_open = _market_open(now)
+    quotes_by_symbols: dict[tuple[str, ...], dict[str, float]] = {}
+    for outcome in outcomes:
+        if (
+            outcome["id"] not in headline
+            or outcome["dataset"] != "broad"
+            or outcome["result"] is not None
+            # Blocked for a real reason (a config error, say): keep that reason, it is reported.
+            or not _awaiting_data(outcome["blocked"])
+        ):
+            continue
+        if not market_open:
+            # Off hours (or an exchange holiday) "live" quotes are the last session's prices; the
+            # outcome stays exactly as it was, waiting for the 19:30 run, so it is not reported
+            # (nor is a group made of such sleeves).
+            continue
+        outcome["journal"] = False
+        outcome["awaiting_data"] = False
+        if creds is None:
+            outcome["blocked"] = (
+                "Live Broad preview needs a Fyers token; log in from Broker logins or run "
+                "`uv run mbt login`. The 19:30 run will still send the signal on closing prices."
+            )
+            continue
+        favorite = favorites_by_id[outcome["id"]]
+        try:
+            outcome["result"] = _broad_live_weekly_result(favorite, creds, now, quotes_by_symbols)
+            outcome["blocked"] = None
+        except Exception as error:  # noqa: BLE001 - must never cost the run its other signals
+            outcome["result"] = None
+            reason = str(error) or type(error).__name__
+            outcome["blocked"] = f"Live Broad preview failed: {reason}"
+
+
+def _broad_live_weekly_result(
+    favorite: dict,
+    creds,
+    now: datetime,
+    quotes_by_symbols: dict[tuple[str, ...], dict[str, float]],
+):
+    """One Broad favourite's preview signal on live prices, shaped like `_research_weekly_result`
+    so a group can combine it with its other sleeves."""
+    from .weekly import RunResult
+
+    config = dict(favorite["config"])
+    req = BacktestRequest.model_validate(config)
+    if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
+        raise ValueError("the whole-market universe is not quoted live")
+    symbols = tuple(sorted(set(rebalance.broad_quote_symbols(_broad_ranking(req)).values())))
+    if symbols not in quotes_by_symbols:
+        quotes_by_symbols[symbols] = fyers.quotes(list(symbols), creds)
+    run = _broad_live_sentinel_run(req, quotes_by_symbols[symbols], now.date())
+    outcome, week = run
+    latest = _broad_engine_signal(req, run)
+    result = outcome.result
+
+    # The model portfolio before this week's trades: last week's weights, moved by this week's
+    # live prices (the engine never trades its newest week, so the decision week's own row is
+    # the portfolio after them).
+    earlier = result.weights.index[result.weights.index < week]
+    weights: dict[str, float] = {}
+    if len(earlier):
+        previous = earlier[-1]
+        prices = outcome.ranking.prices
+        moved = {}
+        for name, weight in result.weights.loc[previous].items():
+            if weight <= 1e-9:
+                continue
+            growth = 1.0
+            if name in prices.columns and previous in prices.index and week in prices.index:
+                before, after = prices.at[previous, name], prices.at[week, name]
+                if pd.notna(before) and pd.notna(after) and before > 0:
+                    growth = float(after / before)
+            moved[name] = weight * growth
+        total = sum(moved.values())
+        if total > 0:
+            weights = {name: round(value / total, 4) for name, value in moved.items()}
+    equity = result.equity.loc[:week]
+    rows = latest.get("rows", [])
+    actionable = _actionable_rows(rows)
+    signal = {
+        "week": latest.get("week", week.strftime("%Y-%m-%d")),
+        "label": favorite["name"],
+        "rows": rows,
+        "weights": weights,
+        "target_weights": latest.get("target_weights"),
+        "config": config,
+        "rebalance": _rebalance_info(req, week),
+        "sleeve_value": groups_mod.sleeve_value(
+            [d.strftime("%Y-%m-%d") for d in equity.index],
+            [float(v) if pd.notna(v) else None for v in equity.to_numpy()],
+        ),
+        "price_mode": "live",
+    }
+    lines = [f"Strategy: {favorite['name']} · dataset: broad"]
+    lines.append(latest.get("explain", ""))
+    if actionable:
+        lines.extend(
+            f"• {row.get('asset', 'Unknown')} — {row.get('action')} · rank {row.get('rank', '-')}"
+            for row in actionable
+        )
+    else:
+        lines.append("No trades this week.")
+    lines.append(
+        f"Ranked on Fyers live prices at {now:%H:%M} IST, held in memory only. The final "
+        "signal on closing prices follows after the 19:30 data sync."
+    )
+    note = Notification(
+        "momentum-weekly",
+        "action_required" if actionable else "info",
+        f"Momentum PREVIEW — {favorite['name']} — week of {week:%d %b %Y}",
+        "\n".join(line for line in lines if line),
+        type="momentum.preview",
+    )
+    return RunResult(note, signal)
+
+
+def _actionable_rows(rows: list[dict]) -> list[dict]:
+    """The rows that are trades to place (not a hold, a capped position or a wait)."""
+    return [
+        row
+        for row in rows
+        if row.get("action")
+        and str(row.get("action", "")).upper() not in {"HOLD", "AT CAP", "WAIT"}
+    ]
+
+
 def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     """Evaluate one bhavcopy-backed favourite after its processed-week gate passes."""
     from .weekly import RunResult
@@ -3127,20 +3800,18 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     elif req.dataset == "custom_index":
         payload = _custom_index_backtest(req)
     elif req.dataset == "broad":
-        payload = _broad_backtest(req)
-        # The engine's own decision for this week, not the advisory panel (see its docstring).
+        core, lazy = _broad_parts(req)
+        # The engine's own decision for the newest STORED week (a lagging outer-market series can
+        # end the run itself a week earlier), so the run's own `latest` is not built at all.
+        lazy.pop("latest", None)
+        payload = _full(core, lazy)
         payload["latest"] = _broad_engine_signal(req)
     else:
         return None, f"Unsupported weekly dataset {req.dataset!r}."
 
     latest = payload.get("latest", {})
     rows = latest.get("rows", [])
-    actionable = [
-        row
-        for row in rows
-        if row.get("action")
-        and str(row.get("action", "")).upper() not in {"HOLD", "AT CAP", "WAIT"}
-    ]
+    actionable = _actionable_rows(rows)
     lines = [f"Strategy: {favorite['name']} · dataset: {req.dataset}"]
     if actionable:
         lines.extend(
@@ -3606,6 +4277,22 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "result change not found")
         return change
 
+    @app.get("/api/alerts")
+    def alerts_view() -> dict:
+        """What needs a person right now (BL-051 Phase 5), computed from the checks the Telegram
+        jobs run: an unclassified split, the headline's data not ready, a journal entry missing
+        after its run, an unreviewed Check / Not reproducible result change, a live-money rule
+        breached. Open alerts for the bell and the pop-up; `resolved` are those that cleared."""
+        from . import alerts, live_rules
+
+        return alerts.collect(
+            now=_now(),
+            catalog=read_catalog,
+            weekly_status=lambda today: _weekly_status(today),
+            live_rules_report=lambda: live_rules.load_last(this_week.state_dir()),
+            state_dir=this_week.state_dir(),
+        )
+
     @app.post("/api/weekly/run", status_code=202)
     def weekly_run(body: WeeklyRunBody) -> dict:
         """Manual trigger for the Friday signal (TODO.md 3.11.5): the same orchestration the
@@ -3644,6 +4331,90 @@ def create_app() -> FastAPI:
     def live_rules_run() -> dict:
         job, started = LIVE_RULES_JOBS.start(_run_live_rules_check, {})
         return {"job": job, "started": started}
+
+    @app.get("/api/orders")
+    def orders_view(week: date | None = None) -> dict:
+        """Your orders (BL-051 Phase 3): settings, the latest holdings snapshot and its rules,
+        every set of orders made for the week (default: this or the coming Friday), the job."""
+        from . import holdings_store
+        from .weekly import week_ending_on_or_before
+
+        who = holdings_store.owner()
+        target = week or week_ending_on_or_before(datetime.now(IST).date() + timedelta(days=6))
+        empty = {
+            "week": target.isoformat(),
+            "settings": {"owner": who, **holdings_store.SETTINGS_DEFAULTS},
+            "holdings": None,
+            "rules": {},
+            "orders": [],
+            "job": ORDERS_JOBS.latest(),
+        }
+        try:
+            with read_catalog() as con:
+                return {
+                    **empty,
+                    "settings": holdings_store.settings(con, who),
+                    "holdings": holdings_store.latest_holdings(con, who),
+                    "rules": holdings_store.rules(con, who),
+                    "orders": holdings_store.orders_for(con, who, target.isoformat()),
+                }
+        except (FileNotFoundError, duckdb.CatalogException):  # no catalog / tables yet
+            return empty
+
+    @app.post("/api/orders/run", status_code=202)
+    def orders_run() -> dict:
+        job, started = ORDERS_JOBS.start(lambda: _compute_orders("manual"), {})
+        return {"job": job, "started": started}
+
+    @app.put("/api/orders/settings")
+    def orders_settings(body: OrderSettingsBody) -> dict:
+        from . import holdings_store
+
+        try:
+            with open_catalog() as con:
+                return holdings_store.save_settings(
+                    con, holdings_store.owner(), **body.model_dump(exclude_none=True)
+                )
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
+
+    @app.post("/api/holdings/sync")
+    def holdings_sync() -> dict:
+        """Read the owner's Fyers holdings (read-only) and keep them as a new snapshot."""
+        from . import holdings_store
+
+        try:
+            rows = fyers.holdings(fyers.resolve_credentials())
+        except fyers.FyersCredentialsError as error:
+            raise HTTPException(409, f"No valid Fyers login: {error}") from error
+        except RuntimeError as error:
+            raise HTTPException(502, str(error)) from error
+        with open_catalog() as con:
+            who = holdings_store.owner()
+            holdings_store.save_holdings(con, who, "fyers", rows)
+            return holdings_store.latest_holdings(con, who) or {}
+
+    @app.post("/api/holdings/paste")
+    def holdings_paste(body: PastedHoldingsBody) -> dict:
+        from . import holdings_store
+
+        try:
+            rows = _parse_pasted_holdings(body.text)
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
+        with open_catalog() as con:
+            who = holdings_store.owner()
+            holdings_store.save_holdings(con, who, "paste", rows)
+            return holdings_store.latest_holdings(con, who) or {}
+
+    @app.put("/api/holdings/rules")
+    def holdings_rule(body: HoldingRuleBody) -> dict:
+        from . import holdings_store
+
+        with open_catalog() as con:
+            who = holdings_store.owner()
+            holdings_store.set_rule(con, who, body.symbol.upper(), body.treatment)
+            return holdings_store.rules(con, who)
 
     @app.get("/api/journal")
     def forward_journal_view(week: str | None = None) -> dict:
@@ -3699,6 +4470,17 @@ def create_app() -> FastAPI:
     @app.post("/api/rebalance-preview")
     def preview(req: RebalanceRequest) -> dict:
         return rebalance_preview(req)
+
+    @app.post("/api/rebalance-preview/jobs", status_code=202)
+    def start_preview_job(req: RebalanceRequest) -> dict:
+        return PREVIEW_JOBS.start(req)
+
+    @app.get("/api/rebalance-preview/jobs/{job_id}")
+    def preview_job(job_id: str) -> dict:
+        job = PREVIEW_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(404, "Unknown preview job (the service may have restarted).")
+        return job
 
     return app
 

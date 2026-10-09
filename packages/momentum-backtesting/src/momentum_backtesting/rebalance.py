@@ -408,15 +408,19 @@ def persisted_broad_prices(
     return ltp, symbols
 
 
-def persisted_broad_ranking(ranking: broad.UniverseRanking) -> broad.UniverseRanking:
-    """Add one flat sentinel week so the engine can decide on the last stored week."""
-    week = ranking.prices.index[-1]
+def persisted_broad_ranking(
+    ranking: broad.UniverseRanking, through: pd.Timestamp | None = None
+) -> broad.UniverseRanking:
+    """Add one flat sentinel week so the engine can decide on the last stored week. `through`
+    (a stored week) first drops every later week, so the engine decides that week instead, on
+    what was known at its close: a backtest that ends before the newest data."""
+    week = ranking.prices.index[-1] if through is None else through
     sentinel = week + pd.Timedelta(days=7)
 
     def extended(frame: pd.DataFrame | None) -> pd.DataFrame | None:
         if frame is None:
             return None
-        result = frame.copy()
+        result = frame.loc[frame.index <= week].copy()
         result.loc[sentinel] = result.loc[week]
         return result.sort_index()
 
@@ -426,7 +430,7 @@ def persisted_broad_ranking(ranking: broad.UniverseRanking) -> broad.UniverseRan
         ranking,
         prices=prices,
         raw_prices=extended(ranking.raw_prices),
-        weeks=[*ranking.weeks, sentinel],
+        weeks=[*(w for w in ranking.weeks if w <= week), sentinel],
         global_ranks=extended(ranking.global_ranks),
         pool_membership=extended(ranking.pool_membership),
         stock_pool_ranks=extended(ranking.stock_pool_ranks),
@@ -507,14 +511,20 @@ def live_broad_ranking(
     raw_prices = raw_prices.sort_index()
     ranks, _ = engine.compute_ranks(prices, config)
     stock_columns = list(ranking.column_to_base_symbol)
-    universe = broad.load_stock_universe_frame(
-        stocks_data_dir=data_dir / "stocks",
-        categories_data_dir=data_dir / "categories",
-        liquidity=liquidity,
-        universe=universe_kind,  # type: ignore[arg-type]
-        series_breaks=series_breaks,  # type: ignore[arg-type]
-    )
-    membership = universe.stock_membership.copy()
+    if ranking.stock_membership is not None:
+        # The ranking was built from this very universe (same membership, gate and series
+        # rule, by its cache key): reuse it rather than reload every stock from disk.
+        membership_source, gate_source = ranking.stock_membership, ranking.liquidity_gate
+    else:
+        universe = broad.load_stock_universe_frame(
+            stocks_data_dir=data_dir / "stocks",
+            categories_data_dir=data_dir / "categories",
+            liquidity=liquidity,
+            universe=universe_kind,  # type: ignore[arg-type]
+            series_breaks=series_breaks,  # type: ignore[arg-type]
+        )
+        membership_source, gate_source = universe.stock_membership, universe.liquidity_gate
+    membership = membership_source.copy()
     if week > last:
         membership.loc[week] = membership.iloc[-1]
     membership.loc[settlement_week] = membership.loc[week]
@@ -526,12 +536,18 @@ def live_broad_ranking(
         top_n=pool_top_n,
         exit_rank=pool_exit_rank,
     )
-    if universe.liquidity_gate is not None:
-        gate = universe.liquidity_gate.copy()
+    if gate_source is not None:
+        gate = gate_source.copy()
         if week > last:
             gate.loc[week] = gate.iloc[-1]
         gate.loc[settlement_week] = gate.loc[week]
         pool = pool & gate.reindex(index=prices.index, columns=pool.columns).fillna(False)
+    # As `broad.finish_universe_ranking` does: a series that has ended (delisted, the old half
+    # of a demerger) leaves the pool after its last real week; its price is only carried
+    # forward, so a buy would fill at a frozen price.
+    for column, last_real_week in ranking.stale_columns.items():
+        if column in pool.columns:
+            pool.loc[pool.index > last_real_week, column] = False
     stock_pool = broad._dense_rank(ranks[stock_columns].where(pool))
     eligible = pd.DataFrame(False, index=prices.index, columns=prices.columns)
     eligible[stock_columns] = pool

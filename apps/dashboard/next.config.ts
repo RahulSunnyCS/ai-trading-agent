@@ -151,12 +151,30 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/week`,
             },
             {
+              source: '/api/momentum/orders',
+              destination: `${momentumDirectOrigin}/api/orders`,
+            },
+            {
+              // run, settings
+              source: '/api/momentum/orders/:path*',
+              destination: `${momentumDirectOrigin}/api/orders/:path*`,
+            },
+            {
+              // sync, paste, rules
+              source: '/api/momentum/holdings/:path*',
+              destination: `${momentumDirectOrigin}/api/holdings/:path*`,
+            },
+            {
               source: '/api/momentum/live-rules',
               destination: `${momentumDirectOrigin}/api/live-rules`,
             },
             {
               source: '/api/momentum/live-rules/:path*',
               destination: `${momentumDirectOrigin}/api/live-rules/:path*`,
+            },
+            {
+              source: '/api/momentum/alerts',
+              destination: `${momentumDirectOrigin}/api/alerts`,
             },
             {
               // run, jobs/latest and status
@@ -166,6 +184,14 @@ const nextConfig: NextConfig = {
             {
               source: '/api/momentum/rebalance-preview',
               destination: `${momentumDirectOrigin}/api/rebalance-preview`,
+            },
+            {
+              source: '/api/momentum/rebalance-preview/jobs',
+              destination: `${momentumDirectOrigin}/api/rebalance-preview/jobs`,
+            },
+            {
+              source: '/api/momentum/rebalance-preview/jobs/:id',
+              destination: `${momentumDirectOrigin}/api/rebalance-preview/jobs/:id`,
             },
           ]
         : []),

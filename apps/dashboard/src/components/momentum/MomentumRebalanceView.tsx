@@ -39,6 +39,38 @@ import { THead, TRow, Table, Td, Th } from '../ui/Table';
 import { toast } from '../ui/Toast';
 
 type Dataset = 'stock' | 'broad';
+
+interface PreviewJob {
+  id: string;
+  status: 'running' | 'done' | 'failed';
+  result: MomentumRebalanceResult | null;
+  error: string | null;
+}
+
+const PREVIEW_POLL_MS = 2000;
+
+/**
+ * Start the preview as a background job and poll it. A synchronous request is cut off with an
+ * HTTP 524 by Cloudflare after ~100 s, and a Broad preview on a cold cache can take longer.
+ */
+async function runPreviewJob(
+  body: Record<string, unknown>,
+): Promise<{ ok: true; data: MomentumRebalanceResult } | { ok: false; error: string }> {
+  const started = await apiPost<PreviewJob>('/api/momentum/rebalance-preview/jobs', body);
+  if (!started.ok) return { ok: false, error: started.error };
+  const id = started.data.id;
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, PREVIEW_POLL_MS));
+    const polled = await apiGet<PreviewJob>(`/api/momentum/rebalance-preview/jobs/${id}`);
+    if (!polled.ok) return { ok: false, error: polled.error };
+    if (polled.data.status === 'done' && polled.data.result) {
+      return { ok: true, data: polled.data.result };
+    }
+    if (polled.data.status === 'failed') {
+      return { ok: false, error: polled.data.error ?? 'The preview failed.' };
+    }
+  }
+}
 // The rebalance-preview API accepts only these two datasets (it answers 422 for ETF Rotation
 // and Custom Index). Broad Momentum is the one the Momentum section shows; the Nifty 50 stock
 // dataset is hidden from the Backtest tab but still has saved runs, so it is named as such.
@@ -231,7 +263,7 @@ export function MomentumRebalanceView({
     setError(null);
     setPlan(null);
     setRunning(true);
-    const response = await apiPost<MomentumRebalanceResult>('/api/momentum/rebalance-preview', {
+    const response = await runPreviewJob({
       ...config,
       holdings_pct: validation.holdings,
       portfolio_value: Number(portfolioValue),
@@ -525,6 +557,17 @@ export function MomentumRebalanceView({
                 : `as of ${formatDay(plan.as_of)}`
             } · Signal week ${formatDay(plan.signal_week)}`}
           />
+          {plan.live_unavailable ? (
+            <div
+              id="rebalance-live-unavailable"
+              className="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3"
+            >
+              <p className="text-sm font-medium text-foreground">
+                Not live prices: this preview used the latest stored close
+              </p>
+              <p className="mt-1 text-sm text-muted">{plan.live_unavailable}</p>
+            </div>
+          ) : null}
           {plan.rebalance_schedule ? (
             <div
               className={`mb-4 rounded-lg border px-4 py-3 ${

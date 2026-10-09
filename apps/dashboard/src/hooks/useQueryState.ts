@@ -47,6 +47,18 @@ export function setQueryParam(key: string, value: string | null): void {
   for (const listener of listeners) listener();
 }
 
+/**
+ * Open an in-app link (a path with its query, `/momentum/week?review=ABC`) as a new history
+ * entry, without a Next navigation (see useAppRoute for why), and tell every `useQueryState`
+ * reader. Next keeps `usePathname` in step with `pushState` itself.
+ */
+export function navigateToLink(link: string): void {
+  const { pathname, search, hash } = window.location;
+  if (link === `${pathname}${search}${hash}`) return;
+  window.history.pushState(null, '', link);
+  for (const listener of listeners) listener();
+}
+
 export function useQueryState(key: string): [string | null, (value: string | null) => void] {
   const value = useSyncExternalStore(
     subscribe,

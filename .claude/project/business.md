@@ -13,9 +13,10 @@ only; their own money is their decision.
 
 ## Compliance & Legal Notes
 
-- **SEBI / NSE:** this repo places no orders. Fyers credentials are used for market data only
-  (read-only WebSocket and history), not order placement. AlgoTest strategies run on the
-  owner's own broker accounts.
+- **SEBI / NSE:** this repo places no orders. Fyers credentials are used for market data
+  (read-only WebSocket, history and quotes) and, since BL-051 Phase 3, to read the owner's own
+  holdings (read-only `/holdings`) for Momentum's "Your orders"; never for order placement.
+  AlgoTest strategies run on the owner's own broker accounts.
 - **Offering signals to others (check before doing it):** sharing buy/sell recommendations
   with people outside the owner's own use, especially for a fee, can fall under SEBI's
   Research Analyst or Investment Adviser regulations. Get that checked before the workbench or

@@ -507,12 +507,61 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // BL-051 Phase 3: Your orders (settings, holdings, rules, the computed orders) and holdings
+  // read from Fyers (read-only) or pasted. Nothing here places an order.
+  fastify.get(
+    '/api/momentum/orders',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { week: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { week } = request.query as { week?: string };
+      await forward(reply, week ? `/api/orders?week=${encodeURIComponent(week)}` : '/api/orders');
+    },
+  );
+  fastify.post('/api/momentum/orders/run', async (_request, reply) => {
+    await forward(reply, '/api/orders/run', { method: 'POST' });
+  });
+  for (const [path, method] of [
+    ['orders/settings', 'PUT'],
+    ['holdings/paste', 'POST'],
+    ['holdings/rules', 'PUT'],
+  ] as const) {
+    fastify.route({
+      method,
+      url: `/api/momentum/${path}`,
+      bodyLimit: BODY_LIMIT_BYTES,
+      schema: { body: { type: 'object' } },
+      handler: async (request, reply) => {
+        await forward(reply, `/api/${path}`, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request.body),
+        });
+      },
+    });
+  }
+  fastify.post('/api/momentum/holdings/sync', async (_request, reply) => {
+    await forward(reply, '/api/holdings/sync', { method: 'POST' });
+  });
+
   // BL-051: the latest live-money rules check, and a manual re-check (never sends).
   fastify.get('/api/momentum/live-rules', async (_request, reply) => {
     await forward(reply, '/api/live-rules');
   });
   fastify.post('/api/momentum/live-rules/run', async (_request, reply) => {
     await forward(reply, '/api/live-rules/run', { method: 'POST' });
+  });
+
+  // BL-051 Phase 5: what needs a person (the bell and the pop-up), polled from every page.
+  fastify.get('/api/momentum/alerts', async (_request, reply) => {
+    await forward(reply, '/api/alerts');
   });
 
   fastify.post(
@@ -524,6 +573,36 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request.body),
       });
+    },
+  );
+
+  // The preview can outlast Cloudflare's ~100 s request limit: start a job, poll it.
+  fastify.post(
+    '/api/momentum/rebalance-preview/jobs',
+    { bodyLimit: BODY_LIMIT_BYTES, schema: { body: { type: 'object' } } },
+    async (request, reply) => {
+      await forward(reply, '/api/rebalance-preview/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+    },
+  );
+
+  fastify.get(
+    '/api/momentum/rebalance-preview/jobs/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { id: { type: 'string', pattern: '^[0-9a-f]{1,32}$' } },
+          required: ['id'],
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await forward(reply, `/api/rebalance-preview/jobs/${id}`);
     },
   );
 });
