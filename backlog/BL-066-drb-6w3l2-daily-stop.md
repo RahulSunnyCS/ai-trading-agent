@@ -119,7 +119,14 @@ Added after the plain trailing result was read, at the owner's request.
   With A = 0 this is the plain trailing stop above (checked: same numbers). The alternative reading, where the stop jumps
   up to (best profit − X) at the moment ₹5k is reached, is not run.
 - **Fill, outputs, "helps" test, hold-out:** as above (both fill assumptions). **Will not run:** other activation levels.
-- **Result:** (after the run)
+- **Result:** **no level passes**; exploratory (same already-seen year). `stops.py --trail --activate 5000`; check: activation 0 reproduces the
+  plain ₹16k trail (₹4,23,584, −₹75,390, 25 days). Reference, the plain fixed ₹16k stop: 9 days, gross ₹4,29,729 (−0.3%), drawdown
+  −₹66,766 (2.2% smaller). Against no stop (gross ₹4,30,868, drawdown −₹68,294, net ₹3,50,407): **₹16k, trailing after ₹5k, close-of-bar fill:**
+  14 days stopped (5 would have finished better unstopped), gross ₹4,20,148 (−2.5%), drawdown −₹75,568 (10.7% deeper), worst day
+  −₹18,824, net ₹3,39,687 (+26.1%), net drawdown −₹90,144; **best-case fill at the level:** gross ₹4,32,495 (+0.4%), drawdown −₹75,050
+  (+9.9%), worst day −₹16,000, net ₹3,52,034 (+27.1%). **₹12k:** 29 days, close-of-bar +0.9% / drawdown 17.2% deeper, best case +9.4% /
+  4.8% deeper. **₹20k:** 3 days, close-of-bar +0.0% / −0.8%, best case +1.1% / drawdown 3.3% smaller. With activation the trail fires on
+  14 days instead of 25 (plain trail) and behaves much like the fixed stop at the same X; it does not reduce the drawdown.
 
 ## Log
 

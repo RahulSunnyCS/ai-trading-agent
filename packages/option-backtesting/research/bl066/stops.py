@@ -23,6 +23,9 @@ LEVELS = [None] + (
     else [10_000, 12_000, 15_000, 17_000, 20_000]
 )
 FILL_AT_LEVEL = "--fill-at-level" in sys.argv
+ACTIVATE = (
+    int(sys.argv[sys.argv.index("--activate") + 1]) if "--activate" in sys.argv else 0
+)  # trail only above this day profit
 TRAIL = "--trail" in sys.argv  # BL-066: the stop trails X below the day's highest combined P&L
 PER = 2  # lots in each strategy (DRB-6W3L2)
 PICKS = HERE.parent / "bl057" / "daily_picks_min3_core6_buy2L2_whole_day.csv"
@@ -101,7 +104,9 @@ def main() -> None:
                     peak_before = np.maximum.accumulate(
                         np.maximum(np.concatenate(([0.0], paths[i, :-1])), 0)
                     )
-                    level = peak_before - X
+                    level = -X + np.maximum(
+                        peak_before - ACTIVATE, 0
+                    )  # rises 1:1 above the activation profit
                 else:
                     level = np.full(N, -float(X))
                 hit = np.where(paths[i] <= level)[0]
