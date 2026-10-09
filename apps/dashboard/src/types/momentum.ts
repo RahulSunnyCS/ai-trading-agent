@@ -179,7 +179,24 @@ export type MomentumSectionName =
   | 'instruments'
   | 'timeline'
   | 'latest'
-  | 'circuit_exposure';
+  | 'circuit_exposure'
+  | 'friday_spread';
+
+/** One calendar phase's figures from an "All Fridays" run (BL-056); CAGR and drawdown are
+ * fractions, after tax when the run was taxed. */
+export interface MomentumFridayFigures {
+  cagr: number;
+  max_drawdown: number;
+  ulcer: number;
+}
+
+/** The "Friday luck" section: each Friday's figures next to the whole account's. */
+export interface MomentumFridaySpread {
+  every: number;
+  phases: Array<MomentumFridayFigures & { offset: number }>;
+  blend: MomentumFridayFigures;
+  cagr_spread: number;
+}
 
 export interface MomentumLatest {
   week: string;
@@ -223,6 +240,8 @@ export interface MomentumResult {
   missing_symbols?: string[];
   /** Broad Momentum only; null when it couldn't be computed. */
   circuit_exposure?: MomentumCircuitExposure | null;
+  /** Only on an "All Fridays" run (`split_fridays`). */
+  friday_spread?: MomentumFridaySpread | null;
   skipped_categories?: string[];
   fills?: { proxy_trades: number; warnings: string[] };
 }

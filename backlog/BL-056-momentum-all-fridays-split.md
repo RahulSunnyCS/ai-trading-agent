@@ -144,3 +144,9 @@ Answered by the owner on 2026-10-09:
   an unpushed branch `research/bl-056-favourites-score-delay` also uses BL-056; the owner chose to
   keep this item's number and renumber that one when it is pushed. The phase-split fall-depth
   measurement (`scripts/bl054_phase_split.py`) was still running at start; cite it when it lands.
+- 2026-10-09 — Phase 1 (API) and Phase 2 (dashboard) built. A real Broad favourite (Five Sectors,
+  Rank Sum, every 4 weeks, Rs 2 lakh): one Friday reproduces its saved 37.27% CAGR exactly; All
+  Fridays gives 40.6% with a 27.9% worst fall against 40.2% on its single Friday, in 3 s once the
+  ranking is cached (28 s cold). Each Friday set holds Rs 50,000, so the flat depository charge
+  counts for more: a lone sleeve earns about 0.5 point less than the same Friday on the whole sum.
+  Goldens unchanged (one scenario added), 1404 Python and 1240 dashboard tests pass.
