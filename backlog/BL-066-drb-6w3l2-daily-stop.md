@@ -98,7 +98,18 @@ Added after the fixed-level results were read; the owner asked about "a 16k trai
 - **Fill:** two assumptions, as in the fixed-level test: close of the bar (default) and exactly at the level (best case).
 - **Everything else, outputs and the "helps" test:** as above. **Hold-out:** none (owner override). **Will not run:** other
   trail sizes, trailing in steps, a profit target.
-- **Result:** (after the run)
+- **Owner's note:** "1:1" read as the trail ratio (the stop rises ₹1 for each ₹1 the day's combined profit rises), which is
+  what this rule does.
+- **Result:** **no trailing level passes**; exploratory (same already-seen year). `stops.py --trail`; with the trail off it reproduces
+  the fixed-level results exactly. Against no stop (gross ₹4,30,868, drawdown −₹68,294, worst day −₹19,368, net ₹3,50,407):
+  **₹16k trail, close-of-bar fill:** 25 days stopped (14 would have finished better unstopped), gross ₹4,23,584 (−1.7%),
+  drawdown −₹75,390 (10.4% deeper), worst day −₹18,824, net ₹3,43,122 (+26.4%), net drawdown −₹95,391; **best-case fill at the
+  level:** gross ₹4,52,797 (+5.1%), drawdown −₹70,411 (+3.1%), worst day −₹16,000, net ₹3,72,335 (+28.6%). **₹12k trail:** 47
+  days, close-of-bar gross ₹4,24,273 (−1.5%), drawdown −₹58,598 (**14.2% smaller**), net ₹3,43,811, net drawdown −₹71,821;
+  best case gross ₹4,70,292 (+9.1%), drawdown −₹54,295 (**20.5% smaller**, the closest to the 25% bar of any stop tried),
+  net ₹3,89,831 (+30.0%). **₹20k trail:** 11 days, close-of-bar −3.2% / drawdown 11.6% deeper, best case −0.3% / 11.2% deeper.
+  The trail adds stops on days that rose and then gave back ₹12–16k (25 days at ₹16k against 13 for the fixed ₹15k), which
+  is where it differs from the fixed stop.
 
 ## Log
 
