@@ -97,10 +97,35 @@ RECENT_WINDOW = _arg("--recent-window", 0)
 RECENT_LAG = _arg("--recent-lag", 0)
 REVERSE = "--reverse" in sys.argv
 SHUFFLE = _arg("--shuffle-labels", -1)
+# BL-069 ingredients (each pre-registered in backlog/BL-069-drb-new-ingredients.md):
+#   --recent-family F    recent = (1-F) x the variant's own + F x its family's mean (F in 0.5, 1.0)
+#   --recent-shape S     tiers | ewm3 | accel: other shapes of the recent criterion
+#   --fit-lookbacks L    fit-criteria lookbacks as n:w pairs, e.g. 21:50,63:50 (default 5:40,21:30,63:30)
+#   --min-gap M          no two core picks of the same index + family start within M minutes
+#   --require-positive-recent   a core pick whose recent score is <= 0 is not traded (none = sit out)
+#   --streak-gate N      half size (1 lot per strategy) when the ungated basket's last N days < 0
+RECENT_FAMILY = (
+    float(sys.argv[sys.argv.index("--recent-family") + 1]) if "--recent-family" in sys.argv else 0.0
+)
+RECENT_SHAPE = (
+    sys.argv[sys.argv.index("--recent-shape") + 1] if "--recent-shape" in sys.argv else ""
+)
+MIN_GAP = _arg("--min-gap", 0)
+REQUIRE_POS_RECENT = "--require-positive-recent" in sys.argv
+STREAK_GATE = _arg("--streak-gate", 0)
+FIT_LB = sys.argv[sys.argv.index("--fit-lookbacks") + 1] if "--fit-lookbacks" in sys.argv else ""
+if FIT_LB:
+    LOOKBACKS = [(int(a), int(b) / 100) for a, b in (x.split(":") for x in FIT_LB.split(","))]
+    assert abs(sum(w for _, w in LOOKBACKS) - 1) < 1e-9, LOOKBACKS
+_STATE: dict = {}  # per-run arrays set in main: family index per variant, gap label per day x variant
 if "--weights" in sys.argv:
     WEIGHTS = tuple(int(x) for x in sys.argv[sys.argv.index("--weights") + 1].split(","))
-    assert len(WEIGHTS) == 4 and sum(WEIGHTS) == 100, WEIGHTS
-    W_CRIT = {k: w / 100 for k, w in zip(W_CRIT, WEIGHTS, strict=True)}
+    assert len(WEIGHTS) in (4, 5) and sum(WEIGHTS) == 100, WEIGHTS
+    # a fifth value is the overnight-gap fit criterion (BL-069 B2)
+    W_CRIT = {
+        k: w / 100
+        for k, w in zip(["recent", "weekday", "dte", "vix", "gap"], WEIGHTS, strict=False)
+    }
 
 
 def on_grid(name: str) -> bool:
@@ -206,9 +231,10 @@ def skewed_fit(P: np.ndarray, match: np.ndarray, i: int) -> np.ndarray:
     num = np.zeros(P.shape[1])
     den = np.zeros(P.shape[1])
     for n, w in LOOKBACKS:
-        m = match[i - n : i]
+        lo = max(0, i - n)  # a lookback longer than the history uses all of it (never wraps)
+        m = match[lo:i]
         cnt = m.sum(axis=0)
-        avg = np.where(cnt > 0, (P[i - n : i] * m).sum(axis=0) / np.maximum(cnt, 1), 0.0)
+        avg = np.where(cnt > 0, (P[lo:i] * m).sum(axis=0) / np.maximum(cnt, 1), 0.0)
         num += w * avg * (cnt > 0)
         den += w * (cnt > 0)
     return np.where(den > 0, num / np.maximum(den, 1e-12), 0.0)
@@ -297,8 +323,26 @@ def recent_score(Pv: np.ndarray, i: int) -> np.ndarray:
     or the plain sum of the last RECENT_WINDOW days; both end RECENT_LAG days before the day."""
     end = i - RECENT_LAG
     if RECENT_WINDOW:
-        return Pv[end - RECENT_WINDOW : end].sum(axis=0)
-    return (2 / 3) * Pv[end - 5 : end].sum(axis=0) + (1 / 3) * Pv[end - 10 : end - 5].sum(axis=0)
+        r = Pv[max(0, end - RECENT_WINDOW) : end].sum(axis=0)  # never wraps (BL-068 126-day fix)
+    elif RECENT_SHAPE == "tiers":  # 50% last 5, 30% days 6-10, 20% days 11-21
+        r = (
+            0.5 * Pv[end - 5 : end].sum(axis=0)
+            + 0.3 * Pv[end - 10 : end - 5].sum(axis=0)
+            + 0.2 * Pv[max(0, end - 21) : end - 10].sum(axis=0)
+        )
+    elif RECENT_SHAPE == "ewm3":  # exponential weights, half-life 3 sessions, last 21 days
+        k = np.arange(min(21, end))
+        w = 0.5 ** (k / 3)
+        r = (Pv[end - len(k) : end][::-1] * w[:, None]).sum(axis=0)
+    elif RECENT_SHAPE == "accel":  # last 5 days minus the 5 before: is the variant accelerating
+        r = Pv[end - 5 : end].sum(axis=0) - Pv[end - 10 : end - 5].sum(axis=0)
+    else:
+        r = (2 / 3) * Pv[end - 5 : end].sum(axis=0) + (1 / 3) * Pv[end - 10 : end - 5].sum(axis=0)
+    if RECENT_FAMILY and "family_idx" in _STATE:
+        idx = _STATE["family_idx"]
+        mean = np.bincount(idx, weights=r) / np.bincount(idx)
+        r = (1 - RECENT_FAMILY) * r + RECENT_FAMILY * mean[idx]
+    return r
 
 
 def score_day(Pv, wd, vb, dte, i):
@@ -313,8 +357,41 @@ def score_day(Pv, wd, vb, dte, i):
         "dte": skewed_fit(Pv, dte == dte[i][None, :], i),
         "vix": skewed_fit(Pv, (vb[:, None] == vb[i]).repeat(Pv.shape[1], axis=1), i),
     }
+    if W_CRIT.get("gap"):  # BL-069 B2: overnight gap band of the variant's own index
+        gp = _STATE["gap"]
+        crit["gap"] = skewed_fit(Pv, gp == gp[i][None, :], i)
     comp = sum(W_CRIT[k] * pct_rank(crit[k]) for k in W_CRIT)
     return crit, (-comp if REVERSE else comp)
+
+
+def _minutes(tag: str) -> int:
+    """Minutes since midnight of a start-time tag like '1117'."""
+    return int(tag[:2]) * 60 + int(tag[2:])
+
+
+def gap_labels(days: pd.DatetimeIndex, names) -> np.ndarray:
+    """days x variants of str: the overnight gap band of the variant's own index. gap = |09:15 open -
+    previous collected close| / previous close, bands g0 < 0.3% <= g1 < 0.7% <= g2; 'unknown' when the
+    day or its predecessor has no bars. Known before any entry (09:15 open)."""
+    import duckdb
+
+    con = duckdb.connect()
+    con.execute("SET TimeZone='Asia/Kolkata'")
+    per_index = {}
+    for u in ("NIFTY", "SENSEX"):
+        df = con.sql(
+            f"""select date, arg_min(open, ts) filter (where hour(ts) * 60 + minute(ts) >= 555) o,
+                       arg_max(close, ts) c
+                from read_parquet('{A.LAKE}/bars_1m/asset=index/symbol={u}/**/*.parquet', hive_partitioning=true)
+                where date >= '2025-06-01' group by date order by date"""
+        ).df()
+        df["date"] = pd.to_datetime(df.date)
+        df = df.set_index("date")
+        gap = ((df.o - df.c.shift(1)) / df.c.shift(1) * 100).abs()
+        lab = pd.cut(gap, [-1, 0.3, 0.7, 1e9], labels=["g0", "g1", "g2"]).astype(object)
+        per_index[u] = lab.reindex(days).fillna("unknown").to_numpy()
+    nifty = np.array([n.startswith("N_") for n in names])
+    return np.where(nifty[None, :], per_index["NIFTY"][:, None], per_index["SENSEX"][:, None])
 
 
 def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
@@ -329,7 +406,24 @@ def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
     is_wide, is_dir, is_buy, _ = masks
     pool = np.where(~is_buy & np.isfinite(comp))[0]  # -inf = outside the day's pool
     order = sorted(pool, key=lambda v: (-comp[v], names[v]))
-    core_b = order[:core]
+
+    def clash(v, chosen):
+        """BL-069 B4: same index + family and start times within MIN_GAP minutes of a chosen pick."""
+        if not MIN_GAP:
+            return False
+        pv, fv, tv = names[v].split("_")
+        return any(
+            names[c].split("_")[:2] == [pv, fv]
+            and abs(_minutes(tv) - _minutes(names[c].split("_")[2])) < MIN_GAP
+            for c in chosen
+        )
+
+    core_b: list = []
+    for v in order:
+        if len(core_b) == core:
+            break
+        if not clash(v, core_b):
+            core_b.append(v)
     core_a = list(core_b)
     overridden = False
     n_wide = int(is_wide[core_a].sum())
@@ -339,7 +433,9 @@ def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
         while n_wide < min_wide:
             drop = min((v for v in core_a if is_dir[v]), key=lambda v: (comp[v], names[v]))
             core_a.remove(drop)
-            core_a.append(spare.pop(0))
+            pick = next(v for v in spare if not clash(v, core_a))
+            spare.remove(pick)
+            core_a.append(pick)
             n_wide += 1
     top = sorted(np.where(np.isfinite(comp))[0], key=lambda v: (-comp[v], names[v]))[:BUY_TOP]
     buy = [v for v in top if is_buy[v]][:buy_max]
@@ -462,11 +558,19 @@ def main() -> None:
     is_wide, is_dir, is_buy, is_nifty = masks
     core_pool = np.where(~is_buy)[0]
     wd, vb, dte = day_inputs(f, names)
+    if RECENT_FAMILY:
+        _STATE["family_idx"] = pd.factorize(["_".join(n.split("_")[:2]) for n in names])[0]
+    if W_CRIT.get("gap"):
+        _STATE["gap"] = gap_labels(P.index, names)
+        gl = pd.Series(_STATE["gap"][:, 0]).value_counts().to_dict()
+        print(f"gap labels (NIFTY): {gl}")
     if SHUFFLE >= 0:
         # placebo: every day keeps its P&L but takes another day's labels (one permutation for all
         # three, over every row including the warm-up)
         perm = np.random.default_rng(SHUFFLE).permutation(len(wd))
         wd, vb, dte = wd[perm], vb[perm], dte[perm]
+        if "gap" in _STATE:
+            _STATE["gap"] = _STATE["gap"][perm]
         print(f"labels shuffled with seed {SHUFFLE}")
     days = P.index
     print(
@@ -476,6 +580,7 @@ def main() -> None:
     crit_names = list(W_CRIT)
     pers = {k: [] for k in crit_names + ["composite"]}
     picks_A, picks_B, buy_days, rows = [], [], [], []
+    raw_hist: list = []  # the ungated basket's daily P&L, for --streak-gate
     allowed_days = []  # per selection day: the variants in that day's pool
     for i in range(WARMUP, len(days)):
         crit, comp = score_day(Pv, wd, vb, dte, i)
@@ -492,15 +597,26 @@ def main() -> None:
             pers[k].append(pd.Series(crit[k]).rank().corr(pd.Series(today).rank()))
         pers["composite"].append(pd.Series(comp).rank().corr(pd.Series(today).rank()))
         core_a, core_b, buy, overridden = select_picks(comp, names, masks)
+        # BL-069 B7: size by conviction. raw = the ungated basket; the gates only scale / drop picks
+        raw_pnl = LOTS_PER * (today[core_a].sum() + today[buy].sum())
+        use_core, use_buy, scale = core_a, buy, 1.0
+        if REQUIRE_POS_RECENT:
+            use_core = [v for v in core_a if crit["recent"][v] > 0]
+            if not use_core:
+                use_buy = []  # no qualifying core pick: sit the whole day out
+        if STREAK_GATE and len(raw_hist) >= STREAK_GATE and sum(raw_hist[-STREAK_GATE:]) < 0:
+            scale = 0.5  # losing streak: 1 lot per strategy instead of 2
+        raw_hist.append(raw_pnl)
         picks_A.append(core_a)
         picks_B.append(core_b)
         buy_days.append(buy)
         rows.append(
             dict(
                 day=days[i],
-                pnl_A=LOTS_PER * (today[core_a].sum() + today[buy].sum()),
+                pnl_A=scale * LOTS_PER * (today[use_core].sum() + today[use_buy].sum()),
                 pnl_B=LOTS_PER * (today[core_b].sum() + today[buy].sum()),
-                lots=LOTS_PER * (N_CORE + len(buy)),
+                raw_pnl=raw_pnl,
+                lots=scale * LOTS_PER * (len(use_core) + len(use_buy)),
                 n_buy=len(buy),
                 buy_pnl=LOTS_PER * today[buy].sum(),
                 buy_alt=LOTS_PER
@@ -648,17 +764,19 @@ def main() -> None:
     print(
         f"    HINDSIGHT ceiling (look-ahead, best fixed {N_CORE} over the selection days): {LOTS_PER * today_all[:, hind].sum():,.0f} -> {[names[v] for v in hind]}"
     )
-    R.assign(
-        core_A=[",".join(names[v] for v in c) for c in picks_A],
-        buy=[",".join(names[v] for v in b) for b in buy_days],
-    ).to_csv(
+    picks_path = (
         HERE
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}.csv"
         )
     )
+    R.assign(
+        core_A=[",".join(names[v] for v in c) for c in picks_A],
+        buy=[",".join(names[v] for v in b) for b in buy_days],
+    ).to_csv(picks_path)
+    print(f"picks file: {picks_path}")
 
 
 if __name__ == "__main__":
