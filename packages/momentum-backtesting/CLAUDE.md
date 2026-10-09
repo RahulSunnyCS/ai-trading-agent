@@ -333,6 +333,18 @@ contract, not a shared service).
   drawdown and Ulcer next to the blend's. Broad shares one ranking across the K runs, and a
   split run has no `circuit_exposure` section. In `saved_identity` the flag is dropped when off or
   meaningless (no existing fingerprint moves) and replaces `rebalance_offset` when on.
+- **Following on all Fridays (BL-056 Phase 3):** `all_fridays.py`. Favouriting (PATCH
+  `/api/saved-strategies/{id}` or `/api/saved-runs/{id}`, or POST
+  `/api/saved-strategies/{id}/follow-all-fridays`) a run whose config has `split_fridays` plans
+  K sleeve configs (`rebalance_offset` 0..K-1, `split_fridays` off, `capital / K`), runs each
+  (`api.sleeve_summary`, no catalog connection open), saves them as runs named `<group> · Friday
+  n of K` and `runs_store.create_group`s them as `<name> · all Fridays`. The split run stays a
+  saved run with `followed_by` set (`runs_store.annotate`), so a second request changes that group
+  instead of making another. A full Paper/Invested list is refused before anything is saved.
+  `mbt saved split-fridays [--apply]` does the same for every favourite on one Friday of a slower
+  cadence, releasing the old favourite (kept as a saved run; restored if the group fails). The
+  weekly run needs no change: members are journalled one by one and `groups.combine` weights them
+  by value since the April reset. Deleting a group keeps its sleeves.
 - **voladj ignores `lookbacks` and `weights` by default** (NSE's method: 26- and 52-week returns,
   4 weeks back, over 26-week volatility). For a voladj config those two search settings only reach
   the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-055, a heavy key in the

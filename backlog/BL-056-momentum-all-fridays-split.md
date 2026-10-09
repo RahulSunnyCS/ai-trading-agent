@@ -150,3 +150,10 @@ Answered by the owner on 2026-10-09:
   ranking is cached (28 s cold). Each Friday set holds Rs 50,000, so the flat depository charge
   counts for more: a lone sleeve earns about 0.5 point less than the same Friday on the whole sum.
   Goldens unchanged (one scenario added), 1404 Python and 1240 dashboard tests pass.
+- 2026-10-09 — Phase 3 built (`all_fridays.py`, `mbt saved split-fridays`). Tried on a copy of the
+  live catalog (never the live one): 10 favourites would move (9 every 4 weeks, 1 every 2 weeks;
+  Six Sectors Monthly, No Tilt is Paper and the headline), making 38 sleeves instead of 10 daily
+  favourites to run each Friday. The migration ran in 4 minutes, kept each old favourite as a saved
+  run and gave each group its status and headline. **Not applied to the live catalog: owner's call.**
+  Note for that call: the weekly job now evaluates 38 favourites, not 10, so the Friday run is
+  longer (each sleeve is one engine run; Broad's ranking is shared between sleeves of one config).

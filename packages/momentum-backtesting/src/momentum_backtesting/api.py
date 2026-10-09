@@ -21,6 +21,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from . import (
+    all_fridays,
     analysis,
     db_read,
     fyers,
@@ -581,6 +582,24 @@ def request_key(req: BaseModel) -> str:
 
 
 #: The parts of a finished backtest fetched on their own (run_parts.RunParts).
+def wants_follow(changes: dict) -> bool:
+    """A request that makes a strategy a favourite: a status other than none, `favorite` on, or
+    the headline."""
+    status = changes.get("status")
+    return (
+        status in runs_store.STATUSES
+        or (status is None and bool(changes.get("favorite")))
+        or bool(changes.get("active"))
+    )
+
+
+def _follow_status(changes: dict) -> str:
+    status = changes.get("status")
+    if status in runs_store.STATUSES:
+        return status
+    return "paper" if changes.get("active") else "watching"
+
+
 BacktestSection = Literal[
     "trades", "instruments", "timeline", "latest", "circuit_exposure", "friday_spread"
 ]
@@ -772,6 +791,14 @@ class SavedRunUpdate(BaseModel):
     active: bool | None = None
     # BL-051: Watching / Paper / Invested, or "none" to stop following it.
     status: Literal["none", "watching", "paper", "invested"] | None = None
+
+
+class FollowAllFridaysBody(BaseModel):
+    """BL-056: follow a strategy run "All Fridays" as one group of sleeves."""
+
+    status: Literal["watching", "paper", "invested"] = "watching"
+    active: bool = False
+    name: str | None = Field(None, min_length=1, max_length=64)
 
 
 class SavedRunGroupBody(BaseModel):
@@ -2036,6 +2063,49 @@ def _merge_held_categories(details: list[list[dict]], offsets: list[int] | None)
             if entry["status"] == "fresh":
                 seen["status"] = "fresh"
     return sorted(merged.values(), key=lambda e: e["position"])
+
+
+def sleeve_summary(dataset: str, config: dict) -> dict:
+    """One sleeve of an all-Fridays favourite (BL-056), run for its saved-run record: what the
+    dashboard's save would send (`kpis`, `dates`, `strategy`) plus the run's data and code
+    versions. Raises `HTTPException` as the backtest does for a config it refuses."""
+    body = {**config, "dataset": dataset}
+    if not body.get("universe"):
+        body["universe"] = ["_"]  # required by the model, never read for this dataset
+    try:
+        req = BacktestRequest.model_validate(body)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    builders = {
+        "stock": _stock_parts,
+        "broad": _broad_parts,
+        "custom_index": _custom_index_parts,
+    }
+    core, _lazy = builders.get(dataset, _etf_parts)(req)
+    kpis = core["kpis"]
+
+    def number(key: str) -> float | None:
+        value = kpis.get(key)
+        return float(value) if isinstance(value, int | float) else None
+
+    return {
+        "kpis": {
+            key: number(key)
+            for key in (
+                "cagr",
+                "excess_cagr",
+                "max_drawdown",
+                "sharpe",
+                "turnover_per_year",
+                "avg_holdings",
+            )
+        },
+        "dates": core["series"]["dates"],
+        "strategy": core["series"]["strategy"],
+        "versions": saved_identity.versions_from_input(
+            input_version(), saved_identity.code_commit()
+        ),
+    }
 
 
 def _outer_with_sentinel(week: pd.Timestamp, sentinel: pd.Timestamp) -> pd.DataFrame:
@@ -3619,8 +3689,63 @@ def create_app() -> FastAPI:
         except runs_store.FavouriteError as error:
             raise HTTPException(409, str(error)) from error
 
+    def _follow_all_fridays(
+        run_id: str, *, status: str, active: bool = False, name: str | None = None
+    ) -> dict | None:
+        """Follow the strategy `run_id` belongs to on every Friday, if it is a split run that no
+        one follows yet: the group's strategy record, or None when it is not (the caller then
+        treats the request as an ordinary favourite change). The K sleeve backtests run with no
+        catalog connection open."""
+        try:
+            with read_catalog() as con:
+                plan = all_fridays.plan_for_new(con, run_id)
+        except (FileNotFoundError, duckdb.CatalogException):
+            return None
+        if plan is None:
+            return None
+        try:
+            if plan.group:  # followed already: the change goes to its group
+                with open_catalog() as con:
+                    runs_store.update_run(
+                        con, plan.group, status=status, active=True if active else None
+                    )
+                    return runs_store.get_strategy(con, plan.group)
+            if status in runs_store.FOLLOWED:
+                with read_catalog() as con:
+                    runs_store.ensure_followed_slot(con)
+            sleeves = all_fridays.run_sleeves(plan, sleeve_summary)
+            with open_catalog() as con:
+                group = all_fridays.follow(
+                    con, plan, sleeves, status=status, active=active, name=name
+                )
+                return runs_store.get_strategy(con, group["id"]) or group
+        except runs_store.FavouriteError as error:
+            raise HTTPException(409, str(error)) from error
+
+    @app.post("/api/saved-strategies/{run_id}/follow-all-fridays")
+    def follow_all_fridays(run_id: str, body: FollowAllFridaysBody) -> dict:
+        strategy = _follow_all_fridays(
+            run_id, status=body.status, active=body.active, name=body.name
+        )
+        if strategy is None:
+            raise HTTPException(
+                409,
+                "Only a run made with Fridays: All (split) that nobody follows yet can be "
+                "followed on all Fridays.",
+            )
+        return strategy
+
     @app.patch("/api/saved-runs/{run_id}")
     def patch_saved_run(run_id: str, body: SavedRunUpdate) -> dict:
+        changes = body.model_dump(exclude_none=True)
+        if wants_follow(changes) and (
+            followed := _follow_all_fridays(
+                run_id,
+                status=_follow_status(changes),
+                active=bool(changes.get("active")),
+            )
+        ):
+            return followed
         try:
             with open_catalog() as con:
                 record = runs_store.update_run(
@@ -3718,6 +3843,15 @@ def create_app() -> FastAPI:
 
     @app.patch("/api/saved-strategies/{run_id}")
     def patch_saved_strategy(run_id: str, body: SavedStrategyUpdate) -> dict:
+        changes = body.model_dump(exclude_none=True)
+        if wants_follow(changes) and (
+            followed := _follow_all_fridays(
+                run_id,
+                status=_follow_status(changes),
+                active=bool(changes.get("active")),
+            )
+        ):
+            return followed
         try:
             with open_catalog() as con:
                 strategy = runs_store.update_strategy(

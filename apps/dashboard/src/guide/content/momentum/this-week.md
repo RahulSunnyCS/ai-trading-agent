@@ -29,6 +29,10 @@ A group's sleeves trade on their own weeks, so most Fridays only some of them re
 show the whole group: **After** is a name's share of the group, each sleeve weighted by its value
 since the last reset in April. A week when no sleeve rebalances says so.
 
+A group that follows [all Fridays](glossary:all-fridays) has one sleeve per Friday, so exactly one
+trades each week: its card says which (*Friday 2 of 4 trades*), and the other sleeves show when
+they next do. The orders are that sleeve's, shown as shares of the whole group.
+
 ## Classifying a possible split or bonus
 
 A stock that halves overnight has usually split, not crashed. When the automatic check cannot

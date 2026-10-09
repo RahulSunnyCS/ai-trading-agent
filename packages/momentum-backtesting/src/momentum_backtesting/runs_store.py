@@ -200,7 +200,7 @@ def save_run(
         "id": anchor_id,
         "name": anchor_summary.get("name"),
         "name_typed": bool(anchor_summary.get("name_typed", False)),
-        "favourite": _is_favourite(anchor_summary),
+        "favourite": is_favourite(anchor_summary),
     }
     record["change"] = change
     return record
@@ -209,14 +209,14 @@ def save_run(
 # --- strategies: anchor, latest run, pruning --------------------------------------------------
 
 
-def _is_favourite(summary: dict[str, Any]) -> bool:
+def is_favourite(summary: dict[str, Any]) -> bool:
     """A favourite, a group or a group member: what the weekly job runs (an overlay is not)."""
     return bool(summary.get("favorite") or summary.get("member_of") or summary.get("group"))
 
 
 def _keeps(summary: dict[str, Any]) -> bool:
     """A run whose strategy is never pruned: a favourite, a group member, a group, an overlay."""
-    return _is_favourite(summary) or bool(summary.get("overlay"))
+    return is_favourite(summary) or bool(summary.get("overlay"))
 
 
 _FLAG_SQL = (
@@ -242,7 +242,7 @@ def _anchor_of(runs: list[dict[str, Any]]) -> dict[str, Any]:
         enumerate(runs),
         key=lambda item: (
             not item[1]["summary"].get("active", False),
-            not _is_favourite(item[1]["summary"]),
+            not is_favourite(item[1]["summary"]),
             -_RANK.get(item[1]["summary"].get("status"), 0),
             item[0],
         ),
@@ -450,6 +450,37 @@ def _limit_message() -> str:
     return f"{MAX_FOLLOWED} favourites are already Paper or Invested. Set one to Watching first."
 
 
+def annotate(con: duckdb.DuckDBPyConnection, run_id: str, **fields: Any) -> None:
+    """Write extra fields onto a saved run's summary (BL-056's `followed_by`). Nothing that
+    decides its result or favourite state."""
+    loaded = _load(con, run_id)
+    if loaded is not None:
+        _write_summaries(con, {run_id: {**loaded[1], **fields}})
+
+
+def ensure_followed_slot(
+    con: duckdb.DuckDBPyConnection, exclude: set[str] | frozenset = frozenset()
+) -> None:
+    """Raises `FavouriteError` when a Paper or Invested favourite could not be added (BL-056 asks
+    before it saves anything)."""
+    if followed_count(con, exclude) >= MAX_FOLLOWED:
+        raise FavouriteError(_limit_message())
+
+
+def strategy_anchor(
+    con: duckdb.DuckDBPyConnection, run_id: str
+) -> tuple[str, dict[str, Any], dict[str, Any], str] | None:
+    """The anchor run of the strategy `run_id` belongs to, as `(id, summary, config, dataset)`;
+    None when there is no such run."""
+    runs = _strategy_runs(con, run_id)
+    anchor = _anchor(con, runs[0]["version_id"]) if runs else None
+    loaded = _load(con, anchor[0]) if anchor else None
+    if anchor is None or loaded is None:
+        return None
+    spec, summary, _, strategy_id = loaded
+    return anchor[0], summary, json.loads(spec), strategy_id.removeprefix("momentum:")
+
+
 def _write_summaries(
     con: duckdb.DuckDBPyConnection,
     summaries: dict[str, dict[str, Any]],
@@ -582,7 +613,7 @@ def _favourite_holder(con: duckdb.DuckDBPyConnection, run_id: str) -> str | None
         "SELECT version_id FROM backtest_runs WHERE run_id = ? AND kind = 'weekly'", [run_id]
     ).fetchone()
     anchor = _anchor(con, row[0]) if row else None
-    return anchor[0] if anchor and _is_favourite(anchor[1]) else None
+    return anchor[0] if anchor and is_favourite(anchor[1]) else None
 
 
 def create_group(
@@ -1107,7 +1138,7 @@ def merge_plan(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
         unscored += [r for r in runs[:1] if "outcome" not in r["summary"]]
         if not moving and not unscored:
             continue
-        favourites = [r for r in runs if _is_favourite(r["summary"])]
+        favourites = [r for r in runs if is_favourite(r["summary"])]
         item = {
             "dataset": dataset,
             "fingerprint": fp,

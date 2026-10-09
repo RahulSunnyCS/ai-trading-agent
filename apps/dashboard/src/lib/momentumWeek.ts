@@ -255,6 +255,17 @@ export function selectedCard(
   );
 }
 
+/** The sleeves of a group that rebalance this week, as short labels ("Friday 2 of 4"); empty for
+ * a favourite that is not a group or when none rebalance. */
+export function tradingSleeves(card: {
+  name: string;
+  sleeves?: MomentumWeekCard['sleeves'];
+}): string[] {
+  return (card.sleeves ?? [])
+    .filter((sleeve) => sleeve.on_cadence)
+    .map((sleeve) => sleeveLabel(sleeve.name, card.name));
+}
+
 /** "08c4307d (4w, ph1)" for "Phase 6 ensemble 08c4307d (4w, ph1)" inside "Phase 6 ensemble". */
 export function sleeveLabel(name: string, groupName: string): string {
   if (!name.startsWith(groupName)) return name;

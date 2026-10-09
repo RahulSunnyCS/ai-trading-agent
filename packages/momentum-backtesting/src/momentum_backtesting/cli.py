@@ -1757,6 +1757,60 @@ def saved_merge(
         typer.echo("Run again with --apply to write it. Later saves keep the last 3 repeats.")
 
 
+@saved_app.command("split-fridays")
+def saved_split_fridays(
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Make the groups. Without it, only list the favourites that would move.",
+    ),
+) -> None:
+    """BL-056: follow every favourite that rebalances every 2+ weeks on all its Fridays, as one
+    group of sleeves (one per Friday, capital / K each) in place of the single-Friday favourite,
+    which stays a saved run. Same status and headline. A dry run by default; deletes nothing."""
+    from fastapi import HTTPException
+
+    from . import all_fridays, api, runs_store
+    from .db_read import open_catalog, read_catalog
+
+    with read_catalog() as con:
+        plans = all_fridays.migration_plans(con)
+    if not plans:
+        typer.echo("Nothing to move: no favourite follows a single Friday of a slower cadence.")
+        return
+    verb = "Moving" if apply else "Would move"
+    typer.echo(f"{verb} {len(plans)} favourite{'' if len(plans) == 1 else 's'} to all Fridays:")
+    for plan in plans:
+        every = all_fridays.every_of(plan.config)
+        typer.echo(
+            f"  {plan.dataset:<12} {plan.name}  (every {every} weeks, Friday "
+            f"{int(plan.config.get('rebalance_offset') or 0) + 1} of {every}; {plan.status})"
+        )
+    if not apply:
+        typer.echo("Run again with --apply to make the groups.")
+        return
+    failed = 0
+    for plan in plans:
+        try:
+            sleeves = all_fridays.run_sleeves(plan, api.sleeve_summary)
+            with open_catalog() as con:
+                group = all_fridays.follow(
+                    con,
+                    plan,
+                    sleeves,
+                    status=plan.status or "watching",
+                    active=plan.active,
+                    release=plan.run_id,
+                )
+            typer.echo(f"  done  {group['name']} ({group['status']})")
+        except (HTTPException, runs_store.FavouriteError) as error:
+            failed += 1
+            detail = getattr(error, "detail", None) or str(error)
+            typer.echo(f"  FAILED {plan.name}: {detail} (left as it was)")
+    if failed:
+        raise typer.Exit(1)
+
+
 journal_app = typer.Typer(
     no_args_is_help=True,
     help="The forward-signal journal (BL-024): every weekly signal as recorded, unchangeable.",
