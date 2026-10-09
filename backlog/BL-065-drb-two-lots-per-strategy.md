@@ -146,7 +146,23 @@ diversification, which this tests.
   −₹36,454; net ₹2,64,977 / −₹42,824); R and E drawn from each day's pool; BL-057's three conditions.
 - **Read-out:** against the fixed pool, same 5% / drawdown rule. Same year, no hold-out (owner override).
 - **Will not run:** other windows (21, 30, 63), other percentages, other criteria or weights. One try.
-- **Result:** pending.
+- **Result:** **between the two** — more gross than the fixed pool, more drawdown too; INCONCLUSIVE. 202
+  selection days, Buy on 68, 6.67 lots a day. Gross ₹4,00,807 (+30.8%) vs full list ₹4,30,868 and fixed
+  pool ₹3,45,955; max drawdown −₹62,656 vs −₹68,294 / −₹36,454; worst day −₹20,324 (2 Mar), worst week
+  −₹43,500 (2–8 Mar, the worst of the three lists); 63.9% winning days; ₹297 per lot-day. Conditions: R
+  P90 ₹2,73,137 (beats 100%) ✓; E ₹2,13,429 / −₹33,372 — fails on drawdown (E is a good basket here since
+  the pool is already filtered); live mix ✓. After charges (flat ₹13 an order): charges ₹81,508 (20%),
+  net ₹3,19,299 (+24.6%) vs ₹3,50,407 / ₹2,64,977; drawdown −₹68,345 (5.3%) vs −₹84,469 / −₹42,824; 8 of
+  11 months positive, worst month −1.36% (Apr); with AlgoTest's fee ₹3,06,493. Against the fixed pool on
+  the read-out: net +20% but drawdown 60% deeper — "better" on return, not on both. Where it differs:
+  it recovers July (₹96,690 vs the fixed pool's ₹13,309) and September (₹46,140) but gives back March
+  (₹33,074 vs ₹70,366 / ₹81,600): a pool ranked on Jan–Feb was wrong for the first week of March. Picks
+  start between the other two (34% before 11:00, 49% 11:00–13:59, 16% from 14:00); family mix unchanged
+  (436 Widesl incl. 276 closest-premium, 170 Dir); the Buy add-on lost ₹1,504 over its 68 days. Same core
+  as the full list on 9 days, as the fixed pool on 1. The within-pool composite's Spearman diagnostic is
+  not comparable with the other runs (excluded variants sit at −inf). Picks file
+  `research/bl057/daily_picks_min3_core6_buy2L2_whole_day_top25r42.csv`; charges rotation `DRB-6W3L2/T25R42`.
+  Regression: the full-list run still reproduces ₹4,30,868 after the select_picks change.
 
 ## Log
 
@@ -162,3 +178,6 @@ diversification, which this tests.
   37% less net, shallower drawdown. The closest-premium variants stay in the list.
 - 2026-10-10 — owner asked for the top 25% of each family (point in time, warm-up days only; criteria total
   P&L, win %, max drawdown); block above, ran: gross −20%, net −24%, drawdown −47%; PASS.
+- 2026-10-10 — owner asked for the pool re-chosen daily on the last 30 days, then changed it to the last 2 months
+  (42 sessions) before the run; block above, ran: gross −7% vs the full list, drawdown −8%; vs the fixed pool
+  gross +16%, drawdown +72%. INCONCLUSIVE.
