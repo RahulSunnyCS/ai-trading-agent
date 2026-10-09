@@ -155,10 +155,20 @@ Added after the first two blocks' results were read. Changes only the core const
   verdict.
 - **Hold-out:** none; same window, exploratory, chosen after seeing the earlier results.
 - **Will not run:** other minimums (4, 5), any other change to the rule.
-- **Result:** (after the run)
+- **Result:** **kill** at 1 and at 0 (condition 1 fails); the first block's verdict stands. Same 202 days.
+  At least 1: ₹2,92,939, max DD −₹70,076, worst day −₹16,344, ₹254 per lot-day; R (at-least-1) P50
+  ₹2,36,590 / P90 ₹3,09,737, rotation beats 84% of random runs; override fired 91 days. At least 0:
+  ₹2,95,601, max DD −₹70,205, ₹256 per lot-day; R P50 ₹2,46,504 / P90 ₹3,25,478, beats 78%. Together
+  with the earlier blocks, minimum Widesl 0 / 1 / 2 / 3: total ₹2,95,601 / ₹2,92,939 / ₹3,31,842 /
+  ₹2,81,250; max DD −₹70,205 / −₹70,076 / −₹57,153 / −₹86,287; percentile among random picks
+  78 / 84 / 98 / 97. The result is not monotonic: a minimum of 2 is the best of the four on total
+  and drawdown, and its neighbours 1 and 3 are each clearly worse. That fits a setting that is best
+  by luck among four tried on one window as well as a real optimum, so the forward journal (BL-058)
+  is what can tell them apart.
 
 ## Log
 
 - 2026-10-09 — created from the owner's idea and answers; override: same already-seen window.
 - 2026-10-09 — ran; inconclusive under the pass rule (Result above).
+- 2026-10-09 — at-least-1 and at-least-0 block ran; both killed (condition 1), minimum 2 stands as the best of 0–3.
 - 2026-10-09 — at-least-3 block ran; inconclusive, below the at-least-2 case on total and drawdown.
