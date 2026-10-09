@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; follows BL-069 |
-| **Status** | In progress |
+| **Status** | Done — the candidate (no-VIX, 63/126) is killed by the 2022–2024 hold-out (BL-071); nothing adopted |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -105,3 +105,4 @@ the recency signals and the longer-lookback fit signals fixed priorities, and "a
 ## Log
 
 - 2026-10-10 — created; rows registered before any BL-072 run.
+- 2026-10-10 — block-2 shuffles: all three rows above all 10 (no-VIX ₹4,86,704 vs max ₹3,69,792). Hold-out (BL-071 part B): the no-VIX row makes ₹7,73,802 on 618 days, below the random P90 ₹8,65,554 — killed. Row (d) 40/10/20/20/10 beats 100% of random there (₹10,01,802) but is one of 13 rows; not promoted.

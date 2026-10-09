@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; follows BL-067 / 068 / 069 |
-| **Status** | Part A done: recent edge not confirmed out of period; part B (import) started 2026-10-10 on the owner's go-ahead |
+| **Status** | Done — hold-out 2022–2024: the recent edge fails, the candidate is killed, the fit criteria carry the rule; `2014-2024/nifty` imported (BL-034 Phase 5 for NIFTY) |
 | **Type** | research |
 | **Area** | options / trading-data |
 | **Created** | 2026-10-10 |
@@ -132,7 +132,48 @@ year only") and which has been examined many times. Two ways to test the rule ou
   at the 95th percentile on highs); NIFTY's expiry day moved from Thursday to Tuesday in the period.
 - **Hold-out:** this is the hold-out. Nothing is changed after reading it; a row that fails here is
   not adopted whatever it did in-sample.
-- **Result:** pending (engine runs started 2026-10-10).
+- **Result (2026-10-10 05:40, the hold-out; NIFTY-only, 124 variants, 618 selection days 2022-04-05 →
+  2024-10-08, gross, lot sizing current):** **the recent-return edge does not hold; the candidate is
+  killed; the fit criteria carry the rule.**
+
+  | Row | Gross | Max DD | Win % | Worst week | 2022 | 2023 | 2024 | ≥ random P90 (₹8,65,554) |
+  |---|---|---|---|---|---|---|---|---|
+  | baseline 33/25/25/17 | 10,13,627 | −56,329 | 62 | −44,668 | 4,32,802 | 3,09,432 | 2,71,392 | yes (beats 100%) |
+  | recent-only | 7,36,694 | −61,490 | 62 | −42,478 | 3,03,355 | 2,29,281 | 2,04,058 | no (54%) |
+  | **no-recent 0/33/33/34** | **12,61,307** | **−56,030** | **64** | **−30,842** | 4,53,440 | 3,85,112 | 4,22,755 | yes (100%) |
+  | no-VIX 40/30/30/0 | 9,80,741 | −84,454 | 64 | −33,130 | 4,24,470 | 3,69,824 | 1,86,447 | yes (99%) |
+  | B3 baseline + 21/63 | 9,95,829 | −67,171 | 63 | −46,274 | 3,44,903 | 3,16,218 | 3,34,707 | yes (100%) |
+  | B3 baseline + 63/126 | 8,70,882 | −67,412 | 62 | −32,598 | 3,37,363 | 3,60,380 | 1,73,139 | yes (91%) |
+  | recent-only + family 0.5 | 6,62,164 | −56,660 | 63 | −42,523 | 3,02,776 | 1,69,838 | 1,89,549 | no (28%) |
+  | BL-072 25/15/15/20/0/25, 21/63 | 8,72,915 | −82,524 | 63 | −35,841 | 3,20,066 | 2,76,348 | 2,76,501 | yes (91%) |
+  | BL-072 25/15/15/20/0/25, 63/126 | 7,47,542 | −84,234 | 63 | −41,542 | 2,94,190 | 3,21,165 | 1,32,187 | no (58%) |
+  | BL-072 25/15/15/10/10/25, 21/63 | 8,59,582 | −81,296 | 63 | −37,460 | 3,39,956 | 3,17,258 | 2,02,367 | no (89%) |
+  | BL-072 25/15/15/10/10/25, 63/126 | 8,06,139 | −81,237 | 62 | −41,542 | 3,32,546 | 3,20,008 | 1,53,585 | no (76%) |
+  | **BL-072a 30/20/20/0/0/30, 63/126 (the candidate)** | 7,73,802 | −84,201 | 61 | −46,137 | 3,24,084 | 3,06,546 | 1,43,172 | **no (66%)** |
+  | BL-072d 40/20/20/10/0/10, 63/126 | 10,01,802 | −77,272 | 64 | −41,548 | 3,49,895 | 3,96,110 | 2,55,797 | yes (100%) |
+
+  Random picks of the same shape on the same days (n = 1,000): P50 ₹7,25,740, P90 ₹8,65,554, max
+  ₹12,22,091.
+  - **(1) Recent edge: fails.** baseline − no-recent = **−₹2,47,680** (−₹401 a day against the required
+    ≥ +₹507); 90% block-bootstrap interval [−₹3,73,573, −₹73,114], entirely negative. No-recent is the
+    best row in each of 2022, 2023 and 2024. With Jan–Aug 2025 (part A) that is 2½ years in which recent
+    return subtracts, against the one year (2025-09 → 2026-10) in which it added ₹2 lakh.
+  - **(2) Longer fit lookbacks: fail.** 21/63 −₹17,798 vs the baseline (interval straddles zero);
+    63/126 −₹1,42,745 (interval straddles zero; 2024 collapses to ₹1,73,139). The 5/21/63 lookbacks are
+    not the handicap they looked in-sample.
+  - **(3) The rule beats chance: yes.** The baseline and every row that keeps the fit criteria at
+    5/21/63 clear the random P90; the pure-recency rows (recent-only, recent-only + family) sit at
+    chance (54% / 28%). The candidate BL-072a beats 66% of random picks and is **killed**. BL-072d
+    (recency 50% with family 10%, VIX 10%, 63/126) beats 100% — one of 13 rows, noted, not promoted.
+  - **Caveats, as registered:** NIFTY only; expiry-week-only chains with traded minutes (a different
+    construction from the 2025+ set); NIFTY's expiry weekday changed in the period; today's lot size on
+    2022 prices scales rupees. The ranking across rows is what the test says, not the rupee levels.
+- **What stands after BL-067 → BL-072:** DRB's ranking beats random picks in every period tested as long
+  as the weekday / days-to-expiry / VIX fit criteria are in it. The recent-return criterion helps in one
+  year and hurts in the other 2½; the family-pooled recent, the long lookbacks and the overnight gap do
+  not survive. No row passes all three periods: no-recent passes the hold-out and Jan–Aug 2025 and fails
+  2025-09 → 2026-10 (₹2,26,105); the baseline passes the hold-out only. Nothing is adopted from this
+  series; the forward journal is the next evidence.
 
 ## Log
 
@@ -149,3 +190,4 @@ year only") and which has been examined many times. Two ways to test the rule ou
   `012_momentum_orders.sql` (renumbered). Nothing was written by the failed attempt. Needs the BL-051 owner
   to reconcile the ledger before anything from `main`'s `trading_data` runs against this catalog (including
   `obt daily`).
+- 2026-10-10 — part B: 124 NIFTY variants run on the imported days (682 each); hold-out read-out recorded above. The lake now holds NIFTY options 2022-01 → today.
