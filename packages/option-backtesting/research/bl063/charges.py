@@ -36,6 +36,8 @@ PICKS = {  # rotation -> (daily picks file, lots traded in each picked strategy)
         2,
     ),  # BL-065: 3 strategies of 2 lots
     "DRB-6W3L2": ("daily_picks_min3_core6_buy2L2_whole_day.csv", 2),
+    # BL-065 second block: the same basket on the list without the closest-premium Widesl
+    "DRB-6W3L2/OTM": ("daily_picks_min3_core6_buy2L2_whole_day_otm_only.csv", 2),
 }
 
 

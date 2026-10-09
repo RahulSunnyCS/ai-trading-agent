@@ -66,6 +66,23 @@ diversification, which this tests.
   per-lot case: net ₹2,96,111 (+22.8%) / ₹2,94,661 (+22.7%). Scripts: `rotate.py --basket DRB-6W2L2`,
   `research/bl063/` (strategies per day, flat-brokerage column).
 
+### 2026-10-09 — DRB-6W3L2 without the closest-premium Widesl (`DRB-6W3L2/OTM`)
+- **Question (owner):** do the closest-premium Widesl (NIFTY ₹80 / ₹100, SENSEX ₹250 / ₹320, BL-060/061)
+  earn their place in the list, or does DRB-6W3L2 do as well picking from the OTM-strike variants only?
+- **Rule:** DRB-6W3L2 exactly as above, on the 248-variant list **less the 100 closest-premium Widesl**
+  (4 families × 25 start times) = 148 variants: NIFTY OTM1 / SENSEX OTM2 Widesl, Dir ATM and Buy at
+  every start time. Criteria, weights, window, selection days, Widesl minimum (2 strategies), Buy add-on
+  and the per-strategy stops unchanged. `rotate.py --basket DRB-6W3L2 --no-closest`.
+- **Comparators:** the 248-list DRB-6W3L2 (gross ₹4,30,868, drawdown −₹68,294; net ₹3,50,407, drawdown
+  −₹84,469 at flat ₹13 an order), plus R / E / live mix recomputed on the 148-list. BL-057's three
+  conditions reported.
+- **Read-out:** the smaller list is "as good" if its net after charges is within 5% of the 248-list's
+  with a drawdown no deeper; "better" if above it on both. Either way this is a comparison of two
+  already-seen runs on the same year, not a validation.
+- **Hold-out:** none (owner override, as above). **Will not run:** dropping one index's closest-premium
+  only, dropping one premium only, other baskets on the 148-list, re-tuning the weights.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-09 — created from the owner's request to run 6 lots as 3 strategies of 2 lots.

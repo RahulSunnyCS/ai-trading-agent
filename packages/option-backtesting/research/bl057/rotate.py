@@ -70,7 +70,10 @@ N_BUY = max(1, BUY_MAX // LOTS_PER)  # Buy strategies a day (2 Buy lots = 1 Buy 
 N_RUNS, SEED = 1000, 57
 # BL-061: add the closest-premium Widesl (NIFTY 80 / 100, SENSEX 250 / 320) to the candidate list
 WHOLE_DAY = "--whole-day" in sys.argv  # BL-062: every start time 09:17..15:17 (248 variants)
-CLOSEST = "--closest" in sys.argv or WHOLE_DAY
+# BL-065 (second block): drop the closest-premium Widesl from the list, leaving the OTM-strike
+# Widesl, Dir and Buy (148 variants whole-day)
+NO_CLOSEST = "--no-closest" in sys.argv
+CLOSEST = ("--closest" in sys.argv or WHOLE_DAY) and not NO_CLOSEST
 CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320")
 # Case A's Widesl minimum: 2 is the first pre-registered block; 3 is the later block (BL-057).
 MIN_WIDE = int(sys.argv[sys.argv.index("--min-wide") + 1]) if "--min-wide" in sys.argv else 2
@@ -88,7 +91,7 @@ def whole_day_columns(underlying: str, pfx: str) -> pd.DataFrame:
     research = HERE.parent
     nifty = underlying == "NIFTY"
     morning = research / ("bl054" if nifty else "bl056") / "results"
-    premiums = (80, 100) if nifty else (250, 320)
+    premiums = () if NO_CLOSEST else ((80, 100) if nifty else (250, 320))
     cols = {}
     for slot in varlib.SLOTS_MORNING + varlib.SLOTS_LATE + [varlib.SLOT_LAST]:
         tag = slot.replace(":", "")
@@ -542,7 +545,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}.csv"
         )
     )
 

@@ -16,6 +16,8 @@ PICKS = {  # rotation -> daily picks file written by research/bl057/rotate.py
     "DRB-6W3": "daily_picks_min3_core6_buy2_whole_day.csv",
     "DRB-6W2L2": "daily_picks_min2_core6_buy2L2_whole_day.csv",  # BL-065: 3 strategies of 2 lots
     "DRB-6W3L2": "daily_picks_min3_core6_buy2L2_whole_day.csv",
+    # BL-065 second block: the same basket on the list without the closest-premium Widesl
+    "DRB-6W3L2/OTM": "daily_picks_min3_core6_buy2L2_whole_day_otm_only.csv",
 }
 
 
