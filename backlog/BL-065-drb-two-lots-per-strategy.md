@@ -131,6 +131,23 @@ diversification, which this tests.
   pool's survival through Oct 2026 is out-of-time; the daily criteria and the year are not. Picks file
   `research/bl057/daily_picks_min3_core6_buy2L2_whole_day_top25.csv`; charges rotation `DRB-6W3L2/T25`.
 
+### 2026-10-10 — DRB-6W3L2 on a rolling top 25% of each family, trailing 2 months (`DRB-6W3L2/T25R42`)
+- **Question (owner):** instead of fixing the pool on the warm-up days, re-choose the best performers
+  every day on the last 2 months.
+- **Rule:** on each selection day, rank the 248 variants within each family (Widesl incl.
+  closest-premium 150, Dir 50, Buy 48) on the **42 trading sessions before that day** (rows i−42 … i−1,
+  never the day itself) by the mean of the three within-family percentile ranks (total P&L, winning-day %,
+  max drawdown); keep the top 25% (38 / 13 / 12). DRB-6W3L2's daily composite is then percentile-ranked
+  **within that day's pool** and the picks are made as above (Widesl minimum, Buy add-on from the pool's
+  top 10, stops unchanged). "2 months" is read as 42 trading sessions (21 a month); the owner first said 30 days, then 2 months, before the run.
+  `rotate.py --basket DRB-6W3L2 --prefilter 25 --prefilter-window 42`.
+- **Look-ahead:** none; the pool and the scores on a day use only earlier rows.
+- **Comparators:** the full-list DRB-6W3L2 and the fixed-pool `DRB-6W3L2/T25` (gross ₹3,45,955 /
+  −₹36,454; net ₹2,64,977 / −₹42,824); R and E drawn from each day's pool; BL-057's three conditions.
+- **Read-out:** against the fixed pool, same 5% / drawdown rule. Same year, no hold-out (owner override).
+- **Will not run:** other windows (21, 30, 63), other percentages, other criteria or weights. One try.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-09 — created from the owner's request to run 6 lots as 3 strategies of 2 lots.

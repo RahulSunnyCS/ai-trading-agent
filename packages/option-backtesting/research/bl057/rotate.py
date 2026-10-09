@@ -79,6 +79,9 @@ CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320")
 # Buy), the top 25% of variants by total P&L, winning-day % and max drawdown over the warm-up days
 # only (the 63 days before the first selection day); the pool is fixed after that
 PREFILTER = _arg("--prefilter", 0)
+# BL-065 (fourth block): `--prefilter-window 42` re-ranks the families every selection day on the
+# trailing 42 sessions (2 months) instead of fixing the pool on the warm-up days
+PREFILTER_WINDOW = _arg("--prefilter-window", 0)
 # Case A's Widesl minimum: 2 is the first pre-registered block; 3 is the later block (BL-057).
 MIN_WIDE = int(sys.argv[sys.argv.index("--min-wide") + 1]) if "--min-wide" in sys.argv else 2
 MIN_WIDE_N = -(-MIN_WIDE // LOTS_PER)  # the minimum in whole strategies, rounded up
@@ -204,34 +207,46 @@ def variant_masks(names):
     )
 
 
-def prefilter(P: pd.DataFrame, pct: int) -> pd.DataFrame:
-    """Keep the top `pct` % of each family (Widesl, Dir, Buy) ranked on the first WARMUP days only:
-    the mean of the within-family percentile ranks of total P&L, winning-day % and max drawdown
-    (shallower ranks higher). Rounded up, so a family of 50 keeps 13 at 25%."""
-    warm = P.iloc[:WARMUP]
+def pool_mask(window: np.ndarray, names, pct: int, verbose: str = "") -> np.ndarray:
+    """True for the top `pct` % of each family (Widesl incl. closest-premium, Dir, Buy) ranked on the
+    rows of `window` (days x variants): the mean of the within-family percentile ranks of total P&L,
+    winning-day % and max drawdown (shallower ranks higher). Rounded up: a family of 50 keeps 13 at 25%."""
     fam = pd.Series(
-        ["wide" if n.split("_")[1] in CLOSEST_FAMILIES else n.split("_")[1] for n in P.columns],
-        index=P.columns,
+        ["wide" if n.split("_")[1] in CLOSEST_FAMILIES else n.split("_")[1] for n in names],
+        index=list(names),
     )
     stats = pd.DataFrame(
         {
-            "total": warm.sum(),
-            "win": (warm > 0).mean(),
-            "mdd": pd.Series({c: mdd(warm[c].to_numpy()) for c in P.columns}),
-        }
+            "total": window.sum(axis=0),
+            "win": (window > 0).mean(axis=0),
+            "mdd": [mdd(window[:, v]) for v in range(window.shape[1])],
+        },
+        index=list(names),
     )
-    keep = []
+    keep = set()
     for f in ("wide", "dir", "buy"):
         s = stats[fam == f]
         score = s.rank(pct=True).mean(axis=1)  # every column: higher is better (mdd is <= 0)
         n = -(-len(s) * pct // 100)
         chosen = score.sort_values(ascending=False).index[:n]
-        keep.extend(chosen)
-        print(
-            f"prefilter {f}: {n} of {len(s)} kept on the {WARMUP} warm-up days -> "
-            + ", ".join(chosen)
-        )
-    return P[[c for c in P.columns if c in set(keep)]]
+        keep.update(chosen)
+        if verbose:
+            print(f"prefilter {f}: {n} of {len(s)} kept on {verbose} -> " + ", ".join(chosen))
+    return np.array([n in keep for n in names])
+
+
+def prefilter(P: pd.DataFrame, pct: int) -> pd.DataFrame:
+    """The pool fixed once on the first WARMUP days (BL-065 third block)."""
+    mask = pool_mask(P.iloc[:WARMUP].to_numpy(), P.columns, pct, f"the {WARMUP} warm-up days")
+    return P[P.columns[mask]]
+
+
+def masked_composite(crit, allowed: np.ndarray) -> np.ndarray:
+    """The composite scored within the pool only (percentile ranks over the allowed variants);
+    -inf outside it, so select_picks never chooses an excluded variant."""
+    comp = np.full(len(allowed), -np.inf)
+    comp[allowed] = sum(W_CRIT[k] * pct_rank(crit[k][allowed]) for k in W_CRIT)
+    return comp
 
 
 def closest_mask(names):
@@ -275,7 +290,7 @@ def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
     core = N_CORE if core is None else core
     buy_max = N_BUY if buy_max is None else buy_max
     is_wide, is_dir, is_buy, _ = masks
-    pool = np.where(~is_buy)[0]
+    pool = np.where(~is_buy & np.isfinite(comp))[0]  # -inf = outside the day's pool
     order = sorted(pool, key=lambda v: (-comp[v], names[v]))
     core_b = order[:core]
     core_a = list(core_b)
@@ -289,7 +304,7 @@ def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
             core_a.remove(drop)
             core_a.append(spare.pop(0))
             n_wide += 1
-    top = sorted(range(len(names)), key=lambda v: (-comp[v], names[v]))[:BUY_TOP]
+    top = sorted(np.where(np.isfinite(comp))[0], key=lambda v: (-comp[v], names[v]))[:BUY_TOP]
     buy = [v for v in top if is_buy[v]][:buy_max]
     return core_a, core_b, buy, overridden
 
@@ -399,7 +414,7 @@ def closest_report(picks_a, names, Pv, wd, vb, dte, days):
 
 def main() -> None:
     P, f = load_all()
-    if PREFILTER:
+    if PREFILTER and not PREFILTER_WINDOW:
         P = prefilter(P, PREFILTER)
     names = list(P.columns)
     Pv = P.to_numpy()
@@ -415,8 +430,17 @@ def main() -> None:
     crit_names = list(W_CRIT)
     pers = {k: [] for k in crit_names + ["composite"]}
     picks_A, picks_B, buy_days, rows = [], [], [], []
+    allowed_days = []  # per selection day: the variants in that day's pool
     for i in range(WARMUP, len(days)):
         crit, comp = score_day(Pv, wd, vb, dte, i)
+        if PREFILTER and PREFILTER_WINDOW:
+            # rolling pool: the top PREFILTER % of each family on the PREFILTER_WINDOW sessions
+            # before this day (rows i-W .. i-1 only; never row i)
+            allowed = pool_mask(Pv[i - PREFILTER_WINDOW : i], names, PREFILTER)
+            comp = masked_composite(crit, allowed)
+        else:
+            allowed = np.ones(len(names), bool)
+        allowed_days.append(allowed)
         today = Pv[i]
         for k in crit_names:
             pers[k].append(pd.Series(crit[k]).rank().corr(pd.Series(today).rank()))
@@ -450,8 +474,15 @@ def main() -> None:
 
     # comparators
     buy_lots = R.n_buy.to_numpy()
-    E = CORE * today_all[:, ~is_buy].mean(axis=1) + LOTS_PER * buy_lots * today_all[:, is_buy].mean(
-        axis=1
+    # E and R draw from each day's pool (the whole list unless a rolling prefilter is on)
+    day_pools = [np.where(m & ~is_buy)[0] for m in allowed_days]
+    day_pools_b = [np.where(m & is_buy)[0] for m in allowed_days]
+    E = np.array(
+        [
+            CORE * today_all[j, day_pools[j]].mean()
+            + LOTS_PER * buy_lots[j] * today_all[j, day_pools_b[j]].mean()
+            for j in range(len(sel))
+        ]
     )
     b54 = HERE.parent / "bl054" / "results"
     live_w = varlib.live_csv(b54, "nifty_widesl_917_otm1")
@@ -463,8 +494,6 @@ def main() -> None:
     # a selection day missing from the live-strategy CSVs would make every comparison with B2 False
     assert not np.isnan(B2).any(), "live-mix CSVs do not cover every selection day"
     rng = np.random.default_rng(SEED)
-    pool_all = core_pool
-    pool_b = np.where(is_buy)[0]
 
     def random_total(min_wide: int):
         tot, dd = np.empty(N_RUNS), np.empty(N_RUNS)
@@ -472,12 +501,12 @@ def main() -> None:
             d = np.empty(len(sel))
             for j, i in enumerate(sel):
                 while True:
-                    ix = rng.choice(pool_all, N_CORE, replace=False)
+                    ix = rng.choice(day_pools[j], N_CORE, replace=False)
                     if is_wide[ix].sum() >= min_wide:
                         break
                 v = Pv[i, ix].sum()
                 if buy_lots[j]:
-                    v += Pv[i, rng.choice(pool_b, buy_lots[j], replace=False)].sum()
+                    v += Pv[i, rng.choice(day_pools_b[j], buy_lots[j], replace=False)].sum()
                 d[j] = LOTS_PER * v
             tot[r], dd[r] = d.sum(), mdd(d)
         return tot, dd
@@ -581,7 +610,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}.csv"
         )
     )
 
