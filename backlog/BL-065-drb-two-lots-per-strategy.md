@@ -114,7 +114,22 @@ diversification, which this tests.
   on both. Same already-seen year; no hold-out (owner override).
 - **Will not run:** other percentages, other ranking criteria or weights, a rolling re-ranking, the
   look-ahead whole-year filter.
-- **Result:** pending.
+- **Result:** **less gross, far less drawdown; the first DRB run to PASS all three conditions.** Pool: 38
+  Widesl (28 of them closest-premium; no 09:17 Widesl survived), 13 Dir (SENSEX 09:32–10:32 among them),
+  12 Buy (mostly SENSEX 12:32–14:47). 202 selection days, Buy on 62, 6.61 lots a day. Gross ₹3,45,955
+  (+26.6%) vs ₹4,30,868; max drawdown −₹36,454 vs −₹68,294; worst day −₹19,052, worst week −₹22,336
+  (vs −₹29,865); 60.9% winning days; ₹259 per lot-day vs ₹329. PASS: R P90 ₹2,22,414 (beats 100%); E
+  ₹1,65,423 / −₹52,028; live mix ₹2,32,014 / −₹2,08,439. After charges (flat ₹13 an order): charges
+  ₹80,978 (23%), net ₹2,64,977 (+20.4%) vs ₹3,50,407 (+27.0%); drawdown −₹42,824 (3.3%) vs −₹84,469
+  (6.5%); **10 of 11 months positive**, worst month −1.49% (Apr 2026); with AlgoTest's fee ₹2,52,285. On the
+  read-out it is not "as good" (net 24% lower) — it trades ₹85k of net for ₹42k less drawdown and a
+  steadier month profile. Picks start later: 27% of core picks before 11:00 (56% on the full list), 50%
+  11:00–13:59, 22% from 14:00. Family mix unchanged (434 Widesl picks of which 260 closest-premium, 172
+  Dir); the gain comes from which variants, not fewer Widesl. It misses the full list's two big months,
+  Feb (₹29k vs ₹93k; 3 Feb alone −₹51k of the gap) and Jul (₹13k vs ₹1.0 lakh), and wins May (+₹28k vs
+  −₹14k), Jun and Aug. Same core on 2 of 202 days. The pool was fixed before the first trade, so the
+  pool's survival through Oct 2026 is out-of-time; the daily criteria and the year are not. Picks file
+  `research/bl057/daily_picks_min3_core6_buy2L2_whole_day_top25.csv`; charges rotation `DRB-6W3L2/T25`.
 
 ## Log
 
@@ -128,3 +143,5 @@ diversification, which this tests.
   DRB-6W3 (6 × 1 lot) unchanged: net ₹2,49,942 (+19.2%), drawdown −₹72,220.
 - 2026-10-09 — owner asked for DRB-6W3L2 without the closest-premium Widesl; block above, ran: 30% less gross,
   37% less net, shallower drawdown. The closest-premium variants stay in the list.
+- 2026-10-10 — owner asked for the top 25% of each family (point in time, warm-up days only; criteria total
+  P&L, win %, max drawdown); block above, ran: gross −20%, net −24%, drawdown −47%; PASS.
