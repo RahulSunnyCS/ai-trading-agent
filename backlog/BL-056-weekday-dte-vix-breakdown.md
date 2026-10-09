@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; follows BL-054 |
-| **Status** | In progress (descriptive; same already-seen window, owner override) |
+| **Status** | Done (descriptive; one year, 2025-09-01 onward; the earlier period is left for later) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -63,7 +63,24 @@ screen.
   `wide_0917` total = ₹1,74,537 (BL-054).
 - **Hold-out:** none (owner override, same window).
 - **Will not run:** other bands, other windows, any skip or sizing rule, Widesl premium versions.
-- **Result:** (after the run)
+- **Result:** descriptive, no verdict. Window 2025-09-01 → 2026-10-08, 267 weekdays per index (the Sunday
+  1 Feb 2026 session dropped); 33 variants × 3 tables per index; cell totals reconcile with each
+  variant's total; `sensex_wide_0917` equals the live strategy (₹1,86,287 over the full two
+  years); one SENSEX day (30 Sep 2026, contract not collected) is `unknown` for days to expiry.
+  Expiry weekday in the window: NIFTY Tuesday on all 267 days, SENSEX Thursday on all 267. Within a
+  single regime weekday and days to expiry are the same split (NIFTY Tue = 0, Mon = 1, Fri = 4,
+  Thu = 5, Wed = 6). Averages are family means over the 11 start times, ₹ per day per lot.
+  **NIFTY, weekday (Mon Tue Wed Thu Fri; 52–55 days each):** Widesl 190 673 −73 −39 40; Dir ATM 563 602
+  −67 392 355; Buy −88 −43 64 287 −6. By days to expiry (0, 1, 4, 5, 6): Widesl 616 216 17 −57 −52 — a
+  steady fall away from expiry. **SENSEX, weekday:** Widesl −204 426 51 264 −191 (no gradient); Dir 260
+  829 213 436 318; Buy −17 −17 87 61 56. **VIX band at open** (<10.5, 10.5–11.5, 11.5–13, 13–15,
+  15–18, 18+; days 35/50/70/45/24/43 NIFTY, 34/49/70/47/24/43 SENSEX): NIFTY Widesl 231 74 375 227 68
+  −179, Dir 625 449 381 383 −248 366, Buy −24 269 −94 201 62 −128; SENSEX Widesl 112 82 175 254 −401
+  −104, Dir 537 407 530 409 −126 412, Buy 1 91 −4 36 60 37. Common to both indices: Widesl weak at 18+
+  and Dir and Widesl weak at 15–18 (24 days, thin). The two indices trade the same market days, so
+  that is not independent confirmation. Per-start-time tables: `research/bl056/out/`. About 1,100
+  cells were looked at, and a weekday cell's standard error is roughly ₹300–400 a day, so differences
+  under about ₹700 between cells are not distinguishable from noise.
 
 ### Phase 1 — SENSEX runs
 - Generate `research/bl056/variants/` (33 files) from the three bases; run each; per-day CSVs in
