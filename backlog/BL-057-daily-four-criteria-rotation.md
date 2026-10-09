@@ -142,6 +142,21 @@ Added after the first block's result was read. It changes only the core constrai
   (core held exactly 3 Widesl on 175). The first block's verdict stands. `rotate.py --min-wide 3`;
   the default reproduces the first block's ₹3,31,842.
 
+### 2026-10-09 (later still) — Same rule with at least 1 and at least 0 Widesl
+Added after the first two blocks' results were read. Changes only the core constraint.
+- **Hypothesis:** a lower Widesl minimum (1, or none) lets the score pick more Dir and earns more
+  without a worse drawdown than at least 2.
+- **Rule:** identical to the first block except Case A's minimum, set to 1 and to 0. "At least 0"
+  is the first block's Case B, already run (₹2,95,601, max DD −₹70,205); it is re-run here with
+  its own random baseline drawn under no constraint, so all four minimums (0, 1, 2, 3) can be
+  read side by side.
+- **Comparators:** R drawn under the same minimum, 1,000 runs, same seed; E and B2 unchanged.
+- **Pass / kill rule:** the first block's, read from each case; none replaces the first block's
+  verdict.
+- **Hold-out:** none; same window, exploratory, chosen after seeing the earlier results.
+- **Will not run:** other minimums (4, 5), any other change to the rule.
+- **Result:** (after the run)
+
 ## Log
 
 - 2026-10-09 — created from the owner's idea and answers; override: same already-seen window.
