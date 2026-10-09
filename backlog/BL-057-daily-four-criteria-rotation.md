@@ -183,11 +183,22 @@ Added after the earlier blocks' results were read. Owner can run only 3 lots.
   neither replaces the first block's verdict).
 - **Hold-out:** none; same window, exploratory, chosen after seeing earlier results.
 - **Will not run:** other core sizes, other Buy counts, other minimums.
-- **Result:** (after the run)
+- **Result:** **inconclusive** at both minimums (condition 2 fails; conditions 1 and 3 pass). 202 days;
+  the single Buy lot was added on 89 days, 3.44 lots a day on average. **Min 0:** ₹2,19,749, max DD
+  −₹38,258, worst day −₹10,301, ₹316 per lot-day; R P50 ₹1,48,359 / P90 ₹2,04,658, beats 94%.
+  **Min 1:** ₹2,21,717, max DD −₹44,162, worst day −₹10,292, ₹319 per lot-day; R P50 ₹1,31,885 /
+  P90 ₹1,88,982, beats 98%; override fired 111 days; core held exactly 1 Widesl on 158 days.
+  Comparators: E ₹1,47,609 / DD −₹34,261; 3-lot live mix (2 Widesl 09:17 + 1 Dir ITM1 09:24)
+  ₹1,16,007 / DD −₹1,04,220 / worst day −₹10,897. Against the 5-lot rule at the same minimums
+  the 3-lot version earns about two thirds as much (₹2.20 lakh vs ₹3.32 lakh at min 2 is not the
+  same minimum; min 0: ₹2.20 lakh vs ₹2.96 lakh) on 60% of the lots, and more per lot-day
+  (₹316–319 vs ₹256–288). The Buy lot earned ₹14,299 on its 89 days (₹161/day). Script:
+  `rotate.py --core 3 --buy-max 1 --min-wide 0|1`.
 
 ## Log
 
 - 2026-10-09 — created from the owner's idea and answers; override: same already-seen window.
 - 2026-10-09 — ran; inconclusive under the pass rule (Result above).
+- 2026-10-09 — small-book block (3 core lots, 1 Buy) ran at min 0 and min 1; both inconclusive.
 - 2026-10-09 — at-least-1 and at-least-0 block ran; both killed (condition 1), minimum 2 stands as the best of 0–3.
 - 2026-10-09 — at-least-3 block ran; inconclusive, below the at-least-2 case on total and drawdown.
