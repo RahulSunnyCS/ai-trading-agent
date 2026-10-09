@@ -424,3 +424,33 @@ def test_cadence_explain_names_the_phase_and_the_next_trading_friday():
     assert "next " + f"{on + pd.Timedelta(weeks=1):%d %b %Y}" in cadence_explain(
         on, "weekly", 2, 1, True
     )
+
+
+def test_the_this_week_chip_and_the_signal_agree_on_monthly_and_k_weekly_cadences():
+    """`api._rebalance_info` (the sleeve chip) and `cadence_explain` (the signal text) read one
+    rule; monthly used to be "trades" every week on the chip."""
+    from momentum_backtesting import api
+    from momentum_backtesting.analysis import cadence_explain
+
+    for config in (
+        {"rebalance": "monthly"},
+        {"rebalance": "weekly", "rebalance_every": 4, "rebalance_offset": 2},
+    ):
+        req = api.BacktestRequest(universe=["x"], **config)
+        for week in pd.date_range("2025-01-03", periods=20, freq="W-FRI"):
+            info = api._rebalance_info(req, week)
+            text = cadence_explain(
+                week, req.rebalance, req.rebalance_every, req.rebalance_offset, False
+            )
+            assert info["on_cadence"] == (text is None), (config, week)
+            assert pd.Timestamp(info["next"]) > week
+            if text is not None:
+                assert f"next {pd.Timestamp(info['next']):%d %b %Y}" in text
+    monthly = api.BacktestRequest(universe=["x"], rebalance="monthly")
+    assert api._rebalance_info(monthly, pd.Timestamp("2025-01-10")) == {
+        "on_cadence": False,
+        "every": None,
+        "offset": None,
+        "next": "2025-01-31",
+    }
+    assert api._rebalance_info(monthly, pd.Timestamp("2025-01-31"))["next"] == "2025-02-28"

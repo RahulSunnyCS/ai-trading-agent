@@ -64,7 +64,6 @@ from .engine import (
     IDLE,
     Config,
     Result,
-    cadence_weeks,
     ranked_universe,
     run_backtest,
 )
@@ -2015,7 +2014,9 @@ def _outer_with_sentinel(
             raise ValueError("No persisted outer-market data for the preview week.")
         outer.loc[week] = available.iloc[-1]
     outer.loc[sentinel] = outer.loc[week]
-    return outer
+    # Sorted: with a past `week` the frame has later rows, and a missing sentinel Friday is
+    # appended after them.
+    return outer.sort_index()
 
 
 def _broad_sentinel_run(
@@ -3496,19 +3497,21 @@ def _weekly_status(today: date | None = None) -> dict:
 
 
 def _rebalance_info(req: BacktestRequest, week: pd.Timestamp) -> dict:
-    """Whether `week` is a rebalance week for this config, and the next one (BL-051)."""
+    """Whether `week` is a rebalance week for this config, and the next one (BL-051). Monthly
+    trades on the last Friday of the month only, as the engine does (`every` stays None)."""
     every = req.rebalance_every if req.rebalance == "weekly" else 1
     offset = req.rebalance_offset if every > 1 else 0
-    if req.rebalance != "weekly":
+    if req.rebalance == "weekly" and every == 1:
         return {"on_cadence": True, "every": None, "offset": None, "next": None}
-    week = pd.Timestamp(week).normalize()
-    upcoming = [week + pd.Timedelta(weeks=k) for k in range(1, every + 1)]
-    following = next(w for w in upcoming if cadence_weeks([w], every, offset))
+    on, following = analysis.rebalance_weeks(
+        pd.Timestamp(week).normalize(), req.rebalance, every, offset
+    )
+    monthly = req.rebalance == "monthly"
     return {
-        "on_cadence": bool(cadence_weeks([week], every, offset)),
-        "every": every,
-        "offset": offset,
-        "next": following.strftime("%Y-%m-%d"),
+        "on_cadence": on,
+        "every": None if monthly else every,
+        "offset": None if monthly else offset,
+        "next": following.strftime("%Y-%m-%d") if following is not None else None,
     }
 
 

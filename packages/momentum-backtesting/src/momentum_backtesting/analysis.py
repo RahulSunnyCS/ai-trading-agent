@@ -239,6 +239,27 @@ def timeline(result: Result, closed: pd.DataFrame) -> list[dict]:
     return segments
 
 
+def rebalance_weeks(
+    week: pd.Timestamp, rebalance: str, every: int, offset: int
+) -> tuple[bool, pd.Timestamp | None]:
+    """(whether `week` trades, the next Friday after it that does; None when every week trades).
+    Mirrors `engine.run_backtest`'s `trade_weeks`: every `every` weeks on the calendar phase
+    `offset` (`engine.cadence_weeks`), or, monthly, the last Friday of the month (the next Friday
+    falls in another month)."""
+
+    def trades(w: pd.Timestamp) -> bool:
+        if rebalance == "monthly":
+            return (w + pd.Timedelta(days=7)).month != w.month
+        return bool(cadence_weeks([w], every, offset))
+
+    if rebalance != "monthly" and every <= 1:
+        return True, None
+    following = week + pd.Timedelta(days=7)
+    while not trades(following):  # at most 5 Fridays on
+        following += pd.Timedelta(days=7)
+    return trades(week), following
+
+
 def cadence_explain(
     week: pd.Timestamp,
     rebalance: str,
@@ -246,26 +267,19 @@ def cadence_explain(
     offset: int,
     sell_every_week: bool,
 ) -> str | None:
-    """None when `week` is a rebalance week under the cadence, else the sentence saying it is not
-    and what still happens. Mirrors `engine.run_backtest`'s `trade_weeks`: every `every` weeks on
-    the calendar phase `offset` (`engine.cadence_weeks`), or, monthly, the last Friday of the month
-    (the next Friday falls in another month). With `sell_every_week` an off week still sells
-    holdings that dropped out; buys and cap trims wait."""
-    if rebalance == "monthly":
-        if (week + pd.Timedelta(days=7)).month != week.month:
-            return None
-        note = "Not a rebalance week (monthly: trades on the last Friday of the month)"
-    elif every > 1:
-        if cadence_weeks([week], every, offset):
-            return None
-        upcoming = (week + pd.Timedelta(days=7 * k) for k in range(1, every + 1))
-        following = next(w for w in upcoming if cadence_weeks([w], every, offset))
-        note = (
-            f"Not a rebalance week (every {every} weeks, phase {offset + 1} of {every}; "
-            f"next {following:%d %b %Y})"
-        )
-    else:
+    """None when `week` is a rebalance week under the cadence (`rebalance_weeks`), else the
+    sentence saying it is not, when the next one is and what still happens. With
+    `sell_every_week` an off week still sells holdings that dropped out; buys and cap trims
+    wait."""
+    on, following = rebalance_weeks(week, rebalance, every, offset)
+    if on:
         return None
+    rule = (
+        "monthly: trades on the last Friday of the month"
+        if rebalance == "monthly"
+        else f"every {every} weeks, phase {offset + 1} of {every}"
+    )
+    note = f"Not a rebalance week ({rule}; next {following:%d %b %Y})"
     if sell_every_week:
         return f"{note}: only holdings that dropped out are sold; buys and trims wait."
     return f"{note}: no trades this week."
