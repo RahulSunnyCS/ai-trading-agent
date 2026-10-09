@@ -16,7 +16,12 @@ import pandas as pd
 HERE = Path(__file__).parent
 CAP = 1_300_000
 N = 375  # minutes on the grid
-LEVELS = [None, 10_000, 12_000, 15_000, 17_000, 20_000]
+# levels in rupees; `--levels 8000,6000,4000` replaces the default five (BL-066's later block)
+LEVELS = [None] + (
+    [int(x) for x in sys.argv[sys.argv.index("--levels") + 1].split(",")]
+    if "--levels" in sys.argv
+    else [10_000, 12_000, 15_000, 17_000, 20_000]
+)
 PER = 2  # lots in each strategy (DRB-6W3L2)
 PICKS = HERE.parent / "bl057" / "daily_picks_min3_core6_buy2L2_whole_day.csv"
 CHARGES = HERE.parent / "bl063" / "out" / "daily_charges.csv"
@@ -78,7 +83,9 @@ def main() -> None:
     charges = ch[ch.rotation == "DRB-6W3L2"].set_index("day").charges.reindex(idx).to_numpy()
     low = paths.min(axis=1)
     print(
-        f"deepest intraday combined loss: ₹{low.min():,.0f}; days whose intraday low was below -10k / -12k / -15k / -17k / -20k: "
+        f"deepest intraday combined loss: ₹{low.min():,.0f}; days whose intraday low reached "
+        + " / ".join(f"-{x // 1000}k" for x in LEVELS[1:])
+        + ": "
         + " / ".join(str(int((low <= -x).sum())) for x in LEVELS[1:])
     )
     rows, results = [], {}
@@ -148,16 +155,22 @@ def main() -> None:
             f"  {d:%d-%b-%y %a} | {final[i]:>8,.0f} | "
             + " | ".join(f"{results[x][0][i]:>7,.0f}" for x in LEVELS[1:])
         )
-    mins = results[10_000][2]
+    mins = results[LEVELS[1]][2]
     hh = (
         pd.Series([f"{9 + (m + 15) // 60:02d}:{(m + 15) % 60:02d}" for m in mins[mins >= 0]])
         .str[:2]
         .value_counts()
         .sort_index()
     )
-    print("\nhour (IST) in which the 10k stop fired:", hh.to_dict())
+    print(f"\nhour (IST) in which the {LEVELS[1] // 1000}k stop fired:", hh.to_dict())
+    suffix = (
+        "_" + sys.argv[sys.argv.index("--levels") + 1].replace(",", "_")
+        if "--levels" in sys.argv
+        else ""
+    )
     pd.DataFrame({"day": idx, **{f"pnl_{x}": results[x][0] for x in LEVELS}}).to_csv(
-        HERE / "out_daily_with_stops.csv", index=False
+        HERE / f"out_daily_with_stops{suffix}.csv",
+        index=False,
     )
 
 

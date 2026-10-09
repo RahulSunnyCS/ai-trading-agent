@@ -60,7 +60,16 @@ Added after the first block's result was read; nothing else in the rule changes.
 - **Rule, basket, charges, outputs, "helps" test:** exactly as above; the curves already recorded are reused.
 - **Levels:** X ∈ {8,000, 6,000, 4,000}.
 - **Hold-out:** none (owner override). **Will not run:** other levels.
-- **Result:** (after the run)
+- **Result:** **no level helps**, and the tighter the worse. Days whose intraday low reached −8k / −6k / −4k: 50 / 72 / 96 of
+  202. Against no stop (gross ₹4,30,868, drawdown −₹68,294): **₹8k** gross ₹4,56,348 (+5.9%), drawdown −₹81,905 (+19.9%
+  deeper), worst day −₹13,696, 50 days stopped (25 would have finished better unstopped), net ₹3,75,887 (+28.9%),
+  net drawdown −₹99,752, worst month −2.46%; **₹6k** ₹3,61,524 (−16.1%), −₹68,554 (+0.4%), −₹13,696, 72 days (37
+  whipsaws), net ₹2,81,063 (+21.6%), net drawdown −₹82,573; **₹4k** ₹3,09,007 (−28.3%), −₹95,090 (+39.2%), −₹11,464,
+  96 days (50 whipsaws), net ₹2,28,546 (+17.6%), net drawdown −₹1,11,266, worst month −3.85%. Stopped days made, with
+  the stop vs without: ₹8k −₹4,56,479 vs −₹4,81,959 (+₹25,480), ₹6k −₹5,06,971 vs −₹4,37,627 (−₹69,344), ₹4k −₹4,85,070
+  vs −₹3,63,208 (−₹1,21,861). Average loss on a stopped day against the level: ₹8k −₹9,130, ₹6k −₹7,041, ₹4k −₹5,053
+  (overshoot of 14–26%). The ₹8k stop fired mostly 11:00–14:00. Across all eight levels tried (4k to 20k) the effect on
+  total is not monotonic (₹8k and ₹10k positive, ₹12k negative), which fits noise, not a signal.
 
 ## Log
 
