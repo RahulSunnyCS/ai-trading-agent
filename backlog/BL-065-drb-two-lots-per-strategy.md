@@ -177,7 +177,20 @@ diversification, which this tests.
 - **Read-out:** "as good" within 5% of net with a drawdown no deeper. Same year, no hold-out (owner override).
 - **Will not run:** the other 30-minute phase (09:32, 10:02, …), a 45- or 60-minute grid, the grid
   combined with a prefilter.
-- **Result:** pending.
+- **Result:** **nearly as good — 12% less net, same drawdown; INCONCLUSIVE** (the full list's own verdict).
+  128 variants, 202 selection days, Buy on 56, 6.55 lots a day. Gross ₹3,91,051 (+30.1%) vs ₹4,30,868;
+  max drawdown −₹64,600 vs −₹68,294; worst day −₹22,161, worst week −₹32,465 (vs −₹37,562); 63.9%
+  winning days; ₹295 per lot-day vs ₹329. Conditions: R P90 ₹2,72,171 (beats 100%) ✓; E ₹1,97,532 /
+  −₹59,354 fails on drawdown; live mix ✓. Case B (no Widesl minimum) ₹4,47,419 / −₹65,268. After charges
+  (flat ₹13 an order): charges ₹81,326 (21%), net ₹3,09,725 (+23.8%) vs ₹3,50,407 (+27.0%); drawdown
+  −₹82,310 (6.3%) vs −₹84,469 (6.5%); 8 of 11 months positive, worst month −3.18% (Apr 2026, vs −1.74%);
+  with AlgoTest's fee ₹2,97,147. Not "as good" on the 5% read-out (net 12% lower) but the same shape: same
+  family mix (449 Widesl incl. 266 closest-premium, 157 Dir), same start-time profile (54% before 11:00,
+  34% 11:00–13:59, 12% from 14:00), same most-picked variants (NIFTY ₹100 / ₹80 / OTM1 Widesl 09:17). The
+  full list took an off-grid start time (09:32, 10:02, …) for 42% of its core picks; the grid takes the
+  neighbour 15 minutes away, same core on 32 of 202 days. The gap is month noise, not a trend: Mar −₹35k,
+  Apr −₹26k, Jun −₹24k against May +₹36k, Aug +₹16k. Picks file
+  `research/bl057/daily_picks_min3_core6_buy2L2_whole_day_grid30.csv`; charges rotation `DRB-6W3L2/G30`.
 
 ## Log
 
@@ -196,3 +209,5 @@ diversification, which this tests.
 - 2026-10-10 — owner asked for the pool re-chosen daily on the last 30 days, then changed it to the last 2 months
   (42 sessions) before the run; block above, ran: gross −7% vs the full list, drawdown −8%; vs the fixed pool
   gross +16%, drawdown +72%. INCONCLUSIVE.
+- 2026-10-10 — owner asked for the 30-minute start-time grid (half the list, to have fewer strategies to watch);
+  block above, ran: gross −9%, net −12%, drawdown about the same. INCONCLUSIVE, same as the full list.
