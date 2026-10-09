@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; does not block this month's Momentum work |
-| **Status** | In progress (exploratory: owner override, no hold-out) |
+| **Status** | Done — killed by its pass rule (exploratory: owner override, no hold-out) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |

@@ -27,6 +27,9 @@ WINDOW_FROM = "2025-09-01"  # owner, 2026-10-09: one expiry regime, the earlier 
 
 def day_features(underlying: str, days: pd.DatetimeIndex) -> pd.DataFrame:
     con = duckdb.connect()
+    # hour(ts)/minute(ts) on a TIMESTAMPTZ read the session zone: pin it to the exchange's, so the
+    # 09:15 VIX-open filter below is right on any machine
+    con.execute("SET TimeZone='Asia/Kolkata'")
     ce = con.sql(
         f"""select date, min(expiry) filter (where expiry >= date and bars > 0) nearest
             from read_parquet('{LAKE}/derived/contracts_daily/**/*.parquet', hive_partitioning=true)

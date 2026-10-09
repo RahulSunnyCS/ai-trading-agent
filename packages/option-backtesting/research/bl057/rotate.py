@@ -16,7 +16,9 @@ import pandas as pd
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent / "bl056"))
+sys.path.insert(0, str(HERE.parent / "common"))
 import analyse as A  # noqa: E402  (day_features, load, VIX bands, WD)
+import varlib  # noqa: E402  (live_csv: the comparator inputs)
 
 WINDOW_FROM = "2025-09-01"
 WARMUP = 63
@@ -86,20 +88,79 @@ def mdd(s) -> float:
     return float((eq - np.maximum.accumulate(np.maximum(eq, 0))).min())
 
 
+def variant_masks(names):
+    """(is_wide, is_dir, is_buy, is_nifty) boolean arrays over the 66 variants."""
+    fam = [n.split("_")[1] for n in names]
+    return (
+        np.array([x == "wide" for x in fam]),
+        np.array([x == "dir" for x in fam]),
+        np.array([x == "buy" for x in fam]),
+        np.array([n.startswith("N_") for n in names]),
+    )
+
+
+def day_inputs(f, names):
+    """Per-day attribute arrays for score_day: weekday and VIX band (one per day) and days to
+    expiry (days x variants: each variant uses its own index's)."""
+    is_nifty = variant_masks(names)[3]
+    wd = f.weekday.to_numpy()
+    vb = f.vix_band.astype(str).to_numpy()
+    dte = np.where(is_nifty[None, :], f.dte_N.to_numpy()[:, None], f.dte_S.to_numpy()[:, None])
+    return wd, vb, dte
+
+
+def score_day(Pv, wd, vb, dte, i):
+    """The four criteria and the composite for the day at row i.
+
+    Look-ahead: only rows before i of Pv are read; row i contributes its own weekday, VIX band
+    and days to expiry (known before the first entry). Pv[i] itself is never used, so a caller
+    scoring a day that has no results yet can pass a zero row there."""
+    crit = {
+        "recent": (2 / 3) * Pv[i - 5 : i].sum(axis=0) + (1 / 3) * Pv[i - 10 : i - 5].sum(axis=0),
+        "weekday": skewed_fit(Pv, (wd[:, None] == wd[i]).repeat(Pv.shape[1], axis=1), i),
+        "dte": skewed_fit(Pv, dte == dte[i][None, :], i),
+        "vix": skewed_fit(Pv, (vb[:, None] == vb[i]).repeat(Pv.shape[1], axis=1), i),
+    }
+    comp = sum(W_CRIT[k] * pct_rank(crit[k]) for k in W_CRIT)
+    return crit, comp
+
+
+def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
+    """(core_a, core_b, buy, overridden): the top `core` Widesl/Dir variants, case A with at
+    least `min_wide` Widesl (lowest-scoring Dir swapped for the next-best Widesl), case B with no
+    minimum, plus up to `buy_max` Buy variants that are in the overall top BUY_TOP.
+    Defaults are the module settings (--min-wide / --core / --buy-max)."""
+    min_wide = MIN_WIDE if min_wide is None else min_wide
+    core = CORE if core is None else core
+    buy_max = BUY_MAX if buy_max is None else buy_max
+    is_wide, is_dir, is_buy, _ = masks
+    pool = np.where(~is_buy)[0]
+    order = sorted(pool, key=lambda v: (-comp[v], names[v]))
+    core_b = order[:core]
+    core_a = list(core_b)
+    overridden = False
+    n_wide = int(is_wide[core_a].sum())
+    if n_wide < min_wide:
+        overridden = True
+        spare = [v for v in order if is_wide[v] and v not in core_a]
+        while n_wide < min_wide:
+            drop = min((v for v in core_a if is_dir[v]), key=lambda v: (comp[v], names[v]))
+            core_a.remove(drop)
+            core_a.append(spare.pop(0))
+            n_wide += 1
+    top = sorted(range(len(names)), key=lambda v: (-comp[v], names[v]))[:BUY_TOP]
+    buy = [v for v in top if is_buy[v]][:buy_max]
+    return core_a, core_b, buy, overridden
+
+
 def main() -> None:
     P, f = load_all()
     names = list(P.columns)
     Pv = P.to_numpy()
-    is_wide = np.array([n.split("_")[1] == "wide" for n in names])
-    is_dir = np.array([n.split("_")[1] == "dir" for n in names])
-    is_buy = np.array([n.split("_")[1] == "buy" for n in names])
-    is_nifty = np.array([n.startswith("N_") for n in names])
+    masks = variant_masks(names)
+    is_wide, is_dir, is_buy, is_nifty = masks
     core_pool = np.where(~is_buy)[0]
-    wd = f.weekday.to_numpy()
-    vb = f.vix_band.astype(str).to_numpy()
-    dte = np.where(
-        is_nifty[None, :], f.dte_N.to_numpy()[:, None], f.dte_S.to_numpy()[:, None]
-    )  # days x variants
+    wd, vb, dte = day_inputs(f, names)
     days = P.index
     print(
         f"66 variants, {len(days)} weekdays {days[0].date()} -> {days[-1].date()}; selection from day {WARMUP + 1} = {days[WARMUP].date()}"
@@ -109,34 +170,12 @@ def main() -> None:
     pers = {k: [] for k in crit_names + ["composite"]}
     picks_A, picks_B, buy_days, rows = [], [], [], []
     for i in range(WARMUP, len(days)):
-        # look-ahead: everything below indexes rows < i, except vb[i] / wd[i] / dte[i] (the day's own attributes)
-        recent = (2 / 3) * Pv[i - 5 : i].sum(axis=0) + (1 / 3) * Pv[i - 10 : i - 5].sum(axis=0)
-        crit = {
-            "recent": recent,
-            "weekday": skewed_fit(Pv, (wd[:, None] == wd[i]).repeat(66, axis=1), i),
-            "dte": skewed_fit(Pv, dte == dte[i][None, :], i),
-            "vix": skewed_fit(Pv, (vb[:, None] == vb[i]).repeat(66, axis=1), i),
-        }
-        comp = sum(W_CRIT[k] * pct_rank(crit[k]) for k in crit_names)
+        crit, comp = score_day(Pv, wd, vb, dte, i)
         today = Pv[i]
         for k in crit_names:
             pers[k].append(pd.Series(crit[k]).rank().corr(pd.Series(today).rank()))
         pers["composite"].append(pd.Series(comp).rank().corr(pd.Series(today).rank()))
-        order = sorted(core_pool, key=lambda v: (-comp[v], names[v]))
-        core_b = order[:CORE]
-        core_a = list(core_b)
-        overridden = False
-        n_wide = int(is_wide[core_a].sum())
-        if n_wide < MIN_WIDE:
-            overridden = True
-            spare = [v for v in order if is_wide[v] and v not in core_a]
-            while n_wide < MIN_WIDE:
-                drop = min((v for v in core_a if is_dir[v]), key=lambda v: (comp[v], names[v]))
-                core_a.remove(drop)
-                core_a.append(spare.pop(0))
-                n_wide += 1
-        top10 = sorted(range(66), key=lambda v: (-comp[v], names[v]))[:BUY_TOP]
-        buy = [v for v in top10 if is_buy[v]][:BUY_MAX]
+        core_a, core_b, buy, overridden = select_picks(comp, names, masks)
         picks_A.append(core_a)
         picks_B.append(core_b)
         buy_days.append(buy)
@@ -166,18 +205,14 @@ def main() -> None:
     buy_lots = R.n_buy.to_numpy()
     E = CORE * today_all[:, ~is_buy].mean(axis=1) + buy_lots * today_all[:, is_buy].mean(axis=1)
     b54 = HERE.parent / "bl054" / "results"
-    live_w = (
-        pd.read_csv(b54 / "nifty_widesl_917_otm1.csv", parse_dates=["day"]).set_index("day").net
-    )
-    live_d = (
-        pd.read_csv(b54 / "nifty_dir_924_itm1_sl21_recost.csv", parse_dates=["day"])
-        .set_index("day")
-        .net
-    )
+    live_w = varlib.live_csv(b54, "nifty_widesl_917_otm1")
+    live_d = varlib.live_csv(b54, "nifty_dir_924_itm1_sl21_recost")
     nw, nd = {5: (3, 2), 3: (2, 1)}[
         CORE
     ]  # the live mix at this size: 3W+2D (5 lots) or 2W+1D (3 lots)
     B2 = (nw * live_w + nd * live_d).reindex(R.index).to_numpy()
+    # a selection day missing from the live-strategy CSVs would make every comparison with B2 False
+    assert not np.isnan(B2).any(), "live-mix CSVs do not cover every selection day"
     rng = np.random.default_rng(SEED)
     pool_all = core_pool
     pool_b = np.where(is_buy)[0]
@@ -216,10 +251,10 @@ def main() -> None:
         f"({int((R.n_buy == 1).sum())} with 1 lot, {int((R.n_buy == 2).sum())} with 2); lots/day avg {lots_avg:.2f}"
     )
     print("per-lot-day = avg/day divided by that line's avg lots/day")
-    for case, col, min_w in (
-        (f"A (>={MIN_WIDE} Widesl)", "pnl_A", MIN_WIDE),
-        ("B (no minimum)", "pnl_B", 0),
-    ):
+    cases = [(f"A (>={MIN_WIDE} Widesl)", "pnl_A", MIN_WIDE)]
+    if MIN_WIDE > 0:  # with no minimum, case B is case A: do not simulate the baseline twice
+        cases.append(("B (no minimum)", "pnl_B", 0))
+    for case, col, min_w in cases:
         tot, dd = random_total(min_w)
         S = pd.DataFrame(
             {
@@ -266,13 +301,13 @@ def main() -> None:
     )
     print(
         f"    NIFTY share of core picks (case A): {100 * R.nifty_A.sum() / (CORE * len(R)):.0f}%; "
-        f"core members changed per day (case A): avg {R.changes_A.mean():.2f} of 5"
+        f"core members changed per day (case A): avg {R.changes_A.mean():.2f} of {CORE}"
     )
     fired = R[R.n_buy > 0]
     idle = R[R.n_buy == 0]
     print(
         f"    Buy add-on: on the {len(fired)} days it fired its lots made {fired.buy_pnl.sum():,.0f} (avg {fired.buy_pnl.mean():,.0f}/day); "
-        f"the top-2 Buy variants on the {len(idle)} days it stayed out would have made {idle.buy_alt.sum():,.0f} (avg {idle.buy_alt.mean():,.0f}/day)"
+        f"the top-{BUY_MAX} Buy variants on the {len(idle)} days it stayed out would have made {idle.buy_alt.sum():,.0f} (avg {idle.buy_alt.mean():,.0f}/day)"
     )
     counts = pd.Series([names[v] for c in picks_A for v in c]).value_counts().head(10)
     print(
@@ -280,7 +315,7 @@ def main() -> None:
     )
     hind = sorted(core_pool, key=lambda v: -today_all[:, v].sum())[:CORE]
     print(
-        f"    HINDSIGHT ceiling (look-ahead, best fixed 5 over the selection days): {today_all[:, hind].sum():,.0f} -> {[names[v] for v in hind]}"
+        f"    HINDSIGHT ceiling (look-ahead, best fixed {CORE} over the selection days): {today_all[:, hind].sum():,.0f} -> {[names[v] for v in hind]}"
     )
     R.assign(
         core_A=[",".join(names[v] for v in c) for c in picks_A],

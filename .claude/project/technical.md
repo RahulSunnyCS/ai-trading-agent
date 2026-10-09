@@ -386,8 +386,12 @@ ai-trading-agent/
         │   │                             # list_runs, critique_result, export_personality, propose_strategy
         │   └── cli.py                    # `obt` — ingest plan | ingest | validate | run | registry |
         │                                 # walkforward | sweep [--overfit] | export-personality
-        └── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
-                                            # reproduces golden_15_sessions.expected.txt to the rupee for A/B/C/D
+        ├── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
+        │                                   # reproduces golden_15_sessions.expected.txt to the rupee for A/B/C/D
+        └── research/blNNN/                 # one folder per research backlog item (BL-054 …): variant
+                                            # generators, runners and evaluation scripts, with shared
+                                            # code in research/common/varlib.py. Generated output
+                                            # (variants, results, curves) is git-ignored; see below
 ```
 
 ## Architecture
@@ -426,6 +430,7 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`
 - **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `apps/server/src/types/fyers-api-v3.d.ts` covers the SDK surface we use
 - **No default exports:** Use named exports throughout
+- **Research scripts live in `packages/option-backtesting/research/blNNN/`** (one folder per backlog item, run with `uv run python research/blNNN/<script>.py`). They are one-off analysis, not product code: the pre-registered rule is in the item, the scripts write only under their own folder (never into `strategies/legwise/`, which `obt daily` runs in full), generated files are git-ignored, and Ruff does not enforce line length there (`pyproject.toml` per-file-ignores, like `tests/`). Anything two items need goes in `research/common/`, not imported across item folders. DuckDB `hour(ts)`/`minute(ts)` on a `TIMESTAMPTZ` read the session zone: `SET TimeZone='Asia/Kolkata'` before filtering by exchange time of day
 - **Merges into `main` go through green CI (BL-014).** Branch protection requires the four
   CI jobs that run on every PR. In Claude Code, `.claude/hooks/merge-guard.py` (a `PreToolUse`
   hook on Bash) refuses `gh pr merge` while any check is failing or pending, `--admin`, a PR over

@@ -9,6 +9,7 @@ seeing a result; add a new dated block in the item instead.
 
 from __future__ import annotations
 
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -16,6 +17,9 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE.parent / "common"))
+import varlib  # noqa: E402
+
 RES = HERE / "results"
 N_RUNS = 1000
 SEED = 54
@@ -156,14 +160,8 @@ def comparators(df, rot_daily: pd.Series, plan: pd.DataFrame):
     e = CORE * df.loc[days, wide + dirs].mean(axis=1) + np.where(
         in_buy_week, BUY_LOTS * df.loc[days, buys].mean(axis=1), 0
     )
-    t_dir = (
-        pd.read_csv(RES / "nifty_dir_924_itm1_sl21_recost.csv", parse_dates=["day"])
-        .set_index("day")
-        .net
-    )
-    t_buy = (
-        pd.read_csv(RES / "nifty_buy_range_breakout.csv", parse_dates=["day"]).set_index("day").net
-    )
+    t_dir = varlib.live_csv(RES, "nifty_dir_924_itm1_sl21_recost")
+    t_buy = varlib.live_csv(RES, "nifty_buy_range_breakout")
     w917, d924, b935 = df.loc[days, "wide_0917"], t_dir.loc[days], t_buy.loc[days]
     t = 2 * w917 + 2 * d924 + 1 * b935
     bench = {
