@@ -10,3 +10,6 @@ daily_picks*.csv
 weekly_picks*.csv
 summary*.csv
 __pycache__/
+trades_*.jsonl
+pairs_*.txt
+closest_core_lots.csv
