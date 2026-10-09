@@ -91,6 +91,23 @@ const BASE_JOBS: Job[] = [
     fixHint: 'Log in from the dashboard (Broker logins), or: uv run mbt login',
   },
   {
+    // BL-051 Phase 3: the headline's orders before the close. With a signal delay of 1 the
+    // decision is already fixed by last Friday's ranks, so they can be placed at 14:15.
+    id: 'momentum-orders',
+    description: 'Momentum: your orders for the headline favourite',
+    schedule: { at: '14:15', on: FRIDAY, label: 'Fri 14:15' },
+    steps: [['uv', 'run', 'mbt', 'orders', 'run', '--send']],
+    cwd: MOMENTUM,
+    timeoutMinutes: 20,
+    retries: 1,
+    retryDelayMinutes: 5,
+    catchUpHours: 1, // orders after ~15:15 are too late to place before the close
+    group: 'catalog',
+    alertsItself: true,
+    logFile: `${MOMENTUM}/data/launchd-weekly-orders.log`,
+    fixHint: 'cd packages/momentum-backtesting && uv run mbt orders run',
+  },
+  {
     id: 'momentum-preview',
     description: 'Momentum weekly preview on live prices',
     schedule: { at: '14:40', on: FRIDAY, label: 'Fri 14:40' },

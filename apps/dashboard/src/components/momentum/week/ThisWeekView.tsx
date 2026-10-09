@@ -39,6 +39,7 @@ import { RulesStrip } from './RulesStrip';
 import { EdgeNames, NeedsAttention, SincePreview, TelegramMessage } from './SidePanels';
 import { SignalCard } from './SignalCard';
 import { ClassifySplitDrawer, RunByHandDrawer } from './WeekDrawers';
+import { YourOrders } from './YourOrders';
 
 /**
  * Momentum › This week (BL-051): the Friday timeline, what needs a person, the owner's
@@ -214,6 +215,8 @@ export function ThisWeekView({ weekly }: { weekly: MomentumWeeklyJobState }) {
       {card && card.dataset !== 'etf' && !scoresData ? (
         <ScoresFetcher onData={setScoresData} />
       ) : null}
+      <YourOrders />
+
       <RunByHandDrawer open={panel === 'run'} onClose={() => setPanel(null)} weekly={weekly} />
       <ClassifySplitDrawer
         symbol={review}
