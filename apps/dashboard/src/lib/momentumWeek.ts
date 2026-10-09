@@ -13,8 +13,9 @@ import type {
 
 type ScheduledRun = MomentumWeeklyStatus['schedule'][number]['run'];
 
-/** The Friday steps in time order (the 14:15 orders step arrives with BL-051 Phase 3). */
+/** The Friday steps in time order. */
 export const STEP_LABEL: Record<ScheduledRun, string> = {
+  orders: 'Your orders',
   preview: 'ETF preview',
   final: 'ETF final',
   'stock-ingest': 'Stock data + final',

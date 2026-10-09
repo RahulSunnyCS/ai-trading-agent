@@ -94,8 +94,17 @@ and still writes `data/launchd-weekly-<run>.log`, which `GET /api/weekly/status`
 orchestration, not two copies that can drift.
 
 **A blocked or missing active favourite now sends a Telegram warning** (not silence), except
-that a stock-based headline (Stock, Custom Index, Broad) is not reported as blocked by the 14:40
-preview or 16:45 final, which cannot evaluate it: the 19:30 rerun sends it (BL-051) —
+that a stock-based headline (Stock, Custom Index) is not reported as blocked by the 14:40
+preview or 16:45 final, which cannot evaluate it: the 19:30 rerun sends it (BL-051). A **Broad**
+headline gets a 14:40 preview on Fyers live prices (`api._broad_live_previews`, TODO 3.9.26): the
+same in-memory live ranking as the dashboard's rebalance preview (`api._broad_live_ranking` ->
+`rebalance.live_broad_ranking`, never stored, never journalled), the headline only (or its group's
+sleeves); outside market hours or on an exchange holiday (`api._market_open`, `ref_holidays`) it
+leaves the outcome untouched for 19:30, and any failure (token, quote, network) is reported,
+never raised. `live_broad_ranking` reuses the ranking's own `stock_membership` and `liquidity_gate`
+(reloading the universe costs ~150 s) and must keep `broad.finish_universe_ranking`'s pool rules
+(gate, ended series); `tests/test_broad_live_preview.py` pins live = stored when live prices equal
+the close —
 previously a favourite that failed (e.g. the tax-config bug below) meant the job computed a
 signal, found no usable active result, and exited 0 with nothing sent and no alert, for every
 run, for over a week, before anyone noticed.
@@ -374,7 +383,12 @@ contract, not a shared service).
   sample and is never used. The Broad weekly signal (`api._broad_engine_signal`, used by
   `_research_weekly_result`) is the engine's own decision from a flat sentinel week appended
   after the newest week (as `rebalance_preview` does), not `analysis.latest_signal`, which
-  ignores cadence, `sell_every_week`, the price ceiling and circuit locks.
+  knows neither the price ceiling nor the circuit locks. A Broad result's "This week" section
+  (`latest`) is the same engine decision for the run's own last week (`api._broad_decide`, which
+  drops any later weeks first, so a run with a past `end` is decided on what was known then),
+  plus `_mark_price_skips`' "SKIP (above max price)" rows, which only the result panel shows.
+  `latest_signal` (ETF, Stock, Custom Index) follows the cadence through
+  `analysis.cadence_explain`, which both paths use for the "Not a rebalance week" wording.
   `tests/test_broad_parity.py` pins both paths to identical engine arguments and trades. The
   tilt-rank caches (`levers.tilt_cache_get/put`) hold the keyed frame so a recycled `id()`
   cannot serve another frame's ranks.
@@ -401,6 +415,18 @@ contract, not a shared service).
   `tests/conftest.py` points at a temp folder so no test writes the real ones. "Room to exit" is
   only given for a strategy with a single exit rank (`_exit_rank`); Broad in category mode sells on
   its category and pool ranks too, so it gets none.
+- `orders.py` + `holdings_store.py` (BL-051 Phase 3) — Your orders. `orders.plan` is pure: holdings
+  in shares, prices, target weights -> orders (exits and new names always; top-ups/trims under the
+  owner's minimum, ₹10,000 by default, skipped; whole shares; blocked names held; charges at
+  `engine`'s itemised rates, no brokerage). `holdings_store` keeps per-owner settings (`MOMENTUM_OWNER`,
+  default `rahul`; paper capital ₹1 lakh), holdings snapshots (Fyers `fyers.holdings`, read-only,
+  or pasted), holding rules and the orders made (trading-data migration 012). `api._compute_orders`
+  is the body of `mbt orders run [--send]` (scheduler job `momentum-orders`, Fri 14:15) and of
+  `POST /api/orders/run`: the headline's target from `_orders_signal`, which for a stored week one
+  short of the target and a signal delay of 1 uses `_broad_sentinel_run(ahead=True)` - deciding the
+  NEXT week on a flat stand-in row. `tests/test_broad_parity.py` pins that the week-ahead decision
+  buys and fully sells exactly what the full backtest did; trims and top-ups read the week's own
+  prices and are not pinned. Broad only for now; delay-0 strategies get no orders before 19:30.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:
   `split` (`stock_actions.review_snapshot`), `data` (`/weekly/status` readiness, for the
