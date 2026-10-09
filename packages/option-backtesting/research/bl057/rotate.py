@@ -82,6 +82,18 @@ PREFILTER = _arg("--prefilter", 0)
 # BL-065 (fourth block): `--prefilter-window 42` re-ranks the families every selection day on the
 # trailing 42 sessions (2 months) instead of fixing the pool on the warm-up days
 PREFILTER_WINDOW = _arg("--prefilter-window", 0)
+# BL-065 (fifth block): `--grid 30` keeps only the start times on a 30-minute grid from 09:17
+# (09:17, 09:47, ... 15:17): half the whole-day list, 128 variants
+GRID = _arg("--grid", 0)
+
+
+def on_grid(name: str) -> bool:
+    """True when the variant's start time lies on the --grid minute grid from 09:17."""
+    if not GRID:
+        return True
+    tag = name.split("_")[2]
+    minutes = int(tag[:2]) * 60 + int(tag[2:]) - (9 * 60 + 17)
+    return minutes % GRID == 0
 # Case A's Widesl minimum: 2 is the first pre-registered block; 3 is the later block (BL-057).
 MIN_WIDE = int(sys.argv[sys.argv.index("--min-wide") + 1]) if "--min-wide" in sys.argv else 2
 MIN_WIDE_N = -(-MIN_WIDE // LOTS_PER)  # the minimum in whole strategies, rounded up
@@ -414,6 +426,9 @@ def closest_report(picks_a, names, Pv, wd, vb, dte, days):
 
 def main() -> None:
     P, f = load_all()
+    if GRID:
+        P = P[[c for c in P.columns if on_grid(c)]]
+        print(f"grid {GRID} min from 09:17: {P.shape[1]} variants kept")
     if PREFILTER and not PREFILTER_WINDOW:
         P = prefilter(P, PREFILTER)
     names = list(P.columns)
@@ -610,7 +625,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}.csv"
         )
     )
 

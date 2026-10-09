@@ -22,6 +22,8 @@ PICKS = {  # rotation -> daily picks file written by research/bl057/rotate.py
     "DRB-6W3L2/T25": "daily_picks_min3_core6_buy2L2_whole_day_top25.csv",
     # BL-065 fourth block: the top 25% re-chosen every day on the trailing 2 months (42 sessions)
     "DRB-6W3L2/T25R42": "daily_picks_min3_core6_buy2L2_whole_day_top25r42.csv",
+    # BL-065 fifth block: the 30-minute start-time grid from 09:17 (128 variants)
+    "DRB-6W3L2/G30": "daily_picks_min3_core6_buy2L2_whole_day_grid30.csv",
 }
 
 

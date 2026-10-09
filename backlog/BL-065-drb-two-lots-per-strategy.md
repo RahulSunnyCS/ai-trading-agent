@@ -164,6 +164,21 @@ diversification, which this tests.
   `research/bl057/daily_picks_min3_core6_buy2L2_whole_day_top25r42.csv`; charges rotation `DRB-6W3L2/T25R42`.
   Regression: the full-list run still reproduces ₹4,30,868 after the select_picks change.
 
+### 2026-10-10 — DRB-6W3L2 on the 30-minute start-time grid (`DRB-6W3L2/G30`)
+- **Question (owner):** 248 variants is too many to keep in front of you. Does the basket do as well on
+  half the list — every second start time?
+- **Rule:** keep only the start times on a 30-minute grid from 09:17 (09:17, 09:47, 10:17, 10:47, 11:17,
+  11:47, 12:17, 12:47, 13:17, 13:47, 14:17, 14:47, 15:17; Buy has no 15:17): per index 13 Widesl OTM,
+  26 closest-premium Widesl, 13 Dir, 12 Buy = 64, so **128 variants**. DRB-6W3L2 otherwise unchanged
+  (criteria, weights, selection days, Widesl minimum, Buy add-on, stops). `rotate.py --basket DRB-6W3L2
+  --grid 30`. No prefilter.
+- **Comparators:** the full-list DRB-6W3L2 (gross ₹4,30,868 / −₹68,294; net ₹3,50,407 / −₹84,469); R and E
+  on the 128-list; BL-057's three conditions.
+- **Read-out:** "as good" within 5% of net with a drawdown no deeper. Same year, no hold-out (owner override).
+- **Will not run:** the other 30-minute phase (09:32, 10:02, …), a 45- or 60-minute grid, the grid
+  combined with a prefilter.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-09 — created from the owner's request to run 6 lots as 3 strategies of 2 lots.
