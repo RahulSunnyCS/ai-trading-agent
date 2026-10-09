@@ -111,6 +111,16 @@ Added after the fixed-level results were read; the owner asked about "a 16k trai
   The trail adds stops on days that rose and then gave back ₹12–16k (25 days at ₹16k against 13 for the fixed ₹15k), which
   is where it differs from the fixed stop.
 
+### 2026-10-09 (last) — Trailing that starts after the day's profit reaches ₹5k
+Added after the plain trailing result was read, at the owner's request.
+- **Rule:** a fixed stop at −X until the day's best combined profit exceeds the activation A = ₹5,000; above that the
+  stop rises ₹1 for every extra ₹1 of best profit, never falls back. Stop level at minute t =
+  −X + max(0, best combined P&L through minute t−1 − A). X = 16,000 (asked), with 12,000 and 20,000 beside it.
+  With A = 0 this is the plain trailing stop above (checked: same numbers). The alternative reading, where the stop jumps
+  up to (best profit − X) at the moment ₹5k is reached, is not run.
+- **Fill, outputs, "helps" test, hold-out:** as above (both fill assumptions). **Will not run:** other activation levels.
+- **Result:** (after the run)
+
 ## Log
 
 - 2026-10-09 — created from the owner's request.
