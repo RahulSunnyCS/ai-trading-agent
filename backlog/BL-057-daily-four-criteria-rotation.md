@@ -166,6 +166,25 @@ Added after the first two blocks' results were read. Changes only the core const
   by luck among four tried on one window as well as a real optimum, so the forward journal (BL-058)
   is what can tell them apart.
 
+### 2026-10-09 (later still) — Small-book version: 3 core lots, at most 1 Buy lot
+Added after the earlier blocks' results were read. Owner can run only 3 lots.
+- **Hypothesis:** the rule still beats luck, equal weight and a 3-lot copy of the live mix when
+  scaled down to 3 core lots and 1 Buy add-on, with at least 0 or at least 1 Widesl.
+- **Rule:** identical to the first block except **core = top 3** Widesl/Dir variants (not 5) and
+  **Buy add-on = at most 1 lot** (not 2): the single best Buy variant, only on days one is in the
+  overall top 10 of 66. Lots a day are therefore 3 or 4. Minimum Widesl in the core: **0** and **1**
+  (swap rule unchanged: the lowest-scoring Dir pick is replaced by the next-best Widesl).
+- **Comparators** (same days, same lot count as the case): **R** random, 3 Widesl/Dir variants under
+  the same minimum plus a random Buy variant on the days the rule added one, 1,000 runs, same seed;
+  **E** the 44 Widesl/Dir variants equally weighted scaled to 3 lots plus the 22 Buy variants
+  equally weighted for the days' Buy lot; **B3** (the 3-lot live mix, owner's choice) 2 × Widesl
+  OTM1 09:17 + 1 × Dir ITM1 09:24, every day.
+- **Pass / kill rule:** the first block's, read from each case (min 0 and min 1 are both reported;
+  neither replaces the first block's verdict).
+- **Hold-out:** none; same window, exploratory, chosen after seeing earlier results.
+- **Will not run:** other core sizes, other Buy counts, other minimums.
+- **Result:** (after the run)
+
 ## Log
 
 - 2026-10-09 — created from the owner's idea and answers; override: same already-seen window.
