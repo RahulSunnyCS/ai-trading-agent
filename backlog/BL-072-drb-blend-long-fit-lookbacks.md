@@ -50,6 +50,23 @@ the recency signals and the longer-lookback fit signals fixed priorities, and "a
 - **Will not run:** other weights, other lookbacks, other family definitions.
 - **Result:** pending.
 
+### Block 2 — VIX weight on the taken set (2026-10-10, registered before its runs)
+- **Why:** block 1's first rows show the owner's 25/25/15/15 blend below the baseline weights with the
+  same long lookbacks (₹3.35–3.85 lakh vs ₹4.87–4.97 lakh). The owner asked to evaluate the taken set —
+  recent, family recent, weekday, days to expiry, all fit criteria on 63:50,126:50 — with VIX at 0, 10
+  and about 15–20, and with the recency split varied.
+- **Rows (fixed; weights recent / family / weekday / dte / VIX / gap, lookbacks 63:50,126:50):**
+  (a) 30/30/20/20/0/0 — no VIX; (b) 25/25/20/20/10/0 — VIX 10; (c) 25/25/15/15/20/0 — VIX 20 (block 1's
+  row, reused); (d) 40/10/20/20/10/0 — recency mostly the variant's own; (e) 33/0/25/25/17/0 — the
+  baseline weights, no family (BL-069 B3's 63/126 row, reused: ₹4,86,867 / −₹61,058).
+  Each new row: in-sample, the Jan–Aug 2025 slice, and 10 label shuffles (queued after the main rows
+  while the machine is loaded).
+- **Read-out:** as block 1 (candidate = gross ÷ drawdown above 6.31 and gross within one yardstick of the
+  better B3-only row; real = above all 10 shuffles). The 2022–2024 hold-out (BL-071 part B) decides;
+  these rows join its list.
+- **Will not run:** other weights.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-10 — created; rows registered before any BL-072 run.
