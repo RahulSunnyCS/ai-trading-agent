@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; extends BL-057 |
-| **Status** | In progress (descriptive; same already-seen window, owner override) |
+| **Status** | Done (descriptive; same already-seen window, owner override) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -55,7 +55,28 @@ change to the frozen BL-058 forward rule.
 - **Pass / kill rule:** BL-057's, read from this run, reported but not the point of the item.
 - **Hold-out:** none (owner override, same window).
 - **Will not run:** 24-slot or late-start universe, other premiums, other minimums, 3-lot version.
-- **Result:** (after the run)
+- **Result:** descriptive. 110 variants (all 22 NIFTY and 48 SENSEX closest-premium runs finished,
+  no errors), 265 common weekdays, selection 2025-12-03 → 2026-10-08, 202 days; Buy add-on fired on 59
+  days (BL-057: 89), 5.47 lots a day. **Share of core lots (case A):** closest-premium Widesl took
+  **35%** of the 5 daily lots (average 1.76 lots a day; at least one on 167 of 202 days = 83%; lots per
+  day 0 / 1 / 2 / 3 / 4 / 5 on 35 / 54 / 62 / 31 / 15 / 5 days) and 61% of the Widesl lots (584 Widesl
+  lots, 426 Dir). A blind pick would give 50% of core lots and 67% of Widesl lots, so the rotation
+  took them slightly less than chance. By index: NIFTY 38%, SENSEX 32%. **By weekday** (share of core
+  lots | of Widesl lots): Mon 28 | 54, Tue 44 | 66, Wed 32 | 59, Thu 43 | 71, Fri 30 | 53. **By the pick's
+  own index days to expiry** (0 = expiry day): 0 → 47 | 72 (84 days), 1 → 37 | 64, 2 → 17 | 50, 3 → 20 | 60,
+  4 → 36 | 51, 5 → 29 | 53, 6 → 23 | 46. **By VIX band:** <10.5 35, 10.5–11.5 40, 11.5–13 41, 13–15 33,
+  15–18 27, 18+ 33. Average P&L per lot when picked: OTM Widesl ₹285 (228 lots), Dir ATM ₹256 (426),
+  closest-premium Widesl ₹200 (356; win 58% vs 61% / 60%). **Performance, case A:** ₹2,56,510, max
+  drawdown −₹1,01,871, worst day −₹15,989, ₹232 per lot-day; R (110 variants) P50 ₹1,37,304 / P90
+  ₹2,06,183, beats 98% → (1) passes; E ₹1,37,261 / DD −₹79,162 → (2) fails on drawdown; B2 ₹1,85,540 /
+  DD −₹1,67,246 → (3) passes; INCONCLUSIVE, as BL-057. Against BL-057's 66-variant rotation (₹3,31,842,
+  DD −₹57,153, ₹288 per lot-day) adding the closest-premium Widesl lowered the total by ₹75,332 and
+  nearly doubled the drawdown; core members changed per day 3.67 of 5 (BL-057: 3.25). Per-criterion
+  signal: recent +0.046, weekday +0.019, dte +0.001, VIX +0.015, composite +0.032. Reading: the
+  rotation prefers closest-premium Widesl on expiry days and the expiry weekdays (Tue NIFTY, Thu
+  SENSEX) and rarely on days 2–3 before expiry; a plausible reason is that near expiry a fixed-premium
+  rule sells strikes much closer to the money than OTM1 / OTM2 do, which is a different position
+  there (not tested here). Scripts: `rotate.py --closest`, `research/bl061/`.
 
 ### Phase 1 — Missing runs
 - NIFTY ₹80 and ₹100 at the 11 morning start times (22 runs; the 3 BL-055 start times are re-run
@@ -76,3 +97,4 @@ change to the frozen BL-058 forward rule.
 
 - 2026-10-09 — created from the owner's request to put the closest-premium versions in the daily
   list and measure their share.
+- 2026-10-09 — NIFTY runs finished 19:53; `rotate.py --closest` ran (Result above).

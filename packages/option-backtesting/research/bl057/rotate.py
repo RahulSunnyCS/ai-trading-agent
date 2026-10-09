@@ -34,8 +34,28 @@ def _arg(name, default):
 CORE = _arg("--core", 5)  # 5 = first block; 3 = small-book block
 BUY_MAX = _arg("--buy-max", 2)  # 2 = first block; 1 = small-book block
 N_RUNS, SEED = 1000, 57
+# BL-061: add the closest-premium Widesl (NIFTY 80 / 100, SENSEX 250 / 320) to the candidate list
+CLOSEST = "--closest" in sys.argv
+CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320")
 # Case A's Widesl minimum: 2 is the first pre-registered block; 3 is the later block (BL-057).
 MIN_WIDE = int(sys.argv[sys.argv.index("--min-wide") + 1]) if "--min-wide" in sys.argv else 2
+
+
+def closest_columns(underlying: str, pfx: str, days: pd.DatetimeIndex) -> pd.DataFrame:
+    """Per-day net P&L of the closest-premium Widesl variants of one index at the 11 morning start
+    times: NIFTY 80 / 100 (research/bl061) or SENSEX 250 / 320 (research/bl060)."""
+    folder, premiums = ("bl061", (80, 100)) if underlying == "NIFTY" else ("bl060", (250, 320))
+    cols = {}
+    for premium in premiums:
+        for slot in varlib.SLOTS_MORNING:
+            tag = slot.replace(":", "")
+            path = HERE.parent / folder / "results" / f"p{premium}_{tag}.csv"
+            cols[f"{pfx}p{premium}_{tag}"] = varlib.require(
+                path,
+                f"cd packages/option-backtesting && uv run python research/{folder}/gen_variants.py && "
+                f"uv run python research/{folder}/run_variant.py research/{folder}/variants/p{premium}_{tag}.yaml",
+            ).reindex(days)
+    return pd.DataFrame(cols, index=days)
 
 
 def load_all():
@@ -47,6 +67,8 @@ def load_all():
         wk = f.weekday.isin(A.WD).values
         df, f = df[wk], f[wk]
         df.columns = [pfx + c for c in df.columns]
+        if CLOSEST:
+            df = df.join(closest_columns(u, pfx, df.index))
         frames.append(df)
         feats[u] = f
     # keep only the days both indices have (two days each side are missing one index's data)
@@ -56,7 +78,7 @@ def load_all():
     frames = [x.loc[common] for x in frames]
     feats = {u: x.loc[common] for u, x in feats.items()}
     P = pd.concat(frames, axis=1)
-    assert P.shape[1] == 66 and not P.isna().any().any()
+    assert P.shape[1] == (110 if CLOSEST else 66) and not P.isna().any().any()
     assert feats["NIFTY"].index.equals(feats["SENSEX"].index)
     f = feats["NIFTY"][["weekday", "vix_band"]].copy()
     f["dte_N"] = feats["NIFTY"].dte_label
@@ -89,14 +111,20 @@ def mdd(s) -> float:
 
 
 def variant_masks(names):
-    """(is_wide, is_dir, is_buy, is_nifty) boolean arrays over the 66 variants."""
+    """(is_wide, is_dir, is_buy, is_nifty) boolean arrays over the variants; is_wide includes the
+    closest-premium Widesl (BL-061), which count toward the minimum number of Widesl."""
     fam = [n.split("_")[1] for n in names]
     return (
-        np.array([x == "wide" for x in fam]),
+        np.array([x == "wide" or x in CLOSEST_FAMILIES for x in fam]),
         np.array([x == "dir" for x in fam]),
         np.array([x == "buy" for x in fam]),
         np.array([n.startswith("N_") for n in names]),
     )
+
+
+def closest_mask(names):
+    """True for the closest-premium Widesl variants (names like N_p80_0917)."""
+    return np.array([n.split("_")[1] in CLOSEST_FAMILIES for n in names])
 
 
 def day_inputs(f, names):
@@ -153,6 +181,88 @@ def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
     return core_a, core_b, buy, overridden
 
 
+def closest_report(picks_a, names, Pv, wd, vb, dte, days):
+    """BL-061: how much of the daily core the closest-premium Widesl take, and on which days."""
+    is_closest = closest_mask(names)
+    is_wide, is_dir, _, is_nifty = variant_masks(names)
+    rows = []
+    for j, core in enumerate(picks_a):
+        i = WARMUP + j
+        for v in core:
+            rows.append(
+                dict(
+                    day=days[i],
+                    variant=names[v],
+                    closest=bool(is_closest[v]),
+                    widesl=bool(is_wide[v]),
+                    index="NIFTY" if is_nifty[v] else "SENSEX",
+                    weekday=wd[i],
+                    dte=str(dte[i, v]),
+                    vix=vb[i],
+                    pnl=Pv[i, v],
+                )
+            )
+    t = pd.DataFrame(rows)
+    n_days = len(picks_a)
+    pool = np.where(~variant_masks(names)[2])[0]
+    base_core = is_closest[pool].mean()
+    base_wide = is_closest[pool][is_wide[pool]].mean()
+    print(
+        f"\n=== BL-061: closest-premium Widesl in the daily core (case A), {n_days} selection days ==="
+    )
+    print(
+        f"reference: closest-premium variants are {100 * base_core:.0f}% of the core candidates and "
+        f"{100 * base_wide:.0f}% of the Widesl candidates, so a blind pick would give about those shares"
+    )
+    per_day = t.groupby("day").closest.sum()
+    print(
+        f"share of core lots: {100 * t.closest.mean():.0f}%  (average {t.closest.sum() / n_days:.2f} of {CORE} lots a day; "
+        f"at least one on {int((per_day > 0).sum())} of {n_days} days = {100 * (per_day > 0).mean():.0f}%; "
+        f"lots per day: {per_day.value_counts().sort_index().to_dict()})"
+    )
+    w = t[t.widesl]
+    print(
+        f"share of the Widesl lots: {100 * w.closest.mean():.0f}% closest premium, {100 * (1 - w.closest.mean()):.0f}% OTM strike "
+        f"({len(w)} Widesl lots; Dir lots {int((~t.widesl).sum())})"
+    )
+    for label, col in (("index", "index"),):
+        g = t.groupby(col).agg(lots=("closest", "size"), closest_share=("closest", "mean"))
+        g["closest_share"] *= 100
+        print(f"\nby {label} (share of that index's core lots that are closest premium, %):")
+        print(g.round(0).to_string(float_format=lambda x: f"{x:,.0f}"))
+    day_order = {"weekday": A.WD, "vix": A.VIX_LABELS + ["unknown"]}
+    for label, col in (
+        ("weekday", "weekday"),
+        ("own index days to expiry (0 = expiry day)", "dte"),
+        ("VIX band", "vix"),
+    ):
+        g = t.groupby(col).agg(
+            days=("day", "nunique"), lots=("closest", "size"), closest_share=("closest", "mean")
+        )
+        wg = w.groupby(col).closest.mean()
+        g["closest_share"] *= 100
+        g["of Widesl lots %"] = 100 * wg
+        order = day_order.get(col) or sorted(
+            g.index, key=lambda x: 99 if x in ("7+", "unknown") else int(x)
+        )
+        g = g.reindex([o for o in order if o in g.index])
+        print(f"\nby {label}:")
+        print(g.round(0).to_string(float_format=lambda x: f"{x:,.0f}"))
+    pl = t.assign(
+        kind=np.where(
+            t.closest, "closest-premium Widesl", np.where(t.widesl, "OTM Widesl", "Dir ATM")
+        )
+    )
+    g = pl.groupby("kind").agg(
+        lots=("pnl", "size"),
+        avg_pnl=("pnl", "mean"),
+        win_pct=("pnl", lambda x: 100 * (x > 0).mean()),
+    )
+    print("\naverage P&L per lot when picked (1 lot, before charges):")
+    print(g.round(0).to_string(float_format=lambda x: f"{x:,.0f}"))
+    t.to_csv(HERE / "closest_core_lots.csv", index=False)
+
+
 def main() -> None:
     P, f = load_all()
     names = list(P.columns)
@@ -163,7 +273,7 @@ def main() -> None:
     wd, vb, dte = day_inputs(f, names)
     days = P.index
     print(
-        f"66 variants, {len(days)} weekdays {days[0].date()} -> {days[-1].date()}; selection from day {WARMUP + 1} = {days[WARMUP].date()}"
+        f"{len(names)} variants, {len(days)} weekdays {days[0].date()} -> {days[-1].date()}; selection from day {WARMUP + 1} = {days[WARMUP].date()}"
     )
 
     crit_names = list(W_CRIT)
@@ -288,7 +398,7 @@ def main() -> None:
             )
 
     print(
-        "\n--- signal in each criterion: Spearman(criterion rank, same-day P&L) across the 66, averaged over selection days ---"
+        "\n--- signal in each criterion: Spearman(criterion rank, same-day P&L) across the variants, averaged over selection days ---"
     )
     for k, v in pers.items():
         v = np.array(v)
@@ -313,6 +423,8 @@ def main() -> None:
     print(
         "    most-picked core variants (case A):", ", ".join(f"{k}x{v}" for k, v in counts.items())
     )
+    if CLOSEST:
+        closest_report(picks_A, names, Pv, wd, vb, dte, days)
     hind = sorted(core_pool, key=lambda v: -today_all[:, v].sum())[:CORE]
     print(
         f"    HINDSIGHT ceiling (look-ahead, best fixed {CORE} over the selection days): {today_all[:, hind].sum():,.0f} -> {[names[v] for v in hind]}"
@@ -324,8 +436,8 @@ def main() -> None:
         HERE
         / (
             "daily_picks.csv"
-            if (MIN_WIDE, CORE, BUY_MAX) == (2, 5, 2)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}.csv"
+            if (MIN_WIDE, CORE, BUY_MAX, CLOSEST) == (2, 5, 2, False)
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{'_closest' if CLOSEST else ''}.csv"
         )
     )
 

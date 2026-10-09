@@ -53,7 +53,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-056](BL-056-weekday-dte-vix-breakdown.md) | Weekday, days-to-expiry and VIX-band breakdown of the 33 start-time variants, NIFTY and SENSEX | P2 | Done: descriptive | research | options |
 | [BL-059](BL-059-whole-day-start-time-curve.md) | Whole-day start-time curve: NIFTY and SENSEX Widesl, Dir ATM and Buy from 12:02 to 15:02 (78 more variants) | P2 | Done: descriptive | research | options |
 | [BL-060](BL-060-sensex-widesl-closest-premium.md) | SENSEX Widesl by closest premium (₹250 and ₹320) across the whole day, beside the live OTM2 strike | P2 | Done: descriptive | research | options |
-| [BL-061](BL-061-rotation-with-closest-premium-widesl.md) | Daily rotation with closest-premium Widesl in the candidate list: their share of the 5 daily lots, and on which days | P2 | In progress | research | options |
+| [BL-061](BL-061-rotation-with-closest-premium-widesl.md) | Daily rotation with closest-premium Widesl in the candidate list: their share of the 5 daily lots, and on which days | P2 | Done: descriptive | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
