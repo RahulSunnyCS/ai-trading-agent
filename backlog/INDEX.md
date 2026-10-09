@@ -47,7 +47,8 @@ Sorted by priority (P0 first), then ID.
 | [BL-046](BL-046-options-api-performance.md) | Options API performance: bounded anatomy/backtest/results loads, reused connections, streamed proxies | P2 | Planned | improvement | options |
 | [BL-047](BL-047-shared-python-plumbing-and-job-locks.md) | Shared Python plumbing in `trading-data` (token, `.env`, notify, IST) and cross-process job locks | P2 | Planned | improvement | trading-data |
 | [BL-053](BL-053-vix-at-10am-strategy-mix.md) | Pick the NIFTY strategy mix at 10:00 from India VIX's first 45 minutes | P2 | In progress | research | options |
-| [BL-054](BL-054-weekly-strategy-slot-rotation.md) | Weekly rotation of NIFTY strategy start times: rank 33 variants on two weeks' P&L, hold the top 5 Widesl/Dir (≥2 Widesl) plus 2 Buy when Buy is positive (POC) | P2 | Planned | research | options |
+| [BL-054](BL-054-weekly-strategy-slot-rotation.md) | Weekly rotation of NIFTY strategy start times: rank 33 variants on two weeks' P&L, hold the top 5 Widesl/Dir (≥2 Widesl) plus 2 Buy when Buy is positive (POC) | P2 | Done: killed | research | options |
+| [BL-055](BL-055-daily-portfolio-stop-loss.md) | Daily portfolio stop-loss (₹8k / ₹10k / ₹12.5k) on the NIFTY benchmark mixes: worst days, drawdown, cost in profit | P2 | In progress | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |

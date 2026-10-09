@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; does not block this month's Momentum work |
-| **Status** | Planned |
+| **Status** | Done — killed by its pass rule (see Phase 0 Result) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -111,7 +111,26 @@ Committed before any run. Never edited after a run; a changed rule is a new date
   ₹65-premium Widesl, the Mar 2022 – Oct 2024 hold-out. Each needs a new dated block. The
   verdict is read from the at-least-2 run only; a sensitivity run that looks better does not
   replace it.
-- **Result:** (after the run)
+- **Result:** **KILL** (condition 1 fails). 103 evaluated weeks, 481 days, 2024-10-21 → 2026-10-08;
+  33 variants, 1 lot each, before charges; `wide_0917` reproduces the live strategy per day.
+  At least 2 Widesl (verdict run): rotation ₹8,60,176, max DD −₹1,33,542, 6.9 lots a week. It sits
+  at the 79th percentile of 1,000 random picks (P90 ₹9,00,313), so (1) fails. It also fails (2):
+  E ₹8,02,614 with DD −₹80,928 (a better drawdown), and (3): B2 (3 Widesl + 2 Dir, fixed)
+  ₹8,76,366 beats it on total. B1 ₹8,01,827 / DD −₹2,25,807, B3 ₹8,58,424 / DD −₹2,10,009,
+  T ₹7,35,329 / DD −₹1,49,456. Per lot a week: rotation ₹1,203 against B1 ₹1,557, B2 ₹1,702,
+  B3 ₹1,389, T ₹1,428, E ₹1,123 — the rotation's total is helped by carrying 6.9 lots against 5–6.
+  Rank persistence (this week's score vs next week's P&L, Spearman across variants): +0.025
+  (positive in 56% of weeks) for Widesl/Dir, +0.029 (52%) for Buy: no predictive content. The
+  Buy add-on fired in 100 of 103 weeks, so it was nearly always on; its 2 lots made ₹59,771
+  (₹598 a week) and ₹12,025 in the 3 weeks it stayed out. The at-least-2 rule overrode the
+  ranking in 50 weeks; core Widesl count per week: 2 in 64, 3 in 19, 4 in 13, 5 in 7.
+  Sensitivity, at least 3 (not part of the verdict): ₹8,70,039, DD −₹1,31,476, 94th percentile
+  of random (condition 1 would pass), still fails (2) and (3). Hindsight ceiling (look-ahead,
+  not a result): best fixed 5 = dir_1132, dir_1117, dir_1147, wide_0932, wide_1002, ₹10,39,784.
+  Whole-window 1-lot slot pattern (in-sample, descriptive only): Widesl is best at 09:17–10:02
+  (₹1.73–1.75 lakh) and weakest at 11:02–11:47 (₹0.60–0.84 lakh); Dir ATM is best at 11:02–11:47
+  (₹2.2–2.6 lakh, DD −₹12k to −₹25k); Buy is positive but small and does not beat Dir or Widesl
+  at any start time. Scripts: `packages/option-backtesting/research/bl054/`.
 
 ### Phase 1 — Variant backtests
 - **Tasks:**
@@ -156,8 +175,9 @@ Committed before any run. Never edited after a run; a changed rule is a new date
 
 ## Open questions
 
-- Commit the variant generator and evaluation script under `research/bl054/` (the default), or
-  keep them as throwaway scratch files?
+- The slot pattern above (Widesl early, Dir late) is a hint on data we have now looked at. A
+  fixed split of that kind, with no weekly ranking, would need its own pre-registered block and
+  a test on days not yet seen before it means anything.
 
 ## Log
 
@@ -174,5 +194,6 @@ Committed before any run. Never edited after a run; a changed rule is a new date
   pass condition 3 and T stays as a reported line. R, E and conditions 1 and 2 are unchanged.
   B3 holds 6 lots against the rotation's 5 or 7, so lots-adjusted figures (P&L per lot-week)
   are reported next to the totals; the verdict still reads totals and drawdown.
+- 2026-10-09 — ran; killed by its pass rule (Result above).
 - 2026-10-09 — owner dropped the minimum-Widesl 4 and 5 sensitivity runs before any run; only
   2 (verdict) and 3 (sensitivity) remain.
