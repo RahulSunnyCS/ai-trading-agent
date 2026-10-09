@@ -99,8 +99,9 @@ preview or 16:45 final, which cannot evaluate it: the 19:30 rerun sends it (BL-0
 headline gets a 14:40 preview on Fyers live prices (`api._broad_live_previews`, TODO 3.9.26): the
 same in-memory live ranking as the dashboard's rebalance preview (`api._broad_live_ranking` ->
 `rebalance.live_broad_ranking`, never stored, never journalled), the headline only (or its group's
-sleeves); outside market hours it waits quietly for 19:30, and a missing token or quote is
-reported. `live_broad_ranking` reuses the ranking's own `stock_membership` and `liquidity_gate`
+sleeves); outside market hours or on an exchange holiday (`api._market_open`, `ref_holidays`) it
+leaves the outcome untouched for 19:30, and any failure (token, quote, network) is reported,
+never raised. `live_broad_ranking` reuses the ranking's own `stock_membership` and `liquidity_gate`
 (reloading the universe costs ~150 s) and must keep `broad.finish_universe_ranking`'s pool rules
 (gate, ended series); `tests/test_broad_live_preview.py` pins live = stored when live prices equal
 the close —

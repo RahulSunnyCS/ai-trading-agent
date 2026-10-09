@@ -1811,6 +1811,32 @@ GATED_BROAD_UNIVERSES = ("all_liquid", "turnover_rank")
 #: turnover rank is the top 750, the same size as the Total Market pool, so it is quoted.
 LIVE_REFUSED_BROAD_UNIVERSES = ("all_liquid",)
 
+#: Exceptions a live preview reports instead of raising: a missing token, a Fyers error, a
+#: network failure (urllib's URLError and timeouts are OSError), stale history or a missing quote.
+LIVE_PREVIEW_ERRORS = (fyers.FyersCredentialsError, RuntimeError, ValueError, KeyError, OSError)
+
+
+def _exchange_holiday(day: date) -> bool:
+    """Whether NSE is closed on `day` (the catalog's `ref_holidays`). Unknown = open: a missing
+    or locked catalog must not switch live prices off."""
+    try:
+        with read_catalog() as con:
+            row = con.execute("SELECT count(*) FROM ref_holidays WHERE date = ?", [day]).fetchone()
+        return bool(row and row[0])
+    except Exception:  # noqa: BLE001 - a lookup failure means "assume open"
+        return False
+
+
+def _market_open(now: datetime) -> bool:
+    """NSE's cash session is open at `now` (IST): a weekday, 09:15-15:30, not a holiday. Off
+    hours, Fyers "live" quotes are the previous session's last prices."""
+    now = now.astimezone(IST)
+    return (
+        now.weekday() < 5
+        and time(9, 15) <= now.time() <= time(15, 30)
+        and not _exchange_holiday(now.date())
+    )
+
 
 def _liquidity_config(req: BacktestRequest) -> liquidity_mod.LiquidityConfig | None:
     """The request's liquidity gate, or None when it's off (the original, ungated pool)."""
@@ -2154,7 +2180,7 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                 updates["rebalance_offset"] = offset
         return req.model_copy(update=updates), schedule
 
-    live = now.weekday() < 5 and time(9, 15) <= now.time() <= time(15, 30)
+    live = _market_open(now)
     # Why a preview taken in market hours still used stored closes. Shown on the page, so a
     # fallback is never mistaken for live prices.
     live_unavailable: str | None = None
@@ -2183,8 +2209,8 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
                         stock, req.universe, req.holdings_pct, quotes, now.date()
                     )
                     week = rebalance.signal_week(now.date())
-                except (fyers.FyersCredentialsError, RuntimeError, ValueError) as error:
-                    live, live_unavailable = False, str(error)
+                except LIVE_PREVIEW_ERRORS as error:
+                    live, live_unavailable = False, str(error) or type(error).__name__
             if not live:
                 week = stock.prices.index[-1]
                 prices = stock.prices.copy()
@@ -2210,17 +2236,18 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
             unknown = set(req.holdings_pct) - set(symbol_map) - {IDLE}
             if unknown:
                 raise ValueError(f"Unknown or inactive holdings: {', '.join(sorted(unknown))}.")
+            # The whole market is not quoted by design: the last close is its normal preview,
+            # not a fallback, so it carries no warning.
+            if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
+                live, live_unavailable = False, None
             if live:
                 try:
-                    if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
-                        quotes = {}  # _broad_live_ranking refuses it with the reason
-                    else:
-                        quotes = fyers.quotes(sorted(set(symbol_map.values())), creds)
+                    quotes = fyers.quotes(sorted(set(symbol_map.values())), creds)
                     preview_ranking, ltp, symbols, week = _broad_live_ranking(
                         req, quotes, now.date()
                     )
-                except (fyers.FyersCredentialsError, RuntimeError, ValueError) as error:
-                    live, live_unavailable = False, str(error)
+                except LIVE_PREVIEW_ERRORS as error:
+                    live, live_unavailable = False, str(error) or type(error).__name__
             if not live:
                 week = ranking.prices.index[-1]
                 preview_ranking = rebalance.persisted_broad_ranking(ranking)
@@ -3243,6 +3270,7 @@ def _broad_live_previews(
     nothing else). Never journalled: a live-price preview is not a reproducible record."""
     now = (now or _ist_now()).astimezone(IST)
     headline = _headline_ids(outcomes, groups)
+    market_open = _market_open(now)
     quotes_by_symbols: dict[tuple[str, ...], dict[str, float]] = {}
     for outcome in outcomes:
         if (
@@ -3253,13 +3281,13 @@ def _broad_live_previews(
             or not _awaiting_data(outcome["blocked"])
         ):
             continue
+        if not market_open:
+            # Off hours (or an exchange holiday) "live" quotes are the last session's prices; the
+            # outcome stays exactly as it was, waiting for the 19:30 run, so it is not reported
+            # (nor is a group made of such sleeves).
+            continue
         outcome["journal"] = False
         outcome["awaiting_data"] = False
-        if not (now.weekday() < 5 and time(9, 15) <= now.time() <= time(15, 30)):
-            # Off-hours "live" quotes are yesterday's; the 19:30 run is the signal then.
-            outcome["blocked"] = "Live Broad preview runs in market hours only."
-            outcome["awaiting_data"] = True
-            continue
         if creds is None:
             outcome["blocked"] = (
                 "Live Broad preview needs a Fyers token; log in from Broker logins or run "
@@ -3270,9 +3298,10 @@ def _broad_live_previews(
         try:
             outcome["result"] = _broad_live_weekly_result(favorite, creds, now, quotes_by_symbols)
             outcome["blocked"] = None
-        except (fyers.FyersCredentialsError, RuntimeError, ValueError, KeyError) as error:
+        except Exception as error:  # noqa: BLE001 - must never cost the run its other signals
             outcome["result"] = None
-            outcome["blocked"] = f"Live Broad preview failed: {error}"
+            reason = str(error) or type(error).__name__
+            outcome["blocked"] = f"Live Broad preview failed: {reason}"
 
 
 def _broad_live_weekly_result(
@@ -3320,12 +3349,7 @@ def _broad_live_weekly_result(
             weights = {name: round(value / total, 4) for name, value in moved.items()}
     equity = result.equity.loc[:week]
     rows = latest.get("rows", [])
-    actionable = [
-        row
-        for row in rows
-        if row.get("action")
-        and str(row.get("action", "")).upper() not in {"HOLD", "AT CAP", "WAIT"}
-    ]
+    actionable = _actionable_rows(rows)
     signal = {
         "week": latest.get("week", week.strftime("%Y-%m-%d")),
         "label": favorite["name"],
@@ -3363,6 +3387,16 @@ def _broad_live_weekly_result(
     return RunResult(note, signal)
 
 
+def _actionable_rows(rows: list[dict]) -> list[dict]:
+    """The rows that are trades to place (not a hold, a capped position or a wait)."""
+    return [
+        row
+        for row in rows
+        if row.get("action")
+        and str(row.get("action", "")).upper() not in {"HOLD", "AT CAP", "WAIT"}
+    ]
+
+
 def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     """Evaluate one bhavcopy-backed favourite after its processed-week gate passes."""
     from .weekly import RunResult
@@ -3389,12 +3423,7 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
 
     latest = payload.get("latest", {})
     rows = latest.get("rows", [])
-    actionable = [
-        row
-        for row in rows
-        if row.get("action")
-        and str(row.get("action", "")).upper() not in {"HOLD", "AT CAP", "WAIT"}
-    ]
+    actionable = _actionable_rows(rows)
     lines = [f"Strategy: {favorite['name']} · dataset: {req.dataset}"]
     if actionable:
         lines.extend(

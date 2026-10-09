@@ -22,6 +22,8 @@ from momentum_backtesting.categories import broad
 from momentum_backtesting.engine import Config
 from momentum_backtesting.notify import IST, Notification
 
+MARKET_HOURS = datetime(2026, 10, 9, 14, 40, tzinfo=IST)
+
 # --- parity: live prices equal to the close reproduce the stored path --------------------------
 
 
@@ -135,8 +137,6 @@ def test_an_after_hours_preview_uses_the_close_without_a_warning(broad_client, m
 
 # --- the 14:40 weekly job ----------------------------------------------------------------------
 
-MARKET_HOURS = datetime(2026, 10, 9, 14, 40, tzinfo=IST)
-
 
 def _broad_outcome(id_: str, active: bool) -> dict:
     return {
@@ -187,11 +187,89 @@ def test_without_a_token_the_headline_is_blocked_with_the_reason(monkeypatch):
     assert outcomes[0]["awaiting_data"] is False  # so the job reports it
 
 
-def test_after_hours_the_headline_waits_for_the_1930_run_quietly():
-    outcomes = [_broad_outcome("head", True)]
+def test_after_hours_the_headline_waits_for_the_1930_run_untouched():
+    outcome = _broad_outcome("head", True)
+    before = dict(outcome)
     after = datetime(2026, 10, 9, 16, 0, tzinfo=IST)
-    api._broad_live_previews(outcomes, {"head": {}}, [], creds="CREDS", now=after)
-    assert outcomes[0]["result"] is None and outcomes[0]["awaiting_data"] is True
+    api._broad_live_previews([outcome], {"head": {}}, [], creds="CREDS", now=after)
+    assert outcome == before
+
+
+def test_an_exchange_holiday_counts_as_closed(monkeypatch):
+    monkeypatch.setattr(api, "_exchange_holiday", lambda day: True)
+    assert not api._market_open(MARKET_HOURS)
+    outcome = _broad_outcome("head", True)
+    before = dict(outcome)
+    api._broad_live_previews([outcome], {"head": {}}, [], creds="CREDS", now=MARKET_HOURS)
+    assert outcome == before
+
+
+def test_an_off_hours_group_headline_stays_quiet():
+    """Its sleeves keep their 'waiting for 19:30' reason, so the group is awaiting data too."""
+    outcomes = [_broad_outcome("a", False), _broad_outcome("b", False)]
+    group = {
+        "id": "g",
+        "name": "Pair",
+        "config": {"dataset": "broad"},
+        "active": True,
+        "members": [{"id": "a", "name": "a"}, {"id": "b", "name": "b"}],
+    }
+    after = datetime(2026, 10, 9, 16, 0, tzinfo=IST)
+    api._broad_live_previews(outcomes, {}, [group], creds="CREDS", now=after)
+    (combined,) = api._group_outcomes([group], outcomes, "preview")
+    assert combined["result"] is None and combined["awaiting_data"] is True
+
+
+def test_a_network_failure_is_reported_not_raised(monkeypatch):
+    def offline(*_args):
+        raise OSError("urlopen error [Errno 51] Network is unreachable")
+
+    monkeypatch.setattr(api, "_broad_live_weekly_result", offline)
+    outcomes = [_broad_outcome("head", True)]
+    api._broad_live_previews(outcomes, {"head": {}}, [], creds="CREDS", now=MARKET_HOURS)
+    assert "Network is unreachable" in outcomes[0]["blocked"]
+    assert outcomes[0]["awaiting_data"] is False
+
+
+def test_a_network_failure_in_the_rebalance_preview_falls_back_to_the_close(
+    broad_client, monkeypatch
+):
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda **_kwargs: "CREDS")
+    monkeypatch.setattr(api, "load_repo_env", lambda: None)
+
+    def offline(*_args):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(fyers, "quotes", offline)
+    req = api.RebalanceRequest(**_broad_request(), portfolio_value=100000)
+    result = api.rebalance_preview(req, now=MARKET_HOURS)
+    assert result["price_mode"] == "last_close" and result["live_unavailable"] == "timed out"
+
+
+def test_the_whole_market_universe_previews_from_the_close_without_a_warning(monkeypatch):
+    req = api.RebalanceRequest(
+        universe=["*"],
+        dataset="broad",
+        broad_universe="all_liquid",
+        broad_liquidity_filter=True,
+        portfolio_value=100000,
+    )
+    ranking = type("R", (), {"prices": pd.DataFrame(index=[pd.Timestamp("2026-10-02")])})()
+    monkeypatch.setattr(api, "_broad_ranking", lambda r: ranking)
+    monkeypatch.setattr(rebalance, "broad_quote_symbols", lambda r: {})
+    monkeypatch.setattr(fyers, "resolve_credentials", lambda **_kwargs: "CREDS")
+    monkeypatch.setattr(api, "load_repo_env", lambda: None)
+    monkeypatch.setattr(fyers, "quotes", lambda *a: pytest.fail("the whole market was quoted"))
+
+    class Stop(Exception):
+        pass
+
+    def persisted(r):
+        raise Stop
+
+    monkeypatch.setattr(rebalance, "persisted_broad_ranking", persisted)
+    with pytest.raises(Stop):  # reached the last-close branch without quoting
+        api.rebalance_preview(req, now=MARKET_HOURS)
 
 
 def test_a_failed_live_preview_is_reported_not_raised(monkeypatch):
