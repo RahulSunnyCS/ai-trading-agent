@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner question; affects half the search space's meaning |
-| **Status** | Done — killed |
+| **Status** | In progress (addendum 1) |
 | **Type** | research (+ an opt-in engine flag) |
 | **Area** | momentum |
 | **Created** | 2026-10-09 |
@@ -73,3 +73,6 @@ month on every lookback is a different question; it would need its own addendum 
 
 - 2026-10-09 — created and started (owner: "do both"); Phase 0 committed before any run.
 - 2026-10-09 — run (13 runs, 2 cells); killed. Diagnosed as short-term reversal, not a bug.
+- 2026-10-09 — owner: also test skipping the latest month on every lookback, and not skipping at
+  all. Addendum 1 (`search_spaces/bl055_criteria_addendum_1.json`) committed before any run; same
+  strategies and rules, 3 variants in all.
