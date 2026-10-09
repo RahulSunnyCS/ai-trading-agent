@@ -481,6 +481,8 @@ export interface MomentumRebalanceResult {
   signal_week: string;
   price_mode: 'live' | 'last_close';
   price_source: string;
+  /** Why a market-hours preview used stored closes instead of live prices; null otherwise. */
+  live_unavailable?: string | null;
   portfolio_value: number;
   first_allocation: boolean;
   rebalance_schedule: {

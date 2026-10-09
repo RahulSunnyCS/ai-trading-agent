@@ -94,8 +94,17 @@ and still writes `data/launchd-weekly-<run>.log`, which `GET /api/weekly/status`
 orchestration, not two copies that can drift.
 
 **A blocked or missing active favourite now sends a Telegram warning** (not silence), except
-that a stock-based headline (Stock, Custom Index, Broad) is not reported as blocked by the 14:40
-preview or 16:45 final, which cannot evaluate it: the 19:30 rerun sends it (BL-051) —
+that a stock-based headline (Stock, Custom Index) is not reported as blocked by the 14:40
+preview or 16:45 final, which cannot evaluate it: the 19:30 rerun sends it (BL-051). A **Broad**
+headline gets a 14:40 preview on Fyers live prices (`api._broad_live_previews`, TODO 3.9.26): the
+same in-memory live ranking as the dashboard's rebalance preview (`api._broad_live_ranking` ->
+`rebalance.live_broad_ranking`, never stored, never journalled), the headline only (or its group's
+sleeves); outside market hours or on an exchange holiday (`api._market_open`, `ref_holidays`) it
+leaves the outcome untouched for 19:30, and any failure (token, quote, network) is reported,
+never raised. `live_broad_ranking` reuses the ranking's own `stock_membership` and `liquidity_gate`
+(reloading the universe costs ~150 s) and must keep `broad.finish_universe_ranking`'s pool rules
+(gate, ended series); `tests/test_broad_live_preview.py` pins live = stored when live prices equal
+the close —
 previously a favourite that failed (e.g. the tax-config bug below) meant the job computed a
 signal, found no usable active result, and exited 0 with nothing sent and no alert, for every
 run, for over a week, before anyone noticed.
