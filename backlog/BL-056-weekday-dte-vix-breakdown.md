@@ -50,8 +50,10 @@ screen.
   nearest `contracts_daily.expiry` on or after the day with traded bars, per the owner's
   suggestion to read the expiry from the contract — cross-checked against
   `legwise.anatomy.dte_for`; a day where the two disagree → `unknown`; VIX band from the 09:15
-  open of INDIAVIX (missing → `unknown`). A second weekday table covers only the latest
-  expiry-weekday regime for each index, since the weekday of expiry changed during the window.
+  open of INDIAVIX (missing → `unknown`). The weekday table covers only 2025-09-01 →
+  2026-10-08 (owner, 2026-10-09: after NIFTY's expiry moved Thursday → Tuesday; SENSEX moved to
+  Thursday the same day), about 13 months and one expiry regime per index; there is no
+  whole-window weekday table. The days-to-expiry and VIX tables use the full two years.
 - **Per cell:** days, total, avg/day, win %, worst day, max drawdown of the days chained within
   the cell (labelled as such). Cells under 30 days are printed and flagged `thin`.
 - **Look-ahead check:** none needed; descriptive, no decision is simulated.
@@ -89,4 +91,6 @@ screen.
   490 days each, no gaps, equals the lake's own dte column; the calendar disagrees on 6 SENSEX days
   in Oct 2024 (nearest weekly contract missing from the data) → `unknown`. Expiry weekday: NIFTY
   Thu → Tue (about Sep 2025); SENSEX Fri → Tue → Thu (about Aug 2025).
+- 2026-10-09 — before any SENSEX result was read: owner restricted the weekday analysis to
+  2025-09-01 onward (one expiry regime per index); the extra latest-regime table is dropped.
 - 2026-10-09 — created; owner chose bands, SENSEX rupee values, both weekday and dte, no verdict.
