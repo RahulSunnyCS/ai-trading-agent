@@ -121,7 +121,7 @@ year only") and which has been examined many times. Two ways to test the rule ou
   from the 09:15 INDIAVIX open; weekday from the calendar. Nothing is tuned on this period.
 - **Rows (fixed):** baseline 33/25/25/17; recent-only 100/0/0/0; no-recent 0/33/33/34; no-VIX
   40/30/30/0; baseline with fit lookbacks 21:50,63:50; baseline with 63:50,126:50; recent-only + family
-  0.5; the four BL-072 blends (25/25/15/15/20/0 and 25/25/15/15/10/10 on the two lookback sets).
+  0.5; the four BL-072 block-1 blends (25/25/15/15/20/0 and 25/25/15/15/10/10 on the two lookback sets); added 2026-10-10 before any hold-out read: BL-072 block-2 rows (a) 30/30/20/20/0 and (d) 40/10/20/20/10 on 63:50,126:50.
 - **Read-out:** (1) *the recent edge holds* if baseline − no-recent is positive with a 90% block-
   bootstrap interval (5-day blocks, 2,000 resamples) above zero and at least half the main year's
   ₹1,014 a day. (2) *the longer fit lookbacks hold* if each B3 row beats the baseline with a bootstrap

@@ -81,7 +81,26 @@ the recency signals and the longer-lookback fit signals fixed priorities, and "a
   better B3-only row; real = above all 10 shuffles). The 2022–2024 hold-out (BL-071 part B) decides;
   these rows join its list.
 - **Will not run:** other weights.
-- **Result:** pending.
+- **Result, block 2 (2026-10-10, gross; shuffles pending):** the **no-VIX row is the best row of the
+  whole series on both periods** and is a *candidate* under block 1's rule (gross ÷ drawdown 10.4 vs the
+  baseline's 6.31; gross within one yardstick of the better B3-only row, ₹4,97,335).
+
+  | Row (recent/family/weekday/dte/VIX, 63:50 126:50) | In-sample gross | Max DD | Gross÷DD | Win % | Slice Jan–Aug 2025 (gross / DD) |
+  |---|---|---|---|---|---|
+  | **(a) 30/30/20/20/0** | **4,86,704** | **−46,802** | **10.40** | **68.3** | **3,71,462 / −70,596** |
+  | (b) 25/25/20/20/10 | 4,33,411 | −65,946 | 6.57 | 62.4 | 3,25,954 / −82,708 |
+  | (c) 25/25/15/15/20 (block 1) | 3,64,062 | −80,120 | 4.54 | 60.4 | 3,56,092 / −79,098 |
+  | (d) 40/10/20/20/10 | 4,83,612 | −70,325 | 6.88 | 59.4 | 3,09,507 / −61,924 |
+  | (e) 33/—/25/25/17 (BL-069 B3, no family) | 4,86,867 | −61,058 | 7.97 | 63.9 | 2,73,438 / −72,592 |
+  | baseline 33/25/25/17, 5/21/63 | 4,30,868 | −68,294 | 6.31 | 62.4 | 1,70,015 / −88,366 |
+
+  Reading: VIX band hurts in both periods here (0 → 10 → 20 is monotone worse in-sample and on the
+  slice except row c); the family-pooled recent plus long lookbacks is what lifts the slice (rows a–d all
+  above the slice's random P90 ₹2,94,240, row e below it). Row (a) is the first configuration that is
+  near the top in-sample *and* above chance out of period. Caution written down now: this is about the
+  60th configuration read on the same year and the slice has been read several times, so (a) is a
+  candidate and nothing more until the 2022–2024 hold-out (BL-071 part B, row list extended by (a) and
+  (d)); its 10 label shuffles follow.
 
 ## Log
 
