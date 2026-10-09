@@ -26,11 +26,16 @@ SEBI, IPFT_NSE, STAMP_BUY, GST = 0.000001, 0.000005, 0.00003, 0.18
 PLATFORM_FEE = (
     19.0  # optional: AlgoTest per-strategy fee per day (₹75 for 4 strategies in the sheet)
 )
-PICKS = {
-    "whole_day": "daily_picks_min2_core5_buy2_whole_day.csv",  # DRB-5W2 (BL-062)
-    "morning66": "daily_picks.csv",
-    "DRB-6W2": "daily_picks_min2_core6_buy2_whole_day.csv",  # BL-064
-    "DRB-6W3": "daily_picks_min3_core6_buy2_whole_day.csv",
+PICKS = {  # rotation -> (daily picks file, lots traded in each picked strategy)
+    "whole_day": ("daily_picks_min2_core5_buy2_whole_day.csv", 1),  # DRB-5W2 (BL-062)
+    "morning66": ("daily_picks.csv", 1),
+    "DRB-6W2": ("daily_picks_min2_core6_buy2_whole_day.csv", 1),  # BL-064
+    "DRB-6W3": ("daily_picks_min3_core6_buy2_whole_day.csv", 1),
+    "DRB-6W2L2": (
+        "daily_picks_min2_core6_buy2L2_whole_day.csv",
+        2,
+    ),  # BL-065: 3 strategies of 2 lots
+    "DRB-6W3L2": ("daily_picks_min3_core6_buy2L2_whole_day.csv", 2),
 }
 
 
@@ -100,29 +105,32 @@ def main() -> None:
         pair_charges[(name, day)] = (total, trip, len(r["trades"]))
 
     out_rows = []
-    for rot, file in PICKS.items():
+    for rot, (file, per) in PICKS.items():
         picks = pd.read_csv(HERE.parent / "bl057" / file, parse_dates=["day"])
         for row in picks.itertuples():
             names = row.core_A.split(",") + (row.buy.split(",") if isinstance(row.buy, str) else [])
             day = row.day.date().isoformat()
             tot = dict.fromkeys(("brokerage", "stt", "exchange", "sebi_ipft", "stamp", "gst"), 0.0)
-            trip_brokerage = 0.0
-            for n in names:
-                c, t, _ = pair_charges[(n, day)]
+            for n in names:  # a strategy of `per` lots trades `per` times the 1-lot quantity
+                c, _t, _ = pair_charges[(n, day)]
                 for k in tot:
-                    tot[k] += c[k]
-                trip_brokerage += t["brokerage"] + t["gst"] - t["gst"]
+                    tot[k] += c[k] * per
             # brokerage-per-round-trip variant: brokerage and its GST recomputed
-            trip_total = sum(pair_charges[(n, day)][1][k] for n in names for k in tot)
+            trip_total = sum(pair_charges[(n, day)][1][k] for n in names for k in tot) * per
+            # brokerage charged once per order whatever the lots (a flat fee per order, not per lot)
+            flat_brokerage = sum(pair_charges[(n, day)][0]["brokerage"] for n in names)
             out_rows.append(
                 dict(
                     rotation=rot,
                     day=row.day,
                     gross=row.pnl_A,
-                    lots=len(names),
+                    lots=len(names) * per,
+                    strategies=len(names),
+                    flat_brokerage=flat_brokerage,
                     charges=sum(tot.values()),
                     charges_per_trip_brokerage=trip_total,
-                    platform_fee=PLATFORM_FEE * len(names),
+                    platform_fee=PLATFORM_FEE
+                    * len(names),  # AlgoTest's fee is per strategy, not per lot
                     **tot,
                 )
             )
@@ -189,7 +197,7 @@ def main() -> None:
             f"sensitivity: brokerage ₹13 per lot per round trip instead of per order -> charges ₹{t.charges_per_trip_brokerage:,.0f}, net ₹{t.gross - t.charges_per_trip_brokerage:,.0f} ({100 * (t.gross - t.charges_per_trip_brokerage) / CAP:.1f}%)"
         )
         print(
-            f"sensitivity: plus AlgoTest platform fee ₹{PLATFORM_FEE:g} a lot-day -> extra ₹{t.platform_fee:,.0f}, net ₹{t.net - t.platform_fee:,.0f} ({100 * (t.net - t.platform_fee) / CAP:.1f}%)"
+            f"sensitivity: plus AlgoTest platform fee ₹{PLATFORM_FEE:g} a strategy-day -> extra ₹{t.platform_fee:,.0f}, net ₹{t.net - t.platform_fee:,.0f} ({100 * (t.net - t.platform_fee) / CAP:.1f}%)"
         )
 
 

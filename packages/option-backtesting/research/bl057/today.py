@@ -94,7 +94,10 @@ def main() -> None:
         f"NIFTY expiry {att['dte_N_expiry']} (dte {att['dte_N']}), SENSEX expiry {att['dte_S_expiry']} "
         f"(dte {att['dte_S']}); history {len(P)} days to {P.index[-1].date()}"
     )
-    print(f"settings: core {R.CORE}, at least {R.MIN_WIDE} Widesl, up to {R.BUY_MAX} Buy")
+    print(
+        f"settings: core {R.CORE} lots, at least {R.MIN_WIDE} Widesl, up to {R.BUY_MAX} Buy, "
+        f"{R.LOTS_PER} lot(s) per strategy ({R.N_CORE} core strategies)"
+    )
     if (day - P.index[-1]).days > 4:
         print(
             f"WARNING: results end {P.index[-1].date()}; days since then are missing from the scores"
@@ -123,7 +126,7 @@ def main() -> None:
     total = 0.0
     print("\nresult (1 lot each, before charges):")
     for p in picks:
-        pnl = backtest_one_day(p, day.date())
+        pnl = backtest_one_day(p, day.date()) * R.LOTS_PER
         total += pnl
         print(f"  {p:14s} {pnl:>9,.0f}")
     print(f"  {'TOTAL':14s} {total:>9,.0f}")

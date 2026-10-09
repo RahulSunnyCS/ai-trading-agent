@@ -28,6 +28,8 @@ def main() -> None:
     strategies: dict = {}
     with pairs_file.open() as pairs, out_file.open("a") as out:
         for line in pairs:
+            if not line.strip():
+                continue
             name, day_s = line.split()
             if (name, day_s) in done:
                 continue

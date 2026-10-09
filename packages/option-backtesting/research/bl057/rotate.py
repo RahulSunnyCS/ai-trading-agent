@@ -29,8 +29,9 @@ BUY_TOP = 10
 
 # Named baskets (BL-064): `--basket DRB-6W2` = the whole-day Daily Ranked Basket, 6 core lots, at least
 # 2 Widesl, up to 2 Buy. DRB-<core lots>W<minimum Widesl>; DRB-5W2 is the BL-062 run.
+# DRB-6W2L2 = the same 6 core lots as 3 strategies of 2 lots each (BL-065).
 BASKETS = {
-    f"DRB-{core}W{wide}": [
+    f"DRB-{core}W{wide}" + (f"L{per}" if per > 1 else ""): [
         "--whole-day",
         "--core",
         str(core),
@@ -38,15 +39,21 @@ BASKETS = {
         str(wide),
         "--buy-max",
         "2",
+        "--lots-per",
+        str(per),
     ]
     for core in (3, 4, 5, 6, 7, 8)
     for wide in (0, 1, 2, 3, 4)
+    for per in (1, 2, 3)
+    if core % per == 0
 }
 if "--basket" in sys.argv:
     _i = sys.argv.index("--basket")
     _name = sys.argv[_i + 1].upper()
     if _name not in BASKETS:
-        raise SystemExit(f"unknown basket {_name}; choose from DRB-<3..8>W<0..4>, e.g. DRB-6W2")
+        raise SystemExit(
+            f"unknown basket {_name}; choose from DRB-<3..8>W<0..4>[L<2|3>], e.g. DRB-6W2L2"
+        )
     sys.argv[_i : _i + 2] = BASKETS[_name]
 
 
@@ -56,6 +63,10 @@ def _arg(name, default):
 
 CORE = _arg("--core", 5)  # 5 = first block; 3 = small-book block
 BUY_MAX = _arg("--buy-max", 2)  # 2 = first block; 1 = small-book block
+LOTS_PER = _arg("--lots-per", 1)  # BL-065: lots traded in each picked strategy (1 = one lot each)
+assert CORE % LOTS_PER == 0, "--core must be a multiple of --lots-per"
+N_CORE = CORE // LOTS_PER  # core strategies a day
+N_BUY = max(1, BUY_MAX // LOTS_PER)  # Buy strategies a day (2 Buy lots = 1 Buy strategy of 2 lots)
 N_RUNS, SEED = 1000, 57
 # BL-061: add the closest-premium Widesl (NIFTY 80 / 100, SENSEX 250 / 320) to the candidate list
 WHOLE_DAY = "--whole-day" in sys.argv  # BL-062: every start time 09:17..15:17 (248 variants)
@@ -63,6 +74,7 @@ CLOSEST = "--closest" in sys.argv or WHOLE_DAY
 CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320")
 # Case A's Widesl minimum: 2 is the first pre-registered block; 3 is the later block (BL-057).
 MIN_WIDE = int(sys.argv[sys.argv.index("--min-wide") + 1]) if "--min-wide" in sys.argv else 2
+MIN_WIDE_N = -(-MIN_WIDE // LOTS_PER)  # the minimum in whole strategies, rounded up
 
 
 def read_net(path) -> pd.Series:
@@ -220,10 +232,11 @@ def select_picks(comp, names, masks, min_wide=None, core=None, buy_max=None):
     """(core_a, core_b, buy, overridden): the top `core` Widesl/Dir variants, case A with at
     least `min_wide` Widesl (lowest-scoring Dir swapped for the next-best Widesl), case B with no
     minimum, plus up to `buy_max` Buy variants that are in the overall top BUY_TOP.
-    Defaults are the module settings (--min-wide / --core / --buy-max)."""
-    min_wide = MIN_WIDE if min_wide is None else min_wide
-    core = CORE if core is None else core
-    buy_max = BUY_MAX if buy_max is None else buy_max
+    Defaults are the module settings (--min-wide / --core / --buy-max / --lots-per), counted in
+    strategies: with 2 lots per strategy a core of 6 lots is 3 strategies."""
+    min_wide = MIN_WIDE_N if min_wide is None else min_wide
+    core = N_CORE if core is None else core
+    buy_max = N_BUY if buy_max is None else buy_max
     is_wide, is_dir, is_buy, _ = masks
     pool = np.where(~is_buy)[0]
     order = sorted(pool, key=lambda v: (-comp[v], names[v]))
@@ -376,13 +389,14 @@ def main() -> None:
         rows.append(
             dict(
                 day=days[i],
-                pnl_A=today[core_a].sum() + today[buy].sum(),
-                pnl_B=today[core_b].sum() + today[buy].sum(),
-                lots=CORE + len(buy),
+                pnl_A=LOTS_PER * (today[core_a].sum() + today[buy].sum()),
+                pnl_B=LOTS_PER * (today[core_b].sum() + today[buy].sum()),
+                lots=LOTS_PER * (N_CORE + len(buy)),
                 n_buy=len(buy),
-                buy_pnl=today[buy].sum(),
-                buy_alt=today[
-                    [v for v in sorted(np.where(is_buy)[0], key=lambda v: -comp[v])][:BUY_MAX]
+                buy_pnl=LOTS_PER * today[buy].sum(),
+                buy_alt=LOTS_PER
+                * today[
+                    [v for v in sorted(np.where(is_buy)[0], key=lambda v: -comp[v])][:N_BUY]
                 ].sum(),
                 wide_A=int(is_wide[core_a].sum()),
                 wide_B=int(is_wide[core_b].sum()),
@@ -397,7 +411,9 @@ def main() -> None:
 
     # comparators
     buy_lots = R.n_buy.to_numpy()
-    E = CORE * today_all[:, ~is_buy].mean(axis=1) + buy_lots * today_all[:, is_buy].mean(axis=1)
+    E = CORE * today_all[:, ~is_buy].mean(axis=1) + LOTS_PER * buy_lots * today_all[:, is_buy].mean(
+        axis=1
+    )
     b54 = HERE.parent / "bl054" / "results"
     live_w = varlib.live_csv(b54, "nifty_widesl_917_otm1")
     live_d = varlib.live_csv(b54, "nifty_dir_924_itm1_sl21_recost")
@@ -417,13 +433,13 @@ def main() -> None:
             d = np.empty(len(sel))
             for j, i in enumerate(sel):
                 while True:
-                    ix = rng.choice(pool_all, CORE, replace=False)
+                    ix = rng.choice(pool_all, N_CORE, replace=False)
                     if is_wide[ix].sum() >= min_wide:
                         break
                 v = Pv[i, ix].sum()
                 if buy_lots[j]:
                     v += Pv[i, rng.choice(pool_b, buy_lots[j], replace=False)].sum()
-                d[j] = v
+                d[j] = LOTS_PER * v
             tot[r], dd[r] = d.sum(), mdd(d)
         return tot, dd
 
@@ -445,8 +461,13 @@ def main() -> None:
         f"({int((R.n_buy == 1).sum())} with 1 lot, {int((R.n_buy == 2).sum())} with 2); lots/day avg {lots_avg:.2f}"
     )
     print("per-lot-day = avg/day divided by that line's avg lots/day")
-    cases = [(f"A (>={MIN_WIDE} Widesl)", "pnl_A", MIN_WIDE)]
-    if MIN_WIDE > 0:  # with no minimum, case B is case A: do not simulate the baseline twice
+    label_a = (
+        f"A (>={MIN_WIDE} Widesl lots = {MIN_WIDE_N} strategies)"
+        if LOTS_PER > 1
+        else f"A (>={MIN_WIDE} Widesl)"
+    )
+    cases = [(label_a, "pnl_A", MIN_WIDE_N)]
+    if MIN_WIDE_N > 0:  # with no minimum, case B is case A: do not simulate the baseline twice
         cases.append(("B (no minimum)", "pnl_B", 0))
     for case, col, min_w in cases:
         tot, dd = random_total(min_w)
@@ -460,7 +481,7 @@ def main() -> None:
         S["lots/day"] = [lots_avg, lots_avg, CORE]
         S["per-lot-day"] = S.avg_day / S["lots/day"]
         print(
-            f"\n{'=' * 100}\nCASE {case}{'   <- VERDICT CASE' if min_w == MIN_WIDE else '   (reported only)'}\n{'=' * 100}"
+            f"\n{'=' * 100}\nCASE {case}{'   <- VERDICT CASE' if min_w == MIN_WIDE_N else '   (reported only)'}\n{'=' * 100}"
         )
         print(S.to_string(float_format=lambda x: f"{x:,.0f}" if abs(x) >= 100 else f"{x:,.2f}"))
         p90, p50 = np.percentile(tot, 90), np.percentile(tot, 50)
@@ -476,7 +497,7 @@ def main() -> None:
         print(
             f"(1) total >= R P90: {c1} | (2) beats E on total and DD: {c2} | (3) beats B2 on total and DD: {c3}"
         )
-        if min_w == MIN_WIDE:
+        if min_w == MIN_WIDE_N:
             print(
                 "VERDICT:", "PASS" if (c1 and c2 and c3) else ("KILL" if not c1 else "INCONCLUSIVE")
             )
@@ -494,8 +515,8 @@ def main() -> None:
         f"case B Widesl count {R.wide_B.value_counts().sort_index().to_dict()}"
     )
     print(
-        f"    NIFTY share of core picks (case A): {100 * R.nifty_A.sum() / (CORE * len(R)):.0f}%; "
-        f"core members changed per day (case A): avg {R.changes_A.mean():.2f} of {CORE}"
+        f"    NIFTY share of core picks (case A): {100 * R.nifty_A.sum() / (N_CORE * len(R)):.0f}%; "
+        f"core members changed per day (case A): avg {R.changes_A.mean():.2f} of {N_CORE}"
     )
     fired = R[R.n_buy > 0]
     idle = R[R.n_buy == 0]
@@ -509,9 +530,9 @@ def main() -> None:
     )
     if CLOSEST:
         closest_report(picks_A, names, Pv, wd, vb, dte, days)
-    hind = sorted(core_pool, key=lambda v: -today_all[:, v].sum())[:CORE]
+    hind = sorted(core_pool, key=lambda v: -today_all[:, v].sum())[:N_CORE]
     print(
-        f"    HINDSIGHT ceiling (look-ahead, best fixed {CORE} over the selection days): {today_all[:, hind].sum():,.0f} -> {[names[v] for v in hind]}"
+        f"    HINDSIGHT ceiling (look-ahead, best fixed {N_CORE} over the selection days): {LOTS_PER * today_all[:, hind].sum():,.0f} -> {[names[v] for v in hind]}"
     )
     R.assign(
         core_A=[",".join(names[v] for v in c) for c in picks_A],
@@ -520,8 +541,8 @@ def main() -> None:
         HERE
         / (
             "daily_picks.csv"
-            if (MIN_WIDE, CORE, BUY_MAX, CLOSEST) == (2, 5, 2, False)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}.csv"
+            if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}.csv"
         )
     )
 
