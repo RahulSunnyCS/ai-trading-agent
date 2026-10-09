@@ -126,6 +126,14 @@ def live_csv(results_dir, name: str):
     )
 
 
+def with_premium(text: str, premium: int) -> str:
+    """The strategy with both legs' strike set by closest premium instead of a strike offset
+    (SENSEX Widesl OTM2 -> closest_premium; NIFTY's OTM1 file uses the same shape)."""
+    return sub(
+        r"strike: \{ strike_type: OTM\d+ \}", f"strike: {{ closest_premium: {premium} }}", text, 2
+    )
+
+
 def out_dir(default: Path) -> Path:
     """Output folder: `--out DIR` on the command line, else the default."""
     if "--out" in sys.argv:

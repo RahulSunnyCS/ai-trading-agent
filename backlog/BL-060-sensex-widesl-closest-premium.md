@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; completes the SENSEX side of BL-055 |
-| **Status** | In progress (descriptive; same already-seen window, owner override) |
+| **Status** | Done (descriptive; same already-seen window, owner override) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -54,7 +54,24 @@ block), NIFTY.
   OTM2 variants are read from the existing results unchanged.
 - **Hold-out:** none (owner override, same window).
 - **Will not run:** other premiums, Dir / Buy, NIFTY, any rotation or stop-loss mix, charges.
-- **Result:** (after the run)
+- **Result:** descriptive, no verdict. All 48 runs finished (489 days each, 3 skipped by the engine as for
+  the OTM2 variants, no errors); window 2025-09-01 → 2026-10-08, 267 weekdays; the 09:17 OTM2 total
+  reconciles with BL-056. Mean of the start-time averages in each window (₹/day | average max drawdown |
+  start times positive in both halves), OTM2 / ₹250 / ₹320: 09:17–11:47 67 | −34,200 | 5 of 11 /
+  58 | −39,764 | 6 of 11 / 31 | −48,709 | 2 of 11; 12:02–13:47 94 | −22,462 | 4 of 8 / 153 | −19,087 |
+  6 of 8 / 108 | −25,574 | 3 of 8; 14:02–15:02 103 | −14,561 | 2 of 5 / 156 | −9,410 | 4 of 5 / 153 |
+  −10,095 | 5 of 5. Over all 24 start times: ₹250 averages ₹110/day against OTM2's ₹84 (higher on 17 of 24
+  start times, smaller drawdown on 14 of 24, average drawdown −₹26,548 vs −₹26,196); ₹320 averages
+  ₹82 (higher on 13 of 24, smaller drawdown on only 7, average drawdown −₹32,953). Rank correlation of
+  first-half and second-half averages across the 24 start times: OTM2 −0.01, ₹250 +0.25, ₹320 +0.09.
+  By weekday, days to expiry and VIX band all three rules show the same shape as OTM2 (Thursday and
+  expiry day best, Monday and Friday negative, 15–18 VIX worst at about −₹330 to −₹376); ₹250 is a
+  little higher on Thursday (₹374 vs ₹317) and expiry day (₹390 vs ₹328). Average entry premium per leg
+  at 09:17 over the last 15 sessions: OTM2 call ₹277 / put ₹228, closest 250 ₹249 / ₹252, closest 320
+  ₹323 / ₹320 (the closest-premium rule lands on target and balances the two legs; OTM2 does not).
+  Unlike NIFTY (BL-055: closest premium earned less but with a smaller drawdown), SENSEX ₹250 earned
+  more at about the same drawdown and ₹320 was no better than OTM2. Scripts:
+  `packages/option-backtesting/research/bl060/`.
 
 ### Phase 1 — Generate and run the 48 variants (8 in parallel)
 - Done when: 48 result files covering the same days as the OTM2 variants.
@@ -71,3 +88,4 @@ block), NIFTY.
 ## Log
 
 - 2026-10-09 — created from the owner's request; premiums and coverage chosen by the owner.
+- 2026-10-09 — all 48 runs finished 19:29 and the analysis ran (Result above).
