@@ -417,6 +417,7 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
         weights=weights,
         score=heavy.get("score", "ranksum"),
         voladj_skip_recent_month=heavy.get("voladj_skip_recent_month", True),
+        voladj_lookbacks=heavy.get("voladj_lookbacks", False),
         liquidity=liquidity,
         universe_kind=universe_kind,
     )
