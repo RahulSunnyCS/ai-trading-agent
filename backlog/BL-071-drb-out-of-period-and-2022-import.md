@@ -112,3 +112,14 @@ year only") and which has been examined many times. Two ways to test the rule ou
 
 - 2026-10-10 — created; part A registered before its runs, part B inspected read-only and written up.
 - 2026-10-10 — part A ran: not confirmed (all three conditions fail; baseline − no-recent −₹1,26,882). Owner said "import it now in parallel": part B starts, staged (importer into scratch, checked against the Oct 2024 overlap, before anything is written to the lake).
+- 2026-10-10 — part B, owner said "import it now in parallel". Converter `packages/trading-data/scripts/
+  drive_csv_to_parquet.py` wrote 144 expiry Parquet files for 2022-01 → 2024-10-02 (25,246,971 rows, 25,422
+  contract files, none empty / duplicate / skipped) into a staging set with links to the 103 existing vendor
+  expiries. One-week trial (2023-03-13..17, `--force`): 5 days written, 182,534 rows, all `usable`, 129–149
+  contracts a day (was 2–6), far-dated contracts kept. Full import (`--days 2022-01-01..2024-10-02 --force`)
+  started. **Run from a throwaway checkout at 4881945**, not from this branch: after `main` was merged in,
+  any read-write catalog connect fails with `CatalogException: Table "momentum_holdings" already exists`,
+  because the live catalog recorded `011_momentum_orders` while `main` ships the same DDL as
+  `012_momentum_orders.sql` (renumbered). Nothing was written by the failed attempt. Needs the BL-051 owner
+  to reconcile the ledger before anything from `main`'s `trading_data` runs against this catalog (including
+  `obt daily`).
