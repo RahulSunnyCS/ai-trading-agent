@@ -160,6 +160,17 @@ class DrawdownLadder:
             self.state, self.trough = 1, self.equity
 
 
+#   --nifty-only         the 124 NIFTY variants only (BL-071 part B; SENSEX options are not in the lake
+#                        before 2024-10)
+#   --early-results DIR  per-variant results for the days before the main results start
+#                        (research/bl071/results/<variant yaml stem>.csv), prepended to each series
+#   --results DIR        read every variant's per-day results from DIR/<variant name>.csv instead of
+#                        the research folders (BL-070: the no-stop re-runs)
+RESULTS_DIR = Path(sys.argv[sys.argv.index("--results") + 1]) if "--results" in sys.argv else None
+NIFTY_ONLY = "--nifty-only" in sys.argv
+EARLY_DIR = (
+    Path(sys.argv[sys.argv.index("--early-results") + 1]) if "--early-results" in sys.argv else None
+)
 _STATE: dict = {}  # per-run arrays set in main: family index per variant, gap label per day x variant
 if "--weights" in sys.argv:
     WEIGHTS = tuple(int(x) for x in sys.argv[sys.argv.index("--weights") + 1].split(","))
@@ -218,7 +229,19 @@ def whole_day_columns(underlying: str, pfx: str) -> pd.DataFrame:
             else:
                 path = research / "bl060" / "results" / f"p{premium}_{tag}.csv"
             cols[f"{pfx}p{premium}_{tag}"] = read_net(path)
+    if RESULTS_DIR is not None:
+        cols = {name: read_net(RESULTS_DIR / f"{name}.csv") for name in cols}
+    if EARLY_DIR is not None:
+        for name, s in list(cols.items()):
+            early = EARLY_DIR / f"{varlib.variant_file(name, 'variants').stem}.csv"
+            if early.exists():
+                e = read_net(early)
+                cols[name] = pd.concat([e[e.index < s.index.min()], s]).sort_index()
     df = pd.DataFrame(cols).sort_index()
+    if EARLY_DIR is not None:  # a variant that did not trade a day has no row: keep common days
+        before = len(df)
+        df = df.dropna()
+        print(f"{underlying}: {before - len(df)} days dropped for a variant with no row")
     assert not df.isna().any().any(), f"{underlying}: whole-day variants do not cover the same days"
     return df
 
@@ -240,12 +263,46 @@ def closest_columns(underlying: str, pfx: str, days: pd.DatetimeIndex) -> pd.Dat
     return pd.DataFrame(cols, index=days)
 
 
+def lake_features(underlying: str, days: pd.DatetimeIndex) -> pd.DataFrame:
+    """weekday / VIX band / days-to-expiry for any day the lake holds (BL-071 part B). bl056's
+    `day_features` reads the derived contracts table, which starts 2024-10-01; this reads the same
+    quantities from the day files: the 09:15 INDIAVIX open, and the nearest expiry that has bars on
+    the day. Same labels: '0'..'6', '7+', 'unknown'."""
+    import duckdb
+
+    con = duckdb.connect()
+    con.execute("SET TimeZone='Asia/Kolkata'")
+    vix = con.execute(
+        f"""select date, arg_min(open, ts) filter (where hour(ts) * 60 + minute(ts) >= 555) v
+            from read_parquet('{A.LAKE}/bars_1m/asset=index/symbol=INDIAVIX/**/*.parquet', hive_partitioning=true)
+            where date >= '2015-01-01' group by date"""
+    ).fetchall()
+    exp = con.execute(
+        f"""select date, min(expiry) from (
+              select distinct date, expiry
+              from read_parquet('{A.LAKE}/bars_1m/asset=option/underlying={underlying}/**/*.parquet',
+                                hive_partitioning=true)) t
+            where expiry >= date group by date"""
+    ).fetchall()
+    vix_s = pd.Series({pd.Timestamp(d): v for d, v in vix})
+    exp_s = pd.Series({pd.Timestamp(d): pd.Timestamp(e) for d, e in exp})
+    f = pd.DataFrame(index=days)
+    f["weekday"] = days.day_name().str[:3]
+    f["vix_open"] = vix_s.reindex(days)
+    f["vix_band"] = pd.cut(f.vix_open, A.VIX_BINS, labels=A.VIX_LABELS).astype(object).fillna("unknown")
+    dte = (exp_s.reindex(days) - days).dt.days
+    f["dte_label"] = dte.map(lambda v: "unknown" if pd.isna(v) else (str(int(v)) if v <= 6 else "7+"))
+    return f
+
+
 def load_all():
     frames, feats = [], {}
     for u, pfx in (("NIFTY", "N_"), ("SENSEX", "S_")):
+        if NIFTY_ONLY and u == "SENSEX":
+            continue
         df = whole_day_columns(u, pfx) if WHOLE_DAY else A.load(u)
         df = df[df.index >= pd.Timestamp(WINDOW_FROM)]
-        f = A.day_features(u, df.index)
+        f = lake_features(u, df.index) if NIFTY_ONLY else A.day_features(u, df.index)
         wk = f.weekday.isin(A.WD).values
         df, f = df[wk], f[wk]
         if not WHOLE_DAY:
@@ -255,13 +312,21 @@ def load_all():
         frames.append(df)
         feats[u] = f
     # keep only the days both indices have (two days each side are missing one index's data)
-    common = frames[0].index.intersection(frames[1].index)
-    dropped = sorted(set(frames[0].index.symmetric_difference(frames[1].index)).difference(common))
-    print("days in one index only, dropped:", [d.strftime("%d-%b-%y") for d in dropped])
-    frames = [x.loc[common] for x in frames]
-    feats = {u: x.loc[common] for u, x in feats.items()}
-    P = pd.concat(frames, axis=1)
+    if NIFTY_ONLY:
+        P = frames[0]
+        feats["SENSEX"] = feats["NIFTY"]  # unused: every variant is NIFTY
+    else:
+        common = frames[0].index.intersection(frames[1].index)
+        dropped = sorted(
+            set(frames[0].index.symmetric_difference(frames[1].index)).difference(common)
+        )
+        print("days in one index only, dropped:", [d.strftime("%d-%b-%y") for d in dropped])
+        frames = [x.loc[common] for x in frames]
+        feats = {u: x.loc[common] for u, x in feats.items()}
+        P = pd.concat(frames, axis=1)
     expected = (148 if NO_CLOSEST else 248) if WHOLE_DAY else (110 if CLOSEST else 66)
+    if NIFTY_ONLY:
+        expected = expected // 2
     assert P.shape[1] == expected and not P.isna().any().any(), (P.shape[1], expected)
     assert feats["NIFTY"].index.equals(feats["SENSEX"].index)
     f = feats["NIFTY"][["weekday", "vix_band"]].copy()
@@ -714,8 +779,11 @@ def main() -> None:
     live_sizes = {3: (2, 1), 4: (2, 2), 5: (3, 2), 6: (4, 2), 7: (4, 3), 8: (5, 3)}
     nw, nd = live_sizes[CORE]
     B2 = (nw * live_w + nd * live_d).reindex(R.index).to_numpy()
-    # a selection day missing from the live-strategy CSVs would make every comparison with B2 False
-    assert not np.isnan(B2).any(), "live-mix CSVs do not cover every selection day"
+    if EARLY_DIR is None:
+        # a selection day missing from the live-strategy CSVs would make every comparison with B2 False
+        assert not np.isnan(B2).any(), "live-mix CSVs do not cover every selection day"
+    else:  # the live mix has no results before 2024-10-09: condition (3) is not available here
+        B2 = np.zeros(len(R))
     rng = np.random.default_rng(SEED)
 
     def random_total(min_wide: int):
@@ -830,7 +898,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}.csv"
         )
     )
     R.assign(

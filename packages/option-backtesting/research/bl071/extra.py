@@ -30,7 +30,6 @@ ROWS = {
 
 
 def picks_for(args: list[str]) -> Path:
-    before = {p: p.stat().st_mtime for p in BL57.glob("daily_picks_*_from2024-10-09.csv")}
     out = subprocess.run(
         [sys.executable, str(BL57 / "rotate.py"), "--basket", "DRB-6W3L2", "--window-from", "2024-10-09", *args],
         capture_output=True,
