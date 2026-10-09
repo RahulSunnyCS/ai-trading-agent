@@ -52,6 +52,13 @@ RUNS: list[tuple[str, list[str]]] = [
     ("R:B7-positive-recent", [*R, "--require-positive-recent"]),
     ("R:B7-streak-gate-5", [*R, "--streak-gate", "5"]),
 ]
+LADDER = ["--dd-ladder", "20000,30000,10000,25000"]
+RUNS += [
+    ("A:B7b-ladder-actual", [*A, *LADDER]),
+    ("A:B7b-ladder-shadow", [*A, *LADDER, "--dd-basis", "shadow"]),
+    ("R:B7b-ladder-actual", [*R, *LADDER]),
+    ("R:B7b-ladder-shadow", [*R, *LADDER, "--dd-basis", "shadow"]),
+]
 RUNS += [(f"A:B2-placebo-{s}", ["--weights", "30,20,20,15,15", "--shuffle-labels", str(s)]) for s in range(10)]
 RUNS += [(f"A:B3-placebo-{s}", [*A, "--fit-lookbacks", "21:50,63:50", "--shuffle-labels", str(s)]) for s in range(10)]
 
@@ -85,6 +92,12 @@ def run(item) -> dict:
             raw_on_affected=float(d.raw_pnl[affected].sum()),
             gated_on_affected=float(d.pnl_A[affected].sum()),
         )
+        if "dd_level" in d:
+            for lv in (1, 2):
+                m = d.dd_level == lv
+                row[f"days_level{lv}"] = int(m.sum())
+                row[f"raw_on_level{lv}"] = float(d.raw_pnl[m].sum())
+                row[f"gated_on_level{lv}"] = float(d.pnl_A[m].sum())
     return row
 
 

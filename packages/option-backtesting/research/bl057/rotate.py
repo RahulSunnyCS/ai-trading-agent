@@ -121,15 +121,57 @@ FIT_LB = sys.argv[sys.argv.index("--fit-lookbacks") + 1] if "--fit-lookbacks" in
 if FIT_LB:
     LOOKBACKS = [(int(a), int(b) / 100) for a, b in (x.split(":") for x in FIT_LB.split(","))]
     assert abs(sum(w for _, w in LOOKBACKS) - 1) < 1e-9, LOOKBACKS
+#   --dd-ladder C1,C2,B1,B2  the owner's rupee ladder (BL-069 B7b): drawdown >= C1 -> N_CORE-1
+#                        strategies, >= C2 -> 1 strategy and no Buy; back to full after a gain of B1
+#                        from the low, from level 2 back to level 1 at drawdown <= B2
+#   --dd-basis shadow    track the ungated full-size equity instead of the traded equity
+DD_LADDER = (
+    tuple(int(x) for x in sys.argv[sys.argv.index("--dd-ladder") + 1].split(","))
+    if "--dd-ladder" in sys.argv
+    else None
+)
+DD_BASIS = sys.argv[sys.argv.index("--dd-basis") + 1] if "--dd-basis" in sys.argv else "actual"
+
+
+class DrawdownLadder:
+    """The basket's own equity and the size level it implies (0 full, 1 one strategy fewer, 2 one
+    strategy). Decided from equity through the previous day."""
+
+    def __init__(self, cut1: float, cut2: float, back1: float, back2: float):
+        self.cut1, self.cut2, self.back1, self.back2 = cut1, cut2, back1, back2
+        self.state, self.equity, self.peak, self.trough = 0, 0.0, 0.0, 0.0
+
+    def update(self, pnl: float) -> None:
+        self.equity += pnl
+        self.peak = max(self.peak, self.equity)
+        dd = self.peak - self.equity
+        if self.state == 0:
+            if dd >= self.cut2:
+                self.state, self.trough = 2, self.equity
+            elif dd >= self.cut1:
+                self.state, self.trough = 1, self.equity
+        elif self.state == 1:
+            self.trough = min(self.trough, self.equity)
+            if dd >= self.cut2:
+                self.state, self.trough = 2, self.equity
+            elif self.equity - self.trough >= self.back1:
+                self.state = 0
+        elif dd <= self.back2:
+            self.state, self.trough = 1, self.equity
+
+
 _STATE: dict = {}  # per-run arrays set in main: family index per variant, gap label per day x variant
 if "--weights" in sys.argv:
     WEIGHTS = tuple(int(x) for x in sys.argv[sys.argv.index("--weights") + 1].split(","))
-    assert len(WEIGHTS) in (4, 5) and sum(WEIGHTS) == 100, WEIGHTS
-    # a fifth value is the overnight-gap fit criterion (BL-069 B2)
+    assert len(WEIGHTS) in (4, 5, 6) and sum(WEIGHTS) == 100, WEIGHTS
+    # a fifth value is the overnight-gap fit criterion (BL-069 B2), a sixth the family mean of the
+    # recent score as its own criterion (BL-072)
     W_CRIT = {
         k: w / 100
-        for k, w in zip(["recent", "weekday", "dte", "vix", "gap"], WEIGHTS, strict=False)
+        for k, w in zip(["recent", "weekday", "dte", "vix", "gap", "rfam"], WEIGHTS, strict=False)
     }
+    # an optional criterion with weight 0 is simply absent (the four base criteria are always computed)
+    W_CRIT = {k: w for k, w in W_CRIT.items() if w or k in ("recent", "weekday", "dte", "vix")}
 
 
 def on_grid(name: str) -> bool:
@@ -361,6 +403,9 @@ def score_day(Pv, wd, vb, dte, i):
         "dte": skewed_fit(Pv, dte == dte[i][None, :], i),
         "vix": skewed_fit(Pv, (vb[:, None] == vb[i]).repeat(Pv.shape[1], axis=1), i),
     }
+    if W_CRIT.get("rfam"):  # BL-072: the family's mean recent score as its own criterion
+        idx = _STATE["family_idx"]
+        crit["rfam"] = (np.bincount(idx, weights=crit["recent"]) / np.bincount(idx))[idx]
     if W_CRIT.get("gap"):  # BL-069 B2: overnight gap band of the variant's own index
         gp = _STATE["gap"]
         crit["gap"] = skewed_fit(Pv, gp == gp[i][None, :], i)
@@ -562,7 +607,7 @@ def main() -> None:
     is_wide, is_dir, is_buy, is_nifty = masks
     core_pool = np.where(~is_buy)[0]
     wd, vb, dte = day_inputs(f, names)
-    if RECENT_FAMILY:
+    if RECENT_FAMILY or W_CRIT.get("rfam"):
         _STATE["family_idx"] = np.unique(
             ["_".join(n.split("_")[:2]) for n in names], return_inverse=True
         )[1]
@@ -587,6 +632,7 @@ def main() -> None:
     pers = {k: [] for k in crit_names + ["composite"]}
     picks_A, picks_B, buy_days, rows = [], [], [], []
     raw_hist: list = []  # the ungated basket's daily P&L, for --streak-gate
+    ladder = DrawdownLadder(*DD_LADDER) if DD_LADDER else None
     allowed_days = []  # per selection day: the variants in that day's pool
     for i in range(WARMUP, len(days)):
         crit, comp = score_day(Pv, wd, vb, dte, i)
@@ -612,6 +658,12 @@ def main() -> None:
                 use_buy = []  # no qualifying core pick: sit the whole day out
         if STREAK_GATE and len(raw_hist) >= STREAK_GATE and sum(raw_hist[-STREAK_GATE:]) < 0:
             scale = 0.5  # losing streak: 1 lot per strategy instead of 2
+        level = ladder.state if ladder else 0
+        if ladder:
+            keep = max(1, N_CORE - level)
+            use_core = sorted(use_core, key=lambda v: (-comp[v], names[v]))[:keep]
+            if level >= 2:
+                use_buy = []
         raw_hist.append(raw_pnl)
         picks_A.append(core_a)
         picks_B.append(core_b)
@@ -622,6 +674,7 @@ def main() -> None:
                 pnl_A=scale * LOTS_PER * (today[use_core].sum() + today[use_buy].sum()),
                 pnl_B=LOTS_PER * (today[core_b].sum() + today[buy].sum()),
                 raw_pnl=raw_pnl,
+                dd_level=level,
                 lots=scale * LOTS_PER * (len(use_core) + len(use_buy)),
                 n_buy=len(buy),
                 buy_pnl=LOTS_PER * today[buy].sum(),
@@ -636,6 +689,8 @@ def main() -> None:
                 changes_A=np.nan if len(picks_A) < 2 else len(set(core_a) ^ set(picks_A[-2])) / 2,
             )
         )
+        if ladder:  # the next day's size level is decided from equity through today
+            ladder.update(rows[-1]["raw_pnl"] if DD_BASIS == "shadow" else rows[-1]["pnl_A"])
     R = pd.DataFrame(rows).set_index("day")
     sel = np.arange(WARMUP, len(days))
     today_all = Pv[sel]
@@ -775,7 +830,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}.csv"
         )
     )
     R.assign(
