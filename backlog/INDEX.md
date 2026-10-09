@@ -3,7 +3,7 @@
 Rules and workflow: [README.md](README.md). New item: copy [_TEMPLATE.md](_TEMPLATE.md).
 Committed work lives in [`../TODO.md`](../TODO.md).
 
-Last updated: 2026-10-08
+Last updated: 2026-10-09
 
 ## Open
 
@@ -17,6 +17,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-014](BL-014-ci-and-merge-gates.md) | CI and merge gates: nothing reaches `main` while checks are red | P0 | In progress | chore | infra |
 | [BL-024](BL-024-forward-signal-journal.md) | Forward-signal journal: record every weekly signal from now on | P0 | In progress | feature | momentum |
 | [BL-034](BL-034-options-history-lake.md) | Options history lake: two years of vendor 1-minute data in `trading-data`, derived tables for straddle backtests, daily top-up | P0 | In progress | feature | trading-data |
+| [BL-058](BL-058-options-rotation-forward-journal-and-ui.md) | Options rotation: forward paper journal from Mon 12 Oct (picks recorded before 09:17, scored nightly) and the Options Lab screens it needs | P0 | Planned | feature | options |
 | [BL-009](BL-009-intraday-options-backtesting-platform.md) | Intraday options backtesting platform: AlgoTest-verified engine, vendor history, portfolios, event triggers, sweeps | P1 | Planned | feature | options |
 | [BL-015](BL-015-research-gate.md) | Research gate: pre-register every experiment, log every override | P1 | In progress | chore | cross-cutting |
 | [BL-021](BL-021-pro-readiness.md) | End of the Max month: make the project cheap to run on Pro | P1 | Ready | chore | cross-cutting |
@@ -46,6 +47,14 @@ Sorted by priority (P0 first), then ID.
 | [BL-045](BL-045-dashboard-load-diet.md) | Dashboard load diet: code-split views and the Guide, landing tab before mount, last hand-rolled fetches | P2 | Planned | improvement | dashboard |
 | [BL-046](BL-046-options-api-performance.md) | Options API performance: bounded anatomy/backtest/results loads, reused connections, streamed proxies | P2 | Planned | improvement | options |
 | [BL-047](BL-047-shared-python-plumbing-and-job-locks.md) | Shared Python plumbing in `trading-data` (token, `.env`, notify, IST) and cross-process job locks | P2 | Planned | improvement | trading-data |
+| [BL-053](BL-053-vix-at-10am-strategy-mix.md) | Pick the NIFTY strategy mix at 10:00 from India VIX's first 45 minutes | P2 | Done: killed | research | options |
+| [BL-054](BL-054-weekly-strategy-slot-rotation.md) | Weekly rotation of NIFTY strategy start times: rank 33 variants on two weeks' P&L, hold the top 5 Widesl/Dir (≥2 Widesl) plus 2 Buy when Buy is positive (POC) | P2 | Done: killed | research | options |
+| [BL-055](BL-055-daily-portfolio-stop-loss.md) | Daily portfolio stop-loss (₹8k / ₹10k / ₹12.5k) on the NIFTY benchmark mixes: worst days, drawdown, cost in profit | P2 | Done: inconclusive | research | options |
+| [BL-056](BL-056-weekday-dte-vix-breakdown.md) | Weekday, days-to-expiry and VIX-band breakdown of the 33 start-time variants, NIFTY and SENSEX | P2 | Done: descriptive | research | options |
+| [BL-059](BL-059-whole-day-start-time-curve.md) | Whole-day start-time curve: NIFTY and SENSEX Widesl, Dir ATM and Buy from 12:02 to 15:02 (78 more variants) | P2 | Done: descriptive | research | options |
+| [BL-060](BL-060-sensex-widesl-closest-premium.md) | SENSEX Widesl by closest premium (₹250 and ₹320) across the whole day, beside the live OTM2 strike | P2 | Done: descriptive | research | options |
+| [BL-061](BL-061-rotation-with-closest-premium-widesl.md) | Daily rotation with closest-premium Widesl in the candidate list: their share of the 5 daily lots, and on which days | P2 | Done: descriptive | research | options |
+| [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |

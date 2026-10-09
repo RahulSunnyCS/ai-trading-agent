@@ -410,6 +410,18 @@ contract, not a shared service).
   `tests/conftest.py` points at a temp folder so no test writes the real ones. "Room to exit" is
   only given for a strategy with a single exit rank (`_exit_rank`); Broad in category mode sells on
   its category and pool ranks too, so it gets none.
+- `orders.py` + `holdings_store.py` (BL-051 Phase 3) — Your orders. `orders.plan` is pure: holdings
+  in shares, prices, target weights -> orders (exits and new names always; top-ups/trims under the
+  owner's minimum, ₹10,000 by default, skipped; whole shares; blocked names held; charges at
+  `engine`'s itemised rates, no brokerage). `holdings_store` keeps per-owner settings (`MOMENTUM_OWNER`,
+  default `rahul`; paper capital ₹1 lakh), holdings snapshots (Fyers `fyers.holdings`, read-only,
+  or pasted), holding rules and the orders made (trading-data migration 012). `api._compute_orders`
+  is the body of `mbt orders run [--send]` (scheduler job `momentum-orders`, Fri 14:15) and of
+  `POST /api/orders/run`: the headline's target from `_orders_signal`, which for a stored week one
+  short of the target and a signal delay of 1 uses `_broad_sentinel_run(ahead=True)` - deciding the
+  NEXT week on a flat stand-in row. `tests/test_broad_parity.py` pins that the week-ahead decision
+  buys and fully sells exactly what the full backtest did; trims and top-ups read the week's own
+  prices and are not pinned. Broad only for now; delay-0 strategies get no orders before 19:30.
 - `alerts.py` (BL-051 Phase 5) — `GET /api/alerts`: what needs a person, for the dashboard's bell
   and once-a-day pop-up. One pure function per kind over the data its Telegram job already reads:
   `split` (`stock_actions.review_snapshot`), `data` (`/weekly/status` readiness, for the

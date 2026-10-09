@@ -29,6 +29,94 @@ const json = (body: unknown) => ({
   body: JSON.stringify(body),
 });
 
+async function mockOrders(page: Page): Promise<void> {
+  const settings = {
+    owner: 'rahul',
+    min_trade_rs: 10000,
+    extra_cash_rs: 0,
+    holdings_source: 'paper',
+    paper_capital_rs: 100000,
+    updated_at: null,
+  };
+  await page.route(/\/api\/momentum\/orders(\?.*)?$/, (route) =>
+    route.fulfill(
+      json({
+        week: '2026-12-04',
+        settings,
+        holdings: null,
+        rules: {},
+        job: null,
+        orders: [
+          {
+            created_at: '2026-12-04T14:16:00+05:30',
+            trigger: 'scheduled',
+            favourite_id: 'g',
+            holdings_source: 'paper',
+            week: '2026-12-04',
+            headline: { id: 'g', name: 'Phase 6 ensemble' },
+            kind: 'exact',
+            reason: null,
+            holdings: { source: 'paper', capital: 100000 },
+            prices: 'live Fyers quotes',
+            sleeves: [],
+            plan: {
+              portfolio_value: 100000,
+              cash: 1200,
+              sells: 8000,
+              buys: 12400,
+              charges: 41,
+              cash_after: -3241,
+              not_traded: 1,
+              missing_prices: [],
+              rows: [
+                {
+                  symbol: 'COCHINSHIP',
+                  action: 'SELL',
+                  held: 5,
+                  price: 1600,
+                  value: 8000,
+                  current: 0.08,
+                  target: 0,
+                  quantity: 5,
+                  order_value: 8000,
+                  charges: 24,
+                  note: '',
+                },
+                {
+                  symbol: 'ANGELONE',
+                  action: 'BUY',
+                  held: 0,
+                  price: 2480,
+                  value: 0,
+                  current: 0,
+                  target: 0.125,
+                  quantity: 5,
+                  order_value: 12400,
+                  charges: 14,
+                  note: '',
+                },
+                {
+                  symbol: 'BSE',
+                  action: 'SKIP',
+                  held: 2,
+                  price: 6950,
+                  value: 13900,
+                  current: 0.139,
+                  target: 0.15,
+                  quantity: 0,
+                  order_value: 0,
+                  charges: 0,
+                  note: 'under the ₹10,000 minimum; would cost ₹2',
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    ),
+  );
+}
+
 async function mockThisWeek(page: Page): Promise<void> {
   await page.route(/\/api\/momentum\/weekly\/jobs\/latest/, (route) =>
     route.fulfill(json({ job: null })),
@@ -331,6 +419,7 @@ async function mockThisWeek(page: Page): Promise<void> {
 test('This week shows the day, what needs you, the rules and every favourite', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-12-04T14:20:00Z')); // 19:50 IST
   await mockThisWeek(page);
+  await mockOrders(page);
   await page.goto('/momentum/week');
 
   await expect(page.getByText('Friday 04 Dec 2026')).toBeVisible();
@@ -342,6 +431,15 @@ test('This week shows the day, what needs you, the rules and every favourite', a
   await expect(page.getByText('Holds 2 names after these trades', { exact: false })).toBeVisible();
   if (process.env.THIS_WEEK_SHOT)
     await page.screenshot({ path: process.env.THIS_WEEK_SHOT, fullPage: true });
+
+  // Your orders: the paper portfolio, exact before the close, sells first.
+  await expect(page.getByRole('heading', { name: 'Your orders' })).toBeVisible();
+  await expect(page.getByText('Paper portfolio ₹1,00,000')).toBeVisible();
+  await expect(page.getByText('Exact before the close')).toBeVisible();
+  await expect(page.getByText('under the ₹10,000 minimum; would cost ₹2')).toBeVisible();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(page.getByRole('dialog', { name: 'Your orders: settings' })).toBeVisible();
+  await page.keyboard.press('Escape');
 
   // Another favourite's table, and what the final changed against the preview.
   await page.getByRole('button', { name: /ETF Weekly Core/ }).click();

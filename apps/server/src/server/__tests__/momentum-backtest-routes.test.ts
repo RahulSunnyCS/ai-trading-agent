@@ -415,6 +415,38 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards Your orders and the holdings routes, never anything that trades', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { ok: true }));
+    const calls: Array<['GET' | 'POST' | 'PUT', string, string]> = [
+      [
+        'GET',
+        '/api/momentum/orders?week=2026-10-09',
+        'http://127.0.0.1:8765/api/orders?week=2026-10-09',
+      ],
+      ['POST', '/api/momentum/orders/run', 'http://127.0.0.1:8765/api/orders/run'],
+      ['PUT', '/api/momentum/orders/settings', 'http://127.0.0.1:8765/api/orders/settings'],
+      ['POST', '/api/momentum/holdings/sync', 'http://127.0.0.1:8765/api/holdings/sync'],
+      ['POST', '/api/momentum/holdings/paste', 'http://127.0.0.1:8765/api/holdings/paste'],
+      ['PUT', '/api/momentum/holdings/rules', 'http://127.0.0.1:8765/api/holdings/rules'],
+    ];
+    for (const [method, url, upstream] of calls) {
+      const response = await server.inject(
+        method === 'GET' ? { method, url } : { method, url, payload: {} },
+      );
+      expect(response.statusCode, url).toBe(200);
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        upstream,
+        method === 'GET' ? expect.anything() : expect.objectContaining({ method }),
+      );
+    }
+    expect(
+      (await server.inject({ method: 'GET', url: '/api/momentum/orders?week=x' })).statusCode,
+    ).toBe(400);
+    await server.close();
+  });
+
   it('rejects a journal week that is not a date, without calling upstream', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

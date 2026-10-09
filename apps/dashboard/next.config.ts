@@ -151,6 +151,20 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/week`,
             },
             {
+              source: '/api/momentum/orders',
+              destination: `${momentumDirectOrigin}/api/orders`,
+            },
+            {
+              // run, settings
+              source: '/api/momentum/orders/:path*',
+              destination: `${momentumDirectOrigin}/api/orders/:path*`,
+            },
+            {
+              // sync, paste, rules
+              source: '/api/momentum/holdings/:path*',
+              destination: `${momentumDirectOrigin}/api/holdings/:path*`,
+            },
+            {
               source: '/api/momentum/live-rules',
               destination: `${momentumDirectOrigin}/api/live-rules`,
             },
