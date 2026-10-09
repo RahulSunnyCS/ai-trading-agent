@@ -30,7 +30,9 @@ summary flags anything but `main`).
 - `src/loop.ts` — `bun run jobs serve`: every 30 s, `decide()` each job from the run
   history alone: run a due slot, catch up a slot missed while the laptop slept (within the
   job's `catchUpHours`), or record it as missed and alert. Because it reads history, no
-  wake detection is needed. Slots before the scheduler's first start are ignored.
+  wake detection is needed. Slots before the scheduler first saw a job are ignored
+  (`History.jobFirstSeen`, kept per job in the `meta` table), so a newly added job is
+  never reported missed for a slot from before it existed.
 - `src/alerts.ts` — immediate Telegram on failure (skipped for `alertsItself` jobs unless
   they timed out or could not start), on a missed slot, and on recovery. Successes stay
   quiet.

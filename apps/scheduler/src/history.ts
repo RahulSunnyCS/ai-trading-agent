@@ -60,6 +60,25 @@ export class History {
     return new Date(row.value);
   }
 
+  /**
+   * When the scheduler first saw this job, recorded once. Slots before it are neither run
+   * nor reported missed: a job just added to the registry did not exist at its earlier
+   * slots. A job that already has rows (runs or missed slots) predates this record, so it
+   * counts from the scheduler's first start and a slot it slept through is still reported.
+   */
+  jobFirstSeen(job: string, now: Date): Date {
+    const key = `job_first_seen:${job}`;
+    const hasRows = this.db.query('SELECT 1 FROM runs WHERE job = ? LIMIT 1').get(job) !== null;
+    const seen = hasRows ? this.firstStart(now) : now;
+    this.db
+      .query('INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)')
+      .run(key, seen.toISOString());
+    const row = this.db.query('SELECT value FROM meta WHERE key = ?').get(key) as {
+      value: string;
+    };
+    return new Date(row.value);
+  }
+
   /** Record a slot that was too late to catch up, so it is reported once. */
   recordMissed(job: string, scheduledFor: Date, at: Date, reason: string): void {
     this.db
