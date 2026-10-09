@@ -26,7 +26,12 @@ SEBI, IPFT_NSE, STAMP_BUY, GST = 0.000001, 0.000005, 0.00003, 0.18
 PLATFORM_FEE = (
     19.0  # optional: AlgoTest per-strategy fee per day (₹75 for 4 strategies in the sheet)
 )
-PICKS = {"whole_day": "daily_picks_min2_core5_buy2_whole_day.csv", "morning66": "daily_picks.csv"}
+PICKS = {
+    "whole_day": "daily_picks_min2_core5_buy2_whole_day.csv",  # DRB-5W2 (BL-062)
+    "morning66": "daily_picks.csv",
+    "DRB-6W2": "daily_picks_min2_core6_buy2_whole_day.csv",  # BL-064
+    "DRB-6W3": "daily_picks_min3_core6_buy2_whole_day.csv",
+}
 
 
 def stt_rate(day: str) -> float:

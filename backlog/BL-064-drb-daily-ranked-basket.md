@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; names the BL-062 rule and runs it at 6 lots |
-| **Status** | In progress (descriptive; same already-seen window, owner override) |
+| **Status** | Done (passes BL-057's rule; exploratory: same already-seen year, owner override) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -54,8 +54,23 @@ the lots go.
 - **Outputs:** the BL-057 tables and share of lots by start-time window; monthly return on ₹13 lakh
   before and after charges; beside the owner's real sheet.
 - **Hold-out:** none (owner override, same year). **Will not run:** other lot counts, other minimums, tuning.
-- **Result:** (after the run)
+- **Result:** **both baskets PASS** BL-057's three conditions (exploratory: same already-seen year, owner
+  override). `--basket DRB-5W2` reproduces BL-062 exactly (₹3,36,113, drawdown −₹50,636). 202 selection
+  days; Buy lots on 48 days (20 × 1, 28 × 2); 6.38 lots a day. **DRB-6W2:** gross ₹3,53,009 (+27.2% of ₹13
+  lakh), max drawdown −₹55,784 (4.3%), worst day −₹19,317, ₹274 per lot-day; R (6 core lots, ≥2 Widesl)
+  P50 ₹1,88,726 / P90 ₹2,57,854, beats 100% of random runs; E ₹1,86,657 / DD −₹64,662; live mix at 6 lots
+  (4 Widesl 09:17 + 2 Dir 09:24) ₹2,32,014 / DD −₹2,08,439. **DRB-6W3:** gross ₹3,77,386 (+29.0%), max drawdown
+  −₹60,251 (4.6%), worst day −₹19,317, ₹293 per lot-day; R P90 ₹2,52,361, beats 100%; same E and live mix.
+  (No minimum: ₹3,49,598 / −₹54,548.) **After charges** (BL-063 model, brokerage ₹13 a lot per order): DRB-6W2
+  net ₹2,20,934 (+17.0%), charges ₹1,32,075 (37% of gross), drawdown −₹82,980 (6.4%), 7 of 11 months positive,
+  worst month −1.71%; DRB-6W3 net **₹2,49,942 (+19.2%)**, charges ₹1,27,445 (34%), drawdown −₹72,220 (5.6%), 8 of 11
+  months positive, worst month −1.79%; DRB-5W2 for comparison net ₹2,26,707 (+17.4%), drawdown −₹62,354.
+  Net at brokerage ₹7 / ₹13 / ₹20 per lot per order: DRB-5W2 ₹2,61,626 / ₹2,26,707 / ₹1,85,969; DRB-6W2
+  ₹2,62,947 / ₹2,20,934 / ₹1,71,920; DRB-6W3 ₹2,90,765 / ₹2,49,942 / ₹2,02,315; morning-only 66 variants
+  ₹2,51,816 / ₹2,14,122 / ₹1,70,146. The sixth lot adds gross profit but, after charges, only helps with the
+  3-Widesl minimum. Scripts: `rotate.py --basket DRB-<lots>W<min>`, `today.py --basket …`, `research/bl063/`.
 
 ## Log
 
 - 2026-10-09 — created from the owner's request; named DRB.
+- 2026-10-09 — DRB-6W2 and DRB-6W3 ran (Result above); BL-063's trades and charges extended to them.

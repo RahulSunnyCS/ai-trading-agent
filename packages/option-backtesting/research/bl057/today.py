@@ -8,6 +8,7 @@ before DAY plus DAY's own weekday, days to expiry and 09:15 VIX open. Needs DAY'
 research/bl056 (the nightly update will provide them; see BL-058).
 
     uv run --with pandas --with numpy --with duckdb python research/bl057/today.py 2026-10-09
+    uv run --with pandas --with numpy --with duckdb python research/bl057/today.py --basket DRB-6W2 2026-10-09
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ sys.path.insert(0, str(HERE))
 import rotate as R  # noqa: E402
 
 LAKE = "/Volumes/TradingData/lake"
-VARIANTS = {"N_": HERE.parent / "bl054" / "variants", "S_": HERE.parent / "bl056" / "variants"}
+sys.path.insert(0, str(HERE.parent / "common"))
+import varlib  # noqa: E402
 
 
 def _one(con, sql: str, what: str):
@@ -73,7 +75,7 @@ def backtest_one_day(name: str, day: date) -> float:
     from option_backtesting.legwise.engine import run_legwise
     from option_backtesting.legwise.schema import load_legwise
 
-    path = VARIANTS[name[:2]] / f"{name[2:]}.yaml"
+    path = varlib.variant_file(name, "variants")
     skipped: dict = {}
     res = run_legwise(load_legwise(path), data_dir(), day, day, skipped=skipped)
     if not res:

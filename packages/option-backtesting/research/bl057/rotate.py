@@ -27,6 +27,29 @@ W_CRIT = {"recent": 0.33, "weekday": 0.25, "dte": 0.25, "vix": 0.17}
 BUY_TOP = 10
 
 
+# Named baskets (BL-064): `--basket DRB-6W2` = the whole-day Daily Ranked Basket, 6 core lots, at least
+# 2 Widesl, up to 2 Buy. DRB-<core lots>W<minimum Widesl>; DRB-5W2 is the BL-062 run.
+BASKETS = {
+    f"DRB-{core}W{wide}": [
+        "--whole-day",
+        "--core",
+        str(core),
+        "--min-wide",
+        str(wide),
+        "--buy-max",
+        "2",
+    ]
+    for core in (3, 4, 5, 6, 7, 8)
+    for wide in (0, 1, 2, 3, 4)
+}
+if "--basket" in sys.argv:
+    _i = sys.argv.index("--basket")
+    _name = sys.argv[_i + 1].upper()
+    if _name not in BASKETS:
+        raise SystemExit(f"unknown basket {_name}; choose from DRB-<3..8>W<0..4>, e.g. DRB-6W2")
+    sys.argv[_i : _i + 2] = BASKETS[_name]
+
+
 def _arg(name, default):
     return int(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default
 
@@ -378,9 +401,9 @@ def main() -> None:
     b54 = HERE.parent / "bl054" / "results"
     live_w = varlib.live_csv(b54, "nifty_widesl_917_otm1")
     live_d = varlib.live_csv(b54, "nifty_dir_924_itm1_sl21_recost")
-    nw, nd = {5: (3, 2), 3: (2, 1)}[
-        CORE
-    ]  # the live mix at this size: 3W+2D (5 lots) or 2W+1D (3 lots)
+    # the live mix at this size (60 / 40 Widesl / Dir, rounded): 5 lots 3W+2D, 3 lots 2W+1D, 6 lots 4W+2D
+    live_sizes = {3: (2, 1), 4: (2, 2), 5: (3, 2), 6: (4, 2), 7: (4, 3), 8: (5, 3)}
+    nw, nd = live_sizes[CORE]
     B2 = (nw * live_w + nd * live_d).reindex(R.index).to_numpy()
     # a selection day missing from the live-strategy CSVs would make every comparison with B2 False
     assert not np.isnan(B2).any(), "live-mix CSVs do not cover every selection day"
