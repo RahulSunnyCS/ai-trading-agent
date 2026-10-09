@@ -55,6 +55,13 @@ the stop mostly trims the worst day.
   fired between 10:00 and 15:30, most often 11:00–14:00. The strategies' own overall stop (₹2,500 a lot) is
   already in the curves. Scripts: `research/bl066/` (`curves.py`, `stops.py`).
 
+### 2026-10-09 (later) — Tighter levels: ₹8k, ₹6k, ₹4k
+Added after the first block's result was read; nothing else in the rule changes.
+- **Rule, basket, charges, outputs, "helps" test:** exactly as above; the curves already recorded are reused.
+- **Levels:** X ∈ {8,000, 6,000, 4,000}.
+- **Hold-out:** none (owner override). **Will not run:** other levels.
+- **Result:** (after the run)
+
 ## Log
 
 - 2026-10-09 — created from the owner's request.
