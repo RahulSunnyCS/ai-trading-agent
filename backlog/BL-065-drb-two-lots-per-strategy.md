@@ -68,3 +68,9 @@ diversification, which this tests.
 
 - 2026-10-09 — created from the owner's request to run 6 lots as 3 strategies of 2 lots.
 - 2026-10-09 — DRB-6W2L2 and DRB-6W3L2 ran; charges applied (Result above).
+- 2026-10-09 — owner confirmed brokerage is **flat per order, not per lot**, so the flat-per-order figures in the Result are
+  the ones that apply: DRB-6W2L2 charges ₹88,041 (20% of gross), net ₹3,54,588 (+27.3%), drawdown −₹1,03,232 (7.9%), 9 of
+  11 months positive, worst month −2.85%; DRB-6W3L2 charges ₹80,461 (19%), net ₹3,50,407 (+27.0%), drawdown −₹84,469
+  (6.5%), 8 of 11, worst month −1.74%. Net at ₹7 / ₹13 / ₹20 per order: 6W2L2 ₹3,75,842 / ₹3,54,588 / ₹3,29,791; 6W3L2
+  ₹3,70,401 / ₹3,50,407 / ₹3,27,080. After AlgoTest's fee at ₹19 a strategy-day: ₹3,42,162 (+26.3%) / ₹3,37,981 (+26.0%).
+  DRB-6W3 (6 × 1 lot) unchanged: net ₹2,49,942 (+19.2%), drawdown −₹72,220.

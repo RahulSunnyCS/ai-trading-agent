@@ -34,7 +34,9 @@ optional line); tax on profits.
   at a time with the same engine, to read every trade's side, quantity, entry and exit price; the
   re-run's gross P&L must equal the stored per-day result for every pair (checked, else stop).
 - **Charges per trade** (1 lot, one entry order and one exit order; a re-entry is a new trade):
-  - **Brokerage:** ₹13 per lot per order (owner's assumption), so ₹26 per trade.
+  - **Brokerage:** ₹13 per **order** (owner, 2026-10-09: flat per order, not per lot), so ₹26 per trade (one
+    entry order, one exit order); a 2-lot order pays it once. Earlier text assumed per lot; for 1-lot strategies the
+    two are identical, so only the 2-lot baskets (BL-065) differ. Per-lot brokerage is kept as a sensitivity.
   - **STT:** on the sell side premium turnover: 0.10% for trades dated before 2026-04-01, 0.15% from
     2026-04-01 (Finance Act 2026; [Zerodha](https://support.zerodha.com/category/account-opening/resident-individual/ri-charges/articles/how-is-the-securities-transaction-tax-stt-calculated), [ICICI Direct](https://www.icicidirect.com/ilearn/futures-and-options/articles/stt-changes-in-budget-2026-what-f-o-traders-should-know)).
   - **Exchange transaction charge**, both sides: NIFTY (NSE) 0.03503% of premium; SENSEX (BSE) 0.0325%
@@ -75,3 +77,5 @@ optional line); tax on profits.
 
 - 2026-10-09 — created from the owner's request: ₹13 brokerage per lot, plus STT and other charges.
 - 2026-10-09 — trades recorded and charges applied (Result above).
+- 2026-10-09 — owner confirmed brokerage is flat per order; `charges.py` now charges it once per order (1-lot
+  baskets unchanged: DRB-5W2 ₹1,09,405, DRB-6W2 ₹1,32,075, DRB-6W3 ₹1,27,445, 66-variant ₹1,17,720).

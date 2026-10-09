@@ -111,14 +111,25 @@ def main() -> None:
             names = row.core_A.split(",") + (row.buy.split(",") if isinstance(row.buy, str) else [])
             day = row.day.date().isoformat()
             tot = dict.fromkeys(("brokerage", "stt", "exchange", "sebi_ipft", "stamp", "gst"), 0.0)
-            for n in names:  # a strategy of `per` lots trades `per` times the 1-lot quantity
-                c, _t, _ = pair_charges[(n, day)]
-                for k in tot:
+            per_lot_total = trip_total = 0.0
+            for n in names:
+                c, t, _ = pair_charges[(n, day)]
+                gst_other = c["gst"] - GST * c["brokerage"]  # GST on exchange + SEBI + IPFT
+                # owner (2026-10-09): brokerage is a flat fee per ORDER, so a 2-lot order pays it once;
+                # STT, exchange, SEBI, IPFT and stamp follow the quantity traded
+                for k in ("stt", "exchange", "sebi_ipft", "stamp"):
                     tot[k] += c[k] * per
-            # brokerage-per-round-trip variant: brokerage and its GST recomputed
-            trip_total = sum(pair_charges[(n, day)][1][k] for n in names for k in tot) * per
-            # brokerage charged once per order whatever the lots (a flat fee per order, not per lot)
-            flat_brokerage = sum(pair_charges[(n, day)][0]["brokerage"] for n in names)
+                tot["brokerage"] += c["brokerage"]
+                tot["gst"] += GST * c["brokerage"] + gst_other * per
+                # sensitivity: the broker charges per LOT per order (a 2-lot order pays twice)
+                per_lot_total += per * sum(
+                    c[k] for k in tot
+                )  # every component scales with the lots
+                t_gst_other = t["gst"] - GST * t["brokerage"]
+                trip_total += (1 + GST) * t["brokerage"] + per * (
+                    t["stt"] + t["exchange"] + t["sebi_ipft"] + t["stamp"] + t_gst_other
+                )
+            flat_brokerage = tot["brokerage"]
             out_rows.append(
                 dict(
                     rotation=rot,
@@ -128,6 +139,7 @@ def main() -> None:
                     strategies=len(names),
                     flat_brokerage=flat_brokerage,
                     charges=sum(tot.values()),
+                    charges_per_lot_brokerage=per_lot_total,
                     charges_per_trip_brokerage=trip_total,
                     platform_fee=PLATFORM_FEE
                     * len(names),  # AlgoTest's fee is per strategy, not per lot
@@ -194,7 +206,7 @@ def main() -> None:
             f"months positive after charges: {(m.net > 0).sum()} of {len(m)}; worst month {100 * m.net.min() / CAP:.2f}%"
         )
         print(
-            f"sensitivity: brokerage ₹13 per lot per round trip instead of per order -> charges ₹{t.charges_per_trip_brokerage:,.0f}, net ₹{t.gross - t.charges_per_trip_brokerage:,.0f} ({100 * (t.gross - t.charges_per_trip_brokerage) / CAP:.1f}%)"
+            f"sensitivity: brokerage ₹13 per round trip instead of per order -> charges ₹{t.charges_per_trip_brokerage:,.0f}, net ₹{t.gross - t.charges_per_trip_brokerage:,.0f} ({100 * (t.gross - t.charges_per_trip_brokerage) / CAP:.1f}%)"
         )
         print(
             f"sensitivity: plus AlgoTest platform fee ₹{PLATFORM_FEE:g} a strategy-day -> extra ₹{t.platform_fee:,.0f}, net ₹{t.net - t.platform_fee:,.0f} ({100 * (t.net - t.platform_fee) / CAP:.1f}%)"
