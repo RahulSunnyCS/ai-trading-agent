@@ -45,8 +45,13 @@ screen.
   09:32, … 11:47; exits per family unchanged; 1 lot, today's lot size, 1-minute bars, usable
   days, 2024-10-09 → 2026-10-08, before charges. SENSEX lot = 20 vs NIFTY 75, so SENSEX Dir/Buy
   rupees are not comparable with NIFTY's; stops bind less often on SENSEX.
-- **Dimensions:** weekday Mon–Fri; days to expiry 0–4 via `legwise.anatomy.dte_for` (days it
-  cannot resolve → `unknown`); VIX band from the 09:15 open of INDIAVIX (missing → `unknown`).
+- **Dimensions:** weekday Mon–Fri (Saturday and Sunday sessions dropped and counted); days to
+  expiry (calendar days, 0–6; 7+ pooled) taken from the expiry dates in the lake itself — the
+  nearest `contracts_daily.expiry` on or after the day with traded bars, per the owner's
+  suggestion to read the expiry from the contract — cross-checked against
+  `legwise.anatomy.dte_for`; a day where the two disagree → `unknown`; VIX band from the 09:15
+  open of INDIAVIX (missing → `unknown`). A second weekday table covers only the latest
+  expiry-weekday regime for each index, since the weekday of expiry changed during the window.
 - **Per cell:** days, total, avg/day, win %, worst day, max drawdown of the days chained within
   the cell (labelled as such). Cells under 30 days are printed and flagged `thin`.
 - **Look-ahead check:** none needed; descriptive, no decision is simulated.
@@ -79,4 +84,9 @@ screen.
 
 ## Log
 
+- 2026-10-09 — before any SENSEX result was read: days to expiry now comes from the contract expiry
+  dates in the lake (owner's suggestion), calendar function as cross-check; checked on both indices —
+  490 days each, no gaps, equals the lake's own dte column; the calendar disagrees on 6 SENSEX days
+  in Oct 2024 (nearest weekly contract missing from the data) → `unknown`. Expiry weekday: NIFTY
+  Thu → Tue (about Sep 2025); SENSEX Fri → Tue → Thu (about Aug 2025).
 - 2026-10-09 — created; owner chose bands, SENSEX rupee values, both weekday and dte, no verdict.
