@@ -121,6 +121,21 @@ Committed before any run. Never edited after a run; a changed rule is a new date
   of AlgoTest edits and more charges than a fixed mix.
 - Rupee ranking will mostly pick NIFTY; SENSEX variants need ~4× the rank advantage to appear.
 
+### 2026-10-09 (later) — Same rule with at least 3 Widesl in the core
+Added after the first block's result was read. It changes only the core constraint.
+- **Hypothesis:** forcing at least 3 of the 5 core lots to be Widesl (NIFTY or SENSEX) keeps the
+  edge over luck and lowers drawdown.
+- **Rule:** identical to the first block (criteria, weights, lookbacks, Buy add-on, window,
+  selection days) except Case A's minimum: if fewer than 3 Widesl are in the top 5, the
+  lowest-scoring Dir picks are swapped for the next-best Widesl until there are 3.
+- **Comparators:** R drawn under the same at-least-3 constraint, 1,000 runs, same seed; E and B2
+  unchanged.
+- **Pass / kill rule:** the first block's, read from this case.
+- **Hold-out:** none; chosen by the owner after seeing the at-least-2 result on the same window,
+  so the result is exploratory and cannot replace the first block's verdict.
+- **Will not run:** minimums of 4 or 5 (as in BL-054, the owner kept the sweep at 2 and 3).
+- **Result:** (after the run)
+
 ## Log
 
 - 2026-10-09 — created from the owner's idea and answers; override: same already-seen window.
