@@ -54,8 +54,9 @@ measurement, not a pre-registered test, but consistent across every config and b
 ## Goal
 
 1. A backtest can be run "All Fridays": the blended curve, plus each Friday's figures.
-2. Every favourite that rebalances every 2+ weeks is followed "on all Fridays": one group, one
-   sleeve per Friday, one Telegram message per week, every sleeve journalled (owner, 2026-10-09).
+2. A favourite run "All Fridays", and every favourite with rebalance_every > 1 that exists today
+   (migrated once), is followed on all Fridays: one group, one sleeve per Friday, one Telegram
+   message per week, every sleeve journalled (owner, 2026-10-09).
 3. The Rebalance preview previews such a favourite (and any group) as the whole account: every
    sleeve's target, weighted by its value since the April reset, against the actual holdings.
 4. A backtest's result changes only when "All Fridays" is switched on for it.
@@ -89,11 +90,12 @@ it is); any new research; weekly (every = 1) configs, which have only one calend
   card renders on a real Broad run.
 
 ### Phase 3 — Follow on all Fridays
-- **Tasks:** favouriting a saved run with rebalance_every > 1 follows it on all Fridays: save
+- **Tasks:** favouriting a saved run that was run "All Fridays" follows it on all Fridays: save
   one run per offset (same config, `rebalance_offset` 0..K-1, capital / K) and `create_group`
   them as "<strategy> · all Fridays"; respect `MAX_FOLLOWED` (the group takes one slot) and the
-  status rules. Existing every-2+ favourites are converted by `mbt saved split-fridays
-  [--apply]` (dry run by default; applied to the live catalog only after the owner says so).
+  status rules. A run on one Friday is favourited as it is today. Existing every-2+ favourites
+  are migrated once to all Fridays by `mbt saved split-fridays [--apply]` (dry run by default;
+  applied to the live catalog only after the owner says so).
   On This week, the group's card names the sleeve trading this Friday and shows its orders at its
   capital share; the other sleeves are listed with their next Friday.
 - **Done when:** a test creates the group on favouriting, the conversion's dry run lists the
@@ -120,8 +122,10 @@ it is); any new research; weekly (every = 1) configs, which have only one calend
 ## Open questions
 
 Answered by the owner on 2026-10-09:
-1. **Default:** the backtest's "All Fridays" is opt-in. Every favourite with rebalance_every > 1
-   is followed on all Fridays, and the Rebalance page follows suit (Phase 4).
+1. **Default:** the backtest's "All Fridays" is opt-in. A new favourite follows what its run was
+   set to in the UI (All Fridays becomes a group of sleeves; one Friday stays one favourite).
+   The favourites that exist today with rebalance_every > 1 are migrated once to all Fridays.
+   The Rebalance page follows suit (Phase 4).
 2. **April reset:** yes, equal capital each April (the groups / ensemble convention), in both the
    backtest blend and the followed group. The split figures therefore move slightly from
    BL-054's, which never rebalanced the sleeves.

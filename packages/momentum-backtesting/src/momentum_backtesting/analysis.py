@@ -441,6 +441,8 @@ def payload_parts(
         "reason",
         "tax",
     ]
+    if "friday" in closed:  # an "All Fridays" run (tranches.blend_reset): the phase that traded
+        columns.append("friday")
     trade_rows = closed[columns].to_dict("records") if len(closed) else []
     for row in trade_rows:
         row["proxy"] = _proxied(proxy, row["asset"], row["entry_week"], row["exit_week"])

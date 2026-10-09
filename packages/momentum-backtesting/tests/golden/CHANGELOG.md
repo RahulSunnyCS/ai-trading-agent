@@ -123,3 +123,11 @@ response.benchmarks[].reason added for indices that are unavailable for a run (n
 | broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
 | broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-09 (on top of `874fe2f`)
+
+BL-056: new scenario for the All Fridays split; no existing scenario moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_one_category_three_picks_four_weekly_all_fridays | n/a -> 17.88% | n/a -> -35.50% |

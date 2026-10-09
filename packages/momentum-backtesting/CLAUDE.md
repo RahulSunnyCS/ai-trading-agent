@@ -323,6 +323,16 @@ contract, not a shared service).
   `run_broad_backtest` also takes `tax_hold_band`/`tax_hold_weeks` (inert in category mode: every
   sale is an "ineligible" exit) and `feature_tilt=(frame, weight)` (BL-050). Runners:
   `scripts/bl054_levers.py`, `scripts/bl050_filters.py`; features in `filters.py`.
+- **All Fridays (BL-056):** `BacktestRequest.split_fridays` (off by default; a no-op unless
+  `rebalance="weekly"` and `rebalance_every > 1`) runs every `rebalance_offset` 0..K-1 with
+  `capital / K` and returns one `Result` of the whole account (`tranches.blend_reset`: equal
+  capital restored each April via `groups.reset_weeks`, the same rule as `choose.ensemble_curve`
+  and a followed group; separate tax ledgers per sleeve, slightly pessimistic; the reset itself
+  charges no cost or tax). Trade rows and `closed` trades carry `friday` (the sleeve's offset);
+  the lazy `friday_spread` section (`tranches.friday_spread`) holds each Friday's CAGR, max
+  drawdown and Ulcer next to the blend's. Broad shares one ranking across the K runs, and a
+  split run has no `circuit_exposure` section. In `saved_identity` the flag is dropped when off or
+  meaningless (no existing fingerprint moves) and replaces `rebalance_offset` when on.
 - **voladj ignores `lookbacks` and `weights` by default** (NSE's method: 26- and 52-week returns,
   4 weeks back, over 26-week volatility). For a voladj config those two search settings only reach
   the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-055, a heavy key in the

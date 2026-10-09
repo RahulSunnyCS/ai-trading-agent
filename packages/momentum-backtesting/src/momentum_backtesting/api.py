@@ -33,6 +33,7 @@ from . import (
     search,
     stock_actions,
     this_week,
+    tranches,
 )
 from . import groups as groups_mod
 from .categories import broad
@@ -580,7 +581,9 @@ def request_key(req: BaseModel) -> str:
 
 
 #: The parts of a finished backtest fetched on their own (run_parts.RunParts).
-BacktestSection = Literal["trades", "instruments", "timeline", "latest", "circuit_exposure"]
+BacktestSection = Literal[
+    "trades", "instruments", "timeline", "latest", "circuit_exposure", "friday_spread"
+]
 
 
 class BacktestRequest(BaseModel):
@@ -632,6 +635,11 @@ class BacktestRequest(BaseModel):
     # of waiting for the next cadence week; new buys and cap trims still wait (engine.Config's
     # own field of the same name). Harmless no-op when rebalance_every == 1.
     sell_every_week: bool = False
+    # rebalance="weekly" with rebalance_every > 1 only (BL-056, "All Fridays"): run every calendar
+    # phase (offsets 0..K-1, capital / K each) and report them as one account, equal capital
+    # restored each April (tranches.blend_reset); adds the `friday_spread` section.
+    # `rebalance_offset` is then unused. Off by default; a no-op for a weekly cadence.
+    split_fridays: bool = False
     # dataset="etf" only (TODO 3.9.23, owner follow-up): rank on the usual short lookbacks
     # (1/4/13w) blended with a separate "most beaten-down over 26/52w" preference
     # (levers.grouped_momentum_ranks), instead of the config's own ranking method. 0 (default)
@@ -1065,6 +1073,37 @@ def _full(core: dict, lazy: dict[str, Callable[[], object]]) -> dict:
     return {**core, **{name: build() for name, build in lazy.items()}}
 
 
+def split_every(req: BacktestRequest) -> int:
+    """How many calendar phases a request runs: K for an "All Fridays" request, else 1."""
+    if req.split_fridays and req.rebalance == "weekly" and req.rebalance_every > 1:
+        return req.rebalance_every
+    return 1
+
+
+def _run_phases(
+    req: BacktestRequest, config: Config, run_one: Callable[[Config], Result]
+) -> tuple[Result, list[Result] | None]:
+    """`run_one(config)`, or for an "All Fridays" request every phase's run (`capital / K` each)
+    blended into one account, plus the phases (None for a single run)."""
+    every = split_every(req)
+    if every == 1:
+        return run_one(config), None
+    phases = [run_one(c) for c in tranches.tranche_configs(config, every)]
+    return tranches.blend_reset(phases), phases
+
+
+def _with_spread(
+    lazy: dict[str, Callable[[], object]], result: Result, phases: list[Result] | None
+) -> dict[str, Callable[[], object]]:
+    """Adds the "Friday luck" section (each phase against the blend) to a split run."""
+    if phases is None:
+        return lazy
+    return {
+        **lazy,
+        "friday_spread": lambda: analysis._clean(tranches.friday_spread(phases, result)),
+    }
+
+
 def _etf_backtest(req: BacktestRequest) -> dict:
     return _full(*_etf_parts(req))
 
@@ -1109,22 +1148,26 @@ def _etf_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
             for extra in masks[1:]:
                 no_buy = no_buy.reindex_like(extra).fillna(False) | extra
         report("simulating")
-        result = run_backtest(
-            prices,
-            includes,
+        result, phases = _run_phases(
+            req,
             config,
-            classes,
-            DATA.rank_cache,
-            fills.prices if fills is not None else None,
-            no_buy=no_buy,
-            external_ranks=external_ranks,
+            lambda c: run_backtest(
+                prices,
+                includes,
+                c,
+                classes,
+                DATA.rank_cache,
+                fills.prices if fills is not None else None,
+                no_buy=no_buy,
+                external_ranks=external_ranks,
+            ),
         )
         DATA.trim_cache()
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
     groups = {name: inst.group for name, inst in universe.items()}
     report("analysing")
-    return analysis.payload_parts(
+    core, lazy = analysis.payload_parts(
         result,
         prices,
         config,
@@ -1134,6 +1177,7 @@ def _etf_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         references=DATA.references(),
         no_buy=no_buy,
     )
+    return core, _with_spread(lazy, result, phases)
 
 
 def _stock_backtest(req: BacktestRequest) -> dict:
@@ -1170,14 +1214,18 @@ def _stock_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
                 f"top N ({config.top_n})."
             )
         report("simulating")
-        result = run_backtest(
-            stock.prices,
-            includes,
+        result, phases = _run_phases(
+            req,
             config,
-            stock.tax_classes,
-            DATA.stock_rank_cache,
-            None,
-            membership=stock.membership,
+            lambda c: run_backtest(
+                stock.prices,
+                includes,
+                c,
+                stock.tax_classes,
+                DATA.stock_rank_cache,
+                None,
+                membership=stock.membership,
+            ),
         )
         DATA.trim_cache()
     except ValueError as error:
@@ -1194,7 +1242,7 @@ def _stock_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         references=DATA.references(),
     )
     core["companies"] = stock.companies
-    return core, lazy
+    return core, _with_spread(lazy, result, phases)
 
 
 def _custom_index_meta() -> dict:
@@ -1479,7 +1527,11 @@ def _custom_index_parts(req: BacktestRequest, report: Report = _no_report) -> Pa
                 f"top N ({config.top_n})."
             )
         report("simulating")
-        result = run_backtest(prices, includes, config, rank_cache=DATA.custom_index_rank_cache)
+        result, phases = _run_phases(
+            req,
+            config,
+            lambda c: run_backtest(prices, includes, c, rank_cache=DATA.custom_index_rank_cache),
+        )
         DATA.trim_cache()
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
@@ -1499,7 +1551,7 @@ def _custom_index_parts(req: BacktestRequest, report: Report = _no_report) -> Pa
     inner_detail = _inner_category_detail(universe_result, result)
     if inner_detail:
         core["inner_categories"] = inner_detail
-    return core, lazy
+    return core, _with_spread(lazy, result, phases)
 
 
 def _membership_quality() -> dict:
@@ -1864,12 +1916,24 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         ranking = _broad_ranking(req)
         outer_prices = DATA.get()
         report("simulating")
-        outcome = _run_broad(req, ranking, outer_prices)
+        # One run per calendar phase for an "All Fridays" request; the ranking is shared.
+        every = split_every(req)
+        phase_reqs = (
+            [
+                req.model_copy(update={"rebalance_offset": offset, "capital": req.capital / every})
+                for offset in range(every)
+            ]
+            if every > 1
+            else [req]
+        )
+        outcomes = [_run_broad(r, ranking, outer_prices) for r in phase_reqs]
         DATA.trim_cache()
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
 
-    result = outcome.result
+    outcome = outcomes[0]
+    phases = [o.result for o in outcomes] if every > 1 else None
+    result = tranches.blend_reset(phases) if phases else outcome.result
     prices = outcome.ranking.prices
     prices = prices.assign(**{CASH: DATA.get().reindex(prices.index)[CASH]})
     groups = dict.fromkeys(prices.columns, "Stock")
@@ -1893,11 +1957,17 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         if on
         else {}
     )
-    core["held_categories"] = broad.current_holdings_detail(
-        outcome,
-        group_members,
-        category_top_n=req.broad_category_top_n,
-        picks_per_category=req.broad_picks_per_category,
+    core["held_categories"] = _merge_held_categories(
+        [
+            broad.current_holdings_detail(
+                o,
+                group_members,
+                category_top_n=req.broad_category_top_n,
+                picks_per_category=req.broad_picks_per_category,
+            )
+            for o in outcomes
+        ],
+        [r.rebalance_offset for r in phase_reqs] if phases else None,
     )
     core["missing_symbols"] = outcome.ranking.missing_symbols
     base_trades = lazy["trades"]
@@ -1907,17 +1977,20 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         # Fill blank exit ranks and say WHY a holding was sold when it simply stopped being
         # ranked (liquidity gate, left the pool, lost its category). Display-only; never fails
         # the run.
-        with contextlib.suppress(Exception):
-            exit_reasons_mod.explain_exits(
-                rows,
-                ranking=outcome.ranking,
-                held_by_week=outcome.held_by_week,
-                group_members=group_members,
-                signal_delay=req.signal_delay,
-                pool_exit_rank=req.broad_pool_exit_rank,
-                picks_per_category=req.broad_picks_per_category,
-                liquidity_cfg=_liquidity_config(req),
-            )
+        # A split run's rows are explained against the phase that made them (`friday`).
+        for offset, phase in enumerate(outcomes):
+            own = [r for r in rows if r.get("friday", offset) == offset] if phases else rows
+            with contextlib.suppress(Exception):
+                exit_reasons_mod.explain_exits(
+                    own,
+                    ranking=phase.ranking,
+                    held_by_week=phase.held_by_week,
+                    group_members=group_members,
+                    signal_delay=req.signal_delay,
+                    pool_exit_rank=req.broad_pool_exit_rank,
+                    picks_per_category=req.broad_picks_per_category,
+                    liquidity_cfg=_liquidity_config(req),
+                )
         return rows
 
     def circuit_exposure() -> object:
@@ -1937,7 +2010,32 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
                 exposure["realism"] = _circuit_realism(req, ranking, outcome, outer_prices)
         return exposure
 
+    if phases:
+        # The circuit card walks one portfolio's holding periods and re-runs it with locks the
+        # other way; a split run has K portfolios, so it has no such card.
+        return core, _with_spread({**lazy, "trades": trades}, result, phases)
     return core, {**lazy, "trades": trades, "circuit_exposure": circuit_exposure}
+
+
+def _merge_held_categories(details: list[list[dict]], offsets: list[int] | None) -> list[dict]:
+    """Broad's held-categories panel for one run, or for a split run every phase's panel merged:
+    one entry per category at its best position, "fresh" if any phase selected it freshly, and
+    `fridays`, the phases holding it."""
+    if offsets is None:
+        return details[0]
+    merged: dict[str, dict] = {}
+    for offset, detail in zip(offsets, details, strict=True):
+        for entry in detail:
+            seen = merged.get(entry["category"])
+            if seen is None:
+                merged[entry["category"]] = {**entry, "fridays": [offset]}
+                continue
+            seen["fridays"].append(offset)
+            if entry["position"] < seen["position"]:
+                seen.update(position=entry["position"], picks=entry["picks"])
+            if entry["status"] == "fresh":
+                seen["status"] = "fresh"
+    return sorted(merged.values(), key=lambda e: e["position"])
 
 
 def _outer_with_sentinel(week: pd.Timestamp, sentinel: pd.Timestamp) -> pd.DataFrame:
