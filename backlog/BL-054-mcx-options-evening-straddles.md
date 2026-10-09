@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Priority** | P1 for Phases 0–1 (time-critical: an expired contract's 1-minute history cannot be downloaded from Fyers again, so every expiry not collected is lost for good); P2 for the rest (research, after this month's Momentum goal) |
+| **Priority** | P0 — set by the owner (2026-10-09). Time-critical: an expired contract's 1-minute history cannot be downloaded from Fyers again, so every expiry not collected is lost for good. Phases 0–1 (survey, collector, backfill) come first; the strategy research follows once enough days are collected |
 | **Status** | Planned |
 | **Type** | feature (Phases 0–3), research (Phase 4) |
 | **Area** | options / trading-data (+ infra for the schedule) |
@@ -221,3 +221,4 @@ talks to Fyers runs on the laptop.
 - 2026-10-09 — created from the owner's idea. The repo has no MCX code; the collector, engine,
   quality checks and reference data all assume the NSE 09:15–15:29 session. The cloud session
   could not reach `public.fyers.in`, so the survey (Phase 0) runs on the laptop.
+- 2026-10-09 — priority raised P1 → P0 by the owner.
