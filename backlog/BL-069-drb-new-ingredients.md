@@ -104,6 +104,29 @@ on every row), with one charges pass for the final candidate. **Noise yardstick:
     vs no-recent), so a "keep" here is a candidate for that slice and the forward journal, nothing more.
     Scripts `research/bl069/run_all.py`; outputs `research/bl069/out/summary.csv`.
 
+### B7b — the owner's rupee drawdown ladder (dated 2026-10-10, registered before its runs)
+- **Rule (owner):** the basket's *own* equity is tracked from the first selection day; drawdown = running
+  peak − equity, in rupees. Start at full size (3 strategies × 2 lots = 6 lots, plus the Buy add-on).
+  **Level 1:** drawdown ≥ ₹20,000 → trade the 2 highest-ranked of the day's 3 strategies (4 lots);
+  back to full once equity has gained ₹10,000 from its low since the step-down. **Level 2:** drawdown ≥
+  ₹30,000 → trade the top-ranked strategy only (2 lots, Buy add-on off); back to level 1 when drawdown
+  has recovered to ₹25,000, after which the level-1 rule applies from that equity. The state is decided
+  from equity through the previous day (no look-ahead). The strategy dropped is always the lowest-ranked
+  of the day's picks; the Widesl minimum is applied before the cut.
+- **Choices fixed here:** the tracked equity is the *actual* traded equity (it recovers slower while
+  size is cut, as in a real account); a second set of runs tracks the *shadow* full-size equity (paper
+  P&L of the ungated basket) for reference. The Buy add-on stays on at levels 0 and 1.
+- **Runs:** base A and base R, each with actual and with shadow tracking (4 runs, window 2025-09-01
+  onward), and base A actual and shadow on `--window-from 2024-10-09` read at the Jan–Aug 2025 slice
+  (2 runs, a second look, not a hold-out). `rotate.py ... --dd-ladder 20000,30000,10000,25000
+  [--dd-basis shadow]`.
+- **Read-out:** *keep* if max drawdown improves by ≥ 20% **and** gross ÷ |max drawdown| rises (the ladder
+  is a risk control, so it is judged on return per rupee of drawdown, not on total). Also reported:
+  number of step-downs, days at each level, gross per lot-day, and the P&L made on the days at level 1
+  and level 2 by the full-size basket (if it made money there, the ladder gave profit away).
+- **Will not run:** other thresholds, a level 3, ladders on other bases.
+- **Result:** pending.
+
 ## Risks
 
 Eleven ingredient rows on one year: a "keep" is a candidate for the forward journal only. The B7 gates
