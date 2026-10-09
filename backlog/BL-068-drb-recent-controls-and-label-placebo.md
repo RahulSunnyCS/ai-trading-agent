@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; follows BL-067 |
-| **Status** | In progress |
+| **Status** | Done — recent return is momentum and stable; the fit criteria are not shown to be real |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -72,7 +72,38 @@ than nothing".
 - **Hold-out:** none (owner override, as BL-053 → BL-067). **Will not run:** other lags or windows,
   shuffling the P&L instead of the labels, more than 20 shuffles, any new criterion (fourth group needs a
   dated block).
-- **Result:** pending.
+- **Result (2026-10-10, gross, 202 selection days; baseline reproduces ₹4,30,868 / −₹68,294):**
+  - **Group 1 — recent is short-term momentum, not quality.** Lookback ladder (plain sum of the last N
+    days): 5 d ₹4,16,677 · 10 d ₹4,03,911 · 21 d ₹3,02,439 · 42 d ₹2,60,132 · 63 d ₹2,55,242 · 126 d
+    ₹1,97,194 (steady decay; the baseline's 2/3 × 5 d + 1/3 × the 5 before shape is ₹4,30,868, the
+    5-day-only version is within noise of it). Lag: skipping the latest 5 days ₹2,01,273 (−53%, drawdown
+    −₹1,21,292), latest 10 days ₹2,21,923 (−48%). Both registered momentum conditions hold; neither
+    quality condition does. Reverse: baseline picks the lowest composite ₹1,43,919 (drawdown −₹1,40,249)
+    and recent-only reversed ₹1,23,912 (−₹1,93,986), both below the random P50 (₹1.68 / ₹1.63 lakh) —
+    the ranking is informative in both directions.
+  - **Group 2 — the fit criteria are not shown to be real.** 20 label shuffles (weekday / VIX band / dte
+    permuted together over all days): min ₹85,455, mean ₹2,39,636, sd ₹1,07,880, max ₹4,44,293. The
+    true baseline ₹4,30,868 is beaten by 1 of 20 (shuffle 7, ₹4,44,293): inside the shuffled range, so
+    by the registered rule *noise*, at the boundary (95th percentile; +1.8 sd above the shuffle mean).
+    5 of 20 shuffles beat recent-only (₹3,15,861). The three fit criteria are worth ₹1.15 lakh over
+    recent-only in the true labels, but the bootstrap interval of that lead is [−₹41k, +₹2.82 lakh],
+    P(≤ 0) = 0.12. One shuffle sd (₹1.08 lakh) is the noise yardstick for BL-069 (not the ₹1.05 lakh
+    estimated before the run).
+  - **Group 3 — stability.** Halves (Dec–Apr / May–Oct): baseline ₹2,28,512 / ₹2,02,356; recent-only
+    ₹1,32,403 / ₹1,83,458; no-recent ₹75,698 / ₹1,50,408; no-VIX ₹1,79,164 / ₹2,56,042. Baseline beats
+    no-recent in both halves. Block bootstrap (5-day blocks, 2,000 resamples): baseline − no-recent
+    ₹2,04,763, 90% interval [₹62,441, ₹3,43,327], P(≤ 0) 0.006 — the recent edge is *stable*. Baseline −
+    no-VIX −₹4,339, interval [−₹1,17,075, +₹1,10,745], P(≤ 0) 0.49: indistinguishable, and no-VIX
+    flips between halves (worse in H1, better in H2). CSCV / PBO over the 16 BL-067 rows: **0.49** (8
+    blocks, 70 splits), **0.42** (16 blocks, 12,870 splits) — below the 0.5 line but near a coin flip:
+    picking the best of the 16 weightings in-sample is about as likely as not to land at or below the
+    out-of-sample median.
+  - **Read-across:** recent return is the one criterion with an edge that survives a lag control, a
+    reverse control, a half-split and a bootstrap. Weekday / dte / VIX add ₹1.15 lakh over recent-only in
+    this year but do not clear a scrambled-label placebo or the bootstrap; whether they are worth their
+    complexity is open. Which of the 16 weightings is best is not reliably knowable from this year
+    (PBO 0.42–0.49). Nothing adopted. Scripts: `research/bl068/run_all.py`, `analyse.py`; outputs
+    `research/bl068/out/`.
 
 ## Risks
 
@@ -88,3 +119,4 @@ a same-family-within-60-minutes rule) — owner to say.
 ## Log
 
 - 2026-10-10 — created; groups 1–3 registered before any run.
+- 2026-10-10 — groups 1–2 (31 runs) and group 3 ran; Result above. The fourth group (new criteria) moves to BL-069.
