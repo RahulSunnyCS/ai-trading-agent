@@ -56,6 +56,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-061](BL-061-rotation-with-closest-premium-widesl.md) | Daily rotation with closest-premium Widesl in the candidate list: their share of the 5 daily lots, and on which days | P2 | Done: descriptive | research | options |
 | [BL-062](BL-062-whole-day-rotation.md) | Daily rotation over the whole day (start times 09:17 to 15:17, 248 variants) with closest-premium Widesl | P2 | Done: passes (exploratory) | research | options |
 | [BL-063](BL-063-rotation-after-charges.md) | The rotations after brokerage (₹13 a lot) and statutory charges (STT, exchange, GST …) | P2 | Done | research | options |
+| [BL-064](BL-064-drb-daily-ranked-basket.md) | DRB, the Daily Ranked Basket: the whole-day rule at 6 core lots, at least 2 or 3 Widesl, up to 2 Buy | P2 | In progress | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
