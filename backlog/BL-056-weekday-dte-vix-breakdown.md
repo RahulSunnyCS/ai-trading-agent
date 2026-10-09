@@ -36,7 +36,7 @@ screen.
 
 ### Phase 0 — Pre-register
 - **Hypothesis:** none; descriptive.
-- **Universe:** NIFTY — the 33 BL-054 variants as already run (`research/bl054/results/`, 489
+- **Universe:** (window for the analysis: 2025-09-01 → 2026-10-08; see Dimensions) NIFTY — the 33 BL-054 variants as already run (`research/bl054/results/`, 489
   days, not re-run). SENSEX — 33 variants built the same way from three bases: the live
   `strategies/legwise/sensex_widesl_917_otm2.yaml` (OTM2, SL 114/115 % trailed 15/10 %, ₹2,500
   overall); `nifty_dir_924_itm1_sl21_recost.yaml` with `underlying: SENSEX` and `strike_type: ATM`
@@ -50,10 +50,11 @@ screen.
   nearest `contracts_daily.expiry` on or after the day with traded bars, per the owner's
   suggestion to read the expiry from the contract — cross-checked against
   `legwise.anatomy.dte_for`; a day where the two disagree → `unknown`; VIX band from the 09:15
-  open of INDIAVIX (missing → `unknown`). The weekday table covers only 2025-09-01 →
-  2026-10-08 (owner, 2026-10-09: after NIFTY's expiry moved Thursday → Tuesday; SENSEX moved to
-  Thursday the same day), about 13 months and one expiry regime per index; there is no
-  whole-window weekday table. The days-to-expiry and VIX tables use the full two years.
+  open of INDIAVIX (missing → `unknown`). All three tables (weekday, days to expiry, VIX
+  band) cover only 2025-09-01 → 2026-10-08 (owner, 2026-10-09: one year, after NIFTY's expiry
+  moved Thursday → Tuesday; SENSEX moved to Thursday the same day), about 13 months and one
+  expiry regime per index. The earlier period (2024-10-09 → 2025-08-31) is left for a later
+  block. The SENSEX backtests still run over the full two years so that block needs no re-run.
 - **Per cell:** days, total, avg/day, win %, worst day, max drawdown of the days chained within
   the cell (labelled as such). Cells under 30 days are printed and flagged `thin`.
 - **Look-ahead check:** none needed; descriptive, no decision is simulated.
@@ -93,4 +94,7 @@ screen.
   Thu → Tue (about Sep 2025); SENSEX Fri → Tue → Thu (about Aug 2025).
 - 2026-10-09 — before any SENSEX result was read: owner restricted the weekday analysis to
   2025-09-01 onward (one expiry regime per index); the extra latest-regime table is dropped.
+- 2026-10-09 — before any SENSEX result was read: owner restricted the whole analysis (all three
+  tables) to 2025-09-01 → 2026-10-08, the earlier period "later". Thin cells will be more common
+  (about 290 days spread over 6 VIX bands); they stay flagged, not hidden.
 - 2026-10-09 — created; owner chose bands, SENSEX rupee values, both weekday and dte, no verdict.
