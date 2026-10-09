@@ -75,7 +75,8 @@ than nothing".
 - **Result (2026-10-10, gross, 202 selection days; baseline reproduces ₹4,30,868 / −₹68,294):**
   - **Group 1 — recent is short-term momentum, not quality.** Lookback ladder (plain sum of the last N
     days): 5 d ₹4,16,677 · 10 d ₹4,03,911 · 21 d ₹3,02,439 · 42 d ₹2,60,132 · 63 d ₹2,55,242 · 126 d
-    ₹1,97,194 (steady decay; the baseline's 2/3 × 5 d + 1/3 × the 5 before shape is ₹4,30,868, the
+    ₹2,37,930 (steady decay; corrected 2026-10-10 in BL-069: the first run read an empty window on the
+    first 63 selection days and gave ₹1,97,194; the baseline's 2/3 × 5 d + 1/3 × the 5 before shape is ₹4,30,868, the
     5-day-only version is within noise of it). Lag: skipping the latest 5 days ₹2,01,273 (−53%, drawdown
     −₹1,21,292), latest 10 days ₹2,21,923 (−48%). Both registered momentum conditions hold; neither
     quality condition does. Reverse: baseline picks the lowest composite ₹1,43,919 (drawdown −₹1,40,249)
@@ -120,3 +121,4 @@ a same-family-within-60-minutes rule) — owner to say.
 
 - 2026-10-10 — created; groups 1–3 registered before any run.
 - 2026-10-10 — groups 1–2 (31 runs) and group 3 ran; Result above. The fourth group (new criteria) moves to BL-069.
+- 2026-10-10 — 126-day row re-run after fixing a negative-index slice in `recent_score` / `skewed_fit`: ₹2,37,930 (was ₹1,97,194); the finding is unchanged.

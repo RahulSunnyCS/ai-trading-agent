@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; follows BL-067 / BL-068 |
-| **Status** | In progress |
+| **Status** | Done — no ingredient beats the baseline; family-pooled recent (F = 0.5) makes recent-only nearly as good |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -66,7 +66,43 @@ on every row), with one charges pass for the final candidate. **Noise yardstick:
   family weights, other lookback pairs, other spacing, other gate windows, any ingredient not listed.
 - **Side fix (BL-068):** the 126-day recent row was computed with a window that read nothing for the
   first 63 selection days (negative-index slice); it is re-run with the fix and BL-068 is amended.
-- **Result:** pending.
+- **Result (2026-10-10, gross, 202 selection days; yardstick ₹1,07,880; bases A ₹4,30,868 / −₹68,294 and
+  R ₹3,15,861 / −₹1,00,936 reproduce):** no ingredient passes on base A; one passes on base R.
+  Reading of the registered clause "gross within 5%": gross not more than 5% *below* the base.
+
+  | Ingredient | Row | Gross | Max DD | Win % | Verdict |
+  |---|---|---|---|---|---|
+  | B1 family-pooled recent | A, F = 0.5 | 4,06,246 | −73,960 | 61.4 | drop (−6%, deeper) |
+  | | A, F = 1.0 | 2,17,408 | −1,01,145 | 60.9 | drop |
+  | | **R, F = 0.5** | **4,05,396** | **−62,354** | 59.9 | **keep** (+₹89,535 vs R, below the yardstick; DD −38%; BL-057 verdict PASS) |
+  | B2 overnight gap | A, added 30/20/20/15/15 | 4,23,865 | −73,886 | 62.9 | drop (below base, deeper) |
+  | | A, replaces VIX 33/25/25/0/17 | 4,07,197 | −57,902 | 62.4 | drop (−5.5%, DD −15% < 20%) |
+  | B3 fit lookbacks | A, 21:50 + 63:50 | 4,97,335 | −75,155 | 65.4 | drop (+₹66,467 < yardstick; DD deeper) |
+  | | A, 63:50 + 126:50 | 4,86,867 | −61,058 | 63.9 | drop (+₹56,000 < yardstick; DD −11% < 20%) |
+  | B4 spacing 90 min | A | 4,32,012 | −65,174 | 59.9 | drop (no effect: +₹1,144) |
+  | | R | 3,13,899 | −1,04,842 | 57.4 | drop |
+  | B6 streak shapes | A tiers / ewm3 / accel | 3,14,944 / 3,99,185 / 3,01,988 | −80,074 / −94,553 / −89,378 | 63.4 / 62.9 / 62.4 | drop all three |
+  | | R tiers / ewm3 | 2,85,442 / 2,91,834 | −88,802 / −1,26,934 | 59.9 / 58.9 | drop |
+  | B7 positive-recent only | A | 4,12,846 | −66,292 | 61.4 | drop (5 days affected; the dropped picks were net winners, −₹4,650 raw → −₹22,672 gated) |
+  | B7 streak gate 5 | A | 3,28,834 | −64,663 | 62.4 | drop (per lot-day ₹310 < ₹329; DD −5%) |
+  | B7 both | A | 3,13,414 | −65,238 | 61.4 | drop |
+  | B7 positive-recent / gate | R | 3,12,773 / 2,66,849 | −1,04,024 / −81,460 | 58.4 / 58.4 | drop (gate: DD −19.3%, one point short; per lot-day ₹254 vs ₹240) |
+
+  - **Label placebos for the fit-type ingredients.** B2 true-label ₹4,23,865 against 10 shuffles
+    (₹1,21,260 → ₹3,79,129, mean ₹2,15,000): above all 10. B3 (21/63) true-label ₹4,97,335 against 10
+    shuffles (₹73,629 → ₹3,25,172, mean ₹1,89,000): above all 10. Both are "real" under the placebo test
+    but fail the keep rule against base A (gain below one yardstick).
+  - **The sit-out gate is wrong, as registered it would be.** The streak gate cut size on 72 days on which
+    the ungated basket made **+₹2,04,067 (₹2,834 a day, above its ₹2,133 average)**: in this year,
+    after a losing 5-day stretch the basket did *better* than usual, not worse. The owner's intuition
+    ("when I lose I keep losing") is not what the basket's own P&L showed here.
+  - **The 126-day recent row (BL-068), fixed:** ₹2,37,930 / −₹80,792 (was ₹1,97,194; negative-slice bug
+    in the first 63 selection days). The ladder is still monotone: 5 d ₹4,16,677 → 10 d ₹4,03,911 → 21 d
+    ₹3,02,439 → 42 d ₹2,60,132 → 63 d ₹2,55,242 → 126 d ₹2,37,930.
+  - **B5 combined:** only one row passed, so there is nothing to combine; it is the R + family 0.5 row.
+  - **Caveat from BL-071 part A:** in Jan–Aug 2025 the recent criterion did not help (baseline −₹1,26,882
+    vs no-recent), so a "keep" here is a candidate for that slice and the forward journal, nothing more.
+    Scripts `research/bl069/run_all.py`; outputs `research/bl069/out/summary.csv`.
 
 ## Risks
 
@@ -80,3 +116,4 @@ None.
 ## Log
 
 - 2026-10-10 — created; ingredients and read-outs registered before any BL-069 run.
+- 2026-10-10 — 42 runs done; Result above. 126-day row of BL-068 corrected here.
