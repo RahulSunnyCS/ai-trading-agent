@@ -72,7 +72,7 @@ benchmark, not the one picked on the headline.
 
 | Section | What it shows |
 |---|---|
-| This week | The latest ranking with each candidate's score and action, beside the open positions. |
+| This week | The run's last week: each candidate's rank, score and action, beside the open positions. On a slower cadence a week the strategy does not trade says "Not a rebalance week" and names the next trading Friday. For Broad the actions are the engine's own, so a stock above "Max price to buy ₹" is never shown as a buy. |
 | Yearly returns | Each calendar year against the benchmark. Count the losing years. |
 | Rolling 1-year return | The return over every trailing 52 weeks, and how often the strategy was ahead. |
 | Drawdowns | The deepest falls: when, how deep, how long, and what the benchmark did then. |

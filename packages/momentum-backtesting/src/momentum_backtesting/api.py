@@ -1985,13 +1985,30 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
                 exposure["realism"] = _circuit_realism(req, ranking, outcome, outer_prices)
         return exposure
 
-    return core, {**lazy, "trades": trades, "circuit_exposure": circuit_exposure}
+    def latest() -> object:
+        # The engine's own decision for the run's last week, as the weekly signal uses: the
+        # advisory `analysis.latest_signal` knows neither the price ceiling nor the circuit locks
+        # Broad passes the engine, so it recommended buys the engine would refuse. One more engine
+        # pass (the ranking is the run's own), made when the panel is opened.
+        return _broad_engine_signal(
+            req, _broad_decide(req, ranking, outer_prices, result.ranks.index[-1])
+        )
+
+    return core, {
+        **lazy,
+        "trades": trades,
+        "latest": latest,
+        "circuit_exposure": circuit_exposure,
+    }
 
 
-def _outer_with_sentinel(week: pd.Timestamp, sentinel: pd.Timestamp) -> pd.DataFrame:
+def _outer_with_sentinel(
+    week: pd.Timestamp, sentinel: pd.Timestamp, outer: pd.DataFrame | None = None
+) -> pd.DataFrame:
     """The outer-market prices (CASH and the atomic assets) with `week` present and a flat
-    `sentinel` week after it, to match a ranking from `rebalance.persisted_broad_ranking`."""
-    outer = DATA.get().copy()
+    `sentinel` week after it, to match a ranking from `rebalance.persisted_broad_ranking`.
+    `outer` is the frame to start from (a finished run's own); by default, the stored data."""
+    outer = (DATA.get() if outer is None else outer).copy()
     if week not in outer.index:
         available = outer.loc[outer.index <= week]
         if available.empty:
@@ -2017,12 +2034,22 @@ def _broad_sentinel_run(
     ranking = _broad_ranking(req)
     if ahead:
         ranking = rebalance.persisted_broad_ranking(ranking)
-    week = ranking.prices.index[-1]
+    return _broad_decide(req, ranking, DATA.get(), ranking.prices.index[-1])
+
+
+def _broad_decide(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outer_prices: pd.DataFrame,
+    week: pd.Timestamp,
+) -> tuple[broad.BroadBacktestResult, pd.Timestamp]:
+    """Run Broad through `week` plus a flat sentinel week after it, so the engine decides `week`
+    with every rule it has (see `_broad_sentinel_run`). Weeks after `week` are dropped first."""
     sentinel = week + pd.Timedelta(days=7)
     outcome = _run_broad(
         req.model_copy(update={"end": sentinel.strftime("%Y-%m-%d")}),
-        rebalance.persisted_broad_ranking(ranking),
-        _outer_with_sentinel(week, sentinel),
+        rebalance.persisted_broad_ranking(ranking, through=week),
+        _outer_with_sentinel(week, sentinel, outer_prices),
     )
     return outcome, week
 
@@ -2136,20 +2163,15 @@ def _broad_engine_signal(
         )
     rows.sort(key=lambda r: (pd.isna(r["rank"]), r["rank"] if pd.notna(r["rank"]) else 0))
 
-    if req.rebalance == "weekly" and req.rebalance_every > 1:
-        on_cadence = bool(cadence_weeks([week], req.rebalance_every, req.rebalance_offset))
+    explain = analysis.cadence_explain(
+        week, req.rebalance, req.rebalance_every, req.rebalance_offset, req.sell_every_week
+    )
+    if explain is None and req.rebalance == "weekly" and req.rebalance_every > 1:
         explain = (
-            f"Rebalance week (every {req.rebalance_every} weeks, phase {req.rebalance_offset})."
-            if on_cadence
-            else f"Not a rebalance week (every {req.rebalance_every} weeks, phase "
-            f"{req.rebalance_offset}): "
-            + (
-                "only sells of names that dropped out are made."
-                if req.sell_every_week
-                else "no trades."
-            )
+            f"Rebalance week (every {req.rebalance_every} weeks, "
+            f"phase {req.rebalance_offset + 1} of {req.rebalance_every})."
         )
-    else:
+    elif explain is None:
         explain = "Rebalance week."
     if req.signal_delay:
         explain += f" With a {req.signal_delay}-week signal delay, the ranks shown are that old."
@@ -3729,8 +3751,11 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     elif req.dataset == "custom_index":
         payload = _custom_index_backtest(req)
     elif req.dataset == "broad":
-        payload = _broad_backtest(req)
-        # The engine's own decision for this week, not the advisory panel (see its docstring).
+        core, lazy = _broad_parts(req)
+        # The engine's own decision for the newest STORED week (a lagging outer-market series can
+        # end the run itself a week earlier), so the run's own `latest` is not built at all.
+        lazy.pop("latest", None)
+        payload = _full(core, lazy)
         payload["latest"] = _broad_engine_signal(req)
     else:
         return None, f"Unsupported weekly dataset {req.dataset!r}."

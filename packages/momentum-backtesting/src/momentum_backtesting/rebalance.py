@@ -408,15 +408,19 @@ def persisted_broad_prices(
     return ltp, symbols
 
 
-def persisted_broad_ranking(ranking: broad.UniverseRanking) -> broad.UniverseRanking:
-    """Add one flat sentinel week so the engine can decide on the last stored week."""
-    week = ranking.prices.index[-1]
+def persisted_broad_ranking(
+    ranking: broad.UniverseRanking, through: pd.Timestamp | None = None
+) -> broad.UniverseRanking:
+    """Add one flat sentinel week so the engine can decide on the last stored week. `through`
+    (a stored week) first drops every later week, so the engine decides that week instead, on
+    what was known at its close: a backtest that ends before the newest data."""
+    week = ranking.prices.index[-1] if through is None else through
     sentinel = week + pd.Timedelta(days=7)
 
     def extended(frame: pd.DataFrame | None) -> pd.DataFrame | None:
         if frame is None:
             return None
-        result = frame.copy()
+        result = frame.loc[frame.index <= week].copy()
         result.loc[sentinel] = result.loc[week]
         return result.sort_index()
 
@@ -426,7 +430,7 @@ def persisted_broad_ranking(ranking: broad.UniverseRanking) -> broad.UniverseRan
         ranking,
         prices=prices,
         raw_prices=extended(ranking.raw_prices),
-        weeks=[*ranking.weeks, sentinel],
+        weeks=[*(w for w in ranking.weeks if w <= week), sentinel],
         global_ranks=extended(ranking.global_ranks),
         pool_membership=extended(ranking.pool_membership),
         stock_pool_ranks=extended(ranking.stock_pool_ranks),

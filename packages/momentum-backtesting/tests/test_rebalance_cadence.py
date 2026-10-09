@@ -341,3 +341,86 @@ def test_rebalance_preview_job_returns_the_result_and_the_refusals(client, monke
     assert "Stock and Broad" in failed["error"]
 
     assert http.get("/api/rebalance-preview/jobs/ffff").status_code == 404
+
+
+# --- the "This week" panel follows the cadence ---------------------------------------------------
+#
+# `analysis.latest_signal` advises on the last week of a run. It used to ignore the cadence, so on
+# an every-4-weeks strategy it recommended trades on the 3 weeks in 4 the engine does not trade.
+
+
+def _off_week_signals(**overrides):
+    """(week, the panel on a run ending that week, the full run's trades that week) for every
+    checked week the cadence does not trade."""
+    from momentum_backtesting import analysis
+
+    full = run(**overrides)
+    for week in full.equity.index[30:200:3]:
+        config = Config(**{"start": "2017-01-06", "top_n": 3, "exit_rank": 6, **overrides})
+        cut = run(**overrides, end=week.strftime("%Y-%m-%d"))
+        signal = analysis.latest_signal(cut, market(), config)
+        assert signal["week"] == week
+        traded = full.trades[full.trades["week"] == week]
+        yield week, signal, traded
+
+
+@pytest.mark.parametrize("portfolio", ["buffer", "slots"])
+def test_the_panel_advises_no_trades_off_cadence(portfolio):
+    off = 0
+    for week, signal, traded in _off_week_signals(rebalance_every=4, rebalance_offset=1):
+        if phase(week, 4) == 1:
+            continue
+        off += 1
+        assert traded.empty, week  # the engine does nothing ...
+        assert {r["action"] for r in signal["rows"]} <= {"", "HOLD"}, week  # ... nor the panel
+        assert signal["explain"].startswith("Not a rebalance week (every 4 weeks, phase 2 of 4")
+        assert "no trades this week" in signal["explain"]
+    assert off >= 20
+
+
+def test_the_panel_sells_off_cadence_only_with_sell_every_week():
+    sold = 0
+    for week, signal, traded in _off_week_signals(
+        rebalance_every=4, rebalance_offset=0, sell_every_week=True
+    ):
+        if phase(week, 4) == 0:
+            continue
+        rows = signal["rows"]
+        actions = {r["asset"]: r["action"] for r in rows if r["action"] not in ("", "HOLD")}
+        assert set(actions.values()) <= {"SELL"}, week
+        assert set(actions) == set(traded["asset"]), week  # the engine's off-week sells
+        assert set(traded["action"]) <= {"SELL"}, week
+        assert "only holdings that dropped out are sold" in signal["explain"]
+        sold += len(actions)
+    assert sold  # not vacuous
+
+
+def test_the_panel_trades_monthly_only_on_the_last_friday():
+    seen = {True: 0, False: 0}
+    for week, signal, traded in _off_week_signals(rebalance="monthly"):
+        month_end = (week + pd.Timedelta(days=7)).month != week.month
+        seen[month_end] += 1
+        if not month_end:
+            assert traded.empty, week
+            assert {r["action"] for r in signal["rows"]} <= {"", "HOLD"}, week
+            assert signal["explain"].startswith("Not a rebalance week (monthly")
+        else:
+            assert not signal["explain"].startswith("Not a rebalance week"), week
+    assert seen[True] and seen[False]
+
+
+def test_cadence_explain_names_the_phase_and_the_next_trading_friday():
+    from momentum_backtesting.analysis import cadence_explain
+
+    on = CADENCE_EPOCH + pd.Timedelta(weeks=8)  # phase 0 of 4
+    assert cadence_explain(on, "weekly", 4, 0, False) is None
+    assert cadence_explain(on, "weekly", 1, 0, False) is None
+    text = cadence_explain(on + pd.Timedelta(weeks=1), "weekly", 4, 0, False)
+    assert text == (
+        f"Not a rebalance week (every 4 weeks, phase 1 of 4; next "
+        f"{on + pd.Timedelta(weeks=4):%d %b %Y}): no trades this week."
+    )
+    # on is phase 0 of 2, so the phase-1 Friday is the next one
+    assert "next " + f"{on + pd.Timedelta(weeks=1):%d %b %Y}" in cadence_explain(
+        on, "weekly", 2, 1, True
+    )
