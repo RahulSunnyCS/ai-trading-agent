@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; may widen the BL-057/058 universe later |
-| **Status** | In progress (descriptive; same already-seen window, owner override) |
+| **Status** | Done (descriptive; same already-seen window, owner override) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -54,7 +54,26 @@ larger universe (that needs its own block after this curve is read); any skip or
 - **Hold-out:** none (owner override, same window).
 - **Will not run:** a rotation over 144 variants, any rule, slots after 15:02, other windows,
   Widesl OTM1/OTM2 alternatives, charges.
-- **Result:** (after the run)
+- **Result:** descriptive, no verdict. All 78 runs finished (489 days each; NIFTY 2 and SENSEX 3 days
+  skipped by the engine, as for the 09:17–11:47 variants); window 2025-09-01 → 2026-10-08, 267
+  weekdays, halves split at 2026-03-17; the 09:17 Widesl totals reconcile with BL-054 / BL-056
+  (₹48,472 NIFTY, ₹38,147 SENSEX) and cell totals sum to each variant's total. Average ₹ per day per
+  lot, mean of the start-time means in each window (09:17–11:47 | 12:02–13:47 | 14:02–15:02):
+  **NIFTY** Widesl 158 | 178 | 182, Dir ATM 367 | 247 | 152, Buy 41 | −2 | −41; **SENSEX** Widesl
+  67 | 94 | 103, Dir ATM 409 | 285 | 156, Buy 34 | 22 | 8. Start times positive in both halves of the
+  window (morning | midday | late): NIFTY Widesl 9/11 | 4/8 | 3/5, Dir 11/11 | 5/8 | 5/5, Buy
+  4/11 | 0/8 | 0/5; SENSEX Widesl 5/11 | 4/8 | 2/5, **Dir 11/11 | 8/8 | 5/5 (all 24)**, Buy 10/11 |
+  3/8 | 2/5. Rank correlation between first-half and second-half averages across the 24 start times:
+  NIFTY Widesl −0.45, Dir +0.02, Buy −0.24; SENSEX Widesl −0.01, Dir −0.03, Buy −0.20 — the shape
+  of the curve in detail does not repeat across halves. NIFTY Widesl over 12:02–14:32 was flat or
+  negative in the first half and +₹210–440 a day in the second. All four Widesl / Dir series jump at
+  14:47 and fall back at 15:02 (NIFTY Widesl ₹268/day, 71% win, drawdown −₹5,342; NIFTY Dir ₹250;
+  SENSEX Widesl ₹206; SENSEX Dir ₹305, against ₹65–147 at 14:32), positive in both halves;
+  a spot check of ten sessions' trades showed realistic strikes and premiums and exits at the 15:28
+  bar, and did not explain the jump. Buy cells at 14:47 and 15:02 cannot trade (range window ends 15:12,
+  exit 15:14) and are flagged. Weekday, days-to-expiry and VIX-band tables for all 24 start times
+  are in `research/bl059/out/` (the cell patterns agree with BL-056 for the morning start times).
+  Late fills use 1-minute prices without spreads, the weakest assumption here.
 
 ### Phase 1 — Generate and run the 78 variants (about an hour, 8 in parallel)
 - Done when: 78 result files, one day set per index, matching the existing variants' day sets.
@@ -71,3 +90,4 @@ larger universe (that needs its own block after this curve is read); any skip or
 ## Log
 
 - 2026-10-09 — created from the owner's request; override: same already-seen window.
+- 2026-10-09 — all 78 runs finished 18:29 and the analysis ran (Result above).
