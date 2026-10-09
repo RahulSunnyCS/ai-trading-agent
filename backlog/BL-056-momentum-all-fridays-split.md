@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — set by the owner (2026-10-09); how real money should follow any config that trades every 2 or 4 weeks |
-| **Status** | In progress (started 2026-10-09) |
+| **Status** | Built 2026-10-09 (all four phases); migrating today's favourites on the live catalog is the owner's call |
 | **Type** | feature |
 | **Area** | momentum / dashboard |
 | **Created** | 2026-10-09 |
@@ -27,6 +27,21 @@ Five Sectors Monthly alone runs from 34.6% to 44.8% purely by calendar. Splittin
 gamble; it does not raise the average. Every after-tax number in BL-054 already assumes the
 split. The owner (2026-10-09) wants it in the dashboard, both to backtest and to follow with
 money.
+
+Does the split also make falls shallower? Measured (`scripts/bl054_phase_split.py` on
+`feat/momentum-stop-loss`; output in its gitignored
+`data/search/round7_A/bl054/phase_split/phase_split.csv`) on the same 10 configs, after tax at
+Rs 5 lakh, the sleeves never evened out. Median over the 10, full period:
+
+| | Split | Single Friday: median | Single Friday: worst |
+|---|---|---|---|
+| Max drawdown | -27.6% | -31.1% | -35.7% |
+| Ulcer (average fall) | 9.9 | 10.8 | 12.4 |
+| CAGR | 31.5% | | 27.5% (best 33.9%) |
+
+Yes: a shallower worst fall and a calmer ride than a typical Friday, and a CAGR inside the
+single-Friday range. FY2018-22 alone: -27.3% against -28.6% (worst -35.7%); FY2023-26: -19.3%
+against -20.8% (worst -23.2%).
 
 **Measured after tax at Rs 5 lakh, 2017-2026** (`scripts/bl054_phase_split.py`, output
 `data/search/round7_A/bl054/phase_split/phase_split.csv`): the split's worst fall is shallower
@@ -157,3 +172,13 @@ Answered by the owner on 2026-10-09:
   run and gave each group its status and headline. **Not applied to the live catalog: owner's call.**
   Note for that call: the weekly job now evaluates 38 favourites, not 10, so the Friday run is
   longer (each sleeve is one engine run; Broad's ranking is shared between sleeves of one config).
+- 2026-10-09 — Phase 4 built: the Rebalance preview takes a group (`group` on
+  `/api/rebalance-preview`; one preview per sleeve, mixed by each sleeve's value since the April
+  reset), the page offers groups instead of their sleeves, drops the start-date field for a group
+  and shows which sleeve trades this week. Tried on the live-data copy: Five Sectors, Rank Sum ·
+  all Fridays previews in 33 s cold (Friday 2 of 4 trades, 6 rows, target sums to 100%). Cited the
+  fall-depth measurement above.
+- **Left for the owner:** (1) run `uv run mbt saved split-fridays` on the live catalog once this is
+  merged (10 favourites become 10 groups, 38 sleeves; the dry run lists them) and watch the next
+  Friday's job, which now evaluates 38 favourites instead of 10; (2) mark this Done once that is
+  applied and one weekly job has journalled every sleeve.
