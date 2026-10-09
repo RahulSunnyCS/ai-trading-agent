@@ -59,7 +59,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-064](BL-064-drb-daily-ranked-basket.md) | DRB, the Daily Ranked Basket: the whole-day rule at 6 core lots, at least 2 or 3 Widesl, up to 2 Buy | P2 | Done: passes (exploratory) | research | options |
 | [BL-065](BL-065-drb-two-lots-per-strategy.md) | DRB with 2 lots per strategy (3 strategies × 2 lots) to cut charges | P2 | Done: inconclusive | research | options |
 | [BL-066](BL-066-drb-6w3l2-daily-stop.md) | Daily stop-loss levels (₹10k, 12k, 15k, 17k, 20k) for DRB-6W3L2 | P2 | Done: no level helps | research | options |
-| [BL-067](BL-067-drb-weight-map.md) | Which of DRB's four ranking criteria carry the edge? A 16-row weight map | P2 | In progress | research | options |
+| [BL-067](BL-067-drb-weight-map.md) | Which of DRB's four ranking criteria carry the edge? A 16-row weight map | P2 | Done: recent return carries it; nothing beats the baseline beyond noise | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
