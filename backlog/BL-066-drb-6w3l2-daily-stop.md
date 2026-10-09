@@ -71,6 +71,23 @@ Added after the first block's result was read; nothing else in the rule changes.
   (overshoot of 14–26%). The ₹8k stop fired mostly 11:00–14:00. Across all eight levels tried (4k to 20k) the effect on
   total is not monotonic (₹8k and ₹10k positive, ₹12k negative), which fits noise, not a signal.
 
+### 2026-10-09 (later) — Why the ₹8k stop's worst day is −₹13,696, and a best-case fill
+Added after the owner questioned the number. Not a rule change: a check and a sensitivity.
+- **Check:** every recorded curve ends exactly at its strategy's final P&L (the gap is ₹0 on all 654 picks), and the
+  combined curves reproduce DRB-6W3L2's stored P&L. The −₹13,696 is real data: on 2026-07-15 the combined
+  P&L went +₹2,826 (12:54) → −₹4,128 (12:55) → −₹13,696 (12:56); two SENSEX closest-premium strategies hit their own ₹2,500
+  stops in the 12:56 bar (₹3,490 and ₹2,671 a lot), a ₹9,568 fall in one bar. No bar closed between −₹4k and −₹13.7k, so a
+  stop that acts on bar closes cannot fire at −₹8k. Over the 202 days the largest one-minute fall of the combined path
+  has a median of −₹2,202, a 90th percentile of −₹5,394 and a worst of −₹14,444; 66 days fell more than ₹3k in a minute,
+  22 more than ₹5k, 5 more than ₹8k. 2026-09-01 shows the same (−₹7,631 → −₹13,526 at 13:50).
+- **Best-case sensitivity (`stops.py --fill-at-level`):** the stop fills exactly at −X when a bar crosses it. Gross vs
+  no stop / drawdown vs no stop: ₹4k −4.8% / −3.2%; ₹6k +1.3% / −15.7%; ₹8k +19.0% / +6.8%; ₹10k +9.8% / +12.6%; ₹12k
+  +4.1% / +14.8%; ₹15k +2.8% / −3.9%; ₹17k +1.4% / −1.3%; ₹20k none. Net after charges: ₹4k ₹3,29,615, ₹6k ₹3,56,034
+  (+27.4%, drawdown −₹70,777), ₹8k ₹4,32,366 (+33.3%, −₹88,180), ₹10k ₹3,92,422, ₹12k ₹3,67,911, ₹15k ₹3,62,591,
+  ₹17k ₹3,56,422 (no stop ₹3,50,407, −₹84,469). **No level reaches the 25%-smaller-drawdown bar even in the best
+  case**; ₹6k comes closest (−15.7% with the total 1.3% higher). The real behaviour of a live stop lies between the
+  two fill assumptions and depends on how it is implemented (AlgoTest has no portfolio-wide stop).
+
 ## Log
 
 - 2026-10-09 — created from the owner's request.

@@ -22,6 +22,7 @@ LEVELS = [None] + (
     if "--levels" in sys.argv
     else [10_000, 12_000, 15_000, 17_000, 20_000]
 )
+FILL_AT_LEVEL = "--fill-at-level" in sys.argv
 PER = 2  # lots in each strategy (DRB-6W3L2)
 PICKS = HERE.parent / "bl057" / "daily_picks_min3_core6_buy2L2_whole_day.csv"
 CHARGES = HERE.parent / "bl063" / "out" / "daily_charges.csv"
@@ -95,7 +96,13 @@ def main() -> None:
             for i in range(len(keys)):
                 hit = np.where(paths[i] <= -X)[0]
                 if len(hit):
-                    pnl[i], stopped[i], mins[i] = paths[i, hit[0]], True, hit[0]
+                    # default: close at the combined value of the first minute that ends at or below -X;
+                    # --fill-at-level: best case, the stop fills exactly at -X (a stop order that fires inside the bar)
+                    pnl[i], stopped[i], mins[i] = (
+                        (-X if FILL_AT_LEVEL else paths[i, hit[0]]),
+                        True,
+                        hit[0],
+                    )
         s = pd.Series(pnl, index=idx)
         net = s - charges
         m = net.groupby(net.index.to_period("M")).sum()
