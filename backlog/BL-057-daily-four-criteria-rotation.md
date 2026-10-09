@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; follows BL-054 and BL-056 |
-| **Status** | Planned (pre-registered; exploratory: owner override, no hold-out) |
+| **Status** | Done — inconclusive (exploratory: owner override, no hold-out) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -87,7 +87,20 @@ Committed before any run. Never edited after a run; a changed rule is a new date
 - **Will not run:** other criterion weights or skew weights, other lookbacks, top-N other than 5,
   weekly selection, other Buy triggers or more than 2 Buy lots, lot-size normalisation, the
   2024-10-09 → 2025-08-31 period, charges. Each needs a new dated block.
-- **Result:** (after the run)
+- **Result:** **inconclusive** (condition 2 fails). 265 common weekdays; four days present in one
+  index only dropped (NIFTY 23–24 Sep 2026, SENSEX 16–17 Sep 2026); selection 2025-12-03 → 2026-10-08,
+  202 days; Buy add-on fired on 89 days (35 × 1 lot, 54 × 2); lots/day 5.71. **Case A** (verdict):
+  ₹3,31,842, max DD −₹57,153, worst day −₹16,033, ₹288 per lot-day; R random P50 ₹2,26,445 / P90
+  ₹2,93,922 (beats 98% of runs → (1) passes); E ₹2,44,304 / DD −₹56,095 (more total, drawdown ₹1,058
+  worse → (2) fails); B2 ₹1,85,540 / DD −₹1,67,246 → (3) passes. **Case B:** ₹2,95,601 / DD −₹70,205,
+  80th percentile of random, fails (1) and (2). Per-criterion signal (Spearman vs same-day P&L across
+  the 66, mean over days): recent +0.045, weekday +0.024, dte +0.013, VIX +0.023, composite +0.039
+  — small but positive, the recent-P&L term carries most of it. Picks: the ≥2-Widesl override fired
+  on 128 of 202 days (the score prefers Dir); case A held exactly 2 Widesl on 155 days; NIFTY 56%
+  of core picks; 3.25 of 5 core members changed per day. Buy add-on earned ₹19,688 on its 89 days
+  (₹221/day) against ₹58/day for the top-2 Buy on the days it stayed out. Hindsight ceiling (look-ahead):
+  best fixed 5 = all Dir (N 11:02, S 09:47, S 11:02, N 10:47, S 11:32) ₹5,22,577. Case A's edge over
+  E is +₹87,538 before charges with 3.25 strategy changes a day. Script: `research/bl057/rotate.py`.
 
 ### Phase 1 — Script and run
 - `research/bl057/rotate.py`: loads the 66 result files, builds day features (reuse
@@ -111,3 +124,4 @@ Committed before any run. Never edited after a run; a changed rule is a new date
 ## Log
 
 - 2026-10-09 — created from the owner's idea and answers; override: same already-seen window.
+- 2026-10-09 — ran; inconclusive under the pass rule (Result above).
