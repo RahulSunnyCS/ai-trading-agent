@@ -26,9 +26,14 @@ A config that rebalances every K weeks has K possible trading calendars (`Config
 Five Sectors Monthly alone runs from 34.6% to 44.8% purely by calendar. Splitting removes the
 gamble; it does not raise the average. Every after-tax number in BL-054 already assumes the
 split. The owner (2026-10-09) wants it in the dashboard, both to backtest and to follow with
-money. Whether the split also makes falls shallower is being measured
-(`scripts/bl054_phase_split.py report`, output `data/search/round7_A/bl054/phase_split/`); cite
-it here when it lands.
+money.
+
+**Measured after tax at Rs 5 lakh, 2017-2026** (`scripts/bl054_phase_split.py`, output
+`data/search/round7_A/bl054/phase_split/phase_split.csv`): the split's worst fall is shallower
+than the typical single Friday's in 10 of 10 configs (median -27.6% against -31.1%; the
+unluckiest Friday -35.7%) and its Ulcer index is lower in 10 of 10 (9.9% against 10.8%), in
+both FY2018-22 and FY2023-26; CAGR lands mid-range (31.5%, single Fridays 27.5% to 33.9%). A
+measurement, not a pre-registered test, but consistent across every config and both windows.
 
 **What already exists (reuse, do not rebuild):**
 - `packages/momentum-backtesting/src/momentum_backtesting/tranches.py`: K equal sub-portfolios on
@@ -106,3 +111,4 @@ To ask the owner when this is started:
 ## Log
 
 - 2026-10-09 — created at P0 by the owner, from the BL-054 L2 result.
+- 2026-10-09 — the split-against-single-Friday measurement landed (above): shallower falls in 10 of 10.
