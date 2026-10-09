@@ -11,6 +11,7 @@ import { Badge } from '../ui/Badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { Input, Select, NumberField as UiNumberField } from '../ui/Input';
 import { RadioCards } from '../ui/RadioCards';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { SettingsAccordion } from './backtest/SettingsAccordion';
 
 export type Dataset = 'etf' | 'stock' | 'custom_index' | 'broad';
@@ -859,6 +860,7 @@ const SETTINGS_FALLBACKS: Values = {
   rebalance: 'weekly',
   rebalance_every: 1,
   rebalance_offset: 0,
+  split_fridays: false,
   sell_every_week: false,
   exclude_high_vol: 0,
   cost_model: 'flat',
@@ -1421,6 +1423,7 @@ export function MomentumSettingsPanel({
                   onChange('rebalance', choice === 'monthly' ? 'monthly' : 'weekly');
                   onChange('rebalance_every', choice === 'monthly' ? 1 : Number(choice.slice(5)));
                   onChange('rebalance_offset', 0);
+                  if (choice === 'monthly' || choice === 'every1') onChange('split_fridays', false);
                 }}
               >
                 <option value="every1">Weekly</option>
@@ -1430,6 +1433,30 @@ export function MomentumSettingsPanel({
               </Select>
             </Field>
             {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' ? (
+              <div className="text-xs font-medium text-muted">
+                <span className="flex items-center gap-1.5">
+                  Fridays
+                  <InfoTooltip
+                    text="One trades on a single set of Fridays; All (split) runs every set with an equal share of the money each and adds them up, so no Friday has to be picked."
+                    label="About Fridays"
+                  />
+                </span>
+                <SegmentedControl
+                  className="mt-1"
+                  ariaLabel="One Friday or all Fridays"
+                  size="sm"
+                  value={bool('split_fridays') ? 'all' : 'one'}
+                  options={[
+                    { value: 'one', label: 'One' },
+                    { value: 'all', label: 'All (split)' },
+                  ]}
+                  onChange={(choice) => onChange('split_fridays', choice === 'all')}
+                />
+              </div>
+            ) : null}
+            {num('rebalance_every', 1) > 1 &&
+            str('rebalance', 'weekly') === 'weekly' &&
+            !bool('split_fridays') ? (
               <Field
                 label="Which Fridays"
                 help="Trading weeks are fixed on the calendar (counted from 1 Jan 2016), so each choice is a different set of Fridays. Comparing them shows how much of a result is down to lucky timing."
@@ -1448,6 +1475,16 @@ export function MomentumSettingsPanel({
               </Field>
             ) : null}
           </div>
+          {num('rebalance_every', 1) > 1 &&
+          str('rebalance', 'weekly') === 'weekly' &&
+          bool('split_fridays') ? (
+            <Hint>
+              All (split) runs every Friday set with an equal share of the money, evened out again
+              each April, and adds them into one account. Tax is counted per Friday set, so a loss
+              in one set does not offset a gain in another: slightly pessimistic. It takes about as
+              many times longer as there are sets, and the Friday luck card shows each one.
+            </Hint>
+          ) : null}
           {num('rebalance_every', 1) > 1 && str('rebalance', 'weekly') === 'weekly' && buffer ? (
             <Toggle
               label="Sell exits weekly, buy only on the cadence"

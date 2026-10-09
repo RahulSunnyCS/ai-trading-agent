@@ -75,6 +75,7 @@ benchmark, not the one picked on the headline.
 | This week | The latest ranking with each candidate's score and action, beside the open positions. |
 | Yearly returns | Each calendar year against the benchmark. Count the losing years. |
 | Rolling 1-year return | The return over every trailing 52 weeks, and how often the strategy was ahead. |
+| Friday luck | Only for an **All (split)** run. Each Friday set on its own (CAGR, max drawdown, Ulcer) next to the whole account, and the gap between the luckiest and unluckiest. |
 | Drawdowns | The deepest falls: when, how deep, how long, and what the benchmark did then. |
 | Monthly returns | A month-by-month heatmap with each year's total. |
 | Trades | Every closed trade, newest first, filterable. |
@@ -83,6 +84,16 @@ benchmark, not the one picked on the headline.
 | Holdings timeline | What was held, when, and in what share. |
 | Circuit exposure | Broad Momentum only: the circuit-lock situations the strategy ran into. |
 | Instrument attribution | How each instrument made or lost the money. |
+
+## An All (split) run
+
+With **Fridays: All (split)** on a slower cadence, the headline, chart and tables are for the
+whole account: every Friday set holds an equal share of the money, evened out each April. The
+trade list says which Friday set made each trade. The **Friday luck** section shows what each set
+would have earned alone. Splitting removes the gamble of picking a Friday; it does not raise the
+average. Tax is counted separately for each set (a loss in one never offsets a gain in another),
+so after-tax figures are slightly pessimistic. The run takes about as many times longer as there
+are sets, and Broad Momentum's circuit exposure card is not shown for it.
 
 ## Reading a result honestly
 

@@ -80,6 +80,21 @@ and pops up once a day on any screen. Every change is also kept in a log on the 
 - Exactly **one** followed favourite is the **headline**: its signal goes out on Friday and it
   comes first on This week. Making a Watching favourite the headline makes it Paper.
 
+## Following on all Fridays
+
+A strategy that rebalances every 2 or 4 weeks has 2 or 4 possible sets of Fridays, and which one it
+trades is luck (see [All Fridays](glossary:all-fridays)). Run it with **Fridays: All (split)** in
+the Backtest settings, then set its status (Watching, Paper or Invested) here: it is followed as
+**one group with one sleeve per Friday**, each with an equal share of the money, named like
+*Five Sectors · all Fridays · Friday 2 of 4*. The run itself stays a saved run, as the record of
+what was tested. Setting its status again changes the group; it never makes a second one. A
+strategy run on one Friday is favourited as before.
+
+The favourites that followed a single Friday before this existed can be moved to all Fridays in
+one step with `mbt saved split-fridays` (it lists them first; `--apply` makes the groups). The
+single-Friday run is kept as a saved run and the group takes its status and headline. Removing the
+group keeps its sleeves.
+
 ## Groups
 
 Several strategies of one dataset can be **one favourite**: the Phase 6 ensemble is four configs

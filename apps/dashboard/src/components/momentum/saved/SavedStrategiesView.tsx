@@ -20,6 +20,7 @@ import { cn } from '../../../lib/cn';
 import {
   EMPTY,
   formatDay,
+  formatInt,
   formatIstDate,
   formatIstDateTimeShort,
   formatNumber,
@@ -293,11 +294,17 @@ export function SavedStrategiesView({
 
   async function patchStrategy(id: string, body: Record<string, unknown>): Promise<boolean> {
     setError(null);
-    const response = await apiPatch(`${SAVED_STRATEGIES_URL}/${id}`, body);
+    const response = await apiPatch<SavedStrategy>(`${SAVED_STRATEGIES_URL}/${id}`, body);
     if (!response.ok) {
       setError(response.error);
       toast(response.error, 'error');
       return false;
+    }
+    // An All Fridays run is followed as a group of one sleeve per Friday (BL-056).
+    if (response.data?.id !== id && response.data?.group) {
+      toast(
+        `"${response.data.name}" follows all ${formatInt(response.data.group.length)} Fridays as one group`,
+      );
     }
     done();
     return true;

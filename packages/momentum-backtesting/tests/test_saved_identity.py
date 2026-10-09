@@ -244,3 +244,14 @@ def test_tool_state_files_do_not_move_the_input_version(tmp_path, monkeypatch):
     assert api.input_version() == before
     (tmp_path / "weekly_closes.csv").write_text("ab")  # a real input still counts
     assert api.input_version() != before
+
+
+def test_all_fridays_moves_no_existing_fingerprint_and_ignores_the_phase():
+    """BL-056: off (or meaningless) it is not part of a strategy; on, the calendar phase is not."""
+    base = {"universe": ["Nifty 50"], "rebalance_every": 4, "rebalance_offset": 1}
+    assert fingerprint("etf", base) == fingerprint("etf", {**base, "split_fridays": False})
+    weekly = {"universe": ["Nifty 50"]}
+    assert fingerprint("etf", weekly) == fingerprint("etf", {**weekly, "split_fridays": True})
+    split = {**base, "split_fridays": True}
+    assert fingerprint("etf", split) != fingerprint("etf", base)
+    assert fingerprint("etf", split) == fingerprint("etf", {**split, "rebalance_offset": 3})

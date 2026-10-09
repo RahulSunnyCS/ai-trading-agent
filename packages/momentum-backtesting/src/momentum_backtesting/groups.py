@@ -64,6 +64,12 @@ def _mix(parts: list[tuple[float, dict[str, float]]]) -> dict[str, float]:
     return out
 
 
+def mix_targets(parts: list[tuple[float, dict[str, float]]]) -> dict[str, float]:
+    """Sleeves' portfolios (name -> fraction, parked cash included) as one: each weighted by the
+    sleeve's value since the last reset. `combine`'s rule, for the Rebalance preview (BL-056)."""
+    return _mix(parts)
+
+
 def combine(group: dict[str, Any], members: list[dict[str, Any]], week: str) -> dict[str, Any]:
     """The group's signal from its members' (`members`: each `{"id", "name", "signal"}`).
 

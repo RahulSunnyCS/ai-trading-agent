@@ -222,6 +222,7 @@ export const SETTING_LABELS: Record<string, string> = {
   rebalance: 'Rebalance',
   rebalance_every: 'Weeks between rebalances',
   rebalance_offset: 'Which Fridays (phase)',
+  split_fridays: 'Fridays: one or all (split)',
   sell_every_week: 'Sell exits weekly, buy only on the cadence',
   momentum_sizing: 'Win-rate position sizing',
   momentum_sizing_window: 'Sizing window (trades)',

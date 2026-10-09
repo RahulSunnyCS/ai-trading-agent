@@ -323,6 +323,35 @@ contract, not a shared service).
   `run_broad_backtest` also takes `tax_hold_band`/`tax_hold_weeks` (inert in category mode: every
   sale is an "ineligible" exit) and `feature_tilt=(frame, weight)` (BL-050). Runners:
   `scripts/bl054_levers.py`, `scripts/bl050_filters.py`; features in `filters.py`.
+- **All Fridays (BL-056):** `BacktestRequest.split_fridays` (off by default; a no-op unless
+  `rebalance="weekly"` and `rebalance_every > 1`) runs every `rebalance_offset` 0..K-1 with
+  `capital / K` and returns one `Result` of the whole account (`tranches.blend_reset`: equal
+  capital restored each April via `groups.reset_weeks`, the same rule as `choose.ensemble_curve`
+  and a followed group; separate tax ledgers per sleeve, slightly pessimistic; the reset itself
+  charges no cost or tax). Trade rows and `closed` trades carry `friday` (the sleeve's offset);
+  the lazy `friday_spread` section (`tranches.friday_spread`) holds each Friday's CAGR, max
+  drawdown and Ulcer next to the blend's. Broad shares one ranking across the K runs, and a
+  split run has no `circuit_exposure` section. In `saved_identity` the flag is dropped when off or
+  meaningless (no existing fingerprint moves) and replaces `rebalance_offset` when on.
+- **Following on all Fridays (BL-056 Phase 3):** `all_fridays.py`. Favouriting (PATCH
+  `/api/saved-strategies/{id}` or `/api/saved-runs/{id}`, or POST
+  `/api/saved-strategies/{id}/follow-all-fridays`) a run whose config has `split_fridays` plans
+  K sleeve configs (`rebalance_offset` 0..K-1, `split_fridays` off, `capital / K`), runs each
+  (`api.sleeve_summary`, no catalog connection open), saves them as runs named `<group> · Friday
+  n of K` and `runs_store.create_group`s them as `<name> · all Fridays`. The split run stays a
+  saved run with `followed_by` set (`runs_store.annotate`), so a second request changes that group
+  instead of making another. A full Paper/Invested list is refused before anything is saved.
+  `mbt saved split-fridays [--apply]` does the same for every favourite on one Friday of a slower
+  cadence, releasing the old favourite (kept as a saved run; restored if the group fails). The
+  weekly run needs no change: members are journalled one by one and `groups.combine` weights them
+  by value since the April reset. Deleting a group keeps its sleeves.
+- **Rebalance preview of a group (BL-056 Phase 4):** `POST /api/rebalance-preview` (and `/jobs`)
+  takes `group: <id>` (a placeholder `universe` is filled in). `_rebalance_group_preview` runs
+  `_rebalance_model` once per sleeve (`rebalance_preview` is that plus `_rebalance_response`),
+  without a `strategy_start_date`: a sleeve's own `rebalance_offset` fixes its Fridays. Targets are
+  mixed by `groups.mix_targets` weighted by each sleeve's value since the April reset (from the
+  model's own equity curve), prices come from all sleeves, and the response carries `group`
+  (sleeves with `share`, `on_cadence`, `next`) and no `rebalance_schedule`.
 - **voladj ignores `lookbacks` and `weights` by default** (NSE's method: 26- and 52-week returns,
   4 weeks back, over 26-week volatility). For a voladj config those two search settings only reach
   the stock tilt; weights never matter. `Config.voladj_lookbacks=True` (BL-055, a heavy key in the

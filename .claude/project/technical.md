@@ -152,6 +152,7 @@ uv run mbt serve           # private Momentum API on 127.0.0.1:8765
 uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
 uv run mbt saved merge [--apply]  # BL-052: fold saved runs with the same normalised settings into one strategy each (dry run by default; deletes nothing)
+uv run mbt saved split-fridays [--apply]  # BL-056: move every every-2+-weeks favourite from one Friday to a group of sleeves, one per Friday (dry run by default; keeps the old run)
 uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 scheduler job)
 uv run mbt live-rules check [--send] [--simulate drawdown-cut|drawdown-exit|trailing|gate-ready]  # BL-025: the owner's live-money rules vs the followed money (Fri 21:30 scheduler job); never trades
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change

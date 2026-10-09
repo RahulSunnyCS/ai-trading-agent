@@ -1,13 +1,18 @@
 """Overlapping tranches (TODO 3.9.23 Step 0c)."""
 
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from momentum_backtesting import metrics
+from momentum_backtesting import choose, groups, metrics
 from momentum_backtesting.engine import BENCHMARK, CASH, Config, run_backtest
+from momentum_backtesting.tax import TaxRules
 from momentum_backtesting.tranches import (
     blend,
+    blend_reset,
+    friday_spread,
     run_backtest_tranches,
     run_tranches,
     tranche_configs,
@@ -74,3 +79,71 @@ def test_run_tranches_accepts_any_runner():
 
     run_tranches(runner, BASE, 2)
     assert seen == [0, 1]
+
+
+# --- BL-056: the April-reset blend as one Result ------------------------------------------------
+
+
+def _phases(every: int = 4, **changes) -> list:
+    config = replace(BASE, **changes)
+    classes = dict.fromkeys([*NAMES, BENCHMARK], "equity") | {CASH: "debt"}
+    return [
+        run_backtest(market(), INCLUDES, c, classes, rank_cache={})
+        for c in tranche_configs(config, every)
+    ]
+
+
+def test_blend_reset_is_the_ensemble_curve_of_the_phases():
+    phases = _phases()
+    blended = blend_reset(phases)
+    curves = pd.concat([r.equity for r in phases], axis=1, keys=range(4))
+    expected = choose.ensemble_curve(curves, list(range(4)))
+    assert np.allclose(blended.equity.to_numpy(), expected.to_numpy())
+    # Resets happen: the blend is not the never-rebalanced mean.
+    assert not np.allclose(blended.equity, curves.mean(axis=1))
+    assert blended.config.rebalance_offset == 0 and blended.config.capital == BASE.capital
+
+
+def test_blend_reset_weights_are_the_whole_account():
+    blended = blend_reset(_phases())
+    totals = blended.weights.sum(axis=1)
+    assert np.allclose(totals.to_numpy(), 1.0, atol=1e-6)
+
+
+def test_blend_reset_trades_are_in_the_blends_units():
+    phases = _phases()
+    blended = blend_reset(phases)
+    assert set(blended.trades["friday"]) == {0, 1, 2, 3}
+    assert blended.trades["week"].is_monotonic_increasing
+    assert len(blended.trades) == sum(len(r.trades) for r in phases)
+    # Before the first April reset every tranche is a quarter of the account.
+    first_reset = groups.reset_weeks(blended.equity.index)[1]
+    early = blended.trades[blended.trades["week"] <= first_reset]
+    raw = pd.concat([r.trades for r in phases])
+    raw_early = raw[raw["week"] <= first_reset]
+    assert early["value"].sum() == pytest.approx(raw_early["value"].sum() / 4)
+
+
+def test_blend_reset_open_positions_add_up_to_the_last_week():
+    blended = blend_reset(_phases())
+    held = blended.open_positions["value"].sum() + blended.idle_value
+    last = blended.weights.iloc[-1]
+    invested_share = last.drop(labels=["Idle cash"], errors="ignore").sum()
+    assert held == pytest.approx(blended.equity.iloc[-1] * invested_share, rel=1e-6)
+    assert blended.open_positions["asset"].is_unique
+
+
+def test_blend_reset_tax_adds_the_ledgers():
+    phases = _phases(tax=TaxRules())
+    blended = blend_reset(phases)
+    assert blended.tax_ledger is not None
+    assert blended.tax_ledger.sales == sum(r.tax_ledger.sales for r in phases)
+    assert 0 < blended.tax_ledger.paid < sum(r.tax_ledger.paid for r in phases)
+
+
+def test_friday_spread_reports_each_phase_and_the_blend():
+    phases = _phases()
+    spread = friday_spread(phases, blend_reset(phases))
+    assert [p["offset"] for p in spread["phases"]] == [0, 1, 2, 3]
+    assert spread["cagr_spread"] >= 0
+    assert set(spread["blend"]) == {"cagr", "max_drawdown", "ulcer"}

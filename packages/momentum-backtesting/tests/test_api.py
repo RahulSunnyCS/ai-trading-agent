@@ -2150,3 +2150,82 @@ def test_the_stock_circuits_endpoint_reads_the_52_weeks_to_the_pages_last_week(c
 
     monkeypatch.setattr(api.circuit_exposure_mod, "stock_circuit_locks", no_database)
     assert client.get("/api/momentum-scores/stock/S0/circuits").status_code == 503
+
+
+# --- BL-056: "All Fridays" ----------------------------------------------------------------------
+
+
+def _blend_of(phases: list[dict], dates: list[str]) -> np.ndarray:
+    from momentum_backtesting import choose
+
+    curves = pd.DataFrame(
+        {o: p["series"]["strategy"] for o, p in enumerate(phases)}, index=pd.to_datetime(dates)
+    )
+    line = choose.ensemble_curve(curves, list(curves.columns))
+    return (line / line.iloc[0]).to_numpy()
+
+
+def test_all_fridays_is_the_april_reset_blend_of_every_friday(client):
+    body = {"universe": core(client), "start": "2017-01-06", "rebalance_every": 4, "tax": True}
+    split = client.post("/api/backtest", json={**body, "split_fridays": True})
+    assert split.status_code == 200, split.text
+    split = split.json()
+    phases = [
+        client.post(
+            "/api/backtest", json={**body, "rebalance_offset": o, "capital": 250_000}
+        ).json()
+        for o in range(4)
+    ]
+    dates = split["series"]["dates"]
+    strategy = np.array(split["series"]["strategy"])
+    assert np.allclose(strategy / strategy[0], _blend_of(phases, dates))
+    spread = split["friday_spread"]
+    assert [p["offset"] for p in spread["phases"]] == [0, 1, 2, 3]
+    for offset, phase in enumerate(phases):
+        assert spread["phases"][offset]["cagr"] == pytest.approx(phase["kpis"]["cagr"])
+    assert spread["blend"]["cagr"] == pytest.approx(split["kpis"]["cagr"])
+    assert split["trades"] and {t["friday"] for t in split["trades"]} <= {0, 1, 2, 3}
+    # A run on one Friday has no Friday-luck section and no `friday` on its trades.
+    one = client.post("/api/backtest", json=body).json()
+    assert "friday_spread" not in one and all("friday" not in t for t in one["trades"])
+
+
+def test_all_fridays_is_a_no_op_on_a_weekly_cadence(client):
+    body = {"universe": core(client), "start": "2017-01-06"}
+    plain = client.post("/api/backtest", json=body).json()
+    flagged = client.post("/api/backtest", json={**body, "split_fridays": True}).json()
+    assert flagged["kpis"] == plain["kpis"] and "friday_spread" not in flagged
+
+
+def test_all_fridays_job_offers_the_friday_spread_section(client):
+    body = {
+        "universe": core(client),
+        "start": "2017-01-06",
+        "rebalance_every": 2,
+        "split_fridays": True,
+    }
+    started = client.post("/api/backtest/jobs", json=body).json()["job"]
+    done = _wait_for(started["id"], client, "done", "failed")
+    assert done["status"] == "done", done["error"]
+    assert "friday_spread" in done["result"]["sections_available"]
+    section = client.get(f"/api/backtest/jobs/{started['id']}/sections/friday_spread").json()
+    assert section["data"]["every"] == 2 and len(section["data"]["phases"]) == 2
+
+
+def test_broad_all_fridays_blends_each_friday_and_drops_the_circuit_card(broad_client):
+    body = _broad_request(
+        broad_coverage_floor=0.0, broad_pool_top_n=10, broad_pool_exit_rank=10, rebalance_every=2
+    )
+    split = broad_client.post("/api/backtest", json={**body, "split_fridays": True})
+    assert split.status_code == 200, split.text
+    split = split.json()
+    phases = [
+        broad_client.post(
+            "/api/backtest", json={**body, "rebalance_offset": o, "capital": 500_000}
+        ).json()
+        for o in range(2)
+    ]
+    strategy = np.array(split["series"]["strategy"])
+    assert np.allclose(strategy / strategy[0], _blend_of(phases, split["series"]["dates"]))
+    assert "circuit_exposure" not in split and "friday_spread" in split
+    assert all(set(entry["fridays"]) <= {0, 1} for entry in split["held_categories"])

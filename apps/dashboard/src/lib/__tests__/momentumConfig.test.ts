@@ -43,6 +43,23 @@ describe('describeConfig', () => {
     expect(d.cadenceChip).toBe(chip);
   });
 
+  it('says all Fridays for a split run, and ignores the flag where it does nothing', () => {
+    const split = describeConfig(
+      {
+        ...BASE,
+        rebalance: 'weekly',
+        rebalance_every: 4,
+        rebalance_offset: 2,
+        split_fridays: true,
+      },
+      'etf',
+    );
+    expect(split.cadence).toBe('every 4 weeks, all Fridays');
+    expect(split.cadenceChip).toBe('Every 4 weeks (all 4 Fridays)');
+    const weekly = describeConfig({ ...BASE, rebalance: 'weekly', split_fridays: true }, 'etf');
+    expect(weekly.cadenceChip).toBe('Weekly rebalance');
+  });
+
   it('monthly wins over a leftover rebalance_every', () => {
     const d = describeConfig({ ...BASE, rebalance: 'monthly', rebalance_every: 4 }, 'etf');
     expect(d.cadence).toBe('monthly');
