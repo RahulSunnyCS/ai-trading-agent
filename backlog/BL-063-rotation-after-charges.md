@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; turns BL-057 / BL-061 / BL-062 into after-charges numbers |
-| **Status** | In progress (descriptive calculation on existing results) |
+| **Status** | Done (arithmetic on existing results) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-09 |
@@ -51,7 +51,22 @@ optional line); tax on profits.
   real net (+13.3%) and gross (+21.3%).
 - **Pass / kill rule:** none; arithmetic. Reconciliation: re-run gross equals stored gross per pair.
 - **Hold-out / Will not run:** not applicable; no slippage, no other charge models.
-- **Result:** (after the run)
+- **Result:** arithmetic on existing picks; 1,775 distinct (variant, day) pairs re-run, re-run gross equals
+  the stored per-day result on every pair (largest difference ₹0.0000). Lot sizes in the engine are the
+  current ones (NIFTY 65, SENSEX 20). **Whole-day rotation (BL-062):** gross ₹3,36,113 (+25.9% of ₹13
+  lakh) → charges ₹1,09,405 (33% of gross; ₹101 a lot-day, ₹542 a day, 1,086 lots) → **net ₹2,26,707
+  (+17.4%)**; max drawdown −₹50,636 gross → −₹62,354 net (4.8%); 8 of 11 months positive after charges,
+  worst month −1.37%. Charges by item: brokerage ₹64,116, STT ₹20,612, GST ₹13,474, exchange ₹10,619,
+  SEBI + IPFT ₹120, stamp ₹464. Monthly net, % of ₹13 lakh: Dec +2.9, Jan −0.3, Feb +5.5, Mar +2.0, Apr −1.1,
+  May −1.4, Jun +0.7, Jul +3.9, Aug +3.3, Sep +1.4, Oct (1–8) +0.5. **Morning-only rotation (BL-057, 66
+  variants):** gross ₹3,31,842 (+25.5%) → charges ₹1,17,720 (35%) → net ₹2,14,122 (+16.5%); max drawdown
+  −₹57,153 → −₹90,230 (6.9%); worst month −3.06%. **Owner's real sheet** over the same window: gross
+  +21.3%, charges ₹1,03,429, net +13.3%. Sensitivities (whole-day): brokerage ₹13 per round trip instead of
+  per order → charges ₹71,577, net ₹2,64,536 (+20.3%); plus AlgoTest's fee at about ₹19 a lot-day →
+  net ₹2,06,073 (+15.9%). Rates used: STT 0.10% sell side, 0.15% from 2026-04-01; exchange 0.03503% NSE,
+  0.0325% BSE; SEBI ₹10/crore; IPFT ₹50/crore (NSE); stamp 0.003% buy; GST 18% on brokerage + exchange +
+  SEBI + IPFT — to be checked against the owner's contract notes. No slippage or spread. Scripts:
+  `research/bl063/` (`pairs.py`, `trades.py`, `charges.py`).
 
 ### Phase 1 — Re-run the picked (variant, day) pairs and record trades (8 in parallel)
 ### Phase 2 — Apply the charge model; table and chart
@@ -59,3 +74,4 @@ optional line); tax on profits.
 ## Log
 
 - 2026-10-09 — created from the owner's request: ₹13 brokerage per lot, plus STT and other charges.
+- 2026-10-09 — trades recorded and charges applied (Result above).
