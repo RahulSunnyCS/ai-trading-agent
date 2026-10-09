@@ -96,6 +96,26 @@ diversification, which this tests.
   clear gain. Same core on only 26 of 202 days. Picks file
   `research/bl057/daily_picks_min3_core6_buy2L2_whole_day_otm_only.csv`; charges rotation `DRB-6W3L2/OTM`.
 
+### 2026-10-09 — DRB-6W3L2 on the top 25% of each family (`DRB-6W3L2/T25`)
+- **Question (owner):** does a smaller pool of the better variants do better than the full 248?
+- **Rule:** before any selection day, rank the 248 variants **within each family** — Widesl (OTM and
+  closest-premium together, 150), Dir ATM (50), Buy (48) — on the **63 warm-up days only** (1 Sep →
+  2 Dec 2025, the days before the first selection day) by the mean of three within-family percentile
+  ranks: total P&L, winning-day %, max drawdown (shallower is better). Keep the top 25% of each
+  (38 Widesl, 13 Dir, 12 Buy, rounded up) = 63 variants, fixed for the whole run. Then DRB-6W3L2
+  exactly as above on that pool (criteria, weights, selection days, Widesl minimum, Buy add-on, stops
+  unchanged). `rotate.py --basket DRB-6W3L2 --prefilter 25`.
+- **Look-ahead:** the pool is chosen on days before the first trade and never updated (owner's choice:
+  point in time, first three months only); the per-day scores already use only prior days. The full-year
+  "top 25%" (look-ahead) version is **not** run.
+- **Comparators:** the 248-list DRB-6W3L2 (gross ₹4,30,868 / −₹68,294; net ₹3,50,407 / −₹84,469 at flat
+  ₹13 an order); R / E / live mix recomputed on the 63-variant pool; BL-057's three conditions reported.
+- **Read-out:** as the second block — "as good" within 5% of net with a drawdown no deeper, "better" above
+  on both. Same already-seen year; no hold-out (owner override).
+- **Will not run:** other percentages, other ranking criteria or weights, a rolling re-ranking, the
+  look-ahead whole-year filter.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-09 — created from the owner's request to run 6 lots as 3 strategies of 2 lots.

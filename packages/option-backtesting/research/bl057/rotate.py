@@ -75,6 +75,10 @@ WHOLE_DAY = "--whole-day" in sys.argv  # BL-062: every start time 09:17..15:17 (
 NO_CLOSEST = "--no-closest" in sys.argv
 CLOSEST = ("--closest" in sys.argv or WHOLE_DAY) and not NO_CLOSEST
 CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320")
+# BL-065 (third block): `--prefilter 25` keeps, in each family (Widesl incl. closest-premium, Dir,
+# Buy), the top 25% of variants by total P&L, winning-day % and max drawdown over the warm-up days
+# only (the 63 days before the first selection day); the pool is fixed after that
+PREFILTER = _arg("--prefilter", 0)
 # Case A's Widesl minimum: 2 is the first pre-registered block; 3 is the later block (BL-057).
 MIN_WIDE = int(sys.argv[sys.argv.index("--min-wide") + 1]) if "--min-wide" in sys.argv else 2
 MIN_WIDE_N = -(-MIN_WIDE // LOTS_PER)  # the minimum in whole strategies, rounded up
@@ -198,6 +202,36 @@ def variant_masks(names):
         np.array([x == "buy" for x in fam]),
         np.array([n.startswith("N_") for n in names]),
     )
+
+
+def prefilter(P: pd.DataFrame, pct: int) -> pd.DataFrame:
+    """Keep the top `pct` % of each family (Widesl, Dir, Buy) ranked on the first WARMUP days only:
+    the mean of the within-family percentile ranks of total P&L, winning-day % and max drawdown
+    (shallower ranks higher). Rounded up, so a family of 50 keeps 13 at 25%."""
+    warm = P.iloc[:WARMUP]
+    fam = pd.Series(
+        ["wide" if n.split("_")[1] in CLOSEST_FAMILIES else n.split("_")[1] for n in P.columns],
+        index=P.columns,
+    )
+    stats = pd.DataFrame(
+        {
+            "total": warm.sum(),
+            "win": (warm > 0).mean(),
+            "mdd": pd.Series({c: mdd(warm[c].to_numpy()) for c in P.columns}),
+        }
+    )
+    keep = []
+    for f in ("wide", "dir", "buy"):
+        s = stats[fam == f]
+        score = s.rank(pct=True).mean(axis=1)  # every column: higher is better (mdd is <= 0)
+        n = -(-len(s) * pct // 100)
+        chosen = score.sort_values(ascending=False).index[:n]
+        keep.extend(chosen)
+        print(
+            f"prefilter {f}: {n} of {len(s)} kept on the {WARMUP} warm-up days -> "
+            + ", ".join(chosen)
+        )
+    return P[[c for c in P.columns if c in set(keep)]]
 
 
 def closest_mask(names):
@@ -365,6 +399,8 @@ def closest_report(picks_a, names, Pv, wd, vb, dte, days):
 
 def main() -> None:
     P, f = load_all()
+    if PREFILTER:
+        P = prefilter(P, PREFILTER)
     names = list(P.columns)
     Pv = P.to_numpy()
     masks = variant_masks(names)
@@ -545,7 +581,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}.csv"
         )
     )
 
