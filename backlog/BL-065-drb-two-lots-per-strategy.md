@@ -34,6 +34,8 @@ diversification, which this tests.
   Buy strategy on the days DRB bought; E equal weight scaled to the same lots; the live mix at 6 lots).
   DRB-6W2 and DRB-6W3 (1 lot each, 6 strategies) are shown beside them.
 - **Pass / kill rule:** BL-057's three conditions, read from each case; reported, not the point.
+- **Per-strategy stops:** each variant keeps its own overall MTM stop per 1 lot (Widesl ₹2,500, Dir ₹3,000, Buy ₹2,000); a 2-lot
+  strategy is modelled as twice the 1-lot result, i.e. stops of ₹5,000 / ₹6,000 / ₹4,000 when set up in AlgoTest.
 - **Charges:** BL-063's model with quantity doubled for 2-lot strategies. Shown two ways: brokerage
   ₹13 **per lot** per order (owner's assumption: no brokerage saving) and ₹13 per **order** whatever
   the lots (half the brokerage); GST on brokerage follows. Plus AlgoTest's fee at ₹19 a **strategy**-day

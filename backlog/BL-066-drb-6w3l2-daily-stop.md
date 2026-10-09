@@ -20,8 +20,10 @@ the stop mostly trims the worst day.
 
 ### Phase 0 — Pre-register
 - **Basket:** DRB-6W3L2 exactly as in BL-065 (3 strategies × 2 lots + the Buy strategy × 2 lots when it fires;
-  picks from `daily_picks_min3_core6_buy2L2_whole_day.csv`). The engine's own per-strategy overall stop
-  (₹2,500 per lot) stays; for a 2-lot strategy it is therefore ₹5,000.
+  picks from `daily_picks_min3_core6_buy2L2_whole_day.csv`). Each strategy's own overall MTM stop stays: per 1 lot Widesl
+  (OTM and closest premium) ₹2,500, Dir ATM ₹3,000, Buy ₹2,000 (checked in the strategy files); a 2-lot strategy is modelled as
+  twice the 1-lot result, so its stop is ₹5,000 / ₹6,000 / ₹4,000. The engine closes a strategy at the end of the bar in which it
+  crosses its stop, so it can lose more than the stop (₹3,490 against ₹2,500 on 2026-07-15).
 - **Rule (as BL-055):** each minute the day's combined mark-to-market is the sum over the picks of
   2 × (its 1-lot curve: 0 before it starts, its realised P&L after it ends). The first minute it is ≤ −X,
   everything is closed at that minute's combined value and nothing starts or re-enters that day. X ∈
