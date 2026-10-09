@@ -88,6 +88,18 @@ Added after the owner questioned the number. Not a rule change: a check and a se
   case**; ₹6k comes closest (−15.7% with the total 1.3% higher). The real behaviour of a live stop lies between the
   two fill assumptions and depends on how it is implemented (AlgoTest has no portfolio-wide stop).
 
+### 2026-10-09 (later still) — A trailing stop: ₹16k, with ₹12k and ₹20k beside it
+Added after the fixed-level results were read; the owner asked about "a 16k trailing stop loss".
+- **Rule:** the day's combined mark-to-market path as above. The stop is **X below the day's highest combined P&L so
+  far** (the highest is at least 0, the start of the day): at each minute t the stop level is
+  `max(0, highest combined P&L through minute t−1) − X`; the first minute whose combined value is at or below that level
+  closes everything at that minute's combined value, and nothing re-enters. So it behaves as a fixed −X stop until the
+  day has made money, then follows the peak up. X ∈ {16,000 (asked), 12,000, 20,000 (bracketing)}.
+- **Fill:** two assumptions, as in the fixed-level test: close of the bar (default) and exactly at the level (best case).
+- **Everything else, outputs and the "helps" test:** as above. **Hold-out:** none (owner override). **Will not run:** other
+  trail sizes, trailing in steps, a profit target.
+- **Result:** (after the run)
+
 ## Log
 
 - 2026-10-09 — created from the owner's request.
