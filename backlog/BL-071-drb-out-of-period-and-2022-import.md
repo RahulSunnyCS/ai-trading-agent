@@ -108,6 +108,32 @@ year only") and which has been examined many times. Two ways to test the rule ou
   owner agrees and a scratch import reproduces the Oct 2024 overlap.
 - **Decision for the owner:** widen the lake to 2022–2024 (BL-034 Phase 5), yes / no.
 
+### Part B — registered read-out (2026-10-10, before any 2022–2024 variant run)
+- **Universe:** NIFTY only (SENSEX options before 2023-07 are not in the lake, and none before 2024-10
+  are imported): the 124 NIFTY variants of the 248-list (OTM1 Widesl, Dir ATM, Buy, closest-premium
+  ₹80 / ₹100 at the 25 start times 09:17–15:17; Buy has no 15:17). Per-day results from the same
+  variant files as the main runs, run over the imported days 2022-01-03 → 2024-10-08 with
+  `research/bl071/run_variant.py` (research-only reference override, `lot_sizing: current`, costs 0).
+  The existing results for 2024-10-09 onward are used only as warm-up context where a row needs it; the
+  test period is **2022-01 → 2024-10-08** minus the 63 warm-up days and the days `data_quality` excludes.
+- **Rule:** DRB-6W3L2 as BL-065 (3 strategies × 2 lots, at least 2 Widesl, Buy add-on when a Buy ranks in
+  the top 10), NIFTY-only. Days-to-expiry from the nearest listed expiry with bars on that day; VIX band
+  from the 09:15 INDIAVIX open; weekday from the calendar. Nothing is tuned on this period.
+- **Rows (fixed):** baseline 33/25/25/17; recent-only 100/0/0/0; no-recent 0/33/33/34; no-VIX
+  40/30/30/0; baseline with fit lookbacks 21:50,63:50; baseline with 63:50,126:50; recent-only + family
+  0.5; the four BL-072 blends (25/25/15/15/20/0 and 25/25/15/15/10/10 on the two lookback sets).
+- **Read-out:** (1) *the recent edge holds* if baseline − no-recent is positive with a 90% block-
+  bootstrap interval (5-day blocks, 2,000 resamples) above zero and at least half the main year's
+  ₹1,014 a day. (2) *the longer fit lookbacks hold* if each B3 row beats the baseline with a bootstrap
+  interval above zero. (3) *the rule beats chance* if baseline ≥ P90 of 1,000 random picks of the same
+  shape on the same days. (4) Report per calendar year (2022 / 2023 / 2024), since regimes differ.
+  Risk caveats written down now: the data are expiry-week-only chains with traded minutes only, a
+  different construction from the 2025+ vendor set (prices differ on ~22% of overlapping minutes, 0.75%
+  at the 95th percentile on highs); NIFTY's expiry day moved from Thursday to Tuesday in the period.
+- **Hold-out:** this is the hold-out. Nothing is changed after reading it; a row that fails here is
+  not adopted whatever it did in-sample.
+- **Result:** pending (engine runs started 2026-10-10).
+
 ## Log
 
 - 2026-10-10 — created; part A registered before its runs, part B inspected read-only and written up.
