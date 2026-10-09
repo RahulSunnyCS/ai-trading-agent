@@ -62,6 +62,19 @@ year only") and which has been examined many times. Two ways to test the rule ou
   baseline (422 selection days) makes ₹7,20,873 gross, drawdown −₹88,366, of which ₹4,30,868 is the
   2025-12 → 2026-10 year.
 
+### Part A, extra block (2026-10-10, exploratory: the slice was already read)
+- **Why:** BL-069 produced four candidates in-sample and the slice result says the recent criterion did
+  not hold there. The owner wants to know which rows, if any, hold up on Jan–Aug 2025. The slice was
+  read by part A, so this block cannot confirm anything; it is a second, clearly labelled look.
+- **Rows (fixed here, no others):** recent-only + family-pooled recent F = 0.5 (BL-069's keep);
+  baseline with fit lookbacks 21:50,63:50; baseline with 63:50,126:50 (the two placebo-real B3 rows);
+  baseline with the streak gate 5 (tests the "after a losing stretch the basket does better" finding).
+  All `--window-from 2024-10-09`, sliced at 2025-09-01, same random comparator as part A.
+- **Read-out:** report gross, max drawdown, win % and per day beside part A's four rows, and whether
+  each is ≥ the slice's random P90 (₹2,94,240). No keep / drop is declared from this block.
+- **Will not run:** any other row on this slice.
+- **Result:** pending.
+
 ### Part B — 2022–2024 NIFTY from the SSD's `2014-2024` folder (needs the owner's go-ahead)
 - **What is there** (read-only inspection, 2026-10-10, `/Volumes/RAHUL'S SSD/Stock Market Data/2014-2024`):
   `nifty/` 46,864 contract CSVs (12 GB; 52 / 53 / 44 expiry folders in 2022 / 2023 / 2024), `banknifty/`
