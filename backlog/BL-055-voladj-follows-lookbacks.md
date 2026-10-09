@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — owner question; affects half the search space's meaning |
-| **Status** | In progress (addendum 1) |
+| **Status** | Done — killed (all three variants) |
 | **Type** | research (+ an opt-in engine flag) |
 | **Area** | momentum |
 | **Created** | 2026-10-09 |
@@ -69,6 +69,24 @@ this reason.
 **Keep today's NSE method.** The flag stays in the engine, off. A variant that skips the latest
 month on every lookback is a different question; it would need its own addendum and run.
 
+## Result, addendum 1 (2026-10-09): all three variants killed
+
+Run with a true skip-month, against today's default score; after tax at Rs 5 lakh, median of the
+10 strategies:
+
+| Skip rule | FY2018-22 CAGR | Not worse | Worst fall | FY2023-26 CAGR |
+|---|---|---|---|---|
+| Lookbacks of 26 weeks and more (the first variant, as registered) | -11.2 pts | 0 of 10 | -9.9 pts | -2.0 pts |
+| Every lookback (owner) | -12.0 pts | 0 of 10 | -4.3 pts | -14.7 pts |
+| None (owner) | -7.5 pts | 1 of 10 | -7.3 pts | -6.6 pts |
+
+Even with no skip, the plain returns over each config's selected lookbacks lose 7.5 points: the
+problem is not only the skip rule. Today's score uses 30- and 56-week windows (the widened
+"skip"), and on this history those long windows rank stocks much better than the configs' own
+shorter mixes. **Keep today's default.** Whether to relabel it (it does not skip the latest
+month) or test it against NSE's method as published is an owner decision; nothing here suggests
+the change would help.
+
 ## Log
 
 - 2026-10-09 — created and started (owner: "do both"); Phase 0 committed before any run.
@@ -90,3 +108,4 @@ month on every lookback is a different question; it would need its own addendum 
     and lever l8 runs the first variant again as registered (`skip_long`) next to addendum 1's
     `skip_all` and `skip_none`, all against today's default;
   - tests pin the default's actual behaviour and the corrected NSE formula.
+- 2026-10-09 — addendum 1 run (13 runs, 4 cells); all three variants killed.

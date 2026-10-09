@@ -1,6 +1,6 @@
 {
   "item": "BL-055",
-  "verdict": "kill",
+  "verdict": "kill (all three variants)",
   "rule": "bl055_criteria.json",
   "development_after_tax": {
     "median_cagr_change": -0.1221,
@@ -17,5 +17,25 @@
   "development_pre_tax": {
     "median_cagr_change": -0.1497
   },
-  "why": "the lookback-following score measures lookbacks under 26 weeks up to the latest close, so it ranks stocks that just jumped; their next 4 weeks reverse (top 30: last 4 weeks +13.1% vs +7.3%, next 4 weeks -4.4% vs -0.9%, sampled on afbc88e00f32). Not a code bug: with 26/52 and equal weights the variant reproduces today's score exactly (tested)."
+  "why": "the lookback-following score measures lookbacks under 26 weeks up to the latest close, so it ranks stocks that just jumped; their next 4 weeks reverse (top 30: last 4 weeks +13.1% vs +7.3%, next 4 weeks -4.4% vs -0.9%, sampled on afbc88e00f32). Not a code bug: with 26/52 and equal weights the variant reproduces today's score exactly (tested).",
+  "addendum_1": {
+    "verdict": "kill",
+    "engine_note": "run with a true skip-month (return from skip + L to skip weeks ago); the default score is unchanged",
+    "development_after_tax_median_cagr_change": {
+      "skip_long": -0.1117,
+      "skip_all": -0.1195,
+      "skip_none": -0.0746
+    },
+    "confirmation_after_tax_median_cagr_change": {
+      "skip_long": -0.0197,
+      "skip_all": -0.1469,
+      "skip_none": -0.0658
+    },
+    "development_strategies_not_worse": {
+      "skip_long": 0,
+      "skip_all": 0,
+      "skip_none": 1
+    },
+    "why": "every lookback-following variant loses, including no skip at all: the configs' own shorter lookback mixes rank worse than the default's long 30/56-week windows on this history"
+  }
 }
