@@ -85,6 +85,13 @@ PREFILTER_WINDOW = _arg("--prefilter-window", 0)
 # BL-065 (fifth block): `--grid 30` keeps only the start times on a 30-minute grid from 09:17
 # (09:17, 09:47, ... 15:17): half the whole-day list, 128 variants
 GRID = _arg("--grid", 0)
+# BL-067: `--weights R,W,D,V` overrides the criteria weights (recent, weekday, days to expiry, VIX
+# band; whole percents summing to 100). Unset = the BL-057 weights 33/25/25/17
+WEIGHTS = None
+if "--weights" in sys.argv:
+    WEIGHTS = tuple(int(x) for x in sys.argv[sys.argv.index("--weights") + 1].split(","))
+    assert len(WEIGHTS) == 4 and sum(WEIGHTS) == 100, WEIGHTS
+    W_CRIT = {k: w / 100 for k, w in zip(W_CRIT, WEIGHTS, strict=True)}
 
 
 def on_grid(name: str) -> bool:
@@ -625,7 +632,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}.csv"
         )
     )
 

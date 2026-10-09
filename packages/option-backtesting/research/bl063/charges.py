@@ -46,6 +46,10 @@ PICKS = {  # rotation -> (daily picks file, lots traded in each picked strategy)
     "DRB-6W3L2/G30": ("daily_picks_min3_core6_buy2L2_whole_day_grid30.csv", 2),
 }
 
+# BL-067: every weight combination's picks file (rotate.py --weights R,W,D,V) joins the charges run
+for _f in sorted((HERE.parent / "bl057").glob("daily_picks_min3_core6_buy2L2_whole_day_w*.csv")):
+    PICKS["BL067/" + _f.stem.rsplit("_w", 1)[1].replace("_", "-")] = (_f.name, 2)
+
 
 def stt_rate(day: str) -> float:
     return [rate for start, rate in STT_SELL if day >= start][-1]
