@@ -647,3 +647,10 @@ only. This is the engine convention behind every stored result and is left as is
   collapse them or fear may lift them. Data check on 7 sample days: NIFTY ±400 / ±500 and SENSEX
   ±800 / ±1,000 strikes traded every minute in 2022–25; NIFTY's are ₹1–25 the day before expiry, so
   changes are measured in percent as well as points.
+- 2026-10-11 — Owner added: the rolling ATM straddles of other indices (Bank Nifty, Fin Nifty,
+  Midcap Nifty) at the same minutes, since the market moves together and the less liquid ones may
+  show the collapse first. Data check: their option files before October 2024 hold only long-dated
+  contracts (nearest expiry 2–19 months out on samples), so no usable near-expiry straddle in
+  2022–24; in 2025 only monthly expiries exist (weeklies ended November 2024), nearest 0–30 days
+  out. Their 1-minute index bars cover all periods (Bank Nifty from 2015, Fin Nifty 2017, Midcap
+  Nifty July 2022). Not registered yet.
