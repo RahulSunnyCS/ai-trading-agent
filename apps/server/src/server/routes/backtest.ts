@@ -30,6 +30,8 @@
  *  GET  /api/backtest/legwise/correlation       — how the chosen strategies' daily P&L move together
  *                                                 (matrices, basket drawdown, drift). requireAccess
  *  GET  /api/backtest/legwise/correlation/pick  — a basket under a correlation cap (in-sample).
+ *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
+ *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
  *                                                 requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
@@ -541,6 +543,50 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
       );
     },
   );
+
+  // --- rotation: the Rotation page's read layer (BL-058 Phase 4) ---
+  fastify.get(
+    '/api/backtest/legwise/rotation/overview',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { day: { type: 'string', pattern: DATE_RE } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(reply, `/legwise/rotation/overview${upstreamQuery(q, ['day'])}`);
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/summary',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/summary${upstreamQuery(q, ['from', 'to'])}`,
+      );
+    },
+  );
+  // --- end rotation ---
 
   fastify.post(
     '/api/backtest/legwise/daily',

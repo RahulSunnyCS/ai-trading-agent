@@ -74,6 +74,7 @@ describe('routes', () => {
     ['/optionslab/results', 'optionslab', ['results']],
     ['/optionslab/regimes', 'optionslab', ['regimes']],
     ['/optionslab/correlation', 'optionslab', ['correlation']],
+    ['/optionslab/rotation', 'optionslab', ['rotation']],
     ['/momentum', 'momentum', []],
     ['/momentum/backtest', 'momentum', ['backtest']],
     ['/momentum/backtest/etf', 'momentum', ['backtest', 'etf']],
@@ -161,6 +162,7 @@ describe('routes', () => {
       'results',
       'regimes',
       'correlation',
+      'rotation',
     ]);
   });
 
@@ -209,6 +211,7 @@ describe('routes', () => {
     ['optionslab', ['results'], 'Options Lab › Daily results · AI Trading Agent'],
     ['optionslab', ['regimes'], 'Options Lab › Regimes · AI Trading Agent'],
     ['optionslab', ['correlation'], 'Options Lab › Correlation · AI Trading Agent'],
+    ['optionslab', ['rotation'], 'Options Lab › Rotation · AI Trading Agent'],
     ['optionslab', [], 'Options Lab › Daily results · AI Trading Agent'],
     ['optionslab', ['nope'], 'Options Lab › Daily results · AI Trading Agent'],
     ['coverage', [], 'Coverage › Backfill · AI Trading Agent'],

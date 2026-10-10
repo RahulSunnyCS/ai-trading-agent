@@ -214,10 +214,14 @@ def build(
         "cumulative_per_lot": float(base_series.sum()),
         "max_drawdown_per_lot": base_dd,
         "lots_per_day": LOTS_PER * base_mod.BASE_LOTS,
+        # the base at the same 2 lots per strategy, so its cumulative is comparable to a list's
+        "total": float(LOTS_PER * base_mod.BASE_LOTS * base_series.sum()),
+        "max_drawdown": max_drawdown(LOTS_PER * base_mod.BASE_LOTS * base_series),
     }
 
     # random same-shape baskets, one set of core draws per day shared by every list
     rand_total = {k: np.zeros(runs) for k in keys}
+    rand_cum = {k: np.zeros((len(scored), runs)) for k in keys}  # cumulative per run, day by day
     rand_day_pct = {k: [] for k in keys}
     for j, s in enumerate(scored):
         day = s["day"]
@@ -231,6 +235,7 @@ def build(
             has_buy = bool(s["entry"]["lists"][k]["buy"])
             r = LOTS_PER * (core + (buy if has_buy else 0.0))
             rand_total[k] += r
+            rand_cum[k][j] = rand_total[k]
             rand_day_pct[k].append(float((r < total[k][j]).mean()))
 
     ref = per_lot["REF"]
@@ -255,6 +260,10 @@ def build(
                 "max": float(r.max()),
             },
             "mean_daily_random_percentile": float(np.mean(rand_day_pct[k]) * 100),
+            "random_path": {
+                f"p{q}": np.percentile(rand_cum[k], q, axis=1).round(2).tolist()
+                for q in (10, 50, 90)
+            },
             "vs_base": {
                 "mean": vs_base[0],
                 "lower": vs_base[1],
@@ -273,7 +282,9 @@ def build(
         {
             "day": d.isoformat(),
             "base": float(base_series[j]),
+            "base_total": float(LOTS_PER * base_mod.BASE_LOTS * base_series[j]),
             **{k: float(per_lot[k][j]) for k in keys},
+            **{f"{k}_total": float(total[k][j]) for k in keys},
             **{f"{k}_random_pct": rand_day_pct[k][j] * 100 for k in keys},
         }
         for j, d in enumerate(days)
