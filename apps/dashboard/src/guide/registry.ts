@@ -38,6 +38,7 @@ import optionsCorrelation from './content/optionslab/correlation.md?raw';
 import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
+import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
 import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
@@ -322,6 +323,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     summary: 'Ideas kept for forward observation, each against the pick it would have replaced.',
     kind: 'Screen',
     body: optionsRotationShadow,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-daily-log',
+    title: 'Rotation: the daily log',
+    summary:
+      'What each list picked at 09:16 and what those picks did, day by day, with what you placed.',
+    kind: 'Screen',
+    body: optionsRotationDailyLog,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {

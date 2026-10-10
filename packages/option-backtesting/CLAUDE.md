@@ -127,6 +127,24 @@ Otherwise:
   `rotation/series.py`, so a figure is computed in exactly one place. Selectors are validated by pattern and
   matched only against enumerated strategy names; at most 80 strategies per request; the strategy list is
   cached for 30 s. Errors are `{"error": ...}`.
+- `rotation/daylog.py`, `rotation/placements.py`, `api/rotation_log_routes.py` — the rotation daily
+  log (BL-058 Phase 4): `GET /legwise/rotation/log` (one row per journal entry, plus every trading day
+  since the registered first day with no entry as `not_recorded`, plus structural counters),
+  `/day/{day}` (the four baskets in full, chain, re-score check, placement rows), `/placement`,
+  and `/forensics?variant=&day=` (one variant's day re-simulated with `update.py`'s own call and
+  `SIZING_DATE`, for the Day forensics view, with `rotation.matches_stored`).
+  Read-only over the journal and results; `source=reconstructed` re-scores research-history days
+  with `pick.score_history` (the function the 09:16 job calls), labelled and never counted as
+  forward. The only write is `placements.append`: a row to the separate append-only
+  `rotation/placements.jsonl` (`{day, list, status, note, at}`, a later row supersedes in the view,
+  earlier rows kept, validated against the journal; a row identical to the list's current one is a
+  no-op and `POST` answers `written: false`; an unreadable line is skipped and counted), a file
+  nothing else reads. A day with a pick
+  lacking a stored result is `waiting` and its gross is withheld, never zero. Tests build a store
+  through the real `pick.record` (`tests/unit/rotation_synth.py`);
+  `scripts/rotation-daylog-demo.py` serves the same synthetic store on :8123 for a look at the
+  dashboard before the journal has real entries; it refuses the real data root and any root with a
+  `rotation/` directory it did not build (marker file).
 - `rotation/shadow.py` + `api/rotation_shadow_routes.py` — the Shadow scoreboard (BL-083 forward shadow;
   `GET /legwise/rotation/shadow?from=&to=`), read-only over the journal, `rotation/results/` and
   `rotation/triggers/`. Forward = sessions from 2026-10-12 (BL-058). Three parts, every figure an event minus a
