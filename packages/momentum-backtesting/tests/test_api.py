@@ -2094,7 +2094,9 @@ def test_a_missing_extended_tags_file_fails_the_companion_not_the_run(broad_clie
     result = _job(broad_client, body, fresh=True)["result"]
     assert result["kpis"]["cagr"] is not None
     assert result["companion"]["status"] == "failed"
-    assert "stock_groups_wide.csv" in result["companion"]["reason"]
+    # A fixed sentence: the exception text carries a filesystem path and reaches a hover.
+    assert "/" not in result["companion"]["reason"]
+    assert "stock_groups_wide" not in result["companion"]["reason"]
 
 
 def test_the_weekly_build_skips_the_companion(broad_client, monkeypatch):

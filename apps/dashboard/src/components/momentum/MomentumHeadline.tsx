@@ -85,7 +85,7 @@ function Headline({
   benchmark: string;
   gap: string | null;
   gapTone?: Tone;
-  /** A muted third line, for a companion figure (never wraps). */
+  /** A muted third line, for a companion figure. It wraps rather than truncating the figure. */
   note?: CompanionLine | null;
 }) {
   return (

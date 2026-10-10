@@ -3,6 +3,7 @@
 import contextlib
 import inspect
 import json
+import logging
 import math
 import os
 import threading
@@ -1784,6 +1785,17 @@ def _run_broad(
     )
 
 
+def _equity_summary(result: Result) -> dict:
+    """The four figures two "same run, one setting changed" comparisons report."""
+    equity = result.equity
+    return {
+        "cagr": float(metrics.cagr(equity)),
+        "max_drawdown": float(metrics.max_drawdown(equity)[0]),
+        "total_return": float(equity.iloc[-1] - 1),
+        "trades": int(len(result.trades)),
+    }
+
+
 def _circuit_realism(
     req: BacktestRequest,
     ranking: broad.UniverseRanking,
@@ -1795,21 +1807,12 @@ def _circuit_realism(
     `outer_prices` is what the run itself used: this can be asked for after the run, when newer
     data may have been loaded."""
 
-    def summary(result: Result) -> dict:
-        equity = result.equity
-        return {
-            "cagr": float(metrics.cagr(equity)),
-            "max_drawdown": float(metrics.max_drawdown(equity)[0]),
-            "total_return": float(equity.iloc[-1] - 1),
-            "trades": int(len(result.trades)),
-        }
-
     other = _run_broad(
         req.model_copy(update={"broad_respect_circuits": not req.broad_respect_circuits}),
         ranking,
         outer_prices,
     )
-    this_run, alternative = summary(outcome.result), summary(other.result)
+    this_run, alternative = _equity_summary(outcome.result), _equity_summary(other.result)
     ignoring, respecting = (
         (alternative, this_run)
         if req.broad_respect_circuits
@@ -1841,17 +1844,8 @@ def _extended_tags_companion(
     if req.broad_category_mode != "on":
         return {"status": "not_applicable", "reason": "no category layer"}
 
-    def summary(result: Result) -> dict:
-        equity = result.equity
-        return {
-            "cagr": float(metrics.cagr(equity)),
-            "max_drawdown": float(metrics.max_drawdown(equity)[0]),
-            "total_return": float(equity.iloc[-1] - 1),
-            "trades": int(len(result.trades)),
-        }
-
     try:
-        this_run = summary(outcome.result)
+        this_run = _equity_summary(outcome.result)
         if req.broad_category_tags == "extended":
             return {
                 "status": "this_run",
@@ -1862,15 +1856,21 @@ def _extended_tags_companion(
         other = _run_broad(
             req.model_copy(update={"broad_category_tags": "extended"}), ranking, outer_prices
         )
-        extended = summary(other.result)
+        extended = _equity_summary(other.result)
         return {
             "status": "computed",
             "tags": "extended",
             **extended,
             "cagr_impact": extended["cagr"] - this_run["cagr"],
         }
-    except Exception as error:  # noqa: BLE001 - a companion figure must never fail the run
-        return {"status": "failed", "reason": f"{type(error).__name__}: {error}"[:200]}
+    except Exception:  # noqa: BLE001 - a companion figure must never fail the run
+        # The exception text can carry a filesystem path and is shown in a hover, so the payload
+        # gets a fixed sentence and the detail goes to the server log.
+        logging.getLogger(__name__).exception("extended-tags companion failed")
+        return {
+            "status": "failed",
+            "reason": "The extended tags could not be applied to this run (see the server log).",
+        }
 
 
 #: Universes that are only meaningful behind the tradability gate: the whole market (the gate is
