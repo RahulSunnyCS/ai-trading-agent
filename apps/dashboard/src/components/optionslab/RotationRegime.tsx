@@ -79,8 +79,12 @@ function MixBar({ p, row }: { p: RegimePeriod; row: RegimeRowKey }) {
           <i
             key={c}
             title={segmentTitle(c, mix.counts[i] ?? 0, f)}
-            className="flex items-center justify-center overflow-hidden bg-primary font-mono text-[10px] not-italic text-foreground"
-            style={{ width: `${f * 100}%`, opacity: shade(i, mix.categories.length) }}
+            className="flex items-center justify-center overflow-hidden font-mono text-[10px] not-italic text-foreground"
+            style={{
+              width: `${f * 100}%`,
+              // the tint carries the alpha, so the number on a light segment stays readable
+              backgroundColor: `hsl(var(--primary) / ${shade(i, mix.categories.length)})`,
+            }}
           >
             {f >= 0.09 ? formatNumber(f * 100, 0) : ''}
           </i>
