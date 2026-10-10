@@ -1,0 +1,30 @@
+# AlgoTest "Nifty_Widesl_917_OTM1" — transcribed from the owner's AlgoTest export
+# (algotest_strategy_Nifty_Widesl_917_OTM1_2026-09-22) and checked against its backtest PDF
+# (2026-10-07): short OTM1 weekly strangle at 09:17, exit 15:28, 115% SL per leg trailed
+# 15/10 as a PERCENTAGE (was transcribed as points — BL-009 Phase 1), ₹2,500 overall max
+# loss, partial square-off, underlying Cash, slippage 0, qty = today's lot on every day.
+strategy:
+  id: bl080_N_p40_1402
+  underlying: NIFTY
+  entry_time: "14:02"
+  exit_time: "15:28"
+  square_off: partial
+  legs:
+    - id: ce
+      lots: 1
+      position: sell
+      option_type: CE
+      expiry: weekly
+      strike: { closest_premium: 40 }
+      stop_loss: { percent: 115 }
+      trail_sl: { percent: [15, 10] }
+    - id: pe
+      lots: 1
+      position: sell
+      option_type: PE
+      expiry: weekly
+      strike: { closest_premium: 40 }
+      stop_loss: { percent: 115 }
+      trail_sl: { percent: [15, 10] }
+  overall:
+    stop_loss_inr: 2500
