@@ -15,12 +15,10 @@ import {
   ROW_LABEL,
   bandText,
   flagText,
-  flagged,
   measureBand,
   measureValue,
   readingLine,
   spanText,
-  tint,
 } from '../../lib/rotationDriftView';
 import type { RotationListKey } from '../../types/rotation';
 import type { DriftDimension, RotationDriftResponse } from '../../types/rotationDrift';
@@ -29,46 +27,25 @@ import { Card, CardHeader } from '../ui/Card';
 import { RefreshButton } from '../ui/RefreshButton';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
+import { StackedShare } from './StackedShare';
 
 function ShareBar({ d, row }: { d: DriftDimension; row: 'history' | 'last63' | 'last21' }) {
-  const shares = d.shares[row];
   const counts = d.counts[row];
-  const total = counts.reduce((s, c) => s + c, 0);
-  const marked = flagged(d);
-  if (total === 0) {
+  if (counts.reduce((s, c) => s + c, 0) === 0) {
     return <div className="h-5 rounded border border-dashed border-border-strong" />;
   }
+  const ringed =
+    row === 'last21' ? new Map(d.flags.map((f) => [f.category, flagText(f)] as const)) : undefined;
   return (
-    <div
-      className="flex h-5 overflow-hidden rounded border border-border"
-      role="img"
-      aria-label={d.categories
-        .map((c, i) => `${c.label} ${formatNumber((shares[i] ?? 0) * 100, 0)}%`)
-        .join(', ')}
-    >
-      {d.categories.map((c, i) => {
-        const share = shares[i] ?? 0;
-        if (share === 0) return null;
-        const flag = row === 'last21' ? marked.get(c.key) : undefined;
-        return (
-          <i
-            key={c.key}
-            title={`${c.label}: ${counts[i] ?? 0} picks (${formatNumber(share * 100, 0)}%)${
-              flag ? ` · ${flagText(flag)}` : ''
-            }`}
-            className={`flex items-center justify-center overflow-hidden whitespace-nowrap px-1 font-mono text-[10px] not-italic text-foreground ${
-              flag ? 'ring-2 ring-inset ring-warning' : ''
-            }`}
-            style={{
-              width: `${share * 100}%`,
-              backgroundColor: `hsl(var(--primary) / ${tint(i, d.categories.length)})`,
-            }}
-          >
-            {share >= 0.14 ? `${c.label} ${formatNumber(share * 100, 0)}%` : ''}
-          </i>
-        );
-      })}
-    </div>
+    <StackedShare
+      keys={d.categories.map((c) => c.key)}
+      labels={d.categories.map((c) => c.label)}
+      counts={counts}
+      shares={d.shares[row]}
+      minLabel={0.14}
+      named
+      {...(ringed ? { ringed } : {})}
+    />
   );
 }
 

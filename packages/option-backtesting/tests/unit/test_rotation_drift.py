@@ -218,3 +218,45 @@ def test_the_route_answers_validates_and_writes_nothing(world):
     bad = c.get("/legwise/rotation/drift?list=Z")
     assert bad.status_code == 422 and "error" in bad.json()
     assert _fingerprint(root) == before
+
+
+def test_the_buy_add_on_is_not_a_core_pick_and_a_closest_premium_pick_is_premium():
+    row = _row(
+        date(2026, 3, 2),
+        [NIFTY_WIDE, ("N_p80_0932", "wide", "NIFTY", "p80", "A"), NIFTY_DIR],
+        buy_qualified=True,
+    )
+    row["lists"]["A"]["picks"].append(
+        {
+            "name": "N_buy_1017",
+            "kind": "buy",
+            "index": "NIFTY",
+            "family": "buy",
+            "band": "B",
+            "role": "buy",
+        }
+    )
+    (day,) = drift._days([row], "A")
+    assert len(day.names) == 3 and "N_buy_1017" not in day.names
+    assert day.cats["strike"] == ["wide", "premium", "dir"]
+    assert day.cats["kind"] == ["wide", "wide", "dir"]
+    assert day.buy_qualified is True
+    # ditm1 is its own strike method, and a Buy-family name never becomes one
+    assert drift._strike({"family": "ditm1"}) == "ditm1"
+    assert drift._strike({"family": "buy"}) is None
+
+
+def test_one_session_predicate_serves_every_card():
+    assert history.is_session({"source": "recorded", "status": "scored"})
+    assert history.is_session({"source": "reconstructed"})
+    assert not history.is_session({"source": "recorded", "status": "late"})
+    assert not history.is_session({"source": "missing"})
+
+
+def test_a_corrupt_journal_is_named_as_the_journal(world):
+    root, _ = world
+    (root / "rotation" / "journal.jsonl").write_text("{not json\n")
+    history.clear()
+    rotation_drift_routes._cache.clear()
+    r = TestClient(create_app(), raise_server_exceptions=False).get("/legwise/rotation/drift")
+    assert r.status_code == 500 and "journal cannot be read" in r.json()["error"]

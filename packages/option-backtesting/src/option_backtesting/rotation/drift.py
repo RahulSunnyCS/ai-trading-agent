@@ -90,7 +90,7 @@ def _strike(p: dict) -> str | None:
 def _days(rows: list[dict], key: str) -> list[Day]:
     out: list[Day] = []
     for r in rows:
-        if r["source"] == "missing" or (r["source"] == "recorded" and r.get("status") == "late"):
+        if not history.is_session(r):
             continue
         block = (r.get("lists") or {}).get(key)
         if not block:

@@ -3,24 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   bandText,
   flagText,
-  flagged,
   measureBand,
   measureValue,
   readingLine,
   spanText,
-  tint,
 } from '../rotationDriftView';
 import { indexDimension, kindDimension, measure, response } from './rotationDriftFixture';
-
-describe('tint', () => {
-  it('runs light to dark and is never invisible', () => {
-    const t = [0, 1, 2, 3].map((i) => tint(i, 4));
-    expect(t).toEqual([...t].sort((a, b) => a - b));
-    expect(Math.min(...t)).toBeGreaterThan(0.1);
-    expect(Math.max(...t)).toBeLessThanOrEqual(1);
-    expect(tint(0, 1)).toBeGreaterThan(0);
-  });
-});
 
 describe('words', () => {
   it('says a band, and that there is none yet', () => {
@@ -31,11 +19,6 @@ describe('words', () => {
   it('says a flag with its direction and the usual range', () => {
     const f = indexDimension().flags[1];
     expect(f && flagText(f)).toBe('SENSEX 100% over the last 21, above its usual 24% to 51%');
-  });
-
-  it('indexes the flags by category', () => {
-    expect([...flagged(indexDimension()).keys()]).toEqual(['NIFTY', 'SENSEX']);
-    expect(flagged(kindDimension()).size).toBe(0);
   });
 
   it('names the variant on the most-picked row and uses a dash before 21 sessions', () => {

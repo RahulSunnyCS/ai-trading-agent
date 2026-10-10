@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
-from ..rotation import drift
+from ..rotation import drift, journal
 
 router = APIRouter(prefix="/legwise/rotation/drift")
 
@@ -45,6 +45,8 @@ def get_drift(list_: str = Query(default="A", alias="list")) -> Any:
         value = drift.build(list_, root)
     except drift.DriftError as error:
         return _error(error.status, str(error))
+    except journal.JournalCorrupt as error:
+        return _error(500, f"the journal cannot be read: {error}")
     except (ValueError, KeyError, OSError) as error:  # a torn stored file
         return _error(500, f"the stored rotation files cannot be read: {error}")
     with _lock:

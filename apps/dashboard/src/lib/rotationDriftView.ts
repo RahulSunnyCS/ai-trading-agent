@@ -5,7 +5,6 @@
  */
 
 import type {
-  DriftDimension,
   DriftFlag,
   DriftMeasure,
   DriftWindowId,
@@ -20,11 +19,6 @@ export const ROW_LABEL: Record<DriftWindowId, string> = {
 };
 export const ROWS: readonly DriftWindowId[] = ['history', 'last63', 'last21'];
 
-/** The tint of the i-th of n categories: light to dark, never invisible. */
-export function tint(i: number, n: number): number {
-  return n <= 1 ? 0.6 : 0.2 + (0.7 * i) / (n - 1);
-}
-
 /** "0.72 to 0.81" as "72% to 81%". */
 export function bandText(b: { p10: number; p90: number } | null): string {
   if (!b) return 'no band yet';
@@ -36,11 +30,6 @@ export function flagText(f: DriftFlag): string {
   return `${f.label} ${formatPct(f.share, 0)} over the last 21, ${
     f.direction === 'above' ? 'above' : 'below'
   } its usual ${formatPct(f.p10, 0)} to ${formatPct(f.p90, 0)}`;
-}
-
-/** The flagged category keys of a dimension, for outlining its bars. */
-export function flagged(d: DriftDimension): Map<string, DriftFlag> {
-  return new Map(d.flags.map((f) => [f.category, f]));
 }
 
 /** A concentration row's value in words (the most-picked row names the variant). */

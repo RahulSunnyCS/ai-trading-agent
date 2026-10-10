@@ -55,3 +55,12 @@ def daily_log(root: Path, span: str) -> dict:
 def clear() -> None:
     with _lock:
         _cache.clear()
+
+
+def is_session(row: dict) -> bool:
+    """A log row that counts as a session for a list's history: not a day with no entry, and not a
+    late entry (recorded after 09:17, so not forward). One definition for every card that reads
+    the log."""
+    if row["source"] == "missing":
+        return False
+    return not (row["source"] == "recorded" and row.get("status") == "late")

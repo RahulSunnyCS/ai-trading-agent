@@ -110,7 +110,7 @@ def episodes_of(daily: np.ndarray, min_depth: float) -> list[dict]:
 
 def _usable(r: dict, key: str) -> dict | None:
     """The list's scored block of a row that counts as a session, else None."""
-    if r["source"] == "missing" or (r["source"] == "recorded" and r.get("status") == "late"):
+    if not history.is_session(r):
         return None
     block = (r.get("lists") or {}).get(key)
     if block is None or not block["scored"] or block["per_lot_day"] is None:
