@@ -46,6 +46,33 @@ time in cash. **All metrics** opens the full set, the assumptions behind the run
 notes and a one-sentence summary. Hover the (i) by a number for what it means and how it
 changed from your previous run.
 
+### Which stocks the number was made on
+
+For a Broad run the card's title names the universe after the dataset: *Point in time* (each
+year's 750 most-traded stocks, delisted names included), *Today's list* (today's Total Market
+index applied to every year, which flatters) or *Whole NSE market*. The same name is in the
+run bar's chips and in Saved runs.
+
+Under the CAGR, a muted line shows **the same run with extended category tags**: stocks
+that BSE's current classification covers get a tag, not only today's 755 index members, so more of the stocks that later left the index can be bought through a category. NSE-only and
+delisted names are still left untagged: no later-delisted name carries a curated tag and most
+carry no extended one, so this figure still flatters. It is usually a few points below the
+headline. Treat it as the closer reading of what the rule would have done, not as a
+point-in-time result.
+It is computed for every Broad run that ranks by category; hover it for the definition. It
+still uses today's classification for every year, so it is closer to an expected return, not a
+point-in-time one.
+
+Below the cards, one note says what the result is. It opens with the reminder that this CAGR is
+an upper bound, not an expected return, and why: for a point-in-time run the 2026 themes and the
+stocks that carry no category tag are left to blame, for today's list the stock list too. Then comes the in-sample warning: what the
+review measured for a typical config, for the best of a search, and for the four frozen configs on
+years nobody tuned on. The link opens the full
+[evaluation review](https://github.com/RahulSunnyCS/ai-trading-agent/blob/main/packages/momentum-backtesting/docs/evaluation-review.md).
+
+The note is calm grey. It turns amber only when the run left circuit locks or the tradability
+filter off, and then says what turning them on is worth, because that is the part you can act on.
+
 ## The equity chart
 
 The portfolio's value week by week against the benchmark, about two-thirds of the first
@@ -72,9 +99,10 @@ benchmark, not the one picked on the headline.
 
 | Section | What it shows |
 |---|---|
-| This week | The run's last week: each candidate's rank, score and action, beside the open positions. On a slower cadence a week the strategy does not trade says "Not a rebalance week" and names the next trading Friday. For Broad the actions are the engine's own, so a stock above "Max price to buy ₹" is never shown as a buy: one that ranks high enough to be bought shows **SKIP (above max price)** with its price, and the next-best stock takes its slot. |
+| This week | The run's last week: each candidate's rank, score and action, beside the open positions. On a slower cadence a week the strategy does not trade says "Not a rebalance week" and names the next trading Friday. For Broad the actions are the engine's own, so a stock above "Max price to buy ₹" is never shown as a buy: one that ranks high enough to be bought shows **SKIP (above max price)** with its price, and the next-best stock takes its slot. Not for an **All (split)** run: it shows the open positions only (see below). |
 | Yearly returns | Each calendar year against the benchmark. Count the losing years. |
 | Rolling 1-year return | The return over every trailing 52 weeks, and how often the strategy was ahead. |
+| Friday luck | Only for an **All (split)** run. Each Friday set on its own (CAGR, max drawdown, Ulcer) next to the whole account, and the gap between the luckiest and unluckiest. |
 | Drawdowns | The deepest falls: when, how deep, how long, and what the benchmark did then. |
 | Monthly returns | A month-by-month heatmap with each year's total. |
 | Trades | Every closed trade, newest first, filterable. |
@@ -83,6 +111,20 @@ benchmark, not the one picked on the headline.
 | Holdings timeline | What was held, when, and in what share. |
 | Circuit exposure | Broad Momentum only: the circuit-lock situations the strategy ran into. |
 | Instrument attribution | How each instrument made or lost the money. |
+
+## An All (split) run
+
+With **Fridays: All (split)** on a slower cadence, the headline, chart and tables are for the
+whole account: every Friday set holds an equal share of the money, evened out each April. The
+trade list says which Friday set made each trade. The **Friday luck** section shows what each set
+would have earned alone. **This week** has no signals for it: each set trades its own Friday, so
+one list of buys and sells for the whole account would be wrong. It says so and shows the open
+positions; follow the run on all Fridays (see [Saved runs](guide:momentum/saved-runs)) to get each
+set's signal on This week. Splitting removes the gamble of picking a Friday; it does not raise the
+average. Tax is counted separately for each set (a loss in one never offsets a gain in another),
+so after-tax figures are slightly pessimistic. The run takes about as many times longer as there
+are sets, and Broad Momentum's circuit exposure card is not shown for it. The extended-tags line
+under the CAGR is the whole account's too: every Friday set is run again with the extended tags.
 
 ## Reading a result honestly
 

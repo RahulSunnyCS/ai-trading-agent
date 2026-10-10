@@ -343,7 +343,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     term: 'Survivorship bias',
     group: 'Momentum',
     short:
-      'The flattering error of testing only companies that still exist or are in an index today. The stock data here uses who was really listed and in the index on each past date.',
+      'The flattering error of testing only companies that still exist or are in an index today. The stock data here uses who was really listed and in the index on each past date. Broad Momentum\'s "As each year saw it" universe does the same for the Total Market pool; "Today\'s index list" does not, and its result flatters.',
   },
   {
     id: 'circuit',
@@ -421,6 +421,13 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     group: 'Momentum',
     short:
       'Several saved runs of one dataset kept as one favourite, such as the Phase 6 ensemble. Each run is a sleeve with its own share of the money and its own rebalance weeks; the group has one status and one combined signal.',
+  },
+  {
+    id: 'all-fridays',
+    term: 'All Fridays (split)',
+    group: 'Momentum',
+    short:
+      'A strategy that trades every 2 or 4 weeks has 2 or 4 possible sets of Fridays, and which one you pick is luck. All Fridays runs every set with an equal share of the money, evens the shares out again each April, and adds them into one account. It removes the gamble; it does not raise the average.',
   },
   {
     id: 'forward-journal',

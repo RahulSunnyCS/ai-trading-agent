@@ -124,6 +124,14 @@ response.benchmarks[].reason added for indices that are unavailable for a run (n
 | broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
 
+## 2026-10-09 (on top of `874fe2f`)
+
+BL-087: new scenario for the All Fridays split; no existing scenario moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_one_category_three_picks_four_weekly_all_fridays | n/a -> 17.88% | n/a -> -35.50% |
+
 ## 2026-10-09 (on top of `cc65bab`)
 
 Broad results' This week section (latest) is now the engine's own decision for the run's last week (cadence, price ceiling, circuit locks), not the advisory panel; no backtest result moved
@@ -136,3 +144,31 @@ Broad results' This week section (latest) is now the engine's own decision for t
 | broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
 | broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
 | broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-10 (on top of `c0619d6`)
+
+BL-087 review: an All Fridays run has no combined signal. Its latest section is now a note with no rows (split: true) instead of signals judged against the union of every sleeve's holdings. No CAGR, drawdown or trade changes.
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 17.88% | -35.50% -> -35.50% |
+## 2026-10-10 (on top of `3c31f81`)
+
+BL-036 Phase 1: every category-mode Broad result carries the extended-tags companion (response.companion); the six Broad scenarios pin broad_universe=total_market now that a fresh dashboard run defaults to turnover_rank; no CAGR, drawdown or trade moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_default | 18.67% -> 18.67% | -26.72% -> -26.72% |
+| broad_category_mode_off | 36.99% -> 36.99% | -28.58% -> -28.58% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |
+| broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
+| broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
+| broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
+## 2026-10-10 (on top of `d35ef38`)
+
+BL-036 companion on the All Fridays scenario: the extended-tags figure is the whole account's (every sleeve re-run with the extended tags and blended); same field main accepted for the six other Broad scenarios, no CAGR, drawdown or trade moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_one_category_three_picks_four_weekly_all_fridays | 17.88% -> 17.88% | -35.50% -> -35.50% |

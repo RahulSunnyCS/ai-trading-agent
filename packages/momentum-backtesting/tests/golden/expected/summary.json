@@ -184,6 +184,43 @@
   },
   "status": 200
  },
+ "broad_one_category_three_picks_four_weekly_all_fridays": {
+  "kpis": {
+   "avg_holdings": 4.724935733,
+   "avg_loss": -0.06506053978,
+   "avg_weeks_held": 6.424347826,
+   "avg_win": 0.1283446029,
+   "benchmark_cagr": 0.1246213533,
+   "benchmark_final_value": 240027.3378,
+   "benchmark_max_drawdown": -0.3455631745,
+   "benchmark_total_return": 1.400273378,
+   "best_trade": 2.276170342,
+   "cagr": 0.1788305705,
+   "cash_cagr": 0.05978861851,
+   "excess_cagr": 0.05420921714,
+   "exits_per_year": 76.72530297,
+   "final_value": 340943.2472,
+   "max_drawdown": -0.3550447754,
+   "max_drawdown_peak": "2021-10-15",
+   "max_drawdown_trough": "2022-05-13",
+   "max_position_share": 0.540634224,
+   "new_buys_per_year": 77.66424899,
+   "pct_rolling_52w_ahead": 0.5059171598,
+   "sharpe": 0.516628818,
+   "sortino": 0.6988130242,
+   "tax_paid": null,
+   "time_in_cash": 0.09442379145,
+   "top_ups_per_year": 14.62073081,
+   "total_return": 2.409432472,
+   "turnover_per_year": 7.028370498,
+   "volatility": 0.2799246777,
+   "win_rate": 0.5244755245,
+   "worst_trade": -0.2540879891,
+   "years": 8,
+   "years_beating_benchmark": 4
+  },
+  "status": 200
+ },
  "broad_two_categories_three_picks_fortnightly_taxed": {
   "kpis": {
    "avg_holdings": 5.574358974,

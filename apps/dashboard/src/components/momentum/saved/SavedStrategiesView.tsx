@@ -20,6 +20,7 @@ import { cn } from '../../../lib/cn';
 import {
   EMPTY,
   formatDay,
+  formatInt,
   formatIstDate,
   formatIstDateTimeShort,
   formatNumber,
@@ -45,9 +46,12 @@ import {
   TRUST,
   asSavedRun,
   cagrMove,
+  extendedKpis,
+  extendedSentence,
   matchesStrategy,
   strategyCounts,
   strategyName,
+  universeTag,
 } from '../../../lib/momentumSaved';
 import {
   hydrateMomentumSavedFromStorage,
@@ -293,11 +297,17 @@ export function SavedStrategiesView({
 
   async function patchStrategy(id: string, body: Record<string, unknown>): Promise<boolean> {
     setError(null);
-    const response = await apiPatch(`${SAVED_STRATEGIES_URL}/${id}`, body);
+    const response = await apiPatch<SavedStrategy>(`${SAVED_STRATEGIES_URL}/${id}`, body);
     if (!response.ok) {
       setError(response.error);
       toast(response.error, 'error');
       return false;
+    }
+    // An All Fridays run is followed as a group of one sleeve per Friday (BL-087).
+    if (response.data?.id !== id && response.data?.group) {
+      toast(
+        `"${response.data.name}" follows all ${formatInt(response.data.group.length)} Fridays as one group`,
+      );
     }
     done();
     return true;
@@ -381,6 +391,8 @@ export function SavedStrategiesView({
     const isGroup = strategy.group !== null;
     const isOpen = expanded.includes(strategy.id);
     const ticked = selectedIds.includes(strategy.id);
+    const universe = universeTag(strategy);
+    const extended = isGroup ? null : extendedKpis(kpis);
     const memberCagrs = (strategy.members ?? [])
       .map((m) => m.latest.kpis.cagr)
       .filter((v): v is number => typeof v === 'number');
@@ -422,20 +434,38 @@ export function SavedStrategiesView({
             <button
               type="button"
               aria-label={
-                strategy.favorite ? `${name} is a favourite` : `Make ${name} a favourite (Watching)`
+                strategy.favorite
+                  ? `${name} is a favourite`
+                  : strategy.followed_by
+                    ? `${name} is followed on all Fridays`
+                    : `Make ${name} a favourite (Watching)`
               }
               title={
                 strategy.favorite
                   ? 'A favourite: set its status on the right'
-                  : 'Make it a favourite (Watching)'
+                  : strategy.followed_by
+                    ? 'Followed on all Fridays as a group: set its status on the group'
+                    : 'Make it a favourite (Watching)'
               }
-              className={strategy.favorite ? 'text-warning' : 'text-faint hover:text-foreground'}
+              className={
+                strategy.favorite || strategy.followed_by
+                  ? 'text-warning'
+                  : 'text-faint hover:text-foreground'
+              }
               onClick={(event) => {
                 event.stopPropagation();
-                if (!strategy.favorite) void patchStrategy(strategy.id, { status: 'watching' });
+                if (!strategy.favorite && !strategy.followed_by) {
+                  void patchStrategy(strategy.id, { status: 'watching' });
+                }
               }}
             >
-              <Star className={cn('h-4 w-4', strategy.favorite && 'fill-current')} aria-hidden />
+              <Star
+                className={cn(
+                  'h-4 w-4',
+                  (strategy.favorite || strategy.followed_by) && 'fill-current',
+                )}
+                aria-hidden
+              />
             </button>
           )}
         </Td>
@@ -459,6 +489,11 @@ export function SavedStrategiesView({
                 {DATASET_SHORT[strategy.dataset] ?? strategy.dataset}
               </span>
             ) : null}
+            {universe && !isGroup ? (
+              <span className="shrink-0 text-xs text-faint" title="Which stocks this ranks">
+                · {universe}
+              </span>
+            ) : null}
           </span>
         </Td>
         <Td
@@ -472,10 +507,16 @@ export function SavedStrategiesView({
         <Td dense className="whitespace-nowrap">
           {isGroup ? null : <SavedRunSparkline values={strategy.latest.strategy} name={name} />}
         </Td>
-        <Td dense align="right" numeric>
+        <Td dense align="right" numeric className="whitespace-nowrap">
           {isGroup && memberCagrs.length
             ? `${formatPct(Math.min(...memberCagrs), 0)}–${formatPct(Math.max(...memberCagrs), 0)}`
             : formatPct(kpis.cagr)}
+          {extended ? (
+            <span className="text-faint" title={extendedSentence(extended)}>
+              {' '}
+              · {formatPct(extended.cagr, 0)}
+            </span>
+          ) : null}
         </Td>
         <Td
           align="right"
@@ -531,7 +572,9 @@ export function SavedStrategiesView({
               ) : null}
             </span>
           ) : (
-            <span className="text-xs text-faint">☆ to follow</span>
+            <span className="text-xs text-faint">
+              {strategy.followed_by ? 'followed on all Fridays' : '☆ to follow'}
+            </span>
           )}
         </Td>
         <Td dense className="text-xs text-muted" title={formatIstDateTimeShort(strategy.last_run)}>

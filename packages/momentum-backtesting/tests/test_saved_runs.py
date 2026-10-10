@@ -211,6 +211,53 @@ def test_bhavcopy_backed_favorite_uses_saved_start_and_builds_signal(monkeypatch
     assert "NSE bhavcopy" in result.notification.body
 
 
+def test_an_all_fridays_favorite_is_not_told_no_trades(monkeypatch):
+    class Stock:
+        last_week = pd.Timestamp("2026-09-25")
+
+    monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
+    # What `_with_spread` puts in `latest` for a split run: no rows because there is no signal.
+    split = {"latest": {"week": "2026-09-25", "rows": [], "split": True, "explain": "n/a"}}
+    monkeypatch.setattr(api, "_stock_backtest", lambda req: split)
+    favorite = {"name": "Split", "config": {"dataset": "stock", "universe": ["C0001"]}}
+    result, blocked = api._research_weekly_result(favorite, pd.Timestamp("2026-09-25"))
+    assert result is None
+    assert "no combined signal" in blocked
+
+
+def test_an_all_fridays_broad_favorite_never_gets_an_engine_decision(monkeypatch):
+    class Stock:
+        last_week = pd.Timestamp("2026-09-25")
+
+    monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
+    # A single Broad run's weekly signal is the engine's own decision (`_broad_engine_signal`);
+    # an All Fridays one is a blend of sleeves, so it keeps its split note instead.
+    note = {"week": "2026-09-25", "rows": [], "split": True, "explain": "n/a"}
+    monkeypatch.setattr(api, "_broad_parts", lambda req, **_: ({}, {"latest": lambda: note}))
+
+    def engine(*args, **kwargs):
+        raise AssertionError("the engine was asked to decide a split run")
+
+    monkeypatch.setattr(api, "_broad_engine_signal", engine)
+    config = {
+        "dataset": "broad",
+        "universe": ["x"],
+        "rebalance_every": 4,
+        "split_fridays": True,
+    }
+    result, blocked = api._research_weekly_result(
+        {"name": "Split", "config": config}, pd.Timestamp("2026-09-25")
+    )
+    assert result is None
+    assert "no combined signal" in blocked
+    # Your orders (14:15) refuse it the same way, before any ranking is built.
+    monkeypatch.setattr(api, "_broad_ranking", engine)
+    headline = {"id": "h", "name": "Split", "config": config}
+    signal, kind, reason, rankings = api._orders_signal(headline, [], pd.Timestamp("2026-09-25"))
+    assert signal is None and kind == "unavailable" and rankings is None
+    assert "no combined signal" in reason
+
+
 def test_weekly_endpoint_sends_only_the_active_favorite(client, monkeypatch):
     active = client.post("/api/saved-runs", json=_payload("Active")).json()
     inactive = client.post("/api/saved-runs", json=_payload("Dashboard only")).json()

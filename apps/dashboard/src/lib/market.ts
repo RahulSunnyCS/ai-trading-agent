@@ -90,6 +90,15 @@ export function marketSession(now: Date): MarketSession {
 }
 
 /**
+ * Whether live momentum scores can be asked for (BL-051): a Friday during the open session,
+ * 09:15–15:30 IST. The service answers the same question itself; this only decides whether the
+ * Scores page offers the switch.
+ */
+export function isLiveScoresWindow(now: Date): boolean {
+  return istWeekday(istDayIndex(now)) === 5 && marketSession(now).state === 'open';
+}
+
+/**
  * The session in words: "Market open · closes 15:30", "Pre-open · opens 09:15",
  * "Market closed · opens 09:00" (later today) or "Market closed · opens Mon 09:00".
  * "Opens" after a close means the pre-open at 09:00; times are IST.

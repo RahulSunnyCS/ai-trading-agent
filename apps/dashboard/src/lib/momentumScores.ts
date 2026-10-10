@@ -135,6 +135,23 @@ export interface MomentumScores {
   missing_symbols: string[];
   stocks: StockScore[];
   sectors: SectorScore[];
+  /** Only on `/api/momentum/scores/live` (BL-051): scores on live Fyers prices, Fridays in
+   * market hours. Provisional and never saved; the close replaces them. */
+  live?: LiveScoresInfo;
+}
+
+export interface LiveScoresInfo {
+  provisional: true;
+  /** When the prices were read (an ISO instant). */
+  as_of: string;
+  /** The Friday the provisional row stands for ('YYYY-MM-DD'). */
+  week: string;
+  /** Stocks priced live. */
+  priced: number;
+  /** Symbols Fyers returned no price for: they keep last week's close. */
+  missing: string[];
+  /** Symbols whose price was more than 50% from last week's close: kept at that close. */
+  suspect: string[];
 }
 
 // --- Sorting ---------------------------------------------------------------------------------

@@ -47,6 +47,8 @@ HEAVY_KEYS = {
     "weight_scheme",
     "score",
     "voladj_skip_recent_month",
+    "voladj_lookbacks",
+    "voladj_skip",
     "min_drop_pct",
     "turnover_spike_multiple",
     "series_break_policy",  # "legacy" | "verified" (see api.BacktestRequest.broad_series_breaks)
@@ -416,6 +418,8 @@ def run_group(task: dict[str, Any]) -> dict[str, Any]:
         weights=weights,
         score=heavy.get("score", "ranksum"),
         voladj_skip_recent_month=heavy.get("voladj_skip_recent_month", True),
+        voladj_lookbacks=heavy.get("voladj_lookbacks", False),
+        voladj_skip=heavy.get("voladj_skip", "long"),
         liquidity=liquidity,
         universe_kind=universe_kind,
     )

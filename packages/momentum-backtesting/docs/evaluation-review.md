@@ -369,6 +369,12 @@ year before tax against 17.1% for the momentum index. That is before tax (6 to 1
 Phase 2), before the Monday-fill cost (about 1 point), and these 50 were chosen on the biased
 universe, so even this is an upper reading.
 
+**On screen (2026-10-10, BL-036 Phase 1).** A new Broad run in the dashboard now defaults to this
+point-in-time universe, names the universe on the result and in Saved runs, and shows the same run
+with extended category tags as a muted figure under the CAGR. For the five highest-CAGR
+favourites that figure was 4 to 11 points lower (BL-010 log, 2026-10-10). The category tags are
+still today's classification applied to every year; point-in-time categories are BL-074.
+
 ### Step 3 — do the category tags carry information?
 
 **Label shuffle** (`mbt search category-shuffle`, 100 shuffles each): the stocks dealt out to

@@ -1,0 +1,29 @@
+{
+  "item": "BL-055",
+  "committed": "2026-10-09",
+  "note": "Pre-registered before any run. Never edit after a run; supersede with bl055_criteria_addendum_N.json.",
+  "question": "Does the volatility-adjusted score improve when it follows the config's selected lookbacks and weights instead of the fixed NSE 26/52-week returns?",
+  "variant": {
+    "flag": "engine.Config.voladj_lookbacks = True (a heavy search setting; off by default)",
+    "definition": "for each selected lookback L: return over L weeks, measured 4 weeks back when L >= 26 and voladj_skip_recent_month is on, else to the latest close; divided by the trailing 26-week volatility of weekly returns; z-scored across the week's eligible names; the score is the weighted sum of the z-scores with the config's lookback weights (equal when none); higher is better. A name needs every component and the volatility to be ranked",
+    "applies_to": "score 'voladj', and the voladj half of score 'blend'; 'ranksum' is unchanged"
+  },
+  "strategies": "the 11 of bl053_criteria.json except 9f9ef3aa6c1b (ranksum, unaffected): 9 configs on every rebalance phase blended, and the frozen ensemble's four sleeves at their frozen offsets; 10 in all",
+  "settings": "as bl054_criteria.json: round7_A fixed settings, turnover_rank universe, curated tags, Rs 5 lakh, 2017-01-01 to 2026-10-02, after tax with TaxRules() defaults and pre-tax alongside; scripts/bl054_levers.py lever l7",
+  "windows": {
+    "development": "FY2018-FY2022 (2017-04-01 to 2022-03-31)",
+    "confirmation": "FY2023-FY2026 (2022-04-01 to 2026-03-31), read once"
+  },
+  "pass_development_after_tax": [
+    "median CAGR change >= +1.0 pt over the 10 strategies",
+    "CAGR not lower in at least 6 of 10",
+    "median worst-fall change no deeper than -2.0 pts"
+  ],
+  "confirm_after_tax": ["median CAGR change >= 0", "CAGR not lower in at least 5 of 10"],
+  "verdict": "adopt (offer it as an option; the default and the frozen ensemble stay unchanged) only if development passes and confirmation holds; else kill",
+  "will_not_run": [
+    "other volatility windows, other skip rules, per-lookback volatility",
+    "a new search over lookbacks or weights with the variant",
+    "the 2012-2016 hold-out"
+  ]
+}

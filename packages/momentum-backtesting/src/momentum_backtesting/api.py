@@ -3,25 +3,28 @@
 import contextlib
 import inspect
 import json
+import logging
 import math
 import os
 import threading
 import urllib.parse
 from collections import OrderedDict
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from time import perf_counter
-from typing import Literal
+from typing import Any, Literal
 
 import duckdb
 import pandas as pd
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from . import (
+    all_fridays,
     analysis,
     db_read,
     fyers,
@@ -34,6 +37,7 @@ from . import (
     search,
     stock_actions,
     this_week,
+    tranches,
 )
 from . import groups as groups_mod
 from .categories import broad
@@ -580,7 +584,27 @@ def request_key(req: BaseModel) -> str:
 
 
 #: The parts of a finished backtest fetched on their own (run_parts.RunParts).
-BacktestSection = Literal["trades", "instruments", "timeline", "latest", "circuit_exposure"]
+def wants_follow(changes: dict) -> bool:
+    """A request that makes a strategy a favourite: a status other than none, `favorite` on, or
+    the headline."""
+    status = changes.get("status")
+    return (
+        status in runs_store.STATUSES
+        or (status is None and bool(changes.get("favorite")))
+        or bool(changes.get("active"))
+    )
+
+
+def _follow_status(changes: dict) -> str:
+    status = changes.get("status")
+    if status in runs_store.STATUSES:
+        return status
+    return "paper" if changes.get("active") else "watching"
+
+
+BacktestSection = Literal[
+    "trades", "instruments", "timeline", "latest", "circuit_exposure", "friday_spread"
+]
 
 
 class BacktestRequest(BaseModel):
@@ -632,6 +656,11 @@ class BacktestRequest(BaseModel):
     # of waiting for the next cadence week; new buys and cap trims still wait (engine.Config's
     # own field of the same name). Harmless no-op when rebalance_every == 1.
     sell_every_week: bool = False
+    # rebalance="weekly" with rebalance_every > 1 only (BL-087, "All Fridays"): run every calendar
+    # phase (offsets 0..K-1, capital / K each) and report them as one account, equal capital
+    # restored each April (tranches.blend_reset); adds the `friday_spread` section.
+    # `rebalance_offset` is then unused. Off by default; a no-op for a weekly cadence.
+    split_fridays: bool = False
     # dataset="etf" only (TODO 3.9.23, owner follow-up): rank on the usual short lookbacks
     # (1/4/13w) blended with a separate "most beaten-down over 26/52w" preference
     # (levers.grouped_momentum_ranks), instead of the config's own ranking method. 0 (default)
@@ -766,6 +795,14 @@ class SavedRunUpdate(BaseModel):
     status: Literal["none", "watching", "paper", "invested"] | None = None
 
 
+class FollowAllFridaysBody(BaseModel):
+    """BL-087: follow a strategy run "All Fridays" as one group of sleeves."""
+
+    status: Literal["watching", "paper", "invested"] = "watching"
+    active: bool = False
+    name: str | None = Field(None, min_length=1, max_length=64)
+
+
 class OrderSettingsBody(BaseModel):
     """BL-051 Phase 3: Your orders' settings (any left out are kept)."""
 
@@ -818,6 +855,17 @@ class RebalanceRequest(BacktestRequest):
     # When supplied it anchors the every-K-weeks cadence phase used by this preview.
     strategy_start_date: date | None = None
     auth_source: Literal["auto", "dashboard"] = "auto"
+    # BL-087: preview a favourite group (one sleeve per Friday, or the ensemble) as one account.
+    # `dataset` is still needed; the group's sleeves bring their own settings, so the rest of the
+    # strategy's fields are ignored (a placeholder `universe` is filled in).
+    group: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _group_needs_no_universe(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("group") and not data.get("universe"):
+            return {**data, "universe": ["_"]}
+        return data
 
 
 def _stock_classification(stock: StockDataset) -> dict[str, tuple[str, str]]:
@@ -1083,6 +1131,40 @@ def _full(core: dict, lazy: dict[str, Callable[[], object]]) -> dict:
     return {**core, **{name: build() for name, build in lazy.items()}}
 
 
+def split_every(req: BacktestRequest) -> int:
+    """How many calendar phases a request runs: K for an "All Fridays" request, else 1."""
+    if req.split_fridays and req.rebalance == "weekly" and req.rebalance_every > 1:
+        return req.rebalance_every
+    return 1
+
+
+def _run_phases(
+    req: BacktestRequest, config: Config, run_one: Callable[[Config], Result]
+) -> tuple[Result, list[Result] | None]:
+    """`run_one(config)`, or for an "All Fridays" request every phase's run (`capital / K` each)
+    blended into one account, plus the phases (None for a single run)."""
+    every = split_every(req)
+    if every == 1:
+        return run_one(config), None
+    phases = [run_one(c) for c in tranches.tranche_configs(config, every)]
+    return tranches.blend_reset(phases), phases
+
+
+def _with_spread(
+    lazy: dict[str, Callable[[], object]], result: Result, phases: list[Result] | None
+) -> dict[str, Callable[[], object]]:
+    """Adds the "Friday luck" section (each phase against the blend) to a split run, and swaps its
+    `latest` for a note: the blend sums every sleeve's holdings under the first sleeve's config,
+    so `analysis.latest_signal` would judge each name against the wrong portfolio."""
+    if phases is None:
+        return lazy
+    return {
+        **lazy,
+        "latest": lambda: analysis._clean(analysis.split_signal(result)),
+        "friday_spread": lambda: analysis._clean(tranches.friday_spread(phases, result)),
+    }
+
+
 def _etf_backtest(req: BacktestRequest) -> dict:
     return _full(*_etf_parts(req))
 
@@ -1127,22 +1209,26 @@ def _etf_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
             for extra in masks[1:]:
                 no_buy = no_buy.reindex_like(extra).fillna(False) | extra
         report("simulating")
-        result = run_backtest(
-            prices,
-            includes,
+        result, phases = _run_phases(
+            req,
             config,
-            classes,
-            DATA.rank_cache,
-            fills.prices if fills is not None else None,
-            no_buy=no_buy,
-            external_ranks=external_ranks,
+            lambda c: run_backtest(
+                prices,
+                includes,
+                c,
+                classes,
+                DATA.rank_cache,
+                fills.prices if fills is not None else None,
+                no_buy=no_buy,
+                external_ranks=external_ranks,
+            ),
         )
         DATA.trim_cache()
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
     groups = {name: inst.group for name, inst in universe.items()}
     report("analysing")
-    return analysis.payload_parts(
+    core, lazy = analysis.payload_parts(
         result,
         prices,
         config,
@@ -1152,6 +1238,7 @@ def _etf_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         references=DATA.references(),
         no_buy=no_buy,
     )
+    return core, _with_spread(lazy, result, phases)
 
 
 def _stock_backtest(req: BacktestRequest) -> dict:
@@ -1188,14 +1275,18 @@ def _stock_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
                 f"top N ({config.top_n})."
             )
         report("simulating")
-        result = run_backtest(
-            stock.prices,
-            includes,
+        result, phases = _run_phases(
+            req,
             config,
-            stock.tax_classes,
-            DATA.stock_rank_cache,
-            None,
-            membership=stock.membership,
+            lambda c: run_backtest(
+                stock.prices,
+                includes,
+                c,
+                stock.tax_classes,
+                DATA.stock_rank_cache,
+                None,
+                membership=stock.membership,
+            ),
         )
         DATA.trim_cache()
     except ValueError as error:
@@ -1212,7 +1303,7 @@ def _stock_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         references=DATA.references(),
     )
     core["companies"] = stock.companies
-    return core, lazy
+    return core, _with_spread(lazy, result, phases)
 
 
 def _custom_index_meta() -> dict:
@@ -1497,7 +1588,11 @@ def _custom_index_parts(req: BacktestRequest, report: Report = _no_report) -> Pa
                 f"top N ({config.top_n})."
             )
         report("simulating")
-        result = run_backtest(prices, includes, config, rank_cache=DATA.custom_index_rank_cache)
+        result, phases = _run_phases(
+            req,
+            config,
+            lambda c: run_backtest(prices, includes, c, rank_cache=DATA.custom_index_rank_cache),
+        )
         DATA.trim_cache()
     except ValueError as error:
         raise HTTPException(422, str(error)) from None
@@ -1517,7 +1612,7 @@ def _custom_index_parts(req: BacktestRequest, report: Report = _no_report) -> Pa
     inner_detail = _inner_category_detail(universe_result, result)
     if inner_detail:
         core["inner_categories"] = inner_detail
-    return core, lazy
+    return core, _with_spread(lazy, result, phases)
 
 
 def _membership_quality() -> dict:
@@ -1606,7 +1701,11 @@ def _broad_meta() -> dict:
             "broad_off_top_n": 10,
             "broad_off_exit_rank": 20,
             "broad_every_week": True,
-            "broad_universe": "total_market",
+            # A new Broad run uses each year's own 750 most-traded stocks (owner decision
+            # 2026-10-10, BL-029 Phase 2 / BL-036 Phase 1): the survivor-only list inflates the
+            # CAGR (BL-010 F1). The gate below is forced on for this universe. The request model
+            # keeps "total_market", so a saved run (which carries its own value) re-runs unchanged.
+            "broad_universe": "turnover_rank",
             # A new Broad run starts realistic (owner decision 2026-10-05, BL-010 §3.13.2): only
             # stocks that trade enough, and no fills on a circuit-locked day. Together they cut
             # the default run from 53% to 40% CAGR. The request model keeps False, so a saved
@@ -1636,8 +1735,10 @@ def _liquidity_preview_payload(
             members = broad.total_market_members_by_year(DATA_DIR / "categories")
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
-    latest_year = max(members)
-    symbols = sorted(members[latest_year])
+    # The run gates its newest weeks with the list for the last bar's calendar year. `max(members)`
+    # is wrong for `turnover_rank` from late September, when the next year's part-year list exists.
+    year = liquidity_mod.member_year_in_force(members, liquidity_mod.latest_bar_year())
+    symbols = sorted(members[year])
     return liquidity_mod.preview(cfg, symbols)
 
 
@@ -1682,6 +1783,123 @@ def _momentum_scores_payload() -> dict:
         membership_quality=_membership_quality(),
         rotation=rotation,
     )
+
+
+#: Live scores (BL-051 Phase 3): Fridays, during market hours (IST).
+LIVE_SCORES_OPEN, LIVE_SCORES_CLOSE = time(9, 15), time(15, 30)
+_LIVE_SCORES_CACHE: dict[tuple, dict] = {}
+_LIVE_SCORES_LOCK = threading.Lock()
+LIVE_SCORES_TTL_MINUTES = 5
+# A live price outside this band of the last close is not used: the stored prices are adjusted only
+# for confirmed corporate actions, so a 1:1 bonus or 1:2 split effective this week shows as ~0.5x
+# (a +2% day on top makes 0.51). Real weekly moves of index stocks stay well inside it.
+LIVE_SCORES_PRICE_BAND = (0.6, 1 / 0.6)
+
+
+def live_scores_universe(
+    universe: broad.StockUniverseFrame, quotes: dict[str, float], week: pd.Timestamp
+) -> tuple[broad.StockUniverseFrame, dict]:
+    """The scores' price frame with a provisional row for `week` (this Friday) from live prices
+    (`quotes`: base symbol -> last traded price). In memory only, never stored: the 19:30 closes
+    replace it by recomputation. Membership and the liquidity gate keep the last stored week's,
+    since a day's turnover is not complete until the close. A price outside `LIVE_SCORES_PRICE_BAND`
+    of the last close (an unadjusted split or bonus, a bad tick) keeps the last close and is
+    reported, not used."""
+    frame = universe.frame.copy()
+    last = frame.index[-1]
+    row = frame.loc[last].copy()
+    raw = universe.raw_frame.copy() if universe.raw_frame is not None else None
+    raw_row = raw.loc[last].copy() if raw is not None else None
+    used, missing, suspect = 0, [], []
+    for column, base in universe.column_to_base_symbol.items():
+        if column in universe.stale_columns or pd.isna(row.get(column)):
+            continue
+        price = quotes.get(base)
+        if price is None or not math.isfinite(price) or price <= 0:
+            missing.append(base)
+            continue
+        if not LIVE_SCORES_PRICE_BAND[0] <= price / float(row[column]) <= LIVE_SCORES_PRICE_BAND[1]:
+            suspect.append(base)
+            continue
+        row[column] = price
+        if raw_row is not None:
+            raw_row[column] = price
+        used += 1
+
+    def with_row(table: pd.DataFrame | None, value: pd.Series | None) -> pd.DataFrame | None:
+        if table is None:
+            return None
+        table = table.copy()
+        table.loc[week] = value if value is not None else table.loc[last]
+        return table.sort_index()
+
+    live = replace(
+        universe,
+        frame=with_row(frame, row),
+        raw_frame=with_row(raw, raw_row) if raw is not None else None,
+        weeks=sorted({*universe.weeks, week}),
+        stock_membership=with_row(universe.stock_membership, None),
+        liquidity_gate=with_row(universe.liquidity_gate, None),
+    )
+    return live, {"used": used, "missing": sorted(missing), "suspect": sorted(suspect)}
+
+
+def _momentum_scores_live_payload(now: datetime | None = None) -> dict:
+    """GET /api/momentum-scores/live (BL-051 Phase 3): every score and rank on live Fyers prices,
+    Fridays in market hours. Provisional; cached for a few minutes."""
+    from .weekly import week_ending_on_or_before
+
+    now = (now or datetime.now(IST)).astimezone(IST)
+    if now.weekday() != 4 or not LIVE_SCORES_OPEN <= now.time() <= LIVE_SCORES_CLOSE:
+        raise HTTPException(409, "Live scores are available on Fridays from 09:15 to 15:30 IST.")
+    week = pd.Timestamp(week_ending_on_or_before(now.date()))
+    try:
+        universe = DATA.get_momentum_universe()
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    last = pd.Timestamp(universe.frame.index[-1]).normalize()
+    # `last == week` is normal here: a sync during the week stores the partial week under this
+    # Friday's date, and `live_scores_universe` overwrites that row. Friday's real closes only
+    # arrive after the live window ends.
+    if last < week - pd.Timedelta(days=7):
+        raise HTTPException(
+            409, f"The stored prices end {last:%d %b}; refresh the stock data first."
+        )
+    slot = (week, now.hour, now.minute // LIVE_SCORES_TTL_MINUTES)
+    with _LIVE_SCORES_LOCK:
+        if slot in _LIVE_SCORES_CACHE:
+            return _LIVE_SCORES_CACHE[slot]
+    bases = sorted(set(universe.column_to_base_symbol.values()))
+    try:
+        quoted = fyers.quotes([f"NSE:{base}-EQ" for base in bases], fyers.resolve_credentials())
+    except fyers.FyersCredentialsError as error:
+        raise HTTPException(409, f"No valid Fyers login: {error}") from error
+    except (RuntimeError, OSError) as error:
+        raise HTTPException(502, f"Fyers quotes failed: {error}") from error
+    quotes = {fyers.nse_symbol(symbol): price for symbol, price in quoted.items()}
+    live, info = live_scores_universe(universe, quotes, week)
+    group_info = momentum_scores_mod.load_stock_group_info(CATEGORIES_CURATED_DIR)
+    group_members = broad.load_stock_groups(CATEGORIES_CURATED_DIR)
+    stock_snapshot = momentum_scores_mod.compute_stock_momentum_scores(live, group_info)
+    payload = momentum_scores_mod.to_payload(
+        stock_snapshot,
+        momentum_scores_mod.compute_sector_momentum_scores(stock_snapshot, group_members),
+        missing_symbols=universe.missing_symbols,
+        membership_quality=_membership_quality(),
+        rotation=momentum_scores_mod.compute_rotation(live, group_members),
+    )
+    payload["live"] = {
+        "provisional": True,
+        "as_of": now.isoformat(timespec="seconds"),
+        "week": journal_week_string(week),
+        "priced": info["used"],
+        "missing": info["missing"],
+        "suspect": info["suspect"],
+    }
+    with _LIVE_SCORES_LOCK:
+        _LIVE_SCORES_CACHE.clear()
+        _LIVE_SCORES_CACHE[slot] = payload
+    return payload
 
 
 def _momentum_stock_payload(symbol: str) -> dict:
@@ -1780,6 +1998,17 @@ def _run_broad(
     )
 
 
+def _equity_summary(result: Result) -> dict:
+    """The four figures two "same run, one setting changed" comparisons report."""
+    equity = result.equity
+    return {
+        "cagr": float(metrics.cagr(equity)),
+        "max_drawdown": float(metrics.max_drawdown(equity)[0]),
+        "total_return": float(equity.iloc[-1] - 1),
+        "trades": int(len(result.trades)),
+    }
+
+
 def _circuit_realism(
     req: BacktestRequest,
     ranking: broad.UniverseRanking,
@@ -1791,21 +2020,12 @@ def _circuit_realism(
     `outer_prices` is what the run itself used: this can be asked for after the run, when newer
     data may have been loaded."""
 
-    def summary(result: Result) -> dict:
-        equity = result.equity
-        return {
-            "cagr": float(metrics.cagr(equity)),
-            "max_drawdown": float(metrics.max_drawdown(equity)[0]),
-            "total_return": float(equity.iloc[-1] - 1),
-            "trades": int(len(result.trades)),
-        }
-
     other = _run_broad(
         req.model_copy(update={"broad_respect_circuits": not req.broad_respect_circuits}),
         ranking,
         outer_prices,
     )
-    this_run, alternative = summary(outcome.result), summary(other.result)
+    this_run, alternative = _equity_summary(outcome.result), _equity_summary(other.result)
     ignoring, respecting = (
         (alternative, this_run)
         if req.broad_respect_circuits
@@ -1820,6 +2040,62 @@ def _circuit_realism(
         "respecting_locks": respecting,
         "cagr_impact": respecting["cagr"] - ignoring["cagr"],
     }
+
+
+def _extended_tags_companion(
+    req: BacktestRequest,
+    ranking: broad.UniverseRanking,
+    outcome: broad.BroadBacktestResult,
+    outer_prices: pd.DataFrame,
+    *,
+    split: tuple[Result, list[BacktestRequest]] | None = None,
+) -> dict:
+    """The same run with `broad_category_tags="extended"` (BL-036 Phase 1): the curated tags name
+    only today's 755 index members, so a stock that later left the index can be ranked but never
+    picked through a category. The extended tags (BSE's current classification, which covers many
+    more NSE stocks) reduce that, but `stock_groups_wide.csv` leaves NSE-only and delisted names
+    untagged, so most later-failed companies still cannot be bought and the figure still
+    flatters. The gap is the closest figure to an expected return this engine can give. The tags
+    do not touch the ranking, so the run's own `ranking` is reused: one extra engine pass. Never
+    raises; a failure is reported in the payload instead.
+
+    `split` is an All Fridays run's (blended result, sleeve requests): both figures are then the
+    whole account's, every sleeve re-run with the extended tags and blended as the run itself is
+    (`tranches.blend_reset`), one extra engine pass per sleeve."""
+    if req.broad_category_mode != "on":
+        return {"status": "not_applicable", "reason": "no category layer"}
+
+    try:
+        this_run = _equity_summary(split[0] if split else outcome.result)
+        if req.broad_category_tags == "extended":
+            return {
+                "status": "this_run",
+                "tags": "extended",
+                "cagr": this_run["cagr"],
+                "max_drawdown": this_run["max_drawdown"],
+            }
+        sleeves = split[1] if split else [req]
+        others = [
+            _run_broad(
+                r.model_copy(update={"broad_category_tags": "extended"}), ranking, outer_prices
+            ).result
+            for r in sleeves
+        ]
+        extended = _equity_summary(tranches.blend_reset(others) if split else others[0])
+        return {
+            "status": "computed",
+            "tags": "extended",
+            **extended,
+            "cagr_impact": extended["cagr"] - this_run["cagr"],
+        }
+    except Exception:  # noqa: BLE001 - a companion figure must never fail the run
+        # The exception text can carry a filesystem path and is shown in a hover, so the payload
+        # gets a fixed sentence and the detail goes to the server log.
+        logging.getLogger(__name__).exception("extended-tags companion failed")
+        return {
+            "status": "failed",
+            "reason": "The extended tags could not be applied to this run (see the server log).",
+        }
 
 
 #: Universes that are only meaningful behind the tradability gate: the whole market (the gate is
@@ -1889,7 +2165,9 @@ def _broad_backtest(req: BacktestRequest) -> dict:
     return _full(*_broad_parts(req))
 
 
-def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
+def _broad_parts(
+    req: BacktestRequest, report: Report = _no_report, *, companion: bool = True
+) -> Parts:
     report("loading")
     on = req.broad_category_mode == "on"
     if on and req.broad_category_top_n > req.broad_category_exit_rank:
@@ -1911,17 +2189,42 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         ranking = _broad_ranking(req)
         outer_prices = DATA.get()
         report("simulating")
-        outcome = _run_broad(req, ranking, outer_prices)
+        # One run per calendar phase for an "All Fridays" request; the ranking is shared.
+        every = split_every(req)
+        phase_reqs = (
+            [
+                req.model_copy(update={"rebalance_offset": offset, "capital": req.capital / every})
+                for offset in range(every)
+            ]
+            if every > 1
+            else [req]
+        )
+        outcomes = [_run_broad(r, ranking, outer_prices) for r in phase_reqs]
         DATA.trim_cache()
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
 
-    result = outcome.result
+    outcome = outcomes[0]
+    phases = [o.result for o in outcomes] if every > 1 else None
+    result = tranches.blend_reset(phases) if phases else outcome.result
     prices = outcome.ranking.prices
     prices = prices.assign(**{CASH: DATA.get().reindex(prices.index)[CASH]})
     groups = dict.fromkeys(prices.columns, "Stock")
     for name in broad.ATOMIC_NAMES:
         groups[name] = "Atomic"
+    # In `core`, not a lazy section: the headline shows it without a second fetch. The weekly job
+    # skips it (it stores no such figure, and runs every Broad favourite).
+    companion_figure = (
+        _extended_tags_companion(
+            req,
+            ranking,
+            outcome,
+            outer_prices,
+            split=(result, phase_reqs) if phases else None,
+        )
+        if companion
+        else {"status": "skipped", "reason": "weekly run"}
+    )
     report("analysing")
     core, lazy = analysis.payload_parts(
         result,
@@ -1940,13 +2243,20 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         if on
         else {}
     )
-    core["held_categories"] = broad.current_holdings_detail(
-        outcome,
-        group_members,
-        category_top_n=req.broad_category_top_n,
-        picks_per_category=req.broad_picks_per_category,
+    core["held_categories"] = _merge_held_categories(
+        [
+            broad.current_holdings_detail(
+                o,
+                group_members,
+                category_top_n=req.broad_category_top_n,
+                picks_per_category=req.broad_picks_per_category,
+            )
+            for o in outcomes
+        ],
+        [r.rebalance_offset for r in phase_reqs] if phases else None,
     )
     core["missing_symbols"] = outcome.ranking.missing_symbols
+    core["companion"] = companion_figure
     base_trades = lazy["trades"]
 
     def trades() -> object:
@@ -1954,17 +2264,20 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         # Fill blank exit ranks and say WHY a holding was sold when it simply stopped being
         # ranked (liquidity gate, left the pool, lost its category). Display-only; never fails
         # the run.
-        with contextlib.suppress(Exception):
-            exit_reasons_mod.explain_exits(
-                rows,
-                ranking=outcome.ranking,
-                held_by_week=outcome.held_by_week,
-                group_members=group_members,
-                signal_delay=req.signal_delay,
-                pool_exit_rank=req.broad_pool_exit_rank,
-                picks_per_category=req.broad_picks_per_category,
-                liquidity_cfg=_liquidity_config(req),
-            )
+        # A split run's rows are explained against the phase that made them (`friday`).
+        for offset, phase in enumerate(outcomes):
+            own = [r for r in rows if r.get("friday", offset) == offset] if phases else rows
+            with contextlib.suppress(Exception):
+                exit_reasons_mod.explain_exits(
+                    own,
+                    ranking=phase.ranking,
+                    held_by_week=phase.held_by_week,
+                    group_members=group_members,
+                    signal_delay=req.signal_delay,
+                    pool_exit_rank=req.broad_pool_exit_rank,
+                    picks_per_category=req.broad_picks_per_category,
+                    liquidity_cfg=_liquidity_config(req),
+                )
         return rows
 
     def circuit_exposure() -> object:
@@ -1984,6 +2297,13 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
                 exposure["realism"] = _circuit_realism(req, ranking, outcome, outer_prices)
         return exposure
 
+    if phases:
+        # The circuit card walks one portfolio's holding periods and re-runs it with locks the
+        # other way; a split run has K portfolios, so it has no such card. Nor is the engine asked
+        # to decide its last week: `_with_spread` makes `latest` the split note
+        # (`analysis.split_signal`), since the blend is no one portfolio the engine could trade.
+        return core, _with_spread({**lazy, "trades": trades}, result, phases)
+
     def latest() -> object:
         # The engine's own decision for the run's last week, as the weekly signal uses: the
         # advisory `analysis.latest_signal` knows neither the price ceiling nor the circuit locks
@@ -1997,6 +2317,70 @@ def _broad_parts(req: BacktestRequest, report: Report = _no_report) -> Parts:
         "trades": trades,
         "latest": latest,
         "circuit_exposure": circuit_exposure,
+    }
+
+
+def _merge_held_categories(details: list[list[dict]], offsets: list[int] | None) -> list[dict]:
+    """Broad's held-categories panel for one run, or for a split run every phase's panel merged:
+    one entry per category at its best position, "fresh" if any phase selected it freshly, and
+    `fridays`, the phases holding it."""
+    if offsets is None:
+        return details[0]
+    merged: dict[str, dict] = {}
+    for offset, detail in zip(offsets, details, strict=True):
+        for entry in detail:
+            seen = merged.get(entry["category"])
+            if seen is None:
+                merged[entry["category"]] = {**entry, "fridays": [offset]}
+                continue
+            seen["fridays"].append(offset)
+            if entry["position"] < seen["position"]:
+                seen.update(position=entry["position"], picks=entry["picks"])
+            if entry["status"] == "fresh":
+                seen["status"] = "fresh"
+    return sorted(merged.values(), key=lambda e: e["position"])
+
+
+def sleeve_summary(dataset: str, config: dict) -> dict:
+    """One sleeve of an all-Fridays favourite (BL-087), run for its saved-run record: what the
+    dashboard's save would send (`kpis`, `dates`, `strategy`) plus the run's data and code
+    versions. Raises `HTTPException` as the backtest does for a config it refuses."""
+    body = {**config, "dataset": dataset}
+    if not body.get("universe"):
+        body["universe"] = ["_"]  # required by the model, never read for this dataset
+    try:
+        req = BacktestRequest.model_validate(body)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    builders = {
+        "stock": _stock_parts,
+        "broad": _broad_parts,
+        "custom_index": _custom_index_parts,
+    }
+    core, _lazy = builders.get(dataset, _etf_parts)(req)
+    kpis = core["kpis"]
+
+    def number(key: str) -> float | None:
+        value = kpis.get(key)
+        return float(value) if isinstance(value, int | float) else None
+
+    return {
+        "kpis": {
+            key: number(key)
+            for key in (
+                "cagr",
+                "excess_cagr",
+                "max_drawdown",
+                "sharpe",
+                "turnover_per_year",
+                "avg_holdings",
+            )
+        },
+        "dates": core["series"]["dates"],
+        "strategy": core["series"]["strategy"],
+        "versions": saved_identity.versions_from_input(
+            input_version(), saved_identity.code_commit()
+        ),
     }
 
 
@@ -2257,8 +2641,22 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
     Market hours prefer a temporary Fyers LTP row. At every other time (and when
     live credentials or quotes are unavailable), the latest persisted strategy week
     and trade closes are used without pretending those prices are live.
+
+    With `req.group` the target is a favourite group's: every sleeve's model target, weighted
+    by the sleeve's value since the last April reset (`groups.combine`'s rule).
     """
     now = (now or datetime.now(IST)).astimezone(IST)
+    if req.group:
+        return _rebalance_group_preview(req, now)
+    model = _rebalance_model(req, now)
+    return _rebalance_response(req, now, model, model["target"])
+
+
+def _rebalance_model(req: RebalanceRequest, now: datetime) -> dict:
+    """One strategy's model target and the prices to trade it at: `target` (name -> fraction),
+    `ltp`, `symbols`, `week`, `live`, `live_unavailable` (why market hours still used stored
+    closes), `schedule`, `first_allocation`, `model_req` (the request the model ran with) and
+    `sleeve_value` (its value since the last April reset)."""
     if req.dataset not in ("stock", "broad"):
         raise HTTPException(422, "Rebalance preview supports Stock and Broad Momentum.")
     if req.weights is not None and len(req.weights) != len(req.lookbacks):
@@ -2374,29 +2772,60 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
             outer = _outer_with_sentinel(week, settlement_week)
             outcome = _run_broad(model_req, preview_ranking, outer).result
             target = rebalance.model_holdings(outcome, week)
-        current = dict(req.holdings_pct)
-        current[IDLE] = current.get(IDLE, 0.0) + max(0.0, 100 - sum(current.values()))
-        rows = rebalance.build_plan(
-            current,
-            target,
-            ltp,
-            symbols,
-            req.portfolio_value,
-            allow_missing_prices=not live,
-        )
     except (ValueError, KeyError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
     except FileNotFoundError as error:
         raise HTTPException(409, str(error)) from None
+    return {
+        "target": target,
+        "ltp": ltp,
+        "symbols": symbols,
+        "week": week,
+        "live": live,
+        "live_unavailable": live_unavailable,
+        "schedule": schedule,
+        "first_allocation": first_allocation,
+        "model_req": model_req,
+        "sleeve_value": groups_mod.sleeve_value(
+            [d.strftime("%Y-%m-%d") for d in outcome.equity.index], outcome.equity.tolist()
+        ),
+    }
+
+
+def _rebalance_response(
+    req: RebalanceRequest,
+    now: datetime,
+    model: dict,
+    target: dict[str, float],
+    *,
+    extra: dict | None = None,
+) -> dict:
+    """The preview for `target` against the supplied holdings, at `model`'s prices."""
+    week, live = model["week"], model["live"]
+    first_allocation, schedule = model["first_allocation"], model["schedule"]
+    current = dict(req.holdings_pct)
+    current[IDLE] = current.get(IDLE, 0.0) + max(0.0, 100 - sum(current.values()))
+    try:
+        rows = rebalance.build_plan(
+            current,
+            target,
+            model["ltp"],
+            model["symbols"],
+            req.portfolio_value,
+            allow_missing_prices=not live,
+        )
+    except (ValueError, KeyError) as error:
+        raise HTTPException(422, str(error)) from None
     price_mode = "live" if live else "last_close"
 
     return {
+        **(extra or {}),
         "dataset": req.dataset,
         "as_of": now.isoformat(timespec="seconds") if live else week.strftime("%Y-%m-%d"),
         "signal_week": week.strftime("%Y-%m-%d"),
         "price_mode": price_mode,
         "price_source": "Fyers last traded price" if live else "Latest database close",
-        "live_unavailable": live_unavailable,
+        "live_unavailable": model.get("live_unavailable"),
         "portfolio_value": req.portfolio_value,
         "first_allocation": first_allocation,
         "rebalance_schedule": schedule,
@@ -2420,6 +2849,69 @@ def rebalance_preview(req: RebalanceRequest, *, now: datetime | None = None) -> 
             "fees, taxes and live order-book liquidity are not included. No orders were placed."
         ),
     }
+
+
+def _rebalance_group_preview(req: RebalanceRequest, now: datetime) -> dict:
+    """The Rebalance preview of a favourite group as one account (BL-087): every sleeve's model
+    target, mixed by the sleeve's value since the last April reset, against the supplied holdings.
+    Sleeves keep their own calendar (`rebalance_offset`), so no strategy start date is used: the
+    phase a person would have trading it from a start date is what All Fridays removes."""
+    try:
+        with read_catalog() as con:
+            found = next((g for g in runs_store.list_groups(con) if g["id"] == req.group), None)
+    except (FileNotFoundError, duckdb.CatalogException):
+        found = None
+    if found is None:
+        raise HTTPException(404, "favourite group not found")
+    shared = {
+        "holdings_pct": req.holdings_pct,
+        "portfolio_value": req.portfolio_value,
+        "auth_source": req.auth_source,
+    }
+    models = []
+    for member in found["members"]:
+        member_req = RebalanceRequest.model_validate(
+            {"universe": ["_"], **member["config"], "dataset": req.dataset, **shared}
+        )
+        models.append((member, member_req, _rebalance_model(member_req, now)))
+    if not models:
+        raise HTTPException(422, "This group has no sleeves.")
+    # The sleeves share a market: take prices and the signal week from the first, and every
+    # price any sleeve needed.
+    first = models[0][2]
+    model = {
+        **first,
+        "live": all(m["live"] for _, _, m in models),
+        "live_unavailable": next(
+            (m.get("live_unavailable") for _, _, m in models if m.get("live_unavailable")), None
+        ),
+        "ltp": {k: v for _, _, m in models for k, v in m["ltp"].items()},
+        "symbols": {k: v for _, _, m in models for k, v in m["symbols"].items()},
+        "schedule": None,
+    }
+    values = [float(m["sleeve_value"] or 1.0) for _, _, m in models]
+    target = groups_mod.mix_targets(
+        [(value, m["target"]) for value, (_, _, m) in zip(values, models, strict=True)]
+    )
+    total = sum(values)
+    sleeves = [
+        {
+            "id": member["id"],
+            "name": member["name"],
+            "value": round(value, 4),
+            "share": round(value / total, 4),
+            "target_pct": {n: round(w * 100, 4) for n, w in m["target"].items()},
+            **_rebalance_info(m["model_req"], m["week"]),
+        }
+        for value, (member, _, m) in zip(values, models, strict=True)
+    ]
+    return _rebalance_response(
+        req,
+        now,
+        model,
+        target,
+        extra={"group": {"id": found["id"], "name": found["name"], "sleeves": sleeves}},
+    )
 
 
 def _no_active_signal_notification(
@@ -2695,6 +3187,8 @@ def _orders_signal(
         if config.get("dataset") != "broad":
             return None, "unavailable", "Your orders cover Broad strategies for now.", None
         req = BacktestRequest.model_validate(config)
+        if split_every(req) > 1:  # All Fridays: no one portfolio for the engine to decide
+            return None, "unavailable", analysis.SPLIT_SIGNAL_NOTE, None
         ranking = _broad_ranking(req)
         if all(ranking is not seen for seen in rankings):
             rankings.append(ranking)
@@ -3703,6 +4197,8 @@ def _broad_live_weekly_result(
     req = BacktestRequest.model_validate(config)
     if req.broad_universe in LIVE_REFUSED_BROAD_UNIVERSES:
         raise ValueError("the whole-market universe is not quoted live")
+    if split_every(req) > 1:  # All Fridays: no one portfolio for the engine to decide
+        raise ValueError(analysis.SPLIT_SIGNAL_NOTE)
     symbols = tuple(sorted(set(rebalance.broad_quote_symbols(_broad_ranking(req)).values())))
     if symbols not in quotes_by_symbols:
         quotes_by_symbols[symbols] = fyers.quotes(list(symbols), creds)
@@ -3800,16 +4296,23 @@ def _research_weekly_result(favorite: dict, target_week: pd.Timestamp):
     elif req.dataset == "custom_index":
         payload = _custom_index_backtest(req)
     elif req.dataset == "broad":
-        core, lazy = _broad_parts(req)
-        # The engine's own decision for the newest STORED week (a lagging outer-market series can
-        # end the run itself a week earlier), so the run's own `latest` is not built at all.
-        lazy.pop("latest", None)
-        payload = _full(core, lazy)
-        payload["latest"] = _broad_engine_signal(req)
+        core, lazy = _broad_parts(req, companion=False)
+        if split_every(req) > 1:
+            # An All Fridays config: its `latest` is the split note (no combined signal), and the
+            # engine is never asked to decide the blend as if it were one portfolio.
+            payload = _full(core, lazy)
+        else:
+            # The engine's own decision for the newest STORED week (a lagging outer-market series
+            # can end the run itself a week earlier), so the run's own `latest` is not built.
+            lazy.pop("latest", None)
+            payload = _full(core, lazy)
+            payload["latest"] = _broad_engine_signal(req)
     else:
         return None, f"Unsupported weekly dataset {req.dataset!r}."
 
     latest = payload.get("latest", {})
+    if latest.get("split"):  # an All Fridays config: no combined signal, never "No trades"
+        return None, analysis.SPLIT_SIGNAL_NOTE
     rows = latest.get("rows", [])
     actionable = _actionable_rows(rows)
     lines = [f"Strategy: {favorite['name']} · dataset: {req.dataset}"]
@@ -3967,6 +4470,10 @@ def create_app() -> FastAPI:
         if dataset == "broad":
             return _broad_meta()
         return _etf_meta()
+
+    @app.get("/api/momentum-scores/live")
+    def momentum_scores_live() -> dict:
+        return _momentum_scores_live_payload()
 
     @app.get("/api/momentum-scores")
     def momentum_scores() -> dict:
@@ -4138,8 +4645,79 @@ def create_app() -> FastAPI:
         except runs_store.FavouriteError as error:
             raise HTTPException(409, str(error)) from error
 
+    def _follow_all_fridays(
+        run_id: str, *, status: str, active: bool = False, name: str | None = None
+    ) -> dict | None:
+        """Follow the strategy `run_id` belongs to on every Friday, if it is a split run that no
+        one follows yet: the group's strategy record, or None when it is not (the caller then
+        treats the request as an ordinary favourite change). The K sleeve backtests run with no
+        catalog connection open. The record carries `followed_by`, the group that follows the
+        run asked about, so a caller can tell a run that was already followed.
+
+        A run already followed only ever raises its group (`all_fridays.raise_only`): the
+        dashboard's star on the split run asks for "watching" and must not demote a Paper or
+        Invested group or drop its headline."""
+        try:
+            with read_catalog() as con:
+                plan = all_fridays.plan_for_new(con, run_id)
+        except (FileNotFoundError, duckdb.CatalogException):
+            return None
+        if plan is None:
+            return None
+        try:
+            if plan.group:  # followed already: only a raise goes to its group
+                with open_catalog() as con:
+                    found = runs_store.strategy_anchor(con, plan.group)
+                    summary = found[1] if found else {}
+                    raised, headline = all_fridays.raise_only(
+                        runs_store.status_of(summary),
+                        bool(summary.get("active", False)),
+                        status,
+                        active,
+                    )
+                    if raised is not None or headline is not None:
+                        runs_store.update_run(con, plan.group, status=raised, active=headline)
+                    group_strategy = runs_store.get_strategy(con, plan.group)
+                    return {**group_strategy, "followed_by": plan.group} if group_strategy else None
+            if status in runs_store.FOLLOWED:
+                with read_catalog() as con:
+                    runs_store.ensure_followed_slot(con)
+            sleeves = all_fridays.run_sleeves(plan, sleeve_summary)
+            with open_catalog() as con:
+                group = all_fridays.follow(
+                    con, plan, sleeves, status=status, active=active, name=name
+                )
+                return {
+                    **(runs_store.get_strategy(con, group["id"]) or group),
+                    "followed_by": group["id"],
+                }
+        except runs_store.FavouriteError as error:
+            raise HTTPException(409, str(error)) from error
+
+    @app.post("/api/saved-strategies/{run_id}/follow-all-fridays")
+    def follow_all_fridays(run_id: str, body: FollowAllFridaysBody) -> dict:
+        strategy = _follow_all_fridays(
+            run_id, status=body.status, active=body.active, name=body.name
+        )
+        if strategy is None:
+            raise HTTPException(
+                409,
+                "Only a run made with Fridays: All (split) that nobody follows yet can be "
+                "followed on all Fridays.",
+            )
+        return strategy
+
     @app.patch("/api/saved-runs/{run_id}")
     def patch_saved_run(run_id: str, body: SavedRunUpdate) -> dict:
+        changes = body.model_dump(exclude_none=True)
+        if wants_follow(changes) and (
+            followed := _follow_all_fridays(
+                run_id,
+                status=_follow_status(changes),
+                active=bool(changes.get("active")),
+            )
+        ):
+            return followed
         try:
             with open_catalog() as con:
                 record = runs_store.update_run(
@@ -4237,6 +4815,15 @@ def create_app() -> FastAPI:
 
     @app.patch("/api/saved-strategies/{run_id}")
     def patch_saved_strategy(run_id: str, body: SavedStrategyUpdate) -> dict:
+        changes = body.model_dump(exclude_none=True)
+        if wants_follow(changes) and (
+            followed := _follow_all_fridays(
+                run_id,
+                status=_follow_status(changes),
+                active=bool(changes.get("active")),
+            )
+        ):
+            return followed
         try:
             with open_catalog() as con:
                 strategy = runs_store.update_strategy(

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppRoute } from '../../hooks/useAppRoute';
 import { usePolledResource } from '../../hooks/usePolledResource';
 import { useScoresRoute } from '../../hooks/useScoresRoute';
-import { formatDay, formatInt } from '../../lib/format';
+import { formatDay, formatInt, formatIstTime } from '../../lib/format';
 import {
   type MomentumScores,
   type StockScore,
@@ -23,6 +23,7 @@ import { RefreshButton } from '../ui/RefreshButton';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import { StateMessage } from '../ui/StateMessage';
 import { MomentumScoresSkeleton } from './MomentumSkeletons';
+import { LiveScoresSwitch } from './scores/LiveScoresSwitch';
 import { ScoresMarketStrip, ScoresMovers } from './scores/ScoresMarket';
 import { SectorPage } from './scores/SectorPage';
 import { SectorsOverview } from './scores/SectorsOverview';
@@ -30,13 +31,23 @@ import { StockDrawer } from './scores/StockDrawer';
 import { StocksLeaderboard } from './scores/StocksLeaderboard';
 import { StripGuide } from './scores/StripGuide';
 
+/** How often live scores are re-read; the service caches them for five minutes too. */
+const LIVE_SCORES_POLL_MS = 5 * 60_000;
+
 export function MomentumScoresView() {
+  // On Fridays in market hours the page can show provisional scores on live prices (BL-051).
+  // `liveWindow` comes from the switch's own clock, so leaving the window turns live off by itself.
+  const [wantLive, setWantLive] = useState(false);
+  const [liveWindow, setLiveWindow] = useState(false);
+  const live = wantLive && liveWindow;
   // Cached: the payload changes once a day, so coming back to this section shows the last copy
   // straight away while it revalidates.
   const { data, loading, error, refetch } = usePolledResource<MomentumScores>(
-    '/api/momentum/scores',
-    { cache: true },
+    live ? '/api/momentum/scores/live' : '/api/momentum/scores',
+    live ? { cache: true, intervalMs: LIVE_SCORES_POLL_MS } : { cache: true },
   );
+  // A failed live read keeps the closing scores on screen; say which ones they are.
+  const showingLive = live && Boolean(data?.live);
   // Read-only: the most recent manual weekly run this service still remembers. It is the only
   // GET that carries a signal's rows; nothing here ever starts a run.
   const latestJob = usePolledResource<unknown>('/api/momentum/weekly/jobs/latest');
@@ -118,12 +129,15 @@ export function MomentumScoresView() {
           title="Momentum Scores"
           description={
             data
-              ? `Prices as of ${data.as_of ? formatDay(data.as_of) : 'latest data'} · ${formatInt(data.stocks.length)} scored of ${formatInt(data.universe_size)} stocks`
+              ? showingLive && data.live
+                ? `Live prices at ${formatIstTime(new Date(data.live.as_of))} IST · provisional, the close replaces them · ${formatInt(data.stocks.length)} scored of ${formatInt(data.universe_size)} stocks`
+                : `Prices as of ${data.as_of ? formatDay(data.as_of) : 'latest data'} · ${formatInt(data.stocks.length)} scored of ${formatInt(data.universe_size)} stocks`
               : 'Current stock and sector momentum'
           }
           actions={<RefreshButton onClick={refetch} loading={loading} />}
         />
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <LiveScoresSwitch live={wantLive} onLive={setWantLive} onWindow={setLiveWindow} />
           <SegmentedControl
             ariaLabel="Score kind"
             size="sm"
@@ -136,10 +150,29 @@ export function MomentumScoresView() {
           />
         </div>
         {data && signalNote ? <p className="mt-2 text-xs text-muted">{signalNote}</p> : null}
+        {showingLive && data?.live && data.live.missing.length + data.live.suspect.length > 0 ? (
+          <p className="mt-2 text-xs text-warning">
+            {formatInt(data.live.priced)} stocks priced live.{' '}
+            {data.live.missing.length
+              ? `${formatInt(data.live.missing.length)} had no live price and keep last week's close. `
+              : ''}
+            {data.live.suspect.length
+              ? `${formatInt(data.live.suspect.length)} moved more than 40% and keep last week's close until checked: ${data.live.suspect.join(', ')}.`
+              : ''}
+          </p>
+        ) : null}
       </Card>
 
       {error ? (
-        <StateMessage variant="error" title="Couldn't load momentum scores" description={error} />
+        <StateMessage
+          variant="error"
+          title={live ? "Couldn't load live scores" : "Couldn't load momentum scores"}
+          description={
+            live && data
+              ? `${error} Showing ${data.live ? 'the last live read' : "the last close's scores"}.`
+              : error
+          }
+        />
       ) : null}
       {loading && !data && !error ? <MomentumScoresSkeleton /> : null}
       {data?.missing_symbols.length ? (

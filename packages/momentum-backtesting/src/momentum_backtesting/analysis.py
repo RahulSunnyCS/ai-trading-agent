@@ -12,6 +12,11 @@ from . import metrics, reference_benchmarks
 from .engine import CASH, IDLE, Config, Result, cadence_weeks
 
 CAPITAL = 100_000  # rupee figures are shown for Rs 1 lakh invested at the start
+#: A closed trade whose return is within this of zero is flat, not a win. `position_return` is
+#: `value / entry_value - 1`, so a position that did not move comes out as 0 or as 2e-16 depending
+#: on the order floats were summed in (the look-ahead test saw one flip between a whole run and a
+#: truncated copy of the same data). Float noise must not turn a flat trade into a win.
+FLAT_RETURN = 1e-9
 
 
 def _clean(value):
@@ -123,6 +128,12 @@ def rotations(result: Result) -> list[dict]:
     return out
 
 
+def split_wins_losses(returns: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """Closed-trade returns as (wins, everything else). A flat trade is not a win, however the
+    last bit of its float came out (`FLAT_RETURN`)."""
+    return returns[returns > FLAT_RETURN], returns[returns <= FLAT_RETURN]
+
+
 def kpis(result: Result, closed: pd.DataFrame) -> dict:
     stats = metrics.summary(result)
     eq = result.equity
@@ -131,7 +142,7 @@ def kpis(result: Result, closed: pd.DataFrame) -> dict:
     downside = weekly[weekly < 0].std() * math.sqrt(52)
     turnover = metrics.turnover(result)
     rets = closed["position_return"] if len(closed) else pd.Series(dtype=float)
-    wins, losses = rets[rets > 0], rets[rets <= 0]
+    wins, losses = split_wins_losses(rets)
     rolling = (eq / eq.shift(52)) - (result.benchmark / result.benchmark.shift(52))
     yearly = metrics.yearly(result)
     return {
@@ -201,7 +212,9 @@ def instrument_table(result: Result, closed: pd.DataFrame, groups: dict[str, str
                 else 0,
                 "weeks_held": int(share.gt(0).sum()),
                 "avg_share": float(share.mean()),
-                "win_rate": float((mine["position_return"] > 0).mean()) if len(mine) else None,
+                "win_rate": float((mine["position_return"] > FLAT_RETURN).mean())
+                if len(mine)
+                else None,
                 "avg_return": float(mine["position_return"].mean()) if len(mine) else None,
                 "pnl": pnl,
                 "pnl_share": pnl / total_pnl if total_pnl else None,
@@ -427,6 +440,27 @@ def latest_signal(
     return {"week": week, "rows": rows, "explain": explain + delay}
 
 
+#: What the This week panel says for an "All Fridays" run instead of signals.
+SPLIT_SIGNAL_NOTE = (
+    "An All Fridays run has no combined signal. Each Friday's sleeve trades its own week with "
+    "its own share of the money, so one list of buys and sells for the whole account would be "
+    "wrong. Follow the run on all Fridays and each sleeve's signal is shown under This week."
+)
+
+
+def split_signal(result: Result) -> dict:
+    """The `latest` section of an "All Fridays" run: no rows, and why. `latest_signal` reads one
+    portfolio (its open positions, idle cash and cap shares), but a blended run's are summed over
+    every sleeve while its config is the first sleeve's, so it would call a name another sleeve
+    holds HOLD and never show a sleeve's cap trim."""
+    return {
+        "week": result.ranks.index[-1],
+        "rows": [],
+        "explain": SPLIT_SIGNAL_NOTE,
+        "split": True,
+    }
+
+
 def _proxied(proxy: pd.DataFrame | None, asset: str, *weeks) -> bool:
     """True if any of `weeks` priced `asset` on its index because the ETF didn't exist yet."""
     if proxy is None or asset not in proxy:
@@ -500,6 +534,8 @@ def payload_parts(
         "reason",
         "tax",
     ]
+    if "friday" in closed:  # an "All Fridays" run (tranches.blend_reset): the phase that traded
+        columns.append("friday")
     trade_rows = closed[columns].to_dict("records") if len(closed) else []
     for row in trade_rows:
         row["proxy"] = _proxied(proxy, row["asset"], row["entry_week"], row["exit_week"])

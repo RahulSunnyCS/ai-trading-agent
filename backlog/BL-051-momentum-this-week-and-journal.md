@@ -175,7 +175,8 @@ Each phase is one PR, reviewed and merged before the next.
 
 ### Phase 3 — Your orders, holdings from Fyers, and the 14:15 step
 - **Tasks:**
-  - Migration `011_momentum_holdings.sql`: `momentum_holdings` (owner, synced_at, source, symbol,
+  - Migration `012_momentum_orders.sql` (written as `011_momentum_orders`, renumbered when BL-052's
+    011 landed first; idempotent for that reason): `momentum_holdings` (owner, synced_at, source, symbol,
     qty, avg_price), `momentum_holding_rules` (owner, symbol, treatment: exclude / cash, extra cash),
     `momentum_orders` (owner, week, favourite id, prices as-of, rows JSON, created_at). Owner ID
     from `MOMENTUM_OWNER` (default `rahul`).
@@ -327,3 +328,12 @@ Answered by the owner on 2026-10-08 (see the Log):
   `journal:missing:week`, `change:id`, `rules:rule:level:week`); `opened_at` / `resolved_at` come
   from a small state file, so a locked catalog keeps the previous alerts rather than clearing
   them.
+- 2026-10-09 — Phase 3, second PR: Friday live scores. `GET /api/momentum-scores/live` adds this
+  Friday as a provisional row from live Fyers prices (in memory, five-minute cache, a price more
+  than 50% from last week's close is kept at that close and reported) and recomputes every score,
+  rank and sector; the Scores page shows a Last close | Live (provisional) switch on Fridays
+  09:15–15:30 IST. Deferred, not dropped: delay-0 live estimates on This week and the "Since
+  your 14:15 orders" card. Every favourite uses a one-week signal delay today, so the 14:15
+  decision is exact and both would show nothing new; build them when a delay-0 strategy becomes
+  Paper or Invested. Retiring the Rebalance tab waits for the rebalance-preview job fix
+  (`fix/rebalance-preview-job`) to land, so the two changes do not collide.

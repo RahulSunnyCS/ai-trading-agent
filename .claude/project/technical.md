@@ -19,7 +19,7 @@
 | VIX Data | NSE public API endpoint (polling fallback) + Fyers tick (`NSE:INDIAVIX-INDEX`) |
 | Deployment | Docker Compose (dev) → Railway / Fly.io (prod) |
 | Options Backtesting | Python 3.12 + `uv`, in `packages/option-backtesting` — Parquet + DuckDB cache, pydantic-validated YAML strategy DSL, bar-by-bar event engine (golden-fixture-verified to the rupee), FastAPI service + MCP server, fronted by a Fastify proxy and a React dashboard tab; walk-forward, parameter sweeps, a CSCV/PBO + deflated-Sharpe overfitting guard, a margin model, regime bucketing, and personality export are all built (M-5) — the epic is feature-complete |
-| Momentum Backtesting | Python 3.12 + `uv` research engine and private FastAPI service (`mbt serve`) in `packages/momentum-backtesting`; the shared Next.js dashboard owns the Momentum frontend. Weekly index, stock, Custom Index and Broad Momentum rotation use Fyers/public-source prices and the shared local research database (`packages/trading-data`). The CLI supports fetching, backtesting, weekly signals and rebalance previews. |
+| Momentum Backtesting | Python 3.12 + `uv` research engine and private FastAPI service (`mbt serve`) in `packages/momentum-backtesting`; the shared Next.js dashboard owns the Momentum frontend. Weekly index, stock, Custom Index and Broad Momentum rotation use Fyers/public-source prices and the shared local research database (`packages/trading-data`). The CLI supports fetching, backtesting, weekly signals and rebalance previews. A new Broad run defaults to the point-in-time `turnover_rank` universe (BL-036 Phase 1) and carries an extended-tags companion figure. |
 
 ## Package Manager & Runtime
 
@@ -155,6 +155,7 @@ uv run mbt serve           # private Momentum API on 127.0.0.1:8765
 uv run mbt journal show    # forward-signal journal (BL-024): every weekly signal as recorded
 uv run mbt journal verify  # check no journal entry was changed, removed or reordered
 uv run mbt saved merge [--apply]  # BL-052: fold saved runs with the same normalised settings into one strategy each (dry run by default; deletes nothing)
+uv run mbt saved split-fridays [--apply]  # BL-087: move every every-2+-weeks favourite from one Friday to a group of sleeves, one per Friday (dry run by default; keeps the old run)
 uv run mbt journal check [--send]  # did this week's runs record every favourite? (Fri 21:00 scheduler job)
 uv run mbt live-rules check [--send] [--simulate drawdown-cut|drawdown-exit|trailing|gate-ready]  # BL-025: the owner's live-money rules vs the followed money (Fri 21:30 scheduler job); never trades
 uv run python scripts/update-goldens.py   # check frozen results; --accept-results --reason "..." after an intended change

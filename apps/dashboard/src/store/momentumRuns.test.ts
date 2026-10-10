@@ -64,6 +64,38 @@ describe('momentumRuns store', () => {
     expect(b?.status).toBe('queued');
   });
 
+  it('saves the extended-tags companion beside the run, and nothing when there is none', async () => {
+    const withCompanion = {
+      ...result,
+      companion: { status: 'computed', tags: 'extended', cagr: 0.334, max_drawdown: -0.386 },
+    };
+    mockPost.mockImplementation(async (url: string) => {
+      if (url.includes('saved-runs')) return { ok: true, data: { name: 'Run 5' } } as never;
+      const id = mockPost.mock.calls.filter(([u]) => u.includes('jobs')).length === 1 ? 'a' : 'b';
+      return { ok: true, data: { job: { id, status: 'running' } } } as never;
+    });
+    const { startRun } = useMomentumRunsStore.getState();
+    await startRun('broad', {}, false);
+    await startRun('broad', {}, false);
+    jobs({
+      a: { id: 'a', status: 'done', result: withCompanion, error: null },
+      b: {
+        id: 'b',
+        status: 'done',
+        result: { ...result, companion: { status: 'skipped', reason: 'weekly run' } },
+        error: null,
+      },
+    });
+    await vi.advanceTimersByTimeAsync(2100);
+    const saves = mockPost.mock.calls
+      .filter(([url]) => String(url).includes('saved-runs'))
+      .map(([, body]) => (body as { kpis: Record<string, unknown> }).kpis);
+    expect(saves).toHaveLength(2);
+    const [first, second] = saves;
+    expect(first).toMatchObject({ extended_cagr: 0.334, extended_max_drawdown: -0.386 });
+    expect(second).not.toHaveProperty('extended_cagr');
+  });
+
   it('marks a run failed when the service forgot the job (restart)', async () => {
     mockPost.mockResolvedValue({
       ok: true,

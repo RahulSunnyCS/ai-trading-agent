@@ -124,6 +124,8 @@ class Runner:
             weights=search.weights_for(h.get("weight_scheme"), len(lookbacks)),
             score=h.get("score", "ranksum"),
             voladj_skip_recent_month=h.get("voladj_skip_recent_month", True),
+            voladj_lookbacks=h.get("voladj_lookbacks", False),
+            voladj_skip=h.get("voladj_skip", "long"),
         )
         return kwargs, liquidity
 
