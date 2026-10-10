@@ -134,6 +134,27 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('accepts the point-in-time universe on the liquidity preview and rejects unknown ones', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(200, { eligible: 1 }));
+
+    const pit = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/liquidity-preview?universe=turnover_rank',
+    });
+    expect(pit.statusCode).toBe(200);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('universe=turnover_rank');
+
+    const unknown = await server.inject({
+      method: 'GET',
+      url: '/api/momentum/liquidity-preview?universe=nope',
+    });
+    expect(unknown.statusCode).toBe(400);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
   it('forwards a backtest request without reimplementing Python validation', async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);

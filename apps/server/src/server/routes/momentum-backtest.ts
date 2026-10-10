@@ -138,7 +138,7 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
             circuit: { type: 'boolean' },
             circuit_run: { type: 'integer', minimum: 2, maximum: 20 },
             max_circuit_days: { type: 'integer', minimum: 0, maximum: 60 },
-            universe: { type: 'string', enum: ['total_market', 'all_liquid'] },
+            universe: { type: 'string', enum: ['total_market', 'all_liquid', 'turnover_rank'] },
           },
           additionalProperties: false,
         },
