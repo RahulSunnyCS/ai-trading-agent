@@ -910,3 +910,11 @@ small decisions taken and logged.
 - 2026-10-11 — Stage 2 registered (section "Stage 2 — registered") with small decisions logged
   there: candidates start at the hold; give-back replaced by the deepest pullback so far; IV by the
   straddle approximation; other indices' straddles not built in this run.
+- 2026-10-11 — Stage 1b run (11,769 runs; checks passed: pivots and previous highs / lows on a
+  hand-made table, no same-day or post-P2 daily bars). On the first spike of each day a rejection
+  entry fired for 49 of 54 NIFTY 2025 spikes, a median 2 minutes after the hold (median 9 levels on
+  the trend side, 3–4 touches per spike), so D2-rejection is close to D1. No D2 arm passes: NIFTY
+  2025 −₹716 to −₹840 against the comparator (t −1.5 to −1.9), SENSEX negative, NIFTY 2022–24
+  slightly positive (t ≤ 0.9). Looks taken and recorded: results by the level family that fired
+  (D2 at 21 %): previous-day high / low did best (rejection +₹1,213 on 16, break +₹3,283 on 11),
+  the opening range worst (−₹698 on 20, −₹997 on 17); samples too small to act on.
