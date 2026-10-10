@@ -639,7 +639,7 @@ should be re-entered; P2 + P3 first, P1 once the rule is frozen.
 
 | # | Task | Owner | State |
 |---|---|---|---|
-| 3.25.1 | Phase 1: episode census (≥ 25-point rises of the rolling ATM straddle) and the R0 re-entry replay on P2 + P3 | claude | **Running 2026-10-11** |
+| 3.25.1 | Phase 1: episode census (≥ 25-point rises of the rolling ATM straddle) and the R0 re-entry replay on P2 + P3 | claude | **Done 2026-10-11.** 1,450 episodes on 932 index-days; R0 replayed on 1,318 (counts in the BL-091 Result section); next steps wait for the owner |
 
 ## Reference — where detail lives
 

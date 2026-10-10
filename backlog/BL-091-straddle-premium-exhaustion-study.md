@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — evidence for the proposed Live premium-momentum view; useful before adding more signal parameters |
-| **Status** | In progress (Phase 1: episode census + R0 replay on P2 + P3; P1 unread) |
+| **Status** | In progress (Phase 1 done: census + R0 on P2 + P3; next steps wait for the owner; P1 unread) |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -363,8 +363,8 @@ substance; these are the settings the start-time freeze will use unless the owne
    was registered first and dropped, see the Log). Each leg is priced from its last real trade at most
    5 minutes old; a minute with no priced pair holds the last value and is flagged. For derivatives
    (velocity, acceleration, persistence) the Phase 0 rule stands: **reset** at the switch and warm up
-   for the
-   window length (A.7); no derivative is read inside the warm-up. The outcome of a trade is measured on the
+   for the window length (A.7); no derivative is read inside the warm-up. The outcome of a trade is
+   measured on the
    pair actually sold at the entry minute, which is then held fixed (the Phase 0 "freeze that pair"
    rule). NIFTY first; SENSEX where the same bars exist.
 2. **Episodes and outcomes are in points, not percent.** An episode starts when the rolling ATM
@@ -461,6 +461,83 @@ substance; these are the settings the start-time freeze will use unless the owne
    **15:28**; observation starts **09:20**. Scope of the first run: the episode census and the R0
    replay on P2 + P3 only; no parameter tables, no R1–R5, nothing on P1.
 
+## Result — Phase 1 (2026-10-11): episode census and R0 replay on P2 + P3
+
+Counts only. No rule, threshold or arm is chosen from these numbers, and P1 was not read. Scripts:
+`packages/option-backtesting/research/bl091/` (`selfcheck.py` 12 of 12 pass, then `census.py`,
+`replay_r0.py`, `summarise.py`; full tables in its `out/census.md` and `out/r0_summary.md`, not
+tracked). Rupees are per Widesl strategy (the owner runs four), at the engine's cost 0 unless marked.
+
+**Coverage and episode counts** (rolling ATM straddle, ≥ 25-point rise, observation from 09:20):
+
+| period | index | days loaded | episodes | per day | days with 0 / 1 / 2 / 3+ | median switches a day | straddle 09:20→15:28 (median, points) |
+|---|---|---|---|---|---|---|---|
+| P2 | NIFTY | 157 | 163 | 1.0 | 82 / 40 / 13 / 22 | 33 | −44 |
+| P2 | SENSEX | 157 | 1,075 | 6.8 | 2 / 7 / 19 / 129 | 55 | −141 |
+| P3 | NIFTY | 618 | 212 | 0.3 | 476 / 102 / 28 / 12 | 28 | −31 |
+
+Skipped: 8 index-days (3 weekend special sessions, 5 excluded by data_quality). SENSEX's straddle is
+about three times NIFTY's in points, so the same 25 points is a smaller move there; the owner's 25
+was stated for NIFTY. Half of P2 NIFTY's episodes (84 of 163) and 39 % of P3's are on expiry day.
+
+**NIFTY days with a rise of at least X points** (largest episode of the day; of which expiry days):
+
+| rise | P2 (157 days, 33 expiry) | P3 (618 days, 131 expiry) |
+|---|---|---|
+| ≥ 25 | 75 days (48 %), 25 expiry | 142 days (23 %), 54 expiry |
+| ≥ 40 | 48 (31 %), 18 expiry | 48 (8 %), 16 expiry |
+| ≥ 60 | 19 (12 %), 7 expiry | 19 (3 %), 4 expiry |
+| ≥ 100 | 6 (4 %), 2 expiry | 5 (1 %), 1 expiry |
+
+**Outcome at 15:28** (decayed = gave back ≥ 15 points and did not make a new high):
+
+| period | index | decayed | resumed, open at close | never gave back 15 | of which triggered at 15:00 or later |
+|---|---|---|---|---|---|
+| P2 | NIFTY | 146 | 1 | 16 | 16 of the 17 not decayed |
+| P2 | SENSEX | 1,024 | 22 | 29 | 44 of the 51 |
+| P3 | NIFTY | 190 | 7 | 15 | 20 of the 22 |
+
+Before 15:00 almost every episode gave back 15 points by the close, so "does it decay" is not the
+question; when it decays, and what it costs to wait, is.
+
+**Size of the rise** (low to high, points): median 37 (P2 NIFTY), 42 (SENSEX), 34 (P3); 90th
+percentile 74, 108, 63. Rises of 100+ points: 6, 121 and 7 episodes.
+
+**Timing of decayed episodes.** The high and the 15-point give-back are spread across the day; the
+share at or after 14:30 is 14 % / 15 % (P2 NIFTY, high / give-back), 16 % / 18 % (SENSEX), 29 % / 31 %
+(P3 NIFTY). The owner's "decay comes around 14:30–15:00" holds for P3 more than for P2.
+
+**Index after the high (decayed episodes):** stalled within one strike step 70 / 390 / 93, reversed
+47 / 347 / 51, continued 29 / 287 / 46 (P2 NIFTY / SENSEX / P3 NIFTY).
+
+**R0, the owner's habit** (re-enter the live Widesl after each ₹650 MTM stop, up to five attempts;
+1,318 episodes triggered before 15:12):
+
+| period | index | episodes | attempts 1 / 2 / 3 / 4 / 5 | with a held attempt | mean ₹ per episode | median | at ₹20/order mean |
+|---|---|---|---|---|---|---|---|
+| P2 | NIFTY | 145 | 59 / 24 / 14 / 17 / 31 | 117 (81 %) | +174 | +237 | −32 |
+| P2 | SENSEX | 1,002 | 493 / 219 / 93 / 85 / 112 | 893 (89 %) | +532 | +387 | +365 |
+| P3 | NIFTY | 171 | 72 / 40 / 20 / 14 / 25 | 152 (89 %) | +867 | +679 | +683 |
+
+Held rate by attempt number (attempts 1 → 5): P2 NIFTY 41 / 28 / 21 / 35 / 13 %; SENSEX 47 / 42 / 32 /
+41 / 29 %; P3 NIFTY 42 / 39 / 34 / 33 / 36 %. A fifth attempt was needed in 21 % of P2 NIFTY episodes.
+
+Episodes with a held attempt: losses before the winner averaged −₹929 / −₹837 / −₹1,023 (median 0, 0,
+−₹674), the held attempt made +₹2,251 / +₹1,978 / +₹2,658 on average, and the episode ended positive
+in 81 of 117 / 644 of 893 / 110 of 152. Held attempts ran a median 156 / 153 / 123 minutes. Of the
+overall stops, 8 / 98 / 29 hit on the entry bar itself.
+
+Worst day (sum of a day's episodes): −₹9,367 / −₹10,185 / −₹5,093 per strategy counting only ladders
+that do not overlap; −₹24,882 / −₹99,748 / −₹6,234 raw, because a day with several episodes runs
+several ladders at once (67 / 839 / 48 overlapping episodes), which the owner would not.
+
+**What this does not show.** There is no comparator in this phase: R0's rupees include the plain
+theta of a strangle held to 15:28, and nothing here says an episode-triggered entry beats the same
+Widesl entered at another minute. That is the time-matched random re-entry comparator of the R arms
+(E.6), not run. SENSEX's counts are dominated by the 25-point threshold being small for its straddle.
+Expiry-day episodes from 15:00 (13 / 52 / 41) price against the settlement average, not the live
+index (Log, 2026-10-11).
+
 ## Log
 
 - 2026-10-10 — Owner requested adding premium-momentum parameters to the widget proposal and
@@ -509,3 +586,5 @@ substance; these are the settings the start-time freeze will use unless the owne
   and counted separately. Also added, as A.7 asked: each leg is priced from its last real trade at
   most 5 minutes old (the vendor files repeat old closes as zero-volume bars); it did not change the
   smoke-run episodes. All self-checks pass again (12 with the new 5b).
+- 2026-10-11 — Phase 1 census and R0 replay run on P2 + P3 (932 index-days, 1,450 episodes, 1,318
+  replayed, 0 errors). Counts only, in the Result section; no rule chosen; P1 unread.
