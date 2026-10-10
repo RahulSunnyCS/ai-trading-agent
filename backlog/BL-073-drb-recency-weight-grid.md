@@ -99,10 +99,25 @@ on every period, and the winner declared by its *worst* period.
 - **Read-out:** block 1's rule, relative to the best of all twelve rows per period; read beside the same
   recency weight with 5:30,21:25,63:25,126:20.
 - **Will not run:** other first-window lengths.
-- **Result:** pending.
+- **Result (2026-10-10, gross; relative to the best of all twelve rows per period: P1 ₹4,86,802, P2
+  ₹3,14,099, P3 ₹12,72,319):** the 10-day window is worse than the 5-day on both out-of-period sets.
+
+  | Recent | First window | P1 2025-12→2026-10 | P2 Jan–Aug 2025 | P3 2022-04→2024-10 | Min rel | ≥ P90 everywhere |
+  |---|---|---|---|---|---|---|
+  | 10 | 5 days (block 1) | 3,47,323 (0.71) ✓ | **3,14,099 (1.00)** ✓ | **12,72,319 (1.00)** ✓ | 0.71 | **yes** |
+  | 10 | 10 days | 3,58,436 (0.74) ✓ | 1,99,937 (0.64) ✗ | 11,20,218 (0.88) ✓ | 0.64 | no |
+  | 20 | 5 days (block 1) | 3,94,053 (0.81) ✓ | 2,63,941 (0.84) ✗ | 11,62,457 (0.91) ✓ | 0.81 | no |
+  | 20 | 10 days | 4,13,582 (0.85) ✓ | 2,03,974 (0.65) ✗ | 10,70,299 (0.84) ✓ | 0.65 | no |
+
+  Recent 10: +₹11k in-sample, **−₹1,14,162 on the slice** (below chance), −₹1,52,101 on the hold-out.
+  Recent 20: +₹20k, −₹60k, −₹92k. Three blocks now agree: the first fit window should be the 5-day one;
+  lengthening it (10) or removing it (block 2) trades the two out-of-period sets for the in-sample year.
+  Nothing adopted; recent 10 / 5:30,21:25,63:25,126:20 stays the only row above chance in all three
+  periods. The series is closed here.
 
 ## Log
 
 - 2026-10-10 — created and registered before any run.
 - 2026-10-10 — 24 runs done; Result above. Series BL-067 → BL-073 closed; next evidence is the forward journal (BL-058).
 - 2026-10-10 — block 2 (5-day window at 0%) ran: shifts P&L toward the in-sample year, away from the other two; keep the window.
+- 2026-10-10 — block 3 (10-day first window) ran: worse than the 5-day out of period; keep 5. Closed.
