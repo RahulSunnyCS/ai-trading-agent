@@ -122,6 +122,16 @@ Otherwise:
   `rotation/series.py`, so a figure is computed in exactly one place. Selectors are validated by pattern and
   matched only against enumerated strategy names; at most 80 strategies per request; the strategy list is
   cached for 30 s. Errors are `{"error": ...}`.
+- `rotation/shadow.py` + `api/rotation_shadow_routes.py` — the Shadow scoreboard (BL-083 forward shadow;
+  `GET /legwise/rotation/shadow?from=&to=`), read-only over the journal, `rotation/results/` and
+  `rotation/triggers/`. Forward = sessions from 2026-10-12 (BL-058). Three parts, every figure an event minus a
+  comparator: `triggers.summary(since=)` per trigger x template beside BL-083's research numbers (constants, quoted
+  from its tables and checked against the backlog text by a test); the Dir at the event minute minus the list's next
+  not-yet-started core pick (the earliest T1 / T4 event of the day, pick starting >= 15 minutes later, Widesl
+  minimum kept), per day with a status (scored / pending / not_applied / late_entry / no_entry: a day without the
+  displaced pick's stored result is pending, never zero), with the time-matched placebo Dir as its control line
+  (BL-083's random-minute control is not in the trigger files, so it is reported `not_recorded`); and BL-081's two
+  forward candidates returned `not_scored` with their definitions (no nightly scoring exists for them).
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).

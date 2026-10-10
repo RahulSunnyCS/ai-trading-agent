@@ -38,6 +38,7 @@ import optionsCorrelation from './content/optionslab/correlation.md?raw';
 import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
+import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
 import optionsLosingDays from './content/optionslab/walkthrough-losing-days.md?raw';
@@ -288,6 +289,15 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: optionsCorrelation,
     screen: { tab: 'optionslab', rest: ['correlation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-shadow',
+    title: 'Rotation: Shadow scoreboard',
+    summary: 'Ideas kept for forward observation, each against the pick it would have replaced.',
+    kind: 'Screen',
+    body: optionsRotationShadow,
+    // `screen` is set when the Rotation section mounts this widget (it has no route of its own).
   },
   {
     chapter: 'optionslab',
