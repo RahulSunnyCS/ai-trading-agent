@@ -101,7 +101,9 @@ that each trade on their own weeks. Tick them and choose **Group as one favourit
 up and the toast said so. Each strategy keeps its last three repeats and every changed result.
 
 **Why is my highest CAGR marked Not tradable?** It was run with the tradability filter or the
-circuit rule off, so it holds stocks you could not have bought.
+circuit rule off, so it holds stocks you could not have bought. The filter is always on for the
+*As each year saw it* and *Whole NSE market* universes, so only *Today's index list* can be marked
+for it.
 
 ## What it does not tell you
 

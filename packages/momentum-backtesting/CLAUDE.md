@@ -556,7 +556,7 @@ contract, not a shared service).
   last April reset, `choose.ensemble_curve`'s convention) and its one Telegram message. **One strategy per set of
   settings (BL-052):** a version is the run's *normalised* settings
   (`saved_identity.fingerprint`: request-model defaults filled, the fields the dataset never reads
-  dropped, `weights` only for `ranksum`), so rerunning the same settings is a `repeat` of one
+  dropped, `weights` only for `ranksum`, the tradability flag read as on for a gated universe), so rerunning the same settings is a `repeat` of one
   strategy, not a new row. Every run stores `versions` (data + code fingerprints, carried by each
   backtest result) and an `outcome`; a moved result appends a row to the append-only
   `momentum_result_changes` (a run-record table: listed in `db_read.RUN_RECORD_TABLES`, so it

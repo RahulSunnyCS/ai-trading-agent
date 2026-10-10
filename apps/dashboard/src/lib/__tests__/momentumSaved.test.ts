@@ -98,6 +98,19 @@ describe('strategy names', () => {
     expect(differences[0]?.values).toEqual(['Off', 'On']);
   });
 
+  it('does not call a stored filter-off a difference when the universe forces the filter on', () => {
+    const defaults = { ...BROAD_DEFAULTS, broad_universe: 'turnover_rank' };
+    const stored = { start: '2017-01-01', broad_universe: 'turnover_rank' };
+    expect(strategyDifferences({ ...stored, broad_liquidity_filter: false }, defaults)).toEqual([]);
+    // Today's list does not force it: off is a real difference there.
+    expect(
+      strategyDifferences(
+        { ...stored, broad_universe: 'total_market', broad_liquidity_filter: false },
+        defaults,
+      ).map((d) => d.key),
+    ).toContain('broad_liquidity_filter');
+  });
+
   it('ignores weights that do nothing: equal ones, or any under a score that never reads them', () => {
     const base = { score: 'ranksum', lookbacks: [13, 26, 52] };
     expect(strategyDifferences({ ...base, weights: [1, 1, 1] }, base)).toEqual([]);

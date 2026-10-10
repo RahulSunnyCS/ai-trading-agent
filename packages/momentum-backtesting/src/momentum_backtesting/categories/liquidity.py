@@ -128,6 +128,30 @@ def turnover_rank_members_by_year(
     return out
 
 
+def latest_bar_year(root: Path | None = None) -> int | None:
+    """Calendar year of the newest daily stock bar, or None when there are none."""
+    with stock_bars(root) as con:
+        row = con.execute("SELECT max(year(date)) FROM bars_1d_stock").fetchone()
+    return None if row is None or row[0] is None else int(row[0])
+
+
+def member_year_in_force(members: dict[int, set[str]], last_bar_year: int | None) -> int:
+    """The year of `members` a run's newest weeks are gated by: the year of the last bar.
+
+    A run applies each calendar year's list to that year's weeks, so its latest weeks use the
+    last bar's year. `turnover_rank_members_by_year` also returns Y+1 once a symbol has 60
+    sessions after 1 July (late September), built from a part-year; that list is for a year no
+    week has reached yet, so `max(members)` would count a different universe from the run's.
+    Falls back to the newest list at or before that year, then to `max(members)`."""
+    if last_bar_year is not None:
+        if last_bar_year in members:
+            return last_bar_year
+        earlier = [year for year in members if year <= last_bar_year]
+        if earlier:
+            return max(earlier)
+    return max(members)
+
+
 def _band_sql() -> str:
     return " or ".join(f"abs(r) between {lo} and {hi}" for lo, hi in _BANDS)
 

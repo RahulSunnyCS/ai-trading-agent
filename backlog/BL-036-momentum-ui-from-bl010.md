@@ -164,3 +164,6 @@ doing against its pre-set fail lines.
   tradability filter off. The banner stays until BL-074 puts the categories on NSE's classification.
   A cold first run on a fresh API process took 88 s (ranking built from scratch, plus the companion
   pass); the 27 s figure above was with a warm ranking cache.
+- 2026-10-10 — pre-registration (research gate): Phase 1 searches and selects nothing. The Broad
+  default follows BL-010's pre-registered result, and the before/after figures above are descriptive
+  only, so no new Phase 0 or `_EXPERIMENT.md` block applies.

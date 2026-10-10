@@ -123,11 +123,26 @@ def normalise(dataset: str, config: dict[str, Any]) -> dict[str, Any] | None:
         return None
     settings = request.model_dump(mode="json", exclude=set(ignored | RUN_ONLY_FIELDS))
     settings["end"] = settings.get("end") or None
+    if "broad_liquidity_filter" in settings:
+        # A gated universe runs with the filter on whatever was sent (`api._liquidity_config`), so
+        # the stored flag is not a setting there: both spellings are the same strategy.
+        settings["broad_liquidity_filter"] = liquidity_filter_on(settings)
     if settings.get("score") != "ranksum":
         settings.pop("weights", None)
     elif not settings.get("weights"):
         settings["weights"] = [1.0] * len(settings["lookbacks"])
     return settings
+
+
+def liquidity_filter_on(config: dict[str, Any]) -> bool:
+    """Whether a Broad run applies the tradability filter: the flag, or a universe that forces it
+    on (`api.GATED_BROAD_UNIVERSES`). A config with no `broad_universe` ran on Total Market (the
+    request model's default), where the flag alone decides."""
+    from .api import GATED_BROAD_UNIVERSES
+
+    return bool(config.get("broad_liquidity_filter", False)) or (
+        config.get("broad_universe", "total_market") in GATED_BROAD_UNIVERSES
+    )
 
 
 def identity(dataset: str, config: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:

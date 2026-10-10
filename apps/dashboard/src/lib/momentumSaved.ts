@@ -14,7 +14,7 @@ import type {
 } from '../types/momentum';
 import { formatDay, formatPct, formatPp } from './format';
 import { type SettingDifference, completeConfig, differingSettings } from './momentumCompare';
-import { BROAD_UNIVERSES, broadUniverse } from './momentumUniverse';
+import { BROAD_UNIVERSES, broadUniverse, isGatedUniverse } from './momentumUniverse';
 
 export const DATASET_SHORT: Record<string, string> = {
   etf: 'ETF',
@@ -48,7 +48,12 @@ export function strategyDifferences(
   const keep = (source: Record<string, unknown>) =>
     Object.fromEntries(Object.entries(source).filter(([key]) => !skip.has(key)));
   const base = keep(defaults);
-  return differingSettings([keep(completeConfig(base, config)), base]);
+  const completed = completeConfig(base, config);
+  // The server runs a point-in-time or whole-market universe with the tradability filter on
+  // whatever was stored (`saved_identity.normalise`), so a stored `false` is not a difference.
+  // Only a universe the run names counts: a run with none ran on Today's list.
+  const filtered = isGatedUniverse(broadUniverse(config)) ? { broad_liquidity_filter: true } : {};
+  return differingSettings([keep({ ...completed, ...filtered }), base]);
 }
 
 /** "Broad · Liquidity filter Off · Respect circuits Off", or "Broad · defaults". */

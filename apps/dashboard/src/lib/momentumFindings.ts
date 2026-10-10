@@ -7,6 +7,7 @@
 import type { SavedStrategy } from '../types/momentum';
 import { formatDay, formatPct, formatPp } from './format';
 import { cagrMove } from './momentumSaved';
+import { broadUniverse, isGatedUniverse } from './momentumUniverse';
 
 export const MAX_FINDINGS = 5;
 
@@ -76,7 +77,10 @@ export function tradableTwin(
         other.id !== strategy.id &&
         other.dataset === 'broad' &&
         !other.group &&
-        REALISM_FLAGS.every((flag) => other.config_full[flag] === true) &&
+        // A universe that forces the filter on counts as on (`runs_store._trust`).
+        (other.config_full.broad_liquidity_filter === true ||
+          isGatedUniverse(broadUniverse(other.config_full))) &&
+        other.config_full.broad_respect_circuits === true &&
         key(other.config_full) === own,
     ) ?? null
   );

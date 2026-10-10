@@ -12,6 +12,7 @@ import {
   BROAD_UNIVERSE_ORDER,
   broadUniverse,
   isGatedUniverse,
+  universeSettings,
 } from '../../lib/momentumUniverse';
 import { Badge } from '../ui/Badge';
 import { InfoTooltip } from '../ui/InfoTooltip';
@@ -721,7 +722,11 @@ function BroadUniverseControls({
       <RadioCards
         name="broad_universe"
         value={universe}
-        onChange={(value) => onChange('broad_universe', value)}
+        onChange={(value) => {
+          for (const [key, setting] of Object.entries(universeSettings(value))) {
+            onChange(key, setting);
+          }
+        }}
         options={BROAD_UNIVERSE_ORDER.map((id) => ({
           value: id,
           label: BROAD_UNIVERSES[id].label,

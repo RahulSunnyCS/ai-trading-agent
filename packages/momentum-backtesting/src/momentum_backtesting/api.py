@@ -1641,8 +1641,10 @@ def _liquidity_preview_payload(
             members = broad.total_market_members_by_year(DATA_DIR / "categories")
     except (ValueError, broad.TotalMarketDataNotFoundError) as error:
         raise HTTPException(422, str(error)) from None
-    latest_year = max(members)
-    symbols = sorted(members[latest_year])
+    # The run gates its newest weeks with the list for the last bar's calendar year. `max(members)`
+    # is wrong for `turnover_rank` from late September, when the next year's part-year list exists.
+    year = liquidity_mod.member_year_in_force(members, liquidity_mod.latest_bar_year())
+    symbols = sorted(members[year])
     return liquidity_mod.preview(cfg, symbols)
 
 
@@ -1837,10 +1839,12 @@ def _extended_tags_companion(
 ) -> dict:
     """The same run with `broad_category_tags="extended"` (BL-036 Phase 1): the curated tags name
     only today's 755 index members, so a stock that later left the index can be ranked but never
-    picked through a category. The extended tags (BSE's current classification, every liquid NSE
-    stock) remove that, and the gap is the closest figure to an expected return this engine can
-    give. The tags do not touch the ranking, so the run's own `ranking` is reused: one extra
-    engine pass. Never raises; a failure is reported in the payload instead."""
+    picked through a category. The extended tags (BSE's current classification, which covers many
+    more NSE stocks) reduce that, but `stock_groups_wide.csv` leaves NSE-only and delisted names
+    untagged, so most later-failed companies still cannot be bought and the figure still
+    flatters. The gap is the closest figure to an expected return this engine can give. The tags
+    do not touch the ranking, so the run's own `ranking` is reused: one extra engine pass. Never
+    raises; a failure is reported in the payload instead."""
     if req.broad_category_mode != "on":
         return {"status": "not_applicable", "reason": "no category layer"}
 

@@ -159,6 +159,32 @@ def test_followed_strategies_come_first_and_groups_nest_their_members(client):
     assert listed[1]["trust"] == "not_tradable"  # Broad with the liquidity filter off
 
 
+def test_a_forced_on_universe_with_the_stored_flag_off_is_not_called_not_tradable(client):
+    """The settings panel shows the tradability filter on and disabled for a point-in-time run,
+    but a flag left off on Today's list used to travel with it and save as "Not tradable"."""
+
+    def broad(universe, flag):
+        return _payload(
+            dataset="broad",
+            config={
+                "broad_universe": universe,
+                "broad_liquidity_filter": flag,
+                "broad_respect_circuits": True,
+            },
+        )
+
+    off = client.post("/api/saved-runs", json=broad("turnover_rank", False)).json()
+    again = client.post("/api/saved-runs", json=broad("turnover_rank", True)).json()
+    assert again["outcome"] == "repeat" and again["strategy_ref"]["id"] == off["id"]
+    strategy = _strategies(client)["strategies"][0]
+    assert strategy["trust"] != "not_tradable"
+    # Today's list keeps the flag as the person's choice: off there is still not tradable.
+    client.post("/api/saved-runs", json=broad("total_market", False))
+    trust = {s["config"]["broad_universe"]: s["trust"] for s in _strategies(client)["strategies"]}
+    assert trust["total_market"] == "not_tradable"
+    assert trust["turnover_rank"] != "not_tradable"
+
+
 def test_patch_names_notes_and_status_go_to_the_anchor(client):
     first = client.post("/api/saved-runs", json=_payload()).json()
     client.post("/api/saved-runs", json=_payload(name="Run 2"))

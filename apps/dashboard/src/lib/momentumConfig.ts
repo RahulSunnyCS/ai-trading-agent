@@ -433,12 +433,21 @@ export function hindsightWarning(config: Record<string, unknown>): HindsightWarn
         ? null
         : 'the tradability filter',
     ].filter((item): item is string => item !== null);
+    // Without the category layer there are no 2026 themes and no extended-tags figure: only the
+    // stock list is left to talk about.
+    const categories = config.broad_category_mode !== 'off';
     const detail =
       universe === 'turnover_rank'
-        ? 'Each year ranks the 750 stocks most traded before it began, delisted names included, so the stock list carries no hindsight. The categories still come from 2026 themes, which flatter earlier years: the extended-tags figure under the CAGR is the closer reading.'
+        ? categories
+          ? 'Each year ranks the 750 stocks most traded before it began, delisted names included, so the ranking carries no hindsight. Buying is different: in category mode a stock is bought only if it carries a category tag, no later-delisted name carries a curated one and most carry no extended one, and the categories come from 2026 themes. Both flatter earlier years; the extended-tags figure under the CAGR is the closer reading, though it still flatters.'
+          : 'Each year ranks the 750 stocks most traded before it began, delisted names included, and buys them directly with no category tags, so the stock list carries no hindsight.'
         : universe === 'all_liquid'
-          ? 'Each week ranks every liquid NSE stock, so the stock list carries little hindsight. The categories still come from 2026 themes, which flatter earlier years.'
-          : 'Every year since 2017 uses today\'s stock list, so most stocks that later fell out or were delisted are missing, and the categories come from 2026 themes. BL-010 measured the loss at about 5 points a year for a typical config and 22 to 25 for the best of a search: choose "As each year saw it" to see it.';
+          ? categories
+            ? 'Each week ranks every liquid NSE stock, so the ranking carries little hindsight. In category mode only stocks with a category tag can be bought, and the categories come from 2026 themes, which flatter earlier years.'
+            : 'Each week ranks every liquid NSE stock and buys them directly with no category tags, so the stock list carries little hindsight.'
+          : `Every year since 2017 uses today's stock list, so most stocks that later fell out or were delisted are missing${
+              categories ? ', and the categories come from 2026 themes' : ''
+            }. BL-010 measured the loss at about 5 points a year for a typical config and 22 to 25 for the best of a search: choose "As each year saw it" to see it.`;
     return {
       headline: 'Treat this CAGR as an upper bound, not an expected return.',
       detail,
@@ -497,7 +506,7 @@ export function companionLine(
       text,
       title: `With extended category tags: ${formatPct(companion.cagr ?? null)} CAGR · ${formatPct(
         companion.max_drawdown ?? null,
-      )} max drawdown. The same run with every liquid NSE stock tagged by BSE's current classification, not just today's 755 index members. Closer to an expected return than the headline; the tags are still today's classification applied to every year.`,
+      )} max drawdown. The same run with the extra category tags from BSE's current classification, which cover many more NSE stocks than today's 755 index members. A stock with no tag, which includes most delisted names, still cannot be bought through a category. Closer to an expected return than the headline, but it still flatters: the tags are today's classification applied to every year.`,
     };
   }
   if (companion.status === 'this_run') {

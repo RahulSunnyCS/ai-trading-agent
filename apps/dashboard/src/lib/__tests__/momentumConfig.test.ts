@@ -384,6 +384,28 @@ describe('hindsightWarning', () => {
     expect(w?.detail).toMatch(/2026 themes/);
   });
 
+  it('names neither 2026 themes nor the extended-tags figure when categories are off', () => {
+    for (const universe of ['turnover_rank', 'all_liquid', 'total_market']) {
+      const w = hindsightWarning({
+        dataset: 'broad',
+        broad_universe: universe,
+        broad_category_mode: 'off',
+      });
+      expect(w?.detail, universe).not.toMatch(/2026 themes|extended|categories/i);
+    }
+  });
+
+  it('says the later-failed names are ranked but not bought when categories are on', () => {
+    const w = hindsightWarning({
+      dataset: 'broad',
+      broad_universe: 'turnover_rank',
+      broad_category_mode: 'on',
+    });
+    expect(w?.detail).toMatch(/only if it carries a category tag/);
+    expect(w?.detail).toMatch(/extended-tags figure/);
+    expect(w?.detail).not.toMatch(/no hindsight\. The categories/);
+  });
+
   it('warns on Custom Index, and not on ETF Rotation or the Nifty 50 stock set', () => {
     expect(hindsightWarning({ dataset: 'custom_index' })).not.toBeNull();
     expect(hindsightWarning({ dataset: 'etf' })).toBeNull();

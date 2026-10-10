@@ -56,3 +56,16 @@ export function broadUniverse(config: Record<string, unknown>): BroadUniverse {
 export function isGatedUniverse(universe: BroadUniverse): boolean {
   return universe === 'turnover_rank' || universe === 'all_liquid';
 }
+
+/**
+ * The settings that picking `value` as the universe sets. The tradability filter is forced on for
+ * a gated universe, and the toggle shows it on and disabled, so the stored value is set with it:
+ * a filter left off on Today's list would otherwise travel with a point-in-time run and save as
+ * "Not tradable".
+ */
+export function universeSettings(value: string): Record<string, unknown> {
+  const universe = broadUniverse({ broad_universe: value });
+  return isGatedUniverse(universe)
+    ? { broad_universe: universe, broad_liquidity_filter: true }
+    : { broad_universe: universe };
+}
