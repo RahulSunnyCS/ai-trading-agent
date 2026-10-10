@@ -67,6 +67,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-072](BL-072-drb-blend-long-fit-lookbacks.md) | A blend built around the longer fit lookbacks: recent, family recent, weekday, days-to-expiry, VIX | P2 | Done: candidate killed by the hold-out; nothing adopted | research | options |
 | [BL-073](BL-073-drb-recency-weight-grid.md) | How much recency? A fixed grid of recent weight and fit lookbacks, judged by the worst period | P2 | Done: nothing meets the bar; recent 10% + 5/21/63/126 is the only row above chance in all three periods | research | options |
 | [BL-074](BL-074-drb-family-by-type-and-start-band.md) | Family recent pooled by strategy type and start-time band (index- and strike-agnostic) | P2 | Done: own 0 + family-band 10 is above chance in all three periods; journal candidate | research | options |
+| [BL-075](BL-075-drb-final-map-and-structural-switches.md) | The final map: 100 weightings × 3 periods, then the structural switches (Widesl minimum, Buy add-on, closest-premium) on the robust region | P2 | In progress | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
