@@ -92,10 +92,13 @@ Otherwise:
   run of the 298 variant files in `strategies/rotation/` (the 248 original plus 50 Dir ITM1, BL-080), loading each index's day once), `store.py`
   (per-variant CSVs and `days.csv` under `TRADING_DATA_ROOT/rotation/`, not the catalog),
   `journal.py` (insert-only SHA-256 chain, one entry per day), `pick.py` / `live.py` (the 09:16 entry
-  from the 09:15 VIX open read live from Fyers, polled, with Angel One as the unattended fallback, and the days to expiry of the listed contracts from Fyers' symbol master, calendar as fallback; the entry records `vix_source` / `dte_source`, the universe size + hash and `inputs_sha`, a digest of the stored results and day rows it was scored on), `cli.py`
-  (`obt rotation update|pick|verify|show|triggers|triggers-show`), `triggers.py` (BL-083: the four
-  intraday triggers scored forward each evening from the day's bars, event and placebo simulations in
-  `rotation/triggers/`; run by `obt rotation update`, isolated so a failure never fails it;
+  from the 09:15 VIX open read live from Fyers, polled, with Angel One as the unattended fallback, and the days to expiry of the listed contracts from Fyers' symbol master, calendar as fallback; the entry records `vix_source` / `dte_source`, the universe size + hash and `inputs_sha`, a digest of the stored results and day rows it was scored on), `series.py` (BL-090:
+  which strategies have daily results now — variant CSVs plus saved legwise results at the file's current
+  version — and the selectors `slot:` / `family:` / `index:` / `kind:` / globs / `a+b` that name them; nothing
+  is a fixed list, so a new strategy is found once it has results), `cli.py`
+  (`obt rotation update|pick|verify|show|triggers|triggers-show|corr|corr-list|corr-pick`), `triggers.py` (BL-083: the four intraday triggers scored forward each evening from the day's bars,
+  event and placebo simulations in `rotation/triggers/`; run by `obt rotation update`, isolated so a
+  failure never fails it, and `obt rotation triggers|triggers-show`;
   `scripts/rotation-triggers-parity.py` must print PARITY OK). Weekend sessions are excluded from the ranking history, as
   in the research (the Budget Sunday once shifted every later pick).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
@@ -114,6 +117,16 @@ Otherwise:
   validate/save strategies (slug-checked name, `yaml.safe_dump` of the validated model — never
   raw client text), ad-hoc backtest over collected days, saved results, data/token status, and
   the evening run as a background job. Errors are `{"error": ...}` (what the dashboard reads).
+- `api/correlation_routes.py` — `/legwise/correlation/available`, `/legwise/correlation` and `/legwise/correlation/pick`
+  (BL-090, the Options Lab's Correlation tab): thin wrappers over `analytics/correlation.py` and
+  `rotation/series.py`, so a figure is computed in exactly one place. Selectors are validated by pattern and
+  matched only against enumerated strategy names; at most 80 strategies per request; the strategy list is
+  cached for 30 s. Errors are `{"error": ...}`.
+- `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
+  overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
+  drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).
+  numpy only. Every figure is in-sample over the window given; a trailing matrix for a research replay
+  is `analyse(end=day_before)`.
 - `analytics/regime_source.py` — reads `daily_regime_tags` from Postgres,
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`

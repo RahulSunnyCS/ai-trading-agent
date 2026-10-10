@@ -119,6 +119,7 @@ export const NAV_GROUPS: NavGroup[] = [
           { segment: 'runs', label: 'Runs' },
           { segment: 'results', label: 'Daily results' },
           { segment: 'regimes', label: 'Regimes' },
+          { segment: 'correlation', label: 'Correlation' },
         ],
       },
     ],
