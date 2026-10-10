@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P0 — owner, 2026-10-09: the forward record must start before Monday 2026-10-12 09:15 |
-| **Status** | Planned |
+| **Status** | In progress — journal built 2026-10-10 (Phases 0b, 1, 2); UI waits (Phase 4) |
 | **Type** | feature |
 | **Area** | options / dashboard / scheduler |
 | **Created** | 2026-10-09 |
@@ -262,3 +262,15 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   Phases 0–3.
 - 2026-10-10 — owner chose lists A, B and C (BL-075 stage 1) plus the live baseline as REF; Phase 0b registered; build started.
 - 2026-10-10 — journal build is backend-only (CLI + two scheduler jobs + files); UI needs for the four lists added to Phase 4.
+- 2026-10-10 — **Built:** `obt rotation update|pick|verify|show` (`src/option_backtesting/rotation/`),
+  the 248 variant files committed under `strategies/rotation/` (5 of 5 sampled reproduce their stored
+  2026-10-08 result to the rupee), scheduler jobs `options-rotation-nightly` (19:45, retries to 23:00,
+  catalog group) and `options-rotation-pick` (09:16, no catch-up), 15 unit tests, and
+  `scripts/rotation-parity.py`: lists A, B, C and REF pick **202 of 202** selection days identically to
+  rotate.py (a weekend session — the Budget Sunday 2026-02-01 — had to be excluded from the history to
+  get there). Store seeded from the research results (248 files, 487 days) and 2026-10-09 run through
+  the nightly path (248 variants in 4.6 s, idempotent). The live VIX fetch returned 15.28 for
+  2026-10-09, equal to the lake. Dry run for Monday: A/B pick N_dir_0947, N_wide_1347, N_wide_1317.
+  **Before Monday:** the scheduler process must be restarted to load the two jobs; the code lives on this
+  branch only, so the main checkout must stay on it (or PR #154 merge first); the Fyers token for the
+  09:16 read depends on the 08:05 login.

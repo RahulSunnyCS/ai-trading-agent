@@ -86,6 +86,15 @@ Otherwise:
   collection into `packages/trading-data`'s store — instruments registered, bars in the Parquet
   lake, raw responses in `raw/fyers/`, one `ingest_runs` row per call; `obt fyers migrate` moved
   the old `data/fyers/` layout in). Forward-only — see `DECISIONS.md`.
+- `rotation/` — the options rotation's forward paper journal (BL-058): `lists.py` (the registered lists
+  A / B / C / REF, never edited after the first entry), `score.py` (a port of research/bl057/rotate.py's
+  ranking, numpy only; `scripts/rotation-parity.py` must print PARITY OK), `update.py` (nightly one-day
+  run of the 248 variant files in `strategies/rotation/`, loading each index's day once), `store.py`
+  (per-variant CSVs and `days.csv` under `TRADING_DATA_ROOT/rotation/`, not the catalog),
+  `journal.py` (insert-only SHA-256 chain, one entry per day), `pick.py` / `live.py` (the 09:16 entry
+  from the 09:15 VIX open read live from Fyers and the calendar's days to expiry), `cli.py`
+  (`obt rotation update|pick|verify|show`). Weekend sessions are excluded from the ranking history, as
+  in the research (the Budget Sunday once shifted every later pick).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
   (a day on the 375-minute grid), `engine.py` (the state machine — its docstring lists every
