@@ -21,7 +21,7 @@ def _day(text: str | None) -> date:
 def update(
     day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
 ) -> None:
-    """Run all 248 variants over one collected day and store the results (idempotent)."""
+    """Run all 298 variants over one collected day and store the results (idempotent)."""
     from .update import default_day, update_day
 
     d = _day(day) if day else default_day()

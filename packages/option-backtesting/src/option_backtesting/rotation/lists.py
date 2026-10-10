@@ -1,6 +1,6 @@
 """The lists the forward journal records (registered in BL-058 Phase 0b, 2026-10-10).
 
-All are DRB-6W3L2 in shape: 3 strategies x 2 lots from the 248-variant whole-day list, at least 2
+All are DRB-6W3L2 in shape: 3 strategies x 2 lots from the 298-variant whole-day list, at least 2
 Widesl strategies, the Buy add-on when a Buy variant ranks in the overall top 10. They differ
 only in how the daily composite is weighted. Never edit a list after the first entry: add a
 new name.

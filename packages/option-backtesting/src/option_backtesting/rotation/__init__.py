@@ -5,7 +5,7 @@ collected data every evening, and kept in an insert-only hash chain. The scoring
 `research/bl057/rotate.py` (`score_day` / `select_picks`), checked against it by
 `scripts/rotation-parity.py`; nothing in this package places or changes a trade.
 
-Modules: `lists` (the registered lists), `score` (the ranking), `variants` (the 248 strategy files),
+Modules: `lists` (the registered lists), `score` (the ranking), `variants` (the 298 strategy files),
 `store` (per-variant results and per-day attributes under TRADING_DATA_ROOT/rotation),
 `attrs` (weekday / VIX band / days to expiry from the lake), `live` (the 09:15 VIX open and the
 calendar's days to expiry), `update` (the nightly one-day run of every variant), `journal` (the

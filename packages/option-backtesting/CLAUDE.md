@@ -89,7 +89,7 @@ Otherwise:
 - `rotation/` — the options rotation's forward paper journal (BL-058): `lists.py` (the registered lists
   A / B / C / REF, never edited after the first entry), `score.py` (a port of research/bl057/rotate.py's
   ranking, numpy only; `scripts/rotation-parity.py` must print PARITY OK), `update.py` (nightly one-day
-  run of the 248 variant files in `strategies/rotation/`, loading each index's day once), `store.py`
+  run of the 298 variant files in `strategies/rotation/` (the 248 original plus 50 Dir ITM1, BL-080), loading each index's day once), `store.py`
   (per-variant CSVs and `days.csv` under `TRADING_DATA_ROOT/rotation/`, not the catalog),
   `journal.py` (insert-only SHA-256 chain, one entry per day), `pick.py` / `live.py` (the 09:16 entry
   from the 09:15 VIX open read live from Fyers, polled, with Angel One as the unattended fallback, and the days to expiry of the listed contracts from Fyers' symbol master, calendar as fallback; the entry records `vix_source` / `dte_source`), `cli.py`

@@ -1,7 +1,7 @@
 """The nightly step: run every variant's strategy file over one collected day and store the result.
 
-Loads each index's day once and simulates the 124 variants of that index on it. A day is
-written only when BOTH indices can run it (the research dropped a day either index lacks,
+Loads each index's day once and simulates every variant of that index (149 of the 298) on it. A
+day is written only when BOTH indices can run it (the research dropped a day either index lacks,
 so the history the ranking reads is the same here). A stored variant-day is never rewritten.
 """
 

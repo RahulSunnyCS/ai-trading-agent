@@ -1,7 +1,9 @@
 """Check the journal's ranking (rotation/score.py) against research/bl057/rotate.py.
 
-    uv run --with pandas --with numpy --with duckdb python scripts/rotation-parity.py
+    uv run --with pandas --with numpy --with duckdb python scripts/rotation-parity.py [--ext-dir]
 
+`--ext-dir` is the journal's universe (298 variants: the 248 plus Dir ITM1, compared with the
+`rotate.py --ext-dir` picks); without it the 248 original variants are scored against the 248 picks.
 For each list, every selection day of the research run (the main year, history from 2025-09-01) is
 re-scored from the rotation store restricted to the same history, and its core / Buy picks are
 compared with the `daily_picks_*.csv` rotate.py wrote. Exits 1 on any difference.
@@ -28,17 +30,19 @@ from option_backtesting.rotation.score import (  # noqa: E402
 from option_backtesting.rotation.variants import variant_names  # noqa: E402
 
 B = HERE / "research" / "bl057" / "daily_picks_min3_core6_buy2L2_whole_day"
+EXT_DIR = "--ext-dir" in sys.argv
+_SUFFIX = "_extdir" if EXT_DIR else ""
 FILES = {
-    "A": f"{B}_w5_34_33_23_0_5_fitlb5x30_21x25_63x25_126x20_fband.csv",
-    "B": f"{B}_w0_36_35_24_0_5_fitlb5x30_21x25_63x25_126x20_fband.csv",
-    "C": f"{B}_w15_30_30_20_0_5_fitlb5x30_21x25_63x25_126x20_fband.csv",
-    "REF": f"{B}.csv",
+    "A": f"{B}_w5_34_33_23_0_5_fitlb5x30_21x25_63x25_126x20_fband{_SUFFIX}.csv",
+    "B": f"{B}_w0_36_35_24_0_5_fitlb5x30_21x25_63x25_126x20_fband{_SUFFIX}.csv",
+    "C": f"{B}_w15_30_30_20_0_5_fitlb5x30_21x25_63x25_126x20_fband{_SUFFIX}.csv",
+    "REF": f"{B}_w33_25_25_17_extdir.csv" if EXT_DIR else f"{B}.csv",
 }
 FROM = pd.Timestamp("2025-09-01")
 
 
 def main() -> None:
-    names = variant_names()
+    names = [n for n in variant_names() if EXT_DIR or "_ditm1_" not in n]
     m = store.load_matrix(names)
     attrs = store.read_days()
     keep = [i for i, d in enumerate(m.days) if d in attrs and pd.Timestamp(d) >= FROM]

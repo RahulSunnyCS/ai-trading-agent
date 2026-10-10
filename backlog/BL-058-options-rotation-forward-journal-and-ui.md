@@ -193,9 +193,15 @@ equal-weight, live mix, lots per window.
 - Score once against the Phase 0 rule; write the Result here and in BL-057's Log.
 
 ### Phase 0b — what the journal records (dated 2026-10-10, registered before the first entry)
+**Amendment 2026-10-10 (owner, before the first entry): the universe is 298 variants, not 248** — the 248
+below plus the 50 Dir ITM1 variants (`N_ditm1_*`, `S_ditm1_*`, BL-080; family "dir" for the Widesl minimum
+and the family-band recent score). BL-080's read-out passed (A / B / C ≥ their 248 gross in 2 of 3
+periods, all above random P90; REF unchanged). Weights, lookbacks and rule are untouched; the journal
+records the universe size and a hash in every entry. Parity (`scripts/rotation-parity.py --ext-dir`)
+reproduces `rotate.py --ext-dir` on 202 of 202 days for each list.
 Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discipline (picks before
 09:17, scored after, no change from reports) stands.
-- **Lists (all DRB-6W3L2 shape):** 3 strategies × 2 lots from the 248-variant whole-day list, at
+- **Lists (all DRB-6W3L2 shape):** 3 strategies × 2 lots from the whole-day list (298 variants, see the amendment above), at
   least 2 Widesl strategies, the Buy add-on (one 2-lot Buy strategy) when a Buy variant ranks in the
   overall top 10; per-strategy stops as in the variant files; every list ranks with fit lookbacks
   5:30, 21:25, 63:25, 126:20 except REF. Weights are own-recent / weekday / dte / VIX / family-band
@@ -213,7 +219,7 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   to an insert-only hash-chained log under `TRADING_DATA_ROOT/rotation/`; `obt rotation verify`
   re-computes the chain. The picks are Telegrammed with the chain head. If the 09:15 VIX open cannot
   be read by 09:20 nothing is recorded for that day and an alert is sent (a late entry is not forward).
-- **Scoring (every evening, after `options-daily`):** the day's result for all 248 variants is
+- **Scoring (every evening, after `options-daily`):** the day's result for all 298 variants is
   computed (one-day `run_legwise` per variant, same strategy files), stored, and each list's recorded
   picks scored: gross for the day, the random-pick percentile for that day, and the running totals
   and drawdowns per list.
@@ -260,6 +266,7 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
   analysis discussion needs; owner asked that the discussion's UI needs be added here.
 - 2026-10-09 — created from the owner's request; P0 with a Monday 2026-10-12 09:15 deadline for
   Phases 0–3.
+- 2026-10-10 — owner chose the 298 universe (Dir ITM1 added) before the first entry; 50 variant files + results seeded, parity 202/202 on all four lists.
 - 2026-10-10 — owner chose lists A, B and C (BL-075 stage 1) plus the live baseline as REF; Phase 0b registered; build started.
 - 2026-10-10 — journal build is backend-only (CLI + two scheduler jobs + files); UI needs for the four lists added to Phase 4.
 - 2026-10-10 — **Built:** `obt rotation update|pick|verify|show` (`src/option_backtesting/rotation/`),

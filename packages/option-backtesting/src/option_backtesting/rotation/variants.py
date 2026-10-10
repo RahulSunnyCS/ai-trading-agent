@@ -1,7 +1,9 @@
-"""The 248 whole-day variants: NIFTY / SENSEX x (Widesl, Dir ATM, Buy, closest-premium Widesl) x 25
-start times 09:17 .. 15:17 (Buy has none at 15:17). Their strategy files are committed under
-`strategies/rotation/` (copied from the research folders; never edited, so the forward test cannot
-drift) and named `<N|S>_<family>_<HHMM>.yaml`."""
+"""The 298 whole-day variants: NIFTY / SENSEX x (Widesl, Dir ATM, Dir ITM1, Buy, closest-premium
+Widesl) x 25 start times 09:17 .. 15:17 (Buy has none at 15:17). The first 248 are BL-058's
+registered universe; the 50 Dir ITM1 files were added on 2026-10-10 (owner, BL-080) before the first
+journal entry. Their strategy files are committed under `strategies/rotation/` (copied from the
+research folders; never edited, so the forward test cannot drift) and named
+`<N|S>_<family>_<HHMM>.yaml`."""
 
 from __future__ import annotations
 

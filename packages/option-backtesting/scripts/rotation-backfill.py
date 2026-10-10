@@ -2,9 +2,9 @@
 
     uv run --with pandas python scripts/rotation-backfill.py
 
-Copies each of the 248 variants' per-day results (research/bl054|056|059|060|061|062/results,
-2024-10-09 -> 2026-10-08) into rotation/results/, and writes rotation/days.csv with each day's
-weekday, VIX band and days-to-expiry labels as the research used them
+Copies each variant's per-day results (research/bl054|056|059|060|061|062/results, and BL-080's
+Dir ITM1 series, 2024-10-09 onward) into rotation/results/, and writes rotation/days.csv with each
+day's weekday, VIX band and days-to-expiry labels as the research used them
 (`research/bl056/analyse.py::day_features`), keeping only the days both indices have. Existing
 files are not overwritten.
 """
@@ -35,9 +35,14 @@ def main() -> None:
     copied = 0
     for n in names:
         dst = out / f"{n}.csv"
-        if not dst.exists():
+        if dst.exists():
+            continue
+        if "_ditm1_" in n:  # BL-080's series start in 2022; the journal's history starts 2024-10-09
+            src = pd.read_csv(HERE / "research" / "bl080" / "results" / f"{n}.csv")
+            src[src.day >= "2024-10-09"].to_csv(dst, index=False)
+        else:
             shutil.copyfile(varlib.variant_file(n, "results"), dst)
-            copied += 1
+        copied += 1
     print(f"{copied} result files copied ({len(names)} variants) -> {out}")
     # days both indices have, with the research's labels
     frames = {}

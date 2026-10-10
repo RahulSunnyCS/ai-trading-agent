@@ -223,7 +223,7 @@ const BASE_JOBS: Job[] = [
   {
     id: 'options-rotation-nightly',
     description:
-      "Run all 248 rotation variants over the day's collected data and store the results (BL-058)",
+      "Run all 298 rotation variants over the day's collected data and store the results (BL-058)",
     // Needs the day in the lake, so it follows options-daily (same group: never at the same time)
     // and keeps trying until 23:00. Idempotent: a stored variant-day is never rewritten.
     schedule: { at: '19:45', on: tradingDays, label: 'trading days 19:45' },

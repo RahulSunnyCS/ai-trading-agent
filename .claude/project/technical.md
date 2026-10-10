@@ -130,7 +130,7 @@ uv run tdata reference derive-expiries  # rebuild the real expiry list per index
 uv run tdata quality rebuild  # re-judge every lake day -> data_quality (usable / excluded + why); `quality status` summarises; `quality export` rewrites the lock-free verdict file the engine reads
 uv run obt legwise run strategies/legwise/*.yaml [--trades] [--include-excluded] [--bars 5m]   # AlgoTest-style leg-wise backtests over that data; skips (and counts) days data_quality excludes
 uv run obt legwise rerun    # re-run every strategy over every collected day and save (after editing a strategy)
-uv run obt rotation update [--day D]   # BL-058: run the 248 rotation variants over a collected day, store results (idempotent; scheduler 19:45)
+uv run obt rotation update [--day D]   # BL-058: run the 298 rotation variants over a collected day, store results (idempotent; default day = the newest collected day not yet stored; scheduler 19:45)
 uv run obt rotation pick [--dry-run]     # record lists A / B / C / REF before 09:17, hash-chained, + Telegram (scheduler 09:16; never late-recorded silently)
 uv run obt rotation verify | show        # re-compute the chain | recent entries with each list's P&L once scored
 uv run obt daily            # the evening routine: fetch the last closed session (+ nearest/next futures), judge it (data_quality), build its derived tables, run every strategies/legwise/*.yaml, save, summarise + Telegram with verdicts and IV percentile (--no-telegram)
