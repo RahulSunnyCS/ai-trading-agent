@@ -6,7 +6,7 @@ TRADING_DATA_ROOT from conftest.py means these never touch the real catalog."""
 import itertools
 import threading
 import time
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 import pytest
@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from trading_data.db import connect
 
 from momentum_backtesting import api, fyers, local_store, notify, runs_store, weekly
-from momentum_backtesting.notify import Notification
+from momentum_backtesting.notify import IST, Notification
 
 
 @pytest.fixture
@@ -675,8 +675,10 @@ def test_a_group_headline_sends_one_combined_message_and_journals_each_sleeve(cl
 
 
 def test_a_stock_based_headline_stays_quiet_before_the_1930_run(client, monkeypatch):
-    """The 14:40 preview and 16:45 final cannot evaluate a Broad headline; the 19:30 rerun does.
-    They must not send 'blocked' every Friday."""
+    """Outside market hours the preview cannot rank a Broad headline on live prices (that is
+    tests/test_broad_live_preview.py), and the 19:30 rerun sends its signal. It must not send
+    'blocked' every Friday."""
+    monkeypatch.setattr(api, "_ist_now", lambda: datetime(2026, 10, 9, 16, 0, tzinfo=IST))
     headline = _favourite(client, "Broad headline", "paper", "broad")
     client.patch(f"/api/saved-runs/{headline['id']}", json={"active": True})
     monkeypatch.setattr(

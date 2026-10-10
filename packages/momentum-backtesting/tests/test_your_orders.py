@@ -90,7 +90,9 @@ def test_orders_against_the_paper_portfolio_are_saved_and_summarised(client, mon
     assert rows["BBB"] == ("SELL", 1000)  # 50,000 / 50
     assert rows["CCC#2"] == ("BUY", 200)  # 50,000 / 250
     assert rows["AAA"] == ("", 0)
-    stored = client.get("/api/orders", params={"week": "2026-10-09"}).json()["orders"]
+    # Saved under the week the run is for, which follows today's date (a Saturday run is for
+    # the next Friday), not the mocked signal's week.
+    stored = client.get("/api/orders", params={"week": payload["week"]}).json()["orders"]
     assert len(stored) == 1 and stored[0]["trigger"] == "scheduled"
     note = api._orders_message(payload)
     assert "paper portfolio of ₹100,000" in note.body

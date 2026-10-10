@@ -175,7 +175,8 @@ Each phase is one PR, reviewed and merged before the next.
 
 ### Phase 3 — Your orders, holdings from Fyers, and the 14:15 step
 - **Tasks:**
-  - Migration `011_momentum_holdings.sql`: `momentum_holdings` (owner, synced_at, source, symbol,
+  - Migration `012_momentum_orders.sql` (written as `011_momentum_orders`, renumbered when BL-052's
+    011 landed first; idempotent for that reason): `momentum_holdings` (owner, synced_at, source, symbol,
     qty, avg_price), `momentum_holding_rules` (owner, symbol, treatment: exclude / cash, extra cash),
     `momentum_orders` (owner, week, favourite id, prices as-of, rows JSON, created_at). Owner ID
     from `MOMENTUM_OWNER` (default `rahul`).

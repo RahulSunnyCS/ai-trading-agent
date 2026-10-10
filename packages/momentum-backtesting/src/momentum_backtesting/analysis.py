@@ -9,7 +9,7 @@ from collections.abc import Callable
 import pandas as pd
 
 from . import metrics, reference_benchmarks
-from .engine import CASH, IDLE, Config, Result
+from .engine import CASH, IDLE, Config, Result, cadence_weeks
 
 CAPITAL = 100_000  # rupee figures are shown for Rs 1 lakh invested at the start
 
@@ -239,6 +239,52 @@ def timeline(result: Result, closed: pd.DataFrame) -> list[dict]:
     return segments
 
 
+def rebalance_weeks(
+    week: pd.Timestamp, rebalance: str, every: int, offset: int
+) -> tuple[bool, pd.Timestamp | None]:
+    """(whether `week` trades, the next Friday after it that does; None when every week trades).
+    Mirrors `engine.run_backtest`'s `trade_weeks`: every `every` weeks on the calendar phase
+    `offset` (`engine.cadence_weeks`), or, monthly, the last Friday of the month (the next Friday
+    falls in another month)."""
+
+    def trades(w: pd.Timestamp) -> bool:
+        if rebalance == "monthly":
+            return (w + pd.Timedelta(days=7)).month != w.month
+        return bool(cadence_weeks([w], every, offset))
+
+    if rebalance != "monthly" and every <= 1:
+        return True, None
+    following = week + pd.Timedelta(days=7)
+    while not trades(following):  # at most 5 Fridays on
+        following += pd.Timedelta(days=7)
+    return trades(week), following
+
+
+def cadence_explain(
+    week: pd.Timestamp,
+    rebalance: str,
+    every: int,
+    offset: int,
+    sell_every_week: bool,
+) -> str | None:
+    """None when `week` is a rebalance week under the cadence (`rebalance_weeks`), else the
+    sentence saying it is not, when the next one is and what still happens. With
+    `sell_every_week` an off week still sells holdings that dropped out; buys and cap trims
+    wait."""
+    on, following = rebalance_weeks(week, rebalance, every, offset)
+    if on:
+        return None
+    rule = (
+        "monthly: trades on the last Friday of the month"
+        if rebalance == "monthly"
+        else f"every {every} weeks, phase {offset + 1} of {every}"
+    )
+    note = f"Not a rebalance week ({rule}; next {following:%d %b %Y})"
+    if sell_every_week:
+        return f"{note}: only holdings that dropped out are sold; buys and trims wait."
+    return f"{note}: no trades this week."
+
+
 def latest_signal(
     result: Result,
     prices: pd.DataFrame,
@@ -247,6 +293,9 @@ def latest_signal(
     no_buy: pd.DataFrame | None = None,
 ) -> dict:
     """What the rules say to do at the most recent week's close.
+
+    On a week the cadence does not trade (`cadence_explain`) nothing is bought, trimmed or sold,
+    except the sells `sell_every_week` allows, exactly as the engine would do.
 
     `membership` (week x instrument booleans, stock backtests only) mirrors the engine's own
     `_Sim.top_names` gate: an instrument absent from `membership.columns` (an ETF, benchmark or
@@ -345,6 +394,16 @@ def latest_signal(
             for name in new:
                 actions[name] = "WAIT"
             explain = "Nothing to sell, so new top-N names wait for the next sale."
+    off_week = cadence_explain(
+        week,
+        config.rebalance,
+        config.rebalance_every,
+        config.rebalance_offset,
+        config.sell_every_week,
+    )
+    if off_week is not None:
+        actions = {n: "SELL" for n in sells} if config.sell_every_week else {}
+        explain = off_week
     for name in held:
         actions.setdefault(name, "HOLD")
 
