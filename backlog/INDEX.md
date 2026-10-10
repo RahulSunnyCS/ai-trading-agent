@@ -70,6 +70,7 @@ Sorted by priority (P0 first), then ID.
 | [BL-075](BL-075-drb-final-map-and-structural-switches.md) | The final map: 100 weightings × 3 periods, then the structural switches (Widesl minimum, Buy add-on, closest-premium) on the robust region | P2 | In progress | research | options |
 | [BL-080](BL-080-drb-wider-closest-premium-families.md) | Four more closest-premium Widesl families: NIFTY ₹40 / ₹60 and SENSEX ₹120 / ₹200 | P2 | In progress | research | options |
 | [BL-081](BL-081-drb-hourly-checkpoints-and-no-trade.md) | Hourly checkpoints for picks that have not started yet (state at 10:30–13:30: VIX, trend, VWAP, ATR, RSI, pivots) and a no-trade option | P2 | Done: no state variable passes in two periods; no-trade column never picked, rupee gate inert | research | options |
+| [BL-083](BL-083-event-triggered-intraday-entries.md) | Event-triggered intraday entries: fire Widesl / Dir / Buy the minute a pivot, VIX, straddle or RSI condition is met, overriding the next scheduled pick | P2 | Planned | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
 | [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
