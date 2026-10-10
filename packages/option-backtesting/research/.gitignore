@@ -17,3 +17,4 @@ closest_core_lots.csv
 # BL-066 generated
 curves_*.jsonl
 out_daily_with_stops.csv
+out_*/
