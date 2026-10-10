@@ -147,6 +147,21 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
     the selection noise of this rule (BL-068's shuffle sd ≈ ₹1.08 lakh on 202 days). The ranking among
     the sets is more trustworthy than any single number.
 
+### Block 4 — the 298 map and a pruned universe (2026-10-10 17:50, registered before its runs)
+- **Why:** blocks 1–3 say Dir ITM1 helps, the four new closest-premium families hurt, and SENSEX
+  ₹250 / ₹320 look redundant. Two questions remain before the journal's universe is touched: does
+  ITM1 make the weighting less fragile, and does pruning SENSEX ₹250 / ₹320 help or only look good?
+- **Runs:** (a) the 100-weighting map of BL-075 stage 1 on the 298 list (248 + Dir ITM1; 300 runs,
+  `run_all.py --stage 1 --extdir`); (b) lists A, B, C, REF on P1 / P2 / P3 on the pruned list 298 minus
+  SENSEX ₹250 and ₹320 (248 + ITM1 − 50 = 248 variants; `--ext-dir --drop S_p250,S_p320`; 12 runs).
+- **Read-out (registered):** (a) the share of the 100 cells above the random P90 in all three periods
+  and the number in a robust region, against 19% / 0 on the 248 list and 5% / 0 on the 348 list; ITM1
+  is *fragility-reducing* if the share is ≥ 19%. (b) pruning is *adopted* only if at least 3 of the 4
+  lists' gross is ≥ their 298-list gross in at least 2 of 3 periods **and** no list falls below chance
+  in a period where it was above it on the 298 list.
+- **Will not run:** other prunings (S_wide, the Buy families), pairs, other lists.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
