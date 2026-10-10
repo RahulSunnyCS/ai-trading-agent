@@ -106,11 +106,13 @@ function EmptyJournal({ log, onBrowseHistory }: { log: RotationLog; onBrowseHist
   );
 }
 
-export function RotationDailyLog() {
+export function RotationDailyLog({ focus: focusProp }: { focus?: RotationListKey } = {}) {
   const today = useMemo(() => istToday(), []);
   const [source, setSource] = useState<RotationLogSource>('recorded');
   const [windowChoice, setWindowChoice] = useState<WindowChoice>(defaultWindow('recorded'));
-  const [focus, setFocus] = useState<RotationListKey>('A');
+  // The page's focus list when it passes one; otherwise this widget's own (A, the owner's default).
+  const [ownFocus, setFocus] = useState<RotationListKey>('A');
+  const focus = focusProp ?? ownFocus;
   const [filter, setFilter] = useState<RowFilter>('all');
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [month, setMonth] = useState<Month | null>(null);
@@ -176,16 +178,18 @@ export function RotationDailyLog() {
               size="sm"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted">Shade by list</span>
-            <SegmentedControl
-              value={focus}
-              options={FOCUS_OPTIONS}
-              onChange={setFocus}
-              ariaLabel="List the calendar is shaded by"
-              size="sm"
-            />
-          </div>
+          {focusProp === undefined ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted">Shade by list</span>
+              <SegmentedControl
+                value={focus}
+                options={FOCUS_OPTIONS}
+                onChange={setFocus}
+                ariaLabel="List the calendar is shaded by"
+                size="sm"
+              />
+            </div>
+          ) : null}
           {log ? (
             <span
               className="ml-auto flex items-center gap-1.5 text-xs text-faint"

@@ -98,6 +98,14 @@ describe('RotationDailyLog', () => {
     expect(COUNTERS.days).toBe(5);
   });
 
+  it("takes the page's focus list and then offers no second control for it", async () => {
+    stubFetch(() => ({ body: log() }));
+    render(<RotationDailyLog focus="REF" />);
+    await screen.findByRole('table');
+    expect(screen.queryByRole('radiogroup', { name: /List the calendar is shaded by/ })).toBeNull();
+    expect(screen.getByText(/Shaded by list REF/)).toBeTruthy();
+  });
+
   it('labels the filters as browsing and filters to the losing days', async () => {
     stubFetch(() => ({ body: log() }));
     render(<RotationDailyLog />);
