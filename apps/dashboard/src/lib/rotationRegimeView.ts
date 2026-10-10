@@ -12,6 +12,8 @@ import type {
 } from '../types/rotationRegime';
 import { formatNumber } from './format';
 
+export { shade } from './shareTint';
+
 export const PERIOD_SHORT: Record<string, string> = {
   P1: 'P1',
   P2: 'P2',
@@ -23,11 +25,6 @@ export const PERIOD_SHORT: Record<string, string> = {
 export function shares(mix: RegimeMix): number[] {
   const total = mix.counts.reduce((s, c) => s + c, 0);
   return mix.counts.map((c) => (total > 0 ? c / total : 0));
-}
-
-/** An opacity for the i-th of n categories: light to dark, never fully transparent. */
-export function shade(i: number, n: number): number {
-  return n <= 1 ? 0.6 : 0.18 + (0.72 * i) / (n - 1);
 }
 
 /** "P10 · median · P90", or an em dash when there is nothing to show. */

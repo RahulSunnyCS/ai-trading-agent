@@ -29,6 +29,7 @@ import { Card, CardHeader } from '../ui/Card';
 import { RefreshButton } from '../ui/RefreshButton';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
+import { StackedShare } from './StackedShare';
 
 const COLUMNS = ['P1', 'P2', 'P3', 'forward'] as const;
 
@@ -63,34 +64,13 @@ function MixBar({ p, row }: { p: RegimePeriod; row: RegimeRowKey }) {
       />
     );
   }
-  const frac = shares(mix);
   return (
-    <div
-      className="flex h-5 overflow-hidden rounded border border-border"
-      role="img"
-      aria-label={mix.categories
-        .map((c, i) => `${c} ${formatNumber((frac[i] ?? 0) * 100, 0)}%`)
-        .join(', ')}
-    >
-      {mix.categories.map((c, i) => {
-        const f = frac[i] ?? 0;
-        if (f === 0) return null;
-        return (
-          <i
-            key={c}
-            title={segmentTitle(c, mix.counts[i] ?? 0, f)}
-            className="flex items-center justify-center overflow-hidden font-mono text-[10px] not-italic text-foreground"
-            style={{
-              width: `${f * 100}%`,
-              // the tint carries the alpha, so the number on a light segment stays readable
-              backgroundColor: `hsl(var(--primary) / ${shade(i, mix.categories.length)})`,
-            }}
-          >
-            {f >= 0.09 ? formatNumber(f * 100, 0) : ''}
-          </i>
-        );
-      })}
-    </div>
+    <StackedShare
+      keys={mix.categories}
+      labels={mix.categories}
+      counts={mix.counts}
+      shares={shares(mix)}
+    />
   );
 }
 
