@@ -1,4 +1,4 @@
-"""`obt rotation …`: update | pick | verify | show (BL-058)."""
+"""`obt rotation …`: update | pick | verify | show (BL-058); corr, corr-list, corr-pick (BL-090)."""
 
 from __future__ import annotations
 
@@ -121,3 +121,140 @@ def show(last: int = typer.Option(5, "--last", help="How many recent entries."))
                 row = m.values[m.days.index(day)]
                 pnl = f"  P&L {LOTS_PER * sum(row[m.names.index(n)] for n in picked):>9,.0f}"
             typer.echo(f"  {key:3s} {', '.join(picked)}{pnl}")
+
+
+# --- how the strategies move together (BL-090) -----------------------------------------------
+
+_SELECTORS_HELP = (
+    "Strategies: a name, a glob (N_*_0917), all, slot:0917, family:wide|dir|buy|p80, "
+    "index:N|S, kind:legwise|variant; a+b is both (slot:0917+index:N). Default slot:0917."
+)
+
+
+def _window(start: str | None, end: str | None) -> tuple[date | None, date | None]:
+    try:
+        return (
+            date.fromisoformat(start) if start else None,
+            date.fromisoformat(end) if end else None,
+        )
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+
+
+def _load(selectors: list[str], include_stale: bool):
+    from .series import SelectorError, load
+
+    try:
+        return load(selectors, include_stale=include_stale)
+    except SelectorError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(2) from error
+
+
+@rotation_app.command("corr-list")
+def corr_list(
+    kind: str = typer.Option(None, "--kind", help="variant | legwise"),
+) -> None:
+    """Every strategy that has daily results now, with its days and date range."""
+    from .series import available
+
+    rows = [a for a in available() if kind is None or a.kind == kind]
+    if not rows:
+        typer.echo("no strategy has results yet", err=True)
+        raise typer.Exit(2)
+    width = max(len(a.name) for a in rows)
+    for a in rows:
+        flag = "  STALE (file changed since)" if a.stale else ""
+        typer.echo(
+            f"{a.name:<{width}}  {a.kind:<8} {a.n_days:>4} days  {a.first} .. {a.last}{flag}"
+        )
+    typer.echo(f"{len(rows)} strategies")
+
+
+@rotation_app.command()
+def corr(
+    selectors: list[str] = typer.Argument(None, help=_SELECTORS_HELP),
+    start: str = typer.Option(None, "--from", help="First day, YYYY-MM-DD."),
+    end: str = typer.Option(None, "--to", help="Last day, YYYY-MM-DD."),
+    window: int = typer.Option(63, "--window", min=10, help="Trading days per rolling block."),
+    include_stale: bool = typer.Option(False, "--include-stale"),
+    min_days: int = typer.Option(
+        40, "--min-days", min=3, help="Refuse fewer common days than this."
+    ),
+    json_path: str = typer.Option(None, "--json", help="Write the whole report as JSON."),
+    csv_path: str = typer.Option(None, "--csv", help="Write one matrix as CSV."),
+    matrix: str = typer.Option(
+        "pearson", "--matrix", help="pearson | spearman | loss (for --csv)."
+    ),
+) -> None:
+    """Correlation of the strategies' daily P&L, loss-day overlap, basket drawdown, drift."""
+    import csv
+    import json
+
+    from ..analytics import correlation as c
+
+    if matrix not in c.MEASURES:
+        raise typer.BadParameter(f"--matrix must be one of {', '.join(c.MEASURES)}")
+    a, b = _window(start, end)
+    series = _load(selectors, include_stale)
+    if len(series) < 2:
+        typer.echo("need at least two strategies to correlate", err=True)
+        raise typer.Exit(2)
+    try:
+        report = c.analyse(series, start=a, end=b, window=window, min_days=min_days)
+    except ValueError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(2) from error
+    typer.echo(c.render_text(report))
+    if json_path:
+        with open(json_path, "w") as f:
+            json.dump(c.to_json(report), f)
+        typer.echo(f"wrote {json_path}")
+    if csv_path:
+        with open(csv_path, "w", newline="") as f:
+            csv.writer(f).writerows(c.to_csv_rows(report, matrix))
+        typer.echo(f"wrote {csv_path}")
+
+
+@rotation_app.command("corr-pick")
+def corr_pick(
+    selectors: list[str] = typer.Argument(None, help=_SELECTORS_HELP),
+    k: int = typer.Option(3, "--k", min=1, help="Strategies wanted."),
+    max_corr: float = typer.Option(0.6, "--max-corr", help="Keep one only if below this."),
+    measure: str = typer.Option("pearson", "--measure", help="pearson | spearman | loss"),
+    require: list[str] = typer.Option([], "--require", help="A name that must be in the basket."),
+    start: str = typer.Option(None, "--from"),
+    end: str = typer.Option(None, "--to"),
+    include_stale: bool = typer.Option(False, "--include-stale"),
+    min_days: int = typer.Option(40, "--min-days", min=3),
+    json_path: str = typer.Option(None, "--json"),
+) -> None:
+    """A basket of k strategies none of which are alike (diagnostic; changes no list)."""
+    import json
+
+    from ..analytics import correlation as c
+
+    if measure not in c.MEASURES:
+        raise typer.BadParameter(f"--measure must be one of {', '.join(c.MEASURES)}")
+    a, b = _window(start, end)
+    series = _load(selectors, include_stale)
+    names = {s.name for s in series}
+    missing = [n for n in require if n not in names]
+    if missing:
+        typer.echo(f"--require not among the strategies chosen: {', '.join(missing)}", err=True)
+        raise typer.Exit(2)
+    try:
+        report = c.analyse(series, start=a, end=b, min_days=min_days)
+        basket = c.pick_diverse(report, k, max_corr, measure=measure, require=require)
+    except ValueError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(2) from error
+    typer.echo(
+        f"{report.n_days} common days, {report.days[0]} to {report.days[-1]}; "
+        f"{len(series)} candidates"
+    )
+    typer.echo(c.render_basket(basket))
+    if json_path:
+        with open(json_path, "w") as f:
+            json.dump(c.basket_to_json(basket), f)
+        typer.echo(f"wrote {json_path}")

@@ -34,6 +34,7 @@ import opsOverview from './content/operations/overview.md?raw';
 import opsSettings from './content/operations/settings.md?raw';
 import optionsBuilderForm from './content/optionslab/builder-form.md?raw';
 import optionsBuilderYaml from './content/optionslab/builder-yaml.md?raw';
+import optionsCorrelation from './content/optionslab/correlation.md?raw';
 import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
@@ -278,6 +279,15 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: optionsRegimes,
     screen: { tab: 'optionslab', rest: ['regimes'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'correlation',
+    title: 'Correlation',
+    summary: 'Which strategies lose on the same days, and a basket whose parts are not alike.',
+    kind: 'Screen',
+    body: optionsCorrelation,
+    screen: { tab: 'optionslab', rest: ['correlation'] },
   },
   {
     chapter: 'optionslab',

@@ -8,6 +8,7 @@
  *  - Runs: the YAML run registry and the leg-wise runs in one list, clickable and comparable.
  *  - Daily results: saved `obt daily` results, the evening run button, trade logs.
  *  - Regimes: does the index come in persistent periods? (index + VIX history)
+ *  - Correlation: do the strategies lose on the same days? (BL-090)
  *
  * /optionslab with no section opens Daily results, as it always has.
  */
@@ -21,6 +22,7 @@ import {
   builderMode,
   oneOf,
 } from '../lib/routes';
+import { CorrelationPanel } from './optionslab/CorrelationPanel';
 import { RegimesPanel } from './optionslab/RegimesPanel';
 import { ResultsPanel } from './optionslab/ResultsPanel';
 import { RunsPanel } from './optionslab/RunsPanel';
@@ -37,6 +39,7 @@ const SECTION_LABEL: Record<OptionsLabSection, string> = {
   runs: 'Runs',
   results: 'Daily results',
   regimes: 'Regimes',
+  correlation: 'Correlation',
 };
 
 const SECTIONS: TabItem<OptionsLabSection>[] = OPTIONS_LAB_SECTIONS.map((value) => ({
@@ -100,6 +103,7 @@ export function OptionsLabView() {
       {section === 'runs' && <RunsPanel />}
       {section === 'results' && <ResultsPanel />}
       {section === 'regimes' && <RegimesPanel />}
+      {section === 'correlation' && <CorrelationPanel />}
     </div>
   );
 }
