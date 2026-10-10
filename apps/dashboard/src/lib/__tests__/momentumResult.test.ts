@@ -215,6 +215,7 @@ describe('signal actions', () => {
     expect(signalActionTone('WAIT')).toBe('warning');
     expect(signalActionTone('WAITING FOR A SALE')).toBe('warning');
     expect(signalActionTone('AT CAP')).toBe('warning');
+    expect(signalActionTone('SKIP (above max price)')).toBe('warning');
     expect(signalActionTone('HOLD')).toBe('neutral');
     expect(signalActionTone('PARK')).toBe('neutral');
     expect(signalActionTone('NOT A MEMBER')).toBe('neutral');

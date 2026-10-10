@@ -22,6 +22,16 @@ them). Any percentage you leave unallocated counts as cash.
 difference: buy, sell, or leave. During market hours it uses live Fyers prices; otherwise the
 latest close in the database.
 
+The live prices are added as a temporary row for this week and the whole ranking is worked out
+again with them, so the target is what the strategy would pick at today's prices. That row is
+never saved. Broad Momentum quotes every stock in its pool (about 750, the default and the
+turnover-ranked universes alike), so a preview takes a little longer; the whole-market universe
+is too large to quote and always uses the latest close.
+
+If live prices were expected but could not be used, a yellow note above the table says so and
+why: no Fyers token, a stock Fyers returned no price for, or stock history more than ten days
+old (the Friday 19:30 sync refreshes it). The table then shows the latest close.
+
 ### A group
 
 A group is previewed as **one account**. Each sleeve's own target is worked out, then they are

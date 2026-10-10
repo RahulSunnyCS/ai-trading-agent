@@ -614,6 +614,17 @@ export function MomentumRebalanceView({
                 : `as of ${formatDay(plan.as_of)}`
             } · Signal week ${formatDay(plan.signal_week)}`}
           />
+          {plan.live_unavailable ? (
+            <div
+              id="rebalance-live-unavailable"
+              className="mb-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3"
+            >
+              <p className="text-sm font-medium text-foreground">
+                Not live prices: this preview used the latest stored close
+              </p>
+              <p className="mt-1 text-sm text-muted">{plan.live_unavailable}</p>
+            </div>
+          ) : null}
           {plan.group ? (
             <GroupPreview group={plan.group} firstAllocation={plan.first_allocation} />
           ) : null}

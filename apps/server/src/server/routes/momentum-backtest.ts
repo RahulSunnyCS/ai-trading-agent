@@ -507,6 +507,50 @@ export const momentumBacktestRoutes = fp(async (fastify: FastifyInstance) => {
     },
   );
 
+  // BL-051 Phase 3: Your orders (settings, holdings, rules, the computed orders) and holdings
+  // read from Fyers (read-only) or pasted. Nothing here places an order.
+  fastify.get(
+    '/api/momentum/orders',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: { week: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { week } = request.query as { week?: string };
+      await forward(reply, week ? `/api/orders?week=${encodeURIComponent(week)}` : '/api/orders');
+    },
+  );
+  fastify.post('/api/momentum/orders/run', async (_request, reply) => {
+    await forward(reply, '/api/orders/run', { method: 'POST' });
+  });
+  for (const [path, method] of [
+    ['orders/settings', 'PUT'],
+    ['holdings/paste', 'POST'],
+    ['holdings/rules', 'PUT'],
+  ] as const) {
+    fastify.route({
+      method,
+      url: `/api/momentum/${path}`,
+      bodyLimit: BODY_LIMIT_BYTES,
+      schema: { body: { type: 'object' } },
+      handler: async (request, reply) => {
+        await forward(reply, `/api/${path}`, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request.body),
+        });
+      },
+    });
+  }
+  fastify.post('/api/momentum/holdings/sync', async (_request, reply) => {
+    await forward(reply, '/api/holdings/sync', { method: 'POST' });
+  });
+
   // BL-051: the latest live-money rules check, and a manual re-check (never sends).
   fastify.get('/api/momentum/live-rules', async (_request, reply) => {
     await forward(reply, '/api/live-rules');

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P1 — the page the owner acts on every Friday; paper tracking starts 2026-10-09 and real money will follow the headline favourite (BL-025) |
-| **Status** | In progress (Phases 1, 2 and 5 done) |
+| **Status** | In progress (Phases 1, 2 and 5 done; Phase 3 in progress) |
 | **Type** | feature |
 | **Area** | momentum (backend + dashboard + scheduler) |
 | **Created** | 2026-10-08 |
@@ -175,7 +175,8 @@ Each phase is one PR, reviewed and merged before the next.
 
 ### Phase 3 — Your orders, holdings from Fyers, and the 14:15 step
 - **Tasks:**
-  - Migration `011_momentum_holdings.sql`: `momentum_holdings` (owner, synced_at, source, symbol,
+  - Migration `012_momentum_orders.sql` (written as `011_momentum_orders`, renumbered when BL-052's
+    011 landed first; idempotent for that reason): `momentum_holdings` (owner, synced_at, source, symbol,
     qty, avg_price), `momentum_holding_rules` (owner, symbol, treatment: exclude / cash, extra cash),
     `momentum_orders` (owner, week, favourite id, prices as-of, rows JSON, created_at). Owner ID
     from `MOMENTUM_OWNER` (default `rahul`).
@@ -288,6 +289,30 @@ Answered by the owner on 2026-10-08 (see the Log):
   for a strategy with a single exit rank (Broad in category mode has none); the rules strip shows
   the last saved check, with "Check now" re-running it here without sending; "Since the preview"
   covers ETF favourites until Phase 3 stores the 14:15 orders.
+- 2026-10-08 — Phase 2 merged (#137, review fixes in the same PR). Phase 3 started.
+- 2026-10-08 — owner, Phase 3: the paper portfolio for Your orders is **Rs 1 lakh** (an owner
+  setting, `paper_capital_rs`; `live_rules.toml`'s Rs 5 lakh stays the real-money capital). The
+  14:15 step works by each strategy's signal delay: **delay 1** (the Phase 6 sleeves) decides this
+  Friday's trades from last Friday's ranks, already stored, so its orders are **exact** before
+  the close (only sizing and the price-based checks - ceiling, circuit locks, 52-week low, caps -
+  use a stand-in Friday row); **delay 0** decides on Friday's own close, so 14:15 gives an
+  **estimate on live prices**. Added to Phase 3 at the owner's request: on Fridays, **live
+  momentum scores** from Fyers quotes for the whole ranked universe (about 750 stocks, ~15
+  requests), computed in memory and shown as provisional on Scores and This week; the official
+  closes at 19:30 replace them by recomputation, nothing provisional is ever written to the
+  database (a failed 19:30 job must never leave a 14:45 price standing as Friday's close). The
+  pool filter keeps yesterday's turnover-based membership until the close. Live estimates are
+  not journalled and not sent.
+- 2026-10-08 — Phase 3, first PR: Your orders (orders calculator, per-owner settings with a
+  Rs 1 lakh paper portfolio, holdings snapshots from Fyers read-only or pasted, holding rules,
+  saved orders; migration 012), the week-ahead decision for delay-1 strategies (parity-tested
+  against the full backtest: identical buys and full exits in 6 cadence cases), `mbt orders run`
+  and the Fri 14:15 scheduler job with a Telegram summary, the Your orders section and its
+  settings drawer. A real-data dry run of the week ahead (9 Oct) gave 15 trades from sleeve
+  535b17b4 and "not a rebalance week" for the other three. The Fyers holdings call was checked
+  live (the account holds nothing yet, so per-holding field names follow Fyers' documentation).
+  Still to come in Phase 3: Friday live scores and delay-0 estimates (in memory, provisional),
+  "Since your 14:15 orders", and retiring the Rebalance tab.
 - 2026-10-08 — Phase 5 (alerts) built, ahead of Phases 3 and 4 because it does not depend on
   them. `GET /api/alerts` (`alerts.py`) computes the open alerts from the same checks the
   Telegram jobs use; the bell is in the top bar and the pop-up is mounted once in the app shell,

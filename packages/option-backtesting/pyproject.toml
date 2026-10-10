@@ -58,6 +58,9 @@ extend-immutable-calls = ["typer.Option", "typer.Argument"]
 # ported golden-fixture arrays) — wrapping them for line length would make
 # them harder to diff against their source, not easier to read.
 "tests/**" = ["E501"]
+# One-off research scripts (research/blNNN): wide printed result tables are the output, so
+# line length is not enforced there either.
+"research/**" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

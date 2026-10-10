@@ -387,8 +387,12 @@ ai-trading-agent/
         │   │                             # list_runs, critique_result, export_personality, propose_strategy
         │   └── cli.py                    # `obt` — ingest plan | ingest | validate | run | registry |
         │                                 # walkforward | sweep [--overfit] | export-personality
-        └── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
-                                            # reproduces golden_15_sessions.expected.txt to the rupee for A/B/C/D
+        ├── tests/{golden,parity,unit}/    # tests/golden/test_engine_golden.py is the M-3 exit gate —
+        │                                   # reproduces golden_15_sessions.expected.txt to the rupee for A/B/C/D
+        └── research/blNNN/                 # one folder per research backlog item (BL-054 …): variant
+                                            # generators, runners and evaluation scripts, with shared
+                                            # code in research/common/varlib.py. Generated output
+                                            # (variants, results, curves) is git-ignored; see below
 ```
 
 ## Architecture
@@ -427,6 +431,7 @@ The system is a **real-time event-driven pipeline** in four layers:
 - **Probability scores:** Not empirically calibrated yet. Treat as relative rankings, not absolute probabilities. Brier scores are tracked in `retrospection_results.signal_brier_score`
 - **TypeScript strict mode:** Enabled. `fyers-api-v3` has no official types — the shim at `apps/server/src/types/fyers-api-v3.d.ts` covers the SDK surface we use
 - **No default exports:** Use named exports throughout
+- **Research scripts live in `packages/option-backtesting/research/blNNN/`** (one folder per backlog item, run with `uv run python research/blNNN/<script>.py`). They are one-off analysis, not product code: the pre-registered rule is in the item, the scripts write only under their own folder (never into `strategies/legwise/`, which `obt daily` runs in full), generated files are git-ignored, and Ruff does not enforce line length there (`pyproject.toml` per-file-ignores, like `tests/`). Anything two items need goes in `research/common/`, not imported across item folders. DuckDB `hour(ts)`/`minute(ts)` on a `TIMESTAMPTZ` read the session zone: `SET TimeZone='Asia/Kolkata'` before filtering by exchange time of day
 - **Merges into `main` go through green CI (BL-014).** Branch protection requires the four
   CI jobs that run on every PR. In Claude Code, `.claude/hooks/merge-guard.py` (a `PreToolUse`
   hook on Bash) refuses `gh pr merge` while any check is failing or pending, `--admin`, a PR over
@@ -518,6 +523,7 @@ Critical variables whose misconfiguration causes real pain:
 | `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` | Optional. The dashboard host sits behind a Cloudflare Access application that signs people in (Google, one-time PIN). Set both (team hostname `<team>.cloudflareaccess.com` and the application's AUD tag; plain Worker vars, not secrets) and the dashboard accepts only requests carrying a valid signed Access token (`apps/dashboard/src/lib/cfAccess.ts`); `DASHBOARD_PASSWORD` and `/login` are then unused. One without the other, or a team domain outside `cloudflareaccess.com`, makes every request 503 |
 | ~~`MOMENTUM_DATABASE_URL`~~ | **Retired 2026-09-30** (TODO 3.11.5) — `packages/momentum-backtesting`'s price history and weekly signals now live in the shared `momentum_prices`/`momentum_signals` tables (`TRADING_DATA_ROOT`), not a separate Neon Postgres. `DATABASE_URL` (unrelated, still live) is what momentum's `fyers.py` reads for `broker_tokens` |
 | `FYERS_TOKEN_FILE` | Path of the 0600 JSON token `packages/broker-login`'s `bun run fyers-token` writes in CI (headless Fyers login: `FYERS_CLIENT_ID`/`FYERS_PIN`/`FYERS_TOTP_SECRET` + app id/secret/redirect). `mbt` reads it after the dashboard token and `FYERS_ACCESS_TOKEN`; the workflow deletes it when the job ends |
+| `MOMENTUM_OWNER` | Owner ID on Momentum's Your orders rows (settings, holdings, orders; BL-051). Default `rahul`; a second person would run with their own. Tests also set `MOMENTUM_STATE_DIR` / `SCHEDULER_STATE_DIR` to temp folders so they never touch the real `data/` files or the scheduler's run history |
 | `NOTIFY_PREFS_FILE` | Optional override for the notification preferences file (default `~/.config/ai-trading-agent/notifications.json`, `{"disabled": [type, ...]}`) that `@trading/notify` and both Python `notify.py` copies read before every Telegram send (BL-012). Missing or broken = everything on |
 | `TRADING_DATA_ROOT` | The local research database (`packages/trading-data`): `catalog.duckdb` + the Parquet `lake/` + gzipped `raw/` vendor responses. Default `~/TradingData`. On the owner's laptop it is `/Volumes/TradingData`, an APFS disk image on the external SSD (BL-034: ~110k day files would cost 2×256 KiB each on ExFAT). Every process refuses a root on a `/Volumes/<name>` that is not mounted (`trading_data.db.check_mounted`) rather than writing elsewhere; `tdata mount` attaches it. `obt`, `obt-api` and `obt-mcp` load the repo `.env` at start, `mbt` already did; `tdata` reads the environment only. Replaced `FYERS_DATA_DIR` (2026-09-30). The Fyers 1-minute data in it cannot be re-downloaded once contracts expire — back it up monthly with `tdata backup --to <disk>` |
 | `TRADING_DATA_IMAGE` | Path of the disk image `tdata mount` attaches (and the `trading-data-mount` LaunchAgent at login / when a volume appears). Must be double-quoted in `.env`: the launchd jobs `source` it with bash and the SSD's name contains an apostrophe and a space |

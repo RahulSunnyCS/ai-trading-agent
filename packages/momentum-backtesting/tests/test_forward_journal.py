@@ -447,7 +447,7 @@ def test_research_signals_carry_holdings_as_portfolio_weights(monkeypatch):
         },
     }
     monkeypatch.setattr(api.DATA, "get_stock", lambda: Stock())
-    monkeypatch.setattr(api, "_broad_backtest", lambda req: payload)
+    monkeypatch.setattr(api, "_broad_parts", lambda req: (payload, {}))
     monkeypatch.setattr(api, "_broad_engine_signal", lambda req: payload["latest"])
     favourite = {"name": "Broad A", "config": {"dataset": "broad", "universe": ["INFY"]}}
     result, blocked = api._research_weekly_result(favourite, pd.Timestamp("2026-10-09"))

@@ -427,6 +427,10 @@ class UniverseRanking:
     # week x stock column booleans from the tradability gate (None = no gate). Kept so a trade
     # list can say an exit was "liquidity failed" rather than just "ineligible".
     liquidity_gate: pd.DataFrame | None = None
+    # week x stock column booleans: the universe's point-in-time membership (already AND-ed with
+    # the gate). Kept so the live preview (`rebalance.live_broad_ranking`) can rebuild the pool
+    # without reloading the whole universe from disk (~150 s on the real data).
+    stock_membership: pd.DataFrame | None = None
 
 
 def _dense_rank(masked: pd.DataFrame) -> pd.DataFrame:
@@ -666,6 +670,7 @@ def finish_universe_ranking(
         missing_symbols=missing_symbols,
         raw_prices=raw_full_frame,
         liquidity_gate=universe.liquidity_gate,
+        stock_membership=stock_membership,
     )
 
 

@@ -404,6 +404,56 @@ def daily_ohlcv(symbol: str, start: date, end: date, creds: Credentials) -> pd.D
     return frame
 
 
+HOLDINGS_URL = "https://api-t1.fyers.in/api/v3/holdings"
+#: NSE series suffixes on a Fyers equity symbol ("NSE:SBIN-EQ").
+_SERIES = {"EQ", "BE", "BZ", "BL", "SM", "ST", "IL", "GB", "GS"}
+
+
+def nse_symbol(fyers_symbol: str) -> str:
+    """'NSE:SBIN-EQ' -> 'SBIN'; 'NSE:M&M-EQ' -> 'M&M'. Anything else is returned without the
+    exchange prefix."""
+    name = fyers_symbol.split(":", 1)[-1]
+    base, _, series = name.rpartition("-")
+    return base if base and series in _SERIES else name
+
+
+def holdings(creds: Credentials) -> list[dict]:
+    """The account's holdings, read-only (BL-051 Phase 3): one dict per symbol with `symbol`
+    (NSE, no prefix or series), `quantity` (all lots, T1 included) and `avg_price`. Never places
+    or changes anything. Raises RuntimeError when Fyers refuses (an expired token, say)."""
+    request = urllib.request.Request(
+        HOLDINGS_URL,
+        headers={
+            "Authorization": f"{creds.app_id}:{creds.access_token}",
+            "User-Agent": USER_AGENT,
+        },
+    )
+    try:
+        body = json.load(urllib.request.urlopen(request, timeout=15))
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f"Fyers holdings: HTTP {error.code} {_error_body(error)}") from error
+    if body.get("s") != "ok":
+        raise RuntimeError(f"Fyers holdings: {body.get('message') or body}")
+    merged: dict[str, dict] = {}
+    for item in body.get("holdings") or []:
+        symbol = nse_symbol(str(item.get("symbol", "")))
+        quantity = float(item.get("quantity") or 0)
+        if not symbol or quantity <= 0:
+            continue
+        cost = item.get("costPrice")
+        row = merged.setdefault(symbol, {"symbol": symbol, "quantity": 0.0, "cost": 0.0})
+        row["quantity"] += quantity
+        row["cost"] += quantity * float(cost) if cost else 0.0
+    return [
+        {
+            "symbol": r["symbol"],
+            "quantity": r["quantity"],
+            "avg_price": (r["cost"] / r["quantity"]) if r["cost"] else None,
+        }
+        for r in merged.values()
+    ]
+
+
 QUOTES_URL = "https://api-t1.fyers.in/data/quotes"
 
 

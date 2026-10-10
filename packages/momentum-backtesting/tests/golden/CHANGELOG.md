@@ -132,6 +132,19 @@ BL-056: new scenario for the All Fridays split; no existing scenario moved
 |---|---|---|
 | broad_one_category_three_picks_four_weekly_all_fridays | n/a -> 17.88% | n/a -> -35.50% |
 
+## 2026-10-09 (on top of `cc65bab`)
+
+Broad results' This week section (latest) is now the engine's own decision for the run's last week (cadence, price ceiling, circuit locks), not the advisory panel; no backtest result moved
+
+| Scenario | CAGR | Max drawdown |
+|---|---|---|
+| broad_default | 18.67% -> 18.67% | -26.72% -> -26.72% |
+| broad_category_mode_off | 36.99% -> 36.99% | -28.58% -> -28.58% |
+| broad_one_category_three_picks_four_weekly | 32.13% -> 32.13% | -35.20% -> -35.20% |
+| broad_eight_categories_one_pick | 26.32% -> 26.32% | -27.29% -> -27.29% |
+| broad_gates_loosened_and_tilted | 9.34% -> 9.34% | -27.78% -> -27.78% |
+| broad_two_categories_three_picks_fortnightly_taxed | 13.94% -> 13.94% | -18.09% -> -18.09% |
+
 ## 2026-10-10 (on top of `c0619d6`)
 
 BL-056 review: an All Fridays run has no combined signal. Its latest section is now a note with no rows (split: true) instead of signals judged against the union of every sleeve's holdings. No CAGR, drawdown or trade changes.

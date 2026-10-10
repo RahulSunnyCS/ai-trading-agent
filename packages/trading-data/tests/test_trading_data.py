@@ -8,7 +8,7 @@ import pytest
 
 from trading_data import lake, reference
 from trading_data.backup import backup
-from trading_data.db import FIXED_SCHEMA_VIEWS, LAKE_VIEWS, catalog_path, connect
+from trading_data.db import FIXED_SCHEMA_VIEWS, LAKE_VIEWS, _migrations, catalog_path, connect
 from trading_data.instruments import InstrumentSpec, instrument_key, register
 
 DAY = date(2026, 9, 29)
@@ -34,10 +34,106 @@ def test_fresh_catalog_migrates_once_and_loads_reference(root):
             ("009_ref_expiries",),
             ("010_ref_rates",),
             ("011_momentum_result_changes",),
+            ("012_momentum_orders",),
         ]
         assert con.execute("SELECT count(*) FROM ref_lot_sizes").fetchone()[0] > 0
     with connect(root) as con:  # second open: nothing re-applied, nothing duplicated
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 11
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 12
+
+
+# The orders tables as the first draft of BL-051 Phase 3 created them, applied to the owner's live
+# catalog under the ledger name `011_momentum_orders` (before the paper_capital_rs column existed).
+_FIRST_DRAFT_ORDERS_DDL = """
+CREATE TABLE momentum_holdings (
+    owner TEXT NOT NULL, synced_at TEXT NOT NULL,
+    source TEXT NOT NULL CHECK (source IN ('fyers', 'paste')),
+    symbol TEXT NOT NULL, quantity DOUBLE NOT NULL, avg_price DOUBLE,
+    PRIMARY KEY (owner, synced_at, symbol)
+);
+CREATE TABLE momentum_holding_rules (
+    owner TEXT NOT NULL, symbol TEXT NOT NULL,
+    treatment TEXT NOT NULL CHECK (treatment IN ('exclude', 'cash')),
+    PRIMARY KEY (owner, symbol)
+);
+CREATE TABLE momentum_owner_settings (
+    owner TEXT PRIMARY KEY,
+    min_trade_rs DOUBLE NOT NULL DEFAULT 10000,
+    extra_cash_rs DOUBLE NOT NULL DEFAULT 0,
+    holdings_source TEXT NOT NULL DEFAULT 'paper' CHECK (holdings_source IN ('paper', 'fyers')),
+    updated_at TEXT
+);
+CREATE TABLE momentum_orders (
+    owner TEXT NOT NULL, week DATE NOT NULL, created_at TEXT NOT NULL,
+    trigger TEXT NOT NULL CHECK (trigger IN ('scheduled', 'manual')),
+    favourite_id TEXT NOT NULL, holdings_source TEXT NOT NULL, payload TEXT NOT NULL,
+    PRIMARY KEY (owner, week, created_at)
+);
+"""
+
+
+def test_012_applies_over_catalog_with_old_011_ledger(root):
+    """The live catalog's ledger says `011_momentum_orders` (the file's name before it was
+    renumbered to 012) and already holds those tables, one without paper_capital_rs. Opening it
+    must not crash on 'Table ... already exists', must keep every row, and must add the column."""
+    with connect(root, views=()) as con:  # a current catalog, then rewind its orders part
+        for t in (
+            "momentum_orders",
+            "momentum_owner_settings",
+            "momentum_holding_rules",
+            "momentum_holdings",
+        ):
+            con.execute(f"DROP TABLE {t}")
+        con.execute(_FIRST_DRAFT_ORDERS_DDL)
+        con.execute("DELETE FROM schema_migrations WHERE version = '012_momentum_orders'")
+        con.execute("INSERT INTO schema_migrations (version) VALUES ('011_momentum_orders')")
+        con.execute(
+            "INSERT INTO momentum_owner_settings (owner, min_trade_rs) VALUES ('rahul', 7000)"
+        )
+        con.execute("INSERT INTO momentum_holding_rules VALUES ('rahul', 'LIQUIDBEES', 'cash')")
+        con.execute(
+            "INSERT INTO momentum_holdings VALUES ('rahul', '2026-10-09T15:00:00+05:30', 'paste', "
+            "'SBIN', 10, 800.5)"
+        )
+        con.execute(
+            "INSERT INTO momentum_orders VALUES ('rahul', DATE '2026-10-09', "
+            "'2026-10-09T14:15:00+05:30', 'scheduled', 'fav', 'paper', '{}')"
+        )
+    # the live ledger is 001..010, 011_momentum_orders, 011_momentum_result_changes; opening it
+    # adds only 012_momentum_orders, so one row more than there are migration files
+    ledger_rows = len(_migrations()) + 1
+    with connect(root, views=()) as con:
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == ledger_rows
+        assert (
+            con.execute(
+                "SELECT count(*) FROM schema_migrations WHERE version = '011_momentum_orders'"
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            con.execute(
+                "SELECT count(*) FROM schema_migrations WHERE version = '012_momentum_orders'"
+            ).fetchone()[0]
+            == 1
+        )
+        # the rows written under the old name survive, and the later column is there
+        assert con.execute(
+            "SELECT owner, min_trade_rs, holdings_source, paper_capital_rs "
+            "FROM momentum_owner_settings"
+        ).fetchall() == [("rahul", 7000.0, "paper", 100000.0)]
+        assert con.execute("SELECT treatment FROM momentum_holding_rules").fetchall() == [("cash",)]
+        assert con.execute("SELECT symbol, quantity FROM momentum_holdings").fetchall() == [
+            ("SBIN", 10.0)
+        ]
+        assert con.execute("SELECT count(*) FROM momentum_orders").fetchone()[0] == 1
+        con.execute("INSERT INTO momentum_owner_settings (owner) VALUES ('friend')")
+        assert (
+            con.execute(
+                "SELECT paper_capital_rs FROM momentum_owner_settings WHERE owner = 'friend'"
+            ).fetchone()[0]
+            == 100000.0
+        )
+    with connect(root, views=()) as con:  # and the next open applies nothing
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == ledger_rows
 
 
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):
