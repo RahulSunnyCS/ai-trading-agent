@@ -10,7 +10,9 @@ import type {
   RotationVariantRow,
 } from '../../types/rotationExplain';
 import {
+  bandIncludesZero,
   boundaryLines,
+  differsFromEntry,
   dominantCriterion,
   icDomain,
   icLayout,
@@ -123,6 +125,7 @@ describe('provenanceFlags', () => {
     max_abs_diff: 0,
     picks_equal: true,
     overridden_equal: true,
+    missing_in_rebuild: [],
     inputs_sha_recorded: 'a',
     inputs_sha_rebuilt: 'a',
     inputs_match: true,
@@ -176,13 +179,15 @@ describe('provenanceFlags', () => {
 });
 
 describe('boundaryLines', () => {
-  const v = (variant: string, rank: number, composite = 0.9) => ({
+  // `rank` is the rank among every variant; `pool` the rank among the non-Buy pool (null for Buy)
+  const v = (variant: string, rank: number, composite = 0.9, pool: number | null = rank) => ({
     variant,
     index: 'NIFTY',
     family: 'wide',
     kind: 'wide',
     slot: '09:17',
     rank,
+    pool_rank: pool,
     composite,
   });
   const base: RotationBoundary = {
@@ -221,8 +226,33 @@ describe('boundaryLines', () => {
       best_excluded: { ...v('N_dir_1202', 2), gap: -0.1375, kept_out_by: 'widesl_minimum' },
     });
     expect(lines[0]?.text).toContain('N_dir_1202 (rank 2) replaced by N_p100_0917 (rank 27)');
+    expect(lines[0]?.text).toContain('the top 3 non-Buy held 0 Widesl');
     expect(lines[0]?.tone).toBe('warning');
     expect(lines[1]?.text).toContain('0.138 above the weakest pick');
+  });
+
+  it('quotes the rank among the non-Buy pool, the one the rule counts, not the overall rank', () => {
+    // two Buy variants sit above these: overall rank 4 and 8 are pool rank 2 and 6
+    const lines = boundaryLines({
+      ...base,
+      override: {
+        fired: true,
+        wide_in_unconstrained: 0,
+        swaps: [{ dropped: v('S_ditm1_1447', 4, 0.9, 2), added: v('S_wide_1047', 8, 0.8, 6) }],
+      },
+      best_excluded: { ...v('S_dir_1047', 5, 0.91, 3), gap: -0.1, kept_out_by: 'widesl_minimum' },
+    });
+    expect(lines[0]?.text).toContain('S_ditm1_1447 (rank 2) replaced by S_wide_1047 (rank 6)');
+    expect(lines[0]?.text).not.toContain('rank 4');
+    expect(lines[1]?.text).toContain('S_dir_1047 (rank 3)');
+  });
+
+  it('quotes the overall rank in the Buy sentence, which counts every variant', () => {
+    const line = boundaryLines({
+      ...base,
+      buy: { ...base.buy, best_buy: v('N_buy_1332', 19, 0.84, null), gap_to_top: 0.04 },
+    }).at(-1);
+    expect(line?.text).toContain('N_buy_1332 (rank 19 overall)');
   });
 
   it('explains why Buy did or did not qualify', () => {
@@ -240,7 +270,7 @@ describe('boundaryLines', () => {
         best_buy: v('N_buy_1047', 4),
       },
     });
-    expect(yes.at(-1)?.text).toContain('Buy qualified: N_buy_1047 (rank 4)');
+    expect(yes.at(-1)?.text).toContain('Buy qualified: N_buy_1047 (rank 4 overall)');
   });
 });
 
@@ -262,7 +292,18 @@ describe('day stepping', () => {
 });
 
 function summary(over: Partial<RotationIcSummary> = {}): RotationIcSummary {
-  return { n: 0, mean: null, sd: null, se: null, lo: null, hi: null, pos: null, ...over };
+  return {
+    n: 0,
+    mean: null,
+    sd: null,
+    se: null,
+    lo: null,
+    hi: null,
+    t: null,
+    readable: false,
+    pos: null,
+    ...over,
+  };
 }
 
 function icDay(
@@ -290,16 +331,27 @@ function icDay(
 describe('icVerdict', () => {
   it('has nothing to say with no days, and does not read a handful of days', () => {
     expect(icVerdict(summary())).toBe('No day to read yet.');
-    expect(icVerdict(summary({ n: 5, mean: 0.1, lo: -0.2, hi: 0.4 }))).toContain('too few to read');
+    // a band above zero on five days is a number, not a reading
+    const short = summary({ n: 5, mean: 0.1, lo: 0.02, hi: 0.18, t: 2.776, readable: false });
+    expect(icVerdict(short)).toContain('too short to read');
+    expect(icVerdict(short)).not.toContain('above zero');
   });
-  it('compares the band with zero', () => {
-    expect(icVerdict(summary({ n: 60, mean: 0.05, lo: -0.01, hi: 0.11 }))).toContain(
+  it('compares the band with zero once it can be read', () => {
+    const read = { t: 2.0, readable: true };
+    expect(icVerdict(summary({ n: 60, mean: 0.05, lo: -0.01, hi: 0.11, ...read }))).toContain(
       'includes zero',
     );
-    expect(icVerdict(summary({ n: 60, mean: 0.05, lo: 0.01, hi: 0.09 }))).toContain('above zero');
-    expect(icVerdict(summary({ n: 60, mean: -0.05, lo: -0.09, hi: -0.01 }))).toContain(
+    expect(icVerdict(summary({ n: 60, mean: 0.05, lo: 0.01, hi: 0.09, ...read }))).toContain(
+      'above zero',
+    );
+    expect(icVerdict(summary({ n: 60, mean: -0.05, lo: -0.09, hi: -0.01, ...read }))).toContain(
       'below zero',
     );
+  });
+  it('gives no emphasis to a band on too few days', () => {
+    const early = summary({ n: 6, mean: 0.1, lo: 0.02, hi: 0.18, readable: false });
+    expect(bandIncludesZero(early)).toBeNull();
+    expect(bandIncludesZero({ ...early, n: 12, readable: true })).toBe(false);
   });
 });
 
@@ -309,7 +361,7 @@ describe('icRows', () => {
       summary: Object.fromEntries(
         ['recent', 'weekday', 'dte', 'vix', 'rfam', 'composite', 'spread'].map((k) => [
           k,
-          summary({ n: 30, mean: 0.04, lo: -0.01, hi: 0.09 }),
+          summary({ n: 30, mean: 0.04, lo: -0.01, hi: 0.09, t: 2.045, readable: true }),
         ]),
       ),
       reference: {
@@ -395,6 +447,7 @@ describe('roleLabel and orderedRows', () => {
             kind: 'dir',
             slot: '12:02',
             rank: 2,
+            pool_rank: 2,
             composite: 0.93,
           },
           added: {
@@ -404,6 +457,7 @@ describe('roleLabel and orderedRows', () => {
             kind: 'wide',
             slot: '09:17',
             rank: 27,
+            pool_rank: 27,
             composite: 0.8,
           },
         },
@@ -437,5 +491,140 @@ describe('roleLabel and orderedRows', () => {
       [r('t3', 3, 'other'), r('t2', 2, 'other')],
     );
     expect(rows.map((x) => x.variant)).toEqual(['p1', 'buy4', 'p27', 't2', 't3']);
+  });
+});
+
+describe('a broken or unreadable journal', () => {
+  const rec = {
+    source: 'recorded' as const,
+    matches: true,
+    max_abs_diff: 0,
+    picks_equal: true,
+    overridden_equal: true,
+    missing_in_rebuild: [],
+    inputs_sha_recorded: 'a',
+    inputs_sha_rebuilt: 'a',
+    inputs_match: true,
+    universe_match: true,
+  };
+  const prov = {
+    source: 'recorded' as const,
+    recorded_at: '2026-10-12T09:16:03+05:30',
+    before_first_entry: true,
+  };
+
+  it('never gives the Recorded badge when the chain is broken', () => {
+    const flags = provenanceFlags({
+      reconstruction: rec,
+      provenance: prov,
+      chain: {
+        intact: false,
+        problems: ['entry 1 (2026-10-12): content does not match its hash'],
+        error: null,
+      },
+    });
+    expect(flags.map((f) => f.label)).toEqual(['Journal chain broken', 'Reconstructed']);
+    expect(flags.some((f) => f.label.startsWith('Recorded'))).toBe(false);
+    expect(flags[0]?.tone).toBe('warning');
+  });
+
+  it('says the journal is unreadable rather than silently showing a reconstruction', () => {
+    const flags = provenanceFlags({
+      reconstruction: { ...rec, source: 'reconstructed', matches: null },
+      provenance: { source: 'reconstructed' },
+      chain: {
+        intact: false,
+        problems: ['journal.jsonl line 3 is not valid JSON'],
+        error: 'line 3',
+      },
+    });
+    expect(flags.map((f) => f.label)).toEqual(['Journal unreadable', 'Reconstructed']);
+  });
+
+  it('keeps the plain flags when the chain holds', () => {
+    const flags = provenanceFlags({
+      reconstruction: rec,
+      provenance: prov,
+      chain: { intact: true, problems: [], error: null },
+    });
+    expect(flags.map((f) => f.label)).toEqual([
+      'Recorded 09:16',
+      'Reconstructed, matches the entry',
+    ]);
+  });
+});
+
+describe('recorded picks beside the rebuilt ones', () => {
+  const r = (
+    variant: string,
+    rank: number,
+    role: RotationVariantRow['role'],
+  ): RotationVariantRow => ({
+    ...row(),
+    variant,
+    rank,
+    role,
+  });
+  const boundary = { override: { fired: false, wide_in_unconstrained: 2, swaps: [] } };
+
+  it('puts the recorded picks first and does not list a variant twice', () => {
+    const recorded = [
+      {
+        variant: 'rec1',
+        role: 'core' as const,
+        recorded_composite: 0.9,
+        rebuilt_composite: 0.7,
+        rebuilt_rank: 12,
+        rebuilt_pool_rank: 10,
+        rebuilt_pick: false,
+        row: r('rec1', 12, 'recorded_core'),
+      },
+      {
+        variant: 'both',
+        role: 'core' as const,
+        recorded_composite: 0.8,
+        rebuilt_composite: 0.8,
+        rebuilt_rank: 1,
+        rebuilt_pool_rank: 1,
+        rebuilt_pick: true,
+        row: r('both', 1, 'recorded_core'),
+      },
+    ];
+    const rows = orderedRows(
+      [r('both', 1, 'core'), r('new1', 2, 'core')],
+      [r('t3', 3, 'other')],
+      recorded,
+    );
+    expect(rows.map((x) => [x.variant, x.role])).toEqual([
+      ['both', 'recorded_core'],
+      ['rec1', 'recorded_core'],
+      ['new1', 'core'],
+      ['t3', 'other'],
+    ]);
+  });
+
+  it('labels the rebuilt picks as rebuilt when the entry differs, and the recorded ones as recorded', () => {
+    expect(roleLabel(r('x', 1, 'core'), boundary, true)).toBe('Rebuilt core');
+    expect(roleLabel(r('x', 1, 'core'), boundary, false)).toBe('Core');
+    expect(roleLabel(r('x', 1, 'recorded_buy'), boundary, true)).toBe('Recorded Buy');
+  });
+
+  it('flags a recorded day whose rebuild does not match', () => {
+    const base = { recorded_picks: [] };
+    const recon = (matches: boolean | null, source: 'recorded' | 'reconstructed') => ({
+      source,
+      matches,
+      max_abs_diff: 0.2,
+      picks_equal: false,
+      overridden_equal: true,
+      missing_in_rebuild: [],
+      inputs_sha_recorded: null,
+      inputs_sha_rebuilt: 'x',
+      inputs_match: null,
+      universe_match: null,
+    });
+    expect(differsFromEntry({ ...base, reconstruction: recon(false, 'recorded') })).toBe(true);
+    expect(differsFromEntry({ ...base, reconstruction: recon(true, 'recorded') })).toBe(false);
+    expect(differsFromEntry({ ...base, reconstruction: recon(null, 'reconstructed') })).toBe(false);
   });
 });

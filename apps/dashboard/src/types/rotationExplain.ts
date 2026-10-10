@@ -9,7 +9,22 @@ export type RotationListKey = 'A' | 'B' | 'C' | 'REF';
 /** The criteria of the composite, in the order the widgets show them. */
 export type RotationCriterion = 'recent' | 'weekday' | 'dte' | 'vix' | 'rfam';
 
-export type RotationPickRole = 'core' | 'core_override' | 'buy' | 'other';
+export type RotationPickRole =
+  | 'core'
+  | 'core_override'
+  | 'buy'
+  | 'other'
+  /** A pick the journal recorded, shown beside the rebuilt ones. */
+  | 'recorded_core'
+  | 'recorded_buy';
+
+/** The journal's hash chain as the widgets show it. */
+export interface RotationChain {
+  intact: boolean;
+  problems: string[];
+  /** The journal could not be read at all. */
+  error: string | null;
+}
 
 export interface RotationFitWindow {
   lookback: number;
@@ -59,7 +74,10 @@ export interface RotationVariantRef {
   family: string;
   kind: string;
   slot: string;
+  /** Among all variants: what the Buy test counts. */
   rank: number;
+  /** Among the non-Buy pool: what the core and the Widesl minimum count; null for a Buy variant. */
+  pool_rank: number | null;
   composite: number;
 }
 
@@ -99,6 +117,8 @@ export interface RotationReconstruction {
   max_abs_diff: number | null;
   picks_equal: boolean | null;
   overridden_equal: boolean | null;
+  /** Recorded names that are not among the rebuilt variants at all. */
+  missing_in_rebuild: string[];
   inputs_sha_recorded: string | null;
   inputs_sha_rebuilt: string;
   inputs_match: boolean | null;
@@ -116,6 +136,20 @@ export interface RotationProvenance {
   dte_source?: string | null;
 }
 
+/** One pick the journal recorded, with the rebuild's view of it. */
+export interface RotationRecordedPick {
+  variant: string;
+  role: 'core' | 'buy';
+  recorded_composite: number | null;
+  rebuilt_composite: number | null;
+  rebuilt_rank: number | null;
+  rebuilt_pool_rank: number | null;
+  /** The rebuild picks it too. */
+  rebuilt_pick: boolean;
+  /** Its breakdown now (null when the variant is not in the rebuilt universe). */
+  row: RotationVariantRow | null;
+}
+
 export interface RotationExplainRange {
   /** Every day that can be explained, ascending. */
   days: string[];
@@ -125,6 +159,7 @@ export interface RotationExplainRange {
   default: string | null;
   results_through: string | null;
   journal_error: string | null;
+  chain: RotationChain;
 }
 
 export interface RotationExplain {
@@ -156,6 +191,8 @@ export interface RotationExplain {
     overridden: boolean | null;
     composite: Record<string, number>;
   } | null;
+  recorded_picks: RotationRecordedPick[];
+  chain: RotationChain;
   picks: RotationVariantRow[];
   top: RotationVariantRow[];
   boundary: RotationBoundary;
@@ -197,6 +234,10 @@ export interface RotationIcSummary {
   se: number | null;
   lo: number | null;
   hi: number | null;
+  /** The Student t critical value the band used (n - 1 degrees of freedom). */
+  t: number | null;
+  /** The band is on enough days to be read (n >= min_band_days). */
+  readable: boolean;
   /** Share of days above zero. */
   pos: number | null;
 }
@@ -236,10 +277,14 @@ export interface RotationIc {
     forward_scored: number;
     forward_waiting: string[];
     results_through: string | null;
+    journal_error: string | null;
+    chain: RotationChain;
   };
   /** Why there is nothing to show (an empty forward window), in words. */
   reason: string | null;
   warmup: number;
   spread_n: number;
+  min_band_days: number;
+  chain: RotationChain;
   counts: { forward: number; late: number; research: number; mismatch: number };
 }

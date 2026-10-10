@@ -34,7 +34,25 @@ from .variants import variant_names
 SPREAD_N = 30  # the best / worst this many variants by composite
 MIN_VARIANTS = 30  # fewer variants with a result than this: no correlation that day
 DEFAULT_WINDOW = 63
-Z95 = 1.96
+MIN_BAND_DAYS = 10  # a band on fewer days than this is shown as a number, never read
+#: two-sided 95% Student t critical values by degrees of freedom (no scipy in this package)
+_T95 = {
+    1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262,
+    10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131, 16: 2.120, 17: 2.110,
+    18: 2.101, 19: 2.093, 20: 2.086, 21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060,
+    26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042, 40: 2.021, 60: 2.000, 120: 1.980,
+}  # fmt: skip
+
+
+def t_critical(df: int) -> float:
+    """The two-sided 95% t value for `df` degrees of freedom: the table entry at or below `df`
+    (the larger value, so a band is never narrower than the truth), 1.96 beyond 120."""
+    if df < 1:
+        raise ValueError("degrees of freedom must be at least 1")
+    if df > 120:
+        return 1.96
+    return _T95[max(k for k in _T95 if k <= df)]
+
 
 #: BL-081 step 1's calibration of the judging code (list A, period P1, the 248 original variants,
 #: mean over selection days of the daily Spearman). Reference values, not a target: the journal's
@@ -79,25 +97,30 @@ def spread(comp: np.ndarray, gross: np.ndarray, names: list[str]) -> dict[str, f
 
 
 def summarise(values: list[float | None]) -> dict[str, Any]:
-    """Count, mean, standard deviation, standard error and the 95% band of the non-null values."""
+    """Count, mean, standard deviation, standard error and the 95% t band of the non-null values.
+    `readable` is False below MIN_BAND_DAYS: the numbers are there, the reading is not."""
     xs = np.array([v for v in values if v is not None], dtype=float)
     n = int(len(xs))
+    empty = {"sd": None, "se": None, "lo": None, "hi": None, "t": None, "readable": False}
     if n == 0:
-        return {"n": 0, "mean": None, "sd": None, "se": None, "lo": None, "hi": None, "pos": None}
+        return {"n": 0, "mean": None, "pos": None, **empty}
     mean = float(xs.mean())
     pos = float((xs > 0).mean())
     if n < 2:
-        return {"n": n, "mean": mean, "sd": None, "se": None, "lo": None, "hi": None, "pos": pos}
+        return {"n": n, "mean": mean, "pos": pos, **empty}
     sd = float(xs.std(ddof=1))
     se = sd / math.sqrt(n)
+    t = t_critical(n - 1)
     return {
         "n": n,
         "mean": mean,
         "sd": sd,
         "se": se,
-        "lo": mean - Z95 * se,
-        "hi": mean + Z95 * se,
+        "lo": mean - t * se,
+        "hi": mean + t * se,
+        "t": t,
         "pos": pos,
+        "readable": n >= MIN_BAND_DAYS,
     }
 
 
@@ -133,12 +156,18 @@ def _kind(entry: dict | None) -> str:
     return "forward" if entry.get("before_first_entry") else "late"
 
 
+def _entry(snap: Snapshot, day: date) -> dict | None:
+    """The journal entry for `day` when the chain holds; None when there is none or the chain is
+    broken (an entry that cannot be shown to be unedited is a research day, not a forward one)."""
+    return snap.trusted_entries().get(day.isoformat())
+
+
 def day_row(snap: Snapshot, key: str, position: int) -> dict[str, Any]:
     """One day's rank correlations: `position` indexes the days that have results and attributes."""
     prep = _prepared(snap, key)
     names = snap.names
     day: date = prep["days"][position]
-    entry = snap.entries.get(day.isoformat())
+    entry = _entry(snap, day)
     weekday, band = prep["weekday"][: position + 1].copy(), prep["band"][: position + 1].copy()
     dmat = prep["dmat"][: position + 1].copy()
     if entry is not None:
@@ -200,17 +229,21 @@ def _clean(row: dict) -> dict:
 
 
 def status(snap: Snapshot) -> dict[str, Any]:
-    """Where the journal stands, so an empty forward view can say why it is empty."""
+    """Where the journal stands, so an empty forward view can say why it is empty. Entries of a
+    broken chain are listed (`entries`) and never counted as forward."""
     entries = list(snap.entries.values())
+    counted = list(snap.trusted_entries().values())
     scored = {d.isoformat() for d in snap.days}
-    forward = [e for e in entries if e.get("before_first_entry")]
+    forward = [e for e in counted if e.get("before_first_entry")]
     return {
         "entries": len(entries),
         "forward": len(forward),
-        "late": len(entries) - len(forward),
+        "late": len(counted) - len(forward),
         "forward_scored": sum(1 for e in forward if e["day"] in scored),
         "forward_waiting": sorted(e["day"] for e in forward if e["day"] not in scored),
         "results_through": snap.days[-1].isoformat() if snap.days else None,
+        "journal_error": snap.journal_error,
+        "chain": snap.chain(),
     }
 
 
@@ -236,14 +269,24 @@ def analyse(
         chosen = [
             p
             for p in positions
-            if (e := snap.entries.get(days[p].isoformat())) is not None
+            if (e := _entry(snap, days[p])) is not None
             and e.get("before_first_entry")
             and (start is None or days[p] >= start)
             and (end is None or days[p] <= end)
         ]
         if not chosen:
             st = status(snap)
-            if st["entries"] == 0:
+            if snap.journal_error:
+                reason = (
+                    f"The journal could not be read ({snap.journal_error}): no entry can be "
+                    "counted until it is repaired."
+                )
+            elif not snap.chain_intact:
+                reason = (
+                    "The journal's hash chain is broken, so its entries are not counted: "
+                    f"{'; '.join(snap.chain_problems[:2])}"
+                )
+            elif st["entries"] == 0:
                 reason = "No journal entry yet: the first is recorded at 09:16 on a trading day."
             elif st["forward"] == 0:
                 reason = (
@@ -277,9 +320,9 @@ def analyse(
     for r in rows:
         seen.append(r["composite"])
         s = summarise(seen)
-        running.append(
-            {"day": r["day"], "n": s["n"], "mean": s["mean"], "lo": s["lo"], "hi": s["hi"]}
-        )
+        # no band is drawn on days it cannot be read: the mean line alone until MIN_BAND_DAYS
+        lo, hi = (s["lo"], s["hi"]) if s["readable"] else (None, None)
+        running.append({"day": r["day"], "n": s["n"], "mean": s["mean"], "lo": lo, "hi": hi})
     reference = RESEARCH_REFERENCE if key == RESEARCH_REFERENCE["list"] else None
     out = {
         "list": key,
@@ -296,6 +339,8 @@ def analyse(
         "reason": reason,
         "warmup": WARMUP,
         "spread_n": SPREAD_N,
+        "min_band_days": MIN_BAND_DAYS,
+        "chain": snap.chain(),
         "counts": {
             "forward": sum(1 for r in rows if r["kind"] == "forward"),
             "late": sum(1 for r in rows if r["kind"] == "late"),

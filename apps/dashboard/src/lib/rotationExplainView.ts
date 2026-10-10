@@ -8,6 +8,7 @@
 
 import type {
   RotationBoundary,
+  RotationChain,
   RotationCriterion,
   RotationCriterionRow,
   RotationExcluded,
@@ -19,6 +20,7 @@ import type {
   RotationIcSummary,
   RotationListKey,
   RotationPickRole,
+  RotationRecordedPick,
   RotationVariantRef,
   RotationVariantRow,
 } from '../types/rotationExplain';
@@ -168,28 +170,56 @@ export const ROLE_LABEL: Record<RotationPickRole, string> = {
   core_override: 'Swapped in',
   buy: 'Buy',
   other: '',
+  recorded_core: 'Recorded core',
+  recorded_buy: 'Recorded Buy',
 };
 
 /**
  * The role column: a pick says what it is; a strategy the Widesl minimum took out says so; the
- * rest of the top of the ranking is simply not picked.
+ * rest of the top of the ranking is simply not picked. When the rebuild differs from the entry
+ * (`rebuilt`), the rebuilt picks say so, so they are never read as the recorded ones.
  */
 export function roleLabel(
   row: Pick<RotationVariantRow, 'role' | 'variant' | 'kind'>,
   boundary: Pick<RotationBoundary, 'override'>,
+  rebuilt = false,
 ): string {
-  if (row.role !== 'other') return ROLE_LABEL[row.role];
-  const displaced = boundary.override.swaps.some((s) => s.dropped.variant === row.variant);
-  return displaced ? 'Displaced' : EMPTY;
+  if (row.role === 'other') {
+    const displaced = boundary.override.swaps.some((s) => s.dropped.variant === row.variant);
+    return displaced ? 'Displaced' : EMPTY;
+  }
+  const label = ROLE_LABEL[row.role];
+  const recorded = row.role === 'recorded_core' || row.role === 'recorded_buy';
+  return rebuilt && !recorded ? `Rebuilt ${label.toLowerCase()}` : label;
 }
 
-/** Picks first (core in rank order, then Buy), then the best-ranked strategies they beat. */
+/** The rebuild picks differently from, or cannot be matched to, what the journal recorded. */
+export function differsFromEntry(
+  e: Pick<RotationExplain, 'reconstruction' | 'recorded_picks'>,
+): boolean {
+  return e.reconstruction.source === 'recorded' && e.reconstruction.matches === false;
+}
+
+/**
+ * Picks first (core in rank order, then Buy), then the best-ranked strategies they beat. When the
+ * rebuild differs from the entry the recorded picks lead, so the picks the journal wrote down are
+ * the first thing in the table.
+ */
 export function orderedRows(
   picks: readonly RotationVariantRow[],
   top: readonly RotationVariantRow[],
+  recorded: readonly RotationRecordedPick[] = [],
 ): RotationVariantRow[] {
   const rank = (a: RotationVariantRow, b: RotationVariantRow) => a.rank - b.rank;
-  return [...[...picks].sort(rank), ...[...top].sort(rank)];
+  const recordedRows = recorded
+    .map((r) => r.row)
+    .filter((r): r is RotationVariantRow => r !== null);
+  const seen = new Set(recordedRows.map((r) => r.variant));
+  return [
+    ...[...recordedRows].sort(rank),
+    ...[...picks].filter((r) => !seen.has(r.variant)).sort(rank),
+    ...[...top].filter((r) => !seen.has(r.variant)).sort(rank),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -211,21 +241,31 @@ export interface ProvenanceFlag {
  * rebuilt and checked against the entry; a day with no entry is wholly reconstructed.
  */
 export function provenanceFlags(
-  e: Pick<RotationExplain, 'reconstruction' | 'provenance'>,
+  e: Pick<RotationExplain, 'reconstruction' | 'provenance'> & { chain?: RotationChain },
 ): ProvenanceFlag[] {
   const { reconstruction: r, provenance: p } = e;
-  if (r.source !== 'recorded') {
-    return [
-      {
-        id: 'reconstructed',
-        tone: 'info',
-        label: 'Reconstructed',
-        detail:
-          'No journal entry for this day. The ranking is rebuilt from the stored results before it, the same way the 09:16 entry computes it.',
-      },
-    ];
-  }
+  const chain = e.chain;
+  const broken = chain !== undefined && !chain.intact;
   const flags: ProvenanceFlag[] = [];
+  if (broken) {
+    flags.push({
+      id: 'chain',
+      tone: 'warning',
+      label: chain.error ? 'Journal unreadable' : 'Journal chain broken',
+      detail: `${chain.error ?? chain.problems.join('; ')} Entries cannot be shown to be unedited, so none is treated as a recorded, forward day.`,
+    });
+  }
+  if (r.source !== 'recorded' || broken) {
+    flags.push({
+      id: 'reconstructed',
+      tone: 'info',
+      label: 'Reconstructed',
+      detail: broken
+        ? 'The ranking is rebuilt from the stored results; the journal entry for this day (if any) is not trusted.'
+        : 'No journal entry for this day. The ranking is rebuilt from the stored results before it, the same way the 09:16 entry computes it.',
+    });
+    return flags;
+  }
   const time = p.recorded_at ? formatIstTime(p.recorded_at) : EMPTY;
   const late = p.before_first_entry === false;
   flags.push({
@@ -275,8 +315,14 @@ export interface BoundaryLine {
   text: string;
 }
 
+/** A variant in a sentence about the core: its rank among the non-Buy pool the rule counts. */
 function ref(v: RotationVariantRef): string {
-  return `${v.variant} (rank ${formatInt(v.rank)})`;
+  return `${v.variant} (rank ${formatInt(v.pool_rank ?? v.rank)})`;
+}
+
+/** A variant in a sentence about the Buy test: its rank among every variant, Buy included. */
+function refOverall(v: RotationVariantRef): string {
+  return `${v.variant} (rank ${formatInt(v.rank)} overall)`;
 }
 
 function excludedText(x: RotationExcluded): string {
@@ -297,13 +343,13 @@ export function boundaryLines(b: RotationBoundary): BoundaryLine[] {
     lines.push({
       id: 'override',
       tone: 'warning',
-      text: `Widesl minimum overrode rank: the top ${formatInt(b.n_core)} held ${formatInt(b.override.wide_in_unconstrained)} Widesl and ${formatInt(b.min_wide)} are required. ${swaps}.`,
+      text: `Widesl minimum overrode rank: the top ${formatInt(b.n_core)} non-Buy held ${formatInt(b.override.wide_in_unconstrained)} Widesl and ${formatInt(b.min_wide)} are required. ${swaps}.`,
     });
   } else {
     lines.push({
       id: 'override',
       tone: 'neutral',
-      text: `Rank decided the core: the top ${formatInt(b.n_core)} already held ${formatInt(b.override.wide_in_unconstrained)} Widesl (${formatInt(b.min_wide)} required).`,
+      text: `Rank decided the core: the top ${formatInt(b.n_core)} non-Buy already held ${formatInt(b.override.wide_in_unconstrained)} Widesl (${formatInt(b.min_wide)} required).`,
     });
   }
   if (b.best_excluded) {
@@ -318,7 +364,7 @@ export function boundaryLines(b: RotationBoundary): BoundaryLine[] {
     lines.push({
       id: 'buy',
       tone: 'positive',
-      text: `Buy qualified: ${ref(buy.picked[0])} is inside the overall top ${formatInt(buy.top)}.`,
+      text: `Buy qualified: ${refOverall(buy.picked[0])} is inside the overall top ${formatInt(buy.top)}.`,
     });
   } else if (buy.best_buy) {
     const short =
@@ -328,7 +374,7 @@ export function boundaryLines(b: RotationBoundary): BoundaryLine[] {
     lines.push({
       id: 'buy',
       tone: 'neutral',
-      text: `No Buy: the best Buy variant, ${ref(buy.best_buy)}, is outside the overall top ${formatInt(buy.top)}${short}.`,
+      text: `No Buy: the best Buy variant, ${refOverall(buy.best_buy)}, is outside the overall top ${formatInt(buy.top)}${short}.`,
     });
   } else {
     lines.push({ id: 'buy', tone: 'neutral', text: 'No Buy variant has a composite today.' });
@@ -394,7 +440,7 @@ export interface IcRow {
 }
 
 export function bandIncludesZero(s: RotationIcSummary): boolean | null {
-  if (s.lo === null || s.hi === null) return null;
+  if (!s.readable || s.lo === null || s.hi === null) return null;
   return s.lo <= 0 && s.hi >= 0;
 }
 
@@ -411,14 +457,14 @@ export function icRows(ic: RotationIc): IcRow[] {
   });
 }
 
-/** The least number of scored days before a forward mean is read as more than a first look. */
-export const MIN_DAYS_FOR_READING = 20;
+/** Fewer scored days than this and a band is shown as a number, never read (the API's `min_band_days`). */
+export const MIN_DAYS_FOR_READING = 10;
 
 /** One plain sentence on what the composite's correlation says so far. */
 export function icVerdict(s: RotationIcSummary): string {
   if (s.n === 0) return 'No day to read yet.';
-  if (s.n < MIN_DAYS_FOR_READING) {
-    return `${formatInt(s.n)} ${s.n === 1 ? 'day' : 'days'}: too few to read; the band is wide.`;
+  if (s.n < MIN_DAYS_FOR_READING || !s.readable) {
+    return `${formatInt(s.n)} ${s.n === 1 ? 'day' : 'days'}: too short to read (a band needs ${formatInt(MIN_DAYS_FOR_READING)}).`;
   }
   const zero = bandIncludesZero(s);
   if (zero === null) return `${formatInt(s.n)} days, no band yet.`;

@@ -26,16 +26,17 @@ from __future__ import annotations
 
 import csv
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from ..data.reference.loader import default_reference_data
 from . import journal, store
-from .lists import BUY_TOP, LISTS, MIN_WIDE_N, N_BUY, N_CORE, WARMUP, RotationList
+from .lists import BUY_TOP, LISTS, LOTS_PER, MIN_WIDE_N, N_BUY, N_CORE, WARMUP, RotationList
 from .score import (
     VIX_LABELS,
     dte_matrix,
@@ -86,10 +87,29 @@ class Snapshot:
     net: np.ndarray  # days x variants
     gross: np.ndarray  # days x variants (NaN where a stored gross is blank)
     attrs: dict[date, dict[str, str]]
-    entries: dict[str, dict]  # journal entries by ISO day
-    journal_error: str | None = None
+    entries: dict[str, dict]  # journal entries by ISO day (as read, whether or not the chain holds)
+    journal_error: str | None = None  # the journal could not be read at all
+    #: problems `journal.verify` found (a broken link, an edited entry, a torn line); [] = intact
+    chain_problems: tuple[str, ...] = ()
     #: per-result memo for the heavier computations, cleared with the snapshot
     memo: dict = field(default_factory=dict, compare=False, repr=False)
+
+    @property
+    def chain_intact(self) -> bool:
+        return not self.chain_problems
+
+    def trusted_entries(self) -> dict[str, dict]:
+        """The entries a statistic may count: none when the hash chain is broken or unreadable (an
+        entry that cannot be shown to be unedited is not a forward observation)."""
+        return self.entries if self.chain_intact else {}
+
+    def chain(self) -> dict:
+        """The journal's state as the widgets show it."""
+        return {
+            "intact": self.chain_intact,
+            "problems": list(self.chain_problems[:3]),
+            "error": self.journal_error,
+        }
 
 
 def _read_net_gross(name: str, root: Path) -> dict[date, tuple[float, float]]:
@@ -130,11 +150,13 @@ def load_snapshot(root: Path, names: Sequence[str] | None = None) -> Snapshot:
     )
     entries: dict[str, dict] = {}
     error = None
+    path = store.journal_path(root)
     try:
-        entries = {e["day"]: e for e in journal.read(store.journal_path(root))}
+        entries = {e["day"]: e for e in journal.read(path)}
     except journal.JournalCorrupt as exc:
         error = str(exc)
-    return Snapshot(names, days, net, gross, store.read_days(root), entries, error)
+    problems = tuple(journal.verify(path))
+    return Snapshot(names, days, net, gross, store.read_days(root), entries, error, problems)
 
 
 # ---------------------------------------------------------------------------
@@ -374,18 +396,32 @@ def _row(
 
 
 def _family_band_names(names: list[str]) -> list[str]:
-    """The family-band label of each variant ('wide_A' ...), as `score.family_index` groups."""
-    out = []
-    for n in names:
-        tag = parts(n)[2]
-        m = int(tag[:2]) * 60 + int(tag[2:])
-        band = "A" if m <= 602 else "B" if m <= 722 else "C" if m <= 842 else "D"
-        out.append(f"{kind_of(n)}_{band}")
-    return out
+    """A readable name for the family band each variant belongs to ('wide 09:17-10:02' ...).
+
+    The groups ARE `score.family_index`'s (nothing is re-derived here): each group is named by the
+    strategy kind of its members and the first and last start time among them, so the label cannot
+    drift from the grouping the ranking averages over."""
+    group = family_index(names)
+    members: dict[int, list[str]] = {}
+    for name, g in zip(names, group, strict=True):
+        members.setdefault(int(g), []).append(name)
+    label: dict[int, str] = {}
+    for g, group_names in members.items():
+        slots = sorted(parts(n)[2] for n in group_names)
+        kinds = "/".join(sorted({kind_of(n) for n in group_names}))
+        label[g] = f"{kinds} {slots[0][:2]}:{slots[0][2:]}-{slots[-1][:2]}:{slots[-1][2:]}"
+    return [label[int(g)] for g in group]
 
 
-def _ref(r: Ranking, v: int, rank: int) -> dict:
-    return {**variant_label(r.names[v]), "rank": rank, "composite": _round(r.comp[v])}
+def _ref(r: Ranking, v: int, rank: int, pool_rank: int | None = None) -> dict:
+    """A variant named in a sentence: its rank among all variants (what the Buy test counts) and
+    its rank among the non-Buy pool (what the core and the Widesl minimum count; None for Buy)."""
+    return {
+        **variant_label(r.names[v]),
+        "rank": rank,
+        "pool_rank": pool_rank,
+        "composite": _round(r.comp[v]),
+    }
 
 
 def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
@@ -396,8 +432,12 @@ def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
     dir_ = np.array([is_dir(n) for n in names])
     buy_mask = np.array([is_buy(n) for n in names])
     pool = [v for v in order if not buy_mask[v]]
+    pool_rank_of = {v: k + 1 for k, v in enumerate(pool)}
     idx = {n: v for v, n in enumerate(names)}
     core = [idx[n] for n in picks.core]
+
+    def ref(v: int) -> dict:
+        return _ref(r, v, rank_of[v], pool_rank_of.get(v))
 
     unconstrained = pool[:N_CORE]
     # the swaps, replayed the way `score.select` makes them
@@ -413,7 +453,7 @@ def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
         work.remove(drop)
         work.append(add)
         n_wide += 1
-        swaps.append({"dropped": _ref(r, drop, rank_of[drop]), "added": _ref(r, add, rank_of[add])})
+        swaps.append({"dropped": ref(drop), "added": ref(add)})
     if set(work) != set(core):
         raise ExplainError("decomposition", "the replayed Widesl minimum differs from score.select")
 
@@ -421,7 +461,7 @@ def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
     excluded = [v for v in pool if v not in core]
     nearest = []
     for v in excluded[:3]:
-        row = _ref(r, v, rank_of[v])
+        row = ref(v)
         row["gap"] = _round(comp[weakest] - comp[v])
         # an alternative that outscored a pick and was left out by the Widesl minimum
         row["kept_out_by"] = "widesl_minimum" if v in unconstrained and v not in core else None
@@ -435,8 +475,8 @@ def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
         "top": BUY_TOP,
         "size": N_BUY,
         "qualified": bool(picked_buy),
-        "picked": [_ref(r, v, rank_of[v]) for v in picked_buy],
-        "best_buy": _ref(r, best_buy, rank_of[best_buy]) if best_buy is not None else None,
+        "picked": [ref(v) for v in picked_buy],
+        "best_buy": ref(best_buy) if best_buy is not None else None,
         "tenth_composite": _round(comp[top10[-1]]) if len(top10) >= BUY_TOP else None,
         "gap_to_top": None,
     }
@@ -450,8 +490,8 @@ def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
             "wide_in_unconstrained": int(wide[unconstrained].sum()),
             "swaps": swaps,
         },
-        "unconstrained_core": [_ref(r, v, rank_of[v]) for v in unconstrained],
-        "weakest_pick": _ref(r, weakest, rank_of[weakest]),
+        "unconstrained_core": [ref(v) for v in unconstrained],
+        "weakest_pick": ref(weakest),
         "best_excluded": nearest[0] if nearest else None,
         "nearest_excluded": nearest,
         "buy": buy_info,
@@ -461,7 +501,12 @@ def _boundary(r: Ranking, order: list[int], picks, lst: RotationList) -> dict:
 def _compare_with_entry(
     entry: dict, key: str, picks, comp_by_name: dict[str, float], rebuilt_digest: str, names: list
 ) -> dict:
-    """How the rebuilt ranking compares with what the journal recorded for this list."""
+    """How the rebuilt ranking compares with what the journal recorded for this list.
+
+    `comp_by_name` holds the rebuilt composite of EVERY variant, so a recorded pick that the
+    rebuild no longer picks still has a rebuilt composite to compare with: `max_abs_diff` is always
+    a finite number (None only when the entry recorded no composite). A recorded name outside the
+    rebuilt universe is listed in `missing_in_rebuild` and counts as a mismatch."""
     from .pick import universe_fingerprint
 
     rec = (entry.get("lists") or {}).get(key)
@@ -471,6 +516,7 @@ def _compare_with_entry(
         "max_abs_diff": None,
         "picks_equal": None,
         "overridden_equal": None,
+        "missing_in_rebuild": [],
         "inputs_sha_recorded": entry.get("inputs_sha"),
         "inputs_sha_rebuilt": rebuilt_digest,
         "inputs_match": None,
@@ -491,14 +537,33 @@ def _compare_with_entry(
     diffs = []
     for name, recorded in (rec.get("composite") or {}).items():
         mine = comp_by_name.get(name)
-        diffs.append(np.inf if mine is None else abs(round(mine, JOURNAL_DECIMALS) - recorded))
+        if mine is None:
+            out["missing_in_rebuild"].append(name)
+        else:
+            diffs.append(abs(round(mine, JOURNAL_DECIMALS) - recorded))
     out["max_abs_diff"] = float(max(diffs)) if diffs else None
     out["matches"] = bool(
         out["picks_equal"]
         and out["overridden_equal"]
         and diffs
+        and not out["missing_in_rebuild"]
         and out["max_abs_diff"] <= _TOLERANCE
     )
+    return out
+
+
+def missing_trading_days(
+    last: date, day: date, is_trading: Callable[[date], bool] | None = None
+) -> list[date]:
+    """Trading days strictly between `last` and `day`, by the exchange calendar (a Thursday and
+    Friday holiday is not a gap in the results)."""
+    check = is_trading or default_reference_data().is_trading_day
+    out: list[date] = []
+    d = last + timedelta(days=1)
+    while d < day:
+        if check(d):
+            out.append(d)
+        d += timedelta(days=1)
     return out
 
 
@@ -567,7 +632,8 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
         _row(r, v, rank_of[v], pool_rank_of.get(v), lst, "other", True, fam_names) for v in shown
     ]
 
-    comp_by_name = {n: float(r.comp[idx[n]]) for n in picked_names}
+    comp_by_name = {n: float(r.comp[v]) for n, v in idx.items()}
+    recorded_picks: list[dict] = []
     entry = snap.entries.get(day.isoformat())
     if entry is not None:
         recon = _compare_with_entry(entry, list_key, picks, comp_by_name, digest, names)
@@ -588,6 +654,34 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
             "overridden": rec.get("overridden"),
             "composite": rec.get("composite", {}),
         }
+        # the picks that were actually written down, each with the rebuild's view of it (its rank
+        # and composite now, and its breakdown), so a rebuild that differs still shows the record
+        for kind, listed in (("core", recorded["core"]), ("buy", recorded["buy"])):
+            for name in listed:
+                v = idx.get(name)
+                recorded_picks.append(
+                    {
+                        "variant": name,
+                        "role": kind,
+                        "recorded_composite": recorded["composite"].get(name),
+                        "rebuilt_composite": _round(r.comp[v]) if v is not None else None,
+                        "rebuilt_rank": rank_of[v] if v is not None else None,
+                        "rebuilt_pool_rank": pool_rank_of.get(v) if v is not None else None,
+                        "rebuilt_pick": name in picked_names,
+                        "row": _row(
+                            r,
+                            v,
+                            rank_of[v],
+                            pool_rank_of.get(v),
+                            lst,
+                            f"recorded_{kind}",
+                            True,
+                            fam_names,
+                        )
+                        if v is not None
+                        else None,
+                    }
+                )
     else:
         recon = {
             "source": "reconstructed",
@@ -604,14 +698,20 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
         recorded = None
 
     warnings = []
-    gap = (day - hist_days[-1]).days
-    if gap > 4:
+    gaps = missing_trading_days(hist_days[-1], day)
+    if gaps:
+        shown_gaps = ", ".join(d.isoformat() for d in gaps[:3]) + (" ..." if len(gaps) > 3 else "")
         warnings.append(
-            f"the stored results end {hist_days[-1]}, {gap} days before {day}: "
-            "results for the days in between are missing"
+            f"the stored results end {hist_days[-1]} and there is none for the "
+            f"{len(gaps)} trading day(s) in between ({shown_gaps})"
         )
     if snap.journal_error:
         warnings.append(f"the journal could not be read: {snap.journal_error}")
+    elif not snap.chain_intact:
+        warnings.append(
+            "the journal's hash chain is broken, so entries are not trusted: "
+            + "; ".join(snap.chain_problems[:2])
+        )
     if ctx.vix_open is None and ctx.band == "unknown":
         warnings.append("the 09:15 VIX open is unknown for this day; its VIX band is 'unknown'")
 
@@ -636,7 +736,7 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
             "weights": {k: float(lst.weights.get(k, 0.0)) for k in CRITERIA},
             "lookbacks": [{"days": n, "weight": wt} for n, wt in lst.lookbacks],
             "n_core": N_CORE,
-            "lots_per_strategy": 2,
+            "lots_per_strategy": LOTS_PER,
         },
         "criteria": [{"key": k, "label": CRITERION_LABEL[k]} for k in CRITERIA],
         "context": {
@@ -656,6 +756,8 @@ def explain(snap: Snapshot, day: date, list_key: str, top: int = 10) -> dict:
         "reconstruction": recon,
         "provenance": provenance,
         "recorded": recorded,
+        "recorded_picks": recorded_picks,
+        "chain": snap.chain(),
         "picks": pick_rows,
         "top": top_rows,
         "boundary": boundary,
@@ -669,7 +771,7 @@ def explain_range(snap: Snapshot) -> dict:
     """What a day picker can offer: the explainable days, which are journal days, and the default
     (the latest recorded day, else the latest reconstructable one)."""
     days = explainable_days(snap)
-    recorded = sorted(snap.entries)
+    recorded = sorted(snap.trusted_entries())
     default = None
     if recorded:
         default = recorded[-1]
@@ -683,4 +785,5 @@ def explain_range(snap: Snapshot) -> dict:
         "default": default,
         "results_through": snap.days[-1].isoformat() if snap.days else None,
         "journal_error": snap.journal_error,
+        "chain": snap.chain(),
     }

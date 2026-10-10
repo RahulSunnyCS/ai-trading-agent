@@ -4,7 +4,7 @@
  *
  *   /overview
  *   /live  /trades  /personalities  /pnl  /regime
- *   /optionslab/{strategies|builder|runs|results|regimes|correlation}
+ *   /optionslab/{strategies|builder|runs|results|regimes|correlation|rotation}
  *   /optionslab/builder/yaml        (the builder's YAML mode; /optionslab/builder is the form)
  *   /momentum/{backtest|scores|saved|week|rebalance|journal} (old /momentum/weekly redirects)
  *   /momentum/backtest/{etf|stock|custom_index|broad}
@@ -52,6 +52,7 @@ export const OPTIONS_LAB_SECTIONS = [
   'results',
   'regimes',
   'correlation',
+  'rotation',
 ] as const;
 export type OptionsLabSection = (typeof OPTIONS_LAB_SECTIONS)[number];
 

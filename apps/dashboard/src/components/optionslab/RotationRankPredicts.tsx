@@ -300,6 +300,13 @@ function band(s: RotationIcSummary): string {
   return s.lo === null || s.hi === null ? EMPTY : `${formatIc(s.lo)} to ${formatIc(s.hi)}`;
 }
 
+/** The band with a caution while it is on too few days to be read. */
+function bandNote(s: RotationIcSummary, minDays: number): string {
+  const text = band(s);
+  if (text === EMPTY || s.readable) return text;
+  return `${text}, too short to read (${formatInt(s.n)} of ${formatInt(minDays)} days)`;
+}
+
 function CriterionTable({
   active,
   forward,
@@ -320,7 +327,11 @@ function CriterionTable({
         >
           Mean
         </Th>
-        <Th dense align="right" title="Mean ± 1.96 standard errors over days">
+        <Th
+          dense
+          align="right"
+          title="Mean ± the Student t multiple of the standard error over days"
+        >
           95% band
         </Th>
         {mode === 'research' ? (
@@ -359,7 +370,13 @@ function CriterionTable({
               align="right"
               numeric
               className={`whitespace-nowrap ${r.includesZero === false ? 'text-foreground' : 'text-muted'}`}
-              title={r.includesZero ? 'The band includes zero' : undefined}
+              title={
+                r.includesZero
+                  ? 'The band includes zero'
+                  : r.includesZero === null && r.summary.lo !== null
+                    ? 'Too short to read: fewer than 10 days'
+                    : undefined
+              }
             >
               {band(r.summary)}
             </Td>
@@ -478,7 +495,7 @@ export function RotationRankPredicts({
           note={
             forward.data
               ? forwardHas
-                ? `band ${band(forward.data.summary.composite)}`
+                ? `band ${bandNote(forward.data.summary.composite, forward.data.min_band_days)}`
                 : 'no forward day yet'
               : undefined
           }
@@ -557,6 +574,13 @@ export function RotationRankPredicts({
           <Legend hasReference={refComposite !== null && mode === 'research'} />
           <IcChart ic={ic} reference={mode === 'research' ? refComposite : null} />
           <p className="text-sm text-muted">{icVerdict(ic.summary.composite)}</p>
+          {!ic.chain.intact ? (
+            <StateMessage
+              variant="error"
+              title={ic.chain.error ? 'The journal cannot be read' : 'The journal chain is broken'}
+              description={`${ic.chain.error ?? ic.chain.problems.join('; ')} Its entries are not counted as forward days.`}
+            />
+          ) : null}
           {ic.counts.mismatch > 0 ? (
             <StateMessage
               variant="error"
@@ -567,7 +591,8 @@ export function RotationRankPredicts({
           <CriterionTable active={ic} forward={forward.data} mode={mode} />
           <p className="text-xs text-faint">
             Spearman rank correlation per day across {formatInt(ic.n_variants)} variants, gross, one
-            value per day. The band is the mean ± 1.96 standard errors over days; consecutive days
+            value per day. The band is the mean ± a Student t multiple of the standard error over
+            days, and is not read on fewer than {formatInt(ic.min_band_days)} days; consecutive days
             share look-back windows, so it is a little narrower than it should be. A research day is
             scored on what the ranking would have said then, not on a recorded entry.
           </p>

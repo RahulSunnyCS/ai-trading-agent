@@ -9,8 +9,10 @@ and for a recorded day it must reproduce the journal entry to four decimals.
 from __future__ import annotations
 
 import csv
+import dataclasses
 import hashlib
 import itertools
+import json
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -20,7 +22,7 @@ from trading_data import lake
 
 from option_backtesting.rotation import explain as ex
 from option_backtesting.rotation import journal, pick, rankic, store
-from option_backtesting.rotation.lists import LISTS, WARMUP
+from option_backtesting.rotation.lists import LISTS, LOTS_PER, WARMUP
 from option_backtesting.rotation.score import (
     composite,
     dte_matrix,
@@ -28,6 +30,7 @@ from option_backtesting.rotation.score import (
     skewed_fit,
     vix_band,
 )
+from option_backtesting.rotation.variants import variant_names
 
 IST = ZoneInfo("Asia/Kolkata")
 FAMILIES = ("wide", "p80", "dir", "ditm1", "buy")
@@ -472,17 +475,34 @@ def test_spearman_handles_ties_missing_values_and_a_constant_side():
     assert rankic.spearman(tied, tied) == pytest.approx(1.0)
 
 
-def test_summary_is_a_mean_with_a_95_percent_band_over_days():
+def test_summary_is_a_mean_with_a_95_percent_t_band_over_days():
     s = rankic.summarise([0.1, 0.2, None, 0.3, 0.0])
     assert s["n"] == 4 and s["mean"] == pytest.approx(0.15)
     sd = float(np.std([0.1, 0.2, 0.3, 0.0], ddof=1))
     assert s["sd"] == pytest.approx(sd)
-    assert s["lo"] == pytest.approx(0.15 - 1.96 * sd / 2)
-    assert s["hi"] == pytest.approx(0.15 + 1.96 * sd / 2)
+    assert s["t"] == pytest.approx(3.182)  # 3 degrees of freedom, not 1.96
+    assert s["lo"] == pytest.approx(0.15 - 3.182 * sd / 2)
+    assert s["hi"] == pytest.approx(0.15 + 3.182 * sd / 2)
     assert s["pos"] == pytest.approx(0.75)
+    assert s["readable"] is False  # four days: a number, not a reading
     one = rankic.summarise([0.4])
-    assert one["n"] == 1 and one["lo"] is None
+    assert one["n"] == 1 and one["lo"] is None and one["readable"] is False
     assert rankic.summarise([None])["mean"] is None
+
+
+def test_the_t_band_is_wider_than_the_normal_one_for_a_few_days_and_converges():
+    # three forward days +0.10, +0.02, +0.08: the normal band sits above zero, the t band does not
+    s = rankic.summarise([0.10, 0.02, 0.08])
+    assert s["lo"] < 0 < s["hi"]
+    normal_lo = s["mean"] - 1.96 * s["se"]
+    assert normal_lo > 0
+    assert [rankic.t_critical(d) for d in (1, 2, 5, 30, 31, 59, 60, 119, 120, 500)] == [
+        12.706, 4.303, 2.571, 2.042, 2.042, 2.021, 2.0, 2.0, 1.98, 1.96,
+    ]  # fmt: skip
+    with pytest.raises(ValueError):
+        rankic.t_critical(0)
+    assert rankic.summarise(list(np.linspace(-0.1, 0.2, 10)))["readable"] is True
+    assert rankic.summarise(list(np.linspace(-0.1, 0.2, 9)))["readable"] is False
 
 
 def test_the_spread_is_top_thirty_minus_bottom_thirty():
@@ -505,6 +525,9 @@ def test_one_correlation_per_day_never_pooled(env):
     assert len(out["running"]) == 10
     assert out["running"][-1]["mean"] == pytest.approx(out["summary"]["composite"]["mean"])
     assert out["running"][0]["lo"] is None  # one day has no band
+    # no running band is drawn before it can be read, only from the tenth day on
+    assert [r["lo"] is None for r in out["running"]] == [True] * 9 + [False]
+    assert out["summary"]["composite"]["readable"] is True and out["min_band_days"] == 10
 
 
 def test_a_ranking_that_orders_the_days_results_scores_one(env):
@@ -603,6 +626,293 @@ def test_dte_matrix_and_family_index_are_what_the_ranking_uses(env):
     assert np.array_equal(prep["dmat"], dte_matrix(dn, ds, NAMES))
     assert np.array_equal(prep["fam"], family_index(NAMES))
     assert prep["net"].shape == (n, len(NAMES))
+
+
+# ---------------------------------------------------------------------------
+# Review fixes: chain, mismatch, boundary figures, attributes, gross, weekends
+# ---------------------------------------------------------------------------
+
+
+def _ranked_composites(snap, day, key="A"):
+    """Composite of every variant for `day`, from score.composite directly (not explain's path)."""
+    rows = ex._history_rows(snap, day)
+    attrs = snap.attrs
+    hist = [snap.days[i] for i in rows]
+    wd = np.array([*(attrs[d]["weekday"] for d in hist), attrs[day]["weekday"]])
+    vb = np.array([*(attrs[d]["vix_band"] for d in hist), attrs[day]["vix_band"]])
+    dn = np.array([*(attrs[d]["dte_n"] for d in hist), attrs[day]["dte_n"]])
+    ds = np.array([*(attrs[d]["dte_s"] for d in hist), attrs[day]["dte_s"]])
+    P = np.vstack([snap.net[rows], np.zeros((1, len(NAMES)))])
+    return composite(P, wd, vb, dte_matrix(dn, ds, NAMES), NAMES, LISTS[key], family_index(NAMES))
+
+
+def test_buy_threshold_and_gap_are_the_tenth_overall_composite(env):
+    root, days, _ = env
+    _skewed_store(root, days, "buy", bonus=-8000.0)
+    snap = ex.load_snapshot(root, NAMES)
+    comp = _ranked_composites(snap, days[100])
+    order = sorted(range(len(NAMES)), key=lambda v: (-comp[v], NAMES[v]))
+    tenth = comp[order[9]]  # exactly the 10th variant overall, not the 9th or the 11th
+    best_buy = max(comp[v] for v, n in enumerate(NAMES) if "_buy_" in n)
+    buy = ex.explain(snap, days[100], "A")["boundary"]["buy"]
+    assert buy["qualified"] is False
+    assert buy["tenth_composite"] == round(float(tenth), 4)
+    assert buy["gap_to_top"] == round(float(tenth - best_buy), 4)
+
+
+def test_a_composite_off_by_a_few_fourth_decimals_is_not_a_match(env, monkeypatch):
+    root, days, _ = env
+    _record(root, days[100], monkeypatch)
+    snap = ex.load_snapshot(root, NAMES)
+    assert ex.explain(snap, days[100], "A")["reconstruction"]["matches"] is True
+    rec = snap.entries[days[100].isoformat()]["lists"]["A"]["composite"]
+    name = next(iter(rec))
+    rec[name] = round(rec[name] + 0.0003, 4)
+    out = ex.explain(snap, days[100], "A")["reconstruction"]
+    assert out["matches"] is False
+    assert out["max_abs_diff"] == pytest.approx(0.0003, abs=1e-9)
+
+
+def test_a_rebuild_that_differs_still_shows_the_recorded_picks_with_a_finite_difference(
+    env, monkeypatch
+):
+    root, days, _ = env
+    entry = _record(root, days[100], monkeypatch)
+    snap = ex.load_snapshot(root, NAMES)
+    built = ex.explain(snap, days[100], "A")
+    kept = {p["variant"] for p in built["picks"]}
+    stranger = next(n for n in NAMES if n not in kept and "_buy_" not in n)
+    rec = snap.entries[days[100].isoformat()]["lists"]["A"]
+    was = rec["core"][0]
+    rec["core"][0] = stranger
+    rec["composite"][stranger] = rec["composite"].pop(was)
+    out = ex.explain(snap, days[100], "A")
+    json.dumps(out, allow_nan=False)  # no inf / NaN anywhere: it must serialise
+    r = out["reconstruction"]
+    assert r["picks_equal"] is False and r["matches"] is False
+    assert isinstance(r["max_abs_diff"], float) and np.isfinite(r["max_abs_diff"])
+    assert r["max_abs_diff"] > 0 and r["missing_in_rebuild"] == []
+    shown = {p["variant"]: p for p in out["recorded_picks"]}
+    assert set(shown) == set(rec["core"]) | set(rec["buy"])
+    odd = shown[stranger]
+    assert odd["rebuilt_pick"] is False and odd["role"] == "core"
+    assert odd["recorded_composite"] == rec["composite"][stranger]
+    assert odd["row"]["role"] == "recorded_core" and odd["rebuilt_rank"] is not None
+    assert entry["lists"]["A"]["core"][0] == was  # the file itself was not touched
+
+
+def test_a_recorded_name_outside_the_rebuilt_universe_is_listed_not_infinite(env, monkeypatch):
+    root, days, _ = env
+    _record(root, days[100], monkeypatch)
+    snap = ex.load_snapshot(root, NAMES)
+    rec = snap.entries[days[100].isoformat()]["lists"]["A"]
+    rec["composite"]["N_wide_9999"] = 0.5
+    out = ex.explain(snap, days[100], "A")
+    json.dumps(out, allow_nan=False)
+    assert out["reconstruction"]["missing_in_rebuild"] == ["N_wide_9999"]
+    assert out["reconstruction"]["matches"] is False
+
+
+def test_a_journal_day_is_scored_on_the_entrys_attributes_not_days_csv(env, monkeypatch):
+    root, days, _ = env
+    k = 100
+    a = store.read_days(root)[days[k]]
+    # the live 09:15 read and the lake bar landed in different bands / the listed expiry differs
+    monkeypatch.setattr(
+        pick, "listed_dte_labels", lambda d: ({"dte_n": "5", "dte_s": "1"}, "master")
+    )
+    assert vix_band(20.0) != a["vix_band"] and a["dte_n"] != "5"
+    entry = pick.record(days[k], root, vix_open=20.0, now_fn=_at(days[k], 9, 16)).entry
+    assert (entry["vix_band"], entry["dte"]["NIFTY"]) == ("18+", "5")
+    snap = ex.load_snapshot(root, NAMES)
+
+    out = ex.explain(snap, days[k], "A")
+    assert out["context"]["source"] == "journal" and out["context"]["vix_band"] == "18+"
+    assert out["context"]["dte"] == {"NIFTY": "5", "SENSEX": "1"}
+    assert out["reconstruction"]["matches"] is True
+
+    # the rank correlation scores the same day on the entry's attributes: it reproduces the entry
+    row = rankic.analyse(snap, "A", "research", days[k], days[k])["days"][0]
+    assert row["kind"] == "forward" and row["matches_entry"] is True
+    # ... which days.csv alone would not (the premise: the two attribute sets rank differently)
+    bare = dataclasses.replace(snap, entries={})
+    other = ex.explain(bare, days[k], "A")
+    assert other["context"]["source"] == "days.csv"
+    assert {p["variant"]: p["composite"] for p in other["picks"]} != {
+        p["variant"]: p["composite"] for p in out["picks"]
+    }
+
+
+def test_the_correlation_is_against_gross_when_gross_differs_from_net(env):
+    root, days, values = env
+    snap = ex.load_snapshot(root, NAMES)
+    p = 90
+    comp = _ranked_composites(snap, days[p])
+    gross = values.copy()
+    gross[p] = comp * 1000.0  # gross pays in the composite's order; net (random) does not
+    _write_results(root, days, values, gross=gross)
+    out = rankic.analyse(ex.load_snapshot(root, NAMES), "A", "research", days[p], days[p])
+    row = out["days"][0]
+    assert row["composite"] == pytest.approx(1.0)
+    assert row["spread"] > 0
+    # the ranking itself is made from net: it is the same as before gross was touched
+    assert (
+        ex.explain(ex.load_snapshot(root, NAMES), days[p], "A")["history"]["digest"]
+        == (ex.explain(snap, days[p], "A")["history"]["digest"])
+    )
+
+
+def test_weekend_sessions_are_left_out_of_history_digest_and_positions(env):
+    root, days, values = env
+    sat = next(d + timedelta(days=1) for d in days[50:] if d.weekday() == 4)
+    sun = sat + timedelta(days=1)
+    everything = sorted([*days, sat, sun])
+    spiked = np.zeros((len(everything), len(NAMES)))
+    for i, d in enumerate(everything):
+        spiked[i] = 9e6 if d in (sat, sun) else values[days.index(d)]
+    _write_results(root, everything, spiked)
+    with store.days_path(root).open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=store.DAY_COLUMNS)
+        w.writeheader()
+        for k, d in enumerate(everything):
+            w.writerow(_attrs(k, d))
+    snap = ex.load_snapshot(root, NAMES)
+    assert sat not in snap.days and sun not in snap.days
+    day = days[90]
+    rows = ex._history_rows(snap, day)
+    assert all(snap.days[i].weekday() < 5 for i in rows)
+    # the morning code (store.load_matrix) agrees to the digest
+    h = pick.load_history(day, root, NAMES)
+    assert sat not in h.days and ex.history_digest(snap, rows) == h.digest
+    assert all(d.weekday() < 5 for d in rankic._prepared(snap, "A")["days"])
+
+
+def test_the_result_reader_agrees_with_the_stores(env):
+    root, _, _ = env
+    for name in NAMES[:5]:
+        mine = {d: net for d, (net, _g) in ex._read_net_gross(name, root).items()}
+        assert mine == store.read_net(name, root)
+
+
+def test_family_band_labels_group_exactly_as_family_index_does():
+    names = variant_names()
+    labels = ex._family_band_names(names)
+    idx = family_index(names)
+    by_label: dict[str, set[int]] = {}
+    by_group: dict[int, set[int]] = {}
+    for i, (label, g) in enumerate(zip(labels, idx, strict=True)):
+        by_label.setdefault(label, set()).add(i)
+        by_group.setdefault(int(g), set()).add(i)
+    assert sorted(map(sorted, by_label.values())) == sorted(map(sorted, by_group.values()))
+    assert len(by_label) == 12  # three strategy kinds x four start bands
+    assert all(" " in label and "-" in label for label in labels)
+
+
+def test_lots_per_strategy_is_the_lists_constant(env, monkeypatch):
+    root, days, _ = env
+    snap = ex.load_snapshot(root, NAMES)
+    assert ex.explain(snap, days[90], "A")["list_info"]["lots_per_strategy"] == LOTS_PER
+    monkeypatch.setattr(ex, "LOTS_PER", 5)
+    assert ex.explain(snap, days[90], "A")["list_info"]["lots_per_strategy"] == 5
+
+
+def test_boundary_sentences_can_quote_the_non_buy_pool_rank(env):
+    root, days, _ = env
+    _skewed_store(root, days, "dir,ditm1")
+    b = ex.explain(ex.load_snapshot(root, NAMES), days[100], "A")["boundary"]
+    assert [u["pool_rank"] for u in b["unconstrained_core"]] == [1, 2, 3]
+    for s in b["override"]["swaps"]:
+        assert s["dropped"]["pool_rank"] <= 3 < s["added"]["pool_rank"]
+        assert s["added"]["rank"] >= s["added"]["pool_rank"]  # overall rank counts Buy too
+    assert b["buy"]["best_buy"]["pool_rank"] is None
+
+
+# -- the journal's chain ------------------------------------------------------
+
+
+def _edit_journal(root, old: str, new: str) -> None:
+    path = store.journal_path(root)
+    text = path.read_text()
+    assert old in text
+    path.write_text(text.replace(old, new, 1))
+
+
+def test_an_edited_entry_breaks_the_chain_and_is_not_counted_as_forward(env, monkeypatch):
+    root, days, _ = env
+    _record(root, days[100], monkeypatch, hh=9, mm=45)  # recorded late: not forward
+    clean = rankic.analyse(ex.load_snapshot(root, NAMES), "A", "forward")
+    assert clean["n_days"] == 0 and clean["chain"]["intact"] is True
+    # someone flips the flag by hand: the picks and composites still agree, the hash does not
+    _edit_journal(root, '"before_first_entry": false', '"before_first_entry": true')
+    snap = ex.load_snapshot(root, NAMES)
+    assert not snap.chain_intact and snap.journal_error is None
+    out = rankic.analyse(snap, "A", "forward")
+    assert out["n_days"] == 0
+    assert "hash chain is broken" in out["reason"] and "No journal entry yet" not in out["reason"]
+    assert out["status"]["chain"]["intact"] is False and out["status"]["forward"] == 0
+    assert out["status"]["entries"] == 1  # listed, not counted
+    explained = ex.explain(snap, days[100], "A")
+    assert explained["chain"]["intact"] is False
+    assert any("hash chain is broken" in w for w in explained["warnings"])
+    assert ex.explain_range(snap)["recorded"] == []  # nothing offered as "latest recorded"
+
+
+def test_an_intact_chain_is_reported_intact(env, monkeypatch):
+    root, days, _ = env
+    _record(root, days[100], monkeypatch)
+    out = ex.explain(ex.load_snapshot(root, NAMES), days[100], "A")
+    assert out["chain"] == {"intact": True, "problems": [], "error": None}
+
+
+def test_an_unreadable_journal_is_reported_as_unreadable_not_as_empty(env, monkeypatch):
+    root, days, _ = env
+    _record(root, days[100], monkeypatch)
+    with store.journal_path(root).open("a") as f:
+        f.write("{not json\n")
+    snap = ex.load_snapshot(root, NAMES)
+    assert snap.journal_error and snap.entries == {}
+    out = rankic.analyse(snap, "A", "forward")
+    assert out["n_days"] == 0
+    assert "could not be read" in out["reason"] and "No journal entry yet" not in out["reason"]
+    assert out["status"]["journal_error"] == snap.journal_error
+    assert out["status"]["chain"]["intact"] is False
+    assert any("could not be read" in w for w in ex.explain(snap, days[90], "A")["warnings"])
+
+
+# -- the trading calendar -----------------------------------------------------
+
+
+def test_missing_days_follow_the_exchange_calendar_not_the_calendar_gap():
+    wed, mon = date(2026, 10, 7), date(2026, 10, 12)
+    shut = {date(2026, 10, 8), date(2026, 10, 9)}  # a Thursday and Friday holiday
+    assert ex.missing_trading_days(wed, mon, lambda d: d.weekday() < 5 and d not in shut) == []
+    only_thu = {date(2026, 10, 8)}
+    assert ex.missing_trading_days(wed, mon, lambda d: d.weekday() < 5 and d not in only_thu) == [
+        date(2026, 10, 9)
+    ]
+    assert ex.missing_trading_days(wed, wed + timedelta(days=1)) == []
+
+
+def test_a_gap_warning_names_the_missing_trading_days_only(env, monkeypatch):
+    root, days, _ = env
+    far = days[-1] + timedelta(days=7)  # same weekday a week on
+    with store.days_path(root).open("a", newline="") as f:
+        csv.DictWriter(f, fieldnames=store.DAY_COLUMNS).writerow(_attrs(len(days) + 5, far))
+    snap = ex.load_snapshot(root, NAMES)
+
+    class Calendar:
+        def __init__(self, shut):
+            self.shut = shut
+
+        def is_trading_day(self, d):
+            return d.weekday() < 5 and d not in self.shut
+
+    between = [days[-1] + timedelta(days=i) for i in range(1, 7)]
+    monkeypatch.setattr(ex, "default_reference_data", lambda: Calendar(set()))
+    warned = ex.explain(snap, far, "A")["warnings"]
+    assert any("trading day(s) in between" in w for w in warned)
+    monkeypatch.setattr(ex, "default_reference_data", lambda: Calendar(set(between)))
+    assert ex.explain(snap, far, "A")["warnings"] == []
 
 
 # ---------------------------------------------------------------------------

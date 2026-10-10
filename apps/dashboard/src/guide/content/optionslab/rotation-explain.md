@@ -30,7 +30,8 @@ rebuild against the entry.
 | Reconstructed | There is no journal entry for this day. The ranking was rebuilt from the stored results as they stand now. It is what the ranking would have said, not a record of what was written. |
 | Recorded 09:16 | The picks and composites are the journal entry's, written before the first entry time. |
 | Reconstructed, matches the entry | The rebuilt picks and composites equal the entry's to four decimals. |
-| Reconstructed, inputs changed since recording | The stored results for earlier days are no longer what the entry was scored on (a repaired day, say), so the rebuild may not give the recorded picks. The entry stays the record. |
+| Reconstructed, inputs changed since recording | The stored results for earlier days are no longer what the entry was scored on (a repaired day, say), so the rebuild may not give the recorded picks. The entry stays the record: when the rebuild differs, the card lists what the journal recorded first, with its composite then and now, and labels the rebuilt picks as rebuilt. |
+| Journal chain broken / Journal unreadable | The journal's hash chain does not verify, or a line cannot be read. No entry is shown as Recorded or counted as a forward day until it is repaired. |
 | Recorded, late | Recorded after 09:17. The entry is shown, but it is not a forward day and no forward figure counts it. |
 
 ### The criterion table
@@ -44,7 +45,7 @@ the strategy ranked in the top tenth of all 298 on that criterion.
 | 5d, 21d, 63d, 126d | How many earlier days that fit rests on in each lookback window. A window with no matching day is left out and the others are re-weighted, so a fit can rest on one old window alone. Point at a figure for the window's average. |
 | Percentile | Its rank among all the strategies on that criterion. |
 | Weight | The list's weight for the criterion. |
-| Points | Weight times percentile. The points add up to the composite. A "!" means fewer than five matching days. |
+| Points | Weight times percentile. The points add up to the composite. A "!" means fewer than five matching days. Under the table, "Days and averages behind each fit" opens the matching days, the average per lot and what each window adds, as plain text. |
 
 The line above the table says in words which criterion carried the pick and whether it rests on
 few days. "Rank 3" says little; "mostly weekday fit, resting on two matching days" says where to
@@ -52,9 +53,10 @@ look.
 
 ### The lines under the table
 
-- **Widesl minimum.** When the top three held fewer than two Widesl strategies, the lowest-scoring
-  Dir pick is swapped for the best Widesl, until two are in. The line names who was displaced and
-  who replaced them, with both ranks.
+- **Widesl minimum.** The ranks in these lines are ranks among the non-Buy variants, the pool the
+  core is drawn from; the Buy line quotes the overall rank. When the top three held fewer than two
+  Widesl strategies, the lowest-scoring Dir pick is swapped for the best Widesl, until two are in.
+  The line names who was displaced and who replaced them, with both ranks.
 - **Boundary.** The best strategy left out and how far it trailed the weakest pick. When a Dir pick
   scored above a Widesl pick and still lost its place, the gap is negative and the line says the
   minimum kept it out.
@@ -74,7 +76,7 @@ day is kept; days are never pooled.
 | Part | Meaning |
 |---|---|
 | Bars | The correlation for each day. Dark bars are forward days, the others research days. |
-| Line and band | The running mean, with a 95% band (mean ± 1.96 standard errors over days). |
+| Line and band | The running mean, with a 95% band (mean ± the Student t multiple of the standard error over days, which is wide on few days). The band is drawn, and read, only from the tenth day. |
 | Dashed line | The research mean for list A over 2025-12-03 to 2026-10-08 (+0.048, the calibration of the pre-registered study), for list A only. |
 | Top 30 − bottom 30 | Mean gross per lot of the 30 best-ranked strategies minus the 30 worst, in rupees. The ranking's effect in money. |
 
@@ -88,7 +90,8 @@ it, because the weights were chosen on them.
 ## What it does not tell you
 
 - A positive mean with a band that includes zero is not yet different from chance. With a few
-  weeks of days the band is wide. The card says so in words.
+  weeks of days the band is wide, and on fewer than ten days it is shown as a number and not read.
+  The card says so in words.
 - Neighbouring days share look-back windows, so the band is a little narrower than it should be.
 - A research day is scored on the stored results as they stand now. If results were repaired after
   the fact, an old entry and its research rebuild can differ; the flag says when.

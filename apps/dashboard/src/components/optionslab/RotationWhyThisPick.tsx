@@ -23,6 +23,7 @@ import {
   LIST_KEYS,
   type ProvenanceFlag,
   boundaryLines,
+  differsFromEntry,
   orderedRows,
   provenanceFlags,
   roleLabel,
@@ -35,6 +36,7 @@ import {
 import type {
   RotationExplain,
   RotationListKey,
+  RotationRecordedPick,
   RotationVariantRow,
 } from '../../types/rotationExplain';
 import { Badge } from '../ui/Badge';
@@ -110,8 +112,11 @@ function RankingTable({
   onSelect,
   recorded,
   boundary,
+  rebuilt,
 }: {
   boundary: RotationExplain['boundary'];
+  /** The rebuild differs from the entry: its picks are labelled as rebuilt. */
+  rebuilt: boolean;
   rows: RotationVariantRow[];
   selected: string | null;
   onSelect: (variant: string) => void;
@@ -164,7 +169,7 @@ function RankingTable({
                 <CompositeBar row={r} />
               </Td>
               <Td dense className="whitespace-nowrap text-xs text-muted">
-                {roleLabel(r, boundary)}
+                {roleLabel(r, boundary, rebuilt)}
               </Td>
             </TRow>
           );
@@ -274,7 +279,11 @@ function CriterionTable({ row, data }: { row: RotationVariantRow; data: Rotation
                 title={sup?.thin && !off ? 'Few matching days: thin support' : undefined}
               >
                 {formatNumber(c.contribution, 3)}
-                {sup?.thin && !off ? <span className="ml-1 text-warning">!</span> : null}
+                {sup?.thin && !off ? (
+                  <span className="ml-1 text-warning">
+                    !<span className="sr-only"> few matching days</span>
+                  </span>
+                ) : null}
               </Td>
             </TRow>
           );
@@ -302,6 +311,134 @@ function CriterionTable({ row, data }: { row: RotationVariantRow; data: Rotation
   );
 }
 
+/** The days behind each fit, as visible text: the count, the mean and what each window adds. */
+function WindowDetail({ row, data }: { row: RotationVariantRow; data: RotationExplain }) {
+  const fits = (['weekday', 'dte', 'vix'] as const).filter(
+    (k) => (data.list_info.weights[k] ?? 0) > 0 && row.criteria[k]?.windows,
+  );
+  if (fits.length === 0) return null;
+  return (
+    <details className="group text-xs text-muted">
+      <summary className="cursor-pointer select-none rounded py-1 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        Days and averages behind each fit
+      </summary>
+      <div className="mt-2">
+        <Table>
+          <THead>
+            <Th dense>Fit</Th>
+            <Th dense align="right">
+              Window
+            </Th>
+            <Th dense align="right">
+              Matching days
+            </Th>
+            <Th dense align="right">
+              Mean, per lot
+            </Th>
+            <Th dense align="right">
+              Adds to the fit
+            </Th>
+          </THead>
+          <tbody>
+            {fits.flatMap((k) =>
+              (row.criteria[k].windows ?? []).map((w) => (
+                <TRow
+                  key={`${k}-${w.lookback}`}
+                  className={w.matching_days === 0 ? 'text-faint' : ''}
+                >
+                  <Td dense className="whitespace-nowrap">
+                    {CRITERION_SHORT[k]}
+                  </Td>
+                  <Td dense align="right" numeric>
+                    {w.lookback}d
+                  </Td>
+                  <Td dense align="right" numeric>
+                    {formatInt(w.matching_days)}
+                  </Td>
+                  <Td dense align="right" numeric>
+                    {w.matching_days > 0 ? formatInr(w.mean, { sign: true }) : 'none, left out'}
+                  </Td>
+                  <Td dense align="right" numeric>
+                    {w.matching_days > 0 ? formatInr(w.part, { sign: true }) : EMPTY}
+                  </Td>
+                </TRow>
+              )),
+            )}
+          </tbody>
+        </Table>
+      </div>
+    </details>
+  );
+}
+
+/** What the journal wrote down, beside what the rebuild gives now. */
+function RecordedPicks({
+  picks,
+  differs,
+  overridden,
+}: {
+  picks: RotationRecordedPick[];
+  differs: boolean;
+  overridden: boolean | null;
+}) {
+  const names = picks.map((p) => p.variant).join(', ');
+  if (!differs) {
+    return (
+      <p className="text-xs text-muted">
+        Recorded in the journal: <span className="font-mono">{names}</span>. The rebuild below gives
+        the same picks.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-lg border border-warning/30 bg-warning/10 p-3">
+      <p className="text-sm text-foreground">
+        What the journal recorded{overridden ? ' (the Widesl minimum applied)' : ''}. The rebuild
+        from today's stored results does not give the same picks, so these lead the table below and
+        the rebuilt ones are labelled as rebuilt.
+      </p>
+      <Table>
+        <THead>
+          <Th dense>Recorded pick</Th>
+          <Th dense>Role</Th>
+          <Th dense align="right">
+            Recorded
+          </Th>
+          <Th dense align="right">
+            Rebuilt now
+          </Th>
+          <Th dense align="right">
+            Rank now
+          </Th>
+          <Th dense>Rebuild picks it</Th>
+        </THead>
+        <tbody>
+          {picks.map((p) => (
+            <TRow key={p.variant}>
+              <Td dense className="font-mono text-xs">
+                {p.variant}
+              </Td>
+              <Td dense className="text-xs text-muted">
+                {p.role === 'buy' ? 'Buy' : 'Core'}
+              </Td>
+              <Td dense align="right" numeric>
+                {formatNumber(p.recorded_composite, 4)}
+              </Td>
+              <Td dense align="right" numeric>
+                {formatNumber(p.rebuilt_composite, 4)}
+              </Td>
+              <Td dense align="right" numeric>
+                {p.rebuilt_rank === null ? EMPTY : formatInt(p.rebuilt_rank)}
+              </Td>
+              <Td dense>{p.rebuilt_pick ? 'Yes' : 'No'}</Td>
+            </TRow>
+          ))}
+        </tbody>
+      </Table>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // The widget
 // ---------------------------------------------------------------------------
@@ -315,8 +452,12 @@ function Body({
   selected: string | null;
   onSelect: (variant: string) => void;
 }) {
-  const rows = useMemo(() => orderedRows(data.picks, data.top), [data]);
-  const current = rows.find((r) => r.variant === selected) ?? data.picks[0] ?? rows[0] ?? null;
+  const differs = differsFromEntry(data);
+  const rows = useMemo(
+    () => orderedRows(data.picks, data.top, differs ? data.recorded_picks : []),
+    [data, differs],
+  );
+  const current = rows.find((r) => r.variant === selected) ?? rows[0] ?? null;
   const lines = boundaryLines(data.boundary);
   const flags = provenanceFlags(data);
   const ctx = data.context;
@@ -342,12 +483,32 @@ function Body({
         <p className="text-xs text-muted">
           Checked against the entry: largest composite difference{' '}
           {formatNumber(rec.max_abs_diff, 4)}
+          {rec.picks_equal === false ? ', and the rebuilt picks are not the recorded ones' : ''}
+          {rec.missing_in_rebuild.length > 0
+            ? `, and ${rec.missing_in_rebuild.join(', ')} is not among the rebuilt variants`
+            : ''}
           {rec.inputs_match === null
-            ? ''
+            ? '.'
             : rec.inputs_match
               ? ', the stored results are unchanged since it was written.'
               : ', and the stored results have changed since it was written.'}
         </p>
+      ) : null}
+
+      {!data.chain.intact ? (
+        <StateMessage
+          variant="error"
+          title={data.chain.error ? 'The journal cannot be read' : 'The journal chain is broken'}
+          description={`${data.chain.error ?? data.chain.problems.join('; ')} Its entries are not trusted here.`}
+        />
+      ) : null}
+
+      {data.recorded_picks.length > 0 ? (
+        <RecordedPicks
+          picks={data.recorded_picks}
+          differs={differs}
+          overridden={data.recorded?.overridden ?? null}
+        />
       ) : null}
 
       {data.warnings.map((w) => (
@@ -368,6 +529,7 @@ function Body({
         onSelect={onSelect}
         recorded={data.recorded}
         boundary={data.boundary}
+        rebuilt={differs}
       />
 
       {current ? (
@@ -385,6 +547,7 @@ function Body({
             <p className="text-xs text-muted">{whyLine(current)}</p>
           </div>
           <CriterionTable row={current} data={data} />
+          <WindowDetail row={current} data={data} />
           <p className="text-xs text-faint">
             Percentiles rank this variant among all {formatInt(data.n_variants)}; points are weight
             × percentile and add up to the composite. A window with no matching day is left out and
