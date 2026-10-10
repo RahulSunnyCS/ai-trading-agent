@@ -605,3 +605,11 @@ only. This is the engine convention behind every stored result and is left as is
   minute; the settlement flag covers a high at or after 15:00; a non-overlapping per-episode table
   added. Census unchanged (1,450 episodes), R0 unchanged; overlap counts and the settlement count
   moved slightly (numbers above updated). R0's stale-price fills recorded as a limitation.
+- 2026-10-11 — Owner's report (https://claude.ai/artifact/F7D8uTkuio8hwFoHgAPnth, numbers from
+  `research/bl091/report_data.py`). Descriptive cuts looked at on P2 + P3, recorded here as looks
+  per E.3: R0 per spike by number of attempts (1–5), by expiry day or not, by time of the spike
+  (before 11:00 / 11:00–13:00 / after 13:00), held rate by attempt number, average stopped and held
+  attempt, and the monthly share of NIFTY days with a 25–40 or 40+ point spike. Observations, not
+  rules: five-attempt ladders lost about ₹4,500 per Widesl; most of R0's profit is on expiry days;
+  an average ₹650 stop cost ₹930–1,050. Proposed to the owner for Phase 2, not registered: an arm
+  that stops after three losing attempts, and a SENSEX threshold of its own.
