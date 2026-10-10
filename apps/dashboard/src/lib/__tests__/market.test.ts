@@ -4,6 +4,7 @@ import {
   TOKEN_EXPIRING_THRESHOLD_MS,
   describeMarketSession,
   formatCountdown,
+  isLiveScoresWindow,
   marketSession,
   msUntil,
   tokenState,
@@ -148,5 +149,25 @@ describe('formatCountdown', () => {
     expect(formatCountdown(59_999)).toBe('under a minute');
     expect(formatCountdown(0)).toBe('under a minute');
     expect(formatCountdown(-5 * m)).toBe('under a minute');
+  });
+});
+
+describe('isLiveScoresWindow', () => {
+  it('is open on a Friday from 09:15 to just before 15:30 IST only', () => {
+    expect(isLiveScoresWindow(ist('2026-10-09T09:14:59'))).toBe(false);
+    expect(isLiveScoresWindow(ist('2026-10-09T09:15:00'))).toBe(true);
+    expect(isLiveScoresWindow(ist('2026-10-09T15:29:59'))).toBe(true);
+    expect(isLiveScoresWindow(ist('2026-10-09T15:30:00'))).toBe(false);
+  });
+
+  it('is closed on the other weekdays and at the weekend', () => {
+    expect(isLiveScoresWindow(ist('2026-10-08T11:00:00'))).toBe(false);
+    expect(isLiveScoresWindow(ist('2026-10-10T11:00:00'))).toBe(false);
+  });
+
+  it('reads the IST day, not the host day', () => {
+    // 05:00 UTC on Friday is 10:30 IST; 20:00 UTC on Thursday is 01:30 IST on Friday (closed).
+    expect(isLiveScoresWindow(new Date('2026-10-09T05:00:00Z'))).toBe(true);
+    expect(isLiveScoresWindow(new Date('2026-10-08T20:00:00Z'))).toBe(false);
   });
 });

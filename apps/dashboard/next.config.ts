@@ -75,6 +75,10 @@ const nextConfig: NextConfig = {
               destination: `${momentumDirectOrigin}/api/momentum-scores`,
             },
             {
+              source: '/api/momentum/scores/live',
+              destination: `${momentumDirectOrigin}/api/momentum-scores/live`,
+            },
+            {
               source: '/api/momentum/scores/stock/:symbol',
               destination: `${momentumDirectOrigin}/api/momentum-scores/stock/:symbol`,
             },

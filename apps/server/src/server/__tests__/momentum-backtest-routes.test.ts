@@ -44,6 +44,20 @@ describe('momentum backtest proxy routes', () => {
     await server.close();
   });
 
+  it('forwards the live provisional scores, passing a 409 outside Friday hours through', async () => {
+    const server = Fastify();
+    await server.register(momentumBacktestRoutes);
+    fetchMock.mockResolvedValue(jsonResponse(409, { detail: 'Live scores run on Fridays only' }));
+
+    const response = await server.inject({ method: 'GET', url: '/api/momentum/scores/live' });
+    expect(response.statusCode).toBe(409);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:8765/api/momentum-scores/live',
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+    await server.close();
+  });
+
   it("forwards one stock's score history, and refuses a symbol that is not an NSE symbol", async () => {
     const server = Fastify();
     await server.register(momentumBacktestRoutes);
