@@ -28,6 +28,10 @@ app.add_typer(fyers_app, name="fyers")
 legwise_app = typer.Typer(no_args_is_help=True, help="AlgoTest-style leg-wise backtests.")
 app.add_typer(legwise_app, name="legwise")
 
+from .rotation.cli import rotation_app  # noqa: E402  (BL-058: the forward paper journal)
+
+app.add_typer(rotation_app, name="rotation")
+
 
 @app.callback()
 def _load_env() -> None:

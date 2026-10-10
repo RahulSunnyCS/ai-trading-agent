@@ -1,0 +1,123 @@
+"""`obt rotation …`: update | pick | verify | show (BL-058)."""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
+
+import typer
+
+rotation_app = typer.Typer(
+    no_args_is_help=True, help="The options rotation's forward paper journal (BL-058)."
+)
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def _day(text: str | None) -> date:
+    return date.fromisoformat(text) if text else datetime.now(IST).date()
+
+
+@rotation_app.command()
+def update(
+    day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+) -> None:
+    """Run all 298 variants over one collected day and store the results (idempotent)."""
+    from .update import default_day, update_day
+
+    d = _day(day) if day else default_day()
+    if d is None:
+        typer.echo("nothing to update: the latest collected day is already stored")
+        return
+    r = update_day(d)
+    if r["skipped"]:
+        typer.echo(f"nothing written: {r['skipped']}", err=True)
+        raise typer.Exit(2)
+    if r["errors"]:
+        for e in r["errors"][:10]:
+            typer.echo(f"  {e}", err=True)
+        raise typer.Exit(1)
+
+
+@rotation_app.command()
+def pick(
+    day: str = typer.Option(None, "--day", help="YYYY-MM-DD; default: today (IST)."),
+    vix_open: float = typer.Option(
+        None, "--vix-open", help="Override the live 09:15 VIX open (testing)."
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Score and print; write nothing."),
+    telegram: bool = typer.Option(True, "--telegram/--no-telegram"),
+) -> None:
+    """Record today's picks for every list (before 09:17), hash-chained, and Telegram them."""
+    from ..notify import Notification, send
+    from .journal import AlreadyRecorded
+    from .pick import PickError, record
+
+    d = _day(day)
+
+    def alert(title: str, body: str) -> None:
+        if telegram and not dry_run:
+            send(Notification(source="options-rotation", severity="error", title=title, body=body))
+
+    try:
+        r = record(d, vix_open=vix_open, dry_run=dry_run)
+    except AlreadyRecorded as error:  # a retry after a success: the day has its entry
+        typer.echo(f"already recorded: {error}")
+        return
+    except (PickError, ValueError) as error:
+        typer.echo(f"not recorded: {error}", err=True)
+        alert(f"Rotation pick NOT recorded for {d}", str(error))
+        raise typer.Exit(2) from error
+    except Exception as error:  # noqa: BLE001 - an unexpected failure must still alert and retry
+        typer.echo(f"not recorded: {type(error).__name__}: {error}", err=True)
+        alert(f"Rotation pick FAILED for {d}", f"{type(error).__name__}: {str(error)[:300]}")
+        raise typer.Exit(2) from error
+    typer.echo(r.text)
+    if telegram and not dry_run:
+        severity = "info" if r.entry["before_first_entry"] else "warn"
+        send(
+            Notification(
+                source="options-rotation",
+                severity=severity,
+                title=f"Rotation picks {d}",
+                body=r.text,
+            )
+        )
+
+
+@rotation_app.command()
+def verify() -> None:
+    """Re-compute the hash chain; exit 1 on any problem."""
+    from . import journal, store
+
+    path = store.journal_path()
+    problems = journal.verify(path)
+    n = len(journal.read(path))
+    if problems:
+        for p in problems:
+            typer.echo(f"PROBLEM: {p}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"journal intact: {n} entries, head {journal.head(path)[:16]}")
+
+
+@rotation_app.command()
+def show(last: int = typer.Option(5, "--last", help="How many recent entries.")) -> None:
+    """Print the recent entries and each list's P&L where the day is scored."""
+    from . import journal, store
+    from .lists import LOTS_PER
+    from .variants import variant_names
+
+    entries = journal.read(store.journal_path())[-last:]
+    m = store.load_matrix(variant_names()) if entries else None
+    for e in entries:
+        typer.echo(
+            f"{e['day']} {e['weekday']} VIX {e['vix_open']} ({e['vix_band']}) "
+            f"chain {e['hash'][:10]}"
+        )
+        day = date.fromisoformat(e["day"])
+        for key, p in e["lists"].items():
+            picked = p["core"] + p["buy"]
+            pnl = ""
+            if m is not None and day in m.days:
+                row = m.values[m.days.index(day)]
+                pnl = f"  P&L {LOTS_PER * sum(row[m.names.index(n)] for n in picked):>9,.0f}"
+            typer.echo(f"  {key:3s} {', '.join(picked)}{pnl}")

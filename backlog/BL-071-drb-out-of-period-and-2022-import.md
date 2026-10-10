@@ -1,0 +1,193 @@
+# BL-071 — Does DRB's rule hold outside the studied year? Jan–Aug 2025 now; 2022–2024 needs an import
+
+| | |
+|---|---|
+| **Priority** | P2 — options research; follows BL-067 / 068 / 069 |
+| **Status** | Done — hold-out 2022–2024: the recent edge fails, the candidate is killed, the fit criteria carry the rule; `2014-2024/nifty` imported (BL-034 Phase 5 for NIFTY) |
+| **Type** | research |
+| **Area** | options / trading-data |
+| **Created** | 2026-10-10 |
+| **Depends on** | BL-065 (DRB-6W3L2), BL-068 (controls), BL-034 (lake; Phase 5 = `2014-2024`) |
+| **TODO.md row** | — |
+
+## Context
+
+Every DRB result so far comes from one year, 2025-09-01 → 2026-10-08, which the owner chose ("last one
+year only") and which has been examined many times. Two ways to test the rule outside it.
+
+## Plan
+
+### Part A — Jan–Aug 2025, from results that already exist (no engine runs)
+- **Why possible:** every one of the 248 variants has per-day results from 2024-10-09 (BL-054/056/059–062
+  ran 2024-10-09 → 2026-10-08); the rotation only ever read them from 2025-09-01. `rotate.py
+  --window-from 2024-10-09` scores from the start; with a 63-day warm-up the selection days run
+  2025-01-10 → 2026-10-08, and the days before 2025-09-01 (about 160) are the out-of-period slice. Scores
+  use only earlier rows, so slicing the picks file is exact (no look-ahead).
+- **What "unseen" means here:** the rule, its weights and every ingredient were chosen and examined on
+  the 2025-09 → 2026-10 year. The 33 morning variants' two-year totals (BL-054/056) were looked at before;
+  the rotation was not. So this tests the rotation rule, not the variants.
+- **Rows:** baseline 33/25/25/17, recent-only 100/0/0/0, no-recent 0/33/33/34, no-VIX 40/30/30/0, on the
+  slice 2025-01-10 → 2025-08-29.
+- **Read-out (registered before the run):**
+  1. baseline gross on the slice ≥ the 90th percentile of 1,000 random picks of the same shape (3 core
+     strategies × 2 lots, at least 2 Widesl, Buy on the days the rule bought) on the same days;
+  2. baseline − no-recent is positive and the 90% block-bootstrap interval (5-day blocks, 2,000
+     resamples) excludes zero;
+  3. the per-day gap baseline − no-recent is at least half its in-sample value (₹204,763 over 202 days =
+     ₹1,014 a day → ₹507 a day).
+  The recent edge is *confirmed out of period* if all three hold, *not confirmed* if (2) fails. No-VIX
+  and recent-only are reported, not judged.
+- **Hold-out:** this slice is the hold-out; nothing is changed after it is read.
+- **Will not run:** other slices, other rows, re-tuning on the slice.
+- **Result (2026-10-10): NOT confirmed — the recent edge did not hold out of period; it reversed.** Slice
+  2025-01-10 → 2025-08-29, 157 selection days, gross before charges, DRB-6W3L2, 248 variants:
+
+  | Row | Gross | Max DD | Win % | Per day |
+  |---|---|---|---|---|
+  | baseline 33/25/25/17 | ₹1,70,015 | −₹88,366 | 52.9 | ₹1,083 |
+  | recent-only 100/0/0/0 | ₹1,98,550 | −₹69,912 | 57.3 | ₹1,265 |
+  | no-recent 0/33/33/34 | **₹2,96,897** | −₹59,930 | 56.1 | ₹1,891 |
+  | no-VIX 40/30/30/0 | ₹2,18,753 | −₹87,720 | 52.9 | ₹1,393 |
+
+  Random picks of the same shape on the same days (n = 1,000): P50 ₹1,98,170, P90 ₹2,94,240, max
+  ₹4,26,365. (1) baseline ≥ P90: **false** (it beats 34% of random picks; below the median). (2)
+  baseline − no-recent: **−₹1,26,882**, 90% block-bootstrap interval [−₹2,59,561, −₹68], so the sign is
+  the opposite of the in-sample year's +₹2,04,763. (3) per-day gap −₹808 against ≥ +₹507: false. All three
+  conditions fail. Report-only: baseline − recent-only −₹28,535; baseline − no-VIX −₹48,739.
+  Reading: in Jan–Aug 2025 the weekday / days-to-expiry / VIX-band fit criteria alone (no-recent) did
+  best, at the random P90, and adding recent return made it worse; in 2025-09 → 2026-10 it was the other
+  way round (BL-067/068). The ranking of the criteria is not stable across the two periods, so BL-067/068's
+  "recent return carries the edge" is a finding about that one year, not yet about the rule. Not a
+  statement that no-recent is good: one 157-day slice, one comparison. The whole two-year run of the
+  baseline (422 selection days) makes ₹7,20,873 gross, drawdown −₹88,366, of which ₹4,30,868 is the
+  2025-12 → 2026-10 year.
+
+### Part A, extra block (2026-10-10, exploratory: the slice was already read)
+- **Why:** BL-069 produced four candidates in-sample and the slice result says the recent criterion did
+  not hold there. The owner wants to know which rows, if any, hold up on Jan–Aug 2025. The slice was
+  read by part A, so this block cannot confirm anything; it is a second, clearly labelled look.
+- **Rows (fixed here, no others):** recent-only + family-pooled recent F = 0.5 (BL-069's keep);
+  baseline with fit lookbacks 21:50,63:50; baseline with 63:50,126:50 (the two placebo-real B3 rows);
+  baseline with the streak gate 5 (tests the "after a losing stretch the basket does better" finding).
+  All `--window-from 2024-10-09`, sliced at 2025-09-01, same random comparator as part A.
+- **Read-out:** report gross, max drawdown, win % and per day beside part A's four rows, and whether
+  each is ≥ the slice's random P90 (₹2,94,240). No keep / drop is declared from this block.
+- **Will not run:** any other row on this slice.
+- **Result:** pending.
+
+### Part B — 2022–2024 NIFTY from the SSD's `2014-2024` folder (needs the owner's go-ahead)
+- **What is there** (read-only inspection, 2026-10-10, `/Volumes/RAHUL'S SSD/Stock Market Data/2014-2024`):
+  `nifty/` 46,864 contract CSVs (12 GB; 52 / 53 / 44 expiry folders in 2022 / 2023 / 2024), `banknifty/`
+  51,185 CSVs (13 GB), `spot_data/` (NIFTY 2015 →, BANKNIFTY 2015 →, SENSEX 2018 → 1-minute spot).
+  One CSV per strike × CE/PE × expiry (`NIFTY_17350_PE_30_NOV_23.csv`, columns `date,time,open,high,low,
+  close,volume,oi`, `dd-mm-yyyy`), holding only that contract's **expiry week**. For the 2023-03-16 expiry:
+  151 contracts, 137 with rows on 2023-03-15, the day the lake calls `thin_chain: 6 contracts`.
+- **Why the lake looked thin (correction):** the lake's NIFTY options start at the expiry 2024-10-03; a
+  2022–2023 day therefore holds only the few long-dated contracts that traded that early. The week's own
+  contracts are in `2014-2024`, which BL-034 reserved as Phase 5 and never imported. The 2022–2023 data
+  is not sparse; it is not loaded.
+- **Cross-check against the already-imported set (2024-10-31 expiry, 226 contracts, 256,304 minutes in
+  both):** OHLC identical on 74% of minutes (close 74%, open 71.5%, high / low 77.5%); open interest
+  equal on 98%; median close difference 0.0%, 95th-percentile high difference 0.75%. The `2014-2024`
+  CSV holds **traded minutes only** (all 256,570 rows have volume > 0); the Parquet set fills untraded
+  minutes with carried-forward bars (379,863 minutes in the same span, 256,255 traded). So the two sources
+  are the same vendor but not the same construction: importing creates a seam at 2024-10-03.
+- **Proposed route (not started):** convert the `2014-2024/nifty` expiry folders for 2022-01 → 2024-09 to
+  the staging Parquet layout `tdata vendor import` already reads (columns underlying, contract, strike,
+  option_type, expiry, ts, open, high, low, close, volume, oi), together with the existing
+  expiries as one staging set so a rewritten day keeps its far-dated contracts; import with
+  `--days 2022-03-25..2024-10-02 --force` (a Fyers-collector day is never overwritten; there are none
+  before 2026-09). Fill untraded minutes the way the Parquet set does, decided against a day-by-day
+  comparison on the Oct 2024 overlap. Then `tdata quality rebuild`, `tdata reference derive-expiries`,
+  `tdata derived rebuild --underlying NIFTY --days …`, and run the 124 NIFTY variants over the days
+  (about 700 sessions; ~10–12 h at the current pace). Lot sizing stays "current" (the default).
+- **Risks:** a source seam at 2024-10 (prices differ on ~22% of minutes, by 0.75% at the 95th
+  percentile on highs); expiry-week-only chains (no next-expiry contracts on a given day); the single
+  DuckDB writer, so the import must not overlap `obt daily`; the lake lives on a disk image on the same
+  SSD as the source, so it competes with every engine run. Nothing is written to the lake until the
+  owner agrees and a scratch import reproduces the Oct 2024 overlap.
+- **Decision for the owner:** widen the lake to 2022–2024 (BL-034 Phase 5), yes / no.
+
+### Part B — registered read-out (2026-10-10, before any 2022–2024 variant run)
+- **Universe:** NIFTY only (SENSEX options before 2023-07 are not in the lake, and none before 2024-10
+  are imported): the 124 NIFTY variants of the 248-list (OTM1 Widesl, Dir ATM, Buy, closest-premium
+  ₹80 / ₹100 at the 25 start times 09:17–15:17; Buy has no 15:17). Per-day results from the same
+  variant files as the main runs, run over the imported days 2022-01-03 → 2024-10-08 with
+  `research/bl071/run_variant.py` (research-only reference override, `lot_sizing: current`, costs 0).
+  The existing results for 2024-10-09 onward are used only as warm-up context where a row needs it; the
+  test period is **2022-01 → 2024-10-08** minus the 63 warm-up days and the days `data_quality` excludes.
+- **Rule:** DRB-6W3L2 as BL-065 (3 strategies × 2 lots, at least 2 Widesl, Buy add-on when a Buy ranks in
+  the top 10), NIFTY-only. Days-to-expiry from the nearest listed expiry with bars on that day; VIX band
+  from the 09:15 INDIAVIX open; weekday from the calendar. Nothing is tuned on this period.
+- **Rows (fixed):** baseline 33/25/25/17; recent-only 100/0/0/0; no-recent 0/33/33/34; no-VIX
+  40/30/30/0; baseline with fit lookbacks 21:50,63:50; baseline with 63:50,126:50; recent-only + family
+  0.5; the four BL-072 block-1 blends (25/25/15/15/20/0 and 25/25/15/15/10/10 on the two lookback sets); added 2026-10-10 before any hold-out read: BL-072 block-2 rows (a) 30/30/20/20/0 and (d) 40/10/20/20/10 on 63:50,126:50.
+- **Read-out:** (1) *the recent edge holds* if baseline − no-recent is positive with a 90% block-
+  bootstrap interval (5-day blocks, 2,000 resamples) above zero and at least half the main year's
+  ₹1,014 a day. (2) *the longer fit lookbacks hold* if each B3 row beats the baseline with a bootstrap
+  interval above zero. (3) *the rule beats chance* if baseline ≥ P90 of 1,000 random picks of the same
+  shape on the same days. (4) Report per calendar year (2022 / 2023 / 2024), since regimes differ.
+  Risk caveats written down now: the data are expiry-week-only chains with traded minutes only, a
+  different construction from the 2025+ vendor set (prices differ on ~22% of overlapping minutes, 0.75%
+  at the 95th percentile on highs); NIFTY's expiry day moved from Thursday to Tuesday in the period.
+- **Hold-out:** this is the hold-out. Nothing is changed after reading it; a row that fails here is
+  not adopted whatever it did in-sample.
+- **Result (2026-10-10 05:40, the hold-out; NIFTY-only, 124 variants, 618 selection days 2022-04-05 →
+  2024-10-08, gross, lot sizing current):** **the recent-return edge does not hold; the candidate is
+  killed; the fit criteria carry the rule.**
+
+  | Row | Gross | Max DD | Win % | Worst week | 2022 | 2023 | 2024 | ≥ random P90 (₹8,65,554) |
+  |---|---|---|---|---|---|---|---|---|
+  | baseline 33/25/25/17 | 10,13,627 | −56,329 | 62 | −44,668 | 4,32,802 | 3,09,432 | 2,71,392 | yes (beats 100%) |
+  | recent-only | 7,36,694 | −61,490 | 62 | −42,478 | 3,03,355 | 2,29,281 | 2,04,058 | no (54%) |
+  | **no-recent 0/33/33/34** | **12,61,307** | **−56,030** | **64** | **−30,842** | 4,53,440 | 3,85,112 | 4,22,755 | yes (100%) |
+  | no-VIX 40/30/30/0 | 9,80,741 | −84,454 | 64 | −33,130 | 4,24,470 | 3,69,824 | 1,86,447 | yes (99%) |
+  | B3 baseline + 21/63 | 9,95,829 | −67,171 | 63 | −46,274 | 3,44,903 | 3,16,218 | 3,34,707 | yes (100%) |
+  | B3 baseline + 63/126 | 8,70,882 | −67,412 | 62 | −32,598 | 3,37,363 | 3,60,380 | 1,73,139 | yes (91%) |
+  | recent-only + family 0.5 | 6,62,164 | −56,660 | 63 | −42,523 | 3,02,776 | 1,69,838 | 1,89,549 | no (28%) |
+  | BL-072 25/15/15/20/0/25, 21/63 | 8,72,915 | −82,524 | 63 | −35,841 | 3,20,066 | 2,76,348 | 2,76,501 | yes (91%) |
+  | BL-072 25/15/15/20/0/25, 63/126 | 7,47,542 | −84,234 | 63 | −41,542 | 2,94,190 | 3,21,165 | 1,32,187 | no (58%) |
+  | BL-072 25/15/15/10/10/25, 21/63 | 8,59,582 | −81,296 | 63 | −37,460 | 3,39,956 | 3,17,258 | 2,02,367 | no (89%) |
+  | BL-072 25/15/15/10/10/25, 63/126 | 8,06,139 | −81,237 | 62 | −41,542 | 3,32,546 | 3,20,008 | 1,53,585 | no (76%) |
+  | **BL-072a 30/20/20/0/0/30, 63/126 (the candidate)** | 7,73,802 | −84,201 | 61 | −46,137 | 3,24,084 | 3,06,546 | 1,43,172 | **no (66%)** |
+  | BL-072d 40/20/20/10/0/10, 63/126 | 10,01,802 | −77,272 | 64 | −41,548 | 3,49,895 | 3,96,110 | 2,55,797 | yes (100%) |
+
+  Random picks of the same shape on the same days (n = 1,000): P50 ₹7,25,740, P90 ₹8,65,554, max
+  ₹12,22,091.
+  - **(1) Recent edge: fails.** baseline − no-recent = **−₹2,47,680** (−₹401 a day against the required
+    ≥ +₹507); 90% block-bootstrap interval [−₹3,73,573, −₹73,114], entirely negative. No-recent is the
+    best row in each of 2022, 2023 and 2024. With Jan–Aug 2025 (part A) that is 2½ years in which recent
+    return subtracts, against the one year (2025-09 → 2026-10) in which it added ₹2 lakh.
+  - **(2) Longer fit lookbacks: fail.** 21/63 −₹17,798 vs the baseline (interval straddles zero);
+    63/126 −₹1,42,745 (interval straddles zero; 2024 collapses to ₹1,73,139). The 5/21/63 lookbacks are
+    not the handicap they looked in-sample.
+  - **(3) The rule beats chance: yes.** The baseline and every row that keeps the fit criteria at
+    5/21/63 clear the random P90; the pure-recency rows (recent-only, recent-only + family) sit at
+    chance (54% / 28%). The candidate BL-072a beats 66% of random picks and is **killed**. BL-072d
+    (recency 50% with family 10%, VIX 10%, 63/126) beats 100% — one of 13 rows, noted, not promoted.
+  - **Caveats, as registered:** NIFTY only; expiry-week-only chains with traded minutes (a different
+    construction from the 2025+ set); NIFTY's expiry weekday changed in the period; today's lot size on
+    2022 prices scales rupees. The ranking across rows is what the test says, not the rupee levels.
+- **What stands after BL-067 → BL-072:** DRB's ranking beats random picks in every period tested as long
+  as the weekday / days-to-expiry / VIX fit criteria are in it. The recent-return criterion helps in one
+  year and hurts in the other 2½; the family-pooled recent, the long lookbacks and the overnight gap do
+  not survive. No row passes all three periods: no-recent passes the hold-out and Jan–Aug 2025 and fails
+  2025-09 → 2026-10 (₹2,26,105); the baseline passes the hold-out only. Nothing is adopted from this
+  series; the forward journal is the next evidence.
+
+## Log
+
+- 2026-10-10 — created; part A registered before its runs, part B inspected read-only and written up.
+- 2026-10-10 — part A ran: not confirmed (all three conditions fail; baseline − no-recent −₹1,26,882). Owner said "import it now in parallel": part B starts, staged (importer into scratch, checked against the Oct 2024 overlap, before anything is written to the lake).
+- 2026-10-10 — part B, owner said "import it now in parallel". Converter `packages/trading-data/scripts/
+  drive_csv_to_parquet.py` wrote 144 expiry Parquet files for 2022-01 → 2024-10-02 (25,246,971 rows, 25,422
+  contract files, none empty / duplicate / skipped) into a staging set with links to the 103 existing vendor
+  expiries. One-week trial (2023-03-13..17, `--force`): 5 days written, 182,534 rows, all `usable`, 129–149
+  contracts a day (was 2–6), far-dated contracts kept. Full import (`--days 2022-01-01..2024-10-02 --force`)
+  started. **Run from a throwaway checkout at 4881945**, not from this branch: after `main` was merged in,
+  any read-write catalog connect fails with `CatalogException: Table "momentum_holdings" already exists`,
+  because the live catalog recorded `011_momentum_orders` while `main` ships the same DDL as
+  `012_momentum_orders.sql` (renumbered). Nothing was written by the failed attempt. Needs the BL-051 owner
+  to reconcile the ledger before anything from `main`'s `trading_data` runs against this catalog (including
+  `obt daily`).
+- 2026-10-10 — part B: 124 NIFTY variants run on the imported days (682 each); hold-out read-out recorded above. The lake now holds NIFTY options 2022-01 → today.
