@@ -629,3 +629,9 @@ only. This is the engine convention behind every stored result and is left as is
   measure: NIFTY P60 35, P85 44 points; SENSEX 127 and 170. Post-peak: NIFTY 37 / 59, SENSEX 131 /
   209. The live category equals the after-peak category for 54 % of NIFTY and 57 % of SENSEX spikes,
   so the size at entry says little about the size the spike will reach. Not registered yet.
+- 2026-10-11 — Owner: the percentile cuts should differ by VIX regime at the open (below 11, 11–13,
+  13 and above). Look taken: held spikes, share of days with one, and P60 / P85 cuts per VIX band.
+  NIFTY share of days with a held spike: 2025 13 % (VIX 11–13) vs 47 % (13+); 2022–24 10 % (<11),
+  9 % (11–13), 15 % (13+). Held spikes per band, both periods: 5 (<11), 27 (11–13), 168 (13+); SENSEX
+  1 / 3 / 85. Cuts on the level at hold completion: NIFTY 11–13 P60 32 / P85 38, 13+ 35 / 45; SENSEX
+  13+ 126 / 171. Below VIX 11 there are too few spikes for a percentile. Not registered yet.
