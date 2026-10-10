@@ -157,11 +157,45 @@ def stage2(workers: int) -> None:
     print("adopted single switches:", adopted or "none")
 
 
+def stage3(workers: int) -> None:
+    """10 label shuffles per period for the top 10 stage-1 cells at the final structure (stage 2
+    adopted no switch, so the structure is the current one). A cell is real only if its true gross
+    beats all 10 shuffled grosses in every period."""
+    top = pd.read_csv(OUT / "stage1_top.csv", index_col=0).head(10)
+    s1 = pd.read_csv(OUT / "stage1_runs.csv").dropna(subset=["gross"]).set_index(["key", "period"])
+    jobs = []
+    for key in top.index:
+        o, f, s = int(key.split("_")[0][1:]), int(key.split("_")[1][1:]), key.split("_")[2]
+        for p in PERIODS:
+            for seed in range(10):
+                jobs.append((f"{key}__shuf{seed}", cell_args(o, f, s) + ["--shuffle-labels", str(seed)], p))
+    with ThreadPoolExecutor(workers) as pool:
+        rows = list(pool.map(lambda j: run_one(*j), jobs))
+    d = pd.DataFrame(rows).dropna(subset=["gross"])
+    d["cell"] = d.key.str.split("__").str[0]
+    out = []
+    for key in top.index:
+        row = {"cell": key}
+        real = True
+        for p in PERIODS:
+            sh = d[(d.cell == key) & (d.period == p)].gross
+            true = float(s1.loc[(key, p), "gross"])
+            row[f"{p}_true"], row[f"{p}_shuf_max"], row[f"{p}_shuf_mean"] = true, sh.max(), sh.mean()
+            real &= bool(true > sh.max())
+        row["real"] = real
+        out.append(row)
+    res = pd.DataFrame(out)
+    res.to_csv(OUT / "stage3_shuffles.csv", index=False)
+    pd.set_option("display.width", 220)
+    print(res.to_string(index=False, float_format=lambda x: f"{x:,.0f}"))
+    print(f"real in all three periods: {int(res.real.sum())} of {len(res)}")
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     stage = int(sys.argv[sys.argv.index("--stage") + 1])
     workers = int(sys.argv[sys.argv.index("--workers") + 1]) if "--workers" in sys.argv else 4
-    {1: stage1, 2: stage2}[stage](workers)
+    {1: stage1, 2: stage2, 3: stage3}[stage](workers)
 
 
 if __name__ == "__main__":

@@ -77,8 +77,33 @@ whatever it finds.
   - **Nothing reaches the 0.85 worst-period bar;** the best above-chance cell is own 15 / family 5,
     baseline split (0.772). The 19 chance-clearing cells go to stage 2 (fewer than 50, more than 10).
 
+- **Result, stage 2 (2026-10-10 13:50; 399 runs on the 19 stage-1 cells × 7 structures × 3 periods):**
+  **no switch is adopted; the structure stays as it is (Widesl minimum 2, Buy add-on on, closest-premium
+  variants in).** Fraction of the 19 cells whose worst-period score improves, and cells pushed below
+  chance in some period, when one switch is flipped (adopt only if ≥ 70% improve and none fall):
+
+  | Switch flipped | Improved | Below chance | Mean worst-period score (was 0.624) |
+  |---|---|---|---|
+  | Widesl minimum 2 → none | **74%** (14 of 19) | **1** | 0.663 |
+  | Buy add-on on → off | 0% | 6 | 0.594 |
+  | closest-premium variants in → out | 16% | 17 | 0.554 |
+  | none + Buy off | 53% | 1 | 0.633 |
+  | none + closest out | 63% | 10 | 0.670 |
+  | Buy off + closest out | 11% | 14 | 0.515 |
+  | all three | 53% | 12 | 0.631 |
+
+  - **Buy add-on and the closest-premium variants earn their place:** removing either pushes 6 and 17
+    of the 19 cells below chance in at least one period.
+  - **The Widesl minimum is borderline:** dropping it raises the worst-period score of 14 of 19 cells
+    (mean +0.04) and clears the 70% bar, but one cell falls below chance in one period, which the
+    registered rule forbids. Not adopted; it is the one open structural question for the journal.
+  - **Final structure = the current one.** The best cell per structure: current (stage 1) own 15 /
+    family 5, baseline split, 0.772; no minimum, own 15 / family 5, 0.723; no minimum + closest out,
+    own 5 / family 5, 0.763 (only 9 of 19 cells above chance everywhere).
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
 - 2026-10-10 — before any BL-075 result was read: rounding made explicit (largest remainder), so the cells (10, 0, baseline) and (0, 10, baseline) are exactly BL-073's 10/34/33/23 and BL-074 (a)'s 0/10/34/33/23. Regressions: P1 baseline ₹4,30,868 / P90 ₹2,70,198; P2 through `--window-to` ₹1,70,015 / P50 ₹1,98,170 / P90 ₹2,94,240 (identical to BL-071 part A). Stage 1 launched 12:21 IST, chained into stage 2.
 - 2026-10-10 — stage 1 done (13:05): 19 of 100 cells above chance everywhere, 0 robust; stage 2 running on those 19 cells.
+- 2026-10-10 — stage 2 done (13:50): no switch adopted. Stage 3 (shuffles on the top 10 cells) launched; journal lists A, B, C (all in the top 10) are fixed from stage 1.
