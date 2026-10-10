@@ -664,6 +664,61 @@ Open:
 3. D2 level list and the touch / rejection / break definitions above, or a shorter list?
 4. Order: Stage 1 first, then Stage 2, as the owner said.
 
+## Stage 1 — registered 2026-10-11 (P2 + P3 only)
+
+Frozen before any Stage 1 outcome is read. The owner said "continue" to the draft's defaults:
+the breakdown definition, the true-top label, the D2 level list and definitions, and Stage 1
+before Stage 2. P1 stays unread. On the learning periods this stage screens; the keep decision
+comes later, once, on P1.
+
+- **Events.** Held spikes from `research/bl091/sustained.py`: NIFTY ≥ 25, SENSEX ≥ 90 points above
+  the low, held 5 consecutive minutes. First entry = the minute after the hold completes; events
+  whose entry would be 15:13 or later are dropped. **Primary:** the first held spike of each
+  index-day (54 NIFTY 2025, 66 NIFTY 2022–24, 53 SENSEX 2025). **Secondary:** every held spike as
+  its own event, clustered by day.
+- **Categories** (frozen; level above the low when the hold completes, points):
+
+  | Index, VIX at open | 60th pct | 85th pct |
+  |---|---|---|
+  | NIFTY, two regimes: below 13 / 13+ | 31.8 / 35.2 | 36.0 / 44.6 |
+  | NIFTY, three regimes: below 11 / 11–13 / 13+ | 30.7 / 31.8 / 35.2 | 34.0 / 37.5 / 44.6 |
+  | SENSEX, 13+ (lower regimes 1–4 spikes, pooled into one inconclusive cell) | 126.3 | 170.6 |
+
+- **Arms (18 in Stage 1a).** Widesl, the live `{N|S}_wide_1202` shape, MTM stop ₹650, ₹1,300 or
+  ₹1,950, each with five re-entry rules after an overall stop at minute m (at most 5 attempts, no
+  entry at or after 15:13, the ladder ends when an attempt is not overall-stopped):
+  R0 enter at m+1; R2 enter the minute after the rolling straddle has given back ≥ 15 points
+  (SENSEX 54) from its running high since the first entry; R3 enter at the later of m+1 and 13:30;
+  R5 enter at m+20; R6 as R0 with at most 3 attempts. R1 is Stage 2's output. R4 (a stop sized to
+  recent swings) is dropped: the owner's three fixed stops test the same question. Directional D1,
+  the live `{N|S}_dir_1202` shape, entered once at the first entry minute, leg stop / overall stop
+  21 % / ₹3,000, 25 % / ₹3,600, 30 % / ₹4,300.
+- **Stage 1b (registered now, runs after its level code is built and checked):** Directional D2 at
+  the same three stops, entered the minute after the first qualifying reaction at a level during
+  the held spike (from the hold to 15:12). Trend = sign of the index move from the spike's low
+  minute to the hold minute. Rejection: the index comes within 0.1 % of a level on the trend side
+  (resistance when rising, support when falling) and a 1-minute close is back on the near side within
+  3 minutes. Break (separate variant): a completed 5-minute bar closes beyond the level in the trend
+  direction. Levels, all known before that minute: classic pivots P, R1, R2, S1, S2 from the
+  previous day; previous 1-, 2- and 3-day high and low; daily 20, 50, 100, 200-day simple moving
+  averages of closes; the 09:15–09:45 high and low (from 09:45); round numbers (NIFTY multiples of
+  500, SENSEX 1,000); the call and put strikes with the most open interest at the latest snapshot;
+  the open ± the 09:20 ATM straddle. Each level's touch count is reported.
+- **Comparator.** For each event, the same arm on the 10 nearest days of the same index and period
+  with no held spike (5 before, 5 after), entered at the same first-entry minute with the same rule
+  (R2's running high counted from that minute). Event minus placebo mean per event; t over events
+  (primary) or over day means (secondary).
+- **Engine and money.** Legwise engine, `lot_sizing: current`, sizing date 2026-10-12, early
+  reference wrapper for 2022–24; rupees per strategy at cost 0 and at ₹20 per order.
+- **Read-out.** Per arm: events, mean rupees on event days, mean on placebo days, the difference and
+  its t, share of events with a held attempt, mean attempts, worst event; by index × period, by VIX
+  regime (two and three) × category, and expiry days separately. Cells under 20 events are marked
+  inconclusive. The last two years decide (NIFTY 2025, SENSEX 2025); 2022–24 is information.
+- **Screening bar (learning periods).** An arm goes forward to P1 if its event-minus-placebo
+  difference is positive with t ≥ 2 in NIFTY 2025, same sign in NIFTY 2022–24, and its mean at ₹20
+  per order is positive. Nothing else is tuned; every arm is reported.
+- **Will not run:** other stops, rules, thresholds, hold lengths, levels or tolerances; P1.
+
 ## Log
 
 - 2026-10-10 — Owner requested adding premium-momentum parameters to the widget proposal and
@@ -790,3 +845,7 @@ Open:
   Directional second category D2 (enter on a rejection at, or a break of, a support / resistance
   level); option volume and OI change at the spike's reversal added to Stage 2. Data check: index
   bars have no volume in any period, futures start 2026-09-23, option volume exists 2022–25.
+- 2026-10-11 — Stage 1 registered (section "Stage 1 — registered"): owner said "continue" to the
+  draft's defaults. Cut points frozen from spike sizes only (no outcomes read). R4 dropped in favour
+  of the three fixed stops. Stage 1a (Widesl × 3 stops × 5 rules, Directional D1 × 3) runs first;
+  Stage 1b (D2 levels) after its level code is checked.
