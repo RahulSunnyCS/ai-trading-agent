@@ -26,8 +26,8 @@ whatever it finds.
 ### Phase 0 — Pre-register
 - **Stage 1 cells:** own-recent {0, 5, 10, 15, 20} × family-band recent {0, 5, 10, 15, 20} × fit split of
   the remaining weight {baseline 25:25:17, equal 1:1:1, no-VIX 1:1:0, dte-heavy 1:2:1} = 100 cells;
-  weekday / dte / VIX shares are the remainder split in the stated ratio, rounded to whole percents (the
-  largest absorbs the rounding); lookbacks 5:30,21:25,63:25,126:20; basket DRB-6W3L2, 248 variants, Buy on.
+  weekday / dte / VIX shares are the remainder split in the stated ratio, rounded to whole percents by the
+  largest-remainder method (ties to the first criterion; reproduces BL-073/074's weights exactly); lookbacks 5:30,21:25,63:25,126:20; basket DRB-6W3L2, 248 variants, Buy on.
   Each cell on P1, P2, P3 (300 runs); rotate.py's own random comparator on each period via `--window-to`.
 - **Stage 1 read-out:** per cell the worst-period relative score (gross ÷ best cell's gross in that
   period) and above-P90-in-all-three; *fragility* = the share of the 100 above chance everywhere, overall
@@ -58,3 +58,4 @@ whatever it finds.
 ## Log
 
 - 2026-10-10 — created and registered before any run.
+- 2026-10-10 — before any BL-075 result was read: rounding made explicit (largest remainder), so the cells (10, 0, baseline) and (0, 10, baseline) are exactly BL-073's 10/34/33/23 and BL-074 (a)'s 0/10/34/33/23. Regressions: P1 baseline ₹4,30,868 / P90 ₹2,70,198; P2 through `--window-to` ₹1,70,015 / P50 ₹1,98,170 / P90 ₹2,94,240 (identical to BL-071 part A). Stage 1 launched 12:21 IST, chained into stage 2.
