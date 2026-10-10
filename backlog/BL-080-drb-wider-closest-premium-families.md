@@ -172,8 +172,8 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
 
   P3 is NIFTY-only, so removing SENSEX variants cannot change it: the two lists are identical there and
   that tie counts as "≥" under the registered rule without being evidence. Counting it, B, C and REF each
-  reach 2 of 3 periods; on P1 and P2, the only periods that can differ, only one of A, B, C, REF is ≥ in
-  both (REF's P1 falls by ₹45,862, A's falls in both). **The second clause fails outright:** C's
+  reach 2 of 3 periods; on P1 and P2, the only periods that can differ, none of the four is ≥ in both
+  (B and C gain in P1 and lose in P2, REF the reverse, A loses in both). **The second clause fails outright:** C's
   Jan–Aug 2025 drops below the random P90 (3,10,874 vs 3,40,651) where it was above on the 298 list.
   So the pruned list is not used; the journal universe question (248 vs 298) is unaffected by it.
 - **Result (a), the 298 map:** pending (running; `research/bl080/map_extdir.log`).
