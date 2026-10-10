@@ -719,6 +719,56 @@ comes later, once, on P1.
   per order is positive. Nothing else is tuned; every arm is reported.
 - **Will not run:** other stops, rules, thresholds, hold lengths, levels or tolerances; P1.
 
+## Stage 2 — registered 2026-10-11 (P2 + P3 only)
+
+Frozen before any Stage 2 outcome is read; the owner asked for the work to continue overnight with
+small decisions taken and logged.
+
+- **Candidates.** Every held spike (all of them, clustered by day). A candidate is a minute t from
+  the hold minute to the spike's end at which the rolling straddle makes a new high (above every
+  earlier minute of the spike), with t ≤ 15:12 so a sale at t+1 is possible.
+- **Label (hindsight, for labelling only).** True top if (a) after t the straddle falls to its value
+  at t minus 15 points (SENSEX 54) before it exceeds its value at t, by 15:28; and (b) the live
+  Widesl with a ₹650 MTM stop sold at t+1 is not overall-stopped. Reported: share of candidates that
+  are true tops, and labels (a) and (b) separately.
+- **Parameters at t (data stamped ≤ t only):**
+  1. Straddle: 3-minute velocity, 3-minute acceleration (this 3 minutes' change minus the previous
+     3 minutes'), consecutive minutes of falling 1-minute change, rise so far, deepest pullback so
+     far within the spike, minutes since the spike's low, number of new highs so far.
+  2. Opposite breakdown in the last 3 minutes (trend = sign of the index move from the spike's low
+     to t): own index 1-minute close beyond its previous 10 minutes' low (rising) or high (falling);
+     the same on the last completed 5-minute bar against the previous two; Bank Nifty against the
+     same trend; VIX 1-minute close below its previous 10 minutes' low.
+  3. ATM implied volatility approximated as straddle ÷ (0.8 × forward × √time to expiry), forward =
+     strike + call − put; its 5-minute change.
+  4. Neighbour straddles one strike either side of the current ATM: how many have a non-negative
+     3-minute change (0, 1, 2).
+  5. Far options, strikes fixed at the spike's low minute: 8 strikes out (NIFTY 400, SENSEX 800)
+     and the nearest round strike at least that far (NIFTY multiple of 500, SENSEX 1,000), call and
+     put: percent change since the spike's low, 3-minute percent velocity.
+  6. Open interest: ATM call + put OI percent change over the last 6 minutes; far 8-strike call +
+     put OI percent change over the last 6 minutes.
+  7. Option volume: nearest-expiry chain volume in the last 3 minutes ÷ (3 × its average per minute
+     since the spike's low); the same for the ATM pair.
+  8. Other indices: Bank Nifty, Fin Nifty, Midcap Nifty 3-minute percent move in the trend
+     direction. Their rolling straddles are not built in this run (2025-only data, new loader
+     needed); recorded as not done.
+  9. Context: minute of day, days to expiry, VIX at the open, size category, and whether the index
+     is within 0.1 % of a Stage 1b level.
+- **Method.** For each parameter: median among true and false tops and the AUC (the chance a random
+  true top has a higher value than a random false one; 0.5 = no information), with a day-shuffled
+  permutation check (200 shuffles, seed 91). NIFTY: discover on 2022–24, check on 2025. SENSEX:
+  discover January–April 2025, check May–August 2025 (weaker, labelled so). A parameter
+  **separates** if its AUC is ≥ 0.60 or ≤ 0.40 in discovery with permutation p < 0.05, and on the
+  same side of 0.5 by at least 0.05 in the check.
+- **From parameters to a rule.** If at least one NIFTY parameter separates: take the one with the
+  largest discovery AUC distance from 0.5; its threshold is the discovery value that maximises (true
+  tops kept share − false tops kept share); a second parameter is added only if it separates on the
+  candidates the first keeps. That rule is R1: Widesl entries and re-entries only at candidates
+  where it fires, run with the Stage 1a machinery at the three stops and judged against R0 and the
+  comparator. If none separates, Stage 2 reports that and stops.
+- **Will not run:** other thresholds, windows, label definitions or parameter forms; P1.
+
 ## Log
 
 - 2026-10-10 — Owner requested adding premium-momentum parameters to the widget proposal and
@@ -857,3 +907,6 @@ comes later, once, on P1.
   +₹628 2022–24, +₹735 SENSEX) with the smallest worst spike; R6 (cap at 3 attempts) was worst in
   NIFTY 2025 (+₹39). Wider Widesl stops cut attempts but deepened the worst spikes. Directional D1
   lost in 2025 at 21 %. Full tables: `research/bl091/out/stage1.md`; the owner's report follows.
+- 2026-10-11 — Stage 2 registered (section "Stage 2 — registered") with small decisions logged
+  there: candidates start at the hold; give-back replaced by the deepest pullback so far; IV by the
+  straddle approximation; other indices' straddles not built in this run.
