@@ -25,6 +25,10 @@ import varlib  # noqa: E402  (live_csv: the comparator inputs)
 WINDOW_FROM = (
     sys.argv[sys.argv.index("--window-from") + 1] if "--window-from" in sys.argv else "2025-09-01"
 )
+# BL-075: `--window-to D` ends the series at D, so rotate's own random comparator / E / conditions
+# apply to exactly that slice; `--no-buy` switches the Buy add-on off
+WINDOW_TO = sys.argv[sys.argv.index("--window-to") + 1] if "--window-to" in sys.argv else None
+NO_BUY = "--no-buy" in sys.argv
 WARMUP = 63
 LOOKBACKS = [(5, 0.4), (21, 0.3), (63, 0.3)]
 W_CRIT = {"recent": 0.33, "weekday": 0.25, "dte": 0.25, "vix": 0.17}
@@ -70,7 +74,7 @@ BUY_MAX = _arg("--buy-max", 2)  # 2 = first block; 1 = small-book block
 LOTS_PER = _arg("--lots-per", 1)  # BL-065: lots traded in each picked strategy (1 = one lot each)
 assert CORE % LOTS_PER == 0, "--core must be a multiple of --lots-per"
 N_CORE = CORE // LOTS_PER  # core strategies a day
-N_BUY = max(1, BUY_MAX // LOTS_PER)  # Buy strategies a day (2 Buy lots = 1 Buy strategy of 2 lots)
+N_BUY = 0 if NO_BUY else max(1, BUY_MAX // LOTS_PER)  # Buy strategies a day (2 Buy lots = 1 Buy strategy of 2 lots)
 N_RUNS, SEED = 1000, 57
 # BL-061: add the closest-premium Widesl (NIFTY 80 / 100, SENSEX 250 / 320) to the candidate list
 WHOLE_DAY = "--whole-day" in sys.argv  # BL-062: every start time 09:17..15:17 (248 variants)
@@ -306,6 +310,8 @@ def load_all():
             continue
         df = whole_day_columns(u, pfx) if WHOLE_DAY else A.load(u)
         df = df[df.index >= pd.Timestamp(WINDOW_FROM)]
+        if WINDOW_TO:
+            df = df[df.index <= pd.Timestamp(WINDOW_TO)]
         f = lake_features(u, df.index) if NIFTY_ONLY else A.day_features(u, df.index)
         wk = f.weekday.isin(A.WD).values
         df, f = df[wk], f[wk]
@@ -914,7 +920,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_fband' if FAMILY_KEY == 'band' else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_fband' if FAMILY_KEY == 'band' else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}{f'_to{WINDOW_TO}' if WINDOW_TO else ''}{'_nobuy' if NO_BUY else ''}.csv"
         )
     )
     R.assign(
