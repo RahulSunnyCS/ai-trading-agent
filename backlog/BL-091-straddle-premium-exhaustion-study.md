@@ -635,3 +635,15 @@ only. This is the engine convention behind every stored result and is left as is
   9 % (11–13), 15 % (13+). Held spikes per band, both periods: 5 (<11), 27 (11–13), 168 (13+); SENSEX
   1 / 3 / 85. Cuts on the level at hold completion: NIFTY 11–13 P60 32 / P85 38, 13+ 35 / 45; SENSEX
   13+ 126 / 171. Below VIX 11 there are too few spikes for a percentile. Not registered yet.
+- 2026-10-11 — Owner's plan for the next stages, not yet registered (the owner will restate it):
+  Stage 1, the trading test with no hindsight (enter after a spike holds 5 minutes, re-entry rules
+  R0–R6, time-matched random comparator, by VIX regime and percentile category); Stage 2, reverse
+  engineering: every new higher high during a held spike is a candidate top, labelled with hindsight
+  as true or false, and the parameters at each candidate are compared between the two groups.
+  Parameters the owner added: an opposite-direction breakdown on NIFTY, Bank Nifty and VIX (1- and
+  5-minute charts; Bank Nifty 1-minute bars exist from 2015), and the far out-of-the-money options
+  (about 8 strikes out, and the nearest round strike, a multiple of 500 for NIFTY and 1,000 for
+  SENSEX): their price change, velocity and acceleration during the spike, since heavy selling may
+  collapse them or fear may lift them. Data check on 7 sample days: NIFTY ±400 / ±500 and SENSEX
+  ±800 / ±1,000 strikes traded every minute in 2022–25; NIFTY's are ₹1–25 the day before expiry, so
+  changes are measured in percent as well as points.
