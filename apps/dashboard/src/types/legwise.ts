@@ -167,7 +167,10 @@ export interface AnatomyResponse {
   cuts: string[];
   thresholds: { quiet_range_over_implied: number; trend_strength: number };
   dte_reliable_from: string;
-  t33: { status: 'unavailable' | 'empty' | 'ok' | 'error'; message: string | null };
+  t33: {
+    status: 'unavailable' | 'empty' | 'ok' | 'error' | 'connect_failed' | 'missing_table';
+    message: string | null;
+  };
   days: DayAnatomy[];
 }
 

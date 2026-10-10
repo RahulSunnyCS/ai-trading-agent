@@ -313,7 +313,9 @@ def _overlay_t33(underlying: str, days: list[dict]) -> dict[str, str | None]:
     """Attach apps/server's T-33 whole-day regime tag (`daily_regime_tags`) to each day as
     `t33`, so the dashboard can show how the two classifiers agree. Optional enrichment:
     reported as a status, never silently dropped — `unavailable` (no DATABASE_URL in THIS
-    process), `empty` (connected, nothing tagged in range), `ok`, or `error` with the message."""
+    process), `connect_failed` (cannot connect: down, bad credentials or no such database),
+    `missing_table` (no `daily_regime_tags`),
+    `empty` (connected, nothing tagged in range), `ok`, or `error` with the message."""
     for d in days:
         d["t33"] = None
     if not regime_source.regime_data_available():
@@ -324,6 +326,8 @@ def _overlay_t33(underlying: str, days: list[dict]) -> dict[str, str | None]:
         tags = regime_source.fetch_regimes(
             underlying, date.fromisoformat(days[0]["day"]), date.fromisoformat(days[-1]["day"])
         )
+    except regime_source.RegimeSourceUnavailable as error:
+        return {"status": error.status, "message": str(error)}
     except Exception as error:  # a real DB problem must be visible, but must not break the page
         return {"status": "error", "message": f"{type(error).__name__}: {error}"}
     for d in days:

@@ -114,7 +114,12 @@ Otherwise:
 - `analytics/regime_source.py` — reads `daily_regime_tags` from Postgres,
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`
-  Gotchas for the exact silent-omission failure mode.
+  Gotchas for the exact silent-omission failure mode. With it set, a database
+  that is down (`connect_failed`) or lacks the table (`missing_table`) raises
+  `RegimeSourceUnavailable`; `features/regime.py::regime_bucket_status` turns that
+  into an absent regime section plus a status (CLI line, `regime_status` /
+  `regime_message` on `POST /runs`, `regime_status` in the MCP `run_backtest`
+  output, `t33.status` on `/legwise/anatomy`). Any other query error still raises.
 
 ## Commands
 
