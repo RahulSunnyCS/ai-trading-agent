@@ -8,7 +8,7 @@ import pytest
 
 from trading_data import lake, reference
 from trading_data.backup import backup
-from trading_data.db import FIXED_SCHEMA_VIEWS, LAKE_VIEWS, catalog_path, connect
+from trading_data.db import FIXED_SCHEMA_VIEWS, LAKE_VIEWS, _migrations, catalog_path, connect
 from trading_data.instruments import InstrumentSpec, instrument_key, register
 
 DAY = date(2026, 9, 29)
@@ -98,9 +98,11 @@ def test_012_applies_over_catalog_with_old_011_ledger(root):
             "INSERT INTO momentum_orders VALUES ('rahul', DATE '2026-10-09', "
             "'2026-10-09T14:15:00+05:30', 'scheduled', 'fav', 'paper', '{}')"
         )
-    # exactly the live ledger: 001..010, 011_momentum_orders, 011_momentum_result_changes
+    # the live ledger is 001..010, 011_momentum_orders, 011_momentum_result_changes; opening it
+    # adds only 012_momentum_orders, so one row more than there are migration files
+    ledger_rows = len(_migrations()) + 1
     with connect(root, views=()) as con:
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 13
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == ledger_rows
         assert (
             con.execute(
                 "SELECT count(*) FROM schema_migrations WHERE version = '011_momentum_orders'"
@@ -131,7 +133,7 @@ def test_012_applies_over_catalog_with_old_011_ledger(root):
             == 100000.0
         )
     with connect(root, views=()) as con:  # and the next open applies nothing
-        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 13
+        assert con.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == ledger_rows
 
 
 def test_004_moves_stock_benchmark_tris_out_of_momentum_prices(root):
