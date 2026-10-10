@@ -930,3 +930,8 @@ small decisions taken and logged.
   of the day): 2025 traded 35 of 54, −₹70 per traded spike at ₹650, −₹1,234 against the comparator
   (t −3.6), below R0 (+₹372) and R3 (+₹846); 2022–24 +₹568, +₹185 against the comparator (t 0.6).
   R1 does not pass. Stage 2 ends here as registered.
+- 2026-10-11 — Owner's report for Stages 1 and 2: https://claude.ai/artifact/3WfVxSVhhcrsAFv7RyxdYg,
+  with a Markdown copy in the owner's research folder; numbers from `research/bl091/report_stages.py`.
+  Decisions put to the owner: take R3 (after a stop on a spike day, nothing before 13:30) to the P1
+  test as a narrower registered question; test expiry-day spikes on their own; or close the
+  Directional and level ideas.
