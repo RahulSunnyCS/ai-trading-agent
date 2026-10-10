@@ -38,6 +38,7 @@ import optionsCorrelation from './content/optionslab/correlation.md?raw';
 import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
+import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
 import optionsRuns from './content/optionslab/runs.md?raw';
 import optionsStrategies from './content/optionslab/strategies.md?raw';
 import optionsLosingDays from './content/optionslab/walkthrough-losing-days.md?raw';
@@ -288,6 +289,15 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
     kind: 'Screen',
     body: optionsCorrelation,
     screen: { tab: 'optionslab', rest: ['correlation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-matrix',
+    title: 'Matrix',
+    summary: 'Where the rotation variants make or lose money by start time, date and condition.',
+    kind: 'Screen',
+    body: optionsRotationMatrix,
+    screen: { tab: 'optionslab', rest: ['matrix'] },
   },
   {
     chapter: 'optionslab',
