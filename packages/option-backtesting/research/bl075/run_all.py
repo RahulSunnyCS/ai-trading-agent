@@ -20,7 +20,8 @@ import pandas as pd
 
 HERE = Path(__file__).parent
 ROTATE = HERE.parent / "bl057" / "rotate.py"
-OUT = HERE / "out"
+EXT = "--ext" in sys.argv  # BL-080: the 348-variant list (rotate.py --ext-closest), outputs in out_ext/
+OUT = HERE / ("out_ext" if EXT else "out")
 sys.path.insert(0, str(HERE.parent / "common"))
 from rotparse import parse_case_a  # noqa: E402
 
@@ -63,6 +64,8 @@ def run_one(key: str, args: list[str], period: str, mw0: bool = False, extra: li
         out = cache.read_text()
     else:
         cmd = [sys.executable, str(ROTATE), "--basket", "DRB-6W0L2" if mw0 else "DRB-6W3L2", *args, *PERIODS[period], *(extra or [])]
+        if EXT:
+            cmd.append("--ext-closest")
         proc = subprocess.run(cmd, capture_output=True, text=True, cwd=HERE.parent.parent)
         out = proc.stdout
         cache.write_text(out)

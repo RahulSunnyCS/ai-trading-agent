@@ -37,7 +37,7 @@ def is_wide(name: str) -> bool:
 
 
 def is_dir(name: str) -> bool:
-    return parts(name)[1] == "dir"
+    return parts(name)[1] in ("dir", "ditm1")
 
 
 def is_buy(name: str) -> bool:

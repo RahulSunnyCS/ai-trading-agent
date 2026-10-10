@@ -57,7 +57,7 @@ def family_index(names: list[str]) -> np.ndarray:
     keys = []
     for n in names:
         _, family, tag = parts(n)
-        kind = "wide" if is_wide(n) else family
+        kind = "wide" if is_wide(n) else "dir" if is_dir(n) else family
         keys.append(f"{kind}_{band(tag)}")
     return np.unique(keys, return_inverse=True)[1]
 

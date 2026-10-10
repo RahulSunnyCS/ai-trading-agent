@@ -32,7 +32,10 @@ ROOT = HERE.parent.parent
 EXT = ROOT / "strategies" / "rotation_ext"
 CORE = ROOT / "strategies" / "rotation"
 SIZING = date(2026, 10, 12)
-WINDOWS = {"NIFTY": (date(2022, 1, 3), date(2026, 10, 9)), "SENSEX": (date(2024, 10, 9), date(2026, 10, 9))}
+WINDOWS = {
+    "NIFTY": (date(2022, 1, 3), date(2026, 10, 9)),
+    "SENSEX": (date(2024, 10, 9), date(2026, 10, 9)),
+}
 COLUMNS = ["day", "net", "gross", "costs", "worst_mtm", "stopped_by", "n_trades"]
 
 
@@ -73,8 +76,15 @@ def simulate(files: list[Path], underlying: str, start: date, end: date) -> dict
             except MissingReferenceData:
                 continue
             out[name].append(
-                [d, round(r.gross - r.costs, 2), round(r.gross, 2), round(r.costs, 2),
-                 round(r.worst_mtm, 2), r.stopped_by or "", len(r.trades)]
+                [
+                    d,
+                    round(r.gross - r.costs, 2),
+                    round(r.gross, 2),
+                    round(r.costs, 2),
+                    round(r.worst_mtm, 2),
+                    r.stopped_by or "",
+                    len(r.trades),
+                ]
             )
     return out
 
@@ -92,7 +102,9 @@ def validate() -> int:
 
         with open(varlib.variant_file(name, "results")) as f:
             stored = {r["day"]: float(r["net"]) for r in csv.DictReader(f)}
-        diffs = [(str(r[0]), r[1], stored.get(str(r[0]))) for r in got if stored.get(str(r[0])) != r[1]]
+        diffs = [
+            (str(r[0]), r[1], stored.get(str(r[0]))) for r in got if stored.get(str(r[0])) != r[1]
+        ]
         print(f"{name}: {len(got)} days, {len(diffs)} differ {diffs[:3]}")
         bad += len(diffs) + (len(got) == 0)
     return bad
@@ -104,7 +116,9 @@ def main() -> None:
     out = HERE / "results"
     out.mkdir(exist_ok=True)
     for underlying, prefix in (("NIFTY", "N_"), ("SENSEX", "S_")):
-        files = sorted(f for f in EXT.glob(f"{prefix}*.yaml") if not (out / f"{f.stem}.csv").exists())
+        files = sorted(
+            f for f in EXT.glob(f"{prefix}*.yaml") if not (out / f"{f.stem}.csv").exists()
+        )
         if not files:
             continue
         lo, hi = WINDOWS[underlying]

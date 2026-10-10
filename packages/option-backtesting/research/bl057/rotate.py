@@ -82,7 +82,7 @@ WHOLE_DAY = "--whole-day" in sys.argv  # BL-062: every start time 09:17..15:17 (
 # Widesl, Dir and Buy (148 variants whole-day)
 NO_CLOSEST = "--no-closest" in sys.argv
 CLOSEST = ("--closest" in sys.argv or WHOLE_DAY) and not NO_CLOSEST
-CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320")
+CLOSEST_FAMILIES = ("p80", "p100", "p250", "p320", "p40", "p60", "p120", "p200")
 # BL-065 (third block): `--prefilter 25` keeps, in each family (Widesl incl. closest-premium, Dir,
 # Buy), the top 25% of variants by total P&L, winning-day % and max drawdown over the warm-up days
 # only (the 63 days before the first selection day); the pool is fixed after that
@@ -183,6 +183,15 @@ ENSEMBLE = (
     if "--ensemble" in sys.argv
     else None
 )
+#   --ext-closest       BL-080: add the closest-premium families NIFTY 40 / 60 and SENSEX 120 / 200
+#                        (100 variants, results in research/bl080/results): 348 variants
+EXT_CLOSEST = "--ext-closest" in sys.argv
+#   --ext-dir           BL-080 block 2: add Dir at ITM1 (N_ditm1_*, S_ditm1_*; 50 variants)
+#   --drop T[,T...]     BL-080 block 3: leave categories out. T = N_p80 / S_p250 (one index-family),
+#                        p80 (a family on both indices), closest (every closest-premium family),
+#                        wide_otm, dir_atm, dir_itm, buy, NIFTY, SENSEX
+EXT_DIR = "--ext-dir" in sys.argv
+DROP = sys.argv[sys.argv.index("--drop") + 1].split(",") if "--drop" in sys.argv else []
 NIFTY_ONLY = "--nifty-only" in sys.argv
 EARLY_DIR = (
     Path(sys.argv[sys.argv.index("--early-results") + 1]) if "--early-results" in sys.argv else None
@@ -245,10 +254,25 @@ def whole_day_columns(underlying: str, pfx: str) -> pd.DataFrame:
             else:
                 path = research / "bl060" / "results" / f"p{premium}_{tag}.csv"
             cols[f"{pfx}p{premium}_{tag}"] = read_net(path)
+    ext_names: set[str] = set()
+    if EXT_CLOSEST:
+        for slot in varlib.SLOTS_MORNING + varlib.SLOTS_LATE + [varlib.SLOT_LAST]:
+            tag = slot.replace(":", "")
+            for premium in (40, 60) if nifty else (120, 200):
+                name = f"{pfx}p{premium}_{tag}"
+                cols[name] = read_net(HERE.parent / "bl080" / "results" / f"{name}.csv")
+                ext_names.add(name)
+    if EXT_DIR:
+        for slot in varlib.SLOTS_MORNING + varlib.SLOTS_LATE + [varlib.SLOT_LAST]:
+            name = f"{pfx}ditm1_{slot.replace(':', '')}"
+            cols[name] = read_net(HERE.parent / "bl080" / "results" / f"{name}.csv")
+            ext_names.add(name)
     if RESULTS_DIR is not None:
         cols = {name: read_net(RESULTS_DIR / f"{name}.csv") for name in cols}
     if EARLY_DIR is not None:
         for name, s in list(cols.items()):
+            if name in ext_names:  # BL-080's series already spans the whole window
+                continue
             early = EARLY_DIR / f"{varlib.variant_file(name, 'variants').stem}.csv"
             if early.exists():
                 e = read_net(early)
@@ -277,6 +301,18 @@ def closest_columns(underlying: str, pfx: str, days: pd.DatetimeIndex) -> pd.Dat
                 f"uv run python research/{folder}/run_variant.py research/{folder}/variants/p{premium}_{tag}.yaml",
             ).reindex(days)
     return pd.DataFrame(cols, index=days)
+
+
+def _dropped(name: str, token: str) -> bool:
+    """Does `--drop token` leave this variant out?"""
+    index, family, _tag = name.split("_")
+    if token in ("NIFTY", "SENSEX"):
+        return index == token[0]
+    if token == "closest":
+        return family in CLOSEST_FAMILIES
+    return token == {"wide": "wide_otm", "dir": "dir_atm", "ditm1": "dir_itm", "buy": "buy"}.get(
+        family, ""
+    ) or token in (family, f"{index}_{family}")
 
 
 def lake_features(underlying: str, days: pd.DatetimeIndex) -> pd.DataFrame:
@@ -343,9 +379,17 @@ def load_all():
         feats = {u: x.loc[common] for u, x in feats.items()}
         P = pd.concat(frames, axis=1)
     expected = (148 if NO_CLOSEST else 248) if WHOLE_DAY else (110 if CLOSEST else 66)
+    if EXT_CLOSEST:
+        expected += 100
+    if EXT_DIR:
+        expected += 50
     if NIFTY_ONLY:
         expected = expected // 2
     assert P.shape[1] == expected and not P.isna().any().any(), (P.shape[1], expected)
+    if DROP:
+        keep = [c for c in P.columns if not any(_dropped(c, tok) for tok in DROP)]
+        print(f"--drop {','.join(DROP)}: {P.shape[1] - len(keep)} variants left out, {len(keep)} remain")
+        P = P[keep]
     assert feats["NIFTY"].index.equals(feats["SENSEX"].index)
     f = feats["NIFTY"][["weekday", "vix_band"]].copy()
     f["dte_N"] = feats["NIFTY"].dte_label
@@ -384,7 +428,7 @@ def variant_masks(names):
     fam = [n.split("_")[1] for n in names]
     return (
         np.array([x == "wide" or x in CLOSEST_FAMILIES for x in fam]),
-        np.array([x == "dir" for x in fam]),
+        np.array([x in ("dir", "ditm1") for x in fam]),
         np.array([x == "buy" for x in fam]),
         np.array([n.startswith("N_") for n in names]),
     )
@@ -704,6 +748,8 @@ def main() -> None:
             return "A" if m <= _minutes("1002") else "B" if m <= _minutes("1202") else "C" if m <= _minutes("1402") else "D"
 
         def _type(fam: str) -> str:
+            if fam in ("dir", "ditm1"):
+                return "dir"
             return "wide" if fam == "wide" or fam in CLOSEST_FAMILIES else fam
 
         keys = [f"{_type(n.split('_')[1])}_{_band(n.split('_')[2])}" for n in names]
@@ -935,7 +981,7 @@ def main() -> None:
         / (
             "daily_picks.csv"
             if (MIN_WIDE, CORE, BUY_MAX, CLOSEST, LOTS_PER) == (2, 5, 2, False, 1)
-            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_fband' if FAMILY_KEY == 'band' else ''}{'_ens' if ENSEMBLE else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}{f'_to{WINDOW_TO}' if WINDOW_TO else ''}{'_nobuy' if NO_BUY else ''}.csv"
+            else f"daily_picks_min{MIN_WIDE}_core{CORE}_buy{BUY_MAX}{f'L{LOTS_PER}' if LOTS_PER > 1 else ''}{'_whole_day' if WHOLE_DAY else '_closest' if CLOSEST else ''}{'_otm_only' if NO_CLOSEST else ''}{f'_top{PREFILTER}' if PREFILTER else ''}{f'r{PREFILTER_WINDOW}' if PREFILTER_WINDOW else ''}{f'_grid{GRID}' if GRID else ''}{('_w' + '_'.join(map(str, WEIGHTS))) if WEIGHTS else ''}{f'_rw{RECENT_WINDOW}' if RECENT_WINDOW else ''}{f'_lag{RECENT_LAG}' if RECENT_LAG else ''}{'_rev' if REVERSE else ''}{f'_shuf{SHUFFLE}' if SHUFFLE >= 0 else ''}{f'_rfam{RECENT_FAMILY:g}' if RECENT_FAMILY else ''}{f'_shape{RECENT_SHAPE}' if RECENT_SHAPE else ''}{('_fitlb' + FIT_LB.replace(':', 'x').replace(',', '_')) if FIT_LB else ''}{f'_mingap{MIN_GAP}' if MIN_GAP else ''}{'_pos' if REQUIRE_POS_RECENT else ''}{f'_gate{STREAK_GATE}' if STREAK_GATE else ''}{('_ddl' + '_'.join(map(str, DD_LADDER)) + ('_shadow' if DD_BASIS == 'shadow' else '')) if DD_LADDER else ''}{f'_from{WINDOW_FROM}' if WINDOW_FROM != '2025-09-01' else ''}{'_fband' if FAMILY_KEY == 'band' else ''}{'_ens' if ENSEMBLE else ''}{'_ext' if EXT_CLOSEST else ''}{'_extdir' if EXT_DIR else ''}{('_drop' + '-'.join(DROP)) if DROP else ''}{'_nifty' if NIFTY_ONLY else ''}{'_early' if EARLY_DIR else ''}{('_res' + RESULTS_DIR.name) if RESULTS_DIR else ''}{f'_to{WINDOW_TO}' if WINDOW_TO else ''}{'_nobuy' if NO_BUY else ''}.csv"
         )
     )
     R.assign(
