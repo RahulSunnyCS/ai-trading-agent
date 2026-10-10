@@ -91,6 +91,16 @@ on every period, and the winner declared by its *worst* period.
   because the new row raised the in-sample best). **Keep the 5-day window.** The 2025-12 → 2026-10 year
   rewards reacting within a week (recency, and the 5-day fit window); the other 2½ years penalise it.
 
+### Block 3 — a 10-day window in place of the 5-day (2026-10-10, registered before its runs)
+- **Why:** block 2 showed the 5-day window matters out of period; the owner asked whether 10 days does
+  the same job with less noise (a 10-day window holds ~2 matching weekdays instead of ~1).
+- **Rows (fixed, 2):** recent 10 (10/34/33/23) and recent 20 (20/30/30/20), fit lookbacks
+  10:30,21:25,63:25,126:20; the three periods as block 1.
+- **Read-out:** block 1's rule, relative to the best of all twelve rows per period; read beside the same
+  recency weight with 5:30,21:25,63:25,126:20.
+- **Will not run:** other first-window lengths.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
