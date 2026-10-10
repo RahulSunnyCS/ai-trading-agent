@@ -69,7 +69,9 @@ Sorted by priority (P0 first), then ID.
 | [BL-074](BL-074-drb-family-by-type-and-start-band.md) | Family recent pooled by strategy type and start-time band (index- and strike-agnostic) | P2 | Done: own 0 + family-band 10 is above chance in all three periods; journal candidate | research | options |
 | [BL-075](BL-075-drb-final-map-and-structural-switches.md) | The final map: 100 weightings × 3 periods, then the structural switches (Widesl minimum, Buy add-on, closest-premium) on the robust region | P2 | In progress | research | options |
 | [BL-080](BL-080-drb-wider-closest-premium-families.md) | Four more closest-premium Widesl families: NIFTY ₹40 / ₹60 and SENSEX ₹120 / ₹200 | P2 | In progress | research | options |
+| [BL-081](BL-081-drb-hourly-checkpoints-and-no-trade.md) | Hourly checkpoints for picks that have not started yet (state at 10:30–13:30: VIX, trend, VWAP, ATR, RSI, pivots) and a no-trade option | P2 | In progress | research | options |
 | [BL-057](BL-057-daily-four-criteria-rotation.md) | Daily four-criteria rotation (recent P&L, weekday, days-to-expiry, VIX fit) over the 66 NIFTY + SENSEX variants (POC) | P2 | Done: inconclusive | research | options |
+| [BL-082](BL-082-hourly-checkpoint-futures-vwap.md) | Re-run the hourly-checkpoint study with a real VWAP from futures bars (not before 2027-03-23) | P3 | Planned | research | options |
 | [BL-007](BL-007-momentum-ui-polish.md) | Momentum UI polish from the 2026-10-04 review | P3 | Planned | improvement | dashboard |
 | [BL-023](BL-023-personalities-over-history.md) | Personalities as strategy-plus-filters over historical data | P3 | Idea | research | options |
 | [BL-028](BL-028-month-3-workbench-decision.md) | Month-3 decision: is the workbench worth offering beyond friends? | P3 | Planned | research | cross-cutting |
