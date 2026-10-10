@@ -135,6 +135,34 @@ whatever it finds.
     member's. The journal already records A, B and C separately, so the combination can be computed
     afterwards from their picks if wanted; nothing is lost by not recording it.
 
+- **Result, stage 3 (2026-10-10 14:20; 300 runs): label shuffles on the top 10 cells (10 per cell and
+  period; *real* = the true gross beats all 10 shuffled grosses in every period): 3 of 10 are real.**
+
+  | Cell (own / family / split) | P1 true vs best shuffle | P2 true vs best shuffle | P3 true vs best shuffle | Real |
+  |---|---|---|---|---|
+  | **o5_f5 baseline (list A)** | 3,89,900 vs 3,73,009 | 3,18,652 vs 3,12,965 | 12,20,482 vs 10,02,607 | **yes** |
+  | o10_f5 baseline | 3,86,308 vs 3,65,100 | 3,18,346 vs 2,95,093 | 12,14,125 vs 9,44,445 | **yes** |
+  | o20_f5 baseline | 4,10,834 vs 3,58,581 | 2,99,702 vs 2,96,696 | 10,84,412 vs 9,38,430 | **yes** |
+  | o15_f5 baseline (list C) | 4,27,782 vs 3,48,532 | **2,98,124 vs 3,01,951** | 11,58,525 vs 9,66,109 | no (P2 by ₹3.8k) |
+  | o0_f5 baseline (list B) | **3,52,327 vs 3,98,438** | **3,51,201 vs 3,67,753** | 12,39,935 vs 10,23,330 | no (P1, P2) |
+  | o10_f0 baseline (BL-073 candidate) | **3,47,323 vs 4,04,312** | 3,14,099 vs 3,43,674 | 12,72,319 vs 9,81,924 | no (P1, P2) |
+  | o20_f5 dte-heavy | 3,86,539 vs 3,39,868 | 2,99,554 vs 3,03,563 | 10,66,303 vs 9,72,620 | no (P2) |
+  | o0_f5 dte-heavy | 3,73,686 vs 4,16,995 | 3,49,111 vs 3,86,930 | 12,20,428 vs 10,38,306 | no (P1, P2) |
+  | o5_f5 dte-heavy | 3,58,256 vs 3,74,131 | 3,00,580 vs 3,59,149 | 11,61,806 vs 10,01,918 | no |
+  | o10_f5 equal | 3,56,325 vs 3,79,570 | 2,96,662 vs 3,10,868 | 11,60,641 vs 9,17,435 | no |
+
+  - **The three real cells are all baseline split with family-band 5% and own-recent 5–20%** — the
+    one corner of the map where the true labels clearly beat scrambled ones in all three periods.
+    **List A is real. List C misses in Jan–Aug 2025 by ₹3.8k (the shuffle maximum is ₹3,01,951 against its
+    ₹2,98,124). List B is not real: in P1 and P2 the best of ten scrambled-label runs beats it.**
+  - The shuffles beat B and the BL-073 candidate even though they were the strongest cells out of period
+    on gross, which is the reason to hold B and the "recent 10 / no family" row back from a live role;
+    they stay in the journal as registered (Phase 0b allows no change), where unseen days judge them.
+  - **Adoption (registered):** the centre of the largest final region becomes a journal list if its
+    worst-period score ≥ 0.85 and it is real in every period. **No cell reaches 0.85** (best 0.77), so
+    nothing is adopted; the map is the result: *a rule with a real, small edge in a narrow region (low
+    own-recent, family-band 5%, baseline fit split, VIX band kept, 5/21/63/126 lookbacks)*.
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
@@ -142,3 +170,4 @@ whatever it finds.
 - 2026-10-10 — stage 1 done (13:05): 19 of 100 cells above chance everywhere, 0 robust; stage 2 running on those 19 cells.
 - 2026-10-10 — stage 2 done (13:50): no switch adopted. Stage 3 (shuffles on the top 10 cells) launched; journal lists A, B, C (all in the top 10) are fixed from stage 1.
 - 2026-10-10 — block 2 (combined A+B+C) ran: a hedge, not an improvement; not adopted.
+- 2026-10-10 — stage 3 done: 3 of the top 10 cells are real (list A among them); B and C are not. No cell meets the 0.85 adoption bar. Charges pass for A, B and C next.
