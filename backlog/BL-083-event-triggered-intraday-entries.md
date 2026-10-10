@@ -184,3 +184,9 @@ None. Settled on 2026-10-10:
 - 2026-10-10 — created from the owner's event-triggered idea (plan only; Fable designs, Sonnet runs).
 - 2026-10-10 — open questions settled (P / R1 / S1 only; Widesl and Dir templates first).
 - 2026-10-10 — owner: keep Buy as a third template from phase 1 (reverses my earlier call).
+- 2026-10-10 — **Owner's decision: "whatever wins in the last 2 years can be taken."** Leads are read on the
+  exploration set alone (|t| >= 3), the 2022–24 confirmation is information only. That makes **Dir after
+  T1 (pivot with trend)** and **Dir after T4 (RSI exhaustion)** the two leads (event minus placebo +₹754 and
+  +₹403 per lot, t 4.3 and 4.5; confirmation +₹282 / +₹86, t 1.5 / 0.8). Phase 2 (override rule on lists A /
+  B / C / REF) therefore runs for those two on the exploration set, against the random-time and random-day
+  controls; the confirmation set is run alongside as information.
