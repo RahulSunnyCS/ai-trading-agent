@@ -68,6 +68,24 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
   journal universe.
 - **Result:** pending.
 
+### Block 3 — leave one category out (2026-10-10, registered before its runs)
+- **Why:** the owner wants each family dropped in turn (₹80 out, ₹100 out, ITM out, …) to see what it
+  adds to the result, once all the families are in.
+- **Universe:** the full 398 (248 + 100 closest-premium + 50 Dir ITM1), DRB-6W3L2, lists A, B, C and
+  REF on P1 / P2 / P3 (BL-075's periods). `rotate.py --ext-closest --ext-dir --drop T`.
+- **Drop sets (23, fixed):** the 16 index-families one at a time (N_wide, N_p40, N_p60, N_p80, N_p100,
+  N_dir, N_ditm1, N_buy, S_wide, S_p120, S_p200, S_p250, S_p320, S_dir, S_ditm1, S_buy) and 7 groups
+  (all closest-premium, all Dir ITM1, all Dir ATM, all Buy, all OTM Widesl, all NIFTY, all SENSEX; NIFTY
+  and SENSEX are not run on the NIFTY-only P3 where they leave nothing / change nothing).
+- **Read-out (registered):** per drop set, the change in gross against the full 398 list for each list
+  and period, the list's drawdown and whether it is still above the random P90 of that run. A set is
+  *carrying weight* if dropping it lowers gross by more than 5% in at least 2 of 3 periods for at least
+  2 of the 4 lists; *dead weight* if dropping it changes gross by less than ±2% or raises it in at
+  least 2 of 3 periods for at least 2 lists; *in between* otherwise. Also reported: each set's share of
+  the core slots in the full run (E2 / E6).
+- **Will not run:** pairs of dropped sets, other lists, other periods.
+- **Result:** pending.
+
 ## Log
 
 - 2026-10-10 — created and registered before any run.
