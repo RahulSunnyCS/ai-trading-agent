@@ -234,6 +234,25 @@ equal-weight, live mix, lots per window.
     contract-notes cutover (TODO §2). **The rotation trades on one broker account used for nothing else**, so
     its contract notes are the real figure without filtering; until that holds, a day whose rotation
     contracts cannot be told apart is marked "mixed" and left out of the gap.
+  - **11. Family pulse (added 2026-10-11, owner: design it).** "Is morning short-premium working right now?"
+    A Rotation-page card with the **12 cells the family-band criterion pools**: {Widesl incl. closest-premium,
+    Dir incl. Dir ITM1, Buy} × start band (09:17–10:02, 10:17–12:02, 12:17–14:02, 14:17–15:17), across both
+    indices and every strike, exactly `score.family_index`. Columns: mean gross ₹ per lot-day over the last
+    5 / 21 / 63 sessions, P1 and P2 for reference, each with "sessions · variants" (same-day variants are not
+    independent, so sessions is the count that matters); a rolling-21 sparkline over 126 sessions with the P1
+    mean dashed; "ranking sees" = the cell's rank 1–12 on the family-band criterion for the next 09:16 pick
+    (equal to the `rfam` value Why this pick reconstructs); chips where today's picks of A/B/C/REF fall; and the
+    focus list's share of core picks in the cell over the last 21 (frequency beside profit, as the proposal asks).
+    A cell is flagged when its last-21 mean sits outside its own rolling-21 P10–P90 in P1 (the drift rule).
+    Header note: the criterion carries 5% of the composite in A, B and C and none in REF. Index filter allowed,
+    labelled "not what the ranking uses". Click a row → Strategy Matrix pulse view (index × strike) filtered to
+    that family and band. Weekend sessions excluded as in the matrix; missing is never zero; before forward days
+    the windows read the stored research results, labelled. `GET /legwise/rotation/pulse?as_of&list`, a pure
+    function in `rotation/pulse.py` over the matrix's cached cube. Done when the cell means equal the matrix
+    pooled over the same variants and days, and the rank equals the composite's `rfam` for a recorded day.
+    Example from the stored results as of 9 Oct 2026: Dir 09:17–10:02 last 21 ₹676 per lot-day against ₹312
+    in P1 (rank 1 of 12); Widesl 09:17–10:02 ₹78 against ₹147 (rank 11); Buy 14:17–15:17 below zero in every
+    window (−₹121 last 21, −₹13 P1; rank 12). Built after widgets 6–9; no new data, no pre-registration needed.
   - Not scheduled: basket-level day replay (built when a real losing day raises a question; the Daily log
     drawer opens Day forensics per pick until then) and the two premium widgets (wait for BL-091 and an
     intraday collector).
@@ -401,3 +420,14 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
   per lot as the smallest episode, drift flagged against the list's own P1 band, the BL-063 charge model as
   its own registered change, one broker account used only for the rotation. UI only; nothing about the
   journal, the lists or the read-out changes.
+- 2026-10-11 — **Phase 4 built, five widgets plus the page (PRs #170–#177).** Options Lab › Rotation page
+  (health strip, read-out headline per lot against the base, hero chart, today's baskets, verdict), Shadow
+  scoreboard (t gate at 10 days), Why this pick and Rank predicts (rank-IC), Strategy Matrix (its own tab;
+  weekend sessions excluded so it reconciles with the ranking history; P3 2022–24 not imported yet) and the
+  Daily log (reconstructed rows labelled and kept out of the forward counters; the placement record is a
+  separate append-only `rotation/placements.jsonl`, the only new write path). Each PR had an independent
+  review with inline comments and fixes before merge. Nothing changed the journal, a list, a weight, the 298
+  universe, the base or any stored result. Figures in the earlier plan artifact were weekend-inclusive and are
+  superseded by the matrix's own. **Not done:** the live launchd checkout is not synced (the rotation files
+  there carry other sessions' uncommitted edits), so base scoring and the page reach the running stack only
+  after the owner syncs or merges; no nightly scoring job yet for the BL-081 forward candidates.
