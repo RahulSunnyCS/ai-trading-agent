@@ -31,6 +31,7 @@ import { SegmentedControl, type SegmentedOption } from '../ui/SegmentedControl';
 import { SkeletonRows } from '../ui/Skeleton';
 import { StateMessage } from '../ui/StateMessage';
 import { RotationDailyLog } from './RotationDailyLog';
+import { RotationDrawdowns } from './RotationDrawdowns';
 import { RotationExplain } from './RotationExplain';
 import { RotationShadowScoreboard } from './RotationShadowScoreboard';
 import { RotationBaskets } from './rotation/RotationBaskets';
@@ -239,6 +240,8 @@ export function RotationPanel() {
       <RotationDailyLog focus={focus} />
       {/* slot:shadow */}
       <RotationShadowScoreboard />
+      {/* slot:drawdowns */}
+      <RotationDrawdowns list={focus} />
     </div>
   );
 }

@@ -155,6 +155,14 @@ Otherwise:
   displaced pick's stored result is pending, never zero), with the time-matched placebo Dir as its control line
   (BL-083's random-minute control is not in the trigger files, so it is reported `not_recorded`); and BL-081's two
   forward candidates returned `not_scored` with their definitions (no nightly scoring exists for them).
+- `rotation/drawdowns.py` + `api/rotation_drawdowns_routes.py` — "Drawdown episodes" (BL-058 Phase 4 widget 8;
+  `GET /legwise/rotation/drawdowns?list=A|B|C|REF&window=P1|P2|last63|forward&min_depth=500`), read-only. The series
+  is a list's gross per lot-day from `daylog.build_log(source="all")` (recorded entries, and re-scored days before
+  the journal began, counted apart; a late, unscored or missing day is left out and counted). Underwater = cumulative
+  minus its running peak, the peak starting at zero (`readout.max_drawdown`'s convention); an episode runs from the
+  day after a peak to the day back at it (or the last day, `open`) and is listed when at least `min_depth` per lot
+  deep; each carries the fixed base's per-lot sum over the same peak-to-trough days (`base.base_per_lot`, missing
+  days counted, never zero), the stops, and drivers by family x start band that add up to the depth.
 - `rotation/basket.py` + `api/rotation_basket_routes.py` — the Correlation tab's "A day's basket" preset (BL-058
   Phase 4 widget 6; `GET /legwise/rotation/basket?list=A|B|C|REF|BASE&day=&window=P1|P2|last63|forward|custom`),
   read-only. A list's picks for a day are the journal entry's when there is one, else `daylog.reconstruction`'s

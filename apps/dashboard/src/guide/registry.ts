@@ -39,6 +39,7 @@ import optionsDailyResults from './content/optionslab/daily-results.md?raw';
 import optionsHowItWorks from './content/optionslab/how-it-works.md?raw';
 import optionsRegimes from './content/optionslab/regimes.md?raw';
 import optionsRotationDailyLog from './content/optionslab/rotation-daily-log.md?raw';
+import optionsRotationDrawdowns from './content/optionslab/rotation-drawdowns.md?raw';
 import optionsRotationExplain from './content/optionslab/rotation-explain.md?raw';
 import optionsRotationMatrix from './content/optionslab/rotation-matrix.md?raw';
 import optionsRotationShadow from './content/optionslab/rotation-shadow.md?raw';
@@ -314,6 +315,15 @@ export const GUIDE_PAGES: readonly GuidePage[] = [
       'Why each list picked what it did, criterion by criterion, and whether the morning ranking orders the day.',
     kind: 'Screen',
     body: optionsRotationExplain,
+    screen: { tab: 'optionslab', rest: ['rotation'] },
+  },
+  {
+    chapter: 'optionslab',
+    slug: 'rotation-drawdowns',
+    title: 'Rotation: drawdown episodes',
+    summary: 'Each fall of a list: how deep, how long, how fast back, and what it was holding.',
+    kind: 'Screen',
+    body: optionsRotationDrawdowns,
     screen: { tab: 'optionslab', rest: ['rotation'] },
   },
   {
