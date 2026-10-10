@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Priority** | P2 — options research; widens the BL-075 universe |
-| **Status** | In progress |
+| **Status** | Done — closest-premium additions harmful, Dir ITM1 useful, leave-one-out table recorded; pruning follow-up registered as block 4 |
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
@@ -44,7 +44,21 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
   ≥ 19%. Otherwise they are *inert* (fail ii) or *harmful* (fail i or iii). A "useful" verdict still
   changes nothing live: it would be a dated decision to extend the journal universe.
 - **Will not run:** other premiums, other strategy shapes, other weightings.
-- **Result:** pending.
+- **Result (2026-10-10 16:10, gross; the 348-variant list vs the 248 list; 1 lot of each variant,
+  lists A, B, C, REF of BL-058 Phase 0b on BL-075's periods): HARMFUL under the registered read-out.**
+
+  | List | P1 2025-12→2026-10 | P2 Jan–Aug 2025 | P3 2022-04→2024-10 | new families' share of core slots |
+  |---|---|---|---|---|
+  | A | 3,41,951 vs 3,89,900 (−47,949) | 2,50,148 vs 3,18,652 (−68,504; **falls below chance**) | 11,91,835 vs 12,20,482 (−28,647) | 17% / 14% / 19% |
+  | B | 3,26,306 vs 3,52,327 (−26,021) | 2,09,893 vs 3,51,201 (−1,41,308; **below chance**) | 12,42,059 vs 12,39,935 (+2,124) | 16% / 14% / 19% |
+  | C | 3,73,870 vs 4,27,782 (−53,912) | 2,83,220 vs 2,98,124 (−14,904) | 11,11,152 vs 11,58,525 (−47,373) | 17% / 14% / 19% |
+  | REF | 3,88,270 vs 4,30,868 (−42,598) | 86,871 vs 1,70,015 (−83,144) | 9,42,685 vs 10,13,627 (−70,942) | 18% / 15% / 22% |
+
+  (i) fails: no list is ≥ its 248 gross in two periods, and A and B fall below chance on Jan–Aug 2025.
+  (ii) passes (14–22% of core slots). (iii) fails: the 100-weighting map on the 348 list has **5 of
+  100 cells above chance in all three periods (5%, against 19% on 248), none robust** (3 of the 25
+  baseline-split cells, 2 of the dte-heavy). The extra premiums are picked often and make the rule
+  worse and more fragile: the ranking has 100 more near-copies of Widesl to be fooled by.
 
 ### Block 2 — Dir at ITM1 (2026-10-10, registered before its runs)
 - **Why:** the live directional strategy is `nifty_dir_924_itm1_sl21_recost` (ITM1), but the research
@@ -66,7 +80,22 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
   a period where it was above it, **and** the family takes ≥ 10% of the core slots in P1 on at least 2
   lists. Otherwise inert or harmful. Nothing goes live; it would be a dated decision to extend the
   journal universe.
-- **Result:** pending.
+- **Result (2026-10-10 16:10, gross; 298 list = 248 + Dir ITM1):** **USEFUL under the registered
+  read-out.**
+
+  | List | P1 2025-12→2026-10 | P2 Jan–Aug 2025 | P3 2022-04→2024-10 | ITM1 share of core slots | Max DD P1 |
+  |---|---|---|---|---|---|
+  | A | 4,76,560 vs 3,89,900 (**+86,660**) | 3,54,513 vs 3,18,652 (+35,861) | 12,23,256 vs 12,20,482 (+2,774) | 24% / 20% / 21% | −70,142 |
+  | B | 4,38,310 vs 3,52,327 (+85,983) | 3,49,400 vs 3,51,201 (−1,801) | 13,67,159 vs 12,39,935 (**+1,27,224**) | 24% / 19% / 21% | −80,143 |
+  | C | 4,94,715 vs 4,27,782 (+66,933) | 3,51,497 vs 2,98,124 (+53,373) | 11,56,788 vs 11,58,525 (−1,737) | 23% / 19% / 21% | **−55,779** |
+  | REF | 4,08,368 vs 4,30,868 (−22,500) | 2,22,000 vs 1,70,015 (+51,985) | 10,80,967 vs 10,13,627 (+67,340) | 24% / 19% / 21% | −79,426 |
+
+  Every one of A, B, C is ≥ its 248 gross in at least two periods, all three stay above the random
+  P90 in every period (REF's Jan–Aug 2025 stays below, as before), and ITM1 takes 19–24% of the core
+  slots. Family by year (E4, 1 lot, mean per variant): Dir ITM1 beats Dir ATM in every year on both
+  indices (NIFTY +₹13k, +₹16k, +₹4k, +₹7k, +₹12k for 2022–2026; SENSEX +₹3k, +₹14k, +₹9k for 2024–2026)
+  at the same ~60% win rate. The universe with everything (398) is mixed: the ITM gains in P1 survive,
+  Jan–Aug 2025 is worse for A (−86k) and REF because of the closest-premium additions.
 
 ### Block 3 — leave one category out (2026-10-10, registered before its runs)
 - **Why:** the owner wants each family dropped in turn (₹80 out, ₹100 out, ITM out, …) to see what it
@@ -84,8 +113,41 @@ The owner (2026-10-10) asked to add the next two premiums further out on each in
   least 2 of 3 periods for at least 2 lists; *in between* otherwise. Also reported: each set's share of
   the core slots in the full run (E2 / E6).
 - **Will not run:** pairs of dropped sets, other lists, other periods.
-- **Result:** pending.
+- **Result (2026-10-10 16:10; the 398 list; change in gross, ₹ thousand, when the set is switched off,
+  lists A / B / C / REF; + means the list did better without it):**
+
+  | Set switched off | P1 | P2 | P3 | Runs lowered / total | Mean change | Classification |
+  |---|---|---|---|---|---|---|
+  | N ₹40 | −20 / −8 / +17 / +14 | +31 / 0 / −3 / +43 | −18 / +19 / −57 / −16 | 6 / 12 | +0.3k | **dead weight** |
+  | N ₹60 | −43 / −33 / −7 / +29 | +46 / +30 / +32 / +10 | +97 / +49 / +23 / −79 | 4 / 12 | +12.8k | **dead weight** |
+  | S ₹120 | −9 / +17 / +21 / +14 | 0 / −11 / +7 / −19 | — | 3 / 8 | +2.6k | **dead weight** |
+  | S ₹200 | +20 / +44 / +35 / +17 | +17 / +17 / +35 / 0 | — | **0 / 8** | **+23.0k** | **dead weight** (removal never hurts) |
+  | N ₹80 | −63 / −29 / −9 / +40 | +45 / +9 / 0 / +17 | −72 / −163 / −96 / −66 | 8 / 12 | −32.1k | carrying weight |
+  | N ₹100 | −55 / −9 / −12 / +22 | +37 / −9 / −33 / −35 | −62 / −41 / −45 / −81 | 10 / 12 | −26.9k | carrying weight |
+  | S ₹250 | −23 / +18 / −1 / −6 | +35 / +33 / +41 / +53 | — | 3 / 8 | +18.8k | dead weight |
+  | S ₹320 | +12 / +11 / +49 / +4 | +43 / +41 / −7 / −34 | — | 2 / 8 | +14.9k | dead weight |
+  | all closest-premium (200) | −57 / −1 / −33 / −18 | **+204 / +125 / +92 / +107** | −118 / −202 / −178 / −60 | 8 / 12 | −11.7k | carrying weight (regime split: helps P1 and P3, hurts P2) |
+  | N Dir ITM1 | −48 / −36 / −45 / +95 | −11 / −13 / −7 / −53 | +16 / −82 / −37 / −116 | 10 / 12 | −28.1k | **carrying weight** |
+  | S Dir ITM1 | −120 / −151 / −53 / −24 | −10 / −19 / +24 / −33 | — | 7 / 8 | −48.2k | **carrying weight** |
+  | all Dir ITM1 (50) | −126 / −123 / −64 / +25 | +18 / −68 / +8 / −76 | +16 / −82 / −37 / −116 | 8 / 12 | −52.0k | **carrying weight** |
+  | all Dir ATM (50) | −42 / +20 / +10 / +29 | −6 / −28 / −16 / −87 | −47 / −129 / −136 / −107 | 9 / 12 | −44.8k | carrying weight |
+  | N OTM Widesl | −67 / −62 / −38 / −36 | +24 / +11 / −54 / +34 | +41 / −14 / −35 / −44 | 8 / 12 | −19.9k | dead weight by the rule (mixed) |
+  | S OTM Widesl | −24 / +11 / +49 / −12 | +14 / +9 / −32 / +43 | — | 3 / 8 | +7.2k | in between |
+  | all Buy (48) | 0 / −5 / +4 / −42 | +5 / −20 / −3 / +28 | +9 / +18 / −33 / +22 | 5 / 12 | −1.4k | dead weight |
+
+  - **Verified:** the 16 single families partition the 398 variants exactly (N_buy and S_buy 24 each
+    because Buy has no 15:17), every drop-set count is as intended, and the full-list rows equal
+    the comparison runs.
+  - **Safe to remove on this evidence:** the four new closest-premium families (₹40, ₹60 NIFTY, ₹120, ₹200
+    SENSEX): their removal improves or leaves results unchanged in most runs, and ₹200 never hurts.
+    **Candidates to prune next:** SENSEX closest ₹250 and ₹320 (removal helps 5 of 8 and 6 of 8 runs),
+    SENSEX OTM2 Widesl (mixed). **Keep:** NIFTY ₹80 and ₹100, both Dir ITM1 families and Dir ATM, NIFTY
+    OTM1 Widesl.
+  - **Caveats:** one universe (398), 12 correlated runs per set, rupee deltas of ±₹20k are inside
+    the selection noise of this rule (BL-068's shuffle sd ≈ ₹1.08 lakh on 202 days). The ranking among
+    the sets is more trustworthy than any single number.
 
 ## Log
 
 - 2026-10-10 — created and registered before any run.
+- 2026-10-10 — blocks 1–3 ran after an alignment fix (first pass crashed; the 348 map had only P3). Results above.
