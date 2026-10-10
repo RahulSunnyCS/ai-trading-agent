@@ -7,7 +7,7 @@
 | **Type** | research |
 | **Area** | options |
 | **Created** | 2026-10-10 |
-| **Depends on** | BL-034 historical option/index/VIX coverage and quality; existing event study as a comparator, linked below |
+| **Depends on** | BL-034 historical option/index/VIX coverage and quality; BL-083 (T3 as comparator, the straddle builder in `research/bl083/triggers.py`, and the nightly trigger scoring of PR #167 for any forward shadow) |
 | **TODO.md row** | — (filled in when started) |
 
 ## Context
@@ -26,8 +26,8 @@ stale or noisy prices.
 Related work:
 
 - [Event-triggered intraday entries](BL-083-event-triggered-intraday-entries.md): T3 already
-  combined a fixed morning-ATM straddle turn with spot-range stabilisation. The consolidated
-  report records weak evidence. Reproduce its exact definition as a comparator where feasible;
+  combined a fixed morning-ATM straddle turn with spot-range stabilisation and showed no edge in any
+  template; BL-083 attributes the failure to the trigger, not the templates. Reproduce its exact definition as a comparator where feasible;
   do not describe this follow-up as an entirely untested idea.
 - [Hourly checkpoints](BL-081-drb-hourly-checkpoints-and-no-trade.md): many intraday state
   variables failed to show robust value. Additional filters need incremental evidence.
@@ -39,10 +39,28 @@ Related work:
   rolling ATM series and IV/Greeks. Contract-level observations are needed for fixed-strike
   paths; coverage, timestamp conventions and quality flags must be audited.
 
-The external UI proposal is `~/Downloads/Options Research/Options Rotation Widget Proposal.md`.
-It defines a standalone Straddle-Premium Expansion Exhaustion widget in Live only; historical
-verification remains this study, with recorded-event inspection through Day replay. The UI
-proposal owns widget design; this backlog file is the source of truth for the research protocol.
+The owner's widget proposal (a copy is at `~/Downloads/Options Research/Options Rotation Widget
+Proposal.md`; it is not in the repository) defines a standalone Straddle-Premium Expansion
+Exhaustion widget in Live only; historical verification remains this study, with recorded-event
+inspection through Day replay. This backlog file is the source of truth for the research
+protocol. The two widget specifications the amendments below derive from, in short:
+
+- **Straddle-Premium Expansion Exhaustion (Live only):** three aligned panels, premium / velocity
+  (points per minute) / acceleration, on a rolling-ATM series with strike-switch markers and a
+  fixed-strike option; causal smoothing only; descriptive states Expansion / Slowing / Reversal
+  observed / Expansion resumed from the sign of velocity and acceleration; confirmation inputs
+  (preceding expansion size, persistence of slowing, velocity crossing below zero, retracement
+  from the running high, expiry-specific IV direction, underlying activity, nearby-strike
+  agreement, data quality); Early indication / Reversal observed event definitions recorded at
+  detection time with 15 / 30 / 60-minute fixed-strike outcomes; no confidence percentage.
+- **Premium Decay & Expectations (Live / Historical → Session / Period):** fixed-strike CE + PE
+  path from a chosen starting time to a chosen endpoint; comparable-session matching on index,
+  observation time, time to expiry and volatility context with the sample size shown; premium
+  percentile against comparable history, normalised by the underlying level; remaining-outcome
+  distribution (mean and median contraction, ≥ 20 / 30 / 40-point frequencies, finished above
+  start) and maximum adverse expansion; Period heatmaps by date, DTE and opening VIX band ×
+  time interval; an unchanged-market (theta-only) scenario kept separate from the historical
+  estimate; every issued estimate saved with its inputs and version for later review.
 
 ## Goal
 
@@ -206,20 +224,11 @@ Resolve when the owner starts the item, before freezing Phase 0:
 1. Accept the proposed 30-minute primary horizon, sample floor and pass rule, or specify a
    different practical contraction/adverse-expansion trade-off?
 2. Use one-minute observations with causal smoothing, or completed five-minute observations
-   as the primary cadence? Freeze one; do not choose after evaluation results.
+   as the primary cadence? Freeze one; do not choose after evaluation results. Amendment B.10
+   proposes one-minute fixed-strike paths from the lake's contract bars.
 3. Which exact expansion, persistence and retracement definitions should the finite study use?
 4. Confirm historical manifest/cut-offs and eligible DTE coverage without requiring unsupported
    SENSEX history; freeze how low-premium/IV-quality cases are handled.
-
-## Log
-
-- 2026-10-10 — Owner requested adding premium-momentum parameters to the widget proposal and
-  a backlog analysis to verify them historically. Created P2 / Planned; index updated. No
-  experiment, sweep, live collector, alert or strategy change run. Phase 0 remains a draft
-  until start-time questions are resolved and its finite configuration is committed.
-- 2026-10-10 — Owner placed Straddle-Premium Expansion Exhaustion in Live only as a standalone
-  widget. Updated the UI reference; historical study scope, P2 / Planned status and evaluation
-  protocol remain unchanged. No study or product implementation started.
 
 ## Amendments proposed from the two Live widget sections (2026-10-10)
 
@@ -322,5 +331,15 @@ change to Phase 0–3; none is frozen until the owner starts the item. Nothing h
     sessions × 2 indices, the 100-eligible-session floor is plausible for C1–C5 but may fail for
     C6–C9 on their common samples. Report the achievable floor per arm from the coverage audit before
     Phase 2, and declare in advance which arms are inconclusive by construction.
+
+## Log
+
+- 2026-10-10 — Owner requested adding premium-momentum parameters to the widget proposal and
+  a backlog analysis to verify them historically. Created P2 / Planned; index updated. No
+  experiment, sweep, live collector, alert or strategy change run. Phase 0 remains a draft
+  until start-time questions are resolved and its finite configuration is committed.
+- 2026-10-10 — Owner placed Straddle-Premium Expansion Exhaustion in Live only as a standalone
+  widget. Updated the UI reference; historical study scope, P2 / Planned status and evaluation
+  protocol remain unchanged. No study or product implementation started.
 - 2026-10-10 — Renumbered BL-084 → BL-091 (number taken on `main`); amendments A–D appended from the two
   Live widget sections of the proposal. Still Planned; nothing run.
