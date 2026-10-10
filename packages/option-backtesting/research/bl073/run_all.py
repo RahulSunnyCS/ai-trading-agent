@@ -21,6 +21,9 @@ from rotparse import parse_case_a  # noqa: E402
 
 WEIGHTS = {0: "0,37,37,26", 10: "10,34,33,23", 20: "20,30,30,20", 33: "33,25,25,17"}
 LOOKBACKS = {"5/21/63": "5:40,21:30,63:30", "5/21/63/126": "5:30,21:25,63:25,126:20"}
+if "--block2" in sys.argv:  # the 5-day window at 0% (block 2)
+    WEIGHTS = {10: "10,34,33,23", 20: "20,30,30,20"}
+    LOOKBACKS = {"21/63/126": "21:36,63:36,126:28"}
 PERIODS = {
     "P1 in-sample": ([], None, None),
     "P2 Jan-Aug 2025": (["--window-from", "2024-10-09"], None, pd.Timestamp("2024-10-09")),
@@ -62,12 +65,12 @@ def run(item):
 
 def main() -> None:
     items = [((r, lk), (p, v)) for r in WEIGHTS for lk in LOOKBACKS for p, v in PERIODS.items()]
-    workers = int(sys.argv[1]) if len(sys.argv) > 1 else 4
+    workers = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 4
     with ThreadPoolExecutor(workers) as pool:
         rows = list(pool.map(run, items))
     d = pd.DataFrame(rows)
     d["rel"] = d.gross / d.groupby("period").gross.transform("max")
-    d.to_csv(HERE / "out" / "summary.csv", index=False)
+    d.to_csv(HERE / "out" / ("summary_block2.csv" if "--block2" in sys.argv else "summary.csv"), index=False)
     pd.set_option("display.width", 220)
     print(d.to_string(index=False, float_format=lambda x: f"{x:,.0f}" if abs(x) >= 10 else f"{x:.2f}"))
     g = d.groupby(["recent", "lookbacks"]).agg(min_rel=("rel", "min"), mean_rel=("rel", "mean"), all_beat_p90=("beats_p90", "all")).reset_index().sort_values("min_rel", ascending=False)

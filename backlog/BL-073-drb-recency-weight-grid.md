@@ -74,9 +74,25 @@ on every period, and the winner declared by its *worst* period.
 - **Read-out:** block 1's rule (minimum relative score vs the eight block-1 rows plus these two; adopt only
   if ≥ 0.85 and ≥ P90 everywhere). Read beside the same recency weight with the 5-day window kept.
 - **Will not run:** other splits of the remaining weight.
-- **Result:** pending.
+- **Result (2026-10-10, gross; relative scores recomputed against the best of all ten rows per period —
+  P1 best is now recent 20 / 21:63:126 at ₹4,86,802, P2 ₹3,14,099, P3 ₹12,72,319):**
+
+  | Recent | Lookbacks | P1 2025-12→2026-10 | P2 Jan–Aug 2025 | P3 2022-04→2024-10 | Min rel | ≥ P90 everywhere |
+  |---|---|---|---|---|---|---|
+  | 10 | 5/21/63/126 (block 1) | 3,47,323 (0.71) ✓ | 3,14,099 (1.00) ✓ | 12,72,319 (1.00) ✓ | 0.71 | **yes** |
+  | 10 | 21/63/126, no 5-day | 3,82,026 (0.78) ✓ | 2,78,979 (0.89) ✗ | 12,28,826 (0.97) ✓ | 0.78 | no |
+  | 20 | 5/21/63/126 (block 1) | 3,94,053 (0.81) ✓ | 2,63,941 (0.84) ✗ | 11,62,457 (0.91) ✓ | 0.81 | no |
+  | 20 | 21/63/126, no 5-day | **4,86,802 (1.00)** ✓ | 2,34,458 (0.75) ✗ | 9,88,372 (0.78) ✓ | 0.75 | no |
+
+  Dropping the 5-day window moves P&L **toward the in-sample year and away from both other periods** at
+  both recency weights (recent 10: +₹35k in-sample, −₹35k on the slice, −₹43k on the hold-out; recent 20:
+  +₹93k, −₹29k, −₹1.74 lakh) — the same pattern as BL-069 B3. Nothing meets the adoption bar; recent 10 /
+  5:21:63:126 remains the only row above chance in all three periods (its minimum falls to 0.71 only
+  because the new row raised the in-sample best). **Keep the 5-day window.** The 2025-12 → 2026-10 year
+  rewards reacting within a week (recency, and the 5-day fit window); the other 2½ years penalise it.
 
 ## Log
 
 - 2026-10-10 — created and registered before any run.
 - 2026-10-10 — 24 runs done; Result above. Series BL-067 → BL-073 closed; next evidence is the forward journal (BL-058).
+- 2026-10-10 — block 2 (5-day window at 0%) ran: shifts P&L toward the in-sample year, away from the other two; keep the window.
