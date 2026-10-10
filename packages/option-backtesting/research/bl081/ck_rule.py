@@ -9,7 +9,7 @@ variant when that one scores higher (breadth: free = any pending core variant; f
 and index), then dropped when its pool's expected rupees in today's state are < 0 (action: swap / drop /
 both). Pooled state fit: mean P&L per strategy-day of the variant's pool (type x start band x index, pending
 members only) on past days with the same state, lookbacks 21 / 63 / 126 / 252 (25% each, a window needs >= 5
-matching days, else the pool's unconditional fit is used). Widesl minimum (2 strategies) is never broken.
+matching days; windows without them are dropped and the rest re-weighted, the pool's unconditional fit only when none qualifies). Widesl minimum (2 strategies) is never broken.
 State variables: vix_open, trend_atr, atr_range, rsi (BL-081 bands), live_wide, live_dir (the 09:16 picks'
 MTM at the hour: none / down < -1,000 / flat / up > +1,000 for 2 lots) and vix_open+live_wide.
 Controls: state-blind (one label for every day), 1,000 random actions (same counts per day and hour), 10
@@ -99,9 +99,6 @@ class Env:
                     if any_:
                         arr[i] = "down" if tot < -1000 else "up" if tot > 1000 else "flat"
                 self.lab[(kind, h)] = {"N": arr, "S": arr}
-            both = {L: np.array([None if a == "none" else f"{a}|{b}" for a, b in
-                                 zip(self.lab[("vix_open", h)][L], self.lab[("live_wide", h)]["N"], strict=True)], dtype=object)
-                    for L in ("N", "S")}
             # a None vix label or a "none" live label means no label for the pair
             both = {L: np.array([None if (a is None or b == "none") else f"{a}|{b}" for a, b in
                                  zip(self.lab[("vix_open", h)][L], self.lab[("live_wide", h)]["N"], strict=True)], dtype=object)
