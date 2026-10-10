@@ -38,11 +38,14 @@ export const DEFAULT_FILTERS: CorrelationFilters = {
  * nothing chosen at all it is `all`, which the API refuses when it is too many to compare.
  */
 export function buildSelectors(f: CorrelationFilters): string {
+  // Slot, family and index describe rotation variants; a live strategy has none of them, so with
+  // Kind = live they are ignored (ANDing them in would match nothing).
+  const variantOnly = f.kind !== 'legwise';
   const group = (
     [
-      ['slot', f.slot],
-      ['family', f.family],
-      ['index', f.index],
+      ['slot', variantOnly ? f.slot : ANY],
+      ['family', variantOnly ? f.family : ANY],
+      ['index', variantOnly ? f.index : ANY],
       ['kind', f.kind],
     ] as const
   )

@@ -1,6 +1,6 @@
 'use client';
 
-import { type KeyboardEvent, useRef } from 'react';
+import { type KeyboardEvent, useMemo, useRef } from 'react';
 
 import { BAND_BG, BAND_FILL, LEGEND, bandOf } from '../../../lib/correlationView';
 import { formatNumber } from '../../../lib/format';
@@ -79,7 +79,7 @@ export function CorrelationHeatmap({
         Math.min(k - 1, Math.max(0, from[0] + d[0])),
         Math.min(k - 1, Math.max(0, from[1] + d[1])),
       ];
-      onHover(next);
+      hoverAt(next);
     } else if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onPin(active && pinned && active[0] === pinned[0] && active[1] === pinned[1] ? null : active);
@@ -88,6 +88,57 @@ export function CorrelationHeatmap({
       onPin(null);
     }
   }
+
+  // A pointer move inside one cell must not set state again: the parent holds `hover`, and a fresh
+  // array each event re-rendered the whole grid on every pixel of movement.
+  function hoverAt(next: Cell | null) {
+    const same =
+      next === hover ||
+      (next !== null && hover !== null && next[0] === hover[0] && next[1] === hover[1]);
+    if (!same) onHover(next);
+  }
+
+  // The cells depend on the matrix and the geometry only, never on which cell is read, so moving
+  // the pointer redraws a single outline and the row labels, not ~6,000 elements.
+  const cells = useMemo(
+    () =>
+      matrix.flatMap((row, i) =>
+        row.map((value, j) => {
+          const x = left + j * cell;
+          const y = top + i * cell;
+          const diagonal = i === j;
+          const band = bandOf(value);
+          return (
+            <g key={`${names[i]}-${names[j]}`}>
+              <rect
+                x={x + 0.5}
+                y={y + 0.5}
+                width={cell - 1}
+                height={cell - 1}
+                rx={2}
+                className={diagonal ? 'fill-border' : (BAND_FILL[String(band)] ?? 'fill-surface-2')}
+              />
+              {showNumbers && !diagonal && (
+                <text
+                  x={x + cell / 2}
+                  y={y + cell / 2}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className={
+                    typeof band === 'number' && band >= 3
+                      ? 'fill-primary-foreground font-mono text-[11px]'
+                      : 'fill-foreground font-mono text-[11px]'
+                  }
+                >
+                  {formatNumber(value, 2)}
+                </text>
+              )}
+            </g>
+          );
+        }),
+      ),
+    [matrix, names, left, top, cell, showNumbers],
+  );
 
   return (
     <div>
@@ -98,9 +149,11 @@ export function CorrelationHeatmap({
           type="button"
           aria-label={ariaLabel}
           onKeyDown={onKeyDown}
-          onPointerMove={(event) => onHover(cellAt(event))}
-          onPointerLeave={() => onHover(null)}
+          onPointerMove={(event) => hoverAt(cellAt(event))}
+          onPointerLeave={() => hoverAt(null)}
           onClick={(event) => {
+            // A keyboard "click" (detail 0, coordinates 0,0) must not unpin what onKeyDown just pinned.
+            if (event.detail === 0) return;
             const at = cellAt(event);
             onPin(at && pinned && at[0] === pinned[0] && at[1] === pinned[1] ? null : at);
           }}
@@ -143,44 +196,18 @@ export function CorrelationHeatmap({
                   {`${i + 1}. ${truncate(name, 20)}`}
                 </text>
               ))}
-            {matrix.flatMap((row, i) =>
-              row.map((value, j) => {
-                const x = left + j * cell;
-                const y = top + i * cell;
-                const diagonal = i === j;
-                const band = bandOf(value);
-                const isActive = active !== null && active[0] === i && active[1] === j;
-                return (
-                  <g key={`${names[i]}-${names[j]}`}>
-                    <rect
-                      x={x + 0.5}
-                      y={y + 0.5}
-                      width={cell - 1}
-                      height={cell - 1}
-                      rx={2}
-                      className={`${
-                        diagonal ? 'fill-border' : (BAND_FILL[String(band)] ?? 'fill-surface-2')
-                      }${isActive ? ' stroke-foreground' : ''}`}
-                      strokeWidth={isActive ? 2 : 0}
-                    />
-                    {showNumbers && !diagonal && (
-                      <text
-                        x={x + cell / 2}
-                        y={y + cell / 2}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        className={
-                          typeof band === 'number' && band >= 3
-                            ? 'fill-primary-foreground font-mono text-[11px]'
-                            : 'fill-foreground font-mono text-[11px]'
-                        }
-                      >
-                        {formatNumber(value, 2)}
-                      </text>
-                    )}
-                  </g>
-                );
-              }),
+            {cells}
+            {active !== null && (
+              <rect
+                x={left + active[1] * cell + 1}
+                y={top + active[0] * cell + 1}
+                width={cell - 2}
+                height={cell - 2}
+                rx={2}
+                fill="none"
+                strokeWidth={2}
+                className="stroke-foreground"
+              />
             )}
           </svg>
         </button>

@@ -332,3 +332,26 @@ def test_corr_pick_prints_a_basket_and_what_the_cap_cost(populated):
     picked = json.loads(j.read_text())
     assert picked["names"][0] == "N_wide_0917" and "N_p80_0917" not in picked["names"]
     assert run("corr-pick", "--require", "S_wide_1017").exit_code == 2
+
+
+def test_required_names_that_are_alike_are_refused_not_silently_kept():
+    r = c.analyse(_clones())
+    with pytest.raises(
+        ValueError, match=r"required clone1 and clone2 are 1\.00 alike, not below the cap"
+    ):
+        c.pick_diverse(r, 3, 0.6, require=["clone1", "clone2"])
+    ok = c.pick_diverse(r, 3, 0.6, require=["clone1", "other"])  # not alike: allowed
+    assert ok.names[:2] == ["clone1", "other"]
+
+
+def test_a_malformed_strategy_file_does_not_break_enumeration(tmp_path):
+    _variant(tmp_path, "N_wide_0917", noise(60, 50))
+    live = _live("live_ok")
+    _save_live(tmp_path, live, noise(61, 50))
+    folder = tmp_path / "strategies"
+    _write_yaml(folder, live)
+    (folder / "broken.yaml").write_text("strategy: [unclosed\n")
+    (folder / "invalid.yaml").write_text("strategy:\n  id: x\n  legs: nope\n")
+    avail = {a.name: a for a in rseries.available(tmp_path, folder)}
+    assert set(avail) == {"N_wide_0917", "live_ok"}
+    assert avail["live_ok"].stale is False  # the good file still marks its strategy current

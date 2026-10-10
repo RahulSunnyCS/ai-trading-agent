@@ -370,6 +370,15 @@ def pick_diverse(
         raise ValueError(f"not in the report: {', '.join(unknown)}")
     if len(require) > k:
         raise ValueError(f"{len(require)} required names do not fit in a basket of {k}")
+    for n, first in enumerate(require):
+        for second in require[n + 1 :]:
+            c = corr[index[first], index[second]]
+            if math.isnan(c) or c >= max_corr:
+                alike = "cannot be compared" if math.isnan(c) else f"are {c:.2f} alike"
+                raise ValueError(
+                    f"required {first} and {second} {alike}, not below the cap "
+                    f"{max_corr:.2f}: raise the cap or drop one of them"
+                )
     score = {n: p.mean_over_std for n, p in report.parts.items()} if rank is None else dict(rank)
     missing = [n for n in report.names if n not in score]
     if missing:

@@ -34,6 +34,15 @@ describe('buildSelectors', () => {
     ).toBe('slot:0917+family:wide+index:N,S_dir_0932');
   });
 
+  it('ignores slot, family and index for live strategies, which have none', () => {
+    expect(
+      buildSelectors({ slot: '0917', family: 'wide', index: 'N', kind: 'legwise', names: [] }),
+    ).toBe('kind:legwise');
+    expect(buildSelectors({ ...DEFAULT_FILTERS, kind: 'legwise', names: ['N_wide_0917'] })).toBe(
+      'kind:legwise,N_wide_0917',
+    );
+  });
+
   it('asks for everything only when nothing is chosen, and not when names are', () => {
     const none = { slot: ANY, family: ANY, index: ANY, kind: ANY, names: [] as string[] };
     expect(buildSelectors(none)).toBe('all');

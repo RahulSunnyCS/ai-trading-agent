@@ -88,6 +88,7 @@ function Filters({
 }) {
   const { filters, setFilters, range, setRange } = state;
   const g = available.groups;
+  const variantsOnly = filters.kind !== 'legwise';
   const chosen = new Set(filters.names);
   const addable = available.strategies.filter((s) => !chosen.has(s.name) && !s.stale);
   return (
@@ -98,6 +99,7 @@ function Filters({
           <Select
             value={filters.slot}
             onChange={(e) => setFilters({ slot: e.target.value })}
+            disabled={!variantsOnly}
             aria-label="Start time"
           >
             <option value={ANY}>Any start time</option>
@@ -113,6 +115,7 @@ function Filters({
           <Select
             value={filters.family}
             onChange={(e) => setFilters({ family: e.target.value })}
+            disabled={!variantsOnly}
             aria-label="Family"
           >
             <option value={ANY}>Any family</option>
@@ -127,7 +130,7 @@ function Filters({
           Index
           <SegmentedControl
             value={filters.index}
-            options={indexOptions(g.index)}
+            options={indexOptions(g.index).map((o) => ({ ...o, disabled: !variantsOnly }))}
             onChange={(index) => setFilters({ index })}
             ariaLabel="Index"
             size="sm"

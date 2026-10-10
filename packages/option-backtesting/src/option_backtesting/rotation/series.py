@@ -25,12 +25,13 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+import yaml
 from trading_data.db import connect
 
 from ..analytics.correlation import Series
 from ..fyers.daily import data_dir
 from ..legwise import store as legwise_store
-from ..legwise.daily import load_strategy_files
+from ..legwise.schema import load_legwise
 from ..presets import STRATEGIES_DIR
 from . import store
 from .variants import is_buy, is_dir, is_wide
@@ -62,13 +63,27 @@ def _parts(name: str) -> tuple[str, str, str] | None:
     return (bits[0], bits[1], bits[2]) if len(bits) == 3 else None
 
 
+def _current_versions(strategies_dir: Path) -> dict[str, str]:
+    """{strategy id: spec hash} of the strategy files that load. A file that does not parse or
+    validate is skipped (its strategy then reads as stale) instead of failing every comparison,
+    including ones that only involve rotation variants."""
+    out: dict[str, str] = {}
+    for path in sorted(strategies_dir.glob("*.yaml")) if strategies_dir.exists() else []:
+        try:
+            strategy = load_legwise(path)
+        except (ValueError, yaml.YAMLError, OSError):
+            continue
+        out[strategy.id] = legwise_store.spec_hash(strategy)
+    return out
+
+
 def _legwise(root: Path, strategies_dir: Path) -> list[Available]:
     try:
         with connect(root, read_only=True, views=()) as con:
             saved = legwise_store.load_daily_net(con)
     except FileNotFoundError:  # no catalog yet
         return []
-    current = {f.strategy.id: f.sha for f in load_strategy_files(strategies_dir)}
+    current = _current_versions(strategies_dir)
     by_strategy: dict[str, dict[str, dict[date, float]]] = {}
     for (sid, sha), days in saved.items():
         by_strategy.setdefault(sid, {})[sha] = days
