@@ -133,6 +133,8 @@ uv run obt legwise rerun    # re-run every strategy over every collected day and
 uv run obt rotation update [--day D]   # BL-058: run the 298 rotation variants over a collected day, store results (idempotent; default day = the newest collected day not yet stored; scheduler 19:45)
 uv run obt rotation pick [--dry-run]     # record lists A / B / C / REF before 09:17, hash-chained, + Telegram (scheduler 09:16; never late-recorded silently)
 uv run obt rotation verify | show        # re-compute the chain | recent entries with each list's P&L once scored
+uv run obt rotation triggers [--day D]  # BL-083: score the day's intraday triggers (event vs placebo simulations); also run by `rotation update`, isolated
+uv run obt rotation triggers-show        # event minus placebo per trigger and template over every scored day (forward, unseen days only)
 uv run obt rotation corr [slot:0917 | N_*_0917 | family:dir kind:legwise | all]  # BL-090: correlation of the strategies' daily P&L, loss-day overlap, basket drawdown, rolling drift; any strategy with results is found, no list to edit (--json/--csv, --from/--to)
 uv run obt rotation corr-list | corr-pick slot:0917 --k 3 --max-corr 0.6 [--require N_wide_0917]  # what has results | a basket none of whose members are alike (diagnostic, in-sample)
 uv run obt daily            # the evening routine: fetch the last closed session (+ nearest/next futures), judge it (data_quality), build its derived tables, run every strategies/legwise/*.yaml, save, summarise + Telegram with verdicts and IV percentile (--no-telegram)

@@ -96,7 +96,10 @@ Otherwise:
   which strategies have daily results now — variant CSVs plus saved legwise results at the file's current
   version — and the selectors `slot:` / `family:` / `index:` / `kind:` / globs / `a+b` that name them; nothing
   is a fixed list, so a new strategy is found once it has results), `cli.py`
-  (`obt rotation update|pick|verify|show|corr|corr-list|corr-pick`). Weekend sessions are excluded from the ranking history, as
+  (`obt rotation update|pick|verify|show|triggers|triggers-show|corr|corr-list|corr-pick`), `triggers.py` (BL-083: the four intraday triggers scored forward each evening from the day's bars,
+  event and placebo simulations in `rotation/triggers/`; run by `obt rotation update`, isolated so a
+  failure never fails it, and `obt rotation triggers|triggers-show`;
+  `scripts/rotation-triggers-parity.py` must print PARITY OK). Weekend sessions are excluded from the ranking history, as
   in the research (the Budget Sunday once shifted every later pick).
 - `legwise/` — AlgoTest-style leg-wise engine over the Fyers data (`obt legwise run
   strategies/legwise/*.yaml`): `schema.py` (one field per AlgoTest setting), `market.py`
