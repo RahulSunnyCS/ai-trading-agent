@@ -179,6 +179,15 @@ equal-weight, live mix, lots per window.
 
 ### Phase 4 — Build the rotation view (after Monday; not part of the P0 deadline)
 - Endpoints, the view, Guide page, hide the "hide" items. Separate review.
+- **Added 2026-10-10 (owner: any UI change goes to the backlog; none is built with the journal):** the
+  view must show the four forward lists (A, B, C, REF) side by side, not one rule: per list the day's
+  three strategies and Buy strategy with their composite scores, the running gross and max drawdown, the
+  share of random same-shape picks it has beaten, and the difference to REF with its bootstrap
+  interval; a single "chain intact" badge from `obt rotation verify` and the chain head; the days
+  waiting on results (nightly update not yet run) and any day not recorded because the VIX open could
+  not be read. Data comes from `rotation/` files via new `/legwise/rotation/*` endpoints (the files are
+  read-only to the API). Also a per-list "what changed since yesterday" strip (members swapped) for the
+  effort of re-setting AlgoTest.
 
 ### Phase 5 — Review at 60 trading days
 - Score once against the Phase 0 rule; write the Result here and in BL-057's Log.
@@ -252,3 +261,4 @@ Supersedes the 66-variant rule of Phase 0 for the forward test; Phase 0's discip
 - 2026-10-09 — created from the owner's request; P0 with a Monday 2026-10-12 09:15 deadline for
   Phases 0–3.
 - 2026-10-10 — owner chose lists A, B and C (BL-075 stage 1) plus the live baseline as REF; Phase 0b registered; build started.
+- 2026-10-10 — journal build is backend-only (CLI + two scheduler jobs + files); UI needs for the four lists added to Phase 4.
