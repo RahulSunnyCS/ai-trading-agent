@@ -613,3 +613,13 @@ only. This is the engine convention behind every stored result and is left as is
   rules: five-attempt ladders lost about ₹4,500 per Widesl; most of R0's profit is on expiry days;
   an average ₹650 stop cost ₹930–1,050. Proposed to the owner for Phase 2, not registered: an arm
   that stops after three losing attempts, and a SENSEX threshold of its own.
+- 2026-10-11 — Owner's refinement (exploration on P2 + P3, `research/bl091/sustained.py`; the script
+  was run before it was committed, recorded here): a spike counts only if the rolling straddle stays
+  at least the threshold above its low for 5 consecutive minutes; thresholds per index, NIFTY 25 and
+  SENSEX 90 points (episode split level scaled to 15 and 54); size for a top-10 % cut = the straddle 5
+  minutes after the peak minus the low. Looks taken: held vs not held counts, size percentiles (P50 /
+  P75 / P90) by period and index, band counts (NIFTY 25–30 / 30–40 / 40–45 / 45+, SENSEX 90–190 /
+  190+) by both the post-peak and the peak measure. Counts: NIFTY 2025 92 of 163 spikes held 5
+  minutes (58 days), 2022–24 108 of 212 (80 days), SENSEX 2025 89 of 132 (55 days). P90 of the
+  post-peak size: NIFTY 73 (2025), 63 (2022–24), 68 both; SENSEX 269. Band edges for Phase 2 are the
+  owner's to confirm; nothing registered yet.
