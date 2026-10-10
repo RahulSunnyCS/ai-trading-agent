@@ -339,9 +339,22 @@ reference and answers "did the new weights beat the old rotation?". Nothing in t
   reference should be the basic rule, 2 × Widesl OTM1 09:17 + 1 × Dir ATM 09:24, and the lists should beat
   it. Decisions: Dir leg ATM at 09:24 (a new file; the live one is ITM1); added beside REF, not replacing
   it; compared in ₹ per lot-day because the lists carry 6 or 8 lots; "beats the base" = block-bootstrap
-  90% lower bound of list minus base above zero with drawdown per lot no worse, no minimum size. Not yet
-  built: the Dir ATM 09:24 file, the base's nightly scoring and its history run. Also not yet built, though
-  registered above in Phase 0b: the daily random-pick percentile and the bootstrap itself.
+  90% lower bound of list minus base above zero with drawdown per lot no worse, no minimum size. Built in
+  PR #171 (`obt rotation base | readout`): the Dir ATM 09:24 file under `strategies/rotation_base/`, its
+  scoring inside `rotation update` (isolated), the random-basket percentile and the bootstrap. History run
+  2026-10-10: 488 base days 2024-10-09 .. 2026-10-09, ₹349 per lot-day, ₹1,70,248 cumulative per lot.
+- 2026-10-10 — **Context finding for the base (research periods, reconstructed picks, not a verdict).** Per
+  lot-day, gross, list minus base with the registered 5-day block bootstrap 90% interval: Jan–Aug 2025 (157
+  days, base ₹496): A −₹153 [−352, +40], B −₹157, C −₹153, REF −₹282 [−478, −88]. Dec 2025–Oct 2026 (202 days,
+  base ₹208, in-sample for the lists): A +₹156 [−94, +410], B +₹120, C +₹173 [−77, +424], REF +₹104. Both
+  periods (359 days, base ₹334): A +₹21, B −₹1, C +₹31, REF −₹65, every interval contains zero. The lists'
+  edge is drawdown per lot (about −₹10k to −₹14k against the base's −₹30k on Dec 2025–Oct 2026), not return.
+  **The rule as registered is close to unpassable in 60 days:** the typical 90% half-width on a 60-day window
+  is ₹320–410 per lot-day, more than the base's own mean; over every 60-day window of the research history
+  a list passes 0 of 33 windows in Jan–Aug 2025 and 1 to 6 of 48 in Dec 2025–Oct 2026. A "no" at day 60
+  would mostly mean "not enough days", not "the lists do not beat the base". Owner decision before the first
+  entry, if wanted: keep the rule as the verdict and also read the drawdown per lot and the interval at day
+  120; or register a second, descriptive read-out. Nothing here changes the rule.
 - 2026-10-10 — Owner: the fixed base is the **default** reference and REF the second (amendment heading
   updated, before the first entry). View decisions recorded under Phase 4: base as headline benchmark, focus
   list A, placement record allowed (append-only, separate file), 2022–24 matrix import after the first
