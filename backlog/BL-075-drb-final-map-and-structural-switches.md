@@ -53,9 +53,32 @@ whatever it finds.
 - **Hold-out:** none left: every period has been read. Honest label: a fragility map and a structure
   check, not a validation.
 - **Will not run:** other lookbacks, finer weight steps, other families, stop levels, the ladder.
-- **Result:** pending.
+- **Result, stage 1 (2026-10-10 13:05; 300 runs, 40 minutes):** **the rule is fragile: 19 of the 100
+  cells are above the random P90 in all three periods, and none sits in a robust region.**
+
+  | Fit split | Cells | Above chance in all three | Robust | Best worst-period score |
+  |---|---|---|---|---|
+  | baseline 25:25:17 | 25 | 8 | 0 | 0.819 |
+  | dte-heavy 1:2:1 | 25 | 6 | 0 | 0.761 |
+  | equal 1:1:1 | 25 | 5 | 0 | 0.733 |
+  | no VIX 1:1:0 | 25 | **0** | 0 | 0.694 |
+
+  Best period scores (the denominators): P1 ₹5,53,890; P2 ₹3,51,201; P3 ₹13,15,791. Above chance by
+  period, over all 100 cells: P1 98%, P3 100%, **P2 (Jan–Aug 2025) 19%** — the slice is what removes
+  almost every cell.
+  - **Plateau or spike:** the BL-073 candidate (own 10 / family 0, baseline split) is above chance
+    everywhere, worst-period score 0.627, **not robust**; BL-074 (a) (own 0 / family 10) likewise, 0.577,
+    not robust. Both are isolated cells: at least one recency-axis neighbour is below chance in some period.
+  - **Where the above-chance cells sit:** family-band weight 5 holds 55% of them (10 of 20 cells at
+    family 5), family 15 and 20 none; own-recent 0–10 holds 20–30% each, own 15–20 5–10%. The best
+    worst-period cell (own 15 / family 10, baseline split, 0.819) fails chance in one period. **VIX out
+    (no-VIX split) is above chance in all three periods in none of 25 cells**: with 5/21/63/126 lookbacks
+    the VIX-band criterion cannot be dropped, unlike BL-067's no-VIX row (5/21/63 lookbacks, 33% recency).
+  - **Nothing reaches the 0.85 worst-period bar;** the best above-chance cell is own 15 / family 5,
+    baseline split (0.772). The 19 chance-clearing cells go to stage 2 (fewer than 50, more than 10).
 
 ## Log
 
 - 2026-10-10 — created and registered before any run.
 - 2026-10-10 — before any BL-075 result was read: rounding made explicit (largest remainder), so the cells (10, 0, baseline) and (0, 10, baseline) are exactly BL-073's 10/34/33/23 and BL-074 (a)'s 0/10/34/33/23. Regressions: P1 baseline ₹4,30,868 / P90 ₹2,70,198; P2 through `--window-to` ₹1,70,015 / P50 ₹1,98,170 / P90 ₹2,94,240 (identical to BL-071 part A). Stage 1 launched 12:21 IST, chained into stage 2.
+- 2026-10-10 — stage 1 done (13:05): 19 of 100 cells above chance everywhere, 0 robust; stage 2 running on those 19 cells.
