@@ -71,6 +71,24 @@ describe('decide', () => {
     expect(sent[0]).toContain('⚠️ new-job was missed');
   });
 
+  it('lets a newly added job catch up a slot that has only just passed', () => {
+    history.firstStart(longAgo);
+    const since = (at: Date) => history.jobFirstSeen('new-job', at, job.catchUpHours);
+    const added: Job = { ...job, id: 'new-job' };
+    // First seen at 09:30, inside the 2 h window of the 08:00 slot: it runs as a catch-up...
+    const first = since(istAt('2026-10-06', '09:30'));
+    expect(decide(added, istAt('2026-10-06', '09:30'), history, first)).toMatchObject({
+      kind: 'run',
+      trigger: 'catch-up',
+    });
+    // The record is made once, not moved later.
+    expect(since(istAt('2026-10-06', '12:00')).getTime()).toBe(first.getTime());
+    // A job first seen after the slot's window closed stays silent about that slot.
+    const late: Job = { ...job, id: 'later-job' };
+    const lateSince = history.jobFirstSeen('later-job', istAt('2026-10-06', '10:30'), 2);
+    expect(decide(late, istAt('2026-10-06', '10:30'), history, lateSince).kind).toBe('idle');
+  });
+
   it('does not treat a manual try-out as history for a newly added job', () => {
     history.firstStart(longAgo);
     const added: Job = { ...job, id: 'new-job' };

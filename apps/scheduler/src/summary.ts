@@ -34,7 +34,13 @@ export function jobChecks(ctx: BuiltinContext): Check[] {
     if (job.builtin === 'morning-summary') continue;
     const slot = previousDue(job.schedule, now);
     // Slots before the scheduler first saw the job belonged to launchd, or to no one.
-    if (!slot || istDay(slot) !== today || slot < ctx.history.jobFirstSeen(job.id, now)) continue;
+    if (
+      !slot ||
+      istDay(slot) !== today ||
+      slot < ctx.history.jobFirstSeen(job.id, now, job.catchUpHours)
+    ) {
+      continue;
+    }
     const run = ctx.history.forSlot(job.id, slot);
     if (!run) checks.push({ ok: false, label: job.id, detail: 'has not run yet' });
     else if (run.ended_at === null) checks.push({ ok: true, label: job.id, detail: 'running' });

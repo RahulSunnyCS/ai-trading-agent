@@ -65,7 +65,10 @@ export function startLoop({ ctx, jobs, alerts, tickMs = 30_000 }: LoopOptions): 
   ctx.history.firstStart(now());
   // Per job, not the scheduler's first start: a job added since then has no slots to miss
   // from before it was added.
-  const watched = jobs.map((job) => ({ job, since: ctx.history.jobFirstSeen(job.id, now()) }));
+  const watched = jobs.map((job) => ({
+    job,
+    since: ctx.history.jobFirstSeen(job.id, now(), job.catchUpHours),
+  }));
   const inFlight = new Set<string>();
 
   const tick = () => {
