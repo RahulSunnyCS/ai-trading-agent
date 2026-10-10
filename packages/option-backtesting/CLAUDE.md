@@ -145,11 +145,33 @@ Otherwise:
   `scripts/rotation-daylog-demo.py` serves the same synthetic store on :8123 for a look at the
   dashboard before the journal has real entries; it refuses the real data root and any root with a
   `rotation/` directory it did not build (marker file).
+- `rotation/shadow.py` + `api/rotation_shadow_routes.py` — the Shadow scoreboard (BL-083 forward shadow;
+  `GET /legwise/rotation/shadow?from=&to=`), read-only over the journal, `rotation/results/` and
+  `rotation/triggers/`. Forward = sessions from 2026-10-12 (BL-058). Three parts, every figure an event minus a
+  comparator: `triggers.summary(since=)` per trigger x template beside BL-083's research numbers (constants, quoted
+  from its tables and checked against the backlog text by a test); the Dir at the event minute minus the list's next
+  not-yet-started core pick (the earliest T1 / T4 event of the day, pick starting >= 15 minutes later, Widesl
+  minimum kept), per day with a status (scored / pending / not_applied / late_entry / no_entry: a day without the
+  displaced pick's stored result is pending, never zero), with the time-matched placebo Dir as its control line
+  (BL-083's random-minute control is not in the trigger files, so it is reported `not_recorded`); and BL-081's two
+  forward candidates returned `not_scored` with their definitions (no nightly scoring exists for them).
 - `analytics/correlation.py` — BL-090: Pearson / Spearman of strategies' daily 1-lot P&L, loss-day
   overlap and loss-day correlation, equal-lot basket drawdown against the sum of the parts, rolling
   drift, a leaf order that clusters look-alikes, and `pick_diverse` (a basket under a correlation cap).
   numpy only. Every figure is in-sample over the window given; a trailing matrix for a research replay
   is `analyse(end=day_before)`.
+- `rotation/explain.py`, `rotation/rankic.py`, `api/rotation_explain_routes.py` — the Options Lab rotation page's
+  "Why this pick?" and "Does rank predict results?" (read-only, never writes `rotation/`). `explain` REBUILDS a list's
+  ranking for any day with 63 earlier days of stored results (the journal keeps only the picks and their composites)
+  with the ranking's own helpers (`score.recent_score` / `skewed_fit` / `pct_rank` / `composite` / `select`): each
+  criterion's raw value, percentile, weight and points, the matching days behind each fit per lookback window, the
+  Widesl-minimum swaps, the best left-out alternative and why Buy did or did not qualify; for a journal day it must
+  reproduce the entry's composites to 4 decimals and compares `inputs_sha` (`history_digest` is held equal to
+  `pick.load_history`'s by a test). `rankic` is the daily Spearman between the morning composite over all 298 variants
+  and the day's gross, per criterion too, one value per day with a running mean and 95% band; `forward` mode counts
+  only entries made before the first entry time, `research` mode any window. `/legwise/rotation/explain` and `/ic`
+  cache the loaded store for 30 s; errors are `{"error": ...}`. If `score.py`'s criteria change, `rank_day`'s
+  consistency check against `score.composite` fails loudly rather than explaining a different ranking.
 - `analytics/regime_source.py` — reads `daily_regime_tags` from Postgres,
   gated on `DATABASE_URL` being exported in *this process* specifically (not
   just present in a `.env` the server reads) — see the root `technical.md`

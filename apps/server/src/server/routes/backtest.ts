@@ -25,6 +25,10 @@
  *  GET  /api/backtest/legwise/day               — re-simulate one saved day (MTM curve, markers,
  *                                                  per-leg attribution). requireAccess
  *  GET  /api/backtest/legwise/anatomy           — per-day, per-segment index shape. requireAccess
+ *  GET  /api/backtest/legwise/rotation/explain  — why a list picked what it picked on a day, rebuilt
+ *                                                 and checked against the journal. requireAccess
+ *  GET  /api/backtest/legwise/rotation/ic       — daily rank correlation of the morning ranking
+ *                                                 with the day's results. requireAccess
  *  GET  /api/backtest/legwise/correlation/available — strategies with daily results + picker groups.
  *                                                  requireAccess
  *  GET  /api/backtest/legwise/correlation       — how the chosen strategies' daily P&L move together
@@ -33,16 +37,6 @@
  *  GET  /api/backtest/legwise/rotation/overview — the Rotation page: data health, the latest baskets, the lists.
  *  GET  /api/backtest/legwise/rotation/summary  — the 60-day read-out: lists against REF, the base and random baskets.
  *                                                 requireAccess
- *  GET  /api/backtest/legwise/rotation/log      — the rotation daily log: one row a trading day, the
- *                                                 picks and what they did, counters. requireAccess
- *  GET  /api/backtest/legwise/rotation/day/:day — one day in full (baskets, outcomes, chain,
- *                                                 placement rows). requireAccess
- *  GET  /api/backtest/legwise/rotation/placement — the owner's placement record. requireAccess
- *  GET  /api/backtest/legwise/rotation/forensics — one rotation variant's day re-simulated for the
- *                                                 Day forensics view. requireAccess
- *  POST /api/backtest/legwise/rotation/placement — append one placement row (placed | changed |
- *                                                 not_placed). Strict body, requireAccess. Writes
- *                                                 only rotation/placements.jsonl
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
  *  GET  /api/backtest/legwise/daily             — that run's state/log. requireAccess
@@ -478,6 +472,63 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
 
+  // --- rotation explain ---
+  // "Why this pick?" and "Does rank predict results?": read-only, params whitelisted and
+  // validated here, ranges checked again by the Python side.
+  const ROTATION_LIST = { type: 'string', enum: ['A', 'B', 'C', 'REF'] } as const;
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/explain',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            day: { type: 'string', pattern: DATE_RE },
+            list: ROTATION_LIST,
+            top: { type: 'string', pattern: '^\\d{1,2}$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/explain${upstreamQuery(q, ['day', 'list', 'top'])}`,
+      );
+    },
+  );
+
+  fastify.get(
+    '/api/backtest/legwise/rotation/ic',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+            list: ROTATION_LIST,
+            mode: { type: 'string', enum: ['forward', 'research'] },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/ic${upstreamQuery(q, ['from', 'to', 'list', 'mode'])}`,
+      );
+    },
+  );
+  // --- end rotation explain ---
+
   // Correlation (BL-090). Selectors are comma-separated tokens; the Python side matches them only
   // against enumerated strategy names. Numbers stay strings here so upstreamQuery forwards them
   // as given; Python validates the ranges.
@@ -597,6 +648,33 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation ---
+
+  // --- rotation shadow --- the Shadow scoreboard (rotation/shadow.py, read-only). Only the two
+  // optional dates are forwarded; the Python side raises a `from` before the forward window.
+  fastify.get(
+    '/api/backtest/legwise/rotation/shadow',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', pattern: DATE_RE },
+            to: { type: 'string', pattern: DATE_RE },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/shadow${upstreamQuery(q, ['from', 'to'])}`,
+      );
+    },
+  );
+  // --- end rotation shadow ---
 
   // --- rotation daily log ---------------------------------------------------------------
   // The decision-to-result log and the owner's placement record (packages/option-backtesting

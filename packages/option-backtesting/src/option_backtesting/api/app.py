@@ -19,8 +19,10 @@ from ..config import resolve_cache_dir
 from ..data.cache import InvalidUnderlyingError
 from .correlation_routes import router as correlation_router
 from .legwise_routes import router as legwise_router
+from .rotation_explain_routes import router as rotation_explain_router
 from .rotation_log_routes import router as rotation_log_router
 from .rotation_routes import router as rotation_router
+from .rotation_shadow_routes import router as rotation_shadow_router
 from .routes import router
 
 
@@ -46,7 +48,9 @@ def create_app(cache_dir: Path | None = None) -> FastAPI:
     app.include_router(legwise_router)
     app.include_router(correlation_router)
     app.include_router(rotation_log_router)
+    app.include_router(rotation_explain_router)
     app.include_router(rotation_router)
+    app.include_router(rotation_shadow_router)
     return app
 
 
