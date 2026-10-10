@@ -48,6 +48,7 @@
  *  GET  /api/backtest/legwise/rotation/basket   — one list's (or the fixed base's) picks for a day,
  *                                                 correlated over a window. requireAccess
  *  GET  /api/backtest/legwise/rotation/regime   — the forward window's market mix beside P1, P2 and P3.
+ *  GET  /api/backtest/legwise/rotation/drawdowns — a list's drawdown episodes against the fixed base.
  *                                                 requireAccess
  *  POST /api/backtest/legwise/daily             — start the evening run (background; Telegram
  *                                                 summary unless telegram:false). requireAccess
@@ -730,6 +731,34 @@ export const backtestRoutes = fp(async (fastify: FastifyInstance, _opts: unknown
     },
   );
   // --- end rotation regime ---
+
+  // --- rotation drawdowns --- the Rotation page's "Drawdown episodes" card
+  // (rotation/drawdowns.py, read-only). List and window are enums; min_depth is a plain number.
+  fastify.get(
+    '/api/backtest/legwise/rotation/drawdowns',
+    {
+      preHandler: requireAccess,
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            list: { type: 'string', enum: ['A', 'B', 'C', 'REF'] },
+            window: { type: 'string', enum: ['P1', 'P2', 'last63', 'forward'] },
+            min_depth: { type: 'string', pattern: '^\\d{1,6}(\\.\\d{1,2})?$' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const q = request.query as Record<string, unknown>;
+      await forwardToBacktestApi(
+        reply,
+        `/legwise/rotation/drawdowns${upstreamQuery(q, ['list', 'window', 'min_depth'])}`,
+      );
+    },
+  );
+  // --- end rotation drawdowns ---
 
   // --- rotation matrix ---
   // The Strategy Matrix (packages/option-backtesting rotation/matrix.py). Read-only. Every value
